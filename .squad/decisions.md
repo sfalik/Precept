@@ -6,6 +6,24 @@
 
 ---
 
+## Imported Inbox Records — 2026-04-12T16:19:25Z
+
+These records were merged from `.squad/decisions/inbox/` into the canonical ledger in this pass. Only the Elaine archive-move record was ready and clearly executed; unrelated inbox items were left in place.
+
+---
+
+### 2026-04-12: Canonical semantic visual system artifacts move to design/system root
+**By:** Elaine
+**Status:** Executed
+
+**What:** Move the canonical semantic visual system artifacts out of `design/system/foundations/` and into `design/system/`, then retire the empty `foundations/` folder.
+
+**Why:** These artifacts are the live canonical system outputs, not one foundation among several. Keeping them in a `foundations/` folder adds path noise, makes the canonical location harder to communicate, and no longer reflects how the design-system area is actually organized.
+
+**Implementation consequence:** `semantic-visual-system.html`, `semant-visual-system-canonical.precept`, and `semantic-visual-system-notes.md` now live directly in `design/system/`; live workspace references were updated to the new paths; the retired `design/system/foundations/README.md` and the now-empty folder were removed.
+
+---
+
 ## Imported Inbox Records — 2026-04-12T15:13:42Z
 
 These records were merged from `.squad/decisions/inbox/` into the canonical ledger in this pass. No effective duplicates were detected while reconciling the current inbox against `decisions.md`.

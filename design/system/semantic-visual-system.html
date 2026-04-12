@@ -357,30 +357,40 @@ pre {
   padding: 56px 0;
   border-bottom: 1px solid var(--line);
   display: grid;
-   grid-template-columns: minmax(0,1fr);
-   gap: 32px;
+  grid-template-columns: 200px minmax(0,1fr);
+  gap: 40px;
   align-items: start;
 }
 .construct-gallery:last-of-type { border-bottom: none; }
+.construct-sidebar {
+  position: sticky;
+  top: var(--section-rail-height);
+  display: grid;
+  gap: 12px;
+  padding-top: 6px;
+  padding-left: 16px;
+  border-left: 1px solid var(--line-strong);
+}
 .construct-section-head {
   display: grid;
   gap: 10px;
-  max-width: 72ch;
+  max-width: none;
 }
 .construct-section-heading {
   margin: 0;
   font-family: var(--mono);
-  font-size: 16px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
+  font-size: clamp(17px, 1.15vw, 18px);
+  font-weight: 600;
+  letter-spacing: 0.02em;
   line-height: 1.05;
-  text-transform: uppercase;
+  text-transform: none;
   color: var(--fc);
 }
 .construct-section-copy {
   margin: 0;
   font-size: 14px;
-  color: var(--text);
+  line-height: 1.72;
+  color: var(--muted);
 }
 .construct-index {
   display: none;
@@ -2608,7 +2618,6 @@ pre {
   color: var(--warn);
 }
 @media (max-width: 960px) {
-  .specimen-pair { grid-template-columns: 1fr; }
 }
 
 /* ─ Focal strip ───────────────────────────── */
@@ -2735,7 +2744,10 @@ pre {
 }
   .cg-form--frame   { width:28px; height:18px; border:1px solid currentColor; display:inline-block; }
   .cg-form--node    { width:22px; height:18px; border:2px solid currentColor; display:inline-block; }
-  .cg-form--pill    { width:34px; height:18px; border:1px solid currentColor; display:inline-block; }
+  .cg-form--pill    { display:inline-flex; align-items:center; min-height:28px; padding:5px 10px; border:1px solid rgba(48,184,232,0.36); background:#050608; font-family:var(--mono); font-size:11px; letter-spacing:0.04em; line-height:1; white-space:nowrap; }
+  .cg-form--transition-line { position:relative; width:54px; height:18px; }
+  .cg-form--transition-line::before { content:""; position:absolute; left:0; right:8px; top:50%; border-top:2px solid rgba(48,184,232,0.78); transform:translateY(-50%); }
+  .cg-form--transition-line::after { content:""; position:absolute; right:0; top:50%; width:0; height:0; border-top:5px solid transparent; border-bottom:5px solid transparent; border-left:8px solid rgba(48,184,232,0.78); transform:translateY(-50%); }
   .cg-form--row     { width:32px; height:12px; border-bottom:1px solid currentColor; display:inline-block; }
   .cg-form--callout { width:28px; height:18px; border-left:4px solid currentColor; display:inline-block; background:rgba(255,255,255,0.02); }
 .color-system-band {
@@ -3398,62 +3410,19 @@ pre {
 <section class="section" id="constructs">
   <div class="section-head">
     <h2>Constructs</h2>
-    <p>The five constructs are the primary reveal. Each gallery establishes the canonical pair first — Design-time view (how the construct appears as a syntax token in authored code) and Run-time view (how it appears as a rendered component) — then shows the visual cues and semantic modifiers that build on top of that base. All five constructs use the same composed structure.</p>
+    <p>The five constructs are the primary reveal. Each gallery keeps the construct heading, visual cues, semantic modifiers, and valid combinations together so the semantic language can be read without duplicating the surface specimens below.</p>
   </div>
 
   <!-- STRUCTURE ─────────────────────────────────── -->
   <div class="construct-gallery" id="structure" style="--fc: var(--structure)">
-    <div class="construct-body">
+    <div class="construct-sidebar">
       <div class="construct-section-head">
         <h3 class="construct-section-heading">Structure</h3>
         <p class="construct-section-copy">Registration, grouping, and governed boundaries. The perimeter that makes everything inside coherent.</p>
       </div>
+    </div>
 
-      <div class="specimen-pair">
-        <!-- Definition -->
-        <div class="specimen-half">
-          <div class="specimen-half-bar">
-            <span class="specimen-half-label">Design-time view</span>
-            <span class="specimen-half-tag">authored &middot; syntax token</span>
-          </div>
-          <div class="specimen-half-inner">
-            <div class="cg-focal-strip"><span class="cg-focal-label">Structure construct &middot; <span class="sd">precept &middot; field &middot; state &middot; event &middot; in &middot; from&hellip;on &middot; set &middot; transition</span><span class="cg-inline-note">related grammar</span><span class="sg cg-inline-secondary">as &middot; default &middot; == &middot; and &middot; or &middot; not</span></span></div>
-            <pre><span class="s">precept</span> Task
-
-<span class="s">field</span> <span class="da">Done</span> <span class="s">as</span> <span class="dt">boolean</span> <span class="s">default</span> <span class="dv">false</span>
-
-<span class="s">state</span> <span class="st">Open</span> <span class="s">initial</span>, <span class="st">Closed</span>
-
-<span class="s">in</span> <span class="st">Closed</span> <span class="s">assert</span> <span class="da">Done</span> == <span class="dv">true</span>
-  <span class="s">because</span> <span class="ru">"Closed means done"</span>
-
-<span class="s">event</span> <span class="ev">Close</span>
-
-<span class="s">from</span> <span class="st">Open</span> <span class="s">on</span> <span class="ev">Close</span>
-  -&gt; <span class="s">set</span> <span class="da">Done</span> = <span class="dv">true</span>
-  -&gt; <span class="s">transition</span> <span class="st">Closed</span></pre>
-          </div>
-        </div>
-
-        <!-- Runtime -->
-        <div class="specimen-half">
-          <div class="specimen-half-bar">
-            <span class="specimen-half-label">Run-time view</span>
-            <span class="specimen-half-tag">rendered &middot; container frame</span>
-          </div>
-          <div class="specimen-half-inner">
-            <div style="border:1px solid rgba(99,102,241,0.45);">
-              <div style="padding:9px 14px;border-bottom:1px solid rgba(99,102,241,0.2);display:flex;justify-content:space-between;align-items:center;">
-                <span style="font-family:var(--mono);font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:var(--structure)">Task</span>
-                <span style="font-family:var(--mono);font-size:9px;letter-spacing:0.20em;text-transform:uppercase;color:rgba(99,102,241,0.35)">precept</span>
-              </div>
-              <div style="padding:32px 16px;display:flex;align-items:center;justify-content:center;">
-                <span style="font-family:var(--mono);font-size:10px;letter-spacing:0.16em;text-transform:uppercase;color:rgba(99,102,241,0.25)">governed contents</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div class="construct-body">
 
       <!-- Channel signals -->
       <div>
@@ -3481,30 +3450,6 @@ pre {
             </div>
           </div>
         </div>
-        <div class="cg-combination-matrix" aria-label="Structure valid combinations">
-          <div class="cg-combination-head">
-            <div class="cg-combination-title">Valid combinations</div>
-            <p class="cg-combination-intro">Structure reads as base-only. Keyword, weight, and frame are constitutive, not additive.</p>
-          </div>
-          <div class="cg-combination-grid">
-            <div class="cg-combination-row">
-              <div class="cg-channel-name">Base structure only</div>
-              <div class="cg-combination-example">
-                <div class="cg-combination-specimen cg-combination-specimen--structure" aria-hidden="true">
-                  <div class="cg-mini-structure">
-                    <div class="cg-mini-structure-head">precept Task</div>
-                    <div class="cg-mini-structure-body">
-                      <div class="cg-mini-structure-line"></div>
-                      <div class="cg-mini-structure-line"></div>
-                      <div class="cg-mini-structure-line"></div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <p class="cg-combination-reading">The governing keyword, bold indigo frame, and containment cues are the whole read.</p>
-            </div>
-          </div>
-        </div>
       </div>
 
     </div>
@@ -3512,91 +3457,14 @@ pre {
 
   <!-- STATE ─────────────────────────────────────── -->
   <div class="construct-gallery" id="state" style="--fc: var(--state)">
-    <div class="construct-body">
+    <div class="construct-sidebar">
       <div class="construct-section-head">
         <h3 class="construct-section-heading">State</h3>
         <p class="construct-section-copy">A named lifecycle coordinate when lifecycle is part of the contract. States describe what is true right now; they are optional, not universal.</p>
       </div>
+    </div>
 
-      <div class="specimen-pair">
-        <!-- Definition -->
-        <div class="specimen-half">
-          <div class="specimen-half-bar">
-            <span class="specimen-half-label">Design-time view</span>
-            <span class="specimen-half-tag">authored &middot; compile-valid specimen</span>
-          </div>
-          <div class="specimen-half-inner">
-            <div class="cg-focal-strip"><span class="cg-focal-label">State workflow &middot; <span class="st">Requested &middot; Approved &middot; ReadyForPickup &middot; PickedUp &middot; Expired &middot; Cancelled</span></span></div>
-            <pre id="state-design-sample" data-source="semantic-visual-system-state-review.precept"></pre>
-          </div>
-        </div>
-
-        <!-- Runtime -->
-        <div class="specimen-half">
-          <div class="specimen-half-bar">
-            <span class="specimen-half-label">Run-time view</span>
-            <span class="specimen-half-tag">rendered &middot; compact state diagram</span>
-          </div>
-          <div class="specimen-half-inner">
-            <div class="cg-focal-strip"><span class="cg-focal-label">Snapshot after <span class="ev">PrintBadge</span> &middot; current <span class="st"><em>ReadyForPickup</em></span></span></div>
-            <div class="cg-state-diagram">
-              <div class="cg-state-diagram-head">
-                <div>
-                  <div class="cg-state-diagram-title">VisitorBadgePickup flow</div>
-                  <p class="cg-state-diagram-copy">One live snapshot shows ReadyForPickup as current, PickUp live, Expire blocked behind its guard, and earlier authored states dimmed because they are now behind the current position.</p>
-                </div>
-                <div class="cg-state-diagram-meta">
-                  <span class="cg-mini-badge">shared specimen</span>
-                  <span class="cg-mini-badge">current + blocked alternate</span>
-                </div>
-              </div>
-              <div class="svs-state-review-stage" id="state-runtime-review-stage" aria-label="Runtime state diagram for VisitorBadgePickup">
-                <svg viewBox="0 0 760 430" role="img" aria-label="Vertical runtime graph centered on ReadyForPickup with PickUp active and Expire blocked">
-                  <defs>
-                    <marker id="svs-arrow-past" viewBox="0 0 12 10" markerWidth="12" markerHeight="10" refX="10" refY="5" orient="auto-start-reverse" markerUnits="userSpaceOnUse">
-                      <path d="M1 1 L10 5 L1 9 L3.6 5 Z" fill="rgba(48,184,232,0.38)"></path>
-                    </marker>
-                    <marker id="svs-arrow-blocked" viewBox="0 0 12 10" markerWidth="12" markerHeight="10" refX="10" refY="5" orient="auto-start-reverse" markerUnits="userSpaceOnUse">
-                      <path d="M1 1 L10 5 L1 9 L3.6 5 Z" fill="rgba(48,184,232,0.64)"></path>
-                    </marker>
-                    <marker id="svs-arrow-active" viewBox="0 0 12 10" markerWidth="12" markerHeight="10" refX="10" refY="5" orient="auto-start-reverse" markerUnits="userSpaceOnUse">
-                      <path d="M1 1 L10 5 L1 9 L3.6 5 Z" fill="rgba(48,184,232,0.96)"></path>
-                    </marker>
-                  </defs>
-                  <path class="svs-edge-past" data-edge="requested-approved" d="M380 80 V132" marker-end="url(#svs-arrow-past)"></path>
-                  <path class="svs-edge-past" data-edge="approved-ready" d="M380 184 V236" marker-end="url(#svs-arrow-past)"></path>
-                  <path class="svs-edge-past" data-edge="approved-cancelled" d="M454 158 H532" marker-end="url(#svs-arrow-past)"></path>
-                  <path class="svs-edge-active" data-edge="ready-pickedup" d="M380 288 V314 H254 V340" marker-end="url(#svs-arrow-active)"></path>
-                  <path class="svs-edge-blocked" data-edge="ready-expired" d="M380 288 V314 H506 V340" marker-end="url(#svs-arrow-blocked)"></path>
-                </svg>
-
-                <div class="svs-state-node svs-state-node--initial svs-state-node--unreachable-current" data-state="Requested" data-left="236" data-top="32" tabindex="0" style="left:236px; top:32px;"><span class="svs-state-node-dot" aria-hidden="true"></span>Requested</div>
-                <div class="svs-state-node svs-state-node--unreachable-current" data-state="Approved" data-left="236" data-top="176" tabindex="0" style="left:236px; top:176px;">Approved</div>
-                <div class="svs-state-node svs-state-node--current" data-state="ReadyForPickup" data-left="236" data-top="320" tabindex="0" style="left:236px; top:320px;"><em>ReadyForPickup</em></div>
-                <div class="svs-state-node svs-state-node--terminal svs-state-node--unreachable-current" data-state="Cancelled" data-left="464" data-top="176" tabindex="0" style="left:464px; top:176px;">Cancelled</div>
-                <div class="svs-state-node svs-state-node--terminal" data-state="PickedUp" data-left="110" data-top="456" tabindex="0" style="left:110px; top:456px;">PickedUp</div>
-                <div class="svs-state-node svs-state-node--terminal svs-state-node--unreachable-current" data-state="Expired" data-left="362" data-top="456" tabindex="0" style="left:362px; top:456px;">Expired</div>
-
-                <span class="svs-edge-label svs-edge-label--muted" data-edge-label="requested-approved">
-                  <span class="svs-edge-token">ApproveRequest</span>
-                </span>
-                <span class="svs-edge-label svs-edge-label--muted" data-edge-label="approved-ready">
-                  <span class="svs-edge-token">PrintBadge</span>
-                </span>
-                <span class="svs-edge-label svs-edge-label--muted" data-edge-label="approved-cancelled">
-                  <span class="svs-edge-token">Cancel</span>
-                </span>
-                <span class="svs-edge-label svs-edge-label--active" data-edge-label="ready-pickedup">
-                  <span class="svs-edge-token">PickUp</span>
-                </span>
-                <span class="svs-edge-label svs-edge-label--blocked" data-edge-label="ready-expired">
-                  <span class="svs-edge-token">Expire</span>
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div class="construct-body">
 
       <!-- Channel signals -->
       <div>
@@ -3687,7 +3555,7 @@ pre {
         <div class="cg-combination-matrix" aria-label="State valid combinations">
           <div class="cg-combination-head">
             <div class="cg-combination-title">Valid combinations</div>
-            <p class="cg-combination-intro">The shared workflow above carries the primary read. Keep the compact cards below for the remaining valid stacks that are harder to fit into one coherent diagram.</p>
+            <p class="cg-combination-intro">The compact cards below isolate the valid stacks that are harder to show in one baseline state read.</p>
           </div>
           <div class="cg-combination-grid">
             <div class="cg-combination-row">
@@ -3787,34 +3655,14 @@ pre {
 
   <!-- EVENT ─────────────────────────────────────── -->
   <div class="construct-gallery" id="event" style="--fc: var(--event)">
-    <div class="construct-body">
+    <div class="construct-sidebar">
       <div class="construct-section-head">
         <h3 class="construct-section-heading">Event</h3>
         <p class="construct-section-copy">A discrete trigger. Events carry intent without narrating it. They cause transitions and execute rules.</p>
       </div>
+    </div>
 
-      <div class="specimen-pair">
-        <div class="specimen-half">
-          <div class="specimen-half-bar"><span class="specimen-half-label">Design-time view</span><span class="specimen-half-tag">authored &middot; compile-valid specimen</span></div>
-          <div class="specimen-half-inner">
-            <div class="cg-focal-strip"><span class="cg-focal-label">Event topology &middot; <span class="ev">Submit</span> &middot; <span class="ev">Assign</span> &middot; <span class="ev">ApproveParts</span> &middot; <span class="ev">StartWork</span> &middot; <span class="ev">Cancel</span></span></div>
-            <pre id="event-design-sample" data-source="../../prototypes/event-runtime-sample.precept"></pre>
-          </div>
-        </div>
-        <div class="specimen-half">
-          <div class="specimen-half-bar"><span class="specimen-half-label">Run-time view</span><span class="specimen-half-tag">rendered &middot; event tokens</span></div>
-          <div class="specimen-half-inner">
-            <div class="cg-focal-strip"><span class="cg-focal-label">Snapshot after <span class="ev">Assign</span> &middot; active <span class="ev">ApproveParts</span> &middot; rejected <span class="ev">StartWork</span></span></div>
-            <div class="svs-event-review-stack" id="event-runtime-review-stage" aria-label="Runtime event topology for MaintenanceWorkOrder">
-              <div class="svs-event-review-row" data-event="Submit" tabindex="0"><span class="svs-event-review-pill">Submit</span><span class="svs-event-review-arrow">&rarr;</span><span class="svs-event-review-destination">Open</span><span class="svs-event-review-note">past</span></div>
-              <div class="svs-event-review-row" data-event="Assign" tabindex="0"><span class="svs-event-review-pill">Assign</span><span class="svs-event-review-arrow">&rarr;</span><span class="svs-event-review-destination">Scheduled</span><span class="svs-event-review-note">past</span></div>
-              <div class="svs-event-review-row" data-event="Cancel" tabindex="0"><span class="svs-event-review-pill">Cancel</span><span class="svs-event-review-arrow">&rarr;</span><span class="svs-event-review-destination">Cancelled</span><span class="svs-event-review-note">alternate</span></div>
-              <div class="svs-event-review-row svs-event-review-row--active" data-event="ApproveParts" tabindex="0"><span class="svs-event-review-pill">ApproveParts</span><span class="svs-event-review-arrow">&rarr;</span><span class="svs-event-review-destination">no transition</span><span class="svs-event-review-note">active</span></div>
-              <div class="svs-event-review-row svs-event-review-row--blocked" data-event="StartWork" tabindex="0"><span class="svs-event-review-pill">StartWork</span><span class="svs-event-review-arrow">&rarr;</span><span class="svs-event-review-destination">InProgress</span><span class="svs-event-review-note svs-event-review-note--blocked">rejected</span></div>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div class="construct-body">
       <div>
         <div class="eyebrow" style="margin-bottom:12px">Visual cues</div>
         <div class="cg-channels">
@@ -3840,61 +3688,14 @@ pre {
 
   <!-- DATA ──────────────────────────────────────── -->
   <div class="construct-gallery" id="data-c" style="--fc: var(--data)">
-    <div class="construct-body">
+    <div class="construct-sidebar">
       <div class="construct-section-head">
         <h3 class="construct-section-heading">Data</h3>
         <p class="construct-section-copy">The factual payload under governance. Data fields carry the matter that business rules act on and protect.</p>
       </div>
+    </div>
 
-      <div class="specimen-pair">
-        <!-- Definition -->
-        <div class="specimen-half">
-          <div class="specimen-half-bar">
-            <span class="specimen-half-label">Design-time view</span>
-            <span class="specimen-half-tag">authored &middot; syntax token</span>
-          </div>
-          <div class="specimen-half-inner">
-            <div class="cg-focal-strip"><span class="cg-focal-label">Field token &middot; <span class="da">Done</span><span class="cg-inline-note">type/value tones</span><span class="dt cg-inline-secondary">boolean</span> &middot; <span class="dv cg-inline-secondary">false</span></span></div>
-            <pre><span class="s">precept</span> Task
-
-<span class="s">field</span> <span class="da">Done</span> <span class="s">as</span> <span class="dt">boolean</span> <span class="s">default</span> <span class="dv">false</span>
-
-<span class="s">state</span> <span class="st">Open</span> <span class="s">initial</span>, <span class="st">Closed</span>
-
-<span class="s">in</span> <span class="st">Closed</span> <span class="s">assert</span> <span class="da">Done</span> == <span class="dv">true</span>
-  <span class="s">because</span> <span class="ru">"Closed means done"</span>
-
-<span class="s">event</span> <span class="ev">Close</span>
-
-<span class="s">from</span> <span class="st">Open</span> <span class="s">on</span> <span class="ev">Close</span>
-  -&gt; <span class="s">set</span> <span class="da">Done</span> = <span class="dv">true</span>
-  -&gt; <span class="s">transition</span> <span class="st">Closed</span></pre>
-          </div>
-        </div>
-
-        <!-- Runtime -->
-        <div class="specimen-half">
-          <div class="specimen-half-bar">
-            <span class="specimen-half-label">Run-time view</span>
-            <span class="specimen-half-tag">rendered &middot; field table</span>
-          </div>
-          <div class="specimen-half-inner" style="padding:0;">
-            <table class="field-table">
-              <thead>
-                <tr><th>Field</th><th>Type</th><th>Value</th><th>Status</th></tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td class="da">Done</td>
-                  <td class="dt">boolean</td>
-                  <td class="dv">false</td>
-                  <td><span style="color:var(--soft);font-size:11px">editable</span></td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
+    <div class="construct-body">
 
       <!-- Channel signals -->
       <div>
@@ -4058,51 +3859,14 @@ pre {
 
   <!-- RULE ──────────────────────────────────────── -->
   <div class="construct-gallery" id="rule" style="--fc: var(--rule)">
-    <div class="construct-body">
+    <div class="construct-sidebar">
       <div class="construct-section-head">
         <h3 class="construct-section-heading">Rule</h3>
         <p class="construct-section-copy">Causal language. The because and why of Precept&rsquo;s governance. Rules interrupt &mdash; they do not narrate.</p>
       </div>
+    </div>
 
-      <div class="specimen-pair">
-        <!-- Definition -->
-        <div class="specimen-half">
-          <div class="specimen-half-bar">
-            <span class="specimen-half-label">Design-time view</span>
-            <span class="specimen-half-tag">authored &middot; syntax token</span>
-          </div>
-          <div class="specimen-half-inner">
-            <div class="cg-focal-strip"><span class="cg-focal-label">Rule string &middot; <span class="ru">"Closed means done"</span></span></div>
-            <pre><span class="s">precept</span> Task
-
-<span class="s">field</span> <span class="da">Done</span> <span class="s">as</span> <span class="dt">boolean</span> <span class="s">default</span> <span class="dv">false</span>
-
-<span class="s">state</span> <span class="st">Open</span> <span class="s">initial</span>, <span class="st">Closed</span>
-
-<span class="s">in</span> <span class="st">Closed</span> <span class="s">assert</span> <span class="da">Done</span> == <span class="dv">true</span>
-  <span class="s">because</span> <span class="ru">"Closed means done"</span>
-
-<span class="s">event</span> <span class="ev">Close</span>
-
-<span class="s">from</span> <span class="st">Open</span> <span class="s">on</span> <span class="ev">Close</span>
-  -&gt; <span class="s">set</span> <span class="da">Done</span> = <span class="dv">true</span>
-  -&gt; <span class="s">transition</span> <span class="st">Closed</span></pre>
-          </div>
-        </div>
-
-        <!-- Runtime -->
-        <div class="specimen-half">
-          <div class="specimen-half-bar">
-            <span class="specimen-half-label">Run-time view</span>
-            <span class="specimen-half-tag">rendered &middot; verdict callouts</span>
-          </div>
-          <div class="specimen-half-inner">
-            <div style="display:grid;gap:4px;">
-              <div style="padding:11px 14px;border-left:3px solid var(--valid);background:rgba(52,211,153,0.04);font-family:var(--mono);font-size:12px;line-height:1.7;color:var(--valid);">&checkmark; Closed means done <span style="color:rgba(52,211,153,0.45);font-size:10px;text-transform:uppercase;letter-spacing:0.12em;">&mdash; satisfied</span></div>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div class="construct-body">
 
       <!-- Channel signals -->
       <div>
@@ -5381,246 +5145,6 @@ pre.doc-code-body {
 }());
 
 (function() {
-  var authoredSample = document.getElementById("state-design-sample");
-  var runtimeStage = document.getElementById("state-runtime-review-stage");
-  if (!authoredSample || !runtimeStage) {
-    return;
-  }
-
-  var fallbackPreceptText = `precept VisitorBadgePickup
-
-# State construct specimen: current snapshot is ReadyForPickup with PickupWindowOpen = true.
-
-field VisitorName as string nullable
-field HostConfirmed as boolean default false
-field BadgePrinted as boolean default false
-field PickupWindowOpen as boolean default true
-field OutcomeNote as string nullable
-
-state Requested initial
-state Approved
-state ReadyForPickup
-state PickedUp
-state Expired
-state Cancelled
-
-in Approved assert VisitorName != null 
-    because "Approved pickups must record the visitor"
-in Approved assert HostConfirmed 
-    because "Approved pickups require host confirmation"
-in ReadyForPickup assert VisitorName != null 
-    because "Ready badges must still identify the visitor"
-in ReadyForPickup assert HostConfirmed 
-    because "Ready badges require host confirmation"
-in ReadyForPickup assert BadgePrinted 
-    because "Ready badges must already be printed"
-in Expired assert PickupWindowOpen == false 
-    because "Expired pickups require the pickup window to be closed"
-in Expired assert OutcomeNote != null 
-    because "Expired pickups must record why the badge was not collected"
-
-event ApproveRequest with Name as string
-on ApproveRequest assert Name != "" because "A visitor name is required"
-
-event PrintBadge
-event PickUp
-event Expire
-event Cancel with Reason as string
-on Cancel assert Reason != "" because "A cancellation reason is required"
-
-from Requested on ApproveRequest 
-    -> set VisitorName = ApproveRequest.Name 
-    -> set HostConfirmed = true 
-    -> transition Approved
-from Approved on PrintBadge 
-    -> set BadgePrinted = true 
-    -> transition ReadyForPickup
-from Approved on Cancel 
-    -> set OutcomeNote = Cancel.Reason 
-    -> transition Cancelled
-from ReadyForPickup on PickUp when PickupWindowOpen 
-    -> set OutcomeNote = "Badge collected" 
-    -> transition PickedUp
-from ReadyForPickup on Expire when PickupWindowOpen == false 
-    -> set OutcomeNote = "Pickup window closed before collection" 
-    -> transition Expired`;
-
-  var escapeHtml = function(value) {
-    return value
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
-  };
-
-  var primaryKeywords = new Set(["precept", "field", "state", "in", "assert", "because", "event", "on", "from", "set", "transition", "when"]);
-  var secondaryKeywords = new Set(["as", "nullable", "default", "initial", "with"]);
-  var typeKeywords = new Set(["string", "number", "boolean"]);
-  var literalKeywords = new Set(["true", "false", "null"]);
-
-  var collectSymbols = function(text) {
-    var fields = new Set();
-    var states = new Set();
-    var events = new Set();
-
-    text.replace(/\r\n/g, "\n").split("\n").forEach(function(line) {
-      var trimmed = line.trim();
-      var match = /^field\s+([A-Za-z_][A-Za-z0-9_]*)/.exec(trimmed);
-      if (match) fields.add(match[1]);
-      match = /^state\s+([A-Za-z_][A-Za-z0-9_]*)/.exec(trimmed);
-      if (match) states.add(match[1]);
-      match = /^event\s+([A-Za-z_][A-Za-z0-9_]*)/.exec(trimmed);
-      if (match) events.add(match[1]);
-    });
-
-    return { fields: fields, states: states, events: events };
-  };
-
-  var renderToken = function(token, symbols) {
-    if (!token) return "";
-    if (/^\s+$/.test(token)) return token;
-    if (/^"(?:[^"\\]|\\.)*"$/.test(token)) return '<span class="ru">' + escapeHtml(token) + '</span>';
-    if (/^[0-9]+$/.test(token) || literalKeywords.has(token)) return '<span class="dv">' + escapeHtml(token) + '</span>';
-    if (symbols.states.has(token)) return '<span class="svs-authored-state-ref st" data-state="' + escapeHtml(token) + '" tabindex="0">' + escapeHtml(token) + '</span>';
-    if (symbols.events.has(token)) return '<span class="ev">' + escapeHtml(token) + '</span>';
-    if (symbols.fields.has(token)) return '<span class="da">' + escapeHtml(token) + '</span>';
-    if (typeKeywords.has(token)) return '<span class="dt">' + escapeHtml(token) + '</span>';
-    if (primaryKeywords.has(token)) return '<span class="s">' + escapeHtml(token) + '</span>';
-    if (secondaryKeywords.has(token)) return '<span class="sg">' + escapeHtml(token) + '</span>';
-    return escapeHtml(token);
-  };
-
-  var renderPreceptHtml = function(text) {
-    var normalized = text.replace(/\r\n/g, "\n");
-    var symbols = collectSymbols(normalized);
-    var tokenPattern = /"(?:[^"\\]|\\.)*"|==|!=|->|\|\||&&|[A-Za-z_][A-Za-z0-9_]*|\s+|./g;
-
-    return normalized.split("\n").map(function(line) {
-      if (line.trimStart().startsWith("#")) {
-        return '<span class="cm">' + escapeHtml(line) + '</span>';
-      }
-      var tokens = line.match(tokenPattern) || [];
-      return tokens.map(function(token) { return renderToken(token, symbols); }).join("");
-    }).join("\n");
-  };
-
-  var loadPreceptText = async function() {
-    var sourcePath = authoredSample.dataset.source;
-    try {
-      var response = await fetch(sourcePath, { cache: "no-store" });
-      if (response.ok) {
-        return await response.text();
-      }
-    } catch (e) {}
-    return fallbackPreceptText;
-  };
-
-  var formatCoord = function(value) { return Math.round(value * 10) / 10; };
-  var getNodeBox = function(element) {
-    var left = element.offsetLeft;
-    var top = element.offsetTop;
-    var width = element.offsetWidth;
-    var height = element.offsetHeight;
-    return { left: left, top: top, width: width, height: height, right: left + width, bottom: top + height, centerX: left + width / 2, centerY: top + height / 2 };
-  };
-  var buildVerticalPath = function(fromBox, toBox) { return "M" + formatCoord(fromBox.centerX) + " " + formatCoord(fromBox.centerY) + " V" + formatCoord(toBox.centerY); };
-  var buildHorizontalPath = function(fromBox, toBox) { return "M" + formatCoord(fromBox.centerX) + " " + formatCoord(fromBox.centerY) + " H" + formatCoord(toBox.centerX); };
-  var buildBranchPath = function(fromBox, toBox, splitY) { return "M" + formatCoord(fromBox.centerX) + " " + formatCoord(fromBox.centerY) + " V" + formatCoord(splitY) + " H" + formatCoord(toBox.centerX) + " V" + formatCoord(toBox.centerY); };
-  var positionLabel = function(element, left, top) { if (!element) return; element.style.left = formatCoord(left - element.offsetWidth / 2) + "px"; element.style.top = formatCoord(top - element.offsetHeight / 2) + "px"; };
-
-  var routeRuntimeDiagram = function() {
-    var svg = runtimeStage.querySelector("svg");
-    if (!svg) return;
-
-    var nodesByState = new Map(Array.from(runtimeStage.querySelectorAll(".svs-state-node[data-state]")).map(function(node) {
-      return [node.dataset.state, node];
-    }));
-    var labelsByEdge = new Map(Array.from(runtimeStage.querySelectorAll(".svs-edge-label[data-edge-label]")).map(function(label) {
-      return [label.dataset.edgeLabel, label];
-    }));
-    var basePositions = new Map(Array.from(nodesByState.entries()).map(function(entry) {
-      return [entry[0], { left: parseFloat(entry[1].dataset.left || "0"), top: parseFloat(entry[1].dataset.top || "0") }];
-    }));
-    var minLeft = Infinity;
-    var maxRight = 0;
-    basePositions.forEach(function(position, state) {
-      var node = nodesByState.get(state);
-      minLeft = Math.min(minLeft, position.left);
-      maxRight = Math.max(maxRight, position.left + node.offsetWidth);
-    });
-    var sceneWidth = maxRight - minLeft;
-    var shiftX = 32 - minLeft;
-    var availableSlack = runtimeStage.clientWidth - sceneWidth;
-    if (availableSlack >= 240) {
-      shiftX = Math.max(shiftX, ((runtimeStage.clientWidth - sceneWidth) / 2) - minLeft);
-    }
-    nodesByState.forEach(function(node, state) {
-      var position = basePositions.get(state);
-      node.style.left = formatCoord(position.left + shiftX) + "px";
-      node.style.top = formatCoord(position.top) + "px";
-    });
-    var boxes = new Map(Array.from(nodesByState.entries()).map(function(entry) {
-      return [entry[0], getNodeBox(entry[1])];
-    }));
-
-    var requested = boxes.get("Requested");
-    var approved = boxes.get("Approved");
-    var readyForPickup = boxes.get("ReadyForPickup");
-    var cancelled = boxes.get("Cancelled");
-    var pickedUp = boxes.get("PickedUp");
-    var expired = boxes.get("Expired");
-    if (!requested || !approved || !readyForPickup || !cancelled || !pickedUp || !expired) return;
-
-    svg.setAttribute("viewBox", "0 0 " + runtimeStage.clientWidth + " " + runtimeStage.clientHeight);
-    var splitY = readyForPickup.bottom + Math.min(32, Math.max(20, (Math.min(pickedUp.centerY, expired.centerY) - readyForPickup.centerY) / 2));
-    [["requested-approved", buildVerticalPath(requested, approved)], ["approved-ready", buildVerticalPath(approved, readyForPickup)], ["approved-cancelled", buildHorizontalPath(approved, cancelled)], ["ready-pickedup", buildBranchPath(readyForPickup, pickedUp, splitY)], ["ready-expired", buildBranchPath(readyForPickup, expired, splitY)]].forEach(function(entry) {
-      var path = svg.querySelector('path[data-edge="' + entry[0] + '"]');
-      if (path) path.setAttribute("d", entry[1]);
-    });
-
-    positionLabel(labelsByEdge.get("requested-approved"), requested.centerX, (requested.centerY + approved.centerY) / 2);
-    positionLabel(labelsByEdge.get("approved-ready"), approved.centerX, (approved.centerY + readyForPickup.centerY) / 2);
-    positionLabel(labelsByEdge.get("approved-cancelled"), (approved.centerX + cancelled.centerX) / 2, approved.centerY);
-    positionLabel(labelsByEdge.get("ready-pickedup"), (readyForPickup.centerX + pickedUp.centerX) / 2, splitY);
-    positionLabel(labelsByEdge.get("ready-expired"), (readyForPickup.centerX + expired.centerX) / 2, splitY);
-  };
-
-  loadPreceptText().then(function(preceptText) {
-    authoredSample.innerHTML = renderPreceptHtml(preceptText);
-
-    var authoredRefs = Array.from(authoredSample.querySelectorAll(".svs-authored-state-ref[data-state]"));
-    var diagramNodes = Array.from(runtimeStage.querySelectorAll(".svs-state-node[data-state]"));
-    var syncTargets = authoredRefs.concat(diagramNodes);
-    var clearLinked = function() {
-      syncTargets.forEach(function(element) { element.classList.remove("is-linked"); });
-    };
-    var applyLinked = function(state) {
-      syncTargets.forEach(function(element) {
-        element.classList.toggle("is-linked", element.dataset.state === state);
-      });
-    };
-
-    syncTargets.forEach(function(element) {
-      var handleEnter = function() { applyLinked(element.dataset.state); };
-      element.addEventListener("mouseenter", handleEnter);
-      element.addEventListener("mouseleave", clearLinked);
-      element.addEventListener("focus", handleEnter);
-      element.addEventListener("blur", clearLinked);
-    });
-
-    routeRuntimeDiagram();
-    if ("ResizeObserver" in window) {
-      var resizeObserver = new ResizeObserver(function() { routeRuntimeDiagram(); });
-      resizeObserver.observe(runtimeStage);
-    } else {
-      window.addEventListener("resize", routeRuntimeDiagram);
-    }
-    if (document.fonts && document.fonts.ready) {
-      document.fonts.ready.then(function() { routeRuntimeDiagram(); });
-    }
-  });
-}());
-
-(function() {
   var authoredSample = document.getElementById("surface-dsl-syntax-sample");
   if (!authoredSample) {
     return;
@@ -5762,138 +5286,6 @@ from ReadyForPickup on Expire when PickupWindowOpen == false
   });
 }());
 
-(function() {
-  var authoredSample = document.getElementById("event-design-sample");
-  var runtimeStage = document.getElementById("event-runtime-review-stage");
-  if (!authoredSample || !runtimeStage) {
-    return;
-  }
-
-  var fallbackPreceptText = `precept MaintenanceWorkOrder
-
-field Location as string nullable
-field AssignedTechnician as string nullable
-field Urgent as boolean default false
-field PartsApproved as boolean default false
-field CancellationReason as string nullable
-
-state Draft initial
-state Open
-state Scheduled
-state InProgress
-state Cancelled
-
-in Scheduled assert AssignedTechnician != null 
-  because "Scheduled work must have an assigned technician"
-
-event Submit with WorkLocation as string, IsUrgent as boolean default false
-on Submit assert WorkLocation != "" 
-  because "A location is required"
-
-event Assign with Technician as string
-on Assign assert Technician != "" 
-  because "A technician is required"
-
-event ApproveParts
-event StartWork
-
-event Cancel with Reason as string
-on Cancel assert Reason != "" 
-  because "A cancellation reason is required"
-
-from Draft on Submit 
-  -> set Location = Submit.WorkLocation 
-  -> set Urgent = Submit.IsUrgent 
-  -> transition Open
-
-from Open on Assign 
-  -> set AssignedTechnician = Assign.Technician 
-  -> transition Scheduled
-from Open on Cancel 
-  -> set CancellationReason = Cancel.Reason 
-  -> transition Cancelled
-
-from Scheduled on ApproveParts 
-  -> set PartsApproved = true 
-  -> no transition
-from Scheduled on StartWork when PartsApproved 
-  -> transition InProgress
-from Scheduled on StartWork when Urgent == false 
-  -> transition InProgress
-from Scheduled on StartWork 
-  -> reject "Urgent work must have parts approved before it starts"
-from Scheduled on Cancel 
-  -> set CancellationReason = Cancel.Reason 
-  -> transition Cancelled`;
-
-  var escapeHtml = function(value) { return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); };
-  var primaryKeywords = new Set(["precept", "field", "state", "in", "assert", "because", "event", "on", "from", "set", "transition", "when"]);
-  var secondaryKeywords = new Set(["as", "nullable", "default", "initial", "with"]);
-  var typeKeywords = new Set(["string", "number", "boolean"]);
-  var literalKeywords = new Set(["true", "false", "null"]);
-
-  var collectSymbols = function(text) {
-    var fields = new Set();
-    var states = new Set();
-    var events = new Set();
-    text.replace(/\r\n/g, "\n").split("\n").forEach(function(line) {
-      var trimmed = line.trim();
-      var match = /^field\s+([A-Za-z_][A-Za-z0-9_]*)/.exec(trimmed); if (match) fields.add(match[1]);
-      match = /^state\s+([A-Za-z_][A-Za-z0-9_]*)/.exec(trimmed); if (match) states.add(match[1]);
-      match = /^event\s+([A-Za-z_][A-Za-z0-9_]*)/.exec(trimmed); if (match) events.add(match[1]);
-    });
-    return { fields: fields, states: states, events: events };
-  };
-
-  var renderToken = function(token, symbols) {
-    if (!token) return "";
-    if (/^\s+$/.test(token)) return token;
-    if (/^"(?:[^"\\]|\\.)*"$/.test(token)) return '<span class="ru">' + escapeHtml(token) + '</span>';
-    if (/^[0-9]+$/.test(token) || literalKeywords.has(token)) return '<span class="dv">' + escapeHtml(token) + '</span>';
-    if (symbols.events.has(token)) return '<span class="svs-authored-event-ref ev" data-event="' + escapeHtml(token) + '" tabindex="0">' + escapeHtml(token) + '</span>';
-    if (symbols.states.has(token)) return '<span class="st">' + escapeHtml(token) + '</span>';
-    if (symbols.fields.has(token)) return '<span class="da">' + escapeHtml(token) + '</span>';
-    if (typeKeywords.has(token)) return '<span class="dt">' + escapeHtml(token) + '</span>';
-    if (primaryKeywords.has(token)) return '<span class="s">' + escapeHtml(token) + '</span>';
-    if (secondaryKeywords.has(token)) return '<span class="sg">' + escapeHtml(token) + '</span>';
-    return escapeHtml(token);
-  };
-
-  var renderPreceptHtml = function(text) {
-    var normalized = text.replace(/\r\n/g, "\n");
-    var symbols = collectSymbols(normalized);
-    var tokenPattern = /"(?:[^"\\]|\\.)*"|==|!=|->|\|\||&&|[A-Za-z_][A-Za-z0-9_]*|\s+|./g;
-    return normalized.split("\n").map(function(line) {
-      if (line.trimStart().startsWith("#")) return '<span class="cm">' + escapeHtml(line) + '</span>';
-      var tokens = line.match(tokenPattern) || [];
-      return tokens.map(function(token) { return renderToken(token, symbols); }).join("");
-    }).join("\n");
-  };
-
-  var loadPreceptText = async function() {
-    try {
-      var response = await fetch(authoredSample.dataset.source, { cache: "no-store" });
-      if (response.ok) return await response.text();
-    } catch (e) {}
-    return fallbackPreceptText;
-  };
-
-  loadPreceptText().then(function(preceptText) {
-    authoredSample.innerHTML = renderPreceptHtml(preceptText);
-    var authoredRefs = Array.from(authoredSample.querySelectorAll(".svs-authored-event-ref[data-event]"));
-    var runtimeRefs = Array.from(runtimeStage.querySelectorAll("[data-event]"));
-    var syncTargets = authoredRefs.concat(runtimeRefs);
-    var clearLinked = function() { syncTargets.forEach(function(element) { element.classList.remove("is-linked"); }); };
-    var applyLinked = function(eventName) { syncTargets.forEach(function(element) { element.classList.toggle("is-linked", element.dataset.event === eventName); }); };
-    syncTargets.forEach(function(element) {
-      var handleEnter = function() { applyLinked(element.dataset.event); };
-      element.addEventListener("mouseenter", handleEnter);
-      element.addEventListener("mouseleave", clearLinked);
-      element.addEventListener("focus", handleEnter);
-      element.addEventListener("blur", clearLinked);
-    });
-  });
-}());
 </script>
 </body>
 </html>

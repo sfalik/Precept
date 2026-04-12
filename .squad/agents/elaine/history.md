@@ -7,6 +7,10 @@
 
 ## Recent Updates
 
+### 2026-04-12 - Canonical semantic visual system artifacts flattened into design/system
+- Moved `semantic-visual-system.html`, `semant-visual-system-canonical.precept`, and `semantic-visual-system-notes.md` from `design/system/foundations/` into `design/system/` and retired the empty `foundations/` folder.
+- Updated live workspace references in design READMEs, brand review/spec docs, and the state-diagram specimen prototype so the canonical artifact path is now `design/system/semantic-visual-system.html` and the shared specimen path is `design/system/semant-visual-system-canonical.precept`.
+
 ### 2026-04-12 - Sticky subsection labels aligned with rail typography reset
 - Removed the remaining small-caps override from the sticky subsection labels in `design/system/foundations/semantic-visual-system.html` so they match the active rail.
 - Preserved sticky placement, left-rail alignment, spacing, and the existing typography scale; the change was limited to the label treatment.
@@ -42,6 +46,10 @@
 2026-04-05T03:20:00Z: Steinbrenner applied branch protection to main (pull requests required, force pushes/admin only, no branch deletion).
 
 ## Learnings
+
+- 2026-04-12 — The cleanest folder story is status-based: `design/system/` holds live canonical system artifacts, `design/prototypes/` root stays reserved for active durable prototype work, and `design/prototypes/archive/` holds preserved reference sets. An empty-looking prototypes root is acceptable if it prevents archive material from reading like live direction.
+
+- 2026-04-12 — The semantic visual system artifacts are canonical enough that they should live at the root of `design/system/`, not inside a now-misleading `foundations/` subfolder. The prototype state specimen also depends on the shared canonical `.precept` by relative path, so path moves have to be validated as UX-adjacent behavior, not treated as a pure docs rename.
 
 - 2026-04-06 — The semantic visual system page should frame itself as Precept's strongest live expression of the visual system: still canonical and disciplined, but explicitly allowed to be beautiful enough to prove the system rather than merely police it.
 - 2026-04-06 — On semantic-system foundation pages, the typography contract should be explicit as a role map: Cascadia for identity and system-facing UI, Segoe UI Variable Text for paragraph reading, and italic reserved for semantic pressure rather than generic emphasis.
@@ -185,3 +193,4 @@
 - 2026-05-18 — Regenerated `readme-hero-dsl.png` to match GitHub's 830px max image display width. Previous image (1268px) scaled to 830px, shrinking code text to ~8.5px vs GitHub's ~13.6px code blocks. New approach: capture at 830px viewport with 2× deviceScaleFactor → 1660px image. Code text now renders at ~13px on GitHub. Added `design/brand/capture-hero-dsl.mjs` Playwright script for reproducible regeneration. Final width contract is now preserved in `.squad/decisions.md`.
 - 2026-05-18 — GitHub README image width reference: repo README view caps at 830px (per wh0/banner-width research). The `.markdown-body` container maxes at 980px with 45px padding. Different views have different caps: markdown view 1012px, VS Code extension 882px, VS Marketplace ~711px.
 - 2026-04-12 — Sticky subsection labels in `design/system/foundations/semantic-visual-system.html` should follow the same typography reset as the active rail: no small-caps override and no OpenType small-caps feature. Natural title case keeps the left navigation vocabulary consistent without disturbing the baseline-led alignment model.
+- 2026-04-12 — `design/prototypes/` should stay visually quiet at the root: active prototype work or orientation only. Once a prototype set becomes preserved reference material rather than active top-level work, move the whole coupled artifact group into `design/prototypes/archive/` and fix any relative links to shared system assets in the same pass.
