@@ -85,7 +85,20 @@ public static class PreceptParser
             return (null, diagnostics);
         }
 
-        var result = RawFileParser.TryParse(tokens);
+        Superpower.Model.TokenListParserResult<PreceptToken, ((string Name, int SourceLine) Header, StatementResult[] Statements)> result;
+        try
+        {
+            result = RawFileParser.TryParse(tokens);
+        }
+        catch (ConstraintViolationException cve)
+        {
+            // ConstraintViolationException may be thrown from modifier extraction during parsing
+            // (e.g. C70 duplicate modifier detection in BuildFieldResult/BuildEventArgResult).
+            var cveLine = cve.SourceLine > 0 ? cve.SourceLine : 1;
+            diagnostics.Add(new ParseDiagnostic(cveLine, 0, cve.Message, DiagnosticCatalog.ToDiagnosticCode(cve.Constraint.Id)));
+            return (null, diagnostics);
+        }
+
         if (result.HasValue && result.Remainder.IsAtEnd)
         {
             try
@@ -516,6 +529,115 @@ public static class PreceptParser
             select (FieldConstraint)new FieldConstraint.Maxplaces((int)n.ToNumberValue()));
 
     // ═══════════════════════════════════════════════════════════════════
+    // Unified Field Modifier Parser (any-order modifiers)
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Discriminated union for any modifier that can follow a type reference.
+    /// Parsed via <c>.Many()</c> to allow any-order specification.
+    /// </summary>
+    private abstract record FieldModifier;
+    private sealed record NullableModifier : FieldModifier;
+    private sealed record DefaultModifier(object? Value) : FieldModifier;
+    private sealed record ConstraintModifier(FieldConstraint Constraint) : FieldModifier;
+    private sealed record OrderedModifier : FieldModifier;
+
+    /// <summary>
+    /// Parses a single field modifier (nullable, default, constraint, or ordered) for field declarations.
+    /// Uses <see cref="DefaultValue"/> which supports both scalar and list literals.
+    /// </summary>
+    private static readonly TokenListParser<PreceptToken, FieldModifier> AnyFieldModifier =
+        Token.EqualTo(PreceptToken.Nullable).Value((FieldModifier)new NullableModifier()).Try()
+        .Or(Token.EqualTo(PreceptToken.Default)
+            .IgnoreThen(DefaultValue)
+            .Select(v => (FieldModifier)new DefaultModifier(v)).Try())
+        .Or(ConstraintSuffix.Select(c => (FieldModifier)new ConstraintModifier(c)).Try())
+        .Or(Token.EqualTo(PreceptToken.Ordered).Value((FieldModifier)new OrderedModifier()));
+
+    /// <summary>
+    /// Parses a single field modifier for event argument declarations.
+    /// Uses <see cref="ScalarLiteral"/> (no list literals for event args).
+    /// </summary>
+    private static readonly TokenListParser<PreceptToken, FieldModifier> AnyEventArgModifier =
+        Token.EqualTo(PreceptToken.Nullable).Value((FieldModifier)new NullableModifier()).Try()
+        .Or(Token.EqualTo(PreceptToken.Default)
+            .IgnoreThen(ScalarLiteral)
+            .Select(v => (FieldModifier)new DefaultModifier(v)).Try())
+        .Or(ConstraintSuffix.Select(c => (FieldModifier)new ConstraintModifier(c)).Try())
+        .Or(Token.EqualTo(PreceptToken.Ordered).Value((FieldModifier)new OrderedModifier()));
+
+    /// <summary>
+    /// Extracts typed modifier properties from a flat array of <see cref="FieldModifier"/> values.
+    /// Detects duplicate modifiers and throws <see cref="ConstraintViolationException"/> (C70).
+    /// </summary>
+    private static (bool IsNullable, bool HasDefault, object? DefaultValue, FieldConstraint[] Constraints, bool IsOrdered)
+        ExtractModifiers(FieldModifier[] modifiers, string firstName, int sourceLine)
+    {
+        // SYNC:CONSTRAINT:C70
+        if (modifiers.OfType<NullableModifier>().Count() > 1)
+            throw DiagnosticCatalog.C70.ToException(sourceLine, ("modifier", "nullable"), ("name", firstName));
+        if (modifiers.OfType<DefaultModifier>().Count() > 1)
+            throw DiagnosticCatalog.C70.ToException(sourceLine, ("modifier", "default"), ("name", firstName));
+        if (modifiers.OfType<OrderedModifier>().Count() > 1)
+            throw DiagnosticCatalog.C70.ToException(sourceLine, ("modifier", "ordered"), ("name", firstName));
+
+        var isNullable = modifiers.OfType<NullableModifier>().Any();
+        var dflt = modifiers.OfType<DefaultModifier>().FirstOrDefault();
+        var constraints = modifiers.OfType<ConstraintModifier>().Select(m => m.Constraint).ToArray();
+        var isOrdered = modifiers.OfType<OrderedModifier>().Any();
+        return (isNullable, dflt is not null, dflt?.Value, constraints, isOrdered);
+    }
+
+    /// <summary>
+    /// Builds a <see cref="StatementResult"/> from parsed field declaration components.
+    /// Called from the <see cref="FieldDecl"/> combinator's select clause.
+    /// </summary>
+    private static StatementResult BuildFieldResult(
+        Token<PreceptToken> kw,
+        Token<PreceptToken>[] names,
+        (bool IsCollection, PreceptScalarType ScalarType, PreceptCollectionKind? CollectionKind, IReadOnlyList<string>? ChoiceValues) typeRef,
+        FieldModifier[] modifiers)
+    {
+        int sourceLine = kw.Span.Position.Line;
+        var (nullable, hasDefault, defaultValue, constraints, ordered) = ExtractModifiers(modifiers, names[0].ToText(), sourceLine);
+
+        if (typeRef.IsCollection)
+            return new CollectionFieldResult(
+                names.Select(n => new PreceptCollectionField(
+                    n.ToText(), typeRef.CollectionKind!.Value, typeRef.ScalarType,
+                    constraints.Length > 0 ? constraints : null,
+                    typeRef.ChoiceValues,
+                    SourceLine: sourceLine)).ToArray());
+
+        return new FieldResult(
+            names.Select(n => new PreceptField(
+                n.ToText(), typeRef.ScalarType, nullable,
+                hasDefault || nullable,
+                hasDefault ? defaultValue : null,
+                constraints.Length > 0 ? constraints : null,
+                typeRef.ChoiceValues, ordered,
+                SourceLine: sourceLine)).ToArray());
+    }
+
+    /// <summary>
+    /// Builds a <see cref="PreceptEventArg"/> from parsed event argument components.
+    /// Called from the <see cref="EventArg"/> combinator's select clause.
+    /// </summary>
+    private static PreceptEventArg BuildEventArgResult(
+        Token<PreceptToken> name,
+        (PreceptScalarType Type, IReadOnlyList<string>? ChoiceValues) typeRef,
+        FieldModifier[] modifiers)
+    {
+        var (nullable, hasDefault, defaultValue, constraints, ordered) = ExtractModifiers(modifiers, name.ToText(), name.Span.Position.Line);
+        return new PreceptEventArg(name.ToText(), typeRef.Type, nullable,
+            hasDefault,
+            hasDefault ? defaultValue : null,
+            constraints.Length > 0 ? constraints : null,
+            typeRef.ChoiceValues, ordered,
+            SourceLine: name.Span.Position.Line);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
     // State Target Parser
     // ═══════════════════════════════════════════════════════════════════
 
@@ -694,36 +816,19 @@ public static class PreceptParser
                 "Names the workflow",
                 "precept BugTracker"));
 
-    // field <Name>[, <Name>, ...] as <Type> [nullable] [default <Value>] [constraint...] [ordered]
+    // field <Name>[, <Name>, ...] as <Type> [modifier...] (nullable, default, constraints, ordered — any order)
     private static readonly TokenListParser<PreceptToken, StatementResult> FieldDecl =
         (from kw in Token.EqualTo(PreceptToken.Field)
          from names in Token.EqualTo(PreceptToken.Identifier)
              .AtLeastOnceDelimitedBy(Token.EqualTo(PreceptToken.Comma))
          from _ in Token.EqualTo(PreceptToken.As)
          from typeRef in TypeRef
-         from nullable in Token.EqualTo(PreceptToken.Nullable).Value(true).OptionalOrDefault(false)
-         from dflt in OptionalDefault
-         from constraints in ConstraintSuffix.Many()
-         from ordered in Token.EqualTo(PreceptToken.Ordered).Value(true).OptionalOrDefault(false)
-         select typeRef.IsCollection
-            ? (StatementResult)new CollectionFieldResult(
-                names.Select(n => new PreceptCollectionField(
-                    n.ToText(), typeRef.CollectionKind!.Value, typeRef.ScalarType,
-                    constraints.Length > 0 ? constraints : null,
-                    typeRef.ChoiceValues,
-                    SourceLine: kw.Span.Position.Line)).ToArray())
-            : new FieldResult(
-                names.Select(n => new PreceptField(
-                    n.ToText(), typeRef.ScalarType, nullable,
-                    dflt.Specified || nullable,
-                    dflt.Specified ? dflt.Value : null,
-                    constraints.Length > 0 ? constraints : null,
-                    typeRef.ChoiceValues, ordered,
-                    SourceLine: kw.Span.Position.Line)).ToArray()))
+         from modifiers in AnyFieldModifier.Many()
+         select BuildFieldResult(kw, names, typeRef, modifiers))
         .Named("field declaration")
             .Register(new ConstructInfo(
                 "field-declaration",
-                "field <Name>[, <Name>, ...] as <Type> [nullable] [default <Value>]",
+                "field <Name>[, <Name>, ...] as <Type> [<modifier>...]",
                 "top-level",
                 "Declares a scalar or collection data field",
                 "field Priority as number default 3"));
@@ -771,21 +876,13 @@ public static class PreceptParser
                 "state Idle initial"));
 
     // event <Name> [with <ArgList>]
-    // where ArgList = Name as Type [nullable] [default val] [constraint...] [ordered] separated by commas
+    // where ArgList = Name as Type [modifier...] (nullable, default, constraints, ordered — any order) separated by commas
     private static readonly TokenListParser<PreceptToken, PreceptEventArg> EventArg =
         from name in Token.EqualTo(PreceptToken.Identifier)
         from _ in Token.EqualTo(PreceptToken.As)
         from typeRef in ScalarTypeOrChoice
-        from nullable in Token.EqualTo(PreceptToken.Nullable).Value(true).OptionalOrDefault(false)
-        from dflt in OptionalScalarDefault
-        from constraints in ConstraintSuffix.Many()
-        from ordered in Token.EqualTo(PreceptToken.Ordered).Value(true).OptionalOrDefault(false)
-        select new PreceptEventArg(name.ToText(), typeRef.Type, nullable,
-            dflt.Specified,
-            dflt.Specified ? dflt.Value : null,
-            constraints.Length > 0 ? constraints : null,
-            typeRef.ChoiceValues, ordered,
-            SourceLine: name.Span.Position.Line);
+        from modifiers in AnyEventArgModifier.Many()
+        select BuildEventArgResult(name, typeRef, modifiers);
 
     private static readonly TokenListParser<PreceptToken, StatementResult> EventDecl =
         (from kw in Token.EqualTo(PreceptToken.Event)
@@ -800,7 +897,7 @@ public static class PreceptParser
         .Named("event declaration")
             .Register(new ConstructInfo(
                 "event-declaration",
-                "event <Name>[, <Name>, ...] [with <Arg> as <Type> [nullable] [default <Val>], ...]",
+                "event <Name>[, <Name>, ...] [with <Arg> as <Type> [<modifier>...], ...]",
                 "top-level",
                 "Declares an external trigger with optional typed arguments",
                 "event Submit with Comment as string"));

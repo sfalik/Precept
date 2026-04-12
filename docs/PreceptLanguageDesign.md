@@ -191,14 +191,13 @@ Statement          := FieldDecl | Invariant | StateDecl | StateAssert | StateAct
                     | EditDecl | EventDecl | EventAssert | TransitionRow
                     | Comment | Blank
 
-FieldDecl          := "field" Identifier ("," Identifier)* "as" TypeRef NullableOpt DefaultOpt ConstraintSuffix*
-NullableOpt        := ("nullable")?
+FieldDecl          := "field" Identifier ("," Identifier)* "as" TypeRef FieldModifier*
+FieldModifier      := "nullable" | "default" LiteralOrList | ConstraintSuffix | "ordered"
 ConstraintSuffix   := "nonnegative" | "positive" | "notempty"
                     | "min" NumberLiteral | "max" NumberLiteral
                     | "minlength" IntegerLiteral | "maxlength" IntegerLiteral
                     | "mincount" IntegerLiteral | "maxcount" IntegerLiteral
-                    | "maxplaces" IntegerLiteral | "ordered"
-DefaultOpt         := ("default" LiteralOrList)?
+                    | "maxplaces" IntegerLiteral
 
 Invariant          := "invariant" BoolExpr WhenOpt "because" StringLiteral
 
@@ -235,7 +234,7 @@ FieldTarget        := "all" | Identifier ("," Identifier)*
 
 EventDecl          := "event" Identifier ("," Identifier)* ("with" ArgList)?
 ArgList            := ArgDecl ("," ArgDecl)*
-ArgDecl            := Identifier "as" TypeRef NullableOpt DefaultOpt ConstraintSuffix*
+ArgDecl            := Identifier "as" TypeRef FieldModifier*
 
 EventAssert        := "on" Identifier "assert" BoolExpr WhenOpt "because" StringLiteral
 
@@ -512,10 +511,10 @@ from Draft on Submit when EmployeeName != null and AccessReason != null and Acce
 
 Forms:
 
-- `field <Name> as <Type> [nullable] [default <Literal>] [<constraint>...]`
-- `field <Name>, <Name>, ... as <Type> [nullable] [default <Literal>] [<constraint>...]`
+- `field <Name> as <Type> [<modifier>...]`
+- `field <Name>, <Name>, ... as <Type> [<modifier>...]`
 
-Multi-name declarations declare multiple fields sharing the same type, nullability, and default value. The type, `nullable`, and `default` clauses apply uniformly to every name in the list.
+Modifiers (`nullable`, `default <value>`, and constraint keywords) may appear in **any order** after the type. Each modifier may appear at most once per declaration (C70). Multi-name declarations declare multiple fields sharing the same type and modifiers.
 
 Defaults:
 - Non-nullable scalar fields must declare a `default ...`.

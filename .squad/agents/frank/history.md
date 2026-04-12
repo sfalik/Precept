@@ -7,6 +7,19 @@
 - Technical-surface work flows through Elaine (UX), Peterman (brand compliance), Frank (architectural fit), then Shane (sign-off).
 - README and brand-spec changes should reflect actual runtime semantics, not speculative future behavior.
 
+## Learnings
+
+### 2026-04-11 — Modifier any-order investigation (Issue #13)
+- **Key architecture finding:** The fixed modifier order (`nullable → default → constraints → ordered`) is enforced ONLY by two parser combinator chains (`FieldDecl` line 697, `EventArg` line 774). Model types, type checker, runtime, grammar, and MCP are all already order-independent.
+- **Constraint zone is already any-order:** `ConstraintSuffix.Many()` already allows constraints in any order. The rigidity is only between the four zones (nullable, default, constraints, ordered).
+- **Completions are the heavy lift:** `PreceptAnalyzer.cs` has ~30 regex patterns that hardcode position-dependent modifier sequences. These must be replaced with a dynamic "remaining modifiers" approach. The parser change itself is ~50 lines.
+- **Doc inconsistency found:** `PreceptLanguageDesign.md` prose says constraints appear "between the type (and `nullable`) and the `default` clause" but the grammar spec and parser put default BEFORE constraints. Needs correction regardless of this issue.
+- **Implementation approach:** Discriminated union `FieldModifier` with `.Many()` combinator. Extract properties from modifier list post-parse. Duplicate modifier detection via type checker (consistent with C58 precedent).
+- **Event arg comma boundary:** Superpower's `.Many()` uses `TryParse` internally — modifier parsing naturally stops at comma delimiters. Needs explicit test verification.
+- **Collection fields unaffected:** They only take constraints (no nullable/default/ordered), so they're already flexible.
+- **Recommended slicing:** (A) parser + type checker + tests, (B) completions rework, (C) docs.
+- Full analysis: `.squad/decisions/inbox/frank-modifier-any-order-investigation.md`
+
 ## Recent Updates
 
 ### 2026-04-12 — Event hooks gap investigation + external FSM precedent survey

@@ -545,4 +545,14 @@ public static class DiagnosticCatalog
         "C69", "compile",
         "Cross-scope guard reference in when clause.",
         "Guard expression references '{name}' which belongs to a different scope. Invariant and edit guards can only reference entity fields; event assert guards can only reference event arguments.");
+
+    // ═══════════════════════════════════════════════════════════════
+    // Modifier diagnostics (C70+)
+    // ═══════════════════════════════════════════════════════════════
+
+    /// <summary>Duplicate modifier on field or event argument declaration.</summary>
+    public static readonly LanguageConstraint C70 = Register(
+        "C70", "parse",
+        "Duplicate modifier on field or event argument declaration.",
+        "Duplicate modifier '{modifier}' on '{name}'. Each modifier may appear at most once per declaration.");
 }
