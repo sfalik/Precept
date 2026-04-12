@@ -661,6 +661,17 @@ public class CatalogDriftTests
         ["C79"] = new(H + "field X as number default 0\n" + S2 +
             "event Go\nfrom A on Go -> set X = if true then 42 else \"text\" -> no transition\n", "same scalar type"),
 
+        // ── Parse-phase: computed/derived fields (C80–C82) ─────────────
+
+        // C80: default + derived mutual exclusion
+        ["C80"] = new(H + "field X as number default 0 -> 1 + 2\n" + S, "both a default value and a derived expression"),
+
+        // C81: nullable + derived mutual exclusion
+        ["C81"] = new(H + "field X as number nullable -> 1 + 2\n" + S, "nullable and has a derived expression"),
+
+        // C82: multi-name + derived
+        ["C82"] = new(H + "field A, B as number -> 1 + 2\n" + S, "Multi-name field declaration"),
+
         // ── Runtime-phase (C33–C37) ───────────────────────────────────
 
         // C33: CreateInstance with empty initial state
@@ -1435,6 +1446,17 @@ public class CatalogDriftTests
 
         // C79: conditional with mismatched branch types — row on line 6
         ["C79"] = ("precept Test\nfield X as number default 0\nstate A initial\nstate B\nevent Go\nfrom A on Go -> set X = if true then 42 else \"text\" -> no transition\n", "compile", 6),
+
+        // ── Parse-phase: computed/derived fields (C80–C82) ─────────────
+
+        // C80: default + derived — field on line 3
+        ["C80"] = ("precept Test\nstate A initial\nfield X as number default 0 -> 1 + 2\n", "parse", 3),
+
+        // C81: nullable + derived — field on line 3
+        ["C81"] = ("precept Test\nstate A initial\nfield X as number nullable -> 1 + 2\n", "parse", 3),
+
+        // C82: multi-name + derived — field on line 3
+        ["C82"] = ("precept Test\nstate A initial\nfield A, B as number -> 1 + 2\n", "parse", 3),
     };
 
     [Theory]

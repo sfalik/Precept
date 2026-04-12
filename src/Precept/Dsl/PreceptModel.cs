@@ -51,7 +51,13 @@ public sealed record PreceptField(
     IReadOnlyList<FieldConstraint>? Constraints = null,
     IReadOnlyList<string>? ChoiceValues = null,
     bool IsOrdered = false,
-    int SourceLine = 0);
+    int SourceLine = 0,
+    PreceptExpression? DerivedExpression = null,
+    string? DerivedExpressionText = null)
+{
+    /// <summary>True when this field is computed (has a derived expression).</summary>
+    public bool IsComputed => DerivedExpression is not null;
+}
 
 public sealed record PreceptCollectionField(
     string Name,

@@ -619,4 +619,29 @@ public static class DiagnosticCatalog
         "C79", "compile",
         "Conditional expression branches must produce the same scalar type.",
         "Conditional expression branches must produce the same scalar type, but got {thenType} and {elseType}.");
+
+    // ═══════════════════════════════════════════════════════════════
+    // Parse-phase constraints: computed/derived fields (C80–C82)
+    // ═══════════════════════════════════════════════════════════════
+
+    /// <summary>A field cannot have both a default value and a derived expression.</summary>
+    // SYNC:CONSTRAINT:C80
+    public static readonly LanguageConstraint C80 = Register(
+        "C80", "parse",
+        "A field cannot have both a default value and a derived expression.",
+        "Field '{fieldName}' has both a default value and a derived expression. Use one or the other.");
+
+    /// <summary>A nullable field cannot have a derived expression.</summary>
+    // SYNC:CONSTRAINT:C81
+    public static readonly LanguageConstraint C81 = Register(
+        "C81", "parse",
+        "A nullable field cannot have a derived expression.",
+        "Field '{fieldName}' is nullable and has a derived expression. Computed fields cannot be nullable.");
+
+    /// <summary>Multi-name field declarations cannot have a derived expression.</summary>
+    // SYNC:CONSTRAINT:C82
+    public static readonly LanguageConstraint C82 = Register(
+        "C82", "parse",
+        "Multi-name field declarations cannot have a derived expression.",
+        "Multi-name field declaration cannot have a derived expression. Each computed field must be declared separately.");
 }
