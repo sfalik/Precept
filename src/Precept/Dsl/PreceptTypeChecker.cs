@@ -70,14 +70,16 @@ internal sealed class PreceptTypeContext(
 
 internal sealed record TypeCheckResult(
     IReadOnlyList<PreceptValidationDiagnostic> Diagnostics,
-    PreceptTypeContext TypeContext)
+    PreceptTypeContext TypeContext,
+    IReadOnlyList<string>? ComputedFieldOrder = null)
 {
     public bool HasErrors => Diagnostics.Any(static diagnostic => diagnostic.Constraint.Severity == ConstraintSeverity.Error);
 }
 
 internal sealed record ValidationResult(
     IReadOnlyList<PreceptValidationDiagnostic> Diagnostics,
-    PreceptTypeContext TypeContext)
+    PreceptTypeContext TypeContext,
+    PreceptDefinition? ValidatedModel = null)
 {
     public bool HasErrors => Diagnostics.Any(static diagnostic => diagnostic.Constraint.Severity == ConstraintSeverity.Error);
 }
@@ -123,7 +125,9 @@ internal static class PreceptTypeChecker
         ValidateFieldConstraints(model, diagnostics);
         ValidateRules(model, dataFieldKinds, eventArgKinds, diagnostics, expressions, scopes);
 
-        return new TypeCheckResult(diagnostics, new PreceptTypeContext(expressions, scopes));
+        var computedFieldOrder = ValidateComputedFields(model, dataFieldKinds, eventArgKinds, collectionFieldMap, diagnostics, expressions, scopes);
+
+        return new TypeCheckResult(diagnostics, new PreceptTypeContext(expressions, scopes), computedFieldOrder);
     }
 
     internal static StaticValueKind MapFieldContractKind(PreceptField field)
@@ -758,6 +762,322 @@ internal static class PreceptTypeChecker
         FieldConstraint.Maxplaces mp => $"maxplaces {mp.Places}",
         _                           => c.GetType().Name.ToLowerInvariant()
     };
+
+    // ═══════════════════════════════════════════════════════════════
+    // Computed field validation (C83–C88)
+    // ═══════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Validates computed/derived field expressions: type checking, scope restrictions,
+    /// dependency graph analysis, cycle detection, and edit/set protection.
+    /// Returns the topological evaluation order of computed fields (null if none).
+    /// </summary>
+    private static IReadOnlyList<string>? ValidateComputedFields(
+        PreceptDefinition model,
+        IReadOnlyDictionary<string, StaticValueKind> dataFieldKinds,
+        IReadOnlyDictionary<string, Dictionary<string, StaticValueKind>> eventArgKinds,
+        IReadOnlyDictionary<string, PreceptCollectionField> collectionFieldMap,
+        List<PreceptValidationDiagnostic> diagnostics,
+        List<PreceptTypeExpressionInfo> expressions,
+        List<PreceptTypeScopeInfo> scopes)
+    {
+        var computedFields = model.Fields.Where(static f => f.IsComputed).ToArray();
+        if (computedFields.Length == 0)
+            return null;
+
+        var computedFieldNames = new HashSet<string>(
+            computedFields.Select(static f => f.Name), StringComparer.Ordinal);
+
+        // Nullable field names (for C83 checking)
+        var nullableFieldNames = new HashSet<string>(
+            model.Fields.Where(static f => f.IsNullable).Select(static f => f.Name),
+            StringComparer.Ordinal);
+
+        // Event arg dotted forms: "EventName.ArgName" (for C84 checking)
+        var eventArgDottedNames = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var evt in model.Events)
+            foreach (var arg in evt.Args)
+                eventArgDottedNames.Add($"{evt.Name}.{arg.Name}");
+
+        // Unsafe collection accessors (for C85 checking)
+        var unsafeAccessors = new HashSet<string>(StringComparer.Ordinal) { "peek", "min", "max" };
+
+        // Build full data-symbols scope for expression type checking (same as ValidateRules)
+        var dataSymbols = new Dictionary<string, StaticValueKind>(dataFieldKinds, StringComparer.Ordinal);
+        foreach (var col in model.CollectionFields)
+        {
+            dataSymbols[$"{col.Name}.count"] = StaticValueKind.Number;
+            var innerKind = MapScalarTypeToKind(col.InnerType);
+            if (col.CollectionKind == PreceptCollectionKind.Set)
+            {
+                dataSymbols[$"{col.Name}.min"] = innerKind;
+                dataSymbols[$"{col.Name}.max"] = innerKind;
+            }
+            if (col.CollectionKind is PreceptCollectionKind.Queue or PreceptCollectionKind.Stack)
+                dataSymbols[$"{col.Name}.peek"] = innerKind;
+        }
+        foreach (var field in model.Fields)
+        {
+            if (field.Type == PreceptScalarType.String)
+                dataSymbols[$"{field.Name}.length"] = StaticValueKind.Number;
+        }
+
+        // Dependency graph: computed field name → set of computed field names it depends on
+        var dependencies = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+
+        foreach (var field in computedFields)
+        {
+            var expectedKind = MapScalarTypeToKind(field.Type);
+
+            // Type-check the derived expression against the full data scope
+            ValidateExpression(
+                field.DerivedExpression!,
+                field.DerivedExpressionText!,
+                field.SourceLine,
+                dataSymbols,
+                expectedKind,
+                $"computed field '{field.Name}'",
+                diagnostics,
+                expressions);
+
+            // Walk expression for computed-field-specific restrictions
+            var deps = new HashSet<string>(StringComparer.Ordinal);
+            WalkComputedFieldExpression(
+                field.DerivedExpression!,
+                field.SourceLine,
+                nullableFieldNames,
+                eventArgDottedNames,
+                unsafeAccessors,
+                collectionFieldMap,
+                computedFieldNames,
+                deps,
+                diagnostics);
+            dependencies[field.Name] = deps;
+        }
+
+        // Topological sort with cycle detection
+        var sorted = new List<string>();
+        // 0 = not visited, 1 = in progress, 2 = done
+        var visitState = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var name in computedFieldNames)
+            visitState[name] = 0;
+
+        bool hasCycle = false;
+        foreach (var name in computedFieldNames)
+        {
+            if (visitState[name] == 0)
+            {
+                var path = new List<string>();
+                if (!TopologicalVisit(name, dependencies, visitState, sorted, path, computedFields, diagnostics))
+                    hasCycle = true;
+            }
+        }
+
+        // SYNC:CONSTRAINT:C87 — computed field in edit declaration
+        if (model.EditBlocks is { Count: > 0 })
+        {
+            foreach (var editBlock in model.EditBlocks)
+            {
+                foreach (var fieldName in editBlock.FieldNames)
+                {
+                    if (computedFieldNames.Contains(fieldName))
+                    {
+                        diagnostics.Add(new PreceptValidationDiagnostic(
+                            DiagnosticCatalog.C87,
+                            DiagnosticCatalog.C87.FormatMessage(("fieldName", fieldName)),
+                            editBlock.SourceLine));
+                    }
+                }
+            }
+        }
+
+        // SYNC:CONSTRAINT:C88 — computed field as set target
+        var computedFieldLookup = computedFields.ToDictionary(
+            static f => f.Name, static f => f, StringComparer.Ordinal);
+        if (model.TransitionRows is { Count: > 0 })
+        {
+            foreach (var row in model.TransitionRows)
+            {
+                foreach (var assignment in row.SetAssignments)
+                {
+                    if (computedFieldLookup.TryGetValue(assignment.Key, out var cf))
+                    {
+                        diagnostics.Add(new PreceptValidationDiagnostic(
+                            DiagnosticCatalog.C88,
+                            DiagnosticCatalog.C88.FormatMessage(
+                                ("fieldName", assignment.Key),
+                                ("expression", cf.DerivedExpressionText ?? "")),
+                            assignment.SourceLine > 0 ? assignment.SourceLine : row.SourceLine));
+                    }
+                }
+            }
+        }
+
+        if (model.StateActions is { Count: > 0 })
+        {
+            foreach (var action in model.StateActions)
+            {
+                foreach (var assignment in action.SetAssignments)
+                {
+                    if (computedFieldLookup.TryGetValue(assignment.Key, out var cf))
+                    {
+                        diagnostics.Add(new PreceptValidationDiagnostic(
+                            DiagnosticCatalog.C88,
+                            DiagnosticCatalog.C88.FormatMessage(
+                                ("fieldName", assignment.Key),
+                                ("expression", cf.DerivedExpressionText ?? "")),
+                            assignment.SourceLine > 0 ? assignment.SourceLine : action.SourceLine));
+                    }
+                }
+            }
+        }
+
+        return hasCycle ? null : sorted;
+    }
+
+    /// <summary>
+    /// Walks a computed field expression tree and emits C83/C84/C85 for prohibited references.
+    /// Also collects dependencies on other computed fields for cycle detection.
+    /// </summary>
+    private static void WalkComputedFieldExpression(
+        PreceptExpression expr,
+        int sourceLine,
+        HashSet<string> nullableFieldNames,
+        HashSet<string> eventArgDottedNames,
+        HashSet<string> unsafeAccessors,
+        IReadOnlyDictionary<string, PreceptCollectionField> collectionFieldMap,
+        HashSet<string> computedFieldNames,
+        HashSet<string> dependencies,
+        List<PreceptValidationDiagnostic> diagnostics)
+    {
+        switch (expr)
+        {
+            case PreceptIdentifierExpression id:
+                // Check for event argument references (C84)
+                if (id.Member is not null)
+                {
+                    var dottedName = $"{id.Name}.{id.Member}";
+
+                    // Event arg form: EventName.ArgName
+                    if (eventArgDottedNames.Contains(dottedName))
+                    {
+                        diagnostics.Add(new PreceptValidationDiagnostic(
+                            DiagnosticCatalog.C84,
+                            DiagnosticCatalog.C84.FormatMessage(("name", dottedName)),
+                            sourceLine));
+                        break;
+                    }
+
+                    // Collection accessor form: CollectionName.accessor
+                    if (collectionFieldMap.ContainsKey(id.Name))
+                    {
+                        if (unsafeAccessors.Contains(id.Member))
+                        {
+                            // SYNC:CONSTRAINT:C85
+                            diagnostics.Add(new PreceptValidationDiagnostic(
+                                DiagnosticCatalog.C85,
+                                DiagnosticCatalog.C85.FormatMessage(("accessor", id.Member)),
+                                sourceLine));
+                        }
+                        // .count is safe — no diagnostic needed
+                        break;
+                    }
+                }
+
+                // Plain identifier — check nullable field reference (C83)
+                if (id.Member is null && nullableFieldNames.Contains(id.Name))
+                {
+                    diagnostics.Add(new PreceptValidationDiagnostic(
+                        DiagnosticCatalog.C83,
+                        DiagnosticCatalog.C83.FormatMessage(("fieldName", id.Name)),
+                        sourceLine));
+                }
+
+                // Track dependencies on other computed fields
+                if (id.Member is null && computedFieldNames.Contains(id.Name))
+                    dependencies.Add(id.Name);
+
+                break;
+
+            case PreceptBinaryExpression bin:
+                WalkComputedFieldExpression(bin.Left, sourceLine, nullableFieldNames, eventArgDottedNames, unsafeAccessors, collectionFieldMap, computedFieldNames, dependencies, diagnostics);
+                WalkComputedFieldExpression(bin.Right, sourceLine, nullableFieldNames, eventArgDottedNames, unsafeAccessors, collectionFieldMap, computedFieldNames, dependencies, diagnostics);
+                break;
+
+            case PreceptUnaryExpression unary:
+                WalkComputedFieldExpression(unary.Operand, sourceLine, nullableFieldNames, eventArgDottedNames, unsafeAccessors, collectionFieldMap, computedFieldNames, dependencies, diagnostics);
+                break;
+
+            case PreceptParenthesizedExpression paren:
+                WalkComputedFieldExpression(paren.Inner, sourceLine, nullableFieldNames, eventArgDottedNames, unsafeAccessors, collectionFieldMap, computedFieldNames, dependencies, diagnostics);
+                break;
+
+            case PreceptFunctionCallExpression fn:
+                foreach (var arg in fn.Arguments)
+                    WalkComputedFieldExpression(arg, sourceLine, nullableFieldNames, eventArgDottedNames, unsafeAccessors, collectionFieldMap, computedFieldNames, dependencies, diagnostics);
+                break;
+
+            case PreceptConditionalExpression cond:
+                WalkComputedFieldExpression(cond.Condition, sourceLine, nullableFieldNames, eventArgDottedNames, unsafeAccessors, collectionFieldMap, computedFieldNames, dependencies, diagnostics);
+                WalkComputedFieldExpression(cond.ThenBranch, sourceLine, nullableFieldNames, eventArgDottedNames, unsafeAccessors, collectionFieldMap, computedFieldNames, dependencies, diagnostics);
+                WalkComputedFieldExpression(cond.ElseBranch, sourceLine, nullableFieldNames, eventArgDottedNames, unsafeAccessors, collectionFieldMap, computedFieldNames, dependencies, diagnostics);
+                break;
+
+            case PreceptLiteralExpression:
+                break;
+        }
+    }
+
+    /// <summary>
+    /// DFS visit for topological sort. Returns false if a cycle is detected.
+    /// </summary>
+    private static bool TopologicalVisit(
+        string name,
+        Dictionary<string, HashSet<string>> dependencies,
+        Dictionary<string, int> visitState,
+        List<string> sorted,
+        List<string> path,
+        PreceptField[] computedFields,
+        List<PreceptValidationDiagnostic> diagnostics)
+    {
+        if (visitState.TryGetValue(name, out var state))
+        {
+            if (state == 2) return true;  // already done
+            if (state == 1)
+            {
+                // Cycle detected — build the cycle path
+                var cycleStart = path.IndexOf(name);
+                var cyclePath = path.Skip(cycleStart).Append(name).ToArray();
+                var cycleStr = string.Join(" \u2192 ", cyclePath);
+                var field = computedFields.FirstOrDefault(f =>
+                    string.Equals(f.Name, name, StringComparison.Ordinal));
+                // SYNC:CONSTRAINT:C86
+                diagnostics.Add(new PreceptValidationDiagnostic(
+                    DiagnosticCatalog.C86,
+                    DiagnosticCatalog.C86.FormatMessage(("cycle", cycleStr)),
+                    field?.SourceLine ?? 0));
+                return false;
+            }
+        }
+
+        visitState[name] = 1; // in progress
+        path.Add(name);
+
+        bool ok = true;
+        if (dependencies.TryGetValue(name, out var deps))
+        {
+            foreach (var dep in deps)
+            {
+                if (!TopologicalVisit(dep, dependencies, visitState, sorted, path, computedFields, diagnostics))
+                    ok = false;
+            }
+        }
+
+        path.RemoveAt(path.Count - 1);
+        visitState[name] = 2; // done
+        sorted.Add(name);
+        return ok;
+    }
 
     private static void ValidateRules(
         PreceptDefinition model,

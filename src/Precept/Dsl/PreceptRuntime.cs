@@ -1973,12 +1973,16 @@ public static class PreceptCompiler
         var typeCheck = PreceptTypeChecker.Check(model);
         diagnostics.AddRange(typeCheck.Diagnostics);
 
+        // Thread computed field evaluation order onto the model for runtime consumption
+        if (typeCheck.ComputedFieldOrder is not null)
+            model = model with { ComputedFieldOrder = typeCheck.ComputedFieldOrder };
+
         CollectCompileTimeDiagnostics(model, diagnostics);
 
         if (!diagnostics.Any(diagnostic => diagnostic.Constraint.Id is "C27" or "C28"))
             diagnostics.AddRange(PreceptAnalysis.Analyze(model).Diagnostics);
 
-        return new ValidationResult(diagnostics, typeCheck.TypeContext);
+        return new ValidationResult(diagnostics, typeCheck.TypeContext, model);
     }
 
     public static CompileFromTextResult CompileFromText(string text)
@@ -1988,18 +1992,20 @@ public static class PreceptCompiler
             return new CompileFromTextResult(null, null, parseDiagnostics.Select(ToDiagnostic).ToArray());
 
         var validation = Validate(model);
+        var validatedModel = validation.ValidatedModel ?? model;
         var diagnostics = validation.Diagnostics.Select(ToDiagnostic).ToArray();
         if (validation.HasErrors)
-            return new CompileFromTextResult(model, null, diagnostics);
+            return new CompileFromTextResult(validatedModel, null, diagnostics);
 
-        return new CompileFromTextResult(model, new PreceptEngine(model), diagnostics);
+        return new CompileFromTextResult(validatedModel, new PreceptEngine(validatedModel), diagnostics);
     }
 
     public static PreceptEngine Compile(PreceptDefinition model)
     {
         var validation = Validate(model);
         ThrowIfValidationFailed(validation);
-        return new PreceptEngine(model);
+        var validatedModel = validation.ValidatedModel ?? model;
+        return new PreceptEngine(validatedModel);
     }
 
     private static PreceptDiagnostic ToDiagnostic(ParseDiagnostic diagnostic)

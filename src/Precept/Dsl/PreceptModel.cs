@@ -15,7 +15,8 @@ public sealed record PreceptDefinition(
     IReadOnlyList<EventAssertion>? EventAsserts = null,
     IReadOnlyList<PreceptTransitionRow>? TransitionRows = null,
     IReadOnlyList<PreceptEditBlock>? EditBlocks = null,
-    int SourceLine = 0)
+    int SourceLine = 0,
+    IReadOnlyList<string>? ComputedFieldOrder = null)
 {
     public bool IsStateless => States.Count == 0;
 }

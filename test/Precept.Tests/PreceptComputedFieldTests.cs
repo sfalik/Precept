@@ -480,4 +480,473 @@ public class PreceptComputedFieldTests
 
         act.Should().Throw<InvalidOperationException>();
     }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Slice 2 — Type Checker Validation for Computed Fields
+    // ════════════════════════════════════════════════════════════════════
+
+    // ── C83: Nullable field reference in computed expression ──────────
+
+    [Fact]
+    public void TypeCheck_ComputedField_ReferencesNullableField_ProducesC83()
+    {
+        const string dsl = """
+            precept Test
+            field Name as string nullable
+            field Display as string -> Name
+            state Active initial
+            """;
+
+        var result = PreceptCompiler.CompileFromText(dsl);
+
+        result.Diagnostics.Should().Contain(d => d.Code == "PRECEPT083");
+    }
+
+    [Fact]
+    public void TypeCheck_ComputedField_ReferencesNonNullableField_NoC83()
+    {
+        const string dsl = """
+            precept Test
+            field Price as number default 10
+            field Tax as number -> Price * 0.1
+            state Active initial
+            """;
+
+        var result = PreceptCompiler.CompileFromText(dsl);
+
+        result.Diagnostics.Should().NotContain(d => d.Code == "PRECEPT083");
+    }
+
+    // ── C84: Event argument reference in computed expression ──────────
+
+    [Fact]
+    public void TypeCheck_ComputedField_ReferencesEventArg_ProducesC84()
+    {
+        const string dsl = """
+            precept Test
+            field Total as number default 0
+            field Calculated as number -> Submit.Amount
+            state Active initial
+            event Submit with Amount as number
+            """;
+
+        var result = PreceptCompiler.CompileFromText(dsl);
+
+        result.Diagnostics.Should().Contain(d => d.Code == "PRECEPT084");
+    }
+
+    // ── C85: Unsafe collection accessor in computed expression ────────
+
+    [Fact]
+    public void TypeCheck_ComputedField_UsesPeek_ProducesC85()
+    {
+        const string dsl = """
+            precept Test
+            field Items as stack of number
+            field TopItem as number -> Items.peek
+            state Active initial
+            """;
+
+        var result = PreceptCompiler.CompileFromText(dsl);
+
+        result.Diagnostics.Should().Contain(d => d.Code == "PRECEPT085");
+    }
+
+    [Fact]
+    public void TypeCheck_ComputedField_UsesMin_ProducesC85()
+    {
+        const string dsl = """
+            precept Test
+            field Scores as set of number
+            field Lowest as number -> Scores.min
+            state Active initial
+            """;
+
+        var result = PreceptCompiler.CompileFromText(dsl);
+
+        result.Diagnostics.Should().Contain(d => d.Code == "PRECEPT085");
+    }
+
+    [Fact]
+    public void TypeCheck_ComputedField_UsesMax_ProducesC85()
+    {
+        const string dsl = """
+            precept Test
+            field Scores as set of number
+            field Highest as number -> Scores.max
+            state Active initial
+            """;
+
+        var result = PreceptCompiler.CompileFromText(dsl);
+
+        result.Diagnostics.Should().Contain(d => d.Code == "PRECEPT085");
+    }
+
+    [Fact]
+    public void TypeCheck_ComputedField_UsesCount_NoC85()
+    {
+        const string dsl = """
+            precept Test
+            field Items as set of string
+            field ItemCount as number -> Items.count
+            state Active initial
+            """;
+
+        var result = PreceptCompiler.CompileFromText(dsl);
+
+        result.Diagnostics.Should().NotContain(d => d.Code == "PRECEPT085");
+        result.Diagnostics.Should().NotContain(d => d.Severity == ConstraintSeverity.Error);
+    }
+
+    // ── C86: Circular dependency / topological sort ──────────────────
+
+    [Fact]
+    public void TypeCheck_ComputedField_SelfReference_ProducesC86()
+    {
+        const string dsl = """
+            precept Test
+            field X as number -> X + 1
+            state Active initial
+            """;
+
+        var result = PreceptCompiler.CompileFromText(dsl);
+
+        result.Diagnostics.Should().Contain(d => d.Code == "PRECEPT086");
+    }
+
+    [Fact]
+    public void TypeCheck_ComputedField_CircularDependency_ProducesC86()
+    {
+        const string dsl = """
+            precept Test
+            field A as number -> B + 1
+            field B as number -> A + 1
+            state Active initial
+            """;
+
+        var result = PreceptCompiler.CompileFromText(dsl);
+
+        result.Diagnostics.Should().Contain(d =>
+            d.Code == "PRECEPT086" &&
+            d.Message.Contains("\u2192")); // contains arrow (→) in cycle path
+    }
+
+    [Fact]
+    public void TypeCheck_ComputedField_ThreeNodeCycle_ProducesC86()
+    {
+        const string dsl = """
+            precept Test
+            field A as number -> B + 1
+            field B as number -> C + 1
+            field C as number -> A + 1
+            state Active initial
+            """;
+
+        var result = PreceptCompiler.CompileFromText(dsl);
+
+        result.Diagnostics.Should().Contain(d => d.Code == "PRECEPT086");
+    }
+
+    [Fact]
+    public void TypeCheck_ComputedField_LinearChain_TopologicalSortCorrect()
+    {
+        const string dsl = """
+            precept Test
+            field Base as number default 10
+            field Mid as number -> Base * 2
+            field Top as number -> Mid + 1
+            state Active initial
+            """;
+
+        var result = PreceptCompiler.CompileFromText(dsl);
+
+        result.Diagnostics.Should().NotContain(d => d.Severity == ConstraintSeverity.Error);
+        result.Model.Should().NotBeNull();
+        result.Model!.ComputedFieldOrder.Should().NotBeNull();
+        result.Model!.ComputedFieldOrder.Should().Equal("Mid", "Top");
+    }
+
+    [Fact]
+    public void TypeCheck_ComputedField_DependsOnAnotherComputed_Works()
+    {
+        const string dsl = """
+            precept Test
+            field X as number default 5
+            field Y as number -> X * 2
+            field Z as number -> Y + 1
+            state Active initial
+            """;
+
+        var result = PreceptCompiler.CompileFromText(dsl);
+
+        result.Diagnostics.Should().NotContain(d => d.Severity == ConstraintSeverity.Error);
+        result.Model!.ComputedFieldOrder.Should().Equal("Y", "Z");
+    }
+
+    [Fact]
+    public void TypeCheck_ComputedField_DiamondDependency_ResolvesCorrectly()
+    {
+        const string dsl = """
+            precept Test
+            field Base as number default 1
+            field Left as number -> Base + 1
+            field Right as number -> Base + 2
+            field Top as number -> Left + Right
+            state Active initial
+            """;
+
+        var result = PreceptCompiler.CompileFromText(dsl);
+
+        result.Diagnostics.Should().NotContain(d => d.Severity == ConstraintSeverity.Error);
+        result.Model!.ComputedFieldOrder.Should().NotBeNull();
+        var order = result.Model!.ComputedFieldOrder!.ToList();
+        order.Should().HaveCount(3);
+        // Left and Right must come before Top
+        order.IndexOf("Left").Should().BeLessThan(order.IndexOf("Top"));
+        order.IndexOf("Right").Should().BeLessThan(order.IndexOf("Top"));
+    }
+
+    // ── C87: Computed field in edit declaration ──────────────────────
+
+    [Fact]
+    public void TypeCheck_ComputedField_InEditDeclaration_ProducesC87()
+    {
+        const string dsl = """
+            precept Test
+            field X as number default 0
+            field Y as number -> X + 1
+            state Active initial
+            in Active edit X, Y
+            """;
+
+        var result = PreceptCompiler.CompileFromText(dsl);
+
+        result.Diagnostics.Should().Contain(d =>
+            d.Code == "PRECEPT087" &&
+            d.Message.Contains("Y"));
+    }
+
+    [Fact]
+    public void TypeCheck_ComputedField_NotInEditDecl_NoC87()
+    {
+        const string dsl = """
+            precept Test
+            field X as number default 0
+            field Y as number -> X + 1
+            state Active initial
+            in Active edit X
+            """;
+
+        var result = PreceptCompiler.CompileFromText(dsl);
+
+        result.Diagnostics.Should().NotContain(d => d.Code == "PRECEPT087");
+    }
+
+    // ── C88: Computed field as set target ────────────────────────────
+
+    [Fact]
+    public void TypeCheck_ComputedField_AsSetTarget_ProducesC88()
+    {
+        const string dsl = """
+            precept Test
+            field X as number default 0
+            field Y as number -> X + 1
+            state A initial
+            state B
+            event Go
+            from A on Go -> set Y = 5 -> transition B
+            """;
+
+        var result = PreceptCompiler.CompileFromText(dsl);
+
+        result.Diagnostics.Should().Contain(d =>
+            d.Code == "PRECEPT088" &&
+            d.Message.Contains("Y") &&
+            d.Message.Contains("derived from"));
+    }
+
+    [Fact]
+    public void TypeCheck_ComputedField_AsSetTarget_InStateAction_ProducesC88()
+    {
+        const string dsl = """
+            precept Test
+            field X as number default 0
+            field Y as number -> X + 1
+            state A initial
+            state B
+            event Go
+            from A on Go -> transition B
+            to B -> set Y = 99
+            """;
+
+        var result = PreceptCompiler.CompileFromText(dsl);
+
+        result.Diagnostics.Should().Contain(d =>
+            d.Code == "PRECEPT088" &&
+            d.Message.Contains("Y"));
+    }
+
+    // ── Type-appropriate constraints on computed fields ──────────────
+
+    [Fact]
+    public void TypeCheck_ComputedField_WithValidConstraints_Compiles()
+    {
+        const string dsl = """
+            precept Test
+            field A as number default 1
+            field B as number default 2
+            field Total as number -> A + B nonnegative
+            state Active initial
+            """;
+
+        var result = PreceptCompiler.CompileFromText(dsl);
+
+        result.Diagnostics.Should().NotContain(d => d.Severity == ConstraintSeverity.Error);
+    }
+
+    [Fact]
+    public void TypeCheck_ComputedField_WithIncompatibleConstraint_ProducesError()
+    {
+        // minlength is a string constraint, but field is number
+        const string dsl = """
+            precept Test
+            field A as number default 1
+            field B as number -> A + 1 minlength 5
+            state Active initial
+            """;
+
+        var result = PreceptCompiler.CompileFromText(dsl);
+
+        result.Diagnostics.Should().Contain(d => d.Code == "PRECEPT057");
+    }
+
+    // ── Expression type checking ────────────────────────────────────
+
+    [Fact]
+    public void TypeCheck_ComputedField_UndefinedReference_ProducesC38()
+    {
+        const string dsl = """
+            precept Test
+            field X as number -> Missing + 1
+            state Active initial
+            """;
+
+        var result = PreceptCompiler.CompileFromText(dsl);
+
+        result.Diagnostics.Should().Contain(d => d.Code == "PRECEPT038");
+    }
+
+    [Fact]
+    public void TypeCheck_ComputedField_TypeMismatch_ProducesError()
+    {
+        const string dsl = """
+            precept Test
+            field Name as string default "hello"
+            field Count as number -> Name
+            state Active initial
+            """;
+
+        var result = PreceptCompiler.CompileFromText(dsl);
+
+        result.Diagnostics.Should().Contain(d =>
+            d.Code == "PRECEPT039" &&
+            d.Message.Contains("type mismatch"));
+    }
+
+    // ── All data types supported ────────────────────────────────────
+
+    [Fact]
+    public void TypeCheck_ComputedField_IntegerType_CompilesSuccessfully()
+    {
+        const string dsl = """
+            precept Test
+            field X as integer default 1
+            field Y as integer -> X + 2
+            state Active initial
+            """;
+
+        var result = PreceptCompiler.CompileFromText(dsl);
+
+        result.Diagnostics.Should().NotContain(d => d.Severity == ConstraintSeverity.Error);
+    }
+
+    [Fact]
+    public void TypeCheck_ComputedField_DecimalType_CompilesSuccessfully()
+    {
+        const string dsl = """
+            precept Test
+            field X as decimal default 1.5
+            field Y as decimal -> X * 2
+            state Active initial
+            """;
+
+        var result = PreceptCompiler.CompileFromText(dsl);
+
+        result.Diagnostics.Should().NotContain(d => d.Severity == ConstraintSeverity.Error);
+    }
+
+    [Fact]
+    public void TypeCheck_ComputedField_BooleanType_CompilesSuccessfully()
+    {
+        const string dsl = """
+            precept Test
+            field Score as number default 50
+            field IsHigh as boolean -> Score > 100
+            state Active initial
+            """;
+
+        var result = PreceptCompiler.CompileFromText(dsl);
+
+        result.Diagnostics.Should().NotContain(d => d.Severity == ConstraintSeverity.Error);
+    }
+
+    [Fact]
+    public void TypeCheck_ComputedField_ChoiceWithConditional_CompilesSuccessfully()
+    {
+        const string dsl = """
+            precept Test
+            field Score as number default 0
+            field Level as choice("Low", "High") -> if Score > 50 then "High" else "Low"
+            state Active initial
+            """;
+
+        var result = PreceptCompiler.CompileFromText(dsl);
+
+        result.Diagnostics.Should().NotContain(d => d.Severity == ConstraintSeverity.Error);
+    }
+
+    // ── Stateless precept computed field validation ──────────────────
+
+    [Fact]
+    public void TypeCheck_ComputedField_Stateless_CompilesSuccessfully()
+    {
+        const string dsl = """
+            precept Test
+            field A as number default 1
+            field B as number default 2
+            field Sum as number -> A + B
+            """;
+
+        var result = PreceptCompiler.CompileFromText(dsl);
+
+        result.Diagnostics.Should().NotContain(d => d.Severity == ConstraintSeverity.Error);
+        result.Model!.ComputedFieldOrder.Should().NotBeNull();
+        result.Model!.ComputedFieldOrder.Should().Equal("Sum");
+    }
+
+    // ── No computed fields → null order ─────────────────────────────
+
+    [Fact]
+    public void TypeCheck_NoComputedFields_OrderIsNull()
+    {
+        const string dsl = """
+            precept Test
+            field X as number default 0
+            state Active initial
+            """;
+
+        var result = PreceptCompiler.CompileFromText(dsl);
+
+        result.Model!.ComputedFieldOrder.Should().BeNull();
+    }
 }

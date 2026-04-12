@@ -644,4 +644,50 @@ public static class DiagnosticCatalog
         "C82", "parse",
         "Multi-name field declarations cannot have a derived expression.",
         "Multi-name field declaration cannot have a derived expression. Each computed field must be declared separately.");
+
+    // ═══════════════════════════════════════════════════════════════
+    // Compile-phase constraints: computed field validation (C83–C88)
+    // ═══════════════════════════════════════════════════════════════
+
+    /// <summary>Computed field expression references a nullable field.</summary>
+    // SYNC:CONSTRAINT:C83
+    public static readonly LanguageConstraint C83 = Register(
+        "C83", "compile",
+        "Computed field expression references a nullable field.",
+        "Computed field expression references nullable field '{fieldName}'. Computed fields must always produce a value — use only non-nullable fields or collection accessors that guarantee a result.");
+
+    /// <summary>Computed field expression references an event argument.</summary>
+    // SYNC:CONSTRAINT:C84
+    public static readonly LanguageConstraint C84 = Register(
+        "C84", "compile",
+        "Computed field expression references an event argument.",
+        "Computed field expression references event argument '{name}'. Computed fields can only reference persistent fields and safe collection accessors.");
+
+    /// <summary>Computed field expression uses an unsafe collection accessor.</summary>
+    // SYNC:CONSTRAINT:C85
+    public static readonly LanguageConstraint C85 = Register(
+        "C85", "compile",
+        "Computed field expression uses an unsafe collection accessor.",
+        "Computed field expression uses '.{accessor}' which is undefined on empty collections. Only '.count' is allowed in computed expressions.");
+
+    /// <summary>Circular dependency detected among computed fields.</summary>
+    // SYNC:CONSTRAINT:C86
+    public static readonly LanguageConstraint C86 = Register(
+        "C86", "compile",
+        "Circular dependency detected among computed fields.",
+        "Circular dependency detected: {cycle}. Computed fields cannot reference each other in a cycle.");
+
+    /// <summary>Computed field cannot appear in edit declarations.</summary>
+    // SYNC:CONSTRAINT:C87
+    public static readonly LanguageConstraint C87 = Register(
+        "C87", "compile",
+        "Computed field cannot appear in edit declarations.",
+        "'{fieldName}' is a computed field and cannot appear in edit declarations. Computed fields are read-only.");
+
+    /// <summary>Computed field cannot be assigned via set.</summary>
+    // SYNC:CONSTRAINT:C88
+    public static readonly LanguageConstraint C88 = Register(
+        "C88", "compile",
+        "Computed field cannot be assigned via set.",
+        "'{fieldName}' is a computed field and cannot be assigned. Its value is always derived from: {expression}.");
 }
