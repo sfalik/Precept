@@ -1024,6 +1024,87 @@ public class NewSyntaxParserTests
     }
 
     // ════════════════════════════════════════════════════════════════════
+    // PARSING — Diagnostic source line accuracy (regression guard)
+    // Ensures constraint violations squiggle the offending declaration,
+    // not the precept header line.
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void ParseWithDiagnostics_C17_NonNullableFieldWithoutDefault_DiagnosticOnFieldLine()
+    {
+        // Line 1: precept Task
+        // Line 2: field Title as string nullable
+        // Line 3: field Description as string nullable
+        // Line 4: field Blah as choice("A", "B")  ← C17 violation here
+        const string dsl = """
+            precept Task
+            field Title as string nullable
+            field Description as string nullable
+            field Blah as choice("A", "B")
+            """;
+
+        var (_, diagnostics) = PreceptParser.ParseWithDiagnostics(dsl);
+
+        diagnostics.Should().ContainSingle();
+        diagnostics[0].Message.Should().Contain("Blah");
+        diagnostics[0].Line.Should().Be(4);
+    }
+
+    [Fact]
+    public void ParseWithDiagnostics_C6_DuplicateField_DiagnosticOnSecondFieldLine()
+    {
+        // Line 4 is the duplicate field declaration that triggers C6.
+        const string dsl = """
+            precept Test
+            field A as number default 0
+            state Open initial
+            field A as string nullable
+            """;
+
+        var (_, diagnostics) = PreceptParser.ParseWithDiagnostics(dsl);
+
+        diagnostics.Should().ContainSingle();
+        diagnostics[0].Message.Should().Contain("Duplicate field");
+        diagnostics[0].Line.Should().Be(4);
+    }
+
+    [Fact]
+    public void ParseWithDiagnostics_C7_DuplicateState_DiagnosticOnSecondStateLine()
+    {
+        // Line 3 is the duplicate state declaration.
+        const string dsl = """
+            precept Test
+            state Active initial
+            state Active
+            """;
+
+        var (_, diagnostics) = PreceptParser.ParseWithDiagnostics(dsl);
+
+        diagnostics.Should().ContainSingle();
+        diagnostics[0].Message.Should().Contain("Duplicate state");
+        diagnostics[0].Line.Should().Be(3);
+    }
+
+    [Fact]
+    public void ParseWithDiagnostics_C9_DuplicateEvent_DiagnosticOnSecondEventLine()
+    {
+        // Line 4 is the duplicate event declaration.
+        const string dsl = """
+            precept Test
+            state A initial
+            event Go
+            event Go
+            from A on Go -> no transition
+            """;
+
+        var (_, diagnostics) = PreceptParser.ParseWithDiagnostics(dsl);
+
+        diagnostics.Should().ContainSingle();
+        diagnostics[0].Message.Should().Contain("Duplicate event");
+        diagnostics[0].Line.Should().Be(4);
+    }
+
+    // ════════════════════════════════════════════════════════════════════
     // PARSING — Multi-name state declarations
     // ════════════════════════════════════════════════════════════════════
 
