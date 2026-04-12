@@ -129,4 +129,31 @@ public class UpdateToolTests
         result.Error.Should().BeNull();
         result.Outcome.Should().Be("UneditableField");
     }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Computed fields (issue #17)
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void ComputedFieldInPatch_ReturnsInvalidInputError()
+    {
+        var text = """
+            precept Test
+            field A as number default 1
+            field B as number default 2
+            field Total as number -> A + B
+            state Open initial
+            in Open edit A, B
+            event Go
+            from Open on Go -> no transition
+            """;
+
+        var result = UpdateTool.Update(text, "Open", null,
+            new Dictionary<string, object?> { ["Total"] = 99.0 });
+
+        result.Error.Should().BeNull();
+        result.Outcome.Should().Be("InvalidInput");
+        result.Violations.Should().NotBeEmpty();
+        result.Violations[0].Message.Should().Contain("computed field");
+    }
 }
