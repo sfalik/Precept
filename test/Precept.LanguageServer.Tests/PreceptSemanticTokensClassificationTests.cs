@@ -38,6 +38,24 @@ public class PreceptSemanticTokensClassificationTests
     }
 
     [Fact]
+    public void GetClassifiedTokens_RejectString_IsPreceptMessage()
+    {
+        const string dsl = """
+            precept M
+            state Active initial
+            state Closed
+            event Go
+            from Active on Go -> reject "Cannot complete this transition"
+            """;
+
+        var tokens = PreceptSemanticTokensHandler.GetClassifiedTokens(dsl);
+
+        tokens.Should().Contain(t =>
+            t.Text == "\"Cannot complete this transition\"" &&
+            t.Type == "preceptMessage");
+    }
+
+    [Fact]
     public void GetClassifiedTokens_DefaultString_IsPreceptValue()
     {
         const string dsl = """
