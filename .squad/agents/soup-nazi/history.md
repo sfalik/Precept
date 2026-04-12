@@ -93,6 +93,17 @@
 - Runtime arg key format confirmed: `["Name"] = value` (arg name only, no event prefix).
 - Decision filed: `.squad/decisions/inbox/soup-nazi-issue10-three-level-tests.md`.
 
+### 2026-04-12 — Issue #17: Computed/Derived Fields — Design Review test feasibility assessment
+- **Verdict: MANAGEABLE.** ~85–95 new tests across 5 test projects.
+- **Edge cases enumerated:** 65 total — 10 parser, 20 type checker, 22 runtime, 5 API boundary, 8 language server.
+- **Two highest-risk areas:** (1) Arrow `->` disambiguation — token serves double duty in field declarations and transition rows, single highest parser risk; (2) Recomputation timing — 3 pipelines (Fire/Update/Inspect) must recompute after mutations but before constraints.
+- **Novel infrastructure:** Topological sort + cycle detection is new code with no existing codebase pattern. Recommend exhaustive graph topology test section (linear, diamond, self-cycle, multi-node cycle).
+- **Regression hotspots:** `NewSyntaxParserTests.cs` (arrow disambiguation), `PreceptEditTests.cs` (computed fields excluded from editability), expression evaluator tests (shared evaluation path).
+- **AC coverage:** All ACs map to concrete tests. One clarification needed: does "all data types" include `choice` in computed expressions?
+- **Comparison to Issue #14 (when guards):** Issue #14 was HIGH-RISK (~118 tests, 4 novel forms). Issue #17 has fewer forms (one construct) but more novel infrastructure. Better-specified ACs bring it down to MANAGEABLE.
+- **Recommended test order:** Phase 0 gate → parser → type checker → runtime → LS/MCP → CatalogDrift.
+- Assessment filed: `temp/soup-nazi-proposal-review-17.json`.
+
 ### 2026-04-10 — Issue #10: string .length accessor test file authored
 - Created `test/Precept.Tests/StringAccessorTests.cs` (23 tests) covering all Issue #10 acceptance criteria.
 - **Test categories:** parser (2), type checker (7 incl. C56/PRECEPT056 and null narrowing), runtime value semantics (4 incl. UTF-16 emoji), null-guard compound evaluation (4), invariant context (2), event assert context (2), guard routing (2), regression (1).

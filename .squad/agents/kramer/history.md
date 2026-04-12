@@ -98,6 +98,15 @@
 ### 2026-04-12 — Issue #9: Conditional expression tooling
 
 - Expression-only control keywords (`if`, `then`, `else`) must be excluded from `TopLevelItems` even though they share `TokenCategory.Control` with statement-level keywords like `when`. The `BuildTopLevelItems()` method auto-includes all Control tokens — add explicit symbol-name exclusions.
+
+### 2026-04-12 — Issue #17: Computed fields tooling feasibility assessment
+
+- Grammar (`precept.tmLanguage.json`): **zero changes needed.** The `arrowOperator` pattern already tokenizes `->` globally as `punctuation.separator.arrow.precept`. In `field X as number -> expr`, the arrow and expression tokens are caught by the top-level pattern cascade (arrowOperator, identifierReference, operators, collectionMemberAccess). No ambiguity with transition-row arrows — same scope, same shade (#2 Grammar).
+- Semantic tokens: **zero changes needed.** `PreceptToken.Arrow` already maps to `"preceptKeywordGrammar"` via `[TokenCategory(Punctuation)]`. Post-arrow identifiers in field context fall through to default classification — cosmetically suboptimal but functional. Minor context-inference tweak optional.
+- Hover: ~15 lines in `BuildFieldMarkdown()` once `PreceptField` model gains `IsComputed`/`Expression`/dependencies. Blocked on parser/model work.
+- Completions: **majority of tooling effort.** Needs: (1) `->` in `ComputeRemainingModifiers()` when `!hasDefault`, (2) new regex branch + `BuildComputedFieldExpressionCompletions()` helper (field names, `.count` only, operators, literals, NO event args), (3) computed field filtering across 6+ `set` target sites and 3+ `edit` target sites — requires `PreceptDocumentInfo` plumbing for computed field set.
+- Key learning: `FieldScalarModifierZoneRegex` captures trailing content after type, so the `->` derivation arrow can be offered alongside `nullable`/`default`/constraints with mutual exclusion logic. The `BuildDataExpressionCompletions()` helper is close to what computed field expressions need but includes collection scope items that need restriction (`.count` only).
+- Verdict: **medium-effort** — 2 tooling slices after parser/model work ships.
 - Continuation keywords (`then`, `else`) should also be excluded from `KeywordItems` — they're never meaningful standalone, only as part of `if ... then ... else`.
 - `ExpressionOperatorItems` is the correct insertion point for expression-level keywords — it feeds into `BuildGuardCompletions`, `BuildExpressionCompletions`, `BuildDataExpressionCompletions`, and `BuildEventAssertCompletions` (all four expression contexts).
 - Using a snippet (`if ${1:condition} then ${2:value} else ${3:value}`) for conditional expressions provides better UX than a bare keyword since the full form is always required.
