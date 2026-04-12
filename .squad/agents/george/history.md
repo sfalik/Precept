@@ -7,6 +7,17 @@
 
 ## Recent Updates
 
+### 2026-04-11 — Slice 11: Documentation updates for `when` guards on declarations (Issue #14)
+
+Updated 6 documentation files to sync with the completed `when` guard implementation:
+- **`docs/PreceptLanguageDesign.md`**: Updated grammar rules (Invariant, StateAsserts, EventAssert, StateEditDecl) to include `WhenOpt`. Added semantics note about when guards on declarations (guard scope, C69, narrowing exclusion). Added conditional forms to state asserts section, conditional editability subsection, when guard note to event asserts section. Added C69 to constraint codes table. Added when guards bullet to Status section.
+- **`docs/EditableFieldsDesign.md`**: Added conditional syntax form to Syntax section. Added "Conditional editability" subsection to Semantics. Updated `PreceptEditBlock` record to show `WhenText`/`WhenGuard` params. Documented `_guardedEditBlocks` field and `EvaluateGuardedEditFields` helper in engine editability map section.
+- **`docs/ConstraintViolationDesign.md`**: Added C69 to compile-phase diagnostics table.
+- **`docs/RuntimeApiDesign.md`**: Added `when` guard evaluation notes to fire pipeline (event asserts, invariants/state asserts, edit blocks).
+- **`docs/McpServerDesign.md`**: Added declaration arrays (`invariants`, `stateAsserts`, `eventAsserts`, `editBlocks`) with `when?` property to `precept_compile` output documentation.
+- **`README.md`**: Added "Conditional declarations" bullet to feature list.
+- All 1,094 tests passing (883 core + 137 LS + 74 MCP).
+
 ### 2026-04-11 — Issue #14 full implementation scope document
 
 Complete spec written covering all 4 forms and 19 change sites across 5 files. Filed to `.squad/decisions/inbox/george-issue14-implementation-scope.md`. Key determination: single implementable slice with a trivial prerequisite commit for the B1 narrowing fix.

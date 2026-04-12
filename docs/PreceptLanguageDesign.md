@@ -200,16 +200,16 @@ ConstraintSuffix   := "nonnegative" | "positive" | "notempty"
                     | "maxplaces" IntegerLiteral | "ordered"
 DefaultOpt         := ("default" LiteralOrList)?
 
-Invariant          := "invariant" BoolExpr "because" StringLiteral
+Invariant          := "invariant" BoolExpr WhenOpt "because" StringLiteral
 
 StateDecl          := "state" StateNameEntry ("," StateNameEntry)*
 StateNameEntry     := Identifier InitialOpt
 InitialOpt         := ("initial")?
 
 StateAssert        := StateInAssert | StateToAssert | StateFromAssert
-StateInAssert      := "in" StateTarget "assert" BoolExpr "because" StringLiteral
-StateToAssert      := "to" StateTarget "assert" BoolExpr "because" StringLiteral
-StateFromAssert    := "from" StateTarget "assert" BoolExpr "because" StringLiteral
+StateInAssert      := "in" StateTarget "assert" BoolExpr WhenOpt "because" StringLiteral
+StateToAssert      := "to" StateTarget "assert" BoolExpr WhenOpt "because" StringLiteral
+StateFromAssert    := "from" StateTarget "assert" BoolExpr WhenOpt "because" StringLiteral
 StateTarget        := "any" | Identifier ("," Identifier)*
 
 StateAction        := StateToAction | StateFromAction
@@ -229,7 +229,7 @@ PopAction          := "pop" Identifier ("into" Identifier)?
 ClearAction        := "clear" Identifier
 
 EditDecl           := StateEditDecl | RootEditDecl
-StateEditDecl      := "in" StateTarget "edit" FieldTarget
+StateEditDecl      := "in" StateTarget WhenOpt "edit" FieldTarget
 RootEditDecl       := "edit" FieldTarget
 FieldTarget        := "all" | Identifier ("," Identifier)*
 
@@ -237,7 +237,7 @@ EventDecl          := "event" Identifier ("," Identifier)* ("with" ArgList)?
 ArgList            := ArgDecl ("," ArgDecl)*
 ArgDecl            := Identifier "as" TypeRef NullableOpt DefaultOpt ConstraintSuffix*
 
-EventAssert        := "on" Identifier "assert" BoolExpr "because" StringLiteral
+EventAssert        := "on" Identifier "assert" BoolExpr WhenOpt "because" StringLiteral
 
 TransitionRow      := "from" StateTarget "on" Identifier WhenOpt ActionChain? "->" Outcome
 WhenOpt            := ("when" BoolExpr)?
@@ -270,6 +270,7 @@ Notes:
 - All three state assert forms evaluate against the **proposed world** (post-mutation, pre-commit). Fields-scoped.
 - `EventAssert` = movement truth. Checked pre-transition when the named event fires. Scoped to that event's args only.
 - Whether `EventAssert` must appear after its `EventDecl` is not locked yet; recommended to keep asserts near the related event for readability.
+- **`when` guards on declarations** — `WhenOpt` is an optional `when <BoolExpr>` clause on invariants, state asserts, event asserts, and edit declarations. When present, the guard acts as a precondition: if false, the declaration is skipped entirely (invariant/assert not checked, edit fields not granted). Guard scope is inherited from the declaration form: invariant/state-assert/edit guards reference entity fields only; event-assert guards reference event args only. C69 fires for cross-scope guard references (e.g. entity field in an event-assert guard). Guarded state asserts are excluded from unconditional null-narrowing at compile time.
 - **Compile-time error:** duplicate `in` + `to` on the same state with the same expression (syntactic identity after whitespace normalization). `in` already subsumes `to`.
 - **Compile-time error:** duplicate assert — same preposition + same state + same expression appearing more than once.
 - **Compile-time error:** `in` on the initial state where default field values violate the expression. Both defaults and initial state are statically known.
@@ -729,6 +730,9 @@ Forms:
 - `in <StateTarget> assert <BoolExpr> because "<Reason>"`
 - `to <StateTarget> assert <BoolExpr> because "<Reason>"`
 - `from <StateTarget> assert <BoolExpr> because "<Reason>"`
+- `in <StateTarget> assert <BoolExpr> when <Guard> because "<Reason>"` (conditional — guard is entity-field-scoped)
+- `to <StateTarget> assert <BoolExpr> when <Guard> because "<Reason>"`
+- `from <StateTarget> assert <BoolExpr> when <Guard> because "<Reason>"`
 
 Where `<StateTarget>` is one of:
 - A single state name: `Open`
@@ -756,6 +760,8 @@ Compile-time checks (Locked):
 | 5 | Cross-preposition deadlock | `in`/`to` vs `from` on same state, conjoined per-field domains are empty → unexitable | Error |
 
 All domain checks (#3–#5) use per-field interval/set analysis on the expression AST. Expressions involving `contains` or cross-field relationships that cannot be reduced to per-field domains are assumed satisfiable (sound — no false positives).
+
+**`when` guards on state asserts:** All three state assert forms accept an optional `when <Guard>` clause between the expression and `because`. When the guard is present, the assert is conditional — if the guard evaluates to false against current field data, the assert is skipped. Guarded state asserts are excluded from unconditional null-narrowing at compile time (a guarded `in State assert Field != null` does not narrow `Field` for transition rows, because the guard may be false). C69 fires if the guard references identifiers outside the entity-field scope.
 
 Focused example:
 
@@ -854,6 +860,29 @@ This is LL(2) at most — the parser sees `in` → state list → `assert` or `e
 - **`in any edit`** expands to all declared states at parse time (same as `in any assert`).
 - **Independence from events:** Edit declarations and event transitions are orthogonal. A field can be both editable and modified by event `set` assignments.
 - **No terminal state exclusion:** `in any edit` includes terminal states. To exclude specific states, list states explicitly.
+
+### Conditional editability
+
+Edit declarations accept an optional `when <Guard>` clause:
+
+```
+in <StateTarget> when <Guard> edit <FieldList>
+```
+
+Where `<Guard>` is a boolean expression over entity fields. When the guard is present, the listed fields are conditionally editable — only granted when the guard evaluates to true against the current instance data.
+
+Example:
+
+```precept
+in Active when HasPermission == true edit SensitiveField
+in Open, InProgress edit Notes, Description
+```
+
+Semantics:
+- **Additive union:** Unconditional edit blocks + guarded edit blocks whose guard passes = effective editable set. Static fields are always included; guarded fields are added when their guard is satisfied.
+- **Fail-closed:** If a guard expression evaluation fails (expression error, missing data), the guarded fields are NOT granted editability.
+- **Dynamic evaluation:** Guards are evaluated at each `Update` / `Inspect` call with current instance data.
+- **Guard scope:** Entity fields only (same as unconditional edit declarations). C69 fires for out-of-scope references.
 
 ### Root-level editability (stateless precepts)
 
@@ -956,6 +985,8 @@ Scope (Locked):
 - Dotted access on args is permitted if the underlying expression language supports it (e.g., `items.count`).
 - Referencing any non-arg identifier (including fields) is a parse/validation error.
 - Validation that combines event args with field state belongs in `when` guards on transition rows, not in event asserts. Event asserts answer "is this event well-formed?" — `when` guards answer "does this event apply given the current state?"
+
+**`when` guards on event asserts:** Event asserts accept an optional `when <Guard>` clause: `on <Event> assert <Expr> when <Guard> because "..."`. Guards on event asserts are **arg-scoped only** — consistent with the event-assert body scope. C69 fires for entity field references in event-assert guards. When the guard is false, the assert is skipped.
 
 Semantics (Locked ordering):
 - Event asserts run **before** transition selection.
@@ -1343,6 +1374,7 @@ Type checking for `from any` rows expands to per-state checking. Each state may 
 | C42 / PRECEPT042 | Null-flow violation (assigning `T\|null` to `T` without narrowing) |
 | C43 / PRECEPT043 | Collection `pop`/`dequeue into` target type mismatch |
 | C60 / PRECEPT060 | Narrowing assignment: assigning a `number` or `decimal` value to an `integer` field requires an explicit integer-producing expression (no implicit truncation) |
+| C69 / PRECEPT069 | Cross-scope guard reference in `when` clause |
 
 ### Design principle
 
@@ -1403,6 +1435,7 @@ Locked in this discussion:
 - Collection mutation nullability: `add`/`enqueue`/`push`/`remove` with a `T|null` value into a non-nullable collection require prior narrowing. The shared type checker enforces this via C42 (null-flow violation). Guard narrowing (`when Value != null`) and cross-branch narrowing (prior row handles null case) both satisfy the requirement.
 - Event-arg reference form: transition rows (guards, set RHS, mutation values) require the dotted form (`EventName.ArgName`). Bare arg names are valid only inside event asserts (`on <Event> assert`), where scope is arg-only. Narrowing applies to the exact symbol form used — no cross-form mirroring. Cross-event arg references (`EventB.Arg` in a row for `EventA`) are invalid.
 - Event-assert scope: permanently arg-only. Field references in event asserts are a compile-time error (C14/C15/C16). Validation combining event args with field state belongs in `when` guards, not event asserts.
+- `when` guards on declarations: `invariant <Expr> when <Guard> because "..."`, `in <State> assert <Expr> when <Guard> because "..."`, `on <Event> assert <Expr> when <Guard> because "..."`, `in <State> when <Guard> edit <Fields>`. Guard scope is inherited from declaration form. Collect-all semantics preserved. C69 for cross-scope references. Guarded state asserts excluded from unconditional null-narrowing.
 - Static impossibility boundary: the compile-time checker proves contradictions only from type information and null-flow narrowing (single-symbol, local reasoning). Additionally, identical-guard duplicate rows for the same `(state, event)` are a compile-time error. No cross-field arithmetic reasoning — the inspector handles data-dependent impossibility.
 - Diagnostic severity: three-tier model. **Error** = provably wrong (blocks compilation). **Warning** = structural quality concern (does not block). **Hint** = informational observation. The checker never guesses; uncertain cases are left to the inspector.
 - Diagnostic codes: overload existing codes for same conceptual category; new codes only for genuinely new categories. C38–C45 are stable and will not be split. New codes start at C46.
