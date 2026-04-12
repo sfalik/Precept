@@ -13,7 +13,7 @@ This skill operationalizes §3 (Implementation) of `CONTRIBUTING.md`. The key ru
 
 - The PR body checklist is **ephemeral** — it is discarded after merge. It does not need to outlive the PR.
 - Checkboxes are updated **as work progresses**, not at the end. After each slice or logical group, update the PR body.
-- **Design decisions (why, alternatives, rationale) do NOT go in the PR body** — they belong in the issue (during design) and in `research/` (at merge time). The PR body captures what was done during implementation, not the design.
+- **Full design rationale (alternatives, precedent, tradeoff analysis) does NOT go in the PR body** — that belongs in the issue (during design) and in `research/` (at merge time). The PR body's `## Why` section is concise reviewer context for the shipped change, not a duplicate of the proposal's full rationale.
 - The **slice order** for cross-cutting changes is defined in CONTRIBUTING.md §3 step 5: Parser + model + diagnostics → Type checker → Runtime → Language server → Grammar → MCP → Tests → Samples → Docs. The checklist component sections below follow this order.
 
 ## When to use
@@ -24,31 +24,31 @@ This skill operationalizes §3 (Implementation) of `CONTRIBUTING.md`. The key ru
 
 ## Structure
 
-A good PR body has four sections:
+A good PR body has four required sections:
 
 ```
-## What this does
-[2–4 sentences: what capability this adds, not how it works.
- Link to the issue for design context — do NOT duplicate design decisions here.
- The issue already has full rationale, alternatives, and precedent.]
+## Summary
+[2–4 sentences: what changed in reviewer-facing terms. Keep this current if the shipped scope changes.]
 
-## Implementation notes
-[Things discovered DURING implementation that weren't in the issue design.
- This is the high-value PR-specific content. Examples:
- - A non-mechanical path that required special handling (name the file + method)
- - A footgun encountered that future implementers should know about
- - A scope or behavior that differs from the naive reading of the design
- - A deferral with the reason (what was left out and why)
- Leave this section out entirely if implementation was straightforward and matched the design exactly.]
+## Linked Issue
+- Closes #N
 
-## Implementation checklist
+## Why
+[1–3 bullets or a short paragraph explaining why this PR exists, what user/problem it addresses, and any implementation-specific reviewer context. Do NOT duplicate the issue's full design rationale or alternatives analysis.]
+
+## Implementation Plan
 [Sections by component. Each section has granular checkboxes.
  See component sections below.]
+```
 
-## Critical review focus
-[1–3 items that reviewers must explicitly verify. Name the file/line/path.
- Drawn from implementation notes — the stuff that could be subtly wrong.
- This is NOT a summary of what was done.]
+Optional sections if they add value:
+
+```
+## Implementation Notes
+[Things discovered DURING implementation that weren't obvious from the issue design.]
+
+## Critical Review Focus
+[1–3 items reviewers should explicitly verify.]
 ```
 
 ## Implementation checklist — component sections

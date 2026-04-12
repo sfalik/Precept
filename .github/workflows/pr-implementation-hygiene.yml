@@ -31,9 +31,41 @@ jobs:
             }
 
             const errors = [];
+            const sectionContent = (match) => match ? match[1] : '';
+            const hasMeaningfulContent = (text) => {
+              const lines = text
+                .replace(/<!--[\s\S]*?-->/g, '')
+                .split(/\r?\n/)
+                .map(line => line.replace(/^[-*]\s*/, '').trim())
+                .filter(Boolean)
+                .filter(line => line !== '...' && line.toLowerCase() !== 'tbd')
+                .filter(line => !/^replace these placeholders/i.test(line));
+              return lines.length > 0;
+            };
 
             if (!issueLinkPattern.test(body)) {
               errors.push('PR body must link the issue with `Closes #N`, `Fixes #N`, or `Resolves #N`.');
+            }
+
+            const summarySectionMatch = body.match(/##\s+Summary\b([\s\S]*?)(?:\n##\s+|$)/i);
+            if (!summarySectionMatch) {
+              errors.push('PR body must include a `## Summary` section.');
+            } else if (!hasMeaningfulContent(sectionContent(summarySectionMatch))) {
+              errors.push('The `## Summary` section must explain what changed; placeholder text is not enough.');
+            }
+
+            const linkedIssueSectionMatch = body.match(/##\s+Linked Issue\b([\s\S]*?)(?:\n##\s+|$)/i);
+            if (!linkedIssueSectionMatch) {
+              errors.push('PR body must include a `## Linked Issue` section.');
+            } else if (!issueLinkPattern.test(sectionContent(linkedIssueSectionMatch))) {
+              errors.push('The `## Linked Issue` section must contain `Closes #N`, `Fixes #N`, or `Resolves #N`.');
+            }
+
+            const whySectionMatch = body.match(/##\s+Why\b([\s\S]*?)(?:\n##\s+|$)/i);
+            if (!whySectionMatch) {
+              errors.push('PR body must include a `## Why` section.');
+            } else if (!hasMeaningfulContent(sectionContent(whySectionMatch))) {
+              errors.push('The `## Why` section must explain why the change exists; placeholder text is not enough.');
             }
 
             const implementationSectionMatch = body.match(/##\s+Implementation Plan\b([\s\S]*?)(?:\n##\s+|$)/i);

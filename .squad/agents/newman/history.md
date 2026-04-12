@@ -13,8 +13,21 @@
 
 ## Learnings
 
-### 2026-04-10 — Issue #31 shipped
+### 2026-04-12 — Remove squad:copilot integration
+
+- **Removing the coding-agent lane touches 12+ files across 3 categories:** active workflows (4), template workflows (4), and docs/templates (4+). Always inventory the full blast radius before starting — the wisdom.md pattern of "always sync templates in the same pass" applies here too.
+- **RETIRED_LABELS is the clean mechanism for label cleanup.** When removing a label family from squad integration, add the labels to the `RETIRED_LABELS` array in both sync-squad-labels workflow copies. They get deleted from the repo on the next label sync run without requiring manual GitHub API calls.
+- **squad-triage.yml had the most buried copilot coupling.** The `hasCopilot` capability-tier logic (good-fit/needs-review/not-suitable keyword matching) was silently pre-routing issues before the normal member routing ran. Pure copilot logic was deeply interwoven with general triage.
+- **The `squad.agent.md` "Copilot Coding Agent Member" section should be replaced with a disabled notice, not deleted.** A missing section in a large agent file could silently confuse future sessions. A visible "This integration is disabled in this repo" stub prevents that.
+
 - PR #50 merged to main (squash SHA `305ec03`). Issue #31 closed. 775 tests passing.
+
+### 2026-04-12 — Scope correction: squad:chore survives copilot removal
+
+- **`squad:chore` and `squad:copilot` are NOT the same thing.** The previous change conflated them — `squad:copilot` was the autonomous routing label; `squad:chore` was a work-type marker. Retiring both together was overly broad.
+- **Scope of the correct removal:** `squad:copilot` is retired (removed from label set, automation deleted). `squad:chore` survives as an explicit chore/maintenance label with no auto-routing behavior.
+- **Three places to fix when a label's role changes:** (1) RETIRED_LABELS array in the sync workflow, (2) the squad-issue-assign job condition (to skip non-member `squad:*` labels), and (3) any documentation that describes the label's meaning. All three must agree.
+- **Disabled notice language matters.** A stub that says "X / Y has been removed" when only X was removed leaves a false impression of Y's status. Stubs must be precise about what is actually gone.
 
 ### Issue #31 Slice 6 — Operator Inventory (2026-04-10)
 

@@ -29,6 +29,11 @@
 
 ## Recent Updates
 
+### 2026-04-12 — Squad `@copilot` lane retirement contract review
+- Confirmed the contract change is narrowly scoped: retire only the Squad-owned `squad:copilot` coding-agent routing lane. `squad:chore` is retained as an explicit chore/work-type label with no autonomous routing — it is not retired.
+- General repo-wide Copilot tooling should remain in place (`.github/copilot-instructions.md`, `.copilot/skills/`, passive references) because it is not part of Squad governance.
+- Live workflows, mirrored templates, team/routing docs, and squad agent docs all need to agree on the retirement to avoid half-disabled routing.
+
 ### 2026-04-12 — Issue #9 design review resolutions incorporated
 - Updated Issue #9 proposal body with all 4 resolved must-resolve items from the design review (Decisions 6–9).
 - **Decision 6:** `else` branch null-narrowing — original type retained, no reverse narrowing. #14 precedent.

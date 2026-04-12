@@ -53,11 +53,11 @@ Keep `tools/Precept.Plugin/.mcp.json` in shipped `dotnet tool run precept-mcp` f
 
 For issue-based implementation work:
 
-- Read `CONTRIBUTING.md` before starting.
+- Read `CONTRIBUTING.md` before starting and treat it as the canonical workflow for issue work.
 - Open or reuse the linked **draft PR** immediately and treat it as the execution hub for the issue.
-- Put the implementation plan in the **PR body** as a checkbox checklist and keep it updated as work progresses.
-- Work in vertical slices. After each completed slice, commit, push, and update the PR-body checklist before continuing.
-- Link the PR to the issue with `Closes #N`.
+- Use the exact PR-body structure required by `CONTRIBUTING.md` and the repository PR template: `## Summary`, `## Linked Issue` (with `Closes #N`), `## Why`, and `## Implementation Plan`.
+- Keep the `## Summary` and `## Why` sections current so reviewers can see what changed and why without reconstructing it from the diff.
+- Work in vertical slices. After each completed slice, commit, push, and update the PR-body summary/checklist before continuing.
 - Do **not** create a separate implementation-plan markdown file; the PR body is the ephemeral plan artifact for this repo.
 
 ## Use the MCP Tools First
