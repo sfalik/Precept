@@ -48,7 +48,8 @@ jobs:
               }
               if (inMembersTable && line.startsWith('|') && !line.includes('---') && !line.includes('Name')) {
                 const cells = line.split('|').map(c => c.trim()).filter(Boolean);
-                if (cells.length >= 2 && cells[0] !== 'Scribe') {
+                // Exclude Scribe (silent logger) and Ralph (not a work-pickup member; label would collide with retired squad:ralph)
+                if (cells.length >= 2 && cells[0] !== 'Scribe' && cells[0] !== 'Ralph') {
                   members.push({
                     name: cells[0],
                     role: cells[1]
@@ -59,13 +60,9 @@ jobs:
 
             core.info(`Found ${members.length} squad members: ${members.map(m => m.name).join(', ')}`);
 
-            // Check if @copilot is on the team
-            const hasCopilot = content.includes('🤖 Coding Agent');
-
             // Define label color palette for squad labels
             const SQUAD_COLOR = '9B8FCC';
             const MEMBER_COLOR = '9B8FCC';
-            const COPILOT_COLOR = '10b981';
 
             // Define exception and release labels (static)
             const EXCEPTION_LABELS = [
@@ -88,6 +85,11 @@ jobs:
               { name: 'type:docs', color: 'D4E5F7', description: 'Documentation work' },
               { name: 'type:chore', color: 'D4E5F7', description: 'Maintenance, refactoring, cleanup' },
               { name: 'type:epic', color: 'CC4455', description: 'Parent issue that decomposes into sub-issues' }
+            ];
+
+            // squad:chore — autonomous pickup gate; Ralph routes to best-fit member and preserves review ceremony
+            const SQUAD_WORK_LABELS = [
+              { name: 'squad:chore', color: '9B8FCC', description: 'Autonomous chore pickup gate — Ralph routes to best-fit member and preserves review ceremony' }
             ];
 
             // High-signal labels — these MUST visually dominate all others
@@ -115,23 +117,15 @@ jobs:
               });
             }
 
-            // Add @copilot label if coding agent is on the team
-            if (hasCopilot) {
-              labels.push({
-                name: 'squad:copilot',
-                color: COPILOT_COLOR,
-                description: 'Assigned to @copilot (Coding Agent) for autonomous work'
-              });
-            }
-
-            // Add exception, release:, type:, priority:, and high-signal labels
+            // Add exception, release:, type:, squad work, priority:, and high-signal labels
             labels.push(...EXCEPTION_LABELS);
             labels.push(...RELEASE_LABELS);
             labels.push(...TYPE_LABELS);
+            labels.push(...SQUAD_WORK_LABELS);
             labels.push(...PRIORITY_LABELS);
             labels.push(...SIGNAL_LABELS);
 
-            const RETIRED_LABELS = ['go:yes', 'go:no', 'go:needs-research', 'squad:untriaged', 'needs-decision', 'decided'];
+            const RETIRED_LABELS = ['go:yes', 'go:no', 'go:needs-research', 'squad:untriaged', 'needs-decision', 'decided', 'squad:copilot', 'squad:ralph'];
 
             // Sync labels (create or update)
             for (const label of labels) {
