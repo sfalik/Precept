@@ -1,3 +1,8 @@
+## 2026-04-12T15:13:42Z - Elaine subsection-caps decision recorded
+
+- Wrote a brief session log for Elaine's sticky subsection label typography cleanup in `design/system/foundations/semantic-visual-system.html`.
+- Merged 1 Elaine inbox decision into `.squad/decisions.md`, found no effective duplicate, and removed the processed inbox file.
+- Updated the affected squad histories without modifying any product files.
 ## 2026-04-11T00:00:00Z - Slice 9 language design doc sync (#25, #27, #29)
 
 - Updated `docs/PreceptLanguageDesign.md`: grammar BNF (ConstraintSuffix, ScalarType), reserved keywords, scalar types section (integer/decimal/choice), field-level constraints table (maxplaces/ordered), built-in functions subsection (round()), and diagnostic codes (C60–C66).

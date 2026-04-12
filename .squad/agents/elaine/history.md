@@ -7,6 +7,14 @@
 
 ## Recent Updates
 
+### 2026-04-12 - Canonical semantic visual system artifacts flattened into design/system
+- Moved `semantic-visual-system.html`, `semant-visual-system-canonical.precept`, and `semantic-visual-system-notes.md` from `design/system/foundations/` into `design/system/` and retired the empty `foundations/` folder.
+- Updated live workspace references in design READMEs, brand review/spec docs, and the state-diagram specimen prototype so the canonical artifact path is now `design/system/semantic-visual-system.html` and the shared specimen path is `design/system/semant-visual-system-canonical.precept`.
+
+### 2026-04-12 - Sticky subsection labels aligned with rail typography reset
+- Removed the remaining small-caps override from the sticky subsection labels in `design/system/foundations/semantic-visual-system.html` so they match the active rail.
+- Preserved sticky placement, left-rail alignment, spacing, and the existing typography scale; the change was limited to the label treatment.
+
 ### 2026-04-05 - Kanban concept decision merged into squad record
 - Moved Concept 11's kanban-board preview decision from .squad/decisions/inbox/elaine-kanban-preview-concept.md into .squad/decisions.md during the proposal-expansion consolidation pass.
 - Preserved the core recommendation: use kanban as a complementary lifecycle-overview mode for simpler linear precepts, not as a replacement for Timeline, Storyboard, or Notebook views.
@@ -38,6 +46,10 @@
 2026-04-05T03:20:00Z: Steinbrenner applied branch protection to main (pull requests required, force pushes/admin only, no branch deletion).
 
 ## Learnings
+
+- 2026-04-12 — The cleanest folder story is status-based: `design/system/` holds live canonical system artifacts, `design/prototypes/` root stays reserved for active durable prototype work, and `design/prototypes/archive/` holds preserved reference sets. An empty-looking prototypes root is acceptable if it prevents archive material from reading like live direction.
+
+- 2026-04-12 — The semantic visual system artifacts are canonical enough that they should live at the root of `design/system/`, not inside a now-misleading `foundations/` subfolder. The prototype state specimen also depends on the shared canonical `.precept` by relative path, so path moves have to be validated as UX-adjacent behavior, not treated as a pure docs rename.
 
 - 2026-04-06 — The semantic visual system page should frame itself as Precept's strongest live expression of the visual system: still canonical and disciplined, but explicitly allowed to be beautiful enough to prove the system rather than merely police it.
 - 2026-04-06 — On semantic-system foundation pages, the typography contract should be explicit as a role map: Cascadia for identity and system-facing UI, Segoe UI Variable Text for paragraph reading, and italic reserved for semantic pressure rather than generic emphasis.
@@ -78,6 +90,18 @@
 - Golden-path suggestion: data-driven SUGGESTED_JOURNEY array maps state → recommended next event. Generates "▶ suggested next" badge on event cards and contextual step hints after each fire. Non-blocking — users can diverge freely.
 - Welcome banner on first load explains the interaction model and offers two CTAs: "Got it" (dismiss) and "🎓 Take the tour" (start coach marks). Disappears after first event is fired.
 - All guidance elements are independently dismissible and session-scoped (no persistence). Appropriate for a prototype.
+
+### 2026-04-11 — State Diagram Specimen: Prototype-to-Specimen Redesign
+
+- Redesigned `design/prototypes/state-diagram-runtime-options.html` from a dense 1557-line prototype comparison board into a ~905-line design-system specimen page.
+- Removed: hero section, Option 01/02/03 headers and numbering, secondary-section mini-cards, commentary grid, footnote, snapshot comparison cards, annotation strip, legend, surface stats, surface controls, meta cards, all prototype labels/kickers/status badges. Removed ~60 CSS rules that no longer had referencing HTML.
+- Preserved: authored-file renderer (JS tokenizer + data-source fetch), routeLeadRuntimeDiagram() SVG path routing, hover sync (mouseenter/mouseleave/focus/blur → is-linked class), black diagram stage, current-state violet fill, terminal double-border, initial node-dot, unreachable-current dashed treatment, unreachable-initial hatched treatment, tightened canvas max-width, responsive stacking media queries.
+- New specimen header: single `h1` in 11px/0.2em uppercase Geist Mono — vanishingly quiet so the split surface is the hero.
+- Surface bar labels now carry data context ("VisitorBadgePickup" / "ReadyForPickup · PickupWindowOpen = true") instead of prototype framing text.
+- Code pane simplified: code-frame with code-head (filename + pills) directly — no pane-kicker, no pane-copy, no pane-head wrapper.
+- Runtime pane simplified: diagram-surface → diagram-stage only — no surface-topline, no annotations, no snapshots, no caption, no legend.
+- CSS variables pruned: removed --panel, --panel-2, --panel-3, --valid, --warn (no remaining consumers).
+- Key design decision: a specimen page should let the surface speak. Every removed element was a justification layer that a specimen doesn't need — the split surface IS the argument.
 - Updated index page Concept 17 card to mention guided tour and suggested-next badges.
 - Decision record at `.squad/decisions/inbox/elaine-guided-journey.md`.
 - 2026-05-02 — DMN decision-table editors (Camunda, Trisotech) validate the Decision Matrix concept but show that multi-guard cells need sub-table rendering and hit-policy indicators — not just a single outcome badge.
@@ -168,3 +192,5 @@
 - 2026-05-17 — Frank's architectural analysis of the PNG sizing problem is thorough and correct on the core constraint. His recommendation (fenced code block) is the same as mine, and that tradeoff is now preserved in `.squad/decisions.md`.
 - 2026-05-18 — Regenerated `readme-hero-dsl.png` to match GitHub's 830px max image display width. Previous image (1268px) scaled to 830px, shrinking code text to ~8.5px vs GitHub's ~13.6px code blocks. New approach: capture at 830px viewport with 2× deviceScaleFactor → 1660px image. Code text now renders at ~13px on GitHub. Added `design/brand/capture-hero-dsl.mjs` Playwright script for reproducible regeneration. Final width contract is now preserved in `.squad/decisions.md`.
 - 2026-05-18 — GitHub README image width reference: repo README view caps at 830px (per wh0/banner-width research). The `.markdown-body` container maxes at 980px with 45px padding. Different views have different caps: markdown view 1012px, VS Code extension 882px, VS Marketplace ~711px.
+- 2026-04-12 — Sticky subsection labels in `design/system/foundations/semantic-visual-system.html` should follow the same typography reset as the active rail: no small-caps override and no OpenType small-caps feature. Natural title case keeps the left navigation vocabulary consistent without disturbing the baseline-led alignment model.
+- 2026-04-12 — `design/prototypes/` should stay visually quiet at the root: active prototype work or orientation only. Once a prototype set becomes preserved reference material rather than active top-level work, move the whole coupled artifact group into `design/prototypes/archive/` and fix any relative links to shared system assets in the same pass.
