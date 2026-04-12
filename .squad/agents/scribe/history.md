@@ -3,6 +3,13 @@
 - Wrote a brief session log for Elaine's sticky subsection label typography cleanup in `design/system/foundations/semantic-visual-system.html`.
 - Merged 1 Elaine inbox decision into `.squad/decisions.md`, found no effective duplicate, and removed the processed inbox file.
 - Updated the affected squad histories without modifying any product files.
+## 2026-04-11T00:00:00Z - Slice 9 language design doc sync (#25, #27, #29)
+
+- Updated `docs/PreceptLanguageDesign.md`: grammar BNF (ConstraintSuffix, ScalarType), reserved keywords, scalar types section (integer/decimal/choice), field-level constraints table (maxplaces/ordered), built-in functions subsection (round()), and diagnostic codes (C60–C66).
+- `docs/McpServerDesign.md`: confirmed already complete (Newman's Slice 6 commit). No changes needed.
+- `README.md`: no dedicated types/constraints table exists; no update needed.
+- `research/language/README.md`: #25, #27, #29 already present in domain index and open proposal issue map. No update needed.
+- **Docs gap noted:** The `## Status` section at the end of `PreceptLanguageDesign.md` lists locked design decisions but does not mention integer, decimal, or choice types being locked. These should be added to the locked list in a follow-up pass if the team wants the status section kept current.
 
 ---
 

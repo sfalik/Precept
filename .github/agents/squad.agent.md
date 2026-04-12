@@ -102,10 +102,26 @@ The `union` merge driver keeps all lines from both sides, which is correct for a
 This repository's canonical workflow lives in [CONTRIBUTING.md](/CONTRIBUTING.md). Squad must follow it.
 
 - Treat `CONTRIBUTING.md` as the source of truth for proposal lifecycle, artifact placement, and implementation workflow.
-- Treat GitHub issues as the canonical proposal body, `docs/research/` as durable rationale, PR bodies as ephemeral implementation checklists, and spec docs in `docs/` as the record of implemented behavior.
+- Treat GitHub issues as the canonical proposal body, `research/` as durable rationale, PR bodies as ephemeral implementation checklists, and spec docs in `docs/` as the record of implemented behavior.
 - For any implementation task, require documentation sync in the same PR unless the user explicitly says otherwise.
 - Before declaring implementation work complete, verify whether `README.md`, relevant `docs/*.md` files, syntax grammar, language-server completions, samples, and MCP docs need updates. If none are needed, say so explicitly.
 - When spawning agents for implementation work in this repo, instruct them to read `CONTRIBUTING.md` before coding if the task changes language surface, runtime behavior, tooling behavior, or public documentation.
+
+### Review Spawning — Full Subagents with Charter Context
+
+**When the user asks the team to review a PR, spawn reviewer agents as full `runSubagent` calls — never as Explore agents with lean prompts.** Explore agents lack the domain expertise, charter identity, and gate-enforcement authority that reviewers need. Lean prompts produce shallow reviews; full charter context produces thorough, gate-aware verdicts.
+
+**Spawn pattern for each reviewer:**
+1. **Read the reviewer's charter** (`{team_root}/.squad/agents/{name}/charter.md`) and inline it into the spawn prompt.
+2. **Include the reviewer's identity block** (name, role, expertise, style) so they operate in character with their review authority.
+3. **Include the linked issue's acceptance criteria** (for the tester/AC-gate reviewer) — instruct them to read the issue directly via GitHub tools.
+4. **Specify review criteria by role:**
+   - **Lead/Architect (Frank):** doc accuracy vs. implementation, diagnostic message correctness, grammar sync, completions/hover, dead code scan.
+   - **Tester (Soup Nazi):** AC-to-test matrix (every behavioral criterion must have a test), spot-check test quality, disabled test scan.
+5. **Require structured output:** `APPROVED` or `BLOCKED` with numbered findings (`B{N}:` / `G{N}:`).
+6. **Spawn reviewers in parallel** — they have no data dependency on each other.
+
+**Do NOT use `agentName: "Explore"` for reviews.** Explore is for read-only codebase Q&A — it has no review authority, no charter identity, and no gate-enforcement behavior.
 
 ### Implementation Gate — Draft PR Required (Enforced by Coordinator)
 

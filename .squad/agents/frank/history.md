@@ -7,7 +7,56 @@
 - Technical-surface work flows through Elaine (UX), Peterman (brand compliance), Frank (architectural fit), then Shane (sign-off).
 - README and brand-spec changes should reflect actual runtime semantics, not speculative future behavior.
 
+## Learnings
+
+### 2026-04-11 — Modifier any-order investigation (Issue #13)
+- **Key architecture finding:** The fixed modifier order (`nullable → default → constraints → ordered`) is enforced ONLY by two parser combinator chains (`FieldDecl` line 697, `EventArg` line 774). Model types, type checker, runtime, grammar, and MCP are all already order-independent.
+- **Constraint zone is already any-order:** `ConstraintSuffix.Many()` already allows constraints in any order. The rigidity is only between the four zones (nullable, default, constraints, ordered).
+- **Completions are the heavy lift:** `PreceptAnalyzer.cs` has ~30 regex patterns that hardcode position-dependent modifier sequences. These must be replaced with a dynamic "remaining modifiers" approach. The parser change itself is ~50 lines.
+- **Doc inconsistency found:** `PreceptLanguageDesign.md` prose says constraints appear "between the type (and `nullable`) and the `default` clause" but the grammar spec and parser put default BEFORE constraints. Needs correction regardless of this issue.
+- **Implementation approach:** Discriminated union `FieldModifier` with `.Many()` combinator. Extract properties from modifier list post-parse. Duplicate modifier detection via type checker (consistent with C58 precedent).
+- **Event arg comma boundary:** Superpower's `.Many()` uses `TryParse` internally — modifier parsing naturally stops at comma delimiters. Needs explicit test verification.
+- **Collection fields unaffected:** They only take constraints (no nullable/default/ordered), so they're already flexible.
+- **Recommended slicing:** (A) parser + type checker + tests, (B) completions rework, (C) docs.
+- Full analysis: `.squad/decisions/inbox/frank-modifier-any-order-investigation.md`
+
+### 2026-04-11 — Variadic min/max decision (Issue #16)
+- Updated proposal for comprehensive built-in functions to make min/max variadic (≥ 2 args, no upper limit) per Shane's approved decision.
+- Binary-only min/max was the original draft; variadic is the locked form. The mathematical arity-independence of min/max justifies the exception to fixed-arity signatures.
+- Collection overloads for min/max rejected — `.min`/`.max` accessors already serve that role. Added as explicit exclusion.
+- Key proposal changes: 6 signature updates, new locked decision #8, exclusion rewrite, new semantic rule, teachable error message, acceptance criteria updates, 3-arg example.
+- Decision filed: `.squad/decisions/inbox/frank-variadic-min-max.md`
+
 ## Recent Updates
+
+### 2026-04-12 — Event hooks gap investigation + external FSM precedent survey
+- Researched event-level action hooks triggered by Shane's `on Advance -> set Count = Count + 1` parse error.
+- Filed full external precedent survey across 5 systems (XState v5, SCXML, Akka Classic FSM, Spring SM, Redux) in `research/language/expressiveness/event-hooks.md`.
+- **Stateless case (Issue A):** CONFIRMED VIABLE. Zero Principle 7 tension — stateless precepts have no transition rows, so the shared-context concern that motivated Principle 7 has no application surface.
+- **Stateful case (Issue B):** Deferred as Issue B. Three unresolved questions: execution order position (Frank recommends Option 3 — after row mutations, before exit actions — citing SCXML §3.13 as normative precedent), outcome-scoping (fires on Unmatched?), and explicit Principle 7 exception rationale.
+- C49 revision required for Issue A: events with hooks suppress C49; events with asserts but no hooks get lower-severity warning.
+- Confirmed `ActionChain` reuse: `EventActionDecl` shares the existing parser combinator, no changes needed.
+
+
+
+### 2026-04-10 — Structural lifecycle modifiers: second pass (expanded modifier space)
+- Produced comprehensive second pass at `research/language/expressiveness/structural-lifecycle-modifiers.md`.
+- **Scope expansion:** Added 10 event modifier candidates (`entry`, `advancing`, `settling`, `irreversible`, `universal`, `isolated`, `guarded`, `total`, `completing`, `symmetric`), 8 field modifier candidates (`writeonce`, `identity`, `monotonic`, `sensitive`, `derived`, `immutable`, `sealed after <State>`, `audit`), and 6 additional state modifier candidates (`error`, `resting`, `decision`, `guarded` on incoming transitions, `absorbing`, `convergent`).
+- **Key insight reversal:** First pass concluded "event modifiers constrain behavioral properties requiring runtime state." Second pass disproves this — events have rich graph-structural properties (source scope, outcome shape, target scope) that are fully compile-time provable from declared transition rows. The error was conflating "event modifier" with "event firing-history modifier."
+- **Strongest new candidates (Tier 1 additions):** `entry` (intake event pattern), `advancing`/`settling` (routing vs mutation dichotomy), `isolated` (single-state scope), `writeonce` (intake-data immutability), `sealed after <State>` (lifecycle-phase freeze point), `guarded` on states (entry safety).
+- **Most impactful discovery:** The `advancing`/`settling` split is the single most valuable modifier concept — it captures a fundamental domain distinction (routing events vs data-collection events) visible in every sample.
+- **Cross-cutting findings:** Four modifier roles identified (structural constraint, intent declaration, tooling directive, feature gate). Recommended Option C: modifiers must be either compile-time verifiable OR tooling-actionable.
+- **Philosophical question surfaced:** Does the project accept tooling-directive modifiers (`sensitive`, `audit`) or restrict to compile-time-provable properties? Recommended Option C as position; flagged for Shane's decision.
+- Updated recommendation tiers: 8 Tier 1 candidates, 14 Tier 2 candidates, 12 Tier 3 (reject/defer).
+
+### 2026-04-10 — Structural lifecycle modifiers research
+- Produced comprehensive research document at `research/language/expressiveness/structural-lifecycle-modifiers.md`.
+- **Taxonomy:** Mapped 5 modifier categories (boundary, path, residency, cardinality, safety) covering 6 candidate modifiers: `terminal`, `required`/`milestone`, `transient`, `final`, `once`, `idempotent`.
+- **Survey:** Compared 8 systems (XState, Step Functions, BPMN, Stateless, TLA+/Alloy, Temporal, UML, Cedar/OPA). Terminal/final states are the only modifier with broad cross-system precedent.
+- **Tiers:** `terminal` is Tier 1 (strong candidate — compile-time provable, clear `initial` parallel, zero runtime cost). `required`/`transient` are Tier 2 (interesting but guard-dependent false positives or weaker-than-expected guarantees). Event modifiers (`final`, `once`, `idempotent`) are Tier 3 (reject/defer — require runtime state or break row independence).
+- **Key insight:** State modifiers constrain graph-structural roles (compile-time provable). Event modifiers constrain behavioral properties (need runtime tracking). The asymmetry is fundamental, not incidental.
+- **Domain taxonomy decision:** Created new domain "Structural lifecycle modifiers" (domain #23 in domain-map). Not an extension of existing domains — it adds *new declarations* that create new provable properties, distinct from constraint composition (value constraints), static reasoning (proving from existing declarations), and entity modeling (data shape).
+- Updated `research/language/README.md` domain index and horizon domains list. Updated `research/language/domain-map.md` with domain #23 entry and priority assessment.
 
 ### 2026-04-10 — Issue #31 shipped
 - PR #50 merged to main (squash SHA `305ec03`). Issue #31 closed. 775 tests passing.
@@ -140,6 +189,29 @@
 - Decision filed at `.squad/decisions/inbox/frank-stateless-event-boundary.md`.
 
 ## Learnings
+
+### 2026-04-11 - Issue #14 final approval — all 4 forms as unified wave
+
+- Produced definitive unified design sign-off for all four `when <guard>` forms (invariants, state asserts, event asserts, conditional edit eligibility) as a single implementation wave. Filed at `.squad/decisions/inbox/frank-issue14-final-approval.md`.
+- **All 4 forms APPROVED.**
+- **Semantic tension between Forms 1–3 (constraint-skip) and Form 4 (permission-grant) is not an inconsistency.** The directionality difference follows from the nature of the two declaration types: constraints default to applying everywhere and are scoped downward; edit permissions default to denied everywhere and are granted upward. `when <guard>` means "conditional on this boolean" in all cases — what "conditional" implies operationally follows the declaration kind. Teaching model holds uniformly.
+- **Fail-closed is non-negotiable for Form 4 and must be explicitly contracted in the issue.** Guards on edit blocks are permission grants. Granting access on evaluation error = fail-open permission system = never acceptable. Must specify: guard evaluation error → treat as false → field not granted.
+- **Scope-inherited conditioning holds cleanly for all 4 forms.** Form 4 edit guards are definitionally field-scoped — there is no current event during `Update`, so event args cannot be referenced. The distinction does not blur anywhere. Type checker must emit diagnostic for any edit guard that references event-arg identifiers.
+- **New prerequisite identified for Form 4: Elaine coordination on dynamic editability.** With guarded edit blocks, the editable field set can change as data values change (guard truth changes). The preview inspector already handles dynamic field lists, but UX treatment of fields appearing/disappearing mid-edit must be explicitly designed before Form 4 ships.
+- **Hydration reorder (moving `HydrateInstanceData` to start of `Update` and `Inspect(patch)`) is the primary regression risk** when including Form 4. George's analysis confirms it's a structural rearrangement with no semantic change (pure read). Risk is bounded and acceptable.
+- **The deferral was scope-splitting, not design rejection.** Form 4 is the same design principle as Forms 1–3 — the same `when <guard>` conditional semantics applied to a different declaration kind. The additive approach (static dict unchanged, guarded blocks in separate structure evaluated at call time) dissolves the original structural obstacle. No new conceptual risks.
+
+### 2026-04-11 - Form 4 additive approach design review
+
+- Analyzed Shane's proposed additive approach for `in State when <guard> edit <fields>` (Form 4, Issue #14).
+- **Verdict: additive approach is semantically sound. No design-level concerns justify continued deferral.**
+- Conjunctive semantics (in-state AND guard-true) are preserved by the two-pass union: unconditional fields from static dict + guarded fields from per-call guard evaluation. Union doesn't undermine conjunct because state filter is applied before guard filter.
+- **Guard failure → fail-closed** is the correct default. Guards on edit blocks are permission grants, not constraint gates. Fail-open on error would be a broken permission system. Must be explicitly specified in the follow-on issue.
+- **`in any when <guard> edit`** — use the same construction-time expansion that unconditional `any` already uses. No sentinel handling needed at call sites. Consistent with existing pattern.
+- UneditableField message disambiguation (why the field is not editable: not-declared vs. wrong-state vs. guard-false) is an implementation quality decision, not a design requirement. Not a deferral criterion.
+- **The deferral was always implementation-scoping, not design.** Form 4 is semantically identical to Forms 1–3 — the same `when <guard>` conditional semantics applied to a different declaration kind. The static dict was the only structural obstacle; the additive approach removes it without touching the existing path.
+- Three spec requirements must appear in the follow-on issue: (1) fail-closed guard evaluation contract, (2) `any` pre-expansion strategy, (3) Elaine coordination on dynamic editability (fields appear/disappear with guard truth value — intended behavior, UX contract needs to handle it).
+- Filed: `.squad/decisions/inbox/frank-issue14-form4-design.md`.
 
 ### 2026-04-08 - Warning model research for structurally degenerate precepts
 - Audited the full diagnostic infrastructure: `ConstraintSeverity` enum (Error/Warning/Hint), `DiagnosticCatalog.cs` constraints C48–C53, `PreceptAnalysis.cs` graph analysis, and the language server's `MapValidationDiagnostic` severity mapping. All three tiers are fully wired and operational.
@@ -380,6 +452,16 @@ Each exclusion removes complexity that Superpower would struggle with (indentati
 - FEEL/DMN: Strongest external comparator for business-rule DSL expression design. Has ternary, string functions, numeric functions, range membership.
 - Cedar (AWS): Strongest counter-precedent. Deliberately omits division and most math for formal analyzability.
 
+### 2026-04-11 — Issue #14 design verdict: `when <guard>` on declarations — APPROVED (Forms 1–3)
+
+- **Philosophy fit is pre-confirmed, not just defensible.** `docs/philosophy.md` explicitly states "guarded invariants do not weaken the guarantee; they make it precise." When a proposal implements what the philosophy already describes rather than extending it, the philosophy-fit finding is trivially GREEN. Note this explicitly in review to prevent any confusion about scope.
+- **Scope-inherited conditioning is industry-standard.** Zero surveyed systems allow cross-scope guard conditions (FluentValidation guards reference entity properties; Drools guards reference fact properties; Cedar guards reference policy attributes; Alloy facts reference signature fields). The scope-inheritance principle is not a Precept invention — it is the established practice across all production constraint systems.
+- **Implementation constraints ≠ design flaws.** All three reviewers' "blockers" are implementation scope questions: narrowing unsoundness (`WhenGuard is null` filter) is a type-checker implementation invariant; compile DTO gap is prerequisite parallel work; Form 4 static-dictionary mismatch is an architectural scope split best filed as a follow-on issue. None require proposal revision. Classify correctly.
+- **B3 (research files absent) was a false blocker caused by wrong path prefixes in the issue body.** The proposal cited `docs/research/language/...` paths; the actual paths are `research/language/...`. Always verify research file existence directly via `file_search` rather than trusting issue body citations. Corrected the issue body in the same session.
+- **The planned analysis docs (`frank-constraint-scoping-symmetry.md`, `frank-event-assert-when-reversal.md`) were cited in the issue as if existing but had not been produced.** Their substance was covered inline in the review itself (G5 and G6). If a review covers the substance of a planned document, the review IS the document — do not block on materializing the file separately.
+- **Event assert `when` reversal was the most important finding.** The prior position (exclude `on <Event> assert` from `when` coverage) was an overcorrection. The correct boundary is scope-scoped, not declaration-type-scoped. Arg-only guards on event asserts are within-scope → permitted. The teaching model becomes uniform: "every constraint declaration accepts `when`; the guard lives in the same scope as the constraint."
+- **Form 4 conjunctive semantics are architecturally sound but require a different runtime pattern.** `in State when guard edit` — state AND guard must hold. Both are independent filters. The concept is philosophically grounded; the implementation gap is that `_editableFieldsByState` is static. Per-call guard evaluation is the correct strategy for Form 4; a separate issue preserves scope discipline.
+
 **Expression audit highlights:** No ternary (row duplication across 14+ samples), no string `.length` (table-stakes gap), no function calls, no named guards. Current expression surface covers: arithmetic, logical, comparison, contains, collection accessors.
 
 **Verbosity analysis:** Three top smells: event-argument ingestion boilerplate, guard-pair duplication, non-negative constraint boilerplate. Map to proposals #11 (absorb), #12 (else reject), #13 (field constraints).
@@ -401,3 +483,9 @@ All proposals are additive and Superpower-compatible. No structural redesign req
 - Updated implementation scope: removed "reject events/transitions in stateless context" parser items, added analysis-phase items for new warning diagnostic and C50 severity upgrade.
 - Updated acceptance criteria: events-without-states produces warning (not error), C50 severity = warning, transitions in stateless fail existing C54.
 - Key writing lesson: conciseness requires structural discipline — say each argument once in the section where it belongs, then reference it elsewhere. The old issue repeated the philosophy argument in Summary, Motivation, Design Philosophy Thread, and Locked Decisions. The rewrite eliminates that redundancy without losing the argument.
+
+### 2026-04-11 — Issue #14 design review filed
+- Conducted the full design/architecture review for Issue #14 (`when <guard>` on declarations) on 2026-04-11. Filed at `.squad/decisions/inbox/frank-issue14-design-review.md`; merged into `.squad/decisions.md`.
+- **Verdict: APPROVED for Forms 1–3.** Form 4 (`in State when guard edit`) deferred to a follow-on issue — concept is sound, implementation requires per-call guard evaluation rather than static dictionary.
+- B3 (research base absent) cleared: both cited research files confirmed present at `research/language/expressiveness/conditional-logic-strategy.md` and `research/language/references/conditional-invariant-survey.md`. Issue body had wrong `docs/` path prefix — corrected in the same session.
+- All six locked design decisions upheld as architecturally sound. No philosophy gaps found. Zero grammar changes required.

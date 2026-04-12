@@ -99,6 +99,7 @@ internal sealed class PreceptSemanticTokensHandler : SemanticTokensHandlerBase
                 TokenCategory.Action => "preceptKeywordSemantic",
                 TokenCategory.Outcome => "preceptKeywordSemantic",
                 TokenCategory.Grammar => "preceptKeywordGrammar",
+                TokenCategory.Constraint => "preceptKeywordGrammar",
                 TokenCategory.Type => "preceptType",
                 TokenCategory.Literal => "preceptValue",
                 TokenCategory.Operator => "preceptKeywordGrammar",

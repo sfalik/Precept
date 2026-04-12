@@ -1147,11 +1147,11 @@ public class PreceptRulesTests
             from Active on ClearBalance -> set Balance = ClearBalance.NewBalance -> transition Active
             """;
 
-        // compile must succeed: default value null satisfies 'null || null >= 0' = true
+        // compile must succeed: default value null satisfies 'null or null >= 0' = true
         var workflow = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
         var instance = workflow.CreateInstance("Active", new Dictionary<string, object?> { ["Balance"] = 100.0 });
 
-        // Setting Balance to null via nullable arg — 'Balance == null || Balance >= 0' passes
+        // Setting Balance to null via nullable arg — 'Balance == null or Balance >= 0' passes
         var result = workflow.Fire(instance, "ClearBalance", new Dictionary<string, object?> { ["NewBalance"] = null });
 
         (result.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeTrue();

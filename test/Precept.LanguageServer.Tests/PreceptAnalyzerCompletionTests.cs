@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using FluentAssertions;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using Precept;
 using Precept.LanguageServer;
 using Xunit;
 
@@ -434,7 +436,8 @@ public class PreceptAnalyzerCompletionTests
         var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
 
         completions.Should().Contain(",");
-        completions.Should().HaveCount(1);
+        completions.Should().Contain("nullable", "any-order: nullable is valid after default");
+        completions.Should().NotContain("default", "already present in the declaration");
     }
 
     [Fact]
@@ -455,7 +458,7 @@ public class PreceptAnalyzerCompletionTests
     }
 
     [Fact]
-    public void Completions_AfterFieldScalarType_SuggestsNullableAndDefault()
+    public void Completions_AfterFieldScalarType_SuggestsNullableDefaultAndConstraints()
     {
         const string text = """
             precept M
@@ -470,11 +473,15 @@ public class PreceptAnalyzerCompletionTests
 
         completions.Should().Contain("nullable");
         completions.Should().Contain("default");
-        completions.Should().HaveCount(2);
+        completions.Should().Contain("notempty");
+        completions.Should().Contain("minlength");
+        completions.Should().Contain("maxlength");
+        completions.Should().NotContain("nonnegative", "number constraints should not appear on string fields");
+        completions.Should().HaveCount(5);
     }
 
     [Fact]
-    public void Completions_AfterFieldNullable_SuggestsDefault()
+    public void Completions_AfterFieldNullable_SuggestsDefaultAndConstraints()
     {
         const string text = """
             precept M
@@ -488,7 +495,11 @@ public class PreceptAnalyzerCompletionTests
         var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
 
         completions.Should().Contain("default");
-        completions.Should().HaveCount(1);
+        completions.Should().Contain("notempty");
+        completions.Should().Contain("minlength");
+        completions.Should().Contain("maxlength");
+        completions.Should().NotContain("nullable", "nullable already set");
+        completions.Should().HaveCount(4);
     }
 
     [Fact]
@@ -681,6 +692,482 @@ public class PreceptAnalyzerCompletionTests
         completions.Should().Contain("Exact");
     }
 
+    // ── Constraint zone completions (issue #13) ──────────────────────────
+
+    [Fact]
+    public void Completions_NumberFieldAfterType_SuggestsNullableDefaultAndNumberConstraints()
+    {
+        const string text = """
+            precept M
+            field Amount as number $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("nullable");
+        completions.Should().Contain("default");
+        completions.Should().Contain("nonnegative");
+        completions.Should().Contain("positive");
+        completions.Should().Contain("min");
+        completions.Should().Contain("max");
+        completions.Should().NotContain("notempty", "string constraints should not appear on number fields");
+        completions.Should().NotContain("mincount", "collection constraints should not appear on number fields");
+    }
+
+    [Fact]
+    public void Completions_NumberFieldAfterDefault_SuggestsNumberConstraints()
+    {
+        const string text = """
+            precept M
+            field Amount as number default 0 $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("nonnegative");
+        completions.Should().Contain("positive");
+        completions.Should().Contain("min");
+        completions.Should().Contain("max");
+        completions.Should().Contain("nullable", "any-order: nullable is valid after default");
+        completions.Should().NotContain("default", "already present in the declaration");
+        completions.Should().NotContain("notempty");
+    }
+
+    [Fact]
+    public void Completions_NumberFieldAfterConstraint_SuggestsMoreNumberConstraints()
+    {
+        const string text = """
+            precept M
+            field Amount as number nonnegative $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("positive");
+        completions.Should().Contain("min");
+        completions.Should().Contain("max");
+        completions.Should().Contain("nullable", "any-order: nullable is valid after constraints");
+        completions.Should().Contain("default", "any-order: default is valid after constraints");
+        completions.Should().NotContain("nonnegative", "already present in the declaration");
+        completions.Should().NotContain("notempty");
+    }
+
+    [Fact]
+    public void Completions_StringFieldAfterDefault_SuggestsStringConstraints()
+    {
+        const string text = """
+            precept M
+            field Name as string default "" $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("notempty");
+        completions.Should().Contain("minlength");
+        completions.Should().Contain("maxlength");
+        completions.Should().Contain("nullable", "any-order: nullable is valid after default");
+        completions.Should().NotContain("default", "already present in the declaration");
+        completions.Should().NotContain("nonnegative");
+    }
+
+    [Fact]
+    public void Completions_CollectionFieldAfterType_SuggestsCollectionConstraints()
+    {
+        const string text = """
+            precept M
+            field Tags as set of string $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("notempty");
+        completions.Should().Contain("mincount");
+        completions.Should().Contain("maxcount");
+        completions.Should().NotContain("nonnegative");
+        completions.Should().NotContain("minlength");
+    }
+
+    [Fact]
+    public void Completions_EventArgNumberType_SuggestsNumberConstraints()
+    {
+        const string text = """
+            precept M
+            state A initial
+            event Score with Value as number $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("nullable");
+        completions.Should().Contain("default");
+        completions.Should().Contain("nonnegative");
+        completions.Should().Contain("positive");
+        completions.Should().Contain("min");
+        completions.Should().Contain("max");
+        completions.Should().Contain(",");
+        completions.Should().NotContain("notempty");
+    }
+
+    [Fact]
+    public void Completions_EventArgStringType_SuggestsStringConstraints()
+    {
+        const string text = """
+            precept M
+            state A initial
+            event Submit with Comment as string $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("nullable");
+        completions.Should().Contain("default");
+        completions.Should().Contain("notempty");
+        completions.Should().Contain("minlength");
+        completions.Should().Contain("maxlength");
+        completions.Should().Contain(",");
+        completions.Should().NotContain("nonnegative");
+    }
+
+    // ── Choice field completions (issue #25) ──────────────────────────
+
+    [Fact]
+    public void Completions_ChoiceFieldAfterType_SuggestsNullableAndOrdered()
+    {
+        const string text = """
+            precept M
+            field Priority as choice("Low","High") $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("nullable");
+        completions.Should().Contain("ordered",
+            because: "'ordered' is the choice-specific constraint and must be offered after choice(...)");
+        completions.Should().NotContain("nonnegative", "numeric constraints must not appear on choice fields");
+        completions.Should().NotContain("notempty", "string constraints must not appear on choice fields");
+    }
+
+    [Fact]
+    public void Completions_ChoiceFieldSetAssignment_OffersChoiceMemberLiterals()
+    {
+        const string text = """
+            precept M
+            field Status as choice("Draft","Active","Closed") default "Draft"
+            state A initial
+            event Go
+            from A on Go -> set Status = $$ -> no transition
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("\"Draft\"",
+            because: "choice member literals must be offered as completions in set-assignment value position");
+        completions.Should().Contain("\"Active\"");
+        completions.Should().Contain("\"Closed\"");
+    }
+
+    [Fact]
+    public void Completions_GuardExpression_SuggestsKeywordLogicalOperators()
+    {
+        const string text = """
+            precept M
+            field Active as boolean default true
+            state A initial
+            event Go
+            from A on Go when $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("and");
+        completions.Should().Contain("or");
+        completions.Should().Contain("not");
+        completions.Should().NotContain("&&", "symbolic logical operators were replaced by keyword forms");
+        completions.Should().NotContain("||", "symbolic logical operators were replaced by keyword forms");
+        completions.Should().NotContain("!", "symbolic logical operators were replaced by keyword forms");
+    }
+
+    [Fact]
+    public void Completions_StringFieldDotTrigger_SuggestsLength()
+    {
+        const string text = """
+            precept M
+            field Name as string default ""
+            state A initial
+            event Go
+            from A on Go when Name.$$ -> no transition
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("Name.length",
+            because: ".length must be offered after string-typed field identifiers");
+    }
+
+    [Fact]
+    public void Completions_NonStringFieldDotTrigger_DoesNotSuggestLength()
+    {
+        const string text = """
+            precept M
+            field Count as number default 0
+            field Active as boolean default true
+            state A initial
+            event Go
+            from A on Go when Count.$$ -> no transition
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().NotContain("Count.length",
+            because: ".length must not be offered after non-string identifiers");
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Pre-precept scope: blank / new files without a precept declaration
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Completions_BlankFile_OnlyOffersPrecept()
+    {
+        const string text = """
+            $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().ContainSingle()
+            .Which.Should().Be("precept");
+    }
+
+    [Fact]
+    public void Completions_FileWithCommentOnly_OnlyOffersPrecept()
+    {
+        const string text = """
+            # This is a new precept file
+            $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().ContainSingle()
+            .Which.Should().Be("precept");
+    }
+
+    [Fact]
+    public void Completions_TypingPreceptName_SuppressesAll()
+    {
+        const string text = """
+            precept My$$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().BeEmpty(because: "user is naming the precept — no suggestions");
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Gap fixes: pipeline continuation, on + events, top-level, comments,
+    //            scalar types, event arg types
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Completions_AfterCompletedSetExpression_SuggestsArrow()
+    {
+        const string text = """
+            precept M
+            field Count as number default 0
+            state A initial
+            state B
+            event Go
+            from A on Go -> set Count = 42 $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("->",
+            because: "after a completed set expression, the pipeline arrow should be offered");
+    }
+
+    [Fact]
+    public void Completions_AfterCompletedAddExpression_SuggestsArrow()
+    {
+        const string text = """
+            precept M
+            field Tags as set of string
+            state A initial
+            state B
+            event Go
+            from A on Go -> add Tags "important" $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("->",
+            because: "after a completed add expression, the pipeline arrow should be offered");
+    }
+
+    [Fact]
+    public void Completions_OnAtLineStart_SuggestsEventNames()
+    {
+        const string text = """
+            precept M
+            state A initial
+            event Submit
+            event Cancel
+            on $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("Submit");
+        completions.Should().Contain("Cancel");
+        completions.Should().NotContain("set", because: "action keywords should not appear in event name position");
+    }
+
+    [Fact]
+    public void Completions_TopLevelBlankLine_OnlySuggestsDeclarationKeywords()
+    {
+        const string text = """
+            precept M
+            state A initial
+            event Go
+            $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        // Top-level declarations should be present
+        completions.Should().Contain("field");
+        completions.Should().Contain("state");
+        completions.Should().Contain("event");
+        completions.Should().Contain("from");
+        completions.Should().Contain("invariant");
+
+        // Action/outcome/grammar keywords should NOT be at top level
+        completions.Should().NotContain("set", because: "set is an action keyword, not a top-level declaration");
+        completions.Should().NotContain("transition", because: "transition is an outcome keyword, not a top-level declaration");
+        completions.Should().NotContain("nullable", because: "nullable is a grammar modifier, not a top-level declaration");
+        completions.Should().NotContain("nonnegative", because: "constraint keywords should not appear at top level");
+    }
+
+    [Fact]
+    public void Completions_CommentLine_SuppressesAll()
+    {
+        const string text = """
+            precept M
+            state A initial
+            # This is a comment $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().BeEmpty(because: "comment lines should suppress all completions");
+    }
+
+    [Fact]
+    public void Completions_EventArgAsPosition_SuggestsAllScalarTypes()
+    {
+        const string text = """
+            precept M
+            state A initial
+            event Go with Amount as $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("string");
+        completions.Should().Contain("number");
+        completions.Should().Contain("boolean");
+        completions.Should().Contain("integer");
+        completions.Should().Contain("decimal");
+        completions.Should().Contain(c => c.StartsWith("choice", StringComparison.Ordinal),
+            because: "choice type should be offered for event args");
+    }
+
+    [Fact]
+    public void Completions_EventArgIntegerType_SuggestsNumberConstraints()
+    {
+        const string text = """
+            precept M
+            state A initial
+            event Go with Count as integer $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("nonnegative");
+        completions.Should().Contain("positive");
+        completions.Should().Contain("min");
+        completions.Should().Contain("max");
+        completions.Should().Contain("nullable");
+        completions.Should().Contain(",");
+    }
+
+    [Fact]
+    public void Completions_EventArgDecimalType_SuggestsDecimalConstraints()
+    {
+        const string text = """
+            precept M
+            state A initial
+            event Go with Amount as decimal $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("nonnegative");
+        completions.Should().Contain("positive");
+        completions.Should().Contain("min");
+        completions.Should().Contain("max");
+        completions.Should().Contain(c => c.StartsWith("maxplaces", StringComparison.Ordinal),
+            because: "maxplaces must be offered for decimal event args");
+        completions.Should().Contain("nullable");
+        completions.Should().Contain(",");
+    }
+
+    [Fact]
+    public void Completions_CollectionOfPosition_SuggestsAllScalarTypes()
+    {
+        const string text = """
+            precept M
+            state A initial
+            field Items as set of $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("string");
+        completions.Should().Contain("number");
+        completions.Should().Contain("boolean");
+        completions.Should().Contain("integer");
+        completions.Should().Contain("decimal");
+        completions.Should().Contain(c => c.StartsWith("choice", StringComparison.Ordinal),
+            because: "choice type should be offered as collection inner type");
+    }
+
     private static (string text, Position position) ExtractPosition(string textWithMarker)
     {
         var index = textWithMarker.IndexOf("$$", StringComparison.Ordinal);
@@ -692,5 +1179,389 @@ public class PreceptAnalyzerCompletionTests
         var lastNewLine = prefix.LastIndexOf('\n');
         var character = lastNewLine >= 0 ? prefix.Length - lastNewLine - 1 : prefix.Length;
         return (text, new Position(line, character));
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Completions ↔ Token Catalog Drift Tests
+    // ════════════════════════════════════════════════════════════════════
+    //
+    // These tests enforce that the static completion lists in PreceptAnalyzer
+    // stay in sync with the PreceptToken enum. When someone adds a new token
+    // with [TokenCategory(Type)] or [TokenCategory(Constraint)] etc., these
+    // tests fail until the corresponding completion list is updated.
+
+    [Fact]
+    public void AllTypeTokens_AppearInTypeItems()
+    {
+        var typeSymbols = PreceptTokenMeta.GetByCategory(TokenCategory.Type)
+            .Select(t => PreceptTokenMeta.GetSymbol(t))
+            .Where(s => s is not null)
+            .ToHashSet(StringComparer.Ordinal);
+
+        var completionLabels = PreceptAnalyzer.TypeItems
+            .Select(i => i.Label)
+            .ToHashSet(StringComparer.Ordinal);
+
+        // Snippet labels like "choice(...)" won't match the raw symbol "choice",
+        // so also check whether the label starts with the symbol.
+        var missing = typeSymbols
+            .Where(sym => !completionLabels.Contains(sym!)
+                && !completionLabels.Any(label => label.StartsWith(sym!, StringComparison.Ordinal)))
+            .ToList();
+
+        missing.Should().BeEmpty(
+            "every token with [TokenCategory(Type)] must appear in PreceptAnalyzer.TypeItems — "
+            + "add new type keywords there when extending the language");
+    }
+
+    [Fact]
+    public void AllConstraintTokens_AppearInAtLeastOneConstraintList()
+    {
+        var constraintSymbols = PreceptTokenMeta.GetByCategory(TokenCategory.Constraint)
+            .Select(t => PreceptTokenMeta.GetSymbol(t))
+            .Where(s => s is not null)
+            .ToHashSet(StringComparer.Ordinal);
+
+        var allConstraintLabels = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var item in PreceptAnalyzer.NumberConstraintItems) allConstraintLabels.Add(item.Label);
+        foreach (var item in PreceptAnalyzer.StringConstraintItems) allConstraintLabels.Add(item.Label);
+        foreach (var item in PreceptAnalyzer.CollectionConstraintItems) allConstraintLabels.Add(item.Label);
+        foreach (var item in PreceptAnalyzer.DecimalConstraintItems) allConstraintLabels.Add(item.Label);
+        foreach (var item in PreceptAnalyzer.ChoiceConstraintItems) allConstraintLabels.Add(item.Label);
+
+        // Snippet labels like "maxplaces N" start with the symbol "maxplaces"
+        var missing = constraintSymbols
+            .Where(sym => !allConstraintLabels.Contains(sym!)
+                && !allConstraintLabels.Any(label => label.StartsWith(sym!, StringComparison.Ordinal)))
+            .ToList();
+
+        missing.Should().BeEmpty(
+            "every token with [TokenCategory(Constraint)] must appear in at least one constraint "
+            + "completion list (Number/String/Collection/Decimal/Choice) — add new constraint "
+            + "keywords to the appropriate list when extending the language");
+    }
+
+    [Fact]
+    public void AllActionTokens_AppearInArrowItems()
+    {
+        var actionSymbols = PreceptTokenMeta.GetByCategory(TokenCategory.Action)
+            .Select(t => PreceptTokenMeta.GetSymbol(t))
+            .Where(s => s is not null)
+            .ToHashSet(StringComparer.Ordinal);
+
+        var arrowLabels = PreceptAnalyzer.ArrowItems
+            .Select(i => i.Label)
+            .ToHashSet(StringComparer.Ordinal);
+
+        var missing = actionSymbols
+            .Where(sym => !arrowLabels.Contains(sym!))
+            .ToList();
+
+        missing.Should().BeEmpty(
+            "every token with [TokenCategory(Action)] must appear in PreceptAnalyzer.ArrowItems — "
+            + "add new action keywords there when extending the language");
+    }
+
+    [Fact]
+    public void AllOutcomeTokens_AppearInArrowItems()
+    {
+        var outcomeSymbols = PreceptTokenMeta.GetByCategory(TokenCategory.Outcome)
+            .Select(t => PreceptTokenMeta.GetSymbol(t))
+            .Where(s => s is not null)
+            .ToHashSet(StringComparer.Ordinal);
+
+        var arrowLabels = PreceptAnalyzer.ArrowItems
+            .Select(i => i.Label)
+            .ToHashSet(StringComparer.Ordinal);
+
+        // "no" appears as the composite "no transition" in ArrowItems
+        var missing = outcomeSymbols
+            .Where(sym => !arrowLabels.Contains(sym!)
+                && !arrowLabels.Any(label => label.StartsWith(sym!, StringComparison.Ordinal)))
+            .ToList();
+
+        missing.Should().BeEmpty(
+            "every token with [TokenCategory(Outcome)] must appear in PreceptAnalyzer.ArrowItems — "
+            + "add new outcome keywords there when extending the language");
+    }
+
+    [Fact]
+    public void AllLiteralTokens_AppearInLiteralItems()
+    {
+        var literalSymbols = PreceptTokenMeta.GetByCategory(TokenCategory.Literal)
+            .Select(t => PreceptTokenMeta.GetSymbol(t))
+            .Where(s => s is not null)
+            .ToHashSet(StringComparer.Ordinal);
+
+        var literalLabels = PreceptAnalyzer.LiteralItems
+            .Select(i => i.Label)
+            .ToHashSet(StringComparer.Ordinal);
+
+        var missing = literalSymbols
+            .Where(sym => !literalLabels.Contains(sym!))
+            .ToList();
+
+        missing.Should().BeEmpty(
+            "every token with [TokenCategory(Literal)] must appear in PreceptAnalyzer.LiteralItems — "
+            + "add new literal keywords there when extending the language");
+    }
+
+    [Fact]
+    public void AllKeywordOperatorTokens_AppearInExpressionOperatorItems()
+    {
+        // Keyword operators (alphabetic symbols with Operator category) must be offered
+        // in expression contexts. Non-alphabetic operators (==, >=, etc.) are also there
+        // but this test focuses on the ones that could drift as new keyword operators are added.
+        var keywordOperatorSymbols = PreceptTokenMeta.GetByCategory(TokenCategory.Operator)
+            .Select(t => PreceptTokenMeta.GetSymbol(t))
+            .Where(s => s is not null && s.All(char.IsLetter))
+            .ToHashSet(StringComparer.Ordinal);
+
+        var operatorLabels = PreceptAnalyzer.ExpressionOperatorItems
+            .Select(i => i.Label)
+            .ToHashSet(StringComparer.Ordinal);
+
+        var missing = keywordOperatorSymbols
+            .Where(sym => !operatorLabels.Contains(sym!))
+            .ToList();
+
+        missing.Should().BeEmpty(
+            "every keyword operator (alphabetic symbol with [TokenCategory(Operator)]) must appear "
+            + "in PreceptAnalyzer.ExpressionOperatorItems — add new keyword operators there "
+            + "when extending the language");
+    }
+
+    [Fact]
+    public void AllScalarTypeTokens_AppearInScalarTypeItems()
+    {
+        // ScalarTypeItems is used after "of" (collection inner type) and for event arg types.
+        // It must include every scalar type the parser accepts — excluding collection-only types
+        // (set, queue, stack) which are not valid as event arg types or collection inner types.
+        var collectionOnlySymbols = new HashSet<string>(StringComparer.Ordinal) { "set", "queue", "stack" };
+
+        var scalarTypeSymbols = PreceptTokenMeta.GetByCategory(TokenCategory.Type)
+            .Select(t => PreceptTokenMeta.GetSymbol(t))
+            .Where(s => s is not null && !collectionOnlySymbols.Contains(s))
+            .ToHashSet(StringComparer.Ordinal);
+
+        var scalarLabels = PreceptAnalyzer.ScalarTypeItems
+            .Select(i => i.Label)
+            .ToHashSet(StringComparer.Ordinal);
+
+        // Snippet labels like "choice(...)" won't match the raw symbol "choice",
+        // so also check whether the label starts with the symbol.
+        var missing = scalarTypeSymbols
+            .Where(sym => !scalarLabels.Contains(sym!)
+                && !scalarLabels.Any(label => label.StartsWith(sym!, StringComparison.Ordinal)))
+            .ToList();
+
+        missing.Should().BeEmpty(
+            "every scalar type token must appear in PreceptAnalyzer.ScalarTypeItems — "
+            + "this list is used for event arg types and collection inner types. "
+            + "Add new scalar type keywords there when extending the language");
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Slice 9c: when-guard completion contexts
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Completions_AfterInvariantExpression_OffersWhen()
+    {
+        const string text = """
+            precept M
+            field X as number default 0
+            invariant X > 0 $$
+            state A initial
+            event Go
+            from A on Go -> no transition
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("when");
+    }
+
+    [Fact]
+    public void Completions_AfterStateAssertExpression_OffersWhen()
+    {
+        const string text = """
+            precept M
+            field X as number default 0
+            state Open initial
+            in Open assert X > 0 $$
+            event Go
+            from Open on Go -> no transition
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("when");
+    }
+
+    [Fact]
+    public void Completions_AfterEventAssertExpression_OffersWhen()
+    {
+        const string text = """
+            precept M
+            state A initial
+            event Submit with Amount as number
+            on Submit assert Amount > 0 $$
+            from A on Submit -> no transition
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("when");
+    }
+
+    [Fact]
+    public void Completions_InEditBlock_AfterInState_OffersWhen()
+    {
+        const string text = """
+            precept M
+            field X as number default 0
+            state Open initial
+            in Open $$
+            event Go
+            from Open on Go -> no transition
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("when");
+    }
+
+    [Fact]
+    public void Completions_AfterWhenKeyword_InInvariant_OffersFields()
+    {
+        const string text = """
+            precept M
+            field X as number default 0
+            field Active as boolean default true
+            invariant X > 0 when $$
+            state A initial
+            event Go
+            from A on Go -> no transition
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("Active");
+        completions.Should().Contain("X");
+    }
+
+    [Fact]
+    public void Completions_AfterWhenGuard_InInvariant_OffersBecause()
+    {
+        const string text = """
+            precept M
+            field X as number default 0
+            field Active as boolean default true
+            invariant X > 0 when Active $$
+            state A initial
+            event Go
+            from A on Go -> no transition
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("because");
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // COMPLETIONS — Any-order field modifier suggestions
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Completions_FieldAfterConstraintThenDefault_OffersNullableAndRemainingConstraints()
+    {
+        const string text = """
+            precept M
+            field Amount as number nonnegative default 5 $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("nullable", "any-order: nullable valid after default");
+        completions.Should().Contain("positive");
+        completions.Should().Contain("min");
+        completions.Should().Contain("max");
+        completions.Should().NotContain("default", "already present");
+        completions.Should().NotContain("nonnegative", "already present");
+    }
+
+    [Fact]
+    public void Completions_FieldNullableThenConstraint_OffersDefaultAndRemainingConstraints()
+    {
+        const string text = """
+            precept M
+            field Notes as string nullable notempty $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("default", "any-order: default valid after constraints");
+        completions.Should().Contain("minlength");
+        completions.Should().Contain("maxlength");
+        completions.Should().NotContain("nullable", "already present");
+        completions.Should().NotContain("notempty", "already present");
+    }
+
+    [Fact]
+    public void Completions_FieldAllModifiersExhausted_OffersNothing()
+    {
+        const string text = """
+            precept M
+            field Active as boolean nullable default false $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().BeEmpty("boolean has no constraints; nullable and default already present");
+    }
+
+    [Fact]
+    public void Completions_EventArgAfterConstraint_OffersNullableDefaultAndComma()
+    {
+        const string text = """
+            precept M
+            state A initial
+            event Submit with Amount as number nonnegative $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("nullable");
+        completions.Should().Contain("default");
+        completions.Should().Contain(",");
+        completions.Should().Contain("positive");
+        completions.Should().NotContain("nonnegative", "already present");
+    }
+
+    [Fact]
+    public void Completions_ChoiceFieldAfterOrdered_OffersNullableDefaultNotOrdered()
+    {
+        const string text = """
+            precept M
+            field Priority as choice("Low", "Medium", "High") ordered $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("nullable");
+        completions.Should().Contain("default");
+        completions.Should().NotContain("ordered", "already present in the declaration");
     }
 }

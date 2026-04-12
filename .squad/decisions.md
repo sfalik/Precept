@@ -583,6 +583,308 @@ The Architecture identity row should keep the full construct-card treatment with
 **Why:** The square is a semantic marker, not an independent content block. Leading the construct name with the swatch makes the marker and label read as one semantic unit while preserving the body copy for the construct role.
 
 **Implementation consequence:** Use a compact `arch-card-title` row that pairs `arch-card-swatch` with `arch-card-name`, preserve the five-card construct layout, and remove filler copy that only existed to support the temporary pill-row treatment.
+### 2026-04-12T01:53:16Z: Issue #65 — Event action hooks for stateless precepts — PROPOSAL FILED
+**By:** Frank (research + design alignment), George (runtime impact), Steinbrenner (PM), Coordinator (filing)
+**Status:** Proposal filed — branch `research/event-hooks-proposal`, Issue #65 open
+
+Shane surfaced a parse error attempting `on Advance -> set Count = Count + 1` in a stateless precept. The team investigated, confirmed a principled design gap, and filed a formal proposal.
+
+**Gap verdict (Frank):**
+- The `on <Event> -> <ActionChain>` form does not exist in the grammar. Parse fails with "Expected: 'on \<Event\> assert '"." This is a deliberate exclusion — Principle 7 prohibits shared event-level context in stateful precepts (invisible across rows). However, stateless precepts have no transition rows, so Principle 7 has no application surface. The stateless case is a **principled gap**, not a principled exclusion.
+- Workarounds exist (duplication across rows; `to any ->` state hook) but are semantically non-equivalent.
+- Full research: `research/language/expressiveness/event-hooks.md`
+
+**External precedent (Frank — 5 systems surveyed):**
+
+| System | Flat event hook? | Closest analog |
+|---|---|---|
+| XState v5 | Not at flat level | Hierarchical parent `on:` only |
+| SCXML | No (parentstate wildcard only) | §3.13: exit → **transition content** → entry |
+| Akka Classic FSM | No | `whenUnhandled` = fallback only |
+| Spring SM | Via listener | Post-transition, observational only |
+| Redux | Yes — pure event bus | Pre-reducer middleware |
+| **Precept (proposed)** | **Issue A — stateless only** | After asserts, before invariants |
+
+No surveyed system has a flat stateless event hook with typed args and post-mutation constraint enforcement. This is Precept-native territory.
+
+**Split verdict:**
+- **Issue A (stateless):** CONFIRMED VIABLE. Zero Principle 7 tension. Locked execution order (after asserts, before invariants). C49 revision required in same PR.
+- **Issue B (stateful):** NOT BLOCKED but 3 open questions must be locked first: (1) execution order position — 4 options with different semantics, Frank recommends Option 3 (after row mutations, before exit actions) per SCXML §3.13; (2) outcome-scoping (fires on Unmatched?); (3) explicit Principle 7 exception rationale. **Labeled `deferred`.**
+
+**C49 revision decision (Steinbrenner + Frank):**
+
+| Case | C49 behavior |
+|---|---|
+| Event declared, no asserts, no hooks | C49 Warning: "Event 'X' has no effect — it will return `Undefined`" |
+| Event declared, has asserts, no hooks | C49 Warning (revised, lower severity): "Event 'X' validates arguments but has no action effect" |
+| Event declared, has at least one hook | **C49 suppressed** |
+C49 revision ships in the same PR as the runtime and grammar changes (language-surface-sync requirement).
+
+**Runtime impact (George):**
+- **Parser:** Small. `EventActionDecl.Try()` before `EventAssertDecl.Try()`. New `EventActionResult` record. Reuses `ActionChain` unchanged.
+- **Model:** Extra-small. New `PreceptEventAction` record.
+- **Type checker:** Medium. C49 suppression + scope validation.
+- **Engine:** Medium. Hard-abort semantics for hook constraint violations recommended.
+
+**PM decisions (Steinbrenner):**
+- Issue A advances on current roadmap wave. Issue B deferred, not abandoned.
+- C49 revision is in-scope for Issue A, not a follow-up.
+- Stateless event hooks do not change stateless precept's position as first-class entity model — they complete it.
+
+---
+
+### 2026-04-10: PR quality policy — detailed implementation plans + live checkbox updates
+**By:** Shane (owner directive, via Coordinator)
+**Status:** Standing policy — enforced from 2026-04-10 forward
+
+Every implementation PR must have a detailed implementation plan with granular checkboxes. Checkboxes must be kept current after every push to the branch.
+
+**Policy:**
+1. **PR creation:** Coordinator reads `.squad/skills/pr-implementation-plan/SKILL.md` before writing any PR body. Required sections: What this does, Design decisions locked, Implementation checklist (by component), Critical review focus.
+2. **Checklist granularity:** Each checkbox names a file, behavior, or specific case. "Type checker: handles nullable" is too vague. "C56: fires for nullable field in invariant scope (separate symbol injection path from guard scope)" is correct.
+3. **Checkbox maintenance:** Scribe updates PR checkbox state after every agent work batch. Scribe reads `.squad/skills/pr-implementation-plan/SKILL.md` before performing checkbox updates.
+4. **CatalogDriftTests footgun:** Always use `-> no transition` for compile-phase constraint triggers in guards.
+
+**Artifacts created:** `.squad/skills/pr-implementation-plan/SKILL.md`. Scribe charter updated.
+
+---
+
+### 2026-04-10: Issue #10 — Three-level dotted form (`A.B.C`) included in PR #56 scope
+**By:** Shane (via Coordinator)
+**Status:** Implemented — George's changes landed in `squad/10-string-length-accessor`
+
+Decision to include `A.B.C` three-level dotted identifier support (e.g. `Submit.Name.length`) in PR #56 rather than a separate PR.
+
+**Frank's invasiveness assessment:** Low-Medium (~54 lines, 7 files). Test scaffolding already existed in `StringAccessorTests.cs`.
+
+**Implementation sites (George):**
+- `PreceptModel.cs` — `string? SubMember = null` on `PreceptIdentifierExpression`
+- `PreceptParser.cs` — `DottedIdentifier` extended with optional second dot chain; `ReconstituteExpr` updated
+- `PreceptExpressionEvaluator.cs` — three-level guard at top of `EvaluateIdentifier`
+- `PreceptTypeChecker.cs` — 4 sites: `TryInferKind` key, C56 nullable-arg extension (critical: base key is `$"{Name}.{Member}"` not `Name`), `BuildSymbolKinds` arg loop, `BuildEventAssertSymbols` loop
+- `PreceptAnalyzer.cs` — 3-level prefix detection in LS completions
+
+**Critical gotcha (Frank's review, George's implementation):** C56 base-kind lookup must use `$"{identifier.Name}.{identifier.Member}"` for the three-level case, not `identifier.Name` (which resolves to the event name and silently skips C56 for nullable args).
+
+---
+
+### 2026-04-10: Frank — Expanded modifier design space — decisions requiring owner input
+**By:** Frank (Lead/Architect)
+**Status:** Owner decision required — 5 open questions
+
+Second pass at `research/language/expressiveness/structural-lifecycle-modifiers.md` identified 4 open design questions requiring Shane's direction before any modifier implementation:
+
+1. **Modifier role scope:** Option C recommended — modifiers must be either compile-time verifiable OR tooling-actionable. `sensitive`/`audit` as pure annotation need a different mechanism.
+2. **Event modifier taxonomy correction:** Event structural properties (source scope, outcome shape, target scope) are fully compile-time provable. Event behavioral properties (firing history) are not. Domain taxonomy for #23 should reflect this subcategorization.
+3. **`sealed after <State>` grammar form:** New modifier form with state reference — requires architectural sign-off before implementation. Multi-state sealing concern.
+4. **Modifier stacking semantics:** Are incompatible combinations compile-time validated or accepted with runtime checks? Ordering convention?
+5. **Implementation sequence confirmed:** `terminal` → event modifiers (`entry`/`advancing`/`settling`/`isolated`) → `writeonce` → `sealed after <State>` → `guarded` on states.
+
+No philosophy gap. Modifier space extends graph-topology annotation, not entity category or guarantee model.
+
+---
+
+### 2026-04-11: Wave 3 — MCP vocab decisions (integer/decimal/choice)
+**By:** Newman (MCP/AI Dev)
+**Status:** Applied — branch `feature/wave3-integer-decimal-choice`
+
+**Decision 1:** `LanguageTool` requires zero code changes for `integer`/`decimal`/`choice`/`maxplaces`/`ordered` — all catalog-driven via `[TokenCategory]` attributes. Canonical sync check: token has `[TokenSymbol]` + `[TokenCategory]` → all downstream layers pick up automatically.
+
+**Decision 2:** `round()` is registered in `ConstructCatalog` via `.Register(new ConstructInfo(...))` on the `RoundAtom` parser combinator, not hardcoded in `LanguageTool.cs`. Surfaces in `precept_language.constructs`.
+
+**Decision 3:** `FieldDto.IsOrdered` is `bool?` — only populated when `true`. Absent from JSON when false (reduces noise for non-choice fields).
+
+**Decision 4:** `McpServerDesign.md` updated with 3 new reference tables: scalar type reference (integer/decimal/choice), full constraint keyword reference, built-in function reference for `round()`.
+
+---
+
+### 2026-04-11: Wave 3 — Integer type constraint desugaring bug (soup-nazi)
+**By:** Soup Nazi (Tester)
+**Status:** Bug filed — fix required before integer constraints are considered complete
+
+**Critical bug:** `nonnegative`, `positive`, `min N`, `max N` constraints on `integer` fields are accepted by the parser but NEVER desugared to runtime invariants. `BuildScalarConstraintExpr` in `PreceptParser.cs` has branches for `Number` and `String` only — `Integer` falls through to `return (string.Empty, null, string.Empty)`. Constraints are silently ignored at runtime.
+
+**Fix required (George):** Add `Integer` branch to `BuildScalarConstraintExpr`. Use `PreceptLiteralExpression(0L)` for nonneg/positive (long literal). Cast `mn.Value`/`mx.Value` to `long` for min/max.
+
+**Test file:** `PreceptIntegerTypeTests.cs` — 31 tests pass, 3 skipped pending fix.
+
+---
+
+### 2026-04-10: Issue #13 — Grammar + completions tooling decisions
+**By:** Kramer (Tooling Dev)
+**Status:** Applied — grammar and completions changes committed
+
+**Grammar:** New `constraintKeywords` repository entry matching all 9 constraint keywords (`nonnegative`, `positive`, `notempty`, `min`, `max`, `minlength`, `maxlength`, `mincount`, `maxcount`). Scope: `keyword.other.precept`. Inserted before `identifierReference` catch-all. Added to `fieldScalarDeclaration` capture 9 and `eventWithArgsDeclaration` capture 8. No conflict with `collectionMemberAccess` `.min`/`.max` (dot-gated).
+
+**Completions:** Pattern-match `beforeCursor` for field/event-arg declaration context. Type-split by scalar type (number/string/boolean/collection) to return appropriate keyword set. Static items: `NumberConstraintItems`, `StringConstraintItems`, `CollectionConstraintItems`.
+
+---
+
+### 2026-04-11: Wave 3 — Integer/decimal/choice grammar + completions decisions
+**By:** Kramer (Tooling Dev)
+**Status:** Applied — branch `feature/wave3-integer-decimal-choice`, commit `73092a9`
+
+1. **Integer constraint tier reuses `NumberConstraintItems`** — same vocabulary as `number`. No separate array.
+2. **`choice(...)` surfaces as snippet** in `TypeItems` (`insertText = choice("${1:A}", "${2:B}")`), not bare `TypeParameter`. Bare `choice` is invalid DSL.
+3. **`fieldScalarDeclaration` pattern updated** for `integer`/`decimal` only, not `choice(...)` (argument form incompatible with word-boundary alternation).
+4. **`round(expr, N)` in `ExpressionOperatorItems`** (all expression contexts) — type-filtered injection requires guard type inference, out of scope; snippet in all positions is acceptable and correct.
+
+---
+
+### 2026-04-11T00:00:00Z: Issue #14 — `when <guard>` on declarations — FINAL DESIGN APPROVAL, all 4 forms, implementation scope locked
+**By:** George (runtime), Kramer (tooling), Newman (MCP), Soup Nazi (testability), Frank (design/architecture)
+**Status:** APPROVED — all 4 forms cleared for implementation in a single wave.
+
+Design review of Issue #14 (`when <guard>` conditional invariants, state asserts, event asserts, conditional edit eligibility) completed in two passes. Initial review (Frank `frank-issue14-design-review.md`) cleared Forms 1–3 and deferred Form 4 as a scoping question. Second pass (`frank-issue14-form4-design.md`, `george-issue14-form4-simplicity.md`) confirmed the additive approach resolves the structural obstacle. Final approval round (`frank-issue14-final-approval.md`, `george-issue14-implementation-scope.md`, `kramer-issue14-final-tooling.md`, `newman-issue14-final-dtos.md`, `soup-nazi-issue14-final-tests.md`) — all 5 reviewers filed, all approved, all 4 forms same wave.
+
+**Implementation scope: ~163 lines across 5 files, 19 change sites.**
+
+**Frank — APPROVED all 4 forms (final verdict):**
+- All 4 forms semantically unified: `when <guard>` means "conditional on this boolean condition" — constraint-skip semantics (Forms 1–3) and permission-grant semantics (Form 4) follow naturally from declaration kind, not syntax. Teaching model holds uniformly.
+- Fail-closed edit guards are non-negotiable: guard evaluation error → field not granted. Permission-grant systems must default to deny on uncertainty. Must be explicitly contracted in the issue body with named tests `Update_GuardThrows_FieldNotGranted` and `Inspect_GuardNull_FieldNotGranted`.
+- `in any when <guard>` pre-expansion is correct: expand to one `PreceptEditBlock` per declared state at construction, each carrying the same `WhenGuard`. Runtime evaluates `block.State == currentState && evaluateGuard(block.WhenGuard, instanceData)`. No sentinel handling at evaluation sites.
+- All six locked language decisions from the initial review upheld. Form 4 guard is field-scoped only — arg references rejected with C69.
+
+**George — implementation scope confirmed:**
+- **File 1: `PreceptModel.cs`** — +8 lines. Add optional `WhenGuard?`/`WhenText?` tail parameters to `PreceptInvariant`, `StateAssertion`, `EventAssertion`, `PreceptEditBlock`. Pattern identical to existing `PreceptTransitionRow`. Zero call-site breakage (named defaults). Must land first.
+- **File 2: `DiagnosticCatalog.cs`** — +8 lines. Register C69 (cross-scope guard reference — better message than C38). Pure additive.
+- **File 3: `PreceptParser.cs`** — +16 lines. 4 injection points via existing `OptionalWhenGuardParser` (1 line each). `EditDecl` guard injected between `StateTarget` and `Edit` token. Extend `EditResult` and `StateAssertResult` private records (+2 fields each). Update `AssembleModel` cases for both (+2 lines each). `EditDecl.Try()` before `StateAssertDecl.Try()` ordering verified correct.
+- **File 4: `PreceptTypeChecker.cs`** — ~5 distinct changes. B1 narrowing fix: add `WhenGuard is null` filter in `BuildStateAssertNarrowings` (1-line critical prerequisite, must land first as its own commit). Guard scope validation for all 4 forms (C69 emission). C29/C30 guard-against-defaults pre-check. Form 4 guarded-edit evaluation pass (second pass after static `_editableFieldsByState` fast path — additive, untouches existing unconditional path).
+- **File 5: `PreceptAnalyzer.cs` (language server)** — 13 changes (~33–40 lines). See Kramer.
+- **Confirmed non-changes:** tokenizer, expression evaluator, `_editableFieldsByState` fast path, `IsSynthetic` contamination path, statement union ordering — all verified unchanged.
+
+**Kramer — zero grammar changes, 13 completions changes (~33–40 lines in `PreceptAnalyzer.cs`):**
+- Grammar: `when` already in `controlKeywords` without positional anchor. `in State when guard edit` parse is handled by existing individual keyword patterns. **Zero grammar file changes for any of the 4 forms.**
+- New static `WhenItem` added alongside `BecauseItem`.
+- Forms 1–3: 2 new branches + 1 modification per declaration block (A1/A2/A-modified, C1/C2/C-modified, E1/E2/E-modified). All `when`-bearing branches inserted before base branches (strictly more specific — safe ordering).
+- Form 4: 4 new branches for the `in <State> when <guard> edit` sequence — after `in State` → offer `[assert, edit, when, ->]`; after `in State when` → offer field names + `not`; after `in State when <guard>` → offer `edit`; after `in State when <guard> edit` → offer field names.
+- Branch ordering critical throughout — new branches precede their less-specific base branches.
+
+**Newman — 4 new DTO arrays in `precept_compile` output (B2 — parallel prerequisite):**
+- New: `invariants` (exclude `IsSynthetic`), `stateAsserts`, `eventAsserts`, `editBlocks` — each a top-level array with `expression`, `when: string | null`, `reason`, `line` shape. `stateAsserts` adds `anchor` and `state`. `editBlocks` adds `state` and `fields`.
+- `StateDto.rules: string[]` preserved alongside new arrays — not replaced.
+- `when` fields ship as `null` until George's model record changes land (Commit B). DTOs are structurally ready; wire-up is a 1-line change per array once model records have `WhenText`.
+- `precept_inspect` structured constraint trace: `constraintTrace` top-level key per-state/per-event showing which guards evaluated true/false and which assertions fired. Prerequisite for form-by-form tracing in agent workflows.
+
+**Soup Nazi — ~154 tests (6 test files):**
+- `NewSyntaxParserTests.cs`: +5 (→ 36 total)
+- `PreceptTypeCheckerTests.cs`: +7 (→ 33 total)
+- `PreceptWorkflowTests.cs` / `NewSyntaxRuntimeTests.cs` / `PreceptRulesTests.cs`: Forms 1–3 runtime, unchanged (38 tests — regression gate)
+- `GuardedEditTests.cs`: 22 new tests (Form 4 core). Key: fail-closed (`Update_EditGuard_EvaluationError_FieldNotEditable`), `in any` expansion (3 tests), union semantics (3 tests), state-filter-before-guard (1 test), data-driven guard flip (1 test).
+- `Precept.LanguageServer.Tests/`: +3 completions (→ 10)
+- `Precept.Mcp.Tests/CompileToolTests.cs`: +2 (→ 5); `InspectToolTests.cs`: +2 (→ 5). Both block on Newman B2.
+- **EC-3 is the ordering gate:** `Check_Invariant_WhenGuardFalse_AtDefaultData_NoPrecompileViolation` must pass before runtime tests run.
+
+**Prerequisites and sequencing:**
+1. **B1 narrowing fix** — 1-line commit to `BuildStateAssertNarrowings` (`WhenGuard is null` filter). Must land first, standalone commit.
+2. **Newman DTO additions** — `precept_compile` structured arrays (B2). Parallel with B1. Must land before MCP tests.
+3. Model records → parser → type checker → runtime (Form 4 additive pass) → completions, in dependency order.
+
+**Key spec requirements locked:**
+- Fail-closed edit guards (Frank F2 — explicit issue-body contract required)
+- `in any when <guard>` pre-expansion at construction (Frank F3 / George OQ-2)
+- C69 diagnostic for cross-scope guard references (George / Kramer)
+- EC-3 pre-check ordering gate (Soup Nazi)
+- `StateDto.rules` preserved alongside new DTO arrays (Newman)
+
+**Elaine coordination point:** Dynamic editability UX — guarded edit blocks produce per-instance editability rather than a static per-state set. Elaine's preview inspector and any UI surface showing editable fields must handle guard-conditional editability. Coordinate before Elaine's inspector work begins.
+
+---
+
+### 2026-04-10T21:00:00Z: Issue #10 — String `.length` accessor — fully implemented
+**By:** Frank (design analysis), George (runtime + evaluator), Kramer (grammar + completions), Soup Nazi (tests), Coordinator (integration)
+**Status:** Implemented — branch `squad/10-string-length-accessor`, 800 tests passing
+
+String `.length` accessor fully ships as Issue #10. All design decisions locked.
+
+**Design decisions (from Frank's analysis, approved by Shane):**
+
+- **Q1: Unicode semantics → UTF-16 code units.** `.length` returns `string.Length` (UTF-16 code units), matching .NET. `"💀".length == 2`. Ties Precept string semantics to the host platform for predictability and O(1) performance. Documented in `docs/PreceptLanguageDesign.md`.
+- **Q2: New diagnostic code C56.** `.length` on a nullable string without null narrowing emits **C56** — not C42. Separates "accessor on nullable type without null guard" from C42 ("nullable assigned to non-nullable target"). Null narrowing via `!= null and` or `== null or` removes C56.
+
+**Runtime + evaluator (George):** `.length` evaluator added alongside `.count` pattern. Type checker builds `{field}.length` as `StaticValueKind.Number` in all 4 scope types. C56 registered and emitted in the type-checking pass.
+
+**Grammar + completions (Kramer):**
+- `length` added to the `collectionMemberAccess` alternation in grammar alongside `count|min|max|peek`. Comment updated to cover both collection and string accessors.
+- String-field branch added inside existing `collectionMemberPrefixMatch` block in `PreceptAnalyzer.cs`. Uses `info.FieldTypeKinds & StaticValueKind.String`. `BuildStringMemberItems(fieldName, isNullable)` returns `.length` as `CompletionItemKind.Property`, detail `"number"`. Nullable strings inject null-guard reminder.
+- Build: 0 warnings, 0 errors. 87 language server tests pass.
+
+**Tests (Soup Nazi — `StringAccessorTests.cs`):** 25 tests: parser (2), type checker valid (2), type checker type errors (3), C56 nullable (1), C56 narrowing (2), runtime UTF-16 contract (4), null guard compound (4), invariant context (2), event assert context (2), guard routing (2), regression .count (1). UTF-16 emoji test and three-level dotted form (`Submit.Name.length`) are first-class coverage.
+
+---
+
+### 2026-04-10: Policy — Coordinator must enforce draft PR gate before implementation work
+**By:** Shane (owner directive)
+**Status:** Captured, applied to `.github/agents/squad.agent.md`
+
+Coordinator is accountable for ensuring a draft PR exists before any implementation work is routed to agents. Missed for issue #31 — branch was created and exploratory work started with no PR opened. Coordinator must verify branch + PR existence at start of any "work on issue N" request and open the draft PR itself if missing.
+
+**Basis:** CONTRIBUTING.md §3 ("open a draft PR immediately"). Recovery pattern: if `mcp_github_create_pull_request` fails due to no commits ahead of base, push empty chore commit first, then retry. See issue #31 recovery (2026-04-10) as canonical example.
+
+**Remediation:** `.github/agents/squad.agent.md` updated with explicit "Implementation Gate — Draft PR Required" section.
+
+---
+
+### 2026-04-10: Issue #13 — Constraint consistency analysis v2 — No redesign needed
+**By:** Frank (Lead/Architect)
+**Status:** Analysis complete — no redesign needed. Supersedes v1 (rejected for insufficient research grounding).
+
+Shane's question: "How does this contrast with how we apply constraints to events and states? I don't like that it is not consistent."
+
+**Verdict:** The asymmetry is justified scope segregation, not inconsistency. The constraint surface has two tiers:
+1. **Type-shape tier** (field-local, closed vocabulary): keyword constraints on fields and event args
+2. **Business-rule tier** (cross-field, open expression language): predicate invariants and asserts on states, events, and global scope
+
+**Research grounding (7-category, 30+ system precedent survey):** Zero systems use a single mechanism for both type-shape and cross-entity constraints. States have no type shapes to constrain — state asserts are always bespoke cross-field business rules with no closed keyword vocabulary. `nonnegative`/`min`/`max` address 84% of invariants (46/55 in the corpus), all type-shape bounds. Field constraint suffixes desugar to invariants — one mechanism with two authoring surfaces, connected by the Pombrio & Krishnamurthi resugaring framework with preserved diagnostic fidelity.
+
+**Three unification paths evaluated and rejected:** all-predicate (surrenders most measurable verbosity reduction), all-keyword (states lack type shapes), unified where-clause (still dual mechanism, higher verbosity).
+
+**Action item (non-blocking):** #13 proposal should include an explicit scope-segregation rationale section. See `constraint-composition-domain.md`, `constraint-composition.md`, `internal-verbosity-analysis.md`, `expression-language-audit.md`.
+
+---
+
+### 2026-04-10: Frank — Philosophy refresh assessment — 32 research files surveyed
+**By:** Frank (Lead/Architect)
+**Status:** Filed — awaiting owner direction on refresh order and standalone governance-vs-validation document
+
+Assessment at `docs/research/language/philosophy-refresh-assessment.md`. 32 language research files reviewed against rewritten `docs/philosophy.md`.
+
+**Key findings:** (1) 0/32 files use "governed integrity" — the philosophy's unifying principle. (2) 14/32 do not consider data-only/stateless entities. (3) 2 files need significant refresh: `xstate.md` (outdated product description), `fluent-validation.md` (missing governance-vs-validation distinction — most important positioning claim for the most commercially important comparison). (4) 4 new research gaps: stateless constraint patterns, stateless Inspect/Fire semantics, governance-vs-validation evidence document, MDM/industry-standard positioning depth.
+
+**Owner decision needed:** confirm refresh order (recommended start: `fluent-validation.md`, `xstate.md`, `data-only-precepts-research.md`), batch vs. per-file, and whether `governance-vs-validation.md` is standalone or folded into existing file.
+
+---
+
+### 2026-04-10: Frank — Structural lifecycle modifiers — New research domain #23
+**By:** Frank (Lead/Architect)
+**Status:** Filed — P4 horizon, research-only
+
+Structural lifecycle modifiers (`terminal`, `required`, `transient`, etc.) constitute new domain #23, distinct from constraint composition (#8, #13, #14), static reasoning expansion, and entity modeling (#17, #22). These constrain *graph topology*, not field values. Closest relative: state machine expressiveness, but annotate existing graph features rather than adding new ones.
+
+Document at `research/language/expressiveness/structural-lifecycle-modifiers.md`. Added to `domain-map.md` as domain #23 and to the horizon list in `README.md`. Priority P4 — research complete; `terminal` is Tier 1 ready for proposal when demand arises. No code changes.
+
+---
+
+### 2026-04-10: Research roadmap decisions — Milestones, critical path, type system split
+**By:** Frank (Architect), Steinbrenner (PM), Peterman (Brand/DevRel) — approved by Shane
+**Status:** Accepted
+
+**Three milestones for language expansion roadmap:**
+- **M1 "Governed Integrity"**: #31 + #22 + #13 — category-proving milestone
+- **M2 "Full Entity Surface"**: #8 + #14 + #29 + #25 + #11 — production-credible milestone
+- **M3 "Expression Power"**: #26 + #27 + #16 + #9/#10/#15 + #17 — self-sufficiency milestone
+
+**Critical path:** #31 → #22 → #13 → (#8+#14) → (#29+#25) → #11 → #16 → (#10,#15,#9) → (#26+#27) → #17
+
+**Type system split:** integer (#29) + choice (#25) ship in M2; date (#26) + decimal (#27) defer to M3 (benefit from #16 functions shipping first). **Absorb (#11) promoted** from P3 to late M2 (#1 verbosity pattern, 132 instances, gated on research pass). **Brand sequencing constraint (Peterman):** #22 (data-only) must ship before any type expansion — shipping types on workflow-only precepts reinforces "state machine tool" perception. After M1: update README hero to side-by-side (lifecycle + data-only precept). VS Code extension description to lead with governance identity: "Govern entity integrity — fields, constraints, lifecycle rules — in a single .precept file." **Missing proposal:** file new proposal for inline guard rejection (`else reject "reason"`) — #2 verbosity pattern (20-35% of rule headers), no proposal exists. **Governance-vs-validation positioning:** the failure-mode taxonomy (bypass, timing gap, scattered rules, silent mutation) is the primary competitive weapon; deploy in README, marketplace, and developer communications.
+
+---
+
+### 2026-04-09: Frank — PR #48 final sign-off — APPROVED
+**By:** Frank (Lead/Architect)
+**Status:** Merged — HEAD 6468617
+
+All 756 tests pass (614 Precept.Tests, 55 Precept.Mcp.Tests, 87 Precept.LanguageServer.Tests). All four blocking items from the CHANGES REQUESTED review confirmed resolved: (1) `docs/PreceptLanguageDesign.md` — stateless section, C12/C13/C55/C49 fully documented, root `edit` grammar, `ExpandEditFieldNames()`. (2) `docs/RuntimeApiDesign.md` — `IsStateless`, nullable `InitialState`, both `CreateInstance` overloads. (3) `docs/McpServerDesign.md` — `isStateless` in CompileResult DTO, nullable `currentState` for Inspect/Fire/Update. (4) Placeholder samples (`customer-profile.precept`, `fee-schedule.precept`, `payment-method.precept`) present. Non-blocking recommendations applied at commit 530725d. **APPROVED. PR #48 merge-ready.**
 
 ---
 

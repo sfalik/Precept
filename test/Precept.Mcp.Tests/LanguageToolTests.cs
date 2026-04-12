@@ -84,6 +84,15 @@ public class LanguageToolTests
     }
 
     [Fact]
+    public void ConstraintsIncludeBuiltInFunctionTypeCheckingRange()
+    {
+        var result = LanguageTool.Run();
+
+        result.Constraints.Select(constraint => constraint.Id)
+            .Should().Contain(["C71", "C72", "C73", "C74", "C75", "C76", "C77"]);
+    }
+
+    [Fact]
     public void ExpressionScopesHasFiveEntries()
     {
         var result = LanguageTool.Run();
@@ -119,6 +128,34 @@ public class LanguageToolTests
         symbols.Should().NotContain("&&", "symbolic && must not appear in the operator inventory");
         symbols.Should().NotContain("||", "symbolic || must not appear in the operator inventory");
         symbols.Should().NotContain("!", "symbolic ! must not appear in the operator inventory");
+    }
+
+    [Fact]
+    public void TypeKeywordsIncludeIntegerDecimalChoice()
+    {
+        var result = LanguageTool.Run();
+
+        result.Vocabulary.TypeKeywords.Should().Contain("integer");
+        result.Vocabulary.TypeKeywords.Should().Contain("decimal");
+        result.Vocabulary.TypeKeywords.Should().Contain("choice");
+    }
+
+    [Fact]
+    public void ConstraintKeywordsIncludeMaxplacesAndOrdered()
+    {
+        var result = LanguageTool.Run();
+
+        result.Vocabulary.ConstraintKeywords.Should().Contain("maxplaces");
+        result.Vocabulary.ConstraintKeywords.Should().Contain("ordered");
+    }
+
+    [Fact]
+    public void ConstructsIncludeRoundFunction()
+    {
+        var result = LanguageTool.Run();
+
+        result.Constructs.Should().Contain(c => c.Description.Contains("built-in function"),
+            "function-call construct must be registered in the construct catalog");
     }
 
     [Fact]

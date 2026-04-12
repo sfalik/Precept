@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using FluentAssertions;
 using Precept;
@@ -92,6 +93,10 @@ public class CatalogDriftTests
 
             "transition-row" =>
                 $"{header}\n{string.Join("\n", states)}\nevent Submit\n{construct.Example}",
+
+            "function-call" =>
+                // function call needs a decimal field and an event to be valid in a transition context
+                $"{header}\nfield Rate as decimal default 0.0\n{string.Join("\n", states)}\nevent Apply with Amount as number\n{construct.Example}",
 
             _ =>
                 // Generic fallback: include everything
@@ -342,6 +347,12 @@ public class CatalogDriftTests
     private const string S = "state A initial\n";
     private const string S2 = "state A initial\nstate B\n";
 
+    // AUTHORING NOTE: DSL rules for trigger entries
+    //   - Compile-phase constraints that fire in a `when` guard MUST use `-> no transition`
+    //     as the row target. Using `-> transition B` (where B is not declared) triggers C54
+    //     (undeclared state) before the intended constraint fires, masking the correct error.
+    //   - When adding a new compile-phase constraint, verify the trigger DSL produces ONLY
+    //     that constraint — run the entry in isolation and assert Diagnostics.Count == 1.
     private static readonly Dictionary<string, TriggerInput> ConstraintTriggers = new()
     {
         // ── Parse-phase (C1–C25) ──────────────────────────────────────
@@ -512,6 +523,136 @@ public class CatalogDriftTests
         // C55: Root-level edit with states declared
         ["C55"] = new(H + "field Priority as number default 1\n" + S + "edit Priority\n", "Root-level"),
 
+        // C56: .length on nullable string without null guard
+        ["C56"] = new(H + "field Note as string nullable\n" + S + "event Go\nfrom A on Go when Note.length > 0 -> no transition\n", "requires a null check"),
+
+        // C57: Constraint applied to incompatible type (nonnegative on a string field)
+        ["C57"] = new(H + "field Name as string default \"\" nonnegative\n" + S, "not valid for type"),
+
+        // C58: Duplicate constraint on same field (min 1 appears twice)
+        ["C58"] = new(H + "field Amount as number default 5 min 1 min 1\n" + S, "Duplicate constraint"),
+
+        // C59: Default value violates constraint (0 is not positive)
+        ["C59"] = new(H + "field Amount as number default 0 positive\n" + S, "violates constraint"),
+
+        // C60: Narrowing assignment — assigning a number literal (3.0) to an integer field
+        ["C60"] = new(H + "field Count as integer default 0\n" + S2 + "event Go\nfrom A on Go -> set Count = 3.0 -> no transition\n", "explicit conversion"),
+
+        // C61: maxplaces constraint on non-decimal field — constructed directly (maxplaces not yet a keyword)
+        ["C61"] = new("_unused_", "decimal fields", DirectAction: () =>
+        {
+            var model = new PreceptDefinition(
+                "Test",
+                [new PreceptState("A")],
+                new PreceptState("A"),
+                [],
+                [new PreceptField("Count", PreceptScalarType.Integer, false, true, 0L, [new FieldConstraint.Maxplaces(2)])],
+                [], null);
+            var result = PreceptCompiler.Validate(model);
+            var diag = result.Diagnostics.FirstOrDefault(d => d.Constraint.Id == "C61");
+            if (diag is null) throw new InvalidOperationException("C61 was not triggered");
+            throw new InvalidOperationException(diag.Message);
+        }),
+
+        // C62: choice type with no values — constructed directly (parser enforces at least 1 value)
+        ["C62"] = new("_unused_", "at least one value", DirectAction: () =>
+        {
+            var model = new PreceptDefinition(
+                "Test",
+                [new PreceptState("A")],
+                new PreceptState("A"),
+                [],
+                [new PreceptField("Status", PreceptScalarType.Choice, false, false, null, null, [], false)],
+                [], null);
+            var result = PreceptCompiler.Validate(model);
+            var diag = result.Diagnostics.FirstOrDefault(d => d.Constraint.Id == "C62");
+            if (diag is null) throw new InvalidOperationException("C62 was not triggered");
+            throw new InvalidOperationException(diag.Message);
+        }),
+
+        // C63: duplicate value in choice set
+        ["C63"] = new(H + "field Status as choice(\"Open\",\"Open\",\"Closed\") default \"Open\"\n" + S, "Duplicate value"),
+
+        // C64: default value not in choice set
+        ["C64"] = new(H + "field Status as choice(\"Open\",\"Closed\") default \"Pending\"\n" + S, "not a member"),
+
+        // C65: ordinal operator on a choice field that lacks 'ordered'
+        ["C65"] = new(H + "field Status as choice(\"Draft\",\"Active\") default \"Draft\"\n" + S2 +
+            "event Go\nfrom A on Go when Status > \"Active\" -> no transition\n", "ordered' constraint"),
+
+        // C66: ordered on a non-choice type
+        ["C66"] = new(H + "field Name as string nullable ordered\n" + S, "applies only to choice"),
+
+        // C67: ordinal comparison between two choice fields — rank is field-local
+        ["C67"] = new(H + "field Priority as choice(\"Low\",\"High\") default \"Low\" ordered\n" +
+            "field Severity as choice(\"Low\",\"High\") default \"Low\" ordered\n" + S2 +
+            "event Go\nfrom A on Go when Priority > Severity -> no transition\n", "field-local"),
+
+        // C68: literal value not in choice set
+        ["C68"] = new(H + "field Status as choice(\"Open\",\"Closed\") default \"Open\"\n" + S2 +
+            "event Go\nfrom A on Go -> set Status = \"Invalid\" -> no transition\n", "not a member"),
+
+        // C69: cross-scope guard reference — invariant guard referencing event arg
+        ["C69"] = new(H + "field X as number default 0\n" + S2 +
+            "event Go with Amount as number\n" +
+            "invariant X >= 0 when Go.Amount > 0 because \"bad\"\n" +
+            "from A on Go -> no transition\n", "different scope"),
+
+        // C70: duplicate modifier on field/arg declaration
+        ["C70"] = new(H + "field X as number default 0 default 1\n" + S2 +
+            "event Go\nfrom A on Go -> no transition\n", "Duplicate modifier"),
+
+        // C71: unknown function name — parser rejects unknown names at parse time,
+        // so we construct a model with an unknown function call directly.
+        ["C71"] = new("_unused_", "Unknown function", DirectAction: () =>
+        {
+            var model = new PreceptDefinition(
+                "Test",
+                [new PreceptState("A", SourceLine: 2), new PreceptState("B", SourceLine: 3)],
+                new PreceptState("A", SourceLine: 2),
+                [new PreceptEvent("Go", [])],
+                [new PreceptField("X", PreceptScalarType.Number, false, true, 0L)],
+                [],
+                TransitionRows: [new PreceptTransitionRow(
+                    "A", "Go",
+                    new NoTransition(),
+                    [],
+                    WhenText: "unknownfn(X) > 0",
+                    WhenGuard: new PreceptBinaryExpression(
+                        ">",
+                        new PreceptFunctionCallExpression("unknownfn", [new PreceptIdentifierExpression("X")]),
+                        new PreceptLiteralExpression(0L)),
+                    SourceLine: 5)]);
+            var result = PreceptCompiler.Validate(model);
+            var diag = result.Diagnostics.FirstOrDefault(d => d.Constraint.Id == "C71");
+            if (diag is null) throw new InvalidOperationException("C71 not triggered");
+            throw new InvalidOperationException($"{diag.DiagnosticCode}: {diag.Message}");
+        }),
+
+        // C72: wrong number of arguments (parser requires ≥1 arg, so use 2-arg abs)
+        ["C72"] = new(H + "field X as number default 0\n" + S2 +
+            "event Go\nfrom A on Go when abs(X, X) > 0 -> no transition\n", "no matching overload"),
+
+        // C73: argument type mismatch
+        ["C73"] = new(H + "field Name as string default \"test\"\n" + S2 +
+            "event Go\nfrom A on Go when abs(Name) > 0 -> no transition\n", "no matching overload"),
+
+        // C74: round precision must be non-negative integer literal
+        ["C74"] = new(H + "field X as number default 0\n" + S2 +
+            "event Go\nfrom A on Go when round(X, X) > 0 -> no transition\n", "precision"),
+
+        // C75: pow exponent must be integer type
+        ["C75"] = new(H + "field X as number default 0\n" + S2 +
+            "event Go\nfrom A on Go when pow(X, X) > 0 -> no transition\n", "exponent"),
+
+        // C76: sqrt requires non-negative proof
+        ["C76"] = new(H + "field X as number default 0\n" + S2 +
+            "event Go\nfrom A on Go when sqrt(X) > 0 -> no transition\n", "non-negative"),
+
+        // C77: function does not accept nullable arguments
+        ["C77"] = new(H + "field X as number nullable default null\n" + S2 +
+            "event Go\nfrom A on Go when abs(X) > 0 -> no transition\n", "nullable"),
+
         // ── Runtime-phase (C33–C37) ───────────────────────────────────
 
         // C33: CreateInstance with empty initial state
@@ -583,5 +724,761 @@ public class CatalogDriftTests
             dir = Directory.GetParent(dir)?.FullName;
         }
         throw new InvalidOperationException("Could not find repo root (Precept.slnx)");
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Type vocabulary drift — Runtime + Grammar + MCP
+    //
+    // Every declarable scalar type must parse as a field type, as a
+    // collection inner type, compile through the MCP tool, and appear
+    // in the TextMate grammar's type-keyword pattern.
+    // See language-surface-sync.instructions.md § Impact Categories.
+    // ════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// All <see cref="PreceptScalarType"/> values that can appear in a
+    /// <c>field X as {type}</c> declaration. Null is internal-only.
+    /// Choice requires special syntax and is tested separately.
+    /// </summary>
+    private static readonly PreceptScalarType[] DeclarableScalarTypes =
+        Enum.GetValues<PreceptScalarType>()
+            .Where(t => t is not PreceptScalarType.Null and not PreceptScalarType.Choice)
+            .ToArray();
+
+    [Theory]
+    [MemberData(nameof(DeclarableScalarTypeData))]
+    public void EveryScalarType_ParsesAsFieldDeclaration(PreceptScalarType type)
+    {
+        var typeName = type.ToString().ToLowerInvariant();
+        var dsl = $"precept DriftTest\nfield X as {typeName} default {DefaultForType(type)}\nstate A initial\n";
+        var (model, diags) = PreceptParser.ParseWithDiagnostics(dsl);
+        diags.Should().BeEmpty($"'field X as {typeName}' must parse without errors");
+        model.Should().NotBeNull();
+    }
+
+    [Theory]
+    [MemberData(nameof(DeclarableScalarTypeData))]
+    public void EveryScalarType_ParsesAsCollectionInnerType(PreceptScalarType type)
+    {
+        var typeName = type.ToString().ToLowerInvariant();
+        var dsl = $"precept DriftTest\nfield Items as set of {typeName}\nstate A initial\n";
+        var (model, diags) = PreceptParser.ParseWithDiagnostics(dsl);
+        diags.Should().BeEmpty($"'set of {typeName}' must parse without errors");
+        model.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void ChoiceType_ParsesAsFieldDeclaration()
+    {
+        var dsl = "precept DriftTest\nfield X as choice(\"A\",\"B\") default \"A\"\nstate A initial\n";
+        var (model, diags) = PreceptParser.ParseWithDiagnostics(dsl);
+        diags.Should().BeEmpty("'field X as choice(...)' must parse without errors");
+        model.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void ChoiceType_ParsesAsCollectionInnerType()
+    {
+        var dsl = "precept DriftTest\nfield Items as set of choice(\"X\",\"Y\")\nstate A initial\n";
+        var (model, diags) = PreceptParser.ParseWithDiagnostics(dsl);
+        diags.Should().BeEmpty("'set of choice(...)' must parse without errors");
+        model.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void GrammarTypeKeywords_CoverAllDeclarableTypes()
+    {
+        var srcRoot = FindRepoRoot();
+        var grammarPath = Path.Combine(srcRoot, "tools", "Precept.VsCode", "syntaxes", "precept.tmLanguage.json");
+        File.Exists(grammarPath).Should().BeTrue("grammar file must exist");
+
+        var grammarText = File.ReadAllText(grammarPath);
+
+        // Extract the typeKeywords pattern match value
+        var typeKeywordMatch = Regex.Match(grammarText, @"""typeKeywords"".*?""match"":\s*""([^""]+)""", RegexOptions.Singleline);
+        typeKeywordMatch.Success.Should().BeTrue("typeKeywords pattern must exist in grammar");
+
+        var pattern = typeKeywordMatch.Groups[1].Value;
+
+        foreach (var type in DeclarableScalarTypes)
+        {
+            var typeName = type.ToString().ToLowerInvariant();
+            pattern.Should().Contain(typeName,
+                $"TextMate grammar typeKeywords must include '{typeName}'");
+        }
+
+        pattern.Should().Contain("choice",
+            "TextMate grammar typeKeywords must include 'choice'");
+    }
+
+    [Fact]
+    public void GrammarFieldScalarDeclaration_CoversAllSimpleScalarTypes()
+    {
+        var srcRoot = FindRepoRoot();
+        var grammarPath = Path.Combine(srcRoot, "tools", "Precept.VsCode", "syntaxes", "precept.tmLanguage.json");
+        var grammarText = File.ReadAllText(grammarPath);
+
+        // Extract the fieldScalarDeclaration pattern
+        var match = Regex.Match(grammarText, @"""fieldScalarDeclaration"".*?""match"":\s*""([^""]+)""", RegexOptions.Singleline);
+        match.Success.Should().BeTrue("fieldScalarDeclaration pattern must exist");
+
+        var pattern = match.Groups[1].Value;
+
+        foreach (var type in DeclarableScalarTypes)
+        {
+            var typeName = type.ToString().ToLowerInvariant();
+            pattern.Should().Contain(typeName,
+                $"grammar fieldScalarDeclaration must include '{typeName}' so 'field X as {typeName}' gets structured highlighting");
+        }
+    }
+
+    [Fact]
+    public void GrammarFieldCollectionDeclaration_CoversAllSimpleScalarTypes()
+    {
+        var srcRoot = FindRepoRoot();
+        var grammarPath = Path.Combine(srcRoot, "tools", "Precept.VsCode", "syntaxes", "precept.tmLanguage.json");
+        var grammarText = File.ReadAllText(grammarPath);
+
+        // Extract the fieldCollectionDeclaration pattern
+        var match = Regex.Match(grammarText, @"""fieldCollectionDeclaration"".*?""match"":\s*""([^""]+)""", RegexOptions.Singleline);
+        match.Success.Should().BeTrue("fieldCollectionDeclaration pattern must exist");
+
+        var pattern = match.Groups[1].Value;
+
+        foreach (var type in DeclarableScalarTypes)
+        {
+            var typeName = type.ToString().ToLowerInvariant();
+            pattern.Should().Contain(typeName,
+                $"grammar fieldCollectionDeclaration must include '{typeName}' so 'set of {typeName}' gets structured highlighting");
+        }
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Keyword / operator grammar drift — ALL token categories
+    //
+    // Every token that carries a category with a corresponding grammar
+    // pattern must appear in that pattern's regex.  Dual-category tokens
+    // (e.g. set = Action + Type) must appear in ALL their patterns.
+    // See language-surface-sync.instructions.md § Tooling Impact.
+    // ════════════════════════════════════════════════════════════════════
+
+    private static readonly (TokenCategory Category, string PatternName)[] CategoryGrammarMap =
+    [
+        (TokenCategory.Control, "controlKeywords"),
+        (TokenCategory.Declaration, "declarationKeywords"),
+        (TokenCategory.Grammar, "grammarKeywords"),
+        (TokenCategory.Action, "actionKeywords"),
+        (TokenCategory.Type, "typeKeywords"),
+        (TokenCategory.Constraint, "constraintKeywords"),
+        (TokenCategory.Operator, "operators"),
+        (TokenCategory.Outcome, "outcomeKeywords"),
+        (TokenCategory.Literal, "booleanNull"),
+    ];
+
+    private static readonly (TokenCategory Category, string PatternName)[] KeywordCategoryGrammarMap =
+        CategoryGrammarMap
+            .Where(m => m.PatternName != "operators")
+            .ToArray();
+
+    [Theory]
+    [MemberData(nameof(CategoryGrammarMappingData))]
+    public void Grammar_CategoryKeywords_CoverAllTokensWithThatCategory(
+        TokenCategory category, string grammarPatternName)
+    {
+        var srcRoot = FindRepoRoot();
+        var grammarPath = Path.Combine(srcRoot, "tools", "Precept.VsCode", "syntaxes", "precept.tmLanguage.json");
+        var grammarText = File.ReadAllText(grammarPath);
+
+        var patternMatches = ExtractGrammarMatchValues(grammarText, grammarPatternName);
+        patternMatches.Should().NotBeEmpty(
+            $"grammar pattern '{grammarPatternName}' must have at least one match value");
+
+        var combinedPattern = string.Join(" ", patternMatches);
+
+        var tokens = PreceptTokenMeta.GetByCategory(category).ToList();
+        tokens.Should().NotBeEmpty($"TokenCategory.{category} must have at least one token");
+
+        var missing = new List<string>();
+        foreach (var token in tokens)
+        {
+            var symbol = PreceptTokenMeta.GetSymbol(token);
+            if (symbol is null) continue;
+
+            if (!SymbolAppearsInPattern(symbol, combinedPattern))
+                missing.Add($"{token} (symbol: '{symbol}')");
+        }
+
+        missing.Should().BeEmpty(
+            $"every token with TokenCategory.{category} must appear in grammar pattern '{grammarPatternName}'");
+    }
+
+    public static IEnumerable<object[]> CategoryGrammarMappingData()
+        => CategoryGrammarMap.Select(m => new object[] { m.Category, m.PatternName });
+
+    [Theory]
+    [MemberData(nameof(KeywordCategoryGrammarMappingData))]
+    public void Grammar_KeywordPattern_ContainsOnlyTokensWithExpectedCategory(
+        TokenCategory category, string grammarPatternName)
+    {
+        var srcRoot = FindRepoRoot();
+        var grammarPath = Path.Combine(srcRoot, "tools", "Precept.VsCode", "syntaxes", "precept.tmLanguage.json");
+        var grammarText = File.ReadAllText(grammarPath);
+
+        var patternMatches = ExtractGrammarMatchValues(grammarText, grammarPatternName);
+        patternMatches.Should().NotBeEmpty(
+            $"grammar pattern '{grammarPatternName}' must have at least one match value");
+
+        var keywords = ExtractGrammarWordSymbols(patternMatches);
+        keywords.Should().NotBeEmpty(
+            $"grammar pattern '{grammarPatternName}' must contain at least one keyword");
+
+        var mismatches = new List<string>();
+        foreach (var keyword in keywords)
+        {
+            var matchingTokens = Enum.GetValues<PreceptToken>()
+                .Where(token => string.Equals(PreceptTokenMeta.GetSymbol(token), keyword, StringComparison.Ordinal))
+                .ToList();
+
+            if (matchingTokens.Any(token => PreceptTokenMeta.GetCategories(token).Contains(category)))
+                continue;
+
+            var actualCategories = matchingTokens.Count == 0
+                ? "no matching token"
+                : string.Join(" | ", matchingTokens.Select(token =>
+                    $"{token}: [{string.Join(", ", PreceptTokenMeta.GetCategories(token))}]"));
+
+            mismatches.Add($"'{keyword}' => {actualCategories}");
+        }
+
+        mismatches.Should().BeEmpty(
+            $"grammar pattern '{grammarPatternName}' must only contain symbols from TokenCategory.{category}");
+    }
+
+    public static IEnumerable<object[]> KeywordCategoryGrammarMappingData()
+        => KeywordCategoryGrammarMap.Select(m => new object[] { m.Category, m.PatternName });
+
+    /// <summary>
+    /// Extracts all "match" regex strings from a named grammar repository pattern.
+    /// Handles both single-pattern and multi-sub-pattern structures.
+    /// </summary>
+    private static List<string> ExtractGrammarMatchValues(string grammarJson, string patternName)
+    {
+        using var doc = JsonDocument.Parse(grammarJson);
+        var repo = doc.RootElement.GetProperty("repository");
+        var pattern = repo.GetProperty(patternName);
+        var patterns = pattern.GetProperty("patterns");
+
+        var matches = new List<string>();
+        foreach (var p in patterns.EnumerateArray())
+        {
+            if (p.TryGetProperty("match", out var matchProp))
+                matches.Add(matchProp.GetString()!);
+        }
+        return matches;
+    }
+
+    /// <summary>
+    /// Checks whether a token symbol appears in a combined grammar pattern text.
+    /// Strips regex metacharacters before matching to handle compound patterns
+    /// like \bno\s+transition\b where 'no' must be found.
+    /// Uses word-boundary matching for alphabetic symbols to avoid substring false positives
+    /// (e.g. "in" matching inside "initial").
+    /// </summary>
+    private static bool SymbolAppearsInPattern(string symbol, string patternText)
+    {
+        if (symbol.All(char.IsLetterOrDigit))
+        {
+            // Strip regex metacharacters so \bno\s+transition\b becomes "no transition"
+            var stripped = Regex.Replace(patternText, @"\\[bBdDwWsS+*?]", " ");
+            return Regex.IsMatch(stripped, $@"\b{Regex.Escape(symbol)}\b");
+        }
+        return patternText.Contains(symbol);
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Reverse drift — grammar patterns must not contain phantom keywords
+    //
+    // Every word in a grammar keyword pattern must map back to a token in
+    // the PreceptToken enum.  Catches keywords added to the grammar but
+    // never implemented in the runtime (e.g. aspirational "if"/"else").
+    // ════════════════════════════════════════════════════════════════════
+
+    private static readonly string[] KeywordPatternNames =
+    [
+        "controlKeywords",
+        "declarationKeywords",
+        "grammarKeywords",
+        "actionKeywords",
+        "typeKeywords",
+        "constraintKeywords",
+        "outcomeKeywords",
+        "booleanNull",
+    ];
+
+    [Theory]
+    [MemberData(nameof(KeywordPatternNameData))]
+    public void Grammar_KeywordPattern_ContainsOnlyRecognizedTokens(string grammarPatternName)
+    {
+        var srcRoot = FindRepoRoot();
+        var grammarPath = Path.Combine(srcRoot, "tools", "Precept.VsCode", "syntaxes", "precept.tmLanguage.json");
+        var grammarText = File.ReadAllText(grammarPath);
+
+        var patternMatches = ExtractGrammarMatchValues(grammarText, grammarPatternName);
+        patternMatches.Should().NotBeEmpty(
+            $"grammar pattern '{grammarPatternName}' must have at least one match value");
+
+        var allKeywords = ExtractGrammarWordSymbols(patternMatches);
+
+        // Build the set of all known token symbols
+        var knownSymbols = Enum.GetValues<PreceptToken>()
+            .Select(PreceptTokenMeta.GetSymbol)
+            .Where(s => s is not null)
+            .ToHashSet();
+
+        var phantoms = allKeywords.Where(k => !knownSymbols.Contains(k)).ToList();
+
+        phantoms.Should().BeEmpty(
+            $"every keyword in grammar pattern '{grammarPatternName}' must correspond to a token in PreceptToken enum — " +
+            $"phantom keywords have no runtime backing");
+    }
+
+    public static IEnumerable<object[]> KeywordPatternNameData()
+        => KeywordPatternNames.Select(n => new object[] { n });
+
+    private static List<string> ExtractGrammarWordSymbols(IEnumerable<string> patternMatches)
+    {
+        var stripped = string.Join(" ", patternMatches
+            .Select(match => Regex.Replace(match, @"\\[bBdDwWsS+*?]", " ")));
+
+        return Regex.Matches(stripped, @"\b([a-z]+)\b")
+            .Cast<Match>()
+            .Select(match => match.Groups[1].Value)
+            .Distinct()
+            .ToList();
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Reverse drift — operator symbols
+    //
+    // The operators grammar pattern uses symbol characters, not words.
+    // Extract each distinct symbol/word operator and verify it maps to a
+    // token in the enum.
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Grammar_Operators_ContainOnlyRecognizedSymbols()
+    {
+        var srcRoot = FindRepoRoot();
+        var grammarPath = Path.Combine(srcRoot, "tools", "Precept.VsCode", "syntaxes", "precept.tmLanguage.json");
+        var grammarText = File.ReadAllText(grammarPath);
+
+        var patternMatches = ExtractGrammarMatchValues(grammarText, "operators");
+        patternMatches.Should().NotBeEmpty();
+
+        // Known token symbols from the enum
+        var knownSymbols = Enum.GetValues<PreceptToken>()
+            .Select(PreceptTokenMeta.GetSymbol)
+            .Where(s => s is not null)
+            .ToHashSet();
+
+        var phantoms = new List<string>();
+
+        foreach (var pattern in patternMatches)
+        {
+            // Extract word operators (e.g. and|or|not|contains)
+            foreach (Match m in Regex.Matches(pattern, @"\b([a-z]+)\b"))
+            {
+                var word = m.Groups[1].Value;
+                if (word != "b" && !knownSymbols.Contains(word))
+                    phantoms.Add(word);
+            }
+
+            // Extract multi-char symbol operators (e.g. ==, !=, >=, <=, ->)
+            foreach (Match m in Regex.Matches(pattern, @"([=!><]=|->)"))
+            {
+                if (!knownSymbols.Contains(m.Value))
+                    phantoms.Add(m.Value);
+            }
+
+            // Extract single-char operators from character classes [+\-*/%]
+            foreach (Match m in Regex.Matches(pattern, @"\[([^\]]+)\]"))
+            {
+                foreach (var ch in m.Groups[1].Value.Replace("\\", ""))
+                {
+                    var sym = ch.ToString();
+                    if (sym != "-" || !knownSymbols.Contains(sym)) // \- is escape
+                    {
+                        if (!knownSymbols.Contains(sym))
+                            phantoms.Add(sym);
+                    }
+                }
+            }
+
+            // Extract standalone single-char comparison operators (>|<)
+            foreach (Match m in Regex.Matches(pattern, @"^([><])\|([><])$"))
+            {
+                if (!knownSymbols.Contains(m.Groups[1].Value))
+                    phantoms.Add(m.Groups[1].Value);
+                if (!knownSymbols.Contains(m.Groups[2].Value))
+                    phantoms.Add(m.Groups[2].Value);
+            }
+
+            // Standalone single = (assignment)
+            if (Regex.IsMatch(pattern, @"^=$") && !knownSymbols.Contains("="))
+                phantoms.Add("=");
+        }
+
+        phantoms.Distinct().ToList().Should().BeEmpty(
+            "every operator in the grammar must correspond to a token in PreceptToken enum");
+    }
+
+    public static IEnumerable<object[]> DeclarableScalarTypeData()
+        => DeclarableScalarTypes.Select(t => new object[] { t });
+
+    private static string DefaultForType(PreceptScalarType type) => type switch
+    {
+        PreceptScalarType.String => "\"\"",
+        PreceptScalarType.Number => "0",
+        PreceptScalarType.Boolean => "false",
+        PreceptScalarType.Integer => "0",
+        PreceptScalarType.Decimal => "0.0",
+        _ => throw new ArgumentOutOfRangeException(nameof(type))
+    };
+
+    // ════════════════════════════════════════════════════════════════════
+    // Tier 1: Reflection guard — model records must have SourceLine
+    //
+    // Every model record that represents a user-authored declaration must
+    // carry int SourceLine so diagnostics can point to the correct line.
+    // If someone adds PreceptNewThing without SourceLine, this fails.
+    // ════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Model record types that represent user-authored DSL declarations.
+    /// Each must have an <c>int SourceLine</c> property so diagnostics can
+    /// squiggle the correct declaration line.
+    /// </summary>
+    private static readonly Type[] DeclarationRecordTypes =
+    [
+        typeof(PreceptDefinition),
+        typeof(PreceptState),
+        typeof(PreceptEvent),
+        typeof(PreceptEventArg),
+        typeof(PreceptField),
+        typeof(PreceptCollectionField),
+        typeof(PreceptInvariant),
+        typeof(StateAssertion),
+        typeof(EventAssertion),
+        typeof(PreceptTransitionRow),
+        typeof(PreceptEditBlock),
+        typeof(PreceptStateAction),
+        typeof(PreceptSetAssignment),
+        typeof(PreceptCollectionMutation),
+    ];
+
+    [Fact]
+    public void AllDeclarationRecords_HaveSourceLineProperty()
+    {
+        var missing = new List<string>();
+
+        foreach (var type in DeclarationRecordTypes)
+        {
+            var prop = type.GetProperty("SourceLine", BindingFlags.Public | BindingFlags.Instance);
+            if (prop is null || prop.PropertyType != typeof(int))
+                missing.Add(type.Name);
+        }
+
+        missing.Should().BeEmpty(
+            "every model record representing a user-authored declaration must have int SourceLine " +
+            "so constraint violations can squiggle the correct line. " +
+            "Add 'int SourceLine = 0' to the record's trailing parameters.");
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Tier 2: Diagnostic line accuracy — must not squiggle the header
+    //
+    // For every parse/compile-phase constraint, constructs a multi-line
+    // DSL where the offending declaration is NOT on line 1. Asserts that
+    // the diagnostic Line > 1 (1-based: line 1 = precept header).
+    //
+    // Piggybacks on the existing ConstraintTriggers infrastructure.
+    // When someone adds C70, the completeness guard below fails if no
+    // line accuracy case is added.
+    // ════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Constraints exempt from the "must not squiggle line 1" invariant.
+    /// Each has a documented reason for landing on line 1.
+    /// </summary>
+    private static readonly HashSet<string> LineAccuracyExemptions = new(StringComparer.Ordinal)
+    {
+        "C1",   // empty input — nothing to point to
+        "C3",   // structurally unparseable — parse failure, no model
+        "C4",   // invalid expression via standalone ParseExpression — DirectAction
+        "C5",   // invalid number literal — DirectAction (unreachable from normal parse)
+        "C12",  // no states or fields — nothing to point to
+        "C26",  // null model — DirectAction (programmatic precondition)
+        "C27",  // blank initial state — DirectAction
+        "C28",  // initial state not in list — DirectAction
+        "C33",  // runtime: CreateInstance with empty state — DirectAction
+        "C34",  // runtime: CreateInstance with bad state — DirectAction
+        "C35",  // runtime: CreateInstance with bad data — DirectAction
+        "C36",  // runtime: empty current state — DirectAction
+        "C37",  // runtime: empty event name — DirectAction
+        "C53",  // empty precept (no events) — legitimately points at precept header
+        "C61",  // maxplaces on non-decimal — DirectAction
+        "C62",  // choice with no values — DirectAction
+        "C71",  // unknown function name — DirectAction (parser rejects unknown names)
+    };
+
+    /// <summary>
+    /// DSL snippets for line accuracy testing. Each places the offending declaration
+    /// on line 3+ so we can assert the diagnostic doesn't fall back to line 1.
+    /// Most reuse the ConstraintTriggers DSL with extra padding lines prepended.
+    /// </summary>
+    private static readonly Dictionary<string, (string Dsl, string Phase, int MinExpectedLine)> LineAccuracyCases = new()
+    {
+        // ── Parse-phase: field/state/event violations ──
+
+        // C2: tokenizer error — unrecognized character on line 3
+        ["C2"]  = ("precept Test\nfield X as number default 0\n@invalid\n", "parse", 3),
+
+        // C6: duplicate field — second field decl on line 4
+        ["C6"]  = ("precept Test\nfield Pad as number default 0\nstate A initial\nfield Pad as string nullable\n", "parse", 4),
+
+        // C7: duplicate state — second state decl on line 3
+        ["C7"]  = ("precept Test\nstate A initial\nstate A\n", "parse", 3),
+
+        // C8: duplicate initial — second initial on line 3
+        ["C8"]  = ("precept Test\nstate A initial\nstate B initial\n", "parse", 3),
+
+        // C9: duplicate event — second event on line 4
+        ["C9"]  = ("precept Test\nstate A initial\nevent Go\nevent Go\nfrom A on Go -> no transition\n", "parse", 4),
+
+        // C10: missing outcome — row on line 5
+        ["C10"] = ("precept Test\nfield X as number default 0\nstate A initial\nstate B\nevent Go\nfrom A on Go -> set X = 1\n", "parse", 6),
+
+        // C11: statements after outcome — row on line 5
+        ["C11"] = ("precept Test\nfield X as number default 0\nstate A initial\nstate B\nevent Go\nfrom A on Go -> transition B -> set X = 1\n", "parse", 6),
+
+        // C13: no initial state — state decl on line 3
+        ["C13"] = ("precept Test\nfield X as number default 0\nstate A, B\nevent Go\nfrom A on Go -> transition B\n", "parse", 3),
+
+        // C14: event assert with wrong dotted prefix — assert on line 4
+        ["C14"] = ("precept Test\nstate A initial\nevent Submit with Comment as string default \"x\"\non Submit assert Other.Comment != null because \"bad\"\n", "parse", 4),
+
+        // C15: event assert dotted member not a declared arg — assert on line 4
+        ["C15"] = ("precept Test\nstate A initial\nevent Submit with Comment as string default \"x\"\non Submit assert Submit.Nope != null because \"bad\"\n", "parse", 4),
+
+        // C16: event assert plain identifier not a declared arg — assert on line 4
+        ["C16"] = ("precept Test\nstate A initial\nevent Submit with Comment as string default \"x\"\non Submit assert Nope != null because \"bad\"\n", "parse", 4),
+
+        // C17: non-nullable field without default — field on line 4
+        ["C17"] = ("precept Test\nfield Title as string nullable\nfield Description as string nullable\nfield Blah as string\n", "parse", 4),
+
+        // C18: field default type mismatch — field on line 3
+        ["C18"] = ("precept Test\nstate A initial\nfield X as number default \"hello\"\n", "parse", 3),
+
+        // C19: non-nullable field with null default — field on line 3
+        ["C19"] = ("precept Test\nstate A initial\nfield X as string default null\n", "parse", 3),
+
+        // C20: event arg default type mismatch — event on line 3
+        ["C20"] = ("precept Test\nstate A initial\nevent Submit with X as number default \"hello\"\n", "parse", 3),
+
+        // C21: non-nullable event arg with null default — event on line 3
+        ["C21"] = ("precept Test\nstate A initial\nevent Submit with X as string default null\n", "parse", 3),
+
+        // C22: collection verb on scalar field — row on line 5
+        ["C22"] = ("precept Test\nfield X as number default 0\nstate A initial\nstate B\nevent Go\nfrom A on Go -> add X \"val\" -> transition B\n", "parse", 6),
+
+        // C23: collection verb on unknown field — row on line 4
+        ["C23"] = ("precept Test\nstate A initial\nstate B\nevent Go\nfrom A on Go -> add Unknown \"val\" -> transition B\n", "parse", 5),
+
+        // C24: wrong verb for collection kind — row on line 5
+        ["C24"] = ("precept Test\nfield Tags as set of string\nstate A initial\nstate B\nevent Go\nfrom A on Go -> enqueue Tags \"val\" -> transition B\n", "parse", 6),
+
+        // C25: unreachable duplicate row — second row on line 6
+        ["C25"] = ("precept Test\nstate A initial\nstate B\nevent Go\nfrom A on Go -> transition B\nfrom A on Go -> transition B\n", "parse", 6),
+
+        // C54: undeclared state in transition — row on line 4
+        ["C54"] = ("precept Test\nstate A initial\nevent Go\nfrom A on Go -> transition Nowhere\n", "parse", 4),
+
+        // ── Compile-phase: type checker + analysis ────
+
+        // C29: invariant violated by defaults — invariant on line 3
+        ["C29"] = ("precept Test\nfield Score as number default 0\ninvariant Score > 0 because \"must be positive\"\nstate A initial\n", "compile", 3),
+
+        // C30: state assert on initial state violated by defaults — assert on line 3
+        ["C30"] = ("precept Test\nfield Balance as number default 0\nin Active assert Balance > 0 because \"must be positive\"\nstate Active initial\n", "compile", 3),
+
+        // C31: event assert violated by default arg values — assert on line 3
+        ["C31"] = ("precept Test\nstate A initial\non Submit assert Amount > 0 because \"must be positive\"\nevent Submit with Amount as number default 0\n", "compile", 3),
+
+        // C32: literal set violates invariant — row on line 6
+        ["C32"] = ("precept Test\nfield Balance as number default 100\ninvariant Balance >= 0 because \"no negative\"\nstate A initial\nstate B\nevent Go\nfrom A on Go -> set Balance = -5 -> transition B\n", "compile", 7),
+
+        // C38: unknown identifier in expression — row on line 5
+        ["C38"] = ("precept Test\nfield X as number default 0\nstate A initial\nstate B\nevent Go\nfrom A on Go -> set X = Missing -> transition B\n", "compile", 6),
+
+        // C39: expression type mismatch — row on line 5
+        ["C39"] = ("precept Test\nfield X as number default 0\nstate A initial\nstate B\nevent Go\nfrom A on Go -> set X = \"text\" -> transition B\n", "compile", 6),
+
+        // C40: unary operator type error — row on line 6
+        ["C40"] = ("precept Test\nfield X as boolean default false\nfield Y as string default \"\"\nstate A initial\nstate B\nevent Go\nfrom A on Go -> set X = not Y -> transition B\n", "compile", 7),
+
+        // C41: binary operator type error — row on line 6
+        ["C41"] = ("precept Test\nfield X as number default 0\nfield Y as string default \"\"\nstate A initial\nstate B\nevent Go\nfrom A on Go -> set X = Y - 1 -> transition B\n", "compile", 7),
+
+        // C42: null-flow violation — row on line 5
+        ["C42"] = ("precept Test\nfield X as number default 0\nfield Y as number nullable\nstate A initial\nstate B\nevent Go\nfrom A on Go -> set X = Y -> transition B\n", "compile", 7),
+
+        // C43: collection pop/dequeue into target type mismatch — row on line 5
+        ["C43"] = ("precept Test\nfield X as number default 0\nfield Items as stack of string\nstate A initial\nstate B\nevent Go\nfrom A on Go when Items.count > 0 -> pop Items into X -> transition B\n", "compile", 7),
+
+        // C44: duplicate state assert — second assert on line 5
+        ["C44"] = ("precept Test\nfield X as number default 10\nstate A initial\nstate B\nin B assert X > 0 because \"first\"\nin B assert X > 0 because \"duplicate\"\nevent Go\nfrom A on Go -> transition B\n", "compile", 6),
+
+        // C45: subsumed state assert — redundant assert on line 5
+        ["C45"] = ("precept Test\nfield X as number default 10\nstate A initial\nstate B\nin B assert X > 0 because \"in covers entry\"\nto B assert X > 0 because \"to is redundant\"\nevent Go\nfrom A on Go -> transition B\n", "compile", 6),
+
+        // C46: non-boolean expression in guard — row on line 5
+        ["C46"] = ("precept Test\nfield X as number default 0\nstate A initial\nstate B\nevent Go\nfrom A on Go when X -> transition B\nfrom A on Go -> reject \"blocked\"\n", "compile", 6),
+
+        // C47: identical guard on duplicate rows — second guarded row on line 6
+        ["C47"] = ("precept Test\nfield X as number default 0\nstate A initial\nstate B\nevent Go\nfrom A on Go when X > 0 -> transition B\nfrom A on Go when X > 0 -> reject \"blocked\"\n", "compile", 7),
+
+        // C48: unreachable state — state C on line 4
+        ["C48"] = ("precept Test\nstate A initial\nstate B\nstate C\nevent Go\nfrom A on Go -> transition B\n", "compile", 4),
+
+        // C49: orphaned event — unused event on line 4
+        ["C49"] = ("precept Test\nstate A initial\nevent Go\nevent Unused\nfrom A on Go -> no transition\n", "compile", 4),
+
+        // C50: dead-end state — state B on line 3
+        ["C50"] = ("precept Test\nstate A initial\nstate B\nevent Go\nfrom A on Go -> transition B\nfrom B on Go -> reject \"blocked\"\n", "compile", 3),
+
+        // C51: reject-only pair — row on line 3
+        ["C51"] = ("precept Test\nstate A initial\nevent Go\nfrom A on Go -> reject \"blocked\"\n", "compile", 4),
+
+        // C52: event never succeeds — event Stop on line 4
+        ["C52"] = ("precept Test\nstate A initial\nstate B\nevent Move\nevent Stop\nfrom A on Move -> transition B\nfrom A on Stop -> reject \"blocked\"\nfrom B on Stop -> reject \"blocked\"\n", "compile", 5),
+
+        // C55: root-level edit with states declared — edit on line 4
+        ["C55"] = ("precept Test\nfield Priority as number default 1\nstate A initial\nedit Priority\n", "compile", 4),
+
+        // C56: .length on nullable without null guard — row on line 4
+        ["C56"] = ("precept Test\nfield Note as string nullable\nstate A initial\nevent Go\nfrom A on Go when Note.length > 0 -> no transition\n", "compile", 5),
+
+        // C57: constraint on incompatible type — field on line 2
+        ["C57"] = ("precept Test\nfield Name as string default \"\" nonnegative\nstate A initial\n", "compile", 2),
+
+        // C58: duplicate constraint — field on line 2
+        ["C58"] = ("precept Test\nfield Amount as number default 5 min 1 min 1\nstate A initial\n", "compile", 2),
+
+        // C59: default violates constraint — field on line 2
+        ["C59"] = ("precept Test\nfield Amount as number default 0 positive\nstate A initial\n", "compile", 2),
+
+        // C60: narrowing assignment (number → integer) — row on line 5
+        ["C60"] = ("precept Test\nfield Count as integer default 0\nstate A initial\nstate B\nevent Go\nfrom A on Go -> set Count = 3.0 -> no transition\n", "compile", 6),
+
+        // C63: duplicate value in choice set — field on line 2
+        ["C63"] = ("precept Test\nfield Status as choice(\"Open\",\"Open\",\"Closed\") default \"Open\"\nstate A initial\n", "compile", 2),
+
+        // C64: default not in choice set — field on line 2
+        ["C64"] = ("precept Test\nfield Status as choice(\"Open\",\"Closed\") default \"Pending\"\nstate A initial\n", "compile", 2),
+
+        // C65: ordinal operator on unordered choice — row on line 5
+        ["C65"] = ("precept Test\nfield Status as choice(\"Draft\",\"Active\") default \"Draft\"\nstate A initial\nstate B\nevent Go\nfrom A on Go when Status > \"Active\" -> no transition\n", "compile", 6),
+
+        // C66: ordered on non-choice type — field on line 2
+        ["C66"] = ("precept Test\nfield Name as string nullable ordered\nstate A initial\n", "compile", 2),
+
+        // C67: ordinal comparison between two choice fields — row on line 6
+        ["C67"] = ("precept Test\nfield Priority as choice(\"Low\",\"High\") default \"Low\" ordered\nfield Severity as choice(\"Low\",\"High\") default \"Low\" ordered\nstate A initial\nstate B\nevent Go\nfrom A on Go when Priority > Severity -> no transition\n", "compile", 7),
+
+        // C68: literal not in choice set — row on line 5
+        ["C68"] = ("precept Test\nfield Status as choice(\"Open\",\"Closed\") default \"Open\"\nstate A initial\nstate B\nevent Go\nfrom A on Go -> set Status = \"Invalid\" -> no transition\n", "compile", 6),
+
+        // C69: cross-scope guard reference — invariant on line 4
+        ["C69"] = ("precept Test\nfield X as number default 0\nstate A initial\nstate B\nevent Go with Amount as number\ninvariant X >= 0 when Go.Amount > 0 because \"bad\"\nfrom A on Go -> no transition\n", "compile", 6),
+
+        // C70: duplicate modifier — field on line 2
+        ["C70"] = ("precept Test\nfield X as number default 0 default 1\nstate A initial\n", "parse", 2),
+
+        // C72: wrong arity — row on line 6
+        ["C72"] = ("precept Test\nfield X as number default 0\nstate A initial\nstate B\nevent Go\nfrom A on Go when abs(X, X) > 0 -> no transition\n", "compile", 6),
+
+        // C73: type mismatch — row on line 6
+        ["C73"] = ("precept Test\nfield Name as string default \"test\"\nstate A initial\nstate B\nevent Go\nfrom A on Go when abs(Name) > 0 -> no transition\n", "compile", 6),
+
+        // C74: round precision — row on line 6
+        ["C74"] = ("precept Test\nfield X as number default 0\nstate A initial\nstate B\nevent Go\nfrom A on Go when round(X, X) > 0 -> no transition\n", "compile", 6),
+
+        // C75: pow exponent — row on line 6
+        ["C75"] = ("precept Test\nfield X as number default 0\nstate A initial\nstate B\nevent Go\nfrom A on Go when pow(X, X) > 0 -> no transition\n", "compile", 6),
+
+        // C76: sqrt non-negative — row on line 6
+        ["C76"] = ("precept Test\nfield X as number default 0\nstate A initial\nstate B\nevent Go\nfrom A on Go when sqrt(X) > 0 -> no transition\n", "compile", 6),
+
+        // C77: nullable arg — row on line 6
+        ["C77"] = ("precept Test\nfield X as number nullable default null\nstate A initial\nstate B\nevent Go\nfrom A on Go when abs(X) > 0 -> no transition\n", "compile", 6),
+    };
+
+    [Theory]
+    [MemberData(nameof(LineAccuracyData))]
+    public void EveryConstraint_DiagnosticDoesNotSquiggleHeaderLine(string constraintId, string phase, int minExpectedLine)
+    {
+        var caseData = LineAccuracyCases[constraintId];
+        int diagnosticLine;
+
+        if (phase == "parse")
+        {
+            var (model, diagnostics) = PreceptParser.ParseWithDiagnostics(caseData.Dsl);
+            diagnostics.Should().NotBeEmpty($"constraint {constraintId} must produce a parse diagnostic");
+            diagnosticLine = diagnostics[0].Line;
+        }
+        else // compile
+        {
+            var (model, parseDiags) = PreceptParser.ParseWithDiagnostics(caseData.Dsl);
+            parseDiags.Should().BeEmpty($"compile-phase trigger for {constraintId} must parse cleanly");
+            model.Should().NotBeNull();
+
+            var validation = PreceptCompiler.Validate(model!);
+            var diagnostic = validation.Diagnostics.FirstOrDefault(d => d.Constraint.Id == constraintId);
+            diagnostic.Should().NotBeNull($"constraint {constraintId} must produce a validation diagnostic");
+            diagnosticLine = diagnostic!.Line;
+        }
+
+        diagnosticLine.Should().BeGreaterThan(1,
+            $"constraint {constraintId} diagnostic should squiggle the offending declaration " +
+            $"(expected line >= {minExpectedLine}), not the precept header (line 1). " +
+            "Did you forget to pass SourceLine to ToException() or the diagnostic constructor?");
+    }
+
+    public static IEnumerable<object[]> LineAccuracyData()
+        => LineAccuracyCases.Select(kv => new object[] { kv.Key, kv.Value.Phase, kv.Value.MinExpectedLine });
+
+    /// <summary>
+    /// Completeness guard: every non-exempt parse/compile-phase constraint
+    /// must have a line accuracy test case. Fails when someone adds C70
+    /// without adding a corresponding LineAccuracyCases entry.
+    /// </summary>
+    [Fact]
+    public void AllNonExemptConstraints_HaveLineAccuracyCase()
+    {
+        var allIds = DiagnosticCatalog.Constraints
+            .Where(c => c.Phase is "parse" or "compile")
+            .Select(c => c.Id)
+            .ToHashSet(StringComparer.Ordinal);
+
+        var covered = LineAccuracyCases.Keys.ToHashSet(StringComparer.Ordinal);
+        var exempt = LineAccuracyExemptions;
+
+        var uncovered = allIds.Except(covered).Except(exempt).ToList();
+        uncovered.Sort(StringComparer.Ordinal);
+
+        uncovered.Should().BeEmpty(
+            "every parse/compile-phase constraint must either have a LineAccuracyCases entry " +
+            "or be listed in LineAccuracyExemptions with a reason. " +
+            $"Missing: {string.Join(", ", uncovered)}");
     }
 }

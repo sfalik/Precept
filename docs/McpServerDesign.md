@@ -81,15 +81,71 @@ The `vocabulary` object contains the following keyword lists, each reflecting `P
 
 | Property | `TokenCategory` | Keywords |
 |---|---|---|
-| `ControlKeywords` | `Control` | `state`, `in`, `to`, `from`, `on`, `when` |
-| `DeclarationKeywords` | `Declaration` | `precept`, `field`, `invariant`, `event`, `assert`, `edit` |
+| `ControlKeywords` | `Control` | `when` |
+| `DeclarationKeywords` | `Declaration` | `precept`, `field`, `invariant`, `state`, `event`, `assert`, `edit`, `in`, `to`, `from`, `on` |
 | `GrammarKeywords` | `Grammar` | `as`, `with`, `nullable`, `default`, `because`, `any`, `all`, `of`, `into`, `initial` |
 | `ActionKeywords` | `Action` | `set`, `add`, `remove`, `enqueue`, `dequeue`, `push`, `pop`, `clear` |
 | `OutcomeKeywords` | `Outcome` | `transition`, `no`, `reject` |
-| `TypeKeywords` | `Type` | `set`, `string`, `number`, `boolean`, `queue`, `stack` |
+| `TypeKeywords` | `Type` | `set`, `string`, `number`, `boolean`, `integer`, `decimal`, `choice`, `queue`, `stack` |
+| `ConstraintKeywords` | `Constraint` | `nonnegative`, `positive`, `min`, `max`, `notempty`, `minlength`, `maxlength`, `mincount`, `maxcount`, `maxplaces`, `ordered` |
 | `LiteralKeywords` | `Literal` | `true`, `false`, `null` |
 
 `GrammarKeywords` contains connective and modifier keywords that serve a structural grammar role — they join, qualify, or introduce parts of declarations — rather than performing computation or control flow.
+
+`ControlKeywords` is intentionally narrow: it is reserved for actual guard/control-flow tokens. Statement anchors such as `state`, `in`, `to`, `from`, and `on` are emitted under `DeclarationKeywords` so the vocabulary mirrors the runtime token metadata used by syntax highlighting and semantic tokens.
+
+**Scalar type reference** — the `typeKeywords` list includes:
+
+| Type | Description |
+|---|---|
+| `string` | UTF-16 string value |
+| `number` | 64-bit floating-point (IEEE 754) |
+| `boolean` | `true` or `false` |
+| `integer` | Whole number, no decimal component. Supports arithmetic and numeric range constraints (`nonnegative`, `positive`, `min`, `max`). |
+| `decimal` | Exact base-10 decimal. Supports `maxplaces` constraint and the `round()` built-in function. |
+| `choice("A","B","C")` | Constrained string value set. Use `ordered` to enable ordinal comparison operators (`<`, `<=`, `>`, `>=`). |
+
+**Constraint keyword reference** — the `constraintKeywords` list includes:
+
+| Constraint | Applies to | Description |
+|---|---|---|
+| `nonnegative` | `number`, `integer`, `decimal` | Value must be ≥ 0 |
+| `positive` | `number`, `integer`, `decimal` | Value must be > 0 |
+| `min N` | `number`, `integer`, `decimal` | Value must be ≥ N |
+| `max N` | `number`, `integer`, `decimal` | Value must be ≤ N |
+| `notempty` | `string`, collections | Value must not be empty |
+| `minlength N` | `string` | String length must be ≥ N |
+| `maxlength N` | `string` | String length must be ≤ N |
+| `mincount N` | collections | Collection element count must be ≥ N |
+| `maxcount N` | collections | Collection element count must be ≤ N |
+| `maxplaces N` | `decimal` | Caps decimal places to N (e.g. `maxplaces 2` ensures at most 2 decimal digits) |
+| `ordered` | `choice` | Enables ordinal comparison operators on choice fields; values compare in declaration order |
+
+**Built-in function reference** — built-in functions are exposed in the `functions` section of the `precept_language` output, with full signature, parameter, and description metadata:
+
+| Function | Category | Signatures | Description |
+|---|---|---|---|
+| `abs(value)` | numeric | `int→int`, `dec→dec`, `num→num` | Absolute value (type-preserving) |
+| `floor(value)` | numeric | `dec→int`, `num→int` | Round toward negative infinity |
+| `ceil(value)` | numeric | `dec→int`, `num→int` | Round toward positive infinity |
+| `round(value)` | numeric | `int→int`, `dec→int`, `num→num` | Banker's rounding to nearest integer |
+| `round(value, places)` | numeric | `(num, int-literal)→dec` | Precision rounding |
+| `truncate(value)` | numeric | `dec→int`, `num→int` | Truncate toward zero |
+| `min(a, b, ...)` | numeric | `int*→int`, `dec*→dec`, `num*→num` | Smallest of 2+ values (variadic) |
+| `max(a, b, ...)` | numeric | `int*→int`, `dec*→dec`, `num*→num` | Largest of 2+ values (variadic) |
+| `clamp(value, min, max)` | numeric | `(int×3)→int`, `(dec×3)→dec`, `(num×3)→num` | Constrain to range |
+| `pow(base, exp)` | numeric | `(int, int)→int`, `(dec, int)→dec`, `(num, int)→num` | Integer exponent power |
+| `sqrt(value)` | numeric | `dec→dec`, `num→num` | Square root (requires non-negative proof) |
+| `toLower(value)` | string | `str→str` | Lowercase (invariant culture) |
+| `toUpper(value)` | string | `str→str` | Uppercase (invariant culture) |
+| `trim(value)` | string | `str→str` | Remove leading/trailing whitespace |
+| `startsWith(value, prefix)` | string | `(str, str)→bool` | Case-sensitive prefix test |
+| `endsWith(value, suffix)` | string | `(str, str)→bool` | Case-sensitive suffix test |
+| `left(value, count)` | string | `(str, num)→str` | Leftmost N chars (clamping) |
+| `right(value, count)` | string | `(str, num)→str` | Rightmost N chars (clamping) |
+| `mid(value, start, length)` | string | `(str, num, num)→str` | Substring, 1-indexed (clamping) |
+
+The `functions` section in the JSON output provides structured `FunctionDto` objects with `name`, `description`, and `signatures` (each containing `parameters` with name/type/constraint, and `returnType`).
 
 **Implementation:** Serializes `ConstructCatalog.Constructs` + `DiagnosticCatalog.Diagnostics` + reflected `PreceptToken` vocabulary. No MCP-specific data — everything comes from core infrastructure.
 
@@ -173,6 +229,17 @@ The `vocabulary` object contains the following keyword lists, each reflecting `P
 ```
 
 **Implementation:** Calls `PreceptCompiler.CompileFromText(text)` — a composed pipeline that runs parse → structured validation → compile. Returns the full model projection when parsing succeeds (even with type errors), diagnostics only when parsing fails. Graph analysis findings (C48–C53) appear as warning/hint-severity diagnostics alongside any type errors. The tool is a thin projection of the core result into JSON.
+
+**Declaration arrays:** The compile output includes four arrays surfacing invariants, state asserts, event asserts, and edit blocks from the parsed definition:
+
+| Array | Item shape |
+|-------|------------|
+| `invariants` | `{ expression, when?, reason, line, isSynthetic }` |
+| `stateAsserts` | `{ anchor, state, expression, when?, reason, line }` |
+| `eventAsserts` | `{ event, expression, when?, reason, line }` |
+| `editBlocks` | `{ state?, when?, fields[], line }` |
+
+The `when` property is present only when the declaration includes a `when <Guard>` clause. It contains the guard expression text.
 
 **`isStateless` field:** `true` when the precept has no `state` declarations. When `isStateless: true`, `initialState` is `null`, `states` is `[]`, and `stateCount` is `0`.
 

@@ -46,16 +46,21 @@ public sealed record LanguageConstraint(
     /// </summary>
     public ConstraintViolationException ToException(params (string Key, object? Value)[] args)
         => new(this, FormatMessage(args));
+
+    public ConstraintViolationException ToException(int sourceLine, params (string Key, object? Value)[] args)
+        => new(this, FormatMessage(args)) { SourceLine = sourceLine };
 }
 
 /// <summary>
 /// Thrown when a constraint is violated during parsing or assembly.
-/// Carries the <see cref="LanguageConstraint"/> for diagnostic code derivation.
+/// Carries the <see cref="LanguageConstraint"/> for diagnostic code derivation
+/// and optional source line for accurate squiggle placement.
 /// </summary>
 public sealed class ConstraintViolationException(LanguageConstraint constraint, string message)
     : InvalidOperationException(message)
 {
     public LanguageConstraint Constraint { get; } = constraint;
+    public int SourceLine { get; init; }
 }
 
 public static class DiagnosticCatalog
@@ -440,4 +445,160 @@ public static class DiagnosticCatalog
         "C55", "compile",
         "Root-level 'edit' is not valid when states are declared.",
         "Root-level `edit` is not valid when states are declared. Use `in any edit all` or `in <State> edit <Fields>` instead.");
+
+    /// <summary>Member access on nullable string requires explicit null guard before '.length'.</summary>
+    public static readonly LanguageConstraint C56 = Register(
+        "C56", "compile",
+        "Member access on nullable string requires explicit null guard before '.length'.",
+        "'{field}.length' requires a null check — '{field}' is nullable. Use '{field} != null and {field}.length ...' or '{field} == null or {field}.length ...'.");
+
+    // ═══════════════════════════════════════════════════════════════
+    // Field-level constraint diagnostics (C57–C59)
+    // ═══════════════════════════════════════════════════════════════
+
+    /// <summary>Constraint applied to an incompatible field type.</summary>
+    public static readonly LanguageConstraint C57 = Register(
+        "C57", "compile",
+        "Constraint applied to an incompatible field type.",
+        "Constraint '{constraint}' is not valid for type '{type}'.");
+
+    /// <summary>Contradictory or duplicate constraints on the same field.</summary>
+    public static readonly LanguageConstraint C58 = Register(
+        "C58", "compile",
+        "Contradictory or duplicate constraints on the same field.",
+        "{message}");
+
+    /// <summary>Default value violates a declared constraint.</summary>
+    public static readonly LanguageConstraint C59 = Register(
+        "C59", "compile",
+        "Default value violates a declared constraint.",
+        "Default value '{value}' violates constraint '{constraint}'. The default must satisfy all declared constraints.");
+
+    // ═══════════════════════════════════════════════════════════════
+    // Integer type diagnostics (C60–C61)
+    // ═══════════════════════════════════════════════════════════════
+
+    /// <summary>Narrowing assignment: cannot assign a non-integer numeric value to an integer field without explicit conversion.</summary>
+    public static readonly LanguageConstraint C60 = Register(
+        "C60", "compile",
+        "Narrowing assignment: cannot assign non-integer value to integer field without explicit conversion.",
+        "Narrowing assignment: cannot assign '{actual}' to integer field '{name}' without explicit conversion. An explicit integer conversion function is planned; see documentation.");
+
+    /// <summary>'maxplaces' constraint applies only to decimal fields.</summary>
+    public static readonly LanguageConstraint C61 = Register(
+        "C61", "compile",
+        "'maxplaces' constraint applies only to decimal fields.",
+        "'maxplaces' constraint applies only to decimal fields. Integer fields cannot have fractional precision.");
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Choice type diagnostics (C62–C68)
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// <summary>choice type requires at least one value.</summary>
+    public static readonly LanguageConstraint C62 = Register(
+        "C62", "compile",
+        "choice type requires at least one value.",
+        "choice type on field '{name}' requires at least one value.");
+
+    /// <summary>Duplicate value in choice set.</summary>
+    public static readonly LanguageConstraint C63 = Register(
+        "C63", "compile",
+        "Duplicate value in choice set.",
+        "Duplicate value '{value}' in choice set for field '{name}'.");
+
+    /// <summary>Default value is not a member of the choice set.</summary>
+    public static readonly LanguageConstraint C64 = Register(
+        "C64", "compile",
+        "Default value is not a member of the choice set.",
+        "Default value '{value}' is not a member of choice({values}) for field '{name}'.");
+
+    /// <summary>Ordinal comparison requires the 'ordered' constraint on the choice field.</summary>
+    public static readonly LanguageConstraint C65 = Register(
+        "C65", "compile",
+        "Ordinal comparison requires the 'ordered' constraint on the choice field.",
+        "Ordinal comparison '{operator}' requires the 'ordered' constraint. Add 'ordered' to the field declaration, or use '==' / '!=' for unordered comparison.");
+
+    /// <summary>'ordered' constraint applies only to choice types.</summary>
+    public static readonly LanguageConstraint C66 = Register(
+        "C66", "compile",
+        "'ordered' constraint applies only to choice types.",
+        "'ordered' constraint applies only to choice types. Field '{name}' is '{type}', not a choice field.");
+
+    /// <summary>Ordinal comparison cannot be applied to two choice fields — ordinal rank is field-local.</summary>
+    public static readonly LanguageConstraint C67 = Register(
+        "C67", "compile",
+        "Ordinal comparison cannot be applied to two choice fields — ordinal rank is field-local.",
+        "Ordinal comparison '{operator}' cannot be applied to two choice fields. Ordinal rank is field-local — the two fields have independent orderings. Use '==' / '!=' to compare choice field values.");
+
+    /// <summary>Literal value is not a member of the choice set.</summary>
+    public static readonly LanguageConstraint C68 = Register(
+        "C68", "compile",
+        "Literal value is not a member of the choice set.",
+        "'{value}' is not a member of choice({values}) for '{name}'.");
+
+    // ═══════════════════════════════════════════════════════════════
+    // When-guard diagnostics (C69+)
+    // ═══════════════════════════════════════════════════════════════
+
+    /// <summary>Cross-scope guard reference in when clause.</summary>
+    public static readonly LanguageConstraint C69 = Register(
+        "C69", "compile",
+        "Cross-scope guard reference in when clause.",
+        "Guard expression references '{name}' which belongs to a different scope. Invariant and edit guards can only reference entity fields; event assert guards can only reference event arguments.");
+
+    // ═══════════════════════════════════════════════════════════════
+    // Modifier diagnostics (C70+)
+    // ═══════════════════════════════════════════════════════════════
+
+    /// <summary>Duplicate modifier on field or event argument declaration.</summary>
+    public static readonly LanguageConstraint C70 = Register(
+        "C70", "parse",
+        "Duplicate modifier on field or event argument declaration.",
+        "Duplicate modifier '{modifier}' on '{name}'. Each modifier may appear at most once per declaration.");
+
+    // ═══════════════════════════════════════════════════════════════
+    // Function diagnostics (C71–C77)
+    // ═══════════════════════════════════════════════════════════════
+
+    /// <summary>Unknown function name in expression.</summary>
+    public static readonly LanguageConstraint C71 = Register(
+        "C71", "compile",
+        "Unknown function name in expression.",
+        "Unknown function '{name}'.");
+
+    /// <summary>Function called with incorrect number of arguments.</summary>
+    public static readonly LanguageConstraint C72 = Register(
+        "C72", "compile",
+        "Function called with incorrect number of arguments.",
+        "{name}() called with {count} argument(s), but no matching overload found.");
+
+    /// <summary>Function argument type mismatch.</summary>
+    public static readonly LanguageConstraint C73 = Register(
+        "C73", "compile",
+        "Function argument type mismatch.",
+        "{name}() no matching overload: {param} argument expects {expected} but got {actual}.");
+
+    /// <summary>round() precision argument must be a non-negative integer literal.</summary>
+    public static readonly LanguageConstraint C74 = Register(
+        "C74", "compile",
+        "round() precision argument must be a non-negative integer literal.",
+        "round() precision argument must be a non-negative integer literal.");
+
+    /// <summary>pow() exponent must be integer type.</summary>
+    public static readonly LanguageConstraint C75 = Register(
+        "C75", "compile",
+        "pow() exponent must be integer type.",
+        "pow() exponent must be integer type, but got {actual}.");
+
+    /// <summary>sqrt() requires a non-negative argument proof.</summary>
+    public static readonly LanguageConstraint C76 = Register(
+        "C76", "compile",
+        "sqrt() requires a non-negative argument. Add a 'nonnegative' constraint or guard with '>= 0'.",
+        "sqrt() requires a non-negative argument. '{arg}' may be negative. Add a 'nonnegative' constraint or guard with '{arg} >= 0 and ...'.");
+
+    /// <summary>Function does not accept nullable arguments.</summary>
+    public static readonly LanguageConstraint C77 = Register(
+        "C77", "compile",
+        "Function does not accept nullable arguments.",
+        "Function '{name}' does not accept nullable arguments. '{arg}' may be null. Add a null check.");
 }

@@ -41,6 +41,7 @@ These files compare Precept against adjacent tools and systems. They are not pro
 | File | Comparative focus | Most useful for |
 |---|---|---|
 | [../references/cel-comparison.md](../references/cel-comparison.md) | Google CEL: expression model, type system, logical operators, extension model, safety guarantees | Expression expansion, keyword vs symbol surface |
+| [function-library-comparison.md](./function-library-comparison.md) | Excel, SQL, .NET `System.Math`: function-by-function mapping against Precept's proposed 23-signature library | `#16` built-in function library validation |
 
 ## Cross-cutting analysis docs
 
@@ -65,7 +66,7 @@ Every open proposal in this lane should be traceable back to a domain packet her
 | `#13` | Field-level range / basic constraints | [constraint-composition-domain.md](./constraint-composition-domain.md) | [zod-valibot.md](./zod-valibot.md), [fluent-validation.md](./fluent-validation.md), [fluent-assertions.md](./fluent-assertions.md) |
 | `#14` | Conditional invariants / guarded declarations | [constraint-composition-domain.md](./constraint-composition-domain.md) | [conditional-logic-strategy.md](./conditional-logic-strategy.md), [fluent-validation.md](./fluent-validation.md) |
 | `#15` | String `.contains()` | [expression-expansion-domain.md](./expression-expansion-domain.md) | [expression-language-audit.md](./expression-language-audit.md), [zod-valibot.md](./zod-valibot.md) |
-| `#16` | Built-in function library | [expression-expansion-domain.md](./expression-expansion-domain.md) | [expression-language-audit.md](./expression-language-audit.md), [linq.md](./linq.md), [polly.md](./polly.md) |
+| `#16` | Built-in function library | [expression-expansion-domain.md](./expression-expansion-domain.md) | [expression-language-audit.md](./expression-language-audit.md), [linq.md](./linq.md), [polly.md](./polly.md), [function-library-comparison.md](./function-library-comparison.md) |
 | `#17` | Computed / derived fields | [entity-modeling-surface.md](./entity-modeling-surface.md), [computed-fields.md](./computed-fields.md) | [expression-language-audit.md](./expression-language-audit.md) |
 | `#22` | Data-only precepts | [entity-modeling-surface.md](./entity-modeling-surface.md), [data-only-precepts-research.md](./data-only-precepts-research.md) | [expression-tracking-notes.md](./expression-tracking-notes.md) |
 | `#25` | `choice` type | [type-system-domain-survey.md](./type-system-domain-survey.md) | [expression-language-audit.md](./expression-language-audit.md) |

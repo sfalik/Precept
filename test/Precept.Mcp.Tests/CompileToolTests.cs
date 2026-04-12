@@ -252,4 +252,233 @@ public class CompileToolTests
         result.Diagnostics.Should().NotBeEmpty();
         result.Diagnostics[0].Line.Should().BeGreaterThan(0);
     }
+
+    [Fact]
+    public void IntegerField_SerializesAsIntegerType()
+    {
+        var text = """
+            precept Test
+            field Count as integer default 0
+            """;
+
+        var result = CompileTool.Run(text);
+
+        result.Valid.Should().BeTrue();
+        result.Fields.Should().Contain(f => f.Name == "Count" && f.Type == "integer");
+    }
+
+    [Fact]
+    public void DecimalField_SerializesAsDecimalType()
+    {
+        var text = """
+            precept Test
+            field Amount as decimal default 0
+            """;
+
+        var result = CompileTool.Run(text);
+
+        result.Valid.Should().BeTrue();
+        result.Fields.Should().Contain(f => f.Name == "Amount" && f.Type == "decimal");
+    }
+
+    [Fact]
+    public void ChoiceField_SerializesChoiceValuesAndType()
+    {
+        var text = """
+            precept Test
+            field Status as choice("Pending","Active","Closed") default "Pending"
+            """;
+
+        var result = CompileTool.Run(text);
+
+        result.Valid.Should().BeTrue();
+        var statusField = result.Fields!.FirstOrDefault(f => f.Name == "Status");
+        statusField.Should().NotBeNull();
+        statusField!.Type.Should().Be("choice");
+        statusField.ChoiceValues.Should().BeEquivalentTo(["Pending", "Active", "Closed"]);
+    }
+
+    [Fact]
+    public void OrderedChoiceField_SerializesIsOrdered()
+    {
+        var text = """
+            precept Test
+            field Priority as choice("Low","Medium","High") default "Low" ordered
+            """;
+
+        var result = CompileTool.Run(text);
+
+        result.Valid.Should().BeTrue();
+        var priorityField = result.Fields!.FirstOrDefault(f => f.Name == "Priority");
+        priorityField.Should().NotBeNull();
+        priorityField!.IsOrdered.Should().BeTrue();
+    }
+
+    [Fact]
+    public void NonOrderedChoiceField_IsOrderedIsNull()
+    {
+        var text = """
+            precept Test
+            field Status as choice("A","B") default "A"
+            """;
+
+        var result = CompileTool.Run(text);
+
+        result.Valid.Should().BeTrue();
+        var f = result.Fields!.FirstOrDefault(f => f.Name == "Status");
+        f.Should().NotBeNull();
+        f!.IsOrdered.Should().BeNull();
+    }
+
+    [Fact]
+    public void MaxplacesConstraint_SerializesWithPlaces()
+    {
+        var text = """
+            precept Test
+            field Amount as decimal default 0 maxplaces 2
+            """;
+
+        var result = CompileTool.Run(text);
+
+        result.Valid.Should().BeTrue();
+        var amountField = result.Fields!.FirstOrDefault(f => f.Name == "Amount");
+        amountField.Should().NotBeNull();
+        amountField!.Constraints.Should().Contain("maxplaces 2");
+    }
+
+    [Fact]
+    public void StringLengthInvariant_CompilesCleanly()
+    {
+        var text = """
+            precept Test
+            field Name as string default ""
+            state A initial
+            state B
+            event Go
+            invariant Name.length <= 100 because "Name must be \u2264100 characters"
+            from A on Go -> transition B
+            """;
+
+        var result = CompileTool.Run(text);
+
+        result.Valid.Should().BeTrue();
+        result.Diagnostics.Should().BeEmpty();
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Slice 9c: when-guard DTO tests
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Compile_WhenGuardedInvariant_InvariantsArrayPopulated()
+    {
+        var text = """
+            precept Test
+            field X as number default 0
+            field Active as boolean default false
+            invariant X >= 0 when Active because "X must be non-negative when active"
+            state A initial
+            event Go
+            from A on Go -> no transition
+            """;
+
+        var result = CompileTool.Run(text);
+
+        result.Valid.Should().BeTrue();
+        result.Invariants.Should().NotBeNull();
+        var guarded = result.Invariants!.FirstOrDefault(i => i.When is not null);
+        guarded.Should().NotBeNull("a when-guarded invariant should have When populated");
+        guarded!.When.Should().Contain("Active");
+        guarded.Expression.Should().Contain("X >= 0");
+    }
+
+    [Fact]
+    public void Compile_WhenGuardedStateAssert_StateAssertsArrayPopulated()
+    {
+        var text = """
+            precept Test
+            field X as number default 0
+            field Active as boolean default false
+            state Open initial
+            in Open assert X >= 0 when Active because "X must be non-negative when active"
+            event Go
+            from Open on Go -> no transition
+            """;
+
+        var result = CompileTool.Run(text);
+
+        result.Valid.Should().BeTrue();
+        result.StateAsserts.Should().NotBeNull();
+        var guarded = result.StateAsserts!.FirstOrDefault(sa => sa.When is not null);
+        guarded.Should().NotBeNull("a when-guarded state assert should have When populated");
+        guarded!.When.Should().Contain("Active");
+        guarded.State.Should().Be("Open");
+    }
+
+    [Fact]
+    public void Compile_WhenGuardedEventAssert_EventAssertsArrayPopulated()
+    {
+        var text = """
+            precept Test
+            field X as number default 0
+            state A initial
+            event Submit with Amount as number, Priority as number
+            on Submit assert Amount > 0 when Priority > 1 because "Amount required for high priority"
+            from A on Submit -> no transition
+            """;
+
+        var result = CompileTool.Run(text);
+
+        result.Valid.Should().BeTrue();
+        result.EventAsserts.Should().NotBeNull();
+        var guarded = result.EventAsserts!.FirstOrDefault(ea => ea.When is not null);
+        guarded.Should().NotBeNull("a when-guarded event assert should have When populated");
+        guarded!.When.Should().Contain("Priority > 1");
+        guarded.Event.Should().Be("Submit");
+    }
+
+    [Fact]
+    public void Compile_WhenGuardedEditBlock_EditBlocksArrayPopulated()
+    {
+        var text = """
+            precept Test
+            field X as number default 0
+            field Active as boolean default false
+            state Open initial
+            in Open when Active edit X
+            event Go
+            from Open on Go -> no transition
+            """;
+
+        var result = CompileTool.Run(text);
+
+        result.Valid.Should().BeTrue();
+        result.EditBlocks.Should().NotBeNull();
+        var guarded = result.EditBlocks!.FirstOrDefault(eb => eb.When is not null);
+        guarded.Should().NotBeNull("a when-guarded edit block should have When populated");
+        guarded!.When.Should().Contain("Active");
+        guarded.State.Should().Be("Open");
+        guarded.Fields.Should().Contain("X");
+    }
+
+    [Fact]
+    public void Compile_UnguardedInvariant_WhenIsNull()
+    {
+        var text = """
+            precept Test
+            field X as number default 1
+            invariant X > 0 because "X must be positive"
+            state A initial
+            event Go
+            from A on Go -> no transition
+            """;
+
+        var result = CompileTool.Run(text);
+
+        result.Valid.Should().BeTrue();
+        result.Invariants.Should().NotBeNull();
+        var unguarded = result.Invariants!.FirstOrDefault(i => i.Expression.Contains("X > 0"));
+        unguarded.Should().NotBeNull();
+        unguarded!.When.Should().BeNull("an unguarded invariant should have When = null");
+    }
 }

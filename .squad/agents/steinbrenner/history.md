@@ -6,6 +6,15 @@
 
 ## Recent Updates
 
+### 2026-04-12 — Event hooks PM motivation and use case analysis
+- Built use-case inventory for event-level action hooks from the 24-sample corpus.
+- Confirmed real friction: repeated `RegisterAgent` calls in `it-helpdesk-ticket.precept` across 4 identical rows; TrafficLight counter requires duplication across all non-reject Advance rows.
+- **PM recommendation: two-proposal split.** Issue A (stateless) advances first — zero Principle 7 tension, clean execution order. Issue B (stateful) deferred — unresolved execution order (4 options with different semantics) and outcome-scoping question.
+- **C49 revision confirmed in-scope** for Issue A — not optional follow-up. Events with hooks must suppress C49; ships in same PR as runtime/grammar changes.
+- Drafted acceptance criteria for Issue A (stateless only). Filed at `.squad/decisions/inbox/steinbrenner-event-hooks-pm.md` (now merged to decisions.md).
+
+
+
 ### 2026-04-08 - Language research plan fully executed
 - The three-batch domain-first plan is complete on `squad/language-research-corpus`, closed by `3cc5343` after Batch 1 `54a77da` and Batch 2 `48860ae`.
 - PM guardrails held through closeout: no proposal-body edits, horizon domains remained represented, and the final indexes point active proposals back to their grounding research.

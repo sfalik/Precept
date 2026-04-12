@@ -170,6 +170,11 @@ Mutating event execution. Returns `FireResult`.
 8. **Field and top-level rules** — checked against post-`set` working data; returns `Rejected` if violated.
 9. **State rules** — checked against the *target* state (only for `transition` outcomes, not `no transition`); returns `Rejected` if violated.
 
+**`when` guard evaluation on declarations:**
+- **Event asserts (stage 3):** If an event assert has a `when` guard, the guard is evaluated against event args before the assert body. If the guard is false, that assert is skipped. Guards on event asserts are arg-scoped only.
+- **Invariants and state asserts (stage 8–9):** If an invariant or state assert has a `when` guard, the guard is evaluated against post-mutation field data before the assertion body. If the guard is false, that rule is skipped. Collect-all semantics are preserved — guard-skipped declarations don't short-circuit other declarations.
+- **Edit blocks (`Update`/`Inspect`):** If an edit declaration has a `when` guard, the guard is evaluated against current instance data at each `Update`/`Inspect` call. Fail-closed: guard evaluation error → field not granted editability.
+
 On any rejection, the original instance is unchanged — all stages are fully rolled back.
 
 On success, returns `FireResult` with `UpdatedInstance != null`. The `UpdatedInstance` carries the new `CurrentState`, the updated `InstanceData`, and the current `UpdatedAt` timestamp.

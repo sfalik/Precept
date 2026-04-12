@@ -26,7 +26,9 @@ This folder is the durable, domain-first research map for Precept language work.
 | Entity-modeling surface | `#17`, `#22` | [expressiveness/entity-modeling-surface.md](./expressiveness/entity-modeling-surface.md), [expressiveness/computed-fields.md](./expressiveness/computed-fields.md), [expressiveness/data-only-precepts-research.md](./expressiveness/data-only-precepts-research.md) | [references/expression-evaluation.md](./references/expression-evaluation.md) | Governs stored-vs-derived facts and lifecycle-light entities. |
 | Transition shorthand | — | [expressiveness/transition-shorthand.md](./expressiveness/transition-shorthand.md) | [references/multi-event-shorthand.md](./references/multi-event-shorthand.md), [references/state-machine-expressiveness.md](./references/state-machine-expressiveness.md) | Horizon domain with no open proposal yet. |
 | Static reasoning expansion | — | [references/static-reasoning-expansion.md](./references/static-reasoning-expansion.md) | [references/static-reasoning-expansion.md](./references/static-reasoning-expansion.md) | Horizon domain; currently theory-first rather than proposal-first. |
+| Structural lifecycle modifiers | — | [expressiveness/structural-lifecycle-modifiers.md](./expressiveness/structural-lifecycle-modifiers.md) | [references/state-machine-expressiveness.md](./references/state-machine-expressiveness.md), [references/static-reasoning-expansion.md](./references/static-reasoning-expansion.md) | Horizon domain. `terminal` is the strong Tier 1 candidate; `required`/`transient` are Tier 2. |
 | Type-system follow-ons | — | [expressiveness/type-system-follow-ons.md](./expressiveness/type-system-follow-ons.md) | [references/type-system-survey.md](./references/type-system-survey.md) | Residual type pressure after the main type wave; no active proposal yet. |
+| Event action hooks | `#65` | [expressiveness/event-hooks.md](./expressiveness/event-hooks.md) | [references/state-machine-expressiveness.md](./references/state-machine-expressiveness.md) | Two-case split: stateless (Issue A, #65, ready) and stateful (Issue B, deferred). Issue A has zero Principle 7 tension. |
 
 ## Open proposal issue map
 
@@ -49,6 +51,7 @@ Use this table when you already know the issue number and need its research grou
 | `#27` | `decimal` type | Type system expansion | [expressiveness/type-system-domain-survey.md](./expressiveness/type-system-domain-survey.md), [references/type-system-survey.md](./references/type-system-survey.md) |
 | `#29` | `integer` type | Type system expansion | [expressiveness/type-system-domain-survey.md](./expressiveness/type-system-domain-survey.md), [references/type-system-survey.md](./references/type-system-survey.md) |
 | `#31` | Logical keyword forms (`and` / `or` / `not`) | Expression expansion | [expressiveness/expression-expansion-domain.md](./expressiveness/expression-expansion-domain.md), [references/expression-evaluation.md](./references/expression-evaluation.md) |
+| `#65` | Event action hooks (stateless) | Event action hooks | [expressiveness/event-hooks.md](./expressiveness/event-hooks.md), [references/state-machine-expressiveness.md](./references/state-machine-expressiveness.md) |
 
 ## Cross-cutting research that supports multiple domains
 
@@ -57,6 +60,7 @@ Use this table when you already know the issue number and need its research grou
 | [expressiveness/expression-language-audit.md](./expressiveness/expression-language-audit.md) | Runtime-grounded inventory of current expression limits and proposal pressure. |
 | [expressiveness/internal-verbosity-analysis.md](./expressiveness/internal-verbosity-analysis.md) | Corpus evidence for compactness and declaration-pressure work. |
 | [expressiveness/conditional-logic-strategy.md](./expressiveness/conditional-logic-strategy.md) | Guard vocabulary and conditional-shape guidance across the language surface. |
+| [expressiveness/case-insensitive-comparison-survey.md](./expressiveness/case-insensitive-comparison-survey.md) | `~=` precedent survey, CI comparison patterns across 15+ systems, cascade analysis. Supports `#16`. |
 | [domain-map.md](./domain-map.md) | Full durable map of every language research domain. |
 | [domain-research-batches.md](./domain-research-batches.md) | Sequencing plan for active and horizon domain research. |
 | [references/cel-comparison.md](./references/cel-comparison.md) | Full Precept vs CEL language-level comparison — validates expression expansion priorities. |
@@ -68,6 +72,7 @@ These docs are deliberate horizon groundwork, not orphaned notes:
 - [expressiveness/transition-shorthand.md](./expressiveness/transition-shorthand.md)
 - [references/static-reasoning-expansion.md](./references/static-reasoning-expansion.md)
 - [expressiveness/type-system-follow-ons.md](./expressiveness/type-system-follow-ons.md)
+- [expressiveness/structural-lifecycle-modifiers.md](./expressiveness/structural-lifecycle-modifiers.md)
 
 ## Workflow reminder
 

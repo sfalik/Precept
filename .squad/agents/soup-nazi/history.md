@@ -4,7 +4,106 @@
 - Samples and hero candidates should be validated against the real compiler/runtime before the team treats them as canonical.
 - Coverage work should record meaningful gaps, not just raw counts; behavior claims need executable proof.
 
+## Learnings
+
+### 2026-04-11 — Issue #14 Slice 9: Parser + Type Checker test batch written
+
+- **15 new tests total:** 8 parser tests in `NewSyntaxParserTests.cs`, 7 type checker tests in `PreceptTypeCheckerTests.cs` (including the EC-3 gate).
+- **13 of 15 pass.** 1 failure: EC-3 (`Check_Invariant_WhenGuardFalse_AtDefaultData_NoPrecompileViolation`).
+- **EC-3 root cause:** `CollectCompileTimeDiagnostics` in `PreceptRuntime.cs` (line ~2053) evaluates invariant body against default data without checking `WhenGuard` first. When `Active` is `false` at defaults, the guard should suppress the C29 check, but the code unconditionally evaluates `X > 100` → spurious C29. This is an implementation gap, not a test bug.
+- **Parser tests confirmed:** All 4 when-guard forms parse correctly (invariant, state assert, event assert, conditional edit). `when not` parses as `PreceptUnaryExpression`. `in any when Guard edit` expands to per-state guarded blocks. Regression tests confirm unguarded forms retain `null` WhenGuard.
+- **Type checker tests confirmed:** C46 fires for non-boolean guard fields. C69 fires for cross-scope references (event arg in invariant guard, entity field in event assert guard). Guarded state asserts are excluded from type narrowing (BuildStateAssertNarrowings filters on `WhenGuard is null`).
+- **Action needed:** George must add guard-aware logic to `CollectCompileTimeDiagnostics` before EC-3 can pass. Pattern: `if (inv.WhenGuard is not null) { evaluate guard against defaultData; if guard is false, skip body check }`.
+
+### 2026-04-11 — Issue #14: Form 4 complete test matrix
+
+- Form 4 adds +42 tests across all layers: 5 parser, 7 type-checker, 22 runtime (new `GuardedEditTests.cs`), 3 LS completions, 4 MCP tools, 1 CatalogDrift. Total: ~154 (up from ~112 for Forms 1–3 only).
+- EC-3 (`Check_Invariant_WhenGuardFalse_AtDefaultData_NoPrecompileViolation`) is still the mandatory first test for all forms — gating gate before any implementation work.
+- `in any when <guard> edit` design question is resolved: pre-expansion to per-state guarded blocks at construction (Frank + George confirmed). Tests follow the same `in any edit` expansion contract.
+- Fail-closed is now explicit and tested: `Update_EditGuard_EvaluationError_FieldNotEditable` — guard eval error → `UneditableField`, not a throw.
+- Union semantics are well-defined: unconditional block + guarded block for same field → unconditional always grants. Two guarded blocks for same field → either True wins. Tests cover both directions.
+- **Regression hotspot 1:** `PreceptEditTests.cs` — hydration ordering change in `Update` and `Inspect(patch)` is the highest regression risk. All 48 existing edit tests must pass unchanged as the Phase 0 gate.
+- **Regression hotspot 2:** `PreceptStatelessTests.cs` — constructor routing must skip null-State guarded blocks for stateless precepts. `_rootEditableFields` path must be completely unaffected.
+- MCP Phase 8 tests are blocked on Newman's B2 `editBlocks` DTO prerequisite. Write stubs with TODO, activate after B2 merges.
+- `GetEditableFieldNames` (internal API) returns only the static unconditional set — intentionally. Existing `PreceptEditTests.cs` tests against this API remain valid without modification.
+- Full matrix filed: `.squad/decisions/inbox/soup-nazi-issue14-final-tests.md`.
+
 ## Recent Updates
+
+### 2026-04-11 — Issue #14 Slice 9c: Completions, MCP, and semantic token tests for when guards
+
+- **16 new tests total:** 6 completion tests in `PreceptAnalyzerCompletionTests.cs`, 5 CompileTool DTO tests in `CompileToolTests.cs`, 2 InspectTool tests in `InspectToolTests.cs`, 3 semantic token constraint tests in `PreceptSemanticTokensConstraintTests.cs`.
+- **All 1,094 tests pass** (883 core + 137 LS + 74 MCP), zero failures, zero skipped.
+- **C69 CatalogDrift verified:** Trigger at line 596 already uses a real DSL trigger (invariant guard referencing `Go.Amount` — cross-scope event arg reference). No changes needed.
+- **Completions tests cover:** `when` offered after invariant expression, state assert expression, event assert expression, and `in State` position. Field names offered after `when` keyword in invariant guard. `because` offered after completed `when` guard in invariant.
+- **MCP CompileTool tests cover:** Guarded invariant/state-assert/event-assert/edit-block DTOs populate `When` field. Unguarded invariant has `When = null`.
+- **MCP InspectTool tests cover:** Guarded invariant with guard=false → no violation (transition succeeds). Guarded edit block with guard=true → field appears in `EditableFields`.
+- **Semantic token tests cover:** `ExtractConstraintSets` correctly includes states/events/fields from when-guarded state asserts, event asserts, and invariants (guard presence doesn't remove them from constraint highlighting sets).
+
+### 2026-04-11 — Issue #14 Slice 9b: Runtime tests for when guards (Forms 1–4)
+
+- **17 new tests total:** 8 Forms 1–3 runtime tests in `NewSyntaxRuntimeTests.cs`, 9 Form 4 guarded edit tests in new `GuardedEditTests.cs`.
+- **All 17 pass.** Full suite: 1,078 tests (883 core + 128 LS + 67 MCP), zero regressions.
+- **Key discoveries during test authoring:**
+  - `CheckCompatibility` evaluates invariants/state asserts at instance creation time. Creating an instance with data that violates a guarded invariant (guard=true, body=false) makes Fire return `Undefined`. Tests must use data where all constraints pass at creation, then fire events that cause violations.
+  - Event assert `when` guards are limited to event arg scope (C69 enforced). Entity fields cannot be used in event assert guards. Tests use `on Submit assert Amount > 0 when Priority > 1` where `Priority` is an event arg, not a field.
+  - PRECEPT046 rejects nullable boolean guards at compile time (`boolean|null`). Runtime fail-closed path for guard evaluation errors is unreachable via normal API. Test converted to verify type checker enforcement.
+  - `when not Active` with `Active default false` → guard is true at defaults → compile-time check applies → PRECEPT029 if body fails. Tests adjusted to use `Active default true` so `not Active` is false at defaults.
+- **Test categories:** guarded invariant true/false (2), guarded state assert true/false (2), guarded event assert true/false (2), multiple guarded invariants collect-all (1), `when not` semantics (1), guarded edit true/false (2), nullable guard compile rejection (1), unconditional+guarded union (1), inspect editable list true/false (2), `in any when` expansion (1), state filter (1), data-driven guard flip (1).
+
+### 2026-04-11 — Issue #14: `when` guard testability assessment
+- Probed all 4 guard forms via precept_compile: invariant, state assert, event assert, conditional edit — ALL are parse errors today. `when` is recognized only in transition rows.
+- PRECEPT029/030 compile-time violation check must also evaluate the guard at default field values — if guard is false at defaults, no spurious pre-compile error. This is EC-3 and the first correctness gate.
+- The info diagnostic for boolean-field guards (suggesting choice type #25) needs a new diagnostic code → CatalogDriftTests entry required.
+- `in any when <guard> edit` is an undefined combination — `any` + guard needs a design decision before tests can be written.
+- Collect-all semantics (multiple guarded invariants) must be tested explicitly: all applicable checked in one pass, failures collected together.
+- Guard scope inheritance is novel territory for the type checker — need separate scope routing for field-scoped (data-truth) vs arg-scoped (event-truth) guard expressions.
+- Inspector output must extend with skipped/applied/violated status — needs new MCP DTO fields, not just runtime behavior.
+- Test count estimate: ~118 new tests across parser, type checker, runtime, LS, MCP, and CatalogDrift.
+- Verdict: HIGH-RISK. Red-first test authoring mandatory before implementation work begins.
+- Decision filed: `.squad/decisions/inbox/soup-nazi-issue14-testability.md`.
+
+### 2026-04-11 — Issue #29 (Slice 7): integer type test suite written
+- Created `test/Precept.Tests/PreceptIntegerTypeTests.cs` — 34 tests: 31 passing, 3 skipped.
+- **Test categories:** parser (8: field declarations, long literal semantics, double vs long distinction, nullable, large literal, set/queue/stack of integer), type-checker coercion (8: C60 narrowing, C61 maxplaces, widening to number, no-error cases, Theory x3), runtime arithmetic (8: +/-/\*//, negative division truncation, %, ==, widened to number), runtime event args (2: long, coerce int→long), runtime guards (1: comparison routing), collections (1: set<integer> min/max via guard routing).
+- **3 tests skipped with TODO for George:** `nonnegative`, `positive`, and `min/max` constraints on integer fields do not get desugared to runtime invariants. `BuildScalarConstraintExpr` in `PreceptParser.cs` has branches only for `Number` and `String` types — `Integer` falls through to the no-op return. Constraints are parsed and type-checked but never enforced at runtime.
+- **Key patterns hardened:**
+  - Integer literals in DSL parse as `long`; decimal-point literals parse as `double`. Assert `5L` not `5.0`.
+  - For TypeCheck "BeEmpty" assertions: use `-> transition B` (not `-> no transition`) so B is reachable (no C48) and A doesn't become a dead-end (no C50).
+  - For TypeCheck "emits C60" assertions: same pattern — `-> transition B` isolates C60 as the only diagnostic, enabling `ContainSingle()`.
+  - C61 (maxplaces on integer) must be tested via `DirectAction` model construction — maxplaces is not yet a parseable DSL keyword. The model also emits C53 (no events), so assert `Contain(d => d.Constraint.Id == "C61")` not `ContainSingle()`.
+  - Integer divides as C# long truncation toward zero: `-5 / 2 = -2`, not `-3` (floor).
+  - `int` (32-bit) passed as event arg is coerced to `long` by `CoerceToInteger`.
+- **Gap filed:** `.squad/decisions/inbox/soup-nazi-integer-tests.md`.
+
+### 2026-04-10 — Issue #13: field-level constraints test strategy + scaffold written
+- Created `test/Precept.Tests/FieldConstraintTests.cs` — 37 tests: 3 ready (pass now) + 34 stubs (NotImplementedException until George's implementation lands).
+- **3 baseline ready tests** confirm the desugar destination works today: invariant-expressed nonnegative/positive/min-max semantics already produce ConstraintFailure at runtime.
+- **34 stubs** cover: parser acceptance (12), C57 type mismatch (4), C58 contradictory/duplicate (3), C59 default-violates-constraint (6), nullable semantics (2), runtime desugaring verification (8), event arg constraint outcome verification (1).
+- **Design decision flagged:** `nonnegative positive` combined → recommend C58 (subsumed constraint). `positive` strictly subsumes `nonnegative`; the weaker constraint is dead code. Documented in scaffold and decision file. Needs George + Shane sign-off.
+- **Key distinction documented:** field constraints desugar to invariants (→ ConstraintFailure); event arg constraints desugar to on-event asserts (→ Rejected). Test `Fire_EventArgNotempty_EmptyString_ProducesRejected` pins this semantics gap.
+- **CatalogDriftTests entries noted:** C57, C58, C59 require three new entries in `CatalogDriftTests.cs` using `-> no transition` targets (documented in scaffold and decision file).
+- Decision filed: `.squad/decisions/inbox/soup-nazi-issue13-test-strategy.md`.
+- Key learning: the `TypeCheckResult.Diagnostics[n].Constraint.Id` + `.DiagnosticCode` pattern from StringAccessorTests.cs is the established assertion form for new diagnostic codes. The commented-out assertions in stubs follow this pattern for easy activation.
+
+### 2026-04-10 — Issue #10: three-level dotted form tests written
+- Unlocked 2 deferred parser/type-checker tests in `StringAccessorTests.cs` (converted from placeholder invariant-field forms to actual `Submit.Name.length` guard forms): `Parse_ThreeLevel_EventArgLength_AcceptsForm`, `Check_ThreeLevel_EventArgLength_NonNullable_NoDiagnostic`.
+- Added 3 new tests: `Check_ThreeLevel_NullableEventArg_WithoutGuard_ProducesC56` (C56 on nullable event arg — the critical path), `Check_ThreeLevel_NullableEventArg_WithNullGuard_NoC56` (null narrowing removes C56), `Fire_ThreeLevel_EventArgLength_GuardRouting` ([Theory], 2 cases: "Bob" → Transition, "Bo" → Rejected).
+- Invariant scope skipped with note: event args are not accessible in invariant scope.
+- Runtime arg key format confirmed: `["Name"] = value` (arg name only, no event prefix).
+- Decision filed: `.squad/decisions/inbox/soup-nazi-issue10-three-level-tests.md`.
+
+### 2026-04-10 — Issue #10: string .length accessor test file authored
+- Created `test/Precept.Tests/StringAccessorTests.cs` (23 tests) covering all Issue #10 acceptance criteria.
+- **Test categories:** parser (2), type checker (7 incl. C56/PRECEPT056 and null narrowing), runtime value semantics (4 incl. UTF-16 emoji), null-guard compound evaluation (4), invariant context (2), event assert context (2), guard routing (2), regression (1).
+- **Key learnings:**
+  - Event arg access in transition guards uses dotted form `EventName.ArgName` (e.g. `Submit.Note`); appending `.length` produces a three-level dotted form `EventName.ArgName.length` that George's parser extension must handle.
+  - Event asserts (`on Submit assert`) support both bare arg names and dotted prefix; three-level dotted form (`Submit.Name.length`) follows the same pattern.
+  - The `and`/`or` null-narrowing precedent already exists for C42 (nullable scalar in set context); C56 follows the same narrowing contract.
+  - Literal `set Field = ""` with a `Name.length >= 1` invariant throws at compile time (literal invariant check). Use a non-literal event arg as set source to defeat compile-time check and test runtime invariant enforcement.
+  - UTF-16 emoji "💀" has `.Length == 2` in .NET strings; test explicitly documents this as the platform-consistent semantics decision.
+  - Type error codes for `.length` on non-string types are unknown pre-implementation — tests assert `HasErrors` + `NotBeEmpty()` with TODO for specific code pinning.
+  - Regression guard: `Regression_CollectionCount_ParsesAndCompiles_Unaffected` verifies `.count` is unaffected by the `.length` addition.
 
 ### 2026-04-10 — Issue #31 shipped
 - PR #50 merged to main (squash SHA `305ec03`). Issue #31 closed. 775 tests passing.

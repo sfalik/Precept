@@ -12,7 +12,11 @@ internal enum StaticValueKind
     String = 1,
     Number = 2,
     Boolean = 4,
-    Null = 8
+    Null = 8,
+    Integer = 16,   // #29
+    Decimal = 32,   // #27 (scaffold)
+    OrderedChoice = 64,    // #25: choice field with 'ordered' modifier; behaves like String for equality/assignment
+    UnorderedChoice = 128, // #25: choice field without 'ordered' modifier; behaves like String for equality/assignment
 }
 
 internal sealed record PreceptValidationDiagnostic(
@@ -91,6 +95,15 @@ internal static class PreceptTypeChecker
             MapFieldContractKind,
             StringComparer.Ordinal);
 
+        // Inject non-negative proof markers for sqrt() compile-time checking.
+        // Fields with nonnegative, positive, or min >= 0 constraints are provably non-negative.
+        foreach (var field in model.Fields)
+        {
+            if (field.Constraints is not null &&
+                field.Constraints.Any(static c => c is FieldConstraint.Nonnegative or FieldConstraint.Positive or FieldConstraint.Min { Value: >= 0 }))
+                dataFieldKinds[$"$nonneg:{field.Name}"] = StaticValueKind.Boolean;
+        }
+
         var eventArgKinds = model.Events.ToDictionary(
             evt => evt.Name,
             evt => evt.Args.ToDictionary(
@@ -107,14 +120,31 @@ internal static class PreceptTypeChecker
         var stateAssertNarrowings = BuildStateAssertNarrowings(model, dataFieldKinds);
         ValidateTransitionRows(model, dataFieldKinds, eventArgKinds, collectionFieldMap, stateAssertNarrowings, diagnostics, expressions, scopes);
         ValidateStateActions(model, dataFieldKinds, collectionFieldMap, stateAssertNarrowings, diagnostics, expressions, scopes);
+        ValidateFieldConstraints(model, diagnostics);
         ValidateRules(model, dataFieldKinds, eventArgKinds, diagnostics, expressions, scopes);
 
         return new TypeCheckResult(diagnostics, new PreceptTypeContext(expressions, scopes));
     }
 
-    internal static StaticValueKind MapFieldContractKind(PreceptField field) => MapKind(field.Type, field.IsNullable);
+    internal static StaticValueKind MapFieldContractKind(PreceptField field)
+    {
+        if (field.Type == PreceptScalarType.Choice)
+        {
+            var choiceKind = field.IsOrdered ? StaticValueKind.OrderedChoice : StaticValueKind.UnorderedChoice;
+            return field.IsNullable ? choiceKind | StaticValueKind.Null : choiceKind;
+        }
+        return MapKind(field.Type, field.IsNullable);
+    }
 
-    internal static StaticValueKind MapFieldContractKind(PreceptEventArg arg) => MapKind(arg.Type, arg.IsNullable);
+    internal static StaticValueKind MapFieldContractKind(PreceptEventArg arg)
+    {
+        if (arg.Type == PreceptScalarType.Choice)
+        {
+            var choiceKind = arg.IsOrdered ? StaticValueKind.OrderedChoice : StaticValueKind.UnorderedChoice;
+            return arg.IsNullable ? choiceKind | StaticValueKind.Null : choiceKind;
+        }
+        return MapKind(arg.Type, arg.IsNullable);
+    }
 
     internal static StaticValueKind MapScalarType(PreceptScalarType type) => MapScalarTypeToKind(type);
 
@@ -142,9 +172,13 @@ internal static class PreceptTypeChecker
         if (kinds == StaticValueKind.None)
             return "unknown";
 
-        var labels = new List<string>(4);
-        if (HasFlag(kinds, StaticValueKind.String)) labels.Add("string");
+        var labels = new List<string>(6);
+        if (HasFlag(kinds, StaticValueKind.OrderedChoice)) labels.Add("ordered choice");
+        else if (HasFlag(kinds, StaticValueKind.UnorderedChoice)) labels.Add("choice");
+        else if (HasFlag(kinds, StaticValueKind.String)) labels.Add("string");
         if (HasFlag(kinds, StaticValueKind.Number)) labels.Add("number");
+        if (HasFlag(kinds, StaticValueKind.Integer)) labels.Add("integer");
+        if (HasFlag(kinds, StaticValueKind.Decimal)) labels.Add("decimal");
         if (HasFlag(kinds, StaticValueKind.Boolean)) labels.Add("boolean");
         if (HasFlag(kinds, StaticValueKind.Null)) labels.Add("null");
         return string.Join("|", labels);
@@ -160,6 +194,9 @@ internal static class PreceptTypeChecker
         List<PreceptTypeExpressionInfo> expressions,
         List<PreceptTypeScopeInfo> scopes)
     {
+        var fieldChoiceMap = model.Fields
+            .Where(f => f.Type == PreceptScalarType.Choice && f.ChoiceValues?.Count > 0)
+            .ToDictionary(f => f.Name, f => f.ChoiceValues!, StringComparer.Ordinal);
         var allStates = model.States.Select(static state => state.Name).ToArray();
         var rows = model.TransitionRows ?? Array.Empty<PreceptTransitionRow>();
 
@@ -265,6 +302,21 @@ internal static class PreceptTypeChecker
                             diagnostics,
                             expressions,
                             stateContext: item.State);
+
+                        // SYNC:CONSTRAINT:C68: literal must be a member of the choice set
+                        if (fieldChoiceMap.TryGetValue(assignment.Key, out var choiceVals)
+                            && assignment.Expression is PreceptLiteralExpression { Value: string memberLiteral }
+                            && !choiceVals.Contains(memberLiteral, StringComparer.Ordinal))
+                        {
+                            diagnostics.Add(new PreceptValidationDiagnostic(
+                                DiagnosticCatalog.C68,
+                                DiagnosticCatalog.C68.FormatMessage(
+                                    ("value", memberLiteral),
+                                    ("values", string.Join(", ", choiceVals.Select(v => $"\"{v}\""))),
+                                    ("name", assignment.Key)),
+                                assignment.SourceLine > 0 ? assignment.SourceLine : row.SourceLine,
+                                StateContext: item.State));
+                        }
                     }
 
                     ValidateCollectionMutations(
@@ -294,6 +346,10 @@ internal static class PreceptTypeChecker
         if (model.StateActions is null || model.StateActions.Count == 0)
             return;
 
+        var fieldChoiceMap = model.Fields
+            .Where(f => f.Type == PreceptScalarType.Choice && f.ChoiceValues?.Count > 0)
+            .ToDictionary(f => f.Name, f => f.ChoiceValues!, StringComparer.Ordinal);
+
         foreach (var action in model.StateActions)
         {
             // Build data-only symbols with collection accessors, narrowed by state asserts
@@ -314,6 +370,12 @@ internal static class PreceptTypeChecker
 
                 if (col.CollectionKind is PreceptCollectionKind.Queue or PreceptCollectionKind.Stack)
                     baseSymbols[$"{col.Name}.peek"] = innerKind;
+            }
+
+            foreach (var field in model.Fields)
+            {
+                if (field.Type == PreceptScalarType.String)
+                    baseSymbols[$"{field.Name}.length"] = StaticValueKind.Number;
             }
 
             scopes.Add(new PreceptTypeScopeInfo(
@@ -337,6 +399,21 @@ internal static class PreceptTypeChecker
                     diagnostics,
                     expressions,
                     stateContext: action.State);
+
+                // SYNC:CONSTRAINT:C68: literal must be a member of the choice set
+                if (fieldChoiceMap.TryGetValue(assignment.Key, out var choiceVals)
+                    && assignment.Expression is PreceptLiteralExpression { Value: string memberLiteral }
+                    && !choiceVals.Contains(memberLiteral, StringComparer.Ordinal))
+                {
+                    diagnostics.Add(new PreceptValidationDiagnostic(
+                        DiagnosticCatalog.C68,
+                        DiagnosticCatalog.C68.FormatMessage(
+                            ("value", memberLiteral),
+                            ("values", string.Join(", ", choiceVals.Select(v => $"\"{v}\""))),
+                            ("name", assignment.Key)),
+                        assignment.SourceLine > 0 ? assignment.SourceLine : action.SourceLine,
+                        StateContext: action.State));
+                }
             }
 
             ValidateCollectionMutations(
@@ -351,6 +428,336 @@ internal static class PreceptTypeChecker
                 eventName: null);
         }
     }
+
+    /// <summary>
+    /// Validates field/arg-level constraint suffixes for type compatibility (C57),
+    /// contradiction/duplicate (C58), and default-value violations (C59).
+    /// Runs before <see cref="ValidateRules"/> so errors are attributed to constraints,
+    /// not to the synthetic invariants they generate.
+    /// </summary>
+    private static void ValidateFieldConstraints(
+        PreceptDefinition model,
+        List<PreceptValidationDiagnostic> diagnostics)
+    {
+        foreach (var field in model.Fields)
+        {
+            // SYNC:CONSTRAINT:C62
+            // SYNC:CONSTRAINT:C63
+            // SYNC:CONSTRAINT:C66
+            ValidateChoiceField(field.Name, field.Type, field.ChoiceValues, field.IsOrdered, field.SourceLine, diagnostics);
+
+            // SYNC:CONSTRAINT:C64
+            if (field.Type == PreceptScalarType.Choice &&
+                field.HasDefaultValue &&
+                field.DefaultValue is string defaultStr &&
+                field.ChoiceValues is { Count: > 0 } choiceVals &&
+                !choiceVals.Contains(defaultStr, StringComparer.Ordinal))
+            {
+                diagnostics.Add(new PreceptValidationDiagnostic(
+                    DiagnosticCatalog.C64,
+                    DiagnosticCatalog.C64.FormatMessage(
+                        ("value", defaultStr),
+                        ("values", string.Join(", ", choiceVals.Select(v => $"\"{v}\""))),
+                        ("name", field.Name)),
+                    field.SourceLine));
+            }
+
+            if (field.Constraints is not { Count: > 0 }) goto ValidateConstraints;
+            // SYNC:CONSTRAINT:C57
+            ValidateConstraintTypes(field.Name, field.Type, isCollection: false, field.Constraints, field.SourceLine, diagnostics);
+            // SYNC:CONSTRAINT:C58
+            ValidateConstraintDuplicates(field.Name, field.Constraints, field.SourceLine, diagnostics);
+            // SYNC:CONSTRAINT:C59
+            if (field.HasDefaultValue)
+                ValidateConstraintDefault(field.Name, field.DefaultValue, field.Constraints, field.SourceLine, diagnostics);
+
+            ValidateConstraints: ;
+        }
+
+        foreach (var col in model.CollectionFields)
+        {
+            // SYNC:CONSTRAINT:C62
+            // SYNC:CONSTRAINT:C63
+            ValidateChoiceField(col.Name, col.InnerType, col.ChoiceValues, isOrdered: false, col.SourceLine, diagnostics);
+
+            if (col.Constraints is not { Count: > 0 }) continue;
+            // SYNC:CONSTRAINT:C57
+            ValidateConstraintTypes(col.Name, null, isCollection: true, col.Constraints, col.SourceLine, diagnostics);
+            // SYNC:CONSTRAINT:C58
+            ValidateConstraintDuplicates(col.Name, col.Constraints, col.SourceLine, diagnostics);
+        }
+
+        foreach (var evt in model.Events)
+        {
+            foreach (var arg in evt.Args)
+            {
+                // SYNC:CONSTRAINT:C62
+                // SYNC:CONSTRAINT:C63
+                // SYNC:CONSTRAINT:C66
+                ValidateChoiceField(arg.Name, arg.Type, arg.ChoiceValues, arg.IsOrdered, arg.SourceLine, diagnostics);
+
+                if (arg.Constraints is not { Count: > 0 }) continue;
+                // SYNC:CONSTRAINT:C57
+                ValidateConstraintTypes(arg.Name, arg.Type, isCollection: false, arg.Constraints, arg.SourceLine, diagnostics);
+                // SYNC:CONSTRAINT:C58
+                ValidateConstraintDuplicates(arg.Name, arg.Constraints, arg.SourceLine, diagnostics);
+                // SYNC:CONSTRAINT:C59
+                if (arg.HasDefaultValue)
+                    ValidateConstraintDefault(arg.Name, arg.DefaultValue, arg.Constraints, arg.SourceLine, diagnostics);
+            }
+        }
+    }
+
+    /// <summary>Validates choice type metadata: C62 (empty set), C63 (duplicates), C66 (ordered on non-choice).</summary>
+    private static void ValidateChoiceField(
+        string name,
+        PreceptScalarType type,
+        IReadOnlyList<string>? choiceValues,
+        bool isOrdered,
+        int sourceLine,
+        List<PreceptValidationDiagnostic> diagnostics)
+    {
+        // SYNC:CONSTRAINT:C66
+        if (isOrdered && type != PreceptScalarType.Choice)
+        {
+            diagnostics.Add(new PreceptValidationDiagnostic(
+                DiagnosticCatalog.C66,
+                DiagnosticCatalog.C66.FormatMessage(
+                    ("name", name),
+                    ("type", type.ToString().ToLowerInvariant())),
+                sourceLine));
+        }
+
+        if (type != PreceptScalarType.Choice)
+            return;
+
+        // SYNC:CONSTRAINT:C62
+        if (choiceValues == null || choiceValues.Count == 0)
+        {
+            diagnostics.Add(new PreceptValidationDiagnostic(
+                DiagnosticCatalog.C62,
+                DiagnosticCatalog.C62.FormatMessage(("name", name)),
+                sourceLine));
+            return;
+        }
+
+        // SYNC:CONSTRAINT:C63
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var val in choiceValues)
+        {
+            if (!seen.Add(val))
+            {
+                diagnostics.Add(new PreceptValidationDiagnostic(
+                    DiagnosticCatalog.C63,
+                    DiagnosticCatalog.C63.FormatMessage(("value", val), ("name", name)),
+                    sourceLine));
+                break; // one diagnostic per field for duplicate
+            }
+        }
+    }
+
+    private static void ValidateConstraintTypes(
+        string name,
+        PreceptScalarType? scalarType,
+        bool isCollection,
+        IReadOnlyList<FieldConstraint> constraints,
+        int sourceLine,
+        List<PreceptValidationDiagnostic> diagnostics)
+    {
+        foreach (var c in constraints)
+        {
+            bool valid = (c, isCollection, scalarType) switch
+            {
+                // Number-only constraints
+                (FieldConstraint.Nonnegative, false, PreceptScalarType.Number) => true,
+                (FieldConstraint.Positive,    false, PreceptScalarType.Number) => true,
+                (FieldConstraint.Min,         false, PreceptScalarType.Number) => true,
+                (FieldConstraint.Max,         false, PreceptScalarType.Number) => true,
+                // Integer also accepts numeric range constraints
+                (FieldConstraint.Nonnegative, false, PreceptScalarType.Integer) => true,
+                (FieldConstraint.Positive,    false, PreceptScalarType.Integer) => true,
+                (FieldConstraint.Min,         false, PreceptScalarType.Integer) => true,
+                (FieldConstraint.Max,         false, PreceptScalarType.Integer) => true,
+                // Decimal accepts numeric range constraints and maxplaces
+                (FieldConstraint.Nonnegative, false, PreceptScalarType.Decimal) => true,
+                (FieldConstraint.Positive,    false, PreceptScalarType.Decimal) => true,
+                (FieldConstraint.Min,         false, PreceptScalarType.Decimal) => true,
+                (FieldConstraint.Max,         false, PreceptScalarType.Decimal) => true,
+                // Maxplaces only valid on Decimal
+                (FieldConstraint.Maxplaces,   false, PreceptScalarType.Decimal) => true,
+                // String-only constraints
+                (FieldConstraint.Notempty,    false, PreceptScalarType.String) => true,
+                (FieldConstraint.Minlength,   false, PreceptScalarType.String) => true,
+                (FieldConstraint.Maxlength,   false, PreceptScalarType.String) => true,
+                // Collection constraints
+                (FieldConstraint.Notempty,    true,  _) => true,
+                (FieldConstraint.Mincount,    true,  _) => true,
+                (FieldConstraint.Maxcount,    true,  _) => true,
+                _ => false
+            };
+
+            if (!valid)
+            {
+                var typeLabel = isCollection ? "collection" : scalarType?.ToString().ToLowerInvariant() ?? "unknown";
+                var constraintLabel = ConstraintLabel(c);
+                // SYNC:CONSTRAINT:C61
+                if (c is FieldConstraint.Maxplaces)
+                {
+                    diagnostics.Add(new PreceptValidationDiagnostic(
+                        DiagnosticCatalog.C61,
+                        DiagnosticCatalog.C61.MessageTemplate,
+                        sourceLine));
+                }
+                // SYNC:CONSTRAINT:C57
+                else
+                {
+                    diagnostics.Add(new PreceptValidationDiagnostic(
+                        DiagnosticCatalog.C57,
+                        DiagnosticCatalog.C57.FormatMessage(
+                            ("constraint", constraintLabel),
+                            ("type", typeLabel)),
+                        sourceLine));
+                }
+            }
+        }
+    }
+
+    private static void ValidateConstraintDuplicates(
+        string name,
+        IReadOnlyList<FieldConstraint> constraints,
+        int sourceLine,
+        List<PreceptValidationDiagnostic> diagnostics)
+    {
+        // Detect same-kind duplicates (e.g., two min constraints regardless of value)
+        var kindSeen = new Dictionary<string, bool>(StringComparer.Ordinal);
+        foreach (var c in constraints)
+        {
+            var kind = ConstraintKindKey(c);
+            if (kindSeen.ContainsKey(kind))
+            {
+                // SYNC:CONSTRAINT:C58
+                diagnostics.Add(new PreceptValidationDiagnostic(
+                    DiagnosticCatalog.C58,
+                    DiagnosticCatalog.C58.FormatMessage(
+                        ("message", $"Duplicate constraint '{kind}' on field '{name}'.")),
+                    sourceLine));
+            }
+            else
+            {
+                kindSeen[kind] = true;
+            }
+        }
+
+        // Detect subsumption: positive is strictly stronger than nonnegative;
+        // having both means nonnegative can never fire independently — it is dead code.
+        bool hasNonneg = constraints.Any(static c => c is FieldConstraint.Nonnegative);
+        bool hasPositive = constraints.Any(static c => c is FieldConstraint.Positive);
+        if (hasNonneg && hasPositive)
+        {
+            // SYNC:CONSTRAINT:C58
+            diagnostics.Add(new PreceptValidationDiagnostic(
+                DiagnosticCatalog.C58,
+                DiagnosticCatalog.C58.FormatMessage(
+                    ("message", "Constraint 'nonnegative' is subsumed by 'positive'.")) ,
+                sourceLine));
+        }
+
+        // Detect contradictory range constraints
+        double? minVal = null, maxVal = null;
+        foreach (var c in constraints)
+        {
+            if (c is FieldConstraint.Min mn) minVal = mn.Value;
+            if (c is FieldConstraint.Max mx) maxVal = mx.Value;
+            if (c is FieldConstraint.Mincount mc) minVal = mc.Value;
+            if (c is FieldConstraint.Maxcount mc2) maxVal = mc2.Value;
+        }
+        if (minVal.HasValue && maxVal.HasValue && minVal.Value > maxVal.Value)
+        {
+            var c1 = constraints.FirstOrDefault(c => c is FieldConstraint.Min or FieldConstraint.Mincount);
+            var c2 = constraints.FirstOrDefault(c => c is FieldConstraint.Max or FieldConstraint.Maxcount);
+            // SYNC:CONSTRAINT:C58
+            diagnostics.Add(new PreceptValidationDiagnostic(
+                DiagnosticCatalog.C58,
+                DiagnosticCatalog.C58.FormatMessage(
+                    ("message", $"Contradictory constraints: '{ConstraintLabel(c1!)}' and '{ConstraintLabel(c2!)}' define an empty valid range.")),
+                sourceLine));
+        }
+    }
+
+    private static void ValidateConstraintDefault(
+        string name,
+        object? defaultValue,
+        IReadOnlyList<FieldConstraint> constraints,
+        int sourceLine,
+        List<PreceptValidationDiagnostic> diagnostics)
+    {
+        foreach (var c in constraints)
+        {
+            bool violated = (c, defaultValue) switch
+            {
+                (FieldConstraint.Nonnegative, double d) => d < 0,
+                (FieldConstraint.Positive,    double d) => d <= 0,
+                (FieldConstraint.Min mn,      double d) => d < mn.Value,
+                (FieldConstraint.Max mx,      double d) => d > mx.Value,
+                (FieldConstraint.Nonnegative, long l) => l < 0,
+                (FieldConstraint.Positive,    long l) => l <= 0,
+                (FieldConstraint.Min mn,      long l) => l < mn.Value,
+                (FieldConstraint.Max mx,      long l) => l > mx.Value,
+                (FieldConstraint.Notempty,    string s) => s.Length == 0,
+                (FieldConstraint.Minlength ml, string s) => s.Length < ml.Value,
+                (FieldConstraint.Maxlength ml, string s) => s.Length > ml.Value,
+                _ => false
+            };
+
+            if (violated)
+            {
+                var valueLabel = defaultValue switch
+                {
+                    string s => $"\"{s}\"",
+                    long l => l.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    double d => d.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    _ => defaultValue?.ToString() ?? "null"
+                };
+                // SYNC:CONSTRAINT:C59
+                diagnostics.Add(new PreceptValidationDiagnostic(
+                    DiagnosticCatalog.C59,
+                    DiagnosticCatalog.C59.FormatMessage(
+                        ("value", valueLabel),
+                        ("constraint", ConstraintLabel(c))),
+                    sourceLine));
+            }
+        }
+    }
+
+    private static string ConstraintKindKey(FieldConstraint c) => c switch
+    {
+        FieldConstraint.Nonnegative => "nonnegative",
+        FieldConstraint.Positive    => "positive",
+        FieldConstraint.Notempty    => "notempty",
+        FieldConstraint.Min         => "min",
+        FieldConstraint.Max         => "max",
+        FieldConstraint.Minlength   => "minlength",
+        FieldConstraint.Maxlength   => "maxlength",
+        FieldConstraint.Mincount    => "mincount",
+        FieldConstraint.Maxcount    => "maxcount",
+        FieldConstraint.Maxplaces   => "maxplaces",
+        _                           => c.GetType().Name.ToLowerInvariant()
+    };
+
+    private static string ConstraintLabel(FieldConstraint c) => c switch
+    {
+        FieldConstraint.Nonnegative => "nonnegative",
+        FieldConstraint.Positive    => "positive",
+        FieldConstraint.Notempty    => "notempty",
+        FieldConstraint.Min mn      => $"min {mn.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)}",
+        FieldConstraint.Max mx      => $"max {mx.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)}",
+        FieldConstraint.Minlength ml => $"minlength {ml.Value}",
+        FieldConstraint.Maxlength ml => $"maxlength {ml.Value}",
+        FieldConstraint.Mincount mc  => $"mincount {mc.Value}",
+        FieldConstraint.Maxcount mc  => $"maxcount {mc.Value}",
+        FieldConstraint.Maxplaces mp => $"maxplaces {mp.Places}",
+        _                           => c.GetType().Name.ToLowerInvariant()
+    };
 
     private static void ValidateRules(
         PreceptDefinition model,
@@ -376,6 +783,12 @@ internal static class PreceptTypeChecker
                 dataSymbols[$"{col.Name}.peek"] = innerKind;
         }
 
+        foreach (var field in model.Fields)
+        {
+            if (field.Type == PreceptScalarType.String)
+                dataSymbols[$"{field.Name}.length"] = StaticValueKind.Number;
+        }
+
         scopes.Add(new PreceptTypeScopeInfo(1, "data-rules", new Dictionary<string, StaticValueKind>(dataSymbols, StringComparer.Ordinal)));
 
         if (model.Invariants is not null)
@@ -392,6 +805,23 @@ internal static class PreceptTypeChecker
                     diagnostics,
                     expressions,
                     isBooleanRulePosition: true);
+
+                if (invariant.WhenGuard is not null)
+                {
+                    ValidateExpression(
+                        invariant.WhenGuard,
+                        invariant.WhenText!,
+                        invariant.SourceLine,
+                        dataSymbols,
+                        StaticValueKind.Boolean,
+                        "invariant when guard",
+                        diagnostics,
+                        expressions,
+                        isBooleanRulePosition: true);
+
+                    // SYNC:CONSTRAINT:C69
+                    CheckCrossScopeGuardIdentifiers(invariant.WhenGuard, dataSymbols, invariant.SourceLine, diagnostics);
+                }
             }
         }
 
@@ -410,6 +840,24 @@ internal static class PreceptTypeChecker
                     expressions,
                     stateContext: stateAssert.State,
                     isBooleanRulePosition: true);
+
+                if (stateAssert.WhenGuard is not null)
+                {
+                    ValidateExpression(
+                        stateAssert.WhenGuard,
+                        stateAssert.WhenText!,
+                        stateAssert.SourceLine,
+                        dataSymbols,
+                        StaticValueKind.Boolean,
+                        "state assert when guard",
+                        diagnostics,
+                        expressions,
+                        stateContext: stateAssert.State,
+                        isBooleanRulePosition: true);
+
+                    // SYNC:CONSTRAINT:C69
+                    CheckCrossScopeGuardIdentifiers(stateAssert.WhenGuard, dataSymbols, stateAssert.SourceLine, diagnostics);
+                }
             }
         }
 
@@ -435,7 +883,96 @@ internal static class PreceptTypeChecker
                     expressions,
                     eventName: eventAssert.EventName,
                     isBooleanRulePosition: true);
+
+                if (eventAssert.WhenGuard is not null)
+                {
+                    ValidateExpression(
+                        eventAssert.WhenGuard,
+                        eventAssert.WhenText!,
+                        eventAssert.SourceLine,
+                        symbols,
+                        StaticValueKind.Boolean,
+                        "event assert when guard",
+                        diagnostics,
+                        expressions,
+                        eventName: eventAssert.EventName,
+                        isBooleanRulePosition: true);
+
+                    // SYNC:CONSTRAINT:C69
+                    CheckCrossScopeGuardIdentifiers(eventAssert.WhenGuard, symbols, eventAssert.SourceLine, diagnostics);
+                }
             }
+        }
+
+        if (model.EditBlocks is not null)
+        {
+            foreach (var editBlock in model.EditBlocks)
+            {
+                if (editBlock.WhenGuard is not null)
+                {
+                    ValidateExpression(
+                        editBlock.WhenGuard,
+                        editBlock.WhenText!,
+                        editBlock.SourceLine,
+                        dataSymbols,
+                        StaticValueKind.Boolean,
+                        "edit when guard",
+                        diagnostics,
+                        expressions,
+                        isBooleanRulePosition: true);
+
+                    // SYNC:CONSTRAINT:C69
+                    CheckCrossScopeGuardIdentifiers(editBlock.WhenGuard, dataSymbols, editBlock.SourceLine, diagnostics);
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Walks a guard expression and emits C69 for any identifier not in the allowed symbol scope.
+    /// </summary>
+    private static void CheckCrossScopeGuardIdentifiers(
+        PreceptExpression expr,
+        IReadOnlyDictionary<string, StaticValueKind> allowedSymbols,
+        int sourceLine,
+        List<PreceptValidationDiagnostic> diagnostics)
+    {
+        switch (expr)
+        {
+            case PreceptIdentifierExpression id:
+                var fullName = id.SubMember is not null
+                    ? $"{id.Name}.{id.Member}.{id.SubMember}"
+                    : id.Member is not null ? $"{id.Name}.{id.Member}" : id.Name;
+                if (!allowedSymbols.ContainsKey(fullName) && !allowedSymbols.ContainsKey(id.Name))
+                {
+                    // SYNC:CONSTRAINT:C69
+                    diagnostics.Add(new PreceptValidationDiagnostic(
+                        DiagnosticCatalog.C69,
+                        DiagnosticCatalog.C69.FormatMessage(("name", fullName)),
+                        sourceLine));
+                }
+                break;
+
+            case PreceptBinaryExpression bin:
+                CheckCrossScopeGuardIdentifiers(bin.Left, allowedSymbols, sourceLine, diagnostics);
+                CheckCrossScopeGuardIdentifiers(bin.Right, allowedSymbols, sourceLine, diagnostics);
+                break;
+
+            case PreceptUnaryExpression unary:
+                CheckCrossScopeGuardIdentifiers(unary.Operand, allowedSymbols, sourceLine, diagnostics);
+                break;
+
+            case PreceptParenthesizedExpression paren:
+                CheckCrossScopeGuardIdentifiers(paren.Inner, allowedSymbols, sourceLine, diagnostics);
+                break;
+
+            case PreceptFunctionCallExpression fn:
+                foreach (var arg in fn.Arguments)
+                    CheckCrossScopeGuardIdentifiers(arg, allowedSymbols, sourceLine, diagnostics);
+                break;
+
+            case PreceptLiteralExpression:
+                break;
         }
     }
 
@@ -452,6 +989,11 @@ internal static class PreceptTypeChecker
         {
             symbols[pair.Key] = pair.Value;
             symbols[$"{eventName}.{pair.Key}"] = pair.Value;
+            if (HasFlag(pair.Value, StaticValueKind.String))
+            {
+                symbols[$"{pair.Key}.length"] = StaticValueKind.Number;
+                symbols[$"{eventName}.{pair.Key}.length"] = StaticValueKind.Number;
+            }
         }
 
         return symbols;
@@ -474,7 +1016,7 @@ internal static class PreceptTypeChecker
             return result;
 
         foreach (var group in model.StateAsserts
-            .Where(static stateAssert => stateAssert.Anchor == AssertAnchor.In)
+            .Where(static stateAssert => stateAssert.Anchor == AssertAnchor.In && stateAssert.WhenGuard is null)
             .GroupBy(static stateAssert => stateAssert.State, StringComparer.Ordinal))
         {
             IReadOnlyDictionary<string, StaticValueKind> narrowed = new Dictionary<string, StaticValueKind>(dataFieldKinds, StringComparer.Ordinal);
@@ -506,6 +1048,8 @@ internal static class PreceptTypeChecker
                 // Only dotted form (EventName.ArgName) is valid in transition-row scope.
                 // Bare arg names are valid only in event-assert scope (see BuildEventAssertSymbols).
                 symbols[$"{eventName}.{pair.Key}"] = pair.Value;
+                if (HasFlag(pair.Value, StaticValueKind.String))
+                    symbols[$"{eventName}.{pair.Key}.length"] = StaticValueKind.Number;
             }
         }
 
@@ -522,6 +1066,12 @@ internal static class PreceptTypeChecker
 
             if (col.CollectionKind is PreceptCollectionKind.Queue or PreceptCollectionKind.Stack)
                 symbols[$"{col.Name}.peek"] = innerKind;
+        }
+
+        foreach (var pair in dataFieldKinds)
+        {
+            if (HasFlag(pair.Value, StaticValueKind.String))
+                symbols[$"{pair.Key}.length"] = StaticValueKind.Number;
         }
 
         return symbols;
@@ -573,8 +1123,13 @@ internal static class PreceptTypeChecker
         {
             constraint = HasFlag(actualKind, StaticValueKind.Null) && !HasFlag(expectedKind, StaticValueKind.Null)
                 ? DiagnosticCatalog.C42
-                : DiagnosticCatalog.C39;
-            message = $"{expectedLabel} type mismatch: expected {FormatKinds(expectedKind)} but expression produces {FormatKinds(actualKind)}.";
+                // SYNC:CONSTRAINT:C60
+                : IsNarrowingToInteger(actualKind, expectedKind)
+                    ? DiagnosticCatalog.C60
+                    : DiagnosticCatalog.C39;
+            message = constraint == DiagnosticCatalog.C60
+                ? DiagnosticCatalog.C60.FormatMessage(("actual", FormatKinds(actualKind)), ("name", expectedLabel))
+                : $"{expectedLabel} type mismatch: expected {FormatKinds(expectedKind)} but expression produces {FormatKinds(actualKind)}.";
         }
 
         expressions.Add(new PreceptTypeExpressionInfo(
@@ -609,7 +1164,9 @@ internal static class PreceptTypeChecker
 
             case PreceptIdentifierExpression identifier:
             {
-                var key = identifier.Member is null ? identifier.Name : $"{identifier.Name}.{identifier.Member}";
+                var key = identifier.SubMember is not null
+                    ? $"{identifier.Name}.{identifier.Member}.{identifier.SubMember}"
+                    : identifier.Member is null ? identifier.Name : $"{identifier.Name}.{identifier.Member}";
                 if (!symbols.TryGetValue(key, out kind))
                 {
                     diagnostic = new PreceptValidationDiagnostic(
@@ -617,6 +1174,34 @@ internal static class PreceptTypeChecker
                         $"unknown identifier '{key}'.",
                         0);
                     return false;
+                }
+
+                // C56: .length on a nullable string requires an explicit null guard before access.
+                // SYNC:CONSTRAINT:C56
+                if (identifier.Member == "length" &&
+                    symbols.TryGetValue(identifier.Name, out var baseKind) &&
+                    HasFlag(baseKind, StaticValueKind.Null))
+                {
+                    diagnostic = new PreceptValidationDiagnostic(
+                        DiagnosticCatalog.C56,
+                        DiagnosticCatalog.C56.FormatMessage(("field", identifier.Name)),
+                        0);
+                    return false;
+                }
+
+                // C56 three-level form: EventName.ArgName.length — nullable arg requires null guard.
+                // SYNC:CONSTRAINT:C56
+                if (identifier.SubMember == "length")
+                {
+                    var argKey = $"{identifier.Name}.{identifier.Member}";
+                    if (symbols.TryGetValue(argKey, out var argKind) && HasFlag(argKind, StaticValueKind.Null))
+                    {
+                        diagnostic = new PreceptValidationDiagnostic(
+                            DiagnosticCatalog.C56,
+                            DiagnosticCatalog.C56.FormatMessage(("field", argKey)),
+                            0);
+                        return false;
+                    }
                 }
 
                 return true;
@@ -647,7 +1232,8 @@ internal static class PreceptTypeChecker
 
                 if (unary.Operator == "-")
                 {
-                    if (!IsExactly(operandKind, StaticValueKind.Number))
+                    if (!IsExactly(operandKind, StaticValueKind.Number) &&
+                        !IsExactly(operandKind, StaticValueKind.Integer))
                     {
                         diagnostic = new PreceptValidationDiagnostic(
                             DiagnosticCatalog.C40,
@@ -656,7 +1242,7 @@ internal static class PreceptTypeChecker
                         return false;
                     }
 
-                    kind = StaticValueKind.Number;
+                    kind = operandKind; // preserve Integer or Number
                     return true;
                 }
 
@@ -670,6 +1256,9 @@ internal static class PreceptTypeChecker
             case PreceptBinaryExpression binary:
                 return TryInferBinaryKind(binary, symbols, out kind, out diagnostic);
 
+            case PreceptFunctionCallExpression fn:
+                return TryInferFunctionCallKind(fn, symbols, out kind, out diagnostic);
+
             default:
                 diagnostic = new PreceptValidationDiagnostic(
                     DiagnosticCatalog.C39,
@@ -677,6 +1266,202 @@ internal static class PreceptTypeChecker
                     0);
                 return false;
         }
+    }
+
+    private static bool TryInferFunctionCallKind(
+        PreceptFunctionCallExpression fn,
+        IReadOnlyDictionary<string, StaticValueKind> symbols,
+        out StaticValueKind kind,
+        out PreceptValidationDiagnostic? diagnostic)
+    {
+        kind = StaticValueKind.None;
+        diagnostic = null;
+
+        // SYNC:CONSTRAINT:C71 — unknown function name
+        if (!FunctionRegistry.TryGetFunction(fn.Name, out var funcDef))
+        {
+            diagnostic = new PreceptValidationDiagnostic(
+                DiagnosticCatalog.C71,
+                $"Unknown function '{fn.Name}'.",
+                0);
+            return false;
+        }
+
+        // Infer all argument kinds before overload resolution.
+        var argKinds = new StaticValueKind[fn.Arguments.Length];
+        for (int i = 0; i < fn.Arguments.Length; i++)
+        {
+            if (!TryInferKind(fn.Arguments[i], symbols, out argKinds[i], out diagnostic))
+                return false;
+
+            // SYNC:CONSTRAINT:C77 — nullable arguments
+            if ((argKinds[i] & StaticValueKind.Null) != 0)
+            {
+                var argName = fn.Arguments[i] is PreceptIdentifierExpression id ? id.Name : $"argument {i + 1}";
+                diagnostic = new PreceptValidationDiagnostic(
+                    DiagnosticCatalog.C77,
+                    $"Function '{fn.Name}' does not accept nullable arguments. '{argName}' may be null. Add a null check.",
+                    0);
+                return false;
+            }
+        }
+
+        // Find the best matching overload (arity + argument types).
+        FunctionOverload? matched = null;
+        foreach (var overload in funcDef.Overloads)
+        {
+            bool arityOk = overload.MinArity.HasValue
+                ? fn.Arguments.Length >= overload.MinArity.Value
+                : fn.Arguments.Length == overload.Parameters.Length;
+
+            if (!arityOk)
+                continue;
+
+            bool typesOk = true;
+            if (overload.MinArity.HasValue)
+            {
+                // Variadic: single parameter type applies to all arguments.
+                var paramType = overload.Parameters[0].AcceptedTypes;
+                for (int i = 0; i < fn.Arguments.Length; i++)
+                {
+                    if ((argKinds[i] & paramType) == 0)
+                    {
+                        typesOk = false;
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                for (int i = 0; i < overload.Parameters.Length; i++)
+                {
+                    if ((argKinds[i] & overload.Parameters[i].AcceptedTypes) == 0)
+                    {
+                        typesOk = false;
+                        break;
+                    }
+                }
+            }
+
+            if (typesOk)
+            {
+                matched = overload;
+                break;
+            }
+        }
+
+        if (matched is null)
+        {
+            // SYNC:CONSTRAINT:C75 — pow exponent must be integer
+            if (fn.Name == "pow" && fn.Arguments.Length == 2 &&
+                IsNumericKind(argKinds[1]) && !IsExactly(argKinds[1], StaticValueKind.Integer))
+            {
+                diagnostic = new PreceptValidationDiagnostic(
+                    DiagnosticCatalog.C75,
+                    $"pow() exponent must be integer type, but got {KindLabel(argKinds[1])}.",
+                    0);
+                return false;
+            }
+
+            // Try to pinpoint a specific parameter type mismatch (C73).
+            var arityMatch = funcDef.Overloads.LastOrDefault(o =>
+                o.MinArity.HasValue
+                    ? fn.Arguments.Length >= o.MinArity.Value
+                    : fn.Arguments.Length == o.Parameters.Length);
+
+            if (arityMatch is not null)
+            {
+                // SYNC:CONSTRAINT:C73 — argument type mismatch
+                if (arityMatch.MinArity.HasValue)
+                {
+                    var param = arityMatch.Parameters[0];
+                    for (int i = 0; i < fn.Arguments.Length; i++)
+                    {
+                        if ((argKinds[i] & param.AcceptedTypes) == 0)
+                        {
+                            diagnostic = new PreceptValidationDiagnostic(
+                                DiagnosticCatalog.C73,
+                                $"{fn.Name}() no matching overload: {param.Name} argument expects {KindLabel(param.AcceptedTypes)} but got {KindLabel(argKinds[i])}.",
+                                0);
+                            return false;
+                        }
+                    }
+                }
+                else
+                {
+                    for (int i = 0; i < arityMatch.Parameters.Length; i++)
+                    {
+                        var param = arityMatch.Parameters[i];
+                        if ((argKinds[i] & param.AcceptedTypes) == 0)
+                        {
+                            diagnostic = new PreceptValidationDiagnostic(
+                                DiagnosticCatalog.C73,
+                                $"{fn.Name}() no matching overload: {param.Name} argument expects {KindLabel(param.AcceptedTypes)} but got {KindLabel(argKinds[i])}.",
+                                0);
+                            return false;
+                        }
+                    }
+                }
+            }
+
+            // SYNC:CONSTRAINT:C72 — no matching overload
+            diagnostic = new PreceptValidationDiagnostic(
+                DiagnosticCatalog.C72,
+                $"{fn.Name}() called with {fn.Arguments.Length} argument(s), but no matching overload found.",
+                0);
+            return false;
+        }
+
+        // Validate special parameter constraints on the matched overload.
+        var paramLoop = matched.MinArity.HasValue
+            ? Enumerable.Range(0, fn.Arguments.Length).Select(i => (ParamIndex: 0, ArgIndex: i))
+            : Enumerable.Range(0, matched.Parameters.Length).Select(i => (ParamIndex: i, ArgIndex: i));
+
+        foreach (var (paramIndex, argIndex) in paramLoop)
+        {
+            var param = matched.Parameters[paramIndex];
+
+            // SYNC:CONSTRAINT:C74 — round precision must be non-negative integer literal
+            if (param.Constraint == FunctionArgConstraint.MustBeIntegerLiteral)
+            {
+                if (fn.Arguments[argIndex] is not PreceptLiteralExpression { Value: long lv } || lv < 0)
+                {
+                    diagnostic = new PreceptValidationDiagnostic(
+                        DiagnosticCatalog.C74,
+                        "round() precision argument must be a non-negative integer literal.",
+                        0);
+                    return false;
+                }
+            }
+
+            // SYNC:CONSTRAINT:C76 — sqrt requires non-negative proof
+            if (param.Constraint == FunctionArgConstraint.RequiresNonNegativeProof)
+            {
+                var arg = fn.Arguments[argIndex];
+                bool isNonNeg = arg switch
+                {
+                    PreceptLiteralExpression { Value: long lval } => lval >= 0,
+                    PreceptLiteralExpression { Value: double dval } => dval >= 0,
+                    PreceptLiteralExpression { Value: decimal mval } => mval >= 0,
+                    PreceptFunctionCallExpression { Name: "abs" } => true,
+                    PreceptIdentifierExpression idArg => symbols.ContainsKey($"$nonneg:{idArg.Name}"),
+                    _ => false,
+                };
+
+                if (!isNonNeg)
+                {
+                    var argName = arg is PreceptIdentifierExpression nid ? nid.Name : "argument";
+                    diagnostic = new PreceptValidationDiagnostic(
+                        DiagnosticCatalog.C76,
+                        $"sqrt() requires a non-negative argument. '{argName}' may be negative. Add a 'nonnegative' constraint or guard with '{argName} >= 0 and ...'.",
+                        0);
+                    return false;
+                }
+            }
+        }
+
+        kind = matched.ReturnType;
+        return true;
     }
 
     private static bool TryInferBinaryKind(
@@ -747,7 +1532,6 @@ internal static class PreceptTypeChecker
                     return false;
 
                 var stringCandidate = IsExactly(leftKind, StaticValueKind.String) && IsExactly(rightKind, StaticValueKind.String);
-                var numberCandidate = IsExactly(leftKind, StaticValueKind.Number) && IsExactly(rightKind, StaticValueKind.Number);
 
                 if (stringCandidate)
                 {
@@ -755,9 +1539,9 @@ internal static class PreceptTypeChecker
                     return true;
                 }
 
-                if (numberCandidate)
+                if (IsNumericKind(leftKind) && IsNumericKind(rightKind))
                 {
-                    kind = StaticValueKind.Number;
+                    kind = ResolveNumericResultKind(leftKind, rightKind);
                     return true;
                 }
 
@@ -778,7 +1562,42 @@ internal static class PreceptTypeChecker
                     !TryInferKind(binary.Right, symbols, out var rightKind, out diagnostic))
                     return false;
 
-                if (!IsExactly(leftKind, StaticValueKind.Number) || !IsExactly(rightKind, StaticValueKind.Number))
+                // Choice-type ordinal checks apply only to the comparison operators, not arithmetic.
+                if (binary.Operator is ">" or ">=" or "<" or "<=")
+                {
+                    var leftBase = leftKind & ~StaticValueKind.Null;
+                    var rightBase = rightKind & ~StaticValueKind.Null;
+
+                    // SYNC:CONSTRAINT:C65: ordinal operator on a choice field that lacks 'ordered'
+                    if (leftBase == StaticValueKind.UnorderedChoice)
+                    {
+                        diagnostic = new PreceptValidationDiagnostic(
+                            DiagnosticCatalog.C65,
+                            DiagnosticCatalog.C65.FormatMessage(("operator", binary.Operator)),
+                            0);
+                        return false;
+                    }
+
+                    // SYNC:CONSTRAINT:C67: ordinal comparison between two choice fields — rank is field-local
+                    if (leftBase == StaticValueKind.OrderedChoice && rightBase == StaticValueKind.OrderedChoice)
+                    {
+                        diagnostic = new PreceptValidationDiagnostic(
+                            DiagnosticCatalog.C67,
+                            DiagnosticCatalog.C67.FormatMessage(("operator", binary.Operator)),
+                            0);
+                        return false;
+                    }
+
+                    // Valid ordinal comparison: ordered choice field vs string literal (or plain string)
+                    if (leftBase == StaticValueKind.OrderedChoice
+                        && (rightBase == StaticValueKind.String || rightBase == StaticValueKind.UnorderedChoice))
+                    {
+                        kind = StaticValueKind.Boolean;
+                        return true;
+                    }
+                }
+
+                if (!IsNumericKind(leftKind) || !IsNumericKind(rightKind))
                 {
                     diagnostic = new PreceptValidationDiagnostic(
                         DiagnosticCatalog.C41,
@@ -789,7 +1608,7 @@ internal static class PreceptTypeChecker
 
                 kind = binary.Operator is ">" or ">=" or "<" or "<="
                     ? StaticValueKind.Boolean
-                    : StaticValueKind.Number;
+                    : ResolveNumericResultKind(leftKind, rightKind);
                 return true;
             }
 
@@ -800,8 +1619,10 @@ internal static class PreceptTypeChecker
                     !TryInferKind(binary.Right, symbols, out var rightEqKind, out diagnostic))
                     return false;
 
-                var leftEqFamily = leftEqKind & ~StaticValueKind.Null;
-                var rightEqFamily = rightEqKind & ~StaticValueKind.Null;
+                // Normalize choice kinds to String for equality compatibility:
+                // 'Status == "Active"' is valid whether Status is ordered or unordered choice.
+                var leftEqFamily = NormalizeChoiceKind(leftEqKind & ~StaticValueKind.Null);
+                var rightEqFamily = NormalizeChoiceKind(rightEqKind & ~StaticValueKind.Null);
                 var leftIsNull = leftEqKind == StaticValueKind.Null;
                 var rightIsNull = rightEqKind == StaticValueKind.Null;
 
@@ -821,7 +1642,16 @@ internal static class PreceptTypeChecker
                 }
 
                 // Cross-type equality: both sides have non-null scalar families that differ
-                if (leftEqFamily != StaticValueKind.None && rightEqFamily != StaticValueKind.None && leftEqFamily != rightEqFamily)
+                // Allow Integer <=> Number mix (widening)
+                var isIntNumberMix =
+                    (leftEqFamily == StaticValueKind.Integer && rightEqFamily == StaticValueKind.Number) ||
+                    (leftEqFamily == StaticValueKind.Number  && rightEqFamily == StaticValueKind.Integer);
+                // Allow Decimal <=> Integer mix (widening) and Decimal <=> Decimal
+                var isDecimalMix =
+                    (leftEqFamily == StaticValueKind.Decimal && rightEqFamily == StaticValueKind.Integer) ||
+                    (leftEqFamily == StaticValueKind.Integer && rightEqFamily == StaticValueKind.Decimal) ||
+                    (leftEqFamily == StaticValueKind.Decimal && rightEqFamily == StaticValueKind.Decimal);
+                if (!isIntNumberMix && !isDecimalMix && leftEqFamily != StaticValueKind.None && rightEqFamily != StaticValueKind.None && leftEqFamily != rightEqFamily)
                 {
                     diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C41,
                         $"operator '{binary.Operator}' requires operands of the same type, but found {FormatKinds(leftEqKind)} and {FormatKinds(rightEqKind)}.", 0);
@@ -1007,6 +1837,22 @@ internal static class PreceptTypeChecker
                         expressions,
                         stateContext,
                         eventName);
+
+                    // SYNC:CONSTRAINT:C68: literal must be a member of the choice collection's set
+                    if (mutation.Verb != PreceptCollectionMutationVerb.Remove
+                        && collectionField.ChoiceValues?.Count > 0
+                        && mutation.Expression is PreceptLiteralExpression { Value: string literalMember }
+                        && !collectionField.ChoiceValues.Contains(literalMember, StringComparer.Ordinal))
+                    {
+                        diagnostics.Add(new PreceptValidationDiagnostic(
+                            DiagnosticCatalog.C68,
+                            DiagnosticCatalog.C68.FormatMessage(
+                                ("value", literalMember),
+                                ("values", string.Join(", ", collectionField.ChoiceValues.Select(v => $"\"{v}\""))),
+                                ("name", mutation.TargetField)),
+                            line,
+                            StateContext: stateContext));
+                    }
                     break;
 
                 case PreceptCollectionMutationVerb.Dequeue:
@@ -1042,6 +1888,9 @@ internal static class PreceptTypeChecker
         PreceptScalarType.Number => StaticValueKind.Number,
         PreceptScalarType.Boolean => StaticValueKind.Boolean,
         PreceptScalarType.Null => StaticValueKind.Null,
+        PreceptScalarType.Integer => StaticValueKind.Integer,
+        PreceptScalarType.Decimal => StaticValueKind.Decimal,
+        PreceptScalarType.Choice => StaticValueKind.String,  // choice values are strings at runtime
         _ => StaticValueKind.None
     };
 
@@ -1050,7 +1899,8 @@ internal static class PreceptTypeChecker
         null => StaticValueKind.Null,
         string => StaticValueKind.String,
         bool => StaticValueKind.Boolean,
-        byte or sbyte or short or ushort or int or uint or long or ulong or float or double or decimal => StaticValueKind.Number,
+        long => StaticValueKind.Integer,
+        byte or sbyte or short or ushort or int or uint or ulong or float or double or decimal => StaticValueKind.Number,
         _ => StaticValueKind.None
     };
 
@@ -1083,13 +1933,34 @@ internal static class PreceptTypeChecker
     private static bool IsExactly(StaticValueKind kind, StaticValueKind expected)
         => kind == expected;
 
+    /// <summary>Normalizes OrderedChoice and UnorderedChoice to String for assignability and equality checks.
+    /// Choice values are strings at runtime; the distinction only matters for ordinal comparison (>/<).
+    /// </summary>
+    private static StaticValueKind NormalizeChoiceKind(StaticValueKind k)
+    {
+        var withoutNull = k & ~StaticValueKind.Null;
+        var nullBit = k & StaticValueKind.Null;
+        if (withoutNull == StaticValueKind.OrderedChoice || withoutNull == StaticValueKind.UnorderedChoice)
+            return StaticValueKind.String | nullBit;
+        return k;
+    }
+
     private static bool IsAssignable(StaticValueKind actual, StaticValueKind expected)
     {
+        // Normalize choice kinds: choice values are strings at runtime and are assignment-compatible with string.
+        actual = NormalizeChoiceKind(actual);
+        expected = NormalizeChoiceKind(expected);
+
         var actualNonNull = actual & ~StaticValueKind.Null;
         var expectedNonNull = expected & ~StaticValueKind.Null;
 
         if (!HasFlag(expected, StaticValueKind.Null) && HasFlag(actual, StaticValueKind.Null))
             return false;
+
+        // Integer widens to Number and Decimal (explicit widening rules from #29)
+        if (actualNonNull == StaticValueKind.Integer &&
+            (expectedNonNull == StaticValueKind.Number || expectedNonNull == StaticValueKind.Decimal))
+            return true;
 
         if ((actualNonNull & ~expectedNonNull) != StaticValueKind.None)
             return false;
@@ -1102,4 +1973,44 @@ internal static class PreceptTypeChecker
 
     private static bool HasFlag(StaticValueKind kind, StaticValueKind flag)
         => (kind & flag) == flag;
+
+    /// <summary>Returns true when <paramref name="k"/> is a pure numeric kind (Number, Integer, or Decimal, non-nullable, no other flags).</summary>
+    private static bool IsNumericKind(StaticValueKind k)
+        => IsExactly(k, StaticValueKind.Number) || IsExactly(k, StaticValueKind.Integer) || IsExactly(k, StaticValueKind.Decimal);
+
+    /// <summary>Returns a human-readable label for a <see cref="StaticValueKind"/> (used in function diagnostic messages).</summary>
+    private static string KindLabel(StaticValueKind k) => (k & ~StaticValueKind.Null) switch
+    {
+        StaticValueKind.Integer => "integer",
+        StaticValueKind.Decimal => "decimal",
+        StaticValueKind.Number => "number",
+        StaticValueKind.String => "string",
+        StaticValueKind.Boolean => "boolean",
+        StaticValueKind.Number | StaticValueKind.Integer | StaticValueKind.Decimal => "numeric",
+        StaticValueKind.Number | StaticValueKind.Integer => "number or integer",
+        _ => k.ToString().ToLowerInvariant(),
+    };
+
+    /// <summary>
+    /// Resolves the result kind for a numeric binary operation.
+    /// Integer × Integer → Integer; Decimal × Decimal|×Integer → Decimal; anything involving Number → Number.
+    /// </summary>
+    private static StaticValueKind ResolveNumericResultKind(StaticValueKind left, StaticValueKind right)
+    {
+        if (IsExactly(left, StaticValueKind.Integer) && IsExactly(right, StaticValueKind.Integer))
+            return StaticValueKind.Integer;
+        if ((IsExactly(left, StaticValueKind.Decimal) || IsExactly(left, StaticValueKind.Integer)) &&
+            (IsExactly(right, StaticValueKind.Decimal) || IsExactly(right, StaticValueKind.Integer)))
+            return StaticValueKind.Decimal;
+        return StaticValueKind.Number;
+    }
+
+    /// <summary>Returns true when assigning a Number or Decimal to an Integer target (narrowing, requires explicit conversion).</summary>
+    private static bool IsNarrowingToInteger(StaticValueKind actual, StaticValueKind expected)
+    {
+        var expectedNonNull = expected & ~StaticValueKind.Null;
+        var actualNonNull = actual & ~StaticValueKind.Null;
+        return expectedNonNull == StaticValueKind.Integer &&
+               (actualNonNull == StaticValueKind.Number || actualNonNull == StaticValueKind.Decimal);
+    }
 }

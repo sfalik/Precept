@@ -1024,6 +1024,87 @@ public class NewSyntaxParserTests
     }
 
     // ════════════════════════════════════════════════════════════════════
+    // PARSING — Diagnostic source line accuracy (regression guard)
+    // Ensures constraint violations squiggle the offending declaration,
+    // not the precept header line.
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void ParseWithDiagnostics_C17_NonNullableFieldWithoutDefault_DiagnosticOnFieldLine()
+    {
+        // Line 1: precept Task
+        // Line 2: field Title as string nullable
+        // Line 3: field Description as string nullable
+        // Line 4: field Blah as choice("A", "B")  ← C17 violation here
+        const string dsl = """
+            precept Task
+            field Title as string nullable
+            field Description as string nullable
+            field Blah as choice("A", "B")
+            """;
+
+        var (_, diagnostics) = PreceptParser.ParseWithDiagnostics(dsl);
+
+        diagnostics.Should().ContainSingle();
+        diagnostics[0].Message.Should().Contain("Blah");
+        diagnostics[0].Line.Should().Be(4);
+    }
+
+    [Fact]
+    public void ParseWithDiagnostics_C6_DuplicateField_DiagnosticOnSecondFieldLine()
+    {
+        // Line 4 is the duplicate field declaration that triggers C6.
+        const string dsl = """
+            precept Test
+            field A as number default 0
+            state Open initial
+            field A as string nullable
+            """;
+
+        var (_, diagnostics) = PreceptParser.ParseWithDiagnostics(dsl);
+
+        diagnostics.Should().ContainSingle();
+        diagnostics[0].Message.Should().Contain("Duplicate field");
+        diagnostics[0].Line.Should().Be(4);
+    }
+
+    [Fact]
+    public void ParseWithDiagnostics_C7_DuplicateState_DiagnosticOnSecondStateLine()
+    {
+        // Line 3 is the duplicate state declaration.
+        const string dsl = """
+            precept Test
+            state Active initial
+            state Active
+            """;
+
+        var (_, diagnostics) = PreceptParser.ParseWithDiagnostics(dsl);
+
+        diagnostics.Should().ContainSingle();
+        diagnostics[0].Message.Should().Contain("Duplicate state");
+        diagnostics[0].Line.Should().Be(3);
+    }
+
+    [Fact]
+    public void ParseWithDiagnostics_C9_DuplicateEvent_DiagnosticOnSecondEventLine()
+    {
+        // Line 4 is the duplicate event declaration.
+        const string dsl = """
+            precept Test
+            state A initial
+            event Go
+            event Go
+            from A on Go -> no transition
+            """;
+
+        var (_, diagnostics) = PreceptParser.ParseWithDiagnostics(dsl);
+
+        diagnostics.Should().ContainSingle();
+        diagnostics[0].Message.Should().Contain("Duplicate event");
+        diagnostics[0].Line.Should().Be(4);
+    }
+
+    // ════════════════════════════════════════════════════════════════════
     // PARSING — Multi-name state declarations
     // ════════════════════════════════════════════════════════════════════
 
@@ -1415,6 +1496,169 @@ public class NewSyntaxParserTests
     // PARSING — Undeclared state references in transition rows (C54)
     // ════════════════════════════════════════════════════════════════════
 
+    // ════════════════════════════════════════════════════════════════════
+    // PARSING — Conditional when guards (Issue #14 Slice 9)
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Parse_ConditionalInvariant_WhenGuardParsed()
+    {
+        const string dsl = """
+            precept Test
+            field X as number default 0
+            field Active as boolean default false
+            state A initial
+            invariant X >= 0 when Active because "Only when active"
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+
+        model.Invariants.Should().HaveCount(1);
+        var inv = model.Invariants![0];
+        inv.WhenGuard.Should().NotBeNull();
+        inv.WhenText.Should().Be("Active");
+        inv.Reason.Should().Be("Only when active");
+    }
+
+    [Fact]
+    public void Parse_ConditionalStateAssert_WhenGuardParsed()
+    {
+        const string dsl = """
+            precept Test
+            field X as number default 0
+            field Active as boolean default false
+            state Open initial
+            in Open assert X > 0 when Active because "Only when active"
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+
+        model.StateAsserts.Should().HaveCount(1);
+        var sa = model.StateAsserts![0];
+        sa.WhenGuard.Should().NotBeNull();
+        sa.WhenText.Should().Be("Active");
+        sa.Reason.Should().Be("Only when active");
+    }
+
+    [Fact]
+    public void Parse_ConditionalEventAssert_WhenGuardParsed()
+    {
+        const string dsl = """
+            precept Test
+            state Active initial
+            event Submit with Amount as number, Priority as number
+            on Submit assert Amount > 0 when Priority > 1 because "High priority needs amount"
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+
+        model.EventAsserts.Should().HaveCount(1);
+        var ea = model.EventAsserts![0];
+        ea.WhenGuard.Should().NotBeNull();
+        ea.WhenText.Should().Be("Priority > 1");
+        ea.Reason.Should().Be("High priority needs amount");
+    }
+
+    [Fact]
+    public void Parse_ConditionalEdit_WhenGuardParsed()
+    {
+        const string dsl = """
+            precept Test
+            field Priority as number default 0
+            field Active as boolean default false
+            state Open initial
+            in Open when Active edit Priority
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+
+        model.EditBlocks.Should().HaveCount(1);
+        var eb = model.EditBlocks![0];
+        eb.State.Should().Be("Open");
+        eb.WhenGuard.Should().NotBeNull();
+        eb.WhenText.Should().Be("Active");
+        eb.FieldNames.Should().Contain("Priority");
+    }
+
+    [Fact]
+    public void Parse_ConditionalInvariant_WhenNotGuard()
+    {
+        const string dsl = """
+            precept Test
+            field X as number default 0
+            field Active as boolean default false
+            state A initial
+            invariant X >= 0 when not Active because "When not active"
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+
+        var inv = model.Invariants![0];
+        inv.WhenGuard.Should().NotBeNull();
+        inv.WhenGuard.Should().BeOfType<PreceptUnaryExpression>()
+            .Which.Operator.Should().Be("not");
+    }
+
+    [Fact]
+    public void Parse_InvariantWithoutWhen_GuardIsNull()
+    {
+        const string dsl = """
+            precept Test
+            field X as number default 0
+            state A initial
+            invariant X >= 0 because "Always"
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+
+        model.Invariants.Should().HaveCount(1);
+        model.Invariants![0].WhenGuard.Should().BeNull();
+        model.Invariants![0].WhenText.Should().BeNull();
+    }
+
+    [Fact]
+    public void Parse_ConditionalEdit_InAny_ExpandsToAllStates()
+    {
+        const string dsl = """
+            precept Test
+            field Priority as number default 0
+            field Active as boolean default false
+            state A initial
+            state B
+            in any when Active edit Priority
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+
+        model.EditBlocks.Should().HaveCount(2);
+        model.EditBlocks!.Select(e => e.State).Should().BeEquivalentTo("A", "B");
+        model.EditBlocks![0].WhenGuard.Should().NotBeNull();
+        model.EditBlocks![1].WhenGuard.Should().NotBeNull();
+        model.EditBlocks![0].WhenText.Should().Be("Active");
+        model.EditBlocks![1].WhenText.Should().Be("Active");
+    }
+
+    [Fact]
+    public void Parse_EditWithoutWhen_GuardIsNull()
+    {
+        const string dsl = """
+            precept Test
+            field Priority as number default 0
+            state Open initial
+            in Open edit Priority
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+
+        model.EditBlocks.Should().HaveCount(1);
+        model.EditBlocks![0].WhenGuard.Should().BeNull();
+        model.EditBlocks![0].WhenText.Should().BeNull();
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // PARSING — Undeclared state references in transition rows (C54)
+    // ════════════════════════════════════════════════════════════════════
+
     [Fact]
     public void Parse_TransitionTargetUndeclaredState_Throws()
     {
@@ -1459,5 +1703,385 @@ public class NewSyntaxParserTests
         model.Should().BeNull();
         diagnostics.Should().NotBeEmpty();
         diagnostics[0].Message.Should().Contain("Undeclared state 'Nowhere'");
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // PARSING — Conditional state asserts with anchor-specific when guards
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Parse_ConditionalStateAssert_To_WhenGuardParsed()
+    {
+        const string dsl = """
+            precept Test
+            field Amount as number default 0
+            field Active as boolean default false
+            state Draft initial
+            state Approved
+            event Approve
+            to Approved assert Amount > 0 when Active because "Amount required when active"
+            from Draft on Approve -> transition Approved
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+
+        model.StateAsserts.Should().HaveCount(1);
+        var sa = model.StateAsserts![0];
+        sa.Anchor.Should().Be(AssertAnchor.To);
+        sa.State.Should().Be("Approved");
+        sa.WhenGuard.Should().NotBeNull();
+        sa.WhenText.Should().NotBeNull();
+        sa.Reason.Should().Be("Amount required when active");
+    }
+
+    [Fact]
+    public void Parse_ConditionalStateAssert_From_WhenGuardParsed()
+    {
+        const string dsl = """
+            precept Test
+            field Notes as string nullable
+            field RequiresNotes as boolean default false
+            state Draft initial
+            state Review
+            event Submit
+            from Draft assert Notes != null when RequiresNotes because "Notes required before leaving Draft"
+            from Draft on Submit -> transition Review
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+
+        model.StateAsserts.Should().HaveCount(1);
+        var sa = model.StateAsserts![0];
+        sa.Anchor.Should().Be(AssertAnchor.From);
+        sa.State.Should().Be("Draft");
+        sa.WhenGuard.Should().NotBeNull();
+        sa.WhenText.Should().NotBeNull();
+        sa.Reason.Should().Be("Notes required before leaving Draft");
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // PARSING — Any-order field modifiers
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Parse_FieldModifiers_DefaultBeforeNullable()
+    {
+        const string dsl = """
+            precept Test
+            field Name as string default "unknown" nullable
+            state A initial
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+        var f = model.Fields[0];
+
+        f.Name.Should().Be("Name");
+        f.IsNullable.Should().BeTrue();
+        f.HasDefaultValue.Should().BeTrue();
+        f.DefaultValue.Should().Be("unknown");
+    }
+
+    [Fact]
+    public void Parse_FieldModifiers_ConstraintBeforeDefault()
+    {
+        const string dsl = """
+            precept Test
+            field Amount as number nonnegative default 5
+            state A initial
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+        var f = model.Fields[0];
+
+        f.HasDefaultValue.Should().BeTrue();
+        f.DefaultValue.Should().Be(5.0);
+        f.Constraints.Should().Contain(c => c is FieldConstraint.Nonnegative);
+    }
+
+    [Fact]
+    public void Parse_FieldModifiers_ConstraintBeforeNullable()
+    {
+        const string dsl = """
+            precept Test
+            field Notes as string maxlength 500 nullable
+            state A initial
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+        var f = model.Fields[0];
+
+        f.IsNullable.Should().BeTrue();
+        f.Constraints.OfType<FieldConstraint.Maxlength>().Should().ContainSingle().Which.Value.Should().Be(500);
+    }
+
+    [Fact]
+    public void Parse_FieldModifiers_ConstraintThenDefaultThenNullable()
+    {
+        const string dsl = """
+            precept Test
+            field Score as number min 0 default 10 nullable
+            state A initial
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+        var f = model.Fields[0];
+
+        f.IsNullable.Should().BeTrue();
+        f.HasDefaultValue.Should().BeTrue();
+        f.DefaultValue.Should().Be(10.0);
+        f.Constraints.OfType<FieldConstraint.Min>().Should().ContainSingle().Which.Value.Should().Be(0);
+    }
+
+    [Fact]
+    public void Parse_FieldModifiers_NullableBeforeConstraint()
+    {
+        const string dsl = """
+            precept Test
+            field Label as string nullable notempty
+            state A initial
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+        var f = model.Fields[0];
+
+        f.IsNullable.Should().BeTrue();
+        f.Constraints.Should().Contain(c => c is FieldConstraint.Notempty);
+    }
+
+    [Fact]
+    public void Parse_FieldModifiers_DefaultBetweenConstraints()
+    {
+        const string dsl = """
+            precept Test
+            field Amount as number min 0 default 50 max 100
+            state A initial
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+        var f = model.Fields[0];
+
+        f.HasDefaultValue.Should().BeTrue();
+        f.DefaultValue.Should().Be(50.0);
+        f.Constraints.Should().HaveCount(2);
+        f.Constraints.OfType<FieldConstraint.Min>().Should().ContainSingle().Which.Value.Should().Be(0);
+        f.Constraints.OfType<FieldConstraint.Max>().Should().ContainSingle().Which.Value.Should().Be(100);
+    }
+
+    [Fact]
+    public void Parse_FieldModifiers_MultipleConstraintsThenNullableThenDefault()
+    {
+        const string dsl = """
+            precept Test
+            field Bio as string notempty maxlength 1000 nullable default "N/A"
+            state A initial
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+        var f = model.Fields[0];
+
+        f.IsNullable.Should().BeTrue();
+        f.HasDefaultValue.Should().BeTrue();
+        f.DefaultValue.Should().Be("N/A");
+        f.Constraints.Should().HaveCount(2);
+        f.Constraints.Should().Contain(c => c is FieldConstraint.Notempty);
+        f.Constraints.Should().Contain(c => c is FieldConstraint.Maxlength);
+    }
+
+    [Fact]
+    public void Parse_FieldModifiers_ChoiceOrderedBeforeDefault()
+    {
+        const string dsl = """
+            precept Test
+            field Priority as choice("Low", "Medium", "High") ordered default "Low"
+            state A initial
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+        var f = model.Fields[0];
+
+        f.HasDefaultValue.Should().BeTrue();
+        f.DefaultValue.Should().Be("Low");
+        f.IsOrdered.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Parse_FieldModifiers_DecimalMaxplacesBeforeDefault()
+    {
+        const string dsl = """
+            precept Test
+            field Price as decimal maxplaces 2 default 0.00
+            state A initial
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+        var f = model.Fields[0];
+
+        f.HasDefaultValue.Should().BeTrue();
+        f.DefaultValue.Should().Be(0.00);
+        f.Constraints.OfType<FieldConstraint.Maxplaces>().Should().ContainSingle().Which.Places.Should().Be(2);
+    }
+
+    [Fact]
+    public void Parse_FieldModifiers_MultiNameWithNonStandardOrder()
+    {
+        const string dsl = """
+            precept Test
+            field X, Y as number nonnegative default 0
+            state A initial
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+
+        model.Fields.Should().HaveCount(2);
+        foreach (var f in model.Fields)
+        {
+            f.HasDefaultValue.Should().BeTrue();
+            f.DefaultValue.Should().Be(0.0);
+            f.Constraints.Should().Contain(c => c is FieldConstraint.Nonnegative);
+        }
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // PARSING — Any-order event argument modifiers
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Parse_EventArgModifiers_DefaultBeforeNullable()
+    {
+        const string dsl = """
+            precept Test
+            state A initial
+            event Submit with Name as string default "" nullable
+            from A on Submit -> no transition
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+        var arg = model.Events[0].Args[0];
+
+        arg.IsNullable.Should().BeTrue();
+        arg.HasDefaultValue.Should().BeTrue();
+        arg.DefaultValue.Should().Be("");
+    }
+
+    [Fact]
+    public void Parse_EventArgModifiers_ConstraintBeforeDefault()
+    {
+        const string dsl = """
+            precept Test
+            state A initial
+            event Deposit with Amount as number nonnegative default 0
+            from A on Deposit -> no transition
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+        var arg = model.Events[0].Args[0];
+
+        arg.HasDefaultValue.Should().BeTrue();
+        arg.DefaultValue.Should().Be(0.0);
+        arg.Constraints.Should().Contain(c => c is FieldConstraint.Nonnegative);
+    }
+
+    [Fact]
+    public void Parse_EventArgModifiers_NullableAfterConstraint()
+    {
+        const string dsl = """
+            precept Test
+            state A initial
+            event Update with Label as string notempty nullable
+            from A on Update -> no transition
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+        var arg = model.Events[0].Args[0];
+
+        arg.IsNullable.Should().BeTrue();
+        arg.Constraints.Should().Contain(c => c is FieldConstraint.Notempty);
+    }
+
+    [Fact]
+    public void Parse_EventArgModifiers_MultiArgsMixedOrder()
+    {
+        const string dsl = """
+            precept Test
+            state A initial
+            event Submit with Amount as number min 0 default 10, Label as string nullable notempty
+            from A on Submit -> no transition
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+
+        var amount = model.Events[0].Args.Single(a => a.Name == "Amount");
+        amount.HasDefaultValue.Should().BeTrue();
+        amount.DefaultValue.Should().Be(10.0);
+        amount.Constraints.Should().Contain(c => c is FieldConstraint.Min);
+
+        var label = model.Events[0].Args.Single(a => a.Name == "Label");
+        label.IsNullable.Should().BeTrue();
+        label.Constraints.Should().Contain(c => c is FieldConstraint.Notempty);
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // PARSING — C70: Duplicate modifier detection
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void ParseWithDiagnostics_DuplicateDefault_ProducesC70()
+    {
+        const string dsl = """
+            precept Test
+            field X as number default 0 default 1
+            state A initial
+            """;
+
+        var (model, diagnostics) = PreceptParser.ParseWithDiagnostics(dsl);
+
+        model.Should().BeNull();
+        diagnostics.Should().ContainSingle(d => d.Code == "PRECEPT070");
+    }
+
+    [Fact]
+    public void ParseWithDiagnostics_DuplicateNullable_ProducesC70()
+    {
+        const string dsl = """
+            precept Test
+            field X as string nullable nullable
+            state A initial
+            """;
+
+        var (model, diagnostics) = PreceptParser.ParseWithDiagnostics(dsl);
+
+        model.Should().BeNull();
+        diagnostics.Should().ContainSingle(d => d.Code == "PRECEPT070");
+    }
+
+    [Fact]
+    public void ParseWithDiagnostics_DuplicateEventArgModifier_ProducesC70()
+    {
+        const string dsl = """
+            precept Test
+            state A initial
+            event Go with X as number default 0 default 1
+            from A on Go -> no transition
+            """;
+
+        var (model, diagnostics) = PreceptParser.ParseWithDiagnostics(dsl);
+
+        model.Should().BeNull();
+        diagnostics.Should().ContainSingle(d => d.Code == "PRECEPT070");
+    }
+
+    [Fact]
+    public void ParseWithDiagnostics_DuplicateOrdered_ProducesC70()
+    {
+        const string dsl = """
+            precept Test
+            field Priority as choice("Low", "Medium", "High") ordered ordered
+            state A initial
+            """;
+
+        var (model, diagnostics) = PreceptParser.ParseWithDiagnostics(dsl);
+
+        model.Should().BeNull();
+        diagnostics.Should().ContainSingle(d => d.Code == "PRECEPT070");
     }
 }

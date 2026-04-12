@@ -191,20 +191,24 @@ Statement          := FieldDecl | Invariant | StateDecl | StateAssert | StateAct
                     | EditDecl | EventDecl | EventAssert | TransitionRow
                     | Comment | Blank
 
-FieldDecl          := "field" Identifier ("," Identifier)* "as" TypeRef NullableOpt DefaultOpt
-NullableOpt        := ("nullable")?
-DefaultOpt         := ("default" LiteralOrList)?
+FieldDecl          := "field" Identifier ("," Identifier)* "as" TypeRef FieldModifier*
+FieldModifier      := "nullable" | "default" LiteralOrList | ConstraintSuffix | "ordered"
+ConstraintSuffix   := "nonnegative" | "positive" | "notempty"
+                    | "min" NumberLiteral | "max" NumberLiteral
+                    | "minlength" IntegerLiteral | "maxlength" IntegerLiteral
+                    | "mincount" IntegerLiteral | "maxcount" IntegerLiteral
+                    | "maxplaces" IntegerLiteral
 
-Invariant          := "invariant" BoolExpr "because" StringLiteral
+Invariant          := "invariant" BoolExpr WhenOpt "because" StringLiteral
 
 StateDecl          := "state" StateNameEntry ("," StateNameEntry)*
 StateNameEntry     := Identifier InitialOpt
 InitialOpt         := ("initial")?
 
 StateAssert        := StateInAssert | StateToAssert | StateFromAssert
-StateInAssert      := "in" StateTarget "assert" BoolExpr "because" StringLiteral
-StateToAssert      := "to" StateTarget "assert" BoolExpr "because" StringLiteral
-StateFromAssert    := "from" StateTarget "assert" BoolExpr "because" StringLiteral
+StateInAssert      := "in" StateTarget "assert" BoolExpr WhenOpt "because" StringLiteral
+StateToAssert      := "to" StateTarget "assert" BoolExpr WhenOpt "because" StringLiteral
+StateFromAssert    := "from" StateTarget "assert" BoolExpr WhenOpt "because" StringLiteral
 StateTarget        := "any" | Identifier ("," Identifier)*
 
 StateAction        := StateToAction | StateFromAction
@@ -224,15 +228,15 @@ PopAction          := "pop" Identifier ("into" Identifier)?
 ClearAction        := "clear" Identifier
 
 EditDecl           := StateEditDecl | RootEditDecl
-StateEditDecl      := "in" StateTarget "edit" FieldTarget
+StateEditDecl      := "in" StateTarget WhenOpt "edit" FieldTarget
 RootEditDecl       := "edit" FieldTarget
 FieldTarget        := "all" | Identifier ("," Identifier)*
 
 EventDecl          := "event" Identifier ("," Identifier)* ("with" ArgList)?
 ArgList            := ArgDecl ("," ArgDecl)*
-ArgDecl            := Identifier "as" TypeRef NullableOpt DefaultOpt
+ArgDecl            := Identifier "as" TypeRef FieldModifier*
 
-EventAssert        := "on" Identifier "assert" BoolExpr "because" StringLiteral
+EventAssert        := "on" Identifier "assert" BoolExpr WhenOpt "because" StringLiteral
 
 TransitionRow      := "from" StateTarget "on" Identifier WhenOpt ActionChain? "->" Outcome
 WhenOpt            := ("when" BoolExpr)?
@@ -242,7 +246,8 @@ NoTransition       := "no" "transition"
 RejectOutcome      := "reject" StringLiteral
 
 TypeRef            := ScalarType | CollectionType
-ScalarType         := "string" | "number" | "boolean"
+ScalarType         := "string" | "number" | "boolean" | "integer" | "decimal"
+                    | "choice" "(" StringLiteral ("," StringLiteral)* ")"
 CollectionType     := ("set" | "queue" | "stack") "of" ScalarType
 
 LiteralOrList      := ScalarLiteral | ListLiteral
@@ -264,6 +269,7 @@ Notes:
 - All three state assert forms evaluate against the **proposed world** (post-mutation, pre-commit). Fields-scoped.
 - `EventAssert` = movement truth. Checked pre-transition when the named event fires. Scoped to that event's args only.
 - Whether `EventAssert` must appear after its `EventDecl` is not locked yet; recommended to keep asserts near the related event for readability.
+- **`when` guards on declarations** — `WhenOpt` is an optional `when <BoolExpr>` clause on invariants, state asserts, event asserts, and edit declarations. When present, the guard acts as a precondition: if false, the declaration is skipped entirely (invariant/assert not checked, edit fields not granted). Guard scope is inherited from the declaration form: invariant/state-assert/edit guards reference entity fields only; event-assert guards reference event args only. C69 fires for cross-scope guard references (e.g. entity field in an event-assert guard). Guarded state asserts are excluded from unconditional null-narrowing at compile time.
 - **Compile-time error:** duplicate `in` + `to` on the same state with the same expression (syntactic identity after whitespace normalization). `in` already subsumes `to`.
 - **Compile-time error:** duplicate assert — same preposition + same state + same expression appearing more than once.
 - **Compile-time error:** `in` on the initial state where default field values violate the expression. Both defaults and initial state are statically known.
@@ -401,7 +407,8 @@ Full reserved keyword list:
 `in`, `to`, `from`, `on`, `when`, `any`, `all`, `of`,
 `set`, `add`, `remove`, `enqueue`, `dequeue`, `push`, `pop`, `clear`, `into`,
 `transition`, `no`, `reject`,
-`string`, `number`, `boolean`, `true`, `false`, `null`, `contains`,
+`string`, `number`, `boolean`, `integer`, `decimal`, `choice`, `maxplaces`, `ordered`,
+`true`, `false`, `null`, `contains`,
 `and`, `or`, `not`
 
 ### Dual-use: `set`
@@ -421,6 +428,9 @@ No ambiguity in the token stream — the parser knows which meaning applies from
 - `string`
 - `number`
 - `boolean`
+- `integer` — whole number, no decimal component. Supports arithmetic and numeric range constraints (`nonnegative`, `positive`, `min`, `max`). Widens to `number` and `decimal` in mixed arithmetic. Integer division truncates toward zero.
+- `decimal` — exact base-10 decimal number. Supports the `maxplaces` constraint and the `round()` built-in function.
+- `choice("A","B","C")` — constrained string value set; the value must be one of the declared members. Supports the `ordered` constraint for ordinal comparison. At least one member required (C62). No duplicate members (C63). Default value must be a declared member (C64).
 
 ### Collection types
 
@@ -472,16 +482,39 @@ Design rule: writes are lenient where they can be safely idempotent; reads that 
 
 ---
 
+### String accessors
+
+`string` fields expose a single parameterless accessor:
+
+- `<Field>.length` — returns the **UTF-16 code unit count** of the string value as `number`. This matches .NET's `string.Length` and is O(1). Note: characters outside the Basic Multilingual Plane (e.g. emoji) count as 2 code units. Example: `"💀".length == 2`.
+
+**Scope:** valid in `invariant`, `in`/`to`/`from` state assert, `when` guard, and `set` RHS — the same scopes as collection accessors.
+
+**Null handling:** `.length` does not coerce `null` to `0`. Using `.length` on a nullable `string` field without first narrowing it to non-null is a type error (diagnostic `C56`). Null-check before access using one of:
+
+```
+# Non-null minimum length check (invariant)
+invariant Name.length >= 2 because "Names require at least 2 characters"
+
+# Nullable max length (field may be null or short)
+invariant Note == null or Note.length <= 500 because "Notes cannot exceed 500 characters"
+
+# Post-narrowing in a when guard (AccessReason narrowed to non-null by prior condition)
+from Draft on Submit when EmployeeName != null and AccessReason != null and AccessReason.length >= 5 -> transition Submitted
+```
+
+---
+
 ## Fields (Mostly locked)
 
 ### Field declarations
 
 Forms:
 
-- `field <Name> as <Type> [nullable] [default <Literal>]`
-- `field <Name>, <Name>, ... as <Type> [nullable] [default <Literal>]`
+- `field <Name> as <Type> [<modifier>...]`
+- `field <Name>, <Name>, ... as <Type> [<modifier>...]`
 
-Multi-name declarations declare multiple fields sharing the same type, nullability, and default value. The type, `nullable`, and `default` clauses apply uniformly to every name in the list.
+Modifiers (`nullable`, `default <value>`, and constraint keywords) may appear in **any order** after the type. Each modifier may appear at most once per declaration (C70). Multi-name declarations declare multiple fields sharing the same type and modifiers.
 
 Defaults:
 - Non-nullable scalar fields must declare a `default ...`.
@@ -512,9 +545,63 @@ field MinAmount, MaxAmount as number default 0
 field FirstName, LastName, MiddleName as string nullable
 ```
 
-### Field invariants (Locked)
+### Field-level constraints (Locked)
 
-Data integrity rules live adjacent to fields.
+Constraint keywords may appear on field declarations and event argument declarations, between the type (and `nullable`) and the `default` clause. They desugar at parse time — field constraints become `invariant` nodes; event-arg constraints become `on E assert` nodes. No new runtime behavior.
+
+| Keyword | Applies to | Desugar |
+|---------|------------|---------|
+| `nonnegative` | number | `Field >= 0` |
+| `positive` | number | `Field > 0` |
+| `min N` | number | `Field >= N` |
+| `max N` | number | `Field <= N` |
+| `notempty` | string, collection | `Field != ""` / `Field.count > 0` |
+| `minlength N` | string | `Field.length >= N` |
+| `maxlength N` | string | `Field.length <= N` |
+| `mincount N` | collection | `Field.count >= N` |
+| `maxcount N` | collection | `Field.count <= N` |
+| `maxplaces N` | `decimal` | Caps the decimal value to at most N decimal places (runtime enforcement; not a desugared invariant expression) |
+| `ordered` | `choice` | Enables ordinal comparison operators (`<`, `<=`, `>`, `>=`); values compare in declaration order (not a desugared invariant expression) |
+
+**Nullable interaction:** When a nullable field carries a constraint, the desugared expression gains a null guard: `Field == null or Field >= N`. The constraint is only evaluated when the value is non-null.
+
+**Compile-time diagnostics:**
+- **C57** — constraint applied to an incompatible type (e.g. `notempty` on a number field, `nonnegative` on a string).
+- **C58** — contradictory constraints (`min 10 max 5`), duplicate constraints (`min 5 min 10`), or subsumed constraints (`nonnegative positive` — `positive` already implies `nonnegative`).
+- **C59** — the declared `default` value violates a constraint (`default -1` with `nonnegative`).
+- **C61** — `maxplaces` applied to a non-`decimal` field.
+- **C62** — `choice` type declared with no members.
+- **C63** — `choice` type contains a duplicate member value.
+- **C64** — the declared `default` value is not in the `choice` member set.
+- **C65** — Ordinal comparison operator (`<`, `<=`, `>`, `>=`) used on a `choice` field that lacks the `ordered` constraint.
+- **C66** — `ordered` constraint applied to a non-`choice` field.
+- **C67** — Ordinal comparison between two `choice` fields — ordinal rank is field-local and the two fields have independent orderings.
+- **C68** — Literal value assigned to a `choice` field (or added to a `choice` collection) is not a member of the declared value set.
+
+Examples:
+
+```precept
+# Numeric boundaries
+field Price as number default 0 nonnegative
+field Weight as number default 1 positive
+field Score as number default 50 min 0 max 100
+
+# String guards
+field Name as string nullable notempty
+field Code as string default "ABC" minlength 3 maxlength 20
+
+# Collection cardinality
+field Tags as set of string notempty
+field Reviewers as set of string mincount 1
+
+# Nullable with constraint — null guard added automatically
+field Discount as number nullable nonnegative
+
+# Event arg constraints
+event Submit with Name as string notempty, Amount as number positive
+```
+
+Data integrity rules live adjacent to fields. For simple per-field bounds, prefer inline constraints (see above) — `invariant` is the right tool for cross-field relationships and expressions that can't be expressed as a single constraint keyword.
 
 Form:
 
@@ -642,6 +729,9 @@ Forms:
 - `in <StateTarget> assert <BoolExpr> because "<Reason>"`
 - `to <StateTarget> assert <BoolExpr> because "<Reason>"`
 - `from <StateTarget> assert <BoolExpr> because "<Reason>"`
+- `in <StateTarget> assert <BoolExpr> when <Guard> because "<Reason>"` (conditional — guard is entity-field-scoped)
+- `to <StateTarget> assert <BoolExpr> when <Guard> because "<Reason>"`
+- `from <StateTarget> assert <BoolExpr> when <Guard> because "<Reason>"`
 
 Where `<StateTarget>` is one of:
 - A single state name: `Open`
@@ -669,6 +759,8 @@ Compile-time checks (Locked):
 | 5 | Cross-preposition deadlock | `in`/`to` vs `from` on same state, conjoined per-field domains are empty → unexitable | Error |
 
 All domain checks (#3–#5) use per-field interval/set analysis on the expression AST. Expressions involving `contains` or cross-field relationships that cannot be reduced to per-field domains are assumed satisfiable (sound — no false positives).
+
+**`when` guards on state asserts:** All three state assert forms accept an optional `when <Guard>` clause between the expression and `because`. When the guard is present, the assert is conditional — if the guard evaluates to false against current field data, the assert is skipped. Guarded state asserts are excluded from unconditional null-narrowing at compile time (a guarded `in State assert Field != null` does not narrow `Field` for transition rows, because the guard may be false). C69 fires if the guard references identifiers outside the entity-field scope.
 
 Focused example:
 
@@ -767,6 +859,29 @@ This is LL(2) at most — the parser sees `in` → state list → `assert` or `e
 - **`in any edit`** expands to all declared states at parse time (same as `in any assert`).
 - **Independence from events:** Edit declarations and event transitions are orthogonal. A field can be both editable and modified by event `set` assignments.
 - **No terminal state exclusion:** `in any edit` includes terminal states. To exclude specific states, list states explicitly.
+
+### Conditional editability
+
+Edit declarations accept an optional `when <Guard>` clause:
+
+```
+in <StateTarget> when <Guard> edit <FieldList>
+```
+
+Where `<Guard>` is a boolean expression over entity fields. When the guard is present, the listed fields are conditionally editable — only granted when the guard evaluates to true against the current instance data.
+
+Example:
+
+```precept
+in Active when HasPermission == true edit SensitiveField
+in Open, InProgress edit Notes, Description
+```
+
+Semantics:
+- **Additive union:** Unconditional edit blocks + guarded edit blocks whose guard passes = effective editable set. Static fields are always included; guarded fields are added when their guard is satisfied.
+- **Fail-closed:** If a guard expression evaluation fails (expression error, missing data), the guarded fields are NOT granted editability.
+- **Dynamic evaluation:** Guards are evaluated at each `Update` / `Inspect` call with current instance data.
+- **Guard scope:** Entity fields only (same as unconditional edit declarations). C69 fires for out-of-scope references.
 
 ### Root-level editability (stateless precepts)
 
@@ -870,6 +985,8 @@ Scope (Locked):
 - Referencing any non-arg identifier (including fields) is a parse/validation error.
 - Validation that combines event args with field state belongs in `when` guards on transition rows, not in event asserts. Event asserts answer "is this event well-formed?" — `when` guards answer "does this event apply given the current state?"
 
+**`when` guards on event asserts:** Event asserts accept an optional `when <Guard>` clause: `on <Event> assert <Expr> when <Guard> because "..."`. Guards on event asserts are **arg-scoped only** — consistent with the event-assert body scope. C69 fires for entity field references in event-assert guards. When the guard is false, the assert is skipped.
+
 Semantics (Locked ordering):
 - Event asserts run **before** transition selection.
 - If an event assert is false, the fire/inspect outcome is `Rejected` with the provided reason.
@@ -899,10 +1016,44 @@ The expression language supports:
 - parentheses
 - identifier expressions with optional dotted member access (`Name.member`)
 
-Collection accessor members carried forward conceptually:
-- `.count`
-- `.min`, `.max` (sets)
-- `.peek` (queue/stack)
+Dotted member accessors:
+
+| Form | Receiver | Returns | Notes |
+|---|---|---|---|
+| `Field.count` | `set<T>`, `queue<T>`, `stack<T>` | `number` | Total — empty collection → 0 |
+| `Field.min`, `Field.max` | `set<T>` (numeric inner) | inner type | Partial — error on empty set |
+| `Field.peek` | `queue<T>`, `stack<T>` | inner type | Partial — error on empty collection |
+| `Field.length` | `string` | `number` | UTF-16 code unit count. Null-unsafe — requires non-null narrowing first (C56). See [String accessors](#string-accessors). |
+| `EventName.ArgName` | event arg in transition row `when` guard | arg type | Required dotted form to avoid field shadowing. See [Expression scope in transitions](#expression-scope-in-transitions). |
+| `EventName.ArgName.length` | `string` event arg | `number` | Three-level form — combines arg dotted form with string `.length`. |
+
+Built-in functions:
+
+| Function | Signatures | Returns | Description |
+|---|---|---|---|
+| `abs(value)` | `integer → integer`, `decimal → decimal`, `number → number` | Same as input | Absolute value. Type-preserving. |
+| `floor(value)` | `decimal → integer`, `number → integer` | `integer` | Rounds toward negative infinity. |
+| `ceil(value)` | `decimal → integer`, `number → integer` | `integer` | Rounds toward positive infinity. |
+| `round(value)` | `integer → integer`, `decimal → integer`, `number → number` | See signatures | 1-arg: banker's rounding (MidpointRounding.ToEven) to nearest integer. |
+| `round(value, places)` | `(numeric, integer-literal) → decimal` | `decimal` | 2-arg: precision rounding. `places` must be a non-negative integer literal (C74). |
+| `truncate(value)` | `decimal → integer`, `number → integer` | `integer` | Truncates toward zero (not toward negative infinity like `floor`). |
+| `min(a, b, ...)` | `integer* → integer`, `decimal* → decimal`, `number* → number` | Same as input | Smallest of 2+ values. Variadic. All args must match the same numeric type. |
+| `max(a, b, ...)` | `integer* → integer`, `decimal* → decimal`, `number* → number` | Same as input | Largest of 2+ values. Variadic. All args must match the same numeric type. |
+| `clamp(value, min, max)` | `(integer, integer, integer) → integer`, `(decimal×3) → decimal`, `(number×3) → number` | Same as input | Constrains value to [min, max]. Type-preserving. |
+| `pow(base, exponent)` | `(integer, integer) → integer`, `(decimal, integer) → decimal`, `(number, integer) → number` | Same as base | Integer exponent only (C75). Type-preserving. `pow(0, 0) = 1` (IEEE 754). |
+| `sqrt(value)` | `decimal → decimal`, `number → number` | Same as input | Square root. Requires compile-time non-negative proof: field must have `nonnegative`, `positive`, or `min >= 0` constraint, or argument must be guarded with `>= 0` (C76). |
+| `toLower(value)` | `string → string` | `string` | Lowercase using invariant culture. |
+| `toUpper(value)` | `string → string` | `string` | Uppercase using invariant culture. |
+| `trim(value)` | `string → string` | `string` | Removes leading and trailing whitespace. |
+| `startsWith(value, prefix)` | `(string, string) → boolean` | `boolean` | Case-sensitive prefix test. |
+| `endsWith(value, suffix)` | `(string, string) → boolean` | `boolean` | Case-sensitive suffix test. |
+| `left(value, count)` | `(string, numeric) → string` | `string` | Leftmost N characters. Clamping: negative count → empty, count > length → full string. |
+| `right(value, count)` | `(string, numeric) → string` | `string` | Rightmost N characters. Clamping semantics. |
+| `mid(value, start, length)` | `(string, numeric, numeric) → string` | `string` | Substring. 1-indexed start. Clamping: start > length → empty, length beyond end → to end. |
+
+All functions are valid in `set` RHS, `invariant`, `in`/`to`/`from` assert, and `when` guard expression positions. Functions that return `boolean` (`startsWith`, `endsWith`) are additionally valid as standalone guard conditions.
+
+Function arguments must be non-nullable — passing a nullable field without a null guard emits C77. `min` and `max` share tokens with constraint keywords; the parser disambiguates by position (function call requires `(` after the name).
 
 Exact operator precedence and literal forms should align with the runtime expression parser.
 
@@ -1177,18 +1328,18 @@ This matches the broader design direction of explicit null handling and determin
 
 | Expression position | Expected type | Symbol scope |
 |---|---|---|
-| `when` guard | boolean | data fields + event args + collection accessors |
-| `set` assignment RHS | target field type | data fields + event args + collection accessors (narrowed by prior `when`) |
-| `add`/`remove`/`push`/`enqueue` value | collection inner type | data fields + event args + collection accessors |
+| `when` guard | boolean | data fields + event args + collection accessors + string `.length` |
+| `set` assignment RHS | target field type | data fields + event args + collection accessors + string `.length` (narrowed by prior `when`) |
+| `add`/`remove`/`push`/`enqueue` value | collection inner type | data fields + event args + collection accessors + string `.length` |
 | `dequeue`/`pop into` target | collection inner type assignable to target field | data fields only |
-| `invariant` expression | boolean | data fields + collection accessors |
-| `in`/`to`/`from` state assert | boolean | data fields + collection accessors |
+| `invariant` expression | boolean | data fields + collection accessors + string `.length` |
+| `in`/`to`/`from` state assert | boolean | data fields + collection accessors + string `.length` |
 | `on` event assert | boolean | event args only |
-| State action `set`/mutations | same as transition rows | data fields + collection accessors (no event args) |
+| State action `set`/mutations | same as transition rows | data fields + collection accessors + string `.length` (no event args) |
 
 ### Null-flow narrowing
 
-Nullable fields (`string nullable`, `number nullable`) carry a `T|null` union kind. Assigning a nullable value to a non-nullable target is a type error unless the value has been narrowed.
+Nullable fields (`string nullable`, `number nullable`) carry a `T|null` union kind. Assigning a nullable value to a non-nullable target is a type error unless the value has been narrowed. Accessing `.length` on a nullable string without narrowing is also a type error (C56).
 
 Narrowing sources:
 - **`when` guard:** `when Field != null` narrows `Field` from `T|null` to `T` for the row's action scope.
@@ -1243,6 +1394,8 @@ Type checking for `from any` rows expands to per-state checking. Each state may 
 | C41 / PRECEPT041 | Binary operator type error (includes `contains` RHS mismatch) |
 | C42 / PRECEPT042 | Null-flow violation (assigning `T\|null` to `T` without narrowing) |
 | C43 / PRECEPT043 | Collection `pop`/`dequeue into` target type mismatch |
+| C60 / PRECEPT060 | Narrowing assignment: assigning a `number` or `decimal` value to an `integer` field requires an explicit integer-producing expression (no implicit truncation) |
+| C69 / PRECEPT069 | Cross-scope guard reference in `when` clause |
 
 ### Design principle
 
@@ -1303,6 +1456,7 @@ Locked in this discussion:
 - Collection mutation nullability: `add`/`enqueue`/`push`/`remove` with a `T|null` value into a non-nullable collection require prior narrowing. The shared type checker enforces this via C42 (null-flow violation). Guard narrowing (`when Value != null`) and cross-branch narrowing (prior row handles null case) both satisfy the requirement.
 - Event-arg reference form: transition rows (guards, set RHS, mutation values) require the dotted form (`EventName.ArgName`). Bare arg names are valid only inside event asserts (`on <Event> assert`), where scope is arg-only. Narrowing applies to the exact symbol form used — no cross-form mirroring. Cross-event arg references (`EventB.Arg` in a row for `EventA`) are invalid.
 - Event-assert scope: permanently arg-only. Field references in event asserts are a compile-time error (C14/C15/C16). Validation combining event args with field state belongs in `when` guards, not event asserts.
+- `when` guards on declarations: `invariant <Expr> when <Guard> because "..."`, `in <State> assert <Expr> when <Guard> because "..."`, `on <Event> assert <Expr> when <Guard> because "..."`, `in <State> when <Guard> edit <Fields>`. Guard scope is inherited from declaration form. Collect-all semantics preserved. C69 for cross-scope references. Guarded state asserts excluded from unconditional null-narrowing.
 - Static impossibility boundary: the compile-time checker proves contradictions only from type information and null-flow narrowing (single-symbol, local reasoning). Additionally, identical-guard duplicate rows for the same `(state, event)` are a compile-time error. No cross-field arithmetic reasoning — the inspector handles data-dependent impossibility.
 - Diagnostic severity: three-tier model. **Error** = provably wrong (blocks compilation). **Warning** = structural quality concern (does not block). **Hint** = informational observation. The checker never guesses; uncertain cases are left to the inspector.
 - Diagnostic codes: overload existing codes for same conceptual category; new codes only for genuinely new categories. C38–C45 are stable and will not be split. New codes start at C46.

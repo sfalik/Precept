@@ -278,4 +278,94 @@ public class InspectToolTests
         result.Error.Should().BeNull();
         result.EditableFields.Should().BeNull();
     }
+
+    [Fact]
+    public void StringLengthConstraint_ShowsViolationInPreview()
+    {
+        const string text = """
+precept Test
+field Name as string default "valid"
+state Open initial
+state Done
+event Update with NewName as string
+invariant Name.length >= 2 because "Name must be at least 2 characters"
+from Open on Update -> set Name = Update.NewName -> transition Done
+""";
+
+        var data = new Dictionary<string, object?> { ["Name"] = "valid" };
+        var eventArgs = new Dictionary<string, Dictionary<string, object?>>
+        {
+            ["Update"] = new() { ["NewName"] = "x" }
+        };
+        var result = InspectTool.Inspect(text, "Open", data, eventArgs);
+
+        result.Error.Should().BeNull();
+        var update = result.Events.FirstOrDefault(e => e.Event == "Update");
+        update.Should().NotBeNull();
+        update!.Outcome.Should().Be("ConstraintFailure");
+        update.Violations.Should().NotBeEmpty();
+        update.Violations[0].Message.Should().Contain("Name must be at least 2 characters");
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Slice 9c: when-guard inspect tests
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Inspect_GuardedInvariant_GuardFalse_NoViolation()
+    {
+        var text = """
+            precept Test
+            field X as number default 0
+            field Active as boolean default false
+            invariant X > 0 when Active because "X must be positive when active"
+            state Open initial
+            state Done
+            event Finish
+            from Open on Finish -> transition Done
+            """;
+
+        // Active = false → guard is false → invariant should not fire
+        var data = new Dictionary<string, object?>
+        {
+            ["X"] = 0.0,
+            ["Active"] = false
+        };
+
+        var result = InspectTool.Inspect(text, "Open", data);
+
+        result.Error.Should().BeNull();
+        var finish = result.Events.FirstOrDefault(e => e.Event == "Finish");
+        finish.Should().NotBeNull();
+        finish!.Outcome.Should().Be("Transition",
+            "when the invariant guard is false, the invariant should be skipped and the transition should succeed");
+    }
+
+    [Fact]
+    public void Inspect_GuardedEdit_GuardTrue_FieldShownAsEditable()
+    {
+        var text = """
+            precept Test
+            field X as number default 0
+            field Active as boolean default true
+            state Open initial
+            in Open when Active edit X
+            event Go
+            from Open on Go -> no transition
+            """;
+
+        // Active = true → guard passes → X should be editable
+        var data = new Dictionary<string, object?>
+        {
+            ["X"] = 0.0,
+            ["Active"] = true
+        };
+
+        var result = InspectTool.Inspect(text, "Open", data);
+
+        result.Error.Should().BeNull();
+        result.EditableFields.Should().NotBeNull();
+        result.EditableFields!.Select(f => f.Name).Should().Contain("X",
+            "when the edit block guard is true, the field should appear in editable fields");
+    }
 }
