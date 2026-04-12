@@ -92,6 +92,33 @@ public class PreceptAnalyzerDiagnosticRangeTests
             "a field declaration error should squiggle the field line, not the precept header");
     }
 
+    [Fact]
+    public void Diagnostics_C78_ConditionalNonBooleanCondition_SquigglesCorrectLine()
+    {
+        // Line 0: precept Test
+        // Line 1: field Score as number default 0
+        // Line 2: field Label as string default ""
+        // Line 3: state A initial
+        // Line 4: state B
+        // Line 5: event Go
+        // Line 6: from A on Go -> set Label = if Score then "high" else "low" -> transition B
+        const string text = """
+            precept Test
+            field Score as number default 0
+            field Label as string default ""
+            state A initial
+            state B
+            event Go
+            from A on Go -> set Label = if Score then "high" else "low" -> transition B
+            """;
+
+        var diagnostics = Analyze(text);
+
+        diagnostics.Should().ContainSingle();
+        diagnostics[0].Message.Should().Contain("Conditional expression condition must be a non-nullable boolean");
+        diagnostics[0].Range.Start.Line.Should().Be(6);
+    }
+
     private static Diagnostic[] Analyze(string text)
     {
         var analyzer = new PreceptAnalyzer();

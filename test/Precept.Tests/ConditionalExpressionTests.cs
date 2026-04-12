@@ -551,6 +551,81 @@ public class ConditionalExpressionTests
         result2.UpdatedInstance!.InstanceData["Display"].Should().Be("anonymous");
     }
 
+    [Fact]
+    public void Fire_Conditional_WithArithmeticBranches()
+    {
+        const string dsl = """
+            precept Test
+            field Flag as boolean default true
+            field X as number default 0
+            state A initial
+            state B
+            event Go
+            from A on Go -> set X = if Flag then X + 10 else X - 5 -> transition B
+            """;
+
+        var wf = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
+
+        // Flag = true, X = 100 → 100 + 10 = 110
+        var inst1 = wf.CreateInstance("A", new Dictionary<string, object?> { ["Flag"] = true, ["X"] = 100.0 });
+        var result1 = wf.Fire(inst1, "Go");
+        result1.Outcome.Should().Be(TransitionOutcome.Transition);
+        result1.UpdatedInstance!.InstanceData["X"].Should().Be(110.0);
+
+        // Flag = false, X = 100 → 100 - 5 = 95
+        var inst2 = wf.CreateInstance("A", new Dictionary<string, object?> { ["Flag"] = false, ["X"] = 100.0 });
+        var result2 = wf.Fire(inst2, "Go");
+        result2.Outcome.Should().Be(TransitionOutcome.Transition);
+        result2.UpdatedInstance!.InstanceData["X"].Should().Be(95.0);
+    }
+
+    [Fact]
+    public void Fire_Conditional_InWhenGuard_GatesTransition()
+    {
+        const string dsl = """
+            precept Test
+            field Active as boolean default true
+            field Score as number default 0
+            state A initial
+            state B
+            event Go
+            from A on Go when (if Active then Score > 50 else true) -> transition B
+            """;
+
+        var wf = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
+
+        // Active = true, Score = 60 → guard is (Score > 50) = true → transitions
+        var inst1 = wf.CreateInstance("A", new Dictionary<string, object?> { ["Active"] = true, ["Score"] = 60.0 });
+        var result1 = wf.Fire(inst1, "Go");
+        result1.Outcome.Should().Be(TransitionOutcome.Transition);
+
+        // Active = true, Score = 30 → guard is (Score > 50) = false → no matching row
+        var inst2 = wf.CreateInstance("A", new Dictionary<string, object?> { ["Active"] = true, ["Score"] = 30.0 });
+        var result2 = wf.Fire(inst2, "Go");
+        result2.Outcome.Should().Be(TransitionOutcome.Unmatched);
+    }
+
+    [Fact]
+    public void Fire_Conditional_IntegerWidensToNumber_CorrectRuntimeValue()
+    {
+        const string dsl = """
+            precept Test
+            field Flag as boolean default true
+            field Value as number default 0
+            state A initial
+            state B
+            event Go
+            from A on Go -> set Value = if Flag then 42 else 0 -> transition B
+            """;
+
+        var wf = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
+        var inst = wf.CreateInstance("A", new Dictionary<string, object?> { ["Flag"] = true, ["Value"] = 0.0 });
+        var result = wf.Fire(inst, "Go");
+
+        result.Outcome.Should().Be(TransitionOutcome.Transition);
+        result.UpdatedInstance!.InstanceData["Value"].Should().Be(42L);
+    }
+
     // ════════════════════════════════════════════════════════════════════
     // Statement-Level `if` Misuse Detection Tests
     // ════════════════════════════════════════════════════════════════════
