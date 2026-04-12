@@ -251,29 +251,49 @@ REQUEST_CHANGES if any thread remains open or any new blocker is added.
 
 ## Coordinator Workflow (Complete Lifecycle)
 
+**Scribe handles all review posting.** The coordinator quality-checks review content and hands pre-validated payloads to Scribe. This keeps the coordinator's post-work turn lean and makes review posting as reliable as git commits and log writes.
+
 ### After Initial Review
 
 1. Parse JSON from reviewer agent's response.
-2. Write to `temp/{agent-name}-review.json`.
-3. Run `node tools/scripts/squad-review.js <pr> temp/{agent-name}-review.json`.
-4. Report results to user.
+2. Validate: correct format, inline comments have real file paths and line numbers, verdicts are justified.
+3. **Present a synthesis summary to the user** — verdicts, where the team agrees, where they differ, consolidated action items (see `proposal-review` skill § Coordinator Post-Review Summary for format).
+4. Pass validated review JSONs to Scribe in the spawn manifest.
+5. Scribe writes to `temp/{agent-name}-review.json` and runs `node tools/scripts/squad-review.js <pr> temp/{agent-name}-review.json`.
 
 ### After Dev Fix
 
 1. Run `node tools/scripts/squad-review.js <pr> threads --unresolved` to list open threads.
 2. Map each fix to its thread's `commentId`.
 3. Construct reply JSON with fix explanations (no event/body — just replies).
-4. Write to `temp/{agent-name}-fix-reply.json`.
-5. Run `node tools/scripts/squad-review.js <pr> temp/{agent-name}-fix-reply.json`.
+4. Pass to Scribe. Scribe writes to `temp/{agent-name}-fix-reply.json` and runs `node tools/scripts/squad-review.js <pr> temp/{agent-name}-fix-reply.json`.
 
 ### After Re-Review
 
 1. Run `node tools/scripts/squad-review.js <pr> threads --unresolved` to get current threads.
 2. Spawn reviewer with thread data in prompt.
 3. Parse reviewer's reply JSON output.
-4. Write to `temp/{agent-name}-rereview.json`.
-5. Run `node tools/scripts/squad-review.js <pr> temp/{agent-name}-rereview.json`.
+4. **Present synthesis summary to user** — what was verified, what's still open, any new findings.
+5. Pass to Scribe. Scribe writes to `temp/{agent-name}-rereview.json` and runs `node tools/scripts/squad-review.js <pr> temp/{agent-name}-rereview.json`.
 6. Confirm threads resolved and APPROVE posted.
+
+## Project Status Lifecycle
+
+Implementation PRs drive status transitions on the GitHub Projects V2 board for their linked proposal issue. The coordinator signals Scribe to execute these transitions at the right moments.
+
+| Moment | Status Transition | Coordinator Action |
+|--------|-------------------|--------------------|
+| Implementation branch created / draft PR opened | → `In Progress` | Include `STATUS_TRANSITION: In Progress` and the linked issue number in Scribe's spawn manifest |
+| PR merged and issue closed | → `Done` | Include `STATUS_TRANSITION: Done` and the linked issue number in Scribe's post-merge spawn manifest |
+
+### PR → Issue Linking
+
+Every implementation PR body MUST contain `Closes #N` (or `Resolves #N`) referencing the proposal issue. This creates a GitHub-tracked link that:
+- Populates the "Linked pull requests" field on the project board
+- Auto-closes the issue when the PR merges
+- Makes the PR discoverable from the issue timeline
+
+If a PR is opened without an issue link, Scribe adds `Closes #N` during PR stewardship (see Scribe charter § PR Stewardship Responsibilities). The coordinator should ensure this is present at PR creation time.
 
 ## History
 

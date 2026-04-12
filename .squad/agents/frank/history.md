@@ -29,6 +29,17 @@
 
 ## Recent Updates
 
+### 2026-04-12 — Issue #9 design review resolutions incorporated
+- Updated Issue #9 proposal body with all 4 resolved must-resolve items from the design review (Decisions 6–9).
+- **Decision 6:** `else` branch null-narrowing — original type retained, no reverse narrowing. #14 precedent.
+- **Decision 7:** Separate diagnostic codes C72 (non-boolean condition) and C73 (branch type mismatch), split from C39.
+- **Decision 8:** Nullable boolean condition = compile error (C72). Must be non-nullable boolean. Consistent with `when` guard behavior.
+- **Decision 9:** MCP Inspect trace shows `conditionResult` and `branchTaken` fields — inspectability means showing the reasoning.
+- Updated ACs: AC-3 (C39→C72), AC-5 (else branch behavior), AC-9 (trace field names), AC-12 (per-component test breakdown). Added AC-13 (C72/C73 codes) and AC-14 (nullable boolean rejection).
+- Updated teachable error messages table, semantic rules (added rules 7–8), implementation scope, and locked decisions section.
+- Posted resolution comment. Design approved — ready for implementation.
+- Decision filed: `.squad/decisions/inbox/frank-issue9-resolutions.md`
+
 ### 2026-04-12 — Event hooks gap investigation + external FSM precedent survey
 - Researched event-level action hooks triggered by Shane's `on Advance -> set Count = Count + 1` parse error.
 - Filed full external precedent survey across 5 systems (XState v5, SCXML, Akka Classic FSM, Spring SM, Redux) in `research/language/expressiveness/event-hooks.md`.
