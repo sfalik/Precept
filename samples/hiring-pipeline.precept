@@ -50,7 +50,7 @@ from InterviewLoop on RecordInterviewFeedback when PendingInterviewers contains 
 from InterviewLoop on RecordInterviewFeedback -> reject "Only assigned interviewers can submit feedback"
 from InterviewLoop on RejectCandidate -> set FinalNote = RejectCandidate.Note -> transition Rejected
 
-from Decision on ExtendOffer when FeedbackCount >= 2 -> set OfferAmount = ExtendOffer.Amount -> transition OfferExtended
+from Decision on ExtendOffer when FeedbackCount >= 2 -> set OfferAmount = ExtendOffer.Amount -> set FinalNote = if FeedbackCount >= 3 then "Strong Hire" else "Standard Hire" -> transition OfferExtended
 from Decision on ExtendOffer -> reject "At least two completed interview feedback entries are required before extending an offer"
 from Decision on RejectCandidate -> set FinalNote = RejectCandidate.Note -> transition Rejected
 

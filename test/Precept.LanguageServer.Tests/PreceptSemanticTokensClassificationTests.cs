@@ -140,4 +140,31 @@ public class PreceptSemanticTokensClassificationTests
             t.Type == "preceptState" &&
             t.Modifier == "preceptConstrained");
     }
+
+    [Fact]
+    public void GetClassifiedTokens_ConditionalKeywords_ArePreceptKeywordSemantic()
+    {
+        const string dsl = """
+            precept M
+            field Balance as number default 0
+            field Label as string default ""
+            state Active initial
+            event Go with Amount as number
+            from Active on Go -> set Label = if Amount > 0 then "positive" else "zero" -> no transition
+            """;
+
+        var tokens = PreceptSemanticTokensHandler.GetClassifiedTokens(dsl);
+
+        tokens.Should().Contain(t =>
+            t.Text == "if" &&
+            t.Type == "preceptKeywordSemantic");
+
+        tokens.Should().Contain(t =>
+            t.Text == "then" &&
+            t.Type == "preceptKeywordSemantic");
+
+        tokens.Should().Contain(t =>
+            t.Text == "else" &&
+            t.Type == "preceptKeywordSemantic");
+    }
 }

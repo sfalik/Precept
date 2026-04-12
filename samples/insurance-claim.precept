@@ -64,7 +64,7 @@ from UnderReview on RequestDocument -> add MissingDocuments RequestDocument.Name
 from UnderReview on ReceiveDocument when MissingDocuments contains ReceiveDocument.Name -> remove MissingDocuments ReceiveDocument.Name -> no transition
 from UnderReview on ReceiveDocument -> reject "That document is not currently outstanding"
 
-from UnderReview on Approve when (not PoliceReportRequired or MissingDocuments.count == 0) and Approve.Amount <= ClaimAmount -> set ApprovedAmount = Approve.Amount -> set DecisionNote = Approve.Note -> transition Approved
+from UnderReview on Approve when (not PoliceReportRequired or MissingDocuments.count == 0) and Approve.Amount <= ClaimAmount -> set ApprovedAmount = if FraudFlag then min(Approve.Amount, ClaimAmount / 2) else Approve.Amount -> set DecisionNote = Approve.Note -> transition Approved
 from UnderReview on Approve -> reject "Required documents must be complete before a claim can be approved"
 
 from UnderReview on Deny -> set DecisionNote = Deny.Note -> transition Denied

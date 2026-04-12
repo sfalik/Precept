@@ -653,6 +653,14 @@ public class CatalogDriftTests
         ["C77"] = new(H + "field X as number nullable default null\n" + S2 +
             "event Go\nfrom A on Go when abs(X) > 0 -> no transition\n", "nullable"),
 
+        // C78: conditional expression condition must be a non-nullable boolean
+        ["C78"] = new(H + "field X as string default \"\"\n" + S2 +
+            "event Go\nfrom A on Go -> set X = if 42 then \"a\" else \"b\" -> no transition\n", "non-nullable boolean"),
+
+        // C79: conditional expression branches must produce the same scalar type
+        ["C79"] = new(H + "field X as number default 0\n" + S2 +
+            "event Go\nfrom A on Go -> set X = if true then 42 else \"text\" -> no transition\n", "same scalar type"),
+
         // ── Runtime-phase (C33–C37) ───────────────────────────────────
 
         // C33: CreateInstance with empty initial state
@@ -1421,6 +1429,12 @@ public class CatalogDriftTests
 
         // C77: nullable arg — row on line 6
         ["C77"] = ("precept Test\nfield X as number nullable default null\nstate A initial\nstate B\nevent Go\nfrom A on Go when abs(X) > 0 -> no transition\n", "compile", 6),
+
+        // C78: conditional with non-boolean condition — row on line 6
+        ["C78"] = ("precept Test\nfield X as string default \"\"\nstate A initial\nstate B\nevent Go\nfrom A on Go -> set X = if 42 then \"a\" else \"b\" -> no transition\n", "compile", 6),
+
+        // C79: conditional with mismatched branch types — row on line 6
+        ["C79"] = ("precept Test\nfield X as number default 0\nstate A initial\nstate B\nevent Go\nfrom A on Go -> set X = if true then 42 else \"text\" -> no transition\n", "compile", 6),
     };
 
     [Theory]

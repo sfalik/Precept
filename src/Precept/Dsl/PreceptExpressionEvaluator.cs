@@ -25,6 +25,7 @@ internal static class PreceptExpressionRuntimeEvaluator
             PreceptUnaryExpression unary => EvaluateUnary(unary, context),
             PreceptBinaryExpression binary => EvaluateBinary(binary, context, fieldContracts),
             PreceptFunctionCallExpression fn => EvaluateFunction(fn, context),
+            PreceptConditionalExpression cond => EvaluateConditional(cond, context, fieldContracts),
             _ => EvaluationResult.Fail("unsupported expression node.")
         };
     }
@@ -363,6 +364,23 @@ internal static class PreceptExpressionRuntimeEvaluator
             return rightResult;
 
         return EvaluationResult.Ok(collection.Contains(rightResult.Value));
+    }
+
+    private static EvaluationResult EvaluateConditional(
+        PreceptConditionalExpression cond,
+        IReadOnlyDictionary<string, object?> context,
+        IReadOnlyDictionary<string, PreceptField>? fieldContracts)
+    {
+        var condResult = Evaluate(cond.Condition, context, fieldContracts);
+        if (!condResult.Success)
+            return condResult;
+
+        if (condResult.Value is not bool condBool)
+            return EvaluationResult.Fail("conditional expression condition must be a boolean.");
+
+        return condBool
+            ? Evaluate(cond.ThenBranch, context, fieldContracts)
+            : Evaluate(cond.ElseBranch, context, fieldContracts);
     }
 
     private static EvaluationResult EvaluateFunction(PreceptFunctionCallExpression fn, IReadOnlyDictionary<string, object?> context)

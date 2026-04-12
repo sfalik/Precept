@@ -409,7 +409,8 @@ Full reserved keyword list:
 `transition`, `no`, `reject`,
 `string`, `number`, `boolean`, `integer`, `decimal`, `choice`, `maxplaces`, `ordered`,
 `true`, `false`, `null`, `contains`,
-`and`, `or`, `not`
+`and`, `or`, `not`,
+`if`, `then`, `else`
 
 ### Dual-use: `set`
 
@@ -428,7 +429,7 @@ No ambiguity in the token stream — the parser knows which meaning applies from
 - `string`
 - `number`
 - `boolean`
-- `integer` — whole number, no decimal component. Supports arithmetic and numeric range constraints (`nonnegative`, `positive`, `min`, `max`). Widens to `number` and `decimal` in mixed arithmetic. Integer division truncates toward zero.
+- `integer` — whole number, no decimal component. Supports arithmetic and numeric range constraints (`nonnegative`, `positive`, `min`, `max`). Widens to `number` and `decimal` — an integer value is accepted wherever a number or decimal is expected (assignment, comparison, arithmetic, conditional branches). This is lossless: every integer is a valid number and a valid decimal. Integer division truncates toward zero.
 - `decimal` — exact base-10 decimal number. Supports the `maxplaces` constraint and the `round()` built-in function.
 - `choice("A","B","C")` — constrained string value set; the value must be one of the declared members. Supports the `ordered` constraint for ordinal comparison. At least one member required (C62). No duplicate members (C63). Default value must be a declared member (C64).
 
@@ -1013,6 +1014,7 @@ The expression language supports:
 - logical: `and`, `or`
 - comparisons: `==`, `!=`, `>`, `>=`, `<`, `<=`
 - membership: `contains`
+- conditional: `if <condition> then <value> else <value>` (see [Conditional Expressions](#conditional-expressions-locked))
 - parentheses
 - identifier expressions with optional dotted member access (`Name.member`)
 
@@ -1058,6 +1060,97 @@ Function arguments must be non-nullable — passing a nullable field without a n
 Exact operator precedence and literal forms should align with the runtime expression parser.
 
 See [Keyword vs Symbol Design Framework](#keyword-vs-symbol-design-framework-locked) for the rationale behind using keywords for logical operators and symbols for math/comparison.
+
+---
+
+## Conditional Expressions (Locked)
+
+Conditional expressions select between two values based on a boolean condition.
+
+### Syntax
+
+```
+if <condition> then <value> else <value>
+```
+
+All three keywords (`if`, `then`, `else`) are required. There is no short-form ternary (`? :`), no statement-level `if`, and no short-circuit evaluation — both branches are type-checked at compile time, and exactly one is evaluated at runtime.
+
+### Semantics
+
+A conditional expression is a **pure value expression**. It produces a single value and is valid in any expression position: `set` RHS, `invariant`, `assert`, and `when` guard. It is not a control-flow statement — it does not skip or apply declarations.
+
+### Type rules
+
+- The **condition** must be a non-nullable `boolean`. Non-boolean conditions (numbers, strings) emit **C78**. Nullable booleans also emit C78 — narrow with an explicit comparison first.
+- Both **branches** must resolve to compatible scalar base types. Integer widens to number or decimal (lossless subset), so `if Flag then abs(X) else 0` is valid when X is `number`. Incompatible types (e.g., `string` vs `number`, or `number` vs `decimal`) emit **C79**.
+- The result type is the wider of the two branch types. If either branch is nullable, the result is nullable.
+
+### `when` vs `if` — the teaching model
+
+`when` and `if` serve fundamentally different roles in Precept:
+
+| | `when` | `if` |
+|---|---|---|
+| **Kind** | Structural guard | Value expression |
+| **Effect** | Applies or skips an entire declaration (row, invariant, assert, edit block) | Selects between two values within an expression |
+| **Position** | After `from...on`, on `invariant`, `assert`, `edit` declarations | Inside any expression position |
+| **Branching** | Multiple rows with different `when` guards → first-match routing | Single expression with two branches → one value produced |
+
+`when` answers: *does this rule apply?* `if` answers: *which value do I use?*
+
+### Null-narrowing
+
+When the condition is a null check (`field != null`), the field is narrowed to non-nullable in the `then` branch. The `else` branch retains the original nullable type.
+
+```precept
+# Name is string nullable — narrowed to string in then-branch
+set Display = if Name != null then Name else "anonymous"
+```
+
+### Nesting
+
+Conditional expressions nest via parentheses. Without parentheses, the `else` branch greedily consumes the next `if`:
+
+```precept
+# Nested conditional — explicit parentheses for clarity
+set X = if A then (if B then 1 else 2) else 3
+
+# Chained else-if — greedy else binding
+set Note = if Score >= 90 then "excellent" else if Score >= 70 then "good" else "needs work"
+```
+
+### Diagnostic codes
+
+| Code | Condition | Message |
+|---|---|---|
+| C78 | Condition is not a non-nullable boolean | `Conditional expression condition must be a non-nullable boolean, but got {actual}.` |
+| C79 | Branch types incompatible | `Conditional expression branches must produce the same scalar type, but got {thenType} and {elseType}.` Integer widens to number/decimal; number ↔ decimal is a hard error. |
+
+### Examples
+
+```precept
+# Conditional in set assignment
+from Decision on ExtendOffer when FeedbackCount >= 2
+    -> set OfferAmount = ExtendOffer.Amount
+    -> set FinalNote = if FeedbackCount >= 3 then "Strong Hire" else "Standard Hire"
+    -> transition OfferExtended
+
+# Conditional in invariant
+invariant ApprovedAmount <= (if FraudFlag then ClaimAmount / 2 else ClaimAmount) because "Fraud-flagged claims capped at half"
+
+# Null-narrowing with conditional
+set DecisionNote = if Approve.Note != null then Approve.Note else "Auto-approved"
+
+# Nested conditional (chained else-if)
+set Tier = if CreditScore >= 750 then "prime" else if CreditScore >= 680 then "standard" else "subprime"
+```
+
+### Explicit exclusions
+
+- **No ternary syntax** — `condition ? value : value` is not supported. The keyword form `if...then...else` is deliberate per Principle #13 (keywords for domain, symbols for math).
+- **No statement-level `if`** — `if` does not control declaration applicability. Use `when` guards for structural branching. The parser detects `if` at statement level and emits a redirect message pointing to `when`.
+- **No short-circuit evaluation** — both branches are type-checked at compile time. At runtime, only the selected branch is evaluated.
+- **No implicit boolean coercion** — numbers and strings are not truthy/falsy. The condition must be explicitly boolean.
 
 ---
 
@@ -1396,6 +1489,8 @@ Type checking for `from any` rows expands to per-state checking. Each state may 
 | C43 / PRECEPT043 | Collection `pop`/`dequeue into` target type mismatch |
 | C60 / PRECEPT060 | Narrowing assignment: assigning a `number` or `decimal` value to an `integer` field requires an explicit integer-producing expression (no implicit truncation) |
 | C69 / PRECEPT069 | Cross-scope guard reference in `when` clause |
+| C78 / PRECEPT078 | Conditional expression condition must be a non-nullable boolean |
+| C79 / PRECEPT079 | Conditional expression branches must produce the same scalar type |
 
 ### Design principle
 
@@ -1460,6 +1555,7 @@ Locked in this discussion:
 - Static impossibility boundary: the compile-time checker proves contradictions only from type information and null-flow narrowing (single-symbol, local reasoning). Additionally, identical-guard duplicate rows for the same `(state, event)` are a compile-time error. No cross-field arithmetic reasoning — the inspector handles data-dependent impossibility.
 - Diagnostic severity: three-tier model. **Error** = provably wrong (blocks compilation). **Warning** = structural quality concern (does not block). **Hint** = informational observation. The checker never guesses; uncertain cases are left to the inspector.
 - Diagnostic codes: overload existing codes for same conceptual category; new codes only for genuinely new categories. C38–C45 are stable and will not be split. New codes start at C46.
+- Conditional expressions: `if <condition> then <value> else <value>` — pure value expressions valid in set RHS, invariant, assert, and guard positions. Both branches type-checked; condition must be non-nullable boolean (C78). Branches must produce compatible scalar types with integer widening (C79). Null-narrowing applies in then-branch when condition is a null check. No ternary syntax, no statement-level `if`, no short-circuit evaluation.
 
 Not yet locked:
 - Full EBNF and tokenization rules
