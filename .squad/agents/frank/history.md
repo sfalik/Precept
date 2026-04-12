@@ -20,6 +20,13 @@
 - **Recommended slicing:** (A) parser + type checker + tests, (B) completions rework, (C) docs.
 - Full analysis: `.squad/decisions/inbox/frank-modifier-any-order-investigation.md`
 
+### 2026-04-11 — Variadic min/max decision (Issue #16)
+- Updated proposal for comprehensive built-in functions to make min/max variadic (≥ 2 args, no upper limit) per Shane's approved decision.
+- Binary-only min/max was the original draft; variadic is the locked form. The mathematical arity-independence of min/max justifies the exception to fixed-arity signatures.
+- Collection overloads for min/max rejected — `.min`/`.max` accessors already serve that role. Added as explicit exclusion.
+- Key proposal changes: 6 signature updates, new locked decision #8, exclusion rewrite, new semantic rule, teachable error message, acceptance criteria updates, 3-arg example.
+- Decision filed: `.squad/decisions/inbox/frank-variadic-min-max.md`
+
 ## Recent Updates
 
 ### 2026-04-12 — Event hooks gap investigation + external FSM precedent survey

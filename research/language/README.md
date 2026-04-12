@@ -60,6 +60,7 @@ Use this table when you already know the issue number and need its research grou
 | [expressiveness/expression-language-audit.md](./expressiveness/expression-language-audit.md) | Runtime-grounded inventory of current expression limits and proposal pressure. |
 | [expressiveness/internal-verbosity-analysis.md](./expressiveness/internal-verbosity-analysis.md) | Corpus evidence for compactness and declaration-pressure work. |
 | [expressiveness/conditional-logic-strategy.md](./expressiveness/conditional-logic-strategy.md) | Guard vocabulary and conditional-shape guidance across the language surface. |
+| [expressiveness/case-insensitive-comparison-survey.md](./expressiveness/case-insensitive-comparison-survey.md) | `~=` precedent survey, CI comparison patterns across 15+ systems, cascade analysis. Supports `#16`. |
 | [domain-map.md](./domain-map.md) | Full durable map of every language research domain. |
 | [domain-research-batches.md](./domain-research-batches.md) | Sequencing plan for active and horizon domain research. |
 | [references/cel-comparison.md](./references/cel-comparison.md) | Full Precept vs CEL language-level comparison — validates expression expansion priorities. |

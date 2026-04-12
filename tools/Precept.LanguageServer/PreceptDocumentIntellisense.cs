@@ -29,6 +29,29 @@ internal static class PreceptDocumentIntellisense
     private static readonly Regex EventAssertRegex = new("^\\s*on\\s+(?<event>[A-Za-z_][A-Za-z0-9_]*)\\s+assert\\s+", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex TransitionOutcomeRegex = new("\\btransition\\s+(?<state>[A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
+    /// <summary>Hover content for built-in function names, keyed by function name.</summary>
+    private static readonly Dictionary<string, string> FunctionHoverContent = new(StringComparer.Ordinal)
+    {
+        ["abs"] = "```precept\nabs(value)\n```\n\nAbsolute value. Returns the non-negative magnitude.\n\nExample: `abs(-5)` → `5`",
+        ["floor"] = "```precept\nfloor(value)\n```\n\nRound down to the nearest integer.\n\nExample: `floor(3.7)` → `3`",
+        ["ceil"] = "```precept\nceil(value)\n```\n\nRound up to the nearest integer.\n\nExample: `ceil(3.2)` → `4`",
+        ["round"] = "```precept\nround(value)\nround(value, places)\n```\n\nRound to nearest integer (1-arg) or to N decimal places (2-arg).\n\nExample: `round(3.456, 2)` → `3.46`",
+        ["truncate"] = "```precept\ntruncate(value)\n```\n\nTruncate toward zero, removing the fractional part.\n\nExample: `truncate(3.9)` → `3`",
+        ["min"] = "```precept\nmin(a, b, ...)\n```\n\nMinimum of two or more values.\n\nExample: `min(Price, Limit)` → the smaller value",
+        ["max"] = "```precept\nmax(a, b, ...)\n```\n\nMaximum of two or more values.\n\nExample: `max(Score, Threshold)` → the larger value",
+        ["pow"] = "```precept\npow(base, exponent)\n```\n\nRaise to an integer power.\n\nExample: `pow(2, 3)` → `8`",
+        ["sqrt"] = "```precept\nsqrt(value)\n```\n\nSquare root. Requires non-negative argument (compile-time proof).\n\nExample: `sqrt(16)` → `4`",
+        ["clamp"] = "```precept\nclamp(value, lo, hi)\n```\n\nClamp value to range [lo, hi].\n\nExample: `clamp(Score, 0, 100)` → value bounded to 0–100",
+        ["toLower"] = "```precept\ntoLower(str)\n```\n\nConvert string to lowercase.\n\nExample: `toLower(Email)` → `\"user@example.com\"`",
+        ["toUpper"] = "```precept\ntoUpper(str)\n```\n\nConvert string to uppercase.\n\nExample: `toUpper(Code)` → `\"ABC\"`",
+        ["startsWith"] = "```precept\nstartsWith(str, prefix)\n```\n\nCheck if string starts with prefix. Returns boolean.\n\nExample: `startsWith(Email, \"admin@\")`",
+        ["endsWith"] = "```precept\nendsWith(str, suffix)\n```\n\nCheck if string ends with suffix. Returns boolean.\n\nExample: `endsWith(File, \".pdf\")`",
+        ["trim"] = "```precept\ntrim(str)\n```\n\nRemove leading and trailing whitespace.\n\nExample: `trim(Name)` → `\"Alice\"`",
+        ["left"] = "```precept\nleft(str, count)\n```\n\nFirst N characters (1-indexed, clamping).\n\nExample: `left(Code, 3)` → `\"ABC\"` from `\"ABCDEF\"`",
+        ["right"] = "```precept\nright(str, count)\n```\n\nLast N characters (clamping).\n\nExample: `right(Code, 3)` → `\"DEF\"` from `\"ABCDEF\"`",
+        ["mid"] = "```precept\nmid(str, start, count)\n```\n\nSubstring from position (1-indexed, clamping).\n\nExample: `mid(Code, 2, 3)` → `\"BCD\"` from `\"ABCDEF\"`",
+    };
+
     internal static PreceptDocumentInfo Analyze(string text)
     {
         var lines = text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
@@ -169,6 +192,27 @@ internal static class PreceptDocumentIntellisense
                 }),
                 Range = CreateRange((int)position.Line, start, end)
             };
+        }
+
+        // Check if the word is a built-in function name followed by (
+        if (FunctionHoverContent.TryGetValue(word, out var functionHover))
+        {
+            // Verify it's actually a function call (followed by '(' on the line)
+            var afterEnd = end;
+            while (afterEnd < line.Length && char.IsWhiteSpace(line[afterEnd]))
+                afterEnd++;
+            if (afterEnd < line.Length && line[afterEnd] == '(')
+            {
+                return new Hover
+                {
+                    Contents = new MarkedStringsOrMarkupContent(new MarkupContent
+                    {
+                        Kind = MarkupKind.Markdown,
+                        Value = functionHover
+                    }),
+                    Range = CreateRange((int)position.Line, start, end)
+                };
+            }
         }
 
         // Fall back to token keyword description (Tier 1)

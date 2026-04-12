@@ -133,6 +133,10 @@ public sealed record ExpressionSubjects(
             case PreceptParenthesizedExpression paren:
                 Walk(paren.Inner, fields, args);
                 break;
+            case PreceptFunctionCallExpression fn:
+                foreach (var arg in fn.Arguments)
+                    Walk(arg, fields, args);
+                break;
             case PreceptLiteralExpression:
                 break;
         }

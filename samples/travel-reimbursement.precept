@@ -2,6 +2,7 @@ precept TravelReimbursement
 
 # Finance reviews a reimbursement request by checking both totals and policy ratios.
 # This sample brings in multiplication and division without making the domain obscure.
+# Built-in functions (round, min, clamp) keep arithmetic readable.
 
 field EmployeeName as string nullable
 field TripDays as number default 1
@@ -47,7 +48,7 @@ event Pay
 from Draft on Submit when Submit.Lodging / Submit.Days <= 350 -> set EmployeeName = Submit.Employee -> set TripDays = Submit.Days -> set LodgingTotal = Submit.Lodging -> set MealsTotal = Submit.Meals -> set MileageTotal = round(Submit.Miles * Submit.Rate, 2) -> set MileageRate = Submit.Rate -> set RequestedTotal = Submit.Lodging + Submit.Meals + (Submit.Miles * Submit.Rate) -> transition Submitted
 from Draft on Submit -> reject "Average lodging per day exceeds the policy cap"
 
-from Submitted on Approve when Approve.Amount <= RequestedTotal -> set ApprovedTotal = Approve.Amount -> set FinanceNote = Approve.Note -> transition Approved
+from Submitted on Approve when Approve.Amount <= RequestedTotal -> set ApprovedTotal = min(Approve.Amount, RequestedTotal) -> set FinanceNote = Approve.Note -> transition Approved
 from Submitted on Approve -> reject "Finance cannot approve more than the requested total"
 from Submitted on Reject -> set FinanceNote = Reject.Note -> transition Rejected
 

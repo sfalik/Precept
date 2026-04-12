@@ -183,3 +183,13 @@ Both skills use `precept_language` for syntax authority, handle Mermaid diagrams
 - **JSON shapes match design spec exactly:** no field additions, no name drift
 - **Catalog-driven:** `LanguageTool` uses `ConstructCatalog` + `DiagnosticCatalog` + `PreceptToken` metadata — all single source of truth
 - **DTOs stay in sync:** `ViolationDtoMapper` handles all 4 source types × 5 target types automatically via switch statements
+
+### Issue #16 — MCP function catalog (2026-04-12)
+
+- **`LanguageTool.cs`:** Added `Functions` section to `LanguageResult`. New DTOs: `FunctionDto(Name, Description, Signatures)`, `FunctionSignatureDto(Parameters, ReturnType, IsVariadic)`, `FunctionParamDto(Name, Type, Constraint?)`. Built dynamically from `FunctionRegistry.AllFunctions` — zero hardcoded function metadata in MCP layer.
+- **`FunctionRegistry.cs`:** Added `Description` field to `FunctionDefinition` record. Added `AllFunctions` property. Registered all 18 functions (abs, ceil, clamp, endsWith, floor, left, max, mid, min, pow, right, round, sqrt, startsWith, toLower, toUpper, trim, truncate) with overloads, parameter types, return types, and constraints.
+- **`CompileTool.cs`:** No changes needed. Expressions are string-based via `ExpressionText` / `ReconstituteExpr`. `PreceptFunctionCallExpression` case already exists in parser's `ReconstituteExpr` (produces `"round(Amount, 2)"` etc.). Nested function calls serialize correctly.
+- **`PreceptParser.cs`:** Updated ConstructInfo ID from `round-function` to `function-call`. Updated description to list all 18 available functions. Kept `round` as lead keyword in Form for backward compatibility with `SampleFiles_CoverAllConstructs` drift test.
+- **`StaticValueKind` display:** `FormatValueKind` helper collapses `Number|Integer|Decimal` → `"number"`, surfaces specific types otherwise. `FormatArgConstraint` maps `MustBeIntegerLiteral` → `"must be integer literal"`.
+- **Test impact:** Fixed assertion in `ConstructsIncludeRoundFunction` (checks description contains "built-in function" instead of form starts with "round"). Updated `CatalogDriftTests` switch case for new construct ID. All 1187 tests pass.
+- **Docs note:** `docs/McpServerDesign.md` needs a `functions` section added in the final doc sync slice. The existing `round()` reference table should expand to cover all 18 functions.

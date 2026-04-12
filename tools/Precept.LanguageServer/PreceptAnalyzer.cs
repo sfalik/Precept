@@ -1107,7 +1107,27 @@ internal sealed class PreceptAnalyzer
         new CompletionItem { Label = "or", Kind = CompletionItemKind.Keyword },
         new CompletionItem { Label = "not", Kind = CompletionItemKind.Keyword },
         new CompletionItem { Label = "contains", Kind = CompletionItemKind.Operator },
-        SnippetItem("round(expr, N)", "round(${1:expr}, ${2:2})", "Round a decimal value to N places")
+        // Numeric functions
+        FunctionSnippetItem("abs(expr)", "abs(${1:expr})", "Absolute value"),
+        FunctionSnippetItem("floor(expr)", "floor(${1:expr})", "Round down to nearest integer"),
+        FunctionSnippetItem("ceil(expr)", "ceil(${1:expr})", "Round up to nearest integer"),
+        FunctionSnippetItem("round(expr)", "round(${1:expr})", "Round to nearest integer"),
+        FunctionSnippetItem("round(expr, N)", "round(${1:expr}, ${2:2})", "Round a decimal value to N places"),
+        FunctionSnippetItem("truncate(expr)", "truncate(${1:expr})", "Truncate toward zero"),
+        FunctionSnippetItem("min(a, b)", "min(${1:a}, ${2:b})", "Minimum of two or more values"),
+        FunctionSnippetItem("max(a, b)", "max(${1:a}, ${2:b})", "Maximum of two or more values"),
+        FunctionSnippetItem("pow(base, exp)", "pow(${1:base}, ${2:exp})", "Raise to integer power"),
+        FunctionSnippetItem("sqrt(expr)", "sqrt(${1:expr})", "Square root (requires non-negative)"),
+        FunctionSnippetItem("clamp(value, lo, hi)", "clamp(${1:value}, ${2:lo}, ${3:hi})", "Clamp value to range [lo, hi]"),
+        // String functions
+        FunctionSnippetItem("toLower(expr)", "toLower(${1:expr})", "Convert string to lowercase"),
+        FunctionSnippetItem("toUpper(expr)", "toUpper(${1:expr})", "Convert string to uppercase"),
+        FunctionSnippetItem("startsWith(str, prefix)", "startsWith(${1:str}, ${2:prefix})", "Check if string starts with prefix"),
+        FunctionSnippetItem("endsWith(str, suffix)", "endsWith(${1:str}, ${2:suffix})", "Check if string ends with suffix"),
+        FunctionSnippetItem("trim(expr)", "trim(${1:expr})", "Remove leading/trailing whitespace"),
+        FunctionSnippetItem("left(str, count)", "left(${1:str}, ${2:count})", "First N characters (clamping)"),
+        FunctionSnippetItem("right(str, count)", "right(${1:str}, ${2:count})", "Last N characters"),
+        FunctionSnippetItem("mid(str, start, count)", "mid(${1:str}, ${2:start}, ${3:count})", "Substring from position (1-indexed)")
     ];
 
     internal static readonly IReadOnlyList<CompletionItem> LiteralItems =
@@ -1376,6 +1396,16 @@ internal sealed class PreceptAnalyzer
         {
             Label = label,
             Kind = CompletionItemKind.Snippet,
+            InsertText = snippet,
+            InsertTextFormat = InsertTextFormat.Snippet,
+            Detail = detail
+        };
+
+    private static CompletionItem FunctionSnippetItem(string label, string snippet, string detail)
+        => new()
+        {
+            Label = label,
+            Kind = CompletionItemKind.Function,
             InsertText = snippet,
             InsertTextFormat = InsertTextFormat.Snippet,
             Detail = detail

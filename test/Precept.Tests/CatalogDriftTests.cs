@@ -94,8 +94,8 @@ public class CatalogDriftTests
             "transition-row" =>
                 $"{header}\n{string.Join("\n", states)}\nevent Submit\n{construct.Example}",
 
-            "round-function" =>
-                // round() needs a decimal field and an event to be valid in a transition context
+            "function-call" =>
+                // function call needs a decimal field and an event to be valid in a transition context
                 $"{header}\nfield Rate as decimal default 0.0\n{string.Join("\n", states)}\nevent Apply with Amount as number\n{construct.Example}",
 
             _ =>
@@ -601,6 +601,57 @@ public class CatalogDriftTests
         // C70: duplicate modifier on field/arg declaration
         ["C70"] = new(H + "field X as number default 0 default 1\n" + S2 +
             "event Go\nfrom A on Go -> no transition\n", "Duplicate modifier"),
+
+        // C71: unknown function name — parser rejects unknown names at parse time,
+        // so we construct a model with an unknown function call directly.
+        ["C71"] = new("_unused_", "Unknown function", DirectAction: () =>
+        {
+            var model = new PreceptDefinition(
+                "Test",
+                [new PreceptState("A", SourceLine: 2), new PreceptState("B", SourceLine: 3)],
+                new PreceptState("A", SourceLine: 2),
+                [new PreceptEvent("Go", [])],
+                [new PreceptField("X", PreceptScalarType.Number, false, true, 0L)],
+                [],
+                TransitionRows: [new PreceptTransitionRow(
+                    "A", "Go",
+                    new NoTransition(),
+                    [],
+                    WhenText: "unknownfn(X) > 0",
+                    WhenGuard: new PreceptBinaryExpression(
+                        ">",
+                        new PreceptFunctionCallExpression("unknownfn", [new PreceptIdentifierExpression("X")]),
+                        new PreceptLiteralExpression(0L)),
+                    SourceLine: 5)]);
+            var result = PreceptCompiler.Validate(model);
+            var diag = result.Diagnostics.FirstOrDefault(d => d.Constraint.Id == "C71");
+            if (diag is null) throw new InvalidOperationException("C71 not triggered");
+            throw new InvalidOperationException($"{diag.DiagnosticCode}: {diag.Message}");
+        }),
+
+        // C72: wrong number of arguments (parser requires ≥1 arg, so use 2-arg abs)
+        ["C72"] = new(H + "field X as number default 0\n" + S2 +
+            "event Go\nfrom A on Go when abs(X, X) > 0 -> no transition\n", "no matching overload"),
+
+        // C73: argument type mismatch
+        ["C73"] = new(H + "field Name as string default \"test\"\n" + S2 +
+            "event Go\nfrom A on Go when abs(Name) > 0 -> no transition\n", "no matching overload"),
+
+        // C74: round precision must be non-negative integer literal
+        ["C74"] = new(H + "field X as number default 0\n" + S2 +
+            "event Go\nfrom A on Go when round(X, X) > 0 -> no transition\n", "precision"),
+
+        // C75: pow exponent must be integer type
+        ["C75"] = new(H + "field X as number default 0\n" + S2 +
+            "event Go\nfrom A on Go when pow(X, X) > 0 -> no transition\n", "exponent"),
+
+        // C76: sqrt requires non-negative proof
+        ["C76"] = new(H + "field X as number default 0\n" + S2 +
+            "event Go\nfrom A on Go when sqrt(X) > 0 -> no transition\n", "non-negative"),
+
+        // C77: function does not accept nullable arguments
+        ["C77"] = new(H + "field X as number nullable default null\n" + S2 +
+            "event Go\nfrom A on Go when abs(X) > 0 -> no transition\n", "nullable"),
 
         // ── Runtime-phase (C33–C37) ───────────────────────────────────
 
@@ -1177,6 +1228,7 @@ public class CatalogDriftTests
         "C53",  // empty precept (no events) — legitimately points at precept header
         "C61",  // maxplaces on non-decimal — DirectAction
         "C62",  // choice with no values — DirectAction
+        "C71",  // unknown function name — DirectAction (parser rejects unknown names)
     };
 
     /// <summary>
@@ -1351,6 +1403,24 @@ public class CatalogDriftTests
 
         // C70: duplicate modifier — field on line 2
         ["C70"] = ("precept Test\nfield X as number default 0 default 1\nstate A initial\n", "parse", 2),
+
+        // C72: wrong arity — row on line 6
+        ["C72"] = ("precept Test\nfield X as number default 0\nstate A initial\nstate B\nevent Go\nfrom A on Go when abs(X, X) > 0 -> no transition\n", "compile", 6),
+
+        // C73: type mismatch — row on line 6
+        ["C73"] = ("precept Test\nfield Name as string default \"test\"\nstate A initial\nstate B\nevent Go\nfrom A on Go when abs(Name) > 0 -> no transition\n", "compile", 6),
+
+        // C74: round precision — row on line 6
+        ["C74"] = ("precept Test\nfield X as number default 0\nstate A initial\nstate B\nevent Go\nfrom A on Go when round(X, X) > 0 -> no transition\n", "compile", 6),
+
+        // C75: pow exponent — row on line 6
+        ["C75"] = ("precept Test\nfield X as number default 0\nstate A initial\nstate B\nevent Go\nfrom A on Go when pow(X, X) > 0 -> no transition\n", "compile", 6),
+
+        // C76: sqrt non-negative — row on line 6
+        ["C76"] = ("precept Test\nfield X as number default 0\nstate A initial\nstate B\nevent Go\nfrom A on Go when sqrt(X) > 0 -> no transition\n", "compile", 6),
+
+        // C77: nullable arg — row on line 6
+        ["C77"] = ("precept Test\nfield X as number nullable default null\nstate A initial\nstate B\nevent Go\nfrom A on Go when abs(X) > 0 -> no transition\n", "compile", 6),
     };
 
     [Theory]

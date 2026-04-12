@@ -555,4 +555,50 @@ public static class DiagnosticCatalog
         "C70", "parse",
         "Duplicate modifier on field or event argument declaration.",
         "Duplicate modifier '{modifier}' on '{name}'. Each modifier may appear at most once per declaration.");
+
+    // ═══════════════════════════════════════════════════════════════
+    // Function diagnostics (C71–C77)
+    // ═══════════════════════════════════════════════════════════════
+
+    /// <summary>Unknown function name in expression.</summary>
+    public static readonly LanguageConstraint C71 = Register(
+        "C71", "compile",
+        "Unknown function name in expression.",
+        "Unknown function '{name}'.");
+
+    /// <summary>Function called with incorrect number of arguments.</summary>
+    public static readonly LanguageConstraint C72 = Register(
+        "C72", "compile",
+        "Function called with incorrect number of arguments.",
+        "{name}() called with {count} argument(s), but no matching overload found.");
+
+    /// <summary>Function argument type mismatch.</summary>
+    public static readonly LanguageConstraint C73 = Register(
+        "C73", "compile",
+        "Function argument type mismatch.",
+        "{name}() no matching overload: {param} argument expects {expected} but got {actual}.");
+
+    /// <summary>round() precision argument must be a non-negative integer literal.</summary>
+    public static readonly LanguageConstraint C74 = Register(
+        "C74", "compile",
+        "round() precision argument must be a non-negative integer literal.",
+        "round() precision argument must be a non-negative integer literal.");
+
+    /// <summary>pow() exponent must be integer type.</summary>
+    public static readonly LanguageConstraint C75 = Register(
+        "C75", "compile",
+        "pow() exponent must be integer type.",
+        "pow() exponent must be integer type, but got {actual}.");
+
+    /// <summary>sqrt() requires a non-negative argument proof.</summary>
+    public static readonly LanguageConstraint C76 = Register(
+        "C76", "compile",
+        "sqrt() requires a non-negative argument. Add a 'nonnegative' constraint or guard with '>= 0'.",
+        "sqrt() requires a non-negative argument. '{arg}' may be negative. Add a 'nonnegative' constraint or guard with '{arg} >= 0 and ...'.");
+
+    /// <summary>Function does not accept nullable arguments.</summary>
+    public static readonly LanguageConstraint C77 = Register(
+        "C77", "compile",
+        "Function does not accept nullable arguments.",
+        "Function '{name}' does not accept nullable arguments. '{arg}' may be null. Add a null check.");
 }

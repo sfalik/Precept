@@ -84,6 +84,15 @@ public class LanguageToolTests
     }
 
     [Fact]
+    public void ConstraintsIncludeBuiltInFunctionTypeCheckingRange()
+    {
+        var result = LanguageTool.Run();
+
+        result.Constraints.Select(constraint => constraint.Id)
+            .Should().Contain(["C71", "C72", "C73", "C74", "C75", "C76", "C77"]);
+    }
+
+    [Fact]
     public void ExpressionScopesHasFiveEntries()
     {
         var result = LanguageTool.Run();
@@ -145,8 +154,8 @@ public class LanguageToolTests
     {
         var result = LanguageTool.Run();
 
-        result.Constructs.Should().Contain(c => c.Form.StartsWith("round"),
-            "round() built-in must be registered in the construct catalog");
+        result.Constructs.Should().Contain(c => c.Description.Contains("built-in function"),
+            "function-call construct must be registered in the construct catalog");
     }
 
     [Fact]

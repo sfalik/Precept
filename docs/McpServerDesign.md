@@ -121,11 +121,31 @@ The `vocabulary` object contains the following keyword lists, each reflecting `P
 | `maxplaces N` | `decimal` | Caps decimal places to N (e.g. `maxplaces 2` ensures at most 2 decimal digits) |
 | `ordered` | `choice` | Enables ordinal comparison operators on choice fields; values compare in declaration order |
 
-**Built-in function reference** — built-in functions are not keywords but appear in the `constructs` catalog:
+**Built-in function reference** — built-in functions are exposed in the `functions` section of the `precept_language` output, with full signature, parameter, and description metadata:
 
-| Function | Description |
-|---|---|
-| `round(expr, N)` | Rounds a decimal expression to N decimal places (banker's rounding / MidpointRounding.ToEven). Valid in `set` RHS and invariant/assert expressions. |
+| Function | Category | Signatures | Description |
+|---|---|---|---|
+| `abs(value)` | numeric | `int→int`, `dec→dec`, `num→num` | Absolute value (type-preserving) |
+| `floor(value)` | numeric | `dec→int`, `num→int` | Round toward negative infinity |
+| `ceil(value)` | numeric | `dec→int`, `num→int` | Round toward positive infinity |
+| `round(value)` | numeric | `int→int`, `dec→int`, `num→num` | Banker's rounding to nearest integer |
+| `round(value, places)` | numeric | `(num, int-literal)→dec` | Precision rounding |
+| `truncate(value)` | numeric | `dec→int`, `num→int` | Truncate toward zero |
+| `min(a, b, ...)` | numeric | `int*→int`, `dec*→dec`, `num*→num` | Smallest of 2+ values (variadic) |
+| `max(a, b, ...)` | numeric | `int*→int`, `dec*→dec`, `num*→num` | Largest of 2+ values (variadic) |
+| `clamp(value, min, max)` | numeric | `(int×3)→int`, `(dec×3)→dec`, `(num×3)→num` | Constrain to range |
+| `pow(base, exp)` | numeric | `(int, int)→int`, `(dec, int)→dec`, `(num, int)→num` | Integer exponent power |
+| `sqrt(value)` | numeric | `dec→dec`, `num→num` | Square root (requires non-negative proof) |
+| `toLower(value)` | string | `str→str` | Lowercase (invariant culture) |
+| `toUpper(value)` | string | `str→str` | Uppercase (invariant culture) |
+| `trim(value)` | string | `str→str` | Remove leading/trailing whitespace |
+| `startsWith(value, prefix)` | string | `(str, str)→bool` | Case-sensitive prefix test |
+| `endsWith(value, suffix)` | string | `(str, str)→bool` | Case-sensitive suffix test |
+| `left(value, count)` | string | `(str, num)→str` | Leftmost N chars (clamping) |
+| `right(value, count)` | string | `(str, num)→str` | Rightmost N chars (clamping) |
+| `mid(value, start, length)` | string | `(str, num, num)→str` | Substring, 1-indexed (clamping) |
+
+The `functions` section in the JSON output provides structured `FunctionDto` objects with `name`, `description`, and `signatures` (each containing `parameters` with name/type/constraint, and `returnType`).
 
 **Implementation:** Serializes `ConstructCatalog.Constructs` + `DiagnosticCatalog.Diagnostics` + reflected `PreceptToken` vocabulary. No MCP-specific data — everything comes from core infrastructure.
 

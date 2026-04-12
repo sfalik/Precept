@@ -2,6 +2,7 @@ precept LoanApplication
 
 # This sample keeps underwriting rules in the workflow itself instead of spreading them across services.
 # The approval guard combines document verification, credit policy, and affordability checks.
+# Built-in functions (min, round, clamp) keep the logic readable without external helpers.
 
 field ApplicantName as string nullable
 field RequestedAmount as number default 0
@@ -53,7 +54,7 @@ from Draft on Submit -> set ApplicantName = Submit.Applicant -> set RequestedAmo
 
 from UnderReview on VerifyDocuments -> set DocumentsVerified = true -> no transition
 
-from UnderReview on Approve when DocumentsVerified and CreditScore >= 680 and AnnualIncome >= ExistingDebt * 2 and RequestedAmount < AnnualIncome / 2 and Approve.Amount <= RequestedAmount -> set ApprovedAmount = Approve.Amount -> set DecisionNote = Approve.Note -> transition Approved
+from UnderReview on Approve when DocumentsVerified and CreditScore >= 680 and AnnualIncome >= ExistingDebt * 2 and RequestedAmount < AnnualIncome / 2 and Approve.Amount <= RequestedAmount -> set ApprovedAmount = min(Approve.Amount, RequestedAmount) -> set DecisionNote = Approve.Note -> transition Approved
 from UnderReview on Approve -> reject "Approval requires verified documents, strong credit, and affordable debt load"
 
 from UnderReview on Decline -> set DecisionNote = Decline.Note -> transition Declined

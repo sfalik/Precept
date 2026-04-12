@@ -1029,9 +1029,31 @@ Dotted member accessors:
 
 Built-in functions:
 
-| Function | Valid in | Description |
-|---|---|---|
-| `round(expr, N)` | `set` RHS, `invariant`, `in`/`to`/`from` assert, `when` guard | Rounds a `decimal` expression to N decimal places using banker's rounding (MidpointRounding.ToEven). `expr` must resolve to `decimal`; `N` must be a non-negative integer literal. |
+| Function | Signatures | Returns | Description |
+|---|---|---|---|
+| `abs(value)` | `integer → integer`, `decimal → decimal`, `number → number` | Same as input | Absolute value. Type-preserving. |
+| `floor(value)` | `decimal → integer`, `number → integer` | `integer` | Rounds toward negative infinity. |
+| `ceil(value)` | `decimal → integer`, `number → integer` | `integer` | Rounds toward positive infinity. |
+| `round(value)` | `integer → integer`, `decimal → integer`, `number → number` | See signatures | 1-arg: banker's rounding (MidpointRounding.ToEven) to nearest integer. |
+| `round(value, places)` | `(numeric, integer-literal) → decimal` | `decimal` | 2-arg: precision rounding. `places` must be a non-negative integer literal (C74). |
+| `truncate(value)` | `decimal → integer`, `number → integer` | `integer` | Truncates toward zero (not toward negative infinity like `floor`). |
+| `min(a, b, ...)` | `integer* → integer`, `decimal* → decimal`, `number* → number` | Same as input | Smallest of 2+ values. Variadic. All args must match the same numeric type. |
+| `max(a, b, ...)` | `integer* → integer`, `decimal* → decimal`, `number* → number` | Same as input | Largest of 2+ values. Variadic. All args must match the same numeric type. |
+| `clamp(value, min, max)` | `(integer, integer, integer) → integer`, `(decimal×3) → decimal`, `(number×3) → number` | Same as input | Constrains value to [min, max]. Type-preserving. |
+| `pow(base, exponent)` | `(integer, integer) → integer`, `(decimal, integer) → decimal`, `(number, integer) → number` | Same as base | Integer exponent only (C75). Type-preserving. `pow(0, 0) = 1` (IEEE 754). |
+| `sqrt(value)` | `decimal → decimal`, `number → number` | Same as input | Square root. Requires compile-time non-negative proof: field must have `nonnegative`, `positive`, or `min >= 0` constraint, or argument must be guarded with `>= 0` (C76). |
+| `toLower(value)` | `string → string` | `string` | Lowercase using invariant culture. |
+| `toUpper(value)` | `string → string` | `string` | Uppercase using invariant culture. |
+| `trim(value)` | `string → string` | `string` | Removes leading and trailing whitespace. |
+| `startsWith(value, prefix)` | `(string, string) → boolean` | `boolean` | Case-sensitive prefix test. |
+| `endsWith(value, suffix)` | `(string, string) → boolean` | `boolean` | Case-sensitive suffix test. |
+| `left(value, count)` | `(string, numeric) → string` | `string` | Leftmost N characters. Clamping: negative count → empty, count > length → full string. |
+| `right(value, count)` | `(string, numeric) → string` | `string` | Rightmost N characters. Clamping semantics. |
+| `mid(value, start, length)` | `(string, numeric, numeric) → string` | `string` | Substring. 1-indexed start. Clamping: start > length → empty, length beyond end → to end. |
+
+All functions are valid in `set` RHS, `invariant`, `in`/`to`/`from` assert, and `when` guard expression positions. Functions that return `boolean` (`startsWith`, `endsWith`) are additionally valid as standalone guard conditions.
+
+Function arguments must be non-nullable — passing a nullable field without a null guard emits C77. `min` and `max` share tokens with constraint keywords; the parser disambiguates by position (function call requires `(` after the name).
 
 Exact operator precedence and literal forms should align with the runtime expression parser.
 
