@@ -19,8 +19,9 @@ public static class LanguageTool
         var constraints = DiagnosticCatalog.Constraints
             .Select(c => new ConstraintDto(c.Id, c.Phase, c.Rule))
             .ToList();
+        var functions = BuildFunctionCatalog();
 
-        return new LanguageResult(vocabulary, constructs, constraints, ExpressionScopes, FirePipeline, OutcomeKinds);
+        return new LanguageResult(vocabulary, constructs, constraints, ExpressionScopes, functions, FirePipeline, OutcomeKinds);
     }
 
     private static VocabularyDto BuildVocabulary()
@@ -91,6 +92,47 @@ public static class LanguageTool
                     operators);
     }
 
+    private static IReadOnlyList<FunctionDto> BuildFunctionCatalog()
+    {
+        return FunctionRegistry.AllFunctions
+            .OrderBy(f => f.Name, StringComparer.Ordinal)
+            .Select(f => new FunctionDto(
+                f.Name,
+                f.Description,
+                f.Overloads.Select(o => new FunctionSignatureDto(
+                    o.Parameters.Select(p => new FunctionParamDto(
+                        p.Name,
+                        FormatValueKind(p.AcceptedTypes),
+                        FormatArgConstraint(p.Constraint)
+                    )).ToList(),
+                    FormatValueKind(o.ReturnType),
+                    o.MinArity.HasValue
+                )).ToList()
+            ))
+            .ToList();
+    }
+
+    private static string FormatValueKind(StaticValueKind kind)
+    {
+        var allNumeric = StaticValueKind.Number | StaticValueKind.Integer | StaticValueKind.Decimal;
+        if ((kind & allNumeric) == allNumeric)
+            return "number";
+
+        var parts = new List<string>();
+        if (kind.HasFlag(StaticValueKind.Number)) parts.Add("number");
+        if (kind.HasFlag(StaticValueKind.Integer)) parts.Add("integer");
+        if (kind.HasFlag(StaticValueKind.Decimal)) parts.Add("decimal");
+        if (kind.HasFlag(StaticValueKind.String)) parts.Add("string");
+        if (kind.HasFlag(StaticValueKind.Boolean)) parts.Add("boolean");
+        return parts.Count > 0 ? string.Join(" | ", parts) : "unknown";
+    }
+
+    private static string? FormatArgConstraint(FunctionArgConstraint constraint) => constraint switch
+    {
+        FunctionArgConstraint.MustBeIntegerLiteral => "must be integer literal",
+        _ => null
+    };
+
     private static (int Precedence, string Arity) GetOperatorInfo(PreceptToken token) => token switch
     {
         PreceptToken.Or => (1, "binary"),
@@ -147,6 +189,7 @@ public sealed record LanguageResult(
     IReadOnlyList<ConstructDto> Constructs,
     IReadOnlyList<ConstraintDto> Constraints,
     IReadOnlyList<ExpressionScopeDto> ExpressionScopes,
+    IReadOnlyList<FunctionDto> Functions,
     IReadOnlyList<FirePipelineStageDto> FirePipeline,
     IReadOnlyList<OutcomeKindDto> OutcomeKinds);
 
@@ -165,5 +208,8 @@ public sealed record OperatorDto(string Symbol, int Precedence, string Arity, st
 public sealed record ConstructDto(string Form, string Context, string Description, string Example);
 public sealed record ConstraintDto(string Id, string Phase, string Rule);
 public sealed record ExpressionScopeDto(string Position, string Allowed);
+public sealed record FunctionDto(string Name, string Description, IReadOnlyList<FunctionSignatureDto> Signatures);
+public sealed record FunctionSignatureDto(IReadOnlyList<FunctionParamDto> Parameters, string ReturnType, bool IsVariadic);
+public sealed record FunctionParamDto(string Name, string Type, string? Constraint);
 public sealed record FirePipelineStageDto(int Stage, string Name, string Description);
 public sealed record OutcomeKindDto(string Kind, string Description, bool Mutated);

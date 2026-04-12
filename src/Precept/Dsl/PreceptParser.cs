@@ -329,10 +329,10 @@ public static class PreceptParser
              new[] { firstArg }.Concat(restArgs).ToArray()))
         .Try()
         .Register(new ConstructInfo(
-            "round-function",
-            "round (<Expr>, <N>)",
+            "function-call",
+            "round (<Expr>, ...)",
             "expression",
-            "Calls a built-in function. Available: round(value, places) — rounds a decimal value to N decimal places (banker's rounding). Valid in set RHS and invariant/assert expressions.",
+            "Calls a built-in function. 18 functions available: abs, ceil, clamp, endsWith, floor, left, max, mid, min, pow, right, round, sqrt, startsWith, toLower, toUpper, trim, truncate. Valid in set RHS and invariant/assert expressions.",
             "from Idle on Apply -> set Rate = round(Apply.Amount, 2) -> no transition"));
 
     private static readonly TokenListParser<PreceptToken, PreceptExpression> Atom =
