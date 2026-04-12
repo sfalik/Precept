@@ -130,6 +130,7 @@ public static class LanguageTool
     private static string? FormatArgConstraint(FunctionArgConstraint constraint) => constraint switch
     {
         FunctionArgConstraint.MustBeIntegerLiteral => "must be integer literal",
+        FunctionArgConstraint.RequiresNonNegativeProof => "requires non-negative proof",
         _ => null
     };
 

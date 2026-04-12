@@ -424,6 +424,71 @@ public class PreceptBuiltInFunctionTests
         validation.Diagnostics.Should().Contain(d => d.Constraint.Id == "C77");
     }
 
+    [Fact]
+    public void TypeChecker_C72_MinSingleArg()
+    {
+        var dsl = "precept Test\nfield X as number default 0\nstate A initial\nstate B\nevent Go\nfrom A on Go when min(X) > 0 -> no transition\n";
+        var model = PreceptParser.Parse(dsl);
+        var validation = PreceptCompiler.Validate(model);
+        validation.Diagnostics.Should().Contain(d => d.Constraint.Id == "C72");
+    }
+
+    [Fact]
+    public void TypeChecker_C72_MaxSingleArg()
+    {
+        var dsl = "precept Test\nfield X as number default 0\nstate A initial\nstate B\nevent Go\nfrom A on Go when max(X) > 0 -> no transition\n";
+        var model = PreceptParser.Parse(dsl);
+        var validation = PreceptCompiler.Validate(model);
+        validation.Diagnostics.Should().Contain(d => d.Constraint.Id == "C72");
+    }
+
+    [Fact]
+    public void TypeChecker_C76_SqrtWithAbsProof_NoDiagnostic()
+    {
+        var dsl = "precept Test\nfield X as number default 0\nstate A initial\nstate B\nevent Go\nfrom A on Go when sqrt(abs(X)) > 0 -> no transition\n";
+        var model = PreceptParser.Parse(dsl);
+        var validation = PreceptCompiler.Validate(model);
+        validation.Diagnostics.Where(d => d.Constraint.Id == "C76").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void TypeChecker_C76_SqrtWithNonNegativeLiteral_NoDiagnostic()
+    {
+        var dsl = "precept Test\nstate A initial\nstate B\nevent Go\nfrom A on Go when sqrt(4.0) > 0 -> no transition\n";
+        var model = PreceptParser.Parse(dsl);
+        var validation = PreceptCompiler.Validate(model);
+        validation.Diagnostics.Where(d => d.Constraint.Id == "C76").Should().BeEmpty();
+    }
+
+    // ─── Functions in invariant and assert contexts ─────────────────
+
+    [Fact]
+    public void Invariant_WithFunction_CompilesClean()
+    {
+        var dsl = "precept Test\nfield Balance as number nonnegative default 0\nstate Open initial\nstate Closed\nevent Go\nfrom Open on Go -> transition Closed\ninvariant sqrt(Balance) >= 0 because \"balance root must be non-negative\"\n";
+        var model = PreceptParser.Parse(dsl);
+        var validation = PreceptCompiler.Validate(model);
+        validation.Diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void StateAssert_WithFunction_CompilesClean()
+    {
+        var dsl = "precept Test\nfield Score as number default 10\nstate Active initial\nstate Done\nevent Go\nfrom Active on Go -> transition Done\nin Active assert floor(Score) >= 0 because \"floor score must be non-negative\"\n";
+        var model = PreceptParser.Parse(dsl);
+        var validation = PreceptCompiler.Validate(model);
+        validation.Diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void EventAssert_WithFunction_CompilesClean()
+    {
+        var dsl = "precept Test\nfield X as number default 0\nstate A initial\nstate B\nevent Submit with Amount as number default 1\non Submit assert abs(Amount) > 0 because \"amount must be non-zero\"\nfrom A on Submit -> transition B\n";
+        var model = PreceptParser.Parse(dsl);
+        var validation = PreceptCompiler.Validate(model);
+        validation.Diagnostics.Should().BeEmpty();
+    }
+
     // ─── Evaluation: toLower ────────────────────────────────────────
 
     [Fact]
