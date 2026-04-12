@@ -170,4 +170,27 @@ public class LanguageToolTests
         deserialized.Should().NotBeNull();
         deserialized!.Vocabulary.ControlKeywords.Should().HaveCount(result.Vocabulary.ControlKeywords.Count);
     }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Conditional expressions (issue #9)
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void ControlKeywordsIncludeConditionalExpressionTokens()
+    {
+        var result = LanguageTool.Run();
+
+        result.Vocabulary.ControlKeywords.Should().Contain("if");
+        result.Vocabulary.ControlKeywords.Should().Contain("then");
+        result.Vocabulary.ControlKeywords.Should().Contain("else");
+    }
+
+    [Fact]
+    public void ConstraintsIncludeConditionalExpressionRange()
+    {
+        var result = LanguageTool.Run();
+
+        result.Constraints.Select(c => c.Id)
+            .Should().Contain(["C78", "C79"]);
+    }
 }

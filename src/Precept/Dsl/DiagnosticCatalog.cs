@@ -601,4 +601,22 @@ public static class DiagnosticCatalog
         "C77", "compile",
         "Function does not accept nullable arguments.",
         "Function '{name}' does not accept nullable arguments. '{arg}' may be null. Add a null check.");
+
+    // ═══════════════════════════════════════════════════════════════
+    // Compile-phase constraints: conditional expressions (C78–C79)
+    // ═══════════════════════════════════════════════════════════════
+
+    /// <summary>Conditional expression condition must be a non-nullable boolean.</summary>
+    // SYNC:CONSTRAINT:C78
+    public static readonly LanguageConstraint C78 = Register(
+        "C78", "compile",
+        "Conditional expression condition must be a non-nullable boolean.",
+        "Conditional expression condition must be a non-nullable boolean, but got {actual}.");
+
+    /// <summary>Conditional expression branches must produce the same scalar type.</summary>
+    // SYNC:CONSTRAINT:C79
+    public static readonly LanguageConstraint C79 = Register(
+        "C79", "compile",
+        "Conditional expression branches must produce the same scalar type.",
+        "Conditional expression branches must produce the same scalar type, but got {thenType} and {elseType}.");
 }

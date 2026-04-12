@@ -1032,6 +1032,9 @@ internal sealed class PreceptAnalyzer
             if (!symbol.All(char.IsLetter)) continue;
             if (category is TokenCategory.Structure or TokenCategory.Value) continue;
 
+            // Exclude continuation-only keywords that are never valid standalone
+            if (symbol is "then" or "else") continue;
+
             items.Add(new CompletionItem
             {
                 Label = symbol,
@@ -1078,6 +1081,9 @@ internal sealed class PreceptAnalyzer
             if (category is null || symbol is null) continue;
             if (!symbol.All(char.IsLetter)) continue;
             if (!topLevelCategories.Contains(category.Value)) continue;
+
+            // Exclude expression-only control keywords from statement-start completions
+            if (symbol is "if" or "then" or "else") continue;
 
             items.Add(new CompletionItem
             {
@@ -1127,7 +1133,9 @@ internal sealed class PreceptAnalyzer
         FunctionSnippetItem("trim(expr)", "trim(${1:expr})", "Remove leading/trailing whitespace"),
         FunctionSnippetItem("left(str, count)", "left(${1:str}, ${2:count})", "First N characters (clamping)"),
         FunctionSnippetItem("right(str, count)", "right(${1:str}, ${2:count})", "Last N characters"),
-        FunctionSnippetItem("mid(str, start, count)", "mid(${1:str}, ${2:start}, ${3:count})", "Substring from position (1-indexed)")
+        FunctionSnippetItem("mid(str, start, count)", "mid(${1:str}, ${2:start}, ${3:count})", "Substring from position (1-indexed)"),
+        // Conditional expression
+        SnippetItem("if ... then ... else", "if ${1:condition} then ${2:value} else ${3:value}", "Conditional expression")
     ];
 
     internal static readonly IReadOnlyList<CompletionItem> LiteralItems =

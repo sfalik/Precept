@@ -481,4 +481,64 @@ public class CompileToolTests
         unguarded.Should().NotBeNull();
         unguarded!.When.Should().BeNull("an unguarded invariant should have When = null");
     }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Conditional expressions (issue #9)
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Compile_ConditionalExpressionInSetRhs_CompilesCleanly()
+    {
+        var text = """
+            precept Test
+            field Urgent as boolean default false
+            field Priority as number default 1
+            state Open initial
+            state Done
+            event Finish
+            from Open on Finish -> set Priority = if Urgent then 10 else 1 -> transition Done
+            """;
+
+        var result = CompileTool.Run(text);
+
+        result.Valid.Should().BeTrue();
+        result.Diagnostics.Should().BeEmpty();
+        result.Transitions.Should().NotBeEmpty();
+    }
+
+    [Fact]
+    public void Compile_ConditionalNonBooleanCondition_C78Diagnostic()
+    {
+        var text = """
+            precept Test
+            field Label as string default "x"
+            field Priority as number default 1
+            state A initial
+            event Go
+            from A on Go -> set Priority = if Label then 10 else 1 -> no transition
+            """;
+
+        var result = CompileTool.Run(text);
+
+        result.Valid.Should().BeFalse();
+        result.Diagnostics.Should().Contain(d => d.Code == "PRECEPT078");
+    }
+
+    [Fact]
+    public void Compile_ConditionalBranchTypeMismatch_C79Diagnostic()
+    {
+        var text = """
+            precept Test
+            field Flag as boolean default true
+            field Value as number default 0
+            state A initial
+            event Go
+            from A on Go -> set Value = if Flag then 10 else "nope" -> no transition
+            """;
+
+        var result = CompileTool.Run(text);
+
+        result.Valid.Should().BeFalse();
+        result.Diagnostics.Should().Contain(d => d.Code == "PRECEPT079");
+    }
 }
