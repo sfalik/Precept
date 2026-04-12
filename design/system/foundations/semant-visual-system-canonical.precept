@@ -1,0 +1,55 @@
+precept VisitorBadgePickup
+
+field VisitorName as string nullable
+field HostConfirmed as boolean default false
+field BadgePrinted as boolean default false
+field PickupWindowOpen as boolean default true
+field OutcomeNote as string nullable
+
+state Requested initial
+state Approved
+state ReadyForPickup
+state PickedUp
+state Expired
+state Cancelled
+
+in Approved assert VisitorName != null 
+    because "Approved pickups must record the visitor"
+in Approved assert HostConfirmed 
+    because "Approved pickups require host confirmation"
+in ReadyForPickup assert VisitorName != null 
+    because "Ready badges must still identify the visitor"
+in ReadyForPickup assert HostConfirmed 
+    because "Ready badges require host confirmation"
+in ReadyForPickup assert BadgePrinted 
+    because "Ready badges must already be printed"
+in Expired assert PickupWindowOpen == false 
+    because "Expired pickups require the pickup window to be closed"
+in Expired assert OutcomeNote != null 
+    because "Expired pickups must record why the badge was not collected"
+
+event ApproveRequest with Name as string
+on ApproveRequest assert Name != "" because "A visitor name is required"
+
+event PrintBadge
+event PickUp
+event Expire
+event Cancel with Reason as string
+on Cancel assert Reason != "" because "A cancellation reason is required"
+
+from Requested on ApproveRequest 
+    -> set VisitorName = ApproveRequest.Name 
+    -> set HostConfirmed = true 
+    -> transition Approved
+from Approved on PrintBadge 
+    -> set BadgePrinted = true 
+    -> transition ReadyForPickup
+from Approved on Cancel 
+    -> set OutcomeNote = Cancel.Reason 
+    -> transition Cancelled
+from ReadyForPickup on PickUp when PickupWindowOpen 
+    -> set OutcomeNote = "Badge collected" 
+    -> transition PickedUp
+from ReadyForPickup on Expire when PickupWindowOpen == false 
+    -> set OutcomeNote = "Pickup window closed before collection" 
+    -> transition Expired
