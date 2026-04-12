@@ -199,6 +199,19 @@ Both skills use `precept_language` for syntax authority, handle Mermaid diagrams
 - **Catalog-driven:** `LanguageTool` uses `ConstructCatalog` + `DiagnosticCatalog` + `PreceptToken` metadata — all single source of truth
 - **DTOs stay in sync:** `ViolationDtoMapper` handles all 4 source types × 5 target types automatically via switch statements
 
+## Recent Updates
+
+### 2026-04-12 — Design Review: Issue #17 Computed/Derived Fields — MCP Contract Assessment
+
+**Verdict: minor update (additive only, no breaking changes).**
+
+- **`FieldDto` expansion:** 3 new optional trailing parameters: `IsComputed` (bool?), `Expression` (string?), `Dependencies` (IReadOnlyList<string>?). Follows the `IsOrdered` nullable-bool pattern — omitted from JSON for regular fields.
+- **`LanguageTool.cs`:** One new `ExpressionScopeDto` entry for "computed field expression" scope (fields + .count only, no event args). Construct catalog auto-registers from parser combinator — no manual LanguageTool edits beyond the scope entry.
+- **Inspect/Fire: zero MCP changes.** Computed values flow through `instance.InstanceData` → `ToDictionary()` automatically. Dependency-aware violation targets use existing `FieldTarget` kind.
+- **UpdateTool: existing robustness gap identified.** `engine.Update()` is not wrapped in try-catch (unlike CreateInstance). If core rejects via exception rather than outcome, this surfaces as unhandled error. Recommended defensive catch regardless of #17.
+- **AI legibility: 3 convergent signals** — `isComputed` flag, `expression` text, and absence from `editableFields` in inspect output. Recommended: add rejection note to `precept_update` tool description.
+- **Thin wrapper holds:** All new logic (recomputation, dependency ordering, rejection) lives in core engine. MCP layer reads new model properties it already projects.
+
 ### Issue #16 — MCP function catalog (2026-04-12)
 
 - **`LanguageTool.cs`:** Added `Functions` section to `LanguageResult`. New DTOs: `FunctionDto(Name, Description, Signatures)`, `FunctionSignatureDto(Parameters, ReturnType, IsVariadic)`, `FunctionParamDto(Name, Type, Constraint?)`. Built dynamically from `FunctionRegistry.AllFunctions` — zero hardcoded function metadata in MCP layer.

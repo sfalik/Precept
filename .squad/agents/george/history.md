@@ -7,6 +7,19 @@
 
 ## Recent Updates
 
+### 2026-04-12 — Issue #17 Computed Fields: Runtime Feasibility Assessment
+- **Verdict: Feasible.** No fundamental blockers, no architectural mismatches.
+- **Parser (Small):** `derivedOpt` combinator after TypeRef in FieldDecl. Arrow disambiguation is trivial — `field` keyword vs. `from` keyword disambiguates before either combinator reaches `->`. ~25 lines.
+- **Type Checker (Medium-High):** 6 concerns — mutual exclusions (nullable/default + derived), nullable-ref rejection, collection accessor safety (.count only), event-arg scope rejection, dependency graph + topological sort, cycle detection (C85). ~150 lines total. All additive, no existing logic modified.
+- **Expression Evaluator (None):** Existing `Evaluate(expr, context)` handles computed expressions with zero changes. Scope restriction is enforced by type checker + context dictionary, not the evaluator.
+- **Runtime Engine (Medium):** New `RecomputeDerivedFields` helper (~25 lines) + 5 one-line insertion points (Fire no-transition, Fire transition, Update, Inspect event, Inspect patch) + `BuildInitialInstanceData` for initial computed values. Insertion point: after `CommitCollections`, before constraint evaluation in every pipeline.
+- **External Input Rejection (Small):** 3 API boundaries — CreateInstance, Update, MCP. Engine-level rejection propagates to all consumers.
+- **Model:** `PreceptField` gains `DerivedExpression?` and `DerivedExpressionText?` optional tail params. Non-breaking for all existing code.
+- **New Diagnostics:** 8 codes (C80–C87) covering mutual exclusions, nullable/event-arg/unsafe-accessor rejection, cycle detection, edit/set restrictions.
+- **Risk flags:** Multi-name field declarations for computed fields (recommend reject), `BuildDefaultData` needs computed field initial values (semantic edge needing test coverage).
+- **Total estimate:** ~300-350 lines production code, 6-7 vertical slices.
+- Assessment filed to `temp/george-proposal-review-17.json`.
+
 ### 2026-04-12 — Event hooks runtime implementation impact analysis
 - Analyzed parser, model, type checker, and engine impact for `on <Event> -> <ActionChain>` (Issue A: stateless event hooks).
 - **Parser:** Small. Syntactically unambiguous — `Arrow` after `On + Identifier` distinguishes `EventActionDecl` from `EventAssertDecl`. Reuses existing `ActionChain` unchanged. New `EventActionResult` private record.

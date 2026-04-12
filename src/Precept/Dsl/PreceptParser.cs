@@ -573,6 +573,7 @@ public static class PreceptParser
     private sealed record DefaultModifier(object? Value) : FieldModifier;
     private sealed record ConstraintModifier(FieldConstraint Constraint) : FieldModifier;
     private sealed record OrderedModifier : FieldModifier;
+    private sealed record DerivedModifier(PreceptExpression Expression) : FieldModifier;
 
     /// <summary>
     /// Parses a single field modifier (nullable, default, constraint, or ordered) for field declarations.
@@ -583,6 +584,9 @@ public static class PreceptParser
         .Or(Token.EqualTo(PreceptToken.Default)
             .IgnoreThen(DefaultValue)
             .Select(v => (FieldModifier)new DefaultModifier(v)).Try())
+        .Or(Token.EqualTo(PreceptToken.Arrow)
+            .IgnoreThen(BoolExpr)
+            .Select(expr => (FieldModifier)new DerivedModifier(expr)).Try())
         .Or(ConstraintSuffix.Select(c => (FieldModifier)new ConstraintModifier(c)).Try())
         .Or(Token.EqualTo(PreceptToken.Ordered).Value((FieldModifier)new OrderedModifier()));
 
@@ -602,7 +606,7 @@ public static class PreceptParser
     /// Extracts typed modifier properties from a flat array of <see cref="FieldModifier"/> values.
     /// Detects duplicate modifiers and throws <see cref="ConstraintViolationException"/> (C70).
     /// </summary>
-    private static (bool IsNullable, bool HasDefault, object? DefaultValue, FieldConstraint[] Constraints, bool IsOrdered)
+    private static (bool IsNullable, bool HasDefault, object? DefaultValue, FieldConstraint[] Constraints, bool IsOrdered, PreceptExpression? DerivedExpr)
         ExtractModifiers(FieldModifier[] modifiers, string firstName, int sourceLine)
     {
         // SYNC:CONSTRAINT:C70
@@ -612,12 +616,15 @@ public static class PreceptParser
             throw DiagnosticCatalog.C70.ToException(sourceLine, ("modifier", "default"), ("name", firstName));
         if (modifiers.OfType<OrderedModifier>().Count() > 1)
             throw DiagnosticCatalog.C70.ToException(sourceLine, ("modifier", "ordered"), ("name", firstName));
+        if (modifiers.OfType<DerivedModifier>().Count() > 1)
+            throw DiagnosticCatalog.C70.ToException(sourceLine, ("modifier", "->"), ("name", firstName));
 
         var isNullable = modifiers.OfType<NullableModifier>().Any();
         var dflt = modifiers.OfType<DefaultModifier>().FirstOrDefault();
         var constraints = modifiers.OfType<ConstraintModifier>().Select(m => m.Constraint).ToArray();
         var isOrdered = modifiers.OfType<OrderedModifier>().Any();
-        return (isNullable, dflt is not null, dflt?.Value, constraints, isOrdered);
+        var derived = modifiers.OfType<DerivedModifier>().FirstOrDefault();
+        return (isNullable, dflt is not null, dflt?.Value, constraints, isOrdered, derived?.Expression);
     }
 
     /// <summary>
@@ -631,7 +638,20 @@ public static class PreceptParser
         FieldModifier[] modifiers)
     {
         int sourceLine = kw.Span.Position.Line;
-        var (nullable, hasDefault, defaultValue, constraints, ordered) = ExtractModifiers(modifiers, names[0].ToText(), sourceLine);
+        var (nullable, hasDefault, defaultValue, constraints, ordered, derivedExpr) = ExtractModifiers(modifiers, names[0].ToText(), sourceLine);
+
+        if (derivedExpr is not null)
+        {
+            // SYNC:CONSTRAINT:C82 — multi-name + derived
+            if (names.Length > 1)
+                throw DiagnosticCatalog.C82.ToException(sourceLine);
+            // SYNC:CONSTRAINT:C80 — default + derived mutual exclusion
+            if (hasDefault)
+                throw DiagnosticCatalog.C80.ToException(sourceLine, ("fieldName", names[0].ToText()));
+            // SYNC:CONSTRAINT:C81 — nullable + derived mutual exclusion
+            if (nullable)
+                throw DiagnosticCatalog.C81.ToException(sourceLine, ("fieldName", names[0].ToText()));
+        }
 
         if (typeRef.IsCollection)
             return new CollectionFieldResult(
@@ -648,7 +668,9 @@ public static class PreceptParser
                 hasDefault ? defaultValue : null,
                 constraints.Length > 0 ? constraints : null,
                 typeRef.ChoiceValues, ordered,
-                SourceLine: sourceLine)).ToArray());
+                SourceLine: sourceLine,
+                DerivedExpression: derivedExpr,
+                DerivedExpressionText: derivedExpr is not null ? ReconstituteExpr(derivedExpr) : null)).ToArray());
     }
 
     /// <summary>
@@ -660,7 +682,7 @@ public static class PreceptParser
         (PreceptScalarType Type, IReadOnlyList<string>? ChoiceValues) typeRef,
         FieldModifier[] modifiers)
     {
-        var (nullable, hasDefault, defaultValue, constraints, ordered) = ExtractModifiers(modifiers, name.ToText(), name.Span.Position.Line);
+        var (nullable, hasDefault, defaultValue, constraints, ordered, _) = ExtractModifiers(modifiers, name.ToText(), name.Span.Position.Line);
         return new PreceptEventArg(name.ToText(), typeRef.Type, nullable,
             hasDefault,
             hasDefault ? defaultValue : null,
@@ -849,7 +871,7 @@ public static class PreceptParser
                 "Names the workflow",
                 "precept BugTracker"));
 
-    // field <Name>[, <Name>, ...] as <Type> [modifier...] (nullable, default, constraints, ordered — any order)
+    // field <Name>[, <Name>, ...] as <Type> [modifier...] (nullable, default, -> expr, constraints, ordered — any order)
     private static readonly TokenListParser<PreceptToken, StatementResult> FieldDecl =
         (from kw in Token.EqualTo(PreceptToken.Field)
          from names in Token.EqualTo(PreceptToken.Identifier)
@@ -861,9 +883,9 @@ public static class PreceptParser
         .Named("field declaration")
             .Register(new ConstructInfo(
                 "field-declaration",
-                "field <Name>[, <Name>, ...] as <Type> [<modifier>...]",
+                "field <Name>[, <Name>, ...] as <Type> [<modifier>...] | field <Name> as <Type> -> <Expr> [<constraint>...]",
                 "top-level",
-                "Declares a scalar or collection data field",
+                "Declares a scalar, collection, or computed data field",
                 "field Priority as number default 3"));
 
     // invariant <BoolExpr> because "reason"
@@ -1335,7 +1357,7 @@ public static class PreceptParser
         // Validate field defaults: non-nullable fields must have a default; default type must match
         foreach (var f in fields)
         {
-            if (!f.IsNullable && !f.HasDefaultValue)
+            if (!f.IsNullable && !f.HasDefaultValue && !f.IsComputed)
                 // SYNC:CONSTRAINT:C17
                 throw DiagnosticCatalog.C17.ToException(f.SourceLine, ("fieldName", f.Name));
             if (f.HasDefaultValue && f.DefaultValue is not null)

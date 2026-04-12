@@ -31,7 +31,9 @@ public static class CompileTool
             .Select(f => new FieldDto(f.Name, f.Type.ToString().ToLowerInvariant(), f.IsNullable, FormatDefault(f),
                 f.Constraints?.Select(FormatConstraint).ToList(),
                 f.ChoiceValues is { Count: > 0 } ? f.ChoiceValues : null,
-                f.IsOrdered ? (bool?)true : null))
+                f.IsOrdered ? (bool?)true : null,
+                f.IsComputed ? (bool?)true : null,
+                f.DerivedExpressionText))
             .ToList();
 
         var collectionFields = model.CollectionFields
@@ -165,7 +167,9 @@ public sealed record StateDto(string Name, IReadOnlyList<string> Rules);
 public sealed record FieldDto(string Name, string Type, bool Nullable, object? Default,
     IReadOnlyList<string>? Constraints = null,
     IReadOnlyList<string>? ChoiceValues = null,
-    bool? IsOrdered = null);
+    bool? IsOrdered = null,
+    bool? IsComputed = null,
+    string? Expression = null);
 public sealed record CollectionFieldDto(string Name, string Kind, string InnerType, IReadOnlyList<string>? Constraints = null);
 public sealed record EventDto(string Name, IReadOnlyList<EventArgDto> Args);
 public sealed record EventArgDto(string Name, string Type, bool Nullable, bool Required,

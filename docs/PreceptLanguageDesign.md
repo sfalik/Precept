@@ -546,6 +546,53 @@ field MinAmount, MaxAmount as number default 0
 field FirstName, LastName, MiddleName as string nullable
 ```
 
+### Computed (derived) fields (Locked)
+
+Computed fields are fields whose values are calculated from other fields and re-evaluated automatically after every state transition, field edit, or inspect operation. They eliminate manual synchronization — the formula is declared once, and the value is always current.
+
+Form:
+
+- `field <Name> as <Type> -> <Expression> [<constraint>...]`
+
+The bare `->` signals derivation, consistent with Principle 11 ("`->` means results in"). A computed field is a formula that always results in a value.
+
+Semantic rules:
+
+- **Mutually exclusive with `default`:** A field is either initialized (`default`) or derived (`->`), never both (C80).
+- **Cannot be `nullable`:** Computed fields always produce a value (C81).
+- **Multi-name declarations not allowed:** Each computed field must have its own expression (C82).
+- **Field-level constraints allowed:** Type-appropriate constraints may be declared after the expression (e.g., `nonnegative`).
+- **Expression scope:** Only persistent fields and safe collection accessors (`.count`). Event arguments are rejected (C84) — store via `set` first if needed. Nullable field references are rejected (C83). Unsafe collection accessors (`.peek`, `.min`, `.max`) are rejected (C85).
+- **Dependency ordering:** Computed fields referencing other computed fields are evaluated in topological order. Circular dependencies are compile errors (C86) with cycle path reporting.
+- **Read-only:** Cannot appear in `edit` declarations (C87) or as targets of `set` actions (C88). The formula is the single authority on the field's value.
+- **Recomputation timing:** Recomputed after ALL mutations committed, before constraint evaluation — in Fire, Update, and Inspect pipelines. One recomputation pass per operation.
+- **External input rejection:** Caller-provided values for computed fields in `CreateInstance`, `Update`, or MCP payloads are rejected with a descriptive error. The formula is the only authority.
+
+Examples:
+
+```precept
+# Simple arithmetic derivation
+field Quantity as number default 10
+field UnitPrice as number default 5.00
+field TotalCost as number -> Quantity * UnitPrice
+
+# Collection accessor reference
+field AllRejections as set default []
+field RejectionCount as number -> AllRejections.count
+
+# Chained computation — depends on another computed field
+field SubTotal as number -> Quantity * UnitPrice
+field Tax as number default 0
+field GrandTotal as number -> SubTotal + Tax
+
+# Conditional expression in computed field
+field Score as number default 0
+field Priority as choice("high", "medium", "low") -> if Score >= 90 then "high" else "low"
+
+# Computed field with constraint
+field RequestedTotal as number -> LodgingTotal + MealsTotal + MileageTotal nonnegative
+```
+
 ### Field-level constraints (Locked)
 
 Constraint keywords may appear on field declarations and event argument declarations, between the type (and `nullable`) and the `default` clause. They desugar at parse time — field constraints become `invariant` nodes; event-arg constraints become `on E assert` nodes. No new runtime behavior.
@@ -1556,6 +1603,7 @@ Locked in this discussion:
 - Diagnostic severity: three-tier model. **Error** = provably wrong (blocks compilation). **Warning** = structural quality concern (does not block). **Hint** = informational observation. The checker never guesses; uncertain cases are left to the inspector.
 - Diagnostic codes: overload existing codes for same conceptual category; new codes only for genuinely new categories. C38–C45 are stable and will not be split. New codes start at C46.
 - Conditional expressions: `if <condition> then <value> else <value>` — pure value expressions valid in set RHS, invariant, assert, and guard positions. Both branches type-checked; condition must be non-nullable boolean (C78). Branches must produce compatible scalar types with integer widening (C79). Null-narrowing applies in then-branch when condition is a null check. No ternary syntax, no statement-level `if`, no short-circuit evaluation.
+- Computed (derived) fields: `field <Name> as <Type> -> <Expression>` — bare `->` signals derivation (Principle 11). Mutually exclusive with `default` (C80) and `nullable` (C81). Multi-name declarations rejected (C82). Expression scope: fields and `.count` only — no event arguments (C84), no nullable field references (C83), no unsafe collection accessors (C85). Dependency ordering via topological sort; circular dependencies are compile errors (C86). Read-only: excluded from `edit` (C87) and `set` (C88). Recomputed after all mutations, before constraint evaluation in Fire, Update, and Inspect. External input rejected (Terraform model). Type-appropriate field constraints allowed after the expression.
 
 Not yet locked:
 - Full EBNF and tokenization rules

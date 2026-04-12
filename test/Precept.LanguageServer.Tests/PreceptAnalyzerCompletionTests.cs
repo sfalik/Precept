@@ -473,11 +473,12 @@ public class PreceptAnalyzerCompletionTests
 
         completions.Should().Contain("nullable");
         completions.Should().Contain("default");
+        completions.Should().Contain("->");
         completions.Should().Contain("notempty");
         completions.Should().Contain("minlength");
         completions.Should().Contain("maxlength");
         completions.Should().NotContain("nonnegative", "number constraints should not appear on string fields");
-        completions.Should().HaveCount(5);
+        completions.Should().HaveCount(6);
     }
 
     [Fact]
@@ -1642,5 +1643,178 @@ public class PreceptAnalyzerCompletionTests
         completions.Should().Contain("nullable");
         completions.Should().Contain("default");
         completions.Should().NotContain("ordered", "already present in the declaration");
+    }
+
+    [Fact]
+    public void Completions_SetTarget_ExcludesComputedFields()
+    {
+        const string text = """
+            precept M
+            field Price as number default 0
+            field Qty as number default 1
+            field Total as number -> Price * Qty
+            state A initial
+            event Go
+            from A on Go -> set $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("Price", "editable fields should appear as set targets");
+        completions.Should().Contain("Qty", "editable fields should appear as set targets");
+        completions.Should().NotContain("Total", "computed fields must not appear as set targets");
+    }
+
+    [Fact]
+    public void Completions_InStateEdit_ExcludesComputedFields()
+    {
+        const string text = """
+            precept M
+            field Price as number default 0
+            field Qty as number default 1
+            field Total as number -> Price * Qty
+            state Open initial
+            in Open edit $$
+            event Go
+            from Open on Go -> no transition
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("Price");
+        completions.Should().Contain("Qty");
+        completions.Should().NotContain("Total", "computed fields must not appear in edit declarations");
+    }
+
+    [Fact]
+    public void Completions_RootEdit_ExcludesComputedFields()
+    {
+        const string text = """
+            precept M
+            field Name as string nullable
+            field Score as number default 0
+            field Bonus as number -> Score * 2
+            edit $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("Name");
+        completions.Should().Contain("Score");
+        completions.Should().NotContain("Bonus", "computed fields must not appear in root edit declarations");
+        completions.Should().Contain("all", "the 'all' keyword should still be offered");
+    }
+
+    [Fact]
+    public void Completions_InStateWhenGuardEdit_ExcludesComputedFields()
+    {
+        const string text = """
+            precept M
+            field Price as number default 0
+            field Qty as number default 1
+            field Total as number -> Price * Qty
+            state Open initial
+            in Open when Price > 0 edit $$
+            event Go
+            from Open on Go -> no transition
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("Price");
+        completions.Should().Contain("Qty");
+        completions.Should().NotContain("Total", "computed fields must not appear in guarded edit declarations");
+    }
+
+    [Fact]
+    public void Completions_DerivedExpression_IncludesFieldsAndOperators()
+    {
+        const string text = """
+            precept M
+            field Price as number default 0
+            field Qty as number default 1
+            field Total as number -> $$
+            state A initial
+            event Go with Amount as number
+            from A on Go -> no transition
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("Price", "data fields should be available in derived expressions");
+        completions.Should().Contain("Qty", "data fields should be available in derived expressions");
+        completions.Should().Contain("+", "operators should be available in derived expressions");
+        completions.Should().NotContain("Amount", "event args must not appear in derived expressions");
+        completions.Should().NotContain("Go.Amount", "dotted event args must not appear in derived expressions");
+    }
+
+    [Fact]
+    public void Completions_DerivedExpression_IncludesCollectionAccessors()
+    {
+        const string text = """
+            precept M
+            field Items as set of string
+            field Count as number -> $$
+            state A initial
+            event Go
+            from A on Go -> no transition
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("Items.count", "collection count accessor should be available in derived expressions");
+    }
+
+    [Fact]
+    public void Completions_FieldModifier_OffersDeriveWhenClean()
+    {
+        const string text = """
+            precept M
+            field Total as number $$
+            state A initial
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("->", "derivation operator should be offered when no default or nullable is present");
+        completions.Should().Contain("nullable", "nullable should still be offered");
+        completions.Should().Contain("default", "default should still be offered");
+    }
+
+    [Fact]
+    public void Completions_FieldModifier_NoDeriveAfterNullable()
+    {
+        const string text = """
+            precept M
+            field Total as number nullable $$
+            state A initial
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().NotContain("->", "derivation operator must not be offered when nullable is already present");
+    }
+
+    [Fact]
+    public void Completions_FieldModifier_NoDeriveAfterDefault()
+    {
+        const string text = """
+            precept M
+            field Total as number default 0 $$
+            state A initial
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().NotContain("->", "derivation operator must not be offered when default is already present");
     }
 }

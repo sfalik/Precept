@@ -6,6 +6,28 @@
 
 ---
 
+### 2026-04-12: Issue #17 — Computed/Derived Fields — DESIGN REVIEW COMPLETE, all 5 reviewers approve
+**By:** Frank (architect), George (runtime), Kramer (tooling), Newman (MCP), Soup Nazi (testing)
+**Status:** All reviews posted — awaiting Shane's sign-off, then implementation
+
+Design review ceremony for Issue #17 (`field X as Type -> Expression`) completed. 5 reviewers, unanimous clearance.
+
+| Reviewer | Role | Verdict | Key Finding |
+|----------|------|---------|-------------|
+| Frank | Architect | **APPROVED** | Passes all 7 philosophy filter questions. 11/11 locked decisions with complete rationale. 6 non-blocking warnings. |
+| George | Runtime | **Feasible** | ~300–350 lines, 6–7 vertical slices, 8 new diagnostics (C80–C87). No blockers. |
+| Kramer | Tooling | **Medium-effort** | Grammar/semantic tokens free. Completions ~80–100 lines across 9+ call sites. 2 tooling slices. |
+| Newman | MCP | **Minor update** | Additive DTO expansion (3 params on `FieldDto`), 1 expression scope entry. No breaking changes. |
+| Soup Nazi | Testing | **MANAGEABLE** | ~85–95 new tests. Risk in arrow disambiguation + recomputation timing. Red-first mandatory. |
+
+**Micro-decision flagged (Frank W6 + George Risk #7):** Disallow multi-name computed field declarations (`field A, B as number -> expr`) at parser level. Each computed field should have its own expression for independent formula and dependency tracking. Not in proposal — should be locked before implementation.
+
+**Clarification needed (Soup Nazi):** Does "all data types supported" include `choice` in computed expressions? A formula producing a choice value is semantically questionable.
+
+**Defensive fix (Newman):** `UpdateTool.cs` lacks try-catch around `engine.Update()` — pre-existing robustness gap, not #17-specific. Recommend fixing regardless.
+
+---
+
 ### 2026-04-12T20:00:58Z: Ralph autonomous chore loop — `squad:chore` is the pickup gate
 **By:** shane (owner directive), Frank (process contract), Newman (operational loop)  
 **Amended:** 2026-04-12 — `squad:chore` replaces `squad:ralph` as the gate (Shane directive)  

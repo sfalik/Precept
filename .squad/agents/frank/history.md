@@ -9,6 +9,16 @@
 
 ## Learnings
 
+### 2026-04-12 — Issue #17 Design Review: Computed Fields Proposal
+- **Verdict: APPROVED.** Strongest language proposal this project has produced. All 7 philosophy filter questions passed. All 3 impact categories covered. 11/11 locked decisions have complete 4-point rationale. ~37 behavioral ACs.
+- **Key architectural observation:** The `->` dual role (action introducer in transitions, derivation operator in fields) is cleanly disambiguated by parser context. `FieldDecl` tries `-> Expression ConstraintSuffix*` vs `FieldModifier*`. Constraint keywords after the derived expression are token-type-distinct from expression identifiers — Superpower handles this naturally.
+- **Parser concern flagged (W5):** Expression-then-constraint boundary (`field X as number -> A + B nonnegative`) relies on constraint keywords being reserved tokens that the expression parser won't consume. Works, but implementers should be aware.
+- **Multi-name declaration concern flagged (W6):** `field A, B as number -> expr` is not addressed. Recommended: disallow at parser level — each computed field should have its own declaration for readable dependency tracking.
+- **Recomputation contract confirmed correct:** One pass after ALL mutation phases (exit + row + entry in Fire, field edits in Update, simulated on clone in Inspect), before constraint evaluation. No per-phase recomputation. This is the single most important semantic contract.
+- **Research quality:** 24-system survey across all 7 philosophy positioning categories with cross-category structural gap finding — no surveyed system combines field-level derivation with lifecycle-aware constraint enforcement. Dead-end analysis covers 5 rejected directions with reasons.
+- **6 non-blocking warnings filed:** syntax highlighting not explicitly listed, `precept_language` vocabulary gap, no stateless precept AC, conditional expression not explicitly addressed, expression-then-constraint parsing, multi-name declaration interaction.
+- Full review: `temp/frank-proposal-review-17.json`
+
 ### 2026-04-11 — Modifier any-order investigation (Issue #13)
 - **Key architecture finding:** The fixed modifier order (`nullable → default → constraints → ordered`) is enforced ONLY by two parser combinator chains (`FieldDecl` line 697, `EventArg` line 774). Model types, type checker, runtime, grammar, and MCP are all already order-independent.
 - **Constraint zone is already any-order:** `ConstraintSuffix.Many()` already allows constraints in any order. The rigidity is only between the four zones (nullable, default, constraints, ordered).

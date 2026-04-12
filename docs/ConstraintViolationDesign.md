@@ -650,6 +650,17 @@ Compile-phase and parse-phase diagnostics (DSL validity checks) use a separate v
 | C75 / PRECEPT075 | compile | Error | `pow()` exponent must be integer type. The second argument to `pow(base, exponent)` must resolve to `integer`, not `number` or `decimal`. This ensures totality — integer exponentiation always produces a finite result. |
 | C76 / PRECEPT076 | compile | Error | `sqrt()` requires a non-negative argument. The argument may be negative at runtime. Add a `nonnegative` constraint to the field, or guard the expression with `field >= 0 and ...`. Also accepted: literal values ≥ 0 and `abs()` results. |
 | C77 / PRECEPT077 | compile | Error | Function does not accept nullable arguments. The argument may be null at runtime. Add a null check (e.g., `field != null and ...`) before calling the function. Same pattern as C56 for string `.length`. |
+| C78 / PRECEPT078 | compile | Error | Conditional expression condition must be a boolean expression. The `if` clause evaluates to a non-boolean type. |
+| C79 / PRECEPT079 | compile | Error | Conditional expression branches must produce the same scalar type. The `then` and `else` branches return different types. |
+| C80 / PRECEPT080 | parse | Error | A field cannot have both a default value and a derived expression. Use `default` for user-set fields or `->` for computed fields, not both. |
+| C81 / PRECEPT081 | parse | Error | A nullable field cannot have a derived expression. Computed fields always produce a value and cannot be nullable. |
+| C82 / PRECEPT082 | parse | Error | Multi-name field declarations cannot have a derived expression. Each computed field must be declared separately. |
+| C83 / PRECEPT083 | compile | Error | Computed field expression references a nullable field. Computed fields must always produce a value — use only non-nullable fields or collection accessors that guarantee a result. |
+| C84 / PRECEPT084 | compile | Error | Computed field expression references an event argument. Computed fields can only reference persistent fields and safe collection accessors. |
+| C85 / PRECEPT085 | compile | Error | Computed field expression uses an unsafe collection accessor (`.peek`, `.min`, `.max`). Only `.count` is allowed in computed expressions. |
+| C86 / PRECEPT086 | compile | Error | Circular dependency detected among computed fields. The cycle path is included in the message (e.g., "A → B → A"). |
+| C87 / PRECEPT087 | compile | Error | Computed field cannot appear in edit declarations. Computed fields are read-only — the formula is the only authority on the field's value. |
+| C88 / PRECEPT088 | compile | Error | Computed field cannot be assigned via set. Its value is always derived from the declared expression. |
 
 **Distinction from runtime violations:** These are compile-time diagnostics, not runtime `ConstraintViolation` objects. They are reported during `PreceptCompiler.CompileFromText()` and surfaced via the language server (squiggles), MCP `precept_compile`, and CLI. They do not produce `ConstraintViolation` instances.
 

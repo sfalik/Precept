@@ -661,6 +661,39 @@ public class CatalogDriftTests
         ["C79"] = new(H + "field X as number default 0\n" + S2 +
             "event Go\nfrom A on Go -> set X = if true then 42 else \"text\" -> no transition\n", "same scalar type"),
 
+        // ── Parse-phase: computed/derived fields (C80–C82) ─────────────
+
+        // C80: default + derived mutual exclusion
+        ["C80"] = new(H + "field X as number default 0 -> 1 + 2\n" + S, "both a default value and a derived expression"),
+
+        // C81: nullable + derived mutual exclusion
+        ["C81"] = new(H + "field X as number nullable -> 1 + 2\n" + S, "nullable and has a derived expression"),
+
+        // C82: multi-name + derived
+        ["C82"] = new(H + "field A, B as number -> 1 + 2\n" + S, "Multi-name field declaration"),
+
+        // ── Compile-phase: computed field validation (C83–C88) ─────────
+
+        // C83: computed field references nullable field
+        ["C83"] = new(H + "field Name as string nullable\nfield Display as string -> Name\n" + S, "nullable field"),
+
+        // C84: computed field references event argument
+        ["C84"] = new(H + "field Total as number default 0\nfield Calc as number -> Submit.Amount\n" + S2 +
+            "event Submit with Amount as number\n", "event argument"),
+
+        // C85: computed field uses unsafe collection accessor
+        ["C85"] = new(H + "field Items as stack of number\nfield Top as number -> Items.peek\n" + S, "undefined on empty"),
+
+        // C86: circular dependency among computed fields
+        ["C86"] = new(H + "field A as number -> B + 1\nfield B as number -> A + 1\n" + S, "Circular dependency"),
+
+        // C87: computed field in edit declaration
+        ["C87"] = new(H + "field X as number default 0\nfield Y as number -> X + 1\n" + S2 + "in A edit X, Y\n", "computed field"),
+
+        // C88: computed field as set target
+        ["C88"] = new(H + "field X as number default 0\nfield Y as number -> X + 1\n" + S2 +
+            "event Go\nfrom A on Go -> set Y = 5 -> no transition\n", "computed field"),
+
         // ── Runtime-phase (C33–C37) ───────────────────────────────────
 
         // C33: CreateInstance with empty initial state
@@ -1435,6 +1468,37 @@ public class CatalogDriftTests
 
         // C79: conditional with mismatched branch types — row on line 6
         ["C79"] = ("precept Test\nfield X as number default 0\nstate A initial\nstate B\nevent Go\nfrom A on Go -> set X = if true then 42 else \"text\" -> no transition\n", "compile", 6),
+
+        // ── Parse-phase: computed/derived fields (C80–C82) ─────────────
+
+        // C80: default + derived — field on line 3
+        ["C80"] = ("precept Test\nstate A initial\nfield X as number default 0 -> 1 + 2\n", "parse", 3),
+
+        // C81: nullable + derived — field on line 3
+        ["C81"] = ("precept Test\nstate A initial\nfield X as number nullable -> 1 + 2\n", "parse", 3),
+
+        // C82: multi-name + derived — field on line 3
+        ["C82"] = ("precept Test\nstate A initial\nfield A, B as number -> 1 + 2\n", "parse", 3),
+
+        // ── Compile-phase: computed field validation (C83–C88) ─────────
+
+        // C83: nullable field in computed expression — field on line 3
+        ["C83"] = ("precept Test\nfield Name as string nullable\nfield Display as string -> Name\nstate A initial\n", "compile", 3),
+
+        // C84: event arg in computed expression — field on line 3
+        ["C84"] = ("precept Test\nfield Total as number default 0\nfield Calc as number -> Submit.Amount\nstate A initial\nevent Submit with Amount as number\n", "compile", 3),
+
+        // C85: unsafe accessor in computed expression — field on line 3
+        ["C85"] = ("precept Test\nfield Items as stack of number\nfield Top as number -> Items.peek\nstate A initial\n", "compile", 3),
+
+        // C86: circular dependency — field on line 2
+        ["C86"] = ("precept Test\nfield A as number -> B + 1\nfield B as number -> A + 1\nstate A initial\n", "compile", 2),
+
+        // C87: computed field in edit — edit on line 5
+        ["C87"] = ("precept Test\nfield X as number default 0\nfield Y as number -> X + 1\nstate A initial\nin A edit X, Y\n", "compile", 5),
+
+        // C88: computed field as set target — row on line 6
+        ["C88"] = ("precept Test\nfield X as number default 0\nfield Y as number -> X + 1\nstate A initial\nstate B\nevent Go\nfrom A on Go -> set Y = 5 -> no transition\n", "compile", 7),
     };
 
     [Theory]

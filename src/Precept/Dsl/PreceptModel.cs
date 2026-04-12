@@ -15,7 +15,8 @@ public sealed record PreceptDefinition(
     IReadOnlyList<EventAssertion>? EventAsserts = null,
     IReadOnlyList<PreceptTransitionRow>? TransitionRows = null,
     IReadOnlyList<PreceptEditBlock>? EditBlocks = null,
-    int SourceLine = 0)
+    int SourceLine = 0,
+    IReadOnlyList<string>? ComputedFieldOrder = null)
 {
     public bool IsStateless => States.Count == 0;
 }
@@ -51,7 +52,13 @@ public sealed record PreceptField(
     IReadOnlyList<FieldConstraint>? Constraints = null,
     IReadOnlyList<string>? ChoiceValues = null,
     bool IsOrdered = false,
-    int SourceLine = 0);
+    int SourceLine = 0,
+    PreceptExpression? DerivedExpression = null,
+    string? DerivedExpressionText = null)
+{
+    /// <summary>True when this field is computed (has a derived expression).</summary>
+    public bool IsComputed => DerivedExpression is not null;
+}
 
 public sealed record PreceptCollectionField(
     string Name,

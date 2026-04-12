@@ -27,6 +27,15 @@ public sealed class PreceptEngine
     /// <summary>Guarded edit blocks evaluated per-call: block.WhenGuard != null entries stored here.</summary>
     private readonly IReadOnlyList<PreceptEditBlock> _guardedEditBlocks;
 
+    /// <summary>Computed field evaluation order (topological sort). Null when no computed fields.</summary>
+    private readonly IReadOnlyList<string>? _computedFieldOrder;
+
+    /// <summary>
+    /// For each computed field, the set of stored (non-computed) field names that transitively feed it.
+    /// Used to expand violation targets when a rule fails on a computed field.
+    /// </summary>
+    private readonly IReadOnlyDictionary<string, IReadOnlyList<string>>? _computedFieldDependencies;
+
     /// <summary>Editable fields for stateless (root-level) edit declarations. Null if no root edit blocks.</summary>
     private HashSet<string>? _rootEditableFields;
 
@@ -158,16 +167,48 @@ public sealed class PreceptEngine
         }
         _editableFieldsByState = editMap;
         _guardedEditBlocks = guardedBlocks;
+
+        // Computed fields: store evaluation order and build transitive dependency map
+        _computedFieldOrder = model.ComputedFieldOrder;
+        if (_computedFieldOrder is { Count: > 0 })
+        {
+            var computedSet = new HashSet<string>(_computedFieldOrder, StringComparer.Ordinal);
+            var deps = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
+            foreach (var cfName in _computedFieldOrder)
+            {
+                var field = _fieldMap[cfName];
+                var directRefs = ExpressionSubjects.Extract(field.DerivedExpression!).FieldReferences;
+                var stored = new List<string>();
+                foreach (var dep in directRefs)
+                {
+                    if (computedSet.Contains(dep) && deps.TryGetValue(dep, out var transitive))
+                    {
+                        // Computed dependency — inherit its stored fields
+                        foreach (var t in transitive)
+                            if (!stored.Contains(t)) stored.Add(t);
+                    }
+                    else if (!computedSet.Contains(dep))
+                    {
+                        // Stored field — add directly
+                        if (!stored.Contains(dep)) stored.Add(dep);
+                    }
+                }
+                deps[cfName] = stored;
+            }
+            _computedFieldDependencies = deps;
+        }
     }
 
     /// <summary>
     /// Expands ["all"] to all declared field names, or returns the list unchanged.
-    /// "all" means all scalar fields + all collection fields.
+    /// "all" means all scalar fields + all collection fields, excluding computed fields
+    /// (computed fields are read-only and cannot be edited).
     /// </summary>
     private IEnumerable<string> ExpandEditFieldNames(IReadOnlyList<string> fieldNames)
     {
         if (fieldNames.Count == 1 && string.Equals(fieldNames[0], "all", StringComparison.Ordinal))
-            return Fields.Select(static f => f.Name).Concat(CollectionFields.Select(static f => f.Name));
+            return Fields.Where(static f => !f.IsComputed).Select(static f => f.Name)
+                .Concat(CollectionFields.Select(static f => f.Name));
         return fieldNames;
     }
 
@@ -200,6 +241,24 @@ public sealed class PreceptEngine
                 result.Add(fieldName);
         }
         return result;
+    }
+
+    /// <summary>
+    /// Recomputes all computed/derived fields in dependency order against the current data dictionary.
+    /// Evaluates each field's <see cref="PreceptField.DerivedExpression"/> and updates data in-place.
+    /// </summary>
+    private void RecomputeDerivedFields(Dictionary<string, object?> data)
+    {
+        if (_computedFieldOrder is null)
+            return;
+
+        foreach (var fieldName in _computedFieldOrder)
+        {
+            var field = _fieldMap[fieldName];
+            var result = PreceptExpressionRuntimeEvaluator.Evaluate(field.DerivedExpression!, data, _fieldMap);
+            if (result.Success)
+                data[fieldName] = result.Value;
+        }
     }
 
     public PreceptInstance CreateInstance(
@@ -248,9 +307,22 @@ public sealed class PreceptEngine
 
     private IReadOnlyDictionary<string, object?> BuildInitialInstanceData(IReadOnlyDictionary<string, object?>? instanceData)
     {
+        // Reject computed field values in caller-provided data (Terraform model: explicit rejection)
+        if (instanceData is not null && _computedFieldOrder is { Count: > 0 })
+        {
+            foreach (var cfName in _computedFieldOrder)
+            {
+                if (instanceData.ContainsKey(cfName))
+                    throw new InvalidOperationException(
+                        $"Cannot provide a value for computed field '{cfName}'. " +
+                        $"Computed fields are derived automatically from their expression.");
+            }
+        }
+
         var hasDefaults = Fields.Any(field => field.HasDefaultValue);
         var hasCollections = CollectionFields.Count > 0;
-        if (!hasDefaults && !hasCollections && instanceData is null)
+        var hasComputed = _computedFieldOrder is { Count: > 0 };
+        if (!hasDefaults && !hasCollections && !hasComputed && instanceData is null)
             return EmptyInstanceData.Instance;
 
         var merged = new Dictionary<string, object?>(StringComparer.Ordinal);
@@ -282,6 +354,19 @@ public sealed class PreceptEngine
                 }
 
                 merged[pair.Key] = pair.Value;
+            }
+        }
+
+        // Compute initial values for derived fields
+        if (hasComputed)
+        {
+            var hydrated = HydrateInstanceData(merged);
+            RecomputeDerivedFields(hydrated);
+            // Copy computed values back to clean format
+            foreach (var cfName in _computedFieldOrder!)
+            {
+                if (hydrated.TryGetValue(cfName, out var cfValue))
+                    merged[cfName] = cfValue;
             }
         }
 
@@ -465,6 +550,7 @@ public sealed class PreceptEngine
             simulatedData, simulatedCollections, eventName, eventArguments);
 
         CommitCollections(simulatedData, simulatedCollections);
+        RecomputeDerivedFields(simulatedData);
 
         // Validate invariants + state asserts
         var violations = CollectConstraintViolations(
@@ -611,6 +697,7 @@ public sealed class PreceptEngine
 
         ApplyPatchOperations(operations, updatedData, workingCollections);
         CommitCollections(updatedData, workingCollections);
+        RecomputeDerivedFields(updatedData);
 
         // Evaluate rules on working copy
         var violations = new List<ConstraintViolation>();
@@ -794,6 +881,7 @@ public sealed class PreceptEngine
                 return FireResult.Rejected(instance.CurrentState, eventName, new[] { ConstraintViolation.Simple(mutError) });
 
             CommitCollections(updatedData, workingCollections);
+            RecomputeDerivedFields(updatedData);
 
             // Validate: invariants + 'in' asserts for current state
             var violations = new List<ConstraintViolation>();
@@ -828,6 +916,7 @@ public sealed class PreceptEngine
             updatedData, workingCollections, eventName, eventArguments);
 
         CommitCollections(updatedData, workingCollections);
+        RecomputeDerivedFields(updatedData);
 
         // Stage 6: Validation (invariants + state asserts, collect-all)
         var validationViolations = CollectConstraintViolations(
@@ -864,6 +953,18 @@ public sealed class PreceptEngine
         var operations = builder.GetOperations();
         if (operations.Count == 0)
             return UpdateResult.Failed(UpdateOutcome.InvalidInput, new[] { "Patch is empty." });
+
+        // Reject patches targeting computed fields (Terraform model: explicit rejection)
+        if (_computedFieldOrder is { Count: > 0 })
+        {
+            var computedSet = new HashSet<string>(_computedFieldOrder, StringComparer.Ordinal);
+            foreach (var op in operations)
+            {
+                if (computedSet.Contains(op.FieldName))
+                    return UpdateResult.Failed(UpdateOutcome.InvalidInput,
+                        new[] { $"Cannot update computed field '{op.FieldName}'. Computed fields are derived automatically from their expression." });
+            }
+        }
 
         // Hydrate instance data early — needed for guarded edit evaluation
         var internalData = HydrateInstanceData(instance.InstanceData);
@@ -919,6 +1020,7 @@ public sealed class PreceptEngine
             return UpdateResult.Failed(UpdateOutcome.InvalidInput, new[] { mutError });
 
         CommitCollections(updatedData, workingCollections);
+        RecomputeDerivedFields(updatedData);
 
         // Stage 4: Rules evaluation (invariants + 'in' state asserts)
         var violations = new List<ConstraintViolation>();
@@ -1502,6 +1604,7 @@ public sealed class PreceptEngine
                 var targets = new List<ConstraintTarget>();
                 foreach (var fieldName in subjects.FieldReferences)
                     targets.Add(new ConstraintTarget.FieldTarget(fieldName));
+                ExpandComputedFieldTargets(subjects.FieldReferences, targets);
                 targets.Add(new ConstraintTarget.DefinitionTarget());
 
                 violations.Add(new ConstraintViolation(
@@ -1540,6 +1643,7 @@ public sealed class PreceptEngine
                 var targets = new List<ConstraintTarget>();
                 foreach (var fieldName in subjects.FieldReferences)
                     targets.Add(new ConstraintTarget.FieldTarget(fieldName));
+                ExpandComputedFieldTargets(subjects.FieldReferences, targets);
                 targets.Add(new ConstraintTarget.StateTarget(assert.State, assert.Anchor));
 
                 violations.Add(new ConstraintViolation(
@@ -1549,6 +1653,25 @@ public sealed class PreceptEngine
             }
         }
         return violations;
+    }
+
+    /// <summary>
+    /// Expands violation targets through computed field dependency closure.
+    /// When a rule references a computed field, surfaces the stored fields that transitively feed it.
+    /// </summary>
+    private void ExpandComputedFieldTargets(IReadOnlyList<string> fieldReferences, List<ConstraintTarget> targets)
+    {
+        if (_computedFieldDependencies is null)
+            return;
+
+        foreach (var fieldName in fieldReferences)
+        {
+            if (_computedFieldDependencies.TryGetValue(fieldName, out var storedDeps))
+            {
+                foreach (var dep in storedDeps)
+                    targets.Add(new ConstraintTarget.FieldTarget(dep));
+            }
+        }
     }
 
     /// <summary>
@@ -1973,12 +2096,16 @@ public static class PreceptCompiler
         var typeCheck = PreceptTypeChecker.Check(model);
         diagnostics.AddRange(typeCheck.Diagnostics);
 
+        // Thread computed field evaluation order onto the model for runtime consumption
+        if (typeCheck.ComputedFieldOrder is not null)
+            model = model with { ComputedFieldOrder = typeCheck.ComputedFieldOrder };
+
         CollectCompileTimeDiagnostics(model, diagnostics);
 
         if (!diagnostics.Any(diagnostic => diagnostic.Constraint.Id is "C27" or "C28"))
             diagnostics.AddRange(PreceptAnalysis.Analyze(model).Diagnostics);
 
-        return new ValidationResult(diagnostics, typeCheck.TypeContext);
+        return new ValidationResult(diagnostics, typeCheck.TypeContext, model);
     }
 
     public static CompileFromTextResult CompileFromText(string text)
@@ -1988,18 +2115,20 @@ public static class PreceptCompiler
             return new CompileFromTextResult(null, null, parseDiagnostics.Select(ToDiagnostic).ToArray());
 
         var validation = Validate(model);
+        var validatedModel = validation.ValidatedModel ?? model;
         var diagnostics = validation.Diagnostics.Select(ToDiagnostic).ToArray();
         if (validation.HasErrors)
-            return new CompileFromTextResult(model, null, diagnostics);
+            return new CompileFromTextResult(validatedModel, null, diagnostics);
 
-        return new CompileFromTextResult(model, new PreceptEngine(model), diagnostics);
+        return new CompileFromTextResult(validatedModel, new PreceptEngine(validatedModel), diagnostics);
     }
 
     public static PreceptEngine Compile(PreceptDefinition model)
     {
         var validation = Validate(model);
         ThrowIfValidationFailed(validation);
-        return new PreceptEngine(model);
+        var validatedModel = validation.ValidatedModel ?? model;
+        return new PreceptEngine(validatedModel);
     }
 
     private static PreceptDiagnostic ToDiagnostic(ParseDiagnostic diagnostic)
@@ -2040,6 +2169,23 @@ public static class PreceptCompiler
         }
 
         var defaultData = BuildDefaultData(model);
+
+        // Recompute derived fields so compile-time invariant checks see fresh computed values
+        if (model.ComputedFieldOrder is { Count: > 0 })
+        {
+            var mutableData = new Dictionary<string, object?>(defaultData, StringComparer.Ordinal);
+            var fieldMap = model.Fields.ToDictionary(static f => f.Name, StringComparer.Ordinal);
+            foreach (var cfName in model.ComputedFieldOrder)
+            {
+                if (fieldMap.TryGetValue(cfName, out var cf) && cf.DerivedExpression is not null)
+                {
+                    var result = PreceptExpressionRuntimeEvaluator.Evaluate(cf.DerivedExpression, mutableData, fieldMap);
+                    if (result.Success)
+                        mutableData[cfName] = result.Value;
+                }
+            }
+            defaultData = mutableData;
+        }
 
         // 1. Validate invariants against default values
         //    Synthetic invariants (generated by field constraint desugaring) are skipped:
