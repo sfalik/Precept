@@ -436,7 +436,8 @@ public class PreceptAnalyzerCompletionTests
         var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
 
         completions.Should().Contain(",");
-        completions.Should().HaveCount(1);
+        completions.Should().Contain("nullable", "any-order: nullable is valid after default");
+        completions.Should().NotContain("default", "already present in the declaration");
     }
 
     [Fact]
@@ -729,8 +730,8 @@ public class PreceptAnalyzerCompletionTests
         completions.Should().Contain("positive");
         completions.Should().Contain("min");
         completions.Should().Contain("max");
-        completions.Should().NotContain("nullable");
-        completions.Should().NotContain("default");
+        completions.Should().Contain("nullable", "any-order: nullable is valid after default");
+        completions.Should().NotContain("default", "already present in the declaration");
         completions.Should().NotContain("notempty");
     }
 
@@ -745,10 +746,12 @@ public class PreceptAnalyzerCompletionTests
         var (code, position) = ExtractPosition(text);
         var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
 
-        completions.Should().Contain("nonnegative");
         completions.Should().Contain("positive");
         completions.Should().Contain("min");
         completions.Should().Contain("max");
+        completions.Should().Contain("nullable", "any-order: nullable is valid after constraints");
+        completions.Should().Contain("default", "any-order: default is valid after constraints");
+        completions.Should().NotContain("nonnegative", "already present in the declaration");
         completions.Should().NotContain("notempty");
     }
 
@@ -766,8 +769,8 @@ public class PreceptAnalyzerCompletionTests
         completions.Should().Contain("notempty");
         completions.Should().Contain("minlength");
         completions.Should().Contain("maxlength");
-        completions.Should().NotContain("nullable");
-        completions.Should().NotContain("default");
+        completions.Should().Contain("nullable", "any-order: nullable is valid after default");
+        completions.Should().NotContain("default", "already present in the declaration");
         completions.Should().NotContain("nonnegative");
     }
 
@@ -1470,5 +1473,79 @@ public class PreceptAnalyzerCompletionTests
         var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
 
         completions.Should().Contain("because");
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // COMPLETIONS — Any-order field modifier suggestions
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Completions_FieldAfterConstraintThenDefault_OffersNullableAndRemainingConstraints()
+    {
+        const string text = """
+            precept M
+            field Amount as number nonnegative default 5 $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("nullable", "any-order: nullable valid after default");
+        completions.Should().Contain("positive");
+        completions.Should().Contain("min");
+        completions.Should().Contain("max");
+        completions.Should().NotContain("default", "already present");
+        completions.Should().NotContain("nonnegative", "already present");
+    }
+
+    [Fact]
+    public void Completions_FieldNullableThenConstraint_OffersDefaultAndRemainingConstraints()
+    {
+        const string text = """
+            precept M
+            field Notes as string nullable notempty $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("default", "any-order: default valid after constraints");
+        completions.Should().Contain("minlength");
+        completions.Should().Contain("maxlength");
+        completions.Should().NotContain("nullable", "already present");
+        completions.Should().NotContain("notempty", "already present");
+    }
+
+    [Fact]
+    public void Completions_FieldAllModifiersExhausted_OffersNothing()
+    {
+        const string text = """
+            precept M
+            field Active as boolean nullable default false $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().BeEmpty("boolean has no constraints; nullable and default already present");
+    }
+
+    [Fact]
+    public void Completions_EventArgAfterConstraint_OffersNullableDefaultAndComma()
+    {
+        const string text = """
+            precept M
+            state A initial
+            event Submit with Amount as number nonnegative $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("nullable");
+        completions.Should().Contain("default");
+        completions.Should().Contain(",");
+        completions.Should().Contain("positive");
+        completions.Should().NotContain("nonnegative", "already present");
     }
 }

@@ -275,64 +275,12 @@ internal sealed class PreceptAnalyzer
         if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+(?:set|queue|stack)\s+$", RegexOptions.IgnoreCase))
             return [new CompletionItem { Label = "of", Kind = CompletionItemKind.Keyword }];
 
-        // After "field Name as Type nullable " → suggest "default" + type constraints
-        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+number\s+nullable\s+$", RegexOptions.IgnoreCase))
-            return [DefaultItem, ..NumberConstraintItems];
-        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+string\s+nullable\s+$", RegexOptions.IgnoreCase))
-            return [DefaultItem, ..StringConstraintItems];
-        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+boolean\s+nullable\s+$", RegexOptions.IgnoreCase))
-            return [DefaultItem];
-        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+integer\s+nullable\s+$", RegexOptions.IgnoreCase))
-            return [DefaultItem, ..NumberConstraintItems];
-        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+decimal\s+nullable\s+$", RegexOptions.IgnoreCase))
-            return [DefaultItem, ..DecimalConstraintItems];
-
-        // After "field Name as TYPE [nullable] default VALUE " → type constraints only
-        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+number(?:\s+nullable)?\s+default\s+(?:-?\d+(?:\.\d+)?|true|false|null)\s+$", RegexOptions.IgnoreCase))
-            return NumberConstraintItems;
-        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+string(?:\s+nullable)?\s+default\s+(?:""[^""\n]*""|\S+)\s+$", RegexOptions.IgnoreCase))
-            return StringConstraintItems;
-        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+integer(?:\s+nullable)?\s+default\s+(?:-?\d+(?:\.\d+)?|true|false|null)\s+$", RegexOptions.IgnoreCase))
-            return NumberConstraintItems;
-        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+decimal(?:\s+nullable)?\s+default\s+(?:-?\d+(?:\.\d+)?|true|false|null)\s+$", RegexOptions.IgnoreCase))
-            return DecimalConstraintItems;
-
-        // After already having constraints on a number field → offer more
-        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+number\b.*\b(?:nonnegative|positive|(?:min|max)\s+\S+)\s+$", RegexOptions.IgnoreCase))
-            return NumberConstraintItems;
-        // After already having constraints on a string field → offer more
-        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+string\b.*\b(?:notempty|(?:minlength|maxlength)\s+\S+)\s+$", RegexOptions.IgnoreCase))
-            return StringConstraintItems;
-        // After already having constraints on an integer field → offer more
-        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+integer\b.*\b(?:nonnegative|positive|(?:min|max)\s+\S+)\s+$", RegexOptions.IgnoreCase))
-            return NumberConstraintItems;
-        // After already having constraints on a decimal field → offer more
-        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+decimal\b.*\b(?:nonnegative|positive|(?:min|max|maxplaces)\s+\S+)\s+$", RegexOptions.IgnoreCase))
-            return DecimalConstraintItems;
-        // After already having ordered on a choice field → nothing more to offer
-        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+choice\([^)]*\)\b.*\bordered\s+$", RegexOptions.IgnoreCase))
-            return Array.Empty<CompletionItem>();
-
-        // After "field Name as set|queue|stack of TYPE " → collection constraints
-        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+(?:set|queue|stack)\s+of\s+\w+\s+$", RegexOptions.IgnoreCase))
-            return CollectionConstraintItems;
-        // After already having constraints on a collection field → offer more
-        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+(?:set|queue|stack)\b.*\b(?:notempty|(?:mincount|maxcount)\s+\S+)\s+$", RegexOptions.IgnoreCase))
-            return CollectionConstraintItems;
-
-        // After "field Name as Type " (scalar type completed) → suggest "nullable", "default", type constraints
-        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+number\s+$", RegexOptions.IgnoreCase))
-            return [NullableItem, DefaultItem, ..NumberConstraintItems];
-        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+string\s+$", RegexOptions.IgnoreCase))
-            return [NullableItem, DefaultItem, ..StringConstraintItems];
-        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+boolean\s+$", RegexOptions.IgnoreCase))
-            return [NullableItem, DefaultItem];
-        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+integer\s+$", RegexOptions.IgnoreCase))
-            return [NullableItem, DefaultItem, ..NumberConstraintItems];
-        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+decimal\s+$", RegexOptions.IgnoreCase))
-            return [NullableItem, DefaultItem, ..DecimalConstraintItems];
-        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+choice\([^)]*\)\s+$", RegexOptions.IgnoreCase))
-            return [NullableItem, ..ChoiceConstraintItems];
+        // ── Field modifier zone: any-order modifiers after type ──
+        // Unified handler for all field modifier completions (nullable, default, constraints, ordered).
+        // Detects the field type, scans existing modifiers, offers remaining items.
+        var fieldModifiers = TryGetFieldModifierCompletions(beforeCursor);
+        if (fieldModifiers is not null)
+            return fieldModifiers;
 
         // After "field Name as " (typing type) → suggest type keywords
         if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+\w*$", RegexOptions.IgnoreCase))
@@ -460,34 +408,16 @@ internal sealed class PreceptAnalyzer
                     .Concat(BuildItems(dataFields, CompletionItemKind.Field))
                     .Concat(BuildItems(collectionFields, CompletionItemKind.Field)));
 
-        // After "event Name with Arg as Type [nullable] [default Value] " → suggest delimiter / modifiers
-        // Split by type to include type-appropriate constraint keywords.
-        // The preceding-args pattern uses a broad type alternation to handle all scalar types + choice.
-        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean|integer|decimal|choice\\([^)]*\\))(?:\\s+nullable)?(?:\\s+default\\s+(?:\"[^\"\\n]*\"|\\S+))?)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:number|integer)\\s+nullable\\s+$", RegexOptions.IgnoreCase))
-            return [DefaultItem, ..NumberConstraintItems, CommaItem];
-        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean|integer|decimal|choice\\([^)]*\\))(?:\\s+nullable)?(?:\\s+default\\s+(?:\"[^\"\\n]*\"|\\S+))?)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+decimal\\s+nullable\\s+$", RegexOptions.IgnoreCase))
-            return [DefaultItem, ..DecimalConstraintItems, CommaItem];
-        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean|integer|decimal|choice\\([^)]*\\))(?:\\s+nullable)?(?:\\s+default\\s+(?:\"[^\"\\n]*\"|\\S+))?)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+string\\s+nullable\\s+$", RegexOptions.IgnoreCase))
-            return [DefaultItem, ..StringConstraintItems, CommaItem];
-        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean|integer|decimal|choice\\([^)]*\\))(?:\\s+nullable)?(?:\\s+default\\s+(?:\"[^\"\\n]*\"|\\S+))?)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:boolean|choice\\([^)]*\\))\\s+nullable\\s+$", RegexOptions.IgnoreCase))
-            return [DefaultItem, CommaItem];
-
-        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean|integer|decimal|choice\\([^)]*\\))(?:\\s+nullable)?(?:\\s+default\\s+(?:\"[^\"\\n]*\"|-?\\d+(?:\\.\\d+)?|true|false|null))?)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean|integer|decimal|choice\\([^)]*\\))\\s+default\\s+(?:\"[^\"\\n]*\"|-?\\d+(?:\\.\\d+)?|true|false|null)\\s*$", RegexOptions.IgnoreCase))
-            return [CommaItem];
+        // ── Event arg modifier zone: any-order modifiers after type ──
+        // Unified handler for event argument modifier completions (nullable, default, constraints, comma).
+        var eventArgModifiers = TryGetEventArgModifierCompletions(beforeCursor);
+        if (eventArgModifiers is not null)
+            return eventArgModifiers;
 
         // After a comma in an event arg list, the user is starting the next arg name.
         // Avoid unrelated global keyword fallback in this position.
         if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+.*\\,\\s*$", RegexOptions.IgnoreCase))
             return Array.Empty<CompletionItem>();
-
-        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean|integer|decimal|choice\\([^)]*\\))(?:\\s+nullable)?(?:\\s+default\\s+(?:\"[^\"\\n]*\"|\\S+))?)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:number|integer)\\s+$", RegexOptions.IgnoreCase))
-            return [NullableItem, DefaultItem, ..NumberConstraintItems, CommaItem];
-        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean|integer|decimal|choice\\([^)]*\\))(?:\\s+nullable)?(?:\\s+default\\s+(?:\"[^\"\\n]*\"|\\S+))?)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+decimal\\s+$", RegexOptions.IgnoreCase))
-            return [NullableItem, DefaultItem, ..DecimalConstraintItems, CommaItem];
-        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean|integer|decimal|choice\\([^)]*\\))(?:\\s+nullable)?(?:\\s+default\\s+(?:\"[^\"\\n]*\"|\\S+))?)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+string\\s+$", RegexOptions.IgnoreCase))
-            return [NullableItem, DefaultItem, ..StringConstraintItems, CommaItem];
-        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean|integer|decimal|choice\\([^)]*\\))(?:\\s+nullable)?(?:\\s+default\\s+(?:\"[^\"\\n]*\"|-?\\d+(?:\\.\\d+)?|true|false|null))?)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:boolean|choice\\([^)]*\\))\\s+$", RegexOptions.IgnoreCase))
-            return [NullableItem, DefaultItem, CommaItem];
 
         // After "event Name with ArgName as " → suggest type keywords
         if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean|integer|decimal|choice\\([^)]*\\))(?:\\s+nullable)?(?:\\s+default\\s+(?:\"[^\"\\n]*\"|-?\\d+(?:\\.\\d+)?|true|false|null))?)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+\\w*$", RegexOptions.IgnoreCase))
@@ -1293,6 +1223,153 @@ internal sealed class PreceptAnalyzer
 
     private static bool EndsWithCompletedExpression(string text)
         => Regex.IsMatch(text, "(?:[A-Za-z0-9_\\)\"]|true|false|null)\\s+$", RegexOptions.IgnoreCase);
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Field/Arg Modifier Completion Helpers (any-order modifier support)
+    // ═══════════════════════════════════════════════════════════════════
+
+    // Matches a scalar field declaration in the modifier zone: field Name as <type> <rest...>
+    private static readonly Regex FieldScalarModifierZoneRegex = new(
+        @"^\s*field\s+(?:[A-Za-z_]\w*\s*,\s*)*[A-Za-z_]\w*\s+as\s+(?<type>number|string|boolean|integer|decimal|choice\([^)]*\))\s+(?<rest>.*)$",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    // Matches a collection field declaration in the modifier zone: field Name as set|queue|stack of <inner> <rest...>
+    private static readonly Regex FieldCollectionModifierZoneRegex = new(
+        @"^\s*field\s+(?:[A-Za-z_]\w*\s*,\s*)*[A-Za-z_]\w*\s+as\s+(?:set|queue|stack)\s+of\s+\w+\s+(?<rest>.*)$",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    /// <summary>
+    /// Detects if the cursor is in a field declaration modifier zone and returns the
+    /// remaining modifiers appropriate for the field type. Returns null if not in modifier zone.
+    /// </summary>
+    private static IReadOnlyList<CompletionItem>? TryGetFieldModifierCompletions(string beforeCursor)
+    {
+        if (!beforeCursor.EndsWith(' '))
+            return null;
+
+        // Try scalar field
+        var scalarMatch = FieldScalarModifierZoneRegex.Match(beforeCursor);
+        if (scalarMatch.Success)
+        {
+            var rest = scalarMatch.Groups["rest"].Value;
+            if (rest.Length > 0 && IsValueExpectingKeyword(rest.TrimEnd().Split(' ')[^1]))
+                return null;
+            return ComputeRemainingModifiers(scalarMatch.Groups["type"].Value, rest, isCollection: false, isEventArg: false);
+        }
+
+        // Try collection field
+        var colMatch = FieldCollectionModifierZoneRegex.Match(beforeCursor);
+        if (colMatch.Success)
+        {
+            var rest = colMatch.Groups["rest"].Value;
+            if (rest.Length > 0 && IsValueExpectingKeyword(rest.TrimEnd().Split(' ')[^1]))
+                return null;
+            return ComputeRemainingModifiers("collection", rest, isCollection: true, isEventArg: false);
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Detects if the cursor is in an event argument modifier zone and returns the
+    /// remaining modifiers. Returns null if not in modifier zone.
+    /// </summary>
+    private static IReadOnlyList<CompletionItem>? TryGetEventArgModifierCompletions(string beforeCursor)
+    {
+        if (!beforeCursor.EndsWith(' '))
+            return null;
+
+        var eventMatch = NewEventWithArgsRegex.Match(beforeCursor);
+        if (!eventMatch.Success)
+            return null;
+
+        var argsText = eventMatch.Groups["args"].Value;
+        var lastArg = ExtractLastEventArg(argsText);
+
+        var argTypeMatch = Regex.Match(lastArg,
+            @"^[A-Za-z_][A-Za-z0-9_]*\s+as\s+(?<type>string|number|boolean|integer|decimal|choice\([^)]*\))\s+(?<rest>.*)$",
+            RegexOptions.IgnoreCase);
+        if (!argTypeMatch.Success)
+            return null;
+
+        var rest = argTypeMatch.Groups["rest"].Value;
+        if (rest.Length > 0 && IsValueExpectingKeyword(rest.TrimEnd().Split(' ')[^1]))
+            return null;
+
+        return ComputeRemainingModifiers(argTypeMatch.Groups["type"].Value, rest, isCollection: false, isEventArg: true);
+    }
+
+    /// <summary>
+    /// Extracts the last event argument text from a comma-delimited arg list,
+    /// correctly handling commas inside choice(...) parentheses.
+    /// </summary>
+    private static string ExtractLastEventArg(string argsText)
+    {
+        int depth = 0;
+        int lastComma = -1;
+        for (int i = 0; i < argsText.Length; i++)
+        {
+            switch (argsText[i])
+            {
+                case '(': depth++; break;
+                case ')': depth--; break;
+                case ',' when depth == 0: lastComma = i; break;
+            }
+        }
+        return lastComma >= 0 ? argsText[(lastComma + 1)..].TrimStart() : argsText.TrimStart();
+    }
+
+    private static bool IsValueExpectingKeyword(string word)
+        => word.Equals("default", StringComparison.OrdinalIgnoreCase) ||
+           word.Equals("min", StringComparison.OrdinalIgnoreCase) ||
+           word.Equals("max", StringComparison.OrdinalIgnoreCase) ||
+           word.Equals("minlength", StringComparison.OrdinalIgnoreCase) ||
+           word.Equals("maxlength", StringComparison.OrdinalIgnoreCase) ||
+           word.Equals("mincount", StringComparison.OrdinalIgnoreCase) ||
+           word.Equals("maxcount", StringComparison.OrdinalIgnoreCase) ||
+           word.Equals("maxplaces", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Computes the remaining modifier completions for a field or event argument,
+    /// given the type and any modifiers already present in the text.
+    /// </summary>
+    private static IReadOnlyList<CompletionItem> ComputeRemainingModifiers(
+        string typeStr, string existingModifierText, bool isCollection, bool isEventArg)
+    {
+        bool isChoice = typeStr.StartsWith("choice", StringComparison.OrdinalIgnoreCase);
+        string normalizedType = isCollection ? "collection" : isChoice ? "choice" : typeStr.ToLowerInvariant();
+
+        bool hasNullable = Regex.IsMatch(existingModifierText, @"\bnullable\b", RegexOptions.IgnoreCase);
+        bool hasDefault = Regex.IsMatch(existingModifierText, @"\bdefault\b", RegexOptions.IgnoreCase);
+
+        var items = new List<CompletionItem>();
+
+        if (!isCollection)
+        {
+            if (!hasNullable) items.Add(NullableItem);
+            if (!hasDefault) items.Add(DefaultItem);
+        }
+
+        IReadOnlyList<CompletionItem> constraintPool = normalizedType switch
+        {
+            "number" or "integer" => NumberConstraintItems,
+            "decimal" => DecimalConstraintItems,
+            "string" => StringConstraintItems,
+            "collection" => CollectionConstraintItems,
+            "choice" => ChoiceConstraintItems,
+            _ => Array.Empty<CompletionItem>()
+        };
+
+        foreach (var item in constraintPool)
+        {
+            var keyword = item.Label.Split(' ')[0];
+            if (!Regex.IsMatch(existingModifierText, $@"\b{Regex.Escape(keyword)}\b", RegexOptions.IgnoreCase))
+                items.Add(item);
+        }
+
+        if (isEventArg) items.Add(CommaItem);
+        return items.Count > 0 ? items.ToArray() : Array.Empty<CompletionItem>();
+    }
 
     private static CompletionItem SnippetItem(string label, string snippet, string detail)
         => new()

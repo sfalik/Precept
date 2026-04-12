@@ -598,6 +598,10 @@ public class CatalogDriftTests
             "invariant X >= 0 when Go.Amount > 0 because \"bad\"\n" +
             "from A on Go -> no transition\n", "different scope"),
 
+        // C70: duplicate modifier on field/arg declaration
+        ["C70"] = new(H + "field X as number default 0 default 1\n" + S2 +
+            "event Go\nfrom A on Go -> no transition\n", "Duplicate modifier"),
+
         // ── Runtime-phase (C33–C37) ───────────────────────────────────
 
         // C33: CreateInstance with empty initial state
@@ -1344,6 +1348,9 @@ public class CatalogDriftTests
 
         // C69: cross-scope guard reference — invariant on line 4
         ["C69"] = ("precept Test\nfield X as number default 0\nstate A initial\nstate B\nevent Go with Amount as number\ninvariant X >= 0 when Go.Amount > 0 because \"bad\"\nfrom A on Go -> no transition\n", "compile", 6),
+
+        // C70: duplicate modifier — field on line 2
+        ["C70"] = ("precept Test\nfield X as number default 0 default 1\nstate A initial\n", "parse", 2),
     };
 
     [Theory]

@@ -1758,4 +1758,278 @@ public class NewSyntaxParserTests
         sa.WhenText.Should().NotBeNull();
         sa.Reason.Should().Be("Notes required before leaving Draft");
     }
+
+    // ════════════════════════════════════════════════════════════════════
+    // PARSING — Any-order field modifiers
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Parse_FieldModifiers_DefaultBeforeNullable()
+    {
+        const string dsl = """
+            precept Test
+            field Name as string default "unknown" nullable
+            state A initial
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+        var f = model.Fields[0];
+
+        f.Name.Should().Be("Name");
+        f.IsNullable.Should().BeTrue();
+        f.HasDefaultValue.Should().BeTrue();
+        f.DefaultValue.Should().Be("unknown");
+    }
+
+    [Fact]
+    public void Parse_FieldModifiers_ConstraintBeforeDefault()
+    {
+        const string dsl = """
+            precept Test
+            field Amount as number nonnegative default 5
+            state A initial
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+        var f = model.Fields[0];
+
+        f.HasDefaultValue.Should().BeTrue();
+        f.DefaultValue.Should().Be(5.0);
+        f.Constraints.Should().Contain(c => c is FieldConstraint.Nonnegative);
+    }
+
+    [Fact]
+    public void Parse_FieldModifiers_ConstraintBeforeNullable()
+    {
+        const string dsl = """
+            precept Test
+            field Notes as string maxlength 500 nullable
+            state A initial
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+        var f = model.Fields[0];
+
+        f.IsNullable.Should().BeTrue();
+        f.Constraints.OfType<FieldConstraint.Maxlength>().Should().ContainSingle().Which.Value.Should().Be(500);
+    }
+
+    [Fact]
+    public void Parse_FieldModifiers_ConstraintThenDefaultThenNullable()
+    {
+        const string dsl = """
+            precept Test
+            field Score as number min 0 default 10 nullable
+            state A initial
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+        var f = model.Fields[0];
+
+        f.IsNullable.Should().BeTrue();
+        f.HasDefaultValue.Should().BeTrue();
+        f.DefaultValue.Should().Be(10.0);
+        f.Constraints.OfType<FieldConstraint.Min>().Should().ContainSingle().Which.Value.Should().Be(0);
+    }
+
+    [Fact]
+    public void Parse_FieldModifiers_NullableBeforeConstraint()
+    {
+        const string dsl = """
+            precept Test
+            field Label as string nullable notempty
+            state A initial
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+        var f = model.Fields[0];
+
+        f.IsNullable.Should().BeTrue();
+        f.Constraints.Should().Contain(c => c is FieldConstraint.Notempty);
+    }
+
+    [Fact]
+    public void Parse_FieldModifiers_DefaultBetweenConstraints()
+    {
+        const string dsl = """
+            precept Test
+            field Amount as number min 0 default 50 max 100
+            state A initial
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+        var f = model.Fields[0];
+
+        f.HasDefaultValue.Should().BeTrue();
+        f.DefaultValue.Should().Be(50.0);
+        f.Constraints.Should().HaveCount(2);
+        f.Constraints.OfType<FieldConstraint.Min>().Should().ContainSingle().Which.Value.Should().Be(0);
+        f.Constraints.OfType<FieldConstraint.Max>().Should().ContainSingle().Which.Value.Should().Be(100);
+    }
+
+    [Fact]
+    public void Parse_FieldModifiers_MultipleConstraintsThenNullableThenDefault()
+    {
+        const string dsl = """
+            precept Test
+            field Bio as string notempty maxlength 1000 nullable default "N/A"
+            state A initial
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+        var f = model.Fields[0];
+
+        f.IsNullable.Should().BeTrue();
+        f.HasDefaultValue.Should().BeTrue();
+        f.DefaultValue.Should().Be("N/A");
+        f.Constraints.Should().HaveCount(2);
+        f.Constraints.Should().Contain(c => c is FieldConstraint.Notempty);
+        f.Constraints.Should().Contain(c => c is FieldConstraint.Maxlength);
+    }
+
+    [Fact]
+    public void Parse_FieldModifiers_ChoiceOrderedBeforeDefault()
+    {
+        const string dsl = """
+            precept Test
+            field Priority as choice("Low", "Medium", "High") ordered default "Low"
+            state A initial
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+        var f = model.Fields[0];
+
+        f.HasDefaultValue.Should().BeTrue();
+        f.DefaultValue.Should().Be("Low");
+        f.IsOrdered.Should().BeTrue();
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // PARSING — Any-order event argument modifiers
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Parse_EventArgModifiers_DefaultBeforeNullable()
+    {
+        const string dsl = """
+            precept Test
+            state A initial
+            event Submit with Name as string default "" nullable
+            from A on Submit -> no transition
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+        var arg = model.Events[0].Args[0];
+
+        arg.IsNullable.Should().BeTrue();
+        arg.HasDefaultValue.Should().BeTrue();
+        arg.DefaultValue.Should().Be("");
+    }
+
+    [Fact]
+    public void Parse_EventArgModifiers_ConstraintBeforeDefault()
+    {
+        const string dsl = """
+            precept Test
+            state A initial
+            event Deposit with Amount as number nonnegative default 0
+            from A on Deposit -> no transition
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+        var arg = model.Events[0].Args[0];
+
+        arg.HasDefaultValue.Should().BeTrue();
+        arg.DefaultValue.Should().Be(0.0);
+        arg.Constraints.Should().Contain(c => c is FieldConstraint.Nonnegative);
+    }
+
+    [Fact]
+    public void Parse_EventArgModifiers_NullableAfterConstraint()
+    {
+        const string dsl = """
+            precept Test
+            state A initial
+            event Update with Label as string notempty nullable
+            from A on Update -> no transition
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+        var arg = model.Events[0].Args[0];
+
+        arg.IsNullable.Should().BeTrue();
+        arg.Constraints.Should().Contain(c => c is FieldConstraint.Notempty);
+    }
+
+    [Fact]
+    public void Parse_EventArgModifiers_MultiArgsMixedOrder()
+    {
+        const string dsl = """
+            precept Test
+            state A initial
+            event Submit with Amount as number min 0 default 10, Label as string nullable notempty
+            from A on Submit -> no transition
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+
+        var amount = model.Events[0].Args.Single(a => a.Name == "Amount");
+        amount.HasDefaultValue.Should().BeTrue();
+        amount.DefaultValue.Should().Be(10.0);
+        amount.Constraints.Should().Contain(c => c is FieldConstraint.Min);
+
+        var label = model.Events[0].Args.Single(a => a.Name == "Label");
+        label.IsNullable.Should().BeTrue();
+        label.Constraints.Should().Contain(c => c is FieldConstraint.Notempty);
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // PARSING — C70: Duplicate modifier detection
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void ParseWithDiagnostics_DuplicateDefault_ProducesC70()
+    {
+        const string dsl = """
+            precept Test
+            field X as number default 0 default 1
+            state A initial
+            """;
+
+        var (model, diagnostics) = PreceptParser.ParseWithDiagnostics(dsl);
+
+        model.Should().BeNull();
+        diagnostics.Should().ContainSingle(d => d.Code == "PRECEPT070");
+    }
+
+    [Fact]
+    public void ParseWithDiagnostics_DuplicateNullable_ProducesC70()
+    {
+        const string dsl = """
+            precept Test
+            field X as string nullable nullable
+            state A initial
+            """;
+
+        var (model, diagnostics) = PreceptParser.ParseWithDiagnostics(dsl);
+
+        model.Should().BeNull();
+        diagnostics.Should().ContainSingle(d => d.Code == "PRECEPT070");
+    }
+
+    [Fact]
+    public void ParseWithDiagnostics_DuplicateEventArgModifier_ProducesC70()
+    {
+        const string dsl = """
+            precept Test
+            state A initial
+            event Go with X as number default 0 default 1
+            from A on Go -> no transition
+            """;
+
+        var (model, diagnostics) = PreceptParser.ParseWithDiagnostics(dsl);
+
+        model.Should().BeNull();
+        diagnostics.Should().ContainSingle(d => d.Code == "PRECEPT070");
+    }
 }
