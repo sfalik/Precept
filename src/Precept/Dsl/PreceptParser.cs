@@ -164,6 +164,10 @@ public static class PreceptParser
                 else
                     msg = $"Could not parse transition row 'from {remaining[1].ToStringValue()} on {remaining[3].ToStringValue()}' — expected '{transitionForm}'";
             }
+            else if (next.Kind == PreceptToken.If)
+            {
+                msg = "'if' is a value expression, not a statement. To conditionally apply a transition row, use 'when' as a guard: from <State> on <Event> when <Condition> -> ...";
+            }
             else if (matchingForms.Count > 0)
             {
                 msg += ". Expected: " + string.Join(" or ", matchingForms.Select(f => $"'{f}'"));

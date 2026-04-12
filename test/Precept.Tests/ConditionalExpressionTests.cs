@@ -550,4 +550,47 @@ public class ConditionalExpressionTests
         result2.Outcome.Should().Be(TransitionOutcome.Transition);
         result2.UpdatedInstance!.InstanceData["Display"].Should().Be("anonymous");
     }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Statement-Level `if` Misuse Detection Tests
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Parse_StatementLevelIf_ProducesRedirectToWhen()
+    {
+        const string dsl = """
+            precept Test
+            field Flag as boolean default true
+            field X as number default 0
+            state A initial
+            state B
+            event Go
+            if Flag -> set X = 1 -> transition B
+            """;
+
+        var (model, diags) = PreceptParser.ParseWithDiagnostics(dsl);
+        model.Should().BeNull();
+        diags.Should().ContainSingle();
+        diags[0].Message.Should().Contain("if");
+        diags[0].Message.Should().Contain("value expression");
+        diags[0].Message.Should().Contain("when");
+    }
+
+    [Fact]
+    public void Parse_StatementLevelIf_ErrorMessageIsActionable()
+    {
+        const string dsl = """
+            precept Test
+            field Active as boolean default true
+            state A initial
+            event Go
+            if Active -> transition A
+            """;
+
+        var (model, diags) = PreceptParser.ParseWithDiagnostics(dsl);
+        model.Should().BeNull();
+        diags.Should().ContainSingle();
+        diags[0].Message.Should().Be(
+            "'if' is a value expression, not a statement. To conditionally apply a transition row, use 'when' as a guard: from <State> on <Event> when <Condition> -> ...");
+    }
 }

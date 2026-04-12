@@ -1148,7 +1148,7 @@ set Tier = if CreditScore >= 750 then "prime" else if CreditScore >= 680 then "s
 ### Explicit exclusions
 
 - **No ternary syntax** — `condition ? value : value` is not supported. The keyword form `if...then...else` is deliberate per Principle #13 (keywords for domain, symbols for math).
-- **No statement-level `if`** — `if` does not control declaration applicability. Use `when` guards for structural branching.
+- **No statement-level `if`** — `if` does not control declaration applicability. Use `when` guards for structural branching. The parser detects `if` at statement level and emits a redirect message pointing to `when`.
 - **No short-circuit evaluation** — both branches are type-checked at compile time. At runtime, only the selected branch is evaluated.
 - **No implicit boolean coercion** — numbers and strings are not truthy/falsy. The condition must be explicitly boolean.
 
