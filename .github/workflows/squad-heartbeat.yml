@@ -158,7 +158,7 @@ jobs:
                     agent_assignment: {
                       target_repo: `${context.repo.owner}/${context.repo.repo}`,
                       base_branch: repoData.default_branch,
-                      custom_instructions: `Read .squad/team.md (or .ai-team/team.md) for team context and .squad/routing.md (or .ai-team/routing.md) for routing rules.`
+                      custom_instructions: `Read CONTRIBUTING.md, .github/copilot-instructions.md, .squad/team.md (or .ai-team/team.md), and .squad/routing.md (or .ai-team/routing.md) first. For implementation issues, open or use the draft PR linked to the issue immediately and treat it as the execution hub. Put the implementation plan in the PR body as a checkbox checklist, work in vertical slices, and after each completed slice commit, push, and update the PR-body checklist before continuing. Link the PR with Closes #N, and do not create a separate implementation-plan markdown file. Use the repository-configured Precept MCP server when available, and prefer the Precept MCP tools before source inspection.`
                     }
                   });
                   core.info(`Assigned copilot-swe-agent[bot] to #${issue.number}`);

@@ -85,9 +85,9 @@ jobs:
                 '',
                 `**Issue:** #${issue.number} — ${issue.title}`,
                 '',
-                `@copilot has been assigned and will pick this up automatically.`,
+                `@copilot has been routed for automatic pickup.`,
                 '',
-                `> The coding agent will create a \`copilot/*\` branch and open a draft PR.`,
+                `> The workflow will now attempt coding-agent assignment and create a \`copilot/*\` branch on success.`,
                 `> Review the PR as you would any team member's work.`,
               ].join('\n');
             } else {
@@ -137,7 +137,7 @@ jobs:
                 agent_assignment: {
                   target_repo: `${owner}/${repo}`,
                   base_branch: baseBranch,
-                  custom_instructions: '',
+                  custom_instructions: 'Read CONTRIBUTING.md, .github/copilot-instructions.md, .squad/team.md, and .squad/routing.md first. For implementation issues, open or use the draft PR linked to the issue immediately and treat it as the execution hub. Put the implementation plan in the PR body as a checkbox checklist, work in vertical slices, and after each completed slice commit, push, and update the PR-body checklist before continuing. Link the PR with Closes #N, and do not create a separate implementation-plan markdown file. Use the repository-configured Precept MCP server when available, and prefer the Precept MCP tools before source inspection.',
                   custom_agent: '',
                   model: ''
                 },
@@ -157,5 +157,21 @@ jobs:
                 core.info(`Fallback assigned copilot-swe-agent to issue #${issue_number}`);
               } catch (err2) {
                 core.warning(`Fallback also failed: ${err2.message}`);
+                await github.rest.issues.createComment({
+                  owner,
+                  repo,
+                  issue_number,
+                  body: [
+                    '### ⚠️ @copilot assignment failed',
+                    '',
+                    'The routing workflow recognized this as `squad:copilot`, but the coding-agent assignment API call failed.',
+                    '',
+                    `Primary error: ${err.message}`,
+                    `Fallback error: ${err2.message}`,
+                    '',
+                    '> Check the workflow token configuration and retry the assignment.'
+                  ].join('\n')
+                });
+                throw err2;
               }
             }

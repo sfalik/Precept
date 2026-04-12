@@ -139,8 +139,18 @@ cd ../worktrees/{issue-number}
 
 **Actions:**
 1. Agent makes code changes
-2. Commits reference the issue number
-3. Pushes branch to remote
+2. Updates the draft PR body's implementation checklist after each completed slice or logical group
+3. Commits reference the issue number
+4. Pushes branch to remote
+
+**Slice loop:**
+
+For active implementation work, repeat this loop throughout the PR instead of waiting until the end:
+
+1. Finish one vertical slice or logical group
+2. Check off the corresponding implementation-plan items in the draft PR body
+3. Commit the completed slice
+4. Push the branch
 
 **Commit message format:**
 ```
@@ -169,8 +179,9 @@ git push -u origin squad/{issue-number}-{slug}
 **Actions:**
 1. Open PR from feature branch to base branch
 2. Reference issue in PR description
-3. Apply labels if needed
-4. Transition issue to `In Review`
+3. Seed the PR body with the implementation checklist if it is not already present
+4. Apply labels if needed
+5. Transition issue to `In Review`
 
 **PR creation commands:**
 
