@@ -71,8 +71,8 @@ public class PreceptIntellisenseNavigationTests
         var hover = PreceptDocumentIntellisense.CreateHover(info, position);
 
         hover.Should().NotBeNull();
-        hover!.Contents.ToString().Should().Contain("field <Name>[, <Name>, ...] as <Type> [<modifier>...]");
-        hover.Contents.ToString().Should().Contain("Declares a scalar or collection data field");
+        hover!.Contents.ToString().Should().Contain("field <Name>[, <Name>, ...] as <Type> [<modifier>...] | field <Name> as <Type> -> <Expr> [<constraint>...]");
+        hover.Contents.ToString().Should().Contain("Declares a scalar, collection, or computed data field");
     }
 
     [Fact]
