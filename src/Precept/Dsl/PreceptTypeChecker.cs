@@ -1259,6 +1259,67 @@ internal static class PreceptTypeChecker
             case PreceptFunctionCallExpression fn:
                 return TryInferFunctionCallKind(fn, symbols, out kind, out diagnostic);
 
+            // SYNC:CONSTRAINT:C78
+            // SYNC:CONSTRAINT:C79
+            case PreceptConditionalExpression cond:
+            {
+                // Infer condition type
+                if (!TryInferKind(cond.Condition, symbols, out var condKind, out diagnostic))
+                    return false;
+
+                // C78: condition must be non-nullable boolean
+                if (!IsExactly(condKind, StaticValueKind.Boolean))
+                {
+                    diagnostic = new PreceptValidationDiagnostic(
+                        DiagnosticCatalog.C78,
+                        DiagnosticCatalog.C78.FormatMessage(("actual", FormatKinds(condKind))),
+                        0);
+                    return false;
+                }
+
+                // Null-narrow symbols for then-branch (condition assumed true)
+                var thenSymbols = ApplyNarrowing(cond.Condition, symbols, assumeTrue: true);
+                if (!TryInferKind(cond.ThenBranch, thenSymbols, out var thenKind, out diagnostic))
+                    return false;
+
+                // Else branch uses original symbols (no reverse narrowing)
+                if (!TryInferKind(cond.ElseBranch, symbols, out var elseKind, out diagnostic))
+                    return false;
+
+                // C79: branches must produce compatible scalar types (with integer widening)
+                var thenBase = thenKind & ~StaticValueKind.Null;
+                var elseBase = elseKind & ~StaticValueKind.Null;
+                StaticValueKind resultBase;
+                if (thenBase == elseBase)
+                {
+                    resultBase = thenBase;
+                }
+                else if (IsAssignable(thenBase, elseBase))
+                {
+                    // then-branch widens to else-branch's type (e.g. integer → number)
+                    resultBase = elseBase;
+                }
+                else if (IsAssignable(elseBase, thenBase))
+                {
+                    // else-branch widens to then-branch's type (e.g. integer → number)
+                    resultBase = thenBase;
+                }
+                else
+                {
+                    diagnostic = new PreceptValidationDiagnostic(
+                        DiagnosticCatalog.C79,
+                        DiagnosticCatalog.C79.FormatMessage(
+                            ("thenType", FormatKinds(thenKind)),
+                            ("elseType", FormatKinds(elseKind))),
+                        0);
+                    return false;
+                }
+
+                // Result type is the wider base + Null if either branch is nullable
+                kind = resultBase | ((thenKind | elseKind) & StaticValueKind.Null);
+                return true;
+            }
+
             default:
                 diagnostic = new PreceptValidationDiagnostic(
                     DiagnosticCatalog.C39,

@@ -208,3 +208,16 @@ Both skills use `precept_language` for syntax authority, handle Mermaid diagrams
 - **`StaticValueKind` display:** `FormatValueKind` helper collapses `Number|Integer|Decimal` → `"number"`, surfaces specific types otherwise. `FormatArgConstraint` maps `MustBeIntegerLiteral` → `"must be integer literal"`.
 - **Test impact:** Fixed assertion in `ConstructsIncludeRoundFunction` (checks description contains "built-in function" instead of form starts with "round"). Updated `CatalogDriftTests` switch case for new construct ID. All 1187 tests pass.
 - **Docs note:** `docs/McpServerDesign.md` needs a `functions` section added in the final doc sync slice. The existing `round()` reference table should expand to cover all 18 functions.
+
+### Issue #9 — MCP updates for conditional expressions (2026-04-12)
+
+- **`LanguageTool.cs`:** Zero changes needed. `if`, `then`, `else` tokens carry `[TokenCategory(TokenCategory.Control)]` attributes — `BuildVocabulary()` picks them up automatically. C78/C79 diagnostics in `DiagnosticCatalog` surface automatically via catalog reflection.
+- **`CompileTool.cs`:** Zero changes needed. Conditional expressions serialize via `ReconstituteExpr` in the parser (`if <cond> then <then> else <else>`). `ExpressionText` on set assignments captures the full conditional text. No new DTO fields required.
+- **`InspectTool.cs`:** No changes made — **trace enhancement (AC-9: `conditionResult` + `branchTaken`) requires core engine changes.** The evaluator's `EvaluationResult(bool Success, object? Value, string? Error)` returns only the final value, not which branch was taken. `EventInspectionResult` carries no per-expression evaluation trace. Surfacing conditional branch decisions requires: (1) the evaluator to produce trace metadata, (2) `EventInspectionResult` to carry it, (3) the MCP layer to project it. Items 1–2 are George's domain. MCP shape would be an optional `ConditionalTraceDto(string conditionText, bool conditionResult, string branchTaken, object? value)` array on `InspectEventDto`.
+- **`FireTool.cs`:** Zero changes needed. `engine.Fire()` evaluates conditionals correctly — field values reflect branch selection.
+- **Tests added (8 new, 83 total, 0 failed):**
+  - `CompileToolTests`: conditional in set RHS compiles cleanly, C78 (non-boolean condition), C79 (branch type mismatch)
+  - `LanguageToolTests`: `if`/`then`/`else` in control keywords vocabulary, C78/C79 in constraints catalog
+  - `FireToolTests`: conditional set produces correct value (then branch), conditional set produces correct value (else branch)
+  - `InspectToolTests`: conditional set assignment shows correct transition outcome
+- **Docs note:** `docs/McpServerDesign.md` may need a note about conditional expression support in compile output. Deferred to doc sync.

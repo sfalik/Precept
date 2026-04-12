@@ -150,6 +150,21 @@ public enum PreceptToken
     [TokenSymbol("when")]
     When,
 
+    [TokenCategory(TokenCategory.Control)]
+    [TokenDescription("Conditional expression — selects between two values")]
+    [TokenSymbol("if")]
+    If,
+
+    [TokenCategory(TokenCategory.Control)]
+    [TokenDescription("Conditional expression — introduces the true branch")]
+    [TokenSymbol("then")]
+    Then,
+
+    [TokenCategory(TokenCategory.Control)]
+    [TokenDescription("Conditional expression — introduces the false branch")]
+    [TokenSymbol("else")]
+    Else,
+
     [TokenCategory(TokenCategory.Grammar)]
     [TokenDescription("Wildcard for all declared states")]
     [TokenSymbol("any")]

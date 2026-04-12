@@ -6,6 +6,14 @@
 
 ## Recent Updates
 
+### 2026-04-12 — Issue #9: Grammar + language server completions for conditional expressions (if/then/else)
+
+- Grammar (`precept.tmLanguage.json`): added `if|then|else` to `controlKeywords` alternation alongside `when`. Updated regex from `\\bwhen\\b` to `\\b(when|if|then|else)\\b`.
+- Completions (`PreceptAnalyzer.cs`): added `if ... then ... else` snippet to `ExpressionOperatorItems` — appears in all expression contexts (set RHS, guard, invariant, event assert, data expression). Excluded `if`, `then`, `else` from `TopLevelItems` (expression-only, not statement keywords). Excluded `then`, `else` from `KeywordItems` (continuation-only keywords).
+- Semantic tokens: zero changes needed — `TokenCategory.Control → "preceptKeywordSemantic"` auto-picks up `If`, `Then`, `Else` from the enum. Verified by test.
+- Tests: 4 new completion tests (set RHS, invariant, guard, statement-start exclusion) + 1 semantic token test. All 151 LS tests pass. All 9 grammar drift tests pass.
+- Build: 0 errors.
+
 ### 2026-04-11 — Slices 6+7: Language server completions + grammar verification (conditional `when` guards)
 
 - **Slice 7 (grammar verification):** Confirmed `when` is already in `controlKeywords` in `precept.tmLanguage.json`. All LanguageServer tests pass. Zero grammar changes needed.
@@ -86,6 +94,13 @@
 - Key learning: When a grammar already has a named pattern for specific dotted accessors (not relying on catch-all), new accessors must be added explicitly to that pattern — the catch-all produces a semantically different token scope.
 
 ## Learnings
+
+### 2026-04-12 — Issue #9: Conditional expression tooling
+
+- Expression-only control keywords (`if`, `then`, `else`) must be excluded from `TopLevelItems` even though they share `TokenCategory.Control` with statement-level keywords like `when`. The `BuildTopLevelItems()` method auto-includes all Control tokens — add explicit symbol-name exclusions.
+- Continuation keywords (`then`, `else`) should also be excluded from `KeywordItems` — they're never meaningful standalone, only as part of `if ... then ... else`.
+- `ExpressionOperatorItems` is the correct insertion point for expression-level keywords — it feeds into `BuildGuardCompletions`, `BuildExpressionCompletions`, `BuildDataExpressionCompletions`, and `BuildEventAssertCompletions` (all four expression contexts).
+- Using a snippet (`if ${1:condition} then ${2:value} else ${3:value}`) for conditional expressions provides better UX than a bare keyword since the full form is always required.
 
 ### 2026-04-11 — Issue #14 final tooling spec (all 4 forms)
 

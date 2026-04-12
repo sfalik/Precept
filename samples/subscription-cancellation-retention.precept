@@ -38,7 +38,7 @@ on DeclineOffer assert Note == null or Note != "" because "A supplied decline no
 
 from Active on RequestCancellation -> set SubscriberName = RequestCancellation.Name -> set PlanName = RequestCancellation.Plan -> set MonthlyPrice = RequestCancellation.Price -> set CancellationReason = RequestCancellation.Reason -> set SaveOfferAccepted = false -> transition RetentionReview
 
-from RetentionReview on MakeSaveOffer when not SaveOfferAccepted and RetentionDiscount == 0 -> set RetentionDiscount = MakeSaveOffer.DiscountPercent -> no transition
+from RetentionReview on MakeSaveOffer when not SaveOfferAccepted and RetentionDiscount == 0 -> set RetentionDiscount = MakeSaveOffer.DiscountPercent -> set LastAgentNote = if MonthlyPrice >= 50 then "Premium plan retention" else "Standard plan retention" -> no transition
 from RetentionReview on MakeSaveOffer -> reject "Only one outstanding save offer can exist at a time"
 
 from RetentionReview on AcceptOffer -> set SaveOfferAccepted = true -> set CancellationReason = null -> transition Active

@@ -164,6 +164,10 @@ public static class PreceptParser
                 else
                     msg = $"Could not parse transition row 'from {remaining[1].ToStringValue()} on {remaining[3].ToStringValue()}' — expected '{transitionForm}'";
             }
+            else if (next.Kind == PreceptToken.If)
+            {
+                msg = "'if' is a value expression, not a statement. To conditionally apply a transition row, use 'when' as a guard: from <State> on <Event> when <Condition> -> ...";
+            }
             else if (matchingForms.Count > 0)
             {
                 msg += ". Expected: " + string.Join(" or ", matchingForms.Select(f => $"'{f}'"));
@@ -312,6 +316,22 @@ public static class PreceptParser
         from _rp in Token.EqualTo(PreceptToken.RightParen)
         select (PreceptExpression)new PreceptParenthesizedExpression(inner);
 
+    // Conditional expression: if <condition> then <value> else <value>
+    private static readonly TokenListParser<PreceptToken, PreceptExpression> ConditionalExpr =
+        (from _if in Token.EqualTo(PreceptToken.If)
+         from condition in Superpower.Parse.Ref(BoolExprRef)
+         from _then in Token.EqualTo(PreceptToken.Then)
+         from thenBranch in Superpower.Parse.Ref(BoolExprRef)
+         from _else in Token.EqualTo(PreceptToken.Else)
+         from elseBranch in Superpower.Parse.Ref(BoolExprRef)
+         select (PreceptExpression)new PreceptConditionalExpression(condition, thenBranch, elseBranch))
+        .Register(new ConstructInfo(
+            "conditional-expression",
+            "if <condition> then <value> else <value>",
+            "expression",
+            "Selects between two values based on a boolean condition. Valid in set RHS, invariant, assert, and guard expressions. Nesting via parentheses: if A then (if B then 1 else 2) else 3.",
+            "from Idle on Apply -> set Label = if Priority > 5 then \"urgent\" else \"normal\" -> no transition"));
+
     // Built-in function call: FunctionName(expr, expr, ...)
     // Function names are identifiers validated against the FunctionRegistry,
     // plus keyword tokens (min/max) that also serve as function names.
@@ -349,6 +369,7 @@ public static class PreceptParser
             .Try().Or(FalseAtom)
             .Try().Or(NullAtom)
             .Try().Or(ParenExpr)
+            .Try().Or(ConditionalExpr)
             .Try().Or(FunctionCallAtom)
             .Or(DottedIdentifier);
 
@@ -807,6 +828,7 @@ public static class PreceptParser
             PreceptBinaryExpression bin => $"{ReconstituteExpr(bin.Left)} {bin.Operator} {ReconstituteExpr(bin.Right)}",
             PreceptParenthesizedExpression paren => $"({ReconstituteExpr(paren.Inner)})",
             PreceptFunctionCallExpression fn => $"{fn.Name}({string.Join(", ", fn.Arguments.Select(ReconstituteExpr))})",
+            PreceptConditionalExpression cond => $"if {ReconstituteExpr(cond.Condition)} then {ReconstituteExpr(cond.ThenBranch)} else {ReconstituteExpr(cond.ElseBranch)}",
             _ => expr.ToString() ?? ""
         };
 

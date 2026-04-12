@@ -1168,6 +1168,85 @@ public class PreceptAnalyzerCompletionTests
             because: "choice type should be offered as collection inner type");
     }
 
+    // ════════════════════════════════════════════════════════════════════
+    // Conditional Expression Completions (if / then / else)
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Completions_SetAssignmentExpr_SuggestsIfSnippet()
+    {
+        const string text = """
+            precept M
+            field Status as string default ""
+            state A initial
+            event Go
+            from A on Go -> set Status = $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain(c => c.StartsWith("if", StringComparison.Ordinal),
+            because: "conditional expression must be offered in set-assignment RHS");
+    }
+
+    [Fact]
+    public void Completions_InvariantExpr_SuggestsIfSnippet()
+    {
+        const string text = """
+            precept M
+            field Balance as number default 0
+            state A initial
+            event Go
+            invariant $$
+            from A on Go -> no transition
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain(c => c.StartsWith("if", StringComparison.Ordinal),
+            because: "conditional expression must be offered in invariant body");
+    }
+
+    [Fact]
+    public void Completions_GuardExpr_SuggestsIfSnippet()
+    {
+        const string text = """
+            precept M
+            field Balance as number default 0
+            state A initial
+            event Go with Amount as number
+            from A on Go when $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain(c => c.StartsWith("if", StringComparison.Ordinal),
+            because: "conditional expression must be offered in guard position");
+    }
+
+    [Fact]
+    public void Completions_StatementStart_DoesNotSuggestIfThenElse()
+    {
+        const string text = """
+            precept M
+            field Balance as number default 0
+            state A initial
+            event Go
+            $$
+            from A on Go -> no transition
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().NotContain("if", because: "if is an expression keyword, not a statement keyword");
+        completions.Should().NotContain("then", because: "then is a continuation keyword, not a statement keyword");
+        completions.Should().NotContain("else", because: "else is a continuation keyword, not a statement keyword");
+    }
+
     private static (string text, Position position) ExtractPosition(string textWithMarker)
     {
         var index = textWithMarker.IndexOf("$$", StringComparison.Ordinal);

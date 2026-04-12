@@ -368,4 +368,36 @@ from Open on Update -> set Name = Update.NewName -> transition Done
         result.EditableFields!.Select(f => f.Name).Should().Contain("X",
             "when the edit block guard is true, the field should appear in editable fields");
     }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Conditional expressions (issue #9)
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Inspect_ConditionalSetAssignment_ShowsCorrectOutcome()
+    {
+        var text = """
+            precept Test
+            field Urgent as boolean default true
+            field Priority as number default 0
+            state Open initial
+            state Done
+            event Finish
+            from Open on Finish -> set Priority = if Urgent then 10 else 1 -> transition Done
+            """;
+
+        var data = new Dictionary<string, object?>
+        {
+            ["Urgent"] = true,
+            ["Priority"] = 0.0
+        };
+
+        var result = InspectTool.Inspect(text, "Open", data);
+
+        result.Error.Should().BeNull();
+        var finish = result.Events.FirstOrDefault(e => e.Event == "Finish");
+        finish.Should().NotBeNull();
+        finish!.Outcome.Should().Be("Transition");
+        finish.ResultState.Should().Be("Done");
+    }
 }
