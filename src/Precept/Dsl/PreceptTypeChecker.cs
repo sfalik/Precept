@@ -957,8 +957,9 @@ internal static class PreceptTypeChecker
                 CheckCrossScopeGuardIdentifiers(paren.Inner, allowedSymbols, sourceLine, diagnostics);
                 break;
 
-            case PreceptRoundExpression round:
-                CheckCrossScopeGuardIdentifiers(round.Value, allowedSymbols, sourceLine, diagnostics);
+            case PreceptFunctionCallExpression fn:
+                foreach (var arg in fn.Arguments)
+                    CheckCrossScopeGuardIdentifiers(arg, allowedSymbols, sourceLine, diagnostics);
                 break;
 
             case PreceptLiteralExpression:
@@ -1246,32 +1247,8 @@ internal static class PreceptTypeChecker
             case PreceptBinaryExpression binary:
                 return TryInferBinaryKind(binary, symbols, out kind, out diagnostic);
 
-            case PreceptRoundExpression round:
-            {
-                if (!TryInferKind(round.Value, symbols, out var innerKind, out diagnostic))
-                    return false;
-
-                if (!IsNumericKind(innerKind))
-                {
-                    diagnostic = new PreceptValidationDiagnostic(
-                        DiagnosticCatalog.C40,
-                        "round() requires a numeric (integer, decimal, or number) argument.",
-                        0);
-                    return false;
-                }
-
-                if (round.Places < 0)
-                {
-                    diagnostic = new PreceptValidationDiagnostic(
-                        DiagnosticCatalog.C40,
-                        "round() places argument must be non-negative.",
-                        0);
-                    return false;
-                }
-
-                kind = StaticValueKind.Decimal;
-                return true;
-            }
+            case PreceptFunctionCallExpression fn:
+                return TryInferFunctionCallKind(fn, symbols, out kind, out diagnostic);
 
             default:
                 diagnostic = new PreceptValidationDiagnostic(
@@ -1280,6 +1257,75 @@ internal static class PreceptTypeChecker
                     0);
                 return false;
         }
+    }
+
+    private static bool TryInferFunctionCallKind(
+        PreceptFunctionCallExpression fn,
+        IReadOnlyDictionary<string, StaticValueKind> symbols,
+        out StaticValueKind kind,
+        out PreceptValidationDiagnostic? diagnostic)
+    {
+        kind = StaticValueKind.None;
+        diagnostic = null;
+
+        if (!FunctionRegistry.TryGetFunction(fn.Name, out var funcDef))
+        {
+            diagnostic = new PreceptValidationDiagnostic(
+                DiagnosticCatalog.C39,
+                $"unknown function '{fn.Name}'.",
+                0);
+            return false;
+        }
+
+        // Find overload matching arity (prefer exact match, then variadic)
+        var overload = funcDef.Overloads.FirstOrDefault(o =>
+            o.MinArity.HasValue
+                ? fn.Arguments.Length >= o.MinArity.Value
+                : fn.Arguments.Length == o.Parameters.Length);
+
+        if (overload is null)
+        {
+            diagnostic = new PreceptValidationDiagnostic(
+                DiagnosticCatalog.C40,
+                $"{fn.Name}() called with {fn.Arguments.Length} argument(s), but no matching overload found.",
+                0);
+            return false;
+        }
+
+        // Validate each argument against the overload's parameter types
+        for (int i = 0; i < fn.Arguments.Length && i < overload.Parameters.Length; i++)
+        {
+            var param = overload.Parameters[i];
+
+            // Special constraint: must be a non-negative integer literal
+            if (param.Constraint == FunctionArgConstraint.MustBeIntegerLiteral)
+            {
+                if (fn.Arguments[i] is not PreceptLiteralExpression { Value: long lv } || lv < 0)
+                {
+                    diagnostic = new PreceptValidationDiagnostic(
+                        DiagnosticCatalog.C40,
+                        $"{fn.Name}() {param.Name} argument must be non-negative.",
+                        0);
+                    return false;
+                }
+                continue;
+            }
+
+            if (!TryInferKind(fn.Arguments[i], symbols, out var argKind, out diagnostic))
+                return false;
+
+            if (!IsNumericKind(argKind))
+            {
+                diagnostic = new PreceptValidationDiagnostic(
+                    DiagnosticCatalog.C40,
+                    $"{fn.Name}() requires a numeric (integer, decimal, or number) argument.",
+                    0);
+                return false;
+            }
+        }
+
+        kind = overload.ReturnType;
+        return true;
     }
 
     private static bool TryInferBinaryKind(

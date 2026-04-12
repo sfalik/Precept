@@ -312,23 +312,27 @@ public static class PreceptParser
         from _rp in Token.EqualTo(PreceptToken.RightParen)
         select (PreceptExpression)new PreceptParenthesizedExpression(inner);
 
-    // round(expr, N) — built-in rounding function; recognized by identifier name, not a keyword
-    private static readonly TokenListParser<PreceptToken, PreceptExpression> RoundAtom =
-        (from kw in Token.EqualTo(PreceptToken.Identifier).Where(t => t.ToStringValue() == "round")
+    // Built-in function call: FunctionName(expr, expr, ...)
+    // Function names are identifiers validated against the FunctionRegistry.
+    private static readonly TokenListParser<PreceptToken, PreceptExpression> FunctionCallAtom =
+        (from name in Token.EqualTo(PreceptToken.Identifier).Where(t => FunctionRegistry.IsFunction(t.ToStringValue()))
          from _lp in Token.EqualTo(PreceptToken.LeftParen)
-         from val in Superpower.Parse.Ref(BoolExprRef)
-         from _c in Token.EqualTo(PreceptToken.Comma)
-         from n in Token.EqualTo(PreceptToken.NumberLiteral)
+         from firstArg in Superpower.Parse.Ref(BoolExprRef)
+         from restArgs in (
+             from _c in Token.EqualTo(PreceptToken.Comma)
+             from arg in Superpower.Parse.Ref(BoolExprRef)
+             select arg
+         ).Many()
          from _rp in Token.EqualTo(PreceptToken.RightParen)
-         let raw = n.ToNumericLiteralValue()
-         let places = raw is long l ? (int)l : (int)(double)raw
-         select (PreceptExpression)new PreceptRoundExpression(val, places))
+         select (PreceptExpression)new PreceptFunctionCallExpression(
+             name.ToStringValue(),
+             new[] { firstArg }.Concat(restArgs).ToArray()))
         .Try()
         .Register(new ConstructInfo(
             "round-function",
             "round (<Expr>, <N>)",
             "expression",
-            "Rounds a decimal expression to N decimal places (banker's rounding). Valid in set RHS and invariant/assert expressions.",
+            "Calls a built-in function. Available: round(value, places) — rounds a decimal value to N decimal places (banker's rounding). Valid in set RHS and invariant/assert expressions.",
             "from Idle on Apply -> set Rate = round(Apply.Amount, 2) -> no transition"));
 
     private static readonly TokenListParser<PreceptToken, PreceptExpression> Atom =
@@ -338,7 +342,7 @@ public static class PreceptParser
             .Try().Or(FalseAtom)
             .Try().Or(NullAtom)
             .Try().Or(ParenExpr)
-            .Try().Or(RoundAtom)
+            .Try().Or(FunctionCallAtom)
             .Or(DottedIdentifier);
 
     // Level 4: Unary (! and unary -)
@@ -795,7 +799,7 @@ public static class PreceptParser
             PreceptUnaryExpression un => $"{un.Operator}{ReconstituteExpr(un.Operand)}",
             PreceptBinaryExpression bin => $"{ReconstituteExpr(bin.Left)} {bin.Operator} {ReconstituteExpr(bin.Right)}",
             PreceptParenthesizedExpression paren => $"({ReconstituteExpr(paren.Inner)})",
-            PreceptRoundExpression round => $"round({ReconstituteExpr(round.Value)}, {round.Places})",
+            PreceptFunctionCallExpression fn => $"{fn.Name}({string.Join(", ", fn.Arguments.Select(ReconstituteExpr))})",
             _ => expr.ToString() ?? ""
         };
 

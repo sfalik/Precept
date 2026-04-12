@@ -24,7 +24,7 @@ internal static class PreceptExpressionRuntimeEvaluator
             PreceptParenthesizedExpression parenthesized => Evaluate(parenthesized.Inner, context, fieldContracts),
             PreceptUnaryExpression unary => EvaluateUnary(unary, context),
             PreceptBinaryExpression binary => EvaluateBinary(binary, context, fieldContracts),
-            PreceptRoundExpression round => EvaluateRound(round, context),
+            PreceptFunctionCallExpression fn => EvaluateFunction(fn, context),
             _ => EvaluationResult.Fail("unsupported expression node.")
         };
     }
@@ -365,16 +365,39 @@ internal static class PreceptExpressionRuntimeEvaluator
         return EvaluationResult.Ok(collection.Contains(rightResult.Value));
     }
 
-    private static EvaluationResult EvaluateRound(PreceptRoundExpression round, IReadOnlyDictionary<string, object?> context)
+    private static EvaluationResult EvaluateFunction(PreceptFunctionCallExpression fn, IReadOnlyDictionary<string, object?> context)
     {
-        var valResult = Evaluate(round.Value, context);
+        return fn.Name switch
+        {
+            "round" => EvaluateRound(fn, context),
+            _ => EvaluationResult.Fail($"unknown function '{fn.Name}'.")
+        };
+    }
+
+    private static EvaluationResult EvaluateRound(PreceptFunctionCallExpression fn, IReadOnlyDictionary<string, object?> context)
+    {
+        var valResult = Evaluate(fn.Arguments[0], context);
         if (!valResult.Success)
             return valResult;
 
         if (!TryToDecimal(valResult.Value, out var d))
             return EvaluationResult.Fail("round() requires a numeric argument.");
 
-        var result = Math.Round(d, round.Places, MidpointRounding.ToEven);
+        int places = 0;
+        if (fn.Arguments.Length >= 2)
+        {
+            var placesResult = Evaluate(fn.Arguments[1], context);
+            if (!placesResult.Success)
+                return placesResult;
+            if (placesResult.Value is long lv)
+                places = (int)lv;
+            else if (placesResult.Value is double dv)
+                places = (int)dv;
+            else
+                return EvaluationResult.Fail("round() places argument must be numeric.");
+        }
+
+        var result = Math.Round(d, places, MidpointRounding.ToEven);
         return EvaluationResult.Ok(result);
     }
 
