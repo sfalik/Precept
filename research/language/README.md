@@ -28,6 +28,7 @@ This folder is the durable, domain-first research map for Precept language work.
 | Static reasoning expansion | — | [references/static-reasoning-expansion.md](./references/static-reasoning-expansion.md) | [references/static-reasoning-expansion.md](./references/static-reasoning-expansion.md) | Horizon domain; currently theory-first rather than proposal-first. |
 | Structural lifecycle modifiers | — | [expressiveness/structural-lifecycle-modifiers.md](./expressiveness/structural-lifecycle-modifiers.md) | [references/state-machine-expressiveness.md](./references/state-machine-expressiveness.md), [references/static-reasoning-expansion.md](./references/static-reasoning-expansion.md) | Horizon domain. `terminal` is the strong Tier 1 candidate; `required`/`transient` are Tier 2. |
 | Type-system follow-ons | — | [expressiveness/type-system-follow-ons.md](./expressiveness/type-system-follow-ons.md) | [references/type-system-survey.md](./references/type-system-survey.md) | Residual type pressure after the main type wave; no active proposal yet. |
+| Event action hooks | `#65` | [expressiveness/event-hooks.md](./expressiveness/event-hooks.md) | [references/state-machine-expressiveness.md](./references/state-machine-expressiveness.md) | Two-case split: stateless (Issue A, #65, ready) and stateful (Issue B, deferred). Issue A has zero Principle 7 tension. |
 
 ## Open proposal issue map
 
@@ -50,6 +51,7 @@ Use this table when you already know the issue number and need its research grou
 | `#27` | `decimal` type | Type system expansion | [expressiveness/type-system-domain-survey.md](./expressiveness/type-system-domain-survey.md), [references/type-system-survey.md](./references/type-system-survey.md) |
 | `#29` | `integer` type | Type system expansion | [expressiveness/type-system-domain-survey.md](./expressiveness/type-system-domain-survey.md), [references/type-system-survey.md](./references/type-system-survey.md) |
 | `#31` | Logical keyword forms (`and` / `or` / `not`) | Expression expansion | [expressiveness/expression-expansion-domain.md](./expressiveness/expression-expansion-domain.md), [references/expression-evaluation.md](./references/expression-evaluation.md) |
+| `#65` | Event action hooks (stateless) | Event action hooks | [expressiveness/event-hooks.md](./expressiveness/event-hooks.md), [references/state-machine-expressiveness.md](./references/state-machine-expressiveness.md) |
 
 ## Cross-cutting research that supports multiple domains
 
