@@ -201,12 +201,14 @@ public sealed class PreceptEngine
 
     /// <summary>
     /// Expands ["all"] to all declared field names, or returns the list unchanged.
-    /// "all" means all scalar fields + all collection fields.
+    /// "all" means all scalar fields + all collection fields, excluding computed fields
+    /// (computed fields are read-only and cannot be edited).
     /// </summary>
     private IEnumerable<string> ExpandEditFieldNames(IReadOnlyList<string> fieldNames)
     {
         if (fieldNames.Count == 1 && string.Equals(fieldNames[0], "all", StringComparison.Ordinal))
-            return Fields.Select(static f => f.Name).Concat(CollectionFields.Select(static f => f.Name));
+            return Fields.Where(static f => !f.IsComputed).Select(static f => f.Name)
+                .Concat(CollectionFields.Select(static f => f.Name));
         return fieldNames;
     }
 

@@ -245,7 +245,7 @@
       ]
     },
     "fieldScalarDeclaration": {
-      "comment": "field Name[, Name, ...] as string nullable default value",
+      "comment": "field Name[, Name, ...] as string nullable default value — also handles computed fields: field Name as type -> expr",
       "patterns": [
         {
           "name": "meta.field-declaration.scalar.precept",
@@ -271,6 +271,13 @@
                 { "include": "#constraintKeywords" },
                 { "include": "#declarationKeywords" },
                 { "include": "#grammarKeywords" },
+                { "include": "#controlKeywords" },
+                { "include": "#arrowOperator" },
+                { "include": "#functionCall" },
+                { "include": "#collectionMemberAccess" },
+                { "include": "#stringMemberAccess" },
+                { "include": "#operators" },
+                { "include": "#identifierReference" },
                 { "include": "#booleanNull" },
                 { "include": "#numbers" },
                 { "include": "#strings" }

@@ -1367,4 +1367,110 @@ public class PreceptComputedFieldRuntimeTests
         fieldTargets.Should().Contain("B");
         violation.Targets.OfType<ConstraintTarget.StateTarget>().Should().ContainSingle();
     }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Entry / exit action → computed recomputation (review B1)
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void EntryAction_MutatesField_RecomputesComputedField()
+    {
+        // Entry action sets Base → computed Doubled should reflect the new value.
+        const string dsl = """
+            precept Test
+            field Base as number default 0
+            field Doubled as number -> Base + Base
+            state S1 initial
+            state S2
+            to S2 -> set Base = 5
+            event Go
+            from S1 on Go -> transition S2
+            """;
+
+        var (engine, instance) = CompileAndCreate(dsl);
+
+        var result = engine.Fire(instance, "Go");
+
+        result.Outcome.Should().Be(TransitionOutcome.Transition);
+        result.UpdatedInstance!.InstanceData["Base"].Should().Be(5.0);
+        result.UpdatedInstance!.InstanceData["Doubled"].Should().Be(10.0);
+    }
+
+    [Fact]
+    public void ExitAction_MutatesField_RecomputesComputedField()
+    {
+        // Exit action sets Base → computed Doubled should reflect the new value.
+        const string dsl = """
+            precept Test
+            field Base as number default 0
+            field Doubled as number -> Base + Base
+            state S1 initial
+            state S2
+            from S1 -> set Base = 7
+            event Go
+            from S1 on Go -> transition S2
+            """;
+
+        var (engine, instance) = CompileAndCreate(dsl);
+
+        var result = engine.Fire(instance, "Go");
+
+        result.Outcome.Should().Be(TransitionOutcome.Transition);
+        // Exit sets Base=7, row has no set, entry has no set. Doubled = 7+7.
+        result.UpdatedInstance!.InstanceData["Doubled"].Should().Be(14.0);
+    }
+
+    [Fact]
+    public void FullPipeline_ExitRowEntry_AllRecomputeComputedField()
+    {
+        // Exit sets Base=1, row adds 10 → Base=11, entry adds 100 → Base=111.
+        // Computed field Doubled = Base + Base should be 222.
+        const string dsl = """
+            precept Test
+            field Base as number default 0
+            field Doubled as number -> Base + Base
+            state S1 initial
+            state S2
+            from S1 -> set Base = 1
+            to S2 -> set Base = Base + 100
+            event Go
+            from S1 on Go -> set Base = Base + 10 -> transition S2
+            """;
+
+        var (engine, instance) = CompileAndCreate(dsl);
+
+        var result = engine.Fire(instance, "Go");
+
+        result.Outcome.Should().Be(TransitionOutcome.Transition);
+        // Exit: Base=1. Row: Base=1+10=11. Entry: Base=11+100=111.
+        result.UpdatedInstance!.InstanceData["Base"].Should().Be(111.0);
+        result.UpdatedInstance!.InstanceData["Doubled"].Should().Be(222.0);
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Stateless invariant vs. recomputed values (review B3)
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void StatelessInvariant_EnforcedAgainstRecomputedValue()
+    {
+        // Stateless precept with computed field + invariant.
+        // Updating dependency to make recomputed value violate the invariant.
+        const string dsl = """
+            precept Test
+            field Qty as number default 1
+            field Total as number -> Qty + Qty
+            edit Qty
+            invariant Total <= 10 because "Total exceeds limit"
+            """;
+
+        var (engine, instance) = CompileAndCreate(dsl);
+
+        // Qty=6 → Total=12 → violates Total <= 10
+        var result = engine.Update(instance, p => p.Set("Qty", 6.0));
+
+        result.Outcome.Should().Be(UpdateOutcome.ConstraintFailure);
+        result.Violations.Should().ContainSingle()
+            .Which.Message.Should().Be("Total exceeds limit");
+    }
 }
