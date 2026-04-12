@@ -1623,4 +1623,58 @@ public class NewSyntaxParserTests
         diagnostics.Should().NotBeEmpty();
         diagnostics[0].Message.Should().Contain("Undeclared state 'Nowhere'");
     }
+
+    // ════════════════════════════════════════════════════════════════════
+    // PARSING — Conditional state asserts with anchor-specific when guards
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Parse_ConditionalStateAssert_To_WhenGuardParsed()
+    {
+        const string dsl = """
+            precept Test
+            field Amount as number default 0
+            field Active as boolean default false
+            state Draft initial
+            state Approved
+            event Approve
+            to Approved assert Amount > 0 when Active because "Amount required when active"
+            from Draft on Approve -> transition Approved
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+
+        model.StateAsserts.Should().HaveCount(1);
+        var sa = model.StateAsserts![0];
+        sa.Anchor.Should().Be(AssertAnchor.To);
+        sa.State.Should().Be("Approved");
+        sa.WhenGuard.Should().NotBeNull();
+        sa.WhenText.Should().NotBeNull();
+        sa.Reason.Should().Be("Amount required when active");
+    }
+
+    [Fact]
+    public void Parse_ConditionalStateAssert_From_WhenGuardParsed()
+    {
+        const string dsl = """
+            precept Test
+            field Notes as string nullable
+            field RequiresNotes as boolean default false
+            state Draft initial
+            state Review
+            event Submit
+            from Draft assert Notes != null when RequiresNotes because "Notes required before leaving Draft"
+            from Draft on Submit -> transition Review
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+
+        model.StateAsserts.Should().HaveCount(1);
+        var sa = model.StateAsserts![0];
+        sa.Anchor.Should().Be(AssertAnchor.From);
+        sa.State.Should().Be("Draft");
+        sa.WhenGuard.Should().NotBeNull();
+        sa.WhenText.Should().NotBeNull();
+        sa.Reason.Should().Be("Notes required before leaving Draft");
+    }
 }

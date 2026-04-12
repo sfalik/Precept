@@ -212,3 +212,13 @@ Complete spec written covering all 4 forms and 19 change sites across 5 files. F
 - `not` dependency (issue #31): SHIPPED April 10. Not a blocker.
 - No existing "guard-skipped" status in engine output. Silent skip (no violation) is correct for v1. "Guard-skipped" as a distinct inspect annotation is an optional enhancement, not a gating requirement.
 - Synthetic invariant flag (`IsSynthetic = true`) must be checked: field constraint desugaring should never attach a WhenGuard to synthetic invariants.
+
+### 2026-04-11 — PR #63 reviewer blockers B1–B5: missing test coverage for `when` guards
+
+Added 5 tests requested by Soup Nazi to resolve reviewer blockers on PR #63:
+- **B1** (`NewSyntaxParserTests.Parse_ConditionalStateAssert_To_WhenGuardParsed`): Verifies `to <State> assert ... when <guard> because "..."` parses with Anchor=To, non-null WhenGuard/WhenText.
+- **B2** (`NewSyntaxParserTests.Parse_ConditionalStateAssert_From_WhenGuardParsed`): Verifies `from <State> assert ... when <guard> because "..."` parses with Anchor=From, non-null WhenGuard.
+- **B3** (`NewSyntaxRuntimeTests.Fire_GuardedStateAssert_WhenNot_SkipsWhenTrue`): `in Open assert X > 0 when not Bypass` — Bypass=true skips assert (no violation), Bypass=false applies assert.
+- **B4** (`NewSyntaxRuntimeTests.Fire_GuardedEventAssert_WhenNot_SkipsWhenTrue`): `on Submit assert Submit.Amount > 0 when not Submit.IsDraft` — IsDraft=true skips (transition), IsDraft=false rejects.
+- **B5** (`GuardedEditTests.Update_GuardedEdit_WhenNot_NegativeGuard`): `in Open when not IsLocked edit Notes` — IsLocked=false → editable, IsLocked=true → UneditableField.
+- All 5 tests passing.

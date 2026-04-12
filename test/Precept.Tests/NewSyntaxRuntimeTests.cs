@@ -1170,4 +1170,62 @@ public class NewSyntaxRuntimeTests
         r2.Outcome.Should().Be(TransitionOutcome.ConstraintFailure);
         r2.Violations.Should().Contain(v => v.Message.Contains("X must be > 100 when inactive"));
     }
+
+    // ════════════════════════════════════════════════════════════════════
+    // GUARDED STATE/EVENT ASSERTS — when not
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Fire_GuardedStateAssert_WhenNot_SkipsWhenTrue()
+    {
+        const string dsl = """
+            precept Test
+            field X as number default 10
+            field Bypass as boolean default false
+            state Open initial, Closed
+            event Reduce
+            in Open assert X > 0 when not Bypass because "X must be positive unless bypassed"
+            from Open on Reduce -> set X = X - 20 -> no transition
+            """;
+
+        var wf = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
+
+        // Bypass=true → guard (not Bypass) is false → assert skipped, no violation
+        var inst1 = wf.CreateInstance("Open", new Dictionary<string, object?> { ["X"] = 10.0, ["Bypass"] = true });
+        var r1 = wf.Fire(inst1, "Reduce");
+        r1.Outcome.Should().Be(TransitionOutcome.NoTransition);
+        r1.Violations.Should().BeEmpty();
+
+        // Bypass=false → guard (not Bypass) is true → assert applies, X=-10 fails
+        var inst2 = wf.CreateInstance("Open", new Dictionary<string, object?> { ["X"] = 10.0, ["Bypass"] = false });
+        var r2 = wf.Fire(inst2, "Reduce");
+        r2.Outcome.Should().Be(TransitionOutcome.ConstraintFailure);
+        r2.Violations.Should().Contain(v => v.Message.Contains("X must be positive unless bypassed"));
+    }
+
+    [Fact]
+    public void Fire_GuardedEventAssert_WhenNot_SkipsWhenTrue()
+    {
+        const string dsl = """
+            precept Test
+            state Open initial, Closed
+            event Submit with Amount as number, IsDraft as boolean
+            on Submit assert Submit.Amount > 0 when not Submit.IsDraft because "Amount required for non-draft"
+            from Open on Submit -> transition Closed
+            """;
+
+        var wf = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
+        var inst = wf.CreateInstance("Open");
+
+        // IsDraft=true → guard (not IsDraft) is false → assert skipped, Amount=0 allowed
+        var r1 = wf.Fire(inst, "Submit", new Dictionary<string, object?> { ["Amount"] = 0.0, ["IsDraft"] = true });
+        r1.Outcome.Should().Be(TransitionOutcome.Transition);
+        r1.Violations.Should().BeEmpty();
+
+        // IsDraft=false → guard (not IsDraft) is true → assert applies, Amount=0 fails
+        var inst2 = wf.CreateInstance("Open");
+        var r2 = wf.Fire(inst2, "Submit", new Dictionary<string, object?> { ["Amount"] = 0.0, ["IsDraft"] = false });
+        r2.Outcome.Should().Be(TransitionOutcome.Rejected);
+        r2.Violations.Should().Contain(v => v.Message.Contains("Amount required for non-draft"));
+    }
 }

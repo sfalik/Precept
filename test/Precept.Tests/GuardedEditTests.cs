@@ -266,4 +266,36 @@ public class GuardedEditTests
         updateResult.Outcome.Should().Be(UpdateOutcome.Update);
         updateResult.UpdatedInstance!.InstanceData["X"].Should().Be(10.0);
     }
+
+    // ════════════════════════════════════════════════════════════════════
+    // when not: negative guard on edit blocks
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Update_GuardedEdit_WhenNot_NegativeGuard()
+    {
+        const string dsl = """
+            precept Test
+            field Notes as string default "initial"
+            field IsLocked as boolean default false
+            state Open initial, Closed
+            event Close
+            in Open when not IsLocked edit Notes
+            from Open on Close -> transition Closed
+            """;
+
+        // IsLocked=false → guard (not IsLocked) is true → Notes editable
+        var (engine, inst1) = CompileAndCreate(dsl, "Open",
+            new Dictionary<string, object?> { ["Notes"] = "initial", ["IsLocked"] = false });
+        var r1 = engine.Update(inst1, p => p.Set("Notes", "updated"));
+        r1.Outcome.Should().Be(UpdateOutcome.Update);
+        r1.UpdatedInstance!.InstanceData["Notes"].Should().Be("updated");
+
+        // IsLocked=true → guard (not IsLocked) is false → Notes not editable
+        var inst2 = engine.CreateInstance("Open",
+            new Dictionary<string, object?> { ["Notes"] = "initial", ["IsLocked"] = true });
+        var r2 = engine.Update(inst2, p => p.Set("Notes", "blocked"));
+        r2.Outcome.Should().Be(UpdateOutcome.UneditableField);
+        r2.UpdatedInstance.Should().BeNull();
+    }
 }
