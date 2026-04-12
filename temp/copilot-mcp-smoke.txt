@@ -1,0 +1,8 @@
+MCP smoke check complete
+
+Precept MCP tool names (confirmed via configured MCP server):
+- precept_language
+- precept_compile
+- precept_inspect
+- precept_fire
+- precept_update
