@@ -55,6 +55,23 @@ public static class CompileTool
                 g.Select(MapBranch).ToList()))
             .ToList();
 
+        var invariants = (model.Invariants ?? [])
+            .Where(inv => !inv.IsSynthetic)
+            .Select(inv => new InvariantDto(inv.ExpressionText, inv.WhenText, inv.Reason, inv.SourceLine, inv.IsSynthetic))
+            .ToList();
+
+        var stateAsserts = (model.StateAsserts ?? [])
+            .Select(sa => new StateAssertDto(sa.Anchor.ToString().ToLowerInvariant(), sa.State, sa.ExpressionText, sa.WhenText, sa.Reason, sa.SourceLine))
+            .ToList();
+
+        var eventAsserts = (model.EventAsserts ?? [])
+            .Select(ea => new EventAssertDto(ea.EventName, ea.ExpressionText, ea.WhenText, ea.Reason, ea.SourceLine))
+            .ToList();
+
+        var editBlocks = (model.EditBlocks ?? [])
+            .Select(eb => new EditBlockDto(eb.State, eb.WhenText, eb.FieldNames, eb.SourceLine))
+            .ToList();
+
         return new CompileResult(
             !result.HasErrors,
             model.IsStateless,
@@ -67,6 +84,10 @@ public static class CompileTool
             collectionFields,
             events,
             transitions,
+            invariants,
+            stateAsserts,
+            eventAsserts,
+            editBlocks,
             diagnostics);
     }
 
@@ -128,10 +149,14 @@ public sealed record CompileResult(
     IReadOnlyList<CollectionFieldDto>? CollectionFields,
     IReadOnlyList<EventDto>? Events,
     IReadOnlyList<TransitionDto>? Transitions,
+    IReadOnlyList<InvariantDto>? Invariants,
+    IReadOnlyList<StateAssertDto>? StateAsserts,
+    IReadOnlyList<EventAssertDto>? EventAsserts,
+    IReadOnlyList<EditBlockDto>? EditBlocks,
     IReadOnlyList<DiagnosticDto> Diagnostics)
 {
     public static CompileResult DiagnosticsOnly(IReadOnlyList<DiagnosticDto> diagnostics) =>
-        new(false, false, null, null, 0, 0, null, null, null, null, null, diagnostics);
+        new(false, false, null, null, 0, 0, null, null, null, null, null, null, null, null, null, diagnostics);
 }
 
 public sealed record DiagnosticDto(int Line, int Column, string Message, string? Code, string Severity);
@@ -149,3 +174,7 @@ public sealed record EventArgDto(string Name, string Type, bool Nullable, bool R
     bool? IsOrdered = null);
 public sealed record TransitionDto(string From, string On, IReadOnlyList<BranchDto> Branches);
 public sealed record BranchDto(string? Guard, string Outcome, string? Target, string? Reason);
+public sealed record InvariantDto(string Expression, string? When, string Reason, int Line, bool IsSynthetic);
+public sealed record StateAssertDto(string Anchor, string State, string Expression, string? When, string Reason, int Line);
+public sealed record EventAssertDto(string Event, string Expression, string? When, string Reason, int Line);
+public sealed record EditBlockDto(string? State, string? When, IReadOnlyList<string> Fields, int Line);

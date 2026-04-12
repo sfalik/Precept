@@ -721,15 +721,18 @@ public static class PreceptParser
     private static readonly TokenListParser<PreceptToken, StatementResult> InvariantDecl =
         (from kw in Token.EqualTo(PreceptToken.Invariant)
          from expr in BoolExpr
+         from whenGuard in OptionalWhenGuardParser
          from _ in Token.EqualTo(PreceptToken.Because)
          from reason in Token.EqualTo(PreceptToken.StringLiteral)
          select (StatementResult)new InvariantResult(new PreceptInvariant(
              ReconstituteExpr(expr), expr, reason.ToStringLiteralValue(),
-             SourceLine: kw.Span.Position.Line)))
+             SourceLine: kw.Span.Position.Line,
+             WhenText: whenGuard is not null ? ReconstituteExpr(whenGuard) : null,
+             WhenGuard: whenGuard)))
         .Named("invariant declaration")
             .Register(new ConstructInfo(
                 "invariant",
-                "invariant <Expr> because \"<Reason>\"",
+                "invariant <Expr> [when <Guard>] because \"<Reason>\"",
                 "top-level",
                 "Global data constraint checked after every mutation",
                 "invariant Priority >= 1 because \"Priority must be positive\""));
@@ -802,6 +805,7 @@ public static class PreceptParser
          from states in StateTarget
          from _ in Token.EqualTo(PreceptToken.Assert)
          from expr in BoolExpr
+         from whenGuard in OptionalWhenGuardParser
          from __ in Token.EqualTo(PreceptToken.Because)
          from reason in Token.EqualTo(PreceptToken.StringLiteral)
          select (StatementResult)new StateAssertResult(
@@ -810,11 +814,13 @@ public static class PreceptParser
              AssertAnchor.From,
              states,
              ReconstituteExpr(expr), expr, reason.ToStringLiteralValue(),
-             SourceLine: kw.Span.Position.Line))
+             SourceLine: kw.Span.Position.Line,
+             WhenText: whenGuard is not null ? ReconstituteExpr(whenGuard) : null,
+             WhenGuard: whenGuard))
         .Named("state assert")
             .Register(new ConstructInfo(
                 "state-assert",
-                "in|to|from <State> assert <Expr> because \"<Reason>\"",
+                "in|to|from <State> assert <Expr> [when <Guard>] because \"<Reason>\"",
                 "top-level",
                 "State-scoped data constraint checked on entry, exit, or residency",
                 "in Open assert Assignee != null because \"Must have an assignee\""));
@@ -825,15 +831,18 @@ public static class PreceptParser
          from eventName in Token.EqualTo(PreceptToken.Identifier)
          from _ in Token.EqualTo(PreceptToken.Assert)
          from expr in BoolExpr
+         from whenGuard in OptionalWhenGuardParser
          from __ in Token.EqualTo(PreceptToken.Because)
          from reason in Token.EqualTo(PreceptToken.StringLiteral)
          select (StatementResult)new EventAssertResult(new EventAssertion(
              eventName.ToText(), ReconstituteExpr(expr), expr, reason.ToStringLiteralValue(),
-             SourceLine: kwOn.Span.Position.Line)))
+             SourceLine: kwOn.Span.Position.Line,
+             WhenText: whenGuard is not null ? ReconstituteExpr(whenGuard) : null,
+             WhenGuard: whenGuard)))
         .Named("event assert")
             .Register(new ConstructInfo(
                 "event-assert",
-                "on <Event> assert <Expr> because \"<Reason>\"",
+                "on <Event> assert <Expr> [when <Guard>] because \"<Reason>\"",
                 "top-level",
                 "Event-scoped argument constraint checked before firing",
                 "on Submit assert Comment != \"\" because \"Comment required\""));
@@ -874,13 +883,16 @@ public static class PreceptParser
     private static readonly TokenListParser<PreceptToken, StatementResult> EditDecl =
         (from _ in Token.EqualTo(PreceptToken.In)
          from states in StateTarget
+         from whenGuard in OptionalWhenGuardParser
          from __ in Token.EqualTo(PreceptToken.Edit)
          from fields in FieldTarget
-         select (StatementResult)new EditResult(states, fields))
+         select (StatementResult)new EditResult(states, fields,
+             WhenText: whenGuard is not null ? ReconstituteExpr(whenGuard) : null,
+             WhenGuard: whenGuard))
         .Named("edit declaration")
             .Register(new ConstructInfo(
                 "edit-declaration",
-                "in <State> edit <Field>, ...",
+                "in <State> [when <Guard>] edit <Field>, ...",
                 "top-level",
                 "Declares which fields are editable in a state",
                 "in Open edit Priority"));
@@ -951,11 +963,13 @@ public static class PreceptParser
     private sealed record StateResult(PreceptState[] States, bool[] InitialFlags) : StatementResult;
     private sealed record EventResult(PreceptEvent[] Events) : StatementResult;
     private sealed record StateAssertResult(AssertAnchor Prep, string[] States,
-        string ExprText, PreceptExpression Expr, string Reason, int SourceLine = 0) : StatementResult;
+        string ExprText, PreceptExpression Expr, string Reason, int SourceLine = 0,
+        string? WhenText = null, PreceptExpression? WhenGuard = null) : StatementResult;
     private sealed record EventAssertResult(EventAssertion Assert) : StatementResult;
     private sealed record StateActionResult(AssertAnchor Prep, string[] States,
         ParsedAction[] Actions) : StatementResult;
-    private sealed record EditResult(string[] States, string[] Fields) : StatementResult;
+    private sealed record EditResult(string[] States, string[] Fields,
+        string? WhenText = null, PreceptExpression? WhenGuard = null) : StatementResult;
     private sealed record RootEditResult(string[] Fields) : StatementResult;
     private sealed record TransitionRowResult(string[] States, string EventName,
         PreceptExpression? WhenGuard, ParsedAction[] ActionsAndOutcome, int SourceLine = 0) : StatementResult;
@@ -1072,7 +1086,8 @@ public static class PreceptParser
                 case StateAssertResult sar:
                     ExpandStateTargets(sar.States, states).ForEach(stateName =>
                         stateAsserts.Add(new StateAssertion(
-                            sar.Prep, stateName, sar.ExprText, sar.Expr, sar.Reason, sar.SourceLine)));
+                            sar.Prep, stateName, sar.ExprText, sar.Expr, sar.Reason, sar.SourceLine,
+                            WhenText: sar.WhenText, WhenGuard: sar.WhenGuard)));
                     break;
 
                 case EventAssertResult ear:
@@ -1091,7 +1106,8 @@ public static class PreceptParser
 
                 case EditResult edr:
                     ExpandStateTargets(edr.States, states).ForEach(stateName =>
-                        editBlocks.Add(new PreceptEditBlock(stateName, edr.Fields.ToList())));
+                        editBlocks.Add(new PreceptEditBlock(stateName, edr.Fields.ToList(),
+                            WhenText: edr.WhenText, WhenGuard: edr.WhenGuard)));
                     break;
 
                 case RootEditResult redr:

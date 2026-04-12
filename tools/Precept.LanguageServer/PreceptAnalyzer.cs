@@ -343,17 +343,36 @@ internal sealed class PreceptAnalyzer
             return [new CompletionItem { Label = "as", Kind = CompletionItemKind.Keyword }, new CompletionItem { Label = ",", Kind = CompletionItemKind.Operator, Detail = "add another field name" }];
 
         // ── New-syntax: invariant/assert expressions ──
-        // After a completed invariant expression, suggest the required reason clause.
-        if (Regex.IsMatch(beforeCursor, "^\\s*invariant\\s+.+\\s+$", RegexOptions.IgnoreCase) && EndsWithCompletedExpression(beforeCursor))
+        // After "invariant <expr> when <guard> " (completed guard) → suggest because
+        if (Regex.IsMatch(beforeCursor, @"^\s*invariant\s+.+\s+when\s+.+\s+$", RegexOptions.IgnoreCase) && EndsWithCompletedExpression(beforeCursor))
             return [BecauseItem];
+
+        // After "invariant <expr> when " (guard in progress) → suggest field names for guard expression
+        if (Regex.IsMatch(beforeCursor, @"^\s*invariant\s+.+\s+when\s+[^\n]*$", RegexOptions.IgnoreCase))
+            return BuildDataExpressionCompletions(dataFields, collectionKinds);
+
+        // After a completed invariant expression, suggest when or because.
+        if (Regex.IsMatch(beforeCursor, "^\\s*invariant\\s+.+\\s+$", RegexOptions.IgnoreCase) && EndsWithCompletedExpression(beforeCursor))
+            return [WhenItem, BecauseItem];
 
         // After "invariant " → suggest expression completions (field names, operators)
         if (Regex.IsMatch(beforeCursor, "^\\s*invariant\\s+[^\\n]*$", RegexOptions.IgnoreCase))
             return BuildDataExpressionCompletions(dataFields, collectionKinds);
 
-        // After a completed event assert expression, suggest the required reason clause.
-        if (Regex.IsMatch(beforeCursor, "^\\s*on\\s+[A-Za-z_][A-Za-z0-9_]*\\s+assert\\s+.+\\s+$", RegexOptions.IgnoreCase) && EndsWithCompletedExpression(beforeCursor))
+        // After "on Event assert <expr> when <guard> " (completed guard) → suggest because
+        if (Regex.IsMatch(beforeCursor, @"^\s*on\s+[A-Za-z_][A-Za-z0-9_]*\s+assert\s+.+\s+when\s+.+\s+$", RegexOptions.IgnoreCase) && EndsWithCompletedExpression(beforeCursor))
             return [BecauseItem];
+
+        // After "on Event assert <expr> when " (guard in progress) → suggest event arg completions
+        if (Regex.IsMatch(beforeCursor, @"^\s*on\s+[A-Za-z_][A-Za-z0-9_]*\s+assert\s+.+\s+when\s+[^\n]*$", RegexOptions.IgnoreCase))
+        {
+            var eventName = Regex.Match(beforeCursor, @"^\s*on\s+(?<evt>[A-Za-z_][A-Za-z0-9_]*)").Groups["evt"].Value;
+            return BuildEventAssertCompletions(eventName, eventArgs);
+        }
+
+        // After a completed event assert expression, suggest when or because.
+        if (Regex.IsMatch(beforeCursor, "^\\s*on\\s+[A-Za-z_][A-Za-z0-9_]*\\s+assert\\s+.+\\s+$", RegexOptions.IgnoreCase) && EndsWithCompletedExpression(beforeCursor))
+            return [WhenItem, BecauseItem];
 
         // After "on EventName assert " → suggest expression completions (event args)
         if (Regex.IsMatch(beforeCursor, "^\\s*on\\s+[A-Za-z_][A-Za-z0-9_]*\\s+assert\\s+[^\\n]*$", RegexOptions.IgnoreCase))
@@ -370,12 +389,28 @@ internal sealed class PreceptAnalyzer
         if (Regex.IsMatch(beforeCursor, @"^\s*on\s+\w*$", RegexOptions.IgnoreCase))
             return BuildItems(events, CompletionItemKind.Event);
 
-        // After "in/to StateName " → suggest assert, ->, edit (in only)
+        // After "in State when <guard> edit " → suggest field names
+        if (Regex.IsMatch(beforeCursor, @"^\s*in\s+[^\n]*\s+when\s+[^\n]+\s+edit\s+[^\n]*$", RegexOptions.IgnoreCase))
+            return DistinctAndSort(
+                new CompletionItem[] { new() { Label = "all", Kind = CompletionItemKind.Keyword } }
+                    .Concat(BuildItems(dataFields, CompletionItemKind.Field))
+                    .Concat(BuildItems(collectionFields, CompletionItemKind.Field)));
+
+        // After "in State when <guard> " (completed guard) → suggest edit
+        if (Regex.IsMatch(beforeCursor, @"^\s*in\s+[A-Za-z_][A-Za-z0-9_]*(?:\s*,\s*[A-Za-z_][A-Za-z0-9_]*)*\s+when\s+.+\s+$", RegexOptions.IgnoreCase) && EndsWithCompletedExpression(beforeCursor))
+            return [new CompletionItem { Label = "edit", Kind = CompletionItemKind.Keyword }];
+
+        // After "in State when " (guard in progress) → suggest field names for guard expression
+        if (Regex.IsMatch(beforeCursor, @"^\s*in\s+[A-Za-z_][A-Za-z0-9_]*(?:\s*,\s*[A-Za-z_][A-Za-z0-9_]*)*\s+when\s+[^\n]*$", RegexOptions.IgnoreCase))
+            return BuildDataExpressionCompletions(dataFields, collectionKinds);
+
+        // After "in/to StateName " → suggest assert, ->, edit (in only), when (in only)
         if (Regex.IsMatch(beforeCursor, "^\\s*in\\s+[A-Za-z_][A-Za-z0-9_]*(?:\\s*,\\s*[A-Za-z_][A-Za-z0-9_]*)*\\s+$", RegexOptions.IgnoreCase))
             return
             [
                 new CompletionItem { Label = "assert", Kind = CompletionItemKind.Keyword },
                 new CompletionItem { Label = "edit", Kind = CompletionItemKind.Keyword },
+                WhenItem,
                 new CompletionItem { Label = "->", Kind = CompletionItemKind.Operator, Detail = "action chain" }
             ];
 
@@ -391,9 +426,17 @@ internal sealed class PreceptAnalyzer
         if (Regex.IsMatch(beforeCursor, "^\\s*(?:in|to)\\s+(?:[A-Za-z_][A-Za-z0-9_]*\\s*,\\s*)*(?:[A-Za-z_][A-Za-z0-9_]*)?$", RegexOptions.IgnoreCase))
             return BuildItems(states.Append("any"), CompletionItemKind.EnumMember);
 
-        // After a completed state assert expression, suggest the required reason clause.
-        if (Regex.IsMatch(beforeCursor, "^\\s*(?:in|to|from)\\s+[^\\n]*\\s+assert\\s+.+\\s+$", RegexOptions.IgnoreCase) && EndsWithCompletedExpression(beforeCursor))
+        // After "in/to/from State assert <expr> when <guard> " (completed guard) → suggest because
+        if (Regex.IsMatch(beforeCursor, @"^\s*(?:in|to|from)\s+[^\n]*\s+assert\s+.+\s+when\s+.+\s+$", RegexOptions.IgnoreCase) && EndsWithCompletedExpression(beforeCursor))
             return [BecauseItem];
+
+        // After "in/to/from State assert <expr> when " (guard in progress) → suggest field completions
+        if (Regex.IsMatch(beforeCursor, @"^\s*(?:in|to|from)\s+[^\n]*\s+assert\s+.+\s+when\s+[^\n]*$", RegexOptions.IgnoreCase))
+            return BuildDataExpressionCompletions(dataFields, collectionKinds);
+
+        // After a completed state assert expression, suggest when or because.
+        if (Regex.IsMatch(beforeCursor, "^\\s*(?:in|to|from)\\s+[^\\n]*\\s+assert\\s+.+\\s+$", RegexOptions.IgnoreCase) && EndsWithCompletedExpression(beforeCursor))
+            return [WhenItem, BecauseItem];
 
         // After "in/to/from State assert " → expression completions
         if (Regex.IsMatch(beforeCursor, "^\\s*(?:in|to|from)\\s+[^\\n]*\\s+assert\\s+[^\\n]*$", RegexOptions.IgnoreCase))
@@ -1207,6 +1250,7 @@ internal sealed class PreceptAnalyzer
     private static readonly CompletionItem NullableItem = new() { Label = "nullable", Kind = CompletionItemKind.Keyword, Detail = "Makes field nullable" };
     private static readonly CompletionItem DefaultItem = new() { Label = "default", Kind = CompletionItemKind.Keyword, Detail = "Default value" };
     private static readonly CompletionItem BecauseItem = new() { Label = "because", Kind = CompletionItemKind.Keyword, Detail = "Constraint reason" };
+    private static readonly CompletionItem WhenItem = new() { Label = "when", Kind = CompletionItemKind.Keyword, Detail = "Conditional guard" };
     private static readonly CompletionItem ArrowPipelineItem = new() { Label = "->", Kind = CompletionItemKind.Operator, Detail = "action/outcome pipeline" };
     private static readonly CompletionItem CommaItem = new() { Label = ",", Kind = CompletionItemKind.Operator, Detail = "Next event argument" };
 

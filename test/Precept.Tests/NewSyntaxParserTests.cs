@@ -1415,6 +1415,169 @@ public class NewSyntaxParserTests
     // PARSING — Undeclared state references in transition rows (C54)
     // ════════════════════════════════════════════════════════════════════
 
+    // ════════════════════════════════════════════════════════════════════
+    // PARSING — Conditional when guards (Issue #14 Slice 9)
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Parse_ConditionalInvariant_WhenGuardParsed()
+    {
+        const string dsl = """
+            precept Test
+            field X as number default 0
+            field Active as boolean default false
+            state A initial
+            invariant X >= 0 when Active because "Only when active"
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+
+        model.Invariants.Should().HaveCount(1);
+        var inv = model.Invariants![0];
+        inv.WhenGuard.Should().NotBeNull();
+        inv.WhenText.Should().Be("Active");
+        inv.Reason.Should().Be("Only when active");
+    }
+
+    [Fact]
+    public void Parse_ConditionalStateAssert_WhenGuardParsed()
+    {
+        const string dsl = """
+            precept Test
+            field X as number default 0
+            field Active as boolean default false
+            state Open initial
+            in Open assert X > 0 when Active because "Only when active"
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+
+        model.StateAsserts.Should().HaveCount(1);
+        var sa = model.StateAsserts![0];
+        sa.WhenGuard.Should().NotBeNull();
+        sa.WhenText.Should().Be("Active");
+        sa.Reason.Should().Be("Only when active");
+    }
+
+    [Fact]
+    public void Parse_ConditionalEventAssert_WhenGuardParsed()
+    {
+        const string dsl = """
+            precept Test
+            state Active initial
+            event Submit with Amount as number, Priority as number
+            on Submit assert Amount > 0 when Priority > 1 because "High priority needs amount"
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+
+        model.EventAsserts.Should().HaveCount(1);
+        var ea = model.EventAsserts![0];
+        ea.WhenGuard.Should().NotBeNull();
+        ea.WhenText.Should().Be("Priority > 1");
+        ea.Reason.Should().Be("High priority needs amount");
+    }
+
+    [Fact]
+    public void Parse_ConditionalEdit_WhenGuardParsed()
+    {
+        const string dsl = """
+            precept Test
+            field Priority as number default 0
+            field Active as boolean default false
+            state Open initial
+            in Open when Active edit Priority
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+
+        model.EditBlocks.Should().HaveCount(1);
+        var eb = model.EditBlocks![0];
+        eb.State.Should().Be("Open");
+        eb.WhenGuard.Should().NotBeNull();
+        eb.WhenText.Should().Be("Active");
+        eb.FieldNames.Should().Contain("Priority");
+    }
+
+    [Fact]
+    public void Parse_ConditionalInvariant_WhenNotGuard()
+    {
+        const string dsl = """
+            precept Test
+            field X as number default 0
+            field Active as boolean default false
+            state A initial
+            invariant X >= 0 when not Active because "When not active"
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+
+        var inv = model.Invariants![0];
+        inv.WhenGuard.Should().NotBeNull();
+        inv.WhenGuard.Should().BeOfType<PreceptUnaryExpression>()
+            .Which.Operator.Should().Be("not");
+    }
+
+    [Fact]
+    public void Parse_InvariantWithoutWhen_GuardIsNull()
+    {
+        const string dsl = """
+            precept Test
+            field X as number default 0
+            state A initial
+            invariant X >= 0 because "Always"
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+
+        model.Invariants.Should().HaveCount(1);
+        model.Invariants![0].WhenGuard.Should().BeNull();
+        model.Invariants![0].WhenText.Should().BeNull();
+    }
+
+    [Fact]
+    public void Parse_ConditionalEdit_InAny_ExpandsToAllStates()
+    {
+        const string dsl = """
+            precept Test
+            field Priority as number default 0
+            field Active as boolean default false
+            state A initial
+            state B
+            in any when Active edit Priority
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+
+        model.EditBlocks.Should().HaveCount(2);
+        model.EditBlocks!.Select(e => e.State).Should().BeEquivalentTo("A", "B");
+        model.EditBlocks![0].WhenGuard.Should().NotBeNull();
+        model.EditBlocks![1].WhenGuard.Should().NotBeNull();
+        model.EditBlocks![0].WhenText.Should().Be("Active");
+        model.EditBlocks![1].WhenText.Should().Be("Active");
+    }
+
+    [Fact]
+    public void Parse_EditWithoutWhen_GuardIsNull()
+    {
+        const string dsl = """
+            precept Test
+            field Priority as number default 0
+            state Open initial
+            in Open edit Priority
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+
+        model.EditBlocks.Should().HaveCount(1);
+        model.EditBlocks![0].WhenGuard.Should().BeNull();
+        model.EditBlocks![0].WhenText.Should().BeNull();
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // PARSING — Undeclared state references in transition rows (C54)
+    // ════════════════════════════════════════════════════════════════════
+
     [Fact]
     public void Parse_TransitionTargetUndeclaredState_Throws()
     {
@@ -1459,5 +1622,59 @@ public class NewSyntaxParserTests
         model.Should().BeNull();
         diagnostics.Should().NotBeEmpty();
         diagnostics[0].Message.Should().Contain("Undeclared state 'Nowhere'");
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // PARSING — Conditional state asserts with anchor-specific when guards
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Parse_ConditionalStateAssert_To_WhenGuardParsed()
+    {
+        const string dsl = """
+            precept Test
+            field Amount as number default 0
+            field Active as boolean default false
+            state Draft initial
+            state Approved
+            event Approve
+            to Approved assert Amount > 0 when Active because "Amount required when active"
+            from Draft on Approve -> transition Approved
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+
+        model.StateAsserts.Should().HaveCount(1);
+        var sa = model.StateAsserts![0];
+        sa.Anchor.Should().Be(AssertAnchor.To);
+        sa.State.Should().Be("Approved");
+        sa.WhenGuard.Should().NotBeNull();
+        sa.WhenText.Should().NotBeNull();
+        sa.Reason.Should().Be("Amount required when active");
+    }
+
+    [Fact]
+    public void Parse_ConditionalStateAssert_From_WhenGuardParsed()
+    {
+        const string dsl = """
+            precept Test
+            field Notes as string nullable
+            field RequiresNotes as boolean default false
+            state Draft initial
+            state Review
+            event Submit
+            from Draft assert Notes != null when RequiresNotes because "Notes required before leaving Draft"
+            from Draft on Submit -> transition Review
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+
+        model.StateAsserts.Should().HaveCount(1);
+        var sa = model.StateAsserts![0];
+        sa.Anchor.Should().Be(AssertAnchor.From);
+        sa.State.Should().Be("Draft");
+        sa.WhenGuard.Should().NotBeNull();
+        sa.WhenText.Should().NotBeNull();
+        sa.Reason.Should().Be("Notes required before leaving Draft");
     }
 }

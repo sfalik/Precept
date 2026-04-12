@@ -792,6 +792,23 @@ internal static class PreceptTypeChecker
                     diagnostics,
                     expressions,
                     isBooleanRulePosition: true);
+
+                if (invariant.WhenGuard is not null)
+                {
+                    ValidateExpression(
+                        invariant.WhenGuard,
+                        invariant.WhenText!,
+                        invariant.SourceLine,
+                        dataSymbols,
+                        StaticValueKind.Boolean,
+                        "invariant when guard",
+                        diagnostics,
+                        expressions,
+                        isBooleanRulePosition: true);
+
+                    // SYNC:CONSTRAINT:C69
+                    CheckCrossScopeGuardIdentifiers(invariant.WhenGuard, dataSymbols, invariant.SourceLine, diagnostics);
+                }
             }
         }
 
@@ -810,6 +827,24 @@ internal static class PreceptTypeChecker
                     expressions,
                     stateContext: stateAssert.State,
                     isBooleanRulePosition: true);
+
+                if (stateAssert.WhenGuard is not null)
+                {
+                    ValidateExpression(
+                        stateAssert.WhenGuard,
+                        stateAssert.WhenText!,
+                        stateAssert.SourceLine,
+                        dataSymbols,
+                        StaticValueKind.Boolean,
+                        "state assert when guard",
+                        diagnostics,
+                        expressions,
+                        stateContext: stateAssert.State,
+                        isBooleanRulePosition: true);
+
+                    // SYNC:CONSTRAINT:C69
+                    CheckCrossScopeGuardIdentifiers(stateAssert.WhenGuard, dataSymbols, stateAssert.SourceLine, diagnostics);
+                }
             }
         }
 
@@ -835,7 +870,95 @@ internal static class PreceptTypeChecker
                     expressions,
                     eventName: eventAssert.EventName,
                     isBooleanRulePosition: true);
+
+                if (eventAssert.WhenGuard is not null)
+                {
+                    ValidateExpression(
+                        eventAssert.WhenGuard,
+                        eventAssert.WhenText!,
+                        eventAssert.SourceLine,
+                        symbols,
+                        StaticValueKind.Boolean,
+                        "event assert when guard",
+                        diagnostics,
+                        expressions,
+                        eventName: eventAssert.EventName,
+                        isBooleanRulePosition: true);
+
+                    // SYNC:CONSTRAINT:C69
+                    CheckCrossScopeGuardIdentifiers(eventAssert.WhenGuard, symbols, eventAssert.SourceLine, diagnostics);
+                }
             }
+        }
+
+        if (model.EditBlocks is not null)
+        {
+            foreach (var editBlock in model.EditBlocks)
+            {
+                if (editBlock.WhenGuard is not null)
+                {
+                    ValidateExpression(
+                        editBlock.WhenGuard,
+                        editBlock.WhenText!,
+                        editBlock.SourceLine,
+                        dataSymbols,
+                        StaticValueKind.Boolean,
+                        "edit when guard",
+                        diagnostics,
+                        expressions,
+                        isBooleanRulePosition: true);
+
+                    // SYNC:CONSTRAINT:C69
+                    CheckCrossScopeGuardIdentifiers(editBlock.WhenGuard, dataSymbols, editBlock.SourceLine, diagnostics);
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Walks a guard expression and emits C69 for any identifier not in the allowed symbol scope.
+    /// </summary>
+    private static void CheckCrossScopeGuardIdentifiers(
+        PreceptExpression expr,
+        IReadOnlyDictionary<string, StaticValueKind> allowedSymbols,
+        int sourceLine,
+        List<PreceptValidationDiagnostic> diagnostics)
+    {
+        switch (expr)
+        {
+            case PreceptIdentifierExpression id:
+                var fullName = id.SubMember is not null
+                    ? $"{id.Name}.{id.Member}.{id.SubMember}"
+                    : id.Member is not null ? $"{id.Name}.{id.Member}" : id.Name;
+                if (!allowedSymbols.ContainsKey(fullName) && !allowedSymbols.ContainsKey(id.Name))
+                {
+                    // SYNC:CONSTRAINT:C69
+                    diagnostics.Add(new PreceptValidationDiagnostic(
+                        DiagnosticCatalog.C69,
+                        DiagnosticCatalog.C69.FormatMessage(("name", fullName)),
+                        sourceLine));
+                }
+                break;
+
+            case PreceptBinaryExpression bin:
+                CheckCrossScopeGuardIdentifiers(bin.Left, allowedSymbols, sourceLine, diagnostics);
+                CheckCrossScopeGuardIdentifiers(bin.Right, allowedSymbols, sourceLine, diagnostics);
+                break;
+
+            case PreceptUnaryExpression unary:
+                CheckCrossScopeGuardIdentifiers(unary.Operand, allowedSymbols, sourceLine, diagnostics);
+                break;
+
+            case PreceptParenthesizedExpression paren:
+                CheckCrossScopeGuardIdentifiers(paren.Inner, allowedSymbols, sourceLine, diagnostics);
+                break;
+
+            case PreceptRoundExpression round:
+                CheckCrossScopeGuardIdentifiers(round.Value, allowedSymbols, sourceLine, diagnostics);
+                break;
+
+            case PreceptLiteralExpression:
+                break;
         }
     }
 
@@ -879,7 +1002,7 @@ internal static class PreceptTypeChecker
             return result;
 
         foreach (var group in model.StateAsserts
-            .Where(static stateAssert => stateAssert.Anchor == AssertAnchor.In)
+            .Where(static stateAssert => stateAssert.Anchor == AssertAnchor.In && stateAssert.WhenGuard is null)
             .GroupBy(static stateAssert => stateAssert.State, StringComparer.Ordinal))
         {
             IReadOnlyDictionary<string, StaticValueKind> narrowed = new Dictionary<string, StaticValueKind>(dataFieldKinds, StringComparer.Ordinal);

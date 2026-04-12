@@ -26,6 +26,34 @@
 - 9 new MCP tests added (65 total, 0 failed).
 
 
+### Issue #14 — Final DTO specification filed (2026-04-11)
+
+- **Four new top-level arrays for `precept_compile`:** `invariants`, `stateAsserts`, `eventAsserts`, `editBlocks`. All use camelCase field names. `when: string | null` on each entry. `StateDto.rules: string[]` preserved unchanged (additive, not replacement).
+- **Synthetic invariant filtering is mandatory:** `model.Invariants` must be filtered with `!i.IsSynthetic` before projecting to `InvariantDto`. Synthetic invariants desugar from field constraints — including them in the `invariants` array would duplicate the field's own `constraints` array.
+- **`stateAsserts` anchor is lowercased string:** `AssertAnchor.In/To/From` → `"in"/"to"/"from"` via `.ToString().ToLowerInvariant()`. Matches the DSL keyword form.
+- **`editBlocks[].state` is nullable:** Root-level stateless edit declarations have no state — `state: null` is a valid DTO shape, not an error.
+- **`constraintTrace` belongs on per-event `InspectEventDto`**, not the top-level `InspectResult`. Per-event placement preserves evaluation context — mixing all events' traces at the top level is harder to correlate.
+- **`guardStatus` field is omitted when there is no guard**: Only populated when `when != null`. When `guardStatus == "skipped"`, `status` is also omitted (constraint was never evaluated). When `guardStatus == "applied"`, `status` is always present. When no guard: `when: null`, no `guardStatus`, `status` always present.
+- **Edit block editability in inspect — no change for now:** `EditableFieldDto` requires no changes. Form 4 (`in State when guard edit`) is deferred; `grantedWhen` shape is out of scope for this sprint.
+- **C69 is a mechanism-selection diagnostic, not a typo diagnostic:** Fires when an event arg identifier IS known but is referenced in the wrong scope (invariant/state-assert guard). C38 fires for unknown identifiers. C69 message must name the dotted identifier, state the scope mismatch, and propose the correct transition-row guard alternative. These are mutually exclusive.
+- **Two-commit sequence within one PR:** Commit A (structured arrays, `when: null` hardcoded) can land before George's model record changes. Commit B (wire `when` from `WhenText`) is gated on George's parser changes. Commit B stays in the same Issue #14 PR — not a separate PR.
+- **`precept_language` — 6 construct entries need form/description updates** (invariant, in/to/from state assert × 3, on event assert, in state edit). No new vocabulary entries — `when` is already in `controlKeywords`.
+
+### Issue #14 — `when` guards MCP contract assessment (2026-04-11)
+
+- **Current compile output is nearly empty of declaration structure.** Invariants, event asserts, and edit blocks are entirely absent. State asserts appear only as `StateDto.rules: string[]` (reason text only — no expression, no anchor, no guard field). This is the most important finding: #14 cannot "add a guard field to existing declaration DTOs" because most declaration DTOs don't exist yet in the compile output.
+- **Correct compile expansion:** Add new top-level arrays (`invariants`, `stateAsserts`, `eventAsserts`, `editBlocks`) each with a `when: string?` property. Do NOT replace `StateDto.rules: string[]` — that would break existing consumers. Keep the string array; add structured arrays alongside it.
+- **Inspect trace requires runtime support.** The `constraintTrace` (#14's "skipped/applied/violated" requirement) doesn't exist at the core runtime layer — violations only, no full evaluation trace. George needs to surface guard evaluation results via `InspectionResult` before the MCP DTO can carry them. This is the highest-effort item.
+- **`when` is already in `controlKeywords`.** It appears there because of transition row guards (`from S on E when G ->`). No new vocabulary additions needed for #14 — just construct catalog entry updates.
+- **Cross-scope guard diagnostics must name the preferred form** (e.g., `from S on E when G -> reject`). A generic C038 "unknown identifier" is insufficient — the agent needs to understand it's a mechanism-selection problem, not a typo. Needs a dedicated C6X diagnostic code.
+- **Verdict: Minor update, additive only.** Provided new declaration arrays are added (not replacing existing ones) and `constraintTrace` is treated as an additive nullable field.
+
+### Issue #14 Slice 8 — MCP tool updates for when guards (2026-04-11)
+
+- **8a: CompileTool.cs — 4 new DTO arrays added.** `InvariantDto`, `StateAssertDto`, `EventAssertDto`, `EditBlockDto` with `When` (nullable string) on all four. `CompileResult` expanded from 12 to 16 positional parameters. `DiagnosticsOnly` factory updated with 4 extra `null` args. Synthetic invariants filtered with `!inv.IsSynthetic`. `StateAssertDto.Anchor` lowercased via `.ToString().ToLowerInvariant()`.
+- **8b: LanguageTool.cs — no changes needed.** `ConstructCatalog.Constructs` auto-picks up updated parser `.Register()` descriptions from Slice 2. Verified the dynamic projection in `LanguageTool.Run()` requires zero manual edits.
+- **Validation: 67/67 MCP tests pass, 850/850 core tests pass.** Zero regressions — new DTO fields are additive and don't break existing deserialization.
+
 ### MCP Tool Surface (5 Tools — Final Design)
 
 **Tool philosophy:** One tool per concern. No overlap in reporting. Failure modes reinforce the intended signal chain: `compile → fix → inspect/fire/update`.

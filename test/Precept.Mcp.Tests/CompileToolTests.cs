@@ -364,4 +364,121 @@ public class CompileToolTests
         result.Valid.Should().BeTrue();
         result.Diagnostics.Should().BeEmpty();
     }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Slice 9c: when-guard DTO tests
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Compile_WhenGuardedInvariant_InvariantsArrayPopulated()
+    {
+        var text = """
+            precept Test
+            field X as number default 0
+            field Active as boolean default false
+            invariant X >= 0 when Active because "X must be non-negative when active"
+            state A initial
+            event Go
+            from A on Go -> no transition
+            """;
+
+        var result = CompileTool.Run(text);
+
+        result.Valid.Should().BeTrue();
+        result.Invariants.Should().NotBeNull();
+        var guarded = result.Invariants!.FirstOrDefault(i => i.When is not null);
+        guarded.Should().NotBeNull("a when-guarded invariant should have When populated");
+        guarded!.When.Should().Contain("Active");
+        guarded.Expression.Should().Contain("X >= 0");
+    }
+
+    [Fact]
+    public void Compile_WhenGuardedStateAssert_StateAssertsArrayPopulated()
+    {
+        var text = """
+            precept Test
+            field X as number default 0
+            field Active as boolean default false
+            state Open initial
+            in Open assert X >= 0 when Active because "X must be non-negative when active"
+            event Go
+            from Open on Go -> no transition
+            """;
+
+        var result = CompileTool.Run(text);
+
+        result.Valid.Should().BeTrue();
+        result.StateAsserts.Should().NotBeNull();
+        var guarded = result.StateAsserts!.FirstOrDefault(sa => sa.When is not null);
+        guarded.Should().NotBeNull("a when-guarded state assert should have When populated");
+        guarded!.When.Should().Contain("Active");
+        guarded.State.Should().Be("Open");
+    }
+
+    [Fact]
+    public void Compile_WhenGuardedEventAssert_EventAssertsArrayPopulated()
+    {
+        var text = """
+            precept Test
+            field X as number default 0
+            state A initial
+            event Submit with Amount as number, Priority as number
+            on Submit assert Amount > 0 when Priority > 1 because "Amount required for high priority"
+            from A on Submit -> no transition
+            """;
+
+        var result = CompileTool.Run(text);
+
+        result.Valid.Should().BeTrue();
+        result.EventAsserts.Should().NotBeNull();
+        var guarded = result.EventAsserts!.FirstOrDefault(ea => ea.When is not null);
+        guarded.Should().NotBeNull("a when-guarded event assert should have When populated");
+        guarded!.When.Should().Contain("Priority > 1");
+        guarded.Event.Should().Be("Submit");
+    }
+
+    [Fact]
+    public void Compile_WhenGuardedEditBlock_EditBlocksArrayPopulated()
+    {
+        var text = """
+            precept Test
+            field X as number default 0
+            field Active as boolean default false
+            state Open initial
+            in Open when Active edit X
+            event Go
+            from Open on Go -> no transition
+            """;
+
+        var result = CompileTool.Run(text);
+
+        result.Valid.Should().BeTrue();
+        result.EditBlocks.Should().NotBeNull();
+        var guarded = result.EditBlocks!.FirstOrDefault(eb => eb.When is not null);
+        guarded.Should().NotBeNull("a when-guarded edit block should have When populated");
+        guarded!.When.Should().Contain("Active");
+        guarded.State.Should().Be("Open");
+        guarded.Fields.Should().Contain("X");
+    }
+
+    [Fact]
+    public void Compile_UnguardedInvariant_WhenIsNull()
+    {
+        var text = """
+            precept Test
+            field X as number default 1
+            invariant X > 0 because "X must be positive"
+            state A initial
+            event Go
+            from A on Go -> no transition
+            """;
+
+        var result = CompileTool.Run(text);
+
+        result.Valid.Should().BeTrue();
+        result.Invariants.Should().NotBeNull();
+        var unguarded = result.Invariants!.FirstOrDefault(i => i.Expression.Contains("X > 0"));
+        unguarded.Should().NotBeNull();
+        unguarded!.When.Should().BeNull("an unguarded invariant should have When = null");
+    }
 }

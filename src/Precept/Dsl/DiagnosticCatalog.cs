@@ -530,4 +530,14 @@ public static class DiagnosticCatalog
         "C68", "compile",
         "Literal value is not a member of the choice set.",
         "'{value}' is not a member of choice({values}) for '{name}'.");
+
+    // ═══════════════════════════════════════════════════════════════
+    // When-guard diagnostics (C69+)
+    // ═══════════════════════════════════════════════════════════════
+
+    /// <summary>Cross-scope guard reference in when clause.</summary>
+    public static readonly LanguageConstraint C69 = Register(
+        "C69", "compile",
+        "Cross-scope guard reference in when clause.",
+        "Guard expression references '{name}' which belongs to a different scope. Invariant and edit guards can only reference entity fields; event assert guards can only reference event arguments.");
 }

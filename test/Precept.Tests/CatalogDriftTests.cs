@@ -592,6 +592,12 @@ public class CatalogDriftTests
         ["C68"] = new(H + "field Status as choice(\"Open\",\"Closed\") default \"Open\"\n" + S2 +
             "event Go\nfrom A on Go -> set Status = \"Invalid\" -> no transition\n", "not a member"),
 
+        // C69: cross-scope guard reference — invariant guard referencing event arg
+        ["C69"] = new(H + "field X as number default 0\n" + S2 +
+            "event Go with Amount as number\n" +
+            "invariant X >= 0 when Go.Amount > 0 because \"bad\"\n" +
+            "from A on Go -> no transition\n", "different scope"),
+
         // ── Runtime-phase (C33–C37) ───────────────────────────────────
 
         // C33: CreateInstance with empty initial state

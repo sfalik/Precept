@@ -6,6 +6,66 @@
 
 ---
 
+### 2026-04-11T00:00:00Z: Issue #14 — `when <guard>` on declarations — FINAL DESIGN APPROVAL, all 4 forms, implementation scope locked
+**By:** George (runtime), Kramer (tooling), Newman (MCP), Soup Nazi (testability), Frank (design/architecture)
+**Status:** APPROVED — all 4 forms cleared for implementation in a single wave.
+
+Design review of Issue #14 (`when <guard>` conditional invariants, state asserts, event asserts, conditional edit eligibility) completed in two passes. Initial review (Frank `frank-issue14-design-review.md`) cleared Forms 1–3 and deferred Form 4 as a scoping question. Second pass (`frank-issue14-form4-design.md`, `george-issue14-form4-simplicity.md`) confirmed the additive approach resolves the structural obstacle. Final approval round (`frank-issue14-final-approval.md`, `george-issue14-implementation-scope.md`, `kramer-issue14-final-tooling.md`, `newman-issue14-final-dtos.md`, `soup-nazi-issue14-final-tests.md`) — all 5 reviewers filed, all approved, all 4 forms same wave.
+
+**Implementation scope: ~163 lines across 5 files, 19 change sites.**
+
+**Frank — APPROVED all 4 forms (final verdict):**
+- All 4 forms semantically unified: `when <guard>` means "conditional on this boolean condition" — constraint-skip semantics (Forms 1–3) and permission-grant semantics (Form 4) follow naturally from declaration kind, not syntax. Teaching model holds uniformly.
+- Fail-closed edit guards are non-negotiable: guard evaluation error → field not granted. Permission-grant systems must default to deny on uncertainty. Must be explicitly contracted in the issue body with named tests `Update_GuardThrows_FieldNotGranted` and `Inspect_GuardNull_FieldNotGranted`.
+- `in any when <guard>` pre-expansion is correct: expand to one `PreceptEditBlock` per declared state at construction, each carrying the same `WhenGuard`. Runtime evaluates `block.State == currentState && evaluateGuard(block.WhenGuard, instanceData)`. No sentinel handling at evaluation sites.
+- All six locked language decisions from the initial review upheld. Form 4 guard is field-scoped only — arg references rejected with C69.
+
+**George — implementation scope confirmed:**
+- **File 1: `PreceptModel.cs`** — +8 lines. Add optional `WhenGuard?`/`WhenText?` tail parameters to `PreceptInvariant`, `StateAssertion`, `EventAssertion`, `PreceptEditBlock`. Pattern identical to existing `PreceptTransitionRow`. Zero call-site breakage (named defaults). Must land first.
+- **File 2: `DiagnosticCatalog.cs`** — +8 lines. Register C69 (cross-scope guard reference — better message than C38). Pure additive.
+- **File 3: `PreceptParser.cs`** — +16 lines. 4 injection points via existing `OptionalWhenGuardParser` (1 line each). `EditDecl` guard injected between `StateTarget` and `Edit` token. Extend `EditResult` and `StateAssertResult` private records (+2 fields each). Update `AssembleModel` cases for both (+2 lines each). `EditDecl.Try()` before `StateAssertDecl.Try()` ordering verified correct.
+- **File 4: `PreceptTypeChecker.cs`** — ~5 distinct changes. B1 narrowing fix: add `WhenGuard is null` filter in `BuildStateAssertNarrowings` (1-line critical prerequisite, must land first as its own commit). Guard scope validation for all 4 forms (C69 emission). C29/C30 guard-against-defaults pre-check. Form 4 guarded-edit evaluation pass (second pass after static `_editableFieldsByState` fast path — additive, untouches existing unconditional path).
+- **File 5: `PreceptAnalyzer.cs` (language server)** — 13 changes (~33–40 lines). See Kramer.
+- **Confirmed non-changes:** tokenizer, expression evaluator, `_editableFieldsByState` fast path, `IsSynthetic` contamination path, statement union ordering — all verified unchanged.
+
+**Kramer — zero grammar changes, 13 completions changes (~33–40 lines in `PreceptAnalyzer.cs`):**
+- Grammar: `when` already in `controlKeywords` without positional anchor. `in State when guard edit` parse is handled by existing individual keyword patterns. **Zero grammar file changes for any of the 4 forms.**
+- New static `WhenItem` added alongside `BecauseItem`.
+- Forms 1–3: 2 new branches + 1 modification per declaration block (A1/A2/A-modified, C1/C2/C-modified, E1/E2/E-modified). All `when`-bearing branches inserted before base branches (strictly more specific — safe ordering).
+- Form 4: 4 new branches for the `in <State> when <guard> edit` sequence — after `in State` → offer `[assert, edit, when, ->]`; after `in State when` → offer field names + `not`; after `in State when <guard>` → offer `edit`; after `in State when <guard> edit` → offer field names.
+- Branch ordering critical throughout — new branches precede their less-specific base branches.
+
+**Newman — 4 new DTO arrays in `precept_compile` output (B2 — parallel prerequisite):**
+- New: `invariants` (exclude `IsSynthetic`), `stateAsserts`, `eventAsserts`, `editBlocks` — each a top-level array with `expression`, `when: string | null`, `reason`, `line` shape. `stateAsserts` adds `anchor` and `state`. `editBlocks` adds `state` and `fields`.
+- `StateDto.rules: string[]` preserved alongside new arrays — not replaced.
+- `when` fields ship as `null` until George's model record changes land (Commit B). DTOs are structurally ready; wire-up is a 1-line change per array once model records have `WhenText`.
+- `precept_inspect` structured constraint trace: `constraintTrace` top-level key per-state/per-event showing which guards evaluated true/false and which assertions fired. Prerequisite for form-by-form tracing in agent workflows.
+
+**Soup Nazi — ~154 tests (6 test files):**
+- `NewSyntaxParserTests.cs`: +5 (→ 36 total)
+- `PreceptTypeCheckerTests.cs`: +7 (→ 33 total)
+- `PreceptWorkflowTests.cs` / `NewSyntaxRuntimeTests.cs` / `PreceptRulesTests.cs`: Forms 1–3 runtime, unchanged (38 tests — regression gate)
+- `GuardedEditTests.cs`: 22 new tests (Form 4 core). Key: fail-closed (`Update_EditGuard_EvaluationError_FieldNotEditable`), `in any` expansion (3 tests), union semantics (3 tests), state-filter-before-guard (1 test), data-driven guard flip (1 test).
+- `Precept.LanguageServer.Tests/`: +3 completions (→ 10)
+- `Precept.Mcp.Tests/CompileToolTests.cs`: +2 (→ 5); `InspectToolTests.cs`: +2 (→ 5). Both block on Newman B2.
+- **EC-3 is the ordering gate:** `Check_Invariant_WhenGuardFalse_AtDefaultData_NoPrecompileViolation` must pass before runtime tests run.
+
+**Prerequisites and sequencing:**
+1. **B1 narrowing fix** — 1-line commit to `BuildStateAssertNarrowings` (`WhenGuard is null` filter). Must land first, standalone commit.
+2. **Newman DTO additions** — `precept_compile` structured arrays (B2). Parallel with B1. Must land before MCP tests.
+3. Model records → parser → type checker → runtime (Form 4 additive pass) → completions, in dependency order.
+
+**Key spec requirements locked:**
+- Fail-closed edit guards (Frank F2 — explicit issue-body contract required)
+- `in any when <guard>` pre-expansion at construction (Frank F3 / George OQ-2)
+- C69 diagnostic for cross-scope guard references (George / Kramer)
+- EC-3 pre-check ordering gate (Soup Nazi)
+- `StateDto.rules` preserved alongside new DTO arrays (Newman)
+
+**Elaine coordination point:** Dynamic editability UX — guarded edit blocks produce per-instance editability rather than a static per-state set. Elaine's preview inspector and any UI surface showing editable fields must handle guard-conditional editability. Coordinate before Elaine's inspector work begins.
+
+---
+
 ### 2026-04-10T21:00:00Z: Issue #10 — String `.length` accessor — fully implemented
 **By:** Frank (design analysis), George (runtime + evaluator), Kramer (grammar + completions), Soup Nazi (tests), Coordinator (integration)
 **Status:** Implemented — branch `squad/10-string-length-accessor`, 800 tests passing

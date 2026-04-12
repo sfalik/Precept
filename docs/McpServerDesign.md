@@ -210,6 +210,17 @@ The `vocabulary` object contains the following keyword lists, each reflecting `P
 
 **Implementation:** Calls `PreceptCompiler.CompileFromText(text)` — a composed pipeline that runs parse → structured validation → compile. Returns the full model projection when parsing succeeds (even with type errors), diagnostics only when parsing fails. Graph analysis findings (C48–C53) appear as warning/hint-severity diagnostics alongside any type errors. The tool is a thin projection of the core result into JSON.
 
+**Declaration arrays:** The compile output includes four arrays surfacing invariants, state asserts, event asserts, and edit blocks from the parsed definition:
+
+| Array | Item shape |
+|-------|------------|
+| `invariants` | `{ expression, when?, reason, line, isSynthetic }` |
+| `stateAsserts` | `{ anchor, state, expression, when?, reason, line }` |
+| `eventAsserts` | `{ event, expression, when?, reason, line }` |
+| `editBlocks` | `{ state?, when?, fields[], line }` |
+
+The `when` property is present only when the declaration includes a `when <Guard>` clause. It contains the guard expression text.
+
 **`isStateless` field:** `true` when the precept has no `state` declarations. When `isStateless: true`, `initialState` is `null`, `states` is `[]`, and `stateCount` is `0`.
 
 **Stateless example output:**
