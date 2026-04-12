@@ -398,6 +398,64 @@ All PRs reviewed → All PRs merged → Epic closed
 - ❌ Manually transitioning issue states — let the platform and Squad automation handle it
 - ❌ Skipping the branch naming convention — breaks Ralph's tracking logic
 
+## GitHub Projects V2 — Status Sync
+
+Scribe owns all project-board status transitions. The coordinator tells Scribe WHAT to transition; Scribe executes the update mechanically.
+
+### Board Reference (Precept Language Improvements — Project #2)
+
+| Field | Value |
+|-------|-------|
+| Project number | `2` |
+| Project ID | `PVT_kwHOAQyRK84BTxO4` |
+| Owner | `sfalik` |
+| Status field ID | `PVTSSF_lAHOAQyRK84BTxO4zhA94Fw` |
+
+### Status Options
+
+| Status | Option ID | Trigger |
+|--------|-----------|---------|
+| Backlog | `86bc9793` | Issue triaged and added to board |
+| In Review | `6c1e3216` | Design review ceremony starts |
+| Ready | `732ec1dd` | Design approved / all reviewers approve + Shane signs off |
+| In Progress | `f5aee879` | Implementation branch created or draft PR opened |
+| Done | `f79a3ae0` | PR merged and issue closed |
+
+### Update Commands
+
+**Look up item ID for an issue:**
+```bash
+gh project item-list 2 --owner sfalik --format json --limit 50
+# Match content.number to find the PVTI_... item ID
+```
+
+**Set status:**
+```bash
+gh project item-edit --project-id PVT_kwHOAQyRK84BTxO4 \
+  --id <item-id> \
+  --field-id PVTSSF_lAHOAQyRK84BTxO4zhA94Fw \
+  --single-select-option-id <status-option-id>
+```
+
+### Coordinator-to-Scribe Handoff
+
+Include in Scribe's spawn manifest when a status transition is needed:
+
+```
+STATUS_TRANSITION:
+  issueNumber: {N}
+  targetStatus: "In Review" | "Ready" | "In Progress" | "Done"
+```
+
+Scribe looks up the item ID, maps the target status to the option ID, and executes `gh project item-edit`. See Scribe charter § Project Status Sync Responsibilities.
+
+### PR Linking
+
+Every implementation PR MUST contain `Closes #N` in the body. This:
+- Creates a GitHub-tracked link (populates "Linked pull requests" on the board)
+- Auto-closes the issue when the PR merges
+- If missing, Scribe adds it during PR stewardship
+
 ## Migration Notes
 
 **v0.8.x → v0.9.x (Worktree Support):**

@@ -127,16 +127,33 @@ Reviewers MUST produce a **structured JSON object** — not plain Markdown. The 
 - Regression risk: clean / manageable / high-risk
 ```
 
+## Project Status Lifecycle
+
+Proposal reviews drive status transitions on the GitHub Projects V2 board. The coordinator signals Scribe to execute these transitions at the right moments.
+
+| Moment | Status Transition | Coordinator Action |
+|--------|-------------------|--------------------|
+| Design review ceremony starts | → `In Review` | Include `STATUS_TRANSITION: In Review` in Scribe's spawn manifest alongside the review payloads |
+| All reviewers approve + Shane signs off | → `Ready` | Include `STATUS_TRANSITION: Ready` in Scribe's post-review spawn manifest |
+
+If the proposal is `BLOCKED` or `NEEDS_REVISION`, status stays at `In Review` until the re-review completes with approval.
+
+The coordinator MUST include the issue number and the target status in Scribe's spawn manifest. Scribe executes the transition per its § Project Status Sync Responsibilities.
+
 ## How to Post
 
-The coordinator posts the review as a GitHub issue comment:
+**Scribe posts all proposal reviews.** The coordinator quality-checks review content, then passes pre-validated payloads to Scribe in the spawn manifest. Scribe writes each to a temp file and posts via GitHub API. See Scribe charter § Review Posting Responsibilities.
 
-```bash
-# Using gh CLI
-gh issue comment <issue-number> --body-file temp/<agent>-proposal-review.md
+### Coordinator's role:
+1. Collect structured JSON from each reviewer agent.
+2. Validate: correct format, no hallucinated findings, verdicts are justified.
+3. Pass validated review bodies to Scribe in the spawn manifest.
+4. **Present a synthesis summary to the user** (see § Coordinator Post-Review Summary below).
 
-# Or programmatically via the GitHub API / MCP tools
-```
+### Scribe's role:
+1. Write each review body to `temp/{agent-name}-proposal-review.md`.
+2. Post: `gh issue comment <issue-number> --body-file temp/<agent>-proposal-review.md` (or `mcp_github_add_issue_comment`).
+3. Log posted URL in orchestration log.
 
 Unlike PR reviews, issue comments don't have `APPROVE` / `REQUEST_CHANGES` events. The verdict is conveyed in the structured body. To make the verdict machine-scannable, the first line after the heading MUST be:
 
@@ -145,6 +162,46 @@ Unlike PR reviews, issue comments don't have `APPROVE` / `REQUEST_CHANGES` event
 **BLOCKED** — ...
 **NEEDS_REVISION** — ...
 ```
+
+## Coordinator Post-Review Summary
+
+After all reviews are collected (and before or alongside Scribe posting), the coordinator presents a **synthesis summary** to the user. This is the user-facing deliverable — not the raw reviews.
+
+### Required sections:
+
+1. **Verdict table** — each reviewer's verdict in one glanceable table
+2. **Where the team agrees** — themes, positions, or assessments that appeared across multiple reviews
+3. **Where they differ** — any disagreements, divergent risk assessments, or items one reviewer flagged that others didn't
+4. **Consolidated action items** — deduplicated list of blockers and amendments, with source attribution
+5. **Bottom line** — one-sentence overall recommendation
+
+### Example format:
+
+```markdown
+## Design Review Summary — Issue #N: {Title}
+
+### Verdicts
+| Reviewer | Verdict |
+|---|---|
+| Frank | APPROVED |
+| George | feasible-with-caveats |
+
+### Where the team agrees
+- ...
+
+### Where they differ
+- ...
+
+### Action items (deduplicated)
+| # | Item | Raised by |
+|---|---|---|
+| 1 | ... | Soup Nazi, Steinbrenner |
+
+### Bottom line
+...
+```
+
+The summary is chat-only — it is NOT posted to the issue. The structured individual reviews on the issue are the durable record; the summary is for the user's immediate decision-making.
 
 ## Spawn Prompt Addition
 
