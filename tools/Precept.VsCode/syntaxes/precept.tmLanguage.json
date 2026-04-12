@@ -20,6 +20,7 @@
     { "include": "#collectionMemberAccess" },
     { "include": "#stringMemberAccess" },
     { "include": "#rootEditDeclaration" },
+    { "include": "#functionCall" },
     { "include": "#controlKeywords" },
     { "include": "#declarationKeywords" },
     { "include": "#grammarKeywords" },
@@ -382,6 +383,18 @@
             "1": { "name": "variable.other.field.precept" },
             "2": { "name": "punctuation.accessor.precept" },
             "3": { "name": "variable.other.property.precept" }
+          }
+        }
+      ]
+    },
+
+    "functionCall": {
+      "comment": "Built-in function calls: function name followed by ( — must precede constraintKeywords so min(/max( match as functions, not constraints",
+      "patterns": [
+        {
+          "match": "\\b(abs|floor|ceil|round|truncate|min|max|pow|sqrt|clamp|toLower|toUpper|startsWith|endsWith|trim|left|right|mid)(?=\\s*\\()",
+          "captures": {
+            "1": { "name": "support.function.precept" }
           }
         }
       ]
