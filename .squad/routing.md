@@ -35,28 +35,22 @@ How to decide who handles what.
 |-------|--------|-----|
 | `squad` | Triage: analyze issue, assign `squad:{member}` label | Lead |
 | `squad:{name}` | Pick up issue and complete the work | Named member |
-| `squad:copilot` | Pick up issue and complete the work autonomously | @copilot |
+| `squad:chore` | Autonomous pickup: Ralph routes to a real member, applies `squad:{member}` label, preserves review ceremony | Ralph (automatic) |
 
-### How Issue Assignment Works
+### Label Semantics — Backlog vs Autonomous Lane
+
+| Label | Meaning | Behavior |
+|-------|---------|----------|
+| `squad` | Issue is in Squad backlog, awaiting triage | Lead analyzes and assigns `squad:{member}` |
+| `squad:{member}` | Issue is assigned to a specific named agent | That agent picks it up in their next session |
+| `squad:chore` | **Explicit chore gate for Ralph autonomous pickup** | Ralph routes to the best-fit real member, applies `squad:{member}` label; normal review flow follows |
+
+`squad:chore` is the authoritative autonomous lane. Shane applies it to a chore issue to signal "Ralph may pick this up." Ralph routes it to the best-fit real member and preserves the review ceremony. No second label is required.
 
 1. When a GitHub issue gets the `squad` label, the **Lead** triages it — analyzing content, assigning the right `squad:{member}` label, and commenting with triage notes.
-2. When a `squad:{member}` label is applied, that member picks up the issue in their next session. When `squad:copilot` is applied, the coding agent picks it up asynchronously.
-3. Members can reassign by removing their label and adding another member's label, including `squad:copilot` when the issue fits the coding agent capability profile.
+2. When a `squad:{member}` label is applied, that member picks up the issue in their next session.
+3. Members can reassign by removing their label and adding another member's label.
 4. The `squad` label marks the shared backlog entry point — issues waiting for Lead triage and board placement.
-5. Small explicit chore issues that clearly fit the coding-agent capability profile may skip base `squad` triage and be created directly with `squad:copilot`.
-6. When an `@copilot` PR is marked ready for review, the PR Review ceremony runs before human approval and merge.
-7. Normal review feedback on an `@copilot` PR routes back to `@copilot`. Hard reviewer rejection transfers ownership to a different squad member under the lockout rules.
-
-### `squad:copilot` Routing Criteria
-
-Route directly to `squad:copilot` only when the issue is all of the following:
-
-1. Bounded to a small chore, bug fix, cleanup, or narrowly scoped improvement
-2. Backed by clear reproduction steps, acceptance criteria, or an obvious existing pattern to follow
-3. Limited enough that one PR can complete it without cross-team coordination
-4. Verifiable with the repository's existing validation path
-
-Do **not** route directly to `squad:copilot` when the issue changes product philosophy, DSL semantics, parser/runtime behavior, syntax grammar, language-server completions, MCP contracts, security-sensitive behavior, or any cross-cutting design/architecture boundary. Route those through the normal Lead triage path instead.
 
 ## Rules
 

@@ -232,3 +232,15 @@ Added 5 tests requested by Soup Nazi to resolve reviewer blockers on PR #63:
 - **B4** (`NewSyntaxRuntimeTests.Fire_GuardedEventAssert_WhenNot_SkipsWhenTrue`): `on Submit assert Submit.Amount > 0 when not Submit.IsDraft` — IsDraft=true skips (transition), IsDraft=false rejects.
 - **B5** (`GuardedEditTests.Update_GuardedEdit_WhenNot_NegativeGuard`): `in Open when not IsLocked edit Notes` — IsLocked=false → editable, IsLocked=true → UneditableField.
 - All 5 tests passing.
+
+### 2026-04-12 — Conditional expression tests (Issue #9)
+
+Wrote 24 tests for conditional expressions (`if <cond> then <expr> else <expr>`) and fixed 3 catalog drift entries:
+- **Parser tests (8):** simple conditional, field ref + comparison, nested via parens, set RHS in full precept, invariant expression, when guard expression, arithmetic branches, boolean branches.
+- **Type checker tests (9):** valid conditional (no diags), C78 non-boolean condition (number, string, nullable boolean — 3 tests), C79 branch type mismatch (string vs number, boolean vs string — 2 tests), null-narrowing in then-branch, nested conditional type consistency, function call in branch.
+- **Runtime tests (7):** set with conditional, true branch, false branch, comparison condition, nested conditional, invariant with conditional, null-narrowing produces correct value.
+- **Catalog drift fixes:** Added C78 and C79 to `ConstraintTriggers` dictionary and `LineAccuracyCases`. Both use `-> no transition` to avoid C54 masking.
+- **Key gotchas found:**
+  - Literal `0` is typed as `integer`, not `number`. When using `abs(field)` (returns `number`) in a conditional branch, the other branch must also be `number`-typed (e.g. `0.0`), or C79 fires for branch type mismatch.
+  - An unguarded transition row followed by a reject row triggers C25 (unreachable duplicate). For conditional expressions that handle both null and non-null cases inline (via `if Name != null then Name else "default"`), the reject fallback row is unnecessary and must be omitted.
+  - All 1,096 tests passing after changes.

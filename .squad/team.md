@@ -24,54 +24,6 @@
 | Scribe | Session Logger | `.squad/agents/scribe/charter.md` | 🟢 Active |
 | Ralph | Work Monitor | — | 🔄 Monitor |
 
-## Coding Agent
-
-<!-- copilot-auto-assign: true -->
-
-| Name | Role | Charter | Status |
-|------|------|---------|--------|
-| @copilot | Coding Agent | — | 🤖 Coding Agent |
-
-### Capabilities
-
-**🟢 Good fit — auto-route when enabled:**
-- Bug fixes with clear reproduction steps
-- Test coverage (adding missing tests, fixing flaky tests)
-- Lint/format fixes and code style cleanup
-- Dependency updates and version bumps
-- Small isolated features with clear specs and established implementation patterns
-- Boilerplate/scaffolding generation
-- Documentation fixes and README updates
-- Narrow tooling or workflow fixes that stay within an existing pattern
-
-**🟡 Needs review — route to @copilot but flag for squad member PR review:**
-- Medium features with clear specs and acceptance criteria
-- Refactoring with existing test coverage
-- API endpoint additions following established patterns
-- Migration scripts with well-defined schemas
-- Changes that touch multiple files but remain low-ambiguity and pattern-following
-
-**🔴 Not suitable — route to squad member instead:**
-- Architecture decisions and system design
-- Multi-system integration requiring coordination
-- Ambiguous requirements needing clarification
-- Security-critical changes (auth, encryption, access control)
-- Performance-critical paths requiring benchmarking
-- Changes requiring cross-team discussion
-- Product philosophy or positioning changes
-- DSL surface, parser, runtime semantics, or constraint-model changes
-- Syntax grammar, language-server completion, or MCP contract changes
-- Work that needs new design direction instead of following an established pattern
-
-### Workflow
-
-- Small explicit chore issues that clearly fit the coding-agent profile may be created directly with the `squad:copilot` label.
-- Use direct `squad:copilot` routing only for bounded, low-ambiguity work with clear acceptance criteria and an existing pattern to follow.
-- Keep philosophy, language-surface, runtime-semantics, MCP-contract, security-sensitive, and cross-cutting design work on the normal squad triage path.
-- `@copilot` picks up those issues automatically, opens the PR, and keeps ownership through normal review feedback.
-- When the PR is marked ready for review, the squad PR Review ceremony runs.
-- Shane handles final approval and merge.
-
 ## Human Members
 
 | Name | Role | Badge | Status | Notes |

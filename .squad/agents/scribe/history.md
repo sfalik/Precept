@@ -112,6 +112,11 @@ Team cast on 2026-04-04: Frank (Lead), George (Runtime), Kramer (Tooling), Elain
 
 ## Recent Updates
 
+### 2026-04-12T19:45:41Z - Squad `@copilot` lane retirement recorded
+- Wrote orchestration logs for Newman and Frank plus a session log for the Squad operations contract change.
+- Merged 2 relevant inbox items into one canonical `decisions.md` entry, recording the lane retirement and marking the earlier direct-`@copilot` directive as superseded.
+- Updated affected cross-agent memory for Frank and Ralph, then cleared the processed inbox files.
+
 ### 2026-04-08T13:29:23Z - Language research corpus closeout recorded
 - Merged the remaining `.squad/decisions/inbox/` backlog into `.squad/decisions.md`, recorded 61 entries, skipped 2 superseded duplicate(s), and cleared the inbox.
 - Wrote the missing closeout orchestration/session logs, updated `now.md` plus the Frank/George/Steinbrenner histories, and captured the finishing corpus commit `3cc5343`.

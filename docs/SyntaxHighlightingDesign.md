@@ -279,6 +279,8 @@ This is new capability. The handler must determine which states, events, and fie
 
 **✅ Decided.** Mechanical — follows directly from A and B. Comments are scanned from raw text and emitted as a Precept-specific semantic token (`preceptComment`). In practice, many themes still define aggressive styling for the standard semantic selector `comment`, so the extension also ships a targeted semantic token color override for `preceptComment` and `comment:precept` to force the Precept comment color to win.
 
+Similarly, `preceptMessage` (rule/rejection message strings and the precept name) gets a direct semantic color override. The scope-map fallback (`entity.name.precept.message.precept`, `string.quoted.double.message.precept`) also resolves to gold via the TextMate rules, but the direct override ensures the gold treatment wins unambiguously regardless of theme-installed semantic token rules that might otherwise match string or name selectors.
+
 Add the custom semantic token type contributions, semantic-token-to-scope mappings, and Precept-owned fallback scope rules:
 
 ```jsonc
@@ -321,7 +323,8 @@ Add the custom semantic token type contributions, semantic-token-to-scope mappin
     "editor.semanticTokenColorCustomizations": {
       "rules": {
         "preceptComment": { "foreground": "#9096A6", "italic": true },
-        "comment:precept": { "foreground": "#9096A6", "italic": true }
+        "comment:precept": { "foreground": "#9096A6", "italic": true },
+        "preceptMessage": { "foreground": "#FBBF24" }
       }
     },
     "editor.tokenColorCustomizations": {

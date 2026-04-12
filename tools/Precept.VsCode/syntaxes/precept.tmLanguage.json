@@ -404,7 +404,7 @@
       "patterns": [
         {
           "name": "keyword.control.precept",
-          "match": "\\bwhen\\b"
+          "match": "\\b(when|if|then|else)\\b"
         }
       ]
     },

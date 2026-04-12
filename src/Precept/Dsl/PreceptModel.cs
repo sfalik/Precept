@@ -134,6 +134,9 @@ public sealed record PreceptParenthesizedExpression(PreceptExpression Inner) : P
 /// <summary>General built-in function call: name(arg1, arg2, ...).</summary>
 public sealed record PreceptFunctionCallExpression(string Name, PreceptExpression[] Arguments) : PreceptExpression;
 
+/// <summary>Conditional expression: if &lt;condition&gt; then &lt;thenBranch&gt; else &lt;elseBranch&gt;.</summary>
+public sealed record PreceptConditionalExpression(PreceptExpression Condition, PreceptExpression ThenBranch, PreceptExpression ElseBranch) : PreceptExpression;
+
 public sealed record PreceptSetAssignment(
     string Key,
     string ExpressionText,

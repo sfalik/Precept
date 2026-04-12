@@ -583,6 +583,52 @@ The Architecture identity row should keep the full construct-card treatment with
 **Why:** The square is a semantic marker, not an independent content block. Leading the construct name with the swatch makes the marker and label read as one semantic unit while preserving the body copy for the construct role.
 
 **Implementation consequence:** Use a compact `arch-card-title` row that pairs `arch-card-swatch` with `arch-card-name`, preserve the five-card construct layout, and remove filler copy that only existed to support the temporary pill-row treatment.
+### 2026-04-12T20:00:58Z: Ralph autonomous chore loop — `squad:chore` is the pickup gate
+**By:** shane (owner directive), Frank (process contract), Newman (operational loop)  
+**Amended:** 2026-04-12 — `squad:chore` replaces `squad:ralph` as the gate (Shane directive)  
+**Status:** Standing policy — active from 2026-04-12 forward
+
+Interactive Squad sessions may spin unrelated maintenance work into separate backlog issues. `squad:chore` is both the work-type marker and the explicit approval signal for Ralph's autonomous chore loop. When Shane applies `squad:chore` to an issue, Ralph picks it up, routes it to the best-fit real member, applies `squad:{member}`, and preserves the review ceremony. No second label is required.
+
+**Policy:**
+1. Interactive Squad sessions may create standalone backlog issues for unrelated chore or maintenance work instead of forcing that work through the current session.
+2. Those spun-off chores should be labeled with `squad:chore` (and optionally `type:chore` for work-type context).
+3. Autonomous Ralph execution is opt-in only and gated by the `squad:chore` label. Shane applies it. Ralph acts on it.
+4. Ralph's local CLI loop watches only open, unblocked issues labeled `squad:chore`, not every chore or `squad` issue.
+5. `squad:ralph` is retired. It has been moved to the label tombstone list and will be deleted from the repo on next sync.
+
+---
+
+### 2026-04-12T19:45:41Z: Squad operations contract — dedicated `@copilot` lane retired
+**By:** shane (owner directive), Newman (implementation), Frank (contract review)
+**Status:** Standing policy — active from 2026-04-12 forward
+
+The Squad-specific coding-agent lane is removed from this repo. This retires the `squad:copilot` routing and automation lane without removing general repo-wide Copilot tooling. `squad:chore` is retained as an active label — it now also serves as the explicit approval gate for Ralph's autonomous chore pickup (see the 2026-04-12 amendment to the Ralph chore loop policy above).
+
+**Policy:**
+1. Retire the dedicated Squad lane from live workflows, mirrored workflow templates, team/routing docs, and squad agent docs.
+2. All Squad issue routing now flows only through `squad` → `squad:{member}` and normal named-member triage, except for `squad:chore` which also triggers Ralph's chore pickup.
+3. Keep general repo-wide Copilot tooling and instructions intact (`.github/copilot-instructions.md`, `.copilot/skills/`, and passive reference docs that are not part of Squad routing).
+4. The earlier 2026-04-12T17:39:52Z directive to route small chore issues directly to `@copilot` is superseded and is not part of the active Squad contract.
+5. Label cleanup for `squad:copilot` should happen through the normal retired-label sync path, not manual repo surgery. `squad:chore` is NOT in the retired list — it remains an active label with pickup semantics.
+
+---
+
+### 2026-04-12: PR body schema — summary and why are required for issue work
+**By:** Shane (owner directive, via Coordinator)
+**Status:** Standing policy — enforced from 2026-04-12 forward
+
+Issue-driven implementation PRs must keep reviewer-facing context in the PR body, not only in the file diff.
+
+**Policy:**
+1. `CONTRIBUTING.md` is the canonical workflow and PR-body source of truth.
+2. Required PR sections for issue-driven implementation work: `## Summary`, `## Linked Issue` (with `Closes #N`), `## Why`, and `## Implementation Plan`.
+3. `## Why` is concise motivation and implementation-specific reviewer context. Full design rationale, alternatives, and precedent remain in the issue and `research/`.
+4. `## Summary` and `## Why` must stay current as scope changes. Implementation-plan checkboxes continue to update after each completed slice or logical group.
+5. This supersedes the 2026-04-10 section-name requirement while preserving detailed checkbox granularity and live checkbox maintenance.
+
+---
+
 ### 2026-04-12T01:53:16Z: Issue #65 — Event action hooks for stateless precepts — PROPOSAL FILED
 **By:** Frank (research + design alignment), George (runtime impact), Steinbrenner (PM), Coordinator (filing)
 **Status:** Proposal filed — branch `research/event-hooks-proposal`, Issue #65 open

@@ -1,10 +1,18 @@
 ## Summary
 
+> Explain what changed in reviewer-facing terms.
+
 - ...
 
 ## Linked Issue
 
 - Closes #
+
+## Why
+
+> Explain why this change exists, what problem it addresses, and any implementation context reviewers should know. Keep the full proposal rationale and alternatives in the linked issue/research docs.
+
+- ...
 
 ## Implementation Plan
 
