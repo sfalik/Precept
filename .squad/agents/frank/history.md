@@ -9,6 +9,16 @@
 
 ## Recent Updates
 
+### 2026-04-12 — Event hooks gap investigation + external FSM precedent survey
+- Researched event-level action hooks triggered by Shane's `on Advance -> set Count = Count + 1` parse error.
+- Filed full external precedent survey across 5 systems (XState v5, SCXML, Akka Classic FSM, Spring SM, Redux) in `research/language/expressiveness/event-hooks.md`.
+- **Stateless case (Issue A):** CONFIRMED VIABLE. Zero Principle 7 tension — stateless precepts have no transition rows, so the shared-context concern that motivated Principle 7 has no application surface.
+- **Stateful case (Issue B):** Deferred as Issue B. Three unresolved questions: execution order position (Frank recommends Option 3 — after row mutations, before exit actions — citing SCXML §3.13 as normative precedent), outcome-scoping (fires on Unmatched?), and explicit Principle 7 exception rationale.
+- C49 revision required for Issue A: events with hooks suppress C49; events with asserts but no hooks get lower-severity warning.
+- Confirmed `ActionChain` reuse: `EventActionDecl` shares the existing parser combinator, no changes needed.
+
+
+
 ### 2026-04-10 — Structural lifecycle modifiers: second pass (expanded modifier space)
 - Produced comprehensive second pass at `research/language/expressiveness/structural-lifecycle-modifiers.md`.
 - **Scope expansion:** Added 10 event modifier candidates (`entry`, `advancing`, `settling`, `irreversible`, `universal`, `isolated`, `guarded`, `total`, `completing`, `symmetric`), 8 field modifier candidates (`writeonce`, `identity`, `monotonic`, `sensitive`, `derived`, `immutable`, `sealed after <State>`, `audit`), and 6 additional state modifier candidates (`error`, `resting`, `decision`, `guarded` on incoming transitions, `absorbing`, `convergent`).
