@@ -39,7 +39,8 @@ public sealed record PreceptEventArg(
     object? DefaultValue = null,
     IReadOnlyList<FieldConstraint>? Constraints = null,
     IReadOnlyList<string>? ChoiceValues = null,
-    bool IsOrdered = false);
+    bool IsOrdered = false,
+    int SourceLine = 0);
 
 public sealed record PreceptField(
     string Name,
@@ -49,14 +50,16 @@ public sealed record PreceptField(
     object? DefaultValue = null,
     IReadOnlyList<FieldConstraint>? Constraints = null,
     IReadOnlyList<string>? ChoiceValues = null,
-    bool IsOrdered = false);
+    bool IsOrdered = false,
+    int SourceLine = 0);
 
 public sealed record PreceptCollectionField(
     string Name,
     PreceptCollectionKind CollectionKind,
     PreceptScalarType InnerType,
     IReadOnlyList<FieldConstraint>? Constraints = null,
-    IReadOnlyList<string>? ChoiceValues = null);
+    IReadOnlyList<string>? ChoiceValues = null,
+    int SourceLine = 0);
 
 
 public enum PreceptCollectionKind

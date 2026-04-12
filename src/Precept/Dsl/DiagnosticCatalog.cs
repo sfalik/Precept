@@ -46,16 +46,21 @@ public sealed record LanguageConstraint(
     /// </summary>
     public ConstraintViolationException ToException(params (string Key, object? Value)[] args)
         => new(this, FormatMessage(args));
+
+    public ConstraintViolationException ToException(int sourceLine, params (string Key, object? Value)[] args)
+        => new(this, FormatMessage(args)) { SourceLine = sourceLine };
 }
 
 /// <summary>
 /// Thrown when a constraint is violated during parsing or assembly.
-/// Carries the <see cref="LanguageConstraint"/> for diagnostic code derivation.
+/// Carries the <see cref="LanguageConstraint"/> for diagnostic code derivation
+/// and optional source line for accurate squiggle placement.
 /// </summary>
 public sealed class ConstraintViolationException(LanguageConstraint constraint, string message)
     : InvalidOperationException(message)
 {
     public LanguageConstraint Constraint { get; } = constraint;
+    public int SourceLine { get; init; }
 }
 
 public static class DiagnosticCatalog

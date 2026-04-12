@@ -90,10 +90,14 @@ public static class PreceptParser
             }
             catch (InvalidOperationException ex)
             {
-                var code = ex is ConstraintViolationException cve
-                    ? DiagnosticCatalog.ToDiagnosticCode(cve.Constraint.Id)
-                    : null;
-                diagnostics.Add(new ParseDiagnostic(1, 0, ex.Message, code));
+                string? code = null;
+                int sourceLine = 1;
+                if (ex is ConstraintViolationException cve)
+                {
+                    code = DiagnosticCatalog.ToDiagnosticCode(cve.Constraint.Id);
+                    if (cve.SourceLine > 0) sourceLine = cve.SourceLine;
+                }
+                diagnostics.Add(new ParseDiagnostic(sourceLine, 0, ex.Message, code));
                 return (null, diagnostics);
             }
         }
@@ -701,14 +705,16 @@ public static class PreceptParser
                 names.Select(n => new PreceptCollectionField(
                     n.ToText(), typeRef.CollectionKind!.Value, typeRef.ScalarType,
                     constraints.Length > 0 ? constraints : null,
-                    typeRef.ChoiceValues)).ToArray())
+                    typeRef.ChoiceValues,
+                    SourceLine: kw.Span.Position.Line)).ToArray())
             : new FieldResult(
                 names.Select(n => new PreceptField(
                     n.ToText(), typeRef.ScalarType, nullable,
                     dflt.Specified || nullable,
                     dflt.Specified ? dflt.Value : null,
                     constraints.Length > 0 ? constraints : null,
-                    typeRef.ChoiceValues, ordered)).ToArray()))
+                    typeRef.ChoiceValues, ordered,
+                    SourceLine: kw.Span.Position.Line)).ToArray()))
         .Named("field declaration")
             .Register(new ConstructInfo(
                 "field-declaration",
@@ -773,7 +779,8 @@ public static class PreceptParser
             dflt.Specified,
             dflt.Specified ? dflt.Value : null,
             constraints.Length > 0 ? constraints : null,
-            typeRef.ChoiceValues, ordered);
+            typeRef.ChoiceValues, ordered,
+            SourceLine: name.Span.Position.Line);
 
     private static readonly TokenListParser<PreceptToken, StatementResult> EventDecl =
         (from kw in Token.EqualTo(PreceptToken.Event)
@@ -1036,7 +1043,7 @@ public static class PreceptParser
                     {
                         if (fields.Any(f => f.Name == field.Name) || collectionFields.Any(f => f.Name == field.Name))
                             // SYNC:CONSTRAINT:C6
-                            throw DiagnosticCatalog.C6.ToException(("fieldName", field.Name));
+                            throw DiagnosticCatalog.C6.ToException(field.SourceLine, ("fieldName", field.Name));
                         fields.Add(field);
                     }
                     break;
@@ -1046,7 +1053,7 @@ public static class PreceptParser
                     {
                         if (fields.Any(f => f.Name == collField.Name) || collectionFields.Any(f => f.Name == collField.Name))
                             // SYNC:CONSTRAINT:C6
-                            throw DiagnosticCatalog.C6.ToException(("fieldName", collField.Name));
+                            throw DiagnosticCatalog.C6.ToException(collField.SourceLine, ("fieldName", collField.Name));
                         collectionFields.Add(collField);
                     }
                     break;
@@ -1061,13 +1068,13 @@ public static class PreceptParser
                         var state = sr.States[i];
                         if (states.Any(s => s.Name == state.Name))
                             // SYNC:CONSTRAINT:C7
-                            throw DiagnosticCatalog.C7.ToException(("stateName", state.Name));
+                            throw DiagnosticCatalog.C7.ToException(state.SourceLine, ("stateName", state.Name));
                         states.Add(state);
                         if (sr.InitialFlags[i])
                         {
                             if (initialState is not null)
                                 // SYNC:CONSTRAINT:C8
-                                throw DiagnosticCatalog.C8.ToException(("stateName", initialState.Name));
+                                throw DiagnosticCatalog.C8.ToException(state.SourceLine, ("stateName", initialState.Name));
                             initialState = state;
                         }
                     }
@@ -1078,7 +1085,7 @@ public static class PreceptParser
                     {
                         if (events.Any(e => e.Name == evt.Name))
                             // SYNC:CONSTRAINT:C9
-                            throw DiagnosticCatalog.C9.ToException(("eventName", evt.Name));
+                            throw DiagnosticCatalog.C9.ToException(evt.SourceLine, ("eventName", evt.Name));
                         events.Add(evt);
                     }
                     break;
@@ -1118,16 +1125,16 @@ public static class PreceptParser
                     var outcomes = trr.ActionsAndOutcome.OfType<OutcomeAction>().ToList();
                     if (outcomes.Count == 0)
                         // SYNC:CONSTRAINT:C10
-                        throw DiagnosticCatalog.C10.ToException(("eventName", trr.EventName));
+                        throw DiagnosticCatalog.C10.ToException(trr.SourceLine, ("eventName", trr.EventName));
 
                     // Design: "exactly one outcome, at the end; no statements after it"
                     if (outcomes.Count > 1)
                         // SYNC:CONSTRAINT:C11
-                        throw DiagnosticCatalog.C11.ToException(("eventName", trr.EventName));
+                        throw DiagnosticCatalog.C11.ToException(trr.SourceLine, ("eventName", trr.EventName));
                     var firstOutcomeIdx = Array.IndexOf(trr.ActionsAndOutcome, outcomes[0]);
                     if (firstOutcomeIdx < trr.ActionsAndOutcome.Length - 1)
                         // SYNC:CONSTRAINT:C11
-                        throw DiagnosticCatalog.C11.ToException(("eventName", trr.EventName));
+                        throw DiagnosticCatalog.C11.ToException(trr.SourceLine, ("eventName", trr.EventName));
 
                     var outcome = outcomes[0].Outcome;
                     var rowActions = trr.ActionsAndOutcome.Where(a => a is not OutcomeAction).ToArray();
@@ -1150,9 +1157,9 @@ public static class PreceptParser
         foreach (var row in transitionRows)
         {
             if (!stateNames.Contains(row.FromState))
-                throw DiagnosticCatalog.C54.ToException(("stateName", row.FromState));
+                throw DiagnosticCatalog.C54.ToException(row.SourceLine, ("stateName", row.FromState));
             if (row.Outcome is StateTransition st && !stateNames.Contains(st.TargetState))
-                throw DiagnosticCatalog.C54.ToException(("stateName", st.TargetState));
+                throw DiagnosticCatalog.C54.ToException(row.SourceLine, ("stateName", st.TargetState));
         }
 
         if (states.Count == 0 && fields.Count == 0 && collectionFields.Count == 0)
@@ -1175,15 +1182,15 @@ public static class PreceptParser
                     // EventName.ArgName form: prefix must be the event name, member must be an arg
                     if (!StringComparer.Ordinal.Equals(id.Name, ea.EventName))
                         // SYNC:CONSTRAINT:C14
-                        throw DiagnosticCatalog.C14.ToException(("eventName", ea.EventName), ("prefix", id.Name), ("member", id.Member));
+                        throw DiagnosticCatalog.C14.ToException(ea.SourceLine, ("eventName", ea.EventName), ("prefix", id.Name), ("member", id.Member));
                     if (!argNames.Contains(id.Member))
                         // SYNC:CONSTRAINT:C15
-                        throw DiagnosticCatalog.C15.ToException(("eventName", ea.EventName), ("member", id.Member));
+                        throw DiagnosticCatalog.C15.ToException(ea.SourceLine, ("eventName", ea.EventName), ("member", id.Member));
                 }
                 else if (!argNames.Contains(id.Name))
                 {
                     // SYNC:CONSTRAINT:C16
-                    throw DiagnosticCatalog.C16.ToException(("eventName", ea.EventName), ("identifier", id.Name));
+                    throw DiagnosticCatalog.C16.ToException(ea.SourceLine, ("eventName", ea.EventName), ("identifier", id.Name));
                 }
             }
         }
@@ -1193,7 +1200,7 @@ public static class PreceptParser
         {
             if (!f.IsNullable && !f.HasDefaultValue)
                 // SYNC:CONSTRAINT:C17
-                throw DiagnosticCatalog.C17.ToException(("fieldName", f.Name));
+                throw DiagnosticCatalog.C17.ToException(f.SourceLine, ("fieldName", f.Name));
             if (f.HasDefaultValue && f.DefaultValue is not null)
             {
                 var ok = f.Type switch
@@ -1206,11 +1213,11 @@ public static class PreceptParser
                 };
                 if (!ok)
                     // SYNC:CONSTRAINT:C18
-                    throw DiagnosticCatalog.C18.ToException(("fieldName", f.Name), ("fieldType", f.Type));
+                    throw DiagnosticCatalog.C18.ToException(f.SourceLine, ("fieldName", f.Name), ("fieldType", f.Type));
             }
             if (f.HasDefaultValue && f.DefaultValue is null && !f.IsNullable)
                 // SYNC:CONSTRAINT:C19
-                throw DiagnosticCatalog.C19.ToException(("fieldName", f.Name), ("fieldType", f.Type));
+                throw DiagnosticCatalog.C19.ToException(f.SourceLine, ("fieldName", f.Name), ("fieldType", f.Type));
         }
 
         // Validate event arg defaults: type mismatch / null on non-nullable
@@ -1230,11 +1237,11 @@ public static class PreceptParser
                     };
                     if (!ok)
                         // SYNC:CONSTRAINT:C20
-                        throw DiagnosticCatalog.C20.ToException(("argName", arg.Name), ("argType", arg.Type));
+                        throw DiagnosticCatalog.C20.ToException(arg.SourceLine, ("argName", arg.Name), ("argType", arg.Type));
                 }
                 if (arg.HasDefaultValue && arg.DefaultValue is null && !arg.IsNullable)
                     // SYNC:CONSTRAINT:C21
-                    throw DiagnosticCatalog.C21.ToException(("argName", arg.Name), ("argType", arg.Type));
+                    throw DiagnosticCatalog.C21.ToException(arg.SourceLine, ("argName", arg.Name), ("argType", arg.Type));
             }
         }
 
@@ -1249,9 +1256,9 @@ public static class PreceptParser
                 {
                     if (fields.Any(f => f.Name == mut.TargetField))
                         // SYNC:CONSTRAINT:C22
-                        throw DiagnosticCatalog.C22.ToException(("verb", mut.Verb.ToString().ToLowerInvariant()), ("fieldName", mut.TargetField));
+                        throw DiagnosticCatalog.C22.ToException(row.SourceLine, ("verb", mut.Verb.ToString().ToLowerInvariant()), ("fieldName", mut.TargetField));
                     // SYNC:CONSTRAINT:C23
-                    throw DiagnosticCatalog.C23.ToException(("verb", mut.Verb.ToString().ToLowerInvariant()), ("fieldName", mut.TargetField));
+                    throw DiagnosticCatalog.C23.ToException(row.SourceLine, ("verb", mut.Verb.ToString().ToLowerInvariant()), ("fieldName", mut.TargetField));
                 }
                 var verbValid = (mut.Verb, kind) switch
                 {
@@ -1266,7 +1273,7 @@ public static class PreceptParser
                 };
                 if (!verbValid)
                     // SYNC:CONSTRAINT:C24
-                    throw DiagnosticCatalog.C24.ToException(("verb", mut.Verb.ToString().ToLowerInvariant()), ("collectionKind", kind.ToString().ToLowerInvariant()), ("fieldName", mut.TargetField));
+                    throw DiagnosticCatalog.C24.ToException(row.SourceLine, ("verb", mut.Verb.ToString().ToLowerInvariant()), ("collectionKind", kind.ToString().ToLowerInvariant()), ("fieldName", mut.TargetField));
             }
         }
 
@@ -1280,7 +1287,7 @@ public static class PreceptParser
             var key = (row.FromState, row.EventName);
             if (seenUnguarded.Contains(key))
                 // SYNC:CONSTRAINT:C25
-                throw DiagnosticCatalog.C25.ToException(("fromState", row.FromState), ("eventName", row.EventName));
+                throw DiagnosticCatalog.C25.ToException(row.SourceLine, ("fromState", row.FromState), ("eventName", row.EventName));
             if (row.WhenGuard is null)
                 seenUnguarded.Add(key);
         }
