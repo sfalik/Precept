@@ -1,7 +1,5 @@
 precept VisitorBadgePickup
 
-# State construct specimen: current snapshot is ReadyForPickup with PickupWindowOpen = true.
-
 field VisitorName as string nullable
 field HostConfirmed as boolean default false
 field BadgePrinted as boolean default false
