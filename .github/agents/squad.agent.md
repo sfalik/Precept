@@ -843,6 +843,10 @@ prompt: |
   The user says: "{message}"
   
   Do the work. Respond as {Name}.
+  For issue-based implementation work, treat the draft PR as the live execution hub.
+  Work in vertical slices. After each completed slice or logical group, commit,
+  push, and update the PR-body implementation checklist before continuing.
+  Do not create a separate implementation-plan markdown file.
   
   ⚠️ OUTPUT: Report outcomes in human terms. Never expose tool internals or SQL.
   

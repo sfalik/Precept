@@ -1,0 +1,83 @@
+name: PR Implementation Hygiene
+
+on:
+  pull_request_target:
+    types: [opened, edited, reopened, synchronize, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  enforce:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check linked issue and implementation plan
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const body = pr.body || '';
+            const headRef = pr.head.ref || '';
+
+            const issueBranchPattern = /^(copilot\/|squad\/|feature\/issue-\d+)/i;
+            const issueLinkPattern = /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s*:?\s+#\d+\b/i;
+            const separatePlanPattern = /(^|\/)implementation[-_ ]plan[^/]*\.md$/i;
+
+            const isIssueFlow = issueBranchPattern.test(headRef) || issueLinkPattern.test(body);
+            if (!isIssueFlow) {
+              core.info('PR is not using the issue-driven squad/copilot flow; skipping implementation hygiene checks.');
+              return;
+            }
+
+            const errors = [];
+
+            if (!issueLinkPattern.test(body)) {
+              errors.push('PR body must link the issue with `Closes #N`, `Fixes #N`, or `Resolves #N`.');
+            }
+
+            const implementationSectionMatch = body.match(/##\s+Implementation Plan\b([\s\S]*?)(?:\n##\s+|$)/i);
+            if (!implementationSectionMatch) {
+              errors.push('PR body must include a `## Implementation Plan` section.');
+            }
+
+            const implementationSection = implementationSectionMatch ? implementationSectionMatch[1] : '';
+            const checklistItems = implementationSection.match(/^- \[[ xX]\] .+/gm) || [];
+            const checkedItems = implementationSection.match(/^- \[[xX]\] .+/gm) || [];
+            const uncheckedItems = implementationSection.match(/^- \[ \] .+/gm) || [];
+
+            if (implementationSectionMatch && checklistItems.length === 0) {
+              errors.push('The `## Implementation Plan` section must contain markdown checkbox items.');
+            }
+
+            if (pr.draft && pr.commits >= 2 && checkedItems.length === 0) {
+              errors.push('Draft PR has multiple commits but no completed implementation-plan items checked off yet. Update the PR body as slices land.');
+            }
+
+            if (!pr.draft && uncheckedItems.length > 0) {
+              errors.push('Ready-for-review PR still has unchecked implementation-plan items. Finish them or consciously remove them before review.');
+            }
+
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr.number,
+              per_page: 100,
+            });
+
+            const separatePlanFiles = files
+              .map(file => file.filename)
+              .filter(filename => separatePlanPattern.test(filename));
+
+            if (separatePlanFiles.length > 0) {
+              errors.push(
+                `Remove separate implementation-plan markdown files from the PR: ${separatePlanFiles.join(', ')}. Use the PR body as the plan instead.`
+              );
+            }
+
+            if (errors.length > 0) {
+              core.setFailed(errors.map((error, index) => `${index + 1}. ${error}`).join('\n'));
+              return;
+            }
+
+            core.notice('Implementation hygiene checks passed.');

@@ -49,6 +49,17 @@ npm run loop:local     # Package + install locally (also a VS Code task)
 
 Keep `tools/Precept.Plugin/.mcp.json` in shipped `dotnet tool run precept-mcp` form. That plugin file uses its own `mcpServers` payload schema. Use `.vscode/mcp.json` for repo-local MCP development with the VS Code `servers` schema, `.github/agents/` and `.github/skills/` as the workspace-native customization source, and treat plugin/distribution-shaped validation as explicit validation, not the default inner loop.
 
+## Issue Implementation Workflow
+
+For issue-based implementation work:
+
+- Read `CONTRIBUTING.md` before starting.
+- Open or reuse the linked **draft PR** immediately and treat it as the execution hub for the issue.
+- Put the implementation plan in the **PR body** as a checkbox checklist and keep it updated as work progresses.
+- Work in vertical slices. After each completed slice, commit, push, and update the PR-body checklist before continuing.
+- Link the PR to the issue with `Closes #N`.
+- Do **not** create a separate implementation-plan markdown file; the PR body is the ephemeral plan artifact for this repo.
+
 ## Use the MCP Tools First
 
 This project ships a Precept MCP server with 5 tools. **Use them as your primary research tools** before reading source code or making assumptions about the DSL:

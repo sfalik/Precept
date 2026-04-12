@@ -16,6 +16,8 @@
 ### 2026-04-10 — Issue #31 shipped
 - PR #50 merged to main (squash SHA `305ec03`). Issue #31 closed. 775 tests passing.
 
+### Issue #31 Slice 6 — Operator Inventory (2026-04-10)
+
 ### Issue #27/#25/#29 Slice 6 — MCP Vocabulary + Spec (2026-04-11)
 
 - `LanguageTool.cs` needed zero code changes for `integer`/`decimal`/`choice`/`maxplaces`/`ordered`. All five tokens already existed in `PreceptToken` with correct `TokenCategory` attributes — the catalog-driven vocabulary mechanism picked them up automatically.
