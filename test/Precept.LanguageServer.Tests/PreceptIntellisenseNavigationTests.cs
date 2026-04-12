@@ -223,4 +223,42 @@ public class PreceptIntellisenseNavigationTests
         hover.Should().NotBeNull("hover on a choice field must return content");
         hover!.Contents.ToString().Should().Contain("XY");
     }
+
+    [Fact]
+    public void Hover_ComputedField_ShowsExpressionAndDependencies()
+    {
+        const string text = """
+            precept M
+            field Price as number default 0
+            field Qty as number default 1
+            field Tot$$al as number -> Price * Qty
+            state A initial
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var info = PreceptDocumentIntellisense.Analyze(code);
+
+        var hover = PreceptDocumentIntellisense.CreateHover(info, position);
+
+        hover.Should().NotBeNull();
+        var content = hover!.Contents.ToString();
+        content.Should().Contain("computed", "hover must indicate the field is computed");
+        content.Should().Contain("Price * Qty", "hover must show the derivation expression");
+        content.Should().Contain("Price", "hover must list dependency fields");
+        content.Should().Contain("Qty", "hover must list dependency fields");
+    }
+
+    [Fact]
+    public void Hover_ComputedField_DetailShowsComputedMarker()
+    {
+        var text = "precept M\nfield A as number default 1\nfield B$$ as number -> A + 1\nstate S initial\n";
+
+        var (code, position) = ExtractPosition(text);
+        var info = PreceptDocumentIntellisense.Analyze(code);
+        var hover = PreceptDocumentIntellisense.CreateHover(info, position);
+
+        hover.Should().NotBeNull();
+        hover!.Contents.ToString().Should().Contain("computed", "hover must indicate the field is computed");
+        hover.Contents.ToString().Should().Contain("A + 1", "hover must show the derivation expression");
+    }
 }

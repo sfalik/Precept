@@ -114,10 +114,12 @@ internal sealed class PreceptAnalyzer
         var currentEvent = FindCurrentEventName(lines, (int)position.Line);
 
         // Computed fields are excluded from set/edit target positions (they are read-only).
+        // When the model is available, use it; otherwise fall back to regex detection
+        // so computed field filtering works even on incomplete documents during editing.
         var computedFieldNames = info.Model?.Fields
             .Where(static f => f.IsComputed)
             .Select(static f => f.Name)
-            .ToHashSet(StringComparer.Ordinal) ?? new HashSet<string>(StringComparer.Ordinal);
+            .ToHashSet(StringComparer.Ordinal) ?? DetectComputedFieldsByRegex(lines);
         var editableDataFields = computedFieldNames.Count > 0
             ? dataFields.Where(f => !computedFieldNames.Contains(f)).ToArray()
             : dataFields;
@@ -236,8 +238,10 @@ internal sealed class PreceptAnalyzer
 
         // After "-> " → suggest action/outcome keywords
         // Must be checked before the broader "from … on …" regex which would swallow "->"
-        if (beforeCursor.TrimEnd().EndsWith("->", StringComparison.Ordinal) ||
-            Regex.IsMatch(beforeCursor, "->\\s+$"))
+        // Exclude field declaration lines — those use "->" for derived expression syntax.
+        if ((beforeCursor.TrimEnd().EndsWith("->", StringComparison.Ordinal) ||
+            Regex.IsMatch(beforeCursor, "->\\s+$")) &&
+            !Regex.IsMatch(beforeCursor, @"^\s*field\s+", RegexOptions.IgnoreCase))
             return ArrowItems;
 
         // After a completed guarded transition expression, suggest the action/outcome pipeline.
@@ -1455,6 +1459,22 @@ internal sealed class PreceptAnalyzer
             InsertTextFormat = InsertTextFormat.Snippet,
             Detail = detail
         };
+
+    /// <summary>
+    /// Regex fallback for detecting computed field names when the parser model is unavailable
+    /// (e.g. incomplete documents during editing). Scans for <c>field Name as Type -&gt;</c> patterns.
+    /// </summary>
+    private static HashSet<string> DetectComputedFieldsByRegex(string[] lines)
+    {
+        var result = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var line in lines)
+        {
+            var match = Regex.Match(line, @"^\s*field\s+([A-Za-z_]\w*)\s+as\s+\S+\s*->", RegexOptions.IgnoreCase);
+            if (match.Success)
+                result.Add(match.Groups[1].Value);
+        }
+        return result;
+    }
 
     internal sealed record RejectOnlyStateEventIssue(
         string StateName,
