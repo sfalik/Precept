@@ -38,6 +38,13 @@
 | **Time budget** | focused |
 | **Enabled** | ✅ yes |
 
+### Coordinator pre-flight (BLOCKING — do these BEFORE spawning reviewers)
+
+1. **Read `.squad/skills/pr-review/SKILL.md`** — this defines the structured JSON format, the posting workflow via `squad-review.js`, and the full review conversation lifecycle (initial review → dev fix → re-review). Do not spawn reviewers without reading it.
+2. **Spawn reviewers as full agents (not Explore)** — reviewers need tool access to read files with accurate line numbers. Never use `agentName: "Explore"` for reviews.
+3. **Include in each reviewer's prompt:** their charter identity, the linked issue's acceptance criteria, the structured JSON output format from the skill file, and the instruction to produce a JSON review file (not chat-only analysis).
+4. **After collecting results:** post reviews to the PR via `node tools/scripts/squad-review.js <pr-number> <review-file.json>`. Reviews must be durable on the PR, not buried in chat.
+
 **Output:** Follow `.squad/skills/pr-review/SKILL.md` for structured review format and posting workflow. Every reviewer produces structured JSON; Scribe posts each review via `squad-reviewer[bot]`. Reviews are durable on the PR, not buried in chat.
 
 **Agenda:**
