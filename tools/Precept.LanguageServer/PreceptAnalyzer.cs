@@ -420,11 +420,11 @@ internal sealed class PreceptAnalyzer
             return Array.Empty<CompletionItem>();
 
         // After "event Name with ArgName as " → suggest type keywords
-        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean|integer|decimal|choice\\([^)]*\\))(?:\\s+nullable)?(?:\\s+default\\s+(?:\"[^\"\\n]*\"|-?\\d+(?:\\.\\d+)?|true|false|null))?)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+\\w*$", RegexOptions.IgnoreCase))
+        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean|integer|decimal|choice\\([^)]*\\))(?:\\s+(?:nullable|nonnegative|positive|notempty|ordered|(?:(?:default|min|max|minlength|maxlength|mincount|maxcount|maxplaces)\\s+(?:\"[^\"\\n]*\"|-?\\d+(?:\\.\\d+)?|true|false|null|\\[\"[^\"]*\"(?:,\\s*\"[^\"]*\")*\\]))))*)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+\\w*$", RegexOptions.IgnoreCase))
             return ScalarTypeItems;
 
         // After "event Name with ArgName " → suggest "as"
-        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean|integer|decimal|choice\\([^)]*\\))(?:\\s+nullable)?(?:\\s+default\\s+(?:\"[^\"\\n]*\"|-?\\d+(?:\\.\\d+)?|true|false|null))?)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+$", RegexOptions.IgnoreCase))
+        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean|integer|decimal|choice\\([^)]*\\))(?:\\s+(?:nullable|nonnegative|positive|notempty|ordered|(?:(?:default|min|max|minlength|maxlength|mincount|maxcount|maxplaces)\\s+(?:\"[^\"\\n]*\"|-?\\d+(?:\\.\\d+)?|true|false|null|\\[\"[^\"]*\"(?:,\\s*\"[^\"]*\")*\\]))))*)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+$", RegexOptions.IgnoreCase))
             return [AsItem];
 
         // After "event Name with " → user is typing arg name, no suggestions

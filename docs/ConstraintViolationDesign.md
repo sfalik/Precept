@@ -642,6 +642,7 @@ Compile-phase and parse-phase diagnostics (DSL validity checks) use a separate v
 | C50 / PRECEPT050 | compile | Warning | Non-terminal state has outgoing rows but none can reach another state. Upgraded from `Hint` to `Warning` (2026-04-08). Rationale: a state where every outgoing path dead-ends is a structural smell that warrants author attention, not just an informational note. Consistent with the severity model for C49 (same kind of structural quality problem). |
 | C55 / PRECEPT055 | compile | Error | Root-level `edit` is not valid when states are declared. Message: `"Root-level \`edit\` is not valid when states are declared. Use \`in any edit all\` or \`in <State> edit <Fields>\` instead."` |
 | C69 / PRECEPT069 | compile | Error | Cross-scope guard reference in `when` clause. Guard expression references an identifier that belongs to a different scope than the declaration's guard allows. Invariant/state-assert/edit guards are entity-field-scoped; event-assert guards are event-arg-scoped. |
+| C70 / PRECEPT070 | parse | Error | Duplicate modifier on field or event argument declaration. Each modifier (`nullable`, `default`, `ordered`) may appear at most once per declaration. |
 
 **Distinction from runtime violations:** These are compile-time diagnostics, not runtime `ConstraintViolation` objects. They are reported during `PreceptCompiler.CompileFromText()` and surfaced via the language server (squiggles), MCP `precept_compile`, and CLI. They do not produce `ConstraintViolation` instances.
 

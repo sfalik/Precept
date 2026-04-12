@@ -1548,4 +1548,20 @@ public class PreceptAnalyzerCompletionTests
         completions.Should().Contain("positive");
         completions.Should().NotContain("nonnegative", "already present");
     }
+
+    [Fact]
+    public void Completions_ChoiceFieldAfterOrdered_OffersNullableDefaultNotOrdered()
+    {
+        const string text = """
+            precept M
+            field Priority as choice("Low", "Medium", "High") ordered $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("nullable");
+        completions.Should().Contain("default");
+        completions.Should().NotContain("ordered", "already present in the declaration");
+    }
 }

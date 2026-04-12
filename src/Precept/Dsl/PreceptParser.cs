@@ -828,7 +828,7 @@ public static class PreceptParser
         .Named("field declaration")
             .Register(new ConstructInfo(
                 "field-declaration",
-                "field <Name>[, <Name>, ...] as <Type> [nullable] [default <Value>]",
+                "field <Name>[, <Name>, ...] as <Type> [<modifier>...]",
                 "top-level",
                 "Declares a scalar or collection data field",
                 "field Priority as number default 3"));
@@ -897,7 +897,7 @@ public static class PreceptParser
         .Named("event declaration")
             .Register(new ConstructInfo(
                 "event-declaration",
-                "event <Name>[, <Name>, ...] [with <Arg> as <Type> [nullable] [default <Val>], ...]",
+                "event <Name>[, <Name>, ...] [with <Arg> as <Type> [<modifier>...], ...]",
                 "top-level",
                 "Declares an external trigger with optional typed arguments",
                 "event Submit with Comment as string"));

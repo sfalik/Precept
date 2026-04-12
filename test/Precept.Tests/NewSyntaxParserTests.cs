@@ -1904,6 +1904,43 @@ public class NewSyntaxParserTests
         f.IsOrdered.Should().BeTrue();
     }
 
+    [Fact]
+    public void Parse_FieldModifiers_DecimalMaxplacesBeforeDefault()
+    {
+        const string dsl = """
+            precept Test
+            field Price as decimal maxplaces 2 default 0.00
+            state A initial
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+        var f = model.Fields[0];
+
+        f.HasDefaultValue.Should().BeTrue();
+        f.DefaultValue.Should().Be(0.00);
+        f.Constraints.OfType<FieldConstraint.Maxplaces>().Should().ContainSingle().Which.Places.Should().Be(2);
+    }
+
+    [Fact]
+    public void Parse_FieldModifiers_MultiNameWithNonStandardOrder()
+    {
+        const string dsl = """
+            precept Test
+            field X, Y as number nonnegative default 0
+            state A initial
+            """;
+
+        var model = PreceptParser.Parse(dsl);
+
+        model.Fields.Should().HaveCount(2);
+        foreach (var f in model.Fields)
+        {
+            f.HasDefaultValue.Should().BeTrue();
+            f.DefaultValue.Should().Be(0.0);
+            f.Constraints.Should().Contain(c => c is FieldConstraint.Nonnegative);
+        }
+    }
+
     // ════════════════════════════════════════════════════════════════════
     // PARSING — Any-order event argument modifiers
     // ════════════════════════════════════════════════════════════════════
@@ -2025,6 +2062,21 @@ public class NewSyntaxParserTests
             state A initial
             event Go with X as number default 0 default 1
             from A on Go -> no transition
+            """;
+
+        var (model, diagnostics) = PreceptParser.ParseWithDiagnostics(dsl);
+
+        model.Should().BeNull();
+        diagnostics.Should().ContainSingle(d => d.Code == "PRECEPT070");
+    }
+
+    [Fact]
+    public void ParseWithDiagnostics_DuplicateOrdered_ProducesC70()
+    {
+        const string dsl = """
+            precept Test
+            field Priority as choice("Low", "Medium", "High") ordered ordered
+            state A initial
             """;
 
         var (model, diagnostics) = PreceptParser.ParseWithDiagnostics(dsl);
