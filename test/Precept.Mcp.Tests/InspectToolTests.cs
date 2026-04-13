@@ -278,4 +278,185 @@ public class InspectToolTests
         result.Error.Should().BeNull();
         result.EditableFields.Should().BeNull();
     }
+
+    [Fact]
+    public void StringLengthConstraint_ShowsViolationInPreview()
+    {
+        const string text = """
+precept Test
+field Name as string default "valid"
+state Open initial
+state Done
+event Update with NewName as string
+invariant Name.length >= 2 because "Name must be at least 2 characters"
+from Open on Update -> set Name = Update.NewName -> transition Done
+""";
+
+        var data = new Dictionary<string, object?> { ["Name"] = "valid" };
+        var eventArgs = new Dictionary<string, Dictionary<string, object?>>
+        {
+            ["Update"] = new() { ["NewName"] = "x" }
+        };
+        var result = InspectTool.Inspect(text, "Open", data, eventArgs);
+
+        result.Error.Should().BeNull();
+        var update = result.Events.FirstOrDefault(e => e.Event == "Update");
+        update.Should().NotBeNull();
+        update!.Outcome.Should().Be("ConstraintFailure");
+        update.Violations.Should().NotBeEmpty();
+        update.Violations[0].Message.Should().Contain("Name must be at least 2 characters");
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Slice 9c: when-guard inspect tests
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Inspect_GuardedInvariant_GuardFalse_NoViolation()
+    {
+        var text = """
+            precept Test
+            field X as number default 0
+            field Active as boolean default false
+            invariant X > 0 when Active because "X must be positive when active"
+            state Open initial
+            state Done
+            event Finish
+            from Open on Finish -> transition Done
+            """;
+
+        // Active = false → guard is false → invariant should not fire
+        var data = new Dictionary<string, object?>
+        {
+            ["X"] = 0.0,
+            ["Active"] = false
+        };
+
+        var result = InspectTool.Inspect(text, "Open", data);
+
+        result.Error.Should().BeNull();
+        var finish = result.Events.FirstOrDefault(e => e.Event == "Finish");
+        finish.Should().NotBeNull();
+        finish!.Outcome.Should().Be("Transition",
+            "when the invariant guard is false, the invariant should be skipped and the transition should succeed");
+    }
+
+    [Fact]
+    public void Inspect_GuardedEdit_GuardTrue_FieldShownAsEditable()
+    {
+        var text = """
+            precept Test
+            field X as number default 0
+            field Active as boolean default true
+            state Open initial
+            in Open when Active edit X
+            event Go
+            from Open on Go -> no transition
+            """;
+
+        // Active = true → guard passes → X should be editable
+        var data = new Dictionary<string, object?>
+        {
+            ["X"] = 0.0,
+            ["Active"] = true
+        };
+
+        var result = InspectTool.Inspect(text, "Open", data);
+
+        result.Error.Should().BeNull();
+        result.EditableFields.Should().NotBeNull();
+        result.EditableFields!.Select(f => f.Name).Should().Contain("X",
+            "when the edit block guard is true, the field should appear in editable fields");
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Conditional expressions (issue #9)
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Inspect_ConditionalSetAssignment_ShowsCorrectOutcome()
+    {
+        var text = """
+            precept Test
+            field Urgent as boolean default true
+            field Priority as number default 0
+            state Open initial
+            state Done
+            event Finish
+            from Open on Finish -> set Priority = if Urgent then 10 else 1 -> transition Done
+            """;
+
+        var data = new Dictionary<string, object?>
+        {
+            ["Urgent"] = true,
+            ["Priority"] = 0.0
+        };
+
+        var result = InspectTool.Inspect(text, "Open", data);
+
+        result.Error.Should().BeNull();
+        var finish = result.Events.FirstOrDefault(e => e.Event == "Finish");
+        finish.Should().NotBeNull();
+        finish!.Outcome.Should().Be("Transition");
+        finish.ResultState.Should().Be("Done");
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Computed fields (issue #17)
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Inspect_ComputedFieldValues_AppearInPreview()
+    {
+        var text = """
+            precept Test
+            field Price as number default 10
+            field Qty as number default 2
+            field Total as number -> Price * Qty
+            state Open initial
+            state Closed
+            event Close
+            from Open on Close -> transition Closed
+            """;
+
+        var data = new Dictionary<string, object?>
+        {
+            ["Price"] = 10.0,
+            ["Qty"] = 2.0
+        };
+
+        var result = InspectTool.Inspect(text, "Open", data);
+
+        result.Error.Should().BeNull();
+        // The computed field Total should be present in the instance data
+        result.Data.Should().ContainKey("Total");
+        result.Data!["Total"].Should().Be(20.0);
+    }
+
+    [Fact]
+    public void Inspect_ComputedFieldNotEditable()
+    {
+        var text = """
+            precept Test
+            field Base as number default 5
+            field Derived as number -> Base + 1
+            state Open initial
+            in Open edit Base
+            event Go
+            from Open on Go -> no transition
+            """;
+
+        var data = new Dictionary<string, object?>
+        {
+            ["Base"] = 5.0
+        };
+
+        var result = InspectTool.Inspect(text, "Open", data);
+
+        result.Error.Should().BeNull();
+        // Computed field "Derived" should NOT appear in the editable fields list
+        result.EditableFields.Should().NotBeNull();
+        result.EditableFields.Should().Contain(f => f.Name == "Base");
+        result.EditableFields.Should().NotContain(f => f.Name == "Derived");
+    }
 }

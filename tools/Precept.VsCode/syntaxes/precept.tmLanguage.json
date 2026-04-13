@@ -20,8 +20,10 @@
     { "include": "#collectionMemberAccess" },
     { "include": "#stringMemberAccess" },
     { "include": "#rootEditDeclaration" },
+    { "include": "#functionCall" },
     { "include": "#controlKeywords" },
     { "include": "#declarationKeywords" },
+    { "include": "#grammarKeywords" },
     { "include": "#typeKeywords" },
     { "include": "#actionKeywords" },
     { "include": "#constraintKeywords" },
@@ -62,7 +64,7 @@
           "name": "meta.message.because.precept",
           "match": "\\b(because)(\\s+)(\"(?:\\\\.|[^\"\\\\])*\")",
           "captures": {
-            "1": { "name": "keyword.other.precept" },
+            "1": { "name": "keyword.other.grammar.precept" },
             "3": { "name": "string.quoted.double.message.precept" }
           }
         },
@@ -99,7 +101,7 @@
             "4": {
               "patterns": [
                 {
-                  "name": "keyword.control.precept",
+                  "name": "keyword.other.grammar.precept",
                   "match": "\\binitial\\b"
                 },
                 {
@@ -127,7 +129,7 @@
             "4": {
               "patterns": [
                 {
-                  "name": "keyword.control.precept",
+                  "name": "keyword.other.grammar.precept",
                   "match": "\\ball\\b"
                 },
                 {
@@ -164,12 +166,13 @@
                 }
               ]
             },
-            "6": { "name": "keyword.other.precept" },
+            "6": { "name": "keyword.other.grammar.precept" },
             "8": {
               "patterns": [
                 { "include": "#typeKeywords" },
                 { "include": "#constraintKeywords" },
                 { "include": "#declarationKeywords" },
+                { "include": "#grammarKeywords" },
                 { "include": "#numbers" },
                 { "include": "#booleanNull" },
                 { "include": "#operators" },
@@ -218,7 +221,7 @@
       "patterns": [
         {
           "name": "meta.field-declaration.collection.precept",
-          "match": "^(\\s*)(field)(\\s+)((?:[A-Za-z_][A-Za-z0-9_]*\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*)(\\s+)(as)(\\s+)(set|queue|stack)(\\s+)(of)(\\s+)(string|number|boolean)",
+          "match": "^(\\s*)(field)(\\s+)((?:[A-Za-z_][A-Za-z0-9_]*\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*)(\\s+)(as)(\\s+)(set|queue|stack)(\\s+)(of)(\\s+)(string|number|boolean|integer|decimal)",
           "captures": {
             "2": { "name": "keyword.other.precept" },
             "4": {
@@ -233,20 +236,20 @@
                 }
               ]
             },
-            "6": { "name": "keyword.other.precept" },
+            "6": { "name": "keyword.other.grammar.precept" },
             "8": { "name": "storage.type.precept" },
-            "10": { "name": "keyword.control.precept" },
+            "10": { "name": "keyword.other.grammar.precept" },
             "12": { "name": "storage.type.precept" }
           }
         }
       ]
     },
     "fieldScalarDeclaration": {
-      "comment": "field Name[, Name, ...] as string nullable default value",
+      "comment": "field Name[, Name, ...] as string nullable default value — also handles computed fields: field Name as type -> expr",
       "patterns": [
         {
           "name": "meta.field-declaration.scalar.precept",
-          "match": "^(\\s*)(field)(\\s+)((?:[A-Za-z_][A-Za-z0-9_]*\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*)(\\s+)(as)(\\s+)(string|number|boolean)(.*)",
+          "match": "^(\\s*)(field)(\\s+)((?:[A-Za-z_][A-Za-z0-9_]*\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*)(\\s+)(as)(\\s+)(string|number|boolean|integer|decimal)(.*)",
           "captures": {
             "2": { "name": "keyword.other.precept" },
             "4": {
@@ -261,12 +264,20 @@
                 }
               ]
             },
-            "6": { "name": "keyword.other.precept" },
+            "6": { "name": "keyword.other.grammar.precept" },
             "8": { "name": "storage.type.precept" },
             "9": {
               "patterns": [
                 { "include": "#constraintKeywords" },
                 { "include": "#declarationKeywords" },
+                { "include": "#grammarKeywords" },
+                { "include": "#controlKeywords" },
+                { "include": "#arrowOperator" },
+                { "include": "#functionCall" },
+                { "include": "#collectionMemberAccess" },
+                { "include": "#stringMemberAccess" },
+                { "include": "#operators" },
+                { "include": "#identifierReference" },
                 { "include": "#booleanNull" },
                 { "include": "#numbers" },
                 { "include": "#strings" }
@@ -309,7 +320,22 @@
           "match": "^(\\s*)(from)(\\s+)(any|[A-Za-z_][A-Za-z0-9_]*(?:\\s*,\\s*[A-Za-z_][A-Za-z0-9_]*)*)(\\s+)(on)(\\s+)([A-Za-z_][A-Za-z0-9_]*)",
           "captures": {
             "2": { "name": "keyword.control.precept" },
-            "4": { "name": "entity.name.type.state.precept" },
+            "4": {
+              "patterns": [
+                {
+                  "name": "keyword.other.grammar.precept",
+                  "match": "\\bany\\b"
+                },
+                {
+                  "name": "entity.name.type.state.precept",
+                  "match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b"
+                },
+                {
+                  "name": "punctuation.separator.comma.precept",
+                  "match": ","
+                }
+              ]
+            },
             "6": { "name": "keyword.control.precept" },
             "8": { "name": "entity.name.function.event.precept" }
           }
@@ -369,11 +395,23 @@
       ]
     },
 
+    "functionCall": {
+      "comment": "Built-in function calls: function name followed by ( — must precede constraintKeywords so min(/max( match as functions, not constraints",
+      "patterns": [
+        {
+          "match": "\\b(abs|floor|ceil|round|truncate|min|max|pow|sqrt|clamp|toLower|toUpper|startsWith|endsWith|trim|left|right|mid)(?=\\s*\\()",
+          "captures": {
+            "1": { "name": "support.function.precept" }
+          }
+        }
+      ]
+    },
+
     "controlKeywords": {
       "patterns": [
         {
           "name": "keyword.control.precept",
-          "match": "\\b(precept|state|event|from|on|if|else|initial|when|in|to|any|all|of)\\b"
+          "match": "\\b(when|if|then|else)\\b"
         }
       ]
     },
@@ -381,7 +419,15 @@
       "patterns": [
         {
           "name": "keyword.other.precept",
-          "match": "\\b(field|as|with|assert|because|nullable|default|invariant|edit)\\b"
+          "match": "\\b(precept|state|event|field|invariant|assert|edit|from|on|in|to)\\b"
+        }
+      ]
+    },
+    "grammarKeywords": {
+      "patterns": [
+        {
+          "name": "keyword.other.grammar.precept",
+          "match": "\\b(as|nullable|default|because|initial|with|any|all|of|into)\\b"
         }
       ]
     },
@@ -389,7 +435,7 @@
       "patterns": [
         {
           "name": "storage.type.precept",
-          "match": "\\b(string|number|boolean|set|queue|stack)\\b"
+          "match": "\\b(string|number|boolean|integer|decimal|choice|set|queue|stack)\\b"
         }
       ]
     },
@@ -397,7 +443,7 @@
       "patterns": [
         {
           "name": "keyword.other.precept",
-          "match": "\\b(set|add|remove|enqueue|dequeue|push|pop|clear|into|contains)\\b"
+          "match": "\\b(set|add|remove|enqueue|dequeue|push|pop|clear)\\b"
         }
       ]
     },
@@ -405,8 +451,8 @@
       "comment": "Field-level and event-arg-level constraint keywords (type-shape tier, issue #13)",
       "patterns": [
         {
-          "name": "keyword.other.precept",
-          "match": "\\b(nonnegative|positive|notempty|min|max|minlength|maxlength|mincount|maxcount)\\b"
+          "name": "keyword.other.constraint.precept",
+          "match": "\\b(nonnegative|positive|notempty|min|max|minlength|maxlength|mincount|maxcount|maxplaces|ordered)\\b"
         }
       ]
     },
@@ -434,7 +480,7 @@
       "patterns": [
         {
           "name": "keyword.operator.logical.precept",
-          "match": "\\b(and|or|not)\\b"
+          "match": "\\b(and|or|not|contains)\\b"
         },
         {
           "name": "keyword.operator.comparison.precept",

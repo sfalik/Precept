@@ -151,4 +151,94 @@ public class FireToolTests
         result.FromState.Should().Be("Scheduled");
         result.Violations.Should().BeEmpty();
     }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Conditional expressions (issue #9)
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void ConditionalSetAssignment_ThenBranch_ProducesCorrectValue()
+    {
+        var text = """
+            precept Test
+            field Urgent as boolean default true
+            field Priority as number default 0
+            state Open initial
+            state Done
+            event Finish
+            from Open on Finish -> set Priority = if Urgent then 10 else 1 -> transition Done
+            """;
+
+        var data = new Dictionary<string, object?>
+        {
+            ["Urgent"] = true,
+            ["Priority"] = 0.0
+        };
+
+        var result = FireTool.Fire(text, "Open", "Finish", data);
+
+        result.Error.Should().BeNull();
+        result.Outcome.Should().Be("Transition");
+        result.ToState.Should().Be("Done");
+        result.Data!["Priority"].Should().Be(10.0);
+    }
+
+    [Fact]
+    public void ConditionalSetAssignment_ElseBranch_ProducesCorrectValue()
+    {
+        var text = """
+            precept Test
+            field Urgent as boolean default false
+            field Priority as number default 0
+            state Open initial
+            state Done
+            event Finish
+            from Open on Finish -> set Priority = if Urgent then 10 else 1 -> transition Done
+            """;
+
+        var data = new Dictionary<string, object?>
+        {
+            ["Urgent"] = false,
+            ["Priority"] = 0.0
+        };
+
+        var result = FireTool.Fire(text, "Open", "Finish", data);
+
+        result.Error.Should().BeNull();
+        result.Outcome.Should().Be("Transition");
+        result.ToState.Should().Be("Done");
+        result.Data!["Priority"].Should().Be(1.0);
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Computed fields (issue #17)
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Fire_ComputedFieldValues_AppearInDataSnapshot()
+    {
+        var text = """
+            precept Test
+            field A as number default 1
+            field B as number default 2
+            field Total as number -> A + B
+            state Open initial
+            state Done
+            event Finish with NewA as number
+            from Open on Finish -> set A = Finish.NewA -> transition Done
+            """;
+
+        var data = new Dictionary<string, object?>
+        {
+            ["A"] = 1.0,
+            ["B"] = 2.0
+        };
+
+        var result = FireTool.Fire(text, "Open", "Finish", data, new() { ["NewA"] = 5.0 });
+
+        result.Error.Should().BeNull();
+        result.Outcome.Should().Be("Transition");
+        result.Data.Should().ContainKey("Total");
+        result.Data!["Total"].Should().Be(7.0, "Total = A(5) + B(2)");
+    }
 }

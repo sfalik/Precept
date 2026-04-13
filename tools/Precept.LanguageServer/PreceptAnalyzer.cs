@@ -16,7 +16,7 @@ internal sealed class PreceptAnalyzer
 
     // ── Regex patterns for new-syntax declarations ──────────────────────
     // Match `field Name[, Name, ...] as string|number|boolean` (scalar fields)
-    private static readonly Regex NewFieldDeclRegex = new("^\\s*field\\s+(?<names>(?:[A-Za-z_][A-Za-z0-9_]*\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*)\\s+as\\s+(?:string|number|boolean)(?:\\s|$)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex NewFieldDeclRegex = new("^\\s*field\\s+(?<names>(?:[A-Za-z_][A-Za-z0-9_]*\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*)\\s+as\\s+(?:string|number|boolean|integer|decimal|choice)(?:\\s|\\(|$)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     // Match `field Name[, Name, ...] as set|queue|stack of type` (collection fields)
     private static readonly Regex NewCollectionFieldRegex = new("^\\s*field\\s+(?<names>(?:[A-Za-z_][A-Za-z0-9_]*\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*)\\s+as\\s+(?:set|queue|stack)\\s+of\\s+", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     // Match `event Name[, Name, ...] with ...` (inline event args)
@@ -67,7 +67,7 @@ internal sealed class PreceptAnalyzer
             return Array.Empty<Diagnostic>();
 
         var validation = PreceptCompiler.Validate(model);
-        var diagnostics = validation.Diagnostics.Select(MapValidationDiagnostic).ToList();
+        var diagnostics = validation.Diagnostics.Select(d => MapValidationDiagnostic(d, lines)).ToList();
         diagnostics.AddRange(GetSemanticDiagnostics(model, lines));
         return diagnostics.Count == 0 ? Array.Empty<Diagnostic>() : diagnostics;
     }
@@ -87,6 +87,24 @@ internal sealed class PreceptAnalyzer
             ? lineText[..(int)position.Character]
             : lineText;
 
+        // ── Comment lines: suppress completions entirely ──
+        if (beforeCursor.TrimStart().StartsWith('#'))
+            return Array.Empty<CompletionItem>();
+
+        // ── Pre-precept scope: before any precept declaration, only offer 'precept' ──
+        var hasPreceptDecl = info.Lines.Any(static l => Regex.IsMatch(l, @"^\s*precept\s+", RegexOptions.IgnoreCase));
+        if (!hasPreceptDecl)
+        {
+            // If the user is on a line starting with 'precept', they're naming it — suppress
+            if (Regex.IsMatch(beforeCursor, @"^\s*precept\s+\S*$", RegexOptions.IgnoreCase))
+                return Array.Empty<CompletionItem>();
+
+            return
+            [
+                new CompletionItem { Label = "precept", Kind = CompletionItemKind.Keyword, Detail = "Top-level precept declaration" }
+            ];
+        }
+
         var states = info.States;
         var events = info.Events;
         var dataFields = info.Fields;
@@ -94,6 +112,17 @@ internal sealed class PreceptAnalyzer
         var eventArgs = info.EventArgs;
         var collectionKinds = info.CollectionKinds;
         var currentEvent = FindCurrentEventName(lines, (int)position.Line);
+
+        // Computed fields are excluded from set/edit target positions (they are read-only).
+        // When the model is available, use it; otherwise fall back to regex detection
+        // so computed field filtering works even on incomplete documents during editing.
+        var computedFieldNames = info.Model?.Fields
+            .Where(static f => f.IsComputed)
+            .Select(static f => f.Name)
+            .ToHashSet(StringComparer.Ordinal) ?? DetectComputedFieldsByRegex(lines);
+        var editableDataFields = computedFieldNames.Count > 0
+            ? dataFields.Where(f => !computedFieldNames.Contains(f)).ToArray()
+            : dataFields;
 
         // ── Completion suppression: "inventing a name" positions ──
         // When the user is typing a new identifier name, suppress the default keyword list.
@@ -156,6 +185,13 @@ internal sealed class PreceptAnalyzer
             // After "add|remove|push|enqueue <Field> ", suggest expression (the value to add/push/remove)
             if (Regex.IsMatch(beforeCursor, "(?:^|->)\\s*(?:add|remove|push|enqueue)\\s+[A-Za-z_][A-Za-z0-9_]*\\s+[^\\n]*$", RegexOptions.IgnoreCase))
             {
+                // If expression looks complete (ends with identifier/literal + space), offer -> for pipeline continuation.
+                // Only check after the value portion has started — the regex requires at least one non-space token
+                // past the field name to distinguish "add Field |" (needs value) from "add Field value |" (needs ->).
+                var valueMatch = Regex.Match(beforeCursor, "(?:^|->)\\s*(?:add|remove|push|enqueue)\\s+[A-Za-z_][A-Za-z0-9_]*\\s+(?<value>\\S.*)$", RegexOptions.IgnoreCase);
+                if (valueMatch.Success && EndsWithCompletedExpression(valueMatch.Groups["value"].Value))
+                    return [ArrowPipelineItem];
+
                 var typedItems = TryBuildTypedCollectionMutationExpressionCompletions(
                     text,
                     lines,
@@ -172,10 +208,14 @@ internal sealed class PreceptAnalyzer
 
         if (Regex.IsMatch(beforeCursor, "(?:^|->)\\s*set\\s+[^=\\n]*$", RegexOptions.IgnoreCase) &&
             !beforeCursor.Contains('=', StringComparison.Ordinal))
-            return DistinctAndSort(BuildItems(dataFields, CompletionItemKind.Field).Concat(SetSnippetItems));
+            return DistinctAndSort(BuildItems(editableDataFields, CompletionItemKind.Field).Concat(SetSnippetItems));
 
         if (Regex.IsMatch(beforeCursor, "(?:^|->)\\s*set\\s+[A-Za-z_][A-Za-z0-9_]*\\s*=\\s*[^\\n]*$", RegexOptions.IgnoreCase))
         {
+            // If expression looks complete (ends with identifier/literal + space), offer -> for pipeline continuation
+            if (EndsWithCompletedExpression(beforeCursor))
+                return [ArrowPipelineItem];
+
             var typedItems = TryBuildTypedSetExpressionCompletions(
                 text,
                 lines,
@@ -198,8 +238,10 @@ internal sealed class PreceptAnalyzer
 
         // After "-> " → suggest action/outcome keywords
         // Must be checked before the broader "from … on …" regex which would swallow "->"
-        if (beforeCursor.TrimEnd().EndsWith("->", StringComparison.Ordinal) ||
-            Regex.IsMatch(beforeCursor, "->\\s+$"))
+        // Exclude field declaration lines — those use "->" for derived expression syntax.
+        if ((beforeCursor.TrimEnd().EndsWith("->", StringComparison.Ordinal) ||
+            Regex.IsMatch(beforeCursor, "->\\s+$")) &&
+            !Regex.IsMatch(beforeCursor, @"^\s*field\s+", RegexOptions.IgnoreCase))
             return ArrowItems;
 
         // After a completed guarded transition expression, suggest the action/outcome pipeline.
@@ -246,41 +288,16 @@ internal sealed class PreceptAnalyzer
         if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+(?:set|queue|stack)\s+$", RegexOptions.IgnoreCase))
             return [new CompletionItem { Label = "of", Kind = CompletionItemKind.Keyword }];
 
-        // After "field Name as Type nullable " → suggest "default" + type constraints
-        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+number\s+nullable\s+$", RegexOptions.IgnoreCase))
-            return [DefaultItem, ..NumberConstraintItems];
-        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+string\s+nullable\s+$", RegexOptions.IgnoreCase))
-            return [DefaultItem, ..StringConstraintItems];
-        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+boolean\s+nullable\s+$", RegexOptions.IgnoreCase))
-            return [DefaultItem];
+        // ── Field modifier zone: any-order modifiers after type ──
+        // Computed field derivation: after "field Name as type -> " → suggest field names and collection accessors
+        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+(?:string|number|boolean|integer|decimal|choice\([^)]*\))\s*->\s+[^\n]*$", RegexOptions.IgnoreCase))
+            return BuildDerivedExpressionCompletions(dataFields, collectionFields, collectionKinds);
 
-        // After "field Name as TYPE [nullable] default VALUE " → type constraints only
-        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+number(?:\s+nullable)?\s+default\s+(?:-?\d+(?:\.\d+)?|true|false|null)\s+$", RegexOptions.IgnoreCase))
-            return NumberConstraintItems;
-        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+string(?:\s+nullable)?\s+default\s+(?:""[^""\n]*""|\S+)\s+$", RegexOptions.IgnoreCase))
-            return StringConstraintItems;
-
-        // After already having constraints on a number field → offer more
-        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+number\b.*\b(?:nonnegative|positive|(?:min|max)\s+\S+)\s+$", RegexOptions.IgnoreCase))
-            return NumberConstraintItems;
-        // After already having constraints on a string field → offer more
-        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+string\b.*\b(?:notempty|(?:minlength|maxlength)\s+\S+)\s+$", RegexOptions.IgnoreCase))
-            return StringConstraintItems;
-
-        // After "field Name as set|queue|stack of TYPE " → collection constraints
-        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+(?:set|queue|stack)\s+of\s+\w+\s+$", RegexOptions.IgnoreCase))
-            return CollectionConstraintItems;
-        // After already having constraints on a collection field → offer more
-        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+(?:set|queue|stack)\b.*\b(?:notempty|(?:mincount|maxcount)\s+\S+)\s+$", RegexOptions.IgnoreCase))
-            return CollectionConstraintItems;
-
-        // After "field Name as Type " (scalar type completed) → suggest "nullable", "default", type constraints
-        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+number\s+$", RegexOptions.IgnoreCase))
-            return [NullableItem, DefaultItem, ..NumberConstraintItems];
-        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+string\s+$", RegexOptions.IgnoreCase))
-            return [NullableItem, DefaultItem, ..StringConstraintItems];
-        if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+boolean\s+$", RegexOptions.IgnoreCase))
-            return [NullableItem, DefaultItem];
+        // Unified handler for all field modifier completions (nullable, default, constraints, ordered).
+        // Detects the field type, scans existing modifiers, offers remaining items.
+        var fieldModifiers = TryGetFieldModifierCompletions(beforeCursor);
+        if (fieldModifiers is not null)
+            return fieldModifiers;
 
         // After "field Name as " (typing type) → suggest type keywords
         if (Regex.IsMatch(beforeCursor, @"^\s*field\s+[A-Za-z_]\w*\s+as\s+\w*$", RegexOptions.IgnoreCase))
@@ -291,17 +308,36 @@ internal sealed class PreceptAnalyzer
             return [new CompletionItem { Label = "as", Kind = CompletionItemKind.Keyword }, new CompletionItem { Label = ",", Kind = CompletionItemKind.Operator, Detail = "add another field name" }];
 
         // ── New-syntax: invariant/assert expressions ──
-        // After a completed invariant expression, suggest the required reason clause.
-        if (Regex.IsMatch(beforeCursor, "^\\s*invariant\\s+.+\\s+$", RegexOptions.IgnoreCase) && EndsWithCompletedExpression(beforeCursor))
+        // After "invariant <expr> when <guard> " (completed guard) → suggest because
+        if (Regex.IsMatch(beforeCursor, @"^\s*invariant\s+.+\s+when\s+.+\s+$", RegexOptions.IgnoreCase) && EndsWithCompletedExpression(beforeCursor))
             return [BecauseItem];
+
+        // After "invariant <expr> when " (guard in progress) → suggest field names for guard expression
+        if (Regex.IsMatch(beforeCursor, @"^\s*invariant\s+.+\s+when\s+[^\n]*$", RegexOptions.IgnoreCase))
+            return BuildDataExpressionCompletions(dataFields, collectionKinds);
+
+        // After a completed invariant expression, suggest when or because.
+        if (Regex.IsMatch(beforeCursor, "^\\s*invariant\\s+.+\\s+$", RegexOptions.IgnoreCase) && EndsWithCompletedExpression(beforeCursor))
+            return [WhenItem, BecauseItem];
 
         // After "invariant " → suggest expression completions (field names, operators)
         if (Regex.IsMatch(beforeCursor, "^\\s*invariant\\s+[^\\n]*$", RegexOptions.IgnoreCase))
             return BuildDataExpressionCompletions(dataFields, collectionKinds);
 
-        // After a completed event assert expression, suggest the required reason clause.
-        if (Regex.IsMatch(beforeCursor, "^\\s*on\\s+[A-Za-z_][A-Za-z0-9_]*\\s+assert\\s+.+\\s+$", RegexOptions.IgnoreCase) && EndsWithCompletedExpression(beforeCursor))
+        // After "on Event assert <expr> when <guard> " (completed guard) → suggest because
+        if (Regex.IsMatch(beforeCursor, @"^\s*on\s+[A-Za-z_][A-Za-z0-9_]*\s+assert\s+.+\s+when\s+.+\s+$", RegexOptions.IgnoreCase) && EndsWithCompletedExpression(beforeCursor))
             return [BecauseItem];
+
+        // After "on Event assert <expr> when " (guard in progress) → suggest event arg completions
+        if (Regex.IsMatch(beforeCursor, @"^\s*on\s+[A-Za-z_][A-Za-z0-9_]*\s+assert\s+.+\s+when\s+[^\n]*$", RegexOptions.IgnoreCase))
+        {
+            var eventName = Regex.Match(beforeCursor, @"^\s*on\s+(?<evt>[A-Za-z_][A-Za-z0-9_]*)").Groups["evt"].Value;
+            return BuildEventAssertCompletions(eventName, eventArgs);
+        }
+
+        // After a completed event assert expression, suggest when or because.
+        if (Regex.IsMatch(beforeCursor, "^\\s*on\\s+[A-Za-z_][A-Za-z0-9_]*\\s+assert\\s+.+\\s+$", RegexOptions.IgnoreCase) && EndsWithCompletedExpression(beforeCursor))
+            return [WhenItem, BecauseItem];
 
         // After "on EventName assert " → suggest expression completions (event args)
         if (Regex.IsMatch(beforeCursor, "^\\s*on\\s+[A-Za-z_][A-Za-z0-9_]*\\s+assert\\s+[^\\n]*$", RegexOptions.IgnoreCase))
@@ -314,12 +350,32 @@ internal sealed class PreceptAnalyzer
         if (Regex.IsMatch(beforeCursor, "^\\s*on\\s+[A-Za-z_][A-Za-z0-9_]*\\s+$", RegexOptions.IgnoreCase))
             return [new CompletionItem { Label = "assert", Kind = CompletionItemKind.Keyword }];
 
-        // After "in/to StateName " → suggest assert, ->, edit (in only)
+        // After "on " (typing or choosing event name) → suggest event names
+        if (Regex.IsMatch(beforeCursor, @"^\s*on\s+\w*$", RegexOptions.IgnoreCase))
+            return BuildItems(events, CompletionItemKind.Event);
+
+        // After "in State when <guard> edit " → suggest field names (excludes computed fields)
+        if (Regex.IsMatch(beforeCursor, @"^\s*in\s+[^\n]*\s+when\s+[^\n]+\s+edit\s+[^\n]*$", RegexOptions.IgnoreCase))
+            return DistinctAndSort(
+                new CompletionItem[] { new() { Label = "all", Kind = CompletionItemKind.Keyword } }
+                    .Concat(BuildItems(editableDataFields, CompletionItemKind.Field))
+                    .Concat(BuildItems(collectionFields, CompletionItemKind.Field)));
+
+        // After "in State when <guard> " (completed guard) → suggest edit
+        if (Regex.IsMatch(beforeCursor, @"^\s*in\s+[A-Za-z_][A-Za-z0-9_]*(?:\s*,\s*[A-Za-z_][A-Za-z0-9_]*)*\s+when\s+.+\s+$", RegexOptions.IgnoreCase) && EndsWithCompletedExpression(beforeCursor))
+            return [new CompletionItem { Label = "edit", Kind = CompletionItemKind.Keyword }];
+
+        // After "in State when " (guard in progress) → suggest field names for guard expression
+        if (Regex.IsMatch(beforeCursor, @"^\s*in\s+[A-Za-z_][A-Za-z0-9_]*(?:\s*,\s*[A-Za-z_][A-Za-z0-9_]*)*\s+when\s+[^\n]*$", RegexOptions.IgnoreCase))
+            return BuildDataExpressionCompletions(dataFields, collectionKinds);
+
+        // After "in/to StateName " → suggest assert, ->, edit (in only), when (in only)
         if (Regex.IsMatch(beforeCursor, "^\\s*in\\s+[A-Za-z_][A-Za-z0-9_]*(?:\\s*,\\s*[A-Za-z_][A-Za-z0-9_]*)*\\s+$", RegexOptions.IgnoreCase))
             return
             [
                 new CompletionItem { Label = "assert", Kind = CompletionItemKind.Keyword },
                 new CompletionItem { Label = "edit", Kind = CompletionItemKind.Keyword },
+                WhenItem,
                 new CompletionItem { Label = "->", Kind = CompletionItemKind.Operator, Detail = "action chain" }
             ];
 
@@ -335,9 +391,17 @@ internal sealed class PreceptAnalyzer
         if (Regex.IsMatch(beforeCursor, "^\\s*(?:in|to)\\s+(?:[A-Za-z_][A-Za-z0-9_]*\\s*,\\s*)*(?:[A-Za-z_][A-Za-z0-9_]*)?$", RegexOptions.IgnoreCase))
             return BuildItems(states.Append("any"), CompletionItemKind.EnumMember);
 
-        // After a completed state assert expression, suggest the required reason clause.
-        if (Regex.IsMatch(beforeCursor, "^\\s*(?:in|to|from)\\s+[^\\n]*\\s+assert\\s+.+\\s+$", RegexOptions.IgnoreCase) && EndsWithCompletedExpression(beforeCursor))
+        // After "in/to/from State assert <expr> when <guard> " (completed guard) → suggest because
+        if (Regex.IsMatch(beforeCursor, @"^\s*(?:in|to|from)\s+[^\n]*\s+assert\s+.+\s+when\s+.+\s+$", RegexOptions.IgnoreCase) && EndsWithCompletedExpression(beforeCursor))
             return [BecauseItem];
+
+        // After "in/to/from State assert <expr> when " (guard in progress) → suggest field completions
+        if (Regex.IsMatch(beforeCursor, @"^\s*(?:in|to|from)\s+[^\n]*\s+assert\s+.+\s+when\s+[^\n]*$", RegexOptions.IgnoreCase))
+            return BuildDataExpressionCompletions(dataFields, collectionKinds);
+
+        // After a completed state assert expression, suggest when or because.
+        if (Regex.IsMatch(beforeCursor, "^\\s*(?:in|to|from)\\s+[^\\n]*\\s+assert\\s+.+\\s+$", RegexOptions.IgnoreCase) && EndsWithCompletedExpression(beforeCursor))
+            return [WhenItem, BecauseItem];
 
         // After "in/to/from State assert " → expression completions
         if (Regex.IsMatch(beforeCursor, "^\\s*(?:in|to|from)\\s+[^\\n]*\\s+assert\\s+[^\\n]*$", RegexOptions.IgnoreCase))
@@ -347,50 +411,37 @@ internal sealed class PreceptAnalyzer
         if (Regex.IsMatch(beforeCursor, "\\bbecause\\s+[^\\n]*$", RegexOptions.IgnoreCase))
             return [SnippetItem("because reason", "because \"${1:Reason}\"", "Constraint reason")];
 
-        // After root "edit " → suggest 'all' + field names (stateless precept root-level editability)
+        // After root "edit " → suggest 'all' + field names (excludes computed fields)
         if (Regex.IsMatch(beforeCursor, "^\\s*edit\\s+[^\\n]*$", RegexOptions.IgnoreCase))
             return DistinctAndSort(
                 new CompletionItem[] { new() { Label = "all", Kind = CompletionItemKind.Keyword } }
-                    .Concat(BuildItems(dataFields, CompletionItemKind.Field))
+                    .Concat(BuildItems(editableDataFields, CompletionItemKind.Field))
                     .Concat(BuildItems(collectionFields, CompletionItemKind.Field)));
 
-        // After "in State edit " → suggest 'all' + field names (in any edit all / in State edit Fields)
+        // After "in State edit " → suggest 'all' + field names (excludes computed fields)
         if (Regex.IsMatch(beforeCursor, "^\\s*in\\s+[^\\n]*\\s+edit\\s+[^\\n]*$", RegexOptions.IgnoreCase))
             return DistinctAndSort(
                 new CompletionItem[] { new() { Label = "all", Kind = CompletionItemKind.Keyword } }
-                    .Concat(BuildItems(dataFields, CompletionItemKind.Field))
+                    .Concat(BuildItems(editableDataFields, CompletionItemKind.Field))
                     .Concat(BuildItems(collectionFields, CompletionItemKind.Field)));
 
-        // After "event Name with Arg as Type [nullable] [default Value] " → suggest delimiter / modifiers
-        // Split by type to include type-appropriate constraint keywords
-        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean)(?:\\s+nullable)?(?:\\s+default\\s+(?:\"[^\"\\n]*\"|\\S+))?)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+number\\s+nullable\\s+$", RegexOptions.IgnoreCase))
-            return [DefaultItem, ..NumberConstraintItems, CommaItem];
-        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean)(?:\\s+nullable)?(?:\\s+default\\s+(?:\"[^\"\\n]*\"|\\S+))?)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+string\\s+nullable\\s+$", RegexOptions.IgnoreCase))
-            return [DefaultItem, ..StringConstraintItems, CommaItem];
-        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean)(?:\\s+nullable)?(?:\\s+default\\s+(?:\"[^\"\\n]*\"|\\S+))?)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+boolean\\s+nullable\\s+$", RegexOptions.IgnoreCase))
-            return [DefaultItem, CommaItem];
-
-        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean)(?:\\s+nullable)?(?:\\s+default\\s+(?:\"[^\"\\n]*\"|-?\\d+(?:\\.\\d+)?|true|false|null))?)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean)\\s+default\\s+(?:\"[^\"\\n]*\"|-?\\d+(?:\\.\\d+)?|true|false|null)\\s*$", RegexOptions.IgnoreCase))
-            return [CommaItem];
+        // ── Event arg modifier zone: any-order modifiers after type ──
+        // Unified handler for event argument modifier completions (nullable, default, constraints, comma).
+        var eventArgModifiers = TryGetEventArgModifierCompletions(beforeCursor);
+        if (eventArgModifiers is not null)
+            return eventArgModifiers;
 
         // After a comma in an event arg list, the user is starting the next arg name.
         // Avoid unrelated global keyword fallback in this position.
         if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+.*\\,\\s*$", RegexOptions.IgnoreCase))
             return Array.Empty<CompletionItem>();
 
-        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean)(?:\\s+nullable)?(?:\\s+default\\s+(?:\"[^\"\\n]*\"|\\S+))?)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+number\\s+$", RegexOptions.IgnoreCase))
-            return [NullableItem, DefaultItem, ..NumberConstraintItems, CommaItem];
-        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean)(?:\\s+nullable)?(?:\\s+default\\s+(?:\"[^\"\\n]*\"|\\S+))?)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+string\\s+$", RegexOptions.IgnoreCase))
-            return [NullableItem, DefaultItem, ..StringConstraintItems, CommaItem];
-        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean)(?:\\s+nullable)?(?:\\s+default\\s+(?:\"[^\"\\n]*\"|-?\\d+(?:\\.\\d+)?|true|false|null))?)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+boolean\\s+$", RegexOptions.IgnoreCase))
-            return [NullableItem, DefaultItem, CommaItem];
-
         // After "event Name with ArgName as " → suggest type keywords
-        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean)(?:\\s+nullable)?(?:\\s+default\\s+(?:\"[^\"\\n]*\"|-?\\d+(?:\\.\\d+)?|true|false|null))?)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+\\w*$", RegexOptions.IgnoreCase))
+        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean|integer|decimal|choice\\([^)]*\\))(?:\\s+(?:nullable|nonnegative|positive|notempty|ordered|(?:(?:default|min|max|minlength|maxlength|mincount|maxcount|maxplaces)\\s+(?:\"[^\"\\n]*\"|-?\\d+(?:\\.\\d+)?|true|false|null|\\[\"[^\"]*\"(?:,\\s*\"[^\"]*\")*\\]))))*)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+\\w*$", RegexOptions.IgnoreCase))
             return ScalarTypeItems;
 
         // After "event Name with ArgName " → suggest "as"
-        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean)(?:\\s+nullable)?(?:\\s+default\\s+(?:\"[^\"\\n]*\"|-?\\d+(?:\\.\\d+)?|true|false|null))?)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+$", RegexOptions.IgnoreCase))
+        if (Regex.IsMatch(beforeCursor, "^\\s*event\\s+[A-Za-z_][A-Za-z0-9_]*\\s+with\\s+(?:(?:[A-Za-z_][A-Za-z0-9_]*\\s+as\\s+(?:string|number|boolean|integer|decimal|choice\\([^)]*\\))(?:\\s+(?:nullable|nonnegative|positive|notempty|ordered|(?:(?:default|min|max|minlength|maxlength|mincount|maxcount|maxplaces)\\s+(?:\"[^\"\\n]*\"|-?\\d+(?:\\.\\d+)?|true|false|null|\\[\"[^\"]*\"(?:,\\s*\"[^\"]*\")*\\]))))*)\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*\\s+$", RegexOptions.IgnoreCase))
             return [AsItem];
 
         // After "event Name with " → user is typing arg name, no suggestions
@@ -410,7 +461,7 @@ internal sealed class PreceptAnalyzer
         if (Regex.IsMatch(beforeCursor, @"^\s*state\s+.*\binitial\s+$", RegexOptions.IgnoreCase))
             return [new CompletionItem { Label = ",", Kind = CompletionItemKind.Operator, Detail = "add another state name" }];
 
-        return DistinctAndSort(KeywordItems.Concat(GlobalSnippetItems));
+        return DistinctAndSort(TopLevelItems.Concat(GlobalSnippetItems));
     }
 
     internal IReadOnlyList<RejectOnlyStateEventIssue> GetRejectOnlyStateEventIssues(DocumentUri uri)
@@ -563,9 +614,19 @@ internal sealed class PreceptAnalyzer
             collectionKinds);
         var dataFieldNames = model.Fields.Select(static field => field.Name).ToHashSet(StringComparer.Ordinal);
 
-        return DistinctAndSort(baseline.Where(item =>
+        var filtered = baseline.Where(item =>
             item.Kind is CompletionItemKind.Operator or CompletionItemKind.Snippet ||
-            IsTypedExpressionCompletionItem(item, scope.Symbols, expectedKind, dataFieldNames, eventName, collectionKinds)));
+            IsTypedExpressionCompletionItem(item, scope.Symbols, expectedKind, dataFieldNames, eventName, collectionKinds));
+
+        // For choice fields, also offer the declared member values as string literal completions
+        if (target.Type == PreceptScalarType.Choice && target.ChoiceValues?.Count > 0)
+        {
+            var choiceLiterals = target.ChoiceValues.Select(static v =>
+                new CompletionItem { Label = $"\"{v}\"", Kind = CompletionItemKind.EnumMember, Detail = "choice value" });
+            return DistinctAndSort(filtered.Concat(choiceLiterals));
+        }
+
+        return DistinctAndSort(filtered);
     }
 
     private static IReadOnlyList<CompletionItem>? TryBuildTypedCollectionMutationExpressionCompletions(
@@ -619,9 +680,19 @@ internal sealed class PreceptAnalyzer
             collectionKinds);
         var dataFieldNames = model.Fields.Select(static field => field.Name).ToHashSet(StringComparer.Ordinal);
 
-        return DistinctAndSort(baseline.Where(item =>
+        var filtered = baseline.Where(item =>
             item.Kind is CompletionItemKind.Operator or CompletionItemKind.Snippet ||
-            IsTypedExpressionCompletionItem(item, scope.Symbols, expectedKind, dataFieldNames, eventName, collectionKinds)));
+            IsTypedExpressionCompletionItem(item, scope.Symbols, expectedKind, dataFieldNames, eventName, collectionKinds));
+
+        // For choice collections, also offer the declared member values as string literal completions
+        if (target.InnerType == PreceptScalarType.Choice && target.ChoiceValues?.Count > 0)
+        {
+            var choiceLiterals = target.ChoiceValues.Select(static v =>
+                new CompletionItem { Label = $"\"{v}\"", Kind = CompletionItemKind.EnumMember, Detail = "choice value" });
+            return DistinctAndSort(filtered.Concat(choiceLiterals));
+        }
+
+        return DistinctAndSort(filtered);
     }
 
     private static IReadOnlyList<CompletionItem>? TryBuildTypedDequeuePopIntoCompletions(
@@ -743,6 +814,24 @@ internal sealed class PreceptAnalyzer
         return DistinctAndSort(items);
     }
 
+    /// <summary>
+    /// Expression completions for the derived field context (after <c>-></c> in a field declaration).
+    /// Includes data fields and collection accessors but excludes event arguments (not in scope).
+    /// </summary>
+    private static IReadOnlyList<CompletionItem> BuildDerivedExpressionCompletions(
+        IReadOnlyList<string> dataFields,
+        IReadOnlyList<string> collectionFields,
+        IReadOnlyDictionary<string, PreceptCollectionKind> collectionKinds)
+    {
+        var items = new List<CompletionItem>();
+        items.AddRange(BuildItems(dataFields, CompletionItemKind.Variable));
+        items.AddRange(BuildItems(collectionFields, CompletionItemKind.Variable));
+        items.AddRange(BuildCollectionScopeItems(collectionKinds));
+        items.AddRange(ExpressionOperatorItems);
+        items.AddRange(LiteralItems);
+        return DistinctAndSort(items);
+    }
+
     private static IReadOnlyList<CompletionItem> BuildEventAssertCompletions(
         string eventName,
         IReadOnlyDictionary<string, IReadOnlyList<string>> eventArgs)
@@ -777,7 +866,7 @@ internal sealed class PreceptAnalyzer
     private static IReadOnlyList<CompletionItem> BuildStringMemberItems(string fieldName, bool isNullable)
     {
         var doc = isNullable
-            ? "Returns the string's character count (UTF-16 code units). Use 'field != null && field.length ...' for nullable strings."
+            ? "Returns the string's character count (UTF-16 code units). Use 'field != null and field.length ...' for nullable strings."
             : "Returns the string's character count (UTF-16 code units).";
         return
         [
@@ -839,9 +928,10 @@ internal sealed class PreceptAnalyzer
         return diagnostics;
     }
 
-    private static Diagnostic MapValidationDiagnostic(PreceptValidationDiagnostic diagnostic)
+    private static Diagnostic MapValidationDiagnostic(PreceptValidationDiagnostic diagnostic, string[] lines)
     {
         var lineIndex = Math.Max(0, diagnostic.Line - 1);
+        var lineLength = lineIndex < lines.Length ? lines[lineIndex].Length : 1;
         var message = string.IsNullOrWhiteSpace(diagnostic.StateContext)
             ? diagnostic.Message
             : $"{diagnostic.Message} [state {diagnostic.StateContext}]";
@@ -861,7 +951,7 @@ internal sealed class PreceptAnalyzer
             Code = new DiagnosticCode(diagnostic.DiagnosticCode),
             Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
                 new Position(lineIndex, Math.Max(0, diagnostic.Column)),
-                new Position(lineIndex, Math.Max(1, diagnostic.Column + 1)))
+                new Position(lineIndex, Math.Max(diagnostic.Column + 1, lineLength)))
         };
     }
 
@@ -957,7 +1047,7 @@ internal sealed class PreceptAnalyzer
             })
             .ToArray();
 
-    private static readonly IReadOnlyList<CompletionItem> KeywordItems = BuildKeywordItems();
+    internal static readonly IReadOnlyList<CompletionItem> KeywordItems = BuildKeywordItems();
 
     /// <summary>
     /// Builds the fallback keyword completion list from <see cref="PreceptTokenMeta"/> attributes.
@@ -976,6 +1066,9 @@ internal sealed class PreceptAnalyzer
             if (category is null || symbol is null) continue;
             if (!symbol.All(char.IsLetter)) continue;
             if (category is TokenCategory.Structure or TokenCategory.Value) continue;
+
+            // Exclude continuation-only keywords that are never valid standalone
+            if (symbol is "then" or "else") continue;
 
             items.Add(new CompletionItem
             {
@@ -996,7 +1089,49 @@ internal sealed class PreceptAnalyzer
         return items;
     }
 
-    private static readonly IReadOnlyList<CompletionItem> ExpressionOperatorItems =
+    /// <summary>
+    /// Top-level declaration keywords appropriate for blank lines / statement start.
+    /// Excludes action keywords (set, add), outcome keywords (transition, reject),
+    /// grammar modifiers (as, nullable, because), and constraint keywords that only
+    /// make sense inside specific declaration contexts.
+    /// </summary>
+    private static readonly IReadOnlyList<CompletionItem> TopLevelItems = BuildTopLevelItems();
+
+    private static IReadOnlyList<CompletionItem> BuildTopLevelItems()
+    {
+        var topLevelCategories = new HashSet<TokenCategory>
+        {
+            TokenCategory.Declaration,
+            TokenCategory.Control
+        };
+
+        var items = new List<CompletionItem>();
+
+        foreach (var token in Enum.GetValues<PreceptToken>())
+        {
+            var category = PreceptTokenMeta.GetCategory(token);
+            var symbol = PreceptTokenMeta.GetSymbol(token);
+            var description = PreceptTokenMeta.GetDescription(token);
+
+            if (category is null || symbol is null) continue;
+            if (!symbol.All(char.IsLetter)) continue;
+            if (!topLevelCategories.Contains(category.Value)) continue;
+
+            // Exclude expression-only control keywords from statement-start completions
+            if (symbol is "if" or "then" or "else") continue;
+
+            items.Add(new CompletionItem
+            {
+                Label = symbol,
+                Kind = CompletionItemKind.Keyword,
+                Detail = description
+            });
+        }
+
+        return items;
+    }
+
+    internal static readonly IReadOnlyList<CompletionItem> ExpressionOperatorItems =
     [
         new CompletionItem { Label = "+", Kind = CompletionItemKind.Operator },
         new CompletionItem { Label = "-", Kind = CompletionItemKind.Operator },
@@ -1012,10 +1147,33 @@ internal sealed class PreceptAnalyzer
         new CompletionItem { Label = "and", Kind = CompletionItemKind.Keyword },
         new CompletionItem { Label = "or", Kind = CompletionItemKind.Keyword },
         new CompletionItem { Label = "not", Kind = CompletionItemKind.Keyword },
-        new CompletionItem { Label = "contains", Kind = CompletionItemKind.Operator }
+        new CompletionItem { Label = "contains", Kind = CompletionItemKind.Operator },
+        // Numeric functions
+        FunctionSnippetItem("abs(expr)", "abs(${1:expr})", "Absolute value"),
+        FunctionSnippetItem("floor(expr)", "floor(${1:expr})", "Round down to nearest integer"),
+        FunctionSnippetItem("ceil(expr)", "ceil(${1:expr})", "Round up to nearest integer"),
+        FunctionSnippetItem("round(expr)", "round(${1:expr})", "Round to nearest integer"),
+        FunctionSnippetItem("round(expr, N)", "round(${1:expr}, ${2:2})", "Round a decimal value to N places"),
+        FunctionSnippetItem("truncate(expr)", "truncate(${1:expr})", "Truncate toward zero"),
+        FunctionSnippetItem("min(a, b)", "min(${1:a}, ${2:b})", "Minimum of two or more values"),
+        FunctionSnippetItem("max(a, b)", "max(${1:a}, ${2:b})", "Maximum of two or more values"),
+        FunctionSnippetItem("pow(base, exp)", "pow(${1:base}, ${2:exp})", "Raise to integer power"),
+        FunctionSnippetItem("sqrt(expr)", "sqrt(${1:expr})", "Square root (requires non-negative)"),
+        FunctionSnippetItem("clamp(value, lo, hi)", "clamp(${1:value}, ${2:lo}, ${3:hi})", "Clamp value to range [lo, hi]"),
+        // String functions
+        FunctionSnippetItem("toLower(expr)", "toLower(${1:expr})", "Convert string to lowercase"),
+        FunctionSnippetItem("toUpper(expr)", "toUpper(${1:expr})", "Convert string to uppercase"),
+        FunctionSnippetItem("startsWith(str, prefix)", "startsWith(${1:str}, ${2:prefix})", "Check if string starts with prefix"),
+        FunctionSnippetItem("endsWith(str, suffix)", "endsWith(${1:str}, ${2:suffix})", "Check if string ends with suffix"),
+        FunctionSnippetItem("trim(expr)", "trim(${1:expr})", "Remove leading/trailing whitespace"),
+        FunctionSnippetItem("left(str, count)", "left(${1:str}, ${2:count})", "First N characters (clamping)"),
+        FunctionSnippetItem("right(str, count)", "right(${1:str}, ${2:count})", "Last N characters"),
+        FunctionSnippetItem("mid(str, start, count)", "mid(${1:str}, ${2:start}, ${3:count})", "Substring from position (1-indexed)"),
+        // Conditional expression
+        SnippetItem("if ... then ... else", "if ${1:condition} then ${2:value} else ${3:value}", "Conditional expression")
     ];
 
-    private static readonly IReadOnlyList<CompletionItem> LiteralItems =
+    internal static readonly IReadOnlyList<CompletionItem> LiteralItems =
     [
         new CompletionItem { Label = "true", Kind = CompletionItemKind.Constant },
         new CompletionItem { Label = "false", Kind = CompletionItemKind.Constant },
@@ -1040,26 +1198,32 @@ internal sealed class PreceptAnalyzer
     // ── New-syntax item lists ──────────────────────────────────────────
 
     /// <summary>Scalar type keywords for positions after "as" / "of" / event arg type.</summary>
-    private static readonly IReadOnlyList<CompletionItem> ScalarTypeItems =
-    [
-        new CompletionItem { Label = "string", Kind = CompletionItemKind.TypeParameter },
-        new CompletionItem { Label = "number", Kind = CompletionItemKind.TypeParameter },
-        new CompletionItem { Label = "boolean", Kind = CompletionItemKind.TypeParameter }
-    ];
-
-    /// <summary>All type keywords for positions after "field Name as" (scalar + collection).</summary>
-    private static readonly IReadOnlyList<CompletionItem> TypeItems =
+    internal static readonly IReadOnlyList<CompletionItem> ScalarTypeItems =
     [
         new CompletionItem { Label = "string", Kind = CompletionItemKind.TypeParameter },
         new CompletionItem { Label = "number", Kind = CompletionItemKind.TypeParameter },
         new CompletionItem { Label = "boolean", Kind = CompletionItemKind.TypeParameter },
+        new CompletionItem { Label = "integer", Kind = CompletionItemKind.TypeParameter, Detail = "Whole number (no decimal point)" },
+        new CompletionItem { Label = "decimal", Kind = CompletionItemKind.TypeParameter, Detail = "Exact base-10 decimal number" },
+        SnippetItem("choice(...)", "choice(\"${1:A}\", \"${2:B}\")", "Constrained value from a predefined set")
+    ];
+
+    /// <summary>All type keywords for positions after "field Name as" (scalar + collection).</summary>
+    internal static readonly IReadOnlyList<CompletionItem> TypeItems =
+    [
+        new CompletionItem { Label = "string", Kind = CompletionItemKind.TypeParameter },
+        new CompletionItem { Label = "number", Kind = CompletionItemKind.TypeParameter },
+        new CompletionItem { Label = "boolean", Kind = CompletionItemKind.TypeParameter },
+        new CompletionItem { Label = "integer", Kind = CompletionItemKind.TypeParameter, Detail = "Whole number (no decimal point)" },
+        new CompletionItem { Label = "decimal", Kind = CompletionItemKind.TypeParameter, Detail = "Exact base-10 decimal number" },
+        SnippetItem("choice(...)", "choice(\"${1:A}\", \"${2:B}\")", "Constrained value from a predefined set"),
         new CompletionItem { Label = "set", Kind = CompletionItemKind.TypeParameter, Detail = "Sorted unique set" },
         new CompletionItem { Label = "queue", Kind = CompletionItemKind.TypeParameter, Detail = "FIFO ordered" },
         new CompletionItem { Label = "stack", Kind = CompletionItemKind.TypeParameter, Detail = "LIFO ordered" }
     ];
 
     /// <summary>Action/outcome keywords available after "->" in flat transition rows.</summary>
-    private static readonly IReadOnlyList<CompletionItem> ArrowItems =
+    internal static readonly IReadOnlyList<CompletionItem> ArrowItems =
     [
         new CompletionItem { Label = "set", Kind = CompletionItemKind.Keyword, Detail = "Data assignment" },
         new CompletionItem { Label = "transition", Kind = CompletionItemKind.Keyword, Detail = "Transition to state" },
@@ -1080,10 +1244,12 @@ internal sealed class PreceptAnalyzer
     private static readonly CompletionItem NullableItem = new() { Label = "nullable", Kind = CompletionItemKind.Keyword, Detail = "Makes field nullable" };
     private static readonly CompletionItem DefaultItem = new() { Label = "default", Kind = CompletionItemKind.Keyword, Detail = "Default value" };
     private static readonly CompletionItem BecauseItem = new() { Label = "because", Kind = CompletionItemKind.Keyword, Detail = "Constraint reason" };
+    private static readonly CompletionItem WhenItem = new() { Label = "when", Kind = CompletionItemKind.Keyword, Detail = "Conditional guard" };
     private static readonly CompletionItem ArrowPipelineItem = new() { Label = "->", Kind = CompletionItemKind.Operator, Detail = "action/outcome pipeline" };
+    private static readonly CompletionItem DeriveItem = new() { Label = "->", Kind = CompletionItemKind.Operator, Detail = "computed field derivation" };
     private static readonly CompletionItem CommaItem = new() { Label = ",", Kind = CompletionItemKind.Operator, Detail = "Next event argument" };
 
-    private static readonly IReadOnlyList<CompletionItem> NumberConstraintItems =
+    internal static readonly IReadOnlyList<CompletionItem> NumberConstraintItems =
     [
         new CompletionItem { Label = "nonnegative", Kind = CompletionItemKind.Keyword, Detail = "number constraint", Documentation = new StringOrMarkupContent("Field must be >= 0") },
         new CompletionItem { Label = "positive",    Kind = CompletionItemKind.Keyword, Detail = "number constraint", Documentation = new StringOrMarkupContent("Field must be > 0") },
@@ -1091,22 +1257,188 @@ internal sealed class PreceptAnalyzer
         new CompletionItem { Label = "max",         Kind = CompletionItemKind.Keyword, Detail = "number constraint", Documentation = new StringOrMarkupContent("Field must be <= value") },
     ];
 
-    private static readonly IReadOnlyList<CompletionItem> StringConstraintItems =
+    internal static readonly IReadOnlyList<CompletionItem> StringConstraintItems =
     [
         new CompletionItem { Label = "notempty",   Kind = CompletionItemKind.Keyword, Detail = "string constraint", Documentation = new StringOrMarkupContent("Field must not be empty") },
         new CompletionItem { Label = "minlength",  Kind = CompletionItemKind.Keyword, Detail = "string constraint", Documentation = new StringOrMarkupContent("Field must have at least N characters") },
         new CompletionItem { Label = "maxlength",  Kind = CompletionItemKind.Keyword, Detail = "string constraint", Documentation = new StringOrMarkupContent("Field must have at most N characters") },
     ];
 
-    private static readonly IReadOnlyList<CompletionItem> CollectionConstraintItems =
+    internal static readonly IReadOnlyList<CompletionItem> CollectionConstraintItems =
     [
         new CompletionItem { Label = "notempty",  Kind = CompletionItemKind.Keyword, Detail = "collection constraint", Documentation = new StringOrMarkupContent("Collection must not be empty") },
         new CompletionItem { Label = "mincount",  Kind = CompletionItemKind.Keyword, Detail = "collection constraint", Documentation = new StringOrMarkupContent("Collection must have at least N items") },
         new CompletionItem { Label = "maxcount",  Kind = CompletionItemKind.Keyword, Detail = "collection constraint", Documentation = new StringOrMarkupContent("Collection must have at most N items") },
     ];
 
+    internal static readonly IReadOnlyList<CompletionItem> DecimalConstraintItems =
+    [
+        new CompletionItem { Label = "nonnegative", Kind = CompletionItemKind.Keyword, Detail = "decimal constraint", Documentation = new StringOrMarkupContent("Field must be >= 0") },
+        new CompletionItem { Label = "positive",    Kind = CompletionItemKind.Keyword, Detail = "decimal constraint", Documentation = new StringOrMarkupContent("Field must be > 0") },
+        new CompletionItem { Label = "min",         Kind = CompletionItemKind.Keyword, Detail = "decimal constraint", Documentation = new StringOrMarkupContent("Field must be >= value") },
+        new CompletionItem { Label = "max",         Kind = CompletionItemKind.Keyword, Detail = "decimal constraint", Documentation = new StringOrMarkupContent("Field must be <= value") },
+        SnippetItem("maxplaces N", "maxplaces ${1:2}", "Maximum decimal places"),
+    ];
+
+    internal static readonly IReadOnlyList<CompletionItem> ChoiceConstraintItems =
+    [
+        new CompletionItem { Label = "ordered", Kind = CompletionItemKind.Keyword, Detail = "choice constraint", Documentation = new StringOrMarkupContent("Enables ordinal comparison of choice values") },
+    ];
+
     private static bool EndsWithCompletedExpression(string text)
         => Regex.IsMatch(text, "(?:[A-Za-z0-9_\\)\"]|true|false|null)\\s+$", RegexOptions.IgnoreCase);
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Field/Arg Modifier Completion Helpers (any-order modifier support)
+    // ═══════════════════════════════════════════════════════════════════
+
+    // Matches a scalar field declaration in the modifier zone: field Name as <type> <rest...>
+    private static readonly Regex FieldScalarModifierZoneRegex = new(
+        @"^\s*field\s+(?:[A-Za-z_]\w*\s*,\s*)*[A-Za-z_]\w*\s+as\s+(?<type>number|string|boolean|integer|decimal|choice\([^)]*\))\s+(?<rest>.*)$",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    // Matches a collection field declaration in the modifier zone: field Name as set|queue|stack of <inner> <rest...>
+    private static readonly Regex FieldCollectionModifierZoneRegex = new(
+        @"^\s*field\s+(?:[A-Za-z_]\w*\s*,\s*)*[A-Za-z_]\w*\s+as\s+(?:set|queue|stack)\s+of\s+\w+\s+(?<rest>.*)$",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    /// <summary>
+    /// Detects if the cursor is in a field declaration modifier zone and returns the
+    /// remaining modifiers appropriate for the field type. Returns null if not in modifier zone.
+    /// </summary>
+    private static IReadOnlyList<CompletionItem>? TryGetFieldModifierCompletions(string beforeCursor)
+    {
+        if (!beforeCursor.EndsWith(' '))
+            return null;
+
+        // Try scalar field
+        var scalarMatch = FieldScalarModifierZoneRegex.Match(beforeCursor);
+        if (scalarMatch.Success)
+        {
+            var rest = scalarMatch.Groups["rest"].Value;
+            if (rest.Length > 0 && IsValueExpectingKeyword(rest.TrimEnd().Split(' ')[^1]))
+                return null;
+            return ComputeRemainingModifiers(scalarMatch.Groups["type"].Value, rest, isCollection: false, isEventArg: false);
+        }
+
+        // Try collection field
+        var colMatch = FieldCollectionModifierZoneRegex.Match(beforeCursor);
+        if (colMatch.Success)
+        {
+            var rest = colMatch.Groups["rest"].Value;
+            if (rest.Length > 0 && IsValueExpectingKeyword(rest.TrimEnd().Split(' ')[^1]))
+                return null;
+            return ComputeRemainingModifiers("collection", rest, isCollection: true, isEventArg: false);
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Detects if the cursor is in an event argument modifier zone and returns the
+    /// remaining modifiers. Returns null if not in modifier zone.
+    /// </summary>
+    private static IReadOnlyList<CompletionItem>? TryGetEventArgModifierCompletions(string beforeCursor)
+    {
+        if (!beforeCursor.EndsWith(' '))
+            return null;
+
+        var eventMatch = NewEventWithArgsRegex.Match(beforeCursor);
+        if (!eventMatch.Success)
+            return null;
+
+        var argsText = eventMatch.Groups["args"].Value;
+        var lastArg = ExtractLastEventArg(argsText);
+
+        var argTypeMatch = Regex.Match(lastArg,
+            @"^[A-Za-z_][A-Za-z0-9_]*\s+as\s+(?<type>string|number|boolean|integer|decimal|choice\([^)]*\))\s+(?<rest>.*)$",
+            RegexOptions.IgnoreCase);
+        if (!argTypeMatch.Success)
+            return null;
+
+        var rest = argTypeMatch.Groups["rest"].Value;
+        if (rest.Length > 0 && IsValueExpectingKeyword(rest.TrimEnd().Split(' ')[^1]))
+            return null;
+
+        return ComputeRemainingModifiers(argTypeMatch.Groups["type"].Value, rest, isCollection: false, isEventArg: true);
+    }
+
+    /// <summary>
+    /// Extracts the last event argument text from a comma-delimited arg list,
+    /// correctly handling commas inside choice(...) parentheses.
+    /// </summary>
+    private static string ExtractLastEventArg(string argsText)
+    {
+        int depth = 0;
+        int lastComma = -1;
+        for (int i = 0; i < argsText.Length; i++)
+        {
+            switch (argsText[i])
+            {
+                case '(': depth++; break;
+                case ')': depth--; break;
+                case ',' when depth == 0: lastComma = i; break;
+            }
+        }
+        return lastComma >= 0 ? argsText[(lastComma + 1)..].TrimStart() : argsText.TrimStart();
+    }
+
+    private static bool IsValueExpectingKeyword(string word)
+        => word.Equals("default", StringComparison.OrdinalIgnoreCase) ||
+           word.Equals("min", StringComparison.OrdinalIgnoreCase) ||
+           word.Equals("max", StringComparison.OrdinalIgnoreCase) ||
+           word.Equals("minlength", StringComparison.OrdinalIgnoreCase) ||
+           word.Equals("maxlength", StringComparison.OrdinalIgnoreCase) ||
+           word.Equals("mincount", StringComparison.OrdinalIgnoreCase) ||
+           word.Equals("maxcount", StringComparison.OrdinalIgnoreCase) ||
+           word.Equals("maxplaces", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Computes the remaining modifier completions for a field or event argument,
+    /// given the type and any modifiers already present in the text.
+    /// </summary>
+    private static IReadOnlyList<CompletionItem> ComputeRemainingModifiers(
+        string typeStr, string existingModifierText, bool isCollection, bool isEventArg)
+    {
+        bool isChoice = typeStr.StartsWith("choice", StringComparison.OrdinalIgnoreCase);
+        string normalizedType = isCollection ? "collection" : isChoice ? "choice" : typeStr.ToLowerInvariant();
+
+        bool hasNullable = Regex.IsMatch(existingModifierText, @"\bnullable\b", RegexOptions.IgnoreCase);
+        bool hasDefault = Regex.IsMatch(existingModifierText, @"\bdefault\b", RegexOptions.IgnoreCase);
+        bool hasDerived = existingModifierText.Contains("->", StringComparison.Ordinal);
+
+        var items = new List<CompletionItem>();
+
+        if (!isCollection && !hasDerived)
+        {
+            if (!hasNullable) items.Add(NullableItem);
+            if (!hasDefault) items.Add(DefaultItem);
+        }
+
+        // Offer derivation operator for scalar fields (not collections, not event args, not already derived)
+        if (!isCollection && !isEventArg && !hasDerived && !hasDefault && !hasNullable)
+            items.Add(DeriveItem);
+
+        IReadOnlyList<CompletionItem> constraintPool = normalizedType switch
+        {
+            "number" or "integer" => NumberConstraintItems,
+            "decimal" => DecimalConstraintItems,
+            "string" => StringConstraintItems,
+            "collection" => CollectionConstraintItems,
+            "choice" => ChoiceConstraintItems,
+            _ => Array.Empty<CompletionItem>()
+        };
+
+        foreach (var item in constraintPool)
+        {
+            var keyword = item.Label.Split(' ')[0];
+            if (!Regex.IsMatch(existingModifierText, $@"\b{Regex.Escape(keyword)}\b", RegexOptions.IgnoreCase))
+                items.Add(item);
+        }
+
+        if (isEventArg) items.Add(CommaItem);
+        return items.Count > 0 ? items.ToArray() : Array.Empty<CompletionItem>();
+    }
 
     private static CompletionItem SnippetItem(string label, string snippet, string detail)
         => new()
@@ -1117,6 +1449,32 @@ internal sealed class PreceptAnalyzer
             InsertTextFormat = InsertTextFormat.Snippet,
             Detail = detail
         };
+
+    private static CompletionItem FunctionSnippetItem(string label, string snippet, string detail)
+        => new()
+        {
+            Label = label,
+            Kind = CompletionItemKind.Function,
+            InsertText = snippet,
+            InsertTextFormat = InsertTextFormat.Snippet,
+            Detail = detail
+        };
+
+    /// <summary>
+    /// Regex fallback for detecting computed field names when the parser model is unavailable
+    /// (e.g. incomplete documents during editing). Scans for <c>field Name as Type -&gt;</c> patterns.
+    /// </summary>
+    private static HashSet<string> DetectComputedFieldsByRegex(string[] lines)
+    {
+        var result = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var line in lines)
+        {
+            var match = Regex.Match(line, @"^\s*field\s+([A-Za-z_]\w*)\s+as\s+\S+\s*->", RegexOptions.IgnoreCase);
+            if (match.Success)
+                result.Add(match.Groups[1].Value);
+        }
+        return result;
+    }
 
     internal sealed record RejectOnlyStateEventIssue(
         string StateName,

@@ -137,6 +137,279 @@ Confirms Shane's concern is well-founded. Same keyword for auto-enforced constra
 **Status:** Recommendation — awaiting Shane sign-off. Do not re-open.
 
 Full analysis of whether `invariant`/`assert` should be unified to `rule`. Verdict: KEEP the two-keyword system. The philosophy itself uses two terms with distinct semantics. The split serves 6 of 8 relevant design principles. `assert` works as a verb after prepositions; `rule` (a noun) doesn't. Domain experts learn `invariant` from one `because` clause example. Merging to `rule` loses Principle #5 signaling and grammar correctness. The named predicate slot (`define`) stays cleaner with the split.
+### 2026-04-12: Issue #17 — Computed/Derived Fields — DESIGN REVIEW COMPLETE, all 5 reviewers approve
+**By:** Frank (architect), George (runtime), Kramer (tooling), Newman (MCP), Soup Nazi (testing)
+**Status:** All reviews posted — awaiting Shane's sign-off, then implementation
+
+Design review ceremony for Issue #17 (`field X as Type -> Expression`) completed. 5 reviewers, unanimous clearance.
+
+| Reviewer | Role | Verdict | Key Finding |
+|----------|------|---------|-------------|
+| Frank | Architect | **APPROVED** | Passes all 7 philosophy filter questions. 11/11 locked decisions with complete rationale. 6 non-blocking warnings. |
+| George | Runtime | **Feasible** | ~300–350 lines, 6–7 vertical slices, 8 new diagnostics (C80–C87). No blockers. |
+| Kramer | Tooling | **Medium-effort** | Grammar/semantic tokens free. Completions ~80–100 lines across 9+ call sites. 2 tooling slices. |
+| Newman | MCP | **Minor update** | Additive DTO expansion (3 params on `FieldDto`), 1 expression scope entry. No breaking changes. |
+| Soup Nazi | Testing | **MANAGEABLE** | ~85–95 new tests. Risk in arrow disambiguation + recomputation timing. Red-first mandatory. |
+
+**Micro-decision flagged (Frank W6 + George Risk #7):** Disallow multi-name computed field declarations (`field A, B as number -> expr`) at parser level. Each computed field should have its own expression for independent formula and dependency tracking. Not in proposal — should be locked before implementation.
+
+**Clarification needed (Soup Nazi):** Does "all data types supported" include `choice` in computed expressions? A formula producing a choice value is semantically questionable.
+
+**Defensive fix (Newman):** `UpdateTool.cs` lacks try-catch around `engine.Update()` — pre-existing robustness gap, not #17-specific. Recommend fixing regardless.
+
+---
+
+### 2026-04-12T20:00:58Z: Ralph autonomous chore loop — `squad:chore` is the pickup gate
+**By:** shane (owner directive), Frank (process contract), Newman (operational loop)  
+**Amended:** 2026-04-12 — `squad:chore` replaces `squad:ralph` as the gate (Shane directive)  
+**Status:** Standing policy — active from 2026-04-12 forward
+
+Interactive Squad sessions may spin unrelated maintenance work into separate backlog issues. `squad:chore` is both the work-type marker and the explicit approval signal for Ralph's autonomous chore loop. When Shane applies `squad:chore` to an issue, Ralph picks it up, routes it to the best-fit real member, applies `squad:{member}`, and preserves the review ceremony. No second label is required.
+
+**Policy:**
+1. Interactive Squad sessions may create standalone backlog issues for unrelated chore or maintenance work instead of forcing that work through the current session.
+2. Those spun-off chores should be labeled with `squad:chore` (and optionally `type:chore` for work-type context).
+3. Autonomous Ralph execution is opt-in only and gated by the `squad:chore` label. Shane applies it. Ralph acts on it.
+4. Ralph's local CLI loop watches only open, unblocked issues labeled `squad:chore`, not every chore or `squad` issue.
+5. `squad:ralph` is retired. It has been moved to the label tombstone list and will be deleted from the repo on next sync.
+
+---
+
+### 2026-04-12T19:45:41Z: Squad operations contract — dedicated `@copilot` lane retired
+**By:** shane (owner directive), Newman (implementation), Frank (contract review)
+**Status:** Standing policy — active from 2026-04-12 forward
+
+The Squad-specific coding-agent lane is removed from this repo. This retires the `squad:copilot` routing and automation lane without removing general repo-wide Copilot tooling. `squad:chore` is retained as an active label — it now also serves as the explicit approval gate for Ralph's autonomous chore pickup (see the 2026-04-12 amendment to the Ralph chore loop policy above).
+
+**Policy:**
+1. Retire the dedicated Squad lane from live workflows, mirrored workflow templates, team/routing docs, and squad agent docs.
+2. All Squad issue routing now flows only through `squad` → `squad:{member}` and normal named-member triage, except for `squad:chore` which also triggers Ralph's chore pickup.
+3. Keep general repo-wide Copilot tooling and instructions intact (`.github/copilot-instructions.md`, `.copilot/skills/`, and passive reference docs that are not part of Squad routing).
+4. The earlier 2026-04-12T17:39:52Z directive to route small chore issues directly to `@copilot` is superseded and is not part of the active Squad contract.
+5. Label cleanup for `squad:copilot` should happen through the normal retired-label sync path, not manual repo surgery. `squad:chore` is NOT in the retired list — it remains an active label with pickup semantics.
+
+---
+
+### 2026-04-12: PR body schema — summary and why are required for issue work
+**By:** Shane (owner directive, via Coordinator)
+**Status:** Standing policy — enforced from 2026-04-12 forward
+
+Issue-driven implementation PRs must keep reviewer-facing context in the PR body, not only in the file diff.
+
+**Policy:**
+1. `CONTRIBUTING.md` is the canonical workflow and PR-body source of truth.
+2. Required PR sections for issue-driven implementation work: `## Summary`, `## Linked Issue` (with `Closes #N`), `## Why`, and `## Implementation Plan`.
+3. `## Why` is concise motivation and implementation-specific reviewer context. Full design rationale, alternatives, and precedent remain in the issue and `research/`.
+4. `## Summary` and `## Why` must stay current as scope changes. Implementation-plan checkboxes continue to update after each completed slice or logical group.
+5. This supersedes the 2026-04-10 section-name requirement while preserving detailed checkbox granularity and live checkbox maintenance.
+
+---
+
+### 2026-04-12T01:53:16Z: Issue #65 — Event action hooks for stateless precepts — PROPOSAL FILED
+**By:** Frank (research + design alignment), George (runtime impact), Steinbrenner (PM), Coordinator (filing)
+**Status:** Proposal filed — branch `research/event-hooks-proposal`, Issue #65 open
+
+Shane surfaced a parse error attempting `on Advance -> set Count = Count + 1` in a stateless precept. The team investigated, confirmed a principled design gap, and filed a formal proposal.
+
+**Gap verdict (Frank):**
+- The `on <Event> -> <ActionChain>` form does not exist in the grammar. Parse fails with "Expected: 'on \<Event\> assert '"." This is a deliberate exclusion — Principle 7 prohibits shared event-level context in stateful precepts (invisible across rows). However, stateless precepts have no transition rows, so Principle 7 has no application surface. The stateless case is a **principled gap**, not a principled exclusion.
+- Workarounds exist (duplication across rows; `to any ->` state hook) but are semantically non-equivalent.
+- Full research: `research/language/expressiveness/event-hooks.md`
+
+**External precedent (Frank — 5 systems surveyed):**
+
+| System | Flat event hook? | Closest analog |
+|---|---|---|
+| XState v5 | Not at flat level | Hierarchical parent `on:` only |
+| SCXML | No (parentstate wildcard only) | §3.13: exit → **transition content** → entry |
+| Akka Classic FSM | No | `whenUnhandled` = fallback only |
+| Spring SM | Via listener | Post-transition, observational only |
+| Redux | Yes — pure event bus | Pre-reducer middleware |
+| **Precept (proposed)** | **Issue A — stateless only** | After asserts, before invariants |
+
+No surveyed system has a flat stateless event hook with typed args and post-mutation constraint enforcement. This is Precept-native territory.
+
+**Split verdict:**
+- **Issue A (stateless):** CONFIRMED VIABLE. Zero Principle 7 tension. Locked execution order (after asserts, before invariants). C49 revision required in same PR.
+- **Issue B (stateful):** NOT BLOCKED but 3 open questions must be locked first: (1) execution order position — 4 options with different semantics, Frank recommends Option 3 (after row mutations, before exit actions) per SCXML §3.13; (2) outcome-scoping (fires on Unmatched?); (3) explicit Principle 7 exception rationale. **Labeled `deferred`.**
+
+**C49 revision decision (Steinbrenner + Frank):**
+
+| Case | C49 behavior |
+|---|---|
+| Event declared, no asserts, no hooks | C49 Warning: "Event 'X' has no effect — it will return `Undefined`" |
+| Event declared, has asserts, no hooks | C49 Warning (revised, lower severity): "Event 'X' validates arguments but has no action effect" |
+| Event declared, has at least one hook | **C49 suppressed** |
+C49 revision ships in the same PR as the runtime and grammar changes (language-surface-sync requirement).
+
+**Runtime impact (George):**
+- **Parser:** Small. `EventActionDecl.Try()` before `EventAssertDecl.Try()`. New `EventActionResult` record. Reuses `ActionChain` unchanged.
+- **Model:** Extra-small. New `PreceptEventAction` record.
+- **Type checker:** Medium. C49 suppression + scope validation.
+- **Engine:** Medium. Hard-abort semantics for hook constraint violations recommended.
+
+**PM decisions (Steinbrenner):**
+- Issue A advances on current roadmap wave. Issue B deferred, not abandoned.
+- C49 revision is in-scope for Issue A, not a follow-up.
+- Stateless event hooks do not change stateless precept's position as first-class entity model — they complete it.
+
+---
+
+### 2026-04-10: PR quality policy — detailed implementation plans + live checkbox updates
+**By:** Shane (owner directive, via Coordinator)
+**Status:** Standing policy — enforced from 2026-04-10 forward
+
+Every implementation PR must have a detailed implementation plan with granular checkboxes. Checkboxes must be kept current after every push to the branch.
+
+**Policy:**
+1. **PR creation:** Coordinator reads `.squad/skills/pr-implementation-plan/SKILL.md` before writing any PR body. Required sections: What this does, Design decisions locked, Implementation checklist (by component), Critical review focus.
+2. **Checklist granularity:** Each checkbox names a file, behavior, or specific case. "Type checker: handles nullable" is too vague. "C56: fires for nullable field in invariant scope (separate symbol injection path from guard scope)" is correct.
+3. **Checkbox maintenance:** Scribe updates PR checkbox state after every agent work batch. Scribe reads `.squad/skills/pr-implementation-plan/SKILL.md` before performing checkbox updates.
+4. **CatalogDriftTests footgun:** Always use `-> no transition` for compile-phase constraint triggers in guards.
+
+**Artifacts created:** `.squad/skills/pr-implementation-plan/SKILL.md`. Scribe charter updated.
+
+---
+
+### 2026-04-10: Issue #10 — Three-level dotted form (`A.B.C`) included in PR #56 scope
+**By:** Shane (via Coordinator)
+**Status:** Implemented — George's changes landed in `squad/10-string-length-accessor`
+
+Decision to include `A.B.C` three-level dotted identifier support (e.g. `Submit.Name.length`) in PR #56 rather than a separate PR.
+
+**Frank's invasiveness assessment:** Low-Medium (~54 lines, 7 files). Test scaffolding already existed in `StringAccessorTests.cs`.
+
+**Implementation sites (George):**
+- `PreceptModel.cs` — `string? SubMember = null` on `PreceptIdentifierExpression`
+- `PreceptParser.cs` — `DottedIdentifier` extended with optional second dot chain; `ReconstituteExpr` updated
+- `PreceptExpressionEvaluator.cs` — three-level guard at top of `EvaluateIdentifier`
+- `PreceptTypeChecker.cs` — 4 sites: `TryInferKind` key, C56 nullable-arg extension (critical: base key is `$"{Name}.{Member}"` not `Name`), `BuildSymbolKinds` arg loop, `BuildEventAssertSymbols` loop
+- `PreceptAnalyzer.cs` — 3-level prefix detection in LS completions
+
+**Critical gotcha (Frank's review, George's implementation):** C56 base-kind lookup must use `$"{identifier.Name}.{identifier.Member}"` for the three-level case, not `identifier.Name` (which resolves to the event name and silently skips C56 for nullable args).
+
+---
+
+### 2026-04-10: Frank — Expanded modifier design space — decisions requiring owner input
+**By:** Frank (Lead/Architect)
+**Status:** Owner decision required — 5 open questions
+
+Second pass at `research/language/expressiveness/structural-lifecycle-modifiers.md` identified 4 open design questions requiring Shane's direction before any modifier implementation:
+
+1. **Modifier role scope:** Option C recommended — modifiers must be either compile-time verifiable OR tooling-actionable. `sensitive`/`audit` as pure annotation need a different mechanism.
+2. **Event modifier taxonomy correction:** Event structural properties (source scope, outcome shape, target scope) are fully compile-time provable. Event behavioral properties (firing history) are not. Domain taxonomy for #23 should reflect this subcategorization.
+3. **`sealed after <State>` grammar form:** New modifier form with state reference — requires architectural sign-off before implementation. Multi-state sealing concern.
+4. **Modifier stacking semantics:** Are incompatible combinations compile-time validated or accepted with runtime checks? Ordering convention?
+5. **Implementation sequence confirmed:** `terminal` → event modifiers (`entry`/`advancing`/`settling`/`isolated`) → `writeonce` → `sealed after <State>` → `guarded` on states.
+
+No philosophy gap. Modifier space extends graph-topology annotation, not entity category or guarantee model.
+
+---
+
+### 2026-04-11: Wave 3 — MCP vocab decisions (integer/decimal/choice)
+**By:** Newman (MCP/AI Dev)
+**Status:** Applied — branch `feature/wave3-integer-decimal-choice`
+
+**Decision 1:** `LanguageTool` requires zero code changes for `integer`/`decimal`/`choice`/`maxplaces`/`ordered` — all catalog-driven via `[TokenCategory]` attributes. Canonical sync check: token has `[TokenSymbol]` + `[TokenCategory]` → all downstream layers pick up automatically.
+
+**Decision 2:** `round()` is registered in `ConstructCatalog` via `.Register(new ConstructInfo(...))` on the `RoundAtom` parser combinator, not hardcoded in `LanguageTool.cs`. Surfaces in `precept_language.constructs`.
+
+**Decision 3:** `FieldDto.IsOrdered` is `bool?` — only populated when `true`. Absent from JSON when false (reduces noise for non-choice fields).
+
+**Decision 4:** `McpServerDesign.md` updated with 3 new reference tables: scalar type reference (integer/decimal/choice), full constraint keyword reference, built-in function reference for `round()`.
+
+---
+
+### 2026-04-11: Wave 3 — Integer type constraint desugaring bug (soup-nazi)
+**By:** Soup Nazi (Tester)
+**Status:** Bug filed — fix required before integer constraints are considered complete
+
+**Critical bug:** `nonnegative`, `positive`, `min N`, `max N` constraints on `integer` fields are accepted by the parser but NEVER desugared to runtime invariants. `BuildScalarConstraintExpr` in `PreceptParser.cs` has branches for `Number` and `String` only — `Integer` falls through to `return (string.Empty, null, string.Empty)`. Constraints are silently ignored at runtime.
+
+**Fix required (George):** Add `Integer` branch to `BuildScalarConstraintExpr`. Use `PreceptLiteralExpression(0L)` for nonneg/positive (long literal). Cast `mn.Value`/`mx.Value` to `long` for min/max.
+
+**Test file:** `PreceptIntegerTypeTests.cs` — 31 tests pass, 3 skipped pending fix.
+
+---
+
+### 2026-04-10: Issue #13 — Grammar + completions tooling decisions
+**By:** Kramer (Tooling Dev)
+**Status:** Applied — grammar and completions changes committed
+
+**Grammar:** New `constraintKeywords` repository entry matching all 9 constraint keywords (`nonnegative`, `positive`, `notempty`, `min`, `max`, `minlength`, `maxlength`, `mincount`, `maxcount`). Scope: `keyword.other.precept`. Inserted before `identifierReference` catch-all. Added to `fieldScalarDeclaration` capture 9 and `eventWithArgsDeclaration` capture 8. No conflict with `collectionMemberAccess` `.min`/`.max` (dot-gated).
+
+**Completions:** Pattern-match `beforeCursor` for field/event-arg declaration context. Type-split by scalar type (number/string/boolean/collection) to return appropriate keyword set. Static items: `NumberConstraintItems`, `StringConstraintItems`, `CollectionConstraintItems`.
+
+---
+
+### 2026-04-11: Wave 3 — Integer/decimal/choice grammar + completions decisions
+**By:** Kramer (Tooling Dev)
+**Status:** Applied — branch `feature/wave3-integer-decimal-choice`, commit `73092a9`
+
+1. **Integer constraint tier reuses `NumberConstraintItems`** — same vocabulary as `number`. No separate array.
+2. **`choice(...)` surfaces as snippet** in `TypeItems` (`insertText = choice("${1:A}", "${2:B}")`), not bare `TypeParameter`. Bare `choice` is invalid DSL.
+3. **`fieldScalarDeclaration` pattern updated** for `integer`/`decimal` only, not `choice(...)` (argument form incompatible with word-boundary alternation).
+4. **`round(expr, N)` in `ExpressionOperatorItems`** (all expression contexts) — type-filtered injection requires guard type inference, out of scope; snippet in all positions is acceptable and correct.
+
+---
+
+### 2026-04-11T00:00:00Z: Issue #14 — `when <guard>` on declarations — FINAL DESIGN APPROVAL, all 4 forms, implementation scope locked
+**By:** George (runtime), Kramer (tooling), Newman (MCP), Soup Nazi (testability), Frank (design/architecture)
+**Status:** APPROVED — all 4 forms cleared for implementation in a single wave.
+
+Design review of Issue #14 (`when <guard>` conditional invariants, state asserts, event asserts, conditional edit eligibility) completed in two passes. Initial review (Frank `frank-issue14-design-review.md`) cleared Forms 1–3 and deferred Form 4 as a scoping question. Second pass (`frank-issue14-form4-design.md`, `george-issue14-form4-simplicity.md`) confirmed the additive approach resolves the structural obstacle. Final approval round (`frank-issue14-final-approval.md`, `george-issue14-implementation-scope.md`, `kramer-issue14-final-tooling.md`, `newman-issue14-final-dtos.md`, `soup-nazi-issue14-final-tests.md`) — all 5 reviewers filed, all approved, all 4 forms same wave.
+
+**Implementation scope: ~163 lines across 5 files, 19 change sites.**
+
+**Frank — APPROVED all 4 forms (final verdict):**
+- All 4 forms semantically unified: `when <guard>` means "conditional on this boolean condition" — constraint-skip semantics (Forms 1–3) and permission-grant semantics (Form 4) follow naturally from declaration kind, not syntax. Teaching model holds uniformly.
+- Fail-closed edit guards are non-negotiable: guard evaluation error → field not granted. Permission-grant systems must default to deny on uncertainty. Must be explicitly contracted in the issue body with named tests `Update_GuardThrows_FieldNotGranted` and `Inspect_GuardNull_FieldNotGranted`.
+- `in any when <guard>` pre-expansion is correct: expand to one `PreceptEditBlock` per declared state at construction, each carrying the same `WhenGuard`. Runtime evaluates `block.State == currentState && evaluateGuard(block.WhenGuard, instanceData)`. No sentinel handling at evaluation sites.
+- All six locked language decisions from the initial review upheld. Form 4 guard is field-scoped only — arg references rejected with C69.
+
+**George — implementation scope confirmed:**
+- **File 1: `PreceptModel.cs`** — +8 lines. Add optional `WhenGuard?`/`WhenText?` tail parameters to `PreceptInvariant`, `StateAssertion`, `EventAssertion`, `PreceptEditBlock`. Pattern identical to existing `PreceptTransitionRow`. Zero call-site breakage (named defaults). Must land first.
+- **File 2: `DiagnosticCatalog.cs`** — +8 lines. Register C69 (cross-scope guard reference — better message than C38). Pure additive.
+- **File 3: `PreceptParser.cs`** — +16 lines. 4 injection points via existing `OptionalWhenGuardParser` (1 line each). `EditDecl` guard injected between `StateTarget` and `Edit` token. Extend `EditResult` and `StateAssertResult` private records (+2 fields each). Update `AssembleModel` cases for both (+2 lines each). `EditDecl.Try()` before `StateAssertDecl.Try()` ordering verified correct.
+- **File 4: `PreceptTypeChecker.cs`** — ~5 distinct changes. B1 narrowing fix: add `WhenGuard is null` filter in `BuildStateAssertNarrowings` (1-line critical prerequisite, must land first as its own commit). Guard scope validation for all 4 forms (C69 emission). C29/C30 guard-against-defaults pre-check. Form 4 guarded-edit evaluation pass (second pass after static `_editableFieldsByState` fast path — additive, untouches existing unconditional path).
+- **File 5: `PreceptAnalyzer.cs` (language server)** — 13 changes (~33–40 lines). See Kramer.
+- **Confirmed non-changes:** tokenizer, expression evaluator, `_editableFieldsByState` fast path, `IsSynthetic` contamination path, statement union ordering — all verified unchanged.
+
+**Kramer — zero grammar changes, 13 completions changes (~33–40 lines in `PreceptAnalyzer.cs`):**
+- Grammar: `when` already in `controlKeywords` without positional anchor. `in State when guard edit` parse is handled by existing individual keyword patterns. **Zero grammar file changes for any of the 4 forms.**
+- New static `WhenItem` added alongside `BecauseItem`.
+- Forms 1–3: 2 new branches + 1 modification per declaration block (A1/A2/A-modified, C1/C2/C-modified, E1/E2/E-modified). All `when`-bearing branches inserted before base branches (strictly more specific — safe ordering).
+- Form 4: 4 new branches for the `in <State> when <guard> edit` sequence — after `in State` → offer `[assert, edit, when, ->]`; after `in State when` → offer field names + `not`; after `in State when <guard>` → offer `edit`; after `in State when <guard> edit` → offer field names.
+- Branch ordering critical throughout — new branches precede their less-specific base branches.
+
+**Newman — 4 new DTO arrays in `precept_compile` output (B2 — parallel prerequisite):**
+- New: `invariants` (exclude `IsSynthetic`), `stateAsserts`, `eventAsserts`, `editBlocks` — each a top-level array with `expression`, `when: string | null`, `reason`, `line` shape. `stateAsserts` adds `anchor` and `state`. `editBlocks` adds `state` and `fields`.
+- `StateDto.rules: string[]` preserved alongside new arrays — not replaced.
+- `when` fields ship as `null` until George's model record changes land (Commit B). DTOs are structurally ready; wire-up is a 1-line change per array once model records have `WhenText`.
+- `precept_inspect` structured constraint trace: `constraintTrace` top-level key per-state/per-event showing which guards evaluated true/false and which assertions fired. Prerequisite for form-by-form tracing in agent workflows.
+
+**Soup Nazi — ~154 tests (6 test files):**
+- `NewSyntaxParserTests.cs`: +5 (→ 36 total)
+- `PreceptTypeCheckerTests.cs`: +7 (→ 33 total)
+- `PreceptWorkflowTests.cs` / `NewSyntaxRuntimeTests.cs` / `PreceptRulesTests.cs`: Forms 1–3 runtime, unchanged (38 tests — regression gate)
+- `GuardedEditTests.cs`: 22 new tests (Form 4 core). Key: fail-closed (`Update_EditGuard_EvaluationError_FieldNotEditable`), `in any` expansion (3 tests), union semantics (3 tests), state-filter-before-guard (1 test), data-driven guard flip (1 test).
+- `Precept.LanguageServer.Tests/`: +3 completions (→ 10)
+- `Precept.Mcp.Tests/CompileToolTests.cs`: +2 (→ 5); `InspectToolTests.cs`: +2 (→ 5). Both block on Newman B2.
+- **EC-3 is the ordering gate:** `Check_Invariant_WhenGuardFalse_AtDefaultData_NoPrecompileViolation` must pass before runtime tests run.
+
+**Prerequisites and sequencing:**
+1. **B1 narrowing fix** — 1-line commit to `BuildStateAssertNarrowings` (`WhenGuard is null` filter). Must land first, standalone commit.
+2. **Newman DTO additions** — `precept_compile` structured arrays (B2). Parallel with B1. Must land before MCP tests.
+3. Model records → parser → type checker → runtime (Form 4 additive pass) → completions, in dependency order.
+
+**Key spec requirements locked:**
+- Fail-closed edit guards (Frank F2 — explicit issue-body contract required)
+- `in any when <guard>` pre-expansion at construction (Frank F3 / George OQ-2)
+- C69 diagnostic for cross-scope guard references (George / Kramer)
+- EC-3 pre-check ordering gate (Soup Nazi)
+- `StateDto.rules` preserved alongside new DTO arrays (Newman)
+
+**Elaine coordination point:** Dynamic editability UX — guarded edit blocks produce per-instance editability rather than a static per-state set. Elaine's preview inspector and any UI surface showing editable fields must handle guard-conditional editability. Coordinate before Elaine's inspector work begins.
 
 ---
 

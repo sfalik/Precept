@@ -88,7 +88,7 @@ The `union` merge driver keeps all lines from both sides, which is correct for a
    - PRD/spec: *"Do you have a PRD or spec document? (file path, paste it, or skip)"* → If provided, follow PRD Mode flow
    - GitHub issues: *"Is there a GitHub repo with issues I should pull from? (owner/repo, or skip)"* → If provided, follow GitHub Issues Mode flow
    - Human members: *"Are any humans joining the team? (names and roles, or just AI for now)"* → If provided, add per Human Team Members section
-   - Copilot agent: *"Want to include @copilot? It can pick up issues autonomously. (yes/no)"* → If yes, follow Copilot Coding Agent Member section and ask about auto-assignment
+   - Copilot agent: *"Want to include @copilot? It can pick up issues autonomously. (yes/no)"* → This integration has been removed from this repo — skip this question.
    - These are additive. Don't block — if the user skips or gives a task instead, proceed immediately.
 
 ---
@@ -106,6 +106,22 @@ This repository's canonical workflow lives in [CONTRIBUTING.md](/CONTRIBUTING.md
 - For any implementation task, require documentation sync in the same PR unless the user explicitly says otherwise.
 - Before declaring implementation work complete, verify whether `README.md`, relevant `docs/*.md` files, syntax grammar, language-server completions, samples, and MCP docs need updates. If none are needed, say so explicitly.
 - When spawning agents for implementation work in this repo, instruct them to read `CONTRIBUTING.md` before coding if the task changes language surface, runtime behavior, tooling behavior, or public documentation.
+
+### Review Spawning — Full Subagents with Charter Context
+
+**When the user asks the team to review a PR, spawn reviewer agents as full `runSubagent` calls — never as Explore agents with lean prompts.** Explore agents lack the domain expertise, charter identity, and gate-enforcement authority that reviewers need. Lean prompts produce shallow reviews; full charter context produces thorough, gate-aware verdicts.
+
+**Spawn pattern for each reviewer:**
+1. **Read the reviewer's charter** (`{team_root}/.squad/agents/{name}/charter.md`) and inline it into the spawn prompt.
+2. **Include the reviewer's identity block** (name, role, expertise, style) so they operate in character with their review authority.
+3. **Include the linked issue's acceptance criteria** (for the tester/AC-gate reviewer) — instruct them to read the issue directly via GitHub tools.
+4. **Specify review criteria by role:**
+   - **Lead/Architect (Frank):** doc accuracy vs. implementation, diagnostic message correctness, grammar sync, completions/hover, dead code scan.
+   - **Tester (Soup Nazi):** AC-to-test matrix (every behavioral criterion must have a test), spot-check test quality, disabled test scan.
+5. **Require structured output:** `APPROVED` or `BLOCKED` with numbered findings (`B{N}:` / `G{N}:`).
+6. **Spawn reviewers in parallel** — they have no data dependency on each other.
+
+**Do NOT use `agentName: "Explore"` for reviews.** Explore is for read-only codebase Q&A — it has no review authority, no charter identity, and no gate-enforcement behavior.
 
 ### Implementation Gate — Draft PR Required (Enforced by Coordinator)
 
@@ -210,7 +226,6 @@ When spawning agents, include the role emoji in the `description` parameter to m
 | Security, Auth, Compliance | 🔒 | "Security Engineer", "Auth Specialist" |
 | Scribe | 📋 | "Session Logger" (always Scribe) |
 | Ralph | 🔄 | "Work Monitor" (always Ralph) |
-| @copilot | 🤖 | "Coding Agent" (GitHub Copilot) |
 
 **How to determine emoji:**
 1. Look up the agent in `team.md` (already cached after first message)
@@ -263,7 +278,7 @@ The routing table determines **WHO** handles work. After routing, use Response M
 | Personal agent by name (user addresses a personal agent) | Route to personal agent in consult mode — they advise, project agent executes changes |
 | "Team" or multi-domain question | Spawn 2-3+ relevant agents in parallel, synthesize |
 | Human member management ("add Brady as PM", routes to human) | Follow Human Team Members (see that section) |
-| Issue suitable for @copilot (when @copilot is on the roster) | Check capability profile in team.md, suggest routing to @copilot if it's a good fit |
+| Issue suitable for @copilot (when @copilot is on the roster) | @copilot coding-agent integration is removed from this repo — route to a squad member instead |
 | Ceremony request ("design meeting", "run a retro") | Run the matching ceremony from `ceremonies.md` (see Ceremonies) |
 | Issues/backlog request ("pull issues", "show backlog", "work on #N") | Follow GitHub Issues Mode (see that section) |
 | PRD intake ("here's the PRD", "read the PRD at X", pastes spec) | Follow PRD Mode (see that section) |
@@ -827,6 +842,13 @@ prompt: |
   The user says: "{message}"
   
   Do the work. Respond as {Name}.
+  For issue-based implementation work, follow CONTRIBUTING.md as the canonical workflow
+  and treat the draft PR as the live execution hub.
+  Keep the PR body in the exact repository format: `## Summary`, `## Linked Issue`
+  with `Closes #N`, `## Why`, and `## Implementation Plan`.
+  Work in vertical slices. After each completed slice or logical group, commit,
+  push, and update the PR-body summary/why/checklist before continuing.
+  Do not create a separate implementation-plan markdown file.
   
   ⚠️ OUTPUT: Report outcomes in human terms. Never expose tool internals or SQL.
   
@@ -999,7 +1021,7 @@ After selecting a universe:
 2. Each agent gets a unique name. No reuse within the same repo unless an agent is explicitly retired and archived.
 3. **Scribe is always "Scribe"** — exempt from casting.
 4. **Ralph is always "Ralph"** — exempt from casting.
-5. **@copilot is always "@copilot"** — exempt from casting. If the user says "add team member copilot" or "add copilot", this is the GitHub Copilot coding agent. Do NOT cast a name — follow the Copilot Coding Agent Member section instead.
+5. **@copilot is always "@copilot"** — exempt from casting. The coding-agent integration is disabled in this repo; if the user asks to add @copilot, explain that it has been removed.
 5. Store the mapping in `.squad/casting/registry.json`.
 5. Record the assignment snapshot in `.squad/casting/history.json`.
 6. Use the allocated name everywhere: charter.md, history.md, team.md, routing.md, spawn prompts.
@@ -1152,6 +1174,9 @@ When Ralph is active, run this check cycle after every batch of agent work compl
 # Untriaged issues (labeled squad but no squad:{member} sub-label)
 gh issue list --label "squad" --state open --json number,title,labels,assignees --limit 20
 
+# Chore pickup queue (labeled squad:chore — approved for Ralph autonomous routing)
+gh issue list --label "squad:chore" --state open --json number,title,labels,assignees --limit 20
+
 # Member-assigned issues (labeled squad:{member}, still open)
 gh issue list --state open --json number,title,labels,assignees --limit 20 | # filter for squad:* labels
 
@@ -1167,6 +1192,7 @@ gh pr list --state open --draft --json number,title,author,labels,checks --limit
 | Category | Signal | Action |
 |----------|--------|--------|
 | **Untriaged issues** | `squad` label, no `squad:{member}` label | Lead triages: reads issue, assigns `squad:{member}` label |
+| **Chore pickup queue** | `squad:chore` label present | Ralph routes to best-fit member: applies `squad:{member}` label, then spawns that member; review ceremony preserved |
 | **Assigned but unstarted** | `squad:{member}` label, no assignee or no PR | Spawn the assigned agent to pick it up |
 | **Draft PRs** | PR in draft from squad member | Check if agent needs to continue; if stalled, nudge |
 | **Review feedback** | PR has `CHANGES_REQUESTED` review | Route feedback to PR author agent to address |
@@ -1175,7 +1201,7 @@ gh pr list --state open --draft --json number,title,author,labels,checks --limit
 | **No work found** | All clear | Report: "📋 Board is clear. Ralph is idling." Suggest `npx @bradygaster/squad-cli watch` for persistent polling. |
 
 **Step 3 — Act on highest-priority item:**
-- Process one category at a time, highest priority first (triage-needed backlog > assigned > CI failures > review feedback > approved PRs)
+- Process one category at a time, highest priority first: triage-needed backlog > chore pickup queue > assigned > CI failures > review feedback > approved PRs
 - Spawn agents as needed, collect results
 - **⚡ CRITICAL: After results are collected, DO NOT stop. DO NOT wait for user input. IMMEDIATELY go back to Step 1 and scan again.** This is a loop — Ralph keeps cycling until the board is clear or the user says "idle". Each cycle is one "round".
 - If multiple items exist in the same category, process them in parallel (spawn multiple agents)
@@ -1206,7 +1232,6 @@ npx @bradygaster/squad-cli watch --interval 30      # polls every 30 minutes
 This runs as a standalone local process (not inside Copilot) that:
 - Checks GitHub every N minutes for backlog squad work that still needs triage
 - Auto-triages issues based on team roles and keywords
-- Assigns @copilot to `squad:copilot` issues (if auto-assign is enabled)
 - Runs until Ctrl+C
 
 **Three layers of Ralph:**
@@ -1305,13 +1330,14 @@ Humans can join the Squad roster alongside AI agents. They appear in routing, ca
 
 ## Copilot Coding Agent Member
 
-The GitHub Copilot coding agent (`@copilot`) can join the Squad as an autonomous team member. It picks up assigned issues, creates `copilot/*` branches, and opens draft PRs.
+> **This integration is disabled in this repo.** The `squad:copilot` coding-agent lane has been removed and `@copilot` is not on the team roster.
 
-**On-demand reference:** Read `.squad/templates/copilot-agent.md` for adding @copilot, comparison table, roster format, capability profile, auto-assign behavior, lead triage, and routing details.
+### Label Semantics: `squad:chore`
 
-**Core rules (always loaded):**
-- Badge: 🤖 Coding Agent. Always "@copilot" (no casting). No charter — uses `copilot-instructions.md`.
-- NOT spawnable — works via issue assignment, asynchronous.
-- Capability profile (🟢/🟡/🔴) lives in team.md. Lead evaluates issues against it during triage.
-- Auto-assign controlled by `<!-- copilot-auto-assign: true/false -->` in team.md.
-- Non-dependent work continues immediately — @copilot routing does not serialize the team.
+| Label | Meaning | Behavior |
+|-------|---------|----------|
+| `squad:chore` | **Explicit chore gate for Ralph autonomous pickup** | Ralph picks this up, routes it to the best-fit real member, applies `squad:{member}`, and spawns that member. Full review ceremony applies — the member's PR must still pass review before merge. |
+
+**Ralph does not grab arbitrary squad work.** `squad:chore` is the explicit gate — Shane applies it to signal "this chore is safe for Ralph to pick up and route autonomously." Normal `squad` and `squad:{member}` issues flow through the standard human-supervised triage path.
+
+**Ownership after Ralph pickup:** once Ralph applies `squad:{member}`, that member owns the issue visibly. The `squad:chore` label serves as provenance (how it got assigned), not ongoing ownership.

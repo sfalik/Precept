@@ -13,17 +13,61 @@
 
 ## Learnings
 
-### 2026-04-10 — Issue #31 shipped
+### 2026-04-12 — Remove squad:copilot integration
+
+- **Removing the coding-agent lane touches 12+ files across 3 categories:** active workflows (4), template workflows (4), and docs/templates (4+). Always inventory the full blast radius before starting — the wisdom.md pattern of "always sync templates in the same pass" applies here too.
+- **RETIRED_LABELS is the clean mechanism for label cleanup.** When removing a label family from squad integration, add the labels to the `RETIRED_LABELS` array in both sync-squad-labels workflow copies. They get deleted from the repo on the next label sync run without requiring manual GitHub API calls.
+- **squad-triage.yml had the most buried copilot coupling.** The `hasCopilot` capability-tier logic (good-fit/needs-review/not-suitable keyword matching) was silently pre-routing issues before the normal member routing ran. Pure copilot logic was deeply interwoven with general triage.
+- **The `squad.agent.md` "Copilot Coding Agent Member" section should be replaced with a disabled notice, not deleted.** A missing section in a large agent file could silently confuse future sessions. A visible "This integration is disabled in this repo" stub prevents that.
+
 - PR #50 merged to main (squash SHA `305ec03`). Issue #31 closed. 775 tests passing.
+
+### 2026-04-12 — Scope correction: squad:chore survives copilot removal
+
+- **`squad:chore` and `squad:copilot` are NOT the same thing.** The previous change conflated them — `squad:copilot` was the autonomous routing label; `squad:chore` was a work-type marker. Retiring both together was overly broad.
+- **Scope of the correct removal:** `squad:copilot` is retired (removed from label set, automation deleted). `squad:chore` survives as an explicit chore/maintenance label with no auto-routing behavior.
+- **Three places to fix when a label's role changes:** (1) RETIRED_LABELS array in the sync workflow, (2) the squad-issue-assign job condition (to skip non-member `squad:*` labels), and (3) any documentation that describes the label's meaning. All three must agree.
+- **Disabled notice language matters.** A stub that says "X / Y has been removed" when only X was removed leaves a false impression of Y's status. Stubs must be precise about what is actually gone.
 
 ### Issue #31 Slice 6 — Operator Inventory (2026-04-10)
 
-- `LanguageTool.cs` is fully catalog-driven via `PreceptTokenMeta.GetSymbol(token)`. When George updates token symbols in `PreceptToken.cs`, the `precept_language` operator inventory updates automatically — no MCP code changes required.
-- The MCP tool layer had zero hardcoded DSL operator strings (verified `CompileTool.cs`, `InspectTool.cs`, `FireTool.cs`, `UpdateTool.cs`). The thin-wrapper rule held perfectly.
-- `docs/McpServerDesign.md` already used `and` in expression text examples — no doc changes needed.
-- Sync work for a George runtime change = add a regression test asserting the new contract; don't touch tool code.
-- New test pattern: `LogicalOperatorsAreKeywordForms` — assert specific operator symbols are present AND assert old symbolic forms are absent. Dual-assertion approach locks both sides of the rename.
+### Issue #27/#25/#29 Slice 6 — MCP Vocabulary + Spec (2026-04-11)
 
+- `LanguageTool.cs` needed zero code changes for `integer`/`decimal`/`choice`/`maxplaces`/`ordered`. All five tokens already existed in `PreceptToken` with correct `TokenCategory` attributes — the catalog-driven vocabulary mechanism picked them up automatically.
+- `round()` is not a token (recognized by identifier name in the parser). Registered it in `ConstructCatalog` via `.Register(new ConstructInfo(...))` on the `RoundAtom` parser combinator so it surfaces in `precept_language.constructs`. This is the canonical pattern for non-keyword DSL constructs.
+- `CompileTool.cs` `FormatConstraint` had no `Maxplaces` case — it fell through to the catch-all `.GetType().Name.ToLowerInvariant()` producing `"maxplaces"` without the places value. Fixed to `$"maxplaces {m.Places}"` to match the constraint authoring syntax.
+- `FieldDto` and `EventArgDto` gained `ChoiceValues` (`IReadOnlyList<string>?`) and `IsOrdered` (`bool?`). Used nullable bool for `IsOrdered` so `false` is omitted from JSON output (only populated when true), keeping choice-less field output clean.
+- `McpServerDesign.md` was missing a `ConstraintKeywords` row entirely in the vocabulary table. Added it. Also added scalar type reference table, constraint reference table, and built-in function reference table for `round()`.
+- 9 new MCP tests added (65 total, 0 failed).
+
+
+### Issue #14 — Final DTO specification filed (2026-04-11)
+
+- **Four new top-level arrays for `precept_compile`:** `invariants`, `stateAsserts`, `eventAsserts`, `editBlocks`. All use camelCase field names. `when: string | null` on each entry. `StateDto.rules: string[]` preserved unchanged (additive, not replacement).
+- **Synthetic invariant filtering is mandatory:** `model.Invariants` must be filtered with `!i.IsSynthetic` before projecting to `InvariantDto`. Synthetic invariants desugar from field constraints — including them in the `invariants` array would duplicate the field's own `constraints` array.
+- **`stateAsserts` anchor is lowercased string:** `AssertAnchor.In/To/From` → `"in"/"to"/"from"` via `.ToString().ToLowerInvariant()`. Matches the DSL keyword form.
+- **`editBlocks[].state` is nullable:** Root-level stateless edit declarations have no state — `state: null` is a valid DTO shape, not an error.
+- **`constraintTrace` belongs on per-event `InspectEventDto`**, not the top-level `InspectResult`. Per-event placement preserves evaluation context — mixing all events' traces at the top level is harder to correlate.
+- **`guardStatus` field is omitted when there is no guard**: Only populated when `when != null`. When `guardStatus == "skipped"`, `status` is also omitted (constraint was never evaluated). When `guardStatus == "applied"`, `status` is always present. When no guard: `when: null`, no `guardStatus`, `status` always present.
+- **Edit block editability in inspect — no change for now:** `EditableFieldDto` requires no changes. Form 4 (`in State when guard edit`) is deferred; `grantedWhen` shape is out of scope for this sprint.
+- **C69 is a mechanism-selection diagnostic, not a typo diagnostic:** Fires when an event arg identifier IS known but is referenced in the wrong scope (invariant/state-assert guard). C38 fires for unknown identifiers. C69 message must name the dotted identifier, state the scope mismatch, and propose the correct transition-row guard alternative. These are mutually exclusive.
+- **Two-commit sequence within one PR:** Commit A (structured arrays, `when: null` hardcoded) can land before George's model record changes. Commit B (wire `when` from `WhenText`) is gated on George's parser changes. Commit B stays in the same Issue #14 PR — not a separate PR.
+- **`precept_language` — 6 construct entries need form/description updates** (invariant, in/to/from state assert × 3, on event assert, in state edit). No new vocabulary entries — `when` is already in `controlKeywords`.
+
+### Issue #14 — `when` guards MCP contract assessment (2026-04-11)
+
+- **Current compile output is nearly empty of declaration structure.** Invariants, event asserts, and edit blocks are entirely absent. State asserts appear only as `StateDto.rules: string[]` (reason text only — no expression, no anchor, no guard field). This is the most important finding: #14 cannot "add a guard field to existing declaration DTOs" because most declaration DTOs don't exist yet in the compile output.
+- **Correct compile expansion:** Add new top-level arrays (`invariants`, `stateAsserts`, `eventAsserts`, `editBlocks`) each with a `when: string?` property. Do NOT replace `StateDto.rules: string[]` — that would break existing consumers. Keep the string array; add structured arrays alongside it.
+- **Inspect trace requires runtime support.** The `constraintTrace` (#14's "skipped/applied/violated" requirement) doesn't exist at the core runtime layer — violations only, no full evaluation trace. George needs to surface guard evaluation results via `InspectionResult` before the MCP DTO can carry them. This is the highest-effort item.
+- **`when` is already in `controlKeywords`.** It appears there because of transition row guards (`from S on E when G ->`). No new vocabulary additions needed for #14 — just construct catalog entry updates.
+- **Cross-scope guard diagnostics must name the preferred form** (e.g., `from S on E when G -> reject`). A generic C038 "unknown identifier" is insufficient — the agent needs to understand it's a mechanism-selection problem, not a typo. Needs a dedicated C6X diagnostic code.
+- **Verdict: Minor update, additive only.** Provided new declaration arrays are added (not replacing existing ones) and `constraintTrace` is treated as an additive nullable field.
+
+### Issue #14 Slice 8 — MCP tool updates for when guards (2026-04-11)
+
+- **8a: CompileTool.cs — 4 new DTO arrays added.** `InvariantDto`, `StateAssertDto`, `EventAssertDto`, `EditBlockDto` with `When` (nullable string) on all four. `CompileResult` expanded from 12 to 16 positional parameters. `DiagnosticsOnly` factory updated with 4 extra `null` args. Synthetic invariants filtered with `!inv.IsSynthetic`. `StateAssertDto.Anchor` lowercased via `.ToString().ToLowerInvariant()`.
+- **8b: LanguageTool.cs — no changes needed.** `ConstructCatalog.Constructs` auto-picks up updated parser `.Register()` descriptions from Slice 2. Verified the dynamic projection in `LanguageTool.Run()` requires zero manual edits.
+- **Validation: 67/67 MCP tests pass, 850/850 core tests pass.** Zero regressions — new DTO fields are additive and don't break existing deserialization.
 
 ### MCP Tool Surface (5 Tools — Final Design)
 
@@ -154,3 +198,39 @@ Both skills use `precept_language` for syntax authority, handle Mermaid diagrams
 - **JSON shapes match design spec exactly:** no field additions, no name drift
 - **Catalog-driven:** `LanguageTool` uses `ConstructCatalog` + `DiagnosticCatalog` + `PreceptToken` metadata — all single source of truth
 - **DTOs stay in sync:** `ViolationDtoMapper` handles all 4 source types × 5 target types automatically via switch statements
+
+## Recent Updates
+
+### 2026-04-12 — Design Review: Issue #17 Computed/Derived Fields — MCP Contract Assessment
+
+**Verdict: minor update (additive only, no breaking changes).**
+
+- **`FieldDto` expansion:** 3 new optional trailing parameters: `IsComputed` (bool?), `Expression` (string?), `Dependencies` (IReadOnlyList<string>?). Follows the `IsOrdered` nullable-bool pattern — omitted from JSON for regular fields.
+- **`LanguageTool.cs`:** One new `ExpressionScopeDto` entry for "computed field expression" scope (fields + .count only, no event args). Construct catalog auto-registers from parser combinator — no manual LanguageTool edits beyond the scope entry.
+- **Inspect/Fire: zero MCP changes.** Computed values flow through `instance.InstanceData` → `ToDictionary()` automatically. Dependency-aware violation targets use existing `FieldTarget` kind.
+- **UpdateTool: existing robustness gap identified.** `engine.Update()` is not wrapped in try-catch (unlike CreateInstance). If core rejects via exception rather than outcome, this surfaces as unhandled error. Recommended defensive catch regardless of #17.
+- **AI legibility: 3 convergent signals** — `isComputed` flag, `expression` text, and absence from `editableFields` in inspect output. Recommended: add rejection note to `precept_update` tool description.
+- **Thin wrapper holds:** All new logic (recomputation, dependency ordering, rejection) lives in core engine. MCP layer reads new model properties it already projects.
+
+### Issue #16 — MCP function catalog (2026-04-12)
+
+- **`LanguageTool.cs`:** Added `Functions` section to `LanguageResult`. New DTOs: `FunctionDto(Name, Description, Signatures)`, `FunctionSignatureDto(Parameters, ReturnType, IsVariadic)`, `FunctionParamDto(Name, Type, Constraint?)`. Built dynamically from `FunctionRegistry.AllFunctions` — zero hardcoded function metadata in MCP layer.
+- **`FunctionRegistry.cs`:** Added `Description` field to `FunctionDefinition` record. Added `AllFunctions` property. Registered all 18 functions (abs, ceil, clamp, endsWith, floor, left, max, mid, min, pow, right, round, sqrt, startsWith, toLower, toUpper, trim, truncate) with overloads, parameter types, return types, and constraints.
+- **`CompileTool.cs`:** No changes needed. Expressions are string-based via `ExpressionText` / `ReconstituteExpr`. `PreceptFunctionCallExpression` case already exists in parser's `ReconstituteExpr` (produces `"round(Amount, 2)"` etc.). Nested function calls serialize correctly.
+- **`PreceptParser.cs`:** Updated ConstructInfo ID from `round-function` to `function-call`. Updated description to list all 18 available functions. Kept `round` as lead keyword in Form for backward compatibility with `SampleFiles_CoverAllConstructs` drift test.
+- **`StaticValueKind` display:** `FormatValueKind` helper collapses `Number|Integer|Decimal` → `"number"`, surfaces specific types otherwise. `FormatArgConstraint` maps `MustBeIntegerLiteral` → `"must be integer literal"`.
+- **Test impact:** Fixed assertion in `ConstructsIncludeRoundFunction` (checks description contains "built-in function" instead of form starts with "round"). Updated `CatalogDriftTests` switch case for new construct ID. All 1187 tests pass.
+- **Docs note:** `docs/McpServerDesign.md` needs a `functions` section added in the final doc sync slice. The existing `round()` reference table should expand to cover all 18 functions.
+
+### Issue #9 — MCP updates for conditional expressions (2026-04-12)
+
+- **`LanguageTool.cs`:** Zero changes needed. `if`, `then`, `else` tokens carry `[TokenCategory(TokenCategory.Control)]` attributes — `BuildVocabulary()` picks them up automatically. C78/C79 diagnostics in `DiagnosticCatalog` surface automatically via catalog reflection.
+- **`CompileTool.cs`:** Zero changes needed. Conditional expressions serialize via `ReconstituteExpr` in the parser (`if <cond> then <then> else <else>`). `ExpressionText` on set assignments captures the full conditional text. No new DTO fields required.
+- **`InspectTool.cs`:** No changes made — **trace enhancement (AC-9: `conditionResult` + `branchTaken`) requires core engine changes.** The evaluator's `EvaluationResult(bool Success, object? Value, string? Error)` returns only the final value, not which branch was taken. `EventInspectionResult` carries no per-expression evaluation trace. Surfacing conditional branch decisions requires: (1) the evaluator to produce trace metadata, (2) `EventInspectionResult` to carry it, (3) the MCP layer to project it. Items 1–2 are George's domain. MCP shape would be an optional `ConditionalTraceDto(string conditionText, bool conditionResult, string branchTaken, object? value)` array on `InspectEventDto`.
+- **`FireTool.cs`:** Zero changes needed. `engine.Fire()` evaluates conditionals correctly — field values reflect branch selection.
+- **Tests added (8 new, 83 total, 0 failed):**
+  - `CompileToolTests`: conditional in set RHS compiles cleanly, C78 (non-boolean condition), C79 (branch type mismatch)
+  - `LanguageToolTests`: `if`/`then`/`else` in control keywords vocabulary, C78/C79 in constraints catalog
+  - `FireToolTests`: conditional set produces correct value (then branch), conditional set produces correct value (else branch)
+  - `InspectToolTests`: conditional set assignment shows correct transition outcome
+- **Docs note:** `docs/McpServerDesign.md` may need a note about conditional expression support in compile output. Deferred to doc sync.

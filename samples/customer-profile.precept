@@ -11,10 +11,9 @@ precept CustomerProfile
 field Name as string nullable
 field Email as string nullable
 field Phone as string nullable
-field PreferredContactMethod as string default "email"
+field PreferredContactMethod as choice("email","phone","sms") default "email"
 field MarketingOptIn as boolean default false
 
-invariant PreferredContactMethod != "" because "Preferred contact method must be specified"
 invariant MarketingOptIn == false or Email != null because "Marketing opt-in requires an email address"
 
 # All fields are editable — a customer profile can be fully updated at any time.

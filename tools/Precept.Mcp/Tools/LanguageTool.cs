@@ -19,8 +19,9 @@ public static class LanguageTool
         var constraints = DiagnosticCatalog.Constraints
             .Select(c => new ConstraintDto(c.Id, c.Phase, c.Rule))
             .ToList();
+        var functions = BuildFunctionCatalog();
 
-        return new LanguageResult(vocabulary, constructs, constraints, ExpressionScopes, FirePipeline, OutcomeKinds);
+        return new LanguageResult(vocabulary, constructs, constraints, ExpressionScopes, functions, FirePipeline, OutcomeKinds);
     }
 
     private static VocabularyDto BuildVocabulary()
@@ -91,6 +92,48 @@ public static class LanguageTool
                     operators);
     }
 
+    private static IReadOnlyList<FunctionDto> BuildFunctionCatalog()
+    {
+        return FunctionRegistry.AllFunctions
+            .OrderBy(f => f.Name, StringComparer.Ordinal)
+            .Select(f => new FunctionDto(
+                f.Name,
+                f.Description,
+                f.Overloads.Select(o => new FunctionSignatureDto(
+                    o.Parameters.Select(p => new FunctionParamDto(
+                        p.Name,
+                        FormatValueKind(p.AcceptedTypes),
+                        FormatArgConstraint(p.Constraint)
+                    )).ToList(),
+                    FormatValueKind(o.ReturnType),
+                    o.MinArity.HasValue
+                )).ToList()
+            ))
+            .ToList();
+    }
+
+    private static string FormatValueKind(StaticValueKind kind)
+    {
+        var allNumeric = StaticValueKind.Number | StaticValueKind.Integer | StaticValueKind.Decimal;
+        if ((kind & allNumeric) == allNumeric)
+            return "number";
+
+        var parts = new List<string>();
+        if (kind.HasFlag(StaticValueKind.Number)) parts.Add("number");
+        if (kind.HasFlag(StaticValueKind.Integer)) parts.Add("integer");
+        if (kind.HasFlag(StaticValueKind.Decimal)) parts.Add("decimal");
+        if (kind.HasFlag(StaticValueKind.String)) parts.Add("string");
+        if (kind.HasFlag(StaticValueKind.Boolean)) parts.Add("boolean");
+        return parts.Count > 0 ? string.Join(" | ", parts) : "unknown";
+    }
+
+    private static string? FormatArgConstraint(FunctionArgConstraint constraint) => constraint switch
+    {
+        FunctionArgConstraint.MustBeIntegerLiteral => "must be integer literal",
+        FunctionArgConstraint.RequiresNonNegativeProof => "requires non-negative proof",
+        _ => null
+    };
+
     private static (int Precedence, string Arity) GetOperatorInfo(PreceptToken token) => token switch
     {
         PreceptToken.Or => (1, "binary"),
@@ -118,7 +161,8 @@ public static class LanguageTool
         new("state assert expression", "All data fields, collection accessors"),
         new("event assert expression", "That event's args only (bare ArgName or EventName.ArgName)"),
         new("when guard", "All data fields, EventName.ArgName, collection accessors"),
-        new("set RHS", "All data fields (read-your-writes), EventName.ArgName, collection accessors")
+        new("set RHS", "All data fields (read-your-writes), EventName.ArgName, collection accessors"),
+        new("computed field expression", "Data fields and .count only \u2014 no event arguments (C84), no nullable field references (C83), no unsafe collection accessors like .peek/.min/.max (C85)")
     ];
 
     private static readonly IReadOnlyList<FirePipelineStageDto> FirePipeline =
@@ -128,7 +172,8 @@ public static class LanguageTool
         new(3, "Exit actions", "Run 'from <SourceState> ->' automatic mutations."),
         new(4, "Row mutations", "Execute the matched row's '-> set/add/remove/...' action chain in declaration order."),
         new(5, "Entry actions", "Run 'to <TargetState> ->' automatic mutations."),
-        new(6, "Validation", "Check invariants, state asserts (in/to/from with temporal scoping). Any failure → full rollback, ConstraintFailure.")
+        new(6, "Derived field recomputation", "Re-evaluate all computed fields in dependency order after all mutations are committed. Computed values are current before validation."),
+        new(7, "Validation", "Check invariants, state asserts (in/to/from with temporal scoping). Any failure \u2192 full rollback, ConstraintFailure.")
     ];
 
     private static readonly IReadOnlyList<OutcomeKindDto> OutcomeKinds =
@@ -147,6 +192,7 @@ public sealed record LanguageResult(
     IReadOnlyList<ConstructDto> Constructs,
     IReadOnlyList<ConstraintDto> Constraints,
     IReadOnlyList<ExpressionScopeDto> ExpressionScopes,
+    IReadOnlyList<FunctionDto> Functions,
     IReadOnlyList<FirePipelineStageDto> FirePipeline,
     IReadOnlyList<OutcomeKindDto> OutcomeKinds);
 
@@ -165,5 +211,8 @@ public sealed record OperatorDto(string Symbol, int Precedence, string Arity, st
 public sealed record ConstructDto(string Form, string Context, string Description, string Example);
 public sealed record ConstraintDto(string Id, string Phase, string Rule);
 public sealed record ExpressionScopeDto(string Position, string Allowed);
+public sealed record FunctionDto(string Name, string Description, IReadOnlyList<FunctionSignatureDto> Signatures);
+public sealed record FunctionSignatureDto(IReadOnlyList<FunctionParamDto> Parameters, string ReturnType, bool IsVariadic);
+public sealed record FunctionParamDto(string Name, string Type, string? Constraint);
 public sealed record FirePipelineStageDto(int Stage, string Name, string Description);
 public sealed record OutcomeKindDto(string Kind, string Description, bool Mutated);

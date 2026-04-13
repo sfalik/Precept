@@ -101,6 +101,9 @@ See the [Quickstart Guide](docs/RuntimeApiDesign.md) for a complete runtime inte
 - Full inspectability — preview any action's outcome without executing it
 - Compile-time checking — unreachable states and type errors caught before runtime
 - **Stateful or stateless** — precepts can govern stateful workflows (with lifecycle states and transitions) or stateless domain objects (fields and edit rules only, no states)
+- **Conditional declarations** — `when` guards on invariants, asserts, and edit blocks make rules apply only when a precondition is met
+- **Conditional expressions** — `if...then...else` selects between values inline, replacing row duplication for data-dependent field assignments
+- **Computed fields** — `field X as number -> A + B` declares a derived value that recomputes automatically after every mutation, eliminating manual synchronization
 
 Precept is not a workflow orchestrator, event sourcing framework, or ORM — it integrates with all of them. It governs the entity contract; they handle orchestration, persistence, and storage. Think: scattered governance across six service classes — Precept puts it in one file.
 

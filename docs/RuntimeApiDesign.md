@@ -167,8 +167,14 @@ Mutating event execution. Returns `FireResult`.
 5. **Guard evaluation** — evaluates ordered `if`/`else if`/`else` clauses; returns `Rejected` if all guards fail.
 6. **`set` assignments** — executed on a working copy of instance data; returns `Rejected` if an expression fails or the result violates a field's declared type.
 7. **Collection mutations** — `add`/`remove`/`enqueue`/`dequeue`/`push`/`pop`/`clear` operations on working copies.
-8. **Field and top-level rules** — checked against post-`set` working data; returns `Rejected` if violated.
-9. **State rules** — checked against the *target* state (only for `transition` outcomes, not `no transition`); returns `Rejected` if violated.
+8. **Derived field recomputation** — re-evaluates all computed fields in dependency order against post-mutation data. Computed values are current before validation.
+9. **Field and top-level rules** — checked against post-mutation working data (including recomputed derived fields); returns `Rejected` if violated.
+10. **State rules** — checked against the *target* state (only for `transition` outcomes, not `no transition`); returns `Rejected` if violated.
+
+**`when` guard evaluation on declarations:**
+- **Event asserts (stage 3):** If an event assert has a `when` guard, the guard is evaluated against event args before the assert body. If the guard is false, that assert is skipped. Guards on event asserts are arg-scoped only.
+- **Invariants and state asserts (stage 9–10):** If an invariant or state assert has a `when` guard, the guard is evaluated against post-mutation field data before the assertion body. If the guard is false, that rule is skipped. Collect-all semantics are preserved — guard-skipped declarations don't short-circuit other declarations.
+- **Edit blocks (`Update`/`Inspect`):** If an edit declaration has a `when` guard, the guard is evaluated against current instance data at each `Update`/`Inspect` call. Fail-closed: guard evaluation error → field not granted editability.
 
 On any rejection, the original instance is unchanged — all stages are fully rolled back.
 
@@ -434,7 +440,7 @@ The following types are returned by `PreceptParser.Parse` and consumed by `Prece
 | `PreceptState` | State declaration |
 | `PreceptEvent` | Event with argument contract |
 | `PreceptEventArg` | One typed argument: name, `PreceptScalarType`, nullability, optional default |
-| `PreceptField` | One scalar data field: name, `PreceptScalarType`, nullability, optional default |
+| `PreceptField` | One scalar data field: name, `PreceptScalarType`, nullability, optional default, optional derived expression (`IsComputed`, `DerivedExpression`, `DerivedExpressionText`) |
 | `PreceptCollectionField` | One collection field: name, `PreceptCollectionKind`, `PreceptScalarType` inner type |
 | `PreceptInvariant` | A global data rule: `invariant <expr> because "reason"` — always holds |
 | `StateAssertion` | A state-scoped assert: `in/to/from <State> assert <expr> because "reason"` |

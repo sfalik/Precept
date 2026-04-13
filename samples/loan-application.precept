@@ -2,6 +2,7 @@ precept LoanApplication
 
 # This sample keeps underwriting rules in the workflow itself instead of spreading them across services.
 # The approval guard combines document verification, credit policy, and affordability checks.
+# Built-in functions (min, round, clamp) keep the logic readable without external helpers.
 
 field ApplicantName as string nullable
 field RequestedAmount as number default 0
@@ -17,6 +18,7 @@ invariant ApprovedAmount >= 0 because "Approved amount cannot be negative"
 invariant ApprovedAmount <= RequestedAmount because "Approved amount cannot exceed the request"
 invariant AnnualIncome >= 0 because "Annual income cannot be negative"
 invariant ExistingDebt >= 0 because "Existing debt cannot be negative"
+invariant ExistingDebt <= AnnualIncome * 3 when DocumentsVerified because "Verified applications must have a debt-to-income ratio of 3x or less"
 
 state Draft initial
 state UnderReview
@@ -25,7 +27,10 @@ state Funded
 state Declined
 
 in Approved assert DocumentsVerified because "Approved loans must have verified documents"
+in UnderReview assert CreditScore >= 300 when DocumentsVerified because "Verified applicants must have a minimum credit score of 300"
 in Funded assert ApprovedAmount > 0 because "Funded loans must have a positive approved amount"
+
+in UnderReview when DocumentsVerified edit DecisionNote
 
 event Submit with Applicant as string, Amount as number, Score as number, Income as number, Debt as number
 on Submit assert Applicant != "" because "An applicant name is required"
@@ -49,7 +54,7 @@ from Draft on Submit -> set ApplicantName = Submit.Applicant -> set RequestedAmo
 
 from UnderReview on VerifyDocuments -> set DocumentsVerified = true -> no transition
 
-from UnderReview on Approve when DocumentsVerified and CreditScore >= 680 and AnnualIncome >= ExistingDebt * 2 and RequestedAmount < AnnualIncome / 2 and Approve.Amount <= RequestedAmount -> set ApprovedAmount = Approve.Amount -> set DecisionNote = Approve.Note -> transition Approved
+from UnderReview on Approve when DocumentsVerified and CreditScore >= 680 and AnnualIncome >= ExistingDebt * 2 and RequestedAmount < AnnualIncome / 2 and Approve.Amount <= RequestedAmount -> set ApprovedAmount = min(Approve.Amount, RequestedAmount) -> set DecisionNote = if Approve.Note != null then Approve.Note else if CreditScore >= 750 then "Prime tier  — auto-approved" else "Standard tier — approved" -> transition Approved
 from UnderReview on Approve -> reject "Approval requires verified documents, strong credit, and affordable debt load"
 
 from UnderReview on Decline -> set DecisionNote = Decline.Note -> transition Declined

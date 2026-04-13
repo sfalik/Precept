@@ -52,6 +52,46 @@
 - **`docs/` is not a design bucket** — it holds technical design docs, implementation plans, research, and explanatory material rather than canonical visual-system rules.
 - **Shared review is required** when a change affects both brand meaning and reusable product-surface guidance.
 
+## Review Policy
+
+**All PR reviews follow a conversational lifecycle that mirrors how humans use GitHub.** See `.squad/skills/pr-review/SKILL.md` for the full spec.
+
+### Lifecycle
+
+1. **Initial review** — Reviewers post `REQUEST_CHANGES` with inline comments on specific files and lines.
+2. **Dev fix** — Devs fix the code, push, and **reply** to each review thread explaining the fix.
+3. **Re-review** — Reviewers verify by **replying** to the same threads, **resolve** satisfied threads, and submit `APPROVE`.
+
+### Rules
+
+- Reviews are posted as `squad-reviewer[bot]` via the Squad Reviewer GitHub App.
+- Reviewers output **structured JSON** (not Markdown) with inline comments on specific files and lines.
+- Every blocker MUST have an inline comment. Top-level-only blockers are incomplete reviews.
+- Dev fix replies and reviewer verifications happen **in the same thread** — no new duplicate threads.
+- Reviewers resolve threads only after verifying the fix in re-review.
+- The decisions inbox is still used for team-relevant decisions — review findings belong on the PR.
+
+### Script
+
+```bash
+# Initial review
+node tools/scripts/squad-review.js <pr> <review.json>
+
+# Dev fix reply (reply to existing threads)
+node tools/scripts/squad-review.js <pr> <fix-reply.json>
+
+# Re-review (reply + resolve + APPROVE)
+node tools/scripts/squad-review.js <pr> <rereview.json>
+
+# List threads (for mapping)
+node tools/scripts/squad-review.js <pr> threads [--unresolved]
+```
+
+## Review Governance
+
+- **Authors can fix their own rejected code.** They know it best — routing fixes to a different agent who isn't familiar with the code creates worse problems than it solves.
+- **Authors cannot review their own code.** The review gate requires fresh eyes. A different agent (or Shane) must review every PR — the original author never marks their own work as approved.
+
 ## Issue Source
 
 - **Provider:** GitHub

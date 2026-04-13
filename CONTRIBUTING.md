@@ -48,8 +48,12 @@ When ready to implement:
 
 1. Create a feature branch: `feature/issue-N-short-description`
 2. Open a **draft PR** immediately, linked to the issue (`Closes #N`)
-3. Create an implementation plan in the body of the PR, including checkmarks to track progress. This is ephemeral; it doesn't need to outlive the PR.
-4. **Check off items as you complete them.** Update the PR body after each slice or logical group — not at the end. The checkbox list is a live progress tracker; it should reflect current state throughout development so reviewers and collaborators always know where things stand. Use the GitHub UI or `mcp_github_update_pull_request` to check off completed items.
+3. Use the exact PR-body structure required by the repository template. Required sections:
+   - `## Summary` — what changed in reviewer-facing terms
+   - `## Linked Issue` — include `Closes #N`
+   - `## Why` — why this PR exists, what problem it addresses, and any implementation-specific reviewer context; do **not** duplicate the full proposal rationale or alternatives from the issue/research docs
+   - `## Implementation Plan` — checkbox checklist tracking vertical slices
+4. **Check off items as you complete them.** Update the PR body after each slice or logical group — not at the end. The checkbox list is a live progress tracker; it should reflect current state throughout development so reviewers and collaborators always know where things stand. Keep the `## Summary` and `## Why` sections current too if the shipped scope or reviewer context changes during implementation. Use the GitHub UI or `mcp_github_update_pull_request` to keep the PR body current.
 5. Implement in vertical slices. Suggested order for cross-cutting changes:
    - Parser + model + diagnostics
    - Type checker
@@ -126,7 +130,7 @@ Language proposals are assigned to wave milestones that reflect priority and dep
 | What the C# API IS | `docs/RuntimeApiDesign.md` | Permanent — tracks reality |
 | What a feature SHOULD BE | GitHub issue body | Until implemented |
 | WHY a decision was made | Issue body (per-decision rationale) + `research/` (full evidence base) | Permanent — rationale lives in both places |
-| HOW to implement (checklist) | PR body | Ephemeral — dies with the PR |
+| What changed, why this PR exists, and HOW to implement (summary + reviewer context + checklist) | PR body | Ephemeral — dies with the PR |
 | AI agent directives | `.github/copilot-instructions.md` | Permanent — updated as process evolves |
 
 ### Why not separate implementation plan docs?

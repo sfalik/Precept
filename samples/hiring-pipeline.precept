@@ -6,7 +6,7 @@ precept HiringPipeline
 field CandidateName as string nullable
 field RoleName as string nullable
 field RecruiterName as string nullable
-field FeedbackCount as number default 0 nonnegative
+field FeedbackCount as integer default 0 nonnegative
 field OfferAmount as number default 0 nonnegative
 field FinalNote as string nullable maxlength 500
 
@@ -22,6 +22,7 @@ state Rejected
 
 in InterviewLoop assert PendingInterviewers.count > 0 because "Interview loops require at least one pending interviewer"
 in Hired assert OfferAmount > 0 because "Hired candidates must have an offer amount"
+invariant CandidateName == null or CandidateName.length <= 100 because "Candidate name must be ≤100 characters"
 
 event SubmitApplication with Candidate as string notempty, Role as string notempty, Recruiter as string notempty
 
@@ -49,7 +50,7 @@ from InterviewLoop on RecordInterviewFeedback when PendingInterviewers contains 
 from InterviewLoop on RecordInterviewFeedback -> reject "Only assigned interviewers can submit feedback"
 from InterviewLoop on RejectCandidate -> set FinalNote = RejectCandidate.Note -> transition Rejected
 
-from Decision on ExtendOffer when FeedbackCount >= 2 -> set OfferAmount = ExtendOffer.Amount -> transition OfferExtended
+from Decision on ExtendOffer when FeedbackCount >= 2 -> set OfferAmount = ExtendOffer.Amount -> set FinalNote = if FeedbackCount >= 3 then "Strong Hire" else "Standard Hire" -> transition OfferExtended
 from Decision on ExtendOffer -> reject "At least two completed interview feedback entries are required before extending an offer"
 from Decision on RejectCandidate -> set FinalNote = RejectCandidate.Note -> transition Rejected
 
