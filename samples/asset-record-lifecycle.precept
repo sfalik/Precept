@@ -1,0 +1,175 @@
+precept AssetRecordLifecycle
+
+# Shape: H1 hybrid lifecycle + entity — physical asset record
+#
+# Models a physical asset's full lifecycle from procurement through disposal
+# and archival. Demonstrates an H1 hybrid shape: a real state machine
+# lifecycle (OnOrder → Received → Commissioning → Active → maintenance loops
+# → Decommissioned → Disposed → Archived) combined with rich editable entity
+# data for financial tracking, condition monitoring, and transfer management.
+#
+# Condition-driven routing sends assets to OutOfService when maintenance
+# reveals NonFunctional condition. A decommission cost gate prevents
+# retirement when accumulated maintenance exceeds 2× acquisition cost
+# unless CostAnalysisOverride is set.
+#
+# Link fields (WorkOrderId) reference companion entity samples such as
+# maintenance-work-order.
+#
+# FUTURE(date): AcquisitionDate, WarrantyExpirationDate, CommissionDate,
+#               LastMaintenanceDate, DecommissionDate, DisposalDate
+
+# --- Fields ---
+
+# Identity
+field AssetTag as string nullable maxlength 20
+field SerialNumber as string nullable maxlength 50
+field Manufacturer as string nullable maxlength 100
+field Model as string nullable maxlength 100
+field AssetClass as choice("Equipment", "Vehicle", "ITHardware", "Furniture", "Building", "Infrastructure") default "Equipment"
+field Condition as choice("New", "Good", "Fair", "Poor", "NonFunctional") default "New"
+field Location as string nullable maxlength 200
+field Department as string nullable maxlength 100
+field CostCenter as string nullable maxlength 10
+
+# Financial tracking
+field AcquisitionCost as decimal default 0 nonnegative
+field CurrentValue as decimal default 0 nonnegative
+field SalvageValue as decimal default 0 nonnegative
+field AccumulatedMaintenanceCost as decimal default 0 nonnegative
+field DepreciationRate as decimal default 0 nonnegative
+field TotalCostOfOwnership as decimal -> AcquisitionCost + AccumulatedMaintenanceCost
+field IsFullyDepreciated as boolean -> CurrentValue <= SalvageValue
+
+# Maintenance tracking
+field MaintenanceCount as integer default 0 nonnegative
+field WarrantyRemaining as integer default 0 nonnegative
+field IsUnderWarranty as boolean -> WarrantyRemaining > 0
+
+# Disposal governance
+field DisposalMethod as choice("Sale", "Scrap", "Donation", "TradeIn", "Recycle") nullable
+field CostAnalysisOverride as boolean default false
+field DecommissionReason as string nullable maxlength 1000
+field DisposalNote as string nullable maxlength 1000
+
+# Link fields
+field WorkOrderId as string nullable maxlength 50
+
+# --- Invariants ---
+
+invariant AcquisitionCost <= 99999999 because "Acquisition cost cannot exceed 99,999,999"
+invariant SalvageValue <= AcquisitionCost because "Salvage value cannot exceed acquisition cost"
+
+# --- States ---
+
+state OnOrder initial
+state Received
+state Commissioning
+state Active
+state UnderMaintenance
+state OutOfService
+state Decommissioned
+state Disposed
+state Archived
+
+# --- State Constraints ---
+
+in Received assert AssetTag != null because "Received asset must have an asset tag"
+in Commissioning assert AssetTag != null because "Commissioned asset must have an asset tag"
+in Commissioning assert Location != null because "Asset must have a location for commissioning"
+in Active assert AssetTag != null because "Active asset must have an asset tag"
+in Active assert Location != null because "Active asset must have a location"
+in Active assert Department != null because "Active asset must be assigned to a department"
+in Decommissioned assert DecommissionReason != null because "Decommissioned asset must have a reason"
+in Disposed assert DisposalMethod != null because "Disposed asset must have a disposal method"
+in Disposed assert DisposalNote != null because "Disposed asset must have a disposal note"
+
+# --- Edit Declarations ---
+
+in OnOrder edit AssetTag, SerialNumber, Manufacturer, Model, AssetClass, AcquisitionCost, WarrantyRemaining
+in Received edit SerialNumber, Condition, Location
+in Commissioning edit Location, Department, CostCenter, Condition
+in Active edit Location, Department, CostCenter, Condition, CurrentValue, DepreciationRate, WorkOrderId, CostAnalysisOverride
+in Active when IsUnderWarranty edit WarrantyRemaining
+in UnderMaintenance edit Condition, WorkOrderId
+in OutOfService edit Condition, WorkOrderId, CostAnalysisOverride
+in Decommissioned edit DecommissionReason
+
+# --- Events ---
+
+event RegisterAsset with Tag as string notempty maxlength 20, Serial as string nullable default null, Mfr as string nullable default null, Mdl as string nullable default null, Class as choice("Equipment", "Vehicle", "ITHardware", "Furniture", "Building", "Infrastructure") default "Equipment", Cost as decimal positive, Warranty as integer default 0 nonnegative
+
+event ReceiveDelivery with InspectionLocation as string notempty maxlength 200, InspectionCondition as choice("New", "Good", "Fair", "Poor", "NonFunctional") default "New"
+
+event BeginCommissioning with InstallLocation as string notempty maxlength 200, Dept as string notempty maxlength 100, Center as string nullable maxlength 10 default null
+
+event Commission
+
+event BeginMaintenance with OrderId as string nullable default null
+
+event CompleteMaintenance with ResultCondition as choice("New", "Good", "Fair", "Poor", "NonFunctional"), LaborCost as decimal default 0 nonnegative, PartsCost as decimal default 0 nonnegative
+
+event PullFromService
+
+event ReturnToService with RestoredCondition as choice("New", "Good", "Fair", "Poor", "NonFunctional")
+
+event Decommission with Reason as string notempty maxlength 1000
+
+event Dispose with Method as choice("Sale", "Scrap", "Donation", "TradeIn", "Recycle"), Note as string notempty maxlength 1000, FinalValue as decimal default 0 nonnegative
+
+event Archive
+
+event RecordDepreciation with NewValue as decimal nonnegative
+
+event TransferAsset with NewLocation as string notempty maxlength 200, NewDepartment as string notempty maxlength 100
+
+# --- Event Assertions ---
+
+on ReturnToService assert ReturnToService.RestoredCondition != "NonFunctional" because "Cannot return a non-functional asset to service"
+
+# --- Transitions ---
+
+# Register asset details in OnOrder state
+from OnOrder on RegisterAsset -> set AssetTag = RegisterAsset.Tag -> set SerialNumber = RegisterAsset.Serial -> set Manufacturer = RegisterAsset.Mfr -> set Model = RegisterAsset.Mdl -> set AssetClass = RegisterAsset.Class -> set AcquisitionCost = RegisterAsset.Cost -> set CurrentValue = RegisterAsset.Cost -> set WarrantyRemaining = RegisterAsset.Warranty -> no transition
+
+# Receive delivery — transitions to inspection holding state
+from OnOrder on ReceiveDelivery -> set Location = ReceiveDelivery.InspectionLocation -> set Condition = ReceiveDelivery.InspectionCondition -> transition Received
+
+# Begin commissioning from received
+from Received on BeginCommissioning -> set Location = BeginCommissioning.InstallLocation -> set Department = BeginCommissioning.Dept -> set CostCenter = BeginCommissioning.Center -> transition Commissioning
+
+# Commission into active service
+from Commissioning on Commission -> transition Active
+
+# Maintenance loop: Active → UnderMaintenance
+from Active on BeginMaintenance -> set WorkOrderId = BeginMaintenance.OrderId -> set MaintenanceCount = MaintenanceCount + 1 -> transition UnderMaintenance
+
+# Complete maintenance: NonFunctional condition routes to OutOfService
+from UnderMaintenance on CompleteMaintenance when CompleteMaintenance.ResultCondition == "NonFunctional" -> set Condition = CompleteMaintenance.ResultCondition -> set AccumulatedMaintenanceCost = AccumulatedMaintenanceCost + CompleteMaintenance.LaborCost + CompleteMaintenance.PartsCost -> set WorkOrderId = null -> transition OutOfService
+
+from UnderMaintenance on CompleteMaintenance -> set Condition = CompleteMaintenance.ResultCondition -> set AccumulatedMaintenanceCost = AccumulatedMaintenanceCost + CompleteMaintenance.LaborCost + CompleteMaintenance.PartsCost -> set WorkOrderId = null -> transition Active
+
+# Pull from service (emergency or hazard)
+from Active on PullFromService -> transition OutOfService
+
+# Return to service after repair
+from OutOfService on ReturnToService -> set Condition = ReturnToService.RestoredCondition -> transition Active
+
+# Decommission gate: cost analysis required if maintenance exceeds 2× acquisition
+from Active on Decommission when AccumulatedMaintenanceCost > AcquisitionCost * 2 and not CostAnalysisOverride -> reject "Accumulated maintenance cost exceeds 2x acquisition cost — set CostAnalysisOverride before decommissioning"
+from Active on Decommission -> set DecommissionReason = Decommission.Reason -> transition Decommissioned
+
+from OutOfService on Decommission when AccumulatedMaintenanceCost > AcquisitionCost * 2 and not CostAnalysisOverride -> reject "Accumulated maintenance cost exceeds 2x acquisition cost — set CostAnalysisOverride before decommissioning"
+from OutOfService on Decommission -> set DecommissionReason = Decommission.Reason -> transition Decommissioned
+
+# Dispose: requires method, note, and final value assessment
+from Decommissioned on Dispose -> set DisposalMethod = Dispose.Method -> set DisposalNote = Dispose.Note -> set CurrentValue = Dispose.FinalValue -> transition Disposed
+
+# Archive the record
+from Disposed on Archive -> transition Archived
+
+# Record depreciation in active service
+from Active on RecordDepreciation -> set CurrentValue = RecordDepreciation.NewValue -> no transition
+
+# Transfer asset to new location and department
+from Active on TransferAsset -> set Location = TransferAsset.NewLocation -> set Department = TransferAsset.NewDepartment -> no transition
