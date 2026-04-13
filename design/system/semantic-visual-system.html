@@ -823,6 +823,7 @@ pre {
   .cg-mini-state-dot-form {
     display: inline-flex;
     align-items: center;
+    flex-direction: row-reverse;
     gap: 8px;
     min-height: 28px;
     color: var(--state);
@@ -1100,19 +1101,6 @@ pre {
     position: absolute;
   }
   .svs-state-node {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    min-height: 28px;
-    padding: 5px 9px;
-    border: 1px solid rgba(168,152,245,0.32);
-    background: #0b0d11;
-    color: var(--state);
-    font-family: var(--mono);
-    font-size: 11px;
-    letter-spacing: 0.04em;
-    line-height: 1;
-    white-space: nowrap;
     transition:
       border-color 140ms ease,
       background-color 140ms ease,
@@ -1120,12 +1108,19 @@ pre {
       color 140ms ease;
     z-index: 2;
   }
-  .svs-state-node-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--structure);
-    flex-shrink: 0;
+  .svs-state-review-stage .cg-mini-state-node {
+    background: #0b0d11;
+  }
+  .svs-state-review-stage .cg-mini-state-node--current {
+    background: linear-gradient(180deg, #4a3a70, #372b54);
+  }
+  .svs-state-review-stage .cg-mini-state-node--not-reachable {
+    background: #0b0d11;
+  }
+  .svs-state-review-stage .cg-mini-state-node--not-reachable-initial {
+    background:
+      repeating-linear-gradient(135deg, rgba(168,152,245,0.08) 0 1px, transparent 1px 7px),
+      #0b0d11;
   }
   .svs-state-node:hover,
   .svs-state-node:focus-visible,
@@ -1134,65 +1129,22 @@ pre {
     border-color: rgba(168,152,245,0.52);
     box-shadow: inset 0 0 0 1px rgba(168,152,245,0.12);
   }
-  .svs-state-node--current {
-    border-color: rgba(168,152,245,0.72);
-    background: linear-gradient(180deg, #4a3a70, #372b54);
-    box-shadow:
-      inset 0 0 0 1px rgba(168,152,245,0.16),
-      0 0 0 1px rgba(168,152,245,0.10);
-  }
-  .svs-state-node--terminal {
-    border-width: 2px;
-    box-shadow: inset 0 0 0 1px rgba(168,152,245,0.14);
-  }
-  .svs-state-node--current.svs-state-node--terminal {
-    box-shadow:
-      inset 0 0 0 1px rgba(168,152,245,0.16),
-      0 0 0 1px rgba(168,152,245,0.10);
-  }
-  .svs-state-node--initial .svs-state-node-dot {
-    width: 6px;
-    height: 6px;
-  }
-  .svs-state-node--unreachable-current {
-    color: rgba(168,152,245,0.54);
-    border-color: rgba(168,152,245,0.22);
-    border-style: dashed;
-    background: #0b0d11;
-  }
-  .svs-state-node--unreachable-initial {
-    color: rgba(168,152,245,0.54);
-    border-color: rgba(168,152,245,0.16);
-    background:
-      repeating-linear-gradient(135deg, rgba(168,152,245,0.08) 0 1px, transparent 1px 7px),
-      #0b0d11;
-  }
-  .svs-state-node--constrained {
-    font-style: italic;
-  }
   .svs-edge-label {
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    color: var(--event);
-    font-family: var(--mono);
-    font-size: 11px;
-    letter-spacing: 0.04em;
-    line-height: 1;
     white-space: nowrap;
     z-index: 3;
   }
-  .svs-edge-token {
-    display: inline-flex;
-    align-items: center;
-    min-height: 28px;
-    padding: 5px 10px;
-    border: 1px solid rgba(48,184,232,0.36);
+  .svs-edge-token.cg-modifier-token {
     background: #050608;
-    color: var(--event);
   }
   .svs-edge-label--muted {
-    opacity: 0.78;
+    opacity: 1;
+  }
+  .svs-edge-label--muted .svs-edge-token {
+    border-color: rgba(48,184,232,0.28);
+    color: #9ddcf0;
   }
   .svs-edge-label--active {
     filter: drop-shadow(0 0 8px rgba(48,184,232,0.10));
@@ -1203,6 +1155,7 @@ pre {
   }
   .svs-edge-label--blocked .svs-edge-token {
     border-style: dashed;
+    background: #050608;
   }
   .cg-mini-badge {
     display: inline-flex;
@@ -1644,7 +1597,7 @@ pre {
 }
 .timeline-history-row {
   display: grid;
-  grid-template-columns: minmax(0,1fr) 44px;
+  grid-template-columns: minmax(0,1fr) 152px;
   align-items: center;
   height: 32px;
   border-bottom: 1px solid var(--line);
@@ -1668,7 +1621,7 @@ pre {
   display: flex;
   justify-content: flex-end;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
   padding: 0 2px 0 10px;
   overflow: hidden;
@@ -1677,12 +1630,92 @@ pre {
   white-space: nowrap;
   text-align: right;
 }
+.timeline-row-copy--approve {
+  transform: translateX(50px);
+}
+.timeline-row-copy--print {
+  transform: translateX(8px);
+}
+.timeline-row-copy--edit {
+  transform: translateX(18px);
+}
+.timeline-row-copy--pickup {
+  transform: translateX(50px);
+}
+.timeline-row-copy--expire {
+  transform: translateX(58px);
+}
 .timeline-row-rail {
+  position: relative;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
   height: 32px;
+  padding-right: 16px;
+  overflow: visible;
+  z-index: 1;
+}
+.timeline-row-rail--field {
+  padding-right: 39px;
 }
 .timeline-row-entry {
   color: var(--event);
   flex-shrink: 0;
+}
+.timeline-state-form,
+.timeline-event-token,
+.timeline-data-token,
+.timeline-authored-event,
+.timeline-field-title {
+  flex-shrink: 0;
+}
+.timeline-authored-event {
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+}
+.timeline-field-title {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.10em;
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--soft);
+}
+.timeline-specimen .timeline-event-token.cg-modifier-token {
+  background: #050608;
+}
+.timeline-specimen .timeline-event-token.cg-modifier-token--event-muted {
+  opacity: 1;
+  border-color: rgba(48,184,232,0.28);
+  color: #9ddcf0;
+}
+.timeline-specimen .timeline-data-token.cg-modifier-token {
+  background: #0d1116;
+}
+.timeline-state-form {
+  gap: 6px;
+}
+.timeline-row-rail .timeline-state-form {
+  position: relative;
+  z-index: 2;
+}
+.timeline-specimen .timeline-state-form .cg-mini-state-dot-glyph {
+  background: var(--panel);
+}
+.timeline-specimen .timeline-state-form.cg-mini-state-dot-form--current .cg-mini-state-dot-glyph {
+  background: var(--state);
+}
+.timeline-specimen .timeline-state-form.cg-mini-state-dot-form--not-reachable .cg-mini-state-dot-glyph {
+  background: #0b0d11;
+}
+.timeline-state-form .cg-mini-state-dot-label {
+  white-space: nowrap;
+}
+.timeline-event-token,
+.timeline-data-token {
+  max-width: 100%;
 }
 .timeline-row-entry--state {
   color: var(--state);
@@ -4486,17 +4519,17 @@ pre {
             <path class="svs-edge-active" data-edge="ready-pickedup" d="M380 186 V212 Q380 226 366 226 H268 Q254 226 254 240 V274" marker-end="url(#svs-s2-arrow-active)"></path>
             <path class="svs-edge-blocked" data-edge="ready-expired" d="M380 186 V212 Q380 226 394 226 H492 Q506 226 506 240 V274" marker-end="url(#svs-s2-arrow-blocked)"></path>
           </svg>
-          <div class="svs-state-node svs-state-node--initial svs-state-node--unreachable-current" data-state="Requested" data-left="236" data-top="22" tabindex="0" style="left:236px; top:22px;"><span class="svs-state-node-dot" aria-hidden="true"></span>Requested</div>
-          <div class="svs-state-node svs-state-node--unreachable-current" data-state="Approved" data-left="236" data-top="98" tabindex="0" style="left:236px; top:98px;">Approved</div>
-          <div class="svs-state-node svs-state-node--current" data-state="ReadyForPickup" data-left="236" data-top="174" tabindex="0" style="left:236px; top:174px;">ReadyForPickup</div>
-          <div class="svs-state-node svs-state-node--terminal svs-state-node--unreachable-current" data-state="Cancelled" data-left="400" data-top="98" tabindex="0" style="left:400px; top:98px;">Cancelled</div>
-          <div class="svs-state-node svs-state-node--terminal" data-state="PickedUp" data-left="150" data-top="250" tabindex="0" style="left:150px; top:250px;">PickedUp</div>
-          <div class="svs-state-node svs-state-node--terminal svs-state-node--unreachable-current" data-state="Expired" data-left="322" data-top="250" tabindex="0" style="left:322px; top:250px;">Expired</div>
-          <span class="svs-edge-label svs-edge-label--muted" data-edge-label="requested-approved"><span class="svs-edge-token">ApproveRequest</span></span>
-          <span class="svs-edge-label svs-edge-label--muted" data-edge-label="approved-ready"><span class="svs-edge-token">PrintBadge</span></span>
-          <span class="svs-edge-label svs-edge-label--muted" data-edge-label="approved-cancelled"><span class="svs-edge-token">Cancel</span></span>
-          <span class="svs-edge-label svs-edge-label--active" data-edge-label="ready-pickedup"><span class="svs-edge-token">PickUp</span></span>
-          <span class="svs-edge-label svs-edge-label--blocked" data-edge-label="ready-expired"><span class="svs-edge-token">Expire</span></span>
+          <div class="svs-state-node cg-mini-state-node cg-mini-state-node--not-reachable cg-mini-state-node--not-reachable-initial" data-state="Requested" data-left="236" data-top="22" tabindex="0" style="left:236px; top:22px;"><span class="cg-mini-state-node-dot" aria-hidden="true"></span>Requested</div>
+          <div class="svs-state-node cg-mini-state-node cg-mini-state-node--not-reachable cg-mini-state-node--not-reachable-current" data-state="Approved" data-left="236" data-top="98" tabindex="0" style="left:236px; top:98px;">Approved</div>
+          <div class="svs-state-node cg-mini-state-node cg-mini-state-node--current" data-state="ReadyForPickup" data-left="236" data-top="174" tabindex="0" style="left:236px; top:174px;">ReadyForPickup</div>
+          <div class="svs-state-node cg-mini-state-node cg-mini-state-node--terminal cg-mini-state-node--not-reachable cg-mini-state-node--not-reachable-current" data-state="Cancelled" data-left="400" data-top="98" tabindex="0" style="left:400px; top:98px;">Cancelled</div>
+          <div class="svs-state-node cg-mini-state-node cg-mini-state-node--terminal" data-state="PickedUp" data-left="150" data-top="250" tabindex="0" style="left:150px; top:250px;">PickedUp</div>
+          <div class="svs-state-node cg-mini-state-node cg-mini-state-node--terminal cg-mini-state-node--not-reachable cg-mini-state-node--not-reachable-current" data-state="Expired" data-left="322" data-top="250" tabindex="0" style="left:322px; top:250px;">Expired</div>
+          <span class="svs-edge-label svs-edge-label--muted" data-edge-label="requested-approved"><span class="svs-edge-token cg-modifier-token cg-modifier-token--event cg-modifier-token--event-muted">ApproveRequest</span></span>
+          <span class="svs-edge-label svs-edge-label--muted" data-edge-label="approved-ready"><span class="svs-edge-token cg-modifier-token cg-modifier-token--event cg-modifier-token--event-muted">PrintBadge</span></span>
+          <span class="svs-edge-label svs-edge-label--muted" data-edge-label="approved-cancelled"><span class="svs-edge-token cg-modifier-token cg-modifier-token--event cg-modifier-token--event-muted">Cancel</span></span>
+          <span class="svs-edge-label svs-edge-label--active" data-edge-label="ready-pickedup"><span class="svs-edge-token cg-modifier-token cg-modifier-token--event">PickUp</span></span>
+          <span class="svs-edge-label svs-edge-label--blocked" data-edge-label="ready-expired"><span class="svs-edge-token cg-modifier-token cg-modifier-token--event cg-modifier-token--dashed cg-modifier-token--italic">Expire</span></span>
         </div>
       </div>
     </div>
@@ -4528,74 +4561,88 @@ pre {
             <line x1="20" y1="144" x2="20" y2="176" stroke="var(--event)" stroke-width="2" stroke-dasharray="4 3" stroke-opacity="0.72"></line>
             <path d="M 20 144 C 20 158, 34 164, 34 178" fill="none" stroke="var(--event)" stroke-width="2" stroke-dasharray="4 3" stroke-opacity="0.44"></path>
             <path d="M 34 178 C 34 192, 20 194, 20 208" fill="none" stroke="var(--event)" stroke-width="2" stroke-dasharray="4 3" stroke-opacity="0.44"></path>
-            <circle cx="20" cy="16" r="7.3" fill="var(--panel)" stroke="var(--state)" stroke-width="1.5"></circle>
-            <circle cx="20" cy="16" r="2.6" fill="var(--state)"></circle>
-            <circle cx="20" cy="48" r="7.3" fill="var(--panel)" stroke="var(--state)" stroke-width="1.5"></circle>
-            <circle cx="20" cy="80" r="7.3" fill="var(--panel)" stroke="var(--state)" stroke-width="1.5"></circle>
-            <circle cx="20" cy="144" r="12.2" fill="none" stroke="rgba(168,152,245,0.28)" stroke-width="1.2"></circle>
-            <circle cx="20" cy="144" r="8.7" fill="var(--state)" stroke="none"></circle>
-            <circle cx="20" cy="176" r="10.8" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="1"></circle>
-            <circle cx="20" cy="176" r="7.3" fill="var(--panel)" stroke="var(--state)" stroke-width="1.5"></circle>
-            <circle cx="20" cy="208" r="10.8" fill="none" stroke="rgba(255,255,255,0.14)" stroke-width="1"></circle>
-            <circle cx="20" cy="208" r="7.3" fill="var(--panel)" stroke="var(--state)" stroke-width="1.5"></circle>
           </svg>
 
           <div class="timeline-history-row timeline-history-row--past">
-            <div class="timeline-row-copy">
-              <span class="timeline-row-entry timeline-row-entry--state">Requested</span>
+            <div class="timeline-row-copy"></div>
+            <div class="timeline-row-rail">
+              <span class="timeline-state-form cg-mini-state-dot-form cg-mini-state-dot-form--initial">
+                <span class="cg-mini-state-dot-glyph" aria-hidden="true"></span>
+                <span class="cg-mini-state-dot-label">Requested</span>
+              </span>
             </div>
-            <div class="timeline-row-rail"></div>
           </div>
 
           <div class="timeline-history-row timeline-history-row--past">
-            <div class="timeline-row-copy">
-              <span class="timeline-row-entry">ApproveRequest</span>
+            <div class="timeline-row-copy timeline-row-copy--approve">
+              <span class="timeline-authored-event ev">ApproveRequest</span>
               <span class="timeline-row-arrow">→</span>
-              <span class="timeline-row-target">Approved</span>
             </div>
-            <div class="timeline-row-rail"></div>
+            <div class="timeline-row-rail">
+              <span class="timeline-state-form cg-mini-state-dot-form">
+                <span class="cg-mini-state-dot-glyph" aria-hidden="true"></span>
+                <span class="cg-mini-state-dot-label">Approved</span>
+              </span>
+            </div>
           </div>
 
           <div class="timeline-history-row timeline-history-row--past">
-            <div class="timeline-row-copy">
-              <span class="timeline-row-entry">PrintBadge</span>
+            <div class="timeline-row-copy timeline-row-copy--print">
+              <span class="timeline-authored-event ev">PrintBadge</span>
               <span class="timeline-row-arrow">→</span>
-              <span class="timeline-row-target">ReadyForPickup</span>
             </div>
-            <div class="timeline-row-rail"></div>
+            <div class="timeline-row-rail">
+              <span class="timeline-state-form cg-mini-state-dot-form">
+                <span class="cg-mini-state-dot-glyph" aria-hidden="true"></span>
+                <span class="cg-mini-state-dot-label">ReadyForPickup</span>
+              </span>
+            </div>
           </div>
 
           <div class="timeline-history-row timeline-history-row--past">
-            <div class="timeline-row-copy">
+            <div class="timeline-row-copy timeline-row-copy--edit">
               <span class="timeline-row-entry timeline-row-entry--edit">edit</span>
-              <span class="timeline-row-entry timeline-row-entry--edit">OutcomeNote</span>
+              <span class="timeline-row-arrow">→</span>
             </div>
-            <div class="timeline-row-rail"></div>
+            <div class="timeline-row-rail timeline-row-rail--field">
+              <span class="timeline-field-title">OutcomeNote</span>
+            </div>
           </div>
 
           <div class="timeline-history-row timeline-history-row--current">
-            <div class="timeline-row-copy">
-              <span class="timeline-row-entry timeline-row-entry--state">ReadyForPickup</span>
+            <div class="timeline-row-copy"></div>
+            <div class="timeline-row-rail">
+              <span class="timeline-state-form cg-mini-state-dot-form cg-mini-state-dot-form--current">
+                <span class="cg-mini-state-dot-glyph" aria-hidden="true"></span>
+                <span class="cg-mini-state-dot-label">ReadyForPickup</span>
+              </span>
             </div>
-            <div class="timeline-row-rail"></div>
           </div>
 
           <div class="timeline-history-row timeline-history-row--future">
-            <div class="timeline-row-copy">
-              <button class="timeline-event-btn" type="button">PickUp</button>
+            <div class="timeline-row-copy timeline-row-copy--pickup">
+              <span class="timeline-event-token cg-modifier-token cg-modifier-token--event">PickUp</span>
               <span class="timeline-row-arrow">→</span>
-              <span class="timeline-row-target">PickedUp</span>
             </div>
-            <div class="timeline-row-rail"></div>
+            <div class="timeline-row-rail">
+              <span class="timeline-state-form cg-mini-state-dot-form cg-mini-state-dot-form--terminal">
+                <span class="cg-mini-state-dot-glyph" aria-hidden="true"></span>
+                <span class="cg-mini-state-dot-label">PickedUp</span>
+              </span>
+            </div>
           </div>
 
           <div class="timeline-history-row timeline-history-row--future timeline-history-row--blocked">
-            <div class="timeline-row-copy">
-              <button class="timeline-event-btn" type="button" disabled>Expire</button>
+            <div class="timeline-row-copy timeline-row-copy--expire">
+              <span class="timeline-event-token cg-modifier-token cg-modifier-token--event cg-modifier-token--dashed cg-modifier-token--italic">Expire</span>
               <span class="timeline-row-arrow">→</span>
-              <span class="timeline-row-target">Expired</span>
             </div>
-            <div class="timeline-row-rail"></div>
+            <div class="timeline-row-rail">
+              <span class="timeline-state-form cg-mini-state-dot-form cg-mini-state-dot-form--terminal cg-mini-state-dot-form--not-reachable cg-mini-state-dot-form--not-reachable-current">
+                <span class="cg-mini-state-dot-glyph" aria-hidden="true"></span>
+                <span class="cg-mini-state-dot-label">Expired</span>
+              </span>
+            </div>
           </div>
         </div>
       </div>
