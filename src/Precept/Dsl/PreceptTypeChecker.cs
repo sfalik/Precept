@@ -1449,7 +1449,8 @@ internal static class PreceptTypeChecker
                     : DiagnosticCatalog.C39;
             message = constraint == DiagnosticCatalog.C60
                 ? DiagnosticCatalog.C60.FormatMessage(("actual", FormatKinds(actualKind)), ("name", expectedLabel))
-                : $"{expectedLabel} type mismatch: expected {FormatKinds(expectedKind)} but expression produces {FormatKinds(actualKind)}.";
+                : TryBuildNumericMismatchMessage(actualKind, expectedKind, expectedLabel)
+                  ?? $"{expectedLabel} type mismatch: expected {FormatKinds(expectedKind)} but expression produces {FormatKinds(actualKind)}.";
         }
 
         expressions.Add(new PreceptTypeExpressionInfo(
@@ -1628,9 +1629,7 @@ internal static class PreceptTypeChecker
                 {
                     diagnostic = new PreceptValidationDiagnostic(
                         DiagnosticCatalog.C79,
-                        DiagnosticCatalog.C79.FormatMessage(
-                            ("thenType", FormatKinds(thenKind)),
-                            ("elseType", FormatKinds(elseKind))),
+                        BuildC79Message(thenKind, elseKind),
                         0);
                     return false;
                 }
@@ -2393,5 +2392,54 @@ internal static class PreceptTypeChecker
         var actualNonNull = actual & ~StaticValueKind.Null;
         return expectedNonNull == StaticValueKind.Integer &&
                (actualNonNull == StaticValueKind.Number || actualNonNull == StaticValueKind.Decimal);
+    }
+
+    /// <summary>
+    /// Returns a numeric-specific author-oriented mismatch message for C39,
+    /// or <see langword="null"/> when the mismatch is not between numeric kinds.
+    /// </summary>
+    private static string? TryBuildNumericMismatchMessage(
+        StaticValueKind actual, StaticValueKind expected, string expectedLabel)
+    {
+        var actualBase   = actual   & ~StaticValueKind.Null;
+        var expectedBase = expected & ~StaticValueKind.Null;
+
+        // decimal → number: intentionally unsupported (would silently discard precision)
+        if (actualBase == StaticValueKind.Decimal && expectedBase == StaticValueKind.Number)
+            return $"{expectedLabel} type mismatch: decimal cannot be assigned to number — " +
+                   "this conversion is intentionally unsupported to prevent silent precision loss. " +
+                   "Change the field type to decimal, or use floor(), ceil(), truncate(), or round() " +
+                   "to drop the fractional part explicitly.";
+
+        // number → decimal: requires explicit authored normalization path
+        if (actualBase == StaticValueKind.Number && expectedBase == StaticValueKind.Decimal)
+            return $"{expectedLabel} type mismatch: number cannot be implicitly assigned to decimal. " +
+                   "Use round(expr, N) to normalize to a specific decimal precision, " +
+                   "or change the field type to number.";
+
+        return null;
+    }
+
+    /// <summary>
+    /// Builds a C79 branch-type-mismatch message, providing numeric widening guidance
+    /// when both branches are numeric kinds that do not unify.
+    /// </summary>
+    private static string BuildC79Message(StaticValueKind thenKind, StaticValueKind elseKind)
+    {
+        var thenBase = thenKind & ~StaticValueKind.Null;
+        var elseBase = elseKind & ~StaticValueKind.Null;
+
+        var bothNumeric = IsNumericKind(thenBase) && IsNumericKind(elseBase);
+        if (bothNumeric)
+            return DiagnosticCatalog.C79.FormatMessage(
+                ("thenType", FormatKinds(thenKind)),
+                ("elseType", FormatKinds(elseKind)),
+                ("hint", "integer widens to both number and decimal, but number and decimal " +
+                         "do not unify with each other. Make both branches the same numeric kind."));
+
+        return DiagnosticCatalog.C79.FormatMessage(
+            ("thenType", FormatKinds(thenKind)),
+            ("elseType", FormatKinds(elseKind)),
+            ("hint", "Make both branches the same scalar type."));
     }
 }

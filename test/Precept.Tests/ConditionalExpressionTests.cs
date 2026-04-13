@@ -387,6 +387,30 @@ public class ConditionalExpressionTests
         result.Diagnostics[0].Constraint.Id.Should().Be("C79");
     }
 
+    [Fact]
+    public void TypeCheck_NumberVsDecimal_C79MessageExplainsWideningRules()
+    {
+        // C79 for number ↔ decimal should explain that integer widens to both but they don't unify.
+        const string dsl = """
+            precept Test
+            field X as number default 0
+            field Y as decimal default 0
+            field Flag as boolean default true
+            field Result as number default 0
+            state A initial
+            event Go
+            from A on Go -> set Result = if Flag then X else Y -> no transition
+            """;
+
+        var result = PreceptTypeChecker.Check(PreceptParser.Parse(dsl));
+        var c79 = result.Diagnostics.Should().ContainSingle()
+            .Which;
+        c79.Constraint.Id.Should().Be("C79");
+        c79.Message.Should().Contain("integer");
+        c79.Message.Should().Contain("number");
+        c79.Message.Should().Contain("decimal");
+    }
+
     // ════════════════════════════════════════════════════════════════════
     // Runtime Tests (end-to-end with PreceptEngine)
     // ════════════════════════════════════════════════════════════════════

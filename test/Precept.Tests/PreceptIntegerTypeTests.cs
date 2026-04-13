@@ -248,7 +248,8 @@ public class PreceptIntegerTypeTests
         result.Diagnostics.Should().ContainSingle();
         result.Diagnostics[0].Constraint.Id.Should().Be("C60");
         result.Diagnostics[0].DiagnosticCode.Should().Be("PRECEPT060");
-        result.Diagnostics[0].Message.Should().Contain("explicit conversion");
+        result.Diagnostics[0].Message.Should().Contain("floor()");
+        result.Diagnostics[0].Message.Should().Contain("integer");
     }
 
     [Fact]

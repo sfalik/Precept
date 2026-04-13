@@ -1182,7 +1182,7 @@ set Note = if Score >= 90 then "excellent" else if Score >= 70 then "good" else 
 | Code | Condition | Message |
 |---|---|---|
 | C78 | Condition is not a non-nullable boolean | `Conditional expression condition must be a non-nullable boolean, but got {actual}.` |
-| C79 | Branch types incompatible | `Conditional expression branches must produce the same scalar type, but got {thenType} and {elseType}.` Integer widens to number/decimal; number ↔ decimal is a hard error. |
+| C79 | Branch types incompatible | `Conditional expression branches produce incompatible types: {thenType} and {elseType}. {hint}` For numeric kinds: integer widens to both number and decimal, but number and decimal do not unify with each other. |
 
 ### Examples
 
@@ -1545,10 +1545,10 @@ Type checking for `from any` rows expands to per-state checking. Each state may 
 | C41 / PRECEPT041 | Binary operator type error (includes `contains` RHS mismatch) |
 | C42 / PRECEPT042 | Null-flow violation (assigning `T\|null` to `T` without narrowing) |
 | C43 / PRECEPT043 | Collection `pop`/`dequeue into` target type mismatch |
-| C60 / PRECEPT060 | Narrowing assignment: assigning a `number` or `decimal` value to an `integer` field requires an explicit integer-producing expression (no implicit truncation) |
+| C60 / PRECEPT060 | Narrowing assignment: `number` or `decimal` cannot be implicitly narrowed to `integer`. Use `floor()`, `ceil()`, `truncate()`, or `round()` to produce an explicit integer value. |
 | C69 / PRECEPT069 | Cross-scope guard reference in `when` clause |
 | C78 / PRECEPT078 | Conditional expression condition must be a non-nullable boolean |
-| C79 / PRECEPT079 | Conditional expression branches must produce the same scalar type |
+| C79 / PRECEPT079 | Conditional expression branches produce incompatible types. For numeric mismatches: explains that integer widens to both number and decimal, but number and decimal do not unify. |
 
 ### Design principle
 

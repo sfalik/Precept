@@ -536,7 +536,7 @@ public class CatalogDriftTests
         ["C59"] = new(H + "field Amount as number default 0 positive\n" + S, "violates constraint"),
 
         // C60: Narrowing assignment — assigning a number literal (3.0) to an integer field
-        ["C60"] = new(H + "field Count as integer default 0\n" + S2 + "event Go\nfrom A on Go -> set Count = 3.0 -> no transition\n", "explicit conversion"),
+        ["C60"] = new(H + "field Count as integer default 0\n" + S2 + "event Go\nfrom A on Go -> set Count = 3.0 -> no transition\n", "floor()"),
 
         // C61: maxplaces constraint on non-decimal field — constructed directly (maxplaces not yet a keyword)
         ["C61"] = new("_unused_", "decimal fields", DirectAction: () =>
