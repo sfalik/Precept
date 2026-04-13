@@ -12,6 +12,9 @@
   --bg: #040506;
   --panel: #090b0e;
   --panel-2: #0d1014;
+  --support-disabled-surface: #0d1014;
+  --support-disabled-controls: #1f2a39;
+  --support-disabled-text: rgba(158,171,190,0.42);
   --line: rgba(255,255,255,0.08);
   --line-strong: rgba(255,255,255,0.16);
   --text: #f1f3f6;
@@ -58,8 +61,7 @@ body {
   margin: 0 0 28px;
   padding: 12px 16px;
   border: 1px solid var(--line-strong);
-  background: linear-gradient(180deg, rgba(13,16,20,0.92), rgba(9,11,14,0.9));
-  backdrop-filter: blur(18px);
+  background: var(--panel-2);
 }
 .section-rail-links {
   display: flex;
@@ -570,6 +572,19 @@ pre {
 }
 .cg-mini-transition-line--dashed::before {
   border-top-style: dashed;
+  border-top-color: var(--support-disabled-controls);
+}
+.cg-mini-transition-line--dashed::after {
+  border-left-color: var(--support-disabled-controls);
+}
+.cg-mini-transition-line--disabled {
+  opacity: 0.5;
+}
+.cg-mini-transition-line--disabled::before {
+  border-top-color: var(--support-disabled-controls);
+}
+.cg-mini-transition-line--disabled::after {
+  border-left-color: var(--support-disabled-controls);
 }
 .cg-mini-transition-line--blocked::before {
   border-top-style: dashed;
@@ -683,6 +698,12 @@ pre {
 .cg-modifier-token--event {
   --modifier-border: rgba(48,184,232,0.35);
   --modifier-text: var(--event);
+}
+.cg-modifier-token--event-dim-text {
+  --modifier-border: var(--support-disabled-controls);
+  --modifier-bg: var(--support-disabled-surface);
+  --modifier-text: var(--support-disabled-text);
+  border-style: dashed;
 }
 .cg-modifier-token--event-muted {
   --modifier-border: rgba(48,184,232,0.2);
@@ -1183,9 +1204,8 @@ pre {
     stroke: rgba(48,184,232,0.96);
     stroke-width: 2.5;
   }
-  .svs-state-review-stage .svs-edge-blocked {
-    stroke: rgba(48,184,232,0.64);
-    stroke-dasharray: 4 4;
+  .svs-state-review-stage .svs-edge-constraint-blocked {
+    stroke: rgba(255,255,255,0.22);
   }
   .svs-state-node,
   .svs-edge-label {
@@ -1257,9 +1277,11 @@ pre {
     border-color: rgba(48,184,232,0.48);
     box-shadow: 0 0 0 1px rgba(48,184,232,0.14);
   }
-  .svs-edge-label--blocked .svs-edge-token {
-    border-style: dashed;
-    background: #050608;
+  .svs-edge-label--constraint-blocked .svs-edge-token {
+    border-color: var(--support-disabled-controls);
+    background: var(--support-disabled-surface);
+    color: var(--support-disabled-text);
+    box-shadow: none;
   }
   .cg-mini-badge {
     display: inline-flex;
@@ -1663,6 +1685,12 @@ pre {
   opacity: 0.5;
   cursor: default;
 }
+.evt-btn--constraint-blocked[disabled] {
+  border-color: var(--support-disabled-controls);
+  background: var(--support-disabled-surface);
+  color: var(--support-disabled-text);
+  opacity: 1;
+}
 .timeline-specimen {
   display: block;
   width: fit-content;
@@ -1721,8 +1749,8 @@ pre {
 .timeline-history-row--future .timeline-row-target {
   opacity: 0.76;
 }
-.timeline-history-row--blocked .timeline-row-entry,
-.timeline-history-row--blocked .timeline-row-target {
+.timeline-history-row--constraint-blocked .timeline-row-entry,
+.timeline-history-row--constraint-blocked .timeline-row-target {
   opacity: 0.56;
 }
 .timeline-row-copy {
@@ -1804,10 +1832,20 @@ pre {
   opacity: 1;
   border-color: rgba(48,184,232,0.28);
 }
+.timeline-specimen .timeline-event-token.cg-modifier-token.cg-modifier-token--event-dim-text {
+  border-color: var(--support-disabled-controls);
+  background: var(--support-disabled-surface);
+  color: var(--support-disabled-text);
+}
 .timeline-graph .timeline-path--not-callable-current {
   stroke: var(--event);
   stroke-width: 1.5;
   stroke-opacity: 1;
+}
+.timeline-graph .timeline-path--constraint-blocked {
+  stroke: rgba(255,255,255,0.22);
+  stroke-width: 2;
+  stroke-opacity: 0.78;
 }
 .timeline-specimen .timeline-data-token.cg-modifier-token {
   background: #0d1116;
@@ -1868,7 +1906,7 @@ pre {
   white-space: nowrap;
   cursor: default;
 }
-.timeline-history-row--blocked .timeline-event-btn {
+.timeline-history-row--constraint-blocked .timeline-event-btn {
   border-style: dashed;
   border-color: rgba(48,184,232,0.24);
   background:
@@ -3546,7 +3584,7 @@ pre {
   width: 34px;
   height: 14px;
   border-radius: 999px;
-  border: 1px solid rgba(255,255,255,0.12);
+  border: 1px solid var(--swatch-border, rgba(255,255,255,0.12));
   background: var(--swatch, var(--line));
 }
 .support-token-name,
@@ -3809,7 +3847,8 @@ pre {
         <div class="color-lane">
           <div class="color-lane-label">Scaffolding</div>
           <h3>Scaffolding</h3>
-          <p>Canvas, panels, text, and dividers hold the surface together. Their palette is complementary infrastructure, not semantic meaning.</p>
+          <p>Scaffolding backgrounds resolve to three flat roles: Canvas, Panel, and Raised Panel. <strong>Disabled Controls</strong> sits beside that ladder as the cooler, dimmer neutral tone for unavailable controls and rows. Text and dividers remain separate support tones. Use solid fills only in the background ladder; gradients belong to semantic constructs and specimen treatments, not scaffolding.</p>
+          <p>Scaffolding backgrounds resolve to three flat roles: Canvas, Panel, and Raised Panel. <strong>Disabled controls</strong> split into a darker border-and-path tone plus a cooler gray text tone for unavailable controls and rows. Text and dividers remain separate support tones. Use solid fills only in the background ladder; gradients belong to semantic constructs and specimen treatments, not scaffolding.</p>
           <div class="support-token-stack" aria-label="Scaffolding layer">
             <div class="support-token">
               <span class="support-token-swatch" style="--swatch:var(--bg)"></span>
@@ -3820,6 +3859,22 @@ pre {
               <span class="support-token-swatch" style="--swatch:var(--panel)"></span>
               <span class="support-token-name">Panel</span>
               <span class="support-token-value">#090B0E</span>
+            </div>
+            <div class="support-token">
+              <span class="support-token-swatch" style="--swatch:var(--panel-2)"></span>
+              <span class="support-token-name">Raised Panel</span>
+              <span class="support-token-value">#0D1014</span>
+            </div>
+            <div class="support-token">
+              <span class="support-token-swatch" style="--swatch:var(--support-disabled-controls);--swatch-border:var(--support-disabled-controls)"></span>
+              <span class="support-token-name">Disabled Controls</span>
+              <span class="support-token-name">Disabled Borders / Paths</span>
+              <span class="support-token-value">#1F2A39</span>
+            </div>
+            <div class="support-token">
+              <span class="support-token-swatch" style="--swatch:var(--support-disabled-text);--swatch-border:rgba(158,171,190,0.18)"></span>
+              <span class="support-token-name">Disabled Text</span>
+              <span class="support-token-value">rgba(158,171,190,0.42)</span>
             </div>
             <div class="support-token">
               <span class="support-token-swatch" style="--swatch:var(--muted)"></span>
@@ -4410,8 +4465,8 @@ pre {
           <div class="cg-channel cg-channel--modifier"><div class="cg-channel-name">No state change</div><div class="cg-channel-body"><div class="cg-modifier-compare"><div class="cg-modifier-compare-row"><span class="cg-modifier-note">Mark</span><div class="cg-modifier-stack"><span class="cg-modifier-token cg-modifier-token--event cg-modifier-token--event-muted">Refresh</span></div></div><div class="cg-modifier-compare-row"><span class="cg-modifier-note">Transition</span><div class="cg-mini-flow"></div></div></div><p class="cg-channel-caption">Muted mark shows a callable event that leaves the state unchanged.</p></div></div>
           <div class="cg-channel cg-channel--modifier"><div class="cg-channel-name">Not callable from current state</div><div class="cg-channel-body"><div class="cg-modifier-compare"><div class="cg-modifier-compare-row"><span class="cg-modifier-note">Mark</span><div class="cg-modifier-stack"><span class="cg-modifier-token cg-modifier-token--event cg-modifier-token--event-not-callable-current">ApproveRequest</span></div></div><div class="cg-modifier-compare-row"><span class="cg-modifier-note">Transition</span><div class="cg-mini-flow"><span class="cg-mini-transition-line cg-mini-transition-line--not-callable-current"></span></div></div></div><p class="cg-channel-caption">Unboxed cyan mark and thinner path show an event that exists in the lifecycle but is outside the current state's callable set.</p></div></div>
           <div class="cg-channel cg-channel--modifier"><div class="cg-channel-name">Rejected</div><div class="cg-channel-body"><div class="cg-modifier-compare"><div class="cg-modifier-compare-row"><span class="cg-modifier-note">Mark</span><div class="cg-modifier-stack"><span class="cg-modifier-token cg-modifier-token--event cg-modifier-token--violated cg-modifier-token--dashed">Close</span></div></div><div class="cg-modifier-compare-row"><span class="cg-modifier-note">Transition</span><div class="cg-mini-flow"><span class="cg-mini-transition-line cg-mini-transition-line--blocked"></span></div></div></div><p class="cg-channel-caption">Blocked path marks a rejected event.</p></div></div>
-          <div class="cg-channel cg-channel--modifier"><div class="cg-channel-name">Blocked by constraint</div><div class="cg-channel-body"><div class="cg-modifier-compare"><div class="cg-modifier-compare-row"><span class="cg-modifier-note">Mark</span><div class="cg-modifier-stack"><span class="cg-modifier-token cg-modifier-token--event cg-modifier-token--dashed cg-modifier-token--italic">Close</span></div></div><div class="cg-modifier-compare-row"><span class="cg-modifier-note">Transition</span><div class="cg-mini-flow"><span class="cg-mini-transition-line cg-mini-transition-line--dashed"></span></div></div></div><p class="cg-channel-caption">Dashed path and italic mark indicate an event blocked by constraint.</p></div></div>
-          <div class="cg-channel cg-channel--modifier"><div class="cg-channel-name">Unmatched</div><div class="cg-channel-body"><div class="cg-modifier-compare"><div class="cg-modifier-compare-row"><span class="cg-modifier-note">Mark</span><div class="cg-modifier-stack"><span class="cg-modifier-token cg-modifier-token--event cg-modifier-token--outline-dashed">Close</span></div></div><div class="cg-modifier-compare-row"><span class="cg-modifier-note">Transition</span><div class="cg-mini-flow"><span class="cg-mini-transition-line cg-mini-transition-line--dashed"></span></div></div></div><p class="cg-channel-caption">Dashed outline and path show an unmatched event.</p></div></div>
+          <div class="cg-channel cg-channel--modifier"><div class="cg-channel-name">Blocked by constraint</div><div class="cg-channel-body"><div class="cg-modifier-compare"><div class="cg-modifier-compare-row"><span class="cg-modifier-note">Mark</span><div class="cg-modifier-stack"><span class="cg-modifier-token cg-modifier-token--event cg-modifier-token--event-dim-text">Close</span></div></div><div class="cg-modifier-compare-row"><span class="cg-modifier-note">Transition</span><div class="cg-mini-flow"><span class="cg-mini-transition-line cg-mini-transition-line--disabled"></span></div></div></div><p class="cg-channel-caption">Softened neutral mark and a neutral path show an event that exists here but is not currently fireable because a constraint still fails.</p></div></div>
+          <div class="cg-channel cg-channel--modifier"><div class="cg-channel-name">Unmatched</div><div class="cg-channel-body"><div class="cg-modifier-compare"><div class="cg-modifier-compare-row"><span class="cg-modifier-note">Mark</span><div class="cg-modifier-stack"><span class="cg-modifier-token cg-modifier-token--event cg-modifier-token--event-dim-text cg-modifier-token--outline-dashed">Close</span></div></div><div class="cg-modifier-compare-row"><span class="cg-modifier-note">Transition</span><div class="cg-mini-flow"><span class="cg-mini-transition-line cg-mini-transition-line--dashed"></span></div></div></div><p class="cg-channel-caption">Softened neutral mark with a dashed outline and a dashed path show an unmatched event.</p></div></div>
         </div>
       </div>
 
@@ -4734,18 +4789,18 @@ pre {
     <div class="surface-specimen">
       <div class="cg-state-diagram">
         <div class="svs-state-review-stage" id="surface02-state-diagram-stage" aria-label="Runtime state diagram for VisitorBadgePickup">
-          <svg viewBox="0 0 760 362" role="img" aria-label="Vertical runtime graph: ReadyForPickup is current, PickUp is active, Expire is blocked">
+          <svg viewBox="0 0 760 362" role="img" aria-label="Vertical runtime graph: ReadyForPickup is current, PickUp is active, Expire is blocked by constraint">
             <defs>
               <marker id="svs-s2-arrow-past" viewBox="0 0 12 10" markerWidth="12" markerHeight="10" refX="10" refY="5" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M1 1 L10 5 L1 9 L3.6 5 Z" fill="rgba(48,184,232,0.38)"></path></marker>
               <marker id="svs-s2-arrow-not-callable-current" viewBox="0 0 12 10" markerWidth="12" markerHeight="10" refX="10" refY="5" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M1 1 L10 5 L1 9 L3.6 5 Z" fill="#30B8E8"></path></marker>
-              <marker id="svs-s2-arrow-blocked" viewBox="0 0 12 10" markerWidth="12" markerHeight="10" refX="10" refY="5" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M1 1 L10 5 L1 9 L3.6 5 Z" fill="rgba(48,184,232,0.64)"></path></marker>
+              <marker id="svs-s2-arrow-constraint-blocked" viewBox="0 0 12 10" markerWidth="12" markerHeight="10" refX="10" refY="5" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M1 1 L10 5 L1 9 L3.6 5 Z" fill="rgba(255,255,255,0.22)"></path></marker>
               <marker id="svs-s2-arrow-active" viewBox="0 0 12 10" markerWidth="12" markerHeight="10" refX="10" refY="5" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M1 1 L10 5 L1 9 L3.6 5 Z" fill="rgba(48,184,232,0.96)"></path></marker>
             </defs>
             <path class="svs-edge-past svs-edge-not-callable-current" data-edge="requested-approved" d="M380 34 V102" marker-end="url(#svs-s2-arrow-not-callable-current)"></path>
             <path class="svs-edge-past svs-edge-not-callable-current" data-edge="approved-ready" d="M380 102 V170" marker-end="url(#svs-s2-arrow-not-callable-current)"></path>
             <path class="svs-edge-past svs-edge-not-callable-current" data-edge="approved-cancelled" d="M454 102 H468" marker-end="url(#svs-s2-arrow-not-callable-current)"></path>
                 <path class="svs-edge-active" data-edge="ready-pickedup" d="M380 170 V203 Q380 216 366 216 H298 Q284 216 284 229 V262" marker-end="url(#svs-s2-arrow-active)"></path>
-                <path class="svs-edge-blocked" data-edge="ready-expired" d="M380 170 V203 Q380 216 394 216 H462 Q476 216 476 229 V262" marker-end="url(#svs-s2-arrow-blocked)"></path>
+                <path class="svs-edge-constraint-blocked" data-edge="ready-expired" d="M380 170 V203 Q380 216 394 216 H462 Q476 216 476 229 V262" marker-end="url(#svs-s2-arrow-constraint-blocked)"></path>
           </svg>
           <div class="svs-state-node cg-mini-state-node cg-mini-state-node--not-reachable cg-mini-state-node--not-reachable-initial" data-state="Requested" data-left="236" data-top="22" tabindex="0" style="left:236px; top:22px;"><span class="cg-mini-state-node-dot" aria-hidden="true"></span>Requested</div>
           <div class="svs-state-node cg-mini-state-node cg-mini-state-node--not-reachable cg-mini-state-node--not-reachable-current" data-state="Approved" data-left="236" data-top="90" tabindex="0" style="left:236px; top:90px;">Approved</div>
@@ -4757,7 +4812,7 @@ pre {
           <span class="svs-edge-label svs-edge-label--not-callable-current" data-edge-label="approved-ready"><span class="svs-edge-token cg-modifier-token cg-modifier-token--event cg-modifier-token--event-not-callable-current">PrintBadge</span></span>
           <span class="svs-edge-label svs-edge-label--not-callable-current" data-edge-label="approved-cancelled"><span class="svs-edge-token cg-modifier-token cg-modifier-token--event cg-modifier-token--event-not-callable-current">Cancel</span></span>
           <span class="svs-edge-label svs-edge-label--active" data-edge-label="ready-pickedup"><span class="svs-edge-token cg-modifier-token cg-modifier-token--event">PickUp</span></span>
-          <span class="svs-edge-label svs-edge-label--blocked" data-edge-label="ready-expired"><span class="svs-edge-token cg-modifier-token cg-modifier-token--event cg-modifier-token--dashed cg-modifier-token--italic">Expire</span></span>
+          <span class="svs-edge-label svs-edge-label--constraint-blocked" data-edge-label="ready-expired"><span class="svs-edge-token cg-modifier-token cg-modifier-token--event cg-modifier-token--event-dim-text">Expire</span></span>
         </div>
       </div>
     </div>
@@ -4787,8 +4842,8 @@ pre {
             <line class="timeline-path--not-callable-current" x1="20" y1="48" x2="20" y2="80" stroke="var(--event)" stroke-width="2"></line>
             <line x1="20" y1="80" x2="20" y2="144" stroke="var(--soft)" stroke-width="2" stroke-opacity="0.72"></line>
             <line x1="20" y1="144" x2="20" y2="180" stroke="var(--event)" stroke-width="2" stroke-dasharray="4 3" stroke-opacity="0.72"></line>
-            <path d="M 20 144 C 20 160, 34 168, 34 182" fill="none" stroke="var(--event)" stroke-width="2" stroke-dasharray="4 3" stroke-opacity="0.44"></path>
-            <path d="M 34 182 C 34 198, 20 206, 20 220" fill="none" stroke="var(--event)" stroke-width="2" stroke-dasharray="4 3" stroke-opacity="0.44"></path>
+            <path class="timeline-path--constraint-blocked" d="M 20 144 C 20 160, 34 168, 34 182" fill="none"></path>
+            <path class="timeline-path--constraint-blocked" d="M 34 182 C 34 198, 20 206, 20 220" fill="none"></path>
           </svg>
 
           <div class="timeline-history-row timeline-history-row--past">
@@ -4860,9 +4915,9 @@ pre {
             </div>
           </div>
 
-          <div class="timeline-history-row timeline-history-row--future timeline-history-row--blocked timeline-history-row--expire">
+          <div class="timeline-history-row timeline-history-row--future timeline-history-row--constraint-blocked timeline-history-row--expire">
             <div class="timeline-row-copy timeline-row-copy--expire">
-              <span class="timeline-event-token cg-modifier-token cg-modifier-token--event cg-modifier-token--dashed cg-modifier-token--italic">Expire</span>
+              <span class="timeline-event-token cg-modifier-token cg-modifier-token--event cg-modifier-token--event-dim-text">Expire</span>
               <span class="timeline-row-arrow">→</span>
             </div>
             <div class="timeline-row-rail">
@@ -4894,7 +4949,7 @@ pre {
       <div class="panel-inner">
         <div style="margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center">
           <span style="font-family:var(--mono);font-size:10px;letter-spacing:0.06em;color:var(--soft)">VisitorBadgePickup</span>
-          <span style="font-family:var(--mono);font-size:11px;color:var(--state);border:1px solid rgba(168,152,245,0.35);padding:3px 9px"><em>ReadyForPickup</em></span>
+          <span class="cg-modifier-token cg-modifier-token--state cg-modifier-token--state-current">ReadyForPickup</span>
         </div>
         <div class="form-row"><span class="form-lbl">VisitorName</span><span class="form-locked-val">"Ada Reyes"</span></div>
         <div class="form-row form-row--constrained"><span class="form-lbl">HostConfirmed</span><span class="form-locked-val dv">true</span></div>
@@ -4908,7 +4963,7 @@ pre {
           </div>
           <div style="display:flex;gap:8px">
             <button class="evt-btn">PickUp</button>
-            <button class="evt-btn" disabled title="Blocked — PickupWindowOpen == false required">Expire</button>
+            <button class="evt-btn evt-btn--constraint-blocked" disabled title="Blocked by constraint — PickupWindowOpen must be false">Expire</button>
           </div>
         </div>
       </div>
@@ -5029,14 +5084,14 @@ pre {
           </div>
 
           <div class="cg-channel cg-channel--modifier">
-            <div class="cg-channel-name">Disabled</div>
+            <div class="cg-channel-name">Blocked by constraint</div>
             <div class="cg-channel-body">
               <div class="cg-modifier-stack">
                 <div class="form-state-specimen" style="flex-direction:row;gap:6px;align-items:center">
-                  <button class="evt-btn" disabled>Expire</button>
+                  <button class="evt-btn evt-btn--constraint-blocked" disabled>Expire</button>
                 </div>
               </div>
-              <p class="cg-channel-caption">Event exists but its guard fails or the transition is not available from the current state. Mark is muted and non-interactive.</p>
+              <p class="cg-channel-caption">Event is authored from the current state, but the current data still fails its constraint. Mark softens to the neutral blocked-by-constraint treatment and remains non-interactive.</p>
             </div>
           </div>
 
@@ -5888,11 +5943,12 @@ pre.doc-code-body {
   <!-- Chrome support layer -->
   <div class="cov-zone-hdr" id="docs-chrome" style="border:1px solid var(--line-strong);border-bottom:none;margin-top:32px">
     <span class="cov-z-label">Chrome / Support Layer</span>
-    <span class="cov-z-note">separate support layer for text, surfaces, and line scaffolding</span>
+    <span class="cov-z-note">separate support layer for flat backgrounds, text, and line scaffolding</span>
   </div>
   <div style="padding:18px 20px;border:1px solid var(--line-strong);border-top:none;background:var(--panel)">
-    <p>This is not a sixth semantic color. It is the support layer that holds the reading environment together: canvas, panels, prose tone, and dividers. Because it does not encode construct meaning, the chrome palette can be tuned to complement the semantic system and the needs of a given surface without competing with Precept's authored meaning.</p>
+    <p>This is not a sixth semantic color. It is the support layer that holds the reading environment together: a flat background ladder of <strong>Canvas</strong>, <strong>Panel</strong>, and <strong>Raised Panel</strong>, plus prose tone, dividers, and a separate <strong>Disabled Controls</strong> neutral for unavailable controls and rows. Because it does not encode construct meaning, the chrome palette can be tuned to complement the semantic system and the needs of a given surface without competing with Precept's authored meaning. Keep these backgrounds as solid fills, not gradients.</p>
   </div>
+    <p>This is not a sixth semantic color. It is the support layer that holds the reading environment together: a flat background ladder of <strong>Canvas</strong>, <strong>Panel</strong>, and <strong>Raised Panel</strong>, plus prose tone, dividers, a darker disabled-control border tone, and a cooler disabled-text tone for unavailable controls and rows. Because it does not encode construct meaning, the chrome palette can be tuned to complement the semantic system and the needs of a given surface without competing with Precept's authored meaning. Keep these backgrounds as solid fills, not gradients.</p>
   <div class="doc-tokens">
     <div class="doc-token" style="background:var(--panel-2)">
       <span class="doc-token-name">--text</span>
@@ -5918,17 +5974,33 @@ pre.doc-code-body {
     <div class="doc-token" style="background:var(--bg);border:1px solid var(--line)">
       <span class="doc-token-name">--bg</span>
       <span class="doc-token-value" style="color:var(--muted)">#040506</span>
-      <span class="doc-token-role">Base canvas</span>
+      <span class="doc-token-role">Canvas background</span>
     </div>
     <div class="doc-token" style="background:var(--panel)">
       <span class="doc-token-name">--panel</span>
       <span class="doc-token-value" style="color:var(--muted)">#090b0e</span>
-      <span class="doc-token-role">Cards &amp; inset blocks</span>
+      <span class="doc-token-role">Primary panels &amp; inset blocks</span>
     </div>
     <div class="doc-token" style="background:var(--panel-2)">
       <span class="doc-token-name">--panel-2</span>
       <span class="doc-token-value" style="color:var(--muted)">#0d1014</span>
-      <span class="doc-token-role">Elevated cells &amp; specimens</span>
+      <span class="doc-token-role">Raised panels, sticky rails &amp; specimen cells</span>
+    </div>
+    <div class="doc-token" style="background:var(--support-disabled-surface)">
+      <span class="doc-token-name">--support-disabled-surface</span>
+      <span class="doc-token-value" style="color:var(--muted)">#0d1014</span>
+      <span class="doc-token-role">Disabled-control fill on unavailable controls &amp; rows</span>
+    </div>
+    <div class="doc-token" style="background:var(--panel-2);border:1px solid var(--support-disabled-controls)">
+      <span class="doc-token-name">--support-disabled-controls</span>
+      <span class="doc-token-value" style="color:var(--support-disabled-controls)">#1F2A39</span>
+      <span class="doc-token-role">Disabled control border, divider, and path tone</span>
+      <div style="margin-top:10px;height:1px;background:var(--support-disabled-controls)"></div>
+    </div>
+    <div class="doc-token" style="background:var(--panel-2)">
+      <span class="doc-token-name">--support-disabled-text</span>
+      <span class="doc-token-value" style="color:var(--support-disabled-text)">rgba(158,171,190,0.42)</span>
+      <span class="doc-token-role">Disabled control labels and blocked event text</span>
     </div>
     <div class="doc-token" style="background:var(--panel-2)">
       <span class="doc-token-name">--line-strong</span>
