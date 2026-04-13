@@ -1,0 +1,62 @@
+precept FailureCodeCatalog
+
+# Shape: E1 stateless reference data — failure code catalog
+#
+# A stateless data-only precept representing an equipment failure code entry.
+# No lifecycle states or events — this precept governs what a valid failure
+# code record looks like at all times, and which fields the host application
+# can edit.
+#
+# Companion precepts (maintenance-work-order, asset-record-lifecycle) reference
+# failure codes from this catalog. The catalog enforces structural validity,
+# severity-shutdown consistency, and response-priority constraints.
+#
+# FUTURE(date): CreatedDate, LastReviewedDate, SunsetDate
+# FUTURE(duration): MeanTimeBetweenFailures (currently integer hours)
+
+# ── Core identity ────────────────────────────────────────────────────
+
+field Code as string nullable notempty maxlength 10
+field Description as string nullable notempty maxlength 200
+field IsActive as boolean default false
+
+# ── Classification ───────────────────────────────────────────────────
+
+field Category as choice("Mechanical", "Electrical", "Structural", "Environmental", "Software", "Hydraulic", "Pneumatic") default "Mechanical"
+field Severity as choice("Critical", "Major", "Minor", "Cosmetic") default "Minor"
+field AssetClass as choice("Equipment", "Vehicle", "ITHardware", "Furniture", "Building", "Infrastructure") default "Equipment"
+field FailureMode as choice("Wear", "Fatigue", "Corrosion", "Overload", "Contamination", "Misalignment", "ElectricalFault", "SoftwareBug") default "Wear"
+field ResponsePriority as choice("Immediate", "Urgent", "Scheduled", "Deferred") default "Scheduled"
+
+# ── Operational flags ────────────────────────────────────────────────
+
+field RequiresShutdown as boolean default false
+field RequiresInspection as boolean default false
+
+# ── Numeric estimates ────────────────────────────────────────────────
+
+field MeanTimeBetweenFailures as integer default 0 nonnegative
+field EstimatedRepairHours as integer default 1 positive
+field MinSkillLevel as integer default 1 min 1 max 5
+
+field EstimatedRepairCost as decimal default 0 nonnegative
+field PartsCostEstimate as decimal default 0 nonnegative
+
+# ── Computed fields ──────────────────────────────────────────────────
+
+field TotalEstimatedCost as decimal -> EstimatedRepairCost + PartsCostEstimate
+field IsCriticalFailure as boolean -> Severity == "Critical" or RequiresShutdown
+field RequiresSpecialist as boolean -> MinSkillLevel >= 4
+
+# ── Invariants ───────────────────────────────────────────────────────
+
+invariant Severity != "Critical" or RequiresShutdown because "Critical severity must require equipment shutdown"
+invariant ResponsePriority != "Immediate" or Severity == "Critical" or Severity == "Major" because "Immediate response priority requires Critical or Major severity"
+invariant IsActive == false or Description != null and Description.length > 10 because "Active failure codes must have a description longer than 10 characters"
+
+# ── Editability ──────────────────────────────────────────────────────
+# NOTE: In a stateful variant, Code would be guarded by IsActive == false
+# and Severity changes would require RequiresInspection to be rechecked.
+# Stateless precepts do not support conditional edit guards.
+
+edit Code, Description, IsActive, Category, Severity, AssetClass, FailureMode, ResponsePriority, RequiresShutdown, RequiresInspection, MeanTimeBetweenFailures, EstimatedRepairHours, MinSkillLevel, EstimatedRepairCost, PartsCostEstimate
