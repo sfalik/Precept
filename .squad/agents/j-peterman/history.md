@@ -12,6 +12,34 @@
 - Changes: removed explanatory hedge, removed copyable DSL code block, replaced markdown image syntax with fixed-width HTML img tag (`width="600"`).
 - Decision reinforced: Rendered contract image is the hero artifact; declutter Quick Example by trusting design.
 - Full orchestration recorded in `.squad/decisions.md` and PR merged to main with team collaboration.
+### 2026-04-08 - Sample-realism organization map recorded
+- Team update (2026-04-08T02:31:54Z): Scribe logged Peterman's research-organization pass, merged the resulting decision into .squad/decisions.md, and cleared the related inbox note.
+- Shared outcome: docs/research/sample-realism/README.md now classifies the research corpus, separates dual-citizenship philosophy findings from sample-planning work, and gives future authors placement guidance.
+
+### 2026-04-08 - Platform and entity research consolidated
+- Team update (2026-04-08T01:48:59Z): Scribe logged Peterman's enterprise and entity benchmark passes, merged the consolidated decision into .squad/decisions.md, and cleared the related inbox notes.
+- Shared outcome: future sample storytelling must combine workflow realism signals with explicit entity/data-contract lanes instead of presenting Precept as workflow-only.
+
+### 2025-07-18 - Enterprise ecosystem benchmarks for sample design
+- Created `docs/research/sample-realism/peterman-enterprise-ecosystem-benchmarks.md` after benchmarking 8 enterprise platforms (Salesforce, ServiceNow, Pega, Appian, Camunda, IBM ODM/BAW, Guidewire, Temporal) plus 10+ supplementary sources (Drools, ACORD, FHIR, BPMN academic repos, NIST/CISA, OMG DMN/CMMN, Nintex, Flowable/Activiti).
+- Core findings: five realism signals distinguish enterprise examples from demos; five lifecycle shapes are completely absent from current Precept samples; Precept's edit blocks and field-per-state modeling are unique market differentiators.
+- Identified 12 prioritized research lanes for further sample improvement, led by public process libraries, ACORD field-per-state mapping, and regulated workflow compliance shapes.
+- Decision filed to `.squad/decisions/inbox/j-peterman-sample-benchmark-next-lanes.md`.
+
+### 2026-05-17 - Entity-centric benchmarks for stateless precept sample lanes
+- Created `docs/research/sample-realism/peterman-entity-centric-benchmarks.md` after studying 15 entity-modeling ecosystems (Salesforce, ServiceNow, SAP MDG, Guidewire, JSON Schema, Zod, FluentValidation, Pydantic, Drools, NRules, XState, Terraform, OpenAPI, DDD literature, ERP master data).
+- Core finding: if stateless/data-only precepts land (#22), the sample corpus should add three explicit non-workflow lanes — master data contracts (2-3), reference data definitions (1-2), and domain-rule contracts (1) — totaling 4-6 new stateless samples.
+- Credibility for entity samples requires domain-bearing field names, cross-field constraints, enumerated vocabularies, realistic nullability, and business-toned because messages.
+- Decision filed to `.squad/decisions/inbox/j-peterman-entity-sample-lanes.md`.
+
+### 2026-04-08 - Sample ceiling consolidation recorded
+- Team update (2026-04-08T01:13:25.793Z): Scribe merged Peterman's benchmark lane with Frank's architectural/philosophy notes and Steinbrenner's PM plan into `.squad/decisions.md` — decided by Frank, Steinbrenner, and J. Peterman.
+- Shared outcome: future sample storytelling now depends on explicit tiering, canon-versus-extended segmentation, and quota-resistant quality gates before the corpus grows past the mid-30s.
+
+
+### 2026-04-08 - Sample realism recommendations merged
+- Scribe merged Peterman's benchmark research into .squad/decisions.md together with the directive to use Opus when sample/design judgment is especially high.
+- The active brand/devrel guidance now explicitly favors evidence-bearing, exception-rich, case-centric flagship workflows over more approval-ladder demos.
 
 ### 2026-04-07 - README Quick Example refactored for clarity
 - Removed explanatory hedge sentence about DSL rendering fallback
@@ -76,3 +104,19 @@
 - Switched from markdown image syntax `![...](...)` to fixed-size HTML `<img src="..." width="600" />` to ensure the contract diagram reads at proper visual scale alongside surrounding page text in GitHub's README view.
 - Brand rationale: The Quick Example section is a teaching artifact, not an archive. The professionally rendered contract image is the hero; the copyable fallback was defensive scaffolding. Removing it simplifies visual hierarchy and directs curious readers toward `samples/` or the language reference for further exploration.
 - Decision written to `.squad/decisions/inbox/j-peterman-readme-contract.md`.
+
+### 2026-04-08 - Realistic domain benchmark lane
+- Created `docs\research\sample-realism\peterman-realistic-domain-benchmarks.md` after reviewing the README, brand positioning, and representative samples against external workflow research.
+- Core finding: the strongest future samples should look like governed case files with evidence loops, exception handling, and post-decision fulfillment, not just clean approval ladders.
+- Recommendation merged into `.squad/decisions.md`; inbox cleared so future sample selection stays aligned with the category story.
+
+### 2026-05-17 - Entity-centric benchmark research
+- Entity-centric samples have different credibility signals than workflow samples. The key differentiators are cross-field constraints, enumerated vocabularies, and business-toned because messages — not evidence loops or exception paths.
+- The strongest stateless sample candidates are master data entities (Vendor, Product, Employee) because they are universally understood, constraint-dense, and well-grounded in every enterprise platform studied.
+- Precept's differentiation vs. Zod/FluentValidation/JSON Schema for stateless entities is that invariants hold across all mutations and are inspectable — samples must demonstrate this difference, not just validate shape.
+
+### 2026-04-08 - Sample corpus ceiling research
+- Created `docs\research\sample-realism\peterman-sample-corpus-benchmarks.md` after benchmarking Precept's sample-count question against Temporal, XState, Dagster, AWS guidance patterns, Mermaid, and JSON Schema.
+- Core finding: benchmark projects support a **tiered** sample strategy; once official corpora approach the 40+ range, they usually separate canonical, reference, experimental, or fixture lanes instead of keeping one flat shelf.
+- Recommendation: treat roughly **38-46 total in-repo samples** as Precept's realistic upper-end band, with only about **30-36** of those carrying co-equal canonical business weight.
+- Team follow-up written to `.squad/decisions/inbox/peterman-sample-ceiling.md`.

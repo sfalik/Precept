@@ -1,11 +1,10 @@
 ## Core Context
 
-- Owns architecture, system boundaries, and review gates across the runtime, tooling, and documentation surfaces.
-- **Language Designer:** Owns Precept language design, grammar evolution, and Superpower parser strategy. `docs/PreceptLanguageDesign.md` is the foundational document.
-- **Language research co-owner:** Co-owns `docs/research/language/` with George. Knows the comparative studies (xstate, Polly, FluentValidation, Zod/Valibot, LINQ, FluentAssertions, FEEL/DMN, Cedar), expression audit, verbosity analysis, and all PLT references.
-- Core architectural discipline: keep MCP tools as thin wrappers, keep docs honest about implemented behavior, and document open decisions instead of inventing values.
-- Technical-surface work flows through Elaine (UX), Peterman (brand compliance), Frank (architectural fit), then Shane (sign-off).
-- README and brand-spec changes should reflect actual runtime semantics, not speculative future behavior.
+- Owns architecture, system boundaries, language direction, and final architectural review across runtime, tooling, and documentation surfaces.
+- Co-owns docs/research/language/ with George; proposal work must stay aligned with docs/PreceptLanguageDesign.md, the MCP/runtime truth, and Shane sign-off gates.
+- Public-facing docs and design assets must describe implemented behavior honestly; samples and README examples are product claims, not decorative filler.
+- The sample corpus is roadmap instrumentation. Preserve real domain pressure, classify sample complexity explicitly, and use FUTURE(#N) comments when a believable workflow needs not-yet-shipped syntax.
+- Architectural guardrails remain stable: thin MCP wrappers, keyword-anchored flat statements, deterministic inspectability, first-match routing, and no speculative semantics in docs.
 
 ## Learnings
 
@@ -148,39 +147,67 @@
 - User directive honored: branch retained locally and remotely per user request (NOT deleted post-merge).
 - Verified zero scope creep: 81 additions, 3 files changed (README.md, .squad/decisions.md, .squad/agents/j-peterman/history.md), no unrelated code changes.
 - Co-authored-by trailer included in original commits.
+### 2026-04-08 - Philosophy research promotion recorded
+- Team update (2026-04-08T02:31:54Z): Scribe logged Frank's philosophy-promotion lane, merged the organization decision into .squad/decisions.md, and cleared the related inbox note.
+- Shared outcome: reusable entity-first and category-positioning evidence now has a durable home in docs/research/philosophy/, while docs/philosophy.md stays concise and links back to the evidence base.
+
+### 2026-04-08 - Platform and entity research consolidated
+- Team update (2026-04-08T01:48:59Z): Scribe logged Frank's enterprise-platform and entity-modeling research, merged the shared decision into .squad/decisions.md, and cleared the related inbox notes.
+- Shared outcome: sample planning now treats workflow, entity/stateless, and hybrid contracts as co-equal research lanes while preserving the four missing enterprise lifecycle shapes as near-term roadmap pressure.
+
+### 2026-05-19 - Entity modeling addendum: correcting workflow-heavy framing
+- Produced docs/research/sample-realism/frank-entity-modeling-addendum.md.
+- Corrected the sample-realism research framing from workflow-only to entity-inclusive, per Shane's directive that Precept is for modeling business entities, not just workflow.
+- Promoted reference data from Tier 3 to Tier 2 in domain-fit ranking. Defined three precept archetypes (Workflow, Entity, Hybrid). Revised corpus target to 60-70% workflow, 15-20% entity, 8-12% hybrid.
+- Reframed dilution test question #1 to cover governed integrity (lifecycle + field constraints + editability), not just lifecycle transitions.
+- Identified 8 entity-precept sample candidates, 3 hybrid candidates, and 3 domain-suite concepts (workflow + entity precepts in the same domain).
+- Cataloged external analogs for entity modeling: Salesforce objects, ServiceNow records, Guidewire entities, MDM tools, JSON Schema, FluentValidation, ACORD/FHIR/ISO 20022 standards, DMN/OPA/Cedar policy systems.
+- Recommended 6 new research lanes for the entity/data-contract side, prioritized by immediate value.
+- Decision note filed to .squad/decisions/inbox/frank-entity-sample-balance.md.
+
+### 2026-04-08 - Sample ceiling consolidation recorded
+- Team update (2026-04-08T01:13:25.793Z): Scribe merged Frank's ceiling analysis and philosophy addendum with Steinbrenner's planning lane and Peterman's benchmark lane into `.squad/decisions.md` — decided by Frank, Steinbrenner, and J. Peterman.
+- Shared outcome: 42 is now the hard upper bound for the flat in-repo corpus, while the real acceptance gate is whether a candidate strengthens domain fit, prevention, inspectability, and marginal corpus value.
+
+
+### 2026-05-18 - Sample ceiling philosophy addendum
+- Produced docs/research/sample-realism/frank-sample-ceiling-philosophy-addendum.md.
+- Made explicit how Precept philosophy (prevention, inspectability, determinism, one-file completeness, AI-first) shapes corpus size, domain selection, and refusal criteria.
+- Established domain-fit tiers: Tier 1 (native) = claims/disputes, financial approvals, compliance; Tier 2 = IAM, healthcare auth, HR lifecycle; Tier 3 = scheduling/logistics, reference data.
+- Defined dilution test: 5 questions to evaluate whether a candidate sample earns its slot or inflates count.
+- Reframed 42 as an upper bound, not a quota. Realistic philosophy-driven range is 30–42 depending on how many candidates pass the quality floor.
+- Decision note filed to .squad/decisions/inbox/frank-sample-ceiling-philosophy.md.
+
+### 2026-05-17 - Sample corpus ceiling analysis
+- Produced docs/research/sample-realism/frank-sample-ceiling-analysis.md.
+- Recommended optimal operating band of 40-50 samples, soft ceiling at 50, hard ceiling at 55.
+- Proposed three-tier model: Core Canon (15-20), Extended Canon (20-25), Experimental (5-10 rotating).
+- Confirmed Steinbrenner's 42-sample target as sound near-term anchor at the low end of the optimal band.
+- Introduced marginal-value gate: new samples past 42 must demonstrate value on ≥2 of 3 axes (domain, shape, construct).
+- Decision note filed to .squad/decisions/inbox/frank-sample-ceiling.md.
+
+### 2026-04-08 - Sample realism research consolidated
+- Scribe merged Frank, George, J. Peterman, and Steinbrenner sample-realism findings into .squad/decisions.md and cleared the inbox notes.
+- The active decision set now locks the FUTURE(#N) comment protocol, modeling-over-syntax principle, case-centric flagship sample bias, the 42-sample portfolio direction, and Shane's directive to use Opus when sample/design judgment is especially high.
+
+### 2026-05-17 - Sample realism initiative: language & philosophy research
+- Produced docs/research/sample-realism/frank-language-and-philosophy.md.
+- Established realism criteria, sample complexity labels, and feature-to-sample traceability expectations for the sample expansion pass.
+- Ranked proposal impact on sample quality: Tier 1 choice, conditional expressions, field constraints, logical operators; Tier 2 integer/decimal/conditional invariants/computed fields/named rules; Tier 3 data-only, absorb, date, .length, .contains(), and functions.
+- Proposed 20 additional sample candidates spanning missing business domains so the corpus can teach category breadth instead of only syntax coverage.
+
+### 2026-05-01 - Expression feature research
+- Produced docs/research/dsl-expressiveness/expression-feature-proposals.md and aligned the research README around verified parser/runtime gaps.
+- Recommended staged rollout: Wave 1 .length plus conditional expressions, Wave 2 named rules and conditional invariants, later waves for richer string/numeric helpers.
+- FEEL/DMN remains the strongest business-rule comparator; Cedar remains the strongest analyzability counterweight.
 
 ### 2026-04-07 - PR #34 merge with Squad config and README image fixes
-- Merged PR #34 (chore: upgrade Squad configuration and fix README image links) to `main`.
-- Branch `chore/upgrade-squad-latest` carried both architectural Squad updates and related README.md image path corrections.
-- Image references corrected: `brand/readme-hero.svg` → `design/brand/readme-hero.svg` (added `design/` prefix per canonical asset layout).
-- Workflow: Committed image fix with Co-authored-by trailer, pushed with `-u` for upstream tracking, created PR via `gh pr create` with explicit `--base` and `--head` flags, merged with merge-commit strategy, deleted remote branch post-merge.
-- Remote branch cleaned up post-merge; no uncommitted changes remaining.
-- User directive captured: keep branch open for future work (logged in decisions).
-- Verified zero scope creep: only Squad config + image link fixes, no unrelated code changes.
+- Merged PR #34 to main, keeping the scope to Squad metadata plus README image-path corrections.
+- Confirmed the workflow pattern: commit related uncommitted work before push, create the PR with explicit base/head, and keep the history auditable with the required trailer.
 
 ### 2026-04-05 - Named rule proposal converged
-- Reached the final proposal framing for issue #8: rule <Name> when <BoolExpr>, with reuse allowed in when, invariant, and state assert, but not on <Event> assert.
-- The standing architecture filter now treats philosophy, non-programmer readability, and configuration-like legibility as explicit review criteria instead of secondary polish.
-
-### 2026-05-01 - Expression feature research & proposals
-- Produced comprehensive expression-surface research at `docs/research/dsl-expressiveness/expression-feature-proposals.md`.
-- Confirmed current expression limitations via MCP compile: no ternary (`?` parse error), no `.length` on strings (PRECEPT038), no function calls, no named guards.
-- Proposed 7 features across 3 waves: Wave 1 (ternary + `.length`), Wave 2 (named guards + conditional invariants), Wave 3 (`.contains()` + numeric functions), Future (computed fields).
-- Extended research base beyond existing 6-library set to include FEEL/DMN, Drools DRL, and Cedar (AWS). FEEL is the strongest comparator for business-rule DSL expression design — it has ternary, string functions, numeric functions, and range membership, all of which Precept currently lacks.
-- Updated `docs/research/dsl-expressiveness/README.md` with the new file entry.
-- Decision note filed at `.squad/decisions/inbox/frank-expression-research.md`. No implementation authorized — Shane sign-off required per wave.
-
-### 2026-04-05 - Proposal bodies expanded for issues #11-#13
-- Expanded GitHub issues #11, #12, and #13 into fuller proposal narratives with before/after Precept examples, reference-language snippets, and explicit architectural cautions.
-- Logged the wave placement and guardrails in .squad/decisions.md so the issue bodies stay aligned with keyword-anchored flat statements and first-match routing.
-
-### 2026-04-05 - Trunk consolidation dissent logged
-- Audited the repo topology and argued for force-promoting 'feature/language-redesign' to 'main' because 'main' still carries only placeholder history.
-- The team did not adopt that path: Uncle Leo's review blocked direct trunk replacement, so Frank's recommendation now stands as a documented dissent pending Shane sign-off.
-
----
-
-2026-04-05T03:20:00Z: Steinbrenner applied branch protection to main (pull requests required, force pushes/admin only, no branch deletion).
+- Finalized the proposal framing around rule <Name> when <BoolExpr> with reuse in when, invariant, and state assert, but not on <Event> assert.
+- Elevated philosophy fit and non-programmer readability from soft preferences to explicit review gates.
 
 ### 2026-04-08 - Issue #17 computed fields proposal revamp
 - Revamped `temp/issue-body-rewrites/17.md` to incorporate all findings from the research document and all 7 team re-reviews.
@@ -500,6 +527,16 @@ Each exclusion removes complexity that Superpower would struggle with (indentati
 - Rejected: #18 conditional outcome in `->` chain
 
 All proposals are additive and Superpower-compatible. No structural redesign required.
+- 2026-05-18: philosophy-driven corpus analysis is more useful than count-driven analysis because it gives the team a refusal test ("does this sample demonstrate prevention, inspectability, or deterministic policy enforcement?") rather than a quota ("we need 7 more to hit 42"). Refusal criteria prevent dilution; quotas invite it.
+- 2026-05-19: when framing a product's sample corpus, the lens you choose (workflow-only vs. entity-inclusive) determines which samples even qualify for consideration. A workflow-only lens systematically excludes the majority of entities in every real business domain — the reference data, configuration records, and master data that workflow entities depend on. Broadening the lens is not "adding a feature" to the portfolio; it is correcting a categorical blind spot.
+- 2026-05-18: philosophy-driven corpus analysisis more useful than count-driven analysis because it gives the team a refusal test ("does this sample demonstrate prevention, inspectability, or deterministic policy enforcement?") rather than a quota ("we need 7 more to hit 42"). Refusal criteria prevent dilution; quotas invite it.
+- 2026-05-17: corpus ceiling is best argued from three converging axes (domain breadth, workflow shape, construct coverage) rather than raw count. All three saturate in the 40-55 range for a focused DSL. Maintenance cost is the hard backstop — past ~55 files, single-feature update passes become unreliable without migration tooling.
+- 2026-05-17: sample realism is mostly a semantic-types and policy-density problem, not a sample-count problem. The biggest credibility failures are categorical values, money, and calendar logic forced through string/number workarounds.
+- 2026-05-16: keep PRs surgically scoped when Shane asks for targeted metadata changes; local bookkeeping should not hitchhike into those PRs.
+- 2026-05-15: GitHub issue hygiene works best when routing labels, taxonomy labels, board status, and close/open state each keep one job.
+- 2026-05-01: validate DSL capability claims with MCP tools before writing research, and benchmark new expression ideas against both FEEL and Cedar.
+- 2026-04-07: for PRs on dirty branches, commit the relevant work first, push with upstream tracking, and use explicit base/head flags to avoid routing mistakes.
+- 2026-04-05: sequence language proposals by containment risk; anything that pressures keyword-anchored flat statements or first-match routing needs extra architectural scrutiny before implementation.
 
 ### 2026-04-08 - Issue #22 full rewrite incorporating warning model decisions
 - Rewrote the complete #22 issue body at Shane's request, incorporating all session decisions: events-without-states = warning (Shane's override of Frank's error recommendation), C50 severity upgrade from hint to warning, tautological/structurally-impossible rules dropped from semantic rules.

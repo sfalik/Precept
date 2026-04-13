@@ -1,45 +1,187 @@
 precept SubscriptionCancellationRetention
 
-# Retention teams often make one last save attempt before a subscription is closed.
-# This sample is intentionally compact but still shows realistic in-place mutations.
+# Shape: W6 active-life subscription with dunning and retention
+#
+# Models a full subscription lifecycle from enrollment through grace periods,
+# dunning escalation, cancellation with retention offers, and reinstatement.
+# Demonstrates choice fields, decimal money types, integer counters, computed
+# fields, conditional edits, and when-guarded retention logic.
+#
+# FUTURE(date): StartDate, NextBillingDate, CancellationDate,
+#               ReinstatementDeadline, LastPaymentDate
 
-field SubscriberName as string nullable
-field PlanName as string nullable
-field MonthlyPrice as number default 0
+# --- Fields ---
+
+field SubscriberName as string nullable maxlength 200
+field PlanTier as choice("Basic", "Standard", "Premium", "Enterprise") default "Basic"
+field BillingCycle as choice("Monthly", "Quarterly", "Annual") default "Monthly"
+field CancellationReason as choice("Price", "NotUsing", "Competitor", "Features", "Support", "Other") nullable
+field DunningStage as choice("None", "FirstNotice", "SecondNotice", "FinalNotice") default "None"
+
+field MonthlyPrice as decimal default 0 nonnegative maxplaces 2
+field RetentionDiscountPercent as decimal default 0 nonnegative max 100 maxplaces 2
+field CurrentBalance as decimal default 0 nonnegative maxplaces 2
+field LifetimeValue as decimal default 0 nonnegative maxplaces 2
+
+field MissedPayments as integer default 0 nonnegative
+field RetentionAttempts as integer default 0 nonnegative
+field MonthsActive as integer default 0 nonnegative
+field DaysSinceCancellation as integer default 0 nonnegative
+field ReinstatementWindowDays as integer default 90 positive
+
 field SaveOfferAccepted as boolean default false
-field RetentionDiscount as number default 0
-field CancellationReason as string nullable
-field LastAgentNote as string nullable
+field CancellationInitiated as boolean default false
+field LastAgentNote as string nullable maxlength 500
 
-invariant MonthlyPrice >= 0 because "Monthly price cannot be negative"
-invariant RetentionDiscount >= 0 because "Retention discounts cannot be negative"
-invariant RetentionDiscount <= 100 because "Retention discounts are percentages and must stay within 0-100"
+field DiscountedPrice as decimal -> round(MonthlyPrice * (1 - RetentionDiscountPercent / 100), 2)
+field IsHighValue as boolean -> LifetimeValue >= 1000 or MonthsActive >= 24
+field IsChurnRisk as boolean -> MissedPayments >= 2 or (CancellationInitiated and not SaveOfferAccepted)
+
+# --- Invariants ---
+
+invariant MissedPayments <= 12 because "Missed payments capped at twelve for manual review"
+invariant RetentionAttempts <= 3 because "No more than three retention attempts allowed"
+
+# --- States ---
 
 state Active initial
+state GracePeriod
+state PastDue
+state Dunning
+state Suspended
+state CancellationRequested
 state RetentionReview
 state Cancelled
+state Reinstated
 
-in RetentionReview edit LastAgentNote
+# --- State Constraints ---
 
-event RequestCancellation with Name as string, Plan as string, Price as number, Reason as string
-on RequestCancellation assert Name != "" because "The subscriber name is required"
-on RequestCancellation assert Plan != "" because "The plan name is required"
-on RequestCancellation assert Price >= 0 because "The plan price cannot be negative"
-on RequestCancellation assert Reason != "" because "A cancellation reason is required"
+in Active assert MonthlyPrice > 0 when SubscriberName != null because "Enrolled subscriptions must have a positive price"
+in GracePeriod assert MissedPayments >= 1 because "Grace period requires at least one missed payment"
+in PastDue assert MissedPayments >= 2 because "Past-due status requires at least two missed payments"
+in Dunning assert DunningStage != "None" because "Dunning state requires an active dunning stage"
+in CancellationRequested assert CancellationReason != null because "Cancellation requests must include a reason"
+in RetentionReview assert CancellationReason != null because "Retention review requires a cancellation reason"
+in Cancelled assert CancellationReason != null because "Cancelled subscriptions must record the reason"
 
-event MakeSaveOffer with DiscountPercent as number default 10
-on MakeSaveOffer assert DiscountPercent > 0 because "Save offers must include a positive discount"
-on MakeSaveOffer assert DiscountPercent <= 100 because "Save offers cannot exceed 100 percent"
+# --- Edit Declarations ---
+
+in Active edit PlanTier, SubscriberName
+in GracePeriod edit BillingCycle
+in RetentionReview edit RetentionDiscountPercent, LastAgentNote
+in RetentionReview when IsHighValue edit PlanTier
+
+# --- Events ---
+
+event Enroll with Name as string notempty maxlength 200, Tier as choice("Basic", "Standard", "Premium", "Enterprise") default "Basic", Cycle as choice("Monthly", "Quarterly", "Annual") default "Monthly", Price as decimal positive maxplaces 2
+
+event RecordMonth
+
+event MissPayment
+
+event MakePayment with Amount as decimal positive maxplaces 2
+
+event RequestCancellation with Reason as choice("Price", "NotUsing", "Competitor", "Features", "Support", "Other")
+
+event ReviewForRetention with AgentNote as string nullable default null
+
+event MakeSaveOffer with DiscountPercent as decimal positive max 100 maxplaces 2
 
 event AcceptOffer
 
 event DeclineOffer with Note as string nullable default null
 on DeclineOffer assert Note == null or Note != "" because "A supplied decline note cannot be blank"
 
-from Active on RequestCancellation -> set SubscriberName = RequestCancellation.Name -> set PlanName = RequestCancellation.Plan -> set MonthlyPrice = RequestCancellation.Price -> set CancellationReason = RequestCancellation.Reason -> set SaveOfferAccepted = false -> transition RetentionReview
+event ConfirmCancellation
 
-from RetentionReview on MakeSaveOffer when not SaveOfferAccepted and RetentionDiscount == 0 -> set RetentionDiscount = MakeSaveOffer.DiscountPercent -> set LastAgentNote = if MonthlyPrice >= 50 then "Premium plan retention" else "Standard plan retention" -> no transition
-from RetentionReview on MakeSaveOffer -> reject "Only one outstanding save offer can exist at a time"
+event EscalateDunning
 
-from RetentionReview on AcceptOffer -> set SaveOfferAccepted = true -> set CancellationReason = null -> transition Active
-from RetentionReview on DeclineOffer -> set LastAgentNote = DeclineOffer.Note -> transition Cancelled
+event Reinstate
+
+event ActivateReinstatement
+
+event AdvanceCancellationClock
+
+# --- Transitions ---
+
+# Enrollment — initialize subscriber details
+# FUTURE(date): would set StartDate and NextBillingDate
+from Active on Enroll when SubscriberName == null -> set SubscriberName = Enroll.Name -> set PlanTier = Enroll.Tier -> set BillingCycle = Enroll.Cycle -> set MonthlyPrice = Enroll.Price -> no transition
+from Active on Enroll -> reject "Subscriber is already enrolled"
+
+# Monthly lifecycle tick — tracks tenure
+# FUTURE(date): would derive from billing-date advancement
+from any on RecordMonth -> set MonthsActive = MonthsActive + 1 -> set LifetimeValue = LifetimeValue + MonthlyPrice -> no transition
+
+# --- Payment and Dunning ---
+
+# Missed payment from active enters grace period
+from Active on MissPayment -> set MissedPayments = MissedPayments + 1 -> set CurrentBalance = CurrentBalance + MonthlyPrice -> transition GracePeriod
+
+# Grace period — second missed payment pushes to past due
+from GracePeriod on MissPayment -> set MissedPayments = MissedPayments + 1 -> set CurrentBalance = CurrentBalance + MonthlyPrice -> transition PastDue
+
+# Past due — additional missed payments accumulate
+from PastDue on MissPayment -> set MissedPayments = MissedPayments + 1 -> set CurrentBalance = CurrentBalance + MonthlyPrice -> no transition
+
+# Dunning — additional missed payments accumulate
+from Dunning on MissPayment -> set MissedPayments = MissedPayments + 1 -> set CurrentBalance = CurrentBalance + MonthlyPrice -> no transition
+
+# Full payment restores to active; partial payment reduces balance
+# FUTURE(date): would update LastPaymentDate
+from GracePeriod on MakePayment when MakePayment.Amount >= CurrentBalance -> set CurrentBalance = 0 -> set MissedPayments = 0 -> set DunningStage = "None" -> transition Active
+from GracePeriod on MakePayment -> set CurrentBalance = CurrentBalance - MakePayment.Amount -> no transition
+
+from PastDue on MakePayment when MakePayment.Amount >= CurrentBalance -> set CurrentBalance = 0 -> set MissedPayments = 0 -> set DunningStage = "None" -> transition Active
+from PastDue on MakePayment -> set CurrentBalance = CurrentBalance - MakePayment.Amount -> no transition
+
+from Dunning on MakePayment when MakePayment.Amount >= CurrentBalance -> set CurrentBalance = 0 -> set MissedPayments = 0 -> set DunningStage = "None" -> transition Active
+from Dunning on MakePayment -> set CurrentBalance = CurrentBalance - MakePayment.Amount -> no transition
+
+# Dunning escalation — FirstNotice → SecondNotice → FinalNotice → Suspended
+from PastDue on EscalateDunning -> set DunningStage = "FirstNotice" -> transition Dunning
+from Dunning on EscalateDunning when DunningStage == "FirstNotice" -> set DunningStage = "SecondNotice" -> no transition
+from Dunning on EscalateDunning when DunningStage == "SecondNotice" -> set DunningStage = "FinalNotice" -> no transition
+from Dunning on EscalateDunning when DunningStage == "FinalNotice" -> transition Suspended
+from Dunning on EscalateDunning -> reject "Dunning stage is not in an escalatable state"
+
+# --- Cancellation ---
+
+# Cancellation requests from multiple lifecycle states
+from Active on RequestCancellation -> set CancellationReason = RequestCancellation.Reason -> set CancellationInitiated = true -> set SaveOfferAccepted = false -> set RetentionAttempts = 0 -> transition CancellationRequested
+from GracePeriod on RequestCancellation -> set CancellationReason = RequestCancellation.Reason -> set CancellationInitiated = true -> set SaveOfferAccepted = false -> set RetentionAttempts = 0 -> transition CancellationRequested
+from PastDue on RequestCancellation -> set CancellationReason = RequestCancellation.Reason -> set CancellationInitiated = true -> set SaveOfferAccepted = false -> set RetentionAttempts = 0 -> transition CancellationRequested
+from Suspended on RequestCancellation -> set CancellationReason = RequestCancellation.Reason -> set CancellationInitiated = true -> set SaveOfferAccepted = false -> set RetentionAttempts = 0 -> transition CancellationRequested
+
+# Route to retention review or skip directly to cancellation
+from CancellationRequested on ReviewForRetention -> set LastAgentNote = ReviewForRetention.AgentNote -> transition RetentionReview
+from CancellationRequested on ConfirmCancellation -> set DaysSinceCancellation = 0 -> transition Cancelled
+
+# --- Retention ---
+
+# Save offers — high-value subscribers get up to 3 attempts, standard get 1
+from RetentionReview on MakeSaveOffer when IsHighValue and RetentionAttempts < 3 -> set RetentionAttempts = RetentionAttempts + 1 -> set RetentionDiscountPercent = MakeSaveOffer.DiscountPercent -> no transition
+from RetentionReview on MakeSaveOffer when not IsHighValue and RetentionAttempts < 1 -> set RetentionAttempts = RetentionAttempts + 1 -> set RetentionDiscountPercent = MakeSaveOffer.DiscountPercent -> no transition
+from RetentionReview on MakeSaveOffer -> reject "Maximum retention attempts reached for this subscriber"
+
+# Accept offer — return to active with discount applied
+# FUTURE(date): would reset NextBillingDate
+from RetentionReview on AcceptOffer when RetentionDiscountPercent > 0 -> set SaveOfferAccepted = true -> set CancellationReason = null -> set CancellationInitiated = false -> transition Active
+from RetentionReview on AcceptOffer -> reject "No save offer is pending"
+
+# Decline offer — proceed to cancellation
+from RetentionReview on DeclineOffer -> set LastAgentNote = DeclineOffer.Note -> set DaysSinceCancellation = 0 -> transition Cancelled
+
+# --- Reinstatement ---
+
+# Track days since cancellation (surrogate for date arithmetic)
+# FUTURE(date): would calculate from CancellationDate automatically
+from Cancelled on AdvanceCancellationClock -> set DaysSinceCancellation = DaysSinceCancellation + 1 -> no transition
+
+# Reinstate within the allowed window
+from Cancelled on Reinstate when DaysSinceCancellation < ReinstatementWindowDays -> transition Reinstated
+from Cancelled on Reinstate -> reject "Reinstatement window has expired"
+
+# Activate reinstated subscription — reset billing and dunning state
+# FUTURE(date): would set new StartDate and NextBillingDate
+from Reinstated on ActivateReinstatement -> set MissedPayments = 0 -> set DunningStage = "None" -> set CurrentBalance = 0 -> set CancellationReason = null -> set CancellationInitiated = false -> set SaveOfferAccepted = false -> set RetentionAttempts = 0 -> set RetentionDiscountPercent = 0 -> set DaysSinceCancellation = 0 -> transition Active

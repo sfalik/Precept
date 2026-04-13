@@ -1,63 +1,137 @@
 precept ItHelpdeskTicket
 
-# This sample uses a shared assignment queue to demonstrate queue.peek and dequeue.
-# It also shows from any rows that act like system-wide support events.
+# Shape: W1 intake → triage → assignment → resolution
+#
+# Models an IT helpdesk ticket from intake through triage, agent assignment,
+# active work, and resolution. Demonstrates queue-based agent assignment,
+# computed escalation status, hold and escalation paths, and conditional
+# edit guards.
+#
+# FUTURE(date): CreatedDate, DueDate, ResolvedDate, SlaTargetDate
 
-field TicketTitle as string nullable
-field Severity as number default 3
+# --- Fields ---
+
+field TicketTitle as string nullable maxlength 200
+field Description as string nullable maxlength 2000
+field CustomerEmail as string nullable maxlength 254
+field Severity as choice("Low", "Medium", "High", "Critical") default "Low"
+field Category as choice("Hardware", "Software", "Network", "Access", "Other") default "Other"
+field Priority as choice("Low", "Medium", "High", "Critical") default "Low"
 field AssignedAgent as string nullable
 field LastQueuedAgent as string nullable
-field ResolutionNote as string nullable
-field ReopenCount as integer default 0
-field Priority as choice("Low","Medium","High","Critical") default "Low"
+field ResolutionNote as string nullable maxlength 1000
+field HoldReason as string nullable maxlength 500
+field EscalationNote as string nullable maxlength 500
+field ReopenCount as integer default 0 nonnegative
+field IsEscalated as boolean -> ReopenCount >= 3 or Severity == "Critical"
 
 field AgentQueue as queue of string
 
-invariant Severity >= 1 because "Severity cannot be lower than 1"
-invariant Severity <= 5 because "Severity cannot be higher than 5"
-invariant ReopenCount >= 0 because "Reopen count cannot be negative"
+# --- Invariants ---
+
+invariant ReopenCount <= 5 because "Tickets reopened more than five times must be handled offline"
+
+# --- States ---
 
 state New initial
+state Triaged
 state Assigned
+state InProgress
+state OnHold
 state WaitingOnCustomer
+state Escalated
 state Resolved
 state Closed
 
+# --- State Constraints ---
+
+in Triaged assert TicketTitle != null because "Triaged tickets must have a title"
+in Triaged assert CustomerEmail != null because "Triaged tickets must have a customer email"
 in Assigned assert AssignedAgent != null because "Assigned tickets must name an agent"
-in New edit Priority
+in InProgress assert AssignedAgent != null because "In-progress tickets must have an agent"
+in OnHold assert HoldReason != null because "On-hold tickets must have a hold reason"
+in Escalated assert EscalationNote != null because "Escalated tickets must have an escalation note"
+in Resolved assert ResolutionNote != null because "Resolved tickets must have a resolution note"
 
-event RegisterAgent with AgentName as string
-on RegisterAgent assert AgentName != "" because "An agent name is required"
+# --- Edit Declarations ---
 
-event Triage with Title as string, Level as number default 3
-on Triage assert Title != "" because "A ticket title is required"
-on Triage assert Level >= 1 and Level <= 5 because "Severity must stay within the supported range"
+in New edit TicketTitle, Description, CustomerEmail, Category
+in Triaged edit Severity, Priority, Category
+in Triaged when Severity == "Low" or Severity == "Medium" edit Description
+in Assigned edit Priority
+in InProgress edit Priority
+in InProgress when IsEscalated edit Severity
+
+# --- Events ---
+
+event RegisterAgent with AgentName as string notempty
+
+event SubmitTicket with Title as string notempty maxlength 200, Email as string notempty maxlength 254, Cat as choice("Hardware", "Software", "Network", "Access", "Other") default "Other", Desc as string nullable default null
+
+event Triage with Sev as choice("Low", "Medium", "High", "Critical") default "Low", Pri as choice("Low", "Medium", "High", "Critical") default "Low"
 
 event Assign
 
+event StartWork
+
+event PlaceOnHold with Reason as string notempty
+
+event ResumeFromHold
+
+event RequestCustomerInfo
+
 event CustomerReply
-event Resolve with Note as string
-on Resolve assert Note != "" because "A resolution note is required"
+
+event Escalate with Note as string notempty
+
+event DeEscalate
+
+event Resolve with Note as string notempty
 
 event CloseTicket
 
 event Reopen with Note as string nullable default null
 on Reopen assert Note == null or Note != "" because "A supplied reopen note cannot be blank"
 
-from New on RegisterAgent -> enqueue AgentQueue RegisterAgent.AgentName -> no transition
-from Assigned on RegisterAgent -> enqueue AgentQueue RegisterAgent.AgentName -> no transition
-from WaitingOnCustomer on RegisterAgent -> enqueue AgentQueue RegisterAgent.AgentName -> no transition
-from Resolved on RegisterAgent -> enqueue AgentQueue RegisterAgent.AgentName -> no transition
+# --- Transitions ---
 
-from New on Triage -> set TicketTitle = Triage.Title -> set Severity = Triage.Level -> no transition
-from New on Assign when AgentQueue.count > 0 -> set LastQueuedAgent = AgentQueue.peek -> dequeue AgentQueue -> set AssignedAgent = LastQueuedAgent -> transition Assigned
-from New on Assign -> reject "No support agent is currently available"
+# Agent registration — available from all states
+from any on RegisterAgent -> enqueue AgentQueue RegisterAgent.AgentName -> no transition
 
-from Assigned on CustomerReply -> transition WaitingOnCustomer
-from Assigned on Resolve -> set ResolutionNote = Resolve.Note -> transition Resolved
+# Intake: customer submits a ticket
+from New on SubmitTicket -> set TicketTitle = SubmitTicket.Title -> set CustomerEmail = SubmitTicket.Email -> set Category = SubmitTicket.Cat -> set Description = SubmitTicket.Desc -> transition Triaged
 
-from WaitingOnCustomer on Assign when AgentQueue.count > 0 -> set LastQueuedAgent = AgentQueue.peek -> dequeue AgentQueue -> set AssignedAgent = LastQueuedAgent -> transition Assigned
-from WaitingOnCustomer on Assign -> reject "No support agent is currently available"
+# Triage: set severity and auto-compute priority for critical tickets
+from Triaged on Triage -> set Severity = Triage.Sev -> set Priority = if Triage.Sev == "Critical" then "Critical" else Triage.Pri -> no transition
 
+# Assignment: pull next agent from the queue
+from Triaged on Assign when AgentQueue.count > 0 -> set LastQueuedAgent = AgentQueue.peek -> dequeue AgentQueue -> set AssignedAgent = LastQueuedAgent -> transition Assigned
+from Triaged on Assign -> reject "No support agent is currently available"
+
+# Reassignment: swap agent while still in Assigned
+from Assigned on Assign when AgentQueue.count > 0 -> set LastQueuedAgent = AgentQueue.peek -> dequeue AgentQueue -> set AssignedAgent = LastQueuedAgent -> no transition
+from Assigned on Assign -> reject "No support agent is currently available for reassignment"
+
+# Agent begins work
+from Assigned on StartWork -> transition InProgress
+
+# In-progress: agent can hold, escalate, wait on customer, or resolve
+from InProgress on PlaceOnHold -> set HoldReason = PlaceOnHold.Reason -> transition OnHold
+from InProgress on RequestCustomerInfo -> transition WaitingOnCustomer
+from InProgress on Escalate -> set EscalationNote = Escalate.Note -> transition Escalated
+from InProgress on Resolve -> set ResolutionNote = Resolve.Note -> transition Resolved
+
+# On hold: resume returns to in-progress
+from OnHold on ResumeFromHold -> set HoldReason = null -> transition InProgress
+
+# Waiting on customer: customer reply resumes work
+from WaitingOnCustomer on CustomerReply -> transition InProgress
+
+# Escalation: can be de-escalated back or resolved directly
+from Escalated on DeEscalate -> set EscalationNote = null -> transition InProgress
+from Escalated on Resolve -> set ResolutionNote = Resolve.Note -> transition Resolved
+
+# Resolution: close or reopen (with reopen cap)
 from Resolved on CloseTicket -> transition Closed
-from Resolved on Reopen -> set ReopenCount = ReopenCount + 1 -> transition New
+from Resolved on Reopen when ReopenCount < 5 -> set ReopenCount = ReopenCount + 1 -> set ResolutionNote = null -> transition Triaged
+from Resolved on Reopen -> reject "This ticket has been reopened too many times and must be handled offline"

@@ -1,67 +1,166 @@
 precept MaintenanceWorkOrder
 
-# A facilities work order from intake through scheduling and completion.
-# This sample introduces stronger guard logic and a from-state assertion.
+# Shape: W3 authorization-gated execution
+#
+# Models an enterprise maintenance work order from request intake through
+# planning, authorization, scheduling, execution, completion review, and
+# formal close. Demonstrates authorization-gated execution where non-emergency
+# work requires approval before scheduling, emergency work bypasses approval,
+# parts and permit readiness gates control execution start, cost tracking
+# flags over-budget work for review, and conditional edit guards restrict
+# field access by state and work type.
+#
+# Link fields (AssetId, FailureCode, JobPlanId) reference companion entity
+# samples that will ship in later waves.
+#
+# FUTURE(date): RequestedDate, ScheduledDate, StartedDate, CompletedDate, DueDate
 
-field RequesterName as string nullable
-field Location as string nullable
-field IssueSummary as string nullable
-field AssignedTechnician as string nullable
-field EstimatedHours as number default 0
-field ActualHours as number default 0
-field Urgent as boolean default false
-field PartsApproved as boolean default false
-field CompletionNote as string nullable
-field CancellationReason as string nullable
+# --- Fields ---
 
-invariant EstimatedHours >= 0 because "Estimated hours cannot be negative"
-invariant ActualHours >= 0 because "Actual hours cannot be negative"
+field RequesterName as string nullable maxlength 100
+field Location as string nullable maxlength 200
+field WorkSummary as string nullable maxlength 2000
+field WorkType as choice("Preventive", "Corrective", "Emergency", "Inspection", "Modification") default "Corrective"
+field Priority as choice("Low", "Medium", "High", "Emergency") default "Medium"
+field Craft as choice("Electrical", "Mechanical", "HVAC", "Plumbing", "General", "Instrumentation") default "General"
+field PermitRequired as choice("None", "HotWork", "ConfinedSpace", "Lockout", "Excavation") default "None"
+field PermitApproved as boolean default false
+field AssignedTechnician as string nullable maxlength 100
+field ApproverName as string nullable maxlength 100
+field EstimatedCost as decimal default 0 nonnegative
+field EstimatedHours as decimal default 0 nonnegative
+field ActualLaborCost as decimal default 0 nonnegative
+field ActualPartsCost as decimal default 0 nonnegative
+field TotalActualCost as decimal -> ActualLaborCost + ActualPartsCost
+field OverBudget as boolean -> EstimatedCost > 0 and TotalActualCost > EstimatedCost * 1.15
+field ActualHours as decimal default 0 nonnegative
+field PartsReady as boolean default false
+field CompletionNote as string nullable maxlength 2000
+field CompletionReviewer as string nullable maxlength 100
+field CancellationReason as string nullable maxlength 1000
+field AssetId as string nullable maxlength 50
+field FailureCode as string nullable maxlength 50
+field JobPlanId as string nullable maxlength 50
 
-state Draft initial
-state Open
+# --- Invariants ---
+
+invariant EstimatedHours <= 1000 because "Estimated hours cannot exceed 1000"
+invariant EstimatedCost <= 999999 because "Estimated cost cannot exceed 999999"
+
+# --- States ---
+
+state Request initial
+state Planning
+state Approval
 state Scheduled
 state InProgress
+state CompletionReview
 state Completed
+state Closed
 state Cancelled
 
-in Draft edit Location, IssueSummary, Urgent
+# --- State Constraints ---
+
+in Planning assert RequesterName != null because "Planned work must have a requester on record"
+in Planning assert WorkSummary != null because "Planned work must have a work summary"
+in Planning assert Location != null because "Planned work must have a location"
+in Approval assert AssignedTechnician != null because "Work submitted for approval must have an assigned technician"
+in Approval assert EstimatedCost > 0 because "Work submitted for approval must have a cost estimate"
+in Approval assert EstimatedHours > 0 because "Work submitted for approval must have an hours estimate"
 in Scheduled assert AssignedTechnician != null because "Scheduled work must have an assigned technician"
-in Completed assert CompletionNote != null because "Completed work orders need a completion note"
+in InProgress assert AssignedTechnician != null because "Active work must have an assigned technician"
+in CompletionReview assert CompletionNote != null because "Work under review must have a completion note"
+in Completed assert CompletionNote != null because "Completed work must have a completion note"
 
-# Leaving active work still requires a technician on record.
-from InProgress assert AssignedTechnician != null because "Active work cannot finish without a technician"
+# --- Edit Declarations ---
 
-event Submit with Requester as string, WorkLocation as string, Summary as string, IsUrgent as boolean default false
-on Submit assert Requester != "" because "A requester name is required"
-on Submit assert WorkLocation != "" because "A location is required"
-on Submit assert Summary != "" because "An issue summary is required"
+in Request edit Location, WorkSummary, WorkType, Priority, AssetId, FailureCode
+in Planning edit Craft, PermitRequired, EstimatedCost, EstimatedHours, AssignedTechnician, JobPlanId, Priority
+in Planning when WorkType != "Emergency" edit Location, AssetId, FailureCode
+in Approval edit Priority
+in Scheduled edit Priority
+in Scheduled when PermitRequired != "None" edit PermitRequired
+in InProgress edit Priority
+in InProgress when WorkType == "Emergency" edit Craft
 
-event Assign with Technician as string, Estimate as number
-on Assign assert Technician != "" because "A technician is required"
-on Assign assert Estimate > 0 because "Estimated hours must be positive"
+# --- Events ---
 
-event ApproveParts
+event SubmitRequest with Requester as string notempty maxlength 100, WorkLocation as string notempty maxlength 200, Summary as string notempty maxlength 2000, Type as choice("Preventive", "Corrective", "Emergency", "Inspection", "Modification") default "Corrective", Pri as choice("Low", "Medium", "High", "Emergency") default "Medium", Asset as string nullable default null, Failure as string nullable default null
+
+event Plan with Technician as string notempty maxlength 100, Cost as decimal positive, Hours as decimal positive, WorkCraft as choice("Electrical", "Mechanical", "HVAC", "Plumbing", "General", "Instrumentation") default "General", Permit as choice("None", "HotWork", "ConfinedSpace", "Lockout", "Excavation") default "None", PlanId as string nullable default null
+
+event SubmitForApproval with Approver as string notempty maxlength 100
+
+event Approve
+
+event RejectApproval
+
+event Schedule
+
+event ReadyParts
+
+event ApprovePermit
+
 event StartWork
 
-event RecordProgress with Hours as number
-on RecordProgress assert Hours > 0 because "Progress entries must be positive"
+event RecordLabor with Hours as decimal positive, Cost as decimal nonnegative
 
-event Complete with Note as string
-on Complete assert Note != "" because "A completion note is required"
+event RecordParts with Cost as decimal positive
+
+event CompleteWork with Note as string notempty maxlength 2000
+
+event ReviewCompletion with Reviewer as string notempty maxlength 100
+
+event CloseWorkOrder
 
 event Cancel with Reason as string nullable default null
 on Cancel assert Reason == null or Reason != "" because "A supplied cancellation reason cannot be blank"
 
-from Draft on Submit -> set RequesterName = Submit.Requester -> set Location = Submit.WorkLocation -> set IssueSummary = Submit.Summary -> set Urgent = Submit.IsUrgent -> transition Open
+# --- Transitions ---
 
-from Open on Assign -> set AssignedTechnician = Assign.Technician -> set EstimatedHours = Assign.Estimate -> transition Scheduled
-from Open on Cancel -> set CancellationReason = Cancel.Reason -> transition Cancelled
+# Request intake
+from Request on SubmitRequest -> set RequesterName = SubmitRequest.Requester -> set Location = SubmitRequest.WorkLocation -> set WorkSummary = SubmitRequest.Summary -> set WorkType = SubmitRequest.Type -> set Priority = SubmitRequest.Pri -> set AssetId = SubmitRequest.Asset -> set FailureCode = SubmitRequest.Failure -> transition Planning
 
-from Scheduled on ApproveParts -> set PartsApproved = true -> no transition
-from Scheduled on StartWork when not Urgent or PartsApproved -> transition InProgress
-from Scheduled on StartWork -> reject "Urgent work must have parts approved before it starts"
+# Planning: assign technician, estimate costs and hours, set craft and permit
+from Planning on Plan -> set AssignedTechnician = Plan.Technician -> set EstimatedCost = Plan.Cost -> set EstimatedHours = Plan.Hours -> set Craft = Plan.WorkCraft -> set PermitRequired = Plan.Permit -> set JobPlanId = Plan.PlanId -> no transition
+
+# Authorization gate: non-emergency work requires approval
+from Planning on SubmitForApproval when WorkType != "Emergency" -> set ApproverName = SubmitForApproval.Approver -> transition Approval
+from Planning on SubmitForApproval when WorkType == "Emergency" -> reject "Emergency work orders bypass approval — use Schedule directly"
+
+# Emergency bypass: schedule directly from planning
+from Planning on Schedule when WorkType == "Emergency" and AssignedTechnician != null and EstimatedHours > 0 -> transition Scheduled
+from Planning on Schedule when WorkType == "Emergency" -> reject "Emergency work must have an assigned technician and hours estimate before scheduling"
+from Planning on Schedule when WorkType != "Emergency" -> reject "Non-emergency work must be approved before scheduling"
+
+# Approval: approve advances to scheduling, reject returns to planning
+from Approval on Approve -> transition Scheduled
+from Approval on RejectApproval -> set ApproverName = null -> transition Planning
+
+# Scheduled: ready parts, approve permits, then start work
+from Scheduled on ReadyParts -> set PartsReady = true -> no transition
+from Scheduled on ApprovePermit -> set PermitApproved = true -> no transition
+
+from Scheduled on StartWork when (WorkType == "Emergency" or PartsReady) and (PermitRequired == "None" or PermitApproved) -> transition InProgress
+from Scheduled on StartWork when not PartsReady and WorkType != "Emergency" -> reject "Parts must be ready before starting non-emergency work"
+from Scheduled on StartWork -> reject "Permit must be approved before starting work"
+
+# Execution: accumulate labor hours and costs
+from InProgress on RecordLabor -> set ActualHours = ActualHours + RecordLabor.Hours -> set ActualLaborCost = ActualLaborCost + RecordLabor.Cost -> no transition
+from InProgress on RecordParts -> set ActualPartsCost = ActualPartsCost + RecordParts.Cost -> no transition
+
+# Completion: over-budget work routes through review
+from InProgress on CompleteWork when OverBudget -> set CompletionNote = CompleteWork.Note -> transition CompletionReview
+from InProgress on CompleteWork -> set CompletionNote = CompleteWork.Note -> transition Completed
+
+# Completion review: reviewer signs off, advances to completed
+from CompletionReview on ReviewCompletion -> set CompletionReviewer = ReviewCompletion.Reviewer -> transition Completed
+
+# Formal close
+from Completed on CloseWorkOrder -> transition Closed
+
+# Cancellation from pre-execution states
+from Request on Cancel -> set CancellationReason = Cancel.Reason -> transition Cancelled
+from Planning on Cancel -> set CancellationReason = Cancel.Reason -> transition Cancelled
+from Approval on Cancel -> set CancellationReason = Cancel.Reason -> transition Cancelled
 from Scheduled on Cancel -> set CancellationReason = Cancel.Reason -> transition Cancelled
-
-from InProgress on RecordProgress -> set ActualHours = ActualHours + RecordProgress.Hours -> no transition
-from InProgress on Complete when ActualHours <= EstimatedHours + 4 -> set CompletionNote = Complete.Note -> transition Completed
-from InProgress on Complete -> reject "Work orders that exceed the estimate by more than four hours need review first"

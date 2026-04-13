@@ -22,6 +22,11 @@
 - Wrote orchestration logs for Kramer and Elaine plus a brief session log for the README DSL hero width pass.
 - Merged 5 related README sizing/width inbox notes into `.squad/decisions.md`, updated affected history references, and cleared the processed inbox files.
 - Preserved the final contract: GitHub repo README image cap about 830px, regenerated source width 1660px at 2×, and native text remains the only fully robust typographic match.
+## 2026-04-08T00:50:04.708Z - Sample realism research consolidated
+
+- Wrote orchestration logs for Frank, George, J. Peterman, and Steinbrenner plus the brief session log for the sample-realism pass.
+- Merged 5 inbox decision(s) into .squad/decisions.md, cleared the processed inbox files, and kept the archive unchanged because no active decisions were older than 30 days.
+- Updated the affected agent histories and summarized Frank/Steinbrenner history files back into compact ## Core Context sections.
 
 ---
 
@@ -107,6 +112,22 @@ Team cast on 2026-04-04: Frank (Lead), George (Runtime), Kramer (Tooling), Elain
 
 ## Recent Updates
 
+## 2026-04-08T02:31:54Z - Research organization recorded
+
+- Wrote orchestration/session records for Frank's philosophy-promotion lane and J. Peterman's sample-realism organization lane.
+- Consolidated 2 inbox decision(s) into .squad/decisions.md, cleared .squad/decisions/inbox/, and archived 0 older decision entry(ies).
+- Updated the affected agent histories; no history.md file crossed the summarization threshold.
+
+---
+
+## 2026-04-08T01:13:25.793Z - Sample ceiling research consolidated
+
+- Wrote orchestration and session logs for Frank's analysis/addendum plus Steinbrenner's and J. Peterman's sample-ceiling lanes.
+- Consolidated 4 inbox decision(s) into 1 shared sample-ceiling decision in `.squad/decisions.md`, cleared `.squad/decisions/inbox/`, and archived 0 older active decision entry(ies).
+- Updated the affected agent histories and summarized Elaine's oversized history back into a compact `## Core Context` record.
+
+---
+
 ### 2026-04-12T19:45:41Z - Squad `@copilot` lane retirement recorded
 - Wrote orchestration logs for Newman and Frank plus a session log for the Squad operations contract change.
 - Merged 2 relevant inbox items into one canonical `decisions.md` entry, recording the lane retirement and marking the earlier direct-`@copilot` directive as superseded.
@@ -147,4 +168,3 @@ Team cast on 2026-04-04: Frank (Lead), George (Runtime), Kramer (Tooling), Elain
 ### 2026-04-05 - Frank language proposal review recorded
 - Wrote orchestration and session logs for Frank's GitHub issue review across proposals #8-#13.
 - Merged 4 decision inbox item(s) into .squad/decisions.md, cleared .squad/decisions/inbox/, updated affected histories, and archived 0 older decision entries.
-

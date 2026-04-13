@@ -1,0 +1,80 @@
+precept PreventiveMaintenanceTemplate
+
+# Shape: E3 stateless domain-rule contract — preventive maintenance template
+#
+# A stateless domain-rule precept defining the template/schedule for preventive
+# maintenance programs. No lifecycle states or events — this precept governs
+# what a valid PM template looks like at all times.
+#
+# Companion precepts (maintenance-work-order, asset-record-lifecycle) reference
+# PM templates from this catalog. The template enforces schedule validity,
+# safety protocol consistency, compliance requirements, and cost constraints.
+#
+# FUTURE(date): CreatedDate, LastModifiedDate, EffectiveDate, SunsetDate
+# FUTURE(duration): FrequencyDays (calendar duration), ToleranceDays (duration)
+# FUTURE(meter): FrequencyHours (meter-reading trigger)
+
+# ── Template identity ────────────────────────────────────────────────
+
+field TemplateCode as string nullable notempty maxlength 15
+field TemplateName as string nullable notempty maxlength 100
+field Version as integer default 1 positive
+field IsActive as boolean default false
+
+# ── Applicability ────────────────────────────────────────────────────
+
+field AssetClass as choice("Equipment", "Vehicle", "ITHardware", "Furniture", "Building", "Infrastructure") default "Equipment"
+field Craft as choice("Mechanical", "Electrical", "HVAC", "Plumbing", "General", "Specialized") default "General"
+field MinTechnicianLevel as integer default 1 min 1 max 5
+field ApplicableEnvironments as set of choice("Indoor", "Outdoor", "Cleanroom", "Hazardous", "Marine", "HighTemperature")
+
+# ── Schedule / frequency ─────────────────────────────────────────────
+
+field FrequencyDays as integer default 90 positive
+field FrequencyHours as integer default 0 nonnegative
+field SeasonalRestriction as choice("None", "SpringOnly", "SummerOnly", "FallOnly", "WinterOnly", "NotWinter") default "None"
+field ToleranceDays as integer default 7 nonnegative
+
+# ── Task specification ───────────────────────────────────────────────
+
+field EstimatedDurationMinutes as integer default 60 positive
+field RequiresShutdown as boolean default false
+field RequiresLockoutTagout as boolean default false
+field SafetyPermitRequired as boolean default false
+field TaskCount as integer default 1 positive
+field InspectionPointCount as integer default 0 nonnegative
+
+# ── Cost / resource ──────────────────────────────────────────────────
+
+field EstimatedLaborCost as decimal default 0 nonnegative
+field EstimatedPartsCost as decimal default 0 nonnegative
+
+# ── Compliance ───────────────────────────────────────────────────────
+
+field RegulatoryStandard as string nullable maxlength 50
+field ComplianceCritical as boolean default false
+field MaxOverdueDays as integer default 0 nonnegative
+
+# ── Computed fields ──────────────────────────────────────────────────
+
+field TotalEstimatedCost as decimal -> EstimatedLaborCost + EstimatedPartsCost
+field AnnualCostEstimate as decimal -> TotalEstimatedCost * 365 / FrequencyDays
+field IsHighFrequency as boolean -> FrequencyDays < 30
+field RequiresSafetyProtocol as boolean -> RequiresShutdown or RequiresLockoutTagout or SafetyPermitRequired
+
+# ── Invariants ───────────────────────────────────────────────────────
+
+invariant not RequiresLockoutTagout or RequiresShutdown because "Lockout-tagout requires equipment shutdown"
+invariant not ComplianceCritical or RegulatoryStandard != null because "Compliance-critical templates must specify a regulatory standard"
+invariant not IsActive or TaskCount >= 1 because "Active templates must have at least one task"
+invariant ToleranceDays < FrequencyDays because "Tolerance window cannot exceed the PM frequency interval"
+invariant FrequencyDays >= 30 or not RequiresShutdown because "High-frequency templates (under 30 days) cannot require shutdown"
+
+# ── Editability ──────────────────────────────────────────────────────
+# NOTE: In a stateful variant, editability would be gated by IsActive:
+# - When IsActive == false: all fields editable (template under construction)
+# - When IsActive == true: only Version, EstimatedLaborCost, EstimatedPartsCost,
+#   MaxOverdueDays, and ToleranceDays editable (template structure locked)
+# Stateless precepts do not support conditional edit guards.
+
+edit TemplateCode, TemplateName, Version, IsActive, AssetClass, Craft, MinTechnicianLevel, ApplicableEnvironments, FrequencyDays, FrequencyHours, SeasonalRestriction, ToleranceDays, EstimatedDurationMinutes, RequiresShutdown, RequiresLockoutTagout, SafetyPermitRequired, TaskCount, InspectionPointCount, EstimatedLaborCost, EstimatedPartsCost, RegulatoryStandard, ComplianceCritical, MaxOverdueDays

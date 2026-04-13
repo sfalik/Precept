@@ -628,6 +628,203 @@ The README DSL hero remains an image-based branded treatment, but it must now be
 - Native README text/fenced code remains the only fully robust way to keep DSL text scaling in lockstep with surrounding prose across viewport and zoom changes.
 - GitHub page-geometry research still matters: the repo shell tops out around **1280px** and the README/article frame around **1012px**, but the displayed README image for this treatment clamps earlier at about **830px**.
 - Do not rely on custom CSS, sanitizer-sensitive HTML, or viewport-specific image swapping as a stable README contract.
+# Decision: Sample realism must cover workflows, entities, and stateless contracts
+
+**By:** Frank, J. Peterman, Shane (directive captured via Copilot)  
+**Date:** 2026-04-08  
+**Status:** Consolidated
+
+## What
+
+- Treat Precept sample and research work as covering **three archetypes**: workflow contracts, entity/stateless contracts, and hybrid contracts that mix lifecycle with dense field governance.
+- Preserve the newly verified **enterprise lifecycle gaps** as first-class roadmap pressure: authorization-gate, appeal-loop, containment-before-remediation, and amendment-loop shapes should appear in the next serious sample wave.
+- Reserve explicit room for **entity-centric/data-only samples** when proposal #22 lands: master data contracts, reference data definitions, and domain-rule contracts should occupy **4-6 in-repo slots** rather than being treated as optional extras.
+- Keep the enterprise benchmark tables and research-gap lists as **living planning references** so future sample additions are justified by domain fit, realism signals, and lifecycle-shape coverage instead of by quota.
+
+## Why
+
+- Frank's platform survey showed that the current sample set is missing recurring enterprise lifecycle shapes that appear across multiple major ecosystems.
+- Frank's entity-modeling addendum corrected the earlier workflow-only lens: real business domains also include reference data, master data, and other governed entities that future stateless precepts should cover.
+- Peterman's enterprise benchmark established the realism signals that make examples feel credible in public product narratives.
+- Peterman's entity-centric benchmark showed that strong stateless examples need enterprise-grade field semantics, cross-field rules, and inspectable invariants — not flat schema demos.
+- Shane explicitly directed the team to stop treating Precept as workflow-only and to cover business entities plus future data-only/stateless precepts in both research and samples.
+
+## Consolidated implications
+
+- **George:** future sample authoring should cover both missing workflow shapes and future entity/hybrid lanes without flattening domains to today's weakest primitives.
+- **Steinbrenner:** portfolio planning should reserve workflow and stateless/entity capacity together; data-only slots are additive evidence, not throwaway teaching extras.
+- **Frank + Peterman:** continue using external enterprise systems as the benchmark lens for both roadmap pressure and public sample credibility.
+
+## Artifacts
+
+- docs/research/sample-realism/frank-enterprise-platform-and-research-gaps.md
+- docs/research/sample-realism/peterman-enterprise-ecosystem-benchmarks.md
+- docs/research/sample-realism/frank-entity-modeling-addendum.md
+- docs/research/sample-realism/peterman-entity-centric-benchmarks.md
+
+---
+
+# Decision: Sample ceiling operating model (consolidated)
+
+**By:** Frank, Steinbrenner, J. Peterman  
+**Date:** 2026-04-08  
+**Status:** Consolidated
+
+## What
+
+- Treat **30 total samples** as the near-term expansion target and **30-36 co-equal canonical business samples** as the realistic operating band for the current product stage.
+- Treat **42 total in-repo samples** as the current hard upper bound for a flat corpus. Anything above that needs explicit tiering, stronger curation infrastructure, and a trigger-driven justification.
+- Organize the library as a **tiered corpus**: a small flagship canon, a broader extended shelf, and a constrained reference/experimental lane instead of presenting every sample as equal-strength evidence.
+- Make **quality gates outrank quotas**. A candidate past the low 30s must clear both a **marginal-value gate** (new domain, workflow shape, or construct pressure) and a **dilution/refusal test** (prevention, inspectability, deterministic policy enforcement, one-file completeness, and real domain fit).
+- Prefer **deepening native-fit domains** over adding thin marginal domains. Claims/disputes, financial approvals/exceptions, and compliance/regulatory workflows remain the strongest flagship pressure-test lanes.
+- Revisit the ceiling only when the product or corpus structure materially changes: new language surface ships, docs/navigation improve, or the team adds ownership/segmentation strong enough to support a larger maintained shelf.
+
+## Why
+
+- Steinbrenner's planning pass showed that documentation, onboarding, review bandwidth, and future sample-test burden make the mid-30s the most believable place for a co-equal canon.
+- Peterman's benchmark lane showed that projects with 40+ examples usually segment them into canonical, reference, experimental, or overflow lanes rather than one undifferentiated shelf.
+- Frank's ceiling analysis argued that breadth and workflow-shape coverage saturate around the 40-50 range, but only if the team accepts tiered maintenance and marginal-value screening.
+- Frank's philosophy addendum tightened that further: the real question is not 'how many can we fit?' but 'which samples still prove Precept's prevention and inspectability story without diluting it?'
+
+## Differences resolved in consolidation
+
+- The **near-term operating guidance** now follows Steinbrenner/Peterman: smaller canon, explicit curation, and 42 as an upper bound rather than the default target.
+- Frank's **40-50 / 50-55** framing is preserved as a longer-horizon ceiling analysis, not today's operating plan. It becomes relevant only if the corpus is tiered and the team has stronger maintenance structure.
+- The shared team position is therefore: **plan for ~30 now, operate cautiously through the mid-30s, allow growth toward 42 only when each addition earns its slot, and do not chase a quota.**
+
+## Artifacts
+
+- `docs/research/sample-realism/frank-sample-ceiling-analysis.md`
+- `docs/research/sample-realism/frank-sample-ceiling-philosophy-addendum.md`
+- `docs/research/sample-realism/steinbrenner-sample-ceiling-plan.md`
+- `docs/research/sample-realism/peterman-sample-corpus-benchmarks.md`
+
+---
+
+# Decision: Sample Realism Initiative — Language & Philosophy Guardrails
+
+**Filed by:** Frank (Lead Architect & Language Designer)
+**Date:** 2026-05-17
+**Status:** Research delivered — awaiting Shane review
+
+## Decision Summary
+
+Established the language-design guardrails, realism criteria, and aspirational-comment protocol for the sample-realism initiative. Key decisions:
+
+### 1. FUTURE(#N) Comment Protocol
+
+Aspirational samples that use not-yet-implemented syntax MUST:
+- Compile cleanly with today's syntax (active lines only)
+- Use `# FUTURE(#N): <proposed syntax>` prefix for aspirational logic
+- Show the current workaround alongside the aspirational form
+- Never mix aspirational syntax into active (non-commented) lines
+
+This enables mechanical grep-and-update when features ship.
+
+### 2. Modeling-Over-Syntax Principle
+
+Language limitations constrain *expression*, never *domain models*. If we don't have `choice` type, we don't simplify the domain — we model severity as `number` with invariants and add FUTURE comments. The domain model is the sample's reason for existing.
+
+### 3. Realism Criteria
+
+Defined structural criteria (S1–S6, must-pass) and quality criteria (Q1–Q8, should-pass) plus corpus-level criteria (C1–C6) for the full sample set. Every sample must compile clean, use domain-idiomatic names, have at least one real business rule, and be self-contained.
+
+### 4. Complexity Classification
+
+Samples must be explicitly classified in their header comments as Teaching/Standard/Complex, with domain family noted. This prevents toy demos from masquerading as realistic contracts.
+
+### 5. Feature-to-Sample Traceability
+
+Every language enhancement PR that ships must include sample updates. `FUTURE(#N)` grep makes this mechanical. A feature without sample updates is a feature that doesn't exist for new users.
+
+### 6. Impact Ranking
+
+Tier 1 (transformative): #25 (choice), #9 (if...then...else), #13 (field constraints), #31 (and/or/not)
+Tier 2 (significant): #29 (integer), #27 (decimal), #14 (conditional invariants), #17 (computed fields), #8 (named rules)
+Tier 3 (targeted): #22 (data-only), #11 (absorb), #26 (date), #10 (.length), #15 (.contains()), #16 (functions)
+
+## Artifact
+
+`docs/research/sample-realism/frank-language-and-philosophy.md`
+
+## Next Steps
+
+- Team members author sample-specific research artifacts
+- Sample authoring begins using these guardrails
+- Shane reviews and approves the overall approach
+
+---
+
+# George — sample audit decision
+
+Date: 2026-04-08
+
+## Decision
+
+Future realistic sample revisions should prefer **honest aspirational comments** over flattening the domain down to today’s weakest primitive. If a workflow wants dates, typed categories, computed totals, reusable policy names, or richer string validation, the sample should keep the current valid DSL and add comments describing the intended rule shape.
+
+## Why
+
+- The current corpus is drifting toward syntax fixtures instead of believable business contracts.
+- Flattened surrogates (`CurrentDay`, free-form strings, manual copied totals, `set Field = Event.Arg` walls) make the product look less capable than the roadmap intends.
+- Samples are one of the clearest planning inputs for runtime and language work; they should expose pressure, not hide it.
+
+## Consequences
+
+- Sample expansion should bias toward denser business domains, not more toy/state-machine examples.
+- Flagship pressure-test samples should be `insurance-claim`, `loan-application`, `travel-reimbursement`, and `vehicle-service-appointment`.
+- Proposed language features most likely to improve sample realism are: `choice`, `date`, `decimal`, computed fields, field constraints, declaration guards, named rules, and absorb shorthand.
+
+---
+
+# Peterman sample research decision
+
+## Decision
+
+For future realism-focused sample work, prefer **case-centric, evidence-bearing, exception-rich workflows** over additional straight-line approval examples.
+
+## Why
+
+External research across prior authorization, claims, IAM, KYC/AML, public-sector casework, AP exceptions, and payment disputes keeps converging on the same shape: intake, routing, evidence collection, policy review, decision, fulfillment, and some form of appeal/reopen/audit closure.
+
+That is where Precept's category claim is strongest. The product reads best when one governed entity carries real institutional pressure, not when a sample is only a short approval ladder.
+
+## Practical consequence
+
+When choosing future sample domains, bias toward:
+
+- request-for-information loops
+- exception queues
+- escalation or reconsideration states
+- post-decision fulfillment gates
+- explicit policy reasons in rejects and assertions
+
+Avoid using pipeline-orchestration or abstract task-choreography examples as flagship samples. They are adjacent to the market, but weaker for Precept's entity-contract narrative.
+
+## References
+
+- `docs\research\sample-realism\peterman-realistic-domain-benchmarks.md`
+- `README.md`
+- `design\brand\brand-decisions.md`
+
+---
+
+### 2026-04-08T01:05:00Z: Sample portfolio scope
+**By:** Steinbrenner
+**What:** Treat the canonical sample-expansion target as **42 total repo samples**: **40 roadmap-grade business samples** plus **2 teaching/control samples** (`trafficlight`, `crosswalk-signal`) that remain in-repo but do not drive language-priority decisions.
+**Why:** The current corpus is broad but still under-pressures the roadmap in exact-money, calendar-date, data-only, and policy-dense domains. Doubling the count only helps if the added samples are chosen as roadmap evidence, not just as more demos.
+
+### 2026-04-08T01:05:00Z: Rewrite-before-add sequencing
+**By:** Steinbrenner
+**What:** Rewrite the existing anchor samples first (`clinic-appointment-scheduling`, `library-book-checkout`, `travel-reimbursement`, `it-helpdesk-ticket`, `insurance-claim`, `loan-application`, `utility-outage-report`, `subscription-cancellation-retention`), then add missing domain lanes, then add data-only samples when #22 is ready.
+**Why:** Those eight files already appear in proposal reasoning. Upgrading them gives faster roadmap value than inventing all-new examples first.
+
+---
+
+### 2026-04-08T00:29:05Z: User directive
+**By:** Shane (via Copilot)
+**What:** Use Opus when appropriate so the team produces a strong, high-quality set of samples.
+**Why:** User request — captured for team memory
 
 ---
 
@@ -778,7 +975,6 @@ Use the GitHub label dsl-compactness as the categorization tag for the current l
 **Why:** These six issues form one coherent roadmap slice around reducing ceremony and improving expression density in the language, so a shared label gives PM, architecture, and implementation a stable theme tag across multiple rollout waves.
 
 ---
-
 
 ### Decision: Gold Brand Mark Exception
 
@@ -1038,9 +1234,6 @@ Two new <h3> blocks within the existing §2.2 card:
 **Full analysis:** rand/references/brand-spec-diagram-color-mapping-review-elaine.md
 
 ---
----
-
----
 
 # Team Knowledge Refresh — 2026-04-04 Findings
 *Filed by Scribe, 2026-04-04T06:08:06Z. Consolidated from 6 domain reviews.*
@@ -1277,8 +1470,6 @@ Three methods (`Hydrate`, `Dehydrate`, `CloneCollections`) invoked at three muta
 
 ---
 
----
-
 # Brand Research — Team Observations
 *Filed by J. Peterman, 2026-04-05. For team awareness.*
 
@@ -1326,8 +1517,6 @@ This should be treated as a blocking item for any launch-facing work.
 "Small caps is the typographic convention for defined terms, legal codes, and axioms — exactly what a precept is." This is a strong line that builds brand credibility with developers who notice intentionality. It currently lives only in internal brand files.
 
 **Recommendation:** Surface this reasoning in the README or a brief "About the design" section. Not a manifesto — two sentences. Developers who care about craft will notice it. Developers who don't will skip it.
-
----
 
 ---
 
@@ -1426,8 +1615,6 @@ Should candidate I be promoted as the third shortlisted hero candidate alongside
 
 ---
 
----
-
 # Hero Domain Verdict — Subscription
 
 **Decision:** The Precept hero snippet domain is **Subscription**.
@@ -1456,8 +1643,6 @@ Should candidate I be promoted as the third shortlisted hero candidate alongside
 - **Loan:** Canonical 35-line sample already exists in `samples/loan-application.precept`. A 15-line version would be a worse imitation of existing work.
 - **Shipment:** Too many bootstrap fields (weight, carrier, address) to generate natural rules within the line budget.
 - **ServiceTicket:** Strong (5/5) but narrower projection target than Subscription — requires knowing your team uses a ticketing system.
-
----
 
 ---
 
@@ -1632,8 +1817,6 @@ Avoid: anything that requires 3+ fields to make the domain legible (kills the li
 
 ---
 
----
-
 # Steinbrenner — Lang Spec Review Decisions
 
 **Date:** 2026-04-04
@@ -1696,8 +1879,6 @@ Avoid: anything that requires 3+ fields to make the domain legible (kills the li
 **Rationale:** The runtime returns full `ConstraintViolation` objects. The webview still receives flat strings. Field-level inline highlighting in the inspector panel is blocked by this gap. Not urgent, but it's a visible UX deficit in the flagship developer surface.
 
 **Action:** Schedule as the next "Later" item to graduate to an active milestone after syntax highlighting and plugin distribution are done.
-
----
 
 ---
 
@@ -1809,8 +1990,6 @@ Trade-off: Catching contradictions at compile time is powerful and differentiati
 
 ---
 
----
-
 # Phase 1 Research Findings — Hero Research Sprint (2026-04-04T13:39:08Z)
 
 *Filed by Scribe; consolidated from 4 agents (J. Peterman, Steinbrenner, Uncle Leo, George)*
@@ -1866,8 +2045,6 @@ This section consolidates inbox items from Phase 1 research agents:
 **By:** shane (via Copilot)
 **What:** Research files should be stored according to domain ownership: Peterman's research (brand/copy) → rand/references/; Steinbrenner's research (PM/product/docs) → docs/references/. Each agent's research artifacts live under their domain root, not a shared location.
 **Why:** User request — captured for team memory
-
----
 
 ---
 
@@ -1950,8 +2127,6 @@ This decision record is the direct input for:
 
 ---
 
----
-
 # Palette Mapping Visual Unification
 
 **Filed by:** Elaine
@@ -2013,8 +2188,6 @@ Added ~70 lines of scoped CSS creating a "Surface Palette Mapping" design system
 ## Applicability
 
 The `.spm-*` system is intentionally general. When §2.3 (Inspector), §2.4 (Docs), or §2.5 (CLI) need detailed element-to-color mappings, the same components apply.
-
----
 
 ---
 
@@ -2326,8 +2499,6 @@ These are **constraints**, not suggestions. The proposal can refine the executio
 
 ---
 
----
-
 # Elaine — Reviewer Corrections Applied to Brand Spec
 
 **Date:** 2026-04-04
@@ -2421,8 +2592,6 @@ All corrections applied to:
 
 **Signed:** Elaine
 **Date:** 2026-04-04
-
----
 
 ---
 
@@ -2530,8 +2699,6 @@ The brand marks were using a color outside this system. The replacements bring t
 
 ---
 
----
-
 # Decision: brand-spec §1.4 Palette Structure Refactor
 
 **Filed by:** Frank (Lead/Architect)
@@ -2569,8 +2736,6 @@ J. Peterman (brand-spec maintainer) with Elaine review.
 ## Status
 
 PENDING — awaiting Shane sign-off.
-
----
 
 ---
 
@@ -2779,8 +2944,6 @@ Per charter, this qualifies as a non-design-gated fix because it's a small proto
 
 ---
 
----
-
 # Runtime Review: README Restructure Proposal — Three Required Changes
 
 **Filed by:** George (Runtime Dev)
@@ -2970,8 +3133,6 @@ The brand and UX design principles in Elaine's spec are sound — the color syst
 
 ---
 
----
-
 # Brand-Spec Color Information Architecture — Implementation Complete
 
 **Author:** J. Peterman
@@ -3062,8 +3223,6 @@ Key things to review:
 
 ---
 
----
-
 # Decision: Brand-Spec § 1.4 Palette Structure Reorganization
 **Filed by:** J. Peterman
 **Date:** 2026-04-06
@@ -3110,8 +3269,6 @@ Three issues:
 
 ---
 
----
-
 # J. Peterman — Final Brand-Spec Cleanup Pass
 
 **Date:** 2026-04-04
@@ -3140,8 +3297,6 @@ Treat the §1.4 palette card as the color source of truth and normalize all rema
 ## Remaining blocker
 
 One item still requires Shane sign-off before the brand spec can be considered fully closed: the current-state indicator treatment in `brand/brand-spec.html` §2.2.
-
----
 
 ---
 
@@ -3189,8 +3344,6 @@ All 16 constraints from Elaine's UX/IA review are documented as non-negotiables 
 
 ---
 
----
-
 # Decision: README Badge Cleanup + Sample Catalog Count
 
 **Author:** Kramer
@@ -3226,8 +3379,6 @@ The NuGet badge (`https://img.shields.io/nuget/v/Precept` → `https://www.nuget
 
 ## No Numeric Catalog/Constructs Count Claim Found
 Searched README for claims about number of DSL constructs, catalog items, or language features. No such claim exists.
-
----
 
 ---
 
@@ -3318,8 +3469,6 @@ The two-surfaces card adapted from `brand/explorations/visual-language-explorati
 
 ---
 
----
-
 # Decision: Replace README Hero with TimeMachine
 
 **Date:** 2026-07-11
@@ -3365,8 +3514,6 @@ This is the correct register for a hero example.
 
 ---
 
----
-
 # Decision: Indigo Overview Card Format in § 1.4
 
 **Date:** 2026-05-01
@@ -3408,8 +3555,6 @@ The exploration card format (width: 320px, dark #141414 background, context-bloc
 - Added a `pc-` CSS class prefix family to brand-spec.html's `<style>` block. The existing `.palette-card` class in brand-spec serves the palette swatch grid (a different context) and could not be repurposed.
 - The `pc-context-block h3` override resets brand-spec.html's global `h3` styles (uppercase + border-bottom) to match the exploration card's style.
 - All surrounding § 1.4 content preserved: heading, both callouts, and the structural/state/event/data/rules/comments/verdicts cards below.
-
----
 
 ---
 
@@ -3468,8 +3613,6 @@ The in-context examples (badge, syntax, diagram) demonstrate the palette in the 
 ## Closing line
 
 *"Depth and authority. Selected over teal, amber, and steel. The only brand color that reads as both technical precision and earned trust."*
-
----
 
 ---
 
@@ -3536,8 +3679,6 @@ Compare: "Say goodbye to bugs forever!" (performative) vs. "If you've been writi
 
 ---
 
----
-
 # Decision: README Restructure Proposal — Editorial Review Complete
 
 **Date:** 2026-04-06
@@ -3575,8 +3716,6 @@ Overall structure, section order, CTA hierarchy (Primary/Secondary/Tertiary), du
 ## Status
 
 Blocked on RC-1 and RC-2. Frank's four required changes are separate and not duplicated here. George's technical accuracy review is ongoing.
-
----
 
 ---
 
@@ -3964,8 +4103,6 @@ Claude Sonnet 4.6 remains the default model for design and polish work. However,
 
 ---
 
----
-
 # Brand Mark Icons: Spec Alignment
 
 **Author:** Elaine (UX Designer)
@@ -3994,8 +4131,6 @@ Icons are abstractions, but they still speak the spec's locked visual language. 
 ## Pattern established
 
 **Brand mark icons inherit their parent surface's semantic rules.** If a brand mark depicts a state diagram, it uses §2.2 diagram colors and shapes. If it depicts a code page, it uses §2.1 syntax colors. The icons don't get to invent their own palette — they are small-scale renderings of the locked system.
-
----
 
 ---
 
@@ -4029,8 +4164,6 @@ Gold already carries this meaning in syntax highlighting: every `because` and `r
 
 - `brand/brand-spec.html` — SVG updated, color key updated, prose updated in §1.3, §1.4 intro, §1.4.1, and the Rules · Gold surface section
 - `.squad/skills/color-roles/SKILL.md` — Rule 2 and the Gold row updated to reflect this exception
-
----
 
 ---
 
@@ -4071,8 +4204,6 @@ The brand mark color key now shows Emerald as a fifth entry (Transition #34D399)
 - Emerald is not a second structural lane — it only appears on the transition arrow (one element per mark)
 - Gold does not appear on the state-only mark (no `because` line there; nothing to represent)
 - State shapes and Indigo/Violet structure unchanged
-
----
 
 ---
 
@@ -4182,10 +4313,10 @@ Elaine owns the formatting of the Contributing section:
 
 ---
 
----
-
 # Decision: Elaine's Gate Role in README Rewrite Flow
 
+**Date:** 2026-04-07  
+**By:** Elaine (UX Designer)  
 **Date:** 2026-04-07
 **By:** Elaine (UX Designer)
 **Status:** Recommendation — pending Shane acknowledgment
@@ -4255,8 +4386,6 @@ Elaine's constraints were treated as hard non-negotiables in the proposal precis
 
 ---
 
----
-
 # Decision: README Form/Shape Pass
 
 **Author:** Elaine (UX)
@@ -4289,8 +4418,6 @@ The previous draft had good content but felt dense. Each section competed for at
 - Section order
 - The brand mark (kept current state per task brief)
 - Hero domain (Order) — marked as temporary but acceptable
-
----
 
 ---
 
@@ -4389,8 +4516,6 @@ Both paths are valid. The scaffold path prevents one class of hero-related rewor
 
 ---
 
----
-
 # Decision: Gold — Judicious Use, Tablet Mark Inclusion, Emerald Transition Arrows
 
 **Date:** 2026-04-07
@@ -4423,8 +4548,6 @@ Emerald on transition arrows is semantically correct: Emerald means "allowed, do
 
 - `brand/brand-spec.html` — tablet SVG, combined mark, §2.2 SVG diagram, §2.2 color mapping, §1.4 palette card, §1.4.1 cross-surface table, §2.1 Rules · Gold description, brand paragraph, color key
 - `.squad/skills/color-roles/SKILL.md` — (already updated in prior session; confirmed current)
-
----
 
 ---
 
@@ -4475,8 +4598,6 @@ Until the usability review says otherwise, the current README Order example is t
 1. Merge this into `decisions.md` after review.
 2. Use §2.6 as the source when updating README-adjacent marketplace copy.
 3. Revisit only if usability testing or language/API changes force a new hero.
-
----
 
 ---
 
@@ -4569,10 +4690,11 @@ All required changes from Frank, George, and Uncle Leo are incorporated into the
 
 ---
 
----
-
 # Decision: README Restructure Proposal — Shane Feedback Revision
 
+**Author:** J. Peterman  
+**Date:** 2026-04-07  
+**Source:** Shane's feedback pass on `brand/references/readme-restructure-proposal.md`  
 **Author:** J. Peterman
 **Date:** 2026-04-07
 **Source:** Shane's feedback pass on `brand/references/readme-restructure-proposal.md`
@@ -4683,12 +4805,10 @@ All required changes from Frank, George, and Uncle Leo are incorporated into the
 
 ---
 
----
 date: 2026-04-08T00:00:00Z
 author: j-peterman
 status: ready_for_shane
 phase: readme_copy_refinement
----
 
 ---
 
@@ -4739,8 +4859,6 @@ Ready for Shane sign-off. README is near-signoff state: structure locked by Elai
 
 ---
 
----
-
 # Decision: README Proposal Review Gap Pass — All Required Changes Applied
 
 **Author:** J. Peterman
@@ -4787,10 +4905,10 @@ The proposal is ready for Shane's sign-off. The rewrite can begin.
 
 ---
 
----
-
 # Decision: README Restructure Trim Summary Added to Proposal
 
+**Filed by:** J. Peterman  
+**Date:** 2026-04-06  
 **Filed by:** J. Peterman
 **Date:** 2026-04-06
 **Status:** Proposed — pending Shane review
@@ -4823,8 +4941,6 @@ A fifth category — **Net-New Content** — captures additions the restructure 
 ## Team Impact
 
 The trim summary is a reference artifact for whoever executes the rewrite. It functions as a checklist: if any item in the "Removed Entirely" list appears in the rewritten README, something went wrong. If any item in "Deferred to External Docs" appears as embedded content (not a link), that is also a regression.
-
----
 
 ---
 
@@ -4915,8 +5031,6 @@ This is not a ruling against Elaine's involvement. Elaine's structural requireme
 
 ---
 
----
-
 # Decision: Signal Color Family Names
 
 **Date:** 2026-04-07
@@ -4940,8 +5054,6 @@ Updated `brand/brand-spec.html` to use the family names (Emerald, Amber, Rose) c
 ## Implication for team
 
 All future references to these colors — in docs, copy, surface specs, and team communications — should use **Emerald**, **Amber**, and **Rose**. Plain "green/yellow/red" is now retired from brand vocabulary.
-
----
 
 ---
 
@@ -4988,8 +5100,6 @@ Both `spm-header` (CSS class, `padding: 18px 24px`) and `spm-grid` (inline `styl
 ## Applies To
 
 Any future `spm-*` sections (§2.3 Inspector, §2.4 Docs Site, §2.5 CLI/Terminal) must follow this rule when adding new `spm-header` or `spm-grid` blocks inside `spm-group`.
-
----
 
 ---
 
@@ -5094,22 +5204,19 @@ A rewriter working from this proposal needs one thing: the hero sample. Everythi
 **What:** Use the top-rated hero snippet from the visual-language exploration as the temporary live hero until the final hero question is settled later.
 **Why:** User request — captured for team memory
 
-
----
-
 ---
 
 # Decision Inbox Merge — 2026-04-05T02:00:30Z
 
 **Merged by:** Scribe
 **Source:** .squad/decisions/inbox/
+
 ---
 
 ### 2026-04-04T23:22:00Z: User directive
 **By:** shane (via Copilot)
 **What:** For the README hero snippet, visual impact matters more than copyability; it is a hero artifact, not a practical code sample.
 **Why:** User request — captured for team memory
-
 
 ---
 
@@ -5118,14 +5225,12 @@ A rewriter working from this proposal needs one thing: the hero sample. Everythi
 **What:** Do not show a raw Precept code block in the README hero; use the SVG route for the hero treatment instead.
 **Why:** User request — captured for team memory
 
-
 ---
 
 ### 2026-04-05T01:10:02Z: User directive
 **By:** shane (via Copilot)
 **What:** Also include Frank as the architect on the SVG hero effort.
 **Why:** User request — captured for team memory
-
 
 ---
 
@@ -5134,7 +5239,6 @@ A rewriter working from this proposal needs one thing: the hero sample. Everythi
 **What:** Frank should lead on architecture for the SVG hero effort.
 **Why:** User request — captured for team memory
 
-
 ---
 
 ### 2026-04-05T01:15:32Z: User directive
@@ -5142,16 +5246,12 @@ A rewriter working from this proposal needs one thing: the hero sample. Everythi
 **What:** Do not use Haiku. Use non-Haiku models for squad work.
 **Why:** User request — captured for team memory
 
-
 ---
 
 ### 2026-04-05T01:25:49Z: User directive
 **By:** shane (via Copilot)
 **What:** Always use the latest version of models; do not route work to older model versions like gpt-4.1 by default.
 **Why:** User request — captured for team memory
-
-
----
 
 ---
 
@@ -5257,7 +5357,9 @@ GitHub renders SVGs server-side with limited font availability. The design degra
 
 # Precept
 badges + definition + tagline
+
 ---
+
 ## Quick Example  ← hero area (raw code blocks)
 ```
 
@@ -5268,9 +5370,13 @@ badges + definition + tagline
 
 # Precept
 badges + definition + tagline
+
 ---
+
 ![Precept — Subscription lifecycle](brand/readme-hero.svg)
+
 ---
+
 ## Quick Example  ← raw code blocks preserved below hero
 ```
 
@@ -5342,9 +5448,6 @@ Once these are settled, the SVG can be refined without reopening narrative strat
 4. README wiring: insert SVG, remove "temporary" note, verify Quick Example still works
 5. Brand-spec §2.6 update to reflect the new hero treatment
 6. Shane final sign-off on the implemented README
-
-
----
 
 ---
 
@@ -5570,7 +5673,6 @@ It has the highest signal-to-chrome ratio. Three nodes, two arrows, one blocked 
 2. **Rejection message wording.** The current DSL uses `"Cancelled subscriptions cannot be reactivated"`. This is good — clear, direct, slightly formal. If we want more warmth for the hero moment, options include keeping it exactly as-is (recommended — the formality IS the humor) or adjusting slightly.
 3. **"precept Subscription" label.** Should the top-left context label be present? It hints at the DSL without showing raw code. Alternative: omit it and let the diagram stand alone.
 
-
 ---
 
 ### SVG Hero Architecture Proposal — Issue #4
@@ -5751,9 +5853,6 @@ This is already stated in issue #4 ("current live concept can remain Subscriptio
 | Design iteration takes multiple rounds | Medium | Expected. The handoff sequence (§3) has clear gates. Each round is scoped: Elaine owns visual, Peterman owns brand, Frank owns GitHub constraints. |
 | Subscription Billing domain changes before SVG ships | Low | Issue #4 explicitly locks it. If it changes, the SVG is replaced — the architecture (file path, wiring, `<picture>` pattern) is domain-agnostic. |
 
-
----
-
 ---
 
 # J. Peterman — Brand/DevRel proposal pass for issue #4
@@ -5804,14 +5903,10 @@ That is the real decision gate. Once those are approved, SVG execution becomes c
 
 ---
 
----
-
 # Decision Inbox Merge — 2026-04-05T02:32:19Z
 
 **Merged by:** Scribe
 **Source:** .squad/decisions/inbox/
-
----
 
 ---
 
@@ -5825,15 +5920,10 @@ That is the real decision gate. Once those are approved, SVG execution becomes c
 
 ---
 
----
-
 # README link removal
 
 - Removed the contract artifact links from `README.md` and kept the inline DSL block as the single quick-example reading path.
 - Left the standalone files in place, but stopped advertising them in the README so the hero section reads cleanly without sending readers away.
-
-
----
 
 ---
 
@@ -5844,8 +5934,6 @@ That is the real decision gate. Once those are approved, SVG execution becomes c
 **Summary:** Team safe recommendation = freeze-and-curate cutover. Frank's force-promote recommendation remains logged as a dissenting architectural view and is currently blocked by reviewer rejection.
 **Merged:** 4
 **Skipped as duplicates:** 0
-
----
 
 ---
 
@@ -6024,8 +6112,6 @@ The only scenario where curated re-landing makes sense is when the feature branc
 
 ---
 
----
-
 # Decision: Safe Return to Trunk from `feature/language-redesign`
 
 **Date:** 2026-04-05
@@ -6139,8 +6225,6 @@ We are back on trunk and finalized on the current strategy when all of the follo
 
 ---
 
----
-
 # Uncle Leo - Consolidation Safety Review
 
 **Date:** 2026-04-05
@@ -6236,8 +6320,6 @@ Rejected because the trunk history would inherit exploratory/squad/checkpoint no
 ## Bottom line
 
 This branch can be the source of truth for a landing, but **not by direct merge and not by floating-ref force push**. Freeze the SHA, curate the landing, and treat trunk touch as a repository cutover with explicit artifact review gates.
-
----
 
 ---
 
@@ -7003,8 +7085,6 @@ If we want a fast first pass on language value vs. implementation cost, the clea
 
 ---
 
----
-
 # Decision Inbox Merge — 2026-04-05T15:10:06Z
 
 Merged from `.squad/decisions/inbox/`.
@@ -7219,6 +7299,82 @@ Merged PR #35 containing README Quick Example refactoring and Squad orchestratio
 ## Next Steps
 
 Branch `chore/upgrade-squad-latest` is available for additional Squad upgrade work. Main now carries the finalized README Quick Example refactoring and complete orchestration record.
+# Decision: Philosophy research promoted into durable landing zone
+
+**By:** Frank
+**Date:** 2026-07-18
+**Status:** Proposed
+
+## What
+
+- Created `docs/research/philosophy/` as a durable landing zone for product-philosophy evidence, distinct from language research and sample-realism planning.
+- Promoted the reusable, non-sample-specific conclusions from the sample-realism research initiative into `docs/research/philosophy/entity-first-positioning-evidence.md`.
+- Updated `docs/philosophy.md` to link to the new evidence base and tightened wording around entity-first framing, states-are-optional, workflow-as-one-dimension, and category positioning.
+- Updated `docs/research/README.md` to register the new philosophy folder in the research structure.
+
+## Why
+
+The sample-realism research produced durable philosophical conclusions — entity-first framing, three-archetype model, category positioning evidence — that were buried in sample-planning documents. Those conclusions inform the product narrative independently of any sample roster or corpus plan.
+
+Without a dedicated home, philosophy-grounding evidence either stays scattered across sample-realism artifacts (where it decays as sample planning moves on) or gets inlined into `docs/philosophy.md` (making the philosophy doc bloated and evidence-heavy instead of concise and declarative).
+
+The new structure separates concerns:
+- `docs/philosophy.md` — concise, canonical, product-facing
+- `docs/research/philosophy/` — evidence base that grounds the philosophy claims
+- `docs/research/sample-realism/` — sample-specific planning and research (unchanged)
+
+## Team implications
+
+- **George:** Language research stays in `docs/research/language/`. Philosophy research is a separate lane — cross-reference where useful but do not merge the folders.
+- **Steinbrenner:** Sample planning and portfolio work stay in sample-realism. The philosophy evidence doc is upstream context, not a planning input to act on.
+- **Peterman:** Entity-centric and enterprise benchmark conclusions are cited in the philosophy evidence doc. Original research artifacts remain authoritative in their current locations.
+- **All:** When research produces conclusions that strengthen or challenge claims in `docs/philosophy.md`, promote those conclusions into `docs/research/philosophy/` rather than leaving them embedded in domain-specific research.
+
+## Artifacts
+
+- `docs/research/philosophy/README.md` — landing page for philosophy research
+- `docs/research/philosophy/entity-first-positioning-evidence.md` — first promoted evidence document
+- `docs/philosophy.md` — updated with links and tightened wording
+- `docs/research/README.md` — updated with philosophy folder entry
+
+---
+
+# Decision: Sample-Realism Research Organization
+
+**Author:** J. Peterman (Brand/DevRel)
+**Date:** 2026-07-18
+**Scope:** Documentation organization — non-destructive
+
+## What changed
+
+Created `docs/research/sample-realism/README.md` — an organizational map for the twelve existing research artifacts in that directory.
+
+## Classification
+
+The README sorts documents into four buckets:
+
+1. **Corpus planning** (Steinbrenner's portfolio and ceiling plans) — what to build.
+2. **Realism criteria and sample-design guidance** (Frank's language/philosophy doc, George's audit) — how to evaluate and write samples.
+3. **Philosophy-relevant inputs** (Frank's ceiling philosophy addendum, entity modeling addendum, enterprise platform survey) — conclusions that transcend sample design and should inform product identity.
+4. **External benchmark artifacts** (all four Peterman benchmark passes) — evidence from outside Precept.
+
+## Key distinction made explicit
+
+Three documents carry conclusions with **dual citizenship** — they originated as sample-realism research but contain product-level findings:
+
+- The **domain-fit tiers** and **dilution test** (from Frank's ceiling philosophy addendum) belong in product philosophy.
+- The **entity-vs-workflow identity correction** (from Frank's entity modeling addendum) belongs in brand philosophy.
+- The **platform-fit analysis** (from Frank's enterprise platform survey) belongs in competitive positioning.
+
+The README instructs future authors to cite these from philosophy/positioning docs rather than duplicate them.
+
+## What did NOT change
+
+All twelve research files remain in place. No files were moved, renamed, or modified. This is a map, not a restructuring.
+
+## Guidance added
+
+The README includes a contributor guide: naming conventions, what to include, where new research should land, and the explicit instruction to flag conclusions that inform product identity beyond sample design.
 
 
 ## MERGED INBOX BACKLOG — 2026-04-08T13:29:23Z

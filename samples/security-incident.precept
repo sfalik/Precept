@@ -1,0 +1,196 @@
+precept SecurityIncident
+
+# Shape: W4 containment / remediation — cybersecurity incident
+#
+# Models a cybersecurity incident response workflow aligned with NIST 800-61
+# from detection through triage, containment, eradication, recovery,
+# post-incident review, and formal close. Demonstrates severity-driven
+# escalation where critical incidents must escalate before containment,
+# containment strategy gates prevent premature eradication, data breach
+# notification requirements enforce legal compliance, and mandatory
+# post-incident review for critical and high severity incidents.
+#
+# FUTURE(date): DetectedAt, TriagedAt, ContainedAt, EradicatedAt, RecoveredAt, ClosedAt, NotificationDeadline
+
+# --- Fields ---
+
+field IncidentTitle as string nullable maxlength 200
+field IncidentDescription as string nullable maxlength 4000
+field Severity as choice("Critical", "High", "Medium", "Low") default "Medium"
+field IncidentType as choice("Malware", "Phishing", "DataBreach", "DDoS", "InsiderThreat", "Ransomware", "UnauthorizedAccess") default "Malware"
+field ContainmentStrategy as choice("Isolate", "BlockTraffic", "DisableAccount", "Quarantine", "TakeOffline") nullable
+field DetectionSource as choice("SIEM", "EDR", "UserReport", "ThreatIntel", "Automated", "PenTest") nullable
+field DataClassification as choice("Public", "Internal", "Confidential", "Restricted") default "Internal"
+field DispositionType as choice("Resolved", "Mitigated", "Accepted", "Transferred") nullable
+field ReportedBy as string nullable maxlength 100
+field AssignedAnalyst as string nullable maxlength 100
+field SeniorAnalyst as string nullable maxlength 100
+field AffectedSystemCount as integer default 0 nonnegative
+field AffectedUserCount as integer default 0 nonnegative
+field EscalationCount as integer default 0 nonnegative
+field ContainmentAttempts as integer default 0 nonnegative
+field EstimatedDamage as decimal default 0 nonnegative
+field RecoveryCost as decimal default 0 nonnegative
+field TotalCost as decimal -> EstimatedDamage + RecoveryCost
+field IsCriticalIncident as boolean -> Severity == "Critical" or DataClassification == "Restricted"
+field RequiresCISO as boolean -> IsCriticalIncident or AffectedUserCount > 1000
+field RequiresLegalNotification as boolean -> IncidentType == "DataBreach" and DataClassification != "Public"
+field CISONotified as boolean default false
+field LegalNotified as boolean default false
+field ContainmentVerified as boolean default false
+field EradicationConfirmed as boolean default false
+field LessonsLearned as string nullable maxlength 4000
+field RootCause as string nullable maxlength 2000
+field FalsePositiveJustification as string nullable maxlength 2000
+field PostIncidentReviewComplete as boolean default false
+
+# --- Invariants ---
+
+invariant AffectedSystemCount <= 100000 because "Affected system count cannot exceed 100000"
+invariant AffectedUserCount <= 10000000 because "Affected user count cannot exceed 10 million"
+invariant EstimatedDamage <= 999999999 because "Estimated damage cannot exceed 999999999"
+invariant RecoveryCost <= 999999999 because "Recovery cost cannot exceed 999999999"
+
+# --- States ---
+
+state Detected initial
+state Triaged
+state Containment
+state Escalated
+state Eradication
+state Recovery
+state PostIncident
+state FalsePositive
+state Closed
+
+# --- State Constraints ---
+
+in Triaged assert IncidentTitle != null because "Triaged incidents must have a title"
+in Triaged assert DetectionSource != null because "Triaged incidents must have a detection source"
+in Triaged assert AssignedAnalyst != null because "Triaged incidents must have an assigned analyst"
+in Containment assert ContainmentStrategy != null because "Containment requires a strategy to be set"
+in Escalated assert SeniorAnalyst != null because "Escalated incidents must have a senior analyst assigned"
+in Eradication assert ContainmentVerified because "Eradication requires verified containment"
+in Recovery assert EradicationConfirmed because "Recovery requires confirmed eradication"
+in PostIncident assert DispositionType != null because "Post-incident review requires a disposition type"
+in FalsePositive assert FalsePositiveJustification != null because "False positive determination requires justification"
+in Closed assert DispositionType != null or FalsePositiveJustification != null because "Closed incidents must have a disposition or false positive justification"
+in Closed assert FalsePositiveJustification != null or not RequiresCISO or CISONotified because "CISO notification is required before closing"
+in Closed assert FalsePositiveJustification != null or not RequiresLegalNotification or LegalNotified because "Legal notification is required before closing data breach incidents"
+in Closed assert FalsePositiveJustification != null or (Severity != "Critical" and Severity != "High") or LessonsLearned != null because "Critical and high severity incidents require lessons learned"
+in Closed assert FalsePositiveJustification != null or (Severity != "Critical" and Severity != "High") or RootCause != null because "Critical and high severity incidents require root cause analysis"
+
+# --- Edit Declarations ---
+
+in Detected edit IncidentTitle, IncidentDescription, Severity, DetectionSource, DataClassification
+in Triaged edit Severity, DataClassification, AffectedSystemCount, AffectedUserCount, EstimatedDamage
+in Containment edit AffectedSystemCount, AffectedUserCount, EstimatedDamage
+in Escalated edit AffectedSystemCount, AffectedUserCount, EstimatedDamage
+in Eradication edit AffectedSystemCount, AffectedUserCount, EstimatedDamage, RecoveryCost
+in Recovery edit RecoveryCost
+in PostIncident edit RecoveryCost
+
+# --- Events ---
+
+event ReportIncident with Title as string notempty maxlength 200, Description as string notempty maxlength 4000, Source as choice("SIEM", "EDR", "UserReport", "ThreatIntel", "Automated", "PenTest"), Type as choice("Malware", "Phishing", "DataBreach", "DDoS", "InsiderThreat", "Ransomware", "UnauthorizedAccess"), Sev as choice("Critical", "High", "Medium", "Low") default "Medium", Reporter as string notempty maxlength 100, Analyst as string notempty maxlength 100, DataClass as choice("Public", "Internal", "Confidential", "Restricted") default "Internal", SystemCount as integer nonnegative default 0, UserCount as integer nonnegative default 0
+
+event Escalate with Senior as string notempty maxlength 100
+
+event BeginContainment with Strategy as choice("Isolate", "BlockTraffic", "DisableAccount", "Quarantine", "TakeOffline")
+
+event SetContainment with Strategy as choice("Isolate", "BlockTraffic", "DisableAccount", "Quarantine", "TakeOffline")
+
+event AttemptContainment
+
+event VerifyContainment
+
+event BeginEradication
+
+event ConfirmEradication
+
+event BeginRecovery
+
+event CompleteRecovery with Disposition as choice("Resolved", "Mitigated", "Accepted", "Transferred"), Cost as decimal nonnegative default 0
+
+event NotifyCISO
+
+event NotifyLegal
+
+event CompletePostIncident with Lessons as string notempty maxlength 4000, Cause as string notempty maxlength 2000
+
+event DetermineFalsePositive with Justification as string notempty maxlength 2000
+
+event CloseIncident
+
+event UpdateDamageEstimate with Amount as decimal nonnegative
+
+# --- Event Assertions ---
+
+on ReportIncident assert ReportIncident.Title.length > 2 because "Incident title must be at least 3 characters"
+
+# --- Transitions ---
+
+# Detection: intake captures incident details, analyst, and initial scope
+from Detected on ReportIncident -> set IncidentTitle = ReportIncident.Title -> set IncidentDescription = ReportIncident.Description -> set DetectionSource = ReportIncident.Source -> set IncidentType = ReportIncident.Type -> set Severity = ReportIncident.Sev -> set ReportedBy = ReportIncident.Reporter -> set AssignedAnalyst = ReportIncident.Analyst -> set DataClassification = ReportIncident.DataClass -> set AffectedSystemCount = ReportIncident.SystemCount -> set AffectedUserCount = ReportIncident.UserCount -> transition Triaged
+
+# Triage: severity-driven routing
+# Critical incidents must escalate before containment
+from Triaged on BeginContainment when Severity == "Critical" -> reject "Critical incidents must be escalated before containment"
+from Triaged on BeginContainment -> set ContainmentStrategy = BeginContainment.Strategy -> transition Containment
+
+# Escalation: assign senior analyst for critical/high severity
+from Triaged on Escalate -> set SeniorAnalyst = Escalate.Senior -> set EscalationCount = EscalationCount + 1 -> transition Escalated
+
+# False positive: requires justification, exits main workflow
+from Triaged on DetermineFalsePositive -> set FalsePositiveJustification = DetermineFalsePositive.Justification -> transition FalsePositive
+
+# Escalated: proceed to containment or notify CISO
+from Escalated on BeginContainment -> set ContainmentStrategy = BeginContainment.Strategy -> transition Containment
+from Escalated on NotifyCISO -> set CISONotified = true -> no transition
+
+# Containment: adjust strategy, attempt containment, verify
+from Containment on SetContainment -> set ContainmentStrategy = SetContainment.Strategy -> no transition
+from Containment on AttemptContainment -> set ContainmentAttempts = ContainmentAttempts + 1 -> no transition
+from Containment on VerifyContainment -> set ContainmentVerified = true -> no transition
+
+# Containment gate: must be verified before eradication
+from Containment on BeginEradication when ContainmentVerified -> transition Eradication
+from Containment on BeginEradication -> reject "Containment must be verified before starting eradication"
+
+# Eradication: confirm before recovery
+from Eradication on ConfirmEradication -> set EradicationConfirmed = true -> no transition
+
+from Eradication on BeginRecovery when EradicationConfirmed -> transition Recovery
+from Eradication on BeginRecovery -> reject "Eradication must be confirmed before starting recovery"
+
+# Recovery: critical/high route through post-incident review
+from Recovery on CompleteRecovery when Severity == "Critical" or Severity == "High" -> set DispositionType = CompleteRecovery.Disposition -> set RecoveryCost = RecoveryCost + CompleteRecovery.Cost -> transition PostIncident
+from Recovery on CompleteRecovery -> set DispositionType = CompleteRecovery.Disposition -> set RecoveryCost = RecoveryCost + CompleteRecovery.Cost -> transition Closed
+
+# Post-incident review: captures lessons learned and root cause
+from PostIncident on CompletePostIncident -> set LessonsLearned = CompletePostIncident.Lessons -> set RootCause = CompletePostIncident.Cause -> set PostIncidentReviewComplete = true -> transition Closed
+
+# False positive close
+from FalsePositive on CloseIncident -> transition Closed
+
+# Cross-cutting: CISO notification from active states
+from Triaged on NotifyCISO -> set CISONotified = true -> no transition
+from Containment on NotifyCISO -> set CISONotified = true -> no transition
+from Eradication on NotifyCISO -> set CISONotified = true -> no transition
+from Recovery on NotifyCISO -> set CISONotified = true -> no transition
+from PostIncident on NotifyCISO -> set CISONotified = true -> no transition
+
+# Cross-cutting: legal notification from active states
+from Triaged on NotifyLegal -> set LegalNotified = true -> no transition
+from Escalated on NotifyLegal -> set LegalNotified = true -> no transition
+from Containment on NotifyLegal -> set LegalNotified = true -> no transition
+from Eradication on NotifyLegal -> set LegalNotified = true -> no transition
+from Recovery on NotifyLegal -> set LegalNotified = true -> no transition
+from PostIncident on NotifyLegal -> set LegalNotified = true -> no transition
+
+# Cross-cutting: damage estimate updates from active states
+from Triaged on UpdateDamageEstimate -> set EstimatedDamage = UpdateDamageEstimate.Amount -> no transition
+from Escalated on UpdateDamageEstimate -> set EstimatedDamage = UpdateDamageEstimate.Amount -> no transition
+from Containment on UpdateDamageEstimate -> set EstimatedDamage = UpdateDamageEstimate.Amount -> no transition
+from Eradication on UpdateDamageEstimate -> set EstimatedDamage = UpdateDamageEstimate.Amount -> no transition
+from Recovery on UpdateDamageEstimate -> set EstimatedDamage = UpdateDamageEstimate.Amount -> no transition

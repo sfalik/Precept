@@ -1,0 +1,199 @@
+precept BenefitsApplication
+
+# Shape: W5 appeal / re-review — government benefits
+#
+# Models a government benefits application (disability, unemployment, housing
+# assistance, food assistance, medical coverage) with a formal multi-tier
+# appeal ladder: initial review → administrative appeal → independent hearing.
+# Demonstrates choice-based eligibility categories, income and resource
+# thresholds computed from household size, documentation gating, appeal count
+# caps, hearing outcomes with remand, and conditional edits across lifecycle.
+#
+# FUTURE(date): ApplicationDate, SubmissionDate, DenialDate, AppealDeadline,
+#               HearingDate, DecisionDate
+
+# --- Fields ---
+
+field ApplicantName as string nullable maxlength 200
+field CaseNumber as string nullable maxlength 50
+field BenefitType as choice("Disability", "Unemployment", "HousingAssistance", "FoodAssistance", "MedicalCoverage") nullable
+field EmploymentStatus as choice("Employed", "PartTimeEmployed", "Unemployed", "SelfEmployed", "Retired", "Disabled") nullable
+field DenialReason as choice("IncomeExceeded", "IncompleteDocumentation", "IneligibleStatus", "ResourceExceeded", "Other") nullable
+field HearingOutcome as choice("Overturned", "Upheld", "Remanded") nullable
+field DocumentationStatus as choice("Incomplete", "Complete", "UnderVerification", "Verified") default "Incomplete"
+
+field AnnualIncome as decimal default 0 nonnegative maxplaces 2
+field AssetValue as decimal default 0 nonnegative maxplaces 2
+field BenefitAmount as decimal default 0 nonnegative maxplaces 2
+
+field HouseholdSize as integer default 1 positive
+field DependentCount as integer default 0 nonnegative
+field AppealCount as integer default 0 nonnegative
+field HearingRequestCount as integer default 0 nonnegative
+field DaysToAppeal as integer default 0 nonnegative
+
+field ReviewerName as string nullable maxlength 100
+field HearingOfficerName as string nullable maxlength 100
+field CaseNotes as string nullable maxlength 2000
+field AppealJustification as string nullable maxlength 2000
+field HearingNotes as string nullable maxlength 2000
+
+# --- Computed Fields ---
+
+field IncomeThreshold as decimal -> HouseholdSize * 15000
+field IsIncomeEligible as boolean -> AnnualIncome <= IncomeThreshold
+field IsAppealEligible as boolean -> AppealCount < 2 and DaysToAppeal > 0
+
+# --- Invariants ---
+
+invariant AnnualIncome >= 0 because "Annual income cannot be negative"
+invariant AssetValue >= 0 because "Asset value cannot be negative"
+invariant DependentCount < HouseholdSize because "Dependents must be fewer than household size"
+invariant AppealCount <= 2 because "No more than two appeals are permitted"
+invariant HearingRequestCount <= 1 because "Only one hearing request is permitted"
+
+# --- States ---
+
+state Draft initial
+state Submitted
+state UnderReview
+state Approved
+state Denied
+state AppealFiled
+state AppealReview
+state AppealGranted
+state AppealDenied
+state HearingRequested
+state HearingScheduled
+state HearingDecision
+state Closed
+
+# --- State Constraints ---
+
+in Submitted assert ApplicantName != null because "Application must have an applicant name"
+in Submitted assert BenefitType != null because "Application must specify a benefit type"
+in UnderReview assert ReviewerName != null because "Review requires an assigned reviewer"
+in Approved assert DocumentationStatus == "Verified" because "Approved applications must have verified documentation"
+in Denied assert DenialReason != null because "Denied applications must have a denial reason"
+in AppealFiled assert AppealJustification != null because "Appeals must include a justification"
+in AppealDenied assert DenialReason != null because "Appeal denial must have a reason"
+in HearingScheduled assert HearingOfficerName != null because "Scheduled hearings require a hearing officer"
+in HearingDecision assert HearingOutcome != null because "Hearing decisions must have a recorded outcome"
+in HearingDecision assert HearingNotes != null because "Hearing decisions must include notes"
+
+# --- Edit Declarations ---
+
+in Draft edit ApplicantName, BenefitType, EmploymentStatus, HouseholdSize, DependentCount
+in Draft edit AnnualIncome, AssetValue, CaseNotes
+in Submitted edit CaseNumber
+in UnderReview edit DocumentationStatus, CaseNotes
+in UnderReview when DocumentationStatus == "UnderVerification" edit AnnualIncome, AssetValue
+in AppealFiled edit AppealJustification
+in AppealReview edit CaseNotes
+
+# --- Events ---
+
+event StartApplication with Name as string notempty maxlength 200, Type as choice("Disability", "Unemployment", "HousingAssistance", "FoodAssistance", "MedicalCoverage"), Employment as choice("Employed", "PartTimeEmployed", "Unemployed", "SelfEmployed", "Retired", "Disabled")
+
+event SetFinancialDetails with Income as decimal nonnegative, Assets as decimal nonnegative, Household as integer positive, Dependents as integer nonnegative default 0
+
+event SubmitApplication
+
+event AssignReviewer with Name as string notempty maxlength 100
+
+event UpdateDocumentation with Status as choice("Incomplete", "Complete", "UnderVerification", "Verified")
+
+event Approve
+
+event Deny with Reason as choice("IncomeExceeded", "IncompleteDocumentation", "IneligibleStatus", "ResourceExceeded", "Other")
+
+event FileAppeal with Justification as string notempty maxlength 2000
+
+event BeginAppealReview
+
+event GrantAppeal
+
+event DenyAppeal with Reason as choice("IncomeExceeded", "IncompleteDocumentation", "IneligibleStatus", "ResourceExceeded", "Other")
+
+event RequestHearing
+
+event ScheduleHearing with OfficerName as string notempty maxlength 100
+
+event RecordHearingDecision with Outcome as choice("Overturned", "Upheld", "Remanded"), Notes as string notempty maxlength 2000
+
+event ResolveHearing
+
+event Close
+
+# --- Event Assertions ---
+
+on SetFinancialDetails assert SetFinancialDetails.Dependents < SetFinancialDetails.Household because "Dependents must be fewer than household size"
+
+# --- Transitions ---
+
+# Draft: populate application fields
+from Draft on StartApplication -> set ApplicantName = StartApplication.Name -> set BenefitType = StartApplication.Type -> set EmploymentStatus = StartApplication.Employment -> no transition
+
+from Draft on SetFinancialDetails -> set AnnualIncome = SetFinancialDetails.Income -> set AssetValue = SetFinancialDetails.Assets -> set HouseholdSize = SetFinancialDetails.Household -> set DependentCount = SetFinancialDetails.Dependents -> no transition
+
+# Draft: submit — requires applicant name and benefit type
+from Draft on SubmitApplication when ApplicantName != null and BenefitType != null -> set BenefitAmount = if BenefitType == "Disability" then HouseholdSize * 1200 else if BenefitType == "Unemployment" then HouseholdSize * 800 else if BenefitType == "HousingAssistance" then HouseholdSize * 1500 else if BenefitType == "FoodAssistance" then HouseholdSize * 400 else if BenefitType == "MedicalCoverage" then HouseholdSize * 600 else 0 -> transition Submitted
+from Draft on SubmitApplication -> reject "Application must have an applicant name and benefit type before submission"
+
+# Submitted: assign reviewer to begin review
+from Submitted on AssignReviewer -> set ReviewerName = AssignReviewer.Name -> transition UnderReview
+
+# UnderReview: update documentation status
+from UnderReview on UpdateDocumentation -> set DocumentationStatus = UpdateDocumentation.Status -> no transition
+
+# UnderReview: approve — documentation must be verified and income eligible
+from UnderReview on Approve when DocumentationStatus != "Verified" -> reject "Documentation must be verified before approval"
+from UnderReview on Approve when not IsIncomeEligible -> reject "Applicant does not meet income eligibility requirements"
+from UnderReview on Approve -> transition Approved
+
+# UnderReview: deny with reason
+from UnderReview on Deny -> set DenialReason = Deny.Reason -> set DaysToAppeal = 30 -> transition Denied
+
+# Denied: file appeal — capped at 2, must be within appeal window
+from Denied on FileAppeal when AppealCount >= 2 -> reject "Maximum number of appeals has been reached"
+from Denied on FileAppeal when DaysToAppeal <= 0 -> reject "Appeal window has expired"
+from Denied on FileAppeal -> set AppealCount = AppealCount + 1 -> set AppealJustification = FileAppeal.Justification -> set DenialReason = null -> transition AppealFiled
+
+# Denied: close without appealing
+from Denied on Close -> transition Closed
+
+# AppealFiled: begin appeal review
+from AppealFiled on BeginAppealReview -> transition AppealReview
+
+# AppealReview: grant appeal — clears denial
+from AppealReview on GrantAppeal -> set DenialReason = null -> transition AppealGranted
+
+# AppealReview: deny appeal — records new denial reason
+from AppealReview on DenyAppeal -> set DenialReason = DenyAppeal.Reason -> set DaysToAppeal = 30 -> transition AppealDenied
+
+# AppealDenied: file another appeal if under cap
+from AppealDenied on FileAppeal when AppealCount >= 2 -> reject "Maximum number of appeals has been reached"
+from AppealDenied on FileAppeal when DaysToAppeal <= 0 -> reject "Appeal window has expired"
+from AppealDenied on FileAppeal -> set AppealCount = AppealCount + 1 -> set AppealJustification = FileAppeal.Justification -> set DenialReason = null -> transition AppealFiled
+
+# AppealDenied: request hearing — capped at 1
+from AppealDenied on RequestHearing when HearingRequestCount >= 1 -> reject "Only one hearing request is permitted"
+from AppealDenied on RequestHearing -> set HearingRequestCount = HearingRequestCount + 1 -> transition HearingRequested
+
+# AppealDenied: close without further action
+from AppealDenied on Close -> transition Closed
+
+# HearingRequested: schedule hearing with officer
+from HearingRequested on ScheduleHearing -> set HearingOfficerName = ScheduleHearing.OfficerName -> transition HearingScheduled
+
+# HearingScheduled: record hearing decision
+from HearingScheduled on RecordHearingDecision -> set HearingOutcome = RecordHearingDecision.Outcome -> set HearingNotes = RecordHearingDecision.Notes -> transition HearingDecision
+
+# HearingDecision: resolve based on outcome
+from HearingDecision on ResolveHearing when HearingOutcome == "Overturned" -> set DenialReason = null -> set DocumentationStatus = "Verified" -> transition Approved
+from HearingDecision on ResolveHearing when HearingOutcome == "Upheld" -> transition Closed
+from HearingDecision on ResolveHearing when HearingOutcome == "Remanded" -> set HearingOutcome = null -> set HearingNotes = null -> transition AppealReview
+
+# Terminal: close from approved or granted states
+from Approved on Close -> transition Closed
+from AppealGranted on Close -> transition Closed

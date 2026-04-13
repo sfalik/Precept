@@ -1,61 +1,186 @@
 precept LoanApplication
 
-# This sample keeps underwriting rules in the workflow itself instead of spreading them across services.
-# The approval guard combines document verification, credit policy, and affordability checks.
-# Built-in functions (min, round, clamp) keep the logic readable without external helpers.
+# Shape: W1→W6 intake through active-life governance
+#
+# Models a loan application from initial draft through underwriting,
+# disbursement, active repayment, delinquency management, and closure.
+# Demonstrates real financial types, compound underwriting guards,
+# computed risk metrics, and active-life state governance.
+#
+# FUTURE(date): ApplicationDate, ApprovalDate, DisbursementDate,
+#               MaturityDate, FirstPaymentDue, LastPaymentDate
 
-field ApplicantName as string nullable
-field RequestedAmount as number default 0
-field ApprovedAmount as number default 0
-field CreditScore as number default 0
-field AnnualIncome as number default 0
-field ExistingDebt as number default 0
-field DecisionNote as string nullable
+# --- Fields ---
+
+field ApplicantName as string nullable maxlength 200
+field LoanType as choice("Personal", "Auto", "Mortgage", "Business", "StudentRefi") default "Personal"
+field EmploymentType as choice("FullTime", "PartTime", "SelfEmployed", "Retired", "Unemployed") default "FullTime"
+field LoanAmount as decimal nonnegative default 0
+field ApprovedAmount as decimal nonnegative default 0
+field InterestRate as decimal nonnegative default 0 maxplaces 4
+field LoanTermMonths as integer positive default 12
+field CreditScore as integer nonnegative default 0
+field AnnualIncome as decimal nonnegative default 0
+field ExistingDebt as decimal nonnegative default 0
+field PropertyValue as decimal nonnegative default 0
 field DocumentsVerified as boolean default false
+field ApprovalDecision as choice("Approved", "Denied", "Conditional") nullable
+field DecisionNote as string nullable maxlength 1000
+field OutstandingBalance as decimal nonnegative default 0
+field PaymentsMade as integer nonnegative default 0
+field MissedPayments as integer nonnegative default 0
+field ClosureReason as string nullable maxlength 500
 
-invariant RequestedAmount >= 0 because "Requested amount cannot be negative"
-invariant ApprovedAmount >= 0 because "Approved amount cannot be negative"
-invariant ApprovedAmount <= RequestedAmount because "Approved amount cannot exceed the request"
-invariant AnnualIncome >= 0 because "Annual income cannot be negative"
-invariant ExistingDebt >= 0 because "Existing debt cannot be negative"
-invariant ExistingDebt <= AnnualIncome * 3 when DocumentsVerified because "Verified applications must have a debt-to-income ratio of 3x or less"
+# --- Computed Fields ---
+
+field MonthlyIncome as decimal -> if AnnualIncome > 0 then round(AnnualIncome / 12, 2) else 0
+field DebtToIncomeRatio as decimal -> if AnnualIncome > 0 then round(ExistingDebt / AnnualIncome * 100, 2) else 0
+field MonthlyPaymentEstimate as decimal -> if LoanTermMonths > 0 and ApprovedAmount > 0 then round(ApprovedAmount / LoanTermMonths, 2) else 0
+field LoanToValueRatio as decimal -> if PropertyValue > 0 then round(LoanAmount / PropertyValue * 100, 2) else 0
+field IsHighRisk as boolean -> CreditScore < 620 or DebtToIncomeRatio > 43 or EmploymentType == "Unemployed" or MissedPayments >= 3
+
+# --- Invariants ---
+
+invariant ApprovedAmount <= LoanAmount when ApprovedAmount > 0 because "Approved amount cannot exceed requested loan amount"
+invariant OutstandingBalance <= ApprovedAmount when ApprovedAmount > 0 because "Outstanding balance cannot exceed approved amount"
+
+# --- States ---
 
 state Draft initial
+state Application
 state UnderReview
 state Approved
-state Funded
-state Declined
+state Denied
+state Disbursed
+state Active
+state Delinquent
+state DefaultNotice
+state Closed
 
+# --- State Constraints ---
+
+in Application assert ApplicantName != null because "Applications must have an applicant name"
+in Application assert LoanAmount >= 1000 because "Minimum loan amount is $1,000"
+in UnderReview assert CreditScore >= 300 because "Credit score must be in valid range for review"
 in Approved assert DocumentsVerified because "Approved loans must have verified documents"
-in UnderReview assert CreditScore >= 300 when DocumentsVerified because "Verified applicants must have a minimum credit score of 300"
-in Funded assert ApprovedAmount > 0 because "Funded loans must have a positive approved amount"
+in Approved assert ApprovalDecision != null because "Approved loans must have a recorded decision"
+in Approved assert ApprovedAmount > 0 because "Approved loans must have a positive approved amount"
+in Disbursed assert OutstandingBalance > 0 because "Disbursed loans must have an outstanding balance"
+in Active assert OutstandingBalance > 0 because "Active loans must have a positive outstanding balance"
+in Delinquent assert MissedPayments > 0 because "Delinquent loans must have missed payments"
+in DefaultNotice assert MissedPayments >= 3 because "Default notice requires at least three missed payments"
 
-in UnderReview when DocumentsVerified edit DecisionNote
+# --- Edit Declarations ---
 
-event Submit with Applicant as string, Amount as number, Score as number, Income as number, Debt as number
-on Submit assert Applicant != "" because "An applicant name is required"
-on Submit assert Amount > 0 because "Loan requests must be positive"
-on Submit assert Score >= 0 because "Credit score cannot be negative"
-on Submit assert Income >= 0 because "Income cannot be negative"
-on Submit assert Debt >= 0 because "Debt cannot be negative"
+in Draft edit ApplicantName, LoanType, EmploymentType, LoanAmount, LoanTermMonths, AnnualIncome, ExistingDebt, PropertyValue
+in Application edit ApplicantName, LoanType, EmploymentType, AnnualIncome, ExistingDebt, PropertyValue
+in UnderReview edit DecisionNote
+in UnderReview when DocumentsVerified edit InterestRate, LoanTermMonths
+in Active edit EmploymentType, AnnualIncome
+
+# --- Events ---
+
+event Submit with Applicant as string notempty maxlength 200, Type as choice("Personal", "Auto", "Mortgage", "Business", "StudentRefi"), Employment as choice("FullTime", "PartTime", "SelfEmployed", "Retired", "Unemployed"), Amount as decimal positive min 1000, Term as integer positive default 12, Score as integer min 300 max 850, Income as decimal nonnegative, Debt as decimal nonnegative default 0, Property as decimal nonnegative default 0
+on Submit assert Income > 0 or Employment == "Retired" because "Non-retired applicants must report income"
 
 event VerifyDocuments
 
-event Approve with Amount as number, Note as string nullable default null
-on Approve assert Amount > 0 because "Approved amounts must be positive"
+event BeginReview
+
+event Approve with Amount as decimal positive, Rate as decimal nonnegative maxplaces 4, Note as string nullable default null
 on Approve assert Note == null or Note != "" because "A supplied decision note cannot be blank"
 
-event Decline with Note as string
-on Decline assert Note != "" because "A decline note is required"
+event ApproveConditional with Amount as decimal positive, Rate as decimal nonnegative maxplaces 4, Condition as string notempty maxlength 500
 
-event FundLoan
+event Deny with Note as string notempty maxlength 1000
 
-from Draft on Submit -> set ApplicantName = Submit.Applicant -> set RequestedAmount = Submit.Amount -> set CreditScore = Submit.Score -> set AnnualIncome = Submit.Income -> set ExistingDebt = Submit.Debt -> transition UnderReview
+event Disburse
 
-from UnderReview on VerifyDocuments -> set DocumentsVerified = true -> no transition
+event ActivateLoan
 
-from UnderReview on Approve when DocumentsVerified and CreditScore >= 680 and AnnualIncome >= ExistingDebt * 2 and RequestedAmount < AnnualIncome / 2 and Approve.Amount <= RequestedAmount -> set ApprovedAmount = min(Approve.Amount, RequestedAmount) -> set DecisionNote = if Approve.Note != null then Approve.Note else if CreditScore >= 750 then "Prime tier  — auto-approved" else "Standard tier — approved" -> transition Approved
-from UnderReview on Approve -> reject "Approval requires verified documents, strong credit, and affordable debt load"
+event RecordPayment with Amount as decimal positive
 
-from UnderReview on Decline -> set DecisionNote = Decline.Note -> transition Declined
-from Approved on FundLoan -> transition Funded
+event MissPayment
+
+event IssueDefaultNotice
+
+event CureDefault with Amount as decimal positive
+
+event RescheduleTerms with NewRate as decimal nonnegative maxplaces 4, NewTerm as integer positive
+
+event CloseLoan with Reason as string notempty maxlength 500
+
+# --- Transitions ---
+
+# Intake: submit the application
+from Draft on Submit -> set ApplicantName = Submit.Applicant -> set LoanType = Submit.Type -> set EmploymentType = Submit.Employment -> set LoanAmount = Submit.Amount -> set LoanTermMonths = Submit.Term -> set CreditScore = Submit.Score -> set AnnualIncome = Submit.Income -> set ExistingDebt = Submit.Debt -> set PropertyValue = Submit.Property -> transition Application
+
+# Document verification
+from Application on VerifyDocuments -> set DocumentsVerified = true -> no transition
+
+# Begin underwriting review
+from Application on BeginReview when DocumentsVerified -> transition UnderReview
+from Application on BeginReview -> reject "Documents must be verified before review begins"
+
+# Underwriting: full approval
+from UnderReview on Approve when CreditScore >= 680 and DebtToIncomeRatio <= 43 and not IsHighRisk and Approve.Amount <= LoanAmount -> set ApprovedAmount = Approve.Amount -> set InterestRate = Approve.Rate -> set ApprovalDecision = "Approved" -> set DecisionNote = if Approve.Note != null then Approve.Note else if CreditScore >= 750 then "Prime tier — auto-approved" else "Standard tier — approved" -> transition Approved
+from UnderReview on Approve -> reject "Approval requires credit score >= 680, DTI <= 43%, and no high-risk indicators"
+
+# Underwriting: conditional approval (relaxed thresholds)
+from UnderReview on ApproveConditional when CreditScore >= 620 and DebtToIncomeRatio <= 50 and ApproveConditional.Amount <= LoanAmount -> set ApprovedAmount = ApproveConditional.Amount -> set InterestRate = ApproveConditional.Rate -> set ApprovalDecision = "Conditional" -> set DecisionNote = ApproveConditional.Condition -> transition Approved
+from UnderReview on ApproveConditional -> reject "Conditional approval requires credit score >= 620 and DTI <= 50%"
+
+# Underwriting: denial
+from UnderReview on Deny -> set ApprovalDecision = "Denied" -> set DecisionNote = Deny.Note -> transition Denied
+
+# Disbursement
+from Approved on Disburse -> set OutstandingBalance = ApprovedAmount -> transition Disbursed
+
+# Activate loan for repayment
+from Disbursed on ActivateLoan -> transition Active
+
+# Active repayment: overpayment rejected
+from Active on RecordPayment when RecordPayment.Amount > OutstandingBalance -> reject "Payment cannot exceed outstanding balance"
+
+# Active repayment: full payoff closes the loan
+from Active on RecordPayment when RecordPayment.Amount == OutstandingBalance -> set OutstandingBalance = 0 -> set PaymentsMade = PaymentsMade + 1 -> set ClosureReason = "Paid in full" -> transition Closed
+
+# Active repayment: partial payment
+from Active on RecordPayment -> set OutstandingBalance = OutstandingBalance - RecordPayment.Amount -> set PaymentsMade = PaymentsMade + 1 -> no transition
+
+# Active: missed payment triggers delinquency
+from Active on MissPayment -> set MissedPayments = MissedPayments + 1 -> transition Delinquent
+
+# Active: administrative closure (refinanced, forgiven, etc.)
+from Active on CloseLoan -> set ClosureReason = CloseLoan.Reason -> transition Closed
+
+# Delinquent: overpayment rejected
+from Delinquent on RecordPayment when RecordPayment.Amount > OutstandingBalance -> reject "Payment cannot exceed outstanding balance"
+
+# Delinquent: full payoff closes the loan
+from Delinquent on RecordPayment when RecordPayment.Amount == OutstandingBalance -> set OutstandingBalance = 0 -> set PaymentsMade = PaymentsMade + 1 -> set ClosureReason = "Paid in full" -> transition Closed
+
+# Delinquent: partial payment cures delinquency
+from Delinquent on RecordPayment -> set OutstandingBalance = OutstandingBalance - RecordPayment.Amount -> set PaymentsMade = PaymentsMade + 1 -> set MissedPayments = 0 -> transition Active
+
+# Delinquent: additional missed payment
+from Delinquent on MissPayment -> set MissedPayments = MissedPayments + 1 -> no transition
+
+# Delinquent: escalate to formal default
+from Delinquent on IssueDefaultNotice when MissedPayments >= 3 -> transition DefaultNotice
+from Delinquent on IssueDefaultNotice -> reject "Default notice requires at least three missed payments"
+
+# Delinquent: hardship renegotiation
+from Delinquent on RescheduleTerms -> set InterestRate = RescheduleTerms.NewRate -> set LoanTermMonths = RescheduleTerms.NewTerm -> set MissedPayments = 0 -> transition Active
+
+# Default: overpayment rejected
+from DefaultNotice on CureDefault when CureDefault.Amount > OutstandingBalance -> reject "Cure payment cannot exceed outstanding balance"
+
+# Default: full payoff from default
+from DefaultNotice on CureDefault when CureDefault.Amount == OutstandingBalance -> set OutstandingBalance = 0 -> set MissedPayments = 0 -> set ClosureReason = "Paid in full from default" -> transition Closed
+
+# Default: partial cure restores to active
+from DefaultNotice on CureDefault -> set OutstandingBalance = OutstandingBalance - CureDefault.Amount -> set MissedPayments = 0 -> transition Active
+
+# Default: close (write-off or settlement)
+from DefaultNotice on CloseLoan -> set ClosureReason = CloseLoan.Reason -> transition Closed

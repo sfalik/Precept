@@ -7,6 +7,13 @@
 
 ## Recent Updates
 
+### 2026-04-08 - Platform and entity research merged
+- Team update (2026-04-08T01:48:59Z): Scribe merged Frank/Peterman platform + entity research plus Shane's directive into .squad/decisions.md.
+- Shared outcome: future sample authoring should pressure both missing enterprise lifecycle shapes and upcoming entity/stateless lanes without flattening the domain model.
+
+### 2026-04-08 - Sample realism guidance merged
+- Scribe merged George's sample-audit guidance into .squad/decisions.md alongside the team directive to use Opus when sample/design judgment is high.
+- The standing runtime-facing guidance is to keep realistic domains intact and use aspirational comments rather than flattening workflows to today's weakest primitives.
 ### 2026-04-12 — Issue #17 Computed Fields: Runtime Feasibility Assessment
 - **Verdict: Feasible.** No fundamental blockers, no architectural mismatches.
 - **Parser (Small):** `derivedOpt` combinator after TypeRef in FieldDecl. Arrow disambiguation is trivial — `field` keyword vs. `from` keyword disambiguates before either combinator reaches `->`. ~25 lines.
@@ -214,6 +221,16 @@ Complete spec written covering all 4 forms and 19 change sites across 5 files. F
 - The `on <Event> assert` scope limitation is the one item needing a design decision before any code — it touches the fire pipeline stage contract, not just the parser.
 - Notified team via `.squad/decisions/inbox/george-expression-limitations.md`. No implementation until Frank's proposal and Shane's approval.
 
+### 2026-04-08 - Current sample corpus audit
+
+- Audited all 21 current sample files against the implemented runtime surface, the language design docs, and open proposal issues affecting sample realism.
+- Produced `docs/research/sample-realism/george-current-sample-audit.md`.
+- Key findings:
+  - The sample set covers the runtime surface reasonably well, especially collection mutation, state asserts/actions, and first-match routing.
+  - The corpus still skews toward syntax coverage over believable business policy: many samples flatten dates into counters, categories into strings/numbers, and intake transitions into long argument-copy chains.
+  - The biggest realism multipliers are not cosmetic: `choice`, `date`, `decimal`, computed fields, field constraints, declaration guards, named rules, and absorb shorthand.
+  - Best existing pressure-test samples for future language work: `insurance-claim`, `loan-application`, `travel-reimbursement`, and `vehicle-service-appointment`.
+- Recommendation merged into `.squad/decisions.md`; inbox cleared. Future sample revisions should use aspirational comments instead of hiding domain pressure behind oversimplified current-language surrogates.
 ### 2026-04-08 - Issue #22 semantic rules review (data-only precepts)
 - Reviewed issue #22 semantic rule about "states, events, and transitions forbidden in stateless precepts" against actual parser/type-checker code.
 - Key findings from parser source: (1) C12 fires at the *end* of AssembleModel — adding a `state` to a definition doesn't violate anything, it just makes it stateful. The "prohibition" is tautological. (2) `EventDecl` parser has zero state dependencies — events parse fine without states, but have no dispatch surface. The type checker would need a *new* diagnostic to reject them. (3) C54 already rejects transition rows referencing undeclared states, making an explicit "transitions forbidden" rule structurally redundant.
