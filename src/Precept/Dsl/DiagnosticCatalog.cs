@@ -481,7 +481,7 @@ public static class DiagnosticCatalog
     /// <summary>Narrowing assignment: cannot assign a non-integer numeric value to an integer field without explicit conversion.</summary>
     /// <remarks>
     /// floor(), ceil(), and truncate() return integer for both number and decimal sources.
-    /// round() returns integer only when its argument is decimal; round(number) returns number.
+    /// round() returns integer for all numeric sources (integer, decimal, and number).
     /// The runtime message is generated per source type — see PreceptTypeChecker.BuildC60Message.
     /// </remarks>
     public static readonly LanguageConstraint C60 = Register(

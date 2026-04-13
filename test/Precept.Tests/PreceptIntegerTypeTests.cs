@@ -251,7 +251,7 @@ public class PreceptIntegerTypeTests
         result.Diagnostics[0].Message.Should().Contain("floor()");
         result.Diagnostics[0].Message.Should().Contain("ceil()");
         result.Diagnostics[0].Message.Should().Contain("truncate()");
-        result.Diagnostics[0].Message.Should().NotContain("round()");
+        result.Diagnostics[0].Message.Should().Contain("round()");
         result.Diagnostics[0].Message.Should().Contain("integer");
     }
 
