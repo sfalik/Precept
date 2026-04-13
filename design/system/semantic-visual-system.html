@@ -820,6 +820,103 @@ pre {
     background: var(--structure);
     flex-shrink: 0;
   }
+  .cg-mini-state-dot-form {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 28px;
+    color: var(--state);
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    line-height: 1;
+  }
+  .cg-mini-state-dot-glyph {
+    position: relative;
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    border: 1.5px solid var(--state);
+    background: var(--panel);
+    flex-shrink: 0;
+  }
+  .cg-mini-state-dot-label {
+    white-space: nowrap;
+  }
+  .cg-mini-state-dot-form--initial .cg-mini-state-dot-glyph::after {
+    content: "";
+    position: absolute;
+    inset: 4px;
+    border-radius: 50%;
+    background: var(--structure);
+  }
+  .cg-mini-state-dot-form--current {
+    color: #ddd6ff;
+  }
+  .cg-mini-state-dot-form--current .cg-mini-state-dot-glyph {
+    border-color: transparent;
+    background: var(--state);
+    box-shadow: 0 0 0 3px rgba(168,152,245,0.28);
+  }
+  .cg-mini-state-dot-form--current.cg-mini-state-dot-form--initial .cg-mini-state-dot-glyph::after {
+    inset: 5px;
+  }
+  .cg-mini-state-dot-form--terminal .cg-mini-state-dot-glyph {
+    box-shadow: 0 0 0 2px rgba(255,255,255,0.18);
+  }
+  .cg-mini-state-dot-form--current.cg-mini-state-dot-form--terminal .cg-mini-state-dot-glyph {
+    box-shadow: 0 0 0 2px rgba(255,255,255,0.18), 0 0 0 5px rgba(168,152,245,0.24);
+  }
+  .cg-mini-state-dot-form--not-reachable {
+    color: rgba(168,152,245,0.54);
+  }
+  .cg-mini-state-dot-form--not-reachable .cg-mini-state-dot-glyph {
+    background: #0b0d11;
+  }
+  .cg-mini-state-dot-form--not-reachable-current .cg-mini-state-dot-glyph {
+    border-color: rgba(168,152,245,0.22);
+    border-style: dashed;
+  }
+  .cg-mini-state-dot-form--not-reachable-initial .cg-mini-state-dot-glyph {
+    border-color: rgba(168,152,245,0.16);
+    background:
+      repeating-linear-gradient(135deg, rgba(168,152,245,0.08) 0 1px, transparent 1px 7px),
+      #0b0d11;
+  }
+  .cg-mini-state-dot-form--constrained .cg-mini-state-dot-label {
+    font-style: italic;
+  }
+  #state .cg-modifier-compare--state {
+    width: auto;
+    grid-template-columns: repeat(2, minmax(0, max-content));
+    align-items: start;
+    column-gap: 16px;
+    row-gap: 8px;
+  }
+  #state .cg-modifier-compare--state .cg-modifier-compare-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    width: auto;
+  }
+  #state .cg-combination-specimen {
+    padding: 0;
+    border: none;
+    background: none;
+  }
+  #event .cg-modifier-compare {
+    width: auto;
+    grid-template-columns: repeat(2, minmax(0, max-content));
+    align-items: start;
+    column-gap: 16px;
+    row-gap: 8px;
+  }
+  #event .cg-modifier-compare .cg-modifier-compare-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    width: auto;
+  }
   .cg-mini-state-node--current {
     border-color: rgba(168,152,245,0.72);
     background: linear-gradient(180deg, rgba(168,152,245,0.28), rgba(168,152,245,0.18));
@@ -964,7 +1061,7 @@ pre {
   .svs-state-review-stage {
     position: relative;
     overflow: hidden;
-    min-height: 540px;
+    min-height: 362px;
     border: none;
     background: var(--panel);
     box-shadow: none;
@@ -983,8 +1080,8 @@ pre {
     fill: none;
     stroke: rgba(48,184,232,0.78);
     stroke-width: 2.25;
-    stroke-linecap: butt;
-    stroke-linejoin: miter;
+    stroke-linecap: round;
+    stroke-linejoin: round;
     vector-effect: non-scaling-stroke;
   }
   .svs-state-review-stage .svs-edge-past {
@@ -996,7 +1093,7 @@ pre {
   }
   .svs-state-review-stage .svs-edge-blocked {
     stroke: rgba(48,184,232,0.64);
-    stroke-dasharray: 7 7;
+    stroke-dasharray: 4 4;
   }
   .svs-state-node,
   .svs-edge-label {
@@ -1005,70 +1102,73 @@ pre {
   .svs-state-node {
     display: inline-flex;
     align-items: center;
-    justify-content: center;
-    width: 148px;
-    min-width: 148px;
-    min-height: 52px;
-    padding: 12px 14px;
+    gap: 6px;
+    min-height: 28px;
+    padding: 5px 9px;
     border: 1px solid rgba(168,152,245,0.32);
-    background: #050608;
+    background: #0b0d11;
     color: var(--state);
     font-family: var(--mono);
-    font-size: 12px;
-    letter-spacing: 0.05em;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    line-height: 1;
     white-space: nowrap;
-    border-radius: 8px;
-    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02);
     transition:
       border-color 140ms ease,
       background-color 140ms ease,
       box-shadow 140ms ease,
-      transform 140ms ease;
+      color 140ms ease;
     z-index: 2;
   }
-  .svs-state-node em {
-    font-style: italic;
+  .svs-state-node-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--structure);
+    flex-shrink: 0;
   }
   .svs-state-node:hover,
   .svs-state-node:focus-visible,
   .svs-state-node.is-linked {
     outline: none;
-    border-color: rgba(168,152,245,0.74);
-    background: #17111f;
-    box-shadow:
-      inset 0 0 0 1px rgba(168,152,245,0.18),
-      0 0 0 1px rgba(168,152,245,0.28);
-    transform: translateY(-1px);
+    border-color: rgba(168,152,245,0.52);
+    box-shadow: inset 0 0 0 1px rgba(168,152,245,0.12);
   }
   .svs-state-node--current {
-    background: #251c38;
-    border-color: rgba(168,152,245,0.46);
+    border-color: rgba(168,152,245,0.72);
+    background: linear-gradient(180deg, #4a3a70, #372b54);
     box-shadow:
-      inset 0 0 0 1px rgba(168,152,245,0.22),
-      0 0 0 1px rgba(99,102,241,0.24);
-    color: #ddd6ff;
+      inset 0 0 0 1px rgba(168,152,245,0.16),
+      0 0 0 1px rgba(168,152,245,0.10);
   }
-  .svs-state-node--terminal::after {
-    content: "";
-    position: absolute;
-    inset: 4px;
-    border: 1px solid rgba(168,152,245,0.28);
-    border-radius: 4px;
-    pointer-events: none;
+  .svs-state-node--terminal {
+    border-width: 2px;
+    box-shadow: inset 0 0 0 1px rgba(168,152,245,0.14);
+  }
+  .svs-state-node--current.svs-state-node--terminal {
+    box-shadow:
+      inset 0 0 0 1px rgba(168,152,245,0.16),
+      0 0 0 1px rgba(168,152,245,0.10);
   }
   .svs-state-node--initial .svs-state-node-dot {
-    width: 8px;
-    height: 8px;
-    margin-right: 8px;
-    background: var(--structure);
-    box-shadow: 0 0 0 3px rgba(99,102,241,0.16);
-    border-radius: 999px;
+    width: 6px;
+    height: 6px;
   }
   .svs-state-node--unreachable-current {
-    color: rgba(168,152,245,0.52);
+    color: rgba(168,152,245,0.54);
+    border-color: rgba(168,152,245,0.22);
     border-style: dashed;
-    border-color: rgba(168,152,245,0.32);
-    background: #050608;
+    background: #0b0d11;
+  }
+  .svs-state-node--unreachable-initial {
+    color: rgba(168,152,245,0.54);
+    border-color: rgba(168,152,245,0.16);
+    background:
+      repeating-linear-gradient(135deg, rgba(168,152,245,0.08) 0 1px, transparent 1px 7px),
+      #0b0d11;
+  }
+  .svs-state-node--constrained {
+    font-style: italic;
   }
   .svs-edge-label {
     display: inline-flex;
@@ -3693,7 +3793,25 @@ pre {
           <div class="cg-channel">
             <div class="cg-channel-name">Form</div>
             <div class="cg-channel-body">
-              <div class="cg-channel-signal"><span class="cg-modifier-token">Closed</span></div>
+              <div class="cg-channel-signal">
+                <div class="cg-modifier-compare cg-modifier-compare--state">
+                  <div class="cg-modifier-compare-row">
+                    <span class="cg-modifier-note">Token</span>
+                    <div class="cg-modifier-stack">
+                      <span class="cg-modifier-token cg-modifier-token--state">Closed</span>
+                    </div>
+                  </div>
+                  <div class="cg-modifier-compare-row">
+                    <span class="cg-modifier-note">Dot</span>
+                    <div class="cg-modifier-stack">
+                      <span class="cg-mini-state-dot-form">
+                        <span class="cg-mini-state-dot-glyph"></span>
+                        <span class="cg-mini-state-dot-label">Closed</span>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
               <p class="cg-channel-caption">Rounded 8px state node is the baseline, then dot, fill, dimmed hatch or dashed edge, and double border layer on top.</p>
             </div>
           </div>
@@ -3706,8 +3824,22 @@ pre {
           <div class="cg-channel cg-channel--modifier">
               <div class="cg-channel-name">Initial</div>
             <div class="cg-channel-body">
-              <div class="cg-modifier-stack">
-                <span class="cg-modifier-token cg-modifier-token--state"><span class="cg-modifier-token-dot"></span>Open</span>
+              <div class="cg-modifier-compare cg-modifier-compare--state">
+                <div class="cg-modifier-compare-row">
+                  <span class="cg-modifier-note">Token</span>
+                  <div class="cg-modifier-stack">
+                    <span class="cg-modifier-token cg-modifier-token--state"><span class="cg-modifier-token-dot"></span>Open</span>
+                  </div>
+                </div>
+                <div class="cg-modifier-compare-row">
+                  <span class="cg-modifier-note">Dot</span>
+                  <div class="cg-modifier-stack">
+                    <span class="cg-mini-state-dot-form cg-mini-state-dot-form--initial">
+                      <span class="cg-mini-state-dot-glyph"></span>
+                      <span class="cg-mini-state-dot-label">Open</span>
+                    </span>
+                  </div>
+                </div>
               </div>
                 <p class="cg-channel-caption">Origin dot marks the initial state.</p>
             </div>
@@ -3715,8 +3847,22 @@ pre {
           <div class="cg-channel cg-channel--modifier">
               <div class="cg-channel-name">Terminal</div>
             <div class="cg-channel-body">
-              <div class="cg-modifier-stack">
-                <span class="cg-modifier-token cg-modifier-token--state cg-modifier-token--state-terminal">Closed</span>
+              <div class="cg-modifier-compare cg-modifier-compare--state">
+                <div class="cg-modifier-compare-row">
+                  <span class="cg-modifier-note">Token</span>
+                  <div class="cg-modifier-stack">
+                    <span class="cg-modifier-token cg-modifier-token--state cg-modifier-token--state-terminal">Closed</span>
+                  </div>
+                </div>
+                <div class="cg-modifier-compare-row">
+                  <span class="cg-modifier-note">Dot</span>
+                  <div class="cg-modifier-stack">
+                    <span class="cg-mini-state-dot-form cg-mini-state-dot-form--terminal">
+                      <span class="cg-mini-state-dot-glyph"></span>
+                      <span class="cg-mini-state-dot-label">Closed</span>
+                    </span>
+                  </div>
+                </div>
               </div>
                 <p class="cg-channel-caption">Double border marks a terminal state.</p>
             </div>
@@ -3724,8 +3870,22 @@ pre {
           <div class="cg-channel cg-channel--modifier">
               <div class="cg-channel-name">Constrained</div>
             <div class="cg-channel-body">
-              <div class="cg-modifier-stack">
-                <span class="cg-modifier-token cg-modifier-token--state cg-modifier-token--italic">Closed</span>
+              <div class="cg-modifier-compare cg-modifier-compare--state">
+                <div class="cg-modifier-compare-row">
+                  <span class="cg-modifier-note">Token</span>
+                  <div class="cg-modifier-stack">
+                    <span class="cg-modifier-token cg-modifier-token--state cg-modifier-token--italic">Closed</span>
+                  </div>
+                </div>
+                <div class="cg-modifier-compare-row">
+                  <span class="cg-modifier-note">Dot</span>
+                  <div class="cg-modifier-stack">
+                    <span class="cg-mini-state-dot-form cg-mini-state-dot-form--constrained">
+                      <span class="cg-mini-state-dot-glyph"></span>
+                      <span class="cg-mini-state-dot-label">Closed</span>
+                    </span>
+                  </div>
+                </div>
               </div>
                 <p class="cg-channel-caption">Italic label marks a constrained state.</p>
             </div>
@@ -3733,8 +3893,22 @@ pre {
           <div class="cg-channel cg-channel--modifier">
               <div class="cg-channel-name">Unreachable from initial</div>
             <div class="cg-channel-body">
-              <div class="cg-modifier-stack">
-                <span class="cg-modifier-token cg-modifier-token--state cg-modifier-token--state-not-reachable cg-modifier-token--state-not-reachable-initial">Closed</span>
+              <div class="cg-modifier-compare cg-modifier-compare--state">
+                <div class="cg-modifier-compare-row">
+                  <span class="cg-modifier-note">Token</span>
+                  <div class="cg-modifier-stack">
+                    <span class="cg-modifier-token cg-modifier-token--state cg-modifier-token--state-not-reachable cg-modifier-token--state-not-reachable-initial">Closed</span>
+                  </div>
+                </div>
+                <div class="cg-modifier-compare-row">
+                  <span class="cg-modifier-note">Dot</span>
+                  <div class="cg-modifier-stack">
+                    <span class="cg-mini-state-dot-form cg-mini-state-dot-form--not-reachable cg-mini-state-dot-form--not-reachable-initial">
+                      <span class="cg-mini-state-dot-glyph"></span>
+                      <span class="cg-mini-state-dot-label">Closed</span>
+                    </span>
+                  </div>
+                </div>
               </div>
                 <p class="cg-channel-caption">Heavy dimming and interior hatch mark a state unreachable from the initial state.</p>
             </div>
@@ -3742,8 +3916,22 @@ pre {
           <div class="cg-channel cg-channel--modifier">
               <div class="cg-channel-name">Unreachable from current</div>
             <div class="cg-channel-body">
-              <div class="cg-modifier-stack">
-                <span class="cg-modifier-token cg-modifier-token--state cg-modifier-token--state-not-reachable cg-modifier-token--state-not-reachable-current">Closed</span>
+              <div class="cg-modifier-compare cg-modifier-compare--state">
+                <div class="cg-modifier-compare-row">
+                  <span class="cg-modifier-note">Token</span>
+                  <div class="cg-modifier-stack">
+                    <span class="cg-modifier-token cg-modifier-token--state cg-modifier-token--state-not-reachable cg-modifier-token--state-not-reachable-current">Closed</span>
+                  </div>
+                </div>
+                <div class="cg-modifier-compare-row">
+                  <span class="cg-modifier-note">Dot</span>
+                  <div class="cg-modifier-stack">
+                    <span class="cg-mini-state-dot-form cg-mini-state-dot-form--not-reachable cg-mini-state-dot-form--not-reachable-current">
+                      <span class="cg-mini-state-dot-glyph"></span>
+                      <span class="cg-mini-state-dot-label">Closed</span>
+                    </span>
+                  </div>
+                </div>
               </div>
                 <p class="cg-channel-caption">Heavy dimming and dashed edge mark a state unreachable from the current state.</p>
             </div>
@@ -3751,8 +3939,22 @@ pre {
           <div class="cg-channel cg-channel--modifier">
               <div class="cg-channel-name">Current</div>
             <div class="cg-channel-body">
-              <div class="cg-modifier-stack">
-                <span class="cg-modifier-token cg-modifier-token--state cg-modifier-token--state-current">Open</span>
+              <div class="cg-modifier-compare cg-modifier-compare--state">
+                <div class="cg-modifier-compare-row">
+                  <span class="cg-modifier-note">Token</span>
+                  <div class="cg-modifier-stack">
+                    <span class="cg-modifier-token cg-modifier-token--state cg-modifier-token--state-current">Open</span>
+                  </div>
+                </div>
+                <div class="cg-modifier-compare-row">
+                  <span class="cg-modifier-note">Dot</span>
+                  <div class="cg-modifier-stack">
+                    <span class="cg-mini-state-dot-form cg-mini-state-dot-form--current">
+                      <span class="cg-mini-state-dot-glyph"></span>
+                      <span class="cg-mini-state-dot-label">Open</span>
+                    </span>
+                  </div>
+                </div>
               </div>
                 <p class="cg-channel-caption">Filled node marks the current state.</p>
             </div>
@@ -3772,6 +3974,14 @@ pre {
                     <span class="cg-mini-state-node cg-mini-state-node--current"><span class="cg-mini-state-node-dot"></span>Open</span>
                   </div>
                 </div>
+                <div class="cg-combination-specimen" aria-hidden="true">
+                  <div class="cg-mini-flow">
+                    <span class="cg-mini-state-dot-form cg-mini-state-dot-form--initial cg-mini-state-dot-form--current">
+                      <span class="cg-mini-state-dot-glyph"></span>
+                      <span class="cg-mini-state-dot-label">Open</span>
+                    </span>
+                  </div>
+                </div>
               </div>
               <p class="cg-combination-reading">The active node can also be the entry point.</p>
             </div>
@@ -3781,6 +3991,14 @@ pre {
                 <div class="cg-combination-specimen" aria-hidden="true">
                   <div class="cg-mini-flow">
                     <span class="cg-mini-state-node cg-mini-state-node--current cg-mini-state-node--constrained">Review</span>
+                  </div>
+                </div>
+                <div class="cg-combination-specimen" aria-hidden="true">
+                  <div class="cg-mini-flow">
+                    <span class="cg-mini-state-dot-form cg-mini-state-dot-form--current cg-mini-state-dot-form--constrained">
+                      <span class="cg-mini-state-dot-glyph"></span>
+                      <span class="cg-mini-state-dot-label">Review</span>
+                    </span>
                   </div>
                 </div>
               </div>
@@ -3794,6 +4012,14 @@ pre {
                     <span class="cg-mini-state-node cg-mini-state-node--current cg-mini-state-node--terminal">Closed</span>
                   </div>
                 </div>
+                <div class="cg-combination-specimen" aria-hidden="true">
+                  <div class="cg-mini-flow">
+                    <span class="cg-mini-state-dot-form cg-mini-state-dot-form--current cg-mini-state-dot-form--terminal">
+                      <span class="cg-mini-state-dot-glyph"></span>
+                      <span class="cg-mini-state-dot-label">Closed</span>
+                    </span>
+                  </div>
+                </div>
               </div>
               <p class="cg-combination-reading">The active node can also be the end of the live path.</p>
             </div>
@@ -3803,6 +4029,14 @@ pre {
                 <div class="cg-combination-specimen" aria-hidden="true">
                   <div class="cg-mini-flow">
                     <span class="cg-mini-state-node cg-mini-state-node--constrained"><span class="cg-mini-state-node-dot"></span>Intake</span>
+                  </div>
+                </div>
+                <div class="cg-combination-specimen" aria-hidden="true">
+                  <div class="cg-mini-flow">
+                    <span class="cg-mini-state-dot-form cg-mini-state-dot-form--initial cg-mini-state-dot-form--constrained">
+                      <span class="cg-mini-state-dot-glyph"></span>
+                      <span class="cg-mini-state-dot-label">Intake</span>
+                    </span>
                   </div>
                 </div>
               </div>
@@ -3816,6 +4050,14 @@ pre {
                     <span class="cg-mini-state-node cg-mini-state-node--terminal cg-mini-state-node--constrained">Closed</span>
                   </div>
                 </div>
+                <div class="cg-combination-specimen" aria-hidden="true">
+                  <div class="cg-mini-flow">
+                    <span class="cg-mini-state-dot-form cg-mini-state-dot-form--terminal cg-mini-state-dot-form--constrained">
+                      <span class="cg-mini-state-dot-glyph"></span>
+                      <span class="cg-mini-state-dot-label">Closed</span>
+                    </span>
+                  </div>
+                </div>
               </div>
               <p class="cg-combination-reading">A final state can still sit under rule pressure.</p>
             </div>
@@ -3825,6 +4067,14 @@ pre {
                 <div class="cg-combination-specimen" aria-hidden="true">
                   <div class="cg-mini-flow">
                     <span class="cg-mini-state-node cg-mini-state-node--terminal"><span class="cg-mini-state-node-dot"></span>Closed</span>
+                  </div>
+                </div>
+                <div class="cg-combination-specimen" aria-hidden="true">
+                  <div class="cg-mini-flow">
+                    <span class="cg-mini-state-dot-form cg-mini-state-dot-form--initial cg-mini-state-dot-form--terminal">
+                      <span class="cg-mini-state-dot-glyph"></span>
+                      <span class="cg-mini-state-dot-label">Closed</span>
+                    </span>
                   </div>
                 </div>
               </div>
@@ -3838,6 +4088,14 @@ pre {
                     <span class="cg-mini-state-node cg-mini-state-node--current cg-mini-state-node--terminal cg-mini-state-node--constrained">Closed</span>
                   </div>
                 </div>
+                <div class="cg-combination-specimen" aria-hidden="true">
+                  <div class="cg-mini-flow">
+                    <span class="cg-mini-state-dot-form cg-mini-state-dot-form--current cg-mini-state-dot-form--terminal cg-mini-state-dot-form--constrained">
+                      <span class="cg-mini-state-dot-glyph"></span>
+                      <span class="cg-mini-state-dot-label">Closed</span>
+                    </span>
+                  </div>
+                </div>
               </div>
               <p class="cg-combination-reading">A live final node can still sit under rule pressure.</p>
             </div>
@@ -3847,6 +4105,14 @@ pre {
                 <div class="cg-combination-specimen" aria-hidden="true">
                   <div class="cg-mini-flow">
                     <span class="cg-mini-state-node cg-mini-state-node--terminal cg-mini-state-node--not-reachable cg-mini-state-node--not-reachable-initial">Archived</span>
+                  </div>
+                </div>
+                <div class="cg-combination-specimen" aria-hidden="true">
+                  <div class="cg-mini-flow">
+                    <span class="cg-mini-state-dot-form cg-mini-state-dot-form--terminal cg-mini-state-dot-form--not-reachable cg-mini-state-dot-form--not-reachable-initial">
+                      <span class="cg-mini-state-dot-glyph"></span>
+                      <span class="cg-mini-state-dot-label">Archived</span>
+                    </span>
                   </div>
                 </div>
               </div>
@@ -4208,24 +4474,24 @@ pre {
     <div class="surface-specimen">
       <div class="cg-state-diagram">
         <div class="svs-state-review-stage" id="surface02-state-diagram-stage" aria-label="Runtime state diagram for VisitorBadgePickup">
-          <svg viewBox="0 0 760 540" role="img" aria-label="Vertical runtime graph: ReadyForPickup is current, PickUp is active, Expire is blocked">
+          <svg viewBox="0 0 760 362" role="img" aria-label="Vertical runtime graph: ReadyForPickup is current, PickUp is active, Expire is blocked">
             <defs>
               <marker id="svs-s2-arrow-past" viewBox="0 0 12 10" markerWidth="12" markerHeight="10" refX="10" refY="5" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M1 1 L10 5 L1 9 L3.6 5 Z" fill="rgba(48,184,232,0.38)"></path></marker>
               <marker id="svs-s2-arrow-blocked" viewBox="0 0 12 10" markerWidth="12" markerHeight="10" refX="10" refY="5" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M1 1 L10 5 L1 9 L3.6 5 Z" fill="rgba(48,184,232,0.64)"></path></marker>
               <marker id="svs-s2-arrow-active" viewBox="0 0 12 10" markerWidth="12" markerHeight="10" refX="10" refY="5" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M1 1 L10 5 L1 9 L3.6 5 Z" fill="rgba(48,184,232,0.96)"></path></marker>
             </defs>
-            <path class="svs-edge-past" data-edge="requested-approved" d="M380 80 V132" marker-end="url(#svs-s2-arrow-past)"></path>
-            <path class="svs-edge-past" data-edge="approved-ready" d="M380 184 V236" marker-end="url(#svs-s2-arrow-past)"></path>
-            <path class="svs-edge-past" data-edge="approved-cancelled" d="M454 158 H532" marker-end="url(#svs-s2-arrow-past)"></path>
-            <path class="svs-edge-active" data-edge="ready-pickedup" d="M380 288 V314 H254 V340" marker-end="url(#svs-s2-arrow-active)"></path>
-            <path class="svs-edge-blocked" data-edge="ready-expired" d="M380 288 V314 H506 V340" marker-end="url(#svs-s2-arrow-blocked)"></path>
+            <path class="svs-edge-past" data-edge="requested-approved" d="M380 34 V110" marker-end="url(#svs-s2-arrow-past)"></path>
+            <path class="svs-edge-past" data-edge="approved-ready" d="M380 110 V186" marker-end="url(#svs-s2-arrow-past)"></path>
+            <path class="svs-edge-past" data-edge="approved-cancelled" d="M454 110 H468" marker-end="url(#svs-s2-arrow-past)"></path>
+            <path class="svs-edge-active" data-edge="ready-pickedup" d="M380 186 V212 Q380 226 366 226 H268 Q254 226 254 240 V274" marker-end="url(#svs-s2-arrow-active)"></path>
+            <path class="svs-edge-blocked" data-edge="ready-expired" d="M380 186 V212 Q380 226 394 226 H492 Q506 226 506 240 V274" marker-end="url(#svs-s2-arrow-blocked)"></path>
           </svg>
-          <div class="svs-state-node svs-state-node--initial svs-state-node--unreachable-current" data-state="Requested" data-left="236" data-top="32" tabindex="0" style="left:236px; top:32px;"><span class="svs-state-node-dot" aria-hidden="true"></span>Requested</div>
-          <div class="svs-state-node svs-state-node--unreachable-current" data-state="Approved" data-left="236" data-top="176" tabindex="0" style="left:236px; top:176px;">Approved</div>
-          <div class="svs-state-node svs-state-node--current" data-state="ReadyForPickup" data-left="236" data-top="320" tabindex="0" style="left:236px; top:320px;"><em>ReadyForPickup</em></div>
-          <div class="svs-state-node svs-state-node--terminal svs-state-node--unreachable-current" data-state="Cancelled" data-left="464" data-top="176" tabindex="0" style="left:464px; top:176px;">Cancelled</div>
-          <div class="svs-state-node svs-state-node--terminal" data-state="PickedUp" data-left="110" data-top="456" tabindex="0" style="left:110px; top:456px;">PickedUp</div>
-          <div class="svs-state-node svs-state-node--terminal svs-state-node--unreachable-current" data-state="Expired" data-left="362" data-top="456" tabindex="0" style="left:362px; top:456px;">Expired</div>
+          <div class="svs-state-node svs-state-node--initial svs-state-node--unreachable-current" data-state="Requested" data-left="236" data-top="22" tabindex="0" style="left:236px; top:22px;"><span class="svs-state-node-dot" aria-hidden="true"></span>Requested</div>
+          <div class="svs-state-node svs-state-node--unreachable-current" data-state="Approved" data-left="236" data-top="98" tabindex="0" style="left:236px; top:98px;">Approved</div>
+          <div class="svs-state-node svs-state-node--current" data-state="ReadyForPickup" data-left="236" data-top="174" tabindex="0" style="left:236px; top:174px;">ReadyForPickup</div>
+          <div class="svs-state-node svs-state-node--terminal svs-state-node--unreachable-current" data-state="Cancelled" data-left="400" data-top="98" tabindex="0" style="left:400px; top:98px;">Cancelled</div>
+          <div class="svs-state-node svs-state-node--terminal" data-state="PickedUp" data-left="150" data-top="250" tabindex="0" style="left:150px; top:250px;">PickedUp</div>
+          <div class="svs-state-node svs-state-node--terminal svs-state-node--unreachable-current" data-state="Expired" data-left="322" data-top="250" tabindex="0" style="left:322px; top:250px;">Expired</div>
           <span class="svs-edge-label svs-edge-label--muted" data-edge-label="requested-approved"><span class="svs-edge-token">ApproveRequest</span></span>
           <span class="svs-edge-label svs-edge-label--muted" data-edge-label="approved-ready"><span class="svs-edge-token">PrintBadge</span></span>
           <span class="svs-edge-label svs-edge-label--muted" data-edge-label="approved-cancelled"><span class="svs-edge-token">Cancel</span></span>
@@ -5810,28 +6076,57 @@ from ReadyForPickup on Expire when PickupWindowOpen == false
   var getNodeBox = function(el) { return { left: el.offsetLeft, top: el.offsetTop, width: el.offsetWidth, height: el.offsetHeight, right: el.offsetLeft + el.offsetWidth, bottom: el.offsetTop + el.offsetHeight, centerX: el.offsetLeft + el.offsetWidth / 2, centerY: el.offsetTop + el.offsetHeight / 2 }; };
   var buildVerticalPath = function(a, b) { return "M" + formatCoord(a.centerX) + " " + formatCoord(a.centerY) + " V" + formatCoord(b.centerY); };
   var buildHorizontalPath = function(a, b) { return "M" + formatCoord(a.centerX) + " " + formatCoord(a.centerY) + " H" + formatCoord(b.centerX); };
-  var buildBranchPath = function(a, b, splitY) { return "M" + formatCoord(a.centerX) + " " + formatCoord(a.centerY) + " V" + formatCoord(splitY) + " H" + formatCoord(b.centerX) + " V" + formatCoord(b.centerY); };
+  var buildBranchPath = function(a, b, splitY) {
+    var directionX = Math.sign(b.centerX - a.centerX) || 1;
+    var directionY = Math.sign(b.centerY - splitY) || 1;
+    var cornerRadius = Math.min(14, Math.abs(splitY - a.centerY) / 2, Math.abs(b.centerX - a.centerX) / 2, Math.abs(b.centerY - splitY) / 2);
+    var firstTurnY = splitY - (Math.sign(splitY - a.centerY) * cornerRadius);
+    var firstTurnX = a.centerX + (directionX * cornerRadius);
+    var secondTurnX = b.centerX - (directionX * cornerRadius);
+    var secondTurnY = splitY + (directionY * cornerRadius);
+
+    return "M" + formatCoord(a.centerX) + " " + formatCoord(a.centerY)
+      + " V" + formatCoord(firstTurnY)
+      + " Q" + formatCoord(a.centerX) + " " + formatCoord(splitY) + " " + formatCoord(firstTurnX) + " " + formatCoord(splitY)
+      + " H" + formatCoord(secondTurnX)
+      + " Q" + formatCoord(b.centerX) + " " + formatCoord(splitY) + " " + formatCoord(b.centerX) + " " + formatCoord(secondTurnY)
+      + " V" + formatCoord(b.centerY);
+  };
   var positionLabel = function(el, left, top) { if (!el) return; el.style.left = formatCoord(left - el.offsetWidth / 2) + "px"; el.style.top = formatCoord(top - el.offsetHeight / 2) + "px"; };
 
   var routeDiagram = function() {
     var svg = runtimeStage.querySelector("svg"); if (!svg) return;
     var nodes = new Map(Array.from(runtimeStage.querySelectorAll(".svs-state-node[data-state]")).map(function(n) { return [n.dataset.state, n]; }));
     var labels = new Map(Array.from(runtimeStage.querySelectorAll(".svs-edge-label[data-edge-label]")).map(function(l) { return [l.dataset.edgeLabel, l]; }));
-    var base = new Map(Array.from(nodes.entries()).map(function(e) { return [e[0], { left: parseFloat(e[1].dataset.left || "0"), top: parseFloat(e[1].dataset.top || "0") }]; }));
+    var layoutAnchorWidth = 148;
+    var base = new Map(Array.from(nodes.entries()).map(function(e) {
+      var left = parseFloat(e[1].dataset.left || "0");
+      return [e[0], { left: left, top: parseFloat(e[1].dataset.top || "0"), centerX: left + (layoutAnchorWidth / 2) }];
+    }));
     var minLeft = Infinity; var maxRight = 0;
-    base.forEach(function(p, s) { var n = nodes.get(s); minLeft = Math.min(minLeft, p.left); maxRight = Math.max(maxRight, p.left + n.offsetWidth); });
+    base.forEach(function(p, s) {
+      var n = nodes.get(s);
+      var alignedLeft = p.centerX - (n.offsetWidth / 2);
+      minLeft = Math.min(minLeft, alignedLeft);
+      maxRight = Math.max(maxRight, alignedLeft + n.offsetWidth);
+    });
     var sceneWidth = maxRight - minLeft; var shiftX = 32 - minLeft;
     if (runtimeStage.clientWidth - sceneWidth >= 240) shiftX = Math.max(shiftX, ((runtimeStage.clientWidth - sceneWidth) / 2) - minLeft);
-    nodes.forEach(function(n, s) { var p = base.get(s); n.style.left = formatCoord(p.left + shiftX) + "px"; n.style.top = formatCoord(p.top) + "px"; });
+    nodes.forEach(function(n, s) {
+      var p = base.get(s);
+      n.style.left = formatCoord(p.centerX - (n.offsetWidth / 2) + shiftX) + "px";
+      n.style.top = formatCoord(p.top) + "px";
+    });
     var b = new Map(Array.from(nodes.entries()).map(function(e) { return [e[0], getNodeBox(e[1])]; }));
     var req = b.get("Requested"); var apv = b.get("Approved"); var rdy = b.get("ReadyForPickup"); var can = b.get("Cancelled"); var pku = b.get("PickedUp"); var exp = b.get("Expired");
     if (!req || !apv || !rdy || !can || !pku || !exp) return;
     svg.setAttribute("viewBox", "0 0 " + runtimeStage.clientWidth + " " + runtimeStage.clientHeight);
-    var splitY = rdy.bottom + Math.min(32, Math.max(20, (Math.min(pku.centerY, exp.centerY) - rdy.centerY) / 2));
+    var terminalRowTop = Math.min(pku.top, exp.top);
+    var splitY = rdy.bottom + ((terminalRowTop - rdy.bottom) / 2);
     [["requested-approved", buildVerticalPath(req, apv)], ["approved-ready", buildVerticalPath(apv, rdy)], ["approved-cancelled", buildHorizontalPath(apv, can)], ["ready-pickedup", buildBranchPath(rdy, pku, splitY)], ["ready-expired", buildBranchPath(rdy, exp, splitY)]].forEach(function(e) { var p = svg.querySelector('path[data-edge="' + e[0] + '"]'); if (p) p.setAttribute("d", e[1]); });
     positionLabel(labels.get("requested-approved"), req.centerX, (req.centerY + apv.centerY) / 2);
     positionLabel(labels.get("approved-ready"), apv.centerX, (apv.centerY + rdy.centerY) / 2);
-    positionLabel(labels.get("approved-cancelled"), (apv.centerX + can.centerX) / 2, apv.centerY);
+    positionLabel(labels.get("approved-cancelled"), (apv.right + can.left) / 2, apv.centerY);
     positionLabel(labels.get("ready-pickedup"), (rdy.centerX + pku.centerX) / 2, splitY);
     positionLabel(labels.get("ready-expired"), (rdy.centerX + exp.centerX) / 2, splitY);
   };
