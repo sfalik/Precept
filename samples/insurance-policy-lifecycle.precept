@@ -1,0 +1,213 @@
+precept InsurancePolicyLifecycle
+
+# Shape: W6 active-life amendment / renewal — property insurance
+#
+# Models a property insurance policy lifecycle from application through
+# underwriting, binding, and an active-life phase with endorsement loops,
+# renewal cycles, claim interaction, lapse/reinstatement, and cancellation.
+# Demonstrates choice fields, decimal money types, integer counters, computed
+# fields, conditional edits, when-guarded underwriting gates, and re-entrant
+# active-state loops.
+#
+# FUTURE(date): ApplicationDate, EffectiveDate, ExpirationDate, RenewalDate,
+#               LapseDate, CancellationDate, EndorsementDate, ClaimDate,
+#               ReinstatementDate
+
+# --- Fields ---
+
+field PolicyholderName as string nullable maxlength 200
+field PropertyAddress as string nullable maxlength 500
+field PolicyType as choice("Homeowners", "Renters", "Condo", "Landlord", "Flood", "Umbrella") default "Homeowners"
+field CoverageLevel as choice("Basic", "Standard", "Premium", "Comprehensive") default "Standard"
+field PropertyType as choice("SingleFamily", "MultiFamily", "Condo", "Townhouse", "MobileHome") default "SingleFamily"
+field PaymentFrequency as choice("Monthly", "Quarterly", "SemiAnnual", "Annual") default "Annual"
+field CancellationReason as choice("NonPayment", "Underwriting", "CustomerRequest", "NonRenewal", "FraudSuspected") nullable
+field UnderwritingDecision as choice("Approved", "Declined", "ConditionalApproval") nullable
+
+field BasePremium as decimal default 0 nonnegative maxplaces 2
+field Deductible as decimal default 0 nonnegative maxplaces 2
+field CoverageLimit as decimal default 0 nonnegative maxplaces 2
+field PropertyValue as decimal default 0 nonnegative maxplaces 2
+field ClaimSurchargeRate as decimal default 0 nonnegative max 1 maxplaces 4
+field EndorsementFee as decimal default 50 nonnegative maxplaces 2
+
+field YearBuilt as integer default 0 nonnegative
+field SquareFootage as integer default 0 nonnegative
+field EndorsementCount as integer default 0 nonnegative max 10
+field RenewalCount as integer default 0 nonnegative
+field ClaimCount as integer default 0 nonnegative
+field GracePeriodDays as integer default 30 positive
+field TermLengthMonths as integer default 12 positive
+field DaysSinceLapse as integer default 0 nonnegative
+
+field ConditionsMet as boolean default false
+
+field AnnualPremium as decimal -> round(BasePremium + BasePremium * ClaimSurchargeRate + EndorsementCount * EndorsementFee, 2)
+field IsHighRisk as boolean -> PropertyValue > 1000000 or ClaimCount > 2
+field CoverageAdequacy as boolean -> CoverageLimit >= PropertyValue * 0.8
+field LoanToValue as decimal -> if PropertyValue > 0 then round(CoverageLimit / PropertyValue, 4) else 0
+
+# --- Invariants ---
+
+invariant EndorsementCount <= 10 because "Maximum ten endorsements per policy term"
+invariant ClaimSurchargeRate <= 1 because "Claim surcharge rate cannot exceed 100 percent"
+invariant TermLengthMonths >= 6 because "Minimum policy term is six months"
+
+# --- States ---
+
+state Application initial
+state Underwriting
+state Quoted
+state Bound
+state Active
+state PendingEndorsement
+state PendingRenewal
+state ClaimFiled
+state Lapsed
+state NonRenewalNotice
+state Cancelled
+state Closed
+
+# --- State Constraints ---
+
+in Underwriting assert PolicyholderName != null because "Underwriting requires policyholder name"
+in Underwriting assert PropertyAddress != null because "Underwriting requires property address"
+in Quoted assert UnderwritingDecision != null because "Quoted policies require an underwriting decision"
+in Quoted assert UnderwritingDecision != "Declined" because "Declined applications cannot be quoted"
+in Bound assert BasePremium > 0 because "Bound policies must have a positive base premium"
+in Active assert BasePremium > 0 because "Active policies must have a positive base premium"
+in Active assert CoverageLimit > 0 because "Active policies must have a coverage limit"
+in Cancelled assert CancellationReason != null because "Cancelled policies must record cancellation reason"
+
+# --- Edit Declarations ---
+
+in Application edit PolicyholderName, PropertyAddress, PolicyType, PropertyType, CoverageLevel, PaymentFrequency
+in Application edit YearBuilt, SquareFootage, PropertyValue, CoverageLimit, Deductible
+in Quoted edit ConditionsMet
+in Active edit PaymentFrequency
+in PendingEndorsement edit CoverageLevel, CoverageLimit, Deductible, PropertyType
+
+# --- Events ---
+
+event SubmitApplication with Name as string notempty maxlength 200, Address as string notempty maxlength 500, Type as choice("Homeowners", "Renters", "Condo", "Landlord", "Flood", "Umbrella") default "Homeowners", Value as decimal positive maxplaces 2, Coverage as decimal positive maxplaces 2, DeductibleAmt as decimal nonnegative maxplaces 2 default 1000
+
+event BeginUnderwriting
+
+event CompleteUnderwriting with Decision as choice("Approved", "Declined", "ConditionalApproval")
+
+event IssueQuote with Premium as decimal positive maxplaces 2
+
+event BindPolicy
+
+event ActivatePolicy
+
+event RequestEndorsement
+
+event ApproveEndorsement with NewCoverageLimit as decimal nonnegative maxplaces 2 default 0, NewDeductible as decimal nonnegative maxplaces 2 default 0, Fee as decimal nonnegative maxplaces 2 default 50
+
+event FileClaimNotice
+
+event ResolveClaim with Surcharge as decimal nonnegative max 1 maxplaces 4 default 0
+
+event InitiateRenewal
+
+event CompleteRenewal with NewPremium as decimal positive maxplaces 2
+
+event IssueNonRenewal
+
+event LapsePolicy
+
+event Reinstate
+
+event AdvanceLapseClock
+
+event CancelPolicy with Reason as choice("NonPayment", "Underwriting", "CustomerRequest", "NonRenewal", "FraudSuspected")
+
+event ClosePolicy
+
+# --- Event Assertions ---
+
+on SubmitApplication assert SubmitApplication.Coverage >= SubmitApplication.Value * 0.5 because "Coverage must be at least 50 percent of property value"
+
+# --- Transitions ---
+
+# Application — collect initial details
+# FUTURE(date): would set ApplicationDate
+from Application on SubmitApplication when PolicyholderName == null -> set PolicyholderName = SubmitApplication.Name -> set PropertyAddress = SubmitApplication.Address -> set PolicyType = SubmitApplication.Type -> set PropertyValue = SubmitApplication.Value -> set CoverageLimit = SubmitApplication.Coverage -> set Deductible = SubmitApplication.DeductibleAmt -> no transition
+from Application on SubmitApplication -> reject "Application already submitted"
+
+from Application on BeginUnderwriting when PolicyholderName != null and PropertyAddress != null -> transition Underwriting
+from Application on BeginUnderwriting -> reject "Application is incomplete — name and address required"
+
+# Underwriting — evaluate risk and issue decision
+from Underwriting on CompleteUnderwriting -> set UnderwritingDecision = CompleteUnderwriting.Decision -> no transition
+
+# Underwriting gate: Approved/Conditional → Quoted, Declined → reject (close instead)
+from Underwriting on IssueQuote when UnderwritingDecision == "Approved" -> set BasePremium = IssueQuote.Premium -> transition Quoted
+from Underwriting on IssueQuote when UnderwritingDecision == "ConditionalApproval" -> set BasePremium = IssueQuote.Premium -> transition Quoted
+from Underwriting on IssueQuote when UnderwritingDecision == "Declined" -> reject "Declined applications cannot be quoted"
+from Underwriting on IssueQuote -> reject "Underwriting decision required before quoting"
+
+# Declined applications close directly
+from Underwriting on ClosePolicy when UnderwritingDecision == "Declined" -> set CancellationReason = "Underwriting" -> transition Closed
+from Underwriting on ClosePolicy -> reject "Only declined applications can be closed from underwriting"
+
+# Quoted — bind the policy
+from Quoted on BindPolicy when UnderwritingDecision == "Approved" -> transition Bound
+from Quoted on BindPolicy when UnderwritingDecision == "ConditionalApproval" and ConditionsMet -> transition Bound
+from Quoted on BindPolicy when UnderwritingDecision == "ConditionalApproval" -> reject "Conditions must be met before binding"
+from Quoted on BindPolicy -> reject "Policy cannot be bound without approval"
+
+# Bound — activate the policy
+# FUTURE(date): would set EffectiveDate and ExpirationDate
+from Bound on ActivatePolicy -> transition Active
+
+# --- Active-Life Loops ---
+
+# Endorsement loop: Active → PendingEndorsement → Active
+from Active on RequestEndorsement when EndorsementCount < 10 -> transition PendingEndorsement
+from Active on RequestEndorsement -> reject "Maximum endorsements per term reached"
+
+# FUTURE(date): would set EndorsementDate
+from PendingEndorsement on ApproveEndorsement -> set EndorsementCount = EndorsementCount + 1 -> set CoverageLimit = if ApproveEndorsement.NewCoverageLimit > 0 then ApproveEndorsement.NewCoverageLimit else CoverageLimit -> set Deductible = if ApproveEndorsement.NewDeductible > 0 then ApproveEndorsement.NewDeductible else Deductible -> set EndorsementFee = ApproveEndorsement.Fee -> transition Active
+
+# Renewal cycle: Active → PendingRenewal → Active (renewed) or → NonRenewalNotice → Cancelled
+from Active on InitiateRenewal -> transition PendingRenewal
+
+# FUTURE(date): would set RenewalDate and new ExpirationDate
+from PendingRenewal on CompleteRenewal -> set RenewalCount = RenewalCount + 1 -> set BasePremium = CompleteRenewal.NewPremium -> set EndorsementCount = 0 -> transition Active
+
+from PendingRenewal on IssueNonRenewal -> transition NonRenewalNotice
+
+from NonRenewalNotice on CancelPolicy -> set CancellationReason = CancelPolicy.Reason -> transition Cancelled
+
+# Claim interaction: Active → ClaimFiled → Active
+# FUTURE(date): would set ClaimDate
+from Active on FileClaimNotice -> set ClaimCount = ClaimCount + 1 -> transition ClaimFiled
+
+# Surcharge capped at field maximum of 1 (100%)
+from ClaimFiled on ResolveClaim -> set ClaimSurchargeRate = if ClaimSurchargeRate + ResolveClaim.Surcharge > 1 then 1 else ClaimSurchargeRate + ResolveClaim.Surcharge -> transition Active
+
+# Lapse path: Active → Lapsed → Active (reinstated) or → Cancelled
+# FUTURE(date): would set LapseDate
+from Active on LapsePolicy -> set DaysSinceLapse = 0 -> transition Lapsed
+
+# Surrogate for date-based grace period tracking
+# FUTURE(date): would calculate from LapseDate automatically
+from Lapsed on AdvanceLapseClock -> set DaysSinceLapse = DaysSinceLapse + 1 -> no transition
+
+# Reinstatement within grace period
+# FUTURE(date): would check actual dates
+from Lapsed on Reinstate when DaysSinceLapse <= GracePeriodDays -> set DaysSinceLapse = 0 -> transition Active
+from Lapsed on Reinstate -> reject "Grace period has expired — reinstatement not allowed"
+
+from Lapsed on CancelPolicy -> set CancellationReason = CancelPolicy.Reason -> transition Cancelled
+
+# --- Cancellation ---
+
+# FUTURE(date): would set CancellationDate
+from Active on CancelPolicy -> set CancellationReason = CancelPolicy.Reason -> transition Cancelled
+
+# --- Closing ---
+
+from Cancelled on ClosePolicy -> transition Closed
