@@ -508,6 +508,12 @@
 - **Position confirmed: error is correct.** Revised the justification from "category boundary" (hand-wavy) to "unfulfillable contract — events are unaddressable without states, and the Fire/Inspect APIs are structurally incompatible with statelessness."
 - Updated `.squad/decisions/inbox/frank-stateless-event-boundary.md` with addendum.
 
+### 2026-04-13 - Issue #88 docs reconciliation for guarded root edit
+- Guarded root-level edit is now part of the documented language surface, not a follow-on: `edit <FieldList> [when <Guard>]` and `edit all [when <Guard>]` are the stateless counterparts to `in <StateTarget> [when <Guard>] edit <FieldList>`.
+- The runtime contract distinguishes **absence of edit declarations** from **declared but currently ineffective editability**. `InspectionResult.EditableFields` is `null` only when the engine has no edit declarations; it is an empty list when declarations exist but all matching guarded edit blocks currently fail.
+- The implementation truth for this behavior lives in `src/Precept/Dsl/PreceptRuntime.cs` (`BuildEditableFieldInfosForStateless`, `BuildEditableFieldInfos`, `Update`) and the guard/type-check proof points live in `test/Precept.Tests/GuardedRootEditTests.cs`.
+- Directly affected sync files for editability drift: `docs/PreceptLanguageDesign.md`, `docs/EditableFieldsDesign.md`, and `docs/RuntimeApiDesign.md`. Remove stale "runtime deferred" wording immediately when runtime behavior has already shipped.
+
 ## Language Design Expertise — Deep Study (2026-04-05)
 
 ### A. PreceptLanguageDesign.md — Complete Internalization
