@@ -411,6 +411,17 @@ internal sealed class PreceptAnalyzer
         if (Regex.IsMatch(beforeCursor, "\\bbecause\\s+[^\\n]*$", RegexOptions.IgnoreCase))
             return [SnippetItem("because reason", "because \"${1:Reason}\"", "Constraint reason")];
 
+        // After root "edit <fields> when <guard>" (guard in progress) → suggest field completions
+        if (Regex.IsMatch(beforeCursor, @"^\s*edit\s+[^\n]+\s+when\s+[^\n]*$", RegexOptions.IgnoreCase))
+            return BuildDataExpressionCompletions(dataFields, collectionKinds);
+
+        // After root "edit <fields> " (completed field list) → suggest 'when' + more field names
+        if (Regex.IsMatch(beforeCursor, @"^\s*edit\s+(?:all|[A-Za-z_][A-Za-z0-9_]*(?:\s*,\s*[A-Za-z_][A-Za-z0-9_]*)*)\s+$", RegexOptions.IgnoreCase))
+            return DistinctAndSort(
+                new CompletionItem[] { WhenItem }
+                    .Concat(BuildItems(editableDataFields, CompletionItemKind.Field))
+                    .Concat(BuildItems(collectionFields, CompletionItemKind.Field)));
+
         // After root "edit " → suggest 'all' + field names (excludes computed fields)
         if (Regex.IsMatch(beforeCursor, "^\\s*edit\\s+[^\\n]*$", RegexOptions.IgnoreCase))
             return DistinctAndSort(

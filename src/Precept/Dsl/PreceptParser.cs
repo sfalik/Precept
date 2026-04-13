@@ -1066,18 +1066,22 @@ public static class PreceptParser
     // Root Edit Declarations (stateless precepts)
     // ═══════════════════════════════════════════════════════════════════
 
-    // edit <FieldTarget>  (root-level; valid only when no states declared)
+    // edit <FieldTarget> [when <Guard>]  (root-level; valid only when no states declared)
     private static readonly TokenListParser<PreceptToken, StatementResult> RootEditDecl =
         (from kw in Token.EqualTo(PreceptToken.Edit)
          from fields in FieldTarget
-         select (StatementResult)new RootEditResult(fields, SourceLine: kw.Span.Position.Line))
+         from whenGuard in OptionalWhenGuardParser
+         select (StatementResult)new RootEditResult(fields,
+             WhenText: whenGuard is not null ? ReconstituteExpr(whenGuard) : null,
+             WhenGuard: whenGuard,
+             SourceLine: kw.Span.Position.Line))
         .Named("root edit declaration")
             .Register(new ConstructInfo(
                 "root-edit-declaration",
-                "edit <Field>, ... | edit all",
+                "edit <Field>, ... [when <Guard>] | edit all [when <Guard>]",
                 "top-level",
                 "Declares which fields are editable (stateless precepts)",
-                "edit all"));
+                "edit Priority when Active"));
 
     // ═══════════════════════════════════════════════════════════════════
     // Transition Rows
@@ -1135,7 +1139,8 @@ public static class PreceptParser
         ParsedAction[] Actions) : StatementResult;
     private sealed record EditResult(string[] States, string[] Fields,
         string? WhenText = null, PreceptExpression? WhenGuard = null, int SourceLine = 0) : StatementResult;
-    private sealed record RootEditResult(string[] Fields, int SourceLine = 0) : StatementResult;
+    private sealed record RootEditResult(string[] Fields,
+        string? WhenText = null, PreceptExpression? WhenGuard = null, int SourceLine = 0) : StatementResult;
     private sealed record TransitionRowResult(string[] States, string EventName,
         PreceptExpression? WhenGuard, ParsedAction[] ActionsAndOutcome, int SourceLine = 0) : StatementResult;
 
@@ -1277,7 +1282,8 @@ public static class PreceptParser
                     break;
 
                 case RootEditResult redr:
-                    editBlocks.Add(new PreceptEditBlock(null, redr.Fields.ToList(), SourceLine: redr.SourceLine));
+                    editBlocks.Add(new PreceptEditBlock(null, redr.Fields.ToList(), SourceLine: redr.SourceLine,
+                        WhenText: redr.WhenText, WhenGuard: redr.WhenGuard));
                     break;
 
                 case TransitionRowResult trr:

@@ -229,7 +229,7 @@ ClearAction        := "clear" Identifier
 
 EditDecl           := StateEditDecl | RootEditDecl
 StateEditDecl      := "in" StateTarget WhenOpt "edit" FieldTarget
-RootEditDecl       := "edit" FieldTarget
+RootEditDecl       := "edit" FieldTarget WhenOpt
 FieldTarget        := "all" | Identifier ("," Identifier)*
 
 EventDecl          := "event" Identifier ("," Identifier)* ("with" ArgList)?
@@ -938,14 +938,25 @@ Stateless precepts (no `state` declarations) use a root-level `edit` form withou
 ```
 edit all
 edit Field1, Field2
+edit Field1 when Guard
+edit all when Guard
 ```
 
 - `edit all` — declares all declared fields as editable. The `all` sentinel is stored as `["all"]` in `FieldNames` and expanded to all scalar and collection field names at engine construction via `ExpandEditFieldNames()`.
 - `edit Field1, Field2` — declares specific named fields as editable.
+- `edit Field1 when Guard` — declares fields as editable only when the guard expression evaluates to `true`. The guard uses the same `WhenOpt` grammar as state-scoped edit declarations.
+- `edit all when Guard` — declares all fields as editable only when the guard is satisfied.
 
-Root-level `edit` is only valid on stateless precepts. Using it alongside `state` declarations produces **C55 (Error)**: `"Root-level \`edit\` is not valid when states are declared. Use \`in any edit all\` or \`in <State> edit <Fields>\` instead."`
+**Guard semantics** follow the same rules as state-scoped guarded edits:
 
-At runtime, `Update` on a stateless instance pulls the editable field set from `_rootEditableFields` (the internal set built from root edit blocks). The `BuildEditableFieldInfosForStateless()` method is used by `Inspect(instance)` to surface root-editable fields for stateless instances.
+- **Additive union:** Unconditional and guarded root-level edit blocks combine. A field is editable if ANY unconditional or passing-guard block grants it.
+- **Fail-closed:** Guard evaluation error → field not granted.
+- **Dynamic evaluation:** Guards are evaluated on each `Update` / `Inspect` call with current instance data.
+- **Type checking:** Guard must be a non-nullable boolean expression. C69 fires for out-of-scope references.
+
+Root-level `edit` (with or without guards) is only valid on stateless precepts. Using it alongside `state` declarations produces **C55 (Error)**: `"Root-level \`edit\` is not valid when states are declared. Use \`in any edit all\` or \`in <State> edit <Fields>\` instead."`
+
+At runtime, `Update` on a stateless instance pulls the editable field set from the union of `_rootEditableFields` (unconditional root edit blocks) and any guarded root-level edit blocks whose guards pass. `EvaluateGuardedEditFields(null, data)` evaluates root-level guards by matching on `null` state. The `BuildEditableFieldInfosForStateless()` method is used by `Inspect(instance)` to surface the combined editable field set for stateless instances.
 
 ### Compile-time checks
 
