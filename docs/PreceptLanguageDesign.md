@@ -313,7 +313,7 @@ edit all
 ### Constraints
 
 - **C12 (parse):** At least one `field` or `state` must be declared. A `precept` header alone is not valid.
-- **C55 (compile):** Root-level `edit` is not valid when states are declared. Use `in <State> edit` instead.
+- **C55 (compile):** Root-level `edit` is not valid when states are declared. Use `in any edit all` or `in <State> edit <Fields>` instead.
 - **C49 (compile, Warning):** Event declared in a stateless precept is unreachable — no transition surface exists.
 - C13 ("Exactly one state must be initial") is suppressed for stateless precepts — no states means no initial state required.
 
