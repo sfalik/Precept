@@ -1,0 +1,150 @@
+precept PurchaseOrderApproval
+
+# Shape: W3 authorization-gated procurement
+#
+# Models an enterprise purchase order from drafting through tiered approval,
+# ordering, receipt, and close-out. Demonstrates authorization-gated execution
+# with computed approval tiers, budget guards, partial receipt handling, and
+# a rejection-revision loop.
+#
+# FUTURE(date): RequestDate, ApprovalDate, OrderDate, ExpectedDeliveryDate, ReceivedDate
+
+# --- Fields ---
+
+field Requisitioner as string nullable maxlength 100
+field Department as string nullable maxlength 100
+field VendorName as string nullable maxlength 200
+field VendorCode as string nullable maxlength 50
+field ItemDescription as string nullable maxlength 500
+field Category as choice("Supplies", "Equipment", "Software", "Services", "Maintenance", "Capital") default "Supplies"
+field Priority as choice("Standard", "Urgent", "Emergency") default "Standard"
+field PaymentTerms as choice("Net30", "Net60", "Net90", "Prepaid", "OnReceipt") default "Net30"
+field Justification as string nullable maxlength 1000
+
+field Quantity as integer default 1 positive
+field UnitPrice as decimal default 0.00 nonnegative maxplaces 2
+field LineItemCount as integer default 1 positive
+field BudgetRemaining as decimal default 0.00 nonnegative maxplaces 2
+
+field TotalAmount as decimal -> Quantity * UnitPrice
+field ApprovalTier as choice("Manager", "DepartmentHead", "Director", "VP") -> if TotalAmount >= 50000.00 then "VP" else if TotalAmount >= 10000.00 then "Director" else if TotalAmount >= 1000.00 then "DepartmentHead" else "Manager"
+field IsOverBudget as boolean -> TotalAmount > BudgetRemaining
+field RequiresExecutiveApproval as boolean -> TotalAmount >= 50000.00
+
+field ApproverName as string nullable maxlength 100
+field ApproverTitle as string nullable maxlength 100
+field ApprovedAmount as decimal nullable maxplaces 2
+field RejectionReason as string nullable maxlength 1000
+field RevisionCount as integer default 0 nonnegative
+field QuantityReceived as integer default 0 nonnegative
+field ReceiptNote as string nullable maxlength 500
+field ShortShipmentAcknowledged as boolean default false
+field PurchaseOrderNumber as string nullable maxlength 50
+field CloseOutNote as string nullable maxlength 500
+
+# --- Invariants ---
+
+invariant RevisionCount <= 5 because "Purchase orders revised more than five times must be escalated offline"
+invariant QuantityReceived <= Quantity because "Received quantity cannot exceed ordered quantity"
+
+# --- States ---
+
+state Draft initial
+state Submitted
+state UnderReview
+state Approved
+state Rejected
+state Ordered
+state Received
+state Closed
+
+# --- State Constraints ---
+
+in Submitted assert Requisitioner != null because "Submitted POs must identify a requisitioner"
+in Submitted assert VendorName != null because "Submitted POs must name a vendor"
+in Submitted assert ItemDescription != null because "Submitted POs must describe the item"
+in Submitted assert UnitPrice > 0.00 because "Submitted POs must have a positive unit price"
+in Submitted assert Justification != null because "Submitted POs must include a justification"
+
+in UnderReview assert ApproverName != null because "POs under review must identify the approver"
+
+in Approved assert ApprovedAmount != null because "Approved POs must record the approved amount"
+in Approved assert ApproverName != null because "Approved POs must record the approver"
+
+in Rejected assert RejectionReason != null because "Rejected POs must include a rejection reason"
+
+in Ordered assert PurchaseOrderNumber != null because "Ordered POs must have a PO number"
+
+in Received assert QuantityReceived > 0 because "Received POs must have a positive received quantity"
+
+# --- Edit Declarations ---
+
+in Draft edit Requisitioner, Department, VendorName, VendorCode, ItemDescription, Category, Priority, PaymentTerms, Justification, Quantity, UnitPrice, LineItemCount, BudgetRemaining
+in Submitted edit Priority
+in Approved edit PaymentTerms
+in Ordered edit PurchaseOrderNumber
+
+# --- Events ---
+
+event Submit with Req as string notempty maxlength 100, Vendor as string notempty maxlength 200, Item as string notempty maxlength 500, Price as decimal positive maxplaces 2, Qty as integer positive default 1, Just as string notempty maxlength 1000, Budget as decimal nonnegative maxplaces 2 default 0.00
+
+event BeginReview with Reviewer as string notempty maxlength 100, ReviewerTitle as string notempty maxlength 100
+
+event Approve with Approver as string notempty maxlength 100, Title as string notempty maxlength 100, Amount as decimal positive maxplaces 2
+
+event Reject with Reason as string notempty maxlength 1000
+
+event Revise
+
+event PlaceOrder with PONumber as string notempty maxlength 50
+
+event RecordReceipt with QtyReceived as integer positive, Note as string nullable default null
+on RecordReceipt assert Note == null or Note != "" because "A supplied receipt note cannot be blank"
+
+event AcknowledgeShortShipment
+
+event CloseOut with Note as string nullable default null
+on CloseOut assert Note == null or Note != "" because "A supplied close-out note cannot be blank"
+
+# --- Transitions ---
+
+# Drafting: submit the PO with required details
+from Draft on Submit -> set Requisitioner = Submit.Req -> set VendorName = Submit.Vendor -> set ItemDescription = Submit.Item -> set UnitPrice = Submit.Price -> set Quantity = Submit.Qty -> set Justification = Submit.Just -> set BudgetRemaining = Submit.Budget -> transition Submitted
+
+# Submission: begin the approval review
+from Submitted on BeginReview when not IsOverBudget or Priority == "Emergency" -> set ApproverName = BeginReview.Reviewer -> set ApproverTitle = BeginReview.ReviewerTitle -> transition UnderReview
+from Submitted on BeginReview when IsOverBudget -> reject "Total amount exceeds remaining budget; reduce quantity or unit price, or mark as Emergency priority"
+
+# Review: tier-appropriate approval or rejection
+# Auto-approve path: Manager tier (under $1,000) — no additional authorization needed
+from UnderReview on Approve when ApprovalTier == "Manager" -> set ApprovedAmount = Approve.Amount -> set ApproverName = Approve.Approver -> set ApproverTitle = Approve.Title -> transition Approved
+
+# Department head approval ($1,000–$9,999)
+from UnderReview on Approve when ApprovalTier == "DepartmentHead" -> set ApprovedAmount = Approve.Amount -> set ApproverName = Approve.Approver -> set ApproverTitle = Approve.Title -> transition Approved
+
+# Director approval ($10,000–$49,999)
+from UnderReview on Approve when ApprovalTier == "Director" -> set ApprovedAmount = Approve.Amount -> set ApproverName = Approve.Approver -> set ApproverTitle = Approve.Title -> transition Approved
+
+# VP/executive approval ($50,000+)
+from UnderReview on Approve when ApprovalTier == "VP" -> set ApprovedAmount = Approve.Amount -> set ApproverName = Approve.Approver -> set ApproverTitle = Approve.Title -> transition Approved
+
+from UnderReview on Reject -> set RejectionReason = Reject.Reason -> transition Rejected
+
+# Rejection: revise and return to draft, or close
+from Rejected on Revise when RevisionCount < 5 -> set RevisionCount = RevisionCount + 1 -> set RejectionReason = null -> set ApproverName = null -> set ApproverTitle = null -> set ApprovedAmount = null -> transition Draft
+from Rejected on Revise -> reject "This PO has been revised too many times and must be handled offline"
+
+# Approved: place the order
+from Approved on PlaceOrder -> set PurchaseOrderNumber = PlaceOrder.PONumber -> transition Ordered
+
+# Ordered: receive goods
+from Ordered on RecordReceipt when QuantityReceived + RecordReceipt.QtyReceived <= Quantity -> set QuantityReceived = QuantityReceived + RecordReceipt.QtyReceived -> set ReceiptNote = RecordReceipt.Note -> transition Received
+from Ordered on RecordReceipt -> reject "Received quantity would exceed ordered quantity"
+
+# Received: handle short shipment or close out
+from Received on AcknowledgeShortShipment when QuantityReceived < Quantity -> set ShortShipmentAcknowledged = true -> no transition
+from Received on AcknowledgeShortShipment when QuantityReceived >= Quantity -> reject "No short shipment to acknowledge; full quantity was received"
+
+from Received on CloseOut when QuantityReceived == Quantity -> set CloseOutNote = CloseOut.Note -> transition Closed
+from Received on CloseOut when QuantityReceived < Quantity and ShortShipmentAcknowledged -> set CloseOutNote = CloseOut.Note -> transition Closed
+from Received on CloseOut when QuantityReceived < Quantity and not ShortShipmentAcknowledged -> reject "Cannot close with short shipment unless acknowledged"
