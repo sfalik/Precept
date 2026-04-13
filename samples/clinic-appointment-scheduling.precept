@@ -1,57 +1,163 @@
 precept ClinicAppointmentScheduling
 
-# Appointment slots are kept intentionally simple: a day number and minute-of-day.
-# The event asserts show that modulo checks belong on event arguments, not fields.
+# Shape: W1 scheduling with insurance verification and no-show tracking
+#
+# Models a clinic appointment from patient request through insurance
+# verification, scheduling, check-in, visit, and completion. Demonstrates
+# computed copay balances, reschedule limits, no-show tracking, telehealth
+# bypass of check-in, and conditional edit guards.
+#
+# FUTURE(date): AppointmentDayNumber → AppointmentDate (date)
+# FUTURE(date): AppointmentMinuteOfDay → AppointmentTime (time)
+# FUTURE(date): RequestedDayNumber → RequestedDate (date)
+# FUTURE(date): ReminderSentDayNumber → ReminderSentDate (date)
+# FUTURE(date): CheckInMinuteOfDay → CheckInTime (time)
+# FUTURE(date): VerificationDayNumber → VerificationDate (date)
 
-field PatientName as string nullable
-field ScheduledDay as number default 0
-field ScheduledMinute as number default 0
-field ConfirmationCode as string nullable
+# --- Fields ---
+
+field PatientName as string nullable maxlength 200
+field PatientPhone as string nullable maxlength 20
+field ProviderName as string nullable maxlength 200
+field Notes as string nullable maxlength 2000
+
+field AppointmentType as choice("NewPatient", "FollowUp", "Urgent", "Wellness", "Specialist", "Telehealth") default "FollowUp"
+field InsuranceType as choice("PPO", "HMO", "Medicare", "Medicaid", "SelfPay", "Other") default "SelfPay"
+field CancellationReason as choice("PatientRequest", "ProviderUnavailable", "Insurance", "NoShow", "Weather", "Other") nullable
+
+# FUTURE(date): Replace integer surrogates with date/time types
+field AppointmentDayNumber as integer default 0 nonnegative    # FUTURE(date) → AppointmentDate
+field AppointmentMinuteOfDay as integer default 0 nonnegative  # FUTURE(date) → AppointmentTime
+field RequestedDayNumber as integer default 0 nonnegative      # FUTURE(date) → RequestedDate
+field ReminderSentDayNumber as integer default 0 nonnegative   # FUTURE(date) → ReminderSentDate
+field CheckInMinuteOfDay as integer default 0 nonnegative      # FUTURE(date) → CheckInTime
+field VerificationDayNumber as integer default 0 nonnegative   # FUTURE(date) → VerificationDate
+
+field CopayAmount as decimal default 0 nonnegative
+field CopayCollected as decimal default 0 nonnegative
+
+field RescheduleCount as integer default 0 nonnegative
+field NoShowCount as integer default 0 nonnegative
+
+field InsuranceVerified as boolean default false
 field ReminderSent as boolean default false
-field CheckInNote as string nullable
-field VisitCompleted as boolean default false
-field CancellationReason as string nullable
+field ConfirmationCode as string nullable maxlength 50
 
-invariant ScheduledDay >= 0 because "Scheduled day cannot be negative"
-invariant ScheduledMinute >= 0 because "Scheduled minute cannot be negative"
+# --- Computed Fields ---
 
-state Draft initial
+field IsUrgent as boolean -> AppointmentType == "Urgent"
+field CopayDue as decimal -> if CopayAmount > CopayCollected then CopayAmount - CopayCollected else 0
+field HasCopayBalance as boolean -> CopayDue > 0
+
+# --- Invariants ---
+
+invariant RescheduleCount <= 3 because "Appointments rescheduled more than three times must be rebooked"
+invariant NoShowCount <= 5 because "Patients with more than five no-shows must be handled by administration"
+invariant AppointmentMinuteOfDay % 15 == 0 because "Appointments must align to 15-minute boundaries"
+
+# --- States ---
+
+state Requested initial
+state InsuranceVerification
 state Scheduled
+state Reminded
 state CheckedIn
+state InProgress
 state Completed
 state Cancelled
+state NoShow
 
-in Scheduled edit ScheduledDay, ScheduledMinute
-in Scheduled assert ConfirmationCode != null because "Scheduled appointments need a confirmation code"
-in Completed assert VisitCompleted because "Completed visits must be marked complete"
+# --- State Constraints ---
 
-to Scheduled -> set ConfirmationCode = "CONFIRMED" -> set ReminderSent = false
+in InsuranceVerification assert PatientName != null because "Insurance verification requires a patient name"
+in Scheduled assert ConfirmationCode != null because "Scheduled appointments must have a confirmation code"
+in Scheduled assert AppointmentDayNumber > 0 because "Scheduled appointments must have a valid appointment day"
+in CheckedIn assert CheckInMinuteOfDay > 0 because "Checked-in patients must record a check-in time"
+in Completed assert not HasCopayBalance because "Completed visits must have copay fully collected"
+in NoShow assert NoShowCount > 0 because "No-show state requires at least one recorded no-show"
 
-event Schedule with Name as string, DayNumber as number, MinuteOfDay as number
-on Schedule assert Name != "" because "A patient name is required"
-on Schedule assert DayNumber >= 0 because "The scheduled day cannot be negative"
-on Schedule assert MinuteOfDay >= 0 because "The scheduled minute cannot be negative"
-on Schedule assert MinuteOfDay % 15 == 0 because "Appointments must start on a 15-minute boundary"
+# --- Edit Declarations ---
 
-event Reschedule with DayNumber as number, MinuteOfDay as number
-on Reschedule assert DayNumber >= 0 because "The scheduled day cannot be negative"
-on Reschedule assert MinuteOfDay >= 0 because "The scheduled minute cannot be negative"
+in Requested edit PatientName, PatientPhone, AppointmentType, InsuranceType
+in InsuranceVerification edit ProviderName, Notes
+in Scheduled edit AppointmentType, Notes
+in Scheduled when RescheduleCount < 3 edit AppointmentDayNumber, AppointmentMinuteOfDay
+
+# --- Events ---
+
+event SubmitRequest with Name as string notempty maxlength 200, Phone as string nullable default null, Type as choice("NewPatient", "FollowUp", "Urgent", "Wellness", "Specialist", "Telehealth") default "FollowUp", Insurance as choice("PPO", "HMO", "Medicare", "Medicaid", "SelfPay", "Other") default "SelfPay", DayNumber as integer nonnegative, MinuteOfDay as integer nonnegative, RequestDay as integer nonnegative
+on SubmitRequest assert MinuteOfDay % 15 == 0 because "Appointments must start on a 15-minute boundary"
+on SubmitRequest assert DayNumber > 0 because "Appointment day must be specified"
+
+event VerifyInsurance with Copay as decimal nonnegative default 0, VerifyDay as integer nonnegative
+on VerifyInsurance assert VerifyDay > 0 because "Verification date must be specified"
+
+event Reschedule with DayNumber as integer nonnegative, MinuteOfDay as integer nonnegative
 on Reschedule assert MinuteOfDay % 15 == 0 because "Appointments must start on a 15-minute boundary"
+on Reschedule assert DayNumber > 0 because "Appointment day must be specified"
 
-event SendReminder
+event SendReminder with ReminderDay as integer nonnegative
 
-event CheckIn with Note as string nullable default null
+event CheckIn with MinuteOfDay as integer nonnegative, Note as string nullable default null
 on CheckIn assert Note == null or Note != "" because "A supplied check-in note cannot be blank"
+on CheckIn assert MinuteOfDay > 0 because "Check-in time must be specified"
+
+event StartVisit
+
+event CollectCopay with Amount as decimal nonnegative
+on CollectCopay assert Amount > 0 because "Copay collection amount must be positive"
 
 event CompleteVisit
-event Cancel with Reason as string nullable default null
-on Cancel assert Reason == null or Reason != "" because "A supplied cancellation reason cannot be blank"
 
-from Draft on Schedule -> set PatientName = Schedule.Name -> set ScheduledDay = Schedule.DayNumber -> set ScheduledMinute = Schedule.MinuteOfDay -> transition Scheduled
+event Cancel with Reason as choice("PatientRequest", "ProviderUnavailable", "Insurance", "NoShow", "Weather", "Other")
 
-from Scheduled on Reschedule -> set ScheduledDay = Reschedule.DayNumber -> set ScheduledMinute = Reschedule.MinuteOfDay -> set ReminderSent = false -> no transition
-from Scheduled on SendReminder -> set ReminderSent = true -> no transition
-from Scheduled on CheckIn -> set CheckInNote = CheckIn.Note -> transition CheckedIn
+event MarkNoShow
+
+event RebookAfterNoShow
+
+# --- Transitions ---
+
+# Request: patient submits an appointment request
+from Requested on SubmitRequest -> set PatientName = SubmitRequest.Name -> set PatientPhone = SubmitRequest.Phone -> set AppointmentType = SubmitRequest.Type -> set InsuranceType = SubmitRequest.Insurance -> set AppointmentDayNumber = SubmitRequest.DayNumber -> set AppointmentMinuteOfDay = SubmitRequest.MinuteOfDay -> set RequestedDayNumber = SubmitRequest.RequestDay -> transition InsuranceVerification
+
+# Insurance verification: confirm coverage, set copay, advance to scheduling
+from InsuranceVerification on VerifyInsurance -> set InsuranceVerified = true -> set CopayAmount = VerifyInsurance.Copay -> set VerificationDayNumber = VerifyInsurance.VerifyDay -> set ConfirmationCode = "CONFIRMED" -> transition Scheduled
+
+# Rescheduling with limit (max 3)
+from Scheduled on Reschedule when RescheduleCount < 3 -> set AppointmentDayNumber = Reschedule.DayNumber -> set AppointmentMinuteOfDay = Reschedule.MinuteOfDay -> set RescheduleCount = RescheduleCount + 1 -> set ReminderSent = false -> no transition
+from Scheduled on Reschedule -> reject "Reschedule limit reached — please rebook the appointment"
+
+# Reminder sent                                                # FUTURE(date): SendReminder.ReminderDay → SendReminder.ReminderDate
+from Scheduled on SendReminder -> set ReminderSent = true -> set ReminderSentDayNumber = SendReminder.ReminderDay -> transition Reminded
+
+# Telehealth appointments skip check-in and go directly to in-progress
+from Scheduled on StartVisit when AppointmentType == "Telehealth" -> transition InProgress
+from Reminded on StartVisit when AppointmentType == "Telehealth" -> transition InProgress
+
+# In-person check-in                                           # FUTURE(date): CheckIn.MinuteOfDay → CheckIn.Time
+from Scheduled on CheckIn -> set CheckInMinuteOfDay = CheckIn.MinuteOfDay -> set Notes = CheckIn.Note -> transition CheckedIn
+from Reminded on CheckIn -> set CheckInMinuteOfDay = CheckIn.MinuteOfDay -> set Notes = CheckIn.Note -> transition CheckedIn
+
+# Start in-person visit after check-in
+from CheckedIn on StartVisit -> transition InProgress
+
+# Copay collection during visit
+from InProgress on CollectCopay -> set CopayCollected = CopayCollected + CollectCopay.Amount -> no transition
+
+# Complete the visit (copay must be settled)
+from InProgress on CompleteVisit when not HasCopayBalance -> transition Completed
+from InProgress on CompleteVisit -> reject "Outstanding copay balance must be collected before completing the visit"
+
+# Cancellation from pre-visit states
+from Requested on Cancel -> set CancellationReason = Cancel.Reason -> transition Cancelled
+from InsuranceVerification on Cancel -> set CancellationReason = Cancel.Reason -> transition Cancelled
 from Scheduled on Cancel -> set CancellationReason = Cancel.Reason -> transition Cancelled
+from Reminded on Cancel -> set CancellationReason = Cancel.Reason -> transition Cancelled
 
-from CheckedIn on CompleteVisit -> set VisitCompleted = true -> transition Completed
+# No-show from scheduled or reminded
+from Scheduled on MarkNoShow -> set NoShowCount = NoShowCount + 1 -> set CancellationReason = "NoShow" -> transition NoShow
+from Reminded on MarkNoShow -> set NoShowCount = NoShowCount + 1 -> set CancellationReason = "NoShow" -> transition NoShow
+
+# Rebook after no-show (preserves cumulative no-show count)
+from NoShow on RebookAfterNoShow when NoShowCount <= 5 -> set ConfirmationCode = null -> set ReminderSent = false -> set AppointmentDayNumber = 0 -> set AppointmentMinuteOfDay = 0 -> set InsuranceVerified = false -> set CancellationReason = null -> transition Requested
+from NoShow on RebookAfterNoShow -> reject "Too many no-shows — patient must contact administration"
