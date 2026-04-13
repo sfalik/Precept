@@ -290,7 +290,7 @@ The `when` property is present only when the declaration includes a `when <Guard
 
 The `currentState` parameter is `string?` — pass `null` for stateless precepts. When `currentState` is `null`, all events return `Undefined` outcome (no transition surface). The `data` and `eventArgs` fields behave identically for stateless and stateful precepts.
 
-The `eventArgs` field is optional. When provided, the specified args are used for the named events during evaluation — the tool re-inspects those events individually with the supplied args. Events not listed in `eventArgs` are inspected without args, and the engine reports the actual outcome (which may be `MissingRequiredArguments` if args are needed).
+The `eventArgs` field is optional. When provided, the specified args are used for the named events during evaluation — the tool re-inspects those events individually with the supplied args. Events not listed in `eventArgs` are inspected without args, and the engine still reports its actual `TransitionOutcome`. When the engine surfaces required event arguments for an inspected transition, they appear in the optional `requiredArgs` array.
 
 **Output:**
 ```json
@@ -325,13 +325,6 @@ The `eventArgs` field is optional. When provided, the specified args are used fo
         }
       ]
     },
-    {
-      "event": "Escalate",
-      "outcome": "MissingRequiredArguments",
-      "resultState": null,
-      "violations": [],
-      "requiredArgs": ["Level"]
-    }
   ],
   "editableFields": [
     { "name": "Priority", "type": "number", "nullable": false, "currentValue": 3 },
@@ -354,10 +347,10 @@ The response echoes the resolved instance snapshot (`currentState` + `data` with
 | `precept_update` with `currentState: null` | Works on root-editable fields; `currentState: null` in response |
 
 Each event reports:
-- `outcome` — the engine's actual `TransitionOutcome` string (e.g. `Transition`, `NoTransition`, `ConstraintFailure`, `Rejected`, `MissingRequiredArguments`, `Undefined`, `Unmatched`)
+- `outcome` — the engine's actual `TransitionOutcome` string (e.g. `Transition`, `NoTransition`, `ConstraintFailure`, `Rejected`, `Undefined`, `Unmatched`)
 - `resultState` — the target state on success, `null` otherwise
 - `violations` — structured `ViolationDto` array (empty unless `ConstraintFailure`)
-- `requiredArgs` — list of required argument names (present only when the engine populates `RequiredEventArgumentKeys`)
+- `requiredArgs` — list of required argument names (present only when the engine populates `RequiredEventArgumentKeys`, typically on successful transition inspection)
 
 **Implementation:** Calls `PreceptCompiler.CompileFromText(text)`, then `engine.Inspect(instance)` for the full state-level inspection (declaration order preserved). When `eventArgs` are supplied, re-inspects those specific events individually with `engine.Inspect(instance, eventName, args)`. Projects `EditableFields` from the core `InspectionResult`. No reimplementation of the inspection loop.
 
@@ -466,7 +459,7 @@ The `fields` object contains the field names and new values to apply. At least o
 **Output (success):**
 ```json
 {
-  "outcome": "Updated",
+  "outcome": "Update",
   "data": { "Assignee": "alice", "Priority": 1, "BlockReason": null, "Resolution": null },
   "violations": [],
   "error": null
