@@ -341,7 +341,7 @@ The `eventArgs` field is optional. When provided, the specified args are used fo
 }
 ```
 
-The response echoes the resolved instance snapshot (`currentState` + `data` with defaults applied), so Copilot can see what defaults were filled in and confirm the starting point matches intent. For stateless precepts, `currentState` is `null` in the response. Events appear in declaration order (no sorting). The `editableFields` array lists fields that have `in <State> edit` declarations for the current state (stateful) or root-level `edit` declarations (stateless).
+The response echoes the resolved instance snapshot (`currentState` + `data` with defaults applied), so Copilot can see what defaults were filled in and confirm the starting point matches intent. For stateless precepts, `currentState` is `null` in the response. Events appear in declaration order (no sorting). The `editableFields` array lists the effective editable field set for the current data snapshot: stateful `in <State> edit` declarations that match the current state plus any passing guarded edit blocks, or stateless root-level `edit` declarations plus any passing guarded root-level edit blocks.
 
 **Stateless precept behavior summary:**
 
@@ -440,9 +440,9 @@ The response echoes the resolved data snapshot (with defaults applied), matching
 
 ### 5. `precept_update`
 
-**Purpose:** Apply a direct field edit to a precept instance from a given state and data snapshot. Returns the update outcome — whether the edit succeeded, was rejected (uneditable field, constraint failure, invalid input), and the resulting data. Lets Copilot test `in <State> edit` declarations (stateful) or root-level `edit` declarations (stateless) without firing events.
+**Purpose:** Apply a direct field edit to a precept instance from a given state and data snapshot. Returns the update outcome — whether the edit succeeded, was rejected (uneditable field, constraint failure, invalid input), and the resulting data. Lets Copilot test stateful `in <State> edit` declarations or stateless root-level `edit` declarations, including guarded forms, without firing events.
 
-The `currentState` parameter is `string?` — pass `null` for stateless precepts. When `currentState` is `null`, `Update` applies to root-editable fields declared with `edit all` or `edit Field1, Field2`.
+The `currentState` parameter is `string?` — pass `null` for stateless precepts. When `currentState` is `null`, `Update` applies to the effective root-editable field set declared with `edit all`, `edit Field1, Field2`, or guarded root-level forms such as `edit all when Guard` and `edit Field1 when Guard`.
 
 **Input:**
 ```json
