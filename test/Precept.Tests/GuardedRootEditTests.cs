@@ -380,7 +380,7 @@ public class GuardedRootEditTests
     // ════════════════════════════════════════════════════════════════════
 
     [Fact]
-    public void Update_GuardedRootEdit_CompoundGuard()
+    public void Update_GuardedRootEdit_CompoundGuard_And()
     {
         const string dsl = """
             precept Test
@@ -399,6 +399,28 @@ public class GuardedRootEditTests
         var (engine2, inst2) = CompileAndCreate(dsl,
             new Dictionary<string, object?> { ["X"] = 0.0, ["A"] = true, ["B"] = false });
         engine2.Update(inst2, p => p.Set("X", 10.0)).Outcome.Should().Be(UpdateOutcome.UneditableField);
+    }
+
+    [Fact]
+    public void Update_GuardedRootEdit_CompoundGuard_Or()
+    {
+        const string dsl = """
+            precept Test
+            field X as number default 0
+            field A as boolean default true
+            field B as boolean default true
+            edit X when A or B
+            """;
+
+        // Both false → not editable
+        var (engine1, inst1) = CompileAndCreate(dsl,
+            new Dictionary<string, object?> { ["X"] = 0.0, ["A"] = false, ["B"] = false });
+        engine1.Update(inst1, p => p.Set("X", 10.0)).Outcome.Should().Be(UpdateOutcome.UneditableField);
+
+        // One true → editable
+        var (engine2, inst2) = CompileAndCreate(dsl,
+            new Dictionary<string, object?> { ["X"] = 0.0, ["A"] = false, ["B"] = true });
+        engine2.Update(inst2, p => p.Set("X", 10.0)).Outcome.Should().Be(UpdateOutcome.Update);
     }
 
     // ════════════════════════════════════════════════════════════════════
@@ -451,30 +473,42 @@ public class GuardedRootEditTests
     [Fact]
     public void Inspect_Patch_GuardedRootEdit_FlipGuard()
     {
+        // Only guarded edit — no unconditional edit for Priority
         const string dsl = """
             precept Test
             field Priority as number default 1
             field Active as boolean default true
-            edit Priority, Active
+            edit Active
             edit Priority when Active
             """;
 
-        // Active=false, patch sets Active=true — but edit guard evaluates on pre-patch data
-        // So Priority is NOT guarded-editable (Active=false), only unconditionally editable
-        var (engine, instance) = CompileAndCreate(dsl,
+        // Active=true → Priority IS in editable set (guard passes)
+        var (engineTrue, instTrue) = CompileAndCreate(dsl,
+            new Dictionary<string, object?> { ["Priority"] = 1.0, ["Active"] = true });
+
+        var trueResult = engineTrue.Inspect(instTrue);
+        trueResult.EditableFields.Should().NotBeNull();
+        trueResult.EditableFields!.Select(f => f.FieldName).Should().Contain("Priority",
+            "guard is true so Priority should be editable");
+        trueResult.EditableFields!.Select(f => f.FieldName).Should().Contain("Active");
+
+        // Active=false → Priority NOT in editable set (guard fails)
+        var (engineFalse, instFalse) = CompileAndCreate(dsl,
             new Dictionary<string, object?> { ["Priority"] = 1.0, ["Active"] = false });
 
-        // Priority is unconditionally editable, Active is unconditionally editable
-        var baseResult = engine.Inspect(instance);
-        baseResult.EditableFields.Should().NotBeNull();
-        baseResult.EditableFields!.Select(f => f.FieldName).Should().Contain("Priority");
-        baseResult.EditableFields!.Select(f => f.FieldName).Should().Contain("Active");
+        var falseResult = engineFalse.Inspect(instFalse);
+        falseResult.EditableFields.Should().NotBeNull();
+        falseResult.EditableFields!.Select(f => f.FieldName).Should().Contain("Active");
+        falseResult.EditableFields!.Select(f => f.FieldName).Should().NotContain("Priority",
+            "guard is false so Priority should not be editable");
 
-        // Patch: set Priority → should succeed since Priority is unconditionally editable
-        var patchResult = engine.Inspect(instance, p => p.Set("Priority", 5.0));
+        // Patch: set Priority on false-guard instance — Priority is not editable, expect violation
+        var patchResult = engineFalse.Inspect(instFalse, p => p.Set("Priority", 5.0));
         patchResult.EditableFields.Should().NotBeNull();
+        // Priority is not in editable set, so the patch should show a violation
         var priorityField = patchResult.EditableFields!.FirstOrDefault(f => f.FieldName == "Priority");
-        priorityField.Should().NotBeNull();
-        priorityField!.Violation.Should().BeNull();
+        // Priority may not appear at all (not editable) — that's correct behavior
+        if (priorityField is not null)
+            priorityField.Violation.Should().NotBeNull("Priority is not editable when guard is false");
     }
 }
