@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>State Diagram Specimen Exploration - Precept</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;700&family=Geist:wght@400;500&display=swap">
+<style>
+:root {
+  --bg: #040506;
+  --panel: #090b0e;
+  --panel-2: #0d1014;
+  --panel-3: #111518;
+  --line: rgba(255,255,255,0.08);
+  --line-strong: rgba(255,255,255,0.16);
+  --text: #d4dae3;
+  --muted: #a7afbb;
+  --soft: #687281;
+  --structure-d: #4338CA;
+  --structure: #6366F1;
+  --state: #A898F5;
+  --event: #30B8E8;
+  --data: #B0BEC5;
+  --data-t: #9AA8B5;
+  --data-v: #84929F;
+  --rule: #FBBF24;
+  --valid: #34D399;
+  --violated: #F87171;
+  --warn: #FDE047;
+  --mono: "Geist Mono", "Cascadia Code", Consolas, monospace;
+  --sans: "Geist", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 14px;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background:
+    radial-gradient(circle at top right, rgba(48,184,232,0.08), transparent 30%),
+    radial-gradient(circle at left top, rgba(168,152,245,0.08), transparent 32%),
+    var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  line-height: 1.6;
+  padding: 48px 24px 120px;
+}
+
+.page {
+  max-width: 1080px;
+  margin: 0 auto;
+}
+
+.page-header {
+  padding-bottom: 32px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 32px;
+}
+
+.page-eyebrow {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--soft);
+  margin-bottom: 10px;
+}
+
+.page-title {
+  font-family: var(--mono);
+  font-size: 22px;
+  font-weight: 400;
+  color: var(--event);
+  margin-bottom: 12px;
+}
+
+.page-lead {
+  max-width: 760px;
+  font-size: 13.5px;
+  line-height: 1.78;
+  color: var(--muted);
+}
+
+.page-lead strong {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.concept-box {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 20px 24px;
+  margin-bottom: 40px;
+}
+
+.concept-box h2 {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--soft);
+  margin-bottom: 14px;
+  font-weight: 500;
+}
+
+.concept-box p {
+  max-width: 760px;
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+
+.concept-box p + p {
+  margin-top: 8px;
+}
+
+.concept-box strong {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.example {
+  display: grid;
+  gap: 18px;
+}
+
+.ex-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.ex-num {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+
+.ex-name {
+  font-family: var(--mono);
+  font-size: 18px;
+  font-weight: 400;
+  color: var(--text);
+}
+
+.ex-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 2px 8px;
+  border-radius: 2px;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.ex-chip--source {
+  color: var(--event);
+  border: 1px solid rgba(48,184,232,0.28);
+  background: rgba(48,184,232,0.08);
+}
+
+.ex-chip--isolation {
+  color: var(--state);
+  border: 1px solid rgba(168,152,245,0.26);
+  background: rgba(168,152,245,0.08);
+}
+
+.ex-idea {
+  max-width: 760px;
+  font-size: 13px;
+  line-height: 1.75;
+  color: var(--muted);
+}
+
+.ex-idea strong {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.specimen-frame {
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(17,21,24,0.72), rgba(9,11,14,0.94));
+}
+
+.surface-specimen {
+  background: var(--panel);
+  padding: 26px;
+}
+
+.surface-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--soft);
+  margin-bottom: 6px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.sf-note {
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.72;
+  color: var(--muted);
+  margin-bottom: 18px;
+  max-width: 64ch;
+}
+
+.cg-state-diagram {
+  display: grid;
+  gap: 16px;
+  padding: 0;
+  border: none;
+  background: none;
+  container-type: inline-size;
+}
+
+.svs-state-review-stage {
+  position: relative;
+  overflow: hidden;
+  min-height: 362px;
+  border: none;
+  background: var(--panel);
+  box-shadow: none;
+  width: min(100%, 760px);
+  margin-inline: 0;
+}
+
+.svs-state-review-stage svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.svs-state-review-stage path {
+  fill: none;
+  stroke: rgba(48,184,232,0.78);
+  stroke-width: 2.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.svs-state-review-stage .svs-edge-past {
+  stroke: rgba(48,184,232,0.38);
+}
+
+.svs-state-review-stage .svs-edge-active {
+  stroke: rgba(48,184,232,0.96);
+  stroke-width: 2.5;
+}
+
+.svs-state-review-stage .svs-edge-blocked {
+  stroke: rgba(48,184,232,0.64);
+  stroke-dasharray: 4 4;
+}
+
+.svs-state-node,
+.svs-edge-label {
+  position: absolute;
+}
+
+.svs-state-node {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 5px 9px;
+  border: 1px solid rgba(168,152,245,0.32);
+  background: #0b0d11;
+  color: var(--state);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  white-space: nowrap;
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    box-shadow 140ms ease,
+    color 140ms ease;
+  z-index: 2;
+}
+
+.svs-state-node-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--structure);
+  flex-shrink: 0;
+}
+
+.svs-state-node:hover,
+.svs-state-node:focus-visible,
+.svs-state-node.is-linked {
+  outline: none;
+  border-color: rgba(168,152,245,0.52);
+  box-shadow: inset 0 0 0 1px rgba(168,152,245,0.12);
+}
+
+.svs-state-node--current {
+  border-color: rgba(168,152,245,0.72);
+  background: linear-gradient(180deg, #4a3a70, #372b54);
+  box-shadow:
+    inset 0 0 0 1px rgba(168,152,245,0.16),
+    0 0 0 1px rgba(168,152,245,0.10);
+}
+
+.svs-state-node--terminal {
+  border-width: 2px;
+  box-shadow: inset 0 0 0 1px rgba(168,152,245,0.14);
+}
+
+.svs-state-node--current.svs-state-node--terminal {
+  box-shadow:
+    inset 0 0 0 1px rgba(168,152,245,0.16),
+    0 0 0 1px rgba(168,152,245,0.10);
+}
+
+.svs-state-node--unreachable-current {
+  color: rgba(168,152,245,0.54);
+  border-color: rgba(168,152,245,0.22);
+  border-style: dashed;
+  background: #0b0d11;
+}
+
+.svs-state-node--unreachable-initial {
+  color: rgba(168,152,245,0.54);
+  border-color: rgba(168,152,245,0.16);
+  background:
+    repeating-linear-gradient(135deg, rgba(168,152,245,0.08) 0 1px, transparent 1px 7px),
+    #0b0d11;
+}
+
+.svs-state-node--constrained {
+  font-style: italic;
+}
+
+.svs-edge-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--event);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  white-space: nowrap;
+  z-index: 3;
+}
+
+.svs-edge-token {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 5px 10px;
+  border: 1px solid rgba(48,184,232,0.36);
+  background: #050608;
+  color: var(--event);
+}
+
+.svs-edge-label--muted {
+  opacity: 0.78;
+}
+
+.svs-edge-label--active {
+  filter: drop-shadow(0 0 8px rgba(48,184,232,0.10));
+}
+
+.svs-edge-label--active .svs-edge-token {
+  border-color: rgba(48,184,232,0.48);
+  box-shadow: 0 0 0 1px rgba(48,184,232,0.14);
+}
+
+.svs-edge-label--blocked .svs-edge-token {
+  border-style: dashed;
+}
+
+@container (min-width: 760px) {
+  .svs-state-review-stage {
+    margin-inline: auto;
+  }
+}
+
+@media (max-width: 720px) {
+  body {
+    padding: 32px 16px 96px;
+  }
+
+  .surface-specimen {
+    padding: 20px;
+  }
+
+  .svs-state-review-stage {
+    min-height: 344px;
+  }
+}
+</style>
+</head>
+<body>
+  <main class="page">
+    <header class="page-header">
+      <div class="page-eyebrow">Design Prototype</div>
+      <h1 class="page-title">State Diagram Specimen Exploration</h1>
+      <p class="page-lead">This file isolates the current committed runtime state-diagram specimen from <strong>design/system/semantic-visual-system.html</strong> so future diagram iteration can happen here without touching the canonical semantic visual system document.</p>
+    </header>
+
+    <section class="concept-box" aria-label="Prototype intent">
+      <h2>Prototype Scope</h2>
+      <p>The diagram markup, semantic tokens, node and edge styling, and the routing and label-positioning script are carried over from the canonical specimen. The only added layer is the lightweight prototype shell used across files in <strong>design/prototypes</strong>.</p>
+      <p>This keeps the specimen visually and behaviorally close to the source while giving design work a separate place to evolve.</p>
+    </section>
+
+    <section class="example" aria-labelledby="isolated-specimen-heading">
+      <div class="ex-head">
+        <span class="ex-num">01</span>
+        <h2 class="ex-name" id="isolated-specimen-heading">Isolated Canonical Specimen</h2>
+        <span class="ex-chip ex-chip--source">Committed Source</span>
+        <span class="ex-chip ex-chip--isolation">Standalone Exploration</span>
+      </div>
+
+      <p class="ex-idea">The stage below preserves the current <strong>VisitorBadgePickup</strong> runtime graph: past transitions remain muted, the active event stays emphasized, and the blocked branch retains its dashed event treatment. Node hover and focus states, scene centering, path routing, and edge-label placement follow the same logic as the system document.</p>
+
+      <div class="specimen-frame">
+        <div class="surface-specimen">
+          <div class="surface-label">State Diagram Specimen</div>
+          <p class="sf-note">Isolated copy of the semantic visual system state-diagram specimen for focused experimentation.</p>
+
+          <div class="cg-state-diagram">
+            <div class="svs-state-review-stage" id="surface02-state-diagram-stage" aria-label="Runtime state diagram for VisitorBadgePickup">
+              <svg viewBox="0 0 760 362" role="img" aria-label="Vertical runtime graph: ReadyForPickup is current, PickUp is active, Expire is blocked">
+                <defs>
+                  <marker id="svs-s2-arrow-past" viewBox="0 0 12 10" markerWidth="12" markerHeight="10" refX="10" refY="5" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M1 1 L10 5 L1 9 L3.6 5 Z" fill="rgba(48,184,232,0.38)"></path></marker>
+                  <marker id="svs-s2-arrow-blocked" viewBox="0 0 12 10" markerWidth="12" markerHeight="10" refX="10" refY="5" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M1 1 L10 5 L1 9 L3.6 5 Z" fill="rgba(48,184,232,0.64)"></path></marker>
+                  <marker id="svs-s2-arrow-active" viewBox="0 0 12 10" markerWidth="12" markerHeight="10" refX="10" refY="5" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M1 1 L10 5 L1 9 L3.6 5 Z" fill="rgba(48,184,232,0.96)"></path></marker>
+                </defs>
+                <path class="svs-edge-past" data-edge="requested-approved" d="M380 34 V110" marker-end="url(#svs-s2-arrow-past)"></path>
+                <path class="svs-edge-past" data-edge="approved-ready" d="M380 110 V186" marker-end="url(#svs-s2-arrow-past)"></path>
+                <path class="svs-edge-past" data-edge="approved-cancelled" d="M454 110 H468" marker-end="url(#svs-s2-arrow-past)"></path>
+                <path class="svs-edge-active" data-edge="ready-pickedup" d="M380 186 V212 Q380 226 366 226 H268 Q254 226 254 240 V274" marker-end="url(#svs-s2-arrow-active)"></path>
+                <path class="svs-edge-blocked" data-edge="ready-expired" d="M380 186 V212 Q380 226 394 226 H492 Q506 226 506 240 V274" marker-end="url(#svs-s2-arrow-blocked)"></path>
+              </svg>
+              <div class="svs-state-node svs-state-node--initial svs-state-node--unreachable-current" data-state="Requested" data-left="236" data-top="22" tabindex="0" style="left:236px; top:22px;"><span class="svs-state-node-dot" aria-hidden="true"></span>Requested</div>
+              <div class="svs-state-node svs-state-node--unreachable-current" data-state="Approved" data-left="236" data-top="98" tabindex="0" style="left:236px; top:98px;">Approved</div>
+              <div class="svs-state-node svs-state-node--current" data-state="ReadyForPickup" data-left="236" data-top="174" tabindex="0" style="left:236px; top:174px;">ReadyForPickup</div>
+              <div class="svs-state-node svs-state-node--terminal svs-state-node--unreachable-current" data-state="Cancelled" data-left="400" data-top="98" tabindex="0" style="left:400px; top:98px;">Cancelled</div>
+              <div class="svs-state-node svs-state-node--terminal" data-state="PickedUp" data-left="150" data-top="250" tabindex="0" style="left:150px; top:250px;">PickedUp</div>
+              <div class="svs-state-node svs-state-node--terminal svs-state-node--unreachable-current" data-state="Expired" data-left="322" data-top="250" tabindex="0" style="left:322px; top:250px;">Expired</div>
+              <span class="svs-edge-label svs-edge-label--muted" data-edge-label="requested-approved"><span class="svs-edge-token">ApproveRequest</span></span>
+              <span class="svs-edge-label svs-edge-label--muted" data-edge-label="approved-ready"><span class="svs-edge-token">PrintBadge</span></span>
+              <span class="svs-edge-label svs-edge-label--muted" data-edge-label="approved-cancelled"><span class="svs-edge-token">Cancel</span></span>
+              <span class="svs-edge-label svs-edge-label--active" data-edge-label="ready-pickedup"><span class="svs-edge-token">PickUp</span></span>
+              <span class="svs-edge-label svs-edge-label--blocked" data-edge-label="ready-expired"><span class="svs-edge-token">Expire</span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+  (function() {
+    var runtimeStage = document.getElementById("surface02-state-diagram-stage");
+    if (!runtimeStage) return;
+
+    var formatCoord = function(value) { return Math.round(value * 10) / 10; };
+    var getNodeBox = function(el) {
+      return {
+        left: el.offsetLeft,
+        top: el.offsetTop,
+        width: el.offsetWidth,
+        height: el.offsetHeight,
+        right: el.offsetLeft + el.offsetWidth,
+        bottom: el.offsetTop + el.offsetHeight,
+        centerX: el.offsetLeft + el.offsetWidth / 2,
+        centerY: el.offsetTop + el.offsetHeight / 2
+      };
+    };
+    var buildVerticalPath = function(a, b) { return "M" + formatCoord(a.centerX) + " " + formatCoord(a.centerY) + " V" + formatCoord(b.centerY); };
+    var buildHorizontalPath = function(a, b) { return "M" + formatCoord(a.centerX) + " " + formatCoord(a.centerY) + " H" + formatCoord(b.centerX); };
+    var buildBranchPath = function(a, b, splitY) {
+      var directionX = Math.sign(b.centerX - a.centerX) || 1;
+      var directionY = Math.sign(b.centerY - splitY) || 1;
+      var cornerRadius = Math.min(14, Math.abs(splitY - a.centerY) / 2, Math.abs(b.centerX - a.centerX) / 2, Math.abs(b.centerY - splitY) / 2);
+      var firstTurnY = splitY - (Math.sign(splitY - a.centerY) * cornerRadius);
+      var firstTurnX = a.centerX + (directionX * cornerRadius);
+      var secondTurnX = b.centerX - (directionX * cornerRadius);
+      var secondTurnY = splitY + (directionY * cornerRadius);
+
+      return "M" + formatCoord(a.centerX) + " " + formatCoord(a.centerY)
+        + " V" + formatCoord(firstTurnY)
+        + " Q" + formatCoord(a.centerX) + " " + formatCoord(splitY) + " " + formatCoord(firstTurnX) + " " + formatCoord(splitY)
+        + " H" + formatCoord(secondTurnX)
+        + " Q" + formatCoord(b.centerX) + " " + formatCoord(splitY) + " " + formatCoord(b.centerX) + " " + formatCoord(secondTurnY)
+        + " V" + formatCoord(b.centerY);
+    };
+    var positionLabel = function(el, left, top) {
+      if (!el) return;
+      el.style.left = formatCoord(left - el.offsetWidth / 2) + "px";
+      el.style.top = formatCoord(top - el.offsetHeight / 2) + "px";
+    };
+
+    var routeDiagram = function() {
+      var svg = runtimeStage.querySelector("svg");
+      if (!svg) return;
+      var nodes = new Map(Array.from(runtimeStage.querySelectorAll(".svs-state-node[data-state]")).map(function(n) { return [n.dataset.state, n]; }));
+      var labels = new Map(Array.from(runtimeStage.querySelectorAll(".svs-edge-label[data-edge-label]")).map(function(l) { return [l.dataset.edgeLabel, l]; }));
+      // Preserve the original column centers now that state nodes size to content.
+      var layoutAnchorWidth = 148;
+      var base = new Map(Array.from(nodes.entries()).map(function(e) {
+        var left = parseFloat(e[1].dataset.left || "0");
+        return [e[0], { left: left, top: parseFloat(e[1].dataset.top || "0"), centerX: left + (layoutAnchorWidth / 2) }];
+      }));
+      var minLeft = Infinity;
+      var maxRight = 0;
+
+      base.forEach(function(position, state) {
+        var node = nodes.get(state);
+        var alignedLeft = position.centerX - (node.offsetWidth / 2);
+        minLeft = Math.min(minLeft, alignedLeft);
+        maxRight = Math.max(maxRight, alignedLeft + node.offsetWidth);
+      });
+
+      var sceneWidth = maxRight - minLeft;
+      var shiftX = 32 - minLeft;
+
+      if (runtimeStage.clientWidth - sceneWidth >= 240) {
+        shiftX = Math.max(shiftX, ((runtimeStage.clientWidth - sceneWidth) / 2) - minLeft);
+      }
+
+      nodes.forEach(function(node, state) {
+        var position = base.get(state);
+        node.style.left = formatCoord(position.centerX - (node.offsetWidth / 2) + shiftX) + "px";
+        node.style.top = formatCoord(position.top) + "px";
+      });
+
+      var boxes = new Map(Array.from(nodes.entries()).map(function(entry) { return [entry[0], getNodeBox(entry[1])]; }));
+      var req = boxes.get("Requested");
+      var apv = boxes.get("Approved");
+      var rdy = boxes.get("ReadyForPickup");
+      var can = boxes.get("Cancelled");
+      var pku = boxes.get("PickedUp");
+      var exp = boxes.get("Expired");
+      if (!req || !apv || !rdy || !can || !pku || !exp) return;
+
+      svg.setAttribute("viewBox", "0 0 " + runtimeStage.clientWidth + " " + runtimeStage.clientHeight);
+
+      var terminalRowTop = Math.min(pku.top, exp.top);
+      var splitY = rdy.bottom + ((terminalRowTop - rdy.bottom) / 2);
+      [
+        ["requested-approved", buildVerticalPath(req, apv)],
+        ["approved-ready", buildVerticalPath(apv, rdy)],
+        ["approved-cancelled", buildHorizontalPath(apv, can)],
+        ["ready-pickedup", buildBranchPath(rdy, pku, splitY)],
+        ["ready-expired", buildBranchPath(rdy, exp, splitY)]
+      ].forEach(function(edge) {
+        var path = svg.querySelector('path[data-edge="' + edge[0] + '"]');
+        if (path) path.setAttribute("d", edge[1]);
+      });
+
+      positionLabel(labels.get("requested-approved"), req.centerX, (req.centerY + apv.centerY) / 2);
+      positionLabel(labels.get("approved-ready"), apv.centerX, (apv.centerY + rdy.centerY) / 2);
+      positionLabel(labels.get("approved-cancelled"), (apv.right + can.left) / 2, apv.centerY);
+      positionLabel(labels.get("ready-pickedup"), (rdy.centerX + pku.centerX) / 2, splitY);
+      positionLabel(labels.get("ready-expired"), (rdy.centerX + exp.centerX) / 2, splitY);
+    };
+
+    var diagramNodes = Array.from(runtimeStage.querySelectorAll(".svs-state-node[data-state]"));
+    var clearLinked = function() {
+      diagramNodes.forEach(function(el) { el.classList.remove("is-linked"); });
+    };
+    var applyLinked = function(state) {
+      diagramNodes.forEach(function(el) {
+        el.classList.toggle("is-linked", el.dataset.state === state);
+      });
+    };
+
+    diagramNodes.forEach(function(el) {
+      el.addEventListener("mouseenter", function() { applyLinked(el.dataset.state); });
+      el.addEventListener("mouseleave", clearLinked);
+      el.addEventListener("focus", function() { applyLinked(el.dataset.state); });
+      el.addEventListener("blur", clearLinked);
+    });
+
+    routeDiagram();
+    if ("ResizeObserver" in window) {
+      new ResizeObserver(function() { routeDiagram(); }).observe(runtimeStage);
+    } else {
+      window.addEventListener("resize", routeDiagram);
+    }
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(function() { routeDiagram(); });
+    }
+  }());
+  </script>
+</body>
+</html>
