@@ -217,12 +217,13 @@ public sealed class PreceptEngine
     /// Returns the set of field names granted by passing guards.
     /// Fail-closed: guard evaluation error → field not granted.
     /// </summary>
-    private HashSet<string> EvaluateGuardedEditFields(string state, IReadOnlyDictionary<string, object?> data)
+    private HashSet<string> EvaluateGuardedEditFields(string? state, IReadOnlyDictionary<string, object?> data)
     {
         var result = new HashSet<string>(StringComparer.Ordinal);
         foreach (var block in _guardedEditBlocks)
         {
-            if (block.State is null || !string.Equals(block.State, state, StringComparison.Ordinal))
+            // Match: null state ↔ root-level block; named state ↔ same-named block
+            if (!string.Equals(block.State, state, StringComparison.Ordinal))
                 continue;
 
             // Fail-closed: any evaluation error → guard treated as false
@@ -658,7 +659,19 @@ public sealed class PreceptEngine
         HashSet<string>? editableNames;
         if (IsStateless)
         {
-            editableNames = _rootEditableFields;
+            editableNames = _rootEditableFields is not null
+                ? new HashSet<string>(_rootEditableFields, StringComparer.Ordinal) : null;
+
+            if (_guardedEditBlocks.Count > 0)
+            {
+                var hydrated = HydrateInstanceData(instance.InstanceData);
+                var guardedFields = EvaluateGuardedEditFields(null, hydrated);
+                if (guardedFields.Count > 0)
+                {
+                    editableNames ??= new HashSet<string>(StringComparer.Ordinal);
+                    editableNames.UnionWith(guardedFields);
+                }
+            }
         }
         else
         {
@@ -974,7 +987,19 @@ public sealed class PreceptEngine
         HashSet<string>? editableFields;
         if (IsStateless)
         {
-            editableFields = _rootEditableFields;
+            editableFields = _rootEditableFields is not null
+                ? new HashSet<string>(_rootEditableFields, StringComparer.Ordinal) : null;
+
+            // Add fields from guarded root edit blocks that pass their guards
+            if (_guardedEditBlocks.Count > 0)
+            {
+                var guardedFields = EvaluateGuardedEditFields(null, internalData);
+                if (guardedFields.Count > 0)
+                {
+                    editableFields ??= new HashSet<string>(StringComparer.Ordinal);
+                    editableFields.UnionWith(guardedFields);
+                }
+            }
         }
         else
         {
@@ -1148,13 +1173,31 @@ public sealed class PreceptEngine
     private IReadOnlyList<PreceptEditableFieldInfo>? BuildEditableFieldInfosForStateless(
         IReadOnlyDictionary<string, object?> instanceData)
     {
-        if (_rootEditableFields is null || _rootEditableFields.Count == 0)
-            return null;
+        // Build combined editable field set: static root + guarded root
+        HashSet<string>? editableNames = _rootEditableFields is not null
+            ? new HashSet<string>(_rootEditableFields, StringComparer.Ordinal) : null;
+
+        if (_guardedEditBlocks.Count > 0)
+        {
+            var hydrated = HydrateInstanceData(instanceData);
+            var guardedFields = EvaluateGuardedEditFields(null, hydrated);
+            if (guardedFields.Count > 0)
+            {
+                editableNames ??= new HashSet<string>(StringComparer.Ordinal);
+                editableNames.UnionWith(guardedFields);
+            }
+        }
+
+        if (editableNames is null || editableNames.Count == 0)
+        {
+            // Return null only if there are NO edit blocks at all
+            return (_rootEditableFields is null && _guardedEditBlocks.Count == 0) ? null : Array.Empty<PreceptEditableFieldInfo>();
+        }
 
         var result = new List<PreceptEditableFieldInfo>();
         foreach (var field in Fields)
         {
-            if (!_rootEditableFields.Contains(field.Name))
+            if (!editableNames.Contains(field.Name))
                 continue;
             instanceData.TryGetValue(field.Name, out var currentValue);
             var typeName = field.Type.ToString().ToLowerInvariant();
@@ -1162,7 +1205,7 @@ public sealed class PreceptEngine
         }
         foreach (var col in CollectionFields)
         {
-            if (!_rootEditableFields.Contains(col.Name))
+            if (!editableNames.Contains(col.Name))
                 continue;
             instanceData.TryGetValue(col.Name, out var currentValue);
             var typeName = $"{col.CollectionKind.ToString().ToLowerInvariant()}<{col.InnerType.ToString().ToLowerInvariant()}>";
@@ -1177,7 +1220,23 @@ public sealed class PreceptEngine
     internal IReadOnlySet<string> GetEditableFieldNames(string? state, IReadOnlyDictionary<string, object?>? instanceData = null)
     {
         if (state is null)
-            return _rootEditableFields is not null ? _rootEditableFields : EmptyStringSet.Instance;
+        {
+            HashSet<string>? statelessCombined = _rootEditableFields is not null
+                ? new HashSet<string>(_rootEditableFields, StringComparer.Ordinal) : null;
+
+            if (_guardedEditBlocks.Count > 0 && instanceData is not null)
+            {
+                var hydrated = HydrateInstanceData(instanceData);
+                var guardedFields = EvaluateGuardedEditFields(null, hydrated);
+                if (guardedFields.Count > 0)
+                {
+                    statelessCombined ??= new HashSet<string>(StringComparer.Ordinal);
+                    statelessCombined.UnionWith(guardedFields);
+                }
+            }
+
+            return statelessCombined is not null ? statelessCombined : EmptyStringSet.Instance;
+        }
 
         HashSet<string>? combined = null;
         if (_editableFieldsByState.TryGetValue(state, out var staticFields))

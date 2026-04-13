@@ -1817,4 +1817,37 @@ public class PreceptAnalyzerCompletionTests
 
         completions.Should().NotContain("->", "derivation operator must not be offered when default is already present");
     }
+
+    [Fact]
+    public void Completions_RootEdit_AfterFieldList_OffersWhen()
+    {
+        const string text = """
+            precept M
+            field Priority as number default 1
+            field Active as boolean default true
+            edit Priority $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("when");
+    }
+
+    [Fact]
+    public void Completions_RootEdit_AfterWhen_OffersFields()
+    {
+        const string text = """
+            precept M
+            field Priority as number default 1
+            field Active as boolean default true
+            edit Priority when $$
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
+
+        completions.Should().Contain("Active");
+        completions.Should().Contain("Priority");
+    }
 }
