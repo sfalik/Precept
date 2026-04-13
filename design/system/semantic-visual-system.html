@@ -743,6 +743,12 @@ pre {
   min-width: 0;
   min-height: 0;
 }
+.cg-combination-labeled-specimen {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+  justify-items: start;
+}
 .cg-combination-specimen {
   display: inline-grid;
   gap: 8px;
@@ -2292,7 +2298,7 @@ pre {
               <span class="arch-reg-name">Design-time view</span>
               <span class="arch-reg-tag">authored DSL&thinsp;·&thinsp;what it is</span>
             </div>
-            <p class="arch-reg-note">The token form in the DSL editor. Syntax colour, monospaced weight, and keyword grammar carry each construct's authored meaning before any run-time evaluation.</p>
+            <p class="arch-reg-note">The mark form in the DSL editor. Syntax colour, monospaced weight, and keyword grammar carry each construct's authored meaning before any run-time evaluation.</p>
             <div class="arch-surfaces">
               <span class="arch-sf">Code</span>
             </div>
@@ -2372,7 +2378,7 @@ pre {
       </div>
       <div class="cov-concept">
         <span class="cov-concept-lbl">Cross-Surface Translation</span>
-        <p>Moving from code editor to diagram to data form to timeline, a construct adopts different visual conventions appropriate to each medium. What remains stable is its meaning: construct color, name form, and the modifier logic that applies to it. Chrome/support tokens stay outside that meaning and handle scaffolding instead, which means a surface can choose a complementary chrome palette without inventing new semantic meaning. The system defines what stays constant so nothing needs to be relearned as surfaces change.</p>
+        <p>Moving from code editor to diagram to data form to timeline, a construct adopts different visual conventions appropriate to each medium. What remains stable is its meaning: construct color, name form, and the modifier logic that applies to it. The chrome/support layer stays outside that meaning and handles scaffolding instead, which means a surface can choose a complementary chrome palette without inventing new semantic meaning. The system defines what stays constant so nothing needs to be relearned as surfaces change.</p>
       </div>
     </div>
 
@@ -2727,7 +2733,7 @@ pre {
             <div class="typography-summary-item">
               <span>Structural face</span>
               <strong>Geist Mono</strong>
-              <small>wordmark · headings · labels · tokens · code specimens</small>
+              <small>wordmark · headings · labels · marks · code specimens</small>
             </div>
             <div class="typography-summary-item">
               <span>Reading face</span>
@@ -2748,11 +2754,11 @@ pre {
               <div class="typography-card-kicker">Construct face</div>
               <h3>Geist Mono — construct names &amp; structure</h3>
             </div>
-            <p>Used for: wordmark, section headings, labels, chips, nav, construct names, table headers, eyebrows, inline tokens, and all code specimens. Geist Mono is the face of governed structure. When text needs to read as authored, named, or systematic, it is in Geist Mono.</p>
+            <p>Used for: wordmark, section headings, labels, chips, nav, construct names, table headers, eyebrows, inline marks, and all code specimens. Geist Mono is the face of governed structure. When text needs to read as authored, named, or systematic, it is in Geist Mono.</p>
             <div class="typography-specimen">
               <div class="typography-specimen-bar">
                 <span>Display lockup</span>
-                <span>hero · headings · tokens</span>
+                <span>hero · headings · marks</span>
               </div>
               <div class="typography-wordmark-display">Precept</div>
               <div class="typography-mono-subtitle">Semantic Visual System</div>
@@ -2848,7 +2854,7 @@ pre {
             <div class="typography-summary-item">
               <span>Do not decorate</span>
               <strong>Italic</strong>
-              <small>Run-time outcomes layer onto event tokens without introducing a second event hue.</small>
+              <small>Run-time outcomes layer onto event marks without introducing a second event hue.</small>
             </div>
           </div>
         </div>
@@ -2867,7 +2873,7 @@ pre {
           <div class="typography-rule-card typography-rule-card--compact">
             <span class="typography-rule-label">Guideline</span>
             <h3>Governing keywords are bold.</h3>
-            <p>Semantic indigo keywords render at font-weight 700. Grammar indigo stays normal for connective tokens and logical operators. Color identifies the construct; weight distinguishes governing keywords from connective grammar.</p>
+            <p>Semantic indigo keywords render at font-weight 700. Grammar indigo stays normal for connective grammar and logical operators. Color identifies the construct; weight distinguishes governing keywords from connective grammar.</p>
             <div class="typography-keyword-sample">
               <span class="typography-keywords">precept field state event from on set transition assert reject when</span>
                 <span class="typography-keywords-soft">as default == and or not</span>
@@ -3580,7 +3586,7 @@ pre {
         <div class="semantic-family-usage">
           <span class="semantic-family-usage-label">Carries</span>
           Open · Submit · Approve
-          <span class="semantic-family-usage-subtle">runtime outcomes layer onto event tokens without introducing a second event hue</span>
+          <span class="semantic-family-usage-subtle">runtime outcomes layer onto event marks without introducing a second event hue</span>
         </div>
       </div>
 
@@ -3692,7 +3698,7 @@ pre {
           <div class="color-lane-label">Scaffolding</div>
           <h3>Scaffolding</h3>
           <p>Canvas, panels, text, and dividers hold the surface together. Their palette is complementary infrastructure, not semantic meaning.</p>
-          <div class="support-token-stack" aria-label="Scaffolding tokens">
+          <div class="support-token-stack" aria-label="Scaffolding layer">
             <div class="support-token">
               <span class="support-token-swatch" style="--swatch:var(--bg)"></span>
               <span class="support-token-name">Canvas</span>
@@ -3711,7 +3717,7 @@ pre {
             <div class="support-token">
               <span class="support-token-swatch" style="--swatch:var(--line)"></span>
               <span class="support-token-name">Divider</span>
-              <span class="support-token-value">line token</span>
+              <span class="support-token-value">divider line</span>
             </div>
           </div>
         </div>
@@ -3829,7 +3835,7 @@ pre {
               <div class="cg-channel-signal">
                 <div class="cg-modifier-compare cg-modifier-compare--state">
                   <div class="cg-modifier-compare-row">
-                    <span class="cg-modifier-note">Token</span>
+                    <span class="cg-modifier-note">Mark</span>
                     <div class="cg-modifier-stack">
                       <span class="cg-modifier-token cg-modifier-token--state">Closed</span>
                     </div>
@@ -3859,7 +3865,7 @@ pre {
             <div class="cg-channel-body">
               <div class="cg-modifier-compare cg-modifier-compare--state">
                 <div class="cg-modifier-compare-row">
-                  <span class="cg-modifier-note">Token</span>
+                  <span class="cg-modifier-note">Mark</span>
                   <div class="cg-modifier-stack">
                     <span class="cg-modifier-token cg-modifier-token--state"><span class="cg-modifier-token-dot"></span>Open</span>
                   </div>
@@ -3882,7 +3888,7 @@ pre {
             <div class="cg-channel-body">
               <div class="cg-modifier-compare cg-modifier-compare--state">
                 <div class="cg-modifier-compare-row">
-                  <span class="cg-modifier-note">Token</span>
+                  <span class="cg-modifier-note">Mark</span>
                   <div class="cg-modifier-stack">
                     <span class="cg-modifier-token cg-modifier-token--state cg-modifier-token--state-terminal">Closed</span>
                   </div>
@@ -3905,7 +3911,7 @@ pre {
             <div class="cg-channel-body">
               <div class="cg-modifier-compare cg-modifier-compare--state">
                 <div class="cg-modifier-compare-row">
-                  <span class="cg-modifier-note">Token</span>
+                  <span class="cg-modifier-note">Mark</span>
                   <div class="cg-modifier-stack">
                     <span class="cg-modifier-token cg-modifier-token--state cg-modifier-token--italic">Closed</span>
                   </div>
@@ -3928,7 +3934,7 @@ pre {
             <div class="cg-channel-body">
               <div class="cg-modifier-compare cg-modifier-compare--state">
                 <div class="cg-modifier-compare-row">
-                  <span class="cg-modifier-note">Token</span>
+                  <span class="cg-modifier-note">Mark</span>
                   <div class="cg-modifier-stack">
                     <span class="cg-modifier-token cg-modifier-token--state cg-modifier-token--state-not-reachable cg-modifier-token--state-not-reachable-initial">Closed</span>
                   </div>
@@ -3951,7 +3957,7 @@ pre {
             <div class="cg-channel-body">
               <div class="cg-modifier-compare cg-modifier-compare--state">
                 <div class="cg-modifier-compare-row">
-                  <span class="cg-modifier-note">Token</span>
+                  <span class="cg-modifier-note">Mark</span>
                   <div class="cg-modifier-stack">
                     <span class="cg-modifier-token cg-modifier-token--state cg-modifier-token--state-not-reachable cg-modifier-token--state-not-reachable-current">Closed</span>
                   </div>
@@ -3974,7 +3980,7 @@ pre {
             <div class="cg-channel-body">
               <div class="cg-modifier-compare cg-modifier-compare--state">
                 <div class="cg-modifier-compare-row">
-                  <span class="cg-modifier-note">Token</span>
+                  <span class="cg-modifier-note">Mark</span>
                   <div class="cg-modifier-stack">
                     <span class="cg-modifier-token cg-modifier-token--state cg-modifier-token--state-current">Open</span>
                   </div>
@@ -4002,17 +4008,23 @@ pre {
             <div class="cg-combination-row">
               <div class="cg-channel-name">Initial + current</div>
               <div class="cg-combination-example">
-                <div class="cg-combination-specimen" aria-hidden="true">
-                  <div class="cg-mini-flow">
-                    <span class="cg-mini-state-node cg-mini-state-node--current"><span class="cg-mini-state-node-dot"></span>Open</span>
+                <div class="cg-combination-labeled-specimen">
+                  <span class="cg-modifier-note">Mark</span>
+                  <div class="cg-combination-specimen" aria-hidden="true">
+                    <div class="cg-mini-flow">
+                      <span class="cg-mini-state-node cg-mini-state-node--current"><span class="cg-mini-state-node-dot"></span>Open</span>
+                    </div>
                   </div>
                 </div>
-                <div class="cg-combination-specimen" aria-hidden="true">
-                  <div class="cg-mini-flow">
-                    <span class="cg-mini-state-dot-form cg-mini-state-dot-form--initial cg-mini-state-dot-form--current">
-                      <span class="cg-mini-state-dot-glyph"></span>
-                      <span class="cg-mini-state-dot-label">Open</span>
-                    </span>
+                <div class="cg-combination-labeled-specimen">
+                  <span class="cg-modifier-note">Dot</span>
+                  <div class="cg-combination-specimen" aria-hidden="true">
+                    <div class="cg-mini-flow">
+                      <span class="cg-mini-state-dot-form cg-mini-state-dot-form--initial cg-mini-state-dot-form--current">
+                        <span class="cg-mini-state-dot-glyph"></span>
+                        <span class="cg-mini-state-dot-label">Open</span>
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -4021,17 +4033,23 @@ pre {
             <div class="cg-combination-row">
               <div class="cg-channel-name">Current + constrained</div>
               <div class="cg-combination-example">
-                <div class="cg-combination-specimen" aria-hidden="true">
-                  <div class="cg-mini-flow">
-                    <span class="cg-mini-state-node cg-mini-state-node--current cg-mini-state-node--constrained">Review</span>
+                <div class="cg-combination-labeled-specimen">
+                  <span class="cg-modifier-note">Mark</span>
+                  <div class="cg-combination-specimen" aria-hidden="true">
+                    <div class="cg-mini-flow">
+                      <span class="cg-mini-state-node cg-mini-state-node--current cg-mini-state-node--constrained">Review</span>
+                    </div>
                   </div>
                 </div>
-                <div class="cg-combination-specimen" aria-hidden="true">
-                  <div class="cg-mini-flow">
-                    <span class="cg-mini-state-dot-form cg-mini-state-dot-form--current cg-mini-state-dot-form--constrained">
-                      <span class="cg-mini-state-dot-glyph"></span>
-                      <span class="cg-mini-state-dot-label">Review</span>
-                    </span>
+                <div class="cg-combination-labeled-specimen">
+                  <span class="cg-modifier-note">Dot</span>
+                  <div class="cg-combination-specimen" aria-hidden="true">
+                    <div class="cg-mini-flow">
+                      <span class="cg-mini-state-dot-form cg-mini-state-dot-form--current cg-mini-state-dot-form--constrained">
+                        <span class="cg-mini-state-dot-glyph"></span>
+                        <span class="cg-mini-state-dot-label">Review</span>
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -4040,17 +4058,23 @@ pre {
             <div class="cg-combination-row">
               <div class="cg-channel-name">Current + terminal</div>
               <div class="cg-combination-example">
-                <div class="cg-combination-specimen" aria-hidden="true">
-                  <div class="cg-mini-flow">
-                    <span class="cg-mini-state-node cg-mini-state-node--current cg-mini-state-node--terminal">Closed</span>
+                <div class="cg-combination-labeled-specimen">
+                  <span class="cg-modifier-note">Mark</span>
+                  <div class="cg-combination-specimen" aria-hidden="true">
+                    <div class="cg-mini-flow">
+                      <span class="cg-mini-state-node cg-mini-state-node--current cg-mini-state-node--terminal">Closed</span>
+                    </div>
                   </div>
                 </div>
-                <div class="cg-combination-specimen" aria-hidden="true">
-                  <div class="cg-mini-flow">
-                    <span class="cg-mini-state-dot-form cg-mini-state-dot-form--current cg-mini-state-dot-form--terminal">
-                      <span class="cg-mini-state-dot-glyph"></span>
-                      <span class="cg-mini-state-dot-label">Closed</span>
-                    </span>
+                <div class="cg-combination-labeled-specimen">
+                  <span class="cg-modifier-note">Dot</span>
+                  <div class="cg-combination-specimen" aria-hidden="true">
+                    <div class="cg-mini-flow">
+                      <span class="cg-mini-state-dot-form cg-mini-state-dot-form--current cg-mini-state-dot-form--terminal">
+                        <span class="cg-mini-state-dot-glyph"></span>
+                        <span class="cg-mini-state-dot-label">Closed</span>
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -4059,17 +4083,23 @@ pre {
             <div class="cg-combination-row">
               <div class="cg-channel-name">Initial + constrained</div>
               <div class="cg-combination-example">
-                <div class="cg-combination-specimen" aria-hidden="true">
-                  <div class="cg-mini-flow">
-                    <span class="cg-mini-state-node cg-mini-state-node--constrained"><span class="cg-mini-state-node-dot"></span>Intake</span>
+                <div class="cg-combination-labeled-specimen">
+                  <span class="cg-modifier-note">Mark</span>
+                  <div class="cg-combination-specimen" aria-hidden="true">
+                    <div class="cg-mini-flow">
+                      <span class="cg-mini-state-node cg-mini-state-node--constrained"><span class="cg-mini-state-node-dot"></span>Intake</span>
+                    </div>
                   </div>
                 </div>
-                <div class="cg-combination-specimen" aria-hidden="true">
-                  <div class="cg-mini-flow">
-                    <span class="cg-mini-state-dot-form cg-mini-state-dot-form--initial cg-mini-state-dot-form--constrained">
-                      <span class="cg-mini-state-dot-glyph"></span>
-                      <span class="cg-mini-state-dot-label">Intake</span>
-                    </span>
+                <div class="cg-combination-labeled-specimen">
+                  <span class="cg-modifier-note">Dot</span>
+                  <div class="cg-combination-specimen" aria-hidden="true">
+                    <div class="cg-mini-flow">
+                      <span class="cg-mini-state-dot-form cg-mini-state-dot-form--initial cg-mini-state-dot-form--constrained">
+                        <span class="cg-mini-state-dot-glyph"></span>
+                        <span class="cg-mini-state-dot-label">Intake</span>
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -4078,17 +4108,23 @@ pre {
             <div class="cg-combination-row">
               <div class="cg-channel-name">Terminal + constrained</div>
               <div class="cg-combination-example">
-                <div class="cg-combination-specimen" aria-hidden="true">
-                  <div class="cg-mini-flow">
-                    <span class="cg-mini-state-node cg-mini-state-node--terminal cg-mini-state-node--constrained">Closed</span>
+                <div class="cg-combination-labeled-specimen">
+                  <span class="cg-modifier-note">Mark</span>
+                  <div class="cg-combination-specimen" aria-hidden="true">
+                    <div class="cg-mini-flow">
+                      <span class="cg-mini-state-node cg-mini-state-node--terminal cg-mini-state-node--constrained">Closed</span>
+                    </div>
                   </div>
                 </div>
-                <div class="cg-combination-specimen" aria-hidden="true">
-                  <div class="cg-mini-flow">
-                    <span class="cg-mini-state-dot-form cg-mini-state-dot-form--terminal cg-mini-state-dot-form--constrained">
-                      <span class="cg-mini-state-dot-glyph"></span>
-                      <span class="cg-mini-state-dot-label">Closed</span>
-                    </span>
+                <div class="cg-combination-labeled-specimen">
+                  <span class="cg-modifier-note">Dot</span>
+                  <div class="cg-combination-specimen" aria-hidden="true">
+                    <div class="cg-mini-flow">
+                      <span class="cg-mini-state-dot-form cg-mini-state-dot-form--terminal cg-mini-state-dot-form--constrained">
+                        <span class="cg-mini-state-dot-glyph"></span>
+                        <span class="cg-mini-state-dot-label">Closed</span>
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -4097,17 +4133,23 @@ pre {
             <div class="cg-combination-row">
               <div class="cg-channel-name">Initial + terminal</div>
               <div class="cg-combination-example">
-                <div class="cg-combination-specimen" aria-hidden="true">
-                  <div class="cg-mini-flow">
-                    <span class="cg-mini-state-node cg-mini-state-node--terminal"><span class="cg-mini-state-node-dot"></span>Closed</span>
+                <div class="cg-combination-labeled-specimen">
+                  <span class="cg-modifier-note">Mark</span>
+                  <div class="cg-combination-specimen" aria-hidden="true">
+                    <div class="cg-mini-flow">
+                      <span class="cg-mini-state-node cg-mini-state-node--terminal"><span class="cg-mini-state-node-dot"></span>Closed</span>
+                    </div>
                   </div>
                 </div>
-                <div class="cg-combination-specimen" aria-hidden="true">
-                  <div class="cg-mini-flow">
-                    <span class="cg-mini-state-dot-form cg-mini-state-dot-form--initial cg-mini-state-dot-form--terminal">
-                      <span class="cg-mini-state-dot-glyph"></span>
-                      <span class="cg-mini-state-dot-label">Closed</span>
-                    </span>
+                <div class="cg-combination-labeled-specimen">
+                  <span class="cg-modifier-note">Dot</span>
+                  <div class="cg-combination-specimen" aria-hidden="true">
+                    <div class="cg-mini-flow">
+                      <span class="cg-mini-state-dot-form cg-mini-state-dot-form--initial cg-mini-state-dot-form--terminal">
+                        <span class="cg-mini-state-dot-glyph"></span>
+                        <span class="cg-mini-state-dot-label">Closed</span>
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -4116,17 +4158,23 @@ pre {
             <div class="cg-combination-row">
               <div class="cg-channel-name">Current + terminal + constrained</div>
               <div class="cg-combination-example">
-                <div class="cg-combination-specimen" aria-hidden="true">
-                  <div class="cg-mini-flow">
-                    <span class="cg-mini-state-node cg-mini-state-node--current cg-mini-state-node--terminal cg-mini-state-node--constrained">Closed</span>
+                <div class="cg-combination-labeled-specimen">
+                  <span class="cg-modifier-note">Mark</span>
+                  <div class="cg-combination-specimen" aria-hidden="true">
+                    <div class="cg-mini-flow">
+                      <span class="cg-mini-state-node cg-mini-state-node--current cg-mini-state-node--terminal cg-mini-state-node--constrained">Closed</span>
+                    </div>
                   </div>
                 </div>
-                <div class="cg-combination-specimen" aria-hidden="true">
-                  <div class="cg-mini-flow">
-                    <span class="cg-mini-state-dot-form cg-mini-state-dot-form--current cg-mini-state-dot-form--terminal cg-mini-state-dot-form--constrained">
-                      <span class="cg-mini-state-dot-glyph"></span>
-                      <span class="cg-mini-state-dot-label">Closed</span>
-                    </span>
+                <div class="cg-combination-labeled-specimen">
+                  <span class="cg-modifier-note">Dot</span>
+                  <div class="cg-combination-specimen" aria-hidden="true">
+                    <div class="cg-mini-flow">
+                      <span class="cg-mini-state-dot-form cg-mini-state-dot-form--current cg-mini-state-dot-form--terminal cg-mini-state-dot-form--constrained">
+                        <span class="cg-mini-state-dot-glyph"></span>
+                        <span class="cg-mini-state-dot-label">Closed</span>
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -4135,17 +4183,23 @@ pre {
             <div class="cg-combination-row">
               <div class="cg-channel-name">Terminal + notReachableFromInitial</div>
               <div class="cg-combination-example">
-                <div class="cg-combination-specimen" aria-hidden="true">
-                  <div class="cg-mini-flow">
-                    <span class="cg-mini-state-node cg-mini-state-node--terminal cg-mini-state-node--not-reachable cg-mini-state-node--not-reachable-initial">Archived</span>
+                <div class="cg-combination-labeled-specimen">
+                  <span class="cg-modifier-note">Mark</span>
+                  <div class="cg-combination-specimen" aria-hidden="true">
+                    <div class="cg-mini-flow">
+                      <span class="cg-mini-state-node cg-mini-state-node--terminal cg-mini-state-node--not-reachable cg-mini-state-node--not-reachable-initial">Archived</span>
+                    </div>
                   </div>
                 </div>
-                <div class="cg-combination-specimen" aria-hidden="true">
-                  <div class="cg-mini-flow">
-                    <span class="cg-mini-state-dot-form cg-mini-state-dot-form--terminal cg-mini-state-dot-form--not-reachable cg-mini-state-dot-form--not-reachable-initial">
-                      <span class="cg-mini-state-dot-glyph"></span>
-                      <span class="cg-mini-state-dot-label">Archived</span>
-                    </span>
+                <div class="cg-combination-labeled-specimen">
+                  <span class="cg-modifier-note">Dot</span>
+                  <div class="cg-combination-specimen" aria-hidden="true">
+                    <div class="cg-mini-flow">
+                      <span class="cg-mini-state-dot-form cg-mini-state-dot-form--terminal cg-mini-state-dot-form--not-reachable cg-mini-state-dot-form--not-reachable-initial">
+                        <span class="cg-mini-state-dot-glyph"></span>
+                        <span class="cg-mini-state-dot-label">Archived</span>
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -4171,20 +4225,20 @@ pre {
       <div>
         <div class="eyebrow" style="margin-bottom:12px">Visual cues</div>
         <div class="cg-channels">
-          <div class="cg-channel"><div class="cg-channel-name">Colour</div><div class="cg-channel-body"><div class="cg-channel-signal"><span class="cg-swatch" style="background:var(--event)"></span></div><p class="cg-channel-caption">Cyan marks event triggers and event tokens across authored and rendered views.</p></div></div>
+          <div class="cg-channel"><div class="cg-channel-name">Colour</div><div class="cg-channel-body"><div class="cg-channel-signal"><span class="cg-swatch" style="background:var(--event)"></span></div><p class="cg-channel-caption">Cyan marks event triggers and event marks across authored and rendered views.</p></div></div>
           <div class="cg-channel"><div class="cg-channel-name">Typography</div><div class="cg-channel-body"><div class="cg-channel-signal"><code class="ev">Close</code></div><p class="cg-channel-caption">Mono PascalCase keeps event names terse and action-oriented.</p></div></div>
-          <div class="cg-channel"><div class="cg-channel-name">Form</div><div class="cg-channel-body"><div class="cg-channel-signal"><div class="cg-modifier-compare"><div class="cg-modifier-compare-row"><span class="cg-modifier-note">Token</span><div class="cg-modifier-stack"><div class="cg-form cg-form--pill">Submit</div></div></div><div class="cg-modifier-compare-row"><span class="cg-modifier-note">Transition</span><div class="cg-mini-flow"><div class="cg-form cg-form--transition-line"></div></div></div></div></div><p class="cg-channel-caption">Events use two baseline marks: a token for the event name itself, and a transition for the path it travels on in state-diagram surfaces.</p></div></div>
+          <div class="cg-channel"><div class="cg-channel-name">Form</div><div class="cg-channel-body"><div class="cg-channel-signal"><div class="cg-modifier-compare"><div class="cg-modifier-compare-row"><span class="cg-modifier-note">Mark</span><div class="cg-modifier-stack"><div class="cg-form cg-form--pill">Submit</div></div></div><div class="cg-modifier-compare-row"><span class="cg-modifier-note">Transition</span><div class="cg-mini-flow"><div class="cg-form cg-form--transition-line"></div></div></div></div></div><p class="cg-channel-caption">Events use two baseline marks: a mark for the event name itself, and a transition for the path it travels on in state-diagram surfaces.</p></div></div>
         </div>
       </div>
       <div>
         <div class="eyebrow" style="margin-bottom:12px">Semantic modifiers</div>
         <div class="cg-channels cg-channels--modifiers">
-          <div class="cg-channel cg-channel--modifier"><div class="cg-channel-name">Transition</div><div class="cg-channel-body"><div class="cg-modifier-compare"><div class="cg-modifier-compare-row"><span class="cg-modifier-note">Token</span><div class="cg-modifier-stack"><span class="cg-modifier-token cg-modifier-token--event">Close</span></div></div><div class="cg-modifier-compare-row"><span class="cg-modifier-note">Transition</span><div class="cg-mini-flow"><span class="cg-mini-transition-line"></span></div></div></div><p class="cg-channel-caption">Solid path marks a transition to another state.</p></div></div>
-          <div class="cg-channel cg-channel--modifier"><div class="cg-channel-name">Returns to same state</div><div class="cg-channel-body"><div class="cg-modifier-compare"><div class="cg-modifier-compare-row"><span class="cg-modifier-note">Token</span><div class="cg-modifier-stack"><span class="cg-modifier-token cg-modifier-token--event">Recheck</span></div></div><div class="cg-modifier-compare-row"><span class="cg-modifier-note">Transition</span><div class="cg-mini-flow"><span class="cg-mini-transition-loop">&#8635;</span></div></div></div><p class="cg-channel-caption">Loop marks a transition that returns to the same state.</p></div></div>
-          <div class="cg-channel cg-channel--modifier"><div class="cg-channel-name">No state change</div><div class="cg-channel-body"><div class="cg-modifier-compare"><div class="cg-modifier-compare-row"><span class="cg-modifier-note">Token</span><div class="cg-modifier-stack"><span class="cg-modifier-token cg-modifier-token--event cg-modifier-token--event-muted">Refresh</span></div></div><div class="cg-modifier-compare-row"><span class="cg-modifier-note">Transition</span><div class="cg-mini-flow"></div></div></div><p class="cg-channel-caption">Muted token shows an event with no state change.</p></div></div>
-          <div class="cg-channel cg-channel--modifier"><div class="cg-channel-name">Rejected</div><div class="cg-channel-body"><div class="cg-modifier-compare"><div class="cg-modifier-compare-row"><span class="cg-modifier-note">Token</span><div class="cg-modifier-stack"><span class="cg-modifier-token cg-modifier-token--event cg-modifier-token--violated cg-modifier-token--dashed">Close</span></div></div><div class="cg-modifier-compare-row"><span class="cg-modifier-note">Transition</span><div class="cg-mini-flow"><span class="cg-mini-transition-line cg-mini-transition-line--blocked"></span></div></div></div><p class="cg-channel-caption">Blocked path marks a rejected event.</p></div></div>
-          <div class="cg-channel cg-channel--modifier"><div class="cg-channel-name">Blocked by constraint</div><div class="cg-channel-body"><div class="cg-modifier-compare"><div class="cg-modifier-compare-row"><span class="cg-modifier-note">Token</span><div class="cg-modifier-stack"><span class="cg-modifier-token cg-modifier-token--event cg-modifier-token--dashed cg-modifier-token--italic">Close</span></div></div><div class="cg-modifier-compare-row"><span class="cg-modifier-note">Transition</span><div class="cg-mini-flow"><span class="cg-mini-transition-line cg-mini-transition-line--dashed"></span></div></div></div><p class="cg-channel-caption">Dashed path and italic token mark an event blocked by constraint.</p></div></div>
-          <div class="cg-channel cg-channel--modifier"><div class="cg-channel-name">Unmatched</div><div class="cg-channel-body"><div class="cg-modifier-compare"><div class="cg-modifier-compare-row"><span class="cg-modifier-note">Token</span><div class="cg-modifier-stack"><span class="cg-modifier-token cg-modifier-token--event cg-modifier-token--outline-dashed">Close</span></div></div><div class="cg-modifier-compare-row"><span class="cg-modifier-note">Transition</span><div class="cg-mini-flow"><span class="cg-mini-transition-line cg-mini-transition-line--dashed"></span></div></div></div><p class="cg-channel-caption">Dashed outline and path show an unmatched event.</p></div></div>
+          <div class="cg-channel cg-channel--modifier"><div class="cg-channel-name">Transition</div><div class="cg-channel-body"><div class="cg-modifier-compare"><div class="cg-modifier-compare-row"><span class="cg-modifier-note">Mark</span><div class="cg-modifier-stack"><span class="cg-modifier-token cg-modifier-token--event">Close</span></div></div><div class="cg-modifier-compare-row"><span class="cg-modifier-note">Transition</span><div class="cg-mini-flow"><span class="cg-mini-transition-line"></span></div></div></div><p class="cg-channel-caption">Solid path marks a transition to another state.</p></div></div>
+          <div class="cg-channel cg-channel--modifier"><div class="cg-channel-name">Returns to same state</div><div class="cg-channel-body"><div class="cg-modifier-compare"><div class="cg-modifier-compare-row"><span class="cg-modifier-note">Mark</span><div class="cg-modifier-stack"><span class="cg-modifier-token cg-modifier-token--event">Recheck</span></div></div><div class="cg-modifier-compare-row"><span class="cg-modifier-note">Transition</span><div class="cg-mini-flow"><span class="cg-mini-transition-loop">&#8635;</span></div></div></div><p class="cg-channel-caption">Loop marks a transition that returns to the same state.</p></div></div>
+          <div class="cg-channel cg-channel--modifier"><div class="cg-channel-name">No state change</div><div class="cg-channel-body"><div class="cg-modifier-compare"><div class="cg-modifier-compare-row"><span class="cg-modifier-note">Mark</span><div class="cg-modifier-stack"><span class="cg-modifier-token cg-modifier-token--event cg-modifier-token--event-muted">Refresh</span></div></div><div class="cg-modifier-compare-row"><span class="cg-modifier-note">Transition</span><div class="cg-mini-flow"></div></div></div><p class="cg-channel-caption">Muted mark shows an event with no state change.</p></div></div>
+          <div class="cg-channel cg-channel--modifier"><div class="cg-channel-name">Rejected</div><div class="cg-channel-body"><div class="cg-modifier-compare"><div class="cg-modifier-compare-row"><span class="cg-modifier-note">Mark</span><div class="cg-modifier-stack"><span class="cg-modifier-token cg-modifier-token--event cg-modifier-token--violated cg-modifier-token--dashed">Close</span></div></div><div class="cg-modifier-compare-row"><span class="cg-modifier-note">Transition</span><div class="cg-mini-flow"><span class="cg-mini-transition-line cg-mini-transition-line--blocked"></span></div></div></div><p class="cg-channel-caption">Blocked path marks a rejected event.</p></div></div>
+          <div class="cg-channel cg-channel--modifier"><div class="cg-channel-name">Blocked by constraint</div><div class="cg-channel-body"><div class="cg-modifier-compare"><div class="cg-modifier-compare-row"><span class="cg-modifier-note">Mark</span><div class="cg-modifier-stack"><span class="cg-modifier-token cg-modifier-token--event cg-modifier-token--dashed cg-modifier-token--italic">Close</span></div></div><div class="cg-modifier-compare-row"><span class="cg-modifier-note">Transition</span><div class="cg-mini-flow"><span class="cg-mini-transition-line cg-mini-transition-line--dashed"></span></div></div></div><p class="cg-channel-caption">Dashed path and italic mark indicate an event blocked by constraint.</p></div></div>
+          <div class="cg-channel cg-channel--modifier"><div class="cg-channel-name">Unmatched</div><div class="cg-channel-body"><div class="cg-modifier-compare"><div class="cg-modifier-compare-row"><span class="cg-modifier-note">Mark</span><div class="cg-modifier-stack"><span class="cg-modifier-token cg-modifier-token--event cg-modifier-token--outline-dashed">Close</span></div></div><div class="cg-modifier-compare-row"><span class="cg-modifier-note">Transition</span><div class="cg-mini-flow"><span class="cg-mini-transition-line cg-mini-transition-line--dashed"></span></div></div></div><p class="cg-channel-caption">Dashed outline and path show an unmatched event.</p></div></div>
         </div>
       </div>
 
@@ -4787,7 +4841,7 @@ pre {
         <div class="eyebrow" style="margin-bottom:12px">Event Behaviour</div>
         <div class="cg-channels cg-channels--modifiers">
 
-          <!-- token states -->
+          <!-- mark states -->
           <div class="cg-channel cg-channel--modifier">
             <div class="cg-channel-name">Active</div>
             <div class="cg-channel-body">
@@ -4796,7 +4850,7 @@ pre {
                   <button class="evt-btn">PickUp</button>
                 </div>
               </div>
-              <p class="cg-channel-caption">Event is available from the current state and its guard passes. Token takes the event colour and is interactive.</p>
+              <p class="cg-channel-caption">Event is available from the current state and its guard passes. Mark takes the event colour and is interactive.</p>
             </div>
           </div>
 
@@ -4808,7 +4862,7 @@ pre {
                   <button class="evt-btn" disabled>Expire</button>
                 </div>
               </div>
-              <p class="cg-channel-caption">Event exists but its guard fails or the transition is not available from the current state. Token is muted and non-interactive.</p>
+              <p class="cg-channel-caption">Event exists but its guard fails or the transition is not available from the current state. Mark is muted and non-interactive.</p>
             </div>
           </div>
 
@@ -5021,7 +5075,7 @@ pre {
   line-height: 1.6;
 }
 
-/* ─ chrome token strip ─ */
+/* ─ chrome support strip ─ */
 .doc-tokens {
   display: grid;
   grid-template-columns: repeat(4, minmax(0,1fr));
@@ -5591,7 +5645,7 @@ pre.doc-code-body {
     <div class="section-subgroup-sidebar">
       <div class="section-subgroup-index">02</div>
       <div class="section-subgroup-name">Editorial Blocks</div>
-      <p class="section-subgroup-desc">Long-form docs need more than inline notation. Code, callouts, and support tokens carry the system into explanatory blocks and reading scaffolds.</p>
+      <p class="section-subgroup-desc">Long-form docs need more than inline notation. Code, callouts, and the support layer carry the system into explanatory blocks and reading scaffolds.</p>
     </div>
     <div class="section-subgroup-body">
 
@@ -5657,13 +5711,13 @@ pre.doc-code-body {
     </div>
   </div>
 
-  <!-- Chrome tokens -->
+  <!-- Chrome support layer -->
   <div class="cov-zone-hdr" id="docs-chrome" style="border:1px solid var(--line-strong);border-bottom:none;margin-top:32px">
-    <span class="cov-z-label">Chrome / Support Tokens</span>
+    <span class="cov-z-label">Chrome / Support Layer</span>
     <span class="cov-z-note">separate support layer for text, surfaces, and line scaffolding</span>
   </div>
   <div style="padding:18px 20px;border:1px solid var(--line-strong);border-top:none;background:var(--panel)">
-    <p>These tokens are not a sixth semantic color. They are the support layer that holds the reading environment together: canvas, panels, prose tone, and dividers. Because they do not encode construct meaning, the chrome palette can be tuned to complement the semantic system and the needs of a given surface without competing with Precept's authored meaning.</p>
+    <p>This is not a sixth semantic color. It is the support layer that holds the reading environment together: canvas, panels, prose tone, and dividers. Because it does not encode construct meaning, the chrome palette can be tuned to complement the semantic system and the needs of a given surface without competing with Precept's authored meaning.</p>
   </div>
   <div class="doc-tokens">
     <div class="doc-token" style="background:var(--panel-2)">
