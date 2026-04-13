@@ -38,8 +38,8 @@ from Pending on Escalate
 - `success` event: all transition rows must produce `Transition` or `NoTransition` outcomes
 - `error` event: all transition rows must produce `Rejected` or `ConstraintFailure` outcomes  
 - `warning` event: allows mixed outcomes (no enforcement — warning is transitional intent)
-- Diagnostic: **NEW C58: "Event <Name> declared success but row produces <outcome>"** (error)
-- Diagnostic: **NEW C59: "Event <Name> declared error but row produces <outcome>"** (error)
+- Diagnostic: **NEW C58:** `"Event <Name> declared success but row produces <outcome>"` (error)
+- Diagnostic: **NEW C59:** `"Event <Name> declared error but row produces <outcome>"` (error)
 
 **Runtime behavior:** No change. Verdicts are authoring-time intent only.
 
@@ -133,7 +133,7 @@ from Open on Deny -> transition ToClosing  # ⚠ Mismatch: "Deny error" but row 
 ```
 
 **Compile-time checks:**
-- Mismatch produces **C60 (hint):** "Event declared <verdict> but row produces <outcome>" — non-blocking suggestion
+- Mismatch produces **C60 (hint):** `"Event declared <verdict> but row produces <outcome>"` — non-blocking suggestion
 - Intent still queryable by tooling; author can suppress with comment
 
 **Runtime behavior:** No change.
@@ -197,7 +197,7 @@ When a warning-level constraint fails:
 - Field constraints: `field Name type warning` modifier (same as `writeonce`, `nullable`)
 
 **Compile-time checks:**
-- **C61 (consistency):** "Field <Name> has warning constraint but event <Event> row doesn't handle warning outcome" — guides author to inspect expected behavior
+- **C61 (consistency):** `"Field <Name> has warning constraint but event <Event> row doesn't handle warning outcome"` — guides author to inspect expected behavior
 - No blocking forces for warnings; they coexist with errors in the same operation
 
 **Runtime behavior:**
@@ -247,8 +247,8 @@ When a warning-level constraint fails:
 **Syntax:** Same as A1 (just different semantics).
 
 **Compile-time checks:**
-- **C62 (path analysis):** "Warning constraint <X> can fail on all paths in state <S>" — inform, not error
-- **C63 (coverage):** "No warning handler for <constraint>" — optional checker
+- **C62 (path analysis):** `"Warning constraint <X> can fail on all paths in state <S>"` — inform, not error
+- **C63 (coverage):** `"No warning handler for <constraint>"` — optional checker
 
 **Runtime behavior:**
 - Constraint fails: check severity
@@ -286,7 +286,7 @@ invariant Balance >= 0 when MinimumAccountAge > 6months because "Mature accounts
 invariant Balance >= 0 because "Balance must be non-negative"  # When no guard: error-level (default)
 ```
 
-**Semantics:** Constraint severity = severity of its guard (if present), else error-level. This lets the author attach "this rule is optional/warning-level only for entities matching <condition>."
+**Semantics:** Constraint severity = severity of its guard (if present), else error-level. This lets the author attach "this rule is optional/warning-level only for entities matching `<condition>`."
 
 **Syntax:** No new keywords; uses existing `when` guard with implicit severity hierarchy.
 
@@ -343,7 +343,7 @@ state Cancelled error
 
 **Compile-time checks:**
 - **C64 (structure):** "State declared success but has outgoing transition rows" (warning, not error — terminal states may have administrative exits)
-- **C65 (reachability):** "Success state <S> unreachable from initial state" (warning)
+- **C65 (reachability):** `"Success state <S> unreachable from initial state"` (warning)
 - **C66 (coverage for stateful):** "Precept has transitions but no declared success or error states" (hint)
 - **C67 (path analysis):** "No path from initial to any success state" (warning) — can you succeed?
 
@@ -472,7 +472,7 @@ invariant Balance >= 0 because "Balance non-negative"
 - Event's declared success verdict is advisory—diagnostics note the mismatch (C69: "Event Approve declared success but triggered rule failure")
 - No override: rule failure still rejects
 
-**Diagnostic code:** **C69: "Event <Event> with declared <outcome> verdict produced constraint violation"** (warning, not error).
+**Diagnostic code:** **C69:** `"Event <Event> with declared <outcome> verdict produced constraint violation"` (warning, not error).
 
 **Philosophy:** Event verdict doesn't override rule enforcement. It's intent metadata, not law.
 
