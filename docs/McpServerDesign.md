@@ -290,7 +290,7 @@ The `when` property is present only when the declaration includes a `when <Guard
 
 The `currentState` parameter is `string?` — pass `null` for stateless precepts. When `currentState` is `null`, all events return `Undefined` outcome (no transition surface). The `data` and `eventArgs` fields behave identically for stateless and stateful precepts.
 
-The `eventArgs` field is optional. When provided, the specified args are used for the named events during evaluation — the tool re-inspects those events individually with the supplied args. Events not listed in `eventArgs` are inspected without args, and the engine reports the actual outcome (which may be `MissingRequiredArguments` if args are needed).
+The `eventArgs` field is optional. When provided, the specified args are used for the named events during evaluation — the tool re-inspects those events individually with the supplied args. Events not listed in `eventArgs` are inspected without args, and the engine still reports its actual `TransitionOutcome`. When the engine surfaces required event arguments for an inspected transition, they appear in the optional `requiredArgs` array.
 
 **Output:**
 ```json
@@ -325,13 +325,6 @@ The `eventArgs` field is optional. When provided, the specified args are used fo
         }
       ]
     },
-    {
-      "event": "Escalate",
-      "outcome": "MissingRequiredArguments",
-      "resultState": null,
-      "violations": [],
-      "requiredArgs": ["Level"]
-    }
   ],
   "editableFields": [
     { "name": "Priority", "type": "number", "nullable": false, "currentValue": 3 },
@@ -341,7 +334,7 @@ The `eventArgs` field is optional. When provided, the specified args are used fo
 }
 ```
 
-The response echoes the resolved instance snapshot (`currentState` + `data` with defaults applied), so Copilot can see what defaults were filled in and confirm the starting point matches intent. For stateless precepts, `currentState` is `null` in the response. Events appear in declaration order (no sorting). The `editableFields` array lists fields that have `in <State> edit` declarations for the current state (stateful) or root-level `edit` declarations (stateless).
+The response echoes the resolved instance snapshot (`currentState` + `data` with defaults applied), so Copilot can see what defaults were filled in and confirm the starting point matches intent. For stateless precepts, `currentState` is `null` in the response. Events appear in declaration order (no sorting). The `editableFields` array lists the effective editable field set for the current data snapshot: stateful `in <State> edit` declarations that match the current state plus any passing guarded edit blocks, or stateless root-level `edit` declarations plus any passing guarded root-level edit blocks.
 
 **Stateless precept behavior summary:**
 
@@ -354,10 +347,10 @@ The response echoes the resolved instance snapshot (`currentState` + `data` with
 | `precept_update` with `currentState: null` | Works on root-editable fields; `currentState: null` in response |
 
 Each event reports:
-- `outcome` — the engine's actual `TransitionOutcome` string (e.g. `Transition`, `NoTransition`, `ConstraintFailure`, `Rejected`, `MissingRequiredArguments`, `Undefined`, `Unmatched`)
+- `outcome` — the engine's actual `TransitionOutcome` string (e.g. `Transition`, `NoTransition`, `ConstraintFailure`, `Rejected`, `Undefined`, `Unmatched`)
 - `resultState` — the target state on success, `null` otherwise
 - `violations` — structured `ViolationDto` array (empty unless `ConstraintFailure`)
-- `requiredArgs` — list of required argument names (present only when the engine populates `RequiredEventArgumentKeys`)
+- `requiredArgs` — list of required argument names (present only when the engine populates `RequiredEventArgumentKeys`, typically on successful transition inspection)
 
 **Implementation:** Calls `PreceptCompiler.CompileFromText(text)`, then `engine.Inspect(instance)` for the full state-level inspection (declaration order preserved). When `eventArgs` are supplied, re-inspects those specific events individually with `engine.Inspect(instance, eventName, args)`. Projects `EditableFields` from the core `InspectionResult`. No reimplementation of the inspection loop.
 
@@ -440,9 +433,9 @@ The response echoes the resolved data snapshot (with defaults applied), matching
 
 ### 5. `precept_update`
 
-**Purpose:** Apply a direct field edit to a precept instance from a given state and data snapshot. Returns the update outcome — whether the edit succeeded, was rejected (uneditable field, constraint failure, invalid input), and the resulting data. Lets Copilot test `in <State> edit` declarations (stateful) or root-level `edit` declarations (stateless) without firing events.
+**Purpose:** Apply a direct field edit to a precept instance from a given state and data snapshot. Returns the update outcome — whether the edit succeeded, was rejected (uneditable field, constraint failure, invalid input), and the resulting data. Lets Copilot test stateful `in <State> edit` declarations or stateless root-level `edit` declarations, including guarded forms, without firing events.
 
-The `currentState` parameter is `string?` — pass `null` for stateless precepts. When `currentState` is `null`, `Update` applies to root-editable fields declared with `edit all` or `edit Field1, Field2`.
+The `currentState` parameter is `string?` — pass `null` for stateless precepts. When `currentState` is `null`, `Update` applies to the effective root-editable field set declared with `edit all`, `edit Field1, Field2`, or guarded root-level forms such as `edit all when Guard` and `edit Field1 when Guard`.
 
 **Input:**
 ```json
@@ -466,7 +459,7 @@ The `fields` object contains the field names and new values to apply. At least o
 **Output (success):**
 ```json
 {
-  "outcome": "Updated",
+  "outcome": "Update",
   "data": { "Assignee": "alice", "Priority": 1, "BlockReason": null, "Resolution": null },
   "violations": [],
   "error": null

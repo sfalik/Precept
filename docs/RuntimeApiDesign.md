@@ -123,8 +123,8 @@ Evaluates all events that have at least one transition from the instance's curre
 
 - Events are ordered by declaration position.
 - Each event is evaluated as `Inspect(instance, eventName)` with no event arguments (discovery mode).
-- **Stateless precepts:** All events return `Undefined` outcome (no transition surface). `EditableFields` is populated from root-level `edit` declarations if any exist.
-- `EditableFields` is `null` when no `in ... edit` declarations exist (stateful) or no root-level `edit` declarations exist (stateless), or contains the union of all matching edit declarations for the current state.
+- **Stateless precepts:** All events return `Undefined` outcome (no transition surface). `EditableFields` is populated from the effective root-level editable set, including guarded root-level edit blocks whose guards currently pass.
+- `EditableFields` is `null` when the engine has no edit declarations at all, an empty list when edit declarations exist but none are currently effective, or the union of all matching unconditional edit declarations plus any guarded edit declarations whose guards currently pass.
 - If the instance fails `CheckCompatibility`, returns a result with an empty events list.
 
 Use this as the primary API for rendering a state-machine inspector view.
@@ -143,7 +143,7 @@ Applies a hypothetical patch to a working copy of instance data, runs the full r
 public UpdateResult Update(PreceptInstance instance, Action<IUpdatePatchBuilder> patch)
 ```
 
-Atomically updates editable fields. For **stateful** precepts, only fields declared in an `in <State> edit` block for the current state are mutable. For **stateless** precepts, only fields declared in a root-level `edit` block are mutable (`CurrentState` is `null` throughout). Evaluation sequence: editability check → type check → atomic mutation on working copy → invariant/state-assert evaluation → commit or rollback. Returns `UpdateResult`.
+Atomically updates editable fields. For **stateful** precepts, only fields granted by the effective edit set for the current state are mutable: unconditional `in <State> edit` declarations plus any guarded edit blocks whose guards pass. For **stateless** precepts, only fields granted by the effective root-level edit set are mutable: unconditional root-level `edit` declarations plus guarded root-level `edit ... when ...` / `edit all when ...` blocks whose guards pass (`CurrentState` is `null` throughout). Evaluation sequence: editability check → type check → atomic mutation on working copy → invariant/state-assert evaluation → commit or rollback. Returns `UpdateResult`.
 
 ### `Fire`
 
@@ -304,7 +304,7 @@ public sealed record InspectionResult(
     IReadOnlyList<PreceptEditableFieldInfo>? EditableFields = null)
 ```
 
-Returned by the aggregate `Inspect(instance)` overload. `InstanceData` is the same clean dictionary as `instance.InstanceData`. `CurrentState` is `null` for stateless instances. `EditableFields` is `null` when no `in ... edit` declarations exist (stateful) or no root-level `edit` declarations exist (stateless), or contains the effective editable field set for the current state.
+Returned by the aggregate `Inspect(instance)` overload. `InstanceData` is the same clean dictionary as `instance.InstanceData`. `CurrentState` is `null` for stateless instances. `EditableFields` is `null` when the engine has no edit declarations, an empty list when edit declarations exist but none are currently effective, or the effective editable field set for the current state/root context after guarded edit blocks are evaluated against the current data.
 
 ### `PreceptEditableFieldInfo`
 
@@ -419,7 +419,7 @@ else
         Console.WriteLine(v.Message);
 }
 
-// 6. Direct field editing (for fields declared with `in <State> edit`)
+// 6. Direct field editing (for fields granted by state-scoped `in <State> edit` or stateless root-level `edit`)
 var editResult = engine.Update(instance, patch => patch
     .Set("Notes", "Customer called back")
     .Set("Priority", 1.0));
@@ -449,7 +449,7 @@ The following types are returned by `PreceptParser.Parse` and consumed by `Prece
 | `StateTransition` | Row outcome: `transition <State>` |
 | `Rejection` | Row outcome: `reject "<message>"` |
 | `NoTransition` | Row outcome: `no transition` |
-| `PreceptEditBlock` | Editable field declaration: `in <State> edit <Field>, ...` |
+| `PreceptEditBlock` | Editable field declaration: state-scoped `in <State> [when <Guard>] edit <Field>, ...` or stateless root-level `edit <Field>, ... [when <Guard>]` |
 
 ### Scalar and Collection Enums
 

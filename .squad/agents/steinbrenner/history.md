@@ -1,91 +1,19 @@
 ## Core Context
 
-- Owns PM briefs, hero-evaluation rubrics, README ship planning, and cross-agent sequencing.
-- Hero decisions are judged on recognizability, feature density, line budget, and adoption clarity; once a temporary domain is chosen, downstream work should execute without reopening the selection casually.
-- README delivery is a gated sequence: proposal/spec first, then rewrite, review, and final sign-off.
-
-## Recent Updates
-
-### 2026-04-11 - Named rule keyword confusion analysis delivered
-- Completed PM/UX analysis of Shane's concern about Issue #8: `rule LoanEligible when ...` creates a passive predicate using a keyword that currently means "auto-enforced constraint." This overload fails 3 of 6 philosophy checks (prevention, keyword-anchored clarity, AI legibility).
-- Surveyed 6 comparable tools: xstate (`guard` — not auto-enforced), FluentValidation (`RuleSet` — opt-in), Drools (`rule` — auto-enforced, but with action blocks), Alloy (`pred` — must be used in fact/assert), OCL (`let` — binding only), FHIR (`constraint` — auto-enforced). No comparable tool uses the same keyword for both auto-enforced constraints and passive reusable predicates.
-- PM recommendation: rename the #8 construct to `guard <Name> when <Expr>`. This preserves `rule` for enforcement, aligns with xstate precedent, and passes all 6 philosophy checks. Decision recommendation filed to `.squad/decisions/inbox/steinbrenner-named-rule-keyword-confusion.md`.
-- Key learning: keyword overloading in a prevention-first language is more dangerous than in a validation-first language — users trust that every construct they see is actively protecting them. A passive construct wearing enforcement clothing undermines that trust silently.
-### 2026-04-12 — Event hooks PM motivation and use case analysis
-- Built use-case inventory for event-level action hooks from the 24-sample corpus.
-- Confirmed real friction: repeated `RegisterAgent` calls in `it-helpdesk-ticket.precept` across 4 identical rows; TrafficLight counter requires duplication across all non-reject Advance rows.
-- **PM recommendation: two-proposal split.** Issue A (stateless) advances first — zero Principle 7 tension, clean execution order. Issue B (stateful) deferred — unresolved execution order (4 options with different semantics) and outcome-scoping question.
-- **C49 revision confirmed in-scope** for Issue A — not optional follow-up. Events with hooks must suppress C49; ships in same PR as runtime/grammar changes.
-- Drafted acceptance criteria for Issue A (stateless only). Filed at `.squad/decisions/inbox/steinbrenner-event-hooks-pm.md` (now merged to decisions.md).
-
-
-
-### 2026-04-08 - Language research plan fully executed
-- The three-batch domain-first plan is complete on `squad/language-research-corpus`, closed by `3cc5343` after Batch 1 `54a77da` and Batch 2 `48860ae`.
-- PM guardrails held through closeout: no proposal-body edits, horizon domains remained represented, and the final indexes point active proposals back to their grounding research.
-
-### 2026-04-08 - Language research batching finalized
-- Finished `docs/research/language/domain-research-batches.md` as the domain-first execution plan for the corpus.
-- Regrouped Batch 1 so constraint composition stays with the rest of the validator/rule/declaration lane instead of being split into a later pass.
-- Preserved the session rules: no proposal-body edits during corpus work, horizon domains stay visible, and each completed batch closes with its own commit (`54a77da` for Batch 1, `48860ae` for Batch 2). Batch 3 and the final README/index sweep remain open.
-
-### 2026-04-05 - Proposal #8 finalized around named rules
-- Synced the roadmap framing to rule <Name> when <BoolExpr>, locked the field-only/boolean-only boundaries, and recorded the issue rename to "Proposal: Named rule declarations."
-- PM proposal guidance now requires philosophy fit, non-goals, and the configuration-like readability check on future language work.
-
-### 2026-04-05 - Expressiveness proposal label locked for the next wave
-- Created the `dsl-expressiveness` repository label and applied it to the expression-focused proposal issues #8, #9, and #10.
-- Added `docs/research/dsl-expressiveness/expression-tracking-notes.md` so the team has one repo-local definition of what belongs under the tag and how it differs from `dsl-compactness`.
-
-### 2026-04-05 - Compactness proposal label standardized on GitHub issues
-- Created the `dsl-compactness` repository label and applied it to language improvement proposal issues #8, #9, #10, #11, #12, and #13.
-- Verified the label now sits alongside `squad:frank` on all six proposals, giving the roadmap a durable compactness-focused slice across the language queue.
-
-### 2026-04-05 - Proposal bodies expanded for issues #8-#10
-- Expanded GitHub issues #8, #9, and #10 into a shared proposal format covering motivation, Precept-today pain, hypothetical syntax, reference-language snippets, benefits, and open questions.
-- Reinforced the PM guardrail that hypothetical DSL examples in roadmap issues must be labeled as unimplemented behavior.
-
-### 2026-04-05 - Freeze-and-curate cutover became the safe team path
-- Proposed freezing the exact feature SHA, cutting a fresh integration branch from 'main', and re-landing approved content as curated commits.
-- Uncle Leo's review ratified that sequence as the only approved trunk-return pattern, so PM sequencing now assumes curation, validation gates, and post-cutover cleanup.
+- Owns PM framing, roadmap sequencing, proposal structure, and reviewer-facing positioning across the Squad workflow.
+- Keeps proposal work tied to philosophy fit, durable taxonomy, and clear implementation/review sequencing.
+- Historical summary (pre-2026-04-13): shaped language-research batching, proposal/body standards, expressiveness vs compactness tagging, named-rule positioning, and PM analysis for event hooks and related roadmap decisions.
 
 ## Learnings
 
-- 2026-04-05: The durable repo-wide issue model should separate **workflow**, **taxonomy**, and **exceptions**. Use one shared project lifecycle (`Inbox`/`Ready`/`In Progress`/`In Review`/`Done`) for every issue type; keep labels for durable type/domain/owner/slice metadata; keep only `blocked` and `deferred` as optional exception labels because they answer questions open/closed state cannot. Relevant paths: `.squad/templates/issue-lifecycle.md`, `.squad/routing.md`, `.squad/team.md`, `docs/@ToDo.md`, `docs/research/language/README.md`, `.copilot/skills/architectural-proposals/SKILL.md`, `.squad/decisions/inbox/steinbrenner-standard-issue-workflow.md`, `.squad/skills/unified-issue-workflow/SKILL.md`.
-- 2026-04-05: The durable philosophy screen for language proposals is: preserve domain integrity, deterministic inspectability, keyword-anchored flat statements, first-match routing, compile-time soundness, and AI legibility. Named guards pass only when they stay field-only, predicate-only, and explicitly avoid row-body abstraction or trivial one-clause aliases. Relevant paths: `README.md`, `docs/PreceptLanguageDesign.md`, `docs/research/dsl-expressiveness/README.md`, `docs/research/dsl-expressiveness/expression-feature-proposals.md`, `docs/research/dsl-expressiveness/expression-language-audit.md`, `.squad/decisions/inbox/steinbrenner-philosophy-pass.md`, `.squad/skills/dsl-philosophy-filter/SKILL.md`.
-- 2026-04-05: Domain survey of 10 business domains (100 fields) and 5 workflow platforms confirmed choice and date as Universal-tier type gaps. Choice appeared in 41/100 fields across all 10 domains; date appeared in 30/100 fields across all 10 domains. Integer and currency have no modeling gap because `number` is a tolerable workaround. The three entity-definition platforms (ServiceNow, Salesforce, Dataverse) all treat choice and date as first-class types; the two workflow orchestrators (Camunda 8, Temporal) delegate typing to the host language. This validates proposal #25 scope exactly — no expansion needed. Relevant paths: `docs/research/language/expressiveness/type-system-domain-survey.md`, `.squad/decisions/inbox/steinbrenner-type-system-domain-research.md`.
-- 2026-04-05: The clean PM split is `dsl-expressiveness` for capability-gap proposals and `dsl-compactness` for ceremony-reduction proposals. The research-backed first wave is #8 named guards, #9 ternary-in-`set`, and #10 string `.length`; shortcut features like `absorb` or inline fallback should not inherit the expressiveness tag by default. Relevant paths: `.squad/agents/steinbrenner/history.md`, `docs/research/dsl-expressiveness/README.md`, `docs/research/dsl-expressiveness/expression-tracking-notes.md`, `.squad/decisions/inbox/steinbrenner-dsl-expressiveness-tag.md`.
-- 2026-04-05: A shared proposal tag is worth locking early. `dsl-compactness` cleanly groups the six language-improvement issues (#8-#13) without overloading release or owner labels, so PM filtering can track one roadmap theme across multiple rollout waves. Relevant paths: `.squad/agents/steinbrenner/history.md`, `.squad/decisions.md`, `.squad/orchestration-log/2026-04-05T15-17-53Z-steinbrenner.md`.
-- 2026-04-05: Language proposal issues land better when they use one durable structure — problem, proposed feature, Precept today, proposed syntax, external reference code, benefits, open questions — and explicitly label hypothetical DSL as unimplemented. Pairing a current Precept snippet with concrete xstate/LINQ/Zod/FluentValidation examples makes review faster for PM and architecture. Relevant paths: `.squad/agents/steinbrenner/history.md`, `docs/research/dsl-expressiveness/README.md`, `docs/research/dsl-expressiveness/xstate.md`, `docs/research/dsl-expressiveness/linq.md`, `docs/research/dsl-expressiveness/zod-valibot.md`, `docs/research/dsl-expressiveness/fluent-validation.md`.
-- 2026-04-05: When the working tree has narrowed to one documentation artifact that explains branch lineage and consolidation risks, package it as a single freeze-point commit and treat that SHA—not the moving branch name—as the planning reference.
-- 2026-04-05: GitHub Projects v2 work for `sfalik/Precept` is blocked unless the active `gh` auth gains `project` and `read:project` scopes; repo-level `repo` scope is not enough for listing or creating project boards. Relevant paths: `.squad/agents/steinbrenner/history.md`, `.squad/decisions.md`, `.squad/identity/wisdom.md`, `.squad/identity/now.md`, `.squad/skills/`.
-- 2026-04-05: Preview-panel board setup must start with a scope gate. In this repo, `gh project list --owner sfalik` fails without `read:project`, `gh project create` would still need `project`, and the old repo-project REST fallback is unavailable (`repos/sfalik/Precept/projects` returns 404). Relevant paths: `.squad/decisions/inbox/steinbrenner-preview-board.md`, `.squad/skills/github-project-v2-auth/SKILL.md`.
-- 2026-04-05: Retrying preview-panel project-board creation confirmed the same hard blocker: the active `sfalik` GitHub CLI token still has only `gist`, `read:org`, `repo`, and `workflow`, so `gh project list --owner sfalik` fails for missing `read:project` and `gh project create --owner sfalik --title "Preview Panel Redesign"` fails for missing `project` and `read:project`; classic repo projects remain unavailable because `repos/sfalik/Precept/projects` returns `404 Not Found`. Relevant paths: `.squad/agents/steinbrenner/history.md`, `.squad/skills/github-project-v2-auth/SKILL.md`.
-- 2026-04-05: After auth refresh, GitHub Projects v2 creation succeeded in the `sfalik` owner context with `gh` showing `project` scope. `gh project list --owner sfalik`, `gh project create --owner sfalik --title "Precept Preview Panel Redesign"`, and `gh project edit 1 --owner sfalik --description ...` all worked, and the board now lives at `https://github.com/users/sfalik/projects/1`. Relevant paths: `.squad/agents/steinbrenner/history.md`, `.squad/skills/github-project-v2-auth/SKILL.md`.
-- 2026-04-05: The strongest remembered language-roadmap bundle was the three research-ranked expressiveness proposals (named guards, ternary-in-`set`, string `.length`) plus the three hero-condensation reducers from corpus review (`absorb`-style event ingestion, inline `else reject`, and field-level basic constraints). The field-level constraint item remains caveated because research flags a direct conflict with Precept's keyword-anchored statement design. Relevant paths: `docs/research/dsl-expressiveness/README.md`, `docs/research/dsl-expressiveness/internal-verbosity-analysis.md`, `.squad/decisions/inbox/steinbrenner-language-proposals.md`.
-- 2026-04-05: For GitHub Project v2 intake, `gh issue create --project "<project title>"` is the cleanest path when the board already exists — it creates the issue and adds it to the board in one step, avoiding a second `project item-add` pass. Relevant paths: `.squad/agents/steinbrenner/history.md`, `.squad/skills/github-project-v2-auth/SKILL.md`.
+- Prevention-first languages cannot casually overload enforcement-shaped keywords for passive constructs.
+- Proposal issues land best with one durable structure and clearly labeled hypothetical syntax.
+- Roadmap labels and workflow metadata are most useful when taxonomy, ownership, and exceptions stay separate.
 
----
+## Recent Updates
 
-2026-04-05T03:20:00Z: Steinbrenner applied branch protection to main (pull requests required, force pushes/admin only, no branch deletion).
+### 2026-04-12 — Event hooks PM analysis
+- Recommended a two-proposal split: advance stateless event hooks first and defer stateful hooks until execution-order and scope questions are resolved.
 
-### 2026-04-05 - Language proposal sequencing locked after architecture review
-- Recorded the six-issue language roadmap as a staged rollout: first wave #10 string .length and #8 named guards; second wave #9 ternary-in-set and #11 event absorb shorthand; last wave #12 inline else reject and #13 field-level constraints.
-- Key learning: roadmap order should follow DSL-fit and containment risk. Proposals that pressure keyword-anchored flat statements or first-match routing belong late and need explicit architectural scrutiny.
-
-### 2026-04-05 - Type system expansion PM scoping delivered
-- Ranked type candidates by user value: enum/value-set (high), integer subtype (medium-high), date/duration (medium), constrained ranges (medium-low, overlaps #13), record/struct (non-goal).
-- Key learning: type system proposals should be scored on expressiveness-gap-closed (can authors say something new?) rather than convenience (is a workaround shorter?). Enum passes that bar clearly; integer and date do not pass as cleanly because the `number` workaround is tolerable. Record/struct directly conflicts with flat-field philosophy and is a non-goal.
-- Key learning: type system work has the widest blast radius of any language proposal category — it touches parser, type checker, evaluator, grammar, language server, MCP DTOs, and runtime API simultaneously. Sequencing it after Wave 1 expression foundations (#10, #8) are stable is critical to avoid destabilizing the stack mid-wave.
-- Sequencing position: Wave 2 or 2.5, after #10 and #8 land, potentially parallel with #9 and #11. Enum should be the first type addition; integer and date should be evaluated after enum ships. Relevant paths: `.squad/decisions/inbox/steinbrenner-type-system-scoping.md`, `docs/research/language/expressiveness/expression-language-audit.md`.
-- 2026-04-05: Beyond-v1 domain type roadmap: Re-analyzed 10 business domains (70+ residual fields) and 5 workflow platforms post-choice/post-date. Key findings: (1) The constraint system (#13) absorbs most remaining type pressure — email, phone, URL, percentage, and partially currency are all better served by field-level constraints than new types. (2) Only `integer` and `duration` are strong Phase 2 type candidates, because both need new expression semantics constraints can't provide. (3) Most surprising finding: attachment/document references appear in 10/10 domains — an unaddressed gap that neither types nor current constraints handle. (4) The never-add list includes reference/FK, record/struct, calculated fields, anyType, encrypted text, auto-number, journal/append-only, time-only, and geolocation — all conflict with Precept's single-entity isolation, flat-field philosophy, or deterministic inspectability. (5) Multipicklist may already be solved by `set<choice>` if choice can be a collection inner type. Relevant paths: `docs/research/language/expressiveness/type-system-domain-survey.md`.
-
-### 2026-04-11 - Verdict Modifiers Roadmap Positioning Delivered
-- Produced strategic roadmap positioning document (`research/language/expressiveness/verdict-modifier-roadmap-positioning.md`) synthesizing Frank's externally-grounded research with current M1-M2-M3 roadmap.
-- Key finding: **State verdicts are genuinely novel territory.** Zero comparable systems (XState, BPMN, UML, Kubernetes, ESLint) put severity/verdict annotations on state declarations. This is a major competitive differentiator for Precept but requires philosophy clarification.
-- Recommended **Option D (phased approach):** event verdicts in M2 late slice, rule verdicts in M3 early, state verdicts in M3 mid. Respects structural provability tiers, spreads philosophy risk, delivers debugging value sooner.
-- **Philosophy gate identified:** Before M2 late slice ships, owner must decide whether Precept accepts an "intent-declaration tier" (verdicts are semantic annotation, not structural constraints) alongside the existing "prevention tier" (invariants/guards are structural). This is the core tension. Precedent exists (FluentValidation, BPMN), but Precept's prevention-first positioning is a core brand claim. Decision required.
-- **Competitive positioning locked:** Verdicts enable Precept to claim "the only .NET governance engine that combines structural prevention with semantic clarity — verdicts let you declare success/error/warning endpoints as authored intent, enabling compliance review and risk assessment at definition time."
-- **MVP proposal scoped:** Event verdicts only (narrowest scope, strongest precedent, highest ROI). First proposal can launch in M2 late slice focused on outcome-matching validation and debugging support. Rule and state verdicts follow in M3 as separate proposals, building incrementally on event foundation.
-- Key learning: In a prevention-first language, introducing an intent-only tier is philosophically risky without explicit framing. The value lies in tooling clarity (preview, compliance query, AI guidance) not structural guarantee. This is a deliberate layer distinction worth articulating deeply in docs and brand messaging.
-- Key learning: State verdicts' novelty is both a strength (differentiation) and a burden (no precedent to lean on). Phasing allows state verdicts to ship last, after philosophy is proven with events and rules first. Reduces adoption risk by accumulating confidence incrementally.
+### 2026-04-11 — Named rule keyword analysis
+- Recommended avoiding `rule` for passive named predicates because it silently implies enforcement in a prevention-first product.

@@ -276,7 +276,7 @@ Notes:
 - **Compile-time error (contradiction):** multiple asserts with the same preposition on the same state whose conjoined per-field domains are empty (e.g. two `in Open` asserts that require contradictory values for the same field).
 - **Compile-time error (deadlock):** `in`/`to` vs `from` asserts on the same state whose conjoined per-field domains are empty — the state is provably unexitable.
 - All domain checks use interval/set analysis on the expression AST. Expressions involving `contains` or cross-field relationships that cannot be reduced to per-field domains are assumed satisfiable (no false positives).
-- **Stateless precept** — a precept with no `state` declarations. Only `field`, `invariant`, and root-level `edit` declarations are valid. C12 requires at least one `field` or `state`. C55 rejects root-level `edit` when states are declared. C49 warns per event declared in a stateless precept (events have no transition surface).
+- **Stateless precept** — a precept with no `state` declarations. Root-level declarations such as `field`, `invariant`, and root-level `edit` are valid; state-scoped declarations are not. C12 requires at least one `field` or `state`. C55 rejects root-level `edit` when states are declared. C49 warns per event declared in a stateless precept (events have no transition surface).
 
 ---
 
@@ -313,7 +313,7 @@ edit all
 ### Constraints
 
 - **C12 (parse):** At least one `field` or `state` must be declared. A `precept` header alone is not valid.
-- **C55 (compile):** Root-level `edit` is not valid when states are declared. Use `in <State> edit` instead.
+- **C55 (compile):** Root-level `edit` is not valid when states are declared. Use `in any edit all` or `in <State> edit <Fields>` instead.
 - **C49 (compile, Warning):** Event declared in a stateless precept is unreachable — no transition surface exists.
 - C13 ("Exactly one state must be initial") is suppressed for stateless precepts — no states means no initial state required.
 
@@ -324,8 +324,8 @@ edit all
 - `CreateInstance(state, data?)` — throws `ArgumentException` for stateless precepts.
 - `Fire` on a stateless instance — returns `Undefined` outcome. Events have no transition surface.
 - `Inspect(instance, event)` on stateless — returns `Undefined` outcome.
-- `Inspect(instance)` on stateless — returns all events as `Undefined`; `EditableFields` reflects root-editable fields.
-- `Update` on stateless — applies to root-editable fields; `CurrentState` is `null`.
+- `Inspect(instance)` on stateless — returns all events as `Undefined`; `EditableFields` reflects the effective root-editable set (unconditional root blocks union passing guarded root blocks). It is `null` only when no root-level `edit` declarations exist, and an empty list when declarations exist but none currently grant editability.
+- `Update` on stateless — applies to the same effective root-editable set; `CurrentState` is `null`.
 
 ---
 
@@ -952,7 +952,7 @@ edit all when Guard
 - **Additive union:** Unconditional and guarded root-level edit blocks combine. A field is editable if ANY unconditional or passing-guard block grants it.
 - **Fail-closed:** Guard evaluation error → field not granted.
 - **Dynamic evaluation:** Guards are evaluated on each `Update` / `Inspect` call with current instance data.
-- **Type checking:** Guard must be a non-nullable boolean expression. C69 fires for out-of-scope references.
+- **Type checking:** Guard must be a non-nullable boolean expression. C69 fires for out-of-scope references; C46 rejects nullable or non-boolean guard expressions.
 
 Root-level `edit` (with or without guards) is only valid on stateless precepts. Using it alongside `state` declarations produces **C55 (Error)**: `"Root-level \`edit\` is not valid when states are declared. Use \`in any edit all\` or \`in <State> edit <Fields>\` instead."`
 
@@ -970,20 +970,27 @@ At runtime, `Update` on a stateless instance pulls the editable field set from t
 
 ### Model
 
-The parser produces one `DslEditBlock` per state after expansion:
+The parser produces one `PreceptEditBlock` per expanded edit target:
 
 ```csharp
-public sealed record DslEditBlock(
-    string State,
+public sealed record PreceptEditBlock(
+    string? State,          // null for root-level (stateless) edit declarations
     IReadOnlyList<string> FieldNames,
+    string? WhenText = null,
+    PreceptExpression? WhenGuard = null,
     int SourceLine = 0);
 ```
 
-`DslWorkflowModel` gains an optional `IReadOnlyList<DslEditBlock>? EditBlocks` property.
+- `State` is `null` for root-level `edit` declarations on stateless precepts.
+- `WhenText` and `WhenGuard` are populated for guarded edit declarations.
+- `in any edit` expands to one `PreceptEditBlock` per declared state.
+- `in StateA, StateB edit` expands to one `PreceptEditBlock` per listed state.
+
+`PreceptDefinition` carries these via `IReadOnlyList<PreceptEditBlock>? EditBlocks`.
 
 ### Runtime
 
-The runtime `Update` API, `IUpdatePatchBuilder`, validation pipeline, and inspect integration are fully implemented. See `docs/EditableFieldsDesign.md` for the design.
+The runtime `Update` API, `IUpdatePatchBuilder`, validation pipeline, and inspect integration are fully implemented for both state-scoped guarded edits and stateless root-level guarded edits. See `docs/EditableFieldsDesign.md` for the implementation design notes.
 
 ---
 
@@ -1605,7 +1612,7 @@ Locked in this discussion:
 - Execution order: event asserts → when guard → exit actions → row mutations → entry actions → validation
 - Coverage warning (not error) for reachable `(state, event)` pairs without transition rows
 - Unreachable row after unguarded row = compile-time error
-- Editable field declarations: `in <StateTarget> edit <FieldList>` — flat comma-separated syntax, `in` preposition (consistent with "while residing in"), additive across declarations, `any` support. Syntax and model included in language redesign; runtime `Update` API deferred (see `docs/EditableFieldsDesign.md`).
+- Editable field declarations: stateful form `in <StateTarget> [when <Guard>] edit <FieldList>` and stateless root form `edit <FieldList> [when <Guard>]` / `edit all [when <Guard>]` — flat comma-separated syntax, additive across declarations, `any` support for stateful forms, runtime `Update`/`Inspect` integration implemented.
 - Collection mutation nullability: `add`/`enqueue`/`push`/`remove` with a `T|null` value into a non-nullable collection require prior narrowing. The shared type checker enforces this via C42 (null-flow violation). Guard narrowing (`when Value != null`) and cross-branch narrowing (prior row handles null case) both satisfy the requirement.
 - Event-arg reference form: transition rows (guards, set RHS, mutation values) require the dotted form (`EventName.ArgName`). Bare arg names are valid only inside event asserts (`on <Event> assert`), where scope is arg-only. Narrowing applies to the exact symbol form used — no cross-form mirroring. Cross-event arg references (`EventB.Arg` in a row for `EventA`) are invalid.
 - Event-assert scope: permanently arg-only. Field references in event asserts are a compile-time error (C14/C15/C16). Validation combining event args with field state belongs in `when` guards, not event asserts.
