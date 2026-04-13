@@ -1,81 +1,138 @@
 precept LibraryBookCheckout
 
-# A library checkout workflow from loan creation through return, shelving, and loss resolution.
-# This sample emphasizes due-date guards, renewal limits, and overdue fine accumulation.
+# Shape: W1 circulation with renewal governance and damage routing
+#
+# Models a library item checkout lifecycle from availability through loan,
+# overdue, loss, return, and repair. Demonstrates borrower-type-sensitive
+# loan policy, computed overdue fines, renewal limits with hold suppression,
+# damage-based return routing, and day-counter time simulation.
+#
+# FUTURE(date): CheckoutDate, DueDate, ReturnDate, LossReportDate
 
-field BookTitle as string nullable
-field BorrowerId as string nullable
-field CurrentDay as number default 0
-field CheckoutDay as number default 0
-field DueDay as number default 0
-field RenewalCount as number default 0
-field FineAmount as number default 0
-field ConditionNote as string nullable
+# --- Fields ---
+
+field BookTitle as string nullable maxlength 200
+field BorrowerId as string nullable maxlength 50
+field ItemType as choice("Book", "DVD", "AudioBook", "Magazine", "Reference") default "Book"
+field BorrowerType as choice("Adult", "Child", "Student", "Faculty", "InterlibraryLoan") nullable
+field ReturnCondition as choice("Good", "Damaged", "WaterDamaged", "MissingPages", "Destroyed") nullable
+field ConditionNote as string nullable maxlength 500
+
+field CurrentDay as integer default 0 nonnegative       # FUTURE(date)
+field CheckoutDay as integer default 0 nonnegative      # FUTURE(date): CheckoutDate
+field DueDay as integer default 0 nonnegative           # FUTURE(date): DueDate
+field ReturnDay as integer default 0 nonnegative        # FUTURE(date): ReturnDate
+field LossReportDay as integer default 0 nonnegative    # FUTURE(date): LossReportDate
+
+field RenewalCount as integer default 0 nonnegative max 5
+field MaxRenewals as integer default 3 nonnegative
+field FinePerDay as number default 0.25 nonnegative     # Rate varies by borrower type
+field ReplacementCost as number default 25.00 nonnegative
 field LostReported as boolean default false
+field Reserved as boolean default false                  # Hold queue — suppresses renewals
 
-invariant CurrentDay >= 0 because "The day counter cannot be negative"
-invariant CheckoutDay >= 0 because "The checkout day cannot be negative"
-invariant DueDay >= 0 because "The due day cannot be negative"
-invariant RenewalCount >= 0 because "Renewal counts cannot be negative"
-invariant FineAmount >= 0 because "Fines cannot be negative"
+field DaysOverdue as integer -> if CurrentDay > DueDay and DueDay > 0 then CurrentDay - DueDay else 0
+field FineAccrual as number -> DaysOverdue * FinePerDay
+field TotalOwed as number -> FineAccrual + (if LostReported then ReplacementCost else 0)
+field IsLongOverdue as boolean -> DaysOverdue > 30
+
+# --- Invariants ---
+
+invariant RenewalCount <= MaxRenewals because "Renewal count cannot exceed the borrower policy maximum"
+
+# --- States ---
 
 state Available initial
 state CheckedOut
 state Overdue
-state Returned
 state Lost
+state Returned
+state InRepair
 
-# Staff can correct due-date handling while a loan is active.
-in CheckedOut edit DueDay
-in Overdue edit DueDay, FineAmount
+# --- State Constraints ---
 
-in Available assert BorrowerId == null because "Available books cannot still be assigned to a borrower"
-in CheckedOut assert BorrowerId != null because "Checked-out books must record a borrower"
-in Overdue assert BorrowerId != null because "Overdue books must still record a borrower"
-in Overdue assert CurrentDay > DueDay because "Overdue books must be past their due day"
-in Returned assert BorrowerId == null because "Returned books must clear the borrower"
-in Lost assert LostReported because "Lost books must be marked as reported lost"
-in Lost assert BorrowerId != null because "Lost books must still record the last borrower"
+in Available assert BorrowerId == null because "Available items cannot be assigned to a borrower"
+in Available assert ReturnCondition == null because "Available items have no return condition"
+in CheckedOut assert BorrowerId != null because "Checked-out items must record a borrower"
+in CheckedOut assert DueDay > 0 because "Checked-out items must have a due day"
+in Overdue assert BorrowerId != null because "Overdue items must still record the borrower"
+in Overdue assert CurrentDay > DueDay because "Overdue items must be past their due day"
+in Lost assert LostReported because "Lost items must be marked as reported lost"
+in Lost assert BorrowerId != null because "Lost items must still record the last borrower"
+in Returned assert BorrowerId == null because "Returned items must clear the borrower"
+in InRepair assert ReturnCondition != null because "Items in repair must have a return condition"
+in InRepair assert ReturnCondition != "Good" because "Items in good condition do not need repair"
 
-event Checkout with Title as string, PatronId as string, LoanDays as number default 14
-on Checkout assert Title != "" because "A book title is required"
-on Checkout assert PatronId != "" because "A patron id is required"
-on Checkout assert LoanDays > 0 because "Loan days must be positive"
+# --- Edit Declarations ---
 
-event Renew with ExtraDays as number default 7
-on Renew assert ExtraDays > 0 because "Renewal days must be positive"
+in Available edit BookTitle, ItemType, ReplacementCost
+in CheckedOut edit DueDay, FinePerDay, Reserved
+in Overdue edit DueDay, FinePerDay, Reserved
+in InRepair edit ConditionNote
 
-event AdvanceDay with DayNumber as number
-on AdvanceDay assert DayNumber >= 0 because "The day counter cannot be negative"
+# --- Events ---
 
-event ReturnBook with Condition as string nullable default null
-on ReturnBook assert Condition == null or Condition != "" because "A supplied condition note cannot be blank"
+event Checkout with Title as string notempty maxlength 200, PatronId as string notempty maxlength 50, Borrower as choice("Adult", "Child", "Student", "Faculty", "InterlibraryLoan") default "Adult"
+
+event Renew with ExtraDays as integer default 7 positive
+
+event AdvanceDay with DayNumber as integer nonnegative
+
+event ReturnBook with Condition as choice("Good", "Damaged", "WaterDamaged", "MissingPages", "Destroyed") default "Good"
 
 event ReportLost with Note as string nullable default null
 on ReportLost assert Note == null or Note != "" because "A supplied loss note cannot be blank"
 
 event Shelve
 
+event CompleteRepair
+
 event ResolveLoss
 
-from Available on Checkout -> set BookTitle = Checkout.Title -> set BorrowerId = Checkout.PatronId -> set CheckoutDay = CurrentDay -> set DueDay = CurrentDay + Checkout.LoanDays -> set RenewalCount = 0 -> set FineAmount = 0 -> set ConditionNote = null -> set LostReported = false -> transition CheckedOut
+# --- Transitions ---
 
-from CheckedOut on Renew when RenewalCount < 2 and not LostReported and CurrentDay <= DueDay -> set DueDay = DueDay + Renew.ExtraDays -> set RenewalCount = RenewalCount + 1 -> no transition
-from CheckedOut on Renew -> reject "Only active loans with remaining renewals can be renewed"
+# Checkout: reject non-circulating reference items; set policy by borrower type
+from Available on Checkout when ItemType == "Reference" -> reject "Reference items are non-circulating and cannot be checked out"
+from Available on Checkout -> set BookTitle = Checkout.Title -> set BorrowerId = Checkout.PatronId -> set BorrowerType = Checkout.Borrower -> set CheckoutDay = CurrentDay -> set MaxRenewals = if Checkout.Borrower == "Child" then 2 else (if Checkout.Borrower == "Faculty" then 5 else (if Checkout.Borrower == "InterlibraryLoan" then 1 else 3)) -> set DueDay = CurrentDay + (if Checkout.Borrower == "Child" then 7 else (if Checkout.Borrower == "Faculty" then 28 else 14)) -> set FinePerDay = if Checkout.Borrower == "Faculty" then 0 else (if Checkout.Borrower == "Child" then 0.10 else (if Checkout.Borrower == "InterlibraryLoan" then 0.50 else (if Checkout.Borrower == "Student" then 0.15 else 0.25))) -> set RenewalCount = 0 -> set ReturnCondition = null -> set LostReported = false -> set ReturnDay = 0 -> set LossReportDay = 0 -> transition CheckedOut
 
+# Renewal: requires remaining renewals, no hold, and not yet overdue
+from CheckedOut on Renew when RenewalCount < MaxRenewals and not Reserved and CurrentDay <= DueDay -> set DueDay = DueDay + Renew.ExtraDays -> set RenewalCount = RenewalCount + 1 -> no transition
+from CheckedOut on Renew when Reserved -> reject "Cannot renew — item has been placed on hold"
+from CheckedOut on Renew when RenewalCount >= MaxRenewals -> reject "Maximum renewals reached for this borrower type"
+from CheckedOut on Renew -> reject "Cannot renew an overdue loan"
+
+# Day advancement: triggers overdue transition when past due in CheckedOut
 from CheckedOut on AdvanceDay when AdvanceDay.DayNumber > CurrentDay and AdvanceDay.DayNumber <= DueDay -> set CurrentDay = AdvanceDay.DayNumber -> no transition
-from CheckedOut on AdvanceDay when AdvanceDay.DayNumber > CurrentDay -> set CurrentDay = AdvanceDay.DayNumber -> set FineAmount = AdvanceDay.DayNumber - DueDay -> transition Overdue
-from CheckedOut on AdvanceDay -> reject "The day counter must move forward"
+from CheckedOut on AdvanceDay when AdvanceDay.DayNumber > CurrentDay -> set CurrentDay = AdvanceDay.DayNumber -> transition Overdue
 
-from Overdue on AdvanceDay when AdvanceDay.DayNumber > CurrentDay -> set CurrentDay = AdvanceDay.DayNumber -> set FineAmount = AdvanceDay.DayNumber - DueDay -> no transition
-from Overdue on AdvanceDay -> reject "The day counter must move forward"
+# Day advancement: continue accruing in Overdue
+from Overdue on AdvanceDay when AdvanceDay.DayNumber > CurrentDay -> set CurrentDay = AdvanceDay.DayNumber -> no transition
 
-from CheckedOut on ReturnBook -> set BorrowerId = null -> set ConditionNote = ReturnBook.Condition -> transition Returned
-from Overdue on ReturnBook -> set BorrowerId = null -> set ConditionNote = ReturnBook.Condition -> transition Returned
+# Return: damage routing — good condition to Returned, damaged to InRepair
+from CheckedOut on ReturnBook when ReturnBook.Condition == "Good" -> set BorrowerId = null -> set ReturnCondition = ReturnBook.Condition -> set ReturnDay = CurrentDay -> transition Returned
+from CheckedOut on ReturnBook -> set BorrowerId = null -> set ReturnCondition = ReturnBook.Condition -> set ReturnDay = CurrentDay -> transition InRepair
 
-from CheckedOut on ReportLost -> set LostReported = true -> set ConditionNote = ReportLost.Note -> transition Lost
-from Overdue on ReportLost -> set LostReported = true -> set ConditionNote = ReportLost.Note -> transition Lost
+from Overdue on ReturnBook when ReturnBook.Condition == "Good" -> set BorrowerId = null -> set ReturnCondition = ReturnBook.Condition -> set ReturnDay = CurrentDay -> transition Returned
+from Overdue on ReturnBook -> set BorrowerId = null -> set ReturnCondition = ReturnBook.Condition -> set ReturnDay = CurrentDay -> transition InRepair
 
-from Returned on Shelve -> set CheckoutDay = 0 -> set DueDay = 0 -> set RenewalCount = 0 -> set FineAmount = 0 -> set ConditionNote = null -> transition Available
+# Loss reporting
+from CheckedOut on ReportLost -> set LostReported = true -> set ConditionNote = ReportLost.Note -> set LossReportDay = CurrentDay -> transition Lost
+from Overdue on ReportLost -> set LostReported = true -> set ConditionNote = ReportLost.Note -> set LossReportDay = CurrentDay -> transition Lost
 
-from Lost on ResolveLoss -> set BorrowerId = null -> set CheckoutDay = 0 -> set DueDay = 0 -> set RenewalCount = 0 -> set FineAmount = 0 -> set ConditionNote = null -> set LostReported = false -> transition Available
+# Shelving: reset loan fields and return to circulation
+from Returned on Shelve -> set BorrowerType = null -> set ReturnCondition = null -> set ConditionNote = null -> set CheckoutDay = 0 -> set DueDay = 0 -> set ReturnDay = 0 -> set LossReportDay = 0 -> set RenewalCount = 0 -> set MaxRenewals = 3 -> set FinePerDay = 0.25 -> set LostReported = false -> set Reserved = false -> transition Available
+
+# Repair completion: return repaired item to circulation
+from InRepair on CompleteRepair -> set ReturnCondition = null -> set ConditionNote = null -> set BorrowerType = null -> set CheckoutDay = 0 -> set DueDay = 0 -> set ReturnDay = 0 -> set LossReportDay = 0 -> set RenewalCount = 0 -> set MaxRenewals = 3 -> set FinePerDay = 0.25 -> set LostReported = false -> set Reserved = false -> transition Available
+
+# Loss resolution: clear loss record and return to circulation
+from Lost on ResolveLoss -> set BorrowerId = null -> set LostReported = false -> set ConditionNote = null -> set BorrowerType = null -> set ReturnCondition = null -> set CheckoutDay = 0 -> set DueDay = 0 -> set ReturnDay = 0 -> set LossReportDay = 0 -> set RenewalCount = 0 -> set MaxRenewals = 3 -> set FinePerDay = 0.25 -> set Reserved = false -> transition Available
+
+# Day advancement: time simulation for non-loan states
+from Available on AdvanceDay when AdvanceDay.DayNumber > CurrentDay -> set CurrentDay = AdvanceDay.DayNumber -> no transition
+from Lost on AdvanceDay when AdvanceDay.DayNumber > CurrentDay -> set CurrentDay = AdvanceDay.DayNumber -> no transition
+from Returned on AdvanceDay when AdvanceDay.DayNumber > CurrentDay -> set CurrentDay = AdvanceDay.DayNumber -> no transition
+from InRepair on AdvanceDay when AdvanceDay.DayNumber > CurrentDay -> set CurrentDay = AdvanceDay.DayNumber -> no transition
+
+# Universal fallback: day counter must move forward
+from any on AdvanceDay -> reject "The day counter must move forward"
