@@ -7,6 +7,15 @@
 
 ## Recent Updates
 
+### 2026-04-11 — Verdict Modifier Runtime Enforceability Analysis
+- Analyzed four models for non-blocking warning-level constraints in the Fire/Update pipelines.
+- **Model D (Structural Non-Blocking) is the only model that achieves non-blocking warnings while keeping enforcement in the engine.** Models A/B/C either violate philosophy, punt to consumer, or add surface without new behavior.
+- Key architectural insight: `EvaluateInvariants()` and `EvaluateStateAssertions()` are already pure evaluation functions — partitioning violations by severity requires no mutation pipeline restructuring.
+- Error precedence rule: if ANY error-level constraint fails, entire operation blocks — warning evaluation is moot for that operation.
+- Philosophy reframing required: "prevention" → "prevention and detection." This is a product identity decision, not a technical one.
+- Three new diagnostics proposed: C60 (dead warning rule), C61 (contradictory error+warning), C62 (warning-only event). C59 is already taken by field constraint default-value violation.
+- Output: `research/language/expressiveness/verdict-modifier-runtime-enforceability.md`, decision note in `.squad/decisions/inbox/george-verdict-enforceability.md`.
+- Pattern learned: when evaluating feature proposals that touch philosophy guarantees, always surface the philosophy gap explicitly and let the owner decide — don't resolve product identity questions in technical analysis.
 ### 2026-04-12 — Issue #17 Computed Fields: Runtime Feasibility Assessment
 - **Verdict: Feasible.** No fundamental blockers, no architectural mismatches.
 - **Parser (Small):** `derivedOpt` combinator after TypeRef in FieldDecl. Arrow disambiguation is trivial — `field` keyword vs. `from` keyword disambiguates before either combinator reaches `->`. ~25 lines.
