@@ -1448,7 +1448,7 @@ internal static class PreceptTypeChecker
                     ? DiagnosticCatalog.C60
                     : DiagnosticCatalog.C39;
             message = constraint == DiagnosticCatalog.C60
-                ? DiagnosticCatalog.C60.FormatMessage(("actual", FormatKinds(actualKind)), ("name", expectedLabel))
+                ? BuildC60Message(actualKind, expectedLabel)
                 : TryBuildNumericMismatchMessage(actualKind, expectedKind, expectedLabel)
                   ?? $"{expectedLabel} type mismatch: expected {FormatKinds(expectedKind)} but expression produces {FormatKinds(actualKind)}.";
         }
@@ -2418,6 +2418,24 @@ internal static class PreceptTypeChecker
                    "or change the field type to number.";
 
         return null;
+    }
+
+    /// <summary>
+    /// Builds a C60 narrowing-assignment message that advertises only conversion functions
+    /// whose return type is <c>integer</c> for the given source kind.
+    /// <list type="bullet">
+    ///   <item><c>floor()</c>, <c>ceil()</c>, <c>truncate()</c> — return <c>integer</c> for both <c>number</c> and <c>decimal</c> sources.</item>
+    ///   <item><c>round(decimal)</c> — returns <c>integer</c>; only advertised when the source is <c>decimal</c>.</item>
+    ///   <item><c>round(number)</c> — returns <c>number</c>, not <c>integer</c>; never advertised here.</item>
+    /// </list>
+    /// </summary>
+    private static string BuildC60Message(StaticValueKind actualKind, string fieldName)
+    {
+        var actualLabel = FormatKinds(actualKind);
+        var actualBase  = actualKind & ~StaticValueKind.Null;
+        return actualBase == StaticValueKind.Decimal
+            ? $"Narrowing assignment: {actualLabel} cannot be implicitly narrowed to integer field '{fieldName}'. Use floor(), ceil(), truncate(), or round() to produce an integer value."
+            : $"Narrowing assignment: {actualLabel} cannot be implicitly narrowed to integer field '{fieldName}'. Use floor(), ceil(), or truncate() to produce an integer value.";
     }
 
     /// <summary>

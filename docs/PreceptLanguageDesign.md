@@ -1545,7 +1545,7 @@ Type checking for `from any` rows expands to per-state checking. Each state may 
 | C41 / PRECEPT041 | Binary operator type error (includes `contains` RHS mismatch) |
 | C42 / PRECEPT042 | Null-flow violation (assigning `T\|null` to `T` without narrowing) |
 | C43 / PRECEPT043 | Collection `pop`/`dequeue into` target type mismatch |
-| C60 / PRECEPT060 | Narrowing assignment: `number` or `decimal` cannot be implicitly narrowed to `integer`. Use `floor()`, `ceil()`, `truncate()`, or `round()` to produce an explicit integer value. |
+| C60 / PRECEPT060 | Narrowing assignment: `number` or `decimal` cannot be implicitly narrowed to `integer`. Use `floor()`, `ceil()`, or `truncate()` to produce an integer value. When the source is `decimal`, `round()` also produces `integer`. (`round(number)` returns `number`, not `integer`, so it is never suggested for `number` sources.) |
 | C69 / PRECEPT069 | Cross-scope guard reference in `when` clause |
 | C78 / PRECEPT078 | Conditional expression condition must be a non-nullable boolean |
 | C79 / PRECEPT079 | Conditional expression branches produce incompatible types. For numeric mismatches: explains that integer widens to both number and decimal, but number and decimal do not unify. |

@@ -479,10 +479,15 @@ public static class DiagnosticCatalog
     // ═══════════════════════════════════════════════════════════════
 
     /// <summary>Narrowing assignment: cannot assign a non-integer numeric value to an integer field without explicit conversion.</summary>
+    /// <remarks>
+    /// floor(), ceil(), and truncate() return integer for both number and decimal sources.
+    /// round() returns integer only when its argument is decimal; round(number) returns number.
+    /// The runtime message is generated per source type — see PreceptTypeChecker.BuildC60Message.
+    /// </remarks>
     public static readonly LanguageConstraint C60 = Register(
         "C60", "compile",
         "Narrowing assignment: cannot assign non-integer value to integer field without explicit conversion.",
-        "Narrowing assignment: {actual} cannot be implicitly narrowed to integer field '{name}'. Use floor(), ceil(), truncate(), or round() to produce an explicit integer value.");
+        "Narrowing assignment: {actual} cannot be implicitly narrowed to integer field '{name}'. Use floor(), ceil(), or truncate() to produce an integer value.");
 
     /// <summary>'maxplaces' constraint applies only to decimal fields.</summary>
     public static readonly LanguageConstraint C61 = Register(
