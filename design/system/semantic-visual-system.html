@@ -1713,6 +1713,10 @@ pre {
   background: var(--panel-2);
   box-shadow: inset 2px 0 0 rgba(168,152,245,0.34);
 }
+.timeline-history-row--pickup,
+.timeline-history-row--expire {
+  height: 40px;
+}
 .timeline-history-row--future .timeline-row-entry,
 .timeline-history-row--future .timeline-row-target {
   opacity: 0.76;
@@ -4740,15 +4744,15 @@ pre {
             <path class="svs-edge-past svs-edge-not-callable-current" data-edge="requested-approved" d="M380 34 V102" marker-end="url(#svs-s2-arrow-not-callable-current)"></path>
             <path class="svs-edge-past svs-edge-not-callable-current" data-edge="approved-ready" d="M380 102 V170" marker-end="url(#svs-s2-arrow-not-callable-current)"></path>
             <path class="svs-edge-past svs-edge-not-callable-current" data-edge="approved-cancelled" d="M454 102 H468" marker-end="url(#svs-s2-arrow-not-callable-current)"></path>
-            <path class="svs-edge-active" data-edge="ready-pickedup" d="M380 170 V203 Q380 216 366 216 H268 Q254 216 254 229 V262" marker-end="url(#svs-s2-arrow-active)"></path>
-            <path class="svs-edge-blocked" data-edge="ready-expired" d="M380 170 V203 Q380 216 394 216 H492 Q506 216 506 229 V262" marker-end="url(#svs-s2-arrow-blocked)"></path>
+                <path class="svs-edge-active" data-edge="ready-pickedup" d="M380 170 V203 Q380 216 366 216 H298 Q284 216 284 229 V262" marker-end="url(#svs-s2-arrow-active)"></path>
+                <path class="svs-edge-blocked" data-edge="ready-expired" d="M380 170 V203 Q380 216 394 216 H462 Q476 216 476 229 V262" marker-end="url(#svs-s2-arrow-blocked)"></path>
           </svg>
           <div class="svs-state-node cg-mini-state-node cg-mini-state-node--not-reachable cg-mini-state-node--not-reachable-initial" data-state="Requested" data-left="236" data-top="22" tabindex="0" style="left:236px; top:22px;"><span class="cg-mini-state-node-dot" aria-hidden="true"></span>Requested</div>
           <div class="svs-state-node cg-mini-state-node cg-mini-state-node--not-reachable cg-mini-state-node--not-reachable-current" data-state="Approved" data-left="236" data-top="90" tabindex="0" style="left:236px; top:90px;">Approved</div>
           <div class="svs-state-node cg-mini-state-node cg-mini-state-node--current" data-state="ReadyForPickup" data-left="236" data-top="158" tabindex="0" style="left:236px; top:158px;">ReadyForPickup</div>
           <div class="svs-state-node cg-mini-state-node cg-mini-state-node--terminal cg-mini-state-node--not-reachable cg-mini-state-node--not-reachable-current" data-state="Cancelled" data-left="400" data-top="90" tabindex="0" style="left:400px; top:90px;">Cancelled</div>
-          <div class="svs-state-node cg-mini-state-node cg-mini-state-node--terminal" data-state="PickedUp" data-left="150" data-top="250" tabindex="0" style="left:150px; top:250px;">PickedUp</div>
-          <div class="svs-state-node cg-mini-state-node cg-mini-state-node--terminal cg-mini-state-node--not-reachable cg-mini-state-node--not-reachable-current" data-state="Expired" data-left="322" data-top="250" tabindex="0" style="left:322px; top:250px;">Expired</div>
+              <div class="svs-state-node cg-mini-state-node cg-mini-state-node--terminal" data-state="PickedUp" data-left="180" data-top="250" tabindex="0" style="left:180px; top:250px;">PickedUp</div>
+              <div class="svs-state-node cg-mini-state-node cg-mini-state-node--terminal cg-mini-state-node--not-reachable cg-mini-state-node--not-reachable-current" data-state="Expired" data-left="292" data-top="250" tabindex="0" style="left:292px; top:250px;">Expired</div>
           <span class="svs-edge-label svs-edge-label--not-callable-current" data-edge-label="requested-approved"><span class="svs-edge-token cg-modifier-token cg-modifier-token--event cg-modifier-token--event-not-callable-current">ApproveRequest</span></span>
           <span class="svs-edge-label svs-edge-label--not-callable-current" data-edge-label="approved-ready"><span class="svs-edge-token cg-modifier-token cg-modifier-token--event cg-modifier-token--event-not-callable-current">PrintBadge</span></span>
           <span class="svs-edge-label svs-edge-label--not-callable-current" data-edge-label="approved-cancelled"><span class="svs-edge-token cg-modifier-token cg-modifier-token--event cg-modifier-token--event-not-callable-current">Cancel</span></span>
@@ -4778,13 +4782,13 @@ pre {
           <span class="timeline-specimen-label">Timeline</span>
         </div>
         <div class="timeline-history">
-          <svg class="timeline-graph" viewBox="0 0 44 224" preserveAspectRatio="xMinYMin meet" style="height:224px" role="img" aria-label="Timeline rail">
+          <svg class="timeline-graph" viewBox="0 0 44 240" preserveAspectRatio="xMinYMin meet" style="height:240px" role="img" aria-label="Timeline rail">
             <line class="timeline-path--not-callable-current" x1="20" y1="16" x2="20" y2="48" stroke="var(--event)" stroke-width="2"></line>
             <line class="timeline-path--not-callable-current" x1="20" y1="48" x2="20" y2="80" stroke="var(--event)" stroke-width="2"></line>
             <line x1="20" y1="80" x2="20" y2="144" stroke="var(--soft)" stroke-width="2" stroke-opacity="0.72"></line>
-            <line x1="20" y1="144" x2="20" y2="176" stroke="var(--event)" stroke-width="2" stroke-dasharray="4 3" stroke-opacity="0.72"></line>
-            <path d="M 20 144 C 20 158, 34 164, 34 178" fill="none" stroke="var(--event)" stroke-width="2" stroke-dasharray="4 3" stroke-opacity="0.44"></path>
-            <path d="M 34 178 C 34 192, 20 194, 20 208" fill="none" stroke="var(--event)" stroke-width="2" stroke-dasharray="4 3" stroke-opacity="0.44"></path>
+            <line x1="20" y1="144" x2="20" y2="180" stroke="var(--event)" stroke-width="2" stroke-dasharray="4 3" stroke-opacity="0.72"></line>
+            <path d="M 20 144 C 20 160, 34 168, 34 182" fill="none" stroke="var(--event)" stroke-width="2" stroke-dasharray="4 3" stroke-opacity="0.44"></path>
+            <path d="M 34 182 C 34 198, 20 206, 20 220" fill="none" stroke="var(--event)" stroke-width="2" stroke-dasharray="4 3" stroke-opacity="0.44"></path>
           </svg>
 
           <div class="timeline-history-row timeline-history-row--past">
@@ -4843,7 +4847,7 @@ pre {
             </div>
           </div>
 
-          <div class="timeline-history-row timeline-history-row--future">
+          <div class="timeline-history-row timeline-history-row--future timeline-history-row--pickup">
             <div class="timeline-row-copy timeline-row-copy--pickup">
               <span class="timeline-event-token cg-modifier-token cg-modifier-token--event">PickUp</span>
               <span class="timeline-row-arrow">→</span>
@@ -4856,7 +4860,7 @@ pre {
             </div>
           </div>
 
-          <div class="timeline-history-row timeline-history-row--future timeline-history-row--blocked">
+          <div class="timeline-history-row timeline-history-row--future timeline-history-row--blocked timeline-history-row--expire">
             <div class="timeline-row-copy timeline-row-copy--expire">
               <span class="timeline-event-token cg-modifier-token cg-modifier-token--event cg-modifier-token--dashed cg-modifier-token--italic">Expire</span>
               <span class="timeline-row-arrow">→</span>
@@ -6398,8 +6402,8 @@ from ReadyForPickup on Expire when PickupWindowOpen == false
     positionLabel(labels.get("requested-approved"), req.centerX, (req.centerY + apv.centerY) / 2);
     positionLabel(labels.get("approved-ready"), apv.centerX, (apv.centerY + rdy.centerY) / 2);
     positionLabel(labels.get("approved-cancelled"), (apv.right + can.left) / 2, apv.centerY);
-    positionLabel(labels.get("ready-pickedup"), (rdy.centerX + pku.centerX) / 2, splitY);
-    positionLabel(labels.get("ready-expired"), (rdy.centerX + exp.centerX) / 2, splitY);
+    positionLabel(labels.get("ready-pickedup"), pku.centerX, splitY);
+    positionLabel(labels.get("ready-expired"), exp.centerX, splitY);
   };
 
   var diagramNodes = Array.from(runtimeStage.querySelectorAll(".svs-state-node[data-state]"));
