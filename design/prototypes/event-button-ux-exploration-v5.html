@@ -1,0 +1,1723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Event Button UX Exploration v5 — Micro State Diagram — Precept</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;700&family=Geist:wght@400;500&display=swap">
+<style>
+/* ══════════════════════════════════════════════════════════════════════
+   CSS VARIABLES — Exact Semantic Visual System palette
+   Source: design/system/semantic-visual-system.html
+   ══════════════════════════════════════════════════════════════════════ */
+:root {
+  --bg:          #040506;
+  --panel:       #090b0e;
+  --panel-2:     #0d1014;
+  --panel-3:     #111518;
+  --line:        rgba(255,255,255,0.08);
+  --line-strong: rgba(255,255,255,0.16);
+  --text:        #d4dae3;
+  --muted:       #a7afbb;
+  --soft:        #687281;
+  --structure-d: #4338CA;
+  --structure:   #6366F1;
+  --state:       #A898F5;
+  --event:       #30B8E8;
+  --data:        #B0BEC5;
+  --data-t:      #9AA8B5;
+  --data-v:      #84929F;
+  --rule:        #FBBF24;
+  --valid:       #34D399;
+  --violated:    #F87171;
+  --warn:        #FDE047;
+  --mono:        "Geist Mono","Cascadia Code",Consolas,monospace;
+  --sans:        "Geist","Segoe UI Variable","Segoe UI",system-ui,sans-serif;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   RESET
+   ══════════════════════════════════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 14px; -webkit-text-size-adjust: 100%; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  line-height: 1.6;
+  padding: 48px 24px 120px;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   PAGE LAYOUT
+   ══════════════════════════════════════════════════════════════════════ */
+.page { max-width: 960px; margin: 0 auto; }
+
+.page-header {
+  padding-bottom: 32px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 52px;
+}
+.page-eyebrow {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--soft);
+  margin-bottom: 10px;
+}
+.page-title {
+  font-family: var(--mono);
+  font-size: 20px;
+  font-weight: 400;
+  color: var(--event);
+  margin-bottom: 12px;
+}
+.page-lead {
+  font-size: 13.5px;
+  color: var(--muted);
+  max-width: 720px;
+  line-height: 1.75;
+  font-family: var(--sans);
+}
+.page-lead strong { color: var(--text); font-weight: 500; }
+
+/* ── Design concept callout ──────────────────────────────────────────── */
+.concept-box {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 20px 24px;
+  margin-bottom: 52px;
+}
+.concept-box h3 {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--soft);
+  margin-bottom: 14px;
+}
+.concept-box p {
+  font-size: 12.5px;
+  color: var(--muted);
+  line-height: 1.65;
+  font-family: var(--sans);
+  max-width: 680px;
+}
+.concept-box p strong { color: var(--text); font-weight: 500; }
+.concept-box p + p { margin-top: 8px; }
+
+/* ── Section dividers ────────────────────────────────────────────────── */
+.divider { height: 1px; background: var(--line); margin: 56px 0; }
+
+/* ── Example section ─────────────────────────────────────────────────── */
+.example { margin-bottom: 72px; }
+.ex-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.ex-num {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+.ex-name {
+  font-family: var(--mono);
+  font-size: 18px;
+  font-weight: 400;
+  color: var(--text);
+}
+.ex-chip {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 2px;
+}
+.ex-chip--scenario {
+  background: rgba(48,184,232,0.08);
+  border: 1px solid rgba(48,184,232,0.28);
+  color: var(--event);
+}
+.ex-chip--scale {
+  background: rgba(253,224,71,0.08);
+  border: 1px solid rgba(253,224,71,0.20);
+  color: var(--warn);
+}
+.ex-chip--edge {
+  background: rgba(248,113,113,0.08);
+  border: 1px solid rgba(248,113,113,0.20);
+  color: var(--violated);
+}
+.ex-idea {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.75;
+  margin-bottom: 28px;
+  max-width: 700px;
+  font-family: var(--sans);
+}
+.ex-idea strong { color: var(--text); font-weight: 500; }
+
+.ex-annotation {
+  margin-top: 18px;
+  font-size: 12px;
+  color: var(--soft);
+  font-style: italic;
+  padding-left: 14px;
+  border-left: 2px solid rgba(255,255,255,0.05);
+  max-width: 620px;
+  line-height: 1.65;
+  font-family: var(--sans);
+}
+.ex-annotation strong { color: var(--muted); font-weight: 500; }
+
+
+/* ══════════════════════════════════════════════════════════════════════
+   FORM CARD — Exact SVS form elements
+   Source: design/system/semantic-visual-system.html §form
+   ══════════════════════════════════════════════════════════════════════ */
+.form-stage {
+  display: flex;
+  justify-content: center;
+  padding: 20px 0 4px;
+}
+.form-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  width: 100%;
+  max-width: 620px;
+  position: relative;
+}
+
+/* Card header */
+.card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--line);
+  gap: 16px;
+}
+.card-meta { min-width: 0; flex: 1; }
+.card-type {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--soft);
+  margin-bottom: 3px;
+}
+.card-ref {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--muted);
+  margin-bottom: 5px;
+}
+.card-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: 0.01em;
+  font-family: var(--sans);
+}
+
+/* Header state badge — SVS state-node adapted for inline badge */
+.head-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 13px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  line-height: 1.25;
+  flex-shrink: 0;
+  height: fit-content;
+  border-radius: 8px;
+  /* --current modifier */
+  background: #251c38;
+  border: 1px solid rgba(168,152,245,0.46);
+  box-shadow: inset 0 0 0 1px rgba(168,152,245,0.22), 0 0 0 1px rgba(99,102,241,0.24);
+  color: #ddd6ff;
+}
+.head-state--terminal {
+  position: relative;
+  background: #050608;
+  border: 1px solid rgba(168,152,245,0.32);
+  box-shadow: none;
+  color: var(--state);
+}
+.head-state--terminal::after {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border: 1px solid rgba(168,152,245,0.28);
+  border-radius: 4px;
+  pointer-events: none;
+}
+.head-state--initial .head-state-dot {
+  width: 8px;
+  height: 8px;
+  background: var(--structure);
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.16);
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+/* Card fields — exact SVS form-row */
+.card-fields {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--line);
+}
+.form-row {
+  display: grid;
+  grid-template-columns: 130px minmax(0,1fr);
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line);
+  font-family: var(--mono);
+  font-size: 13px;
+  align-items: baseline;
+}
+.form-row:last-child { border-bottom: none; }
+.form-lbl { color: var(--soft); font-size: 11px; letter-spacing: 0.10em; }
+.form-row--editable { align-items: center; }
+.form-row--editable .form-lbl { color: var(--data); }
+.form-row--constrained .form-lbl { font-style: italic; }
+.form-row--required .form-lbl { color: var(--warn); }
+.form-required-badge { font-size: 9px; font-family: var(--mono); letter-spacing: 0.10em; color: var(--warn); margin-left: 6px; opacity: 0.8; }
+.form-locked-val { color: var(--muted); }
+.form-input {
+  background: rgba(176,190,197,0.06);
+  border: 1px solid rgba(176,190,197,0.22);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 13px;
+  padding: 4px 8px;
+  width: 100%;
+  outline: none;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+.form-input:focus {
+  border-color: rgba(176,190,197,0.5);
+  background: rgba(176,190,197,0.10);
+}
+.form-input::placeholder { color: var(--soft); opacity: 0.6; }
+
+/* Form action buttons — exact SVS form-btn */
+.form-btn {
+  padding: 6px 14px;
+  border: 1px solid var(--line-strong);
+  background: none;
+  color: var(--soft);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: border-color 120ms ease, color 120ms ease, background 120ms ease;
+}
+.form-btn:hover { border-color: rgba(255,255,255,0.28); color: var(--text); }
+.form-btn--save {
+  border-color: rgba(176,190,197,0.35);
+  background: rgba(176,190,197,0.08);
+  color: var(--data);
+}
+.form-btn--save:hover { border-color: rgba(176,190,197,0.6); background: rgba(176,190,197,0.14); color: var(--text); }
+
+
+/* ══════════════════════════════════════════════════════════════════════
+   MICRO STATE DIAGRAM — The action area
+   Uses exact SVS state-node and edge-token visual properties
+   in a flex/grid layout for inline micro diagrams.
+   ══════════════════════════════════════════════════════════════════════ */
+
+.micro-diagram {
+  padding: 18px 20px 20px;
+}
+
+/* Top bar: form buttons on left */
+.micro-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+/* The diagram itself: current state → branching rows */
+.micro-graph {
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+}
+
+/* Left: current state node (shown once) */
+.micro-origin {
+  flex-shrink: 0;
+  z-index: 2;
+  align-self: center;
+}
+
+/* Right: stacked lane rows branching from origin */
+.micro-lanes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Each lane: [arrow → event-token → arrow → target-state → verdict] */
+.micro-lane {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+  transition: background 140ms ease;
+}
+.micro-lane:last-child { border-bottom: none; }
+
+.micro-lane-row {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  min-width: 0;
+}
+
+/* Verdict line — inline right of target state */
+.micro-verdict {
+  margin-left: 10px;
+  font-size: 10.5px;
+  line-height: 1.4;
+  font-family: var(--mono);
+  letter-spacing: 0.02em;
+  white-space: normal;
+  max-width: 22ch;
+}
+.micro-verdict--ready {
+  color: var(--valid);
+  opacity: 0.72;
+}
+.micro-verdict--blocked {
+  color: var(--violated);
+  opacity: 0.72;
+}
+.micro-verdict-icon {
+  font-size: 10px;
+  margin-right: 4px;
+}
+
+/* Arg indicator on event tokens */
+.micro-arg-hint {
+  font-size: 9px;
+  color: var(--data-t);
+  opacity: 0.7;
+  margin-left: 6px;
+  letter-spacing: 0.03em;
+}
+
+/* ── SVS State Node — inline micro-diagram adaptation ──────────────── */
+/* Preserves exact visual properties from SVS, adapted for flex flow */
+
+.svs-state-node {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 36px;
+  padding: 8px 12px;
+  border: 1px solid rgba(168,152,245,0.32);
+  background: #050608;
+  color: var(--state);
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  border-radius: 8px;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02);
+  transition: border-color 140ms ease, background-color 140ms ease, box-shadow 140ms ease;
+  position: relative;
+  flex-shrink: 0;
+}
+
+/* Current — brighter bg, stronger border */
+.svs-state-node--current {
+  background: #251c38;
+  border-color: rgba(168,152,245,0.46);
+  box-shadow: inset 0 0 0 1px rgba(168,152,245,0.22), 0 0 0 1px rgba(99,102,241,0.24);
+  color: #ddd6ff;
+}
+
+/* Terminal — inner double-border via ::after */
+.svs-state-node--terminal {
+  position: relative;
+}
+.svs-state-node--terminal::after {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border: 1px solid rgba(168,152,245,0.28);
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+/* Terminal + blocked — dimmed, uses violated tint */
+.svs-state-node--terminal-blocked {
+  position: relative;
+  border-color: rgba(168,152,245,0.18);
+  background: #050608;
+  color: rgba(168,152,245,0.52);
+  opacity: 0.65;
+}
+.svs-state-node--terminal-blocked::after {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border: 1px solid rgba(168,152,245,0.15);
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+/* Initial — small filled dot before name */
+.svs-state-node--initial .svs-state-node-dot {
+  width: 8px;
+  height: 8px;
+  margin-right: 4px;
+  background: var(--structure);
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.16);
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+/* Unreachable — dashed border, dimmed color */
+.svs-state-node--unreachable-current {
+  color: rgba(168,152,245,0.52);
+  border-style: dashed;
+  border-color: rgba(168,152,245,0.32);
+  background: #050608;
+}
+
+/* Self-transition indicator */
+.svs-state-node--self {
+  background: #251c38;
+  border-color: rgba(168,152,245,0.46);
+  box-shadow: inset 0 0 0 1px rgba(168,152,245,0.22), 0 0 0 1px rgba(99,102,241,0.24);
+  color: #ddd6ff;
+}
+.svs-state-node--self em {
+  font-style: italic;
+  font-size: 10px;
+  opacity: 0.6;
+  margin-left: 3px;
+}
+
+/* ── SVS Edge Token — inline micro-diagram adaptation ────────────────── */
+/* Preserves exact visual properties from SVS edge tokens */
+
+.svs-edge-token {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 5px 10px;
+  border: 1px solid rgba(48,184,232,0.36);
+  background: #050608;
+  color: var(--event);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  transition: border-color 140ms ease, box-shadow 140ms ease, background 140ms ease;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* Active — glow + stronger border */
+.svs-edge-token--active {
+  border-color: rgba(48,184,232,0.48);
+  box-shadow: 0 0 0 1px rgba(48,184,232,0.14);
+  filter: drop-shadow(0 0 8px rgba(48,184,232,0.10));
+}
+.svs-edge-token--active:hover {
+  border-color: rgba(48,184,232,0.68);
+  background: rgba(48,184,232,0.06);
+  box-shadow: 0 0 0 1px rgba(48,184,232,0.22);
+}
+
+/* Blocked — dashed border */
+.svs-edge-token--blocked {
+  border-style: dashed;
+  color: var(--soft);
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ── Connector arrows ────────────────────────────────────────────────── */
+.micro-arrow {
+  display: flex;
+  align-items: center;
+  position: relative;
+  width: 26px;
+  height: 28px;
+  flex-shrink: 0;
+}
+.micro-arrow::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 2px;
+  right: 2px;
+  height: 1px;
+}
+.micro-arrow::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 2px;
+  width: 4px;
+  height: 4px;
+  border-top: 1px solid;
+  border-right: 1px solid;
+  transform: translateY(-50%) rotate(45deg);
+}
+.micro-arrow--active::before { background: rgba(48,184,232,0.40); }
+.micro-arrow--active::after { border-color: rgba(48,184,232,0.50); }
+.micro-arrow--blocked::before { background: rgba(255,255,255,0.08); }
+.micro-arrow--blocked::after { border-color: rgba(255,255,255,0.12); }
+.micro-arrow--self::before { background: rgba(168,152,245,0.30); }
+.micro-arrow--self::after { border-color: rgba(168,152,245,0.40); }
+
+/* Stem from origin to branching lanes */
+.micro-stem {
+  display: flex;
+  align-items: center;
+  position: relative;
+  width: 20px;
+  flex-shrink: 0;
+}
+.micro-stem::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: rgba(168,152,245,0.22);
+}
+
+/* ── Hover enhancements (non-gating) ─────────────────────────────────── */
+.micro-lane--active:hover {
+  background: rgba(48,184,232,0.02);
+}
+.micro-lane--active:hover .micro-arrow--active::before { background: rgba(48,184,232,0.60); }
+.micro-lane--active:hover .micro-arrow--active::after { border-color: rgba(48,184,232,0.70); }
+.micro-lane--active:hover .svs-state-node--terminal {
+  border-color: rgba(168,152,245,0.50);
+  background: rgba(168,152,245,0.08);
+}
+.micro-lane--active:hover .svs-state-node--terminal::after {
+  border-color: rgba(168,152,245,0.38);
+}
+.micro-lane--active:hover .micro-verdict--ready { opacity: 1; }
+
+.micro-lane--blocked:hover {
+  background: rgba(248,113,113,0.02);
+}
+.micro-lane--blocked:hover .svs-edge-token--blocked {
+  opacity: 0.8;
+  border-color: rgba(248,113,113,0.30);
+  color: var(--violated);
+}
+.micro-lane--blocked:hover .micro-arrow--blocked::before { background: rgba(248,113,113,0.18); }
+.micro-lane--blocked:hover .micro-arrow--blocked::after { border-color: rgba(248,113,113,0.22); }
+.micro-lane--blocked:hover .svs-state-node--terminal-blocked {
+  opacity: 0.80;
+  border-color: rgba(168,152,245,0.28);
+}
+.micro-lane--blocked:hover .micro-verdict--blocked { opacity: 1; }
+
+/* Self-transition hover */
+.micro-lane--self:hover {
+  background: rgba(168,152,245,0.02);
+}
+.micro-lane--self:hover .micro-arrow--self::before { background: rgba(168,152,245,0.50); }
+.micro-lane--self:hover .micro-arrow--self::after { border-color: rgba(168,152,245,0.60); }
+
+/* ── Terminal state — empty diagram ──────────────────────────────────── */
+.micro-empty {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 0 8px;
+}
+.micro-empty-text {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--soft);
+  letter-spacing: 0.04em;
+  opacity: 0.7;
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════
+   SCALABILITY NOTES SECTION
+   ══════════════════════════════════════════════════════════════════════ */
+.notes-section {
+  background: var(--panel-2);
+  border: 1px solid rgba(168,152,245,0.20);
+  border-radius: 5px;
+  padding: 28px 28px 24px;
+  margin-top: 56px;
+}
+.notes-section h3 {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--state);
+  margin-bottom: 14px;
+}
+.notes-section p {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.75;
+  margin-bottom: 10px;
+  font-family: var(--sans);
+}
+.notes-section p strong { color: var(--text); font-weight: 500; }
+.notes-section p:last-child { margin-bottom: 0; }
+.notes-section ul {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 14px;
+}
+.notes-section li {
+  font-size: 12.5px;
+  color: var(--muted);
+  line-height: 1.55;
+  padding: 4px 0;
+  display: flex;
+  gap: 8px;
+  font-family: var(--sans);
+}
+.notes-section li::before {
+  content: "—";
+  color: var(--soft);
+  flex-shrink: 0;
+}
+.notes-section li strong { color: var(--text); font-weight: 500; }
+
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       PAGE HEADER
+       ═══════════════════════════════════════════════════════════════════ -->
+  <header class="page-header">
+    <div class="page-eyebrow">Design Prototypes · Event Button UX · v5 · 2026-04-12</div>
+    <h1 class="page-title">Micro State Diagram</h1>
+    <p class="page-lead">
+      The action area of each form card IS a miniature inline state diagram.
+      <strong>Current state</strong> on the left, <strong>events as edge tokens</strong> flowing
+      right to their <strong>target states</strong> — all visible at rest. Every event shows its
+      verdict: why it's available or why it's blocked. No hover required for any critical information.
+      Uses the <strong>exact Semantic Visual System</strong> CSS for state nodes, edge tokens, and form elements.
+    </p>
+  </header>
+
+  <!-- ── Design Concept ──────────────────────────────────────────────── -->
+  <div class="concept-box">
+    <h3>Micro State Diagram Concept</h3>
+    <p>
+      Evolved from <strong>K4 (Action Lane with Verdict)</strong>. Shane's direction:
+      "I want it to be a micro state diagram — starting from the current state and only showing
+      the immediate events and next states." The action area reads as a self-contained diagram:
+      <strong>[Current] → event → [Target]</strong>, with verdict lines explaining every decision.
+    </p>
+    <p>
+      State nodes use exact SVS modifiers: <strong>--current</strong> (bright violet fill),
+      <strong>--terminal</strong> (inner double-border via <code>::after</code>),
+      <strong>--initial</strong> (filled dot prefix),
+      <strong>--unreachable-current</strong> (dashed border, dimmed).
+      Edge tokens use exact SVS styling: <strong>--active</strong> (glow + strong border),
+      <strong>--blocked</strong> (dashed border).
+    </p>
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       EXAMPLE 1 — ReadyForPickup (2 events: 1 active, 1 blocked)
+       ═══════════════════════════════════════════════════════════════════ -->
+  <div class="example">
+    <div class="ex-head">
+      <span class="ex-num">Example 1</span>
+      <span class="ex-name">ReadyForPickup</span>
+      <span class="ex-chip ex-chip--scenario">2 events · 1 active · 1 blocked</span>
+    </div>
+    <p class="ex-idea">
+      The canonical scenario: <strong>PickUp</strong> is active because the guard passes
+      (<code>PickupWindowOpen</code> is true), and <strong>Expire</strong> is blocked because
+      the guard fails (<code>PickupWindowOpen == false</code> is not satisfied). Both events
+      always show their target state and verdict — blocked reason visible at rest.
+    </p>
+
+    <div class="form-stage">
+      <div class="form-card">
+
+        <!-- Header -->
+        <div class="card-head">
+          <div class="card-meta">
+            <div class="card-type">Visitor Badge Pickup</div>
+            <div class="card-ref">#VBP-2847</div>
+            <div class="card-name">Ada Reyes</div>
+          </div>
+          <span class="head-state">ReadyForPickup</span>
+        </div>
+
+        <!-- Fields -->
+        <div class="card-fields">
+          <div class="form-row">
+            <span class="form-lbl">VisitorName</span>
+            <span class="form-locked-val">"Ada Reyes"</span>
+          </div>
+          <div class="form-row form-row--constrained">
+            <span class="form-lbl">HostConfirmed</span>
+            <span class="form-locked-val" style="color:var(--valid);">true</span>
+          </div>
+          <div class="form-row">
+            <span class="form-lbl">BadgePrinted</span>
+            <span class="form-locked-val" style="color:var(--valid);">true</span>
+          </div>
+          <div class="form-row">
+            <span class="form-lbl">PickupWindowOpen</span>
+            <span class="form-locked-val" style="color:var(--valid);">true</span>
+          </div>
+          <div class="form-row form-row--editable">
+            <span class="form-lbl">OutcomeNote</span>
+            <input class="form-input" type="text" placeholder="(nullable)">
+          </div>
+        </div>
+
+        <!-- Micro State Diagram -->
+        <div class="micro-diagram">
+          <div class="micro-top">
+            <button class="form-btn form-btn--save">Save</button>
+            <button class="form-btn">Cancel</button>
+          </div>
+          <div class="micro-graph">
+            <!-- Origin: current state -->
+            <div class="micro-origin">
+              <span class="svs-state-node svs-state-node--current">ReadyForPickup</span>
+            </div>
+            <!-- Branching lanes -->
+            <div class="micro-lanes">
+              <!-- Lane 1: PickUp → PickedUp (active, terminal target) -->
+              <div class="micro-lane micro-lane--active">
+                <div class="micro-lane-row">
+                  <span class="micro-arrow micro-arrow--active"></span>
+                  <span class="svs-edge-token svs-edge-token--active">PickUp</span>
+                  <span class="micro-arrow micro-arrow--active"></span>
+                  <span class="svs-state-node svs-state-node--terminal">PickedUp</span>
+                </div>
+                <div class="micro-verdict micro-verdict--ready">
+                  <span class="micro-verdict-icon">✓</span> guard passes — PickupWindowOpen is true
+                </div>
+              </div>
+              <!-- Lane 2: Expire → Expired (blocked, terminal target) -->
+              <div class="micro-lane micro-lane--blocked">
+                <div class="micro-lane-row">
+                  <span class="micro-arrow micro-arrow--blocked"></span>
+                  <span class="svs-edge-token svs-edge-token--blocked">Expire</span>
+                  <span class="micro-arrow micro-arrow--blocked"></span>
+                  <span class="svs-state-node svs-state-node--terminal-blocked">Expired</span>
+                </div>
+                <div class="micro-verdict micro-verdict--blocked">
+                  <span class="micro-verdict-icon">⊘</span> guard fails — PickupWindowOpen must be false
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <p class="ex-annotation">
+      <strong>Canonical 2-event scenario.</strong> The micro diagram is self-documenting:
+      current state diverges into two possible paths, each with a verdict.
+      Active lane uses full-brightness SVS edge tokens; blocked lane uses dashed tokens
+      and dimmed target state.
+    </p>
+  </div>
+
+  <div class="divider"></div>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       EXAMPLE 2 — Requested (1 event: active with args)
+       ═══════════════════════════════════════════════════════════════════ -->
+  <div class="example">
+    <div class="ex-head">
+      <span class="ex-num">Example 2</span>
+      <span class="ex-name">Requested</span>
+      <span class="ex-chip ex-chip--scenario">1 event · active with args</span>
+    </div>
+    <p class="ex-idea">
+      Single outgoing event: <strong>ApproveRequest</strong>, which requires a
+      <code>Name</code> argument. The micro diagram collapses to a single lane.
+      The arg indicator hints that invoking this event requires input.
+      The initial state modifier (filled dot) appears on the current-state node because
+      Requested is the <code>initial</code> state.
+    </p>
+
+    <div class="form-stage">
+      <div class="form-card">
+
+        <!-- Header -->
+        <div class="card-head">
+          <div class="card-meta">
+            <div class="card-type">Visitor Badge Pickup</div>
+            <div class="card-ref">#VBP-2849</div>
+            <div class="card-name">New Request</div>
+          </div>
+          <span class="head-state head-state--initial"><span class="head-state-dot"></span>Requested</span>
+        </div>
+
+        <!-- Fields -->
+        <div class="card-fields">
+          <div class="form-row">
+            <span class="form-lbl">VisitorName</span>
+            <span class="form-locked-val" style="color:var(--soft);">(null)</span>
+          </div>
+          <div class="form-row form-row--constrained">
+            <span class="form-lbl">HostConfirmed</span>
+            <span class="form-locked-val">false</span>
+          </div>
+          <div class="form-row">
+            <span class="form-lbl">BadgePrinted</span>
+            <span class="form-locked-val">false</span>
+          </div>
+          <div class="form-row">
+            <span class="form-lbl">PickupWindowOpen</span>
+            <span class="form-locked-val" style="color:var(--valid);">true</span>
+          </div>
+          <div class="form-row">
+            <span class="form-lbl">OutcomeNote</span>
+            <span class="form-locked-val" style="color:var(--soft);">(null)</span>
+          </div>
+        </div>
+
+        <!-- Micro State Diagram -->
+        <div class="micro-diagram">
+          <div class="micro-top">
+            <button class="form-btn form-btn--save">Save</button>
+            <button class="form-btn">Cancel</button>
+          </div>
+          <div class="micro-graph">
+            <div class="micro-origin">
+              <span class="svs-state-node svs-state-node--current svs-state-node--initial">
+                <span class="svs-state-node-dot" aria-hidden="true"></span>Requested
+              </span>
+            </div>
+            <div class="micro-lanes">
+              <!-- Lane: ApproveRequest (active, has args) → Approved -->
+              <div class="micro-lane micro-lane--active">
+                <div class="micro-lane-row">
+                  <span class="micro-arrow micro-arrow--active"></span>
+                  <span class="svs-edge-token svs-edge-token--active">ApproveRequest<span class="micro-arg-hint">(Name)</span></span>
+                  <span class="micro-arrow micro-arrow--active"></span>
+                  <span class="svs-state-node">Approved</span>
+                </div>
+                <div class="micro-verdict micro-verdict--ready">
+                  <span class="micro-verdict-icon">✓</span> available — requires Name argument
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <p class="ex-annotation">
+      <strong>Single-event with args.</strong> The arg hint <code>(Name)</code> inside the edge
+      token signals that firing this event requires input. With only one lane, the diagram is
+      extremely compact. The initial-state dot on the current node tells the user "this is where
+      the lifecycle begins."
+    </p>
+  </div>
+
+  <div class="divider"></div>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       EXAMPLE 3 — Approved (2 events: both active, one with args)
+       ═══════════════════════════════════════════════════════════════════ -->
+  <div class="example">
+    <div class="ex-head">
+      <span class="ex-num">Example 3</span>
+      <span class="ex-name">Approved</span>
+      <span class="ex-chip ex-chip--scenario">2 events · both active</span>
+    </div>
+    <p class="ex-idea">
+      Both events are available: <strong>PrintBadge</strong> (no args, no guard) and
+      <strong>Cancel</strong> (requires a <code>Reason</code> argument). Cancel leads to
+      a terminal state (Cancelled), PrintBadge leads to a non-terminal state (ReadyForPickup).
+      The micro diagram shows two active lanes — the user gets a clear choice.
+    </p>
+
+    <div class="form-stage">
+      <div class="form-card">
+
+        <!-- Header -->
+        <div class="card-head">
+          <div class="card-meta">
+            <div class="card-type">Visitor Badge Pickup</div>
+            <div class="card-ref">#VBP-2847</div>
+            <div class="card-name">Ada Reyes</div>
+          </div>
+          <span class="head-state">Approved</span>
+        </div>
+
+        <!-- Fields -->
+        <div class="card-fields">
+          <div class="form-row">
+            <span class="form-lbl">VisitorName</span>
+            <span class="form-locked-val">"Ada Reyes"</span>
+          </div>
+          <div class="form-row form-row--constrained">
+            <span class="form-lbl">HostConfirmed</span>
+            <span class="form-locked-val" style="color:var(--valid);">true</span>
+          </div>
+          <div class="form-row">
+            <span class="form-lbl">BadgePrinted</span>
+            <span class="form-locked-val">false</span>
+          </div>
+          <div class="form-row">
+            <span class="form-lbl">PickupWindowOpen</span>
+            <span class="form-locked-val" style="color:var(--valid);">true</span>
+          </div>
+          <div class="form-row">
+            <span class="form-lbl">OutcomeNote</span>
+            <span class="form-locked-val" style="color:var(--soft);">(null)</span>
+          </div>
+        </div>
+
+        <!-- Micro State Diagram -->
+        <div class="micro-diagram">
+          <div class="micro-top">
+            <button class="form-btn form-btn--save">Save</button>
+            <button class="form-btn">Cancel</button>
+          </div>
+          <div class="micro-graph">
+            <div class="micro-origin">
+              <span class="svs-state-node svs-state-node--current">Approved</span>
+            </div>
+            <div class="micro-lanes">
+              <!-- Lane 1: PrintBadge → ReadyForPickup (active, no guard) -->
+              <div class="micro-lane micro-lane--active">
+                <div class="micro-lane-row">
+                  <span class="micro-arrow micro-arrow--active"></span>
+                  <span class="svs-edge-token svs-edge-token--active">PrintBadge</span>
+                  <span class="micro-arrow micro-arrow--active"></span>
+                  <span class="svs-state-node">ReadyForPickup</span>
+                </div>
+                <div class="micro-verdict micro-verdict--ready">
+                  <span class="micro-verdict-icon">✓</span> available — no guard conditions
+                </div>
+              </div>
+              <!-- Lane 2: Cancel → Cancelled (active, with args, terminal target) -->
+              <div class="micro-lane micro-lane--active">
+                <div class="micro-lane-row">
+                  <span class="micro-arrow micro-arrow--active"></span>
+                  <span class="svs-edge-token svs-edge-token--active">Cancel<span class="micro-arg-hint">(Reason)</span></span>
+                  <span class="micro-arrow micro-arrow--active"></span>
+                  <span class="svs-state-node svs-state-node--terminal">Cancelled</span>
+                </div>
+                <div class="micro-verdict micro-verdict--ready">
+                  <span class="micro-verdict-icon">✓</span> available — requires Reason argument
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <p class="ex-annotation">
+      <strong>Two active events, different profiles.</strong> PrintBadge is a simple fire-and-forget;
+      Cancel requires an argument and leads to a terminal state (inner double-border). The user
+      sees both paths are open and understands the consequences before acting.
+    </p>
+  </div>
+
+  <div class="divider"></div>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       EXAMPLE 4 — Scalability Test (5 events from one state)
+       Invented scenario: IT Helpdesk Ticket at InProgress
+       ═══════════════════════════════════════════════════════════════════ -->
+  <div class="example">
+    <div class="ex-head">
+      <span class="ex-num">Example 4</span>
+      <span class="ex-name">InProgress — Scalability Test</span>
+      <span class="ex-chip ex-chip--scale">5 events · mixed status</span>
+    </div>
+    <p class="ex-idea">
+      A plausible helpdesk ticket with <strong>5 outgoing events</strong> from a single state:
+      <strong>Resolve</strong> (active),
+      <strong>Escalate</strong> (active, with args),
+      <strong>RequestInfo</strong> (active, loops to self),
+      <strong>AutoClose</strong> (blocked — ticket must be idle for 7 days),
+      <strong>Cancel</strong> (blocked — only assignee can cancel).
+      Tests how far the micro diagram scales before the vertical list becomes unwieldy.
+    </p>
+
+    <div class="form-stage">
+      <div class="form-card">
+
+        <!-- Header -->
+        <div class="card-head">
+          <div class="card-meta">
+            <div class="card-type">IT Helpdesk Ticket</div>
+            <div class="card-ref">#HD-10042</div>
+            <div class="card-name">VPN access not working after OS update</div>
+          </div>
+          <span class="head-state">InProgress</span>
+        </div>
+
+        <!-- Fields -->
+        <div class="card-fields">
+          <div class="form-row">
+            <span class="form-lbl">Reporter</span>
+            <span class="form-locked-val">"J. Martinez"</span>
+          </div>
+          <div class="form-row">
+            <span class="form-lbl">Assignee</span>
+            <span class="form-locked-val">"K. Nguyen"</span>
+          </div>
+          <div class="form-row form-row--constrained">
+            <span class="form-lbl">Priority</span>
+            <span class="form-locked-val">"High"</span>
+          </div>
+          <div class="form-row">
+            <span class="form-lbl">IdleDays</span>
+            <span class="form-locked-val">2</span>
+          </div>
+          <div class="form-row">
+            <span class="form-lbl">IsAssignee</span>
+            <span class="form-locked-val">false</span>
+          </div>
+          <div class="form-row form-row--editable form-row--required">
+            <span class="form-lbl">Resolution<span class="form-required-badge">REQUIRED</span></span>
+            <input class="form-input" type="text" placeholder="Enter resolution…">
+          </div>
+        </div>
+
+        <!-- Micro State Diagram — 5 events -->
+        <div class="micro-diagram">
+          <div class="micro-top">
+            <button class="form-btn form-btn--save">Save</button>
+            <button class="form-btn">Cancel</button>
+          </div>
+          <div class="micro-graph">
+            <div class="micro-origin">
+              <span class="svs-state-node svs-state-node--current">InProgress</span>
+            </div>
+            <div class="micro-lanes">
+              <!-- Lane 1: Resolve → Resolved (active, terminal) -->
+              <div class="micro-lane micro-lane--active">
+                <div class="micro-lane-row">
+                  <span class="micro-arrow micro-arrow--active"></span>
+                  <span class="svs-edge-token svs-edge-token--active">Resolve</span>
+                  <span class="micro-arrow micro-arrow--active"></span>
+                  <span class="svs-state-node svs-state-node--terminal">Resolved</span>
+                </div>
+                <div class="micro-verdict micro-verdict--ready">
+                  <span class="micro-verdict-icon">✓</span> available — closes the ticket
+                </div>
+              </div>
+              <!-- Lane 2: Escalate → Escalated (active, with args) -->
+              <div class="micro-lane micro-lane--active">
+                <div class="micro-lane-row">
+                  <span class="micro-arrow micro-arrow--active"></span>
+                  <span class="svs-edge-token svs-edge-token--active">Escalate<span class="micro-arg-hint">(Team)</span></span>
+                  <span class="micro-arrow micro-arrow--active"></span>
+                  <span class="svs-state-node">Escalated</span>
+                </div>
+                <div class="micro-verdict micro-verdict--ready">
+                  <span class="micro-verdict-icon">✓</span> available — requires Team argument
+                </div>
+              </div>
+              <!-- Lane 3: RequestInfo → InProgress (active, self-transition) -->
+              <div class="micro-lane micro-lane--active micro-lane--self">
+                <div class="micro-lane-row">
+                  <span class="micro-arrow micro-arrow--active"></span>
+                  <span class="svs-edge-token svs-edge-token--active">RequestInfo</span>
+                  <span class="micro-arrow micro-arrow--self"></span>
+                  <span class="svs-state-node svs-state-node--self">InProgress<em>&thinsp;↺</em></span>
+                </div>
+                <div class="micro-verdict micro-verdict--ready">
+                  <span class="micro-verdict-icon">✓</span> available — stays in current state (self-transition)
+                </div>
+              </div>
+              <!-- Lane 4: AutoClose → Closed (blocked — idle < 7 days) -->
+              <div class="micro-lane micro-lane--blocked">
+                <div class="micro-lane-row">
+                  <span class="micro-arrow micro-arrow--blocked"></span>
+                  <span class="svs-edge-token svs-edge-token--blocked">AutoClose</span>
+                  <span class="micro-arrow micro-arrow--blocked"></span>
+                  <span class="svs-state-node svs-state-node--terminal-blocked">Closed</span>
+                </div>
+                <div class="micro-verdict micro-verdict--blocked">
+                  <span class="micro-verdict-icon">⊘</span> guard fails — IdleDays must be ≥ 7 (currently 2)
+                </div>
+              </div>
+              <!-- Lane 5: Cancel → Cancelled (blocked — not assignee) -->
+              <div class="micro-lane micro-lane--blocked">
+                <div class="micro-lane-row">
+                  <span class="micro-arrow micro-arrow--blocked"></span>
+                  <span class="svs-edge-token svs-edge-token--blocked">Cancel</span>
+                  <span class="micro-arrow micro-arrow--blocked"></span>
+                  <span class="svs-state-node svs-state-node--terminal-blocked">Cancelled</span>
+                </div>
+                <div class="micro-verdict micro-verdict--blocked">
+                  <span class="micro-verdict-icon">⊘</span> guard fails — only the assignee can cancel
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <p class="ex-annotation">
+      <strong>Scalability test: 5 events.</strong> Three active (one with args, one self-transition)
+      and two blocked. The vertical stack remains scannable at 5 lanes. Active events sort to top,
+      blocked to bottom — the user's eye is drawn to available actions first, with blocked reasons
+      below as reference. This is around the practical limit; 6+ events would benefit from grouping
+      or a secondary scroll boundary.
+    </p>
+  </div>
+
+  <div class="divider"></div>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       EXAMPLE 5 — Terminal State (0 events)
+       ═══════════════════════════════════════════════════════════════════ -->
+  <div class="example">
+    <div class="ex-head">
+      <span class="ex-num">Example 5</span>
+      <span class="ex-name">PickedUp — Terminal State</span>
+      <span class="ex-chip ex-chip--edge">0 events · terminal</span>
+    </div>
+    <p class="ex-idea">
+      <strong>PickedUp</strong> is a terminal state — no outgoing transitions.
+      The micro diagram must gracefully handle an empty action area: show the terminal
+      state with its double-border modifier and a quiet "no transitions available" indication.
+      The lifecycle has reached its end.
+    </p>
+
+    <div class="form-stage">
+      <div class="form-card">
+
+        <!-- Header -->
+        <div class="card-head">
+          <div class="card-meta">
+            <div class="card-type">Visitor Badge Pickup</div>
+            <div class="card-ref">#VBP-2847</div>
+            <div class="card-name">Ada Reyes</div>
+          </div>
+          <span class="head-state head-state--terminal">PickedUp</span>
+        </div>
+
+        <!-- Fields -->
+        <div class="card-fields">
+          <div class="form-row">
+            <span class="form-lbl">VisitorName</span>
+            <span class="form-locked-val">"Ada Reyes"</span>
+          </div>
+          <div class="form-row form-row--constrained">
+            <span class="form-lbl">HostConfirmed</span>
+            <span class="form-locked-val" style="color:var(--valid);">true</span>
+          </div>
+          <div class="form-row">
+            <span class="form-lbl">BadgePrinted</span>
+            <span class="form-locked-val" style="color:var(--valid);">true</span>
+          </div>
+          <div class="form-row">
+            <span class="form-lbl">PickupWindowOpen</span>
+            <span class="form-locked-val" style="color:var(--valid);">true</span>
+          </div>
+          <div class="form-row">
+            <span class="form-lbl">OutcomeNote</span>
+            <span class="form-locked-val">"Badge collected"</span>
+          </div>
+        </div>
+
+        <!-- Micro State Diagram — empty (terminal) -->
+        <div class="micro-diagram">
+          <div class="micro-top">
+            <button class="form-btn form-btn--save" style="opacity:0.4; cursor:default;">Save</button>
+            <button class="form-btn" style="opacity:0.4; cursor:default;">Cancel</button>
+          </div>
+          <div class="micro-empty">
+            <span class="svs-state-node svs-state-node--terminal">PickedUp</span>
+            <span class="micro-empty-text">No transitions available — lifecycle complete</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <p class="ex-annotation">
+      <strong>Zero-event terminal state.</strong> The inner double-border on the state node
+      communicates "this is a final state" in the SVS visual language. The quiet text label
+      confirms there's nothing left to do — no empty-state confusion, no orphaned action bar.
+    </p>
+  </div>
+
+  <div class="divider"></div>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       EXAMPLE 6 — Self-Transition
+       ═══════════════════════════════════════════════════════════════════ -->
+  <div class="example">
+    <div class="ex-head">
+      <span class="ex-num">Example 6</span>
+      <span class="ex-name">WaitingForCustomer — Self-Transition</span>
+      <span class="ex-chip ex-chip--edge">3 events · includes self-loop</span>
+    </div>
+    <p class="ex-idea">
+      An IT helpdesk ticket state where <strong>SendReminder</strong> loops back to the
+      same state (self-transition). The micro diagram marks this with a <strong>↺</strong>
+      glyph and the same <code>--current</code> modifier on the target, since the target
+      IS the current state. Also shows <strong>ReceiveResponse</strong> (active → InProgress)
+      and <strong>AutoClose</strong> (blocked — must be idle for 14 days).
+    </p>
+
+    <div class="form-stage">
+      <div class="form-card">
+
+        <!-- Header -->
+        <div class="card-head">
+          <div class="card-meta">
+            <div class="card-type">IT Helpdesk Ticket</div>
+            <div class="card-ref">#HD-10055</div>
+            <div class="card-name">Password reset for shared mailbox</div>
+          </div>
+          <span class="head-state">WaitingForCustomer</span>
+        </div>
+
+        <!-- Fields -->
+        <div class="card-fields">
+          <div class="form-row">
+            <span class="form-lbl">Reporter</span>
+            <span class="form-locked-val">"P. Chen"</span>
+          </div>
+          <div class="form-row">
+            <span class="form-lbl">Assignee</span>
+            <span class="form-locked-val">"K. Nguyen"</span>
+          </div>
+          <div class="form-row">
+            <span class="form-lbl">RemindersSent</span>
+            <span class="form-locked-val">2</span>
+          </div>
+          <div class="form-row">
+            <span class="form-lbl">IdleDays</span>
+            <span class="form-locked-val">5</span>
+          </div>
+        </div>
+
+        <!-- Micro State Diagram — self-transition -->
+        <div class="micro-diagram">
+          <div class="micro-top">
+            <button class="form-btn form-btn--save">Save</button>
+            <button class="form-btn">Cancel</button>
+          </div>
+          <div class="micro-graph">
+            <div class="micro-origin">
+              <span class="svs-state-node svs-state-node--current">WaitingForCustomer</span>
+            </div>
+            <div class="micro-lanes">
+              <!-- Lane 1: SendReminder → WaitingForCustomer (self-transition) -->
+              <div class="micro-lane micro-lane--active micro-lane--self">
+                <div class="micro-lane-row">
+                  <span class="micro-arrow micro-arrow--active"></span>
+                  <span class="svs-edge-token svs-edge-token--active">SendReminder</span>
+                  <span class="micro-arrow micro-arrow--self"></span>
+                  <span class="svs-state-node svs-state-node--self">WaitingForCustomer<em>&thinsp;↺</em></span>
+                </div>
+                <div class="micro-verdict micro-verdict--ready">
+                  <span class="micro-verdict-icon">✓</span> available — sends reminder, stays in current state
+                </div>
+              </div>
+              <!-- Lane 2: ReceiveResponse → InProgress (active) -->
+              <div class="micro-lane micro-lane--active">
+                <div class="micro-lane-row">
+                  <span class="micro-arrow micro-arrow--active"></span>
+                  <span class="svs-edge-token svs-edge-token--active">ReceiveResponse</span>
+                  <span class="micro-arrow micro-arrow--active"></span>
+                  <span class="svs-state-node">InProgress</span>
+                </div>
+                <div class="micro-verdict micro-verdict--ready">
+                  <span class="micro-verdict-icon">✓</span> available — returns ticket to active work
+                </div>
+              </div>
+              <!-- Lane 3: AutoClose → Closed (blocked — idle < 14) -->
+              <div class="micro-lane micro-lane--blocked">
+                <div class="micro-lane-row">
+                  <span class="micro-arrow micro-arrow--blocked"></span>
+                  <span class="svs-edge-token svs-edge-token--blocked">AutoClose</span>
+                  <span class="micro-arrow micro-arrow--blocked"></span>
+                  <span class="svs-state-node svs-state-node--terminal-blocked">Closed</span>
+                </div>
+                <div class="micro-verdict micro-verdict--blocked">
+                  <span class="micro-verdict-icon">⊘</span> guard fails — IdleDays must be ≥ 14 (currently 5)
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <p class="ex-annotation">
+      <strong>Self-transition edge case.</strong> The ↺ glyph and current-state modifier on the
+      target immediately communicate "this loops back." The verdict confirms the intent:
+      "stays in current state." The visual duplicate (origin = target) is the correct representation —
+      it's honest about what the state machine does.
+    </p>
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       EXAMPLE 7 — Convergent Transitions (2 events → same target state)
+       ═══════════════════════════════════════════════════════════════════ -->
+  <div class="divider"></div>
+
+  <div class="example">
+    <div class="ex-header">
+      <span class="ex-num">Example 7</span>
+      <span class="ex-name">Approved — Convergent Transitions</span>
+      <span class="ex-chip ex-chip--edge">2 events → same state</span>
+    </div>
+    <p class="ex-desc">
+      Two events from the same origin both lead to <strong>Cancelled</strong>.
+      This tests how the micro diagram handles convergent transitions — multiple
+      paths that share a destination.
+    </p>
+
+    <div class="form-stage">
+      <div class="form-card">
+
+        <!-- Header -->
+        <div class="form-card-header">
+          <div>
+            <div class="form-card-type">Visitor Badge Pickup</div>
+            <div style="font-family:var(--mono);font-size:11px;color:var(--soft);margin-top:2px">#VBP-3102 · Ada Reyes</div>
+          </div>
+          <span class="svs-state-node svs-state-node--current" style="min-height:30px;padding:5px 10px;font-size:11px">Approved</span>
+        </div>
+
+        <!-- Fields -->
+        <div class="form-fields">
+          <div class="form-row"><span class="form-lbl">VisitorName</span><span class="form-val">"Ada Reyes"</span></div>
+          <div class="form-row form-row--constrained"><span class="form-lbl">HostConfirmed</span><span class="form-val form-val--bool">true</span></div>
+          <div class="form-row"><span class="form-lbl">BadgePrinted</span><span class="form-val form-val--bool">false</span></div>
+          <div class="form-row"><span class="form-lbl">PickupWindowOpen</span><span class="form-val form-val--bool">true</span></div>
+          <div class="form-row"><span class="form-lbl">OutcomeNote</span><span class="form-val" style="color:var(--soft);opacity:0.5">null</span></div>
+        </div>
+
+        <!-- Micro State Diagram -->
+        <div class="micro-diagram">
+          <div class="micro-top">
+            <button class="form-btn form-btn--save">Save</button>
+            <button class="form-btn">Cancel</button>
+          </div>
+          <div class="micro-graph">
+            <div class="micro-origin">
+              <span class="svs-state-node svs-state-node--current">Approved</span>
+            </div>
+            <div class="micro-lanes">
+              <!-- Lane 1: PrintBadge → ReadyForPickup (active) -->
+              <div class="micro-lane micro-lane--active">
+                <div class="micro-lane-row">
+                  <span class="micro-arrow micro-arrow--active"></span>
+                  <span class="svs-edge-token svs-edge-token--active">PrintBadge</span>
+                  <span class="micro-arrow micro-arrow--active"></span>
+                  <span class="svs-state-node">ReadyForPickup</span>
+                </div>
+                <div class="micro-verdict micro-verdict--ready">
+                  <span class="micro-verdict-icon">✓</span> available — prints badge and advances
+                </div>
+              </div>
+              <!-- Lane 2: Cancel → Cancelled (active, with args) -->
+              <div class="micro-lane micro-lane--active">
+                <div class="micro-lane-row">
+                  <span class="micro-arrow micro-arrow--active"></span>
+                  <span class="svs-edge-token svs-edge-token--active">Cancel<span class="micro-arg-hint">(Reason)</span></span>
+                  <span class="micro-arrow micro-arrow--active"></span>
+                  <span class="svs-state-node svs-state-node--terminal">Cancelled</span>
+                </div>
+                <div class="micro-verdict micro-verdict--ready">
+                  <span class="micro-verdict-icon">✓</span> available — requires Reason argument
+                </div>
+              </div>
+              <!-- Lane 3: Withdraw → Cancelled (active, no args — same target) -->
+              <div class="micro-lane micro-lane--active">
+                <div class="micro-lane-row">
+                  <span class="micro-arrow micro-arrow--active"></span>
+                  <span class="svs-edge-token svs-edge-token--active">Withdraw</span>
+                  <span class="micro-arrow micro-arrow--active"></span>
+                  <span class="svs-state-node svs-state-node--terminal">Cancelled</span>
+                </div>
+                <div class="micro-verdict micro-verdict--ready">
+                  <span class="micro-verdict-icon">✓</span> available — visitor-initiated withdrawal
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <p class="ex-annotation">
+      <strong>Convergent transitions.</strong> Cancel and Withdraw both lead to Cancelled.
+      Each lane renders its own target node — the duplicate destination is the honest
+      representation. The user sees two distinct paths with different intents (admin cancellation
+      vs visitor withdrawal) even though they converge on the same terminal state.
+    </p>
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       SCALABILITY NOTES
+       ═══════════════════════════════════════════════════════════════════ -->
+  <div class="divider"></div>
+
+  <div class="notes-section">
+    <h3>Scalability Notes</h3>
+    <p>
+      How the micro state diagram pattern holds up from 0 to 5+ events:
+    </p>
+    <ul>
+      <li><strong>0 events (terminal):</strong> Clean. The terminal state badge with "no transitions available" text is self-documenting and avoids empty-state confusion.</li>
+      <li><strong>1 event:</strong> Trivially good. Single lane is the most compact possible representation — essentially a one-line summary of what happens next.</li>
+      <li><strong>2 events:</strong> The sweet spot. The canonical VisitorBadgePickup scenario (1 active, 1 blocked) reads naturally as a branching decision. The diverging lanes communicate "two possible paths" at a glance.</li>
+      <li><strong>3 events:</strong> Still clean. Self-transitions introduce visual redundancy (origin = target) but the ↺ glyph resolves it immediately. Active events above blocked events creates a natural priority order.</li>
+      <li><strong>4–5 events:</strong> The practical limit for a single-column vertical list. At 5 lanes, the micro diagram occupies ~280px of vertical space. The information is still scannable, but the action area starts to dominate the card visually. Consider: should events be sorted active-first? Should the diagram get a subtle internal scrollbar at 6+?</li>
+    </ul>
+    <p>
+      <strong>Where it breaks:</strong> At <strong>6+ events</strong>, the vertical list exceeds
+      the natural "action area" mental model. The form starts to look like a diagram with a header,
+      rather than a form with a diagram in its footer. Mitigation strategies:
+    </p>
+    <ul>
+      <li><strong>Sort by availability:</strong> Active events first, blocked events second. The user sees actionable options immediately without scrolling past blocked reasons.</li>
+      <li><strong>Collapse blocked lanes:</strong> Show blocked events as a compact summary row ("3 events blocked") with expand-on-click. Preserves the always-visible principle for active events while managing vertical budget for blocked ones.</li>
+      <li><strong>Horizontal overflow at narrow widths:</strong> Long state names (e.g., "WaitingForCustomer") push lanes wider. Minimum viable panel width is ~420px. Below that, state names would need truncation — which harms the diagrammatic quality.</li>
+    </ul>
+    <p>
+      <strong>Recommendation:</strong> The micro state diagram is strongest at <strong>1–4 events</strong>.
+      At 5 events it's acceptable with active-first sorting. At 6+ events, switch to a collapsed-blocked
+      summary to keep the action area from overwhelming the form. For the VisitorBadgePickup precept
+      (max 2 events per state), this pattern is a perfect fit.
+    </p>
+  </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     SVG BRANCHING CONNECTORS
+     For multi-event micro diagrams, replaces the first CSS micro-arrow
+     with proper SVG branching paths: origin → shared trunk → per-lane
+     branches → event tokens. Keeps the second arrow (event → target)
+     as the existing CSS micro-arrow.
+     ═══════════════════════════════════════════════════════════════════ -->
+<script>
+(function () {
+  var NS = 'http://www.w3.org/2000/svg';
+
+  /* ── Shared SVG marker definitions (document-global) ───────────── */
+  var defsSvg = document.createElementNS(NS, 'svg');
+  defsSvg.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden;';
+  defsSvg.setAttribute('aria-hidden', 'true');
+  defsSvg.innerHTML =
+    '<defs>' +
+    '<marker id="micro-mk-active" viewBox="0 0 10 10" refX="9" refY="5" ' +
+      'markerWidth="6" markerHeight="6" orient="auto">' +
+      '<path d="M1 1 L10 5 L1 9 L3.6 5 Z" fill="rgba(48,184,232,0.96)"/>' +
+    '</marker>' +
+    '<marker id="micro-mk-blocked" viewBox="0 0 10 10" refX="9" refY="5" ' +
+      'markerWidth="6" markerHeight="6" orient="auto">' +
+      '<path d="M1 1 L10 5 L1 9 L3.6 5 Z" fill="rgba(48,184,232,0.64)"/>' +
+    '</marker>' +
+    '<marker id="micro-mk-self" viewBox="0 0 10 10" refX="9" refY="5" ' +
+      'markerWidth="6" markerHeight="6" orient="auto">' +
+      '<path d="M1 1 L10 5 L1 9 L3.6 5 Z" fill="rgba(168,152,245,0.50)"/>' +
+    '</marker>' +
+    '</defs>';
+  document.body.prepend(defsSvg);
+
+  /* ── Branch style table ────────────────────────────────────────── */
+  var BRANCH = {
+    active:  { stroke: 'rgba(48,184,232,0.96)',  dash: '',    marker: 'url(#micro-mk-active)'  },
+    blocked: { stroke: 'rgba(48,184,232,0.64)',  dash: '7 7', marker: 'url(#micro-mk-blocked)' },
+    self:    { stroke: 'rgba(168,152,245,0.30)', dash: '',    marker: 'url(#micro-mk-self)'    }
+  };
+  var TRUNK_COLOR = 'rgba(168,152,245,0.25)';
+  var STROKE_W    = 1.5;
+
+  /* ── Helpers ───────────────────────────────────────────────────── */
+  function f(n) { return n.toFixed(1); }
+
+  function makePath(d, stroke, width, dash) {
+    var p = document.createElementNS(NS, 'path');
+    p.setAttribute('d', d);
+    p.setAttribute('fill', 'none');
+    p.setAttribute('stroke', stroke);
+    p.setAttribute('stroke-width', String(width));
+    if (dash) p.setAttribute('stroke-dasharray', dash);
+    return p;
+  }
+
+  /* ── Main routing function ─────────────────────────────────────── */
+  function routeMicroDiagrams() {
+    var graphs = document.querySelectorAll('.micro-graph');
+    for (var gi = 0; gi < graphs.length; gi++) {
+      var graph = graphs[gi];
+
+      /* Clean up previous run */
+      var old = graph.querySelector('.micro-svg-overlay');
+      if (old) old.remove();
+      var hidden = graph.querySelectorAll('.micro-arrow[data-svg-hidden]');
+      for (var hi = 0; hi < hidden.length; hi++) {
+        hidden[hi].style.visibility = '';
+        hidden[hi].removeAttribute('data-svg-hidden');
+      }
+
+      var lanes = graph.querySelectorAll('.micro-lane');
+      if (lanes.length < 2) continue; /* single-lane or empty — CSS arrows suffice */
+
+      var originNode = graph.querySelector('.micro-origin .svs-state-node');
+      if (!originNode) continue;
+
+      graph.style.position = 'relative';
+      var gRect = graph.getBoundingClientRect();
+      var oRect = originNode.getBoundingClientRect();
+
+      /* Origin: right-center relative to .micro-graph */
+      var ox = oRect.right  - gRect.left;
+      var oy = oRect.top + oRect.height / 2 - gRect.top;
+
+      /* Collect per-lane geometry & classify edge type */
+      var data = [];
+      for (var li = 0; li < lanes.length; li++) {
+        var lane  = lanes[li];
+        var token = lane.querySelector('.svs-edge-token');
+        var arrow = lane.querySelector('.micro-lane-row .micro-arrow');
+        if (!token) continue;
+        var tRect = token.getBoundingClientRect();
+        var tx = tRect.left - gRect.left;
+        var ty = tRect.top + tRect.height / 2 - gRect.top;
+        var type = lane.classList.contains('micro-lane--blocked') ? 'blocked'
+                 : lane.classList.contains('micro-lane--active')  ? 'active'
+                 : 'self';
+        data.push({ tx: tx, ty: ty, type: type, arrow: arrow });
+      }
+      if (data.length < 2) continue;
+
+      /* Hide first CSS micro-arrow per lane */
+      for (var di = 0; di < data.length; di++) {
+        if (data[di].arrow) {
+          data[di].arrow.style.visibility = 'hidden';
+          data[di].arrow.setAttribute('data-svg-hidden', '');
+        }
+      }
+
+      /* Trunk X: midpoint between origin right edge and closest event token */
+      var minTx = data[0].tx;
+      for (var mi = 1; mi < data.length; mi++) {
+        if (data[mi].tx < minTx) minTx = data[mi].tx;
+      }
+      var trunkX = ox + (minTx - ox) / 2;
+
+      /* Vertical span of trunk */
+      var minY = oy, maxY = oy;
+      for (var yi = 0; yi < data.length; yi++) {
+        if (data[yi].ty < minY) minY = data[yi].ty;
+        if (data[yi].ty > maxY) maxY = data[yi].ty;
+      }
+
+      /* Create SVG overlay */
+      var svg = document.createElementNS(NS, 'svg');
+      svg.classList.add('micro-svg-overlay');
+      svg.style.cssText =
+        'position:absolute;top:0;left:0;width:100%;height:100%;' +
+        'pointer-events:none;overflow:visible;z-index:1;';
+
+      /* 1. Shared trunk: horizontal stem from origin → trunkX */
+      svg.appendChild(makePath(
+        'M' + f(ox) + ' ' + f(oy) + ' H' + f(trunkX),
+        TRUNK_COLOR, STROKE_W
+      ));
+
+      /* 2. Shared trunk: vertical span covering all lane Y positions */
+      if (maxY - minY > 0.5) {
+        svg.appendChild(makePath(
+          'M' + f(trunkX) + ' ' + f(minY) + ' V' + f(maxY),
+          TRUNK_COLOR, STROKE_W
+        ));
+      }
+
+      /* 3. Per-lane branches: trunkX → event token left edge (with arrow marker)
+            Paint order: blocked → self → active so active paints on top */
+      var sorted = data.slice().sort(function (a, b) {
+        var order = { blocked: 0, self: 1, active: 2 };
+        return (order[a.type] || 0) - (order[b.type] || 0);
+      });
+      for (var si = 0; si < sorted.length; si++) {
+        var d = sorted[si];
+        var s = BRANCH[d.type];
+        var p = makePath(
+          'M' + f(trunkX) + ' ' + f(d.ty) + ' H' + f(d.tx),
+          s.stroke, STROKE_W, s.dash
+        );
+        p.setAttribute('marker-end', s.marker);
+        svg.appendChild(p);
+      }
+
+      graph.appendChild(svg);
+    }
+  }
+
+  /* ── Run on load, font-swap, and resize ────────────────────────── */
+  document.addEventListener('DOMContentLoaded', routeMicroDiagrams);
+  window.addEventListener('load', routeMicroDiagrams);
+  window.addEventListener('resize', routeMicroDiagrams);
+  if (document.readyState === 'complete') routeMicroDiagrams();
+})();
+</script>
+</body>
+</html>

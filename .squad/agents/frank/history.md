@@ -29,6 +29,15 @@
 
 ## Recent Updates
 
+### 2026-04-12 — Research: Architectural Patterns for Runtime Inspectability in Business Tools
+- Produced comprehensive external research document at `research/design-system/business-app-inspectability-architecture.md`.
+- **Surveyed 5 system categories:** state machine runtimes (XState/Stately, Temporal, AWS Step Functions, Camunda), business rules engines (Drools, IBM ODM, FICO Blaze Advisor, InRule), workflow task forms (Pega, Appian, OutSystems, Mendix), low-code inspector panels (Retool, Budibase, ToolJet), and runtime inspection APIs.
+- **Key architectural finding:** Two fundamental approaches to inspectability — **snapshot-centric** (XState, Precept, ODM) where the runtime returns a single structured object, vs. **event-stream-centric** (Temporal, Camunda, Step Functions) where the runtime emits chronological events. Precept's `InspectResult` is snapshot-centric, which is architecturally superior for form/task UIs.
+- **Precept's unique advantage confirmed:** No surveyed system provides guard-level explanation AND constraint status on editable fields in a single real-time API response. XState's `state.can()` returns only boolean; Camunda's incident diagnosis only explains failures (not availability); Drools has no structured explanation API at all.
+- **5 patterns identified:** (1) Snapshot vs. Stream consumption models, (2) Explanation depth spectrum (boolean → structural → incident → trace), (3) Universal 3-4 level progressive disclosure, (4) Graph overlay (execution state on definition diagram), (5) Monitoring-vs-task UI separation.
+- **Top recommendations for Precept:** Implement 3-level progressive disclosure (summary → detail → trace) in inspector panel; add graph overlay to preview diagram; adopt Camunda-style incident diagnosis richness for constraint violations; consider XState-like state metadata for UI hints; distribute `InspectResult` data across the form (fields inline, events as buttons) rather than a monolithic panel.
+- **Closest external analog to InspectResult:** IBM ODM's execution trace — a structured object containing per-rule evaluation detail alongside the decision result. But ODM's is post-execution, not real-time. Precept's real-time point-in-time inspection is architecturally more ambitious than anything surveyed.
+
 ### 2026-04-12 — Squad `@copilot` lane retirement contract review
 - Confirmed the contract change is narrowly scoped: retire only the Squad-owned `squad:copilot` coding-agent routing lane. `squad:chore` is retained as an explicit chore/work-type label with no autonomous routing — it is not retired.
 - General repo-wide Copilot tooling should remain in place (`.github/copilot-instructions.md`, `.copilot/skills/`, passive references) because it is not part of Squad governance.

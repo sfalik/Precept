@@ -1,0 +1,1575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Header Badge Exploration — Top-Right Badge Variants + Layout Flip — Precept</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;700&family=Geist:wght@400;500&display=swap">
+<style>
+/* ══════════════════════════════════════════════════════════════════════
+   CSS VARIABLES — Semantic Visual System palette
+   Source: design/system/semantic-visual-system.html
+   ══════════════════════════════════════════════════════════════════════ */
+:root {
+  --bg:       #040506;
+  --panel:    #090b0e;
+  --panel-2:  #0d1014;
+  --panel-3:  #111518;
+  --line:     rgba(255,255,255,0.08);
+  --line-strong: rgba(255,255,255,0.16);
+  --text:     #d4dae3;
+  --muted:    #a7afbb;
+  --soft:     #687281;
+  --state:    #A898F5;
+  --event:    #30B8E8;
+  --data:     #B0BEC5;
+  --violated: #F87171;
+  --warn:     #FDE047;
+  --ok:       #34D399;
+  --mono:     "Geist Mono","Cascadia Code",Consolas,monospace;
+  --sans:     "Geist","Segoe UI Variable","Segoe UI",system-ui,sans-serif;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   RESET
+   ══════════════════════════════════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 14px; -webkit-text-size-adjust: 100%; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  line-height: 1.6;
+  padding: 48px 24px 120px;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   PAGE LAYOUT
+   ══════════════════════════════════════════════════════════════════════ */
+.page { max-width: 960px; margin: 0 auto; }
+
+.page-header {
+  padding-bottom: 32px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 52px;
+}
+.page-eyebrow {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--soft);
+  margin-bottom: 10px;
+}
+.page-title {
+  font-family: var(--mono);
+  font-size: 20px;
+  font-weight: 400;
+  color: var(--event);
+  margin-bottom: 12px;
+}
+.page-lead {
+  font-size: 13.5px;
+  color: var(--muted);
+  max-width: 720px;
+  line-height: 1.75;
+  font-family: var(--sans);
+}
+.page-lead strong { color: var(--text); font-weight: 500; }
+
+/* ── Concept callout ─────────────────────────────────────────────────── */
+.concept-box {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 20px 24px;
+  margin-bottom: 52px;
+}
+.concept-box h3 {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--soft);
+  margin-bottom: 14px;
+}
+.concept-box p {
+  font-size: 12.5px;
+  color: var(--muted);
+  line-height: 1.65;
+  font-family: var(--sans);
+  max-width: 680px;
+}
+.concept-box p strong { color: var(--text); font-weight: 500; }
+.concept-box p + p { margin-top: 8px; }
+
+/* ── Section dividers ────────────────────────────────────────────────── */
+.divider { height: 1px; background: var(--line); margin: 48px 0; }
+
+/* ── Variant section ─────────────────────────────────────────────────── */
+.variant { margin-bottom: 56px; }
+.var-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.var-num {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+.var-name {
+  font-family: var(--mono);
+  font-size: 17px;
+  font-weight: 400;
+  color: var(--text);
+}
+.var-idea {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.75;
+  margin-bottom: 24px;
+  max-width: 700px;
+  font-family: var(--sans);
+}
+.var-idea strong { color: var(--text); font-weight: 500; }
+.var-sub-label {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--soft);
+  margin-bottom: 8px;
+  margin-top: 20px;
+}
+.var-sub-label:first-of-type { margin-top: 0; }
+
+/* ══════════════════════════════════════════════════════════════════════
+   CARD HEADER STRIP — Shared base for all variants
+   ══════════════════════════════════════════════════════════════════════ */
+.card-strip-stage {
+  display: flex;
+  justify-content: center;
+  padding: 8px 0;
+}
+.card-strip {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  width: 100%;
+  max-width: 580px;
+}
+.card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 18px 20px 16px;
+  gap: 16px;
+}
+.card-meta { min-width: 0; flex: 1; }
+.card-type {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--soft);
+  margin-bottom: 3px;
+}
+.card-ref {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--muted);
+  margin-bottom: 5px;
+}
+.card-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: 0.01em;
+  font-family: var(--sans);
+}
+
+/* Badge area — right side of header */
+.badge-area {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: fit-content;
+  margin-top: 2px;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   VARIANT 1 — Constraint Pulse
+   ══════════════════════════════════════════════════════════════════════ */
+.badge-constraint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  line-height: 1.25;
+}
+.badge-constraint--ok {
+  background: rgba(52,211,153,0.08);
+  border: 1px solid rgba(52,211,153,0.28);
+  color: var(--ok);
+}
+.badge-constraint--warn {
+  background: rgba(253,224,71,0.08);
+  border: 1px solid rgba(253,224,71,0.25);
+  color: var(--warn);
+}
+.badge-constraint .badge-icon {
+  font-size: 11px;
+  line-height: 1;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   VARIANT 2 — Action Readiness
+   ══════════════════════════════════════════════════════════════════════ */
+.badge-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 12px;
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  line-height: 1.25;
+  background: rgba(48,184,232,0.07);
+  border: 1px solid rgba(48,184,232,0.22);
+  color: var(--event);
+}
+.badge-actions .dot-group {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+.badge-actions .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+.badge-actions .dot--active {
+  background: var(--event);
+}
+.badge-actions .dot--blocked {
+  background: var(--soft);
+  opacity: 0.45;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   VARIANT 3 — Journey Progress Arc
+   ══════════════════════════════════════════════════════════════════════ */
+.badge-journey {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  line-height: 1.25;
+  background: rgba(168,152,245,0.07);
+  border: 1px solid rgba(168,152,245,0.22);
+  color: var(--state);
+}
+.progress-segments {
+  display: inline-flex;
+  gap: 2px;
+  align-items: center;
+}
+.progress-segments .seg {
+  width: 14px;
+  height: 4px;
+  border-radius: 1px;
+}
+.progress-segments .seg--done {
+  background: var(--state);
+  opacity: 0.85;
+}
+.progress-segments .seg--current {
+  background: var(--state);
+  box-shadow: 0 0 5px rgba(168,152,245,0.5);
+}
+.progress-segments .seg--future {
+  background: rgba(168,152,245,0.18);
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   VARIANT 4 — Data Completeness Ring
+   ══════════════════════════════════════════════════════════════════════ */
+.badge-completeness {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  line-height: 1.25;
+  background: rgba(176,190,197,0.06);
+  border: 1px solid rgba(176,190,197,0.18);
+  color: var(--data);
+}
+.ring-wrapper {
+  position: relative;
+  width: 22px;
+  height: 22px;
+}
+.ring-wrapper svg {
+  width: 22px;
+  height: 22px;
+  transform: rotate(-90deg);
+}
+.ring-bg {
+  fill: none;
+  stroke: rgba(176,190,197,0.15);
+  stroke-width: 2.5;
+}
+.ring-fill {
+  fill: none;
+  stroke: var(--data);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.3s;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   VARIANT 5 — Time-in-State
+   ══════════════════════════════════════════════════════════════════════ */
+.badge-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  line-height: 1.25;
+  background: rgba(168,152,245,0.06);
+  border: 1px solid rgba(168,152,245,0.18);
+  color: var(--muted);
+}
+.badge-time .time-icon {
+  font-size: 10px;
+  color: var(--soft);
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   VARIANT 6 — Risk / Attention Tier
+   ══════════════════════════════════════════════════════════════════════ */
+.badge-risk {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 12px;
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  line-height: 1.25;
+  cursor: default;
+  position: relative;
+}
+.badge-risk .tier-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.badge-risk--green {
+  background: rgba(52,211,153,0.06);
+  border: 1px solid rgba(52,211,153,0.18);
+  color: var(--muted);
+}
+.badge-risk--green .tier-dot { background: var(--ok); }
+.badge-risk--amber {
+  background: rgba(253,224,71,0.06);
+  border: 1px solid rgba(253,224,71,0.18);
+  color: var(--muted);
+}
+.badge-risk--amber .tier-dot { background: var(--warn); }
+.badge-risk--red {
+  background: rgba(248,113,113,0.06);
+  border: 1px solid rgba(248,113,113,0.18);
+  color: var(--muted);
+}
+.badge-risk--red .tier-dot { background: var(--violated); }
+.badge-risk .tier-label {
+  opacity: 0;
+  max-width: 0;
+  overflow: hidden;
+  transition: opacity 0.2s, max-width 0.25s;
+}
+.badge-risk:hover .tier-label {
+  opacity: 1;
+  max-width: 120px;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   VARIANT 7 — Last-Touch Attribution
+   ══════════════════════════════════════════════════════════════════════ */
+.badge-lasttouch {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  line-height: 1.25;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+.badge-lasttouch .avatar-placeholder {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(168,152,245,0.18);
+  border: 1px solid rgba(168,152,245,0.30);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 500;
+  color: var(--state);
+  flex-shrink: 0;
+}
+.badge-lasttouch .touch-sep {
+  color: var(--soft);
+  opacity: 0.5;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   VARIANT 8 — Next-Action Hint
+   ══════════════════════════════════════════════════════════════════════ */
+.badge-nextaction {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  line-height: 1.25;
+  background: rgba(48,184,232,0.07);
+  border: 1px solid rgba(48,184,232,0.22);
+  color: var(--event);
+}
+.badge-nextaction .arrow {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   VARIANT 9 — Transition Sparkline
+   ══════════════════════════════════════════════════════════════════════ */
+.badge-sparkline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  line-height: 1.25;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+.sparkline-dots {
+  display: inline-flex;
+  gap: 3px;
+  align-items: center;
+}
+.sparkline-dots .sp-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+.sparkline-dots .sp-edge {
+  width: 6px;
+  height: 1px;
+  background: var(--soft);
+  opacity: 0.4;
+}
+.sparkline-dots .sp-dot--state {
+  background: var(--state);
+  opacity: 0.55;
+}
+.sparkline-dots .sp-dot--current {
+  background: var(--state);
+  box-shadow: 0 0 4px rgba(168,152,245,0.45);
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   VARIANT 10 — Inspectability Toggle
+   ══════════════════════════════════════════════════════════════════════ */
+.badge-inspect {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 28px;
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--line);
+  color: var(--soft);
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.badge-inspect:hover {
+  background: rgba(48,184,232,0.08);
+  border-color: rgba(48,184,232,0.25);
+  color: var(--event);
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   VARIANT 11 — Layout Flip (Full Card Restructure)
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* Stage wrapper */
+.flip-stage {
+  display: flex;
+  justify-content: center;
+  padding: 20px 0 4px;
+}
+
+/* Full card shell */
+.flip-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  width: 100%;
+  max-width: 620px;
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto 1fr auto;
+  /* Areas:
+     origin   meta
+     fields   fields
+     events   actions  */
+  grid-template-areas:
+    "origin  meta"
+    "fields  fields"
+    "events  actions";
+}
+
+/* ── Top-left: Current state node ──────────────────────────────────── */
+.flip-origin {
+  grid-area: origin;
+  padding: 18px 20px 14px;
+  display: flex;
+  align-items: flex-start;
+}
+
+/* ── Top-right: Precept name + record ref ──────────────────────────── */
+.flip-meta {
+  grid-area: meta;
+  padding: 18px 20px 14px 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: flex-start;
+  text-align: right;
+}
+.flip-meta .card-type {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--soft);
+  margin-bottom: 3px;
+}
+.flip-meta .card-ref {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+.flip-meta .card-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: 0.01em;
+  font-family: var(--sans);
+}
+
+/* ── Middle: Fields (full-width) ───────────────────────────────────── */
+.flip-fields {
+  grid-area: fields;
+  padding: 14px 20px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+/* ── Bottom-left: Event lanes with SVG connector ───────────────────── */
+.flip-events {
+  grid-area: events;
+  padding: 18px 20px 20px;
+  position: relative;
+}
+
+/* SVG connector from origin to events */
+.flip-connector {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+.flip-connector line {
+  stroke: rgba(168,152,245,0.22);
+  stroke-width: 1;
+}
+.flip-connector .flip-conn-active {
+  stroke: rgba(168,152,245,0.30);
+}
+.flip-connector .flip-conn-blocked {
+  stroke: rgba(168,152,245,0.12);
+  stroke-dasharray: 4 3;
+}
+
+/* Event lane row */
+.flip-lane {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+  transition: background 140ms ease;
+}
+.flip-lane:last-child { border-bottom: none; }
+.flip-lane-row {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+/* Verdict inline */
+.flip-verdict {
+  margin-left: 10px;
+  font-size: 10.5px;
+  line-height: 1.4;
+  font-family: var(--mono);
+  letter-spacing: 0.02em;
+  white-space: normal;
+  max-width: 22ch;
+}
+.flip-verdict--ready { color: var(--ok); opacity: 0.72; }
+.flip-verdict--blocked { color: var(--violated); opacity: 0.72; }
+.flip-verdict-icon { font-size: 10px; margin-right: 4px; }
+
+/* Reuse micro-arrow styles — alias classes */
+.flip-arrow {
+  display: flex;
+  align-items: center;
+  position: relative;
+  width: 26px;
+  height: 28px;
+  flex-shrink: 0;
+}
+.flip-arrow::before {
+  content: "";
+  position: absolute;
+  top: 50%; left: 2px; right: 2px;
+  height: 1px;
+}
+.flip-arrow::after {
+  content: "";
+  position: absolute;
+  top: 50%; right: 2px;
+  width: 4px; height: 4px;
+  border-top: 1px solid; border-right: 1px solid;
+  transform: translateY(-50%) rotate(45deg);
+}
+.flip-arrow--active::before { background: rgba(48,184,232,0.40); }
+.flip-arrow--active::after  { border-color: rgba(48,184,232,0.50); }
+.flip-arrow--blocked::before { background: rgba(255,255,255,0.08); }
+.flip-arrow--blocked::after  { border-color: rgba(255,255,255,0.12); }
+
+/* Hover enhancements */
+.flip-lane--active:hover { background: rgba(48,184,232,0.02); }
+.flip-lane--active:hover .flip-arrow--active::before { background: rgba(48,184,232,0.60); }
+.flip-lane--active:hover .flip-arrow--active::after  { border-color: rgba(48,184,232,0.70); }
+.flip-lane--active:hover .svs-state-node--terminal {
+  border-color: rgba(168,152,245,0.50);
+  background: rgba(168,152,245,0.08);
+}
+.flip-lane--active:hover .svs-state-node--terminal::after { border-color: rgba(168,152,245,0.38); }
+.flip-lane--active:hover .flip-verdict--ready { opacity: 1; }
+
+.flip-lane--blocked:hover { background: rgba(248,113,113,0.02); }
+.flip-lane--blocked:hover .svs-edge-token--blocked {
+  opacity: 0.8; border-color: rgba(248,113,113,0.30); color: var(--violated);
+}
+.flip-lane--blocked:hover .flip-arrow--blocked::before { background: rgba(248,113,113,0.18); }
+.flip-lane--blocked:hover .flip-arrow--blocked::after  { border-color: rgba(248,113,113,0.22); }
+.flip-lane--blocked:hover .svs-state-node--terminal-blocked {
+  opacity: 0.80; border-color: rgba(168,152,245,0.28);
+}
+.flip-lane--blocked:hover .flip-verdict--blocked { opacity: 1; }
+
+/* ── Bottom-right: Save / Cancel buttons ───────────────────────────── */
+.flip-actions {
+  grid-area: actions;
+  padding: 18px 20px 20px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* Connector overlay sized to the full card */
+.flip-card > .flip-connector-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: visible;
+}
+
+/* Annotation below the flip card */
+.flip-annotation {
+  margin-top: 18px;
+  font-size: 12px;
+  color: var(--soft);
+  font-style: italic;
+  padding-left: 14px;
+  border-left: 2px solid rgba(255,255,255,0.05);
+  max-width: 620px;
+  line-height: 1.65;
+  font-family: var(--sans);
+  margin-left: auto;
+  margin-right: auto;
+  box-sizing: border-box;
+}
+.flip-annotation strong { color: var(--muted); font-weight: 500; }
+
+/* SVS node/token styles needed in this file (shared with v5) */
+.svs-state-node {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 36px;
+  padding: 8px 12px;
+  border: 1px solid rgba(168,152,245,0.32);
+  background: #050608;
+  color: var(--state);
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  border-radius: 8px;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02);
+  transition: border-color 140ms ease, background-color 140ms ease, box-shadow 140ms ease;
+  position: relative;
+  flex-shrink: 0;
+}
+.svs-state-node--current {
+  background: #251c38;
+  border-color: rgba(168,152,245,0.46);
+  box-shadow: inset 0 0 0 1px rgba(168,152,245,0.22), 0 0 0 1px rgba(99,102,241,0.24);
+  color: #ddd6ff;
+}
+.svs-state-node--terminal { position: relative; }
+.svs-state-node--terminal::after {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border: 1px solid rgba(168,152,245,0.28);
+  border-radius: 4px;
+  pointer-events: none;
+}
+.svs-state-node--terminal-blocked {
+  position: relative;
+  border-color: rgba(168,152,245,0.18);
+  background: #050608;
+  color: rgba(168,152,245,0.52);
+  opacity: 0.65;
+}
+.svs-state-node--terminal-blocked::after {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border: 1px solid rgba(168,152,245,0.15);
+  border-radius: 4px;
+  pointer-events: none;
+}
+.svs-edge-token {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 5px 10px;
+  border: 1px solid rgba(48,184,232,0.36);
+  background: #050608;
+  color: var(--event);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  transition: border-color 140ms ease, box-shadow 140ms ease, background 140ms ease;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.svs-edge-token--active {
+  border-color: rgba(48,184,232,0.48);
+  box-shadow: 0 0 0 1px rgba(48,184,232,0.14);
+  filter: drop-shadow(0 0 8px rgba(48,184,232,0.10));
+}
+.svs-edge-token--active:hover {
+  border-color: rgba(48,184,232,0.68);
+  background: rgba(48,184,232,0.06);
+  box-shadow: 0 0 0 1px rgba(48,184,232,0.22);
+}
+.svs-edge-token--blocked {
+  border-style: dashed;
+  color: var(--soft);
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Form rows for Variant 11 */
+.flip-form-row {
+  display: grid;
+  grid-template-columns: 130px minmax(0,1fr);
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line);
+  font-family: var(--mono);
+  font-size: 13px;
+  align-items: baseline;
+}
+.flip-form-row:last-child { border-bottom: none; }
+.flip-form-lbl { color: var(--soft); font-size: 11px; letter-spacing: 0.10em; }
+.flip-form-row--constrained .flip-form-lbl { font-style: italic; }
+.flip-form-row--editable .flip-form-lbl { color: var(--data); }
+.flip-form-row--required .flip-form-lbl { color: var(--warn); }
+.flip-form-required-badge { font-size: 9px; font-family: var(--mono); letter-spacing: 0.10em; color: var(--warn); margin-left: 6px; opacity: 0.8; }
+.flip-form-locked-val { color: var(--muted); }
+.flip-form-input {
+  background: rgba(176,190,197,0.06);
+  border: 1px solid rgba(176,190,197,0.22);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 13px;
+  padding: 4px 8px;
+  width: 100%;
+  outline: none;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+.flip-form-input:focus {
+  border-color: rgba(176,190,197,0.5);
+  background: rgba(176,190,197,0.10);
+}
+.flip-form-input::placeholder { color: var(--soft); opacity: 0.6; }
+
+/* Form buttons for Variant 11 */
+.flip-btn {
+  padding: 6px 14px;
+  border: 1px solid var(--line-strong);
+  background: none;
+  color: var(--soft);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: border-color 120ms ease, color 120ms ease, background 120ms ease;
+}
+.flip-btn:hover { border-color: rgba(255,255,255,0.28); color: var(--text); }
+.flip-btn--save {
+  border-color: rgba(176,190,197,0.35);
+  background: rgba(176,190,197,0.08);
+  color: var(--data);
+}
+.flip-btn--save:hover { border-color: rgba(176,190,197,0.6); background: rgba(176,190,197,0.14); color: var(--text); }
+
+/* ══════════════════════════════════════════════════════════════════════
+   LABEL BELOW CARD
+   ══════════════════════════════════════════════════════════════════════ */
+.card-label {
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--soft);
+  margin-top: 10px;
+  padding-bottom: 4px;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   NOTES
+   ══════════════════════════════════════════════════════════════════════ */
+.notes-section {
+  margin-top: 52px;
+  padding-top: 28px;
+  border-top: 1px solid var(--line);
+}
+.notes-section h3 {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--soft);
+  margin-bottom: 16px;
+}
+.notes-section ul {
+  list-style: none;
+  padding: 0;
+}
+.notes-section li {
+  font-size: 12.5px;
+  color: var(--muted);
+  line-height: 1.65;
+  padding: 6px 0 6px 16px;
+  border-left: 2px solid rgba(255,255,255,0.05);
+  font-family: var(--sans);
+}
+.notes-section li + li { margin-top: 6px; }
+.notes-section li strong { color: var(--text); font-weight: 500; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       PAGE HEADER
+       ═══════════════════════════════════════════════════════════════════ -->
+  <header class="page-header">
+    <div class="page-eyebrow">Precept · Design Exploration</div>
+    <h1 class="page-title">Header Badge Variants</h1>
+    <p class="page-lead">
+      Eleven candidate treatments exploring the form card header. <strong>Variants 1–10</strong> explore
+      the <strong>top-right badge position</strong>, replacing the state pill with richer signals.
+      <strong>Variant 11</strong> is a full <strong>layout restructure</strong> — the micro state diagram
+      becomes the structural spine of the card, not an appendage at the bottom.
+      All shown against the <strong>VisitorBadgePickup</strong> precept at <strong>ReadyForPickup</strong>.
+    </p>
+  </header>
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       CONCEPT
+       ═══════════════════════════════════════════════════════════════════ -->
+  <div class="concept-box">
+    <h3>Design question</h3>
+    <p>
+      The state pill currently occupies the most prominent badge real-estate in the form card header.
+      <strong>What signal deserves that position instead?</strong> The current state is already implicit
+      from the micro diagram in the action area — so the header badge can carry richer operational context.
+    </p>
+    <p>
+      Each variant below shows just the header strip (precept name + record ref on the left,
+      candidate badge on the right). No full form fields — this is a badge-only exploration.
+    </p>
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       VARIANT 1 — Constraint Pulse
+       ═══════════════════════════════════════════════════════════════════ -->
+  <section class="variant">
+    <div class="var-head">
+      <span class="var-num">Variant 1</span>
+      <span class="var-name">Constraint Pulse</span>
+    </div>
+    <p class="var-idea">
+      Shows <strong>rule health</strong> at a glance — how many constraints are currently passing.
+      Green when all rules pass; amber when some are violated. The user sees structural integrity
+      without opening an inspector.
+    </p>
+
+    <div class="var-sub-label">Healthy — all rules passing</div>
+    <div class="card-strip-stage">
+      <div class="card-strip">
+        <div class="card-head">
+          <div class="card-meta">
+            <div class="card-type">Visitor Badge Pickup</div>
+            <div class="card-ref">#VBP-2847</div>
+            <div class="card-name">Ada Reyes</div>
+          </div>
+          <div class="badge-area">
+            <div class="badge-constraint badge-constraint--ok">
+              <span class="badge-icon">✓</span>
+              5/5 rules passing
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-label">Constraint Pulse — Healthy</div>
+
+    <div class="var-sub-label" style="margin-top:24px;">Warning — 2 rules failing</div>
+    <div class="card-strip-stage">
+      <div class="card-strip">
+        <div class="card-head">
+          <div class="card-meta">
+            <div class="card-type">Visitor Badge Pickup</div>
+            <div class="card-ref">#VBP-2847</div>
+            <div class="card-name">Ada Reyes</div>
+          </div>
+          <div class="badge-area">
+            <div class="badge-constraint badge-constraint--warn">
+              <span class="badge-icon">⚠</span>
+              3/5 rules passing
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-label">Constraint Pulse — Warning</div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       VARIANT 2 — Action Readiness
+       ═══════════════════════════════════════════════════════════════════ -->
+  <section class="variant">
+    <div class="var-head">
+      <span class="var-num">Variant 2</span>
+      <span class="var-name">Action Readiness</span>
+    </div>
+    <p class="var-idea">
+      Communicates how many events are <strong>available vs blocked</strong> right now.
+      Dot indicators give an at-a-glance read of action capacity — bright dots for ready events,
+      dim dots for blocked ones.
+    </p>
+
+    <div class="card-strip-stage">
+      <div class="card-strip">
+        <div class="card-head">
+          <div class="card-meta">
+            <div class="card-type">Visitor Badge Pickup</div>
+            <div class="card-ref">#VBP-2847</div>
+            <div class="card-name">Ada Reyes</div>
+          </div>
+          <div class="badge-area">
+            <div class="badge-actions">
+              <span class="dot-group">
+                <span class="dot dot--active"></span>
+                <span class="dot dot--blocked"></span>
+              </span>
+              1 action available
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-label">Action Readiness — Dot Indicators</div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       VARIANT 3 — Journey Progress Arc
+       ═══════════════════════════════════════════════════════════════════ -->
+  <section class="variant">
+    <div class="var-head">
+      <span class="var-num">Variant 3</span>
+      <span class="var-name">Journey Progress Arc</span>
+    </div>
+    <p class="var-idea">
+      A tiny <strong>segmented progress bar</strong> showing where the entity is in its lifecycle.
+      Each segment is a state — filled segments are completed, the glowing segment is the current state,
+      empty segments are ahead. Communicates lifecycle position at a glance.
+    </p>
+
+    <div class="card-strip-stage">
+      <div class="card-strip">
+        <div class="card-head">
+          <div class="card-meta">
+            <div class="card-type">Visitor Badge Pickup</div>
+            <div class="card-ref">#VBP-2847</div>
+            <div class="card-name">Ada Reyes</div>
+          </div>
+          <div class="badge-area">
+            <div class="badge-journey">
+              <span class="progress-segments">
+                <span class="seg seg--done"></span>
+                <span class="seg seg--done"></span>
+                <span class="seg seg--done"></span>
+                <span class="seg seg--current"></span>
+                <span class="seg seg--future"></span>
+                <span class="seg seg--future"></span>
+              </span>
+              4 of 6
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-label">Journey Progress Arc — State 4 of 6</div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       VARIANT 4 — Data Completeness Ring
+       ═══════════════════════════════════════════════════════════════════ -->
+  <section class="variant">
+    <div class="var-head">
+      <span class="var-num">Variant 4</span>
+      <span class="var-name">Data Completeness Ring</span>
+    </div>
+    <p class="var-idea">
+      A small <strong>donut ring</strong> showing how many fields have values set.
+      Communicates data readiness — is this record fully populated or partially complete?
+      The visual fill is proportional to set fields.
+    </p>
+
+    <div class="card-strip-stage">
+      <div class="card-strip">
+        <div class="card-head">
+          <div class="card-meta">
+            <div class="card-type">Visitor Badge Pickup</div>
+            <div class="card-ref">#VBP-2847</div>
+            <div class="card-name">Ada Reyes</div>
+          </div>
+          <div class="badge-area">
+            <div class="badge-completeness">
+              <!-- SVG donut: 5/7 = ~71% -->
+              <span class="ring-wrapper">
+                <svg viewBox="0 0 22 22">
+                  <circle class="ring-bg" cx="11" cy="11" r="8" />
+                  <circle class="ring-fill" cx="11" cy="11" r="8"
+                    stroke-dasharray="50.27"
+                    stroke-dashoffset="14.36" />
+                </svg>
+              </span>
+              5/7 fields set
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-label">Data Completeness Ring — 5 of 7</div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       VARIANT 5 — Time-in-State
+       ═══════════════════════════════════════════════════════════════════ -->
+  <section class="variant">
+    <div class="var-head">
+      <span class="var-num">Variant 5</span>
+      <span class="var-name">Time-in-State</span>
+    </div>
+    <p class="var-idea">
+      Shows <strong>how long the entity has been in its current state</strong>.
+      Reveals dwell time at a glance — useful for SLA awareness, aging alerts, and process bottleneck detection.
+    </p>
+
+    <div class="card-strip-stage">
+      <div class="card-strip">
+        <div class="card-head">
+          <div class="card-meta">
+            <div class="card-type">Visitor Badge Pickup</div>
+            <div class="card-ref">#VBP-2847</div>
+            <div class="card-name">Ada Reyes</div>
+          </div>
+          <div class="badge-area">
+            <div class="badge-time">
+              <span class="time-icon">◷</span>
+              2d in ReadyForPickup
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-label">Time-in-State — Duration Badge</div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       VARIANT 6 — Risk / Attention Tier
+       ═══════════════════════════════════════════════════════════════════ -->
+  <section class="variant">
+    <div class="var-head">
+      <span class="var-num">Variant 6</span>
+      <span class="var-name">Risk / Attention Tier</span>
+    </div>
+    <p class="var-idea">
+      A single <strong>colored dot</strong> encoding the entity's risk or attention level — green (on track),
+      amber (needs attention), red (at risk). The label expands on hover, keeping the badge minimal at rest.
+      Three sub-variants shown.
+    </p>
+
+    <div class="var-sub-label">Green — On track</div>
+    <div class="card-strip-stage">
+      <div class="card-strip">
+        <div class="card-head">
+          <div class="card-meta">
+            <div class="card-type">Visitor Badge Pickup</div>
+            <div class="card-ref">#VBP-2847</div>
+            <div class="card-name">Ada Reyes</div>
+          </div>
+          <div class="badge-area">
+            <div class="badge-risk badge-risk--green">
+              <span class="tier-dot"></span>
+              <span class="tier-label">On track</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-label">Risk Tier — Green (hover to expand)</div>
+
+    <div class="var-sub-label" style="margin-top:20px;">Amber — Needs attention</div>
+    <div class="card-strip-stage">
+      <div class="card-strip">
+        <div class="card-head">
+          <div class="card-meta">
+            <div class="card-type">Visitor Badge Pickup</div>
+            <div class="card-ref">#VBP-2847</div>
+            <div class="card-name">Ada Reyes</div>
+          </div>
+          <div class="badge-area">
+            <div class="badge-risk badge-risk--amber">
+              <span class="tier-dot"></span>
+              <span class="tier-label">Needs attention</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-label">Risk Tier — Amber (hover to expand)</div>
+
+    <div class="var-sub-label" style="margin-top:20px;">Red — At risk</div>
+    <div class="card-strip-stage">
+      <div class="card-strip">
+        <div class="card-head">
+          <div class="card-meta">
+            <div class="card-type">Visitor Badge Pickup</div>
+            <div class="card-ref">#VBP-2847</div>
+            <div class="card-name">Ada Reyes</div>
+          </div>
+          <div class="badge-area">
+            <div class="badge-risk badge-risk--red">
+              <span class="tier-dot"></span>
+              <span class="tier-label">At risk</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-label">Risk Tier — Red (hover to expand)</div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       VARIANT 7 — Last-Touch Attribution
+       ═══════════════════════════════════════════════════════════════════ -->
+  <section class="variant">
+    <div class="var-head">
+      <span class="var-num">Variant 7</span>
+      <span class="var-name">Last-Touch Attribution</span>
+    </div>
+    <p class="var-idea">
+      Shows <strong>who last acted on this record and when</strong>. A tiny avatar placeholder + name +
+      timestamp. Gives immediate accountability and recency context without opening an audit log.
+    </p>
+
+    <div class="card-strip-stage">
+      <div class="card-strip">
+        <div class="card-head">
+          <div class="card-meta">
+            <div class="card-type">Visitor Badge Pickup</div>
+            <div class="card-ref">#VBP-2847</div>
+            <div class="card-name">Ada Reyes</div>
+          </div>
+          <div class="badge-area">
+            <div class="badge-lasttouch">
+              <span class="avatar-placeholder">A</span>
+              Ada
+              <span class="touch-sep">·</span>
+              2h ago
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-label">Last-Touch Attribution — Actor + Timestamp</div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       VARIANT 8 — Next-Action Hint
+       ═══════════════════════════════════════════════════════════════════ -->
+  <section class="variant">
+    <div class="var-head">
+      <span class="var-num">Variant 8</span>
+      <span class="var-name">Next-Action Hint</span>
+    </div>
+    <p class="var-idea">
+      A forward-looking <strong>event hint</strong> in event colour — shows the most likely or primary next
+      action. Primes the user for what they're about to do before they scroll to the action area.
+    </p>
+
+    <div class="card-strip-stage">
+      <div class="card-strip">
+        <div class="card-head">
+          <div class="card-meta">
+            <div class="card-type">Visitor Badge Pickup</div>
+            <div class="card-ref">#VBP-2847</div>
+            <div class="card-name">Ada Reyes</div>
+          </div>
+          <div class="badge-area">
+            <div class="badge-nextaction">
+              <span class="arrow">→</span>
+              PickUp
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-label">Next-Action Hint — Forward-Looking Event</div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       VARIANT 9 — Transition Sparkline
+       ═══════════════════════════════════════════════════════════════════ -->
+  <section class="variant">
+    <div class="var-head">
+      <span class="var-num">Variant 9</span>
+      <span class="var-name">Transition Sparkline</span>
+    </div>
+    <p class="var-idea">
+      A tiny inline <strong>sparkline of recent state transitions</strong> — coloured segments showing
+      the path this entity has taken. Communicates journey history in minimal space.
+      The rightmost glowing dot is the current state.
+    </p>
+
+    <div class="card-strip-stage">
+      <div class="card-strip">
+        <div class="card-head">
+          <div class="card-meta">
+            <div class="card-type">Visitor Badge Pickup</div>
+            <div class="card-ref">#VBP-2847</div>
+            <div class="card-name">Ada Reyes</div>
+          </div>
+          <div class="badge-area">
+            <div class="badge-sparkline">
+              <span class="sparkline-dots">
+                <span class="sp-dot sp-dot--state"></span>
+                <span class="sp-edge"></span>
+                <span class="sp-dot sp-dot--state"></span>
+                <span class="sp-edge"></span>
+                <span class="sp-dot sp-dot--state"></span>
+                <span class="sp-edge"></span>
+                <span class="sp-dot sp-dot--current"></span>
+              </span>
+              4 transitions
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-label">Transition Sparkline — Recent History</div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       VARIANT 10 — Inspectability Toggle
+       ═══════════════════════════════════════════════════════════════════ -->
+  <section class="variant">
+    <div class="var-head">
+      <span class="var-num">Variant 10</span>
+      <span class="var-name">Inspectability Toggle</span>
+    </div>
+    <p class="var-idea">
+      A small <strong>inspect glyph</strong> that hints at expandability — the badge position becomes
+      a gateway to the full inspector panel. Minimal footprint, maximum affordance.
+      Hover changes colour to event-blue, signalling interactivity.
+    </p>
+
+    <div class="card-strip-stage">
+      <div class="card-strip">
+        <div class="card-head">
+          <div class="card-meta">
+            <div class="card-type">Visitor Badge Pickup</div>
+            <div class="card-ref">#VBP-2847</div>
+            <div class="card-name">Ada Reyes</div>
+          </div>
+          <div class="badge-area">
+            <span class="badge-inspect" title="Open inspector">⊞</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-label">Inspectability Toggle — Inspector Gateway</div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       VARIANT 11 — Layout Flip (Full Card Restructure)
+       ═══════════════════════════════════════════════════════════════════ -->
+  <section class="variant">
+    <div class="var-head">
+      <span class="var-num">Variant 11</span>
+      <span class="var-name">Layout Flip</span>
+    </div>
+    <p class="var-idea">
+      A complete rethink: <strong>the micro state diagram becomes the structural spine of the card</strong>,
+      not an appendage at the bottom. Current state moves to <strong>top-left</strong>, precept metadata
+      moves to <strong>top-right</strong>, event lanes sit at <strong>bottom-left</strong>, and Save/Cancel
+      shifts to <strong>bottom-right</strong>. The card reads as a vertical flow: origin state → form data
+      → event outcomes. This is a <strong>full form card mockup</strong>, not just a header strip.
+    </p>
+
+    <div class="flip-stage">
+      <div class="flip-card">
+
+        <!-- SVG connector overlay: lines from origin (top-left) to event lanes (bottom-left) -->
+        <svg class="flip-card-connector" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:1;">
+          <!-- Vertical stem: from bottom of origin node to top of events area -->
+          <!-- These are cosmetic guide lines; exact positions approximate the grid layout -->
+          <line x1="64" y1="56" x2="64" y2="100%" stroke="rgba(168,152,245,0.14)" stroke-width="1" stroke-dasharray="4 4" />
+        </svg>
+
+        <!-- Top-left: Current state node -->
+        <div class="flip-origin">
+          <span class="svs-state-node svs-state-node--current">ReadyForPickup</span>
+        </div>
+
+        <!-- Top-right: Precept metadata -->
+        <div class="flip-meta">
+          <div class="card-type">Visitor Badge Pickup</div>
+          <div class="card-ref">#VBP-2847</div>
+          <div class="card-name">Ada Reyes</div>
+        </div>
+
+        <!-- Middle: Fields (full-width) -->
+        <div class="flip-fields">
+          <div class="flip-form-row">
+            <span class="flip-form-lbl">VisitorName</span>
+            <span class="flip-form-locked-val">"Ada Reyes"</span>
+          </div>
+          <div class="flip-form-row flip-form-row--constrained">
+            <span class="flip-form-lbl">HostConfirmed</span>
+            <span class="flip-form-locked-val" style="color:var(--ok);">true</span>
+          </div>
+          <div class="flip-form-row">
+            <span class="flip-form-lbl">BadgePrinted</span>
+            <span class="flip-form-locked-val" style="color:var(--ok);">true</span>
+          </div>
+          <div class="flip-form-row">
+            <span class="flip-form-lbl">PickupWindowOpen</span>
+            <span class="flip-form-locked-val" style="color:var(--ok);">true</span>
+          </div>
+          <div class="flip-form-row flip-form-row--editable flip-form-row--required">
+            <span class="flip-form-lbl">OutcomeNote<span class="flip-form-required-badge">REQUIRED</span></span>
+            <input class="flip-form-input" type="text" placeholder="(nullable)">
+          </div>
+        </div>
+
+        <!-- Bottom-left: Event lanes -->
+        <div class="flip-events">
+          <!-- Lane 1: PickUp → PickedUp (active, terminal) -->
+          <div class="flip-lane flip-lane--active">
+            <div class="flip-lane-row">
+              <span class="flip-arrow flip-arrow--active"></span>
+              <span class="svs-edge-token svs-edge-token--active">PickUp</span>
+              <span class="flip-arrow flip-arrow--active"></span>
+              <span class="svs-state-node svs-state-node--terminal">PickedUp</span>
+            </div>
+            <div class="flip-verdict flip-verdict--ready">
+              <span class="flip-verdict-icon">✓</span> guard passes — PickupWindowOpen is true
+            </div>
+          </div>
+          <!-- Lane 2: Expire → Expired (blocked, terminal) -->
+          <div class="flip-lane flip-lane--blocked">
+            <div class="flip-lane-row">
+              <span class="flip-arrow flip-arrow--blocked"></span>
+              <span class="svs-edge-token svs-edge-token--blocked">Expire</span>
+              <span class="flip-arrow flip-arrow--blocked"></span>
+              <span class="svs-state-node svs-state-node--terminal-blocked">Expired</span>
+            </div>
+            <div class="flip-verdict flip-verdict--blocked">
+              <span class="flip-verdict-icon">⊘</span> guard fails — PickupWindowOpen must be false
+            </div>
+          </div>
+        </div>
+
+        <!-- Bottom-right: Save / Cancel -->
+        <div class="flip-actions">
+          <button class="flip-btn flip-btn--save">Save</button>
+          <button class="flip-btn">Cancel</button>
+        </div>
+
+      </div>
+    </div>
+    <div class="card-label">Layout Flip — Full Card Restructure</div>
+
+    <div class="flip-annotation">
+      <strong>Layout philosophy:</strong> The current state is the card's anchor (top-left) and the
+      event lanes are the destination (bottom-left). The form data sits between them — the user reads
+      top-to-bottom as "I'm in this state, here's the data, here's where I can go next." Precept
+      metadata and Save/Cancel are pushed to the right column, clearing the left spine for the
+      state-diagram flow. The dashed vertical guide line hints at the structural connection
+      between origin and outcomes.
+    </div>
+  </section>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       DESIGN NOTES
+       ═══════════════════════════════════════════════════════════════════ -->
+  <div class="notes-section">
+    <h3>Design Notes</h3>
+    <ul>
+      <li><strong>Variants 1–4</strong> are data-rich badges — they encode a numeric ratio or proportion. Best when the badge position should carry quantitative context at a glance.</li>
+      <li><strong>Variant 5</strong> is temporal — useful when dwell-time or SLA awareness matters. Requires runtime timestamp data not currently in the DSL.</li>
+      <li><strong>Variant 6</strong> is the most compact at rest (single dot), but relies on hover for the label — breaks the "no-hover-required" principle if the label is essential.</li>
+      <li><strong>Variant 7</strong> is attribution — shows who, not what. Requires actor metadata beyond the current precept model.</li>
+      <li><strong>Variant 8</strong> is forward-looking — primes the user for the primary action. Works best when there's a clear "happy path" event; ambiguous when multiple events are equally likely.</li>
+      <li><strong>Variant 9</strong> is retrospective — visualises history as a mini-sparkline. Useful for audit-oriented workflows; less useful for records with few transitions.</li>
+      <li><strong>Variant 10</strong> is structural — the badge is a gateway, not a signal. It says "more detail is available" without encoding any specific data. Could combine with any other variant.</li>
+      <li><strong>Combinations:</strong> Several of these compose naturally. Constraint Pulse (1) + Inspectability Toggle (10) gives health + expandability. Journey Progress (3) + Next-Action Hint (8) gives position + direction.</li>
+      <li><strong>Runtime feasibility:</strong> Variants 1, 2, 3, 4, 8, 10 can be derived entirely from the precept definition and current instance state. Variants 5, 7 require runtime metadata (timestamps, actor info). Variant 6 requires a computed risk model. Variant 9 requires transition history.</li>
+      <li><strong>Variant 11 (Layout Flip)</strong> is a structural departure — not a badge variant but a full card layout restructure. The micro state diagram becomes the left-hand spine: current state at top-left, event lanes at bottom-left, with the form data sandwiched between. Metadata and actions shift right. This creates a vertical "where I am → what I see → where I can go" reading flow. Requires CSS Grid; no additional runtime data beyond what the micro diagram already needs.</li>
+    </ul>
+  </div>
+
+</div>
+</body>
+</html>

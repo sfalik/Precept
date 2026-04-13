@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Event Button UX Exploration — Precept</title>
+<style>
+/* ─ CSS Custom Properties ─────────────────────────────────────────────── */
+:root {
+  --panel:   #090b0e;
+  --panel-2: #0d1014;
+  --panel-3: #111518;
+  --mono:    "Geist Mono", "Cascadia Code", "Fira Code", monospace;
+  --sans:    "Geist", "Segoe UI Variable Text", system-ui, sans-serif;
+  --event:   #30B8E8;
+  --state:   #A898F5;
+  --data:    #B0BEC5;
+  --violated:#F87171;
+  --warn:    #FDE047;
+  --ok:      #34D399;
+  --line:    rgba(255,255,255,0.08);
+  --line-2:  rgba(255,255,255,0.04);
+  --soft:    #687281;
+  --muted:   #a7afbb;
+  --text:    #d4dae3;
+}
+
+/* ─ Reset & Base ──────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 13px; -webkit-text-size-adjust: 100%; }
+body {
+  background: var(--panel);
+  color: var(--text);
+  font-family: var(--sans);
+  line-height: 1.6;
+  padding: 40px 24px 80px;
+}
+code { font-family: var(--mono); font-size: 0.9em; }
+
+/* ─ Page Layout ───────────────────────────────────────────────────────── */
+.page { max-width: 900px; margin: 0 auto; }
+
+.page-header {
+  padding-bottom: 32px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 48px;
+}
+.page-eyebrow {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--soft);
+  margin-bottom: 8px;
+}
+.page-title {
+  font-family: var(--mono);
+  font-size: 20px;
+  font-weight: 400;
+  color: var(--event);
+  letter-spacing: 0.02em;
+  margin-bottom: 10px;
+}
+.page-subtitle {
+  font-size: 13px;
+  color: var(--muted);
+  max-width: 640px;
+  line-height: 1.65;
+}
+
+/* ─ Problem cards ─────────────────────────────────────────────────────── */
+.problem-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 52px;
+}
+@media (max-width: 600px) { .problem-grid { grid-template-columns: 1fr; } }
+
+/* ─ Approach Section ──────────────────────────────────────────────────── */
+.approach { margin-bottom: 64px; }
+.approach-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.approach-number {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--soft);
+  flex-shrink: 0;
+}
+.approach-name {
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--text);
+  letter-spacing: 0.03em;
+}
+.badge {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 2px;
+}
+.badge--preferred  { background: rgba(52,211,153,0.10); border: 1px solid rgba(52,211,153,0.30); color: var(--ok); }
+.badge--runner-up  { background: rgba(168,152,245,0.08); border: 1px solid rgba(168,152,245,0.22); color: var(--state); }
+
+.approach-philosophy {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 22px;
+  max-width: 680px;
+  line-height: 1.65;
+  border-left: 2px solid rgba(255,255,255,0.06);
+  padding-left: 14px;
+}
+
+/* ─ Tradeoff cards ────────────────────────────────────────────────────── */
+.tradeoff-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 18px;
+}
+@media (max-width: 600px) { .tradeoff-grid { grid-template-columns: 1fr; } }
+.note-card {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 12px 14px;
+}
+.note-card-label {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.note-card p { font-size: 11px; color: var(--muted); line-height: 1.55; }
+.note-card--well .note-card-label { color: var(--ok); }
+.note-card--risk .note-card-label { color: var(--warn); }
+
+/* ─ Section divider ───────────────────────────────────────────────────── */
+.divider { height: 1px; background: var(--line); margin: 56px 0; }
+
+/* ─ Simulated VS Code panel frame ────────────────────────────────────── */
+.panel-frame {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.panel-frame-chrome {
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--panel-3);
+}
+.panel-frame-title {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+.panel-frame-body { padding: 18px; }
+
+/* ─ State pill ────────────────────────────────────────────────────────── */
+.state-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border: 1px solid rgba(168,152,245,0.35);
+  background: rgba(168,152,245,0.07);
+  color: var(--state);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.07em;
+  border-radius: 2px;
+}
+
+/* ─ Data fields (context block) ──────────────────────────────────────── */
+.context-fields {
+  display: grid;
+  gap: 3px;
+  margin-bottom: 18px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+}
+.data-row {
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  gap: 8px;
+  padding: 3px 0;
+  font-family: var(--mono);
+  font-size: 11px;
+  align-items: baseline;
+}
+.data-label { color: var(--soft); font-size: 10px; }
+.data-value { color: var(--data); }
+.data-value--false { color: var(--violated); opacity: 0.85; }
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   APPROACH A — Event Row Table
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.event-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--mono);
+  font-size: 11px;
+}
+.event-table thead th {
+  font-size: 9px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--soft);
+  text-align: left;
+  padding: 4px 14px 10px 0;
+  border-bottom: 1px solid var(--line);
+  font-weight: 400;
+}
+.event-table thead th:last-child { text-align: right; padding-right: 0; }
+
+.event-table tbody td {
+  padding: 9px 14px 9px 0;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--line-2);
+}
+.event-table tbody td:last-child { padding-right: 0; text-align: right; }
+.event-table tbody tr:last-child td { border-bottom: none; }
+
+.event-table tbody tr.row--active { cursor: pointer; }
+.event-table tbody tr.row--active:hover td { background: rgba(48,184,232,0.03); }
+
+/* event name chip */
+.evt-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 2px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.evt-chip--active   { border: 1px solid rgba(48,184,232,0.38); background: rgba(48,184,232,0.06); color: var(--event); }
+.evt-chip--blocked  { border: 1px solid var(--line); background: none; color: var(--soft); }
+.evt-chip--unavail  { border: 1px solid var(--line-2); background: none; color: var(--soft); opacity: 0.35; }
+
+/* args indicator */
+.args-dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: rgba(48,184,232,0.5);
+  flex-shrink: 0;
+}
+
+/* guard column */
+.guard-cell { display: flex; align-items: flex-start; gap: 8px; }
+.guard-icon {
+  flex-shrink: 0;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 8px;
+  margin-top: 1px;
+  font-style: normal;
+}
+.guard-icon--ok     { background: rgba(52,211,153,0.12);  border: 1px solid rgba(52,211,153,0.28); color: var(--ok); }
+.guard-icon--fail   { background: rgba(248,113,113,0.10); border: 1px solid rgba(248,113,113,0.25); color: var(--violated); }
+.guard-icon--unavail{ background: transparent; border: 1px solid var(--line); color: var(--soft); font-size: 9px; }
+
+.guard-text           { font-size: 10px; color: var(--muted); line-height: 1.4; }
+.guard-text--fail     { color: var(--violated); opacity: 0.85; }
+.guard-text--unavail  { color: var(--soft); }
+
+/* target state column */
+.target-cell { display: inline-flex; align-items: center; gap: 5px; }
+.target-arrow { font-size: 9px; color: var(--soft); }
+.target-name  { font-size: 10px; color: var(--state); letter-spacing: 0.04em; }
+.target-self  { font-size: 9px;  color: var(--soft); font-style: italic; margin-left: 2px; }
+.target-none  { font-size: 10px; color: var(--soft); opacity: 0.35; }
+
+/* action column */
+.fire-btn {
+  padding: 3px 12px;
+  border: 1px solid rgba(48,184,232,0.28);
+  background: none;
+  color: var(--event);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: background 0.1s, border-color 0.1s;
+}
+.fire-btn:hover       { background: rgba(48,184,232,0.08); border-color: rgba(48,184,232,0.50); }
+.fire-btn:focus-visible { outline: 1px solid rgba(48,184,232,0.5); outline-offset: 2px; }
+.fire-btn.fired       { color: var(--ok); border-color: rgba(52,211,153,0.35); }
+.fire-btn--args::after { content: " …"; opacity: 0.55; }
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   APPROACH B — Inline Metadata Strip
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* Base event button (shared) */
+.evt-btn {
+  padding: 6px 14px;
+  border: 1px solid rgba(48,184,232,0.35);
+  background: rgba(48,184,232,0.05);
+  color: var(--event);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  cursor: pointer;
+  border-radius: 2px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: background 0.1s, border-color 0.1s;
+}
+.evt-btn:hover        { background: rgba(48,184,232,0.10); border-color: rgba(48,184,232,0.55); }
+.evt-btn:focus-visible{ outline: 1px solid rgba(48,184,232,0.5); outline-offset: 2px; }
+.evt-btn[disabled]    { border-color: var(--line); background: none; color: var(--soft); opacity: 0.5; cursor: default; }
+
+.event-strip { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-start; }
+
+.event-strip-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.strip-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--mono);
+  font-size: 10px;
+  min-height: 16px;
+  padding-left: 2px;
+}
+.strip-arrow            { color: var(--soft); font-size: 9px; }
+.strip-state            { color: var(--state); }
+.strip-self             { color: var(--soft); font-size: 9px; font-style: italic; margin-left: 2px; }
+.strip-args             { color: var(--soft); font-style: italic; }
+.strip-blocked          { color: var(--violated); opacity: 0.8; font-size: 10px; display: flex; align-items: center; gap: 3px; }
+.strip-unavail          { color: var(--soft); opacity: 0.6; }
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   APPROACH C — Split Button Disclosure
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.split-bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-start; }
+
+.split-wrap {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+/* The composite button element */
+.split-btn {
+  display: inline-flex;
+  align-items: stretch;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-radius: 2px;
+  overflow: hidden;
+  cursor: pointer;
+  border: 1px solid rgba(48,184,232,0.35);
+  background: none;
+  padding: 0;
+  transition: border-color 0.1s;
+}
+.split-btn:hover                 { border-color: rgba(48,184,232,0.55); }
+.split-btn:focus-visible         { outline: 1px solid rgba(48,184,232,0.5); outline-offset: 2px; }
+
+.split-btn--off                  { border-color: var(--line); cursor: default; }
+.split-btn--off:hover            { border-color: var(--line); }
+.split-btn--deep-off             { opacity: 0.35; }
+
+/* left zone — action */
+.split-label {
+  padding: 5px 12px;
+  background: rgba(48,184,232,0.05);
+  color: var(--event);
+  border-right: 1px solid rgba(48,184,232,0.18);
+  transition: background 0.1s;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.split-btn:hover .split-label      { background: rgba(48,184,232,0.10); }
+.split-label--off                   { background: none; color: var(--soft); border-right-color: var(--line); }
+.split-btn--off:hover .split-label--off { background: none; }
+
+/* right zone — consequence / disclosure */
+.split-tag {
+  padding: 5px 10px;
+  background: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  text-transform: none;
+  letter-spacing: 0.03em;
+  transition: background 0.1s;
+}
+.split-btn:hover .split-tag        { background: rgba(168,152,245,0.05); }
+.split-tag-arrow                   { font-size: 9px; color: var(--soft); }
+.split-tag-state                   { color: var(--state); }
+.split-tag-self                    { color: var(--soft); font-style: italic; }
+.split-tag--blocked                { color: var(--violated); opacity: 0.82; }
+.split-tag--unavail                { color: var(--soft); opacity: 0.5; }
+.split-btn--off .split-tag         { background: none; }
+.split-btn--off:hover .split-tag   { background: none; }
+
+/* inline reason reveal — blocked */
+.split-reason {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--violated);
+  opacity: 0.88;
+  padding: 3px 8px;
+  background: rgba(248,113,113,0.06);
+  border: 1px solid rgba(248,113,113,0.16);
+  border-radius: 2px;
+  line-height: 1.4;
+  max-width: 260px;
+  display: none;
+}
+.split-wrap.open .split-reason { display: block; }
+
+/* inline reason reveal — unavailable */
+.split-reason-unavail {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--soft);
+  opacity: 0.65;
+  padding: 3px 8px;
+  line-height: 1.4;
+  display: none;
+}
+.split-wrap.open .split-reason-unavail { display: block; }
+
+.hint-text {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--soft);
+  margin-top: 10px;
+  font-style: italic;
+  letter-spacing: 0.04em;
+}
+
+/* ─ Also-considered grid ─────────────────────────────────────────────── */
+.also-considered {
+  margin-top: 40px;
+  padding-top: 32px;
+  border-top: 1px solid var(--line);
+}
+.also-title {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--soft);
+  margin-bottom: 16px;
+}
+.also-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+.also-card {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 12px;
+}
+.also-card-name { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-bottom: 5px; }
+.also-card p    { font-size: 11px; color: var(--soft); line-height: 1.5; }
+
+/* ─ Recommendation block ─────────────────────────────────────────────── */
+.recommendation {
+  background: var(--panel-2);
+  border: 1px solid rgba(52,211,153,0.20);
+  border-radius: 6px;
+  padding: 26px;
+  margin-top: 52px;
+}
+.rec-eyebrow {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ok);
+  margin-bottom: 10px;
+}
+.recommendation h3 {
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--text);
+  margin-bottom: 10px;
+}
+.recommendation p   { font-size: 12px; color: var(--muted); line-height: 1.65; max-width: 680px; }
+.recommendation p + p { margin-top: 8px; }
+
+/* ─ Scrollbars ───────────────────────────────────────────────────────── */
+::-webkit-scrollbar        { width: 6px; height: 6px; }
+::-webkit-scrollbar-track  { background: transparent; }
+::-webkit-scrollbar-thumb  { background: rgba(255,255,255,0.08); border-radius: 3px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ─ Page Header ──────────────────────────────────────────────────── -->
+  <div class="page-header">
+    <p class="page-eyebrow">Precept · UX Design Exploration · 2026-04-12</p>
+    <h1 class="page-title">Event Button Affordances</h1>
+    <p class="page-subtitle">
+      Three approaches solving two gaps in the event bar: no explanation for why a button is disabled, and no pre-click preview of where a transition leads. Shown in a simulated VS Code preview panel. Prototype only — does not modify <code>design/system/semantic-visual-system.html</code>.
+    </p>
+  </div>
+
+  <!-- ─ Problem statement ────────────────────────────────────────────── -->
+  <div class="problem-grid">
+    <div class="note-card note-card--risk">
+      <div class="note-card-label">Problem 1 — Disabled opacity</div>
+      <p>A disabled event button gives no feedback about <em>why</em> it is blocked. Only a <code>title</code> tooltip exists — invisible at a glance, absent on touch. A developer needs to know: what has to change before this event becomes available?</p>
+    </div>
+    <div class="note-card note-card--risk">
+      <div class="note-card-label">Problem 2 — Pre-click destination blind</div>
+      <p>No-args events fire immediately on click. There is no preview of the target state beforehand — including when the outcome might be a self-transition, a rejection, or a clean state change. For args events, the dialog reveals the target state, but for no-args events the developer must commit blind.</p>
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       APPROACH A — Event Row Table
+       ═══════════════════════════════════════════════════════════════════ -->
+  <div class="approach" id="approach-a">
+    <div class="approach-header">
+      <span class="approach-number">A</span>
+      <h2 class="approach-name">Event Row Table</h2>
+      <span class="badge badge--preferred">Preferred</span>
+    </div>
+    <p class="approach-philosophy">
+      Replace the button strip with a compact decision table. Each event is a structured row: event name chip · guard status with reason · target state · fire action. Every piece of information is visible simultaneously in the resting state — no hover, no tooltip, no interaction required.
+    </p>
+
+    <div class="panel-frame">
+      <div class="panel-frame-chrome">
+        <span class="panel-frame-title">Precept Preview</span>
+        <span style="margin-left:auto;display:flex;align-items:center;gap:8px">
+          <span style="font-family:var(--mono);font-size:9px;letter-spacing:0.08em;color:var(--soft)">State</span>
+          <span class="state-pill">AwaitingPickup</span>
+        </span>
+      </div>
+      <div class="panel-frame-body">
+
+        <!-- Context snapshot -->
+        <div class="context-fields">
+          <div class="data-row">
+            <span class="data-label">PickupWindowOpen</span>
+            <span class="data-value data-value--false">false</span>
+          </div>
+          <div class="data-row">
+            <span class="data-label">HostConfirmed</span>
+            <span class="data-value">true</span>
+          </div>
+          <div class="data-row">
+            <span class="data-label">ExpiresAt</span>
+            <span class="data-value">2026-04-13T18:00Z</span>
+          </div>
+        </div>
+
+        <!-- Event table -->
+        <table class="event-table" role="table" aria-label="Available events">
+          <thead>
+            <tr>
+              <th>Event</th>
+              <th>Guard</th>
+              <th>Target</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+
+            <!-- Row 1: Active, no args -->
+            <tr class="row--active" role="row">
+              <td>
+                <span class="evt-chip evt-chip--active">PickUp</span>
+              </td>
+              <td>
+                <div class="guard-cell">
+                  <span class="guard-icon guard-icon--ok" title="Guard passes" aria-label="Guard passes">✓</span>
+                  <span class="guard-text">HostConfirmed == true</span>
+                </div>
+              </td>
+              <td>
+                <div class="target-cell">
+                  <span class="target-arrow">→</span>
+                  <span class="target-name">PickedUp</span>
+                </div>
+              </td>
+              <td>
+                <button class="fire-btn" onclick="this.textContent='Fired'; this.classList.add('fired')" aria-label="Fire PickUp">Fire</button>
+              </td>
+            </tr>
+
+            <!-- Row 2: Active, has args (self-transition) -->
+            <tr class="row--active" role="row">
+              <td>
+                <span class="evt-chip evt-chip--active">
+                  Reassign
+                  <span class="args-dot" title="Requires arguments" aria-label="Requires arguments"></span>
+                </span>
+              </td>
+              <td>
+                <div class="guard-cell">
+                  <span class="guard-icon guard-icon--ok" title="Guard passes" aria-label="Guard passes">✓</span>
+                  <span class="guard-text">always available</span>
+                </div>
+              </td>
+              <td>
+                <div class="target-cell">
+                  <span class="target-arrow">→</span>
+                  <span class="target-name">AwaitingPickup</span>
+                  <span class="target-self">(self)</span>
+                </div>
+              </td>
+              <td>
+                <button class="fire-btn fire-btn--args" aria-label="Fire Reassign — opens argument dialog">Fire</button>
+              </td>
+            </tr>
+
+            <!-- Row 3: Disabled, guard fails -->
+            <tr role="row">
+              <td>
+                <span class="evt-chip evt-chip--blocked">Expire</span>
+              </td>
+              <td>
+                <div class="guard-cell">
+                  <span class="guard-icon guard-icon--fail" title="Guard fails" aria-label="Guard fails">✗</span>
+                  <span class="guard-text guard-text--fail">PickupWindowOpen == false required</span>
+                </div>
+              </td>
+              <td>
+                <div class="target-cell">
+                  <span class="target-arrow" style="opacity:0.25">→</span>
+                  <span class="target-name" style="opacity:0.25">Expired</span>
+                </div>
+              </td>
+              <td>
+                <span style="font-family:var(--mono);font-size:9px;color:var(--soft);opacity:0.45">blocked</span>
+              </td>
+            </tr>
+
+            <!-- Row 4: Disabled, not available from this state -->
+            <tr role="row">
+              <td>
+                <span class="evt-chip evt-chip--unavail">Return</span>
+              </td>
+              <td>
+                <div class="guard-cell">
+                  <span class="guard-icon guard-icon--unavail" title="Not available" aria-label="Not available from current state">○</span>
+                  <span class="guard-text guard-text--unavail">not available from AwaitingPickup</span>
+                </div>
+              </td>
+              <td>
+                <div class="target-cell">
+                  <span class="target-arrow" style="opacity:0.15">→</span>
+                  <span class="target-none">—</span>
+                </div>
+              </td>
+              <td>
+                <span style="font-family:var(--mono);font-size:9px;color:var(--soft);opacity:0.25">—</span>
+              </td>
+            </tr>
+
+          </tbody>
+        </table>
+
+        <!-- small clarifying note -->
+        <p style="font-family:var(--mono);font-size:9px;color:var(--soft);margin-top:12px;letter-spacing:0.04em">
+          Events with <span style="display:inline-block;width:5px;height:5px;border-radius:50%;background:rgba(48,184,232,0.5);margin:0 3px 1px;vertical-align:middle"></span> require arguments — clicking Fire opens an arg dialog.
+        </p>
+      </div>
+    </div>
+
+    <div class="tradeoff-grid">
+      <div class="note-card note-card--well">
+        <div class="note-card-label">Does well</div>
+        <p>All information visible in resting state — zero interaction required. Solves both problems simultaneously: guard reason is always shown for blocked events, target state is always shown for active events. Accessible by default with semantic table markup. Scales to 8–10 events without wrapping chaos. Reads like a runtime truth table — exactly on-brand for Precept's rigor.</p>
+      </div>
+      <div class="note-card note-card--risk">
+        <div class="note-card-label">Trade-offs</div>
+        <p>Uses more vertical space than a flat button row. Developers accustomed to a horizontal button strip may need a moment to register rows as interactive. The "Fire" action column needs careful visual treatment — it should feel primary, not like a form submission button. Long guard expressions may need text clamping at narrow widths.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       APPROACH B — Inline Metadata Strip
+       ═══════════════════════════════════════════════════════════════════ -->
+  <div class="approach" id="approach-b">
+    <div class="approach-header">
+      <span class="approach-number">B</span>
+      <h2 class="approach-name">Inline Metadata Strip</h2>
+      <span class="badge badge--runner-up">Runner-up</span>
+    </div>
+    <p class="approach-philosophy">
+      Preserve the familiar button row but attach a compact one-line metadata strip directly below each button: a target state name for active events, a guard failure reason for disabled events. No interaction required — all affordances visible in the resting state with minimal departure from the current design.
+    </p>
+
+    <div class="panel-frame">
+      <div class="panel-frame-chrome">
+        <span class="panel-frame-title">Precept Preview</span>
+        <span style="margin-left:auto;display:flex;align-items:center;gap:8px">
+          <span style="font-family:var(--mono);font-size:9px;letter-spacing:0.08em;color:var(--soft)">State</span>
+          <span class="state-pill">AwaitingPickup</span>
+        </span>
+      </div>
+      <div class="panel-frame-body">
+
+        <div class="context-fields">
+          <div class="data-row">
+            <span class="data-label">PickupWindowOpen</span>
+            <span class="data-value data-value--false">false</span>
+          </div>
+          <div class="data-row">
+            <span class="data-label">HostConfirmed</span>
+            <span class="data-value">true</span>
+          </div>
+        </div>
+
+        <div class="event-strip">
+
+          <!-- Active, no args -->
+          <div class="event-strip-item">
+            <button class="evt-btn" aria-label="Fire PickUp — transitions to PickedUp">PickUp</button>
+            <div class="strip-meta" aria-label="Transitions to PickedUp">
+              <span class="strip-arrow">→</span>
+              <span class="strip-state">PickedUp</span>
+            </div>
+          </div>
+
+          <!-- Active, has args -->
+          <div class="event-strip-item">
+            <button class="evt-btn" aria-label="Reassign — requires arguments, self-transition">
+              Reassign
+              <span class="args-dot" title="Requires arguments"></span>
+            </button>
+            <div class="strip-meta" aria-label="Self-transition — stays in AwaitingPickup">
+              <span class="strip-arrow">→</span>
+              <span class="strip-state">AwaitingPickup</span>
+              <span class="strip-self">(self)</span>
+            </div>
+          </div>
+
+          <!-- Disabled, guard fails -->
+          <div class="event-strip-item">
+            <button class="evt-btn" disabled aria-disabled="true" aria-label="Expire — blocked, PickupWindowOpen == false required">Expire</button>
+            <div class="strip-meta">
+              <span class="strip-blocked">
+                <span style="font-size:11px">⊗</span>
+                PickupWindowOpen == false required
+              </span>
+            </div>
+          </div>
+
+          <!-- Disabled, not from state -->
+          <div class="event-strip-item">
+            <button class="evt-btn" disabled aria-disabled="true" aria-label="Return — not available from this state">Return</button>
+            <div class="strip-meta">
+              <span class="strip-unavail">not available from this state</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <div class="tradeoff-grid">
+      <div class="note-card note-card--well">
+        <div class="note-card-label">Does well</div>
+        <p>Smallest departure from the current button design — familiar form preserved. Both problems solved in resting state. Low implementation cost: just add a sibling metadata line per button. Works naturally at narrow widths since the strip wraps with its button. Accessible with proper <code>aria-label</code> and <code>aria-disabled</code>.</p>
+      </div>
+      <div class="note-card note-card--risk">
+        <div class="note-card-label">Trade-offs</div>
+        <p>Long guard expressions must be truncated and still risk needing a tooltip as a fallback. Each button gains additional height — with 6+ events wrapping into 2–3 rows, the event dock becomes significantly taller. The strip text competes visually with field labels in the form above it; vertical rhythm needs care.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       APPROACH C — Split Button Disclosure
+       ═══════════════════════════════════════════════════════════════════ -->
+  <div class="approach" id="approach-c">
+    <div class="approach-header">
+      <span class="approach-number">C</span>
+      <h2 class="approach-name">Split Button Disclosure</h2>
+      <span class="badge badge--runner-up">Runner-up</span>
+    </div>
+    <p class="approach-philosophy">
+      Active events become split buttons: left zone fires the event, right zone shows the target state name in state color as a fused badge. Disabled events carry a compact ⊗ zone that toggles an inline reason reveal on click or focus — one click to discover, still zero tooltip required.
+    </p>
+
+    <div class="panel-frame">
+      <div class="panel-frame-chrome">
+        <span class="panel-frame-title">Precept Preview</span>
+        <span style="margin-left:auto;display:flex;align-items:center;gap:8px">
+          <span style="font-family:var(--mono);font-size:9px;letter-spacing:0.08em;color:var(--soft)">State</span>
+          <span class="state-pill">AwaitingPickup</span>
+        </span>
+      </div>
+      <div class="panel-frame-body">
+
+        <div class="context-fields">
+          <div class="data-row">
+            <span class="data-label">PickupWindowOpen</span>
+            <span class="data-value data-value--false">false</span>
+          </div>
+          <div class="data-row">
+            <span class="data-label">HostConfirmed</span>
+            <span class="data-value">true</span>
+          </div>
+        </div>
+
+        <div class="split-bar">
+
+          <!-- Active, no args -->
+          <div class="split-wrap">
+            <button class="split-btn" aria-label="Fire PickUp — transitions to PickedUp">
+              <span class="split-label">PickUp</span>
+              <span class="split-tag">
+                <span class="split-tag-arrow">→</span>
+                <span class="split-tag-state">PickedUp</span>
+              </span>
+            </button>
+          </div>
+
+          <!-- Active, has args -->
+          <div class="split-wrap">
+            <button class="split-btn" aria-label="Reassign — requires arguments, self-transition">
+              <span class="split-label">
+                Reassign
+                <span class="args-dot" title="Requires arguments"></span>
+              </span>
+              <span class="split-tag">
+                <span class="split-tag-arrow">→</span>
+                <span class="split-tag-self">self</span>
+              </span>
+            </button>
+          </div>
+
+          <!-- Disabled, guard fails -->
+          <div class="split-wrap" id="c-expire">
+            <button class="split-btn split-btn--off"
+                    aria-expanded="false"
+                    aria-label="Expire blocked — click to see why"
+                    onclick="
+                      var w = document.getElementById('c-expire');
+                      var open = w.classList.toggle('open');
+                      this.setAttribute('aria-expanded', open);
+                    ">
+              <span class="split-label split-label--off">Expire</span>
+              <span class="split-tag split-tag--blocked">⊗ blocked</span>
+            </button>
+            <div class="split-reason" role="status" aria-live="polite">
+              PickupWindowOpen == false required
+            </div>
+          </div>
+
+          <!-- Disabled, not from state -->
+          <div class="split-wrap split-btn--deep-off" id="c-return">
+            <button class="split-btn split-btn--off"
+                    aria-expanded="false"
+                    aria-label="Return not available from current state — click to see why"
+                    onclick="
+                      var w = document.getElementById('c-return');
+                      var open = w.classList.toggle('open');
+                      this.setAttribute('aria-expanded', open);
+                    ">
+              <span class="split-label split-label--off">Return</span>
+              <span class="split-tag split-tag--unavail">○ n/a</span>
+            </button>
+            <div class="split-reason-unavail" role="status" aria-live="polite">
+              not available from AwaitingPickup
+            </div>
+          </div>
+
+        </div>
+        <p class="hint-text">Click ⊗ or ○ buttons to reveal the blocking reason</p>
+      </div>
+    </div>
+
+    <div class="tradeoff-grid">
+      <div class="note-card note-card--well">
+        <div class="note-card-label">Does well</div>
+        <p>Most compact resting footprint of the three approaches — target state rides inline in the same button row at no extra height. The split form communicates intent clearly: left = action, right = consequence. Blocked events are obviously non-passive (the ⊗ badge is interactive), so developers discover the reason in one deliberate click rather than hoping to find a tooltip.</p>
+      </div>
+      <div class="note-card note-card--risk">
+        <div class="note-card-label">Trade-offs</div>
+        <p>Blocked event reason still requires an explicit click to reveal — not zero-friction. Two interaction zones in one button require careful keyboard tab and Enter/Space handling to prevent accidental fires. Split button is an unusual pattern in VS Code's native UI vocabulary; some developers may not immediately understand the right-zone affordance without a visual cue for the boundary.</p>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ─ Also Considered ──────────────────────────────────────────────── -->
+  <div class="also-considered">
+    <div class="also-title">Also Considered — Not Prototyped</div>
+    <div class="also-grid">
+      <div class="also-card">
+        <div class="also-card-name">D · Rich Hover Popover</div>
+        <p>On hover, a popover shows full guard expression and target state. No resting footprint. Rejected: hover-only excludes touch, hidden information has high discovery friction for developers scanning quickly.</p>
+      </div>
+      <div class="also-card">
+        <div class="also-card-name">E · Accordion Expand Row</div>
+        <p>Click anywhere on a disabled button to expand it into a diagnostic block with full guard details. More informative but requires a click to see anything at all. Better suited as a detail layer within Approach A than as a standalone pattern.</p>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ─ Recommendation ────────────────────────────────────────────────── -->
+  <div class="recommendation">
+    <p class="rec-eyebrow">Recommendation — For Shane's review</p>
+    <h3>Approach A — Event Row Table</h3>
+    <p>
+      The table is the right abstraction for the event bar at this product maturity. It frames the event bar as what it actually is: a decision surface that answers "what can happen from here, why, and where does it go?" simultaneously — in the resting state, with no interaction required. Both problems are resolved in a single layout: guard reason is inline for blocked rows, target state is inline for active rows.
+    </p>
+    <p>
+      Row structure handles 1–10+ events gracefully, is keyboard-navigable, and is accessible by default via semantic table markup. Self-transitions, rejections, and unavailable events each get a distinct visual treatment in the same pattern. The dense, information-first presentation is deeply on-brand for Precept's character as a rigorous runtime tool.
+    </p>
+    <p>
+      Approach B (Inline Strip) is the right answer if the team wants the smallest possible change to the current button design — it solves both problems with minimal departure and low implementation cost. Approach C (Split Button) is worth pursuing if vertical compactness is paramount, but needs additional design work to handle keyboard accessibility cleanly before it's implementation-ready.
+    </p>
+    <p style="color:var(--soft);font-size:11px;margin-top:12px">
+      This prototype does not modify <code>design/system/semantic-visual-system.html</code>. Standalone exploration at <code>design/prototypes/event-button-ux-exploration.html</code>.
+    </p>
+  </div>
+
+  <!-- ─ Footer ────────────────────────────────────────────────────────── -->
+  <div style="margin-top:40px;padding-top:24px;border-top:1px solid var(--line);font-family:var(--mono);font-size:9px;color:var(--soft);letter-spacing:0.08em">
+    PRECEPT · Event Button UX Exploration · Elaine, UX Designer · 2026-04-12
+  </div>
+
+</div>
+</body>
+</html>

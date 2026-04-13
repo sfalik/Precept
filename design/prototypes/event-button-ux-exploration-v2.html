@@ -1,0 +1,978 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Event Button UX Exploration v2 — Precept</title>
+<style>
+/* ─ Custom Properties ─────────────────────────────────────────────────── */
+:root {
+  --panel:    #090b0e;
+  --panel-2:  #0d1014;
+  --panel-3:  #111518;
+  --event:    #30B8E8;
+  --state:    #A898F5;
+  --data:     #B0BEC5;
+  --violated: #F87171;
+  --warn:     #FDE047;
+  --ok:       #34D399;
+  --line:     rgba(255,255,255,0.08);
+  --line-2:   rgba(255,255,255,0.04);
+  --soft:     #687281;
+  --muted:    #a7afbb;
+  --text:     #d4dae3;
+  --mono:     "Geist Mono","Cascadia Code","Fira Code",monospace;
+  --sans:     "Geist","Segoe UI Variable Text",system-ui,sans-serif;
+}
+
+/* ─ Reset ────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 14px; -webkit-text-size-adjust: 100%; }
+body {
+  background: var(--panel);
+  color: var(--text);
+  font-family: var(--sans);
+  line-height: 1.6;
+  padding: 48px 24px 96px;
+}
+a { color: inherit; text-decoration: none; }
+
+/* ─ Page ─────────────────────────────────────────────────────────────── */
+.page { max-width: 960px; margin: 0 auto; }
+
+.page-header {
+  padding-bottom: 32px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 52px;
+}
+.page-eyebrow {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--soft);
+  margin-bottom: 10px;
+}
+.page-title {
+  font-family: var(--mono);
+  font-size: 20px;
+  font-weight: 400;
+  color: var(--event);
+  margin-bottom: 12px;
+}
+.page-lead {
+  font-size: 13.5px;
+  color: var(--muted);
+  max-width: 720px;
+  line-height: 1.75;
+}
+.page-lead strong { color: var(--text); font-weight: 500; }
+
+/* ─ Problem cards ────────────────────────────────────────────────────── */
+.problem-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 52px;
+}
+@media (max-width: 600px) { .problem-grid { grid-template-columns: 1fr; } }
+.problem-card {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 16px 20px;
+}
+.problem-num {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--soft);
+  margin-bottom: 8px;
+}
+.problem-q { font-size: 13.5px; font-weight: 500; color: var(--text); margin-bottom: 5px; }
+.problem-sub { font-size: 11.5px; color: var(--muted); line-height: 1.55; }
+
+/* ─ Section label ─────────────────────────────────────────────────────── */
+.section-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--soft);
+  margin-bottom: 18px;
+}
+
+/* ─ Alternates table ─────────────────────────────────────────────────── */
+.alts-section { margin-bottom: 56px; }
+.alt-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.alt-table thead th {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--soft);
+  font-weight: 400;
+  text-align: left;
+  padding: 0 14px 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.alt-table tbody td {
+  padding: 10px 14px 10px 0;
+  border-bottom: 1px solid var(--line-2);
+  vertical-align: top;
+  color: var(--muted);
+  line-height: 1.55;
+}
+.alt-table tbody tr:last-child td { border-bottom: none; }
+.alt-table .c-n { font-family: var(--mono); font-size: 10px; color: var(--soft); width: 28px; white-space: nowrap; }
+.alt-table .c-name { color: var(--text); font-weight: 500; width: 185px; }
+.alt-table .c-name small {
+  display: block;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--event);
+  letter-spacing: 0.06em;
+  margin-top: 2px;
+}
+.alt-table .c-analogy { font-style: italic; color: var(--soft); font-size: 12px; width: 190px; }
+.alt-table .c-tradeoff { font-size: 12px; color: var(--soft); }
+.tag-top3 {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 2px;
+  background: rgba(168,152,245,0.10);
+  border: 1px solid rgba(168,152,245,0.25);
+  color: var(--state);
+  margin-left: 7px;
+  vertical-align: middle;
+}
+
+/* ─ Divider ──────────────────────────────────────────────────────────── */
+.divider { height: 1px; background: var(--line); margin: 56px 0; }
+
+/* ─ Variant section ──────────────────────────────────────────────────── */
+.variant { margin-bottom: 72px; }
+.var-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.var-letter { font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--soft); }
+.var-name { font-family: var(--mono); font-size: 18px; font-weight: 400; color: var(--text); }
+.var-chip {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 2px;
+}
+.var-chip--shanes { background: rgba(48,184,232,0.08); border: 1px solid rgba(48,184,232,0.28); color: var(--event); }
+.var-chip--selected { background: rgba(168,152,245,0.08); border: 1px solid rgba(168,152,245,0.25); color: var(--state); }
+
+.var-idea {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.75;
+  margin-bottom: 28px;
+  max-width: 700px;
+}
+.var-annotation {
+  margin-top: 16px;
+  font-size: 12px;
+  color: var(--soft);
+  font-style: italic;
+  padding-left: 14px;
+  border-left: 2px solid rgba(255,255,255,0.05);
+  max-width: 580px;
+  line-height: 1.65;
+}
+
+/* ─ Form Card (shared base) ──────────────────────────────────────────── */
+.form-stage {
+  display: flex;
+  justify-content: center;
+  padding: 20px 0 4px;
+}
+.form-card {
+  background: var(--panel-2);
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 7px;
+  width: 100%;
+  max-width: 560px;
+  box-shadow: 0 6px 32px rgba(0,0,0,0.40);
+  position: relative;
+}
+
+/* Card chrome: header */
+.card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--line);
+  gap: 16px;
+}
+.card-meta { min-width: 0; flex: 1; }
+.card-type {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--soft);
+  margin-bottom: 3px;
+}
+.card-ref {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--muted);
+  margin-bottom: 5px;
+}
+.card-name {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: 0.01em;
+}
+
+/* Shared state badge */
+.sbadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 13px;
+  border-radius: 3px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  line-height: 1.25;
+}
+.sbadge--violet {
+  border: 1px solid rgba(168,152,245,0.35);
+  background: rgba(168,152,245,0.08);
+  color: var(--state);
+}
+.sbadge--violet-bright {
+  border: 1px solid rgba(168,152,245,0.55);
+  background: rgba(168,152,245,0.15);
+  color: var(--state);
+}
+.sbadge--rose {
+  border: 1px solid rgba(248,113,113,0.35);
+  background: rgba(248,113,113,0.08);
+  color: var(--violated);
+}
+
+/* Card fields */
+.card-fields {
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  gap: 9px;
+}
+.f-row {
+  display: grid;
+  grid-template-columns: 155px 1fr;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 13px;
+}
+.f-label { font-size: 12px; color: var(--soft); }
+.f-val { color: var(--text); }
+.f-val--yes { color: var(--ok); }
+.f-val--yes::before { content: "✓ "; font-size: 11px; opacity: 0.8; }
+.f-val--open { color: var(--ok); }
+.f-val--open::before { content: "● "; font-size: 9px; opacity: 0.7; }
+
+/* Shared action buttons */
+.act-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 18px;
+  border-radius: 4px;
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, opacity 0.12s;
+  border: 1px solid transparent;
+}
+.act-btn--go {
+  border-color: rgba(48,184,232,0.40);
+  background: rgba(48,184,232,0.10);
+  color: var(--event);
+}
+.act-btn--go:hover {
+  background: rgba(48,184,232,0.18);
+  border-color: rgba(48,184,232,0.60);
+}
+.act-btn--off {
+  border-color: rgba(255,255,255,0.11);
+  background: transparent;
+  color: var(--soft);
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+/* Interactive hint label */
+.interact-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  color: var(--soft);
+  opacity: 0.55;
+  padding: 10px 24px 0;
+}
+.interact-hint::before { content: "↗"; font-size: 10px; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   VARIANT D — State Badge Preview on Hover (Shane's idea)
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* The badge area stacks three elements; only one is visible at a time */
+.card-d .badge-stack {
+  position: relative;
+  height: 28px;
+  min-width: 150px;  /* wide enough for the longest preview badge */
+  flex-shrink: 0;
+}
+.card-d .badge-stack .sbadge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  transition: opacity 0.20s ease;
+}
+.card-d .badge-stack .bd-current   { opacity: 1;  z-index: 1; }
+.card-d .badge-stack .bd-next      { opacity: 0;  z-index: 2; }
+.card-d .badge-stack .bd-blocked   { opacity: 0;  z-index: 2; }
+
+/* On hover: swap badge */
+.card-d:has(.btn-d-go:hover)  .badge-stack .bd-current  { opacity: 0; }
+.card-d:has(.btn-d-go:hover)  .badge-stack .bd-next     { opacity: 1; }
+.card-d:has(.btn-d-off:hover) .badge-stack .bd-current  { opacity: 0; }
+.card-d:has(.btn-d-off:hover) .badge-stack .bd-blocked  { opacity: 1; }
+
+/* Disabled button: on hover show a subtle blocked tint */
+.card-d:has(.btn-d-off:hover) .btn-d-off {
+  border-color: rgba(248,113,113,0.25);
+  color: var(--violated);
+  opacity: 0.65;
+}
+
+/* Guard explanation: appears below action bar on hover */
+.card-d .guard-msg {
+  font-size: 11.5px;
+  color: var(--violated);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+  pointer-events: none;
+  min-height: 18px;
+}
+.card-d .guard-msg .gm-icon { font-size: 12px; opacity: 0.75; flex-shrink: 0; }
+.card-d:has(.btn-d-off:hover) .guard-msg { opacity: 1; }
+
+/* Badge preview "arrow" prefix */
+.badge-prefix { font-size: 10px; opacity: 0.6; margin-right: 1px; }
+
+/* Action bar layout for D */
+.card-d .card-actions {
+  padding: 16px 24px 18px;
+}
+.card-d .action-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   VARIANT E — Inline Outcome Strip (always visible)
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.card-e .card-actions {
+  padding: 16px 24px 20px;
+}
+.card-e .action-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* Each action sits in a column: button on top, outcome strip below */
+.action-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+}
+
+.outcome-strip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  padding: 0 2px;
+  line-height: 1.3;
+}
+.outcome-strip--go {
+  color: var(--state);
+}
+.outcome-strip--go .os-arrow { color: var(--soft); margin-right: 1px; }
+
+.outcome-strip--blocked {
+  color: var(--violated);
+  opacity: 0.80;
+}
+.outcome-strip--blocked .os-icon { font-size: 11px; flex-shrink: 0; }
+.outcome-strip--blocked .os-reason { font-size: 10px; color: rgba(248,113,113,0.70); }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   VARIANT F — Consequence Gutter (populates on hover)
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* The gutter is a fixed-height band between fields and actions that
+   shows a consequence path only when the user hovers an action button. */
+.card-f .consequence-gutter {
+  border-top: 1px solid var(--line);
+  position: relative;
+  height: 44px;
+  overflow: hidden;
+}
+.gutter-layer {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  gap: 8px;
+  transition: opacity 0.18s ease;
+}
+
+/* Default: quiet idle label */
+.card-f .g-idle {
+  opacity: 1;
+  pointer-events: none;
+}
+.g-idle-text {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.07em;
+  color: var(--soft);
+  opacity: 0.45;
+  font-style: italic;
+}
+
+/* Path layers (start hidden) */
+.card-f .g-path-go,
+.card-f .g-path-blocked {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* On hover: fade idle out, fade path in */
+.card-f:has(.btn-f-go:hover)      .g-idle      { opacity: 0; }
+.card-f:has(.btn-f-go:hover)      .g-path-go   { opacity: 1; }
+.card-f:has(.btn-f-blocked:hover) .g-idle      { opacity: 0; }
+.card-f:has(.btn-f-blocked:hover) .g-path-blocked { opacity: 1; }
+
+/* Gutter path elements */
+.g-state-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 2px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+.g-state-chip--from {
+  border: 1px solid rgba(168,152,245,0.25);
+  background: rgba(168,152,245,0.05);
+  color: var(--state);
+  opacity: 0.75;
+}
+.g-state-chip--to {
+  border: 1px solid rgba(168,152,245,0.40);
+  background: rgba(168,152,245,0.11);
+  color: var(--state);
+}
+.g-state-chip--to-blocked {
+  border: 1px solid rgba(248,113,113,0.30);
+  background: rgba(248,113,113,0.06);
+  color: var(--violated);
+  opacity: 0.80;
+}
+
+.g-arrow-seq {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--soft);
+  flex-shrink: 0;
+}
+.g-event-label {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.07em;
+  white-space: nowrap;
+}
+.g-event-label--go     { color: var(--event); }
+.g-event-label--blocked { color: var(--violated); opacity: 0.65; text-decoration: line-through; }
+
+.g-block-reason {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--violated);
+  opacity: 0.65;
+  font-style: italic;
+  margin-left: 4px;
+  white-space: nowrap;
+}
+
+/* Action bar for F */
+.card-f .card-actions {
+  padding: 14px 24px 18px;
+  border-top: 1px solid var(--line);
+}
+.card-f .action-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* Disabled button: on Expire hover, give a blocked color hint */
+.card-f:has(.btn-f-blocked:hover) .btn-f-blocked {
+  border-color: rgba(248,113,113,0.22);
+  color: var(--violated);
+  opacity: 0.60;
+}
+
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ── Page Header ───────────────────────────────────────────────── -->
+  <header class="page-header">
+    <div class="page-eyebrow">Design Prototypes · Event Button UX · v2 · 2026-04-12</div>
+    <h1 class="page-title">Event Button Alternatives — Round 2</h1>
+    <p class="page-lead">
+      Ten alternatives for surfacing <strong>why an event is blocked</strong> and <strong>where an event goes</strong>
+      before the user clicks — framed for a business record form, not a developer panel.
+      Mock data: <strong>Visitor Badge Pickup #VBP-2847</strong> at state <strong>ReadyForPickup</strong>.
+      Events: <strong>Pick Up</strong> (active → PickedUp), <strong>Expire Request</strong> (blocked: PickupWindowOpen must be false → Expired).
+    </p>
+  </header>
+
+  <!-- ── Problem Statement ─────────────────────────────────────────── -->
+  <div class="problem-grid">
+    <div class="problem-card">
+      <div class="problem-num">UX Problem 1</div>
+      <div class="problem-q">Why is this action unavailable?</div>
+      <div class="problem-sub">The user sees a disabled button but doesn't know which condition is blocking it or how to unblock it. Tooltip-on-hover is the current placeholder — it fails on touch and requires discovery.</div>
+    </div>
+    <div class="problem-card">
+      <div class="problem-num">UX Problem 2</div>
+      <div class="problem-q">Where does this action take me?</div>
+      <div class="problem-sub">Every event transitions the record to a new state — but the user has to click to find out. For irreversible transitions this is a real risk. The destination should be readable before committing.</div>
+    </div>
+  </div>
+
+  <!-- ── 10 Alternatives ────────────────────────────────────────────── -->
+  <div class="alts-section">
+    <div class="section-label">10 Alternatives Considered</div>
+    <table class="alt-table">
+      <thead>
+        <tr>
+          <th class="c-n">#</th>
+          <th class="c-name">Name</th>
+          <th>One-sentence idea</th>
+          <th class="c-analogy">Business analogy</th>
+          <th class="c-tradeoff">Key trade-off</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="c-n">1</td>
+          <td class="c-name">
+            State Badge Preview
+            <small>variant D</small>
+            <span class="tag-top3">top 3</span>
+          </td>
+          <td>Hovering an event button fades the state badge (top-right) from the current state to the event's target state — using existing screen real estate, no new element.</td>
+          <td class="c-analogy">Salesforce status picker preview — hover a stage to see the field update before confirming</td>
+          <td class="c-tradeoff">Requires the eye to travel from button to badge; blocked-state guard reason needs a secondary display zone</td>
+        </tr>
+        <tr>
+          <td class="c-n">2</td>
+          <td class="c-name">
+            Inline Outcome Strip
+            <small>variant E</small>
+            <span class="tag-top3">top 3</span>
+          </td>
+          <td>Each action button has a persistent subordinate strip below it showing "→ TargetState" (active) or "⊘ Guard reason" (blocked) — always visible, zero hover required.</td>
+          <td class="c-analogy">ServiceNow incident action bar with inline validation messages below each workflow button</td>
+          <td class="c-tradeoff">Increases vertical footprint of the action bar by ~20px per button; always-on blocked messages may alarm infrequent users</td>
+        </tr>
+        <tr>
+          <td class="c-n">3</td>
+          <td class="c-name">
+            Consequence Gutter
+            <small>variant F</small>
+            <span class="tag-top3">top 3</span>
+          </td>
+          <td>A quiet fixed-height band between the fields and the action bar populates a full path preview (State → Event → State) only when the user hovers an action button.</td>
+          <td class="c-analogy">SharePoint approval step connector bar — shows the current node and next destination while hovering a flow action</td>
+          <td class="c-tradeoff">Idle gutter reads as empty space; hover discovery still required; path text can overflow in compact layouts</td>
+        </tr>
+        <tr>
+          <td class="c-n">4</td>
+          <td class="c-name">Intent-Labeled Button</td>
+          <td>Button label encodes destination: "Pick Up → PickedUp". Disabled buttons show "Expire [blocked]" — the outcome is legible before any interaction.</td>
+          <td class="c-analogy">Dynamics 365 stage-to-stage progression buttons with built-in outcome labels</td>
+          <td class="c-tradeoff">Label length grows; localization becomes complex; blocked button still needs a separate affordance for the guard reason</td>
+        </tr>
+        <tr>
+          <td class="c-n">5</td>
+          <td class="c-name">Tooltip Decision Card</td>
+          <td>Hover any button to show a compact popover card listing the target state, guard status, and a one-line reason in human language.</td>
+          <td class="c-analogy">DocuSign action approval tooltip — surfaces signer status and next step on hover</td>
+          <td class="c-tradeoff">Tooltip pattern requires dwell time; disappears on movement; completely inaccessible on touch; common component but lowest information persistence</td>
+        </tr>
+        <tr>
+          <td class="c-n">6</td>
+          <td class="c-name">Guard Callout Banner</td>
+          <td>Blocked events show a persistent soft banner beneath the button row: "Expire Request is unavailable — the pickup window is still open."</td>
+          <td class="c-analogy">Google Forms contextual helper text shown below locked questions explaining why a field cannot be edited</td>
+          <td class="c-tradeoff">Verbose; can alarm users; scales poorly with multiple blocked events (multiple banners); reads as an error state even when it isn't</td>
+        </tr>
+        <tr>
+          <td class="c-n">7</td>
+          <td class="c-name">Accordion Guard Reveal</td>
+          <td>Disabled event buttons show a ▼ expand trigger; clicking reveals the guard expression and the current blocking field value in an inline drawer.</td>
+          <td class="c-analogy">Insurance claim form "show eligibility criteria" expand section — users who need detail can surface it, others see nothing</td>
+          <td class="c-tradeoff">Requires extra click to get basic information; the info should be visible before committing, not after drilling in</td>
+        </tr>
+        <tr>
+          <td class="c-n">8</td>
+          <td class="c-name">Status Column Layout</td>
+          <td>Event buttons arranged in a vertical list with a status column: each row shows the event name, a guard status icon, and the destination state side-by-side.</td>
+          <td class="c-analogy">Adobe Sign / DocuSign workflow step list — signature actions as a scannable table of status, signer, and next step</td>
+          <td class="c-tradeoff">Consumes more vertical space even for forms with 2 events; columnar layout diverges from conventional button-strip patterns in business apps</td>
+        </tr>
+        <tr>
+          <td class="c-n">9</td>
+          <td class="c-name">Ghost Form Preview</td>
+          <td>Hovering an event renders a semi-transparent "ghost" overlay of the form as it would appear after the event fires — field values and state updated in-place.</td>
+          <td class="c-analogy">HubSpot record editor "Preview changes" mode — shows how fields will look after a pipeline stage update before saving</td>
+          <td class="c-tradeoff">Most implementation-heavy; risks confusing users who mistake the preview for actual state; cognitive overload at high field counts</td>
+        </tr>
+        <tr>
+          <td class="c-n">10</td>
+          <td class="c-name">Popover Flow Mini-Diagram</td>
+          <td>Hovering an event button shows a tiny 2-node diagram (current state → event arrow → target state) as an inline popover, mirroring the state diagram language.</td>
+          <td class="c-analogy">Jira workflow transition hover preview — shows the connected states in the issue's workflow before clicking a transition button</td>
+          <td class="c-tradeoff">Popover positioning logic is fragile in sidebar panel widths; visual vocabulary requires familiarity with Precept's state diagram language</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       TOP 3 PROTOTYPES
+       ══════════════════════════════════════════════════════════════════ -->
+  <div class="section-label" style="margin-bottom: 8px;">Top 3 Prototypes</div>
+  <p style="font-size:13px; color:var(--muted); max-width:680px; line-height:1.7; margin-bottom:52px;">
+    Each card below is a complete dark-mode business form for Visitor Badge Pickup #VBP-2847.
+    Hover the action buttons to see the interactive affordances. Variant D is Shane's idea and must ship.
+  </p>
+
+  <!-- ────────────────────────────────────────────────────────────────
+       VARIANT D — State Badge Preview
+       ──────────────────────────────────────────────────────────────── -->
+  <div class="variant">
+    <div class="var-head">
+      <span class="var-letter">Variant D</span>
+      <span class="var-name">State Badge Preview</span>
+      <span class="var-chip var-chip--shanes">Shane's idea</span>
+      <span class="var-chip var-chip--selected">Top 3</span>
+    </div>
+    <p class="var-idea">
+      Hovering an action button fades the state badge (top-right) from the current state to the event's destination — 
+      no new screen real estate consumed. Active events preview in violet; blocked events preview in rose with a guard 
+      explanation appearing inline below the buttons.
+    </p>
+
+    <div class="form-stage">
+      <div class="form-card card-d">
+
+        <!-- Header -->
+        <div class="card-head">
+          <div class="card-meta">
+            <div class="card-type">Visitor Badge Pickup</div>
+            <div class="card-ref">#VBP-2847</div>
+            <div class="card-name">Ada Reyes</div>
+          </div>
+          <!-- Badge stack: three overlapping badges, only one visible at a time -->
+          <div class="badge-stack">
+            <div class="sbadge sbadge--violet bd-current">ReadyForPickup</div>
+            <div class="sbadge sbadge--violet-bright bd-next" aria-hidden="true">
+              <span class="badge-prefix">→</span> PickedUp
+            </div>
+            <div class="sbadge sbadge--rose bd-blocked" aria-hidden="true">
+              <span class="badge-prefix">→</span> Expired
+            </div>
+          </div>
+        </div>
+
+        <!-- Fields -->
+        <div class="card-fields">
+          <div class="f-row">
+            <span class="f-label">Visitor name</span>
+            <span class="f-val">Ada Reyes</span>
+          </div>
+          <div class="f-row">
+            <span class="f-label">Host confirmed</span>
+            <span class="f-val f-val--yes">Yes</span>
+          </div>
+          <div class="f-row">
+            <span class="f-label">Badge printed</span>
+            <span class="f-val f-val--yes">Yes</span>
+          </div>
+          <div class="f-row">
+            <span class="f-label">Pickup window</span>
+            <span class="f-val f-val--open">Open</span>
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="card-actions">
+          <div class="action-row">
+            <button class="act-btn act-btn--go btn-d-go">Pick Up</button>
+            <button class="act-btn act-btn--off btn-d-off" disabled>Expire Request</button>
+          </div>
+          <!-- Guard message: reveals on hover over disabled button -->
+          <div class="guard-msg" aria-live="polite">
+            <span class="gm-icon">⊘</span>
+            Pickup window must be closed before this request can expire.
+          </div>
+        </div>
+
+        <div class="interact-hint">Hover the action buttons to preview the state change</div>
+
+      </div>
+    </div>
+
+    <p class="var-annotation">
+      The existing state badge does dual duty: resting state shows where you are, hover state shows where you're going.
+      Guard explanation appears below the action bar only when it's needed — zero visual noise in the active case.
+      Requires no new chrome; uses existing badge real estate Shane already pointed to.
+    </p>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ────────────────────────────────────────────────────────────────
+       VARIANT E — Inline Outcome Strip
+       ──────────────────────────────────────────────────────────────── -->
+  <div class="variant">
+    <div class="var-head">
+      <span class="var-letter">Variant E</span>
+      <span class="var-name">Inline Outcome Strip</span>
+      <span class="var-chip var-chip--selected">Top 3</span>
+    </div>
+    <p class="var-idea">
+      Each action button carries a persistent subordinate label: active events show their destination state in violet,
+      blocked events show the guard reason in rose — always visible, no hover or click required.
+      Solves both UX problems at zero interaction cost; the action bar is self-annotating at rest.
+    </p>
+
+    <div class="form-stage">
+      <div class="form-card card-e">
+
+        <!-- Header -->
+        <div class="card-head">
+          <div class="card-meta">
+            <div class="card-type">Visitor Badge Pickup</div>
+            <div class="card-ref">#VBP-2847</div>
+            <div class="card-name">Ada Reyes</div>
+          </div>
+          <div class="sbadge sbadge--violet" style="flex-shrink:0; height:fit-content;">ReadyForPickup</div>
+        </div>
+
+        <!-- Fields -->
+        <div class="card-fields">
+          <div class="f-row">
+            <span class="f-label">Visitor name</span>
+            <span class="f-val">Ada Reyes</span>
+          </div>
+          <div class="f-row">
+            <span class="f-label">Host confirmed</span>
+            <span class="f-val f-val--yes">Yes</span>
+          </div>
+          <div class="f-row">
+            <span class="f-label">Badge printed</span>
+            <span class="f-val f-val--yes">Yes</span>
+          </div>
+          <div class="f-row">
+            <span class="f-label">Pickup window</span>
+            <span class="f-val f-val--open">Open</span>
+          </div>
+        </div>
+
+        <!-- Actions: each button paired with its outcome strip -->
+        <div class="card-actions">
+          <div class="action-row">
+            <!-- Active event -->
+            <div class="action-item">
+              <button class="act-btn act-btn--go">Pick Up</button>
+              <div class="outcome-strip outcome-strip--go">
+                <span class="os-arrow">→</span>
+                <span>PickedUp</span>
+              </div>
+            </div>
+            <!-- Blocked event -->
+            <div class="action-item">
+              <button class="act-btn act-btn--off" disabled>Expire Request</button>
+              <div class="outcome-strip outcome-strip--blocked">
+                <span class="os-icon">⊘</span>
+                <span>Pickup window must be closed</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <p class="var-annotation">
+      The cleanest "zero-interaction information density" pattern: every business user sees destination and guard reason
+      without any discovery. Adds ~20px to the action bar but eliminates all ambiguity about what each button does and
+      whether it's available. Accessible by default — no hover dependency.
+    </p>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ────────────────────────────────────────────────────────────────
+       VARIANT F — Consequence Gutter
+       ──────────────────────────────────────────────────────────────── -->
+  <div class="variant">
+    <div class="var-head">
+      <span class="var-letter">Variant F</span>
+      <span class="var-name">Consequence Gutter</span>
+      <span class="var-chip var-chip--selected">Top 3</span>
+    </div>
+    <p class="var-idea">
+      A fixed-height band between the field section and the action bar sits quiet at rest,
+      then populates with a full consequence path — <em>CurrentState → Event → TargetState</em> — when the user
+      hovers an action button. Blocked events show the path up to the guard and then the blocking reason.
+      Resting state is compact and unobtrusive; information appears exactly when intent is signaled.
+    </p>
+
+    <div class="form-stage">
+      <div class="form-card card-f">
+
+        <!-- Header -->
+        <div class="card-head">
+          <div class="card-meta">
+            <div class="card-type">Visitor Badge Pickup</div>
+            <div class="card-ref">#VBP-2847</div>
+            <div class="card-name">Ada Reyes</div>
+          </div>
+          <div class="sbadge sbadge--violet" style="flex-shrink:0; height:fit-content;">ReadyForPickup</div>
+        </div>
+
+        <!-- Fields -->
+        <div class="card-fields">
+          <div class="f-row">
+            <span class="f-label">Visitor name</span>
+            <span class="f-val">Ada Reyes</span>
+          </div>
+          <div class="f-row">
+            <span class="f-label">Host confirmed</span>
+            <span class="f-val f-val--yes">Yes</span>
+          </div>
+          <div class="f-row">
+            <span class="f-label">Badge printed</span>
+            <span class="f-val f-val--yes">Yes</span>
+          </div>
+          <div class="f-row">
+            <span class="f-label">Pickup window</span>
+            <span class="f-val f-val--open">Open</span>
+          </div>
+        </div>
+
+        <!-- Consequence Gutter: fixed-height band, content swaps on hover -->
+        <div class="consequence-gutter">
+
+          <!-- Idle (default): quiet hint -->
+          <div class="gutter-layer g-idle">
+            <span class="g-idle-text">Hover an action to preview the outcome</span>
+          </div>
+
+          <!-- Pick Up path -->
+          <div class="gutter-layer g-path-go" aria-hidden="true">
+            <span class="g-state-chip g-state-chip--from">ReadyForPickup</span>
+            <span class="g-arrow-seq">→</span>
+            <span class="g-event-label g-event-label--go">Pick Up</span>
+            <span class="g-arrow-seq">→</span>
+            <span class="g-state-chip g-state-chip--to">PickedUp</span>
+          </div>
+
+          <!-- Expire Request path (blocked) -->
+          <div class="gutter-layer g-path-blocked" aria-hidden="true">
+            <span class="g-state-chip g-state-chip--from">ReadyForPickup</span>
+            <span class="g-arrow-seq">→</span>
+            <span class="g-event-label g-event-label--blocked">Expire Request</span>
+            <span class="g-block-reason">— window must be closed first</span>
+          </div>
+
+        </div>
+
+        <!-- Actions -->
+        <div class="card-actions">
+          <div class="action-row">
+            <button class="act-btn act-btn--go btn-f-go">Pick Up</button>
+            <button class="act-btn act-btn--off btn-f-blocked" disabled>Expire Request</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <p class="var-annotation">
+      The gutter pattern separates consequence information from the button label itself, keeping buttons concise
+      while still surfacing full path context — but only when the user's intent is signaled by hovering. Good
+      middle ground between E's always-on density and tooltip's fully-hidden pattern. Works well in wider form layouts.
+    </p>
+  </div>
+
+</div><!-- /.page -->
+</body>
+</html>

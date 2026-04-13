@@ -1,0 +1,1486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Timeline as Primary Surface — 5 Variants</title>
+<style>
+  /* ── Reset & Tokens ──────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --panel:     #090b0e;
+    --mono:      "Geist Mono", monospace;
+    --sans:      "Geist", system-ui, sans-serif;
+    --event:     #30B8E8;
+    --state:     #A898F5;
+    --data:      #B0BEC5;
+    --violated:  #F87171;
+    --warn:      #FDE047;
+    --ok:        #34D399;
+    --line:      rgba(255,255,255,0.08);
+    --soft:      #687281;
+    --muted:     #a7afbb;
+    --text:      #d4dae3;
+    --structure: #6366F1;
+
+    --surface-1: #0f1217;
+    --surface-2: #161b22;
+    --surface-3: #1c2129;
+    --radius:    8px;
+    --radius-lg: 12px;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--panel);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Sticky Nav ──────────────────────────────────────────── */
+  nav.variant-nav {
+    position: sticky; top: 0; z-index: 100;
+    display: flex; align-items: center; gap: 6px;
+    padding: 10px 24px;
+    background: rgba(9,11,14,0.92);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--line);
+  }
+  nav.variant-nav .nav-title {
+    font-weight: 600; font-size: 13px; color: var(--muted);
+    margin-right: 12px; text-transform: uppercase; letter-spacing: 0.06em;
+  }
+  nav.variant-nav a {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 5px 14px;
+    border-radius: 999px;
+    font-size: 13px; font-weight: 500;
+    color: var(--muted);
+    text-decoration: none;
+    border: 1px solid var(--line);
+    transition: all 0.15s ease;
+  }
+  nav.variant-nav a:hover {
+    color: var(--text);
+    border-color: var(--structure);
+    background: rgba(99,102,241,0.08);
+  }
+  nav.variant-nav a .letter {
+    font-family: var(--mono); font-weight: 700; font-size: 11px;
+    color: var(--structure);
+  }
+
+  /* ── Section Shell ───────────────────────────────────────── */
+  .variant-section {
+    padding: 56px 32px 64px;
+    min-height: 100vh;
+    position: relative;
+  }
+  .variant-section + .variant-section {
+    border-top: 1px solid var(--line);
+  }
+  .variant-header {
+    margin-bottom: 32px;
+  }
+  .variant-header h2 {
+    font-size: 22px; font-weight: 700; color: var(--text);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .variant-header h2 .letter-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 30px; height: 30px; border-radius: 8px;
+    background: var(--structure); color: #fff;
+    font-family: var(--mono); font-size: 14px; font-weight: 700;
+  }
+  .variant-header p {
+    margin-top: 8px; color: var(--soft); font-size: 14px; max-width: 720px; line-height: 1.6;
+  }
+
+  /* ── Shared Utility Classes ──────────────────────────────── */
+  .state-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 10px; border-radius: 999px;
+    font-family: var(--mono); font-size: 12px; font-weight: 600;
+    white-space: nowrap;
+  }
+  .state-badge--past { background: rgba(168,152,245,0.1); color: var(--state); opacity: 0.6; }
+  .state-badge--current { background: rgba(168,152,245,0.18); color: var(--state); box-shadow: 0 0 0 2px rgba(168,152,245,0.3); }
+  .state-badge--future { background: rgba(168,152,245,0.08); color: var(--muted); border: 1px dashed rgba(168,152,245,0.25); }
+  .state-badge--terminal { border: 2px double var(--state); background: rgba(168,152,245,0.08); color: var(--state); }
+
+  .event-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 18px; border-radius: var(--radius);
+    font-family: var(--sans); font-size: 13px; font-weight: 600;
+    cursor: pointer; border: none; transition: all 0.15s ease;
+  }
+  .event-btn--active {
+    background: rgba(48,184,232,0.12); color: var(--event);
+    border: 1px solid rgba(48,184,232,0.3);
+  }
+  .event-btn--active:hover {
+    background: rgba(48,184,232,0.22);
+    box-shadow: 0 0 12px rgba(48,184,232,0.15);
+  }
+  .event-btn--blocked {
+    background: rgba(248,113,113,0.08); color: var(--violated);
+    border: 1px solid rgba(248,113,113,0.2);
+    cursor: not-allowed; opacity: 0.7;
+  }
+
+  .guard-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px; border-radius: 999px;
+    font-size: 11px; font-weight: 500;
+  }
+  .guard-chip--ok { background: rgba(52,211,153,0.1); color: var(--ok); }
+  .guard-chip--blocked { background: rgba(248,113,113,0.1); color: var(--violated); }
+
+  .target-label {
+    font-family: var(--mono); font-size: 11px; color: var(--muted);
+  }
+
+  /* ── Modal Overlay ───────────────────────────────────────── */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0; z-index: 200;
+    background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
+    align-items: center; justify-content: center;
+  }
+  .modal-overlay.show { display: flex; }
+  .modal-box {
+    background: var(--surface-2); border: 1px solid var(--line);
+    border-radius: var(--radius-lg); padding: 28px 32px;
+    width: 380px; max-width: 90vw;
+  }
+  .modal-box h3 {
+    font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 16px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .modal-box label {
+    display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px;
+  }
+  .modal-box input[type="text"], .modal-box select {
+    width: 100%; padding: 8px 12px; margin-bottom: 14px;
+    background: var(--surface-1); border: 1px solid var(--line);
+    border-radius: var(--radius); color: var(--text); font-family: var(--sans); font-size: 14px;
+  }
+  .modal-box .modal-actions {
+    display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px;
+  }
+  .modal-box .btn-cancel {
+    padding: 7px 16px; border-radius: var(--radius);
+    background: transparent; border: 1px solid var(--line);
+    color: var(--muted); font-size: 13px; font-weight: 500; cursor: pointer;
+  }
+  .modal-box .btn-cancel:hover { border-color: var(--soft); color: var(--text); }
+  .modal-box .btn-fire {
+    padding: 7px 20px; border-radius: var(--radius);
+    background: var(--event); border: none;
+    color: #000; font-size: 13px; font-weight: 700; cursor: pointer;
+  }
+  .modal-box .btn-fire:hover { filter: brightness(1.15); }
+
+
+  /* ══════════════════════════════════════════════════════════
+     VARIANT A — River Flow
+     ══════════════════════════════════════════════════════════ */
+  .river {
+    padding: 30px 32px;
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    background:
+      radial-gradient(circle at top right, rgba(48,184,232,0.06), transparent 30%),
+      radial-gradient(circle at left center, rgba(168,152,245,0.09), transparent 34%),
+      linear-gradient(180deg, rgba(22,27,34,0.94), rgba(15,18,23,0.98));
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+  }
+
+  .river-flow {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    min-width: max-content;
+  }
+
+  .river-path {
+    display: flex;
+    align-items: flex-start;
+    gap: 0;
+    min-width: 0;
+  }
+
+  .river-step {
+    display: grid;
+    grid-template-rows: auto 34px auto auto;
+    justify-items: center;
+    row-gap: 8px;
+    min-width: max-content;
+  }
+
+  .river-step-track {
+    position: relative;
+    width: clamp(78px, 9vw, 100px);
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .river-step-track::before,
+  .river-step-track::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    height: 2px;
+    transform: translateY(-50%);
+    border-radius: 999px;
+    background: linear-gradient(90deg, rgba(168,152,245,0.18), rgba(168,152,245,0.34));
+  }
+
+  .river-step-track::before {
+    left: 0;
+    right: calc(50% + 11px);
+  }
+
+  .river-step-track::after {
+    left: calc(50% + 11px);
+    right: 0;
+  }
+
+  .river-step--start .river-step-track::before {
+    display: none;
+  }
+
+  .river-step-event {
+    padding: 3px 9px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: rgba(255,255,255,0.03);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--soft);
+  }
+
+  .river-step-dot {
+    position: relative;
+    z-index: 1;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid rgba(168,152,245,0.28);
+    background: rgba(168,152,245,0.18);
+  }
+
+  .river-step-state {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  .river-step-note {
+    font-size: 11px;
+    color: var(--soft);
+    white-space: nowrap;
+  }
+
+  .river-step--current .river-step-event {
+    background: rgba(168,152,245,0.10);
+    border-color: rgba(168,152,245,0.24);
+    color: var(--state);
+  }
+
+  .river-step--current .river-step-dot {
+    width: 20px;
+    height: 20px;
+    border: none;
+    background: var(--state);
+    box-shadow: 0 0 0 6px rgba(168,152,245,0.16);
+  }
+
+  .river-step--current .river-step-state {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  .river-fork {
+    display: grid;
+    grid-template-columns: 36px 24px minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    row-gap: 22px;
+    align-items: center;
+    min-width: max-content;
+  }
+
+  .river-fork-trunk {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    display: grid;
+    align-items: center;
+    width: 36px;
+    min-height: 108px;
+  }
+
+  .river-fork-trunk::before {
+    content: '';
+    position: relative;
+    display: block;
+    width: 100%;
+    height: 2px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, rgba(168,152,245,0.30), rgba(168,152,245,0.18));
+  }
+
+  .river-fork-stem {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    position: relative;
+    justify-self: center;
+    width: 2px;
+    min-height: 108px;
+    border-radius: 999px;
+    background: linear-gradient(180deg, rgba(168,152,245,0.18), rgba(168,152,245,0.38), rgba(168,152,245,0.18));
+  }
+
+  .river-fork-stem::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    border: 2px solid rgba(168,152,245,0.28);
+    background: var(--surface-1);
+    box-shadow: 0 0 0 4px rgba(168,152,245,0.05);
+  }
+
+  .river-branch {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .river-branch-lane {
+    position: relative;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: max-content;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+  }
+
+  .river-branch-lane::before {
+    content: '';
+    position: absolute;
+    left: -18px;
+    top: 50%;
+    width: 18px;
+    height: 2px;
+    transform: translateY(-50%);
+    border-radius: 999px;
+    background: linear-gradient(90deg, rgba(168,152,245,0.24), rgba(168,152,245,0.16));
+  }
+
+  .river-branch-button {
+    padding: 6px 14px;
+  }
+
+  .river-branch-rail {
+    width: 28px;
+    height: 2px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, rgba(168,152,245,0.24), rgba(168,152,245,0.14));
+  }
+
+  .river-branch-target {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .river-branch-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid rgba(168,152,245,0.30);
+    background: var(--surface-1);
+    flex: 0 0 auto;
+  }
+
+  .river-branch-dot--terminal {
+    box-shadow: 0 0 0 3px var(--surface-2), 0 0 0 4.5px rgba(168,152,245,0.18);
+  }
+
+  .river-branch-dot--blocked {
+    border-color: rgba(248,113,113,0.26);
+    box-shadow: 0 0 0 3px var(--surface-2), 0 0 0 4.5px rgba(248,113,113,0.10);
+  }
+
+  .river-branch-state {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text);
+    white-space: nowrap;
+  }
+
+  .river-branch-note {
+    font-size: 11px;
+    color: var(--soft);
+  }
+
+  .river-branch-note--ok { color: var(--ok); }
+  .river-branch-note--blocked { color: var(--violated); }
+
+  @media (max-width: 1100px) {
+    .river {
+      padding: 26px 24px;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .river {
+      padding: 24px 18px;
+    }
+
+    .river-step-track {
+      width: 68px;
+    }
+
+    .river-fork {
+      grid-template-columns: 28px 18px minmax(0, 1fr);
+      row-gap: 18px;
+    }
+
+    .river-branch-lane {
+      gap: 10px;
+    }
+
+    .river-branch-lane::before {
+      left: -14px;
+      width: 14px;
+    }
+
+    .river-branch-rail {
+      width: 22px;
+    }
+  }
+
+
+  /* ══════════════════════════════════════════════════════════
+     VARIANT B — Activity Feed + Action Bar
+     ══════════════════════════════════════════════════════════ */
+  .b-layout {
+    display: grid; grid-template-rows: auto 1fr;
+    gap: 0; height: 520px;
+    border: 1px solid var(--line); border-radius: var(--radius-lg);
+    overflow: hidden; background: var(--surface-1);
+  }
+
+  /* Action Bar (top) */
+  .b-action-bar {
+    display: flex; align-items: center; gap: 20px;
+    padding: 16px 24px;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--line);
+    position: relative; z-index: 5; overflow: visible;
+  }
+  .b-current-state {
+    display: flex; flex-direction: column; gap: 2px;
+  }
+  .b-current-state .label { font-size: 11px; color: var(--soft); text-transform: uppercase; letter-spacing: 0.05em; }
+  .b-current-state .value {
+    font-family: var(--mono); font-size: 16px; font-weight: 700; color: var(--state);
+  }
+  .b-divider {
+    width: 1px; height: 36px; background: var(--line);
+  }
+  .b-actions {
+    display: flex; gap: 10px; flex: 1;
+  }
+  .b-action-card {
+    display: flex; flex-direction: column; gap: 6px;
+    padding: 10px 16px;
+    background: var(--surface-1); border: 1px solid var(--line);
+    border-radius: var(--radius); transition: all 0.15s; position: relative;
+  }
+  .b-action-card:hover { border-color: rgba(48,184,232,0.3); }
+  .b-action-card.blocked { opacity: 0.6; }
+  .b-action-card.blocked:hover { border-color: rgba(248,113,113,0.3); }
+  .b-action-card .action-top {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  }
+  .b-action-card .action-name {
+    font-weight: 600; font-size: 14px; color: var(--event);
+  }
+  .b-action-card.blocked .action-name { color: var(--violated); }
+  .b-action-card .action-target {
+    font-family: var(--mono); font-size: 11px; color: var(--muted);
+    display: flex; align-items: center; gap: 4px;
+  }
+  .b-action-card .action-target .arrow { color: var(--soft); }
+
+  /* Micro state preview on hover */
+  .b-action-card .micro-preview {
+    display: none; position: absolute; top: calc(100% + 8px); left: 50%;
+    transform: translateX(-50%);
+    background: var(--surface-2); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 10px 14px;
+    white-space: nowrap; z-index: 10;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  }
+  .b-action-card:hover .micro-preview { display: flex; align-items: center; gap: 8px; }
+  .b-action-card .micro-preview .mp-node {
+    font-family: var(--mono); font-size: 11px; padding: 2px 8px;
+    border-radius: 4px;
+  }
+  .b-action-card .micro-preview .mp-current { background: rgba(168,152,245,0.15); color: var(--state); }
+  .b-action-card .micro-preview .mp-arrow { color: var(--event); font-size: 13px; }
+  .b-action-card .micro-preview .mp-target { background: rgba(168,152,245,0.08); color: var(--muted); }
+
+  /* Activity Feed (bottom) */
+  .b-feed {
+    display: flex; flex-direction: column; gap: 0;
+    overflow-y: auto; padding: 0;
+  }
+  .b-feed-entry {
+    display: flex; align-items: flex-start; gap: 14px;
+    padding: 14px 24px;
+    border-bottom: 1px solid var(--line);
+    transition: background 0.1s;
+  }
+  .b-feed-entry:hover { background: rgba(255,255,255,0.015); }
+  .b-feed-entry .feed-icon {
+    width: 28px; height: 28px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; font-size: 13px; margin-top: 1px;
+  }
+  .b-feed-entry .feed-icon.icon-transition { background: rgba(168,152,245,0.12); color: var(--state); }
+  .b-feed-entry .feed-icon.icon-create { background: rgba(99,102,241,0.12); color: var(--structure); }
+  .b-feed-entry .feed-body { flex: 1; }
+  .b-feed-entry .feed-title {
+    font-size: 13px; font-weight: 500; color: var(--text);
+  }
+  .b-feed-entry .feed-title strong { font-weight: 700; }
+  .b-feed-entry .feed-detail {
+    font-size: 12px; color: var(--soft); margin-top: 3px;
+  }
+  .b-feed-entry .feed-time {
+    font-size: 11px; color: var(--soft); white-space: nowrap; flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+
+  /* ══════════════════════════════════════════════════════════
+     VARIANT C — Storyboard
+     ══════════════════════════════════════════════════════════ */
+  .c-storyboard {
+    display: flex; gap: 20px;
+    overflow-x: auto; padding: 12px 4px 20px;
+    scroll-snap-type: x mandatory;
+  }
+  .c-page {
+    flex: 0 0 260px;
+    scroll-snap-align: center;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--line);
+    overflow: hidden; transition: all 0.2s;
+    display: flex; flex-direction: column;
+  }
+  .c-page--past { background: var(--surface-1); opacity: 0.55; }
+  .c-page--past:hover { opacity: 0.85; }
+  .c-page--current {
+    background: var(--surface-2);
+    border-color: rgba(168,152,245,0.35);
+    box-shadow: 0 0 24px rgba(168,152,245,0.1);
+    flex: 0 0 340px;
+  }
+  .c-page--future {
+    background: var(--surface-1);
+    border-style: dashed; border-color: rgba(168,152,245,0.18);
+  }
+
+  .c-page-header {
+    padding: 16px 18px 12px;
+    border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .c-page--current .c-page-header { border-bottom-color: rgba(168,152,245,0.2); }
+  .c-page-chapter {
+    font-size: 10px; font-weight: 700; color: var(--soft);
+    text-transform: uppercase; letter-spacing: 0.08em;
+  }
+  .c-page-state {
+    font-family: var(--mono); font-size: 14px; font-weight: 700;
+  }
+  .c-page--past .c-page-state { color: var(--soft); }
+  .c-page--current .c-page-state { color: var(--state); }
+  .c-page--future .c-page-state { color: var(--muted); }
+
+  .c-page-body {
+    padding: 14px 18px 18px; flex: 1;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+
+  .c-change-item {
+    font-size: 12px; color: var(--muted);
+    display: flex; align-items: baseline; gap: 6px;
+  }
+  .c-change-item .field { font-family: var(--mono); color: var(--data); font-size: 11px; }
+  .c-change-item .op { color: var(--soft); }
+  .c-change-item .val { color: var(--text); }
+
+  .c-narrative {
+    font-size: 13px; color: var(--soft); font-style: italic;
+    line-height: 1.5;
+  }
+  .c-page--current .c-narrative { color: var(--muted); font-style: normal; }
+
+  .c-actions {
+    display: flex; flex-direction: column; gap: 8px;
+    margin-top: auto;
+  }
+  .c-action-row {
+    display: flex; align-items: center; gap: 8px;
+  }
+  .c-action-row .target-hint {
+    font-family: var(--mono); font-size: 10px; color: var(--soft);
+  }
+
+  .c-page-nav-hint {
+    display: flex; align-items: center; justify-content: center;
+    padding: 8px; border-top: 1px solid var(--line);
+    font-size: 11px; color: var(--soft);
+  }
+
+
+  /* ══════════════════════════════════════════════════════════
+     VARIANT D — Compact Rail + Expandable Lanes
+     ══════════════════════════════════════════════════════════ */
+  .d-container {
+    border: 1px solid var(--line); border-radius: var(--radius-lg);
+    overflow: hidden; background: var(--surface-1);
+  }
+
+  /* Compact rail — Salesforce Path style: continuous chevron bar */
+  .d-rail {
+    display: flex; align-items: stretch; height: 48px;
+    background: var(--surface-2);
+    position: relative; overflow: visible;
+  }
+
+  .d-step {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    gap: 6px; padding: 0 20px 0 28px;
+    cursor: pointer; transition: background 0.15s;
+    position: relative;
+    clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 50%, calc(100% - 14px) 100%, 0 100%, 14px 50%);
+    margin-left: -8px;
+  }
+  .d-step:first-child {
+    clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 50%, calc(100% - 14px) 100%, 0 100%);
+    margin-left: 0; padding-left: 16px; border-radius: 6px 0 0 6px;
+  }
+
+  .d-step-indicator { display: none; }
+
+  .d-step .d-step-check {
+    font-size: 12px; color: inherit; flex-shrink: 0;
+  }
+
+  .d-step .d-step-name {
+    font-family: var(--mono); font-size: 11px; font-weight: 600;
+    white-space: nowrap;
+  }
+
+  /* Completed chevrons: filled green tint */
+  .d-step--completed {
+    background: rgba(52,211,153,0.08);
+  }
+  .d-step--completed .d-step-name { color: var(--ok); }
+  .d-step--completed .d-step-check { color: var(--ok); }
+  .d-step--completed:hover { background: rgba(52,211,153,0.14); }
+
+  /* Current chevron: highlighted violet */
+  .d-step--current {
+    background: rgba(168,152,245,0.15);
+  }
+  .d-step--current .d-step-name { color: var(--state); font-weight: 700; }
+  .d-step--current:hover { background: rgba(168,152,245,0.22); }
+
+  /* Future chevrons: dim */
+  .d-step--future {
+    background: rgba(255,255,255,0.02);
+  }
+  .d-step--future .d-step-name { color: var(--soft); }
+  .d-step--future:hover { background: rgba(255,255,255,0.04); }
+  .d-step--branch { flex: 0.7; }
+
+  /* Branch group — stacked future chevrons with "or" label */
+  .d-branch-group {
+    display: flex; flex-direction: column; align-items: stretch;
+    position: relative; flex: 1.2;
+  }
+  .d-branch-group .d-step {
+    flex: 1; height: 24px; font-size: 10px;
+  }
+  .d-branch-group .d-step:first-child {
+    clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%, 10px 50%);
+    margin-left: -8px; border-radius: 0;
+  }
+  .d-branch-group .d-step:last-child {
+    clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%, 10px 50%);
+    margin-left: -8px;
+  }
+  .d-branch-group .d-step .d-step-name { font-size: 10px; }
+  .d-branch-group .d-branch-label {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    font-size: 9px; color: var(--soft); background: var(--surface-2);
+    padding: 0 4px; z-index: 1; line-height: 1;
+  }
+
+  /* No separate connectors needed — chevrons butt together */
+  .d-connector { display: none; }
+
+  /* Expand Panel */
+  .d-expand-panel {
+    display: none; padding: 24px;
+    border-top: 1px solid var(--line);
+    background: var(--surface-1);
+  }
+  .d-expand-panel.open { display: block; }
+  .d-expand-heading {
+    font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 16px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .d-expand-heading .hint { font-size: 12px; font-weight: 400; color: var(--soft); }
+
+  .d-lane-list {
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  .d-lane {
+    display: flex; align-items: center; gap: 16px;
+    padding: 12px 16px;
+    background: var(--surface-2); border: 1px solid var(--line);
+    border-radius: var(--radius);
+    transition: border-color 0.15s;
+  }
+  .d-lane:hover { border-color: rgba(48,184,232,0.25); }
+  .d-lane.blocked { opacity: 0.65; }
+  .d-lane.blocked:hover { border-color: rgba(248,113,113,0.25); }
+  .d-lane .lane-event {
+    font-weight: 600; font-size: 14px; color: var(--event); min-width: 80px;
+  }
+  .d-lane.blocked .lane-event { color: var(--violated); }
+  .d-lane .lane-arrow { color: var(--soft); font-size: 16px; }
+  .d-lane .lane-target {
+    font-family: var(--mono); font-size: 12px; color: var(--muted);
+    padding: 3px 10px; background: rgba(168,152,245,0.06);
+    border-radius: 4px;
+  }
+  .d-lane .lane-guard { margin-left: auto; }
+  .d-lane .lane-btn { margin-left: 8px; }
+
+
+  /* ══════════════════════════════════════════════════════════
+     VARIANT E — Conversation Timeline
+     ══════════════════════════════════════════════════════════ */
+  .e-thread {
+    max-width: 560px;
+    margin: 0 auto;
+    display: flex; flex-direction: column; gap: 0;
+    border: 1px solid var(--line); border-radius: var(--radius-lg);
+    overflow: hidden; background: var(--surface-1);
+    height: 560px;
+  }
+
+  .e-thread-header {
+    padding: 14px 20px;
+    background: var(--surface-2); border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; gap: 12px;
+  }
+  .e-thread-header .entity-name {
+    font-size: 15px; font-weight: 700; color: var(--text);
+  }
+  .e-thread-header .entity-id {
+    font-family: var(--mono); font-size: 11px; color: var(--soft);
+  }
+
+  .e-messages {
+    flex: 1; overflow-y: auto;
+    padding: 16px 20px;
+    display: flex; flex-direction: column; gap: 12px;
+  }
+
+  .e-msg {
+    max-width: 85%; display: flex; flex-direction: column; gap: 3px;
+  }
+  .e-msg--system { align-self: flex-start; }
+  .e-msg--user { align-self: flex-end; }
+
+  .e-msg .bubble {
+    padding: 10px 14px;
+    border-radius: 14px;
+    font-size: 13px; line-height: 1.5;
+  }
+  .e-msg--system .bubble {
+    background: var(--surface-2); border: 1px solid var(--line);
+    color: var(--text);
+    border-bottom-left-radius: 4px;
+  }
+  .e-msg--user .bubble {
+    background: rgba(99,102,241,0.12); border: 1px solid rgba(99,102,241,0.2);
+    color: var(--text);
+    border-bottom-right-radius: 4px;
+  }
+  .e-msg .bubble .state-mention {
+    font-family: var(--mono); font-weight: 600; color: var(--state);
+  }
+  .e-msg .bubble .event-mention {
+    font-family: var(--mono); font-weight: 600; color: var(--event);
+  }
+  .e-msg .meta {
+    font-size: 10px; color: var(--soft); padding: 0 4px;
+  }
+  .e-msg--system .meta { text-align: left; }
+  .e-msg--user .meta { text-align: right; }
+
+  .e-msg .bubble .field-change {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12px; margin-top: 4px;
+  }
+  .e-msg .bubble .field-change .fname { font-family: var(--mono); color: var(--data); font-size: 11px; }
+  .e-msg .bubble .field-change .fval { color: var(--text); }
+
+  /* Reply / Action area */
+  .e-reply-area {
+    padding: 14px 20px;
+    background: var(--surface-2); border-top: 1px solid var(--line);
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .e-reply-label {
+    font-size: 11px; color: var(--soft); text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .e-reply-actions {
+    display: flex; gap: 8px; flex-wrap: wrap;
+  }
+  .e-action-bubble {
+    display: flex; flex-direction: column; gap: 4px;
+    padding: 10px 16px;
+    background: var(--surface-1); border: 1px solid var(--line);
+    border-radius: var(--radius); cursor: pointer; transition: all 0.15s;
+  }
+  .e-action-bubble:hover {
+    border-color: rgba(48,184,232,0.3);
+    background: rgba(48,184,232,0.04);
+  }
+  .e-action-bubble.blocked {
+    opacity: 0.55; cursor: not-allowed;
+  }
+  .e-action-bubble.blocked:hover {
+    border-color: rgba(248,113,113,0.3);
+    background: rgba(248,113,113,0.04);
+  }
+  .e-action-bubble .ab-name {
+    font-weight: 600; font-size: 13px; color: var(--event);
+  }
+  .e-action-bubble.blocked .ab-name { color: var(--violated); }
+  .e-action-bubble .ab-detail {
+    font-size: 11px; color: var(--soft);
+  }
+  .e-action-bubble .ab-guard {
+    font-size: 11px; margin-top: 2px;
+  }
+  .e-action-bubble .ab-guard.ok { color: var(--ok); }
+  .e-action-bubble .ab-guard.blocked { color: var(--violated); }
+
+
+  /* ── Responsive helpers ──────────────────────────────────── */
+  @media (max-width: 768px) {
+    .variant-section { padding: 40px 16px 48px; }
+    .c-storyboard { gap: 12px; }
+    .c-page { flex: 0 0 220px; }
+    .c-page--current { flex: 0 0 280px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════
+     Sticky Navigation
+     ═══════════════════════════════════════════════════════════ -->
+<nav class="variant-nav" aria-label="Variant navigation">
+  <span class="nav-title">Variants</span>
+  <a href="#variant-a"><span class="letter">A</span> River Flow</a>
+  <a href="#variant-b"><span class="letter">B</span> Activity Feed</a>
+  <a href="#variant-c"><span class="letter">C</span> Storyboard</a>
+  <a href="#variant-d"><span class="letter">D</span> Compact Rail</a>
+  <a href="#variant-e"><span class="letter">E</span> Conversation</a>
+</nav>
+
+
+<!-- ═══════════════════════════════════════════════════════════
+     VARIANT A — River Flow
+     A continuous horizontal river from origin to possible futures.
+     Past states are faded stepping stones. Current state is prominent.
+     Future events branch out as channels with target states.
+     Minimal — just nodes, labels, and a flowing path.
+     ═══════════════════════════════════════════════════════════ -->
+<section id="variant-a" class="variant-section">
+  <div class="variant-header">
+    <h2><span class="letter-badge">A</span> River Flow</h2>
+    <p>A stripped-back left-to-right flow: past states stay on one line, the current state is the anchor, and the future splits into a clean fork with just the next events and targets.</p>
+  </div>
+
+  <div class="river" aria-label="Badge request lifecycle as a left-to-right flow with a forked future">
+    <div class="river-flow">
+      <div class="river-path" aria-label="Past and current states">
+        <div class="river-step river-step--start">
+          <span class="river-step-event">Created</span>
+          <span class="river-step-track" aria-hidden="true">
+            <span class="river-step-dot"></span>
+          </span>
+          <span class="river-step-state">Requested</span>
+        </div>
+
+        <div class="river-step">
+          <span class="river-step-event">Approve</span>
+          <span class="river-step-track" aria-hidden="true">
+            <span class="river-step-dot"></span>
+          </span>
+          <span class="river-step-state">Approved</span>
+        </div>
+
+        <div class="river-step river-step--current">
+          <span class="river-step-event">Current</span>
+          <span class="river-step-track" aria-hidden="true">
+            <span class="river-step-dot"></span>
+          </span>
+          <span class="river-step-state">ReadyForPickup</span>
+          <span class="river-step-note">Lobby B reception</span>
+        </div>
+      </div>
+
+      <div class="river-fork" aria-label="Possible next states">
+        <span class="river-fork-trunk" aria-hidden="true"></span>
+        <span class="river-fork-stem" aria-hidden="true"></span>
+
+        <div class="river-branch">
+          <div class="river-branch-lane">
+            <span class="river-branch-rail" aria-hidden="true"></span>
+            <button type="button" class="event-btn event-btn--blocked river-branch-button" disabled>Pick Up</button>
+            <span class="river-branch-rail" aria-hidden="true"></span>
+            <div class="river-branch-target">
+              <span class="river-branch-dot river-branch-dot--blocked" aria-hidden="true"></span>
+              <span class="river-branch-state">PickedUp</span>
+            </div>
+          </div>
+          <span class="river-branch-note river-branch-note--blocked">Blocked: host not confirmed</span>
+        </div>
+
+        <div class="river-branch">
+          <div class="river-branch-lane">
+            <span class="river-branch-rail" aria-hidden="true"></span>
+            <button type="button" class="event-btn event-btn--active river-branch-button" onclick="document.getElementById('modal-a').classList.add('show')">Expire</button>
+            <span class="river-branch-rail" aria-hidden="true"></span>
+            <div class="river-branch-target">
+              <span class="river-branch-dot river-branch-dot--terminal" aria-hidden="true"></span>
+              <span class="river-branch-state">Expired</span>
+            </div>
+          </div>
+          <span class="river-branch-note river-branch-note--ok">Ready now</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sample modal for Expire event -->
+  <div id="modal-a" class="modal-overlay" onclick="if(event.target===this)this.classList.remove('show')">
+    <div class="modal-box" role="dialog" aria-label="Expire event">
+      <h3><span style="color:var(--event)">⚡</span> Expire Badge</h3>
+      <label for="a-reason">Reason</label>
+      <select id="a-reason">
+        <option>Unclaimed after 48 hours</option>
+        <option>Host cancelled visit</option>
+        <option>Security override</option>
+      </select>
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="document.getElementById('modal-a').classList.remove('show')">Cancel</button>
+        <button class="btn-fire" onclick="document.getElementById('modal-a').classList.remove('show')">Expire</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════════════
+     VARIANT B — Activity Feed + Action Bar
+     Split layout: a fixed action bar at top showing current state +
+     available events (with micro state diagram previews on hover),
+     and a chronological activity feed below showing past events as
+     human-readable log entries. Separates "what can I do" from
+     "what happened."
+     ═══════════════════════════════════════════════════════════ -->
+<section id="variant-b" class="variant-section">
+  <div class="variant-header">
+    <h2><span class="letter-badge">B</span> Activity Feed + Action Bar</h2>
+    <p>Separates "what can I do now" (top action bar) from "what happened" (bottom activity feed). Hover over an action to see a micro state diagram preview. The feed uses natural language, like a team chat history.</p>
+  </div>
+
+  <div class="b-layout">
+    <!-- Action Bar -->
+    <header class="b-action-bar">
+      <div class="b-current-state">
+        <span class="label">Current Status</span>
+        <span class="value">Ready for Pickup</span>
+      </div>
+      <div class="b-divider"></div>
+      <div class="b-actions">
+        <!-- PickUp (blocked) -->
+        <div class="b-action-card blocked">
+          <div class="micro-preview">
+            <span class="mp-node mp-current">ReadyForPickup</span>
+            <span class="mp-arrow">→</span>
+            <span class="mp-node mp-target">PickedUp</span>
+          </div>
+          <div class="action-top">
+            <span class="action-name">Pick Up</span>
+            <span class="guard-chip guard-chip--blocked">⊘ Blocked</span>
+          </div>
+          <span class="action-target"><span class="arrow">→</span> PickedUp</span>
+          <span style="font-size:11px;color:var(--violated)">Host has not confirmed the visit</span>
+        </div>
+
+        <!-- Expire (active) -->
+        <div class="b-action-card" onclick="document.getElementById('modal-b').classList.add('show')" role="button" tabindex="0">
+          <div class="micro-preview">
+            <span class="mp-node mp-current">ReadyForPickup</span>
+            <span class="mp-arrow">→</span>
+            <span class="mp-node mp-target">Expired</span>
+          </div>
+          <div class="action-top">
+            <span class="action-name">Expire</span>
+            <span class="guard-chip guard-chip--ok">✓ Ready</span>
+          </div>
+          <span class="action-target"><span class="arrow">→</span> Expired</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Activity Feed -->
+    <div class="b-feed" role="log" aria-label="Activity history">
+      <article class="b-feed-entry">
+        <div class="feed-icon icon-transition">→</div>
+        <div class="feed-body">
+          <div class="feed-title">Badge moved to <strong>Ready for Pickup</strong></div>
+          <div class="feed-detail">Issued by system after approval. Badge printed for Lobby B.</div>
+        </div>
+        <time class="feed-time">2 hours ago</time>
+      </article>
+      <article class="b-feed-entry">
+        <div class="feed-icon icon-transition">→</div>
+        <div class="feed-body">
+          <div class="feed-title">Badge <strong>Approved</strong></div>
+          <div class="feed-detail">Approved by security review. HostName set to "Jordan Lee".</div>
+        </div>
+        <time class="feed-time">4 hours ago</time>
+      </article>
+      <article class="b-feed-entry">
+        <div class="feed-icon icon-create">+</div>
+        <div class="feed-body">
+          <div class="feed-title">Badge <strong>Requested</strong></div>
+          <div class="feed-detail">Visitor badge requested for Alex Chen, visiting Building 4.</div>
+        </div>
+        <time class="feed-time">Yesterday, 3:12 PM</time>
+      </article>
+    </div>
+  </div>
+
+  <!-- Modal for Expire -->
+  <div id="modal-b" class="modal-overlay" onclick="if(event.target===this)this.classList.remove('show')">
+    <div class="modal-box" role="dialog" aria-label="Expire event">
+      <h3><span style="color:var(--event)">⚡</span> Expire Badge</h3>
+      <label for="b-reason">Reason</label>
+      <select id="b-reason">
+        <option>Unclaimed after 48 hours</option>
+        <option>Host cancelled visit</option>
+      </select>
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="document.getElementById('modal-b').classList.remove('show')">Cancel</button>
+        <button class="btn-fire" onclick="document.getElementById('modal-b').classList.remove('show')">Expire</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════════════
+     VARIANT C — Storyboard
+     Each state transition is a "page" in a visual storyboard.
+     The current page is prominent with available actions.
+     Past pages fade to the left. Future pages are dashed outlines.
+     Resembles a presentation deck or comic strip — very visual,
+     very approachable for business users.
+     ═══════════════════════════════════════════════════════════ -->
+<section id="variant-c" class="variant-section">
+  <div class="variant-header">
+    <h2><span class="letter-badge">C</span> Storyboard</h2>
+    <p>Each state is a "page" in a visual storyboard. Scroll left to see the past, right to see possible futures. The current page is prominent with available actions. Feels like flipping through a case history — business-friendly and narrative-driven.</p>
+  </div>
+
+  <div class="c-storyboard" role="list" aria-label="Badge request storyboard">
+    <!-- Page 1: Requested (past) -->
+    <article class="c-page c-page--past" role="listitem">
+      <div class="c-page-header">
+        <span class="c-page-chapter">Step 1</span>
+        <span class="c-page-state">Requested</span>
+      </div>
+      <div class="c-page-body">
+        <p class="c-narrative">Visitor badge requested for Alex Chen to visit Building 4.</p>
+        <div class="c-change-item">
+          <span class="field">VisitorName</span>
+          <span class="op">←</span>
+          <span class="val">"Alex Chen"</span>
+        </div>
+        <div class="c-change-item">
+          <span class="field">Building</span>
+          <span class="op">←</span>
+          <span class="val">"Building 4"</span>
+        </div>
+      </div>
+      <div class="c-page-nav-hint">← Past</div>
+    </article>
+
+    <!-- Page 2: Approved (past) -->
+    <article class="c-page c-page--past" role="listitem">
+      <div class="c-page-header">
+        <span class="c-page-chapter">Step 2</span>
+        <span class="c-page-state">Approved</span>
+      </div>
+      <div class="c-page-body">
+        <p class="c-narrative">Security approved the badge. Host assigned.</p>
+        <div class="c-change-item">
+          <span class="field">HostName</span>
+          <span class="op">←</span>
+          <span class="val">"Jordan Lee"</span>
+        </div>
+        <div class="c-change-item">
+          <span class="field">ApprovedBy</span>
+          <span class="op">←</span>
+          <span class="val">"Security Team"</span>
+        </div>
+      </div>
+    </article>
+
+    <!-- Page 3: ReadyForPickup (current) -->
+    <article class="c-page c-page--current" role="listitem">
+      <div class="c-page-header">
+        <span class="c-page-chapter">Now</span>
+        <span class="c-page-state">Ready for Pickup</span>
+      </div>
+      <div class="c-page-body">
+        <p class="c-narrative">Badge is printed and waiting at the Lobby B reception desk. The visitor has not arrived yet.</p>
+        <div class="c-change-item">
+          <span class="field">PickupLocation</span>
+          <span class="op">←</span>
+          <span class="val">"Lobby B"</span>
+        </div>
+
+        <div class="c-actions">
+          <div class="c-action-row">
+            <button class="event-btn event-btn--blocked" disabled>Pick Up</button>
+            <span class="guard-chip guard-chip--blocked">Host not confirmed</span>
+            <span class="target-hint">→ PickedUp</span>
+          </div>
+          <div class="c-action-row">
+            <button class="event-btn event-btn--active" onclick="document.getElementById('modal-c').classList.add('show')">Expire</button>
+            <span class="guard-chip guard-chip--ok">✓ Ready</span>
+            <span class="target-hint">→ Expired</span>
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <!-- Page 4a: PickedUp (future, blocked) -->
+    <article class="c-page c-page--future" role="listitem" style="opacity:0.45">
+      <div class="c-page-header">
+        <span class="c-page-chapter">If Picked Up</span>
+        <span class="c-page-state">Picked Up</span>
+      </div>
+      <div class="c-page-body">
+        <p class="c-narrative" style="color:var(--violated)">Currently blocked — host must confirm the visit before the visitor can pick up the badge.</p>
+      </div>
+    </article>
+
+    <!-- Page 4b: Expired (future, available) -->
+    <article class="c-page c-page--future" role="listitem">
+      <div class="c-page-header">
+        <span class="c-page-chapter">If Expired</span>
+        <span class="c-page-state">Expired</span>
+      </div>
+      <div class="c-page-body">
+        <p class="c-narrative">Badge will be voided and returned to security. The visitor record is closed.</p>
+      </div>
+    </article>
+  </div>
+
+  <!-- Modal for Expire -->
+  <div id="modal-c" class="modal-overlay" onclick="if(event.target===this)this.classList.remove('show')">
+    <div class="modal-box" role="dialog" aria-label="Expire event">
+      <h3><span style="color:var(--event)">⚡</span> Expire Badge</h3>
+      <label for="c-reason">Reason</label>
+      <select id="c-reason">
+        <option>Unclaimed after 48 hours</option>
+        <option>Host cancelled visit</option>
+      </select>
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="document.getElementById('modal-c').classList.remove('show')">Cancel</button>
+        <button class="btn-fire" onclick="document.getElementById('modal-c').classList.remove('show')">Expire</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════════════
+     VARIANT D — Compact Rail + Expandable Lanes
+     A single horizontal rail at top (Salesforce Path style) showing
+     the full lifecycle. Past steps are filled/checked. Current step
+     is highlighted. Future steps show as branching options. Clicking
+     the current step expands downward to reveal available event lanes
+     with guard status and action buttons.
+     ═══════════════════════════════════════════════════════════ -->
+<section id="variant-d" class="variant-section">
+  <div class="variant-header">
+    <h2><span class="letter-badge">D</span> Compact Rail + Expandable Lanes</h2>
+    <p>A Salesforce Path–style horizontal rail showing the full lifecycle. Past steps are checked. The current step is highlighted. Click it to expand action lanes below — each lane shows an event, its target, guard status, and a fire button. Compact at rest, detailed on demand.</p>
+  </div>
+
+  <div class="d-container">
+    <!-- Rail -->
+    <div class="d-rail" role="navigation" aria-label="Badge lifecycle rail">
+      <div class="d-step d-step--completed">
+        <span class="d-step-check">✓</span>
+        <span class="d-step-name">Requested</span>
+      </div>
+
+      <div class="d-step d-step--completed">
+        <span class="d-step-check">✓</span>
+        <span class="d-step-name">Approved</span>
+      </div>
+
+      <div class="d-step d-step--current" onclick="document.getElementById('d-panel').classList.toggle('open')" role="button" tabindex="0" aria-expanded="false" aria-controls="d-panel">
+        <span class="d-step-name">ReadyForPickup</span>
+      </div>
+
+      <!-- Future branches -->
+      <div class="d-branch-group">
+        <div class="d-step d-step--future d-step--branch">
+          <span class="d-step-name">PickedUp</span>
+        </div>
+        <div class="d-branch-label">or</div>
+        <div class="d-step d-step--future d-step--branch">
+          <span class="d-step-name">Expired</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Expandable Panel (shown on click of current step) -->
+    <div id="d-panel" class="d-expand-panel open">
+      <div class="d-expand-heading">
+        Available Actions
+        <span class="hint">from ReadyForPickup</span>
+      </div>
+
+      <div class="d-lane-list">
+        <!-- PickUp lane (blocked) -->
+        <div class="d-lane blocked">
+          <span class="lane-event">Pick Up</span>
+          <span class="lane-arrow">→</span>
+          <span class="lane-target">PickedUp</span>
+          <span class="lane-guard">
+            <span class="guard-chip guard-chip--blocked">⊘ Host not confirmed</span>
+          </span>
+          <button class="event-btn event-btn--blocked lane-btn" disabled>Pick Up</button>
+        </div>
+
+        <!-- Expire lane (active) -->
+        <div class="d-lane">
+          <span class="lane-event">Expire</span>
+          <span class="lane-arrow">→</span>
+          <span class="lane-target">Expired</span>
+          <span class="lane-guard">
+            <span class="guard-chip guard-chip--ok">✓ All guards pass</span>
+          </span>
+          <button class="event-btn event-btn--active lane-btn" onclick="document.getElementById('modal-d').classList.add('show')">Expire</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal for Expire -->
+  <div id="modal-d" class="modal-overlay" onclick="if(event.target===this)this.classList.remove('show')">
+    <div class="modal-box" role="dialog" aria-label="Expire event">
+      <h3><span style="color:var(--event)">⚡</span> Expire Badge</h3>
+      <label for="d-reason">Reason</label>
+      <select id="d-reason">
+        <option>Unclaimed after 48 hours</option>
+        <option>Host cancelled visit</option>
+      </select>
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="document.getElementById('modal-d').classList.remove('show')">Cancel</button>
+        <button class="btn-fire" onclick="document.getElementById('modal-d').classList.remove('show')">Expire</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════════════
+     VARIANT E — Conversation Timeline
+     Reimagines the timeline as a chat thread. System events are
+     left-aligned bubbles ("Badge moved to Approved"). The current
+     moment shows available actions as a "reply" area with event
+     buttons. Guard status appears as inline tooltips. Leverages the
+     familiar messaging mental model that business users already know.
+     ═══════════════════════════════════════════════════════════ -->
+<section id="variant-e" class="variant-section">
+  <div class="variant-header">
+    <h2><span class="letter-badge">E</span> Conversation Timeline</h2>
+    <p>The lifecycle as a chat thread. System transitions appear as left-aligned messages. User actions appear as right-aligned messages. Available actions are presented as a "reply" area at the bottom — familiar to anyone who has used Slack, Teams, or iMessage.</p>
+  </div>
+
+  <div class="e-thread">
+    <!-- Thread Header -->
+    <header class="e-thread-header">
+      <span class="entity-name">Visitor Badge — Alex Chen</span>
+      <span class="entity-id">#VB-2024-0847</span>
+      <span class="state-badge state-badge--current" style="margin-left:auto">ReadyForPickup</span>
+    </header>
+
+    <!-- Messages -->
+    <div class="e-messages" role="log" aria-label="Badge lifecycle conversation">
+
+      <!-- System: Created / Requested -->
+      <div class="e-msg e-msg--system">
+        <div class="bubble">
+          Badge request created for <strong>Alex Chen</strong>, visiting <strong>Building 4</strong>.<br>
+          Status: <span class="state-mention">Requested</span>
+          <div class="field-change">
+            <span class="fname">VisitorName</span> <span class="fval">Alex Chen</span>
+          </div>
+          <div class="field-change">
+            <span class="fname">Building</span> <span class="fval">Building 4</span>
+          </div>
+        </div>
+        <span class="meta">Yesterday, 3:12 PM · System</span>
+      </div>
+
+      <!-- User action: Approve -->
+      <div class="e-msg e-msg--user">
+        <div class="bubble">
+          Approved the badge request.<br>
+          Assigned host: <strong>Jordan Lee</strong>.
+        </div>
+        <span class="meta">Security Team · Yesterday, 5:45 PM</span>
+      </div>
+
+      <!-- System: Moved to Approved -->
+      <div class="e-msg e-msg--system">
+        <div class="bubble">
+          Badge moved to <span class="state-mention">Approved</span>.
+          <div class="field-change">
+            <span class="fname">HostName</span> <span class="fval">Jordan Lee</span>
+          </div>
+        </div>
+        <span class="meta">Yesterday, 5:45 PM · System</span>
+      </div>
+
+      <!-- System: Moved to ReadyForPickup -->
+      <div class="e-msg e-msg--system">
+        <div class="bubble">
+          Badge printed and staged. Moved to <span class="state-mention">Ready for Pickup</span>.<br>
+          Pickup location: <strong>Lobby B reception desk</strong>.
+          <div class="field-change">
+            <span class="fname">PickupLocation</span> <span class="fval">Lobby B</span>
+          </div>
+        </div>
+        <span class="meta">Today, 9:00 AM · System</span>
+      </div>
+
+      <!-- System: waiting indicator -->
+      <div class="e-msg e-msg--system">
+        <div class="bubble" style="color:var(--soft); font-style:italic">
+          Waiting for visitor to arrive&hellip;
+        </div>
+        <span class="meta">Now</span>
+      </div>
+    </div>
+
+    <!-- Reply / Action Area -->
+    <footer class="e-reply-area">
+      <span class="e-reply-label">What happens next?</span>
+      <div class="e-reply-actions">
+        <div class="e-action-bubble blocked" title="Cannot pick up: host has not confirmed the visit">
+          <span class="ab-name">Pick Up</span>
+          <span class="ab-detail">→ PickedUp</span>
+          <span class="ab-guard blocked">⊘ Host not confirmed</span>
+        </div>
+        <div class="e-action-bubble" onclick="document.getElementById('modal-e').classList.add('show')" role="button" tabindex="0">
+          <span class="ab-name">Expire</span>
+          <span class="ab-detail">→ Expired</span>
+          <span class="ab-guard ok">✓ Ready to fire</span>
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Modal for Expire -->
+  <div id="modal-e" class="modal-overlay" onclick="if(event.target===this)this.classList.remove('show')">
+    <div class="modal-box" role="dialog" aria-label="Expire event">
+      <h3><span style="color:var(--event)">⚡</span> Expire Badge</h3>
+      <label for="e-reason">Reason</label>
+      <select id="e-reason">
+        <option>Unclaimed after 48 hours</option>
+        <option>Host cancelled visit</option>
+      </select>
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="document.getElementById('modal-e').classList.remove('show')">Cancel</button>
+        <button class="btn-fire" onclick="document.getElementById('modal-e').classList.remove('show')">Expire</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<script>
+  // Keyboard support for clickable non-button elements
+  document.querySelectorAll('[role="button"]').forEach(el => {
+    el.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); el.click(); }
+    });
+  });
+
+  // Close modals on Escape
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      document.querySelectorAll('.modal-overlay.show').forEach(m => m.classList.remove('show'));
+    }
+  });
+</script>
+
+</body>
+</html>

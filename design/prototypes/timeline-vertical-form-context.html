@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Timeline Vertical Form Context — Git Graph Style</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;700&family=Geist:wght@400;500&display=swap">
+<style>
+:root {
+  --bg: #040506;
+  --panel: #090b0e;
+  --panel-2: #0d1014;
+  --line: rgba(255,255,255,0.08);
+  --line-strong: rgba(255,255,255,0.16);
+  --text: #f1f3f6;
+  --muted: #a7afbb;
+  --soft: #687281;
+  --structure: #6366F1;
+  --state: #A898F5;
+  --event: #30B8E8;
+  --valid: #34D399;
+  --violated: #F87171;
+  --rule: #FBBF24;
+  --mono: "Geist Mono","Cascadia Code",Consolas,monospace;
+  --sans: "Geist","Segoe UI Variable","Segoe UI",system-ui,sans-serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--mono);
+  min-height: 100vh;
+  padding: 24px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── FRAME ────────────────────────────────── */
+.frame {
+  width: min(1280px, 100%);
+  margin: 0 auto;
+}
+
+/* ── HEADER BAR (flat, no radius, no gradient) ── */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 16px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.header-eyebrow {
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+
+.header-name {
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+.header-id {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.state-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(168,152,245,0.24);
+  background: rgba(168,152,245,0.08);
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--state);
+  white-space: nowrap;
+}
+
+.state-pill-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--state);
+}
+
+/* ── TWO-COLUMN GRID ─────────────────────── */
+.body-grid {
+  display: grid;
+  grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
+  border: 1px solid var(--line);
+  border-top: none;
+}
+
+/* ── LEFT: GIT GRAPH HISTORY ─────────────── */
+.history {
+  background: var(--panel);
+  border-right: 1px solid var(--line);
+}
+
+.history-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.history-head-label {
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+
+.history-head-count {
+  font-size: 10px;
+  color: var(--soft);
+}
+
+/* Row table */
+.history-table {
+  position: relative;
+}
+
+.history-row {
+  display: grid;
+  grid-template-columns: 48px 1fr;
+  align-items: center;
+  gap: 0;
+  height: 30px;
+  border-bottom: 1px solid var(--line);
+}
+
+.history-row:last-child {
+  border-bottom: none;
+}
+
+.history-row--current {
+  background: var(--panel-2);
+}
+
+/* Graph rail cell — matches row height */
+.row-rail {
+  position: relative;
+  height: 30px;
+  flex-shrink: 0;
+}
+
+/* Text cell — single line */
+.row-text {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--mono);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+/* Entry type labels */
+.row-entry {
+  color: var(--event);
+  flex-shrink: 0;
+}
+
+.row-entry--edit {
+  color: var(--muted);
+}
+
+.row-entry--state {
+  color: var(--state);
+  font-weight: 500;
+}
+
+.row-arrow {
+  color: var(--soft);
+}
+
+.row-target {
+  color: var(--state);
+}
+
+.row-detail {
+  color: var(--soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Past rows */
+.history-row--past .row-entry  { opacity: 0.7; }
+.history-row--past .row-detail { color: var(--soft); }
+
+/* Future rows */
+.history-row--future .row-entry  { color: var(--soft); }
+.history-row--future .row-detail { color: var(--soft); }
+.history-row--future-ok .row-entry { color: var(--valid); }
+.history-row--future-blocked .row-entry { color: var(--violated); }
+
+/* ── GRAPH RAIL SVG (single authoritative geometry) ── */
+.graph-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 48px;
+  overflow: visible;
+}
+
+/* ── RIGHT: FORM + ACTIONS ───────────────── */
+.detail {
+  background: var(--panel);
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+}
+
+/* Fields */
+.fields-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.fields-head-label {
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+
+.fields-head-meta {
+  font-size: 10px;
+  color: var(--soft);
+}
+
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.field-cell {
+  background: var(--panel);
+  padding: 10px 14px 12px;
+}
+
+.field-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--soft);
+  margin-bottom: 5px;
+}
+
+.field-tag {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 1px 5px;
+  border: 1px solid var(--line);
+  color: var(--soft);
+}
+
+.field-tag--required {
+  color: var(--rule);
+  border-color: rgba(251,191,36,0.22);
+}
+
+.field-value {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--text);
+}
+
+.field-value--dim {
+  color: var(--muted);
+}
+
+.field-input {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid rgba(251,191,36,0.18);
+  background: rgba(251,191,36,0.03);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 13px;
+}
+
+.field-input::placeholder {
+  color: var(--soft);
+}
+
+/* Callout */
+.field-callout {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+  font-family: var(--sans);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.field-callout-icon {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid rgba(251,191,36,0.22);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--rule);
+}
+
+/* ── ACTIONS ──────────────────────────────── */
+.actions {
+  padding: 0;
+}
+
+.actions-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.actions-head-label {
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+
+.actions-head-meta {
+  font-size: 10px;
+  color: var(--soft);
+}
+
+.actions-list {
+  padding: 12px 14px;
+  display: grid;
+  gap: 8px;
+}
+
+.event-btn {
+  display: grid;
+  grid-template-columns: 8px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.event-btn--available {
+  border-color: rgba(52,211,153,0.28);
+  cursor: pointer;
+}
+
+.event-btn--blocked {
+  border-color: rgba(248,113,113,0.22);
+  cursor: not-allowed;
+}
+
+.event-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.event-btn--available .event-dot {
+  background: var(--valid);
+}
+
+.event-btn--blocked .event-dot {
+  background: var(--violated);
+}
+
+.event-btn-body {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.event-name {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.event-btn--available .event-name {
+  color: var(--valid);
+}
+
+.event-btn--blocked .event-name {
+  color: var(--soft);
+}
+
+.event-reason {
+  font-family: var(--sans);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.event-btn--blocked .event-reason {
+  color: var(--soft);
+}
+
+.event-target {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.event-target-arrow {
+  color: var(--state);
+}
+
+/* ── FOOTER ───────────────────────────────── */
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  border: 1px solid var(--line);
+  border-top: none;
+  background: var(--panel);
+  font-size: 10px;
+  color: var(--soft);
+}
+
+/* ── RESPONSIVE ───────────────────────────── */
+@media (max-width: 900px) {
+  .body-grid {
+    grid-template-columns: 1fr;
+  }
+  .history {
+    border-right: none;
+    border-bottom: 1px solid var(--line);
+  }
+}
+</style>
+</head>
+<body>
+<main class="frame">
+
+  <!-- ═══ HEADER BAR (flat, no radius, no gradient) ═══ -->
+  <header class="header">
+    <div class="header-left">
+      <span class="header-eyebrow">Precept</span>
+      <span class="header-name">VisitorBadgePickup</span>
+      <span class="header-id">#VBP-2847</span>
+    </div>
+    <div class="state-pill">
+      <span class="state-pill-dot" aria-hidden="true"></span>
+      ReadyForPickup
+    </div>
+  </header>
+
+  <!-- ═══ TWO-COLUMN BODY ═══ -->
+  <div class="body-grid">
+
+    <!-- ─── LEFT: GIT-GRAPH HISTORY ─── -->
+    <section class="history" aria-label="Lifecycle history">
+      <div class="history-head">
+        <span class="history-head-label">Timeline</span>
+        <span class="history-head-count">4 steps · 3 states visited</span>
+      </div>
+
+      <div class="history-table">
+
+        <!-- Authoritative SVG graph rail.
+             7 rows × 30px = 210px total. Node centers at y = row × 30 + 15.
+             row 0: initial state   y=15   node
+             row 1: event+trans     y=45   node
+             row 2: event+trans     y=75   node
+             row 3: edit            y=105  (no node — no state change)
+             row 4: current state   y=135  node (filled)
+             row 5: future PickUp   y=165  node (fork continues main)
+             row 6: future Expire   y=195  node (fork branches right)
+        -->
+        <svg class="graph-svg" viewBox="0 0 48 210" preserveAspectRatio="xMinYMin meet"
+             style="height:210px"
+             role="img" aria-label="Git-graph timeline rail">
+
+          <!-- Trunk: row 0 through row 4 (current state) -->
+          <line x1="14" y1="15" x2="14" y2="135" stroke="var(--state)" stroke-width="2" />
+
+          <!-- Fork: current → PickUp (continues main lane, dashed) -->
+          <line x1="14" y1="135" x2="14" y2="165" stroke="var(--valid)" stroke-width="2" stroke-dasharray="4 3" />
+
+          <!-- Fork: current → Expire (branches right, dashed) -->
+          <path d="M 14 135 C 14 150, 30 155, 30 165" fill="none" stroke="var(--violated)" stroke-width="2" stroke-dasharray="4 3" />
+          <line x1="30" y1="165" x2="30" y2="195" stroke="var(--violated)" stroke-width="2" stroke-dasharray="4 3" />
+
+          <!-- Nodes (dot at every state change) -->
+          <circle cx="14" cy="15" r="5" fill="var(--panel)" stroke="var(--state)" stroke-width="1.5" />
+          <circle cx="14" cy="45" r="4.5" fill="var(--panel)" stroke="var(--state)" stroke-width="1.5" />
+          <circle cx="14" cy="75" r="4.5" fill="var(--panel)" stroke="var(--state)" stroke-width="1.5" />
+          <circle cx="14" cy="135" r="5.5" fill="var(--state)" stroke="none" />
+          <circle cx="14" cy="165" r="4.5" fill="var(--panel)" stroke="var(--valid)" stroke-width="1.5" />
+          <circle cx="30" cy="195" r="4.5" fill="var(--panel)" stroke="var(--violated)" stroke-width="1.5" />
+        </svg>
+
+        <!-- Initial state -->
+        <div class="history-row history-row--past">
+          <div class="row-rail"></div>
+          <div class="row-text">
+            <span class="row-entry row-entry--state">Requested</span>
+            <span class="row-detail">initial</span>
+          </div>
+        </div>
+
+        <!-- Event: ApproveRequest → Approved -->
+        <div class="history-row history-row--past">
+          <div class="row-rail"></div>
+          <div class="row-text">
+            <span class="row-entry">ApproveRequest</span>
+            <span class="row-arrow">→</span>
+            <span class="row-target">Approved</span>
+          </div>
+        </div>
+
+        <!-- Event: PrintBadge → ReadyForPickup -->
+        <div class="history-row history-row--past">
+          <div class="row-rail"></div>
+          <div class="row-text">
+            <span class="row-entry">PrintBadge</span>
+            <span class="row-arrow">→</span>
+            <span class="row-target">ReadyForPickup</span>
+          </div>
+        </div>
+
+        <!-- Data edit: OutcomeNote (no transition) -->
+        <div class="history-row history-row--past">
+          <div class="row-rail"></div>
+          <div class="row-text">
+            <span class="row-entry row-entry--edit">edit OutcomeNote</span>
+          </div>
+        </div>
+
+        <!-- Current state -->
+        <div class="history-row history-row--current">
+          <div class="row-rail"></div>
+          <div class="row-text">
+            <span class="row-entry row-entry--state">ReadyForPickup</span>
+            <span class="row-detail">4 steps</span>
+          </div>
+        </div>
+
+        <!-- Future: PickUp → PickedUp (available) -->
+        <div class="history-row history-row--future history-row--future-ok">
+          <div class="row-rail"></div>
+          <div class="row-text">
+            <span class="row-entry">PickUp</span>
+            <span class="row-arrow">→</span>
+            <span class="row-target">PickedUp</span>
+          </div>
+        </div>
+
+        <!-- Future: Expire → Expired (blocked) -->
+        <div class="history-row history-row--future history-row--future-blocked">
+          <div class="row-rail"></div>
+          <div class="row-text">
+            <span class="row-entry">Expire</span>
+            <span class="row-arrow">→</span>
+            <span class="row-target">Expired</span>
+            <span class="row-detail">blocked</span>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ─── RIGHT: FORM + ACTIONS ─── -->
+    <section class="detail" aria-label="Record context and actions">
+
+      <!-- Field grid (SVS 1px-gap pattern) -->
+      <div>
+        <div class="fields-head">
+          <span class="fields-head-label">Fields</span>
+          <span class="fields-head-meta">ReadyForPickup · 6 fields</span>
+        </div>
+
+        <div class="field-grid">
+          <div class="field-cell">
+            <div class="field-label">VisitorName <span class="field-tag">locked</span></div>
+            <div class="field-value">Ada Reyes</div>
+          </div>
+          <div class="field-cell">
+            <div class="field-label">HostConfirmed <span class="field-tag">locked</span></div>
+            <div class="field-value">true</div>
+          </div>
+          <div class="field-cell">
+            <div class="field-label">BadgePrinted <span class="field-tag">locked</span></div>
+            <div class="field-value">true</div>
+          </div>
+          <div class="field-cell">
+            <div class="field-label">PickupWindowOpen <span class="field-tag">locked</span></div>
+            <div class="field-value">true</div>
+          </div>
+          <div class="field-cell">
+            <div class="field-label">OutcomeNote <span class="field-tag field-tag--required">required</span></div>
+            <input class="field-input" type="text" value="Badge handed to visitor at desk." aria-label="Outcome note">
+          </div>
+          <div class="field-cell">
+            <div class="field-label">LastTransition</div>
+            <div class="field-value field-value--dim">PreparePickup @ 09:42</div>
+          </div>
+        </div>
+
+        <div class="field-callout">
+          <span class="field-callout-icon" aria-hidden="true">!</span>
+          OutcomeNote is required — terminal outcomes must leave a business explanation.
+        </div>
+      </div>
+
+      <!-- Event actions -->
+      <div class="actions">
+        <div class="actions-head">
+          <span class="actions-head-label">Events</span>
+          <span class="actions-head-meta">2 declared · 1 available</span>
+        </div>
+
+        <div class="actions-list">
+          <!-- Available: PickUp -->
+          <button class="event-btn event-btn--available" type="button">
+            <span class="event-dot" aria-hidden="true"></span>
+            <div class="event-btn-body">
+              <span class="event-name">PickUp</span>
+              <span class="event-reason">Pickup window is open and badge is printed</span>
+            </div>
+            <span class="event-target">
+              <span class="event-target-arrow" aria-hidden="true">→</span> PickedUp
+            </span>
+          </button>
+
+          <!-- Blocked: Expire -->
+          <button class="event-btn event-btn--blocked" type="button" disabled aria-disabled="true">
+            <span class="event-dot" aria-hidden="true"></span>
+            <div class="event-btn-body">
+              <span class="event-name">Expire</span>
+              <span class="event-reason">Blocked — PickupWindowOpen must be false</span>
+            </div>
+            <span class="event-target">
+              <span class="event-target-arrow" aria-hidden="true">→</span> Expired
+            </span>
+          </button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ═══ FOOTER ═══ -->
+  <footer class="footer">
+    <span>Git-graph history + form context study</span>
+    <span>Event reasoning visible at rest</span>
+  </footer>
+
+</main>
+</body>
+</html>

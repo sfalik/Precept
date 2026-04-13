@@ -853,9 +853,9 @@ pre {
   .cg-state-diagram {
     display: grid;
     gap: 16px;
-    padding: 16px;
-    border: 1px solid rgba(255,255,255,0.08);
-    background: linear-gradient(180deg, rgba(255,255,255,0.022), rgba(255,255,255,0.01));
+    padding: 0;
+    border: none;
+    background: none;
     container-type: inline-size;
   }
   .cg-state-diagram-head {
@@ -965,9 +965,9 @@ pre {
     position: relative;
     overflow: hidden;
     min-height: 540px;
-    border: 1px solid var(--line);
-    background: #000;
-    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02);
+    border: none;
+    background: var(--panel);
+    box-shadow: none;
     width: min(100%, 760px);
     margin-inline: 0;
   }
@@ -1388,6 +1388,106 @@ pre {
 }
 .form-row:last-child { border-bottom: none; }
 .form-lbl { color: var(--soft); font-size: 11px; letter-spacing: 0.10em; }
+.form-row--editable { align-items: center; }
+.form-row--editable .form-lbl { color: var(--data); }
+.form-row--constrained .form-lbl { font-style: italic; }
+.form-row--required .form-lbl { color: var(--warn); }
+.form-required-badge { font-size: 9px; font-family: var(--mono); letter-spacing: 0.10em; color: var(--warn); margin-left: 6px; opacity: 0.8; }
+.form-input {
+  background: rgba(176,190,197,0.06);
+  border: 1px solid rgba(176,190,197,0.22);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 13px;
+  padding: 4px 8px;
+  width: 100%;
+  outline: none;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+.form-input:focus {
+  border-color: rgba(176,190,197,0.5);
+  background: rgba(176,190,197,0.10);
+}
+.form-input::placeholder { color: var(--soft); opacity: 0.6; }
+.form-locked-val { color: var(--muted); }
+.form-btn {
+  padding: 6px 14px;
+  border: 1px solid var(--line-strong);
+  background: none;
+  color: var(--soft);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: border-color 120ms ease, color 120ms ease, background 120ms ease;
+}
+.form-btn:hover { border-color: rgba(255,255,255,0.28); color: var(--text); }
+.form-btn--save {
+  border-color: rgba(176,190,197,0.35);
+  background: rgba(176,190,197,0.08);
+  color: var(--data);
+}
+.form-btn--save:hover { border-color: rgba(176,190,197,0.6); background: rgba(176,190,197,0.14); color: var(--text); }
+.form-state-specimen {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  min-width: 220px;
+}
+.form-state-row {
+  display: grid;
+  grid-template-columns: 90px minmax(0,1fr);
+  gap: 8px;
+  align-items: center;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.form-state-lbl { color: var(--soft); font-size: 10px; letter-spacing: 0.08em; }
+.form-state-actions { display: flex; gap: 5px; margin-top: 4px; }
+.form-btn--dirty {
+  border-color: rgba(176,190,197,0.5);
+  background: rgba(176,190,197,0.12);
+  color: var(--data);
+}
+.form-btn--pristine {
+  border-color: var(--line);
+  background: none;
+  color: var(--soft);
+  opacity: 0.45;
+  cursor: default;
+}
+.form-state-specimen {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  min-width: 220px;
+}
+.form-state-row {
+  display: grid;
+  grid-template-columns: 90px minmax(0,1fr);
+  gap: 8px;
+  align-items: center;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.form-state-lbl { color: var(--soft); font-size: 10px; letter-spacing: 0.08em; }
+.form-state-actions { display: flex; gap: 5px; margin-top: 4px; }
+.form-btn--dirty {
+  border-color: rgba(176,190,197,0.5);
+  background: rgba(176,190,197,0.12);
+  color: var(--data);
+}
+.form-btn--pristine {
+  border-color: var(--line);
+  background: none;
+  color: var(--soft);
+  opacity: 0.45;
+  cursor: default;
+}
 .evt-btn {
   padding: 6px 14px;
   border: 1px solid rgba(48,184,232,0.35);
@@ -3983,9 +4083,6 @@ pre {
 
       <!-- Surface 01: DSL Syntax -->
     <div class="surface-specimen">
-      <div class="surface-label">Surface 01</div>
-        <div class="surface-h3">DSL Syntax</div>
-          <p class="sf-note">Design-time syntax highlighting renders the full semantic palette. Governing structure words and connective grammar share indigo, with bold reserved for structural drivers and normal weight used for comparison and logic forms like <span class="sg">==</span> / <span class="sg">and</span> / <span class="sg">or</span> / <span class="sg">not</span>. States stay violet. Events stay cyan. Data stays slate. Rule messages stay gold.</p>
         <pre id="surface-dsl-syntax-sample" data-source="semant-visual-system-canonical.precept" style="font-size:12px"></pre>
     </div>
 
@@ -4004,35 +4101,31 @@ pre {
 
     <!-- Surface 02: State Diagram -->
     <div class="surface-specimen">
-      <div class="surface-label">Surface 02</div>
-      <div class="surface-h3">State Diagram</div>
-      <p class="sf-note">Shape before colour. States are equal hard rectangles distinguished by visual cues — initial origin dot, terminal double border. Events label transition arrows.</p>
-      <div class="panel-inner">
-        <div style="font-family:var(--mono);font-size:10px;color:var(--soft);text-transform:uppercase;letter-spacing:0.12em;margin-bottom:16px">
-          Snapshot after <span class="ev">PrintBadge</span> &nbsp;·&nbsp; current <span class="st"><em>ReadyForPickup</em></span>
-        </div>
-        <div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap;margin-bottom:16px">
-          <span style="display:inline-flex;align-items:center;gap:7px;padding:8px 16px;border:1px solid rgba(168,152,245,0.26);color:rgba(168,152,245,0.7);font-family:var(--mono);font-size:12px">
-            <span style="width:7px;height:7px;border-radius:50%;background:rgba(99,102,241,0.7)"></span>
-            <span class="st">Requested</span>
-          </span>
-          <span style="font-family:var(--mono);font-size:11px;color:rgba(48,184,232,0.52)">── ApproveRequest ──&gt;</span>
-          <span style="padding:8px 16px;border:1px solid rgba(168,152,245,0.26);font-family:var(--mono);font-size:12px;color:rgba(168,152,245,0.7)">Approved</span>
-          <span style="font-family:var(--mono);font-size:11px;color:rgba(48,184,232,0.52)">── PrintBadge ──&gt;</span>
-          <span style="padding:8px 16px;border:2px solid rgba(168,152,245,0.58);background:rgba(67,56,202,0.14);font-family:var(--mono);font-size:12px;color:var(--state)"><em>ReadyForPickup</em></span>
-        </div>
-        <div style="display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin-bottom:16px;padding-left:92px">
-          <span style="font-family:var(--mono);font-size:11px;color:var(--event)">└── PickUp ──&gt;</span>
-          <span style="padding:8px 16px;border:2px solid rgba(168,152,245,0.46);font-family:var(--mono);font-size:12px;color:var(--state)">PickedUp</span>
-          <span style="font-family:var(--mono);font-size:11px;color:rgba(48,184,232,0.7)">└── Expire [PickupWindowOpen == false] ──&gt;</span>
-          <span style="padding:8px 16px;border:2px dashed rgba(168,152,245,0.34);font-family:var(--mono);font-size:12px;color:rgba(168,152,245,0.68)">Expired</span>
-        </div>
-        <div style="display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin-bottom:16px;padding-left:196px">
-          <span style="font-family:var(--mono);font-size:11px;color:rgba(48,184,232,0.52)">└── Cancel ──&gt;</span>
-          <span style="padding:8px 16px;border:2px solid rgba(168,152,245,0.34);font-family:var(--mono);font-size:12px;color:rgba(168,152,245,0.68)">Cancelled</span>
-        </div>
-        <div style="font-family:var(--mono);font-size:10px;color:var(--soft);text-transform:uppercase;letter-spacing:0.12em">
-          Initial ● &nbsp; Current fill tint &nbsp; Terminal double border &nbsp; Blocked branch guard shown inline
+      <div class="cg-state-diagram">
+        <div class="svs-state-review-stage" id="surface02-state-diagram-stage" aria-label="Runtime state diagram for VisitorBadgePickup">
+          <svg viewBox="0 0 760 540" role="img" aria-label="Vertical runtime graph: ReadyForPickup is current, PickUp is active, Expire is blocked">
+            <defs>
+              <marker id="svs-s2-arrow-past" viewBox="0 0 12 10" markerWidth="12" markerHeight="10" refX="10" refY="5" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M1 1 L10 5 L1 9 L3.6 5 Z" fill="rgba(48,184,232,0.38)"></path></marker>
+              <marker id="svs-s2-arrow-blocked" viewBox="0 0 12 10" markerWidth="12" markerHeight="10" refX="10" refY="5" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M1 1 L10 5 L1 9 L3.6 5 Z" fill="rgba(48,184,232,0.64)"></path></marker>
+              <marker id="svs-s2-arrow-active" viewBox="0 0 12 10" markerWidth="12" markerHeight="10" refX="10" refY="5" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M1 1 L10 5 L1 9 L3.6 5 Z" fill="rgba(48,184,232,0.96)"></path></marker>
+            </defs>
+            <path class="svs-edge-past" data-edge="requested-approved" d="M380 80 V132" marker-end="url(#svs-s2-arrow-past)"></path>
+            <path class="svs-edge-past" data-edge="approved-ready" d="M380 184 V236" marker-end="url(#svs-s2-arrow-past)"></path>
+            <path class="svs-edge-past" data-edge="approved-cancelled" d="M454 158 H532" marker-end="url(#svs-s2-arrow-past)"></path>
+            <path class="svs-edge-active" data-edge="ready-pickedup" d="M380 288 V314 H254 V340" marker-end="url(#svs-s2-arrow-active)"></path>
+            <path class="svs-edge-blocked" data-edge="ready-expired" d="M380 288 V314 H506 V340" marker-end="url(#svs-s2-arrow-blocked)"></path>
+          </svg>
+          <div class="svs-state-node svs-state-node--initial svs-state-node--unreachable-current" data-state="Requested" data-left="236" data-top="32" tabindex="0" style="left:236px; top:32px;"><span class="svs-state-node-dot" aria-hidden="true"></span>Requested</div>
+          <div class="svs-state-node svs-state-node--unreachable-current" data-state="Approved" data-left="236" data-top="176" tabindex="0" style="left:236px; top:176px;">Approved</div>
+          <div class="svs-state-node svs-state-node--current" data-state="ReadyForPickup" data-left="236" data-top="320" tabindex="0" style="left:236px; top:320px;"><em>ReadyForPickup</em></div>
+          <div class="svs-state-node svs-state-node--terminal svs-state-node--unreachable-current" data-state="Cancelled" data-left="464" data-top="176" tabindex="0" style="left:464px; top:176px;">Cancelled</div>
+          <div class="svs-state-node svs-state-node--terminal" data-state="PickedUp" data-left="110" data-top="456" tabindex="0" style="left:110px; top:456px;">PickedUp</div>
+          <div class="svs-state-node svs-state-node--terminal svs-state-node--unreachable-current" data-state="Expired" data-left="362" data-top="456" tabindex="0" style="left:362px; top:456px;">Expired</div>
+          <span class="svs-edge-label svs-edge-label--muted" data-edge-label="requested-approved"><span class="svs-edge-token">ApproveRequest</span></span>
+          <span class="svs-edge-label svs-edge-label--muted" data-edge-label="approved-ready"><span class="svs-edge-token">PrintBadge</span></span>
+          <span class="svs-edge-label svs-edge-label--muted" data-edge-label="approved-cancelled"><span class="svs-edge-token">Cancel</span></span>
+          <span class="svs-edge-label svs-edge-label--active" data-edge-label="ready-pickedup"><span class="svs-edge-token">PickUp</span></span>
+          <span class="svs-edge-label svs-edge-label--blocked" data-edge-label="ready-expired"><span class="svs-edge-token">Expire</span></span>
         </div>
       </div>
     </div>
@@ -4052,9 +4145,6 @@ pre {
 
     <!-- Surface 03: Timeline -->
     <div class="surface-specimen">
-      <div class="surface-label">Surface 03</div>
-      <div class="surface-h3">Timeline</div>
-      <p class="sf-note">Timeline orders events chronologically. Each entry shows the event (cyan), the transition outcome (state colours), and any verdict result.</p>
       <div style="padding:6px 0">
         <div class="timeline-row">
           <span class="so" style="font-size:11px">2026-04-01</span>
@@ -4084,24 +4174,273 @@ pre {
 
     <!-- Surface 04: Data Forms -->
     <div class="surface-specimen">
-      <div class="surface-label">Surface 04</div>
-      <div class="surface-h3">Data Forms</div>
-      <p class="sf-note">Data forms compose structure sections, editable data fields, a state badge, and available event buttons into one governed interaction surface.</p>
       <div class="panel-inner">
         <div style="margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center">
-          <span style="font-family:var(--mono);font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:var(--soft)">LoanApplication #1042</span>
-          <span style="font-family:var(--mono);font-size:11px;color:var(--state);border:1px solid rgba(168,152,245,0.35);padding:3px 9px">Submitted</span>
+          <span style="font-family:var(--mono);font-size:10px;letter-spacing:0.06em;color:var(--soft)">VisitorBadgePickup</span>
+          <span style="font-family:var(--mono);font-size:11px;color:var(--state);border:1px solid rgba(168,152,245,0.35);padding:3px 9px"><em>ReadyForPickup</em></span>
         </div>
-        <div class="form-row"><span class="form-lbl">ApplicantName</span><span style="color:var(--text)">"Avery Stone"</span></div>
-        <div class="form-row"><span class="form-lbl">Amount</span><span style="color:var(--text)">12500</span></div>
-        <div style="margin-top:14px;display:flex;gap:8px">
-          <button class="evt-btn">Approve</button>
-          <button class="evt-btn">Decline</button>
+        <div class="form-row"><span class="form-lbl">VisitorName</span><span class="form-locked-val">"Ada Reyes"</span></div>
+        <div class="form-row form-row--constrained"><span class="form-lbl">HostConfirmed</span><span class="form-locked-val dv">true</span></div>
+        <div class="form-row"><span class="form-lbl">BadgePrinted</span><span class="form-locked-val dv">true</span></div>
+        <div class="form-row"><span class="form-lbl">PickupWindowOpen</span><span class="form-locked-val dv">true</span></div>
+        <div class="form-row form-row--editable form-row--required"><span class="form-lbl">OutcomeNote<span class="form-required-badge">required</span></span><input class="form-input" type="text" placeholder="—" aria-label="OutcomeNote"></div>
+        <div style="margin-top:16px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+          <div style="display:flex;gap:6px">
+            <button class="form-btn form-btn--save">Save</button>
+            <button class="form-btn">Cancel</button>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="evt-btn">PickUp</button>
+            <button class="evt-btn" disabled title="Blocked — PickupWindowOpen == false required">Expire</button>
+          </div>
         </div>
       </div>
     </div>
 
       </div>
+
+      <div style="margin-top:32px">
+        <div class="eyebrow" style="margin-bottom:12px">Data Behaviour</div>
+        <div class="cg-channels cg-channels--modifiers">
+          <div class="cg-channel cg-channel--modifier">
+            <div class="cg-channel-name">Pristine</div>
+            <div class="cg-channel-body">
+              <div class="cg-modifier-stack">
+                <div class="form-state-specimen">
+                  <div class="form-state-row"><span class="form-state-lbl">OutcomeNote</span><span class="form-input" style="opacity:0.4;padding:3px 6px;font-size:11px">—</span></div>
+                  <div class="form-state-actions">
+                    <span class="form-btn form-btn--pristine" style="font-size:10px;padding:3px 10px">Save</span>
+                    <span class="form-btn" style="font-size:10px;padding:3px 10px;opacity:0.35">Cancel</span>
+                  </div>
+                </div>
+              </div>
+              <p class="cg-channel-caption">No editable field has been touched. Save is inactive — there is nothing to commit.</p>
+            </div>
+          </div>
+          <div class="cg-channel cg-channel--modifier">
+            <div class="cg-channel-name">Dirty</div>
+            <div class="cg-channel-body">
+              <div class="cg-modifier-stack">
+                <div class="form-state-specimen">
+                  <div class="form-state-row"><span class="form-state-lbl">OutcomeNote</span><span class="form-input" style="border-color:rgba(176,190,197,0.45);padding:3px 6px;font-size:11px;color:var(--text)">&ldquo;Collected&rdquo;</span></div>
+                  <div class="form-state-actions">
+                    <span class="form-btn form-btn--dirty" style="font-size:10px;padding:3px 10px">Save</span>
+                    <span class="form-btn" style="font-size:10px;padding:3px 10px">Cancel</span>
+                  </div>
+                </div>
+              </div>
+              <p class="cg-channel-caption">At least one editable field differs from its committed value. Save activates and takes the data family colour. Cancel becomes live.</p>
+            </div>
+          </div>
+          <div class="cg-channel cg-channel--modifier">
+            <div class="cg-channel-name">Violation</div>
+            <div class="cg-channel-body">
+              <div class="cg-modifier-stack">
+                <div class="form-state-specimen">
+                  <div class="form-state-row"><span class="form-state-lbl">OutcomeNote</span><span class="form-input" style="border-color:rgba(248,113,113,0.5);padding:3px 6px;font-size:11px;color:var(--violated)">""</span></div>
+                  <div style="font-family:var(--mono);font-size:10px;color:var(--violated);margin-top:3px;padding-left:98px">cannot be empty</div>
+                  <div class="form-state-actions">
+                    <span class="form-btn form-btn--pristine" style="font-size:10px;padding:3px 10px">Save</span>
+                    <span class="form-btn" style="font-size:10px;padding:3px 10px">Cancel</span>
+                  </div>
+                </div>
+              </div>
+              <p class="cg-channel-caption">Draft value fails an <code class="sg" style="font-size:11px">assert</code> rule. Field border turns coral, rule message appears inline. Save stays inactive until resolved.</p>
+            </div>
+          </div>
+          <div class="cg-channel cg-channel--modifier">
+            <div class="cg-channel-name">Form-level error</div>
+            <div class="cg-channel-body">
+              <div class="cg-modifier-stack">
+                <div class="form-state-specimen">
+                  <div class="form-state-row"><span class="form-state-lbl">VisitorName</span><span class="form-input" style="border-color:rgba(248,113,113,0.55);padding:3px 6px;font-size:11px;color:var(--violated)">null</span></div>
+                  <div class="form-state-row" style="margin-top:4px"><span class="form-state-lbl">HostConfirmed</span><span class="form-input" style="border-color:rgba(248,113,113,0.55);padding:3px 6px;font-size:11px;color:var(--violated)">false</span></div>
+                  <div style="font-family:var(--mono);font-size:10px;color:var(--violated);border-top:1px solid rgba(248,113,113,0.22);margin-top:6px;padding-top:6px">host must confirm before approval</div>
+                </div>
+              </div>
+              <p class="cg-channel-caption">When a rule spans multiple fields, all involved fields are highlighted with a coral border. The rule message appears in a banner beneath them.</p>
+            </div>
+          </div>
+          <div class="cg-channel cg-channel--modifier">
+            <div class="cg-channel-name">Save</div>
+            <div class="cg-channel-body">
+              <div class="cg-modifier-stack">
+                <div class="form-state-specimen">
+                  <div class="form-state-row"><span class="form-state-lbl">OutcomeNote</span><span style="font-family:var(--mono);font-size:11px;color:var(--muted)">&ldquo;Collected&rdquo;</span></div>
+                  <div class="form-state-actions">
+                    <span class="form-btn form-btn--pristine" style="font-size:10px;padding:3px 10px">Save</span>
+                    <span class="form-btn" style="font-size:10px;padding:3px 10px;opacity:0.35">Cancel</span>
+                  </div>
+                </div>
+              </div>
+              <p class="cg-channel-caption">Draft committed via <code class="sg" style="font-size:11px">Update</code>. Fields return to locked display. Dirty state clears and Save returns to inactive.</p>
+            </div>
+          </div>
+          <div class="cg-channel cg-channel--modifier">
+            <div class="cg-channel-name">Cancel</div>
+            <div class="cg-channel-body">
+              <div class="cg-modifier-stack">
+                <div class="form-state-specimen">
+                  <div class="form-state-row"><span class="form-state-lbl">OutcomeNote</span><span class="form-input" style="opacity:0.4;padding:3px 6px;font-size:11px">—</span></div>
+                  <div class="form-state-actions">
+                    <span class="form-btn form-btn--pristine" style="font-size:10px;padding:3px 10px">Save</span>
+                    <span class="form-btn" style="font-size:10px;padding:3px 10px;opacity:0.35">Cancel</span>
+                  </div>
+                </div>
+              </div>
+              <p class="cg-channel-caption">Draft discarded. All editable fields revert to their last committed values. Dirty state clears without writing to the runtime.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top:32px">
+        <div class="eyebrow" style="margin-bottom:12px">Event Behaviour</div>
+        <div class="cg-channels cg-channels--modifiers">
+
+          <!-- token states -->
+          <div class="cg-channel cg-channel--modifier">
+            <div class="cg-channel-name">Active</div>
+            <div class="cg-channel-body">
+              <div class="cg-modifier-stack">
+                <div class="form-state-specimen" style="flex-direction:row;gap:6px;align-items:center">
+                  <button class="evt-btn">PickUp</button>
+                </div>
+              </div>
+              <p class="cg-channel-caption">Event is available from the current state and its guard passes. Token takes the event colour and is interactive.</p>
+            </div>
+          </div>
+
+          <div class="cg-channel cg-channel--modifier">
+            <div class="cg-channel-name">Disabled</div>
+            <div class="cg-channel-body">
+              <div class="cg-modifier-stack">
+                <div class="form-state-specimen" style="flex-direction:row;gap:6px;align-items:center">
+                  <button class="evt-btn" disabled>Expire</button>
+                </div>
+              </div>
+              <p class="cg-channel-caption">Event exists but its guard fails or the transition is not available from the current state. Token is muted and non-interactive.</p>
+            </div>
+          </div>
+
+          <!-- no-args fire -->
+          <div class="cg-channel cg-channel--modifier">
+            <div class="cg-channel-name">Fire — no args</div>
+            <div class="cg-channel-body">
+              <div class="cg-modifier-stack">
+                <div class="form-state-specimen" style="gap:8px">
+                  <div style="display:flex;gap:6px;align-items:center">
+                    <button class="evt-btn">PickUp</button>
+                    <span style="font-family:var(--mono);font-size:10px;color:var(--soft)">&#x2192; executes immediately</span>
+                  </div>
+                </div>
+              </div>
+              <p class="cg-channel-caption">When an active event carries no arguments, clicking it fires the event directly via <code class="sg" style="font-size:11px">Fire</code>. No confirmation step.</p>
+            </div>
+          </div>
+
+          <!-- args dialog - pristine -->
+          <div class="cg-channel cg-channel--modifier">
+            <div class="cg-channel-name">Args dialog — pristine</div>
+            <div class="cg-channel-body">
+              <div class="cg-modifier-stack">
+                <div class="form-state-specimen" style="gap:0;padding:0;border-color:rgba(48,184,232,0.2)">
+                  <!-- dialog header -->
+                  <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid var(--line)">
+                    <span style="font-family:var(--mono);font-size:11px;letter-spacing:0.08em;color:var(--event)">Approve</span>
+                    <div style="display:flex;align-items:center;gap:6px">
+                      <span style="font-family:var(--mono);font-size:9px;letter-spacing:0.1em;text-transform:uppercase;color:var(--soft)">&#x2192;</span>
+                      <span style="font-family:var(--mono);font-size:10px;color:var(--state)">Approved</span>
+                    </div>
+                  </div>
+                  <!-- args -->
+                  <div style="padding:10px 12px;display:grid;gap:6px">
+                    <div class="form-state-row"><span class="form-state-lbl">ReviewedBy</span><span class="form-input" style="opacity:0.4;padding:3px 6px;font-size:11px">—</span></div>
+                    <div class="form-state-row"><span class="form-state-lbl">Note</span><span class="form-input" style="opacity:0.4;padding:3px 6px;font-size:11px">—</span></div>
+                  </div>
+                  <!-- dialog footer -->
+                  <div style="display:flex;justify-content:flex-end;gap:6px;padding:8px 12px;border-top:1px solid var(--line)">
+                    <span class="form-btn" style="font-size:10px;padding:3px 10px;opacity:0.35">Cancel</span>
+                    <span class="form-btn form-btn--pristine" style="font-size:10px;padding:3px 10px">OK</span>
+                  </div>
+                </div>
+              </div>
+              <p class="cg-channel-caption">When an active event carries arguments, clicking it opens a dialog. The target state is shown at top-right. OK is inactive until all required args are supplied.</p>
+            </div>
+          </div>
+
+          <!-- args dialog - dirty -->
+          <div class="cg-channel cg-channel--modifier">
+            <div class="cg-channel-name">Args dialog — dirty</div>
+            <div class="cg-channel-body">
+              <div class="cg-modifier-stack">
+                <div class="form-state-specimen" style="gap:0;padding:0;border-color:rgba(48,184,232,0.2)">
+                  <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid var(--line)">
+                    <span style="font-family:var(--mono);font-size:11px;letter-spacing:0.08em;color:var(--event)">Approve</span>
+                    <div style="display:flex;align-items:center;gap:6px">
+                      <span style="font-family:var(--mono);font-size:9px;letter-spacing:0.1em;text-transform:uppercase;color:var(--soft)">&#x2192;</span>
+                      <span style="font-family:var(--mono);font-size:10px;color:var(--state)">Approved</span>
+                    </div>
+                  </div>
+                  <div style="padding:10px 12px;display:grid;gap:6px">
+                    <div class="form-state-row"><span class="form-state-lbl">ReviewedBy</span><input class="form-input" type="text" value="Ada Reyes" style="font-size:11px;padding:3px 6px;border-color:rgba(176,190,197,0.45);color:var(--text)" aria-label="ReviewedBy"></div>
+                    <div class="form-state-row"><span class="form-state-lbl">Note</span><input class="form-input" type="text" placeholder="optional…" style="font-size:11px;padding:3px 6px" aria-label="Note"></div>
+                  </div>
+                  <div style="display:flex;justify-content:flex-end;gap:6px;padding:8px 12px;border-top:1px solid var(--line)">
+                    <span class="form-btn" style="font-size:10px;padding:3px 10px">Cancel</span>
+                    <span class="form-btn form-btn--dirty" style="font-size:10px;padding:3px 10px">OK</span>
+                  </div>
+                </div>
+              </div>
+              <p class="cg-channel-caption">Required args supplied. OK activates and takes the event colour. Cancel is live. Firing commits the args and executes the transition.</p>
+            </div>
+          </div>
+
+          <!-- args dialog - violation -->
+          <div class="cg-channel cg-channel--modifier">
+            <div class="cg-channel-name">Args dialog — violation</div>
+            <div class="cg-channel-body">
+              <div class="cg-modifier-stack">
+                <div class="form-state-specimen" style="gap:0;padding:0;border-color:rgba(48,184,232,0.2)">
+                  <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid var(--line)">
+                    <span style="font-family:var(--mono);font-size:11px;letter-spacing:0.08em;color:var(--event)">Approve</span>
+                    <div style="display:flex;align-items:center;gap:6px">
+                      <span style="font-family:var(--mono);font-size:9px;letter-spacing:0.1em;text-transform:uppercase;color:var(--soft)">&#x2192;</span>
+                      <span style="font-family:var(--mono);font-size:10px;color:var(--state)">Approved</span>
+                    </div>
+                  </div>
+                  <div style="padding:10px 12px;display:grid;gap:6px">
+                    <div class="form-state-row"><span class="form-state-lbl">ReviewedBy</span><span class="form-input" style="border-color:rgba(248,113,113,0.55);padding:3px 6px;font-size:11px;color:var(--violated)">""</span></div>
+                    <div style="font-family:var(--mono);font-size:10px;color:var(--violated);padding-left:98px;margin-top:-2px">cannot be empty</div>
+                    <div class="form-state-row"><span class="form-state-lbl">Note</span><span class="form-input" style="opacity:0.4;padding:3px 6px;font-size:11px">—</span></div>
+                  </div>
+                  <div style="display:flex;justify-content:flex-end;gap:6px;padding:8px 12px;border-top:1px solid var(--line)">
+                    <span class="form-btn" style="font-size:10px;padding:3px 10px">Cancel</span>
+                    <span class="form-btn form-btn--pristine" style="font-size:10px;padding:3px 10px">OK</span>
+                  </div>
+                </div>
+              </div>
+              <p class="cg-channel-caption">An arg value fails its <code class="sg" style="font-size:11px">assert</code> rule. The field border turns coral and the message appears inline, matching data form validation. OK stays inactive.</p>
+            </div>
+          </div>
+
+          <!-- cancel -->
+          <div class="cg-channel cg-channel--modifier">
+            <div class="cg-channel-name">Cancel</div>
+            <div class="cg-channel-body">
+              <div class="cg-modifier-stack">
+                <div class="form-state-specimen" style="flex-direction:row;gap:6px;align-items:center">
+                  <button class="evt-btn">Approve</button>
+                  <span style="font-family:var(--mono);font-size:10px;color:var(--soft)">dialog dismissed, no transition</span>
+                </div>
+              </div>
+              <p class="cg-channel-caption">Cancelling the dialog discards all arg input and leaves the precept in its current state. No event is fired.</p>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
     </div>
   </div>
 </section>
@@ -5285,6 +5624,59 @@ from ReadyForPickup on Expire when PickupWindowOpen == false
   loadPreceptText().then(function(preceptText) {
     authoredSample.innerHTML = renderPreceptHtml(preceptText);
   });
+}());
+
+(function() {
+  var runtimeStage = document.getElementById("surface02-state-diagram-stage");
+  if (!runtimeStage) return;
+
+  var formatCoord = function(value) { return Math.round(value * 10) / 10; };
+  var getNodeBox = function(el) { return { left: el.offsetLeft, top: el.offsetTop, width: el.offsetWidth, height: el.offsetHeight, right: el.offsetLeft + el.offsetWidth, bottom: el.offsetTop + el.offsetHeight, centerX: el.offsetLeft + el.offsetWidth / 2, centerY: el.offsetTop + el.offsetHeight / 2 }; };
+  var buildVerticalPath = function(a, b) { return "M" + formatCoord(a.centerX) + " " + formatCoord(a.centerY) + " V" + formatCoord(b.centerY); };
+  var buildHorizontalPath = function(a, b) { return "M" + formatCoord(a.centerX) + " " + formatCoord(a.centerY) + " H" + formatCoord(b.centerX); };
+  var buildBranchPath = function(a, b, splitY) { return "M" + formatCoord(a.centerX) + " " + formatCoord(a.centerY) + " V" + formatCoord(splitY) + " H" + formatCoord(b.centerX) + " V" + formatCoord(b.centerY); };
+  var positionLabel = function(el, left, top) { if (!el) return; el.style.left = formatCoord(left - el.offsetWidth / 2) + "px"; el.style.top = formatCoord(top - el.offsetHeight / 2) + "px"; };
+
+  var routeDiagram = function() {
+    var svg = runtimeStage.querySelector("svg"); if (!svg) return;
+    var nodes = new Map(Array.from(runtimeStage.querySelectorAll(".svs-state-node[data-state]")).map(function(n) { return [n.dataset.state, n]; }));
+    var labels = new Map(Array.from(runtimeStage.querySelectorAll(".svs-edge-label[data-edge-label]")).map(function(l) { return [l.dataset.edgeLabel, l]; }));
+    var base = new Map(Array.from(nodes.entries()).map(function(e) { return [e[0], { left: parseFloat(e[1].dataset.left || "0"), top: parseFloat(e[1].dataset.top || "0") }]; }));
+    var minLeft = Infinity; var maxRight = 0;
+    base.forEach(function(p, s) { var n = nodes.get(s); minLeft = Math.min(minLeft, p.left); maxRight = Math.max(maxRight, p.left + n.offsetWidth); });
+    var sceneWidth = maxRight - minLeft; var shiftX = 32 - minLeft;
+    if (runtimeStage.clientWidth - sceneWidth >= 240) shiftX = Math.max(shiftX, ((runtimeStage.clientWidth - sceneWidth) / 2) - minLeft);
+    nodes.forEach(function(n, s) { var p = base.get(s); n.style.left = formatCoord(p.left + shiftX) + "px"; n.style.top = formatCoord(p.top) + "px"; });
+    var b = new Map(Array.from(nodes.entries()).map(function(e) { return [e[0], getNodeBox(e[1])]; }));
+    var req = b.get("Requested"); var apv = b.get("Approved"); var rdy = b.get("ReadyForPickup"); var can = b.get("Cancelled"); var pku = b.get("PickedUp"); var exp = b.get("Expired");
+    if (!req || !apv || !rdy || !can || !pku || !exp) return;
+    svg.setAttribute("viewBox", "0 0 " + runtimeStage.clientWidth + " " + runtimeStage.clientHeight);
+    var splitY = rdy.bottom + Math.min(32, Math.max(20, (Math.min(pku.centerY, exp.centerY) - rdy.centerY) / 2));
+    [["requested-approved", buildVerticalPath(req, apv)], ["approved-ready", buildVerticalPath(apv, rdy)], ["approved-cancelled", buildHorizontalPath(apv, can)], ["ready-pickedup", buildBranchPath(rdy, pku, splitY)], ["ready-expired", buildBranchPath(rdy, exp, splitY)]].forEach(function(e) { var p = svg.querySelector('path[data-edge="' + e[0] + '"]'); if (p) p.setAttribute("d", e[1]); });
+    positionLabel(labels.get("requested-approved"), req.centerX, (req.centerY + apv.centerY) / 2);
+    positionLabel(labels.get("approved-ready"), apv.centerX, (apv.centerY + rdy.centerY) / 2);
+    positionLabel(labels.get("approved-cancelled"), (apv.centerX + can.centerX) / 2, apv.centerY);
+    positionLabel(labels.get("ready-pickedup"), (rdy.centerX + pku.centerX) / 2, splitY);
+    positionLabel(labels.get("ready-expired"), (rdy.centerX + exp.centerX) / 2, splitY);
+  };
+
+  var diagramNodes = Array.from(runtimeStage.querySelectorAll(".svs-state-node[data-state]"));
+  var clearLinked = function() { diagramNodes.forEach(function(el) { el.classList.remove("is-linked"); }); };
+  var applyLinked = function(state) { diagramNodes.forEach(function(el) { el.classList.toggle("is-linked", el.dataset.state === state); }); };
+  diagramNodes.forEach(function(el) {
+    el.addEventListener("mouseenter", function() { applyLinked(el.dataset.state); });
+    el.addEventListener("mouseleave", clearLinked);
+    el.addEventListener("focus", function() { applyLinked(el.dataset.state); });
+    el.addEventListener("blur", clearLinked);
+  });
+
+  routeDiagram();
+  if ("ResizeObserver" in window) {
+    new ResizeObserver(function() { routeDiagram(); }).observe(runtimeStage);
+  } else {
+    window.addEventListener("resize", routeDiagram);
+  }
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(function() { routeDiagram(); });
 }());
 
 </script>

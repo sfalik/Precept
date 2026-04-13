@@ -28,6 +28,8 @@ in Expired assert PickupWindowOpen == false
 in Expired assert OutcomeNote != null 
     because "Expired pickups must record why the badge was not collected"
 
+in ReadyForPickup edit OutcomeNote
+
 event ApproveRequest with Name as string
 on ApproveRequest assert Name != "" because "A visitor name is required"
 

@@ -1,0 +1,1504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Event Button UX Exploration v3 — Precept</title>
+<style>
+/* ─ Custom Properties ─────────────────────────────────────────────────── */
+:root {
+  --panel:    #090b0e;
+  --panel-2:  #0d1014;
+  --panel-3:  #111518;
+  --event:    #30B8E8;
+  --state:    #A898F5;
+  --data:     #B0BEC5;
+  --violated: #F87171;
+  --warn:     #FDE047;
+  --ok:       #34D399;
+  --line:     rgba(255,255,255,0.08);
+  --line-2:   rgba(255,255,255,0.04);
+  --soft:     #687281;
+  --muted:    #a7afbb;
+  --text:     #d4dae3;
+  --mono:     "Geist Mono","Cascadia Code","Fira Code",monospace;
+  --sans:     "Geist","Segoe UI Variable Text",system-ui,sans-serif;
+}
+
+/* ─ Reset ────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 14px; -webkit-text-size-adjust: 100%; }
+body {
+  background: var(--panel);
+  color: var(--text);
+  font-family: var(--sans);
+  line-height: 1.6;
+  padding: 48px 24px 96px;
+}
+a { color: inherit; text-decoration: none; }
+
+/* ─ Page ─────────────────────────────────────────────────────────────── */
+.page { max-width: 960px; margin: 0 auto; }
+
+.page-header {
+  padding-bottom: 32px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 52px;
+}
+.page-eyebrow {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--soft);
+  margin-bottom: 10px;
+}
+.page-title {
+  font-family: var(--mono);
+  font-size: 20px;
+  font-weight: 400;
+  color: var(--event);
+  margin-bottom: 12px;
+}
+.page-lead {
+  font-size: 13.5px;
+  color: var(--muted);
+  max-width: 720px;
+  line-height: 1.75;
+}
+.page-lead strong { color: var(--text); font-weight: 500; }
+
+/* ─ Research callout ──────────────────────────────────────────────────── */
+.research-box {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 20px 24px;
+  margin-bottom: 52px;
+}
+.research-box h3 {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--soft);
+  margin-bottom: 14px;
+}
+.research-box ol {
+  list-style: none;
+  counter-reset: rb;
+  display: grid;
+  gap: 7px;
+  padding: 0;
+}
+.research-box li {
+  counter-increment: rb;
+  font-size: 12.5px;
+  color: var(--muted);
+  line-height: 1.55;
+  display: flex;
+  gap: 10px;
+}
+.research-box li::before {
+  content: counter(rb) ".";
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--soft);
+  min-width: 18px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.research-box li strong { color: var(--text); font-weight: 500; }
+
+/* ─ Section label ────────────────────────────────────────────────────── */
+.section-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--soft);
+  margin-bottom: 18px;
+}
+
+/* ─ Divider ──────────────────────────────────────────────────────────── */
+.divider { height: 1px; background: var(--line); margin: 56px 0; }
+
+/* ─ Variant section ──────────────────────────────────────────────────── */
+.variant { margin-bottom: 72px; }
+.var-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.var-letter {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--soft);
+}
+.var-name {
+  font-family: var(--mono);
+  font-size: 18px;
+  font-weight: 400;
+  color: var(--text);
+}
+.var-chip {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 2px;
+}
+.var-chip--research {
+  background: rgba(52,211,153,0.08);
+  border: 1px solid rgba(52,211,153,0.25);
+  color: var(--ok);
+}
+.var-chip--shanes {
+  background: rgba(48,184,232,0.08);
+  border: 1px solid rgba(48,184,232,0.28);
+  color: var(--event);
+}
+.var-chip--wild {
+  background: rgba(253,224,71,0.08);
+  border: 1px solid rgba(253,224,71,0.25);
+  color: var(--warn);
+}
+.var-chip--rec {
+  background: rgba(168,152,245,0.10);
+  border: 1px solid rgba(168,152,245,0.28);
+  color: var(--state);
+}
+
+.var-idea {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.75;
+  margin-bottom: 28px;
+  max-width: 700px;
+}
+.var-annotation {
+  margin-top: 18px;
+  font-size: 12px;
+  color: var(--soft);
+  font-style: italic;
+  padding-left: 14px;
+  border-left: 2px solid rgba(255,255,255,0.05);
+  max-width: 620px;
+  line-height: 1.65;
+}
+.var-annotation strong { color: var(--muted); font-weight: 500; }
+
+/* ─ Form Card (shared base) ──────────────────────────────────────────── */
+.form-stage {
+  display: flex;
+  justify-content: center;
+  padding: 20px 0 4px;
+}
+.form-card {
+  background: var(--panel-2);
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 7px;
+  width: 100%;
+  max-width: 580px;
+  box-shadow: 0 6px 32px rgba(0,0,0,0.40);
+  position: relative;
+}
+
+/* Card header */
+.card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--line);
+  gap: 16px;
+}
+.card-meta { min-width: 0; flex: 1; }
+.card-type {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--soft);
+  margin-bottom: 3px;
+}
+.card-ref {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--muted);
+  margin-bottom: 5px;
+}
+.card-name {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: 0.01em;
+}
+
+/* State badge */
+.sbadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 13px;
+  border-radius: 3px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  line-height: 1.25;
+  flex-shrink: 0;
+  height: fit-content;
+}
+.sbadge--violet {
+  border: 1px solid rgba(168,152,245,0.35);
+  background: rgba(168,152,245,0.08);
+  color: var(--state);
+}
+.sbadge--violet-bright {
+  border: 1px solid rgba(168,152,245,0.55);
+  background: rgba(168,152,245,0.15);
+  color: var(--state);
+}
+.sbadge--rose {
+  border: 1px solid rgba(248,113,113,0.35);
+  background: rgba(248,113,113,0.08);
+  color: var(--violated);
+}
+
+/* Card fields */
+.card-fields {
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  gap: 9px;
+}
+.f-row {
+  display: grid;
+  grid-template-columns: 155px 1fr;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 13px;
+}
+.f-label { font-size: 12px; color: var(--soft); }
+.f-label--constrained { font-style: italic; }
+.f-label--required { color: var(--warn); }
+.f-label--required::after { content: " *"; font-size: 10px; }
+.f-val { color: var(--text); }
+.f-val--yes { color: var(--ok); }
+.f-val--yes::before { content: "✓ "; font-size: 11px; opacity: 0.8; }
+.f-val--open { color: var(--ok); }
+.f-val--open::before { content: "● "; font-size: 9px; opacity: 0.7; }
+
+/* Editable field input */
+.f-input {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 3px;
+  padding: 5px 10px;
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 13px;
+  width: 100%;
+  outline: none;
+  transition: border-color 0.12s;
+}
+.f-input:focus { border-color: rgba(48,184,232,0.45); }
+.f-input::placeholder { color: var(--soft); }
+
+/* Shared action buttons */
+.act-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 18px;
+  border-radius: 4px;
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, opacity 0.12s, color 0.12s;
+  border: 1px solid transparent;
+  background: none;
+  line-height: 1.3;
+}
+.act-btn--go {
+  border-color: rgba(48,184,232,0.40);
+  background: rgba(48,184,232,0.10);
+  color: var(--event);
+}
+.act-btn--go:hover {
+  background: rgba(48,184,232,0.18);
+  border-color: rgba(48,184,232,0.60);
+}
+.act-btn--off {
+  border-color: rgba(255,255,255,0.11);
+  background: transparent;
+  color: var(--soft);
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+/* Form buttons (Save/Cancel) */
+.form-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 16px;
+  border-radius: 4px;
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+  background: none;
+  transition: background 0.12s, border-color 0.12s;
+  line-height: 1.3;
+}
+.form-btn--save {
+  background: rgba(52,211,153,0.12);
+  border-color: rgba(52,211,153,0.32);
+  color: var(--ok);
+}
+.form-btn--save:hover {
+  background: rgba(52,211,153,0.20);
+  border-color: rgba(52,211,153,0.50);
+}
+.form-btn--cancel {
+  border-color: rgba(255,255,255,0.10);
+  color: var(--soft);
+}
+.form-btn--cancel:hover {
+  background: rgba(255,255,255,0.04);
+  border-color: rgba(255,255,255,0.18);
+}
+
+/* Interactive hint */
+.interact-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  color: var(--soft);
+  opacity: 0.45;
+  padding: 10px 24px 0;
+}
+.interact-hint::before { content: "↗"; font-size: 10px; }
+
+/* Badge prefix arrow */
+.badge-prefix { font-size: 10px; opacity: 0.6; margin-right: 1px; }
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   VARIANT G — Verdict Strip
+   Always-visible one-line verdict below each event button.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.card-g .card-actions {
+  padding: 16px 24px 20px;
+}
+.card-g .action-bar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+.card-g .action-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.card-g .action-bar-right {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+/* Each event: button + verdict */
+.verdict-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+.verdict-line {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  padding-left: 2px;
+  line-height: 1.3;
+}
+.verdict-line--go {
+  color: var(--state);
+}
+.verdict-line--go .v-arrow { color: var(--soft); font-size: 10px; }
+.verdict-line--blocked {
+  color: var(--violated);
+  opacity: 0.75;
+}
+.verdict-line--blocked .v-icon {
+  font-size: 10px;
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+/* G hover: active button highlights its verdict */
+.card-g .verdict-item:has(.act-btn--go:hover) .verdict-line--go {
+  color: var(--state);
+  opacity: 1;
+}
+/* G hover: disabled button gives rose tint */
+.card-g .verdict-item:has(.act-btn--off:hover) .act-btn--off {
+  border-color: rgba(248,113,113,0.22);
+  color: var(--violated);
+  opacity: 0.60;
+}
+.card-g .verdict-item:has(.act-btn--off:hover) .verdict-line--blocked {
+  opacity: 1;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   VARIANT H — Checklist Gate
+   Disabled buttons show a tiny inline checklist of pass/fail items.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.card-h .card-actions {
+  padding: 16px 24px 20px;
+}
+.card-h .action-bar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+.card-h .action-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.card-h .action-bar-right {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+/* Each event: button + gate display */
+.gate-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+/* Checklist for disabled events */
+.gate-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-left: 2px;
+}
+.gate-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  line-height: 1.35;
+}
+.gate-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.gate-dot--pass { background: var(--ok); opacity: 0.7; }
+.gate-dot--fail { background: var(--violated); opacity: 0.8; }
+.gate-text { color: var(--muted); }
+.gate-text--fail { color: var(--violated); opacity: 0.80; }
+
+/* Active event: green check + target */
+.gate-pass {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  padding-left: 2px;
+  color: var(--ok);
+  opacity: 0.7;
+}
+.gate-pass .gp-check { font-size: 10px; }
+.gate-pass .gp-target {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--state);
+  letter-spacing: 0.04em;
+}
+
+/* H hover: disabled button glow */
+.card-h .gate-item:has(.act-btn--off:hover) .act-btn--off {
+  border-color: rgba(248,113,113,0.22);
+  color: var(--violated);
+  opacity: 0.60;
+}
+.card-h .gate-item:has(.act-btn--off:hover) .gate-checklist {
+  opacity: 1;
+}
+.card-h .gate-item:has(.act-btn--go:hover) .gate-pass {
+  opacity: 1;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   VARIANT I — Smart Badge Preview (Shane's hover idea, enhanced)
+   Badge morphs on hover PLUS persistent one-line reason for disabled.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* Badge stack: three overlapping badges */
+.card-i .badge-stack {
+  position: relative;
+  height: 28px;
+  min-width: 155px;
+  flex-shrink: 0;
+}
+.card-i .badge-stack .sbadge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  transition: opacity 0.20s ease;
+}
+.card-i .badge-stack .bd-current   { opacity: 1; z-index: 1; }
+.card-i .badge-stack .bd-next      { opacity: 0; z-index: 2; }
+.card-i .badge-stack .bd-blocked   { opacity: 0; z-index: 2; }
+
+/* On hover over active button: swap to destination badge */
+.card-i:has(.btn-i-go:hover) .badge-stack .bd-current  { opacity: 0; }
+.card-i:has(.btn-i-go:hover) .badge-stack .bd-next     { opacity: 1; }
+/* On hover over blocked button: swap to rose badge */
+.card-i:has(.btn-i-off:hover) .badge-stack .bd-current { opacity: 0; }
+.card-i:has(.btn-i-off:hover) .badge-stack .bd-blocked { opacity: 1; }
+
+.card-i .card-actions {
+  padding: 16px 24px 20px;
+}
+.card-i .action-bar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+.card-i .action-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.card-i .action-bar-right {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+/* Active event: hover shows target in verdict line */
+.smart-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+}
+
+/* Active event hover target line */
+.smart-target {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  padding-left: 2px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  color: var(--state);
+}
+.smart-target .st-arrow { color: var(--soft); font-size: 10px; }
+
+.card-i .smart-item:has(.btn-i-go:hover) .smart-target { opacity: 1; }
+
+/* Blocked event: persistent reason (always visible — research says so) */
+.smart-reason {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10.5px;
+  padding-left: 2px;
+  color: var(--violated);
+  opacity: 0.70;
+  line-height: 1.3;
+}
+.smart-reason .sr-icon { font-size: 10px; flex-shrink: 0; }
+
+/* Disabled button hover: rose tint */
+.card-i:has(.btn-i-off:hover) .btn-i-off {
+  border-color: rgba(248,113,113,0.25);
+  color: var(--violated);
+  opacity: 0.65;
+}
+.card-i:has(.btn-i-off:hover) .smart-reason {
+  opacity: 1;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   VARIANT J — Action Card
+   Each event is a mini-card, not just a button.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.card-j .card-actions {
+  padding: 16px 24px 20px;
+}
+.card-j .action-bar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+.card-j .action-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.card-j .action-bar-right {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* Action card (mini-card per event) */
+.acard {
+  display: flex;
+  flex-direction: column;
+  border-radius: 5px;
+  padding: 12px 16px 11px;
+  min-width: 180px;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+  cursor: pointer;
+  position: relative;
+}
+.acard--active {
+  border: 1px solid rgba(48,184,232,0.30);
+  background: rgba(48,184,232,0.04);
+}
+.acard--active:hover {
+  border-color: rgba(48,184,232,0.55);
+  background: rgba(48,184,232,0.08);
+  box-shadow: 0 2px 12px rgba(48,184,232,0.08);
+}
+.acard--disabled {
+  border: 1px solid rgba(255,255,255,0.08);
+  background: transparent;
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+.acard--disabled:hover {
+  border-color: rgba(248,113,113,0.22);
+  opacity: 0.80;
+}
+
+.acard-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.acard-name {
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 500;
+}
+.acard--active .acard-name { color: var(--event); }
+.acard--disabled .acard-name { color: var(--soft); }
+
+.acard-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.acard-status-dot--go { background: var(--ok); }
+.acard-status-dot--blocked { background: var(--violated); opacity: 0.7; }
+
+.acard-target {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  margin-bottom: 2px;
+}
+.acard--active .acard-target { color: var(--state); }
+.acard--disabled .acard-target { color: var(--soft); opacity: 0.7; }
+.acard-target .at-arrow { font-size: 9px; color: var(--soft); }
+
+.acard-reason {
+  font-size: 10.5px;
+  color: var(--violated);
+  opacity: 0.80;
+  line-height: 1.35;
+  margin-top: 4px;
+}
+
+/* J hover: active card shows a glow preview */
+.acard--active:hover .acard-target {
+  color: var(--state);
+  opacity: 1;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   VARIANT K — Transition Lane (Wild Card)
+   Inline micro-diagram showing the transition as a tiny visual flow
+   directly within the action bar.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.card-k .card-actions {
+  padding: 16px 24px 20px;
+}
+.card-k .action-bar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+.card-k .action-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.card-k .action-bar-right {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Each event is a horizontal lane: [FromState] → EventButton → [ToState] */
+.lane {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  position: relative;
+}
+
+.lane-from, .lane-to {
+  display: flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 3px;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+.lane-from {
+  border: 1px solid rgba(168,152,245,0.20);
+  background: rgba(168,152,245,0.04);
+  color: var(--state);
+  opacity: 0.6;
+}
+
+.lane-arrow {
+  display: flex;
+  align-items: center;
+  position: relative;
+  width: 24px;
+  flex-shrink: 0;
+}
+.lane-arrow::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 2px;
+  right: 2px;
+  height: 1px;
+}
+.lane-arrow--active::before { background: rgba(48,184,232,0.35); }
+.lane-arrow--blocked::before { background: rgba(248,113,113,0.20); }
+
+/* The event button sits in the center of the lane */
+.lane-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 14px;
+  border-radius: 4px;
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+  border: 1px solid transparent;
+  background: none;
+  white-space: nowrap;
+  position: relative;
+  z-index: 1;
+}
+.lane-btn--go {
+  border-color: rgba(48,184,232,0.40);
+  background: rgba(48,184,232,0.10);
+  color: var(--event);
+}
+.lane-btn--go:hover {
+  background: rgba(48,184,232,0.18);
+  border-color: rgba(48,184,232,0.60);
+}
+.lane-btn--off {
+  border-color: rgba(255,255,255,0.11);
+  color: var(--soft);
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.lane-to--active {
+  border: 1px solid rgba(168,152,245,0.35);
+  background: rgba(168,152,245,0.08);
+  color: var(--state);
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+.lane-to--blocked {
+  border: 1px solid rgba(248,113,113,0.25);
+  background: rgba(248,113,113,0.05);
+  color: var(--violated);
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+
+/* On hover: reveal the destination state */
+.lane--active:hover .lane-to--active { opacity: 1; }
+.lane--active:hover .lane-from { opacity: 0.9; }
+.lane--active:hover .lane-arrow--active::before { background: rgba(48,184,232,0.55); }
+
+.lane--blocked:hover .lane-to--blocked { opacity: 0.75; }
+.lane--blocked:hover .lane-btn--off {
+  border-color: rgba(248,113,113,0.22);
+  color: var(--violated);
+  opacity: 0.60;
+}
+.lane--blocked:hover .lane-from { opacity: 0.9; }
+.lane--blocked:hover .lane-arrow--blocked::before { background: rgba(248,113,113,0.35); }
+
+/* Block reason below the lane */
+.lane-reason {
+  font-size: 10px;
+  color: var(--violated);
+  opacity: 0.65;
+  padding-left: 2px;
+  margin-top: 3px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.lane-reason .lr-icon { font-size: 9px; }
+
+/* K blocked lane at rest: show reason always visible */
+.lane--blocked .lane-reason { opacity: 0.65; }
+.lane--blocked:hover .lane-reason { opacity: 1; }
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   RECOMMENDATION SECTION
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.rec-section {
+  background: var(--panel-2);
+  border: 1px solid rgba(168,152,245,0.20);
+  border-radius: 6px;
+  padding: 28px 28px 24px;
+  margin-top: 56px;
+}
+.rec-section h3 {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--state);
+  margin-bottom: 14px;
+}
+.rec-section p {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.75;
+  margin-bottom: 10px;
+}
+.rec-section p strong { color: var(--text); font-weight: 500; }
+
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ── Page Header ───────────────────────────────────────────────── -->
+  <header class="page-header">
+    <div class="page-eyebrow">Design Prototypes · Event Button UX · v3 · 2026-04-12</div>
+    <h1 class="page-title">Event Action Bar — Research-Informed Variants</h1>
+    <p class="page-lead">
+      Five new event action bar variants for the <strong>VisitorBadgePickup</strong> record form,
+      synthesized from external research across 20+ business products. Each variant is a complete form card
+      at state <strong>ReadyForPickup</strong> with editable field, Save/Cancel, and both events:
+      <strong>Pick Up</strong> (active → PickedUp) and <strong>Expire</strong> (blocked → Expired).
+    </p>
+  </header>
+
+  <!-- ── Research Foundation ───────────────────────────────────────── -->
+  <div class="research-box">
+    <h3>Research Principles Driving v3</h3>
+    <ol>
+      <li><strong>Three-tier progressive disclosure:</strong> Verdict → Factors → Calculation. Every surveyed business tool that succeeded uses this hierarchy.</li>
+      <li><strong>"Because" grammar over boolean expressions.</strong> Surface Precept's <code>because</code> strings as human sentences, not guard expressions.</li>
+      <li><strong>Always-visible beats hover/click</strong> for primary decision info (NNGroup). If users need it for their main task, show it at rest.</li>
+      <li><strong>Never hide blocked actions.</strong> Show them disabled with a reason. Hiding destroys trust (Jira anti-pattern).</li>
+      <li><strong>Checklists beat expressions.</strong> Guidewire's workplan: concrete items with pass/fail indicators — the most effective pattern.</li>
+      <li><strong>One-line reason in domain language.</strong> Stripe's structured decline codes: reason + next action hint.</li>
+      <li><strong>IBM Carbon callout:</strong> The only public design-system component designed for always-on, non-dismissible contextual explanation.</li>
+    </ol>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       VARIANT G — Verdict Strip
+       ══════════════════════════════════════════════════════════════════ -->
+  <div class="variant">
+    <div class="var-head">
+      <span class="var-letter">Variant G</span>
+      <span class="var-name">Verdict Strip</span>
+      <span class="var-chip var-chip--research">Research-driven</span>
+    </div>
+    <p class="var-idea">
+      Every event button carries an always-visible one-line verdict underneath.
+      Active events show "<span style="color:var(--state)">→ TargetState</span>", disabled events show the blocking reason
+      in domain language. Zero hover required for the critical information.
+      Based on NNGroup's finding: if users need it for their primary task, show it at rest.
+    </p>
+
+    <div class="form-stage">
+      <div class="form-card card-g">
+
+        <!-- Header -->
+        <div class="card-head">
+          <div class="card-meta">
+            <div class="card-type">Visitor Badge Pickup</div>
+            <div class="card-ref">#VBP-2847</div>
+            <div class="card-name">Ada Reyes</div>
+          </div>
+          <div class="sbadge sbadge--violet">ReadyForPickup</div>
+        </div>
+
+        <!-- Fields -->
+        <div class="card-fields">
+          <div class="f-row">
+            <span class="f-label">Visitor name</span>
+            <span class="f-val">Ada Reyes</span>
+          </div>
+          <div class="f-row">
+            <span class="f-label f-label--constrained">Host confirmed</span>
+            <span class="f-val f-val--yes">Yes</span>
+          </div>
+          <div class="f-row">
+            <span class="f-label">Badge printed</span>
+            <span class="f-val f-val--yes">Yes</span>
+          </div>
+          <div class="f-row">
+            <span class="f-label">Pickup window</span>
+            <span class="f-val f-val--open">Open</span>
+          </div>
+          <div class="f-row">
+            <span class="f-label f-label--required">Outcome note</span>
+            <input class="f-input" type="text" placeholder="Enter outcome note…">
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="card-actions">
+          <div class="action-bar">
+            <div class="action-bar-left">
+              <button class="form-btn form-btn--save">Save</button>
+              <button class="form-btn form-btn--cancel">Cancel</button>
+            </div>
+            <div class="action-bar-right">
+              <!-- Active event -->
+              <div class="verdict-item">
+                <button class="act-btn act-btn--go">Pick Up</button>
+                <div class="verdict-line verdict-line--go">
+                  <span class="v-arrow">→</span>
+                  <span>PickedUp</span>
+                </div>
+              </div>
+              <!-- Blocked event -->
+              <div class="verdict-item">
+                <button class="act-btn act-btn--off" disabled>Expire</button>
+                <div class="verdict-line verdict-line--blocked">
+                  <span class="v-icon">⊘</span>
+                  <span>Pickup window must be closed</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <p class="var-annotation">
+      <strong>Philosophy:</strong> The action bar should be self-documenting at rest — every answer the user needs is visible
+      before any interaction. <strong>Research basis:</strong> NNGroup's always-visible principle (#3) + Stripe's one-line reason
+      pattern (#6). Evolution of v2's Variant E with Save/Cancel separation and constrained/required field indicators.
+    </p>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       VARIANT H — Checklist Gate
+       ══════════════════════════════════════════════════════════════════ -->
+  <div class="variant">
+    <div class="var-head">
+      <span class="var-letter">Variant H</span>
+      <span class="var-name">Checklist Gate</span>
+      <span class="var-chip var-chip--research">Research-driven</span>
+    </div>
+    <p class="var-idea">
+      Disabled buttons show a tiny inline checklist of guard conditions with colored pass/fail dots.
+      Active buttons show a green checkmark + target state. Like Guidewire's workplan pattern:
+      users see exactly what's required without reading boolean expressions.
+    </p>
+
+    <div class="form-stage">
+      <div class="form-card card-h">
+
+        <!-- Header -->
+        <div class="card-head">
+          <div class="card-meta">
+            <div class="card-type">Visitor Badge Pickup</div>
+            <div class="card-ref">#VBP-2847</div>
+            <div class="card-name">Ada Reyes</div>
+          </div>
+          <div class="sbadge sbadge--violet">ReadyForPickup</div>
+        </div>
+
+        <!-- Fields -->
+        <div class="card-fields">
+          <div class="f-row">
+            <span class="f-label">Visitor name</span>
+            <span class="f-val">Ada Reyes</span>
+          </div>
+          <div class="f-row">
+            <span class="f-label f-label--constrained">Host confirmed</span>
+            <span class="f-val f-val--yes">Yes</span>
+          </div>
+          <div class="f-row">
+            <span class="f-label">Badge printed</span>
+            <span class="f-val f-val--yes">Yes</span>
+          </div>
+          <div class="f-row">
+            <span class="f-label">Pickup window</span>
+            <span class="f-val f-val--open">Open</span>
+          </div>
+          <div class="f-row">
+            <span class="f-label f-label--required">Outcome note</span>
+            <input class="f-input" type="text" placeholder="Enter outcome note…">
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="card-actions">
+          <div class="action-bar">
+            <div class="action-bar-left">
+              <button class="form-btn form-btn--save">Save</button>
+              <button class="form-btn form-btn--cancel">Cancel</button>
+            </div>
+            <div class="action-bar-right">
+              <!-- Active event — all guards pass -->
+              <div class="gate-item">
+                <button class="act-btn act-btn--go">Pick Up</button>
+                <div class="gate-pass">
+                  <span class="gp-check">✓</span>
+                  Ready
+                  <span style="color:var(--soft); margin: 0 2px;">→</span>
+                  <span class="gp-target">PickedUp</span>
+                </div>
+              </div>
+              <!-- Blocked event — guard checklist -->
+              <div class="gate-item">
+                <button class="act-btn act-btn--off" disabled>Expire</button>
+                <div class="gate-checklist">
+                  <div class="gate-check">
+                    <span class="gate-dot gate-dot--fail"></span>
+                    <span class="gate-text gate-text--fail">Pickup window must be closed</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <p class="var-annotation">
+      <strong>Philosophy:</strong> Present guard conditions as a concrete requirements list, not as code —
+      the user reads "what's needed" like a to-do list. <strong>Research basis:</strong> Guidewire's workplan pattern (#5)
+      + nCino's stage requirements checklist. Scales naturally to events with multiple guards — each becomes
+      a checklist item with its own status dot.
+    </p>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       VARIANT I — Smart Badge Preview (Shane's hover idea, enhanced)
+       ══════════════════════════════════════════════════════════════════ -->
+  <div class="variant">
+    <div class="var-head">
+      <span class="var-letter">Variant I</span>
+      <span class="var-name">Smart Badge Preview</span>
+      <span class="var-chip var-chip--shanes">Shane's idea</span>
+      <span class="var-chip var-chip--research">Research-enhanced</span>
+    </div>
+    <p class="var-idea">
+      Shane's state-badge-preview from v2 (Variant D), enhanced with research:
+      hovering an active event morphs the top-right badge to preview the destination state.
+      <strong>New:</strong> disabled events show a persistent one-line reason underneath at rest —
+      no hover required for blocked reasons (research finding #3). The badge hover is a progressive
+      enhancement, not the primary communication channel.
+    </p>
+
+    <div class="form-stage">
+      <div class="form-card card-i">
+
+        <!-- Header with badge stack -->
+        <div class="card-head">
+          <div class="card-meta">
+            <div class="card-type">Visitor Badge Pickup</div>
+            <div class="card-ref">#VBP-2847</div>
+            <div class="card-name">Ada Reyes</div>
+          </div>
+          <div class="badge-stack">
+            <div class="sbadge sbadge--violet bd-current">ReadyForPickup</div>
+            <div class="sbadge sbadge--violet-bright bd-next" aria-hidden="true">
+              <span class="badge-prefix">→</span> PickedUp
+            </div>
+            <div class="sbadge sbadge--rose bd-blocked" aria-hidden="true">
+              <span class="badge-prefix">→</span> Expired
+            </div>
+          </div>
+        </div>
+
+        <!-- Fields -->
+        <div class="card-fields">
+          <div class="f-row">
+            <span class="f-label">Visitor name</span>
+            <span class="f-val">Ada Reyes</span>
+          </div>
+          <div class="f-row">
+            <span class="f-label f-label--constrained">Host confirmed</span>
+            <span class="f-val f-val--yes">Yes</span>
+          </div>
+          <div class="f-row">
+            <span class="f-label">Badge printed</span>
+            <span class="f-val f-val--yes">Yes</span>
+          </div>
+          <div class="f-row">
+            <span class="f-label">Pickup window</span>
+            <span class="f-val f-val--open">Open</span>
+          </div>
+          <div class="f-row">
+            <span class="f-label f-label--required">Outcome note</span>
+            <input class="f-input" type="text" placeholder="Enter outcome note…">
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="card-actions">
+          <div class="action-bar">
+            <div class="action-bar-left">
+              <button class="form-btn form-btn--save">Save</button>
+              <button class="form-btn form-btn--cancel">Cancel</button>
+            </div>
+            <div class="action-bar-right">
+              <!-- Active event: hover reveals target line + morphs badge -->
+              <div class="smart-item">
+                <button class="act-btn act-btn--go btn-i-go">Pick Up</button>
+                <div class="smart-target">
+                  <span class="st-arrow">→</span>
+                  <span>PickedUp</span>
+                </div>
+              </div>
+              <!-- Blocked event: persistent reason + hover morphs badge to rose -->
+              <div class="smart-item">
+                <button class="act-btn act-btn--off btn-i-off" disabled>Expire</button>
+                <div class="smart-reason">
+                  <span class="sr-icon">⊘</span>
+                  <span>Pickup window must be closed</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="interact-hint">Hover the action buttons to preview the state badge change</div>
+
+      </div>
+    </div>
+
+    <p class="var-annotation">
+      <strong>Philosophy:</strong> The badge is a spatial anchor the user already watches for status — repurpose it to preview the future,
+      while keeping blocked reasons always-visible (not hover-gated). <strong>Research basis:</strong> Shane's hover concept from v2 +
+      NNGroup's always-visible principle (#3) for the disabled-event reason. Hybrid of progressive enhancement (hover) and always-on (block reason).
+    </p>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       VARIANT J — Action Card
+       ══════════════════════════════════════════════════════════════════ -->
+  <div class="variant">
+    <div class="var-head">
+      <span class="var-letter">Variant J</span>
+      <span class="var-name">Action Card</span>
+      <span class="var-chip var-chip--research">Research-driven</span>
+    </div>
+    <p class="var-idea">
+      Each event is a self-contained mini-card — not just a button — containing: event name,
+      status indicator (green/rose dot), target state, and (for blocked events) the reason inline.
+      Active cards are clickable surfaces. Disabled cards show the reason inside their boundary.
+      Like a Stripe payment method card or a Linear issue card — the action itself is a data object.
+    </p>
+
+    <div class="form-stage">
+      <div class="form-card card-j">
+
+        <!-- Header -->
+        <div class="card-head">
+          <div class="card-meta">
+            <div class="card-type">Visitor Badge Pickup</div>
+            <div class="card-ref">#VBP-2847</div>
+            <div class="card-name">Ada Reyes</div>
+          </div>
+          <div class="sbadge sbadge--violet">ReadyForPickup</div>
+        </div>
+
+        <!-- Fields -->
+        <div class="card-fields">
+          <div class="f-row">
+            <span class="f-label">Visitor name</span>
+            <span class="f-val">Ada Reyes</span>
+          </div>
+          <div class="f-row">
+            <span class="f-label f-label--constrained">Host confirmed</span>
+            <span class="f-val f-val--yes">Yes</span>
+          </div>
+          <div class="f-row">
+            <span class="f-label">Badge printed</span>
+            <span class="f-val f-val--yes">Yes</span>
+          </div>
+          <div class="f-row">
+            <span class="f-label">Pickup window</span>
+            <span class="f-val f-val--open">Open</span>
+          </div>
+          <div class="f-row">
+            <span class="f-label f-label--required">Outcome note</span>
+            <input class="f-input" type="text" placeholder="Enter outcome note…">
+          </div>
+        </div>
+
+        <!-- Actions: mini-cards -->
+        <div class="card-actions">
+          <div class="action-bar">
+            <div class="action-bar-left">
+              <button class="form-btn form-btn--save">Save</button>
+              <button class="form-btn form-btn--cancel">Cancel</button>
+            </div>
+            <div class="action-bar-right">
+              <!-- Active event card -->
+              <div class="acard acard--active" role="button" tabindex="0">
+                <div class="acard-top">
+                  <span class="acard-name">Pick Up</span>
+                  <span class="acard-status-dot acard-status-dot--go" title="All guards pass"></span>
+                </div>
+                <div class="acard-target">
+                  <span class="at-arrow">→</span>
+                  <span>PickedUp</span>
+                </div>
+              </div>
+              <!-- Blocked event card -->
+              <div class="acard acard--disabled" role="button" aria-disabled="true">
+                <div class="acard-top">
+                  <span class="acard-name">Expire</span>
+                  <span class="acard-status-dot acard-status-dot--blocked" title="Guard failed"></span>
+                </div>
+                <div class="acard-target">
+                  <span class="at-arrow">→</span>
+                  <span>Expired</span>
+                </div>
+                <div class="acard-reason">Pickup window must be closed before expiry</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <p class="var-annotation">
+      <strong>Philosophy:</strong> Events are first-class data objects with their own card boundary, not ephemeral buttons —
+      the card frame communicates "there's information here" before the user reads a single line.
+      <strong>Research basis:</strong> Stripe payment method cards + Linear issue cards (#6) + three-tier disclosure
+      (name → target → reason) packed into a single scannable surface (#1). Scales elegantly to 3+ events.
+    </p>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       VARIANT K — Transition Lane (Wild Card)
+       ══════════════════════════════════════════════════════════════════ -->
+  <div class="variant">
+    <div class="var-head">
+      <span class="var-letter">Variant K</span>
+      <span class="var-name">Transition Lane</span>
+      <span class="var-chip var-chip--wild">Wild card</span>
+    </div>
+    <p class="var-idea">
+      The research found that no product combines diagram + form + guard explanation in a unified surface.
+      This variant embeds a micro-diagram directly in the action bar: each event is a horizontal lane
+      showing <span style="color:var(--state)">[CurrentState]</span> → <span style="color:var(--event)">EventButton</span>
+      → <span style="color:var(--state)">[TargetState]</span>. The target state reveals on hover.
+      Blocked events show the reason always-visible below their lane. The user reads the transition
+      as a sentence: "From ReadyForPickup, fire Pick Up, arrive at PickedUp."
+    </p>
+
+    <div class="form-stage">
+      <div class="form-card card-k">
+
+        <!-- Header -->
+        <div class="card-head">
+          <div class="card-meta">
+            <div class="card-type">Visitor Badge Pickup</div>
+            <div class="card-ref">#VBP-2847</div>
+            <div class="card-name">Ada Reyes</div>
+          </div>
+          <div class="sbadge sbadge--violet">ReadyForPickup</div>
+        </div>
+
+        <!-- Fields -->
+        <div class="card-fields">
+          <div class="f-row">
+            <span class="f-label">Visitor name</span>
+            <span class="f-val">Ada Reyes</span>
+          </div>
+          <div class="f-row">
+            <span class="f-label f-label--constrained">Host confirmed</span>
+            <span class="f-val f-val--yes">Yes</span>
+          </div>
+          <div class="f-row">
+            <span class="f-label">Badge printed</span>
+            <span class="f-val f-val--yes">Yes</span>
+          </div>
+          <div class="f-row">
+            <span class="f-label">Pickup window</span>
+            <span class="f-val f-val--open">Open</span>
+          </div>
+          <div class="f-row">
+            <span class="f-label f-label--required">Outcome note</span>
+            <input class="f-input" type="text" placeholder="Enter outcome note…">
+          </div>
+        </div>
+
+        <!-- Actions: transition lanes -->
+        <div class="card-actions">
+          <div class="action-bar">
+            <div class="action-bar-left">
+              <button class="form-btn form-btn--save">Save</button>
+              <button class="form-btn form-btn--cancel">Cancel</button>
+            </div>
+            <div class="action-bar-right">
+              <!-- Active event lane -->
+              <div>
+                <div class="lane lane--active">
+                  <span class="lane-from">ReadyForPickup</span>
+                  <span class="lane-arrow lane-arrow--active"></span>
+                  <button class="lane-btn lane-btn--go">Pick Up</button>
+                  <span class="lane-arrow lane-arrow--active"></span>
+                  <span class="lane-from lane-to lane-to--active">PickedUp</span>
+                </div>
+              </div>
+              <!-- Blocked event lane -->
+              <div>
+                <div class="lane lane--blocked">
+                  <span class="lane-from">ReadyForPickup</span>
+                  <span class="lane-arrow lane-arrow--blocked"></span>
+                  <button class="lane-btn lane-btn--off" disabled>Expire</button>
+                  <span class="lane-arrow lane-arrow--blocked"></span>
+                  <span class="lane-from lane-to lane-to--blocked">Expired</span>
+                </div>
+                <div class="lane-reason">
+                  <span class="lr-icon">⊘</span>
+                  Pickup window must be closed before expiry
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="interact-hint">Hover a lane to reveal the destination state</div>
+
+      </div>
+    </div>
+
+    <p class="var-annotation">
+      <strong>Philosophy:</strong> The action bar IS the diagram — instead of referencing a separate state diagram, the transition
+      is embedded as a readable horizontal flow directly in the form. The user never has to context-switch between
+      "where am I?" and "what can I do?" <strong>Research basis:</strong> The universal gap identified across 20+ products —
+      no tool combines diagram + form + guard explanation in one surface (#1, #3, #7). This variant closes that gap
+      by making the action itself a micro-diagram.
+    </p>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       RECOMMENDATION
+       ══════════════════════════════════════════════════════════════════ -->
+  <div class="rec-section">
+    <h3>Recommendation</h3>
+    <p>
+      <strong>Ship Variant I (Smart Badge Preview)</strong> as the primary event bar pattern.
+    </p>
+    <p>
+      It is the only variant that satisfies all three of Shane's stated requirements simultaneously:
+      (1) business-app aesthetic (clean button strip, no dev-tool chrome),
+      (2) compact and self-contained (no tables, cards, or lanes expanding the footprint),
+      (3) full inspectability (hover-preview for destination, always-visible reason for blocks).
+    </p>
+    <p>
+      The badge morph is Shane's own idea — the most natural progressive enhancement because it
+      repurposes a UI element the user already watches. Adding the always-visible blocked reason
+      underneath the disabled button (from the research) closes the one gap in v2's Variant D:
+      blocked reasons are no longer hidden behind hover.
+    </p>
+    <p>
+      <strong>Second choice: Variant G (Verdict Strip)</strong> — functionally identical information
+      density but without the badge morph delight. Use G as the fallback if badge animation
+      proves technically complex in the real panel.
+    </p>
+    <p>
+      <strong>Best for multi-guard events: Variant H (Checklist Gate)</strong> — the checklist pattern
+      shines when a single event has 3+ guard conditions. Consider H as a progressive-disclosure
+      expansion of I for complex events.
+    </p>
+  </div>
+
+</div><!-- /.page -->
+</body>
+</html>

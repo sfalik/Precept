@@ -7,6 +7,14 @@
 
 ## Recent Updates
 
+### 2026-04-12 - Research: How Products Communicate Inspectability to Users
+- Deep external research on how business products surface system reasoning to users without feeling technical.
+- Wrote `research/design-system/business-app-inspectability-product-communication.md` covering 5 areas: transparency as product feature, progressive disclosure in business UX, "why" messaging patterns, trust calibration, and design system status/state documentation.
+- Key synthesized model: **three-tier disclosure** — Verdict (always visible: status badge + reason), Factors (on hover: which rules apply and pass/fail), Calculation (on expand: full evaluation trace).
+- Key pattern: **"because" grammar** — "This action is [status] because [reason in domain language]" — maps directly to Precept's mandatory `reason` strings on invariants/assertions.
+- Identified Carbon's callout component as the best reference for always-on invariant display; Stripe's decline codes as the model for structured constraint-violation messaging; NNG's trust principle ("don't hide blocked actions — show them as blocked with a reason") as the governing UX rule.
+- Sources: Stripe, Datadog, Honeycomb, Linear, Zapier, NNG (progressive disclosure + system status heuristic), Atlassian Design, IBM Carbon, GitHub Primer.
+
 ### 2026-04-07 - README Quick Example refactored and PR #35 merged
 - README Quick Example refactoring merged into PR #35 (chore: finalize README cleanup and record Squad decision).
 - Changes: removed explanatory hedge, removed copyable DSL code block, replaced markdown image syntax with fixed-width HTML img tag (`width="600"`).
@@ -46,6 +54,14 @@
 2026-04-05T03:20:00Z: Steinbrenner applied branch protection to main (pull requests required, force pushes/admin only, no branch deletion).
 
 ## Learnings
+
+### 2026-04-12 - Inspectability communication patterns across product categories
+- The three-tier disclosure model (verdict → factors → calculation) appears independently in credit score explanations, automation execution history (Zapier/Make.com), and observability tools (Honeycomb/Datadog). It's a convergent pattern, not an invention.
+- Precept's mandatory `reason` strings already fill the "factors" tier — the visual system just needs to surface them at the right disclosure level.
+- Carbon's non-dismissible callout component is the only design-system pattern specifically designed for "always-on" contextual information — directly maps to invariant display.
+- NNG's trust research: hiding blocked actions destroys trust faster than showing them blocked with a reason. "Don't blindfold your users" is the governing principle.
+- The "because" grammar pattern ("Action is blocked because [business reason]") is consistent across Stripe, Jira, and HR/finance tools. System language ("guard predicate evaluated to false") belongs only at the deepest disclosure tier.
+- IBM Carbon's cognitive load guideline: more than 5-6 status indicators on a view overwhelms users. Consolidation rule: "use the highest-attention color to represent the group." Both apply directly to Precept event-button displays.
 
 ### 2026-04-07 - Image link path integrity check
 - README.md hero images had stale relative paths (`brand/readme-hero.svg` instead of `design/brand/readme-hero.svg`).
