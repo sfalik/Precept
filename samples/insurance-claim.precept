@@ -1,71 +1,184 @@
 precept InsuranceClaim
 
-# Claims often bounce between missing-document collection and adjuster review.
-# This example keeps that back-and-forth in one readable file.
-# Built-in functions (min, trim) keep the logic clear.
+# Shape: W2 evidence → adjudication → settlement
+#
+# Models an insurance claim from first notice of loss through investigation,
+# evaluation, negotiation, and settlement or denial. Demonstrates ACORD-informed
+# field governance, computed risk indicators, document tracking with set
+# collections, conditional edits, appeal paths, and high-value/fraud guard logic.
+#
+# FUTURE(date): LossDate, ReportDate, InvestigationStartDate, DecisionDate,
+#               SettlementDate, AppealDeadline
 
-field ClaimantName as string nullable
-field ClaimAmount as decimal default 0 maxplaces 2
-field ApprovedAmount as decimal default 0 maxplaces 2
-field AdjusterName as string nullable
-field DecisionNote as string nullable
-field PoliceReportRequired as boolean default false
-field FraudFlag as boolean default false
+# --- Fields ---
 
-field MissingDocuments as set of string
+field ClaimantName as string nullable maxlength 200
+field PolicyNumber as string nullable maxlength 50
+field LossDescription as string nullable maxlength 2000
+field ClaimType as choice("Auto", "Property", "Liability", "Health", "Workers Comp") nullable
+field LossType as choice("Collision", "Theft", "Fire", "Water", "Wind", "Vandalism", "Medical", "Other") nullable
+field ClaimDecision as choice("Approved", "Denied", "Partial") nullable
+field Priority as choice("Standard", "Fast Track", "Catastrophe", "Litigation") default "Standard"
 
-invariant ClaimAmount >= 0 because "Claim amounts cannot be negative"
-invariant ApprovedAmount >= 0 because "Approved amounts cannot be negative"
-invariant ApprovedAmount <= ClaimAmount because "Approved amounts cannot exceed the claim"
-invariant ApprovedAmount * 2 <= ClaimAmount when FraudFlag because "Fraud-flagged claims are capped at half the claimed amount"
-invariant DecisionNote == null or DecisionNote.length <= 500 because "Decision notes cannot exceed 500 characters"
+field ClaimAmount as decimal default 0 nonnegative maxplaces 2
+field ReserveAmount as decimal default 0 nonnegative maxplaces 2
+field OfferAmount as decimal default 0 nonnegative maxplaces 2
+field SettlementAmount as decimal default 0 nonnegative maxplaces 2
+field DeductibleAmount as decimal default 0 nonnegative maxplaces 2
 
-state Draft initial
-state Submitted
-state UnderReview
-state Approved
+field AdjusterName as string nullable maxlength 100
+field InvestigatorAssigned as boolean default false
+field FraudIndicatorCount as integer default 0 nonnegative
+field DenialReason as string nullable maxlength 1000
+field AppealCount as integer default 0 nonnegative
+field AppealNote as string nullable maxlength 1000
+field SupervisorApproval as boolean default false
+
+field RequiredDocuments as set of choice("PoliceReport", "ProofOfLoss", "MedicalRecords", "RepairEstimate", "Photos", "WitnessStatement", "Appraisal")
+field SubmittedDocuments as set of choice("PoliceReport", "ProofOfLoss", "MedicalRecords", "RepairEstimate", "Photos", "WitnessStatement", "Appraisal")
+
+# --- Computed Fields ---
+
+field AllDocumentsSubmitted as boolean -> RequiredDocuments.count > 0 and SubmittedDocuments.count >= RequiredDocuments.count
+field NetPayable as decimal -> if SettlementAmount > DeductibleAmount then SettlementAmount - DeductibleAmount else 0
+field IsHighValue as boolean -> ClaimAmount >= 50000
+field IsSuspicious as boolean -> FraudIndicatorCount >= 2
+
+# --- Invariants ---
+
+invariant ClaimAmount >= 0 because "Claim amount cannot be negative"
+invariant ReserveAmount >= 0 because "Reserve amount cannot be negative"
+invariant OfferAmount <= ClaimAmount because "Offer cannot exceed the claim amount"
+invariant SettlementAmount <= ClaimAmount because "Settlement cannot exceed the claim amount"
+invariant AppealCount <= 3 because "No more than three appeals are permitted"
+
+# --- States ---
+
+state FNOL initial
+state Investigation
+state Evaluation
+state Negotiation
+state Settled
 state Denied
-state Paid
+state Appeal
+state Closed
 
-in UnderReview edit FraudFlag
-in UnderReview when not FraudFlag edit AdjusterName
-in Approved assert ApprovedAmount > 0 because "Approved claims must specify a payout amount"
-in Approved assert DecisionNote != null when FraudFlag because "Fraud-flagged approvals require a decision note"
+# --- State Constraints ---
 
-event Submit with Claimant as string, Amount as decimal, RequiresPoliceReport as boolean default false
-on Submit assert Claimant != "" because "A claimant name is required"
-on Submit assert Amount > 0 because "Claim amounts must be positive"
-on Submit assert Amount <= 100000 when RequiresPoliceReport because "Police-report claims are capped at $100,000"
+in Investigation assert AdjusterName != null because "Investigation requires an assigned adjuster"
+in Evaluation assert ReserveAmount > 0 because "Evaluation requires a reserve amount"
+in Negotiation assert OfferAmount > 0 because "Negotiation requires an offer amount"
+in Settled assert SettlementAmount > 0 because "Settled claims must have a settlement amount"
+in Settled assert ClaimDecision != null because "Settled claims must have a decision"
+in Denied assert DenialReason != null because "Denied claims must have a denial reason"
+in Appeal assert AppealNote != null because "Appeals must include a note"
 
-event RequestDocument with Name as string
-on RequestDocument assert Name != "" because "A document name is required"
+# --- Edit Declarations ---
 
-event ReceiveDocument with Name as string
-on ReceiveDocument assert Name != "" because "A document name is required"
+in FNOL edit ClaimantName, PolicyNumber, LossDescription, ClaimType, LossType, Priority
+in Investigation edit InvestigatorAssigned, FraudIndicatorCount
+in Investigation when not IsSuspicious edit AdjusterName
+in Evaluation edit ReserveAmount, DeductibleAmount
+in Evaluation when IsHighValue edit SupervisorApproval
+in Negotiation edit OfferAmount
 
-event AssignAdjuster with Name as string
-on AssignAdjuster assert Name != "" because "An adjuster name is required"
+# --- Events ---
 
-event Approve with Amount as decimal, Note as string nullable default null
-on Approve assert Amount > 0 because "Approved claim amounts must be positive"
-on Approve assert Note == null or Note != "" because "A supplied decision note cannot be blank"
+event FileClaim with Claimant as string notempty maxlength 200, Policy as string notempty maxlength 50, Amount as decimal positive, Type as choice("Auto", "Property", "Liability", "Health", "Workers Comp"), Loss as choice("Collision", "Theft", "Fire", "Water", "Wind", "Vandalism", "Medical", "Other"), Desc as string nullable default null
 
-event Deny with Note as string
-on Deny assert Note != "" because "A denial note is required"
+event AssignAdjuster with Name as string notempty maxlength 100
 
-event PayClaim
+event RequireDocument with Doc as choice("PoliceReport", "ProofOfLoss", "MedicalRecords", "RepairEstimate", "Photos", "WitnessStatement", "Appraisal")
 
-from Draft on Submit -> set ClaimantName = Submit.Claimant -> set ClaimAmount = Submit.Amount -> set PoliceReportRequired = Submit.RequiresPoliceReport -> transition Submitted
+event SubmitDocument with Doc as choice("PoliceReport", "ProofOfLoss", "MedicalRecords", "RepairEstimate", "Photos", "WitnessStatement", "Appraisal")
 
-from Submitted on RequestDocument -> add MissingDocuments RequestDocument.Name -> no transition
-from Submitted on AssignAdjuster -> set AdjusterName = trim(AssignAdjuster.Name) -> transition UnderReview
+event FlagFraud
 
-from UnderReview on RequestDocument -> add MissingDocuments RequestDocument.Name -> no transition
-from UnderReview on ReceiveDocument when MissingDocuments contains ReceiveDocument.Name -> remove MissingDocuments ReceiveDocument.Name -> no transition
-from UnderReview on ReceiveDocument -> reject "That document is not currently outstanding"
+event BeginInvestigation
 
-from UnderReview on Approve when (not PoliceReportRequired or MissingDocuments.count == 0) and Approve.Amount <= ClaimAmount -> set ApprovedAmount = if FraudFlag then min(Approve.Amount, ClaimAmount / 2) else Approve.Amount -> set DecisionNote = Approve.Note -> transition Approved
-from UnderReview on Approve -> reject "Required documents must be complete before a claim can be approved"
+event SetReserve with Amount as decimal positive
 
-from UnderReview on Deny -> set DecisionNote = Deny.Note -> transition Denied
-from Approved on PayClaim -> transition Paid
+event CompleteInvestigation
+
+event MakeOffer with Amount as decimal positive, Deductible as decimal nonnegative default 0
+
+event AdjustOffer with Amount as decimal positive
+
+event DenyClaim with Reason as string notempty maxlength 1000
+
+event AcceptOffer
+
+event FileAppeal with Note as string notempty maxlength 1000
+
+event Reevaluate
+
+event CloseClaim
+
+event ReopenClaim
+
+# --- Transitions ---
+
+# FNOL: file a new claim
+from FNOL on FileClaim -> set ClaimantName = FileClaim.Claimant -> set PolicyNumber = FileClaim.Policy -> set ClaimAmount = FileClaim.Amount -> set ClaimType = FileClaim.Type -> set LossType = FileClaim.Loss -> set LossDescription = FileClaim.Desc -> no transition
+
+# FNOL: assign adjuster before investigation
+from FNOL on AssignAdjuster -> set AdjusterName = AssignAdjuster.Name -> no transition
+
+# FNOL: begin investigation — requires adjuster
+from FNOL on BeginInvestigation when AdjusterName != null -> transition Investigation
+from FNOL on BeginInvestigation -> reject "An adjuster must be assigned before investigation can begin"
+
+# Document management — available in Investigation and Evaluation
+from Investigation on RequireDocument -> add RequiredDocuments RequireDocument.Doc -> no transition
+from Investigation on SubmitDocument when RequiredDocuments contains SubmitDocument.Doc -> add SubmittedDocuments SubmitDocument.Doc -> no transition
+from Investigation on SubmitDocument -> reject "That document is not currently required"
+
+from Evaluation on RequireDocument -> add RequiredDocuments RequireDocument.Doc -> no transition
+from Evaluation on SubmitDocument when RequiredDocuments contains SubmitDocument.Doc -> add SubmittedDocuments SubmitDocument.Doc -> no transition
+from Evaluation on SubmitDocument -> reject "That document is not currently required"
+
+# Investigation: flag fraud indicators
+from Investigation on FlagFraud -> set FraudIndicatorCount = FraudIndicatorCount + 1 -> no transition
+
+# Investigation: set reserve during investigation
+from Investigation on SetReserve -> set ReserveAmount = SetReserve.Amount -> no transition
+
+# Investigation: complete — Fast Track skips document check; suspicious claims need investigator
+from Investigation on CompleteInvestigation when Priority == "Fast Track" and not IsSuspicious -> transition Evaluation
+from Investigation on CompleteInvestigation when AllDocumentsSubmitted and (not IsSuspicious or InvestigatorAssigned) -> transition Evaluation
+from Investigation on CompleteInvestigation when IsSuspicious and not InvestigatorAssigned -> reject "Suspicious claims require an assigned investigator before proceeding"
+from Investigation on CompleteInvestigation -> reject "All required documents must be submitted before completing investigation"
+
+# Evaluation: set or adjust reserve
+from Evaluation on SetReserve -> set ReserveAmount = SetReserve.Amount -> no transition
+
+# Evaluation: make offer — high-value claims require supervisor approval; suspicious need investigator
+from Evaluation on MakeOffer when IsHighValue and not SupervisorApproval -> reject "High-value claims require supervisor approval before making an offer"
+from Evaluation on MakeOffer when not IsSuspicious or InvestigatorAssigned -> set OfferAmount = MakeOffer.Amount -> set DeductibleAmount = MakeOffer.Deductible -> transition Negotiation
+from Evaluation on MakeOffer -> reject "Suspicious claims cannot proceed to offer without investigation"
+
+# Evaluation: deny directly
+from Evaluation on DenyClaim -> set DenialReason = DenyClaim.Reason -> set ClaimDecision = "Denied" -> transition Denied
+
+# Negotiation: adjust the offer
+from Negotiation on AdjustOffer -> set OfferAmount = AdjustOffer.Amount -> no transition
+
+# Negotiation: claimant accepts — partial vs full settlement computed
+from Negotiation on AcceptOffer -> set SettlementAmount = OfferAmount -> set ClaimDecision = if OfferAmount < ClaimAmount then "Partial" else "Approved" -> transition Settled
+
+# Negotiation: deny during negotiation
+from Negotiation on DenyClaim -> set DenialReason = DenyClaim.Reason -> set ClaimDecision = "Denied" -> set OfferAmount = 0 -> transition Denied
+
+# Denial: appeal path (capped at 3)
+from Denied on FileAppeal when AppealCount < 3 -> set AppealCount = AppealCount + 1 -> set AppealNote = FileAppeal.Note -> set ClaimDecision = null -> set DenialReason = null -> transition Appeal
+from Denied on FileAppeal -> reject "Maximum appeal count reached"
+
+# Appeal: reevaluate sends back to Evaluation
+from Appeal on Reevaluate -> set AppealNote = null -> transition Evaluation
+
+# Settlement and Denial: close
+from Settled on CloseClaim -> transition Closed
+from Denied on CloseClaim -> transition Closed
+
+# Closed: reopen sends back to Investigation
+from Closed on ReopenClaim -> set ClaimDecision = null -> set SettlementAmount = 0 -> set OfferAmount = 0 -> set DenialReason = null -> transition Investigation
