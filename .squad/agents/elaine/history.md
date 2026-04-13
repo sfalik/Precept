@@ -147,6 +147,8 @@
 
 - 2026-04-12 — The cleanest folder story is status-based: `design/system/` holds live canonical system artifacts, `design/prototypes/` root stays reserved for active durable prototype work, and `design/prototypes/archive/` holds preserved reference sets. An empty-looking prototypes root is acceptable if it prevents archive material from reading like live direction.
 
+- 2026-04-13 — In a split-row lifecycle timeline, putting event labels on the opposite side of the rail from state labels clarifies cause vs. result without touching the rail geometry. Keep edit rows with the state/context side unless the UI is explicitly treating edits as lifecycle-driving actions.
+
 - 2026-04-12 — The semantic visual system artifacts are canonical enough that they should live at the root of `design/system/`, not inside a now-misleading `foundations/` subfolder. The prototype state specimen also depends on the shared canonical `.precept` by relative path, so path moves have to be validated as UX-adjacent behavior, not treated as a pure docs rename.
 
 - 2026-04-06 — The semantic visual system page should frame itself as Precept's strongest live expression of the visual system: still canonical and disciplined, but explicitly allowed to be beautiful enough to prove the system rather than merely police it.

@@ -1506,20 +1506,125 @@ pre {
   opacity: 0.5;
   cursor: default;
 }
-.timeline-row {
+.timeline-specimen {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  margin-inline: auto;
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+.timeline-specimen-head {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+}
+.timeline-specimen-label,
+.timeline-specimen-meta {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+.timeline-specimen-label { color: var(--soft); }
+.timeline-specimen-meta { color: var(--comment); }
+.timeline-history {
+  position: relative;
+  padding-right: 0;
+}
+.timeline-graph {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 44px;
+  overflow: visible;
+}
+.timeline-history-row {
   display: grid;
-  grid-template-columns: 90px 14px minmax(0,1fr);
-  gap: 12px;
-  padding: 8px 0;
+  grid-template-columns: minmax(0,1fr) 44px;
+  align-items: center;
+  height: 32px;
+  border-bottom: 1px solid var(--line);
+}
+.timeline-history-row:last-child {
+  border-bottom: none;
+}
+.timeline-history-row--current {
+  background: var(--panel-2);
+  box-shadow: inset 2px 0 0 rgba(168,152,245,0.34);
+}
+.timeline-history-row--future .timeline-row-entry,
+.timeline-history-row--future .timeline-row-target {
+  opacity: 0.76;
+}
+.timeline-history-row--blocked .timeline-row-entry,
+.timeline-history-row--blocked .timeline-row-target {
+  opacity: 0.56;
+}
+.timeline-row-copy {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 0 2px 0 10px;
+  overflow: hidden;
   font-family: var(--mono);
   font-size: 12px;
-  align-items: start;
+  white-space: nowrap;
+  text-align: right;
 }
-.tl-dot {
-  width: 12px; height: 12px;
-  border-radius: 50%;
-  border: 1px solid;
-  margin-top: 2px;
+.timeline-row-rail {
+  height: 32px;
+}
+.timeline-row-entry {
+  color: var(--event);
+  flex-shrink: 0;
+}
+.timeline-row-entry--state {
+  color: var(--state);
+  font-weight: 500;
+}
+.timeline-row-entry--edit {
+  color: var(--data);
+}
+.timeline-row-arrow {
+  color: var(--soft);
+}
+.timeline-row-target {
+  color: var(--state);
+}
+.timeline-row-detail {
+  color: var(--soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.timeline-event-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 20px;
+  padding: 0 8px;
+  border: 1px solid rgba(48,184,232,0.34);
+  background: rgba(48,184,232,0.10);
+  color: var(--event);
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: default;
+}
+.timeline-history-row--blocked .timeline-event-btn {
+  border-style: dashed;
+  border-color: rgba(48,184,232,0.24);
+  background:
+    linear-gradient(rgba(48,184,232,0.05), rgba(48,184,232,0.05)),
+    repeating-linear-gradient(135deg, rgba(255,255,255,0.04) 0 4px, transparent 4px 8px);
+  color: rgba(48,184,232,0.72);
+  opacity: 0.64;
 }
 .rule-callout {
   padding: 12px 16px;
@@ -4138,23 +4243,94 @@ pre {
     <div class="section-subgroup-sidebar">
       <div class="section-subgroup-index">03</div>
       <div class="section-subgroup-name">Timeline</div>
-      <p class="section-subgroup-desc">Run-time chronology compresses events into sequence. Each entry shows what happened, what state resulted, and whether evaluation produced a verdict.</p>
+      <p class="section-subgroup-desc">Run-time chronology compresses past, present, and future posture into sequence. Each entry shows what happened, what state resulted, and what remains available next.</p>
     </div>
     <div class="section-subgroup-body">
       <div class="surfaces-grid surfaces-grid--single">
 
     <!-- Surface 03: Timeline -->
     <div class="surface-specimen">
-      <div style="padding:6px 0">
-        <div class="timeline-row">
-          <span class="so" style="font-size:11px">2026-04-01</span>
-          <span class="tl-dot" style="border-color:var(--structure);background:var(--structure)"></span>
-          <span><span class="ev">Create</span> <span class="so">→</span> <span class="st">Draft</span></span>
+      <div class="timeline-specimen">
+        <div class="timeline-specimen-head">
+          <span class="timeline-specimen-label">Timeline</span>
         </div>
-        <div class="timeline-row">
-          <span class="so" style="font-size:11px">2026-04-02</span>
-          <span class="tl-dot" style="border-color:var(--valid);background:var(--valid)"></span>
-          <span><span class="ev">Submit</span> <span class="ok">→</span> <span class="st">Submitted</span></span>
+        <div class="timeline-history">
+          <svg class="timeline-graph" viewBox="0 0 44 224" preserveAspectRatio="xMinYMin meet" style="height:224px" role="img" aria-label="Timeline rail">
+            <line x1="20" y1="16" x2="20" y2="48" stroke="var(--event)" stroke-width="2"></line>
+            <line x1="20" y1="48" x2="20" y2="80" stroke="var(--event)" stroke-width="2"></line>
+            <line x1="20" y1="80" x2="20" y2="144" stroke="var(--soft)" stroke-width="2" stroke-opacity="0.72"></line>
+            <line x1="20" y1="144" x2="20" y2="176" stroke="var(--event)" stroke-width="2" stroke-dasharray="4 3" stroke-opacity="0.72"></line>
+            <path d="M 20 144 C 20 158, 34 164, 34 178" fill="none" stroke="var(--event)" stroke-width="2" stroke-dasharray="4 3" stroke-opacity="0.44"></path>
+            <path d="M 34 178 C 34 192, 20 194, 20 208" fill="none" stroke="var(--event)" stroke-width="2" stroke-dasharray="4 3" stroke-opacity="0.44"></path>
+            <circle cx="20" cy="16" r="7.3" fill="var(--panel)" stroke="var(--state)" stroke-width="1.5"></circle>
+            <circle cx="20" cy="16" r="2.6" fill="var(--state)"></circle>
+            <circle cx="20" cy="48" r="7.3" fill="var(--panel)" stroke="var(--state)" stroke-width="1.5"></circle>
+            <circle cx="20" cy="80" r="7.3" fill="var(--panel)" stroke="var(--state)" stroke-width="1.5"></circle>
+            <circle cx="20" cy="144" r="12.2" fill="none" stroke="rgba(168,152,245,0.28)" stroke-width="1.2"></circle>
+            <circle cx="20" cy="144" r="8.7" fill="var(--state)" stroke="none"></circle>
+            <circle cx="20" cy="176" r="10.8" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="1"></circle>
+            <circle cx="20" cy="176" r="7.3" fill="var(--panel)" stroke="var(--state)" stroke-width="1.5"></circle>
+            <circle cx="20" cy="208" r="10.8" fill="none" stroke="rgba(255,255,255,0.14)" stroke-width="1"></circle>
+            <circle cx="20" cy="208" r="7.3" fill="var(--panel)" stroke="var(--state)" stroke-width="1.5"></circle>
+          </svg>
+
+          <div class="timeline-history-row timeline-history-row--past">
+            <div class="timeline-row-copy">
+              <span class="timeline-row-entry timeline-row-entry--state">Requested</span>
+            </div>
+            <div class="timeline-row-rail"></div>
+          </div>
+
+          <div class="timeline-history-row timeline-history-row--past">
+            <div class="timeline-row-copy">
+              <span class="timeline-row-entry">ApproveRequest</span>
+              <span class="timeline-row-arrow">→</span>
+              <span class="timeline-row-target">Approved</span>
+            </div>
+            <div class="timeline-row-rail"></div>
+          </div>
+
+          <div class="timeline-history-row timeline-history-row--past">
+            <div class="timeline-row-copy">
+              <span class="timeline-row-entry">PrintBadge</span>
+              <span class="timeline-row-arrow">→</span>
+              <span class="timeline-row-target">ReadyForPickup</span>
+            </div>
+            <div class="timeline-row-rail"></div>
+          </div>
+
+          <div class="timeline-history-row timeline-history-row--past">
+            <div class="timeline-row-copy">
+              <span class="timeline-row-entry timeline-row-entry--edit">edit</span>
+              <span class="timeline-row-entry timeline-row-entry--edit">OutcomeNote</span>
+            </div>
+            <div class="timeline-row-rail"></div>
+          </div>
+
+          <div class="timeline-history-row timeline-history-row--current">
+            <div class="timeline-row-copy">
+              <span class="timeline-row-entry timeline-row-entry--state">ReadyForPickup</span>
+            </div>
+            <div class="timeline-row-rail"></div>
+          </div>
+
+          <div class="timeline-history-row timeline-history-row--future">
+            <div class="timeline-row-copy">
+              <button class="timeline-event-btn" type="button">PickUp</button>
+              <span class="timeline-row-arrow">→</span>
+              <span class="timeline-row-target">PickedUp</span>
+            </div>
+            <div class="timeline-row-rail"></div>
+          </div>
+
+          <div class="timeline-history-row timeline-history-row--future timeline-history-row--blocked">
+            <div class="timeline-row-copy">
+              <button class="timeline-event-btn" type="button" disabled>Expire</button>
+              <span class="timeline-row-arrow">→</span>
+              <span class="timeline-row-target">Expired</span>
+            </div>
+            <div class="timeline-row-rail"></div>
+          </div>
         </div>
       </div>
     </div>

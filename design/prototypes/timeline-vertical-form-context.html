@@ -234,7 +234,84 @@ body {
   grid-template-rows: auto 1fr auto;
 }
 
-/* Fields */
+/* Card fields (v3 pattern) */
+.card-fields {
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  gap: 9px;
+}
+
+.f-row {
+  display: grid;
+  grid-template-columns: 155px 1fr;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.f-label {
+  font-size: 12px;
+  color: var(--soft);
+}
+
+.f-label--constrained {
+  font-style: italic;
+}
+
+.f-label--required {
+  color: var(--rule);
+}
+
+.f-label--required::after {
+  content: " *";
+  font-size: 10px;
+}
+
+.f-val {
+  color: var(--text);
+}
+
+.f-val--yes {
+  color: var(--valid);
+}
+
+.f-val--yes::before {
+  content: "\2713  ";
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+.f-val--open {
+  color: var(--valid);
+}
+
+.f-val--open::before {
+  content: "\25CF  ";
+  font-size: 9px;
+  opacity: 0.7;
+}
+
+.f-input {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.12);
+  padding: 5px 10px;
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 13px;
+  width: 100%;
+  outline: none;
+}
+
+.f-input:focus {
+  border-color: rgba(48,184,232,0.45);
+}
+
+.f-input::placeholder {
+  color: var(--soft);
+}
+
+/* Fields header */
 .fields-head {
   display: flex;
   align-items: center;
@@ -255,207 +332,133 @@ body {
   color: var(--soft);
 }
 
-.field-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1px;
-  background: var(--line);
-  border-bottom: 1px solid var(--line);
+/* ── ACTIONS (v3 verdict strip) ───────────── */
+.card-actions {
+  padding: 16px 24px 20px;
+  border-top: 1px solid var(--line);
 }
 
-.field-cell {
-  background: var(--panel);
-  padding: 10px 14px 12px;
-}
-
-.field-label {
+.action-bar {
   display: flex;
-  align-items: center;
-  gap: 6px;
-  font-family: var(--mono);
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  color: var(--soft);
-  margin-bottom: 5px;
-}
-
-.field-tag {
-  font-family: var(--mono);
-  font-size: 9px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  padding: 1px 5px;
-  border: 1px solid var(--line);
-  color: var(--soft);
-}
-
-.field-tag--required {
-  color: var(--rule);
-  border-color: rgba(251,191,36,0.22);
-}
-
-.field-value {
-  font-family: var(--mono);
-  font-size: 13px;
-  color: var(--text);
-}
-
-.field-value--dim {
-  color: var(--muted);
-}
-
-.field-input {
-  width: 100%;
-  padding: 6px 8px;
-  border: 1px solid rgba(251,191,36,0.18);
-  background: rgba(251,191,36,0.03);
-  color: var(--text);
-  font-family: var(--mono);
-  font-size: 13px;
-}
-
-.field-input::placeholder {
-  color: var(--soft);
-}
-
-/* Callout */
-.field-callout {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 14px;
-  border-bottom: 1px solid var(--line);
-  background: var(--panel);
-  font-family: var(--sans);
-  font-size: 11px;
-  color: var(--muted);
-}
-
-.field-callout-icon {
-  flex-shrink: 0;
-  width: 16px;
-  height: 16px;
-  display: inline-grid;
-  place-items: center;
-  border: 1px solid rgba(251,191,36,0.22);
-  font-family: var(--mono);
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--rule);
-}
-
-/* ── ACTIONS ──────────────────────────────── */
-.actions {
-  padding: 0;
-}
-
-.actions-head {
-  display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  padding: 8px 16px;
-  border-bottom: 1px solid var(--line);
 }
 
-.actions-head-label {
-  font-size: 10px;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: var(--soft);
-}
-
-.actions-head-meta {
-  font-size: 10px;
-  color: var(--soft);
-}
-
-.actions-list {
-  padding: 12px 14px;
-  display: grid;
+.action-bar-left {
+  display: flex;
+  align-items: center;
   gap: 8px;
 }
 
-.event-btn {
-  display: grid;
-  grid-template-columns: 8px 1fr auto;
+.action-bar-right {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.verdict-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.act-btn {
+  display: inline-flex;
   align-items: center;
-  gap: 12px;
-  width: 100%;
-  padding: 10px 14px;
-  border: 1px solid var(--line);
-  background: var(--panel);
-  color: var(--text);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.event-btn--available {
-  border-color: rgba(52,211,153,0.28);
-  cursor: pointer;
-}
-
-.event-btn--blocked {
-  border-color: rgba(248,113,113,0.22);
-  cursor: not-allowed;
-}
-
-.event-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-}
-
-.event-btn--available .event-dot {
-  background: var(--valid);
-}
-
-.event-btn--blocked .event-dot {
-  background: var(--violated);
-}
-
-.event-btn-body {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-
-.event-name {
-  font-family: var(--mono);
+  gap: 7px;
+  padding: 8px 18px;
+  font-family: var(--sans);
   font-size: 13px;
   font-weight: 500;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  border: 1px solid transparent;
+  background: none;
+  line-height: 1.3;
 }
 
-.event-btn--available .event-name {
-  color: var(--valid);
+.act-btn--go {
+  border-color: rgba(48,184,232,0.40);
+  background: rgba(48,184,232,0.10);
+  color: var(--event);
 }
 
-.event-btn--blocked .event-name {
+.act-btn--go:hover {
+  background: rgba(48,184,232,0.18);
+  border-color: rgba(48,184,232,0.60);
+}
+
+.act-btn--off {
+  border-color: rgba(255,255,255,0.11);
+  background: transparent;
   color: var(--soft);
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
-.event-reason {
-  font-family: var(--sans);
-  font-size: 11px;
-  color: var(--muted);
-}
-
-.event-btn--blocked .event-reason {
-  color: var(--soft);
-}
-
-.event-target {
-  font-family: var(--mono);
-  font-size: 11px;
-  color: var(--muted);
-  white-space: nowrap;
+.verdict-line {
   display: flex;
   align-items: center;
   gap: 5px;
+  font-size: 11.5px;
+  padding-left: 2px;
+  line-height: 1.3;
 }
 
-.event-target-arrow {
+.verdict-line--go {
   color: var(--state);
+}
+
+.verdict-line--go .v-arrow {
+  color: var(--soft);
+  font-size: 10px;
+}
+
+.verdict-line--blocked {
+  color: var(--violated);
+  opacity: 0.75;
+}
+
+.verdict-line--blocked .v-icon {
+  font-size: 10px;
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.form-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 16px;
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+  background: none;
+  line-height: 1.3;
+}
+
+.form-btn--save {
+  background: rgba(52,211,153,0.12);
+  border-color: rgba(52,211,153,0.32);
+  color: var(--valid);
+}
+
+.form-btn--save:hover {
+  background: rgba(52,211,153,0.20);
+  border-color: rgba(52,211,153,0.50);
+}
+
+.form-btn--cancel {
+  border-color: rgba(255,255,255,0.10);
+  color: var(--soft);
+}
+
+.form-btn--cancel:hover {
+  background: rgba(255,255,255,0.04);
+  border-color: rgba(255,255,255,0.18);
 }
 
 /* ── FOOTER ───────────────────────────────── */
@@ -617,77 +620,63 @@ body {
     <!-- ─── RIGHT: FORM + ACTIONS ─── -->
     <section class="detail" aria-label="Record context and actions">
 
-      <!-- Field grid (SVS 1px-gap pattern) -->
+      <!-- Fields header -->
       <div>
         <div class="fields-head">
           <span class="fields-head-label">Fields</span>
-          <span class="fields-head-meta">ReadyForPickup · 6 fields</span>
+          <span class="fields-head-meta">ReadyForPickup · 5 fields</span>
         </div>
 
-        <div class="field-grid">
-          <div class="field-cell">
-            <div class="field-label">VisitorName <span class="field-tag">locked</span></div>
-            <div class="field-value">Ada Reyes</div>
+        <!-- v3 card-fields pattern -->
+        <div class="card-fields">
+          <div class="f-row">
+            <span class="f-label">Visitor name</span>
+            <span class="f-val">Ada Reyes</span>
           </div>
-          <div class="field-cell">
-            <div class="field-label">HostConfirmed <span class="field-tag">locked</span></div>
-            <div class="field-value">true</div>
+          <div class="f-row">
+            <span class="f-label f-label--constrained">Host confirmed</span>
+            <span class="f-val f-val--yes">Yes</span>
           </div>
-          <div class="field-cell">
-            <div class="field-label">BadgePrinted <span class="field-tag">locked</span></div>
-            <div class="field-value">true</div>
+          <div class="f-row">
+            <span class="f-label">Badge printed</span>
+            <span class="f-val f-val--yes">Yes</span>
           </div>
-          <div class="field-cell">
-            <div class="field-label">PickupWindowOpen <span class="field-tag">locked</span></div>
-            <div class="field-value">true</div>
+          <div class="f-row">
+            <span class="f-label">Pickup window</span>
+            <span class="f-val f-val--open">Open</span>
           </div>
-          <div class="field-cell">
-            <div class="field-label">OutcomeNote <span class="field-tag field-tag--required">required</span></div>
-            <input class="field-input" type="text" value="Badge handed to visitor at desk." aria-label="Outcome note">
+          <div class="f-row">
+            <span class="f-label f-label--required">Outcome note</span>
+            <input class="f-input" type="text" placeholder="Enter outcome note\u2026">
           </div>
-          <div class="field-cell">
-            <div class="field-label">LastTransition</div>
-            <div class="field-value field-value--dim">PreparePickup @ 09:42</div>
-          </div>
-        </div>
-
-        <div class="field-callout">
-          <span class="field-callout-icon" aria-hidden="true">!</span>
-          OutcomeNote is required — terminal outcomes must leave a business explanation.
         </div>
       </div>
 
-      <!-- Event actions -->
-      <div class="actions">
-        <div class="actions-head">
-          <span class="actions-head-label">Events</span>
-          <span class="actions-head-meta">2 declared · 1 available</span>
-        </div>
-
-        <div class="actions-list">
-          <!-- Available: PickUp -->
-          <button class="event-btn event-btn--available" type="button">
-            <span class="event-dot" aria-hidden="true"></span>
-            <div class="event-btn-body">
-              <span class="event-name">PickUp</span>
-              <span class="event-reason">Pickup window is open and badge is printed</span>
+      <!-- v3 action bar with verdict strips -->
+      <div class="card-actions">
+        <div class="action-bar">
+          <div class="action-bar-left">
+            <button class="form-btn form-btn--save" type="button">Save</button>
+            <button class="form-btn form-btn--cancel" type="button">Cancel</button>
+          </div>
+          <div class="action-bar-right">
+            <!-- Available: PickUp -->
+            <div class="verdict-item">
+              <button class="act-btn act-btn--go" type="button">Pick Up</button>
+              <div class="verdict-line verdict-line--go">
+                <span class="v-arrow">→</span>
+                <span>PickedUp</span>
+              </div>
             </div>
-            <span class="event-target">
-              <span class="event-target-arrow" aria-hidden="true">→</span> PickedUp
-            </span>
-          </button>
-
-          <!-- Blocked: Expire -->
-          <button class="event-btn event-btn--blocked" type="button" disabled aria-disabled="true">
-            <span class="event-dot" aria-hidden="true"></span>
-            <div class="event-btn-body">
-              <span class="event-name">Expire</span>
-              <span class="event-reason">Blocked — PickupWindowOpen must be false</span>
+            <!-- Blocked: Expire -->
+            <div class="verdict-item">
+              <button class="act-btn act-btn--off" type="button" disabled>Expire</button>
+              <div class="verdict-line verdict-line--blocked">
+                <span class="v-icon">⊘</span>
+                <span>Pickup window must be closed</span>
+              </div>
             </div>
-            <span class="event-target">
-              <span class="event-target-arrow" aria-hidden="true">→</span> Expired
-            </span>
-          </button>
+          </div>
         </div>
       </div>
     </section>
