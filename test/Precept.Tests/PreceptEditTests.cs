@@ -20,7 +20,7 @@ public class PreceptEditTests
         field AssignedTo as string default ""
         field ResolutionSummary as string nullable
 
-        invariant Priority >= 1 && Priority <= 5 because "Priority must be between 1 and 5"
+        invariant Priority >= 1 and Priority <= 5 because "Priority must be between 1 and 5"
 
         state Open initial
         state InProgress

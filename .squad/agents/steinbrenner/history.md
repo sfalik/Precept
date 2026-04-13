@@ -25,6 +25,23 @@
 - Scribe merged Steinbrenner's portfolio plan with Frank, George, and J. Peterman's sample-realism findings into .squad/decisions.md, alongside Shane's directive to use Opus when sample/design judgment is especially high.
 - The active sample plan targets 42 total repo samples, rewrites the eight roadmap-anchor samples first, adds missing domain lanes next, and holds a deliberate data-only lane for proposal #22.
 - trafficlight and crosswalk-signal remain useful teaching controls but should not drive language-priority decisions.
+### 2026-04-12 — Event hooks PM motivation and use case analysis
+- Built use-case inventory for event-level action hooks from the 24-sample corpus.
+- Confirmed real friction: repeated `RegisterAgent` calls in `it-helpdesk-ticket.precept` across 4 identical rows; TrafficLight counter requires duplication across all non-reject Advance rows.
+- **PM recommendation: two-proposal split.** Issue A (stateless) advances first — zero Principle 7 tension, clean execution order. Issue B (stateful) deferred — unresolved execution order (4 options with different semantics) and outcome-scoping question.
+- **C49 revision confirmed in-scope** for Issue A — not optional follow-up. Events with hooks must suppress C49; ships in same PR as runtime/grammar changes.
+- Drafted acceptance criteria for Issue A (stateless only). Filed at `.squad/decisions/inbox/steinbrenner-event-hooks-pm.md` (now merged to decisions.md).
+
+
+
+### 2026-04-08 - Language research plan fully executed
+- The three-batch domain-first plan is complete on `squad/language-research-corpus`, closed by `3cc5343` after Batch 1 `54a77da` and Batch 2 `48860ae`.
+- PM guardrails held through closeout: no proposal-body edits, horizon domains remained represented, and the final indexes point active proposals back to their grounding research.
+
+### 2026-04-08 - Language research batching finalized
+- Finished `docs/research/language/domain-research-batches.md` as the domain-first execution plan for the corpus.
+- Regrouped Batch 1 so constraint composition stays with the rest of the validator/rule/declaration lane instead of being split into a later pass.
+- Preserved the session rules: no proposal-body edits during corpus work, horizon domains stay visible, and each completed batch closes with its own commit (`54a77da` for Batch 1, `48860ae` for Batch 2). Batch 3 and the final README/index sweep remain open.
 
 ### 2026-04-05 - Proposal #8 finalized around named rules
 - Synced the proposal framing to rule <Name> when <BoolExpr>, locked the field-only/boolean-only boundaries, and reinforced the readability bar for future language work.

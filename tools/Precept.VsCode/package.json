@@ -165,7 +165,8 @@
 
     "configurationDefaults": {
       "[precept]": {
-        "editor.semanticHighlighting.enabled": true
+        "editor.semanticHighlighting.enabled": true,
+        "editor.wordBasedSuggestions": "off"
       },
       "editor.semanticTokenColorCustomizations": {
         "rules": {
@@ -176,6 +177,9 @@
           "comment:precept": {
             "foreground": "#9096A6",
             "italic": true
+          },
+          "preceptMessage": {
+            "foreground": "#FBBF24"
           }
         }
       },
@@ -184,6 +188,7 @@
           "textMateRules": [
             { "scope": "keyword.other.semantic.precept",              "settings": { "foreground": "#4338CA", "fontStyle": "bold" } },
             { "scope": "keyword.other.grammar.precept",               "settings": { "foreground": "#6366F1" } },
+            { "scope": "keyword.other.constraint.precept",            "settings": { "foreground": "#6366F1" } },
             { "scope": "keyword.control.precept",                "settings": { "foreground": "#4338CA", "fontStyle": "bold" } },
             { "scope": "keyword.other.precept",                  "settings": { "foreground": "#4338CA", "fontStyle": "bold" } },
             { "scope": "entity.name.type.state.precept",         "settings": { "foreground": "#A898F5" } },

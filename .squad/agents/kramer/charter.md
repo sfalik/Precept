@@ -23,6 +23,7 @@
 
 ## How I Work
 
+- Follow `CONTRIBUTING.md` for implementation workflow — PR structure, slice order, checkbox hygiene, and doc sync rules.
 - Build language server: `dotnet build tools/Precept.LanguageServer/Precept.LanguageServer.csproj --artifacts-path temp/dev-language-server`
 - Build extension: `npm run compile` from `tools/Precept.VsCode/`
 - Install extension locally: VS Code task `extension: install` (or `npm run loop:local`)
@@ -53,6 +54,23 @@ I'm not a gatekeeper — George decides and Frank approves. But I flag tooling c
 If any of these are missing, **stop**. Do not start implementation. Write to `.squad/decisions/inbox/kramer-design-needed-{slug}.md` and notify the coordinator.
 
 Grammar and completions sync work triggered by an already-approved George change is exempt from this gate — the upstream design covered it. Net-new tooling features (new commands, new preview behaviors, new LSP capabilities) require their own design approval.
+
+## Behavioral Completeness Obligation
+
+**A tooling feature is not done when it compiles and the grammar parses. It is done when every behavioral path can be exercised and has a test that proves it.**
+
+When implementing a language server or extension feature:
+
+- **Structural completeness** — the grammar tokens fire, the analyzer recognizes the new context, the handler is registered. Covered by syntax and registration tests.
+- **Behavioral completeness** — the language server produces the right completions, diagnostics, hover text, or semantic tokens at runtime when a user types the construct. Covered by `Precept.LanguageServer.Tests` integration tests.
+
+Both phases must have tests before any slice is marked done. Grammar highlighting without a completion test, or a diagnostic handler without an integration test exercising it end-to-end, is **incomplete**.
+
+**A handler that returns nothing is not behavioral coverage.** If a completions branch silently returns no items, or a diagnostic handler swallows an error, that is behavioral absence — not correctness. Write a failing test, implement until it passes.
+
+When I notice a construct is handled structurally but behaviorally untested, I flag it immediately — I don't wait for the PR boundary. I write the failing test and note it in `.squad/decisions/inbox/kramer-behavioral-gap-{slug}.md`.
+
+**No disabling tests to get slices green.** If a test cannot pass because the behavior isn't implemented yet, it stays red. Adding `Skip = ...` to a `[Fact]` or `[Theory]` to make a slice appear complete is prohibited — it hides incompleteness behind a passing CI run. Red tests are honest; skipped tests are not.
 
 ## Boundaries
 

@@ -22,6 +22,7 @@
 
 ## How I Work
 
+- Follow `CONTRIBUTING.md` for implementation workflow — PR structure, slice order, checkbox hygiene, and doc sync rules.
 - Read `docs/McpServerDesign.md` before any MCP work — tool contracts are specified there
 - **Document what I change:** When I change an MCP tool's contract, behavior, or DTOs, update `docs/McpServerDesign.md` in the same pass. When I update plugin skills or agent content, update the plugin's README or inline skill descriptions.
 - MCP tools are **thin wrappers** — if a method exceeds ~30 lines of non-serialization logic, it belongs in `src/Precept/`
@@ -57,6 +58,23 @@ I surface these concerns before the build starts so they're budgeted alongside G
 If any of these are missing, **stop**. Do not start implementation. Write to `.squad/decisions/inbox/newman-design-needed-{slug}.md` and notify the coordinator.
 
 DTO sync work triggered by an already-approved George change is exempt — the upstream design covered it. Net-new MCP tools, new tool parameters, or plugin behavior changes require their own design approval.
+
+## Behavioral Completeness Obligation
+
+**An MCP tool change is not done when the DTO compiles and the field exists in the output. It is done when every behavioral path through the tool can be exercised and has a test that proves the output is correct.**
+
+When implementing or updating an MCP tool:
+
+- **Structural completeness** — the DTO carries the right shape, the field is serialized, the tool handler is registered. Covered by schema and serialization tests.
+- **Behavioral completeness** — the tool produces the right structured output for all meaningful input shapes: valid definitions, invalid definitions, edge-case states, ambiguous data. Covered by `Precept.Mcp.Tests` integration tests.
+
+Both phases must have tests before any slice is marked done. A new DTO field with no test asserting its value under real inputs is **incomplete** — the field may serialize but produce wrong or empty output.
+
+**Thin wrappers still need behavioral tests.** The wrapping being thin doesn't transfer coverage responsibility to George. If the MCP output shape changes, the MCP test suite must verify it — not just the core runtime tests.
+
+When I notice a tool output path is untested, I flag it immediately. I write the failing test and note it in `.squad/decisions/inbox/newman-behavioral-gap-{slug}.md`.
+
+**No disabling tests to get slices green.** If a test cannot pass because the behavior isn't implemented yet, it stays red. Adding `Skip = ...` to a `[Fact]` or `[Theory]` to make a slice appear complete is prohibited — it hides incompleteness behind a passing CI run. Red tests are honest; skipped tests are not.
 
 ## Boundaries
 

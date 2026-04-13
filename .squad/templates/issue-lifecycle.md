@@ -40,6 +40,7 @@ Each platform tracks issue lifecycle differently. Squad normalizes these into a 
 **Issue labels used by Squad:**
 - `squad` — Issue is in Squad backlog
 - `squad:{member}` — Assigned to specific agent
+- `squad:chore` — Autonomous chore pickup gate; Ralph routes to best-fit member, applies `squad:{member}` label, and preserves review ceremony
 - `priority:p{N}` — Priority level (0=critical, 1=high, 2=medium, 3=low)
 - `blocked` — Work cannot advance until an external blocker clears
 - `deferred` — Work is intentionally parked outside the current active plan
@@ -98,7 +99,7 @@ Planner does not have native Git integration. Squad uses Planner for task tracki
 
 **Actions:**
 1. Read `.squad/routing.md` to determine which agent should handle the issue
-2. Apply `squad:{member}` label (GitHub) or tag (ADO)
+2. Apply `squad:{member}` (GitHub) or the equivalent ownership tag (ADO)
 3. Transition the board status to `Backlog` or `Ready`, depending on whether the issue is actionable immediately
 4. Optionally spawn agent immediately if issue is high-priority
 
@@ -139,8 +140,18 @@ cd ../worktrees/{issue-number}
 
 **Actions:**
 1. Agent makes code changes
-2. Commits reference the issue number
-3. Pushes branch to remote
+2. Updates the draft PR body after each completed slice or logical group so the summary, why, and implementation checklist stay current
+3. Commits reference the issue number
+4. Pushes branch to remote
+
+**Slice loop:**
+
+For active implementation work, repeat this loop throughout the PR instead of waiting until the end:
+
+1. Finish one vertical slice or logical group
+2. Update `## Summary` / `## Why` if the shipped scope or reviewer context changed, then check off the corresponding implementation-plan items in the draft PR body
+3. Commit the completed slice
+4. Push the branch
 
 **Commit message format:**
 ```
@@ -168,9 +179,10 @@ git push -u origin squad/{issue-number}-{slug}
 
 **Actions:**
 1. Open PR from feature branch to base branch
-2. Reference issue in PR description
-3. Apply labels if needed
-4. Transition issue to `In Review`
+2. Reference the issue in the `## Linked Issue` section with `Closes #{issue-number}`
+3. Seed the PR body with `## Summary`, `## Linked Issue`, `## Why`, and `## Implementation Plan` if they are not already present
+4. Apply labels if needed
+5. Transition issue to `In Review`
 
 **PR creation commands:**
 
@@ -192,17 +204,18 @@ az repos pr create --title "{title}" \
 
 **PR description template:**
 ```markdown
-Closes #{issue-number}
-
 ## Summary
-{what changed}
+- {what changed}
 
-## Changes
-- {change 1}
-- {change 2}
+## Linked Issue
+- Closes #{issue-number}
 
-## Testing
-{how this was tested}
+## Why
+- {why this change exists / what problem it addresses / reviewer context}
+
+## Implementation Plan
+- [ ] Slice 1 — ...
+- [ ] Slice 2 — ...
 
 {If working as a squad member:}
 Working as {member} ({role})
@@ -310,7 +323,7 @@ When spawning an agent to work on an issue, include this context block:
 2. Push branch
 3. Open PR using:
    ```
-   gh pr create --title "{title}" --body "Closes #{number}\n\n{description}" --head squad/{issue-number}-{slug} --base {base-branch}
+   gh pr create --title "{title}" --body-file {tempfile-with-summary-linked-issue-why-and-plan} --head squad/{issue-number}-{slug} --base {base-branch}
    ```
 4. Report PR URL to coordinator
 ```
@@ -397,6 +410,64 @@ All PRs reviewed → All PRs merged → Epic closed
 - ❌ Using `checkout -b` when parallel agents are active (causes working directory conflicts)
 - ❌ Manually transitioning issue states — let the platform and Squad automation handle it
 - ❌ Skipping the branch naming convention — breaks Ralph's tracking logic
+
+## GitHub Projects V2 — Status Sync
+
+Scribe owns all project-board status transitions. The coordinator tells Scribe WHAT to transition; Scribe executes the update mechanically.
+
+### Board Reference (Precept Language Improvements — Project #2)
+
+| Field | Value |
+|-------|-------|
+| Project number | `2` |
+| Project ID | `PVT_kwHOAQyRK84BTxO4` |
+| Owner | `sfalik` |
+| Status field ID | `PVTSSF_lAHOAQyRK84BTxO4zhA94Fw` |
+
+### Status Options
+
+| Status | Option ID | Trigger |
+|--------|-----------|---------|
+| Backlog | `86bc9793` | Issue triaged and added to board |
+| In Review | `6c1e3216` | Design review ceremony starts |
+| Ready | `732ec1dd` | Design approved / all reviewers approve + Shane signs off |
+| In Progress | `f5aee879` | Implementation branch created or draft PR opened |
+| Done | `f79a3ae0` | PR merged and issue closed |
+
+### Update Commands
+
+**Look up item ID for an issue:**
+```bash
+gh project item-list 2 --owner sfalik --format json --limit 50
+# Match content.number to find the PVTI_... item ID
+```
+
+**Set status:**
+```bash
+gh project item-edit --project-id PVT_kwHOAQyRK84BTxO4 \
+  --id <item-id> \
+  --field-id PVTSSF_lAHOAQyRK84BTxO4zhA94Fw \
+  --single-select-option-id <status-option-id>
+```
+
+### Coordinator-to-Scribe Handoff
+
+Include in Scribe's spawn manifest when a status transition is needed:
+
+```
+STATUS_TRANSITION:
+  issueNumber: {N}
+  targetStatus: "In Review" | "Ready" | "In Progress" | "Done"
+```
+
+Scribe looks up the item ID, maps the target status to the option ID, and executes `gh project item-edit`. See Scribe charter § Project Status Sync Responsibilities.
+
+### PR Linking
+
+Every implementation PR MUST contain `Closes #N` in the body. This:
+- Creates a GitHub-tracked link (populates "Linked pull requests" on the board)
+- Auto-closes the issue when the PR merges
+- If missing, Scribe adds it during PR stewardship
 
 ## Migration Notes
 

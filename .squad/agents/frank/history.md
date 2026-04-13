@@ -6,7 +6,138 @@
 - The sample corpus is roadmap instrumentation. Preserve real domain pressure, classify sample complexity explicitly, and use FUTURE(#N) comments when a believable workflow needs not-yet-shipped syntax.
 - Architectural guardrails remain stable: thin MCP wrappers, keyword-anchored flat statements, deterministic inspectability, first-match routing, and no speculative semantics in docs.
 
+## Learnings
+
+### 2026-04-12 — Issue #17 Design Review: Computed Fields Proposal
+- **Verdict: APPROVED.** Strongest language proposal this project has produced. All 7 philosophy filter questions passed. All 3 impact categories covered. 11/11 locked decisions have complete 4-point rationale. ~37 behavioral ACs.
+- **Key architectural observation:** The `->` dual role (action introducer in transitions, derivation operator in fields) is cleanly disambiguated by parser context. `FieldDecl` tries `-> Expression ConstraintSuffix*` vs `FieldModifier*`. Constraint keywords after the derived expression are token-type-distinct from expression identifiers — Superpower handles this naturally.
+- **Parser concern flagged (W5):** Expression-then-constraint boundary (`field X as number -> A + B nonnegative`) relies on constraint keywords being reserved tokens that the expression parser won't consume. Works, but implementers should be aware.
+- **Multi-name declaration concern flagged (W6):** `field A, B as number -> expr` is not addressed. Recommended: disallow at parser level — each computed field should have its own declaration for readable dependency tracking.
+- **Recomputation contract confirmed correct:** One pass after ALL mutation phases (exit + row + entry in Fire, field edits in Update, simulated on clone in Inspect), before constraint evaluation. No per-phase recomputation. This is the single most important semantic contract.
+- **Research quality:** 24-system survey across all 7 philosophy positioning categories with cross-category structural gap finding — no surveyed system combines field-level derivation with lifecycle-aware constraint enforcement. Dead-end analysis covers 5 rejected directions with reasons.
+- **6 non-blocking warnings filed:** syntax highlighting not explicitly listed, `precept_language` vocabulary gap, no stateless precept AC, conditional expression not explicitly addressed, expression-then-constraint parsing, multi-name declaration interaction.
+- Full review: `temp/frank-proposal-review-17.json`
+
+### 2026-04-11 — Modifier any-order investigation (Issue #13)
+- **Key architecture finding:** The fixed modifier order (`nullable → default → constraints → ordered`) is enforced ONLY by two parser combinator chains (`FieldDecl` line 697, `EventArg` line 774). Model types, type checker, runtime, grammar, and MCP are all already order-independent.
+- **Constraint zone is already any-order:** `ConstraintSuffix.Many()` already allows constraints in any order. The rigidity is only between the four zones (nullable, default, constraints, ordered).
+- **Completions are the heavy lift:** `PreceptAnalyzer.cs` has ~30 regex patterns that hardcode position-dependent modifier sequences. These must be replaced with a dynamic "remaining modifiers" approach. The parser change itself is ~50 lines.
+- **Doc inconsistency found:** `PreceptLanguageDesign.md` prose says constraints appear "between the type (and `nullable`) and the `default` clause" but the grammar spec and parser put default BEFORE constraints. Needs correction regardless of this issue.
+- **Implementation approach:** Discriminated union `FieldModifier` with `.Many()` combinator. Extract properties from modifier list post-parse. Duplicate modifier detection via type checker (consistent with C58 precedent).
+- **Event arg comma boundary:** Superpower's `.Many()` uses `TryParse` internally — modifier parsing naturally stops at comma delimiters. Needs explicit test verification.
+- **Collection fields unaffected:** They only take constraints (no nullable/default/ordered), so they're already flexible.
+- **Recommended slicing:** (A) parser + type checker + tests, (B) completions rework, (C) docs.
+- Full analysis: `.squad/decisions/inbox/frank-modifier-any-order-investigation.md`
+
+### 2026-04-11 — Variadic min/max decision (Issue #16)
+- Updated proposal for comprehensive built-in functions to make min/max variadic (≥ 2 args, no upper limit) per Shane's approved decision.
+- Binary-only min/max was the original draft; variadic is the locked form. The mathematical arity-independence of min/max justifies the exception to fixed-arity signatures.
+- Collection overloads for min/max rejected — `.min`/`.max` accessors already serve that role. Added as explicit exclusion.
+- Key proposal changes: 6 signature updates, new locked decision #8, exclusion rewrite, new semantic rule, teachable error message, acceptance criteria updates, 3-arg example.
+- Decision filed: `.squad/decisions/inbox/frank-variadic-min-max.md`
+
 ## Recent Updates
+
+### 2026-04-12 — Squad `@copilot` lane retirement contract review
+- Confirmed the contract change is narrowly scoped: retire only the Squad-owned `squad:copilot` coding-agent routing lane. `squad:chore` is retained as an explicit chore/work-type label with no autonomous routing — it is not retired.
+- General repo-wide Copilot tooling should remain in place (`.github/copilot-instructions.md`, `.copilot/skills/`, passive references) because it is not part of Squad governance.
+- Live workflows, mirrored templates, team/routing docs, and squad agent docs all need to agree on the retirement to avoid half-disabled routing.
+
+### 2026-04-12 — Issue #9 design review resolutions incorporated
+- Updated Issue #9 proposal body with all 4 resolved must-resolve items from the design review (Decisions 6–9).
+- **Decision 6:** `else` branch null-narrowing — original type retained, no reverse narrowing. #14 precedent.
+- **Decision 7:** Separate diagnostic codes C72 (non-boolean condition) and C73 (branch type mismatch), split from C39.
+- **Decision 8:** Nullable boolean condition = compile error (C72). Must be non-nullable boolean. Consistent with `when` guard behavior.
+- **Decision 9:** MCP Inspect trace shows `conditionResult` and `branchTaken` fields — inspectability means showing the reasoning.
+- Updated ACs: AC-3 (C39→C72), AC-5 (else branch behavior), AC-9 (trace field names), AC-12 (per-component test breakdown). Added AC-13 (C72/C73 codes) and AC-14 (nullable boolean rejection).
+- Updated teachable error messages table, semantic rules (added rules 7–8), implementation scope, and locked decisions section.
+- Posted resolution comment. Design approved — ready for implementation.
+- Decision filed: `.squad/decisions/inbox/frank-issue9-resolutions.md`
+
+### 2026-04-12 — Event hooks gap investigation + external FSM precedent survey
+- Researched event-level action hooks triggered by Shane's `on Advance -> set Count = Count + 1` parse error.
+- Filed full external precedent survey across 5 systems (XState v5, SCXML, Akka Classic FSM, Spring SM, Redux) in `research/language/expressiveness/event-hooks.md`.
+- **Stateless case (Issue A):** CONFIRMED VIABLE. Zero Principle 7 tension — stateless precepts have no transition rows, so the shared-context concern that motivated Principle 7 has no application surface.
+- **Stateful case (Issue B):** Deferred as Issue B. Three unresolved questions: execution order position (Frank recommends Option 3 — after row mutations, before exit actions — citing SCXML §3.13 as normative precedent), outcome-scoping (fires on Unmatched?), and explicit Principle 7 exception rationale.
+- C49 revision required for Issue A: events with hooks suppress C49; events with asserts but no hooks get lower-severity warning.
+- Confirmed `ActionChain` reuse: `EventActionDecl` shares the existing parser combinator, no changes needed.
+
+
+
+### 2026-04-10 — Structural lifecycle modifiers: second pass (expanded modifier space)
+- Produced comprehensive second pass at `research/language/expressiveness/structural-lifecycle-modifiers.md`.
+- **Scope expansion:** Added 10 event modifier candidates (`entry`, `advancing`, `settling`, `irreversible`, `universal`, `isolated`, `guarded`, `total`, `completing`, `symmetric`), 8 field modifier candidates (`writeonce`, `identity`, `monotonic`, `sensitive`, `derived`, `immutable`, `sealed after <State>`, `audit`), and 6 additional state modifier candidates (`error`, `resting`, `decision`, `guarded` on incoming transitions, `absorbing`, `convergent`).
+- **Key insight reversal:** First pass concluded "event modifiers constrain behavioral properties requiring runtime state." Second pass disproves this — events have rich graph-structural properties (source scope, outcome shape, target scope) that are fully compile-time provable from declared transition rows. The error was conflating "event modifier" with "event firing-history modifier."
+- **Strongest new candidates (Tier 1 additions):** `entry` (intake event pattern), `advancing`/`settling` (routing vs mutation dichotomy), `isolated` (single-state scope), `writeonce` (intake-data immutability), `sealed after <State>` (lifecycle-phase freeze point), `guarded` on states (entry safety).
+- **Most impactful discovery:** The `advancing`/`settling` split is the single most valuable modifier concept — it captures a fundamental domain distinction (routing events vs data-collection events) visible in every sample.
+- **Cross-cutting findings:** Four modifier roles identified (structural constraint, intent declaration, tooling directive, feature gate). Recommended Option C: modifiers must be either compile-time verifiable OR tooling-actionable.
+- **Philosophical question surfaced:** Does the project accept tooling-directive modifiers (`sensitive`, `audit`) or restrict to compile-time-provable properties? Recommended Option C as position; flagged for Shane's decision.
+- Updated recommendation tiers: 8 Tier 1 candidates, 14 Tier 2 candidates, 12 Tier 3 (reject/defer).
+
+### 2026-04-10 — Structural lifecycle modifiers research
+- Produced comprehensive research document at `research/language/expressiveness/structural-lifecycle-modifiers.md`.
+- **Taxonomy:** Mapped 5 modifier categories (boundary, path, residency, cardinality, safety) covering 6 candidate modifiers: `terminal`, `required`/`milestone`, `transient`, `final`, `once`, `idempotent`.
+- **Survey:** Compared 8 systems (XState, Step Functions, BPMN, Stateless, TLA+/Alloy, Temporal, UML, Cedar/OPA). Terminal/final states are the only modifier with broad cross-system precedent.
+- **Tiers:** `terminal` is Tier 1 (strong candidate — compile-time provable, clear `initial` parallel, zero runtime cost). `required`/`transient` are Tier 2 (interesting but guard-dependent false positives or weaker-than-expected guarantees). Event modifiers (`final`, `once`, `idempotent`) are Tier 3 (reject/defer — require runtime state or break row independence).
+- **Key insight:** State modifiers constrain graph-structural roles (compile-time provable). Event modifiers constrain behavioral properties (need runtime tracking). The asymmetry is fundamental, not incidental.
+- **Domain taxonomy decision:** Created new domain "Structural lifecycle modifiers" (domain #23 in domain-map). Not an extension of existing domains — it adds *new declarations* that create new provable properties, distinct from constraint composition (value constraints), static reasoning (proving from existing declarations), and entity modeling (data shape).
+- Updated `research/language/README.md` domain index and horizon domains list. Updated `research/language/domain-map.md` with domain #23 entry and priority assessment.
+
+### 2026-04-10 — Issue #31 shipped
+- PR #50 merged to main (squash SHA `305ec03`). Issue #31 closed. 775 tests passing.
+
+### 2026-04-10 - PR #50 final review — Issue #31 keyword logical operators
+
+**Verdict: APPROVED.** All 8 slices verified. 774/774 tests passing. Full review filed at `.squad/decisions/inbox/frank-31-review.md`.
+
+**Key architectural confirmation:** `BuildKeywordDictionary()` uses `symbol.All(char.IsLetter)` to auto-include `and`/`or`/`not` via reflection. Registered with `requireDelimiters: true` — whole-word safety against prefixes like `android` is architectural, not ad-hoc. Consistent with `contains` precedent.
+
+**ApplyNarrowing() confirmed updated** — all three arms (`"not"`, `"and"`, `"or"`) correctly updated at their respective pattern-match sites.
+
+**MCP is catalog-driven** — zero hardcoded operator strings. `TokenSymbol` attribute update is the only change needed; LanguageTool picks it up automatically.
+
+**Minor non-blocking gap:** `LanguageToolTests.LogicalOperatorsAreKeywordForms` asserts `&&` and `||` are absent, but does not assert `!` is absent. Not blocking because `!` was removed from the tokenizer entirely and has no path to the inventory.
+
+**Learnings:**
+- The attribute-driven `BuildKeywordDictionary()` + `requireDelimiters` is the correct mechanism for any future operator-to-keyword migrations. No tokenizer code changes are needed — only the `[TokenSymbol]` attribute value.
+- When reviewing logical operator migrations, `ApplyNarrowing()` is the easy-to-miss site — it uses pattern-match syntax (`{ Operator: "..." }` and string comparison) separately from the main type-checker switch. Both were correctly updated here.
+
+### 2026-04-10 - Issue #31 Slice 8 docs — PreceptLanguageDesign.md sync
+- Updated `docs/PreceptLanguageDesign.md` on branch `squad/31-keyword-logical-operators` to reflect #31 as fully implemented.
+- **Sections updated:** (1) "Keyword vs Symbol Design Framework" — migration table heading changed from "Implementation Pending" to "Implemented", table columns renamed from "Current/Target/Pending" to "Symbolic/Keyword/Implemented", removed "Until implementation" paragraph; (2) Reserved keywords list — removed "Pending additions (#31)" note, added `and`, `or`, `not` to the main keyword list; (3) Nullability and narrowing — updated Pattern 1 and Pattern 2 code examples from `&&`/`||` to `and`/`or`, updated prose labels and inline descriptions to match; (4) Expressions section — removed `pending migration` annotations, updated `!` → `not` and `&&`/`||` → `and`/`or` in bullet list; (5) Event asserts section and Minimal Example — updated `&&` → `and` in both code examples.
+- Committed as `03d50b7`, pushed to origin. PR #50 Slice 8 docs checkbox now checked.
+
+### 2026-04-10 - Philosophy Refresh Assessment — full research corpus review
+- Systematically reviewed all 32 files in `docs/research/language/` against the rewritten `docs/philosophy.md` (commits `dd14a4c` entity-first rewrite, `185e20b` governance strengthening).
+- Assessment written to `docs/research/language/philosophy-refresh-assessment.md`.
+- **Findings:** 16 files aligned, 14 need framing updates, 2 need significant refresh (`xstate.md`, one framing gap). No file contradicts the philosophy. Two cross-cutting problems dominate: (1) zero files use "governed integrity" — the philosophy's unifying principle; (2) 14 files don't consider data-only/stateless entities.
+- Identified 4 new research gaps: constraint patterns for data-only entities, Inspect/Fire semantics for stateless instances, governance-vs-validation positioning evidence, MDM/industry-standard comparison depth.
+- Recommended 16-file refresh order prioritized by impact × dependency.
+- Quality bar (`computed-fields.md`) confirmed as excellent research but needs minor framing update for governed integrity language and stateless entity implications.
+- Gold standard files: `entity-first-positioning-evidence.md`, `entity-modeling-surface.md`, `static-reasoning-expansion.md`.
+
+### 2026-04-08 - PR #48 code review — data-only precepts (Slices 1–7)
+- Reviewed `feature/issue-22-data-only-precepts` (commits e0eac05–833422e) against all 12 Q&A design decisions from `.squad/decisions/decisions.md`.
+- **Verdict: CHANGES REQUESTED.** All 12 decisions faithfully implemented (11 PASS, 1 ISSUE — Decision 11 sample files absent). Architecture is sound; no silent drift from design.
+- **Blocking issue:** `docs/PreceptLanguageDesign.md`, `docs/RuntimeApiDesign.md`, and `docs/McpServerDesign.md` are entirely missing stateless-precept documentation. This violates the project's non-negotiable doc-sync mandate.
+- **Required changes:** (1) Update three design docs before merge. (2) Add multi-event C49 test (Decision 10 contract untested: 3 events → 3 separate warnings).
+- **Code quality nits:** `DiagnosticCatalog.C55.MessageTemplate` used instead of `FormatMessage()` at PreceptRuntime.cs:1824; `currentState!` null-forgiving in MCP tool stateful branches; null-forgiving on `InitialState!` in `CollectCompileTimeDiagnostics` relies on implicit guard.
+- **Recommendations (non-blocking):** Add explicit `IsStateless` guard before "2. Validate initial state asserts" block; add at least one sample `.precept` file (Decision 11 placeholder names are fine); add `in State edit all` engine test; replace `MessageTemplate` with `FormatMessage()` on C55.
+- Full review filed at `.squad/decisions/inbox/frank-pr48-review.md`.
+
+### 2026-04-08 - Issue #22 semantic rules review (4 spawns)
+- Reviewed and rewrote #22 semantic rules for stateless precepts across 4 spawns: (1) decomposed the "states, events, and transitions forbidden" rule — states tautological, transitions structurally impossible, events the only real boundary; (2) deep analysis of stateless event boundary — confirmed binary taxonomy (data vs. behavioral), no middle tier, single-state escape hatch is correct not ceremonial; (3) warning model research — audited C48–C53 diagnostic infrastructure, external precedent survey; (4) full #22 issue body rewrite.
+- **Owner decision (Shane):** events-without-states = warning (not error). C50 upgraded from hint to warning for consistency. Binary taxonomy confirmed.
+- Wrote `frank-stateless-event-boundary.md` and `frank-warning-model-research.md` to decisions inbox; both merged into decisions.md by Scribe.
+
+### 2026-04-08 - Language research corpus completed
+- Closed the domain-first corpus with the final sweep in `3cc5343`, keeping `docs/research/language/domain-map.md` as the canonical map and leaving proposal bodies untouched.
+- The finished corpus now spans Batch 1 `54a77da`, Batch 2 `48860ae`, and the final corpus/index pass `3cc5343`, while preserving `computed-fields.md` as the quality bar and keeping horizon domains visible.
+
+### 2026-04-08 - Language research corpus map locked
+- Preserved `docs/research/language/domain-map.md` as the canonical research-corpus map and kept the corpus organized by domain rather than by issue.
+- Held the session guardrails: no proposal-body edits during corpus curation, `computed-fields.md` remains the quality bar, and horizon domains stay in scope even before proposals exist.
+- The alternate map-file experiment was folded back out; Batch 1 research landed in `54a77da`, Batch 2 landed in `48860ae`, and only Batch 3 plus the final README/index sweep remain.
 
 ### 2026-04-07 - PR #35 merge: finalize README cleanup and record Squad decision
 - Merged PR #35 (chore: finalize README cleanup and record Squad decision) to `main`.
@@ -78,7 +209,84 @@
 - Finalized the proposal framing around rule <Name> when <BoolExpr> with reuse in when, invariant, and state assert, but not on <Event> assert.
 - Elevated philosophy fit and non-programmer readability from soft preferences to explicit review gates.
 
+### 2026-04-08 - Issue #17 computed fields proposal revamp
+- Revamped `temp/issue-body-rewrites/17.md` to incorporate all findings from the research document and all 7 team re-reviews.
+- Resolved all 6 semantic contracts from the research: scope boundary, recomputation timing (Fire+Update+Inspect), nullability/accessor safety, dependency ordering, writeability/external input, tooling surface.
+- Used Steinbrenner's default-if-skipped options: (a) conservative nullable rejection, (a) `.count` only for collection accessors, (a) Terraform-model external input rejection, (a) single pass after all mutations.
+- Added 3 new locked decisions (#9 nullable conservative rejection, #10 external input rejection, #11 `.count`-only collection accessor restriction).
+- Expanded locked decision #8 from Fire-only to all three pipelines citing George's `CommitCollections` analysis.
+- Added `->` dual-use acknowledgment note to locked decision #1.
+- Replaced "Open Questions: None" with a "Resolved decisions" table mapping all 6 research contracts to locked decisions.
+- Changed wave from "Wave 4: Compactness + Composition" to "Composition" framing per Steinbrenner's recommendation.
+- Added new sections: Tooling surface (hover, MCP compile, inspect/fire, completions), Teachable error messages (9 scenarios), Before/after example using travel-reimbursement, Interleaved fields examples, `->` reading guide callout.
+- Surfaced the research's cross-category positioning claim in Motivation section.
+- Added spreadsheet mental model sentence to Summary.
+- Linked research document in Research and rationale links.
+- Expanded Explicit exclusions with: silent default fallbacks, writable computed fields, null-coalescing operator, unsafe collection accessors. Merged fixed-point evaluation with cycle detection.
+- Expanded acceptance criteria from 19 to 37 items, organized by category (parser, type checker, runtime, LS, MCP, general). Added all items from Soup Nazi's must-add and should-add lists plus Uncle Leo's blockers.
+- Expanded implementation scope from 10 to 16 items covering nullable validation, accessor safety, Update pipeline, external input rejection, LS filtering, MCP specifics.
+
+### 2026-04-08 - Issue #22 semantic rule review for Shane
+- Reviewed the "states, events, and transitions forbidden in stateless precepts" semantic rule at Shane's request before implementation.
+- Confirmed Shane's critique that the "states forbidden" and "transitions forbidden" parts are tautological/redundant — the real design decision is the events boundary.
+- The issue body already acknowledges the tautology in the exclusions section ("this exclusion is tautological") but contradicts itself in the semantic rules section by framing it as a prohibition. Recommended rewrite to eliminate the contradiction.
+- Key architectural insight: the only non-trivial semantic boundary is events. Events are forbidden because they dispatch transitions between states (a semantic dependency), not because of a tautology or structural impossibility. This is a real design choice with a potential future evolution path (stateless event-triggered mutations), deliberately closed for now.
+
+### 2026-04-08 - Stateless event boundary deep analysis
+- Shane flagged the revised #22 semantic rules as "a slippery slope." Conducted deep analysis of whether events should be forbidden in stateless precepts.
+- **Recommendation: events require states. The binary taxonomy (data vs. behavioral) is correct.** The "middle tier" (data + events, no states) is a category error, not a missing feature.
+- Key insight: events in Precept are not generic triggers — they are routed through states via `from State on Event -> Outcome`. The `from` is the routing context, not decoration. Events without routing are a different concept ("commands") that would need parallel syntax, semantics, and tooling.
+- The single-state escape hatch (`state Active initial`) is correct, not ceremonial: it communicates "this entity has exactly one behavioral mode" — a true structural statement, not dummy ceremony. Cost: 1 line.
+- Precedent survey confirms no surveyed system (Terraform, SQL, DDD, GraphQL, Protobuf) provides "data entity with named commands but no lifecycle." Every system with named commands routes them through a behavioral layer.
+- The slippery slope concern is acknowledged but self-correcting: the escape hatch is cheap enough that demand for stateless events won't reach critical mass.
+- Decision filed at `.squad/decisions/inbox/frank-stateless-event-boundary.md`.
+
 ## Learnings
+
+### 2026-04-11 - Issue #14 final approval — all 4 forms as unified wave
+
+- Produced definitive unified design sign-off for all four `when <guard>` forms (invariants, state asserts, event asserts, conditional edit eligibility) as a single implementation wave. Filed at `.squad/decisions/inbox/frank-issue14-final-approval.md`.
+- **All 4 forms APPROVED.**
+- **Semantic tension between Forms 1–3 (constraint-skip) and Form 4 (permission-grant) is not an inconsistency.** The directionality difference follows from the nature of the two declaration types: constraints default to applying everywhere and are scoped downward; edit permissions default to denied everywhere and are granted upward. `when <guard>` means "conditional on this boolean" in all cases — what "conditional" implies operationally follows the declaration kind. Teaching model holds uniformly.
+- **Fail-closed is non-negotiable for Form 4 and must be explicitly contracted in the issue.** Guards on edit blocks are permission grants. Granting access on evaluation error = fail-open permission system = never acceptable. Must specify: guard evaluation error → treat as false → field not granted.
+- **Scope-inherited conditioning holds cleanly for all 4 forms.** Form 4 edit guards are definitionally field-scoped — there is no current event during `Update`, so event args cannot be referenced. The distinction does not blur anywhere. Type checker must emit diagnostic for any edit guard that references event-arg identifiers.
+- **New prerequisite identified for Form 4: Elaine coordination on dynamic editability.** With guarded edit blocks, the editable field set can change as data values change (guard truth changes). The preview inspector already handles dynamic field lists, but UX treatment of fields appearing/disappearing mid-edit must be explicitly designed before Form 4 ships.
+- **Hydration reorder (moving `HydrateInstanceData` to start of `Update` and `Inspect(patch)`) is the primary regression risk** when including Form 4. George's analysis confirms it's a structural rearrangement with no semantic change (pure read). Risk is bounded and acceptable.
+- **The deferral was scope-splitting, not design rejection.** Form 4 is the same design principle as Forms 1–3 — the same `when <guard>` conditional semantics applied to a different declaration kind. The additive approach (static dict unchanged, guarded blocks in separate structure evaluated at call time) dissolves the original structural obstacle. No new conceptual risks.
+
+### 2026-04-11 - Form 4 additive approach design review
+
+- Analyzed Shane's proposed additive approach for `in State when <guard> edit <fields>` (Form 4, Issue #14).
+- **Verdict: additive approach is semantically sound. No design-level concerns justify continued deferral.**
+- Conjunctive semantics (in-state AND guard-true) are preserved by the two-pass union: unconditional fields from static dict + guarded fields from per-call guard evaluation. Union doesn't undermine conjunct because state filter is applied before guard filter.
+- **Guard failure → fail-closed** is the correct default. Guards on edit blocks are permission grants, not constraint gates. Fail-open on error would be a broken permission system. Must be explicitly specified in the follow-on issue.
+- **`in any when <guard> edit`** — use the same construction-time expansion that unconditional `any` already uses. No sentinel handling needed at call sites. Consistent with existing pattern.
+- UneditableField message disambiguation (why the field is not editable: not-declared vs. wrong-state vs. guard-false) is an implementation quality decision, not a design requirement. Not a deferral criterion.
+- **The deferral was always implementation-scoping, not design.** Form 4 is semantically identical to Forms 1–3 — the same `when <guard>` conditional semantics applied to a different declaration kind. The static dict was the only structural obstacle; the additive approach removes it without touching the existing path.
+- Three spec requirements must appear in the follow-on issue: (1) fail-closed guard evaluation contract, (2) `any` pre-expansion strategy, (3) Elaine coordination on dynamic editability (fields appear/disappear with guard truth value — intended behavior, UX contract needs to handle it).
+- Filed: `.squad/decisions/inbox/frank-issue14-form4-design.md`.
+
+### 2026-04-08 - Warning model research for structurally degenerate precepts
+- Audited the full diagnostic infrastructure: `ConstraintSeverity` enum (Error/Warning/Hint), `DiagnosticCatalog.cs` constraints C48–C53, `PreceptAnalysis.cs` graph analysis, and the language server's `MapValidationDiagnostic` severity mapping. All three tiers are fully wired and operational.
+- The type checker (`PreceptTypeChecker.cs`) does zero reachability analysis — all graph-level structural analysis lives in `PreceptAnalysis.cs` as a separate analysis phase.
+- Single-state precepts with events and no state-changing transitions already trigger **C50 (hint)**: "State 'Active' has outgoing transitions but all reject or no-transition — no path forward." This is the correct severity — hint, not warning — because the pattern is legitimate (counters, rate tables, config entities with audit ops).
+- External precedent strongly supports Precept's existing model: C#/Rust/TypeScript treat unreachable code as warnings; state machine tools either don't detect unreachable states or flag as warnings; SQL is silent on degenerate constraints. No surveyed system errors on structurally degenerate but type-correct constructs.
+- **Key conclusion:** The existing diagnostic infrastructure already handles Shane's scenario correctly. No changes needed to severity assignments. The "events require states" hard error is correct (category boundary), and the single-state escape hatch produces a hint (C50) rather than silence. The system is honest without being punitive.
+- Decision filed at `.squad/decisions/inbox/frank-warning-model-research.md`.
+
+### 2026-04-08 - Proposal revamp process
+- When research identifies semantic contracts and multiple reviewers converge on the same gaps, the work is bounded editing rather than rethinking. The 7 reviews all pointed to the same 3-4 core gaps — the volume of reviews was higher than the volume of actual decisions needed.
+- Steinbrenner's "default-if-skipped" pattern is valuable: each gate decision has a clearly stated default, so the editing pass can proceed without blocking on explicit Shane sign-off for each one.
+
+### 2026-04-08 - Rationale pass on computed fields proposal
+- Added "Why" rationale to all 11 locked design decisions in `temp/issue-body-rewrites/17.md`. Each decision now includes alternatives considered, precedent citations, tradeoff accepted, and the philosophy principle it serves.
+- Incorporated Shane's 3 specific design points:
+  1. **Non-nullable inputs (#9):** Documented that Precept is stricter than all 24 surveyed systems. Those systems all have null-handling operators (COALESCE, BLANKVALUE, etc.); we don't — so conservative rejection is the only sound choice. Practical impact near zero (all numeric fields in samples are non-nullable with defaults).
+  2. **No constraints on computed values (#4):** Clarified that invariants already CAN reference computed fields, which covers output validation. Field-level constraints are the wrong abstraction because they validate externally-supplied data — computed fields have no external supply path. Determinism isn't threatened either way; the choice is about mechanism clarity.
+  3. **Inspect recomputation (#8 + semantic rules):** Reworded to clarify that Inspect operates on a clone — recomputation is simulated on a working copy, consistent with how Inspect already simulates `set` mutations. Skipping recomputation would break Inspect's preview contract (disagreement with Fire on constraint results).
+- Also added rationale to semantic rules section and expanded exclusions with brief "because" statements.
+- Key learning: proposals that state WHAT without WHY are incomplete. The research doc had all the evidence — the gap was in surfacing the key "because" statement at each decision point in the proposal itself.
+- Error message tables are a force multiplier: each row simultaneously specifies a compile error, documents the user-facing UX, and implicitly defines an acceptance criterion. Elaine was right that these are the primary learning surface.
 
 ### 2026-05-18 - Philosophy draft terminology correction
 - Corrected `design/brand/research/philosophy-draft-v2.md` to use actual DSL construct names in concept lists: fields, states, events, invariants, and assertions. `guard` remains acceptable only as informal prose or as the inline `when` condition concept, not as a top-level declared construct.
@@ -195,6 +403,16 @@
 - **Record/structured types conflict with Precept's flat model** — FEEL has `context`, Cedar has `Record`, but both serve different architectural goals. Precept's rejection of structured types is validated.
 - **Proposal #25 is well-calibrated** — `choice` and `date` are the two highest-value additions. The rejections (datetime, structured types, overengineered duration) are validated by the survey.
 - Research written to `docs/research/language/references/type-system-survey.md`.
+
+### 2026-04-08 - Severity consistency challenge on stateless event boundary
+- Shane challenged the severity inconsistency: zero-states+events=error vs single-state+events+no-transitions=hint. "Same structural degeneration, different severities."
+- Confronted the argument honestly. The premise is factually wrong: the two scenarios are NOT structurally identical. MCP Fire confirmed single-state events produce **NoTransition** outcomes (real firing, real mutations, Count 3→4). Zero-state events would produce **Undefined** (no firing, no mutations, nothing).
+- The scenarios share only 1 of 5 behavioral dimensions (no state change). They diverge on event firing, action execution, field mutation, and outcome production. "No state movement" ≠ "no useful dispatch surface."
+- The API-level argument is even stronger: `Fire(currentState, event)` and `Inspect(currentState)` require a `currentState` parameter. No states → no valid API input. Events become not just useless but **unaddressable** — the runtime pipeline has no entry point for them.
+- The orphaned-event analogy (C49=warning) doesn't apply: orphaned events have *accidentally missing* routing (add a `from` row to fix). Events-without-states have *structurally impossible* routing (must change the precept's category to fix).
+- **Position confirmed: error is correct.** Revised the justification from "category boundary" (hand-wavy) to "unfulfillable contract — events are unaddressable without states, and the Fire/Inspect APIs are structurally incompatible with statelessness."
+- Updated `.squad/decisions/inbox/frank-stateless-event-boundary.md` with addendum.
+
 ## Language Design Expertise — Deep Study (2026-04-05)
 
 ### A. PreceptLanguageDesign.md — Complete Internalization
@@ -287,6 +505,16 @@ Each exclusion removes complexity that Superpower would struggle with (indentati
 - FEEL/DMN: Strongest external comparator for business-rule DSL expression design. Has ternary, string functions, numeric functions, range membership.
 - Cedar (AWS): Strongest counter-precedent. Deliberately omits division and most math for formal analyzability.
 
+### 2026-04-11 — Issue #14 design verdict: `when <guard>` on declarations — APPROVED (Forms 1–3)
+
+- **Philosophy fit is pre-confirmed, not just defensible.** `docs/philosophy.md` explicitly states "guarded invariants do not weaken the guarantee; they make it precise." When a proposal implements what the philosophy already describes rather than extending it, the philosophy-fit finding is trivially GREEN. Note this explicitly in review to prevent any confusion about scope.
+- **Scope-inherited conditioning is industry-standard.** Zero surveyed systems allow cross-scope guard conditions (FluentValidation guards reference entity properties; Drools guards reference fact properties; Cedar guards reference policy attributes; Alloy facts reference signature fields). The scope-inheritance principle is not a Precept invention — it is the established practice across all production constraint systems.
+- **Implementation constraints ≠ design flaws.** All three reviewers' "blockers" are implementation scope questions: narrowing unsoundness (`WhenGuard is null` filter) is a type-checker implementation invariant; compile DTO gap is prerequisite parallel work; Form 4 static-dictionary mismatch is an architectural scope split best filed as a follow-on issue. None require proposal revision. Classify correctly.
+- **B3 (research files absent) was a false blocker caused by wrong path prefixes in the issue body.** The proposal cited `docs/research/language/...` paths; the actual paths are `research/language/...`. Always verify research file existence directly via `file_search` rather than trusting issue body citations. Corrected the issue body in the same session.
+- **The planned analysis docs (`frank-constraint-scoping-symmetry.md`, `frank-event-assert-when-reversal.md`) were cited in the issue as if existing but had not been produced.** Their substance was covered inline in the review itself (G5 and G6). If a review covers the substance of a planned document, the review IS the document — do not block on materializing the file separately.
+- **Event assert `when` reversal was the most important finding.** The prior position (exclude `on <Event> assert` from `when` coverage) was an overcorrection. The correct boundary is scope-scoped, not declaration-type-scoped. Arg-only guards on event asserts are within-scope → permitted. The teaching model becomes uniform: "every constraint declaration accepts `when`; the guard lives in the same scope as the constraint."
+- **Form 4 conjunctive semantics are architecturally sound but require a different runtime pattern.** `in State when guard edit` — state AND guard must hold. Both are independent filters. The concept is philosophically grounded; the implementation gap is that `_editableFieldsByState` is static. Per-call guard evaluation is the correct strategy for Form 4; a separate issue preserves scope discipline.
+
 **Expression audit highlights:** No ternary (row duplication across 14+ samples), no string `.length` (table-stakes gap), no function calls, no named guards. Current expression surface covers: arithmetic, logical, comparison, contains, collection accessors.
 
 **Verbosity analysis:** Three top smells: event-argument ingestion boilerplate, guard-pair duplication, non-negative constraint boilerplate. Map to proposals #11 (absorb), #12 (else reject), #13 (field constraints).
@@ -309,3 +537,18 @@ All proposals are additive and Superpower-compatible. No structural redesign req
 - 2026-05-01: validate DSL capability claims with MCP tools before writing research, and benchmark new expression ideas against both FEEL and Cedar.
 - 2026-04-07: for PRs on dirty branches, commit the relevant work first, push with upstream tracking, and use explicit base/head flags to avoid routing mistakes.
 - 2026-04-05: sequence language proposals by containment risk; anything that pressures keyword-anchored flat statements or first-match routing needs extra architectural scrutiny before implementation.
+
+### 2026-04-08 - Issue #22 full rewrite incorporating warning model decisions
+- Rewrote the complete #22 issue body at Shane's request, incorporating all session decisions: events-without-states = warning (Shane's override of Frank's error recommendation), C50 severity upgrade from hint to warning, tautological/structurally-impossible rules dropped from semantic rules.
+- Folded the "Design philosophy thread" section into Summary and Motivation per Shane's conciseness directive. Philosophy argument survives as the Summary's second paragraph; domain fragmentation and progressive disclosure stay in Motivation but tighter.
+- Added locked decision #7 (warning model) with full 4-part rationale: consistency with C49/C50, why C50-as-hint was too lenient, precedent from C#/Rust unreachable-code warnings.
+- Restructured Exclusions into 4 categories: states (definitional boundary, no rule needed), transitions (structurally impossible via C54), events (active design decision — warning per locked decision #7), preview (deferred).
+- Updated implementation scope: removed "reject events/transitions in stateless context" parser items, added analysis-phase items for new warning diagnostic and C50 severity upgrade.
+- Updated acceptance criteria: events-without-states produces warning (not error), C50 severity = warning, transitions in stateless fail existing C54.
+- Key writing lesson: conciseness requires structural discipline — say each argument once in the section where it belongs, then reference it elsewhere. The old issue repeated the philosophy argument in Summary, Motivation, Design Philosophy Thread, and Locked Decisions. The rewrite eliminates that redundancy without losing the argument.
+
+### 2026-04-11 — Issue #14 design review filed
+- Conducted the full design/architecture review for Issue #14 (`when <guard>` on declarations) on 2026-04-11. Filed at `.squad/decisions/inbox/frank-issue14-design-review.md`; merged into `.squad/decisions.md`.
+- **Verdict: APPROVED for Forms 1–3.** Form 4 (`in State when guard edit`) deferred to a follow-on issue — concept is sound, implementation requires per-call guard evaluation rather than static dictionary.
+- B3 (research base absent) cleared: both cited research files confirmed present at `research/language/expressiveness/conditional-logic-strategy.md` and `research/language/references/conditional-invariant-survey.md`. Issue body had wrong `docs/` path prefix — corrected in the same session.
+- All six locked design decisions upheld as architecturally sound. No philosophy gaps found. Zero grammar changes required.

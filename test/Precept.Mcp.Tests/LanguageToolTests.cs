@@ -84,19 +84,28 @@ public class LanguageToolTests
     }
 
     [Fact]
-    public void ExpressionScopesHasFiveEntries()
+    public void ConstraintsIncludeBuiltInFunctionTypeCheckingRange()
     {
         var result = LanguageTool.Run();
 
-        result.ExpressionScopes.Should().HaveCount(5);
+        result.Constraints.Select(constraint => constraint.Id)
+            .Should().Contain(["C71", "C72", "C73", "C74", "C75", "C76", "C77"]);
     }
 
     [Fact]
-    public void FirePipelineHasSixStages()
+    public void ExpressionScopesHasSixEntries()
     {
         var result = LanguageTool.Run();
 
-        result.FirePipeline.Should().HaveCount(6);
+        result.ExpressionScopes.Should().HaveCount(6);
+    }
+
+    [Fact]
+    public void FirePipelineHasSevenStages()
+    {
+        var result = LanguageTool.Run();
+
+        result.FirePipeline.Should().HaveCount(7);
     }
 
     [Fact]
@@ -105,6 +114,48 @@ public class LanguageToolTests
         var result = LanguageTool.Run();
 
         result.OutcomeKinds.Should().HaveCount(6);
+    }
+
+    [Fact]
+    public void LogicalOperatorsAreKeywordForms()
+    {
+        var result = LanguageTool.Run();
+        var symbols = result.Vocabulary.Operators.Select(o => o.Symbol).ToList();
+
+        symbols.Should().Contain("and", "logical AND should be keyword 'and', not '&&'");
+        symbols.Should().Contain("or", "logical OR should be keyword 'or', not '||'");
+        symbols.Should().Contain("not", "logical NOT should be keyword 'not', not '!'");
+        symbols.Should().NotContain("&&", "symbolic && must not appear in the operator inventory");
+        symbols.Should().NotContain("||", "symbolic || must not appear in the operator inventory");
+        symbols.Should().NotContain("!", "symbolic ! must not appear in the operator inventory");
+    }
+
+    [Fact]
+    public void TypeKeywordsIncludeIntegerDecimalChoice()
+    {
+        var result = LanguageTool.Run();
+
+        result.Vocabulary.TypeKeywords.Should().Contain("integer");
+        result.Vocabulary.TypeKeywords.Should().Contain("decimal");
+        result.Vocabulary.TypeKeywords.Should().Contain("choice");
+    }
+
+    [Fact]
+    public void ConstraintKeywordsIncludeMaxplacesAndOrdered()
+    {
+        var result = LanguageTool.Run();
+
+        result.Vocabulary.ConstraintKeywords.Should().Contain("maxplaces");
+        result.Vocabulary.ConstraintKeywords.Should().Contain("ordered");
+    }
+
+    [Fact]
+    public void ConstructsIncludeRoundFunction()
+    {
+        var result = LanguageTool.Run();
+
+        result.Constructs.Should().Contain(c => c.Description.Contains("built-in function"),
+            "function-call construct must be registered in the construct catalog");
     }
 
     [Fact]
@@ -118,5 +169,28 @@ public class LanguageToolTests
         var deserialized = System.Text.Json.JsonSerializer.Deserialize<LanguageResult>(json);
         deserialized.Should().NotBeNull();
         deserialized!.Vocabulary.ControlKeywords.Should().HaveCount(result.Vocabulary.ControlKeywords.Count);
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Conditional expressions (issue #9)
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void ControlKeywordsIncludeConditionalExpressionTokens()
+    {
+        var result = LanguageTool.Run();
+
+        result.Vocabulary.ControlKeywords.Should().Contain("if");
+        result.Vocabulary.ControlKeywords.Should().Contain("then");
+        result.Vocabulary.ControlKeywords.Should().Contain("else");
+    }
+
+    [Fact]
+    public void ConstraintsIncludeConditionalExpressionRange()
+    {
+        var result = LanguageTool.Run();
+
+        result.Constraints.Select(c => c.Id)
+            .Should().Contain(["C78", "C79"]);
     }
 }

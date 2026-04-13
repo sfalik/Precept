@@ -58,6 +58,14 @@ Editable field declarations use the `in` preposition ("while residing in a state
 in <any|StateA[,StateB...]> edit <FieldName>, <FieldName>, ...
 ```
 
+A conditional form accepts a `when` guard between the state target and `edit`:
+
+```text
+in <any|StateA[,StateB...]> when <Guard> edit <FieldName>, <FieldName>, ...
+```
+
+Where `<Guard>` is a boolean expression over entity fields.
+
 Each field name in the list declares that field as editable in the specified state(s). This is a flat, keyword-anchored statement — consistent with all other Precept declarations.
 
 ### Examples
@@ -98,6 +106,25 @@ Multi-state `in` is already supported for state asserts (`in Open, InProgress as
 
 `in any edit` makes the listed fields editable in every declared state, including terminal states. `any` means any — no special exclusions.
 
+### Root-level editability (stateless precepts)
+
+Stateless precepts (no `state` declarations) use root-level `edit` declarations without the `in <StateTarget>` prefix:
+
+```precept
+# All fields are editable
+edit all
+
+# Specific fields are editable
+edit Field1, Field2
+```
+
+- `edit all` — the `all` sentinel is stored as `["all"]` in `FieldNames`. At engine construction, `ExpandEditFieldNames()` expands `["all"]` to every declared scalar and collection field name. This is a stateless-only shorthand for "every field the precept declares."
+- `edit Field1, Field2` — only the listed fields are editable. The remaining fields are read-only.
+
+**Relationship to state-scoped edit:** Root-level `edit` is only valid for stateless precepts. Using it alongside `state` declarations produces **C55 (compile Error)**: `"Root-level 'edit' is not valid when states are declared."` For stateful precepts, use `in any edit all` or `in <State> edit <Fields>`.
+
+**Access:** At runtime, `Update` on a stateless instance uses `_rootEditableFields` as the editable field set. `BuildEditableFieldInfosForStateless()` surfaces root-editable fields in the `Inspect(instance)` aggregate result.
+
 ## Semantics
 
 ### Additive across blocks
@@ -125,6 +152,15 @@ Edit declarations and event transitions are independent features. A field can be
 ### No special terminal state treatment
 
 `in any edit` includes terminal states (states with no outgoing transitions). If the author wants to exclude a terminal state, they list states explicitly instead of using `any`.
+
+### Conditional editability
+
+`in <State> when <Guard> edit <Field>` makes fields conditionally editable based on current instance data. The guard is a boolean expression over entity fields, evaluated dynamically at each `Update` or `Inspect` call.
+
+- **Additive:** Static fields (from unconditional `in <State> edit`) + dynamic fields (from guarded blocks whose guard passes) = effective editable set for the state.
+- **Fail-closed:** If a guard expression evaluation fails (expression error, missing data, non-boolean result), the guarded fields are NOT granted editability. This prevents data integrity holes from expression evaluation edge cases.
+- **Dynamic evaluation:** Guards are evaluated at each `Update` / `Inspect` call with current instance data — the editable set can change as data changes.
+- **Guard scope:** Entity fields only (same as unconditional edit declarations). C69 fires for out-of-scope references in the guard expression.
 
 ### Fields without rules
 
@@ -156,12 +192,14 @@ The parser produces one `PreceptEditBlock` per `(State, FieldNames)` grouping:
 
 ```csharp
 public sealed record PreceptEditBlock(
-    string State,
+    string? State,          // null for root-level (stateless) edit declarations
     IReadOnlyList<string> FieldNames,
+    string? WhenText = null,
+    PreceptExpression? WhenGuard = null,
     int SourceLine = 0);
 ```
 
-When `in any edit` is used, the parser expands `any` into one `PreceptEditBlock` per declared state (same expansion pattern as `in any assert`). When `in State1, State2 edit` is used, the parser creates one `PreceptEditBlock` per listed state.
+`State` is `null` for root-level `edit` declarations (stateless precepts). `WhenText` and `WhenGuard` are populated when the declaration includes a `when` clause. When `in any edit` is used, the parser expands `any` into one `PreceptEditBlock` per declared state. When `in State1, State2 edit` is used, the parser creates one `PreceptEditBlock` per listed state.
 
 ### `PreceptDefinition` extension
 
@@ -169,7 +207,7 @@ When `in any edit` is used, the parser expands `any` into one `PreceptEditBlock`
 public sealed record PreceptDefinition(
     string Name,
     IReadOnlyList<PreceptState> States,
-    PreceptState InitialState,
+    PreceptState? InitialState,         // nullable — null for stateless precepts
     IReadOnlyList<PreceptEvent> Events,
     IReadOnlyList<PreceptTransitionRow> TransitionRows,
     IReadOnlyList<PreceptField> Fields,
@@ -177,17 +215,31 @@ public sealed record PreceptDefinition(
     IReadOnlyList<PreceptInvariant>? Invariants = null,
     IReadOnlyList<StateAssertion>? StateAsserts = null,
     IReadOnlyList<EventAssertion>? EventAsserts = null,
-    IReadOnlyList<PreceptEditBlock>? EditBlocks = null);  // <-- NEW
+    IReadOnlyList<PreceptEditBlock>? EditBlocks = null);
 ```
+
+`IsStateless` is a computed property: `States.Count == 0`.
 
 ### `PreceptEngine` — editability map
 
-At compile time, `PreceptEngine` builds an internal editability map:
+At compile time, `PreceptEngine` builds two internal editability structures:
 
 ```csharp
+// State-scoped edit (stateful precepts): state name → set of editable field names
 private readonly IReadOnlyDictionary<string, HashSet<string>> _editableFieldsByState;
-// Key: state name → Value: set of editable field names (union of all matching edit blocks)
+
+// Guarded edit blocks — evaluated per-call against current instance data
+private readonly IReadOnlyList<PreceptEditBlock> _guardedEditBlocks;
+
+// Root-level edit (stateless precepts): set of editable field names, or null if none declared
+private HashSet<string>? _rootEditableFields;
 ```
+
+`_rootEditableFields` is populated from `PreceptEditBlock` entries where `State == null`. The `ExpandEditFieldNames()` private helper expands `["all"]` to all scalar and collection field names. `BuildEditableFieldInfosForStateless()` is used by `Inspect(instance)` to surface root-editable fields for stateless instances.
+
+`_guardedEditBlocks` contains edit blocks where `WhenGuard != null`. The constructor routes these blocks to `_guardedEditBlocks` instead of `_editableFieldsByState`. At runtime, `EvaluateGuardedEditFields(state, data)` iterates guarded blocks matching the current state, evaluates each guard fail-closed (guard error → field not granted), and returns the union of passing field names. The static + guarded fields are unioned to produce the effective editable set.
+
+At runtime, `Update` Stage 1 branches on `IsStateless`: stateless instances pull the editable field set from `_rootEditableFields`; stateful instances use the `_editableFieldsByState` lookup unioned with guarded edit results.
 
 This precomputed map makes `Update` validation O(1) per field.
 

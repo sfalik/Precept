@@ -5,7 +5,7 @@ namespace Precept;
 public sealed record PreceptDefinition(
     string Name,
     IReadOnlyList<PreceptState> States,
-    PreceptState InitialState,
+    PreceptState? InitialState,
     IReadOnlyList<PreceptEvent> Events,
     IReadOnlyList<PreceptField> Fields,
     IReadOnlyList<PreceptCollectionField> CollectionFields,
@@ -15,7 +15,11 @@ public sealed record PreceptDefinition(
     IReadOnlyList<EventAssertion>? EventAsserts = null,
     IReadOnlyList<PreceptTransitionRow>? TransitionRows = null,
     IReadOnlyList<PreceptEditBlock>? EditBlocks = null,
-    int SourceLine = 0);
+    int SourceLine = 0,
+    IReadOnlyList<string>? ComputedFieldOrder = null)
+{
+    public bool IsStateless => States.Count == 0;
+}
 
 public sealed record PreceptState(
     string Name,
@@ -33,19 +37,36 @@ public sealed record PreceptEventArg(
     PreceptScalarType Type,
     bool IsNullable,
     bool HasDefaultValue = false,
-    object? DefaultValue = null);
+    object? DefaultValue = null,
+    IReadOnlyList<FieldConstraint>? Constraints = null,
+    IReadOnlyList<string>? ChoiceValues = null,
+    bool IsOrdered = false,
+    int SourceLine = 0);
 
 public sealed record PreceptField(
     string Name,
     PreceptScalarType Type,
     bool IsNullable,
     bool HasDefaultValue = false,
-    object? DefaultValue = null);
+    object? DefaultValue = null,
+    IReadOnlyList<FieldConstraint>? Constraints = null,
+    IReadOnlyList<string>? ChoiceValues = null,
+    bool IsOrdered = false,
+    int SourceLine = 0,
+    PreceptExpression? DerivedExpression = null,
+    string? DerivedExpressionText = null)
+{
+    /// <summary>True when this field is computed (has a derived expression).</summary>
+    public bool IsComputed => DerivedExpression is not null;
+}
 
 public sealed record PreceptCollectionField(
     string Name,
     PreceptCollectionKind CollectionKind,
-    PreceptScalarType InnerType);
+    PreceptScalarType InnerType,
+    IReadOnlyList<FieldConstraint>? Constraints = null,
+    IReadOnlyList<string>? ChoiceValues = null,
+    int SourceLine = 0);
 
 
 public enum PreceptCollectionKind
@@ -55,25 +76,73 @@ public enum PreceptCollectionKind
     Stack
 }
 
+/// <summary>
+/// A single declaration-level constraint attached to a field, collection field, or event argument.
+/// Constraints desugar to <c>invariant</c> / <c>on E assert</c> at parse time.
+/// </summary>
+public abstract record FieldConstraint
+{
+    private FieldConstraint() { }
+
+    /// <summary>Value must be &gt;= 0.</summary>
+    public sealed record Nonnegative : FieldConstraint;
+
+    /// <summary>Value must be &gt; 0.</summary>
+    public sealed record Positive : FieldConstraint;
+
+    /// <summary>Value must be &gt;= <see cref="Value"/>.</summary>
+    public sealed record Min(double Value) : FieldConstraint;
+
+    /// <summary>Value must be &lt;= <see cref="Value"/>.</summary>
+    public sealed record Max(double Value) : FieldConstraint;
+
+    /// <summary>String or collection must not be empty.</summary>
+    public sealed record Notempty : FieldConstraint;
+
+    /// <summary>String length must be &gt;= <see cref="Value"/>.</summary>
+    public sealed record Minlength(int Value) : FieldConstraint;
+
+    /// <summary>String length must be &lt;= <see cref="Value"/>.</summary>
+    public sealed record Maxlength(int Value) : FieldConstraint;
+
+    /// <summary>Collection count must be &gt;= <see cref="Value"/>.</summary>
+    public sealed record Mincount(int Value) : FieldConstraint;
+
+    /// <summary>Collection count must be &lt;= <see cref="Value"/>.</summary>
+    public sealed record Maxcount(int Value) : FieldConstraint;
+
+    /// <summary>Value must have at most <see cref="Places"/> decimal places. Decimal fields only.</summary>
+    public sealed record Maxplaces(int Places) : FieldConstraint;
+}
+
 public enum PreceptScalarType
 {
     String,
     Number,
     Boolean,
-    Null
+    Null,
+    Integer,   // #29
+    Decimal,   // #27 (scaffold)
+    Choice,    // #25 (scaffold)
 }
 
 public abstract record PreceptExpression;
 
 public sealed record PreceptLiteralExpression(object? Value) : PreceptExpression;
 
-public sealed record PreceptIdentifierExpression(string Name, string? Member = null) : PreceptExpression;
+public sealed record PreceptIdentifierExpression(string Name, string? Member = null, string? SubMember = null) : PreceptExpression;
 
 public sealed record PreceptUnaryExpression(string Operator, PreceptExpression Operand) : PreceptExpression;
 
 public sealed record PreceptBinaryExpression(string Operator, PreceptExpression Left, PreceptExpression Right) : PreceptExpression;
 
 public sealed record PreceptParenthesizedExpression(PreceptExpression Inner) : PreceptExpression;
+
+/// <summary>General built-in function call: name(arg1, arg2, ...).</summary>
+public sealed record PreceptFunctionCallExpression(string Name, PreceptExpression[] Arguments) : PreceptExpression;
+
+/// <summary>Conditional expression: if &lt;condition&gt; then &lt;thenBranch&gt; else &lt;elseBranch&gt;.</summary>
+public sealed record PreceptConditionalExpression(PreceptExpression Condition, PreceptExpression ThenBranch, PreceptExpression ElseBranch) : PreceptExpression;
 
 public sealed record PreceptSetAssignment(
     string Key,
@@ -135,7 +204,10 @@ public sealed record PreceptInvariant(
     string ExpressionText,
     PreceptExpression Expression,
     string Reason,
-    int SourceLine = 0);
+    int SourceLine = 0,
+    bool IsSynthetic = false,
+    string? WhenText = null,
+    PreceptExpression? WhenGuard = null);
 
 /// <summary>
 /// A state-scoped assert: <c>in/to/from &lt;State&gt; assert &lt;expr&gt; because "reason"</c>.
@@ -147,7 +219,9 @@ public sealed record StateAssertion(
     string ExpressionText,
     PreceptExpression Expression,
     string Reason,
-    int SourceLine = 0);
+    int SourceLine = 0,
+    string? WhenText = null,
+    PreceptExpression? WhenGuard = null);
 
 /// <summary>
 /// A state entry/exit action: <c>to/from &lt;State&gt; -&gt; &lt;actions&gt;</c>.
@@ -169,7 +243,9 @@ public sealed record EventAssertion(
     string ExpressionText,
     PreceptExpression Expression,
     string Reason,
-    int SourceLine = 0);
+    int SourceLine = 0,
+    string? WhenText = null,
+    PreceptExpression? WhenGuard = null);
 
 /// <summary>
 /// A flat transition row: <c>from &lt;State&gt; on &lt;Event&gt; [when &lt;expr&gt;] [-&gt; actions]* -&gt; &lt;outcome&gt;</c>.
@@ -192,6 +268,8 @@ public sealed record PreceptTransitionRow(
 /// Runtime <c>Update</c> API is deferred — model/parser included now.
 /// </summary>
 public sealed record PreceptEditBlock(
-    string State,
+    string? State,
     IReadOnlyList<string> FieldNames,
-    int SourceLine = 0);
+    int SourceLine = 0,
+    string? WhenText = null,
+    PreceptExpression? WhenGuard = null);

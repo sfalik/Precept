@@ -1,0 +1,191 @@
+# FluentValidation — DSL Expressiveness Research
+
+**Studied:** 2026-05-01  
+**Source:** https://docs.fluentvalidation.net/en/latest/ (built-in validators, conditions)  
+**Relevance:** FluentValidation is the standard .NET validation library for the same developer audience Precept targets. It ships with rich built-in validators, conditional rule application (`When`/`Unless`), and rule sets. The comparison here is the most commercially important: a .NET developer choosing Precept will compare it against FluentValidation.
+
+---
+
+## What FluentValidation Does Well
+
+### 1. Co-located property + constraint chain
+
+```csharp
+RuleFor(x => x.Surname)
+    .NotNull()
+    .NotEmpty()
+    .MaximumLength(100)
+    .WithMessage("Surname cannot exceed 100 characters");
+```
+
+One expression: the property selector and all its rules. `.WithMessage()` overrides the default message for the preceding rule.
+
+### 2. Numeric range constraints with readable names
+
+```csharp
+RuleFor(x => x.CreditLimit)
+    .GreaterThan(0).WithMessage("Credit limit must be positive")
+    .LessThanOrEqualTo(x => x.MaxCreditLimit).WithMessage("Cannot exceed max limit");
+```
+
+Cross-property comparison (`.LessThanOrEqualTo(x => x.MaxCreditLimit)`) is first-class.
+
+### 3. Conditional rule blocks (`When`/`Unless`)
+
+```csharp
+When(customer => customer.IsPreferred, () =>
+{
+    RuleFor(x => x.Discount).GreaterThan(0);
+    RuleFor(x => x.CreditCard).NotNull();
+}).Otherwise(() =>
+{
+    RuleFor(x => x.Discount).Equal(0);
+});
+```
+
+One condition gates a block of multiple rules. The `Otherwise` branch handles the inverse. This eliminates repeating the condition on every `RuleFor`.
+
+### 4. Cross-field equality validation
+
+```csharp
+RuleFor(x => x.PasswordConfirmation)
+    .Equal(x => x.Password)
+    .WithMessage("Passwords must match");
+```
+
+Property-to-property equality is a single, readable rule.
+
+---
+
+## Equivalent Precept DSL
+
+### Property chain
+
+```precept
+field Surname as string nullable
+invariant Surname != null because "Surname is required"
+invariant Surname != "" because "Surname cannot be empty"
+# Note: no string length constraint exists in current Precept DSL
+```
+
+### Numeric range with cross-field
+
+```precept
+field CreditLimit as number default 0
+field MaxCreditLimit as number default 1000
+
+invariant CreditLimit > 0 because "Credit limit must be positive"
+invariant CreditLimit <= MaxCreditLimit because "Cannot exceed max limit"
+```
+
+### Conditional rules (state-based equivalent)
+
+```precept
+state PreferredCustomer initial
+state StandardCustomer
+
+in PreferredCustomer assert Discount > 0 because "Preferred customers must have a discount"
+in PreferredCustomer assert CreditCard != null because "Preferred customers need a card on file"
+in StandardCustomer assert Discount == 0 because "Standard customers receive no discount"
+```
+
+### Cross-field equality
+
+```precept
+field Password as string nullable
+field PasswordConfirmation as string nullable
+invariant Password == PasswordConfirmation because "Passwords must match"
+```
+
+---
+
+## Category Distinction: Governance vs. Validation
+
+The most important framing for this comparison is the philosophy's governance-vs-validation distinction.
+
+FluentValidation **validates when called.** A FluentValidation rule runs when you invoke the validator — on a request boundary, before a save, wherever the developer remembers to wire it up. Any code path that skips the validator call skips the rules.
+
+Precept **governs structurally.** A Precept invariant holds because the runtime prevents any operation from producing a result that violates it. There is no call site to forget, no code path that bypasses the contract. The engine enforces every declared rule on every operation — fire, update, or create — before the result is committed.
+
+This is not a difference of degree (more rules, better messages). It is a difference of category. Validation checks data at a moment in time. Governance declares what the data is allowed to become and enforces that declaration structurally, with no bypass.
+
+---
+
+## Gap Analysis
+
+### What's equal
+
+**Cross-field invariants:** Precept's `invariant A == B because "..."` is more concise than FluentValidation's `.Equal(x => x.B).WithMessage("...")`. Precept wins here.
+
+**Collect-all behavior:** FluentValidation evaluates all rules by default (unless `StopOnFirstFailure` is configured). Precept's invariants and asserts are always collect-all. Equal semantics.
+
+### Where Precept is more verbose — GAP 1: No built-in constraint vocabulary
+
+FluentValidation has `NotNull()`, `NotEmpty()`, `Length(min, max)`, `GreaterThan(n)`, `LessThan(n)`, `EmailAddress()`, `Matches(regex)` as first-class, named methods with default error messages.
+
+Precept expresses each of these as boolean expressions in `invariant`:
+
+| FluentValidation | Precept equivalent |
+|---|---|
+| `.NotNull()` | `invariant X != null because "..."` |
+| `.NotEmpty()` | `invariant X != "" because "..."` |
+| `.GreaterThan(0)` | `invariant X > 0 because "..."` |
+| `.MaximumLength(100)` | **no equivalent** (no `.length`) |
+| `.EmailAddress()` | **no equivalent** (no regex or format validators) |
+| `.Matches(@"\d{5}")` | **no equivalent** |
+
+FluentValidation's named constraint methods also carry **default error messages** — you get a human-readable error without writing `because`. Every Precept invariant requires an explicit `because` string.
+
+**Language lacks constructs** for string length and format validation. The `because` requirement is by design but adds a line to every rule.
+
+### Where Precept is more verbose — GAP 2: No conditional invariant block
+
+FluentValidation's `When` block applies one condition to multiple rules without repeating the condition per rule:
+
+```csharp
+When(x => x.HasDiscount, () =>
+{
+    RuleFor(x => x.DiscountAmount).GreaterThan(0);
+    RuleFor(x => x.DiscountCode).NotEmpty();
+    RuleFor(x => x.DiscountExpiry).GreaterThan(DateTime.Now);
+});
+```
+
+Precept has no equivalent conditional invariant block. The closest approximation is state-scoped asserts:
+
+```precept
+in HasDiscount assert DiscountAmount > 0 because "..."
+in HasDiscount assert DiscountCode != "" because "..."
+```
+
+But `in <State>` is about a **named state** — you can't use an arbitrary boolean expression as the condition. If `HasDiscount` is a field value, not a state, there is no Precept equivalent.
+
+**Language lacks a construct** for field-value-conditional invariants. This is a real gap for entities where a boolean flag enables/disables a set of related constraints.
+
+### Where Precept is richer
+
+**State-time discrimination:** FluentValidation has no concept of lifecycle state. All rules apply uniformly at validation time. Precept's `in <State> assert`, `to <State> assert`, and `from <State> assert` apply rules at specific lifecycle moments — entry, exit, and in-place. This is a significant expressiveness advantage for workflow entities that FluentValidation cannot match without manual state-checking code.
+
+**Event-scoped validation:** `on <Event> assert` validates event argument integrity before any mutation. FluentValidation has no event/mutation model — validation is always against current object state. Precept's separation of event-arg validation from field invariants is structurally richer.
+
+### Where Precept directly competes: stateless precepts and data-only entities
+
+A stateless precept — a precept with no states, no transitions, just fields and invariants — is the direct competitor to FluentValidation. Same data-shape validation use case, but with structural prevention instead of invoked checking.
+
+Data-only entities (address records, fee schedules, policy configurations, patient demographics) are where FluentValidation and Precept compete head-to-head. In every real business domain, data and reference entities outnumber workflow entities. For these entities, the comparison is not "state machine vs. validator" — it is "governed integrity vs. invoked checking" on the same shape of data. The test for whether an entity belongs in Precept is not "does it have a state machine?" but "does it need governed integrity?"
+
+---
+
+## Related GitHub proposal issues
+
+- **#14 — Conditional invariants (`when` on `invariant`)**: primary proposal for the field-conditional validation gap documented here.
+- **#10 — String `.length` accessor**: related vocabulary gap for the missing length checks FluentValidation treats as table stakes.
+- **#13 — Field-level range/basic constraints**: adjacent compactness proposal for the co-located simple-validator pressure called out in this comparison.
+
+The proposal bodies now live in GitHub. This file stays focused on market comparison: where FluentValidation still feels denser, where Precept is actually richer, and which gaps are vocabulary gaps versus model gaps.
+
+---
+
+## Takeaway for Hero Sample
+
+The hero sample should deliberately showcase `in <State> assert` — the feature FluentValidation cannot express. This is where Precept beats the category leader. Avoid showing 4+ simple field invariants (non-null, non-empty) unless they're demonstrably business rules, not format rules — that's where FluentValidation's named validators have an advantage.

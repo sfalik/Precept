@@ -1,0 +1,163 @@
+name: Language Proposal
+description: Propose a change to the Precept DSL, runtime behavior, or language-adjacent tooling.
+title: "Proposal: "
+labels:
+  - proposal
+  - language
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template for Precept language proposals.
+
+        Canonical workflow:
+        - Proposal body lives in the GitHub issue
+        - Rationale and precedent live in `research/`
+        - Implementation checklist lives in the PR body
+        - Spec docs in `docs/` are updated at implementation time
+
+        Every proposal should connect to Precept's core guarantees: **prevention**, **determinism**, and **inspectability**. See `CONTRIBUTING.md` for the full workflow and #17 for an exemplar proposal.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What change is being proposed?
+      placeholder: Add a new declaration form, operator, type, or runtime behavior.
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation
+      description: What integrity gap, prevention failure, or product limitation does this address? Connect to prevention, determinism, and/or inspectability.
+      placeholder: Frame the problem as a structural gap — where can invalid state emerge, or where is determinism/inspectability compromised? Not just convenience. See #17 for an exemplar.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed syntax or behavior
+      description: Include concrete examples and semantic rules. Each semantic rule should explain *why* — connect to prevention, determinism, or inspectability.
+      render: markdown
+      placeholder: |
+        ```precept
+        precept Example
+        ...
+        ```
+
+        Semantic rules (each with a "because" statement):
+        - where the construct is valid — because ...
+        - where it is not valid — because allowing it would compromise ...
+        - type-checking or runtime behavior — because ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: decisions
+    attributes:
+      label: Locked design decisions
+      description: Each locked decision requires 4-point rationale (see CONTRIBUTING.md) — Why this choice / Alternatives rejected / Precedent / Tradeoff accepted. Identify the governing design principle (e.g., "determinism over capability").
+      placeholder: |
+        **Governing design principle:** [e.g., determinism over capability]
+
+        **Decision:** [what was decided]
+        - **Why:** [reasoning, not just the outcome]
+        - **Alternatives rejected:** [what else was considered and why it lost]
+        - **Precedent:** [research or prior art that grounds this]
+        - **Tradeoff accepted:** [the known downside deliberately taken on]
+    validations:
+      required: true
+
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies or related issues
+      description: List proposal dependencies, related issues, or adjacent proposals that affect this one.
+      placeholder: Depends on #31. Related: #25, #9.
+
+  - type: textarea
+    id: exclusions
+    attributes:
+      label: Explicit exclusions / out of scope
+      description: State what this proposal intentionally does not include. Trace each exclusion to a design principle — not just "out of scope."
+      placeholder: |
+        - **[Excluded feature]** — excluded because it would compromise [prevention/determinism/inspectability]: [brief reasoning].
+
+  - type: textarea
+    id: open_questions
+    attributes:
+      label: Open questions
+      description: What still needs design discussion before implementation?
+      placeholder: If none, say "None".
+    validations:
+      required: true
+
+  - type: textarea
+    id: research
+    attributes:
+      label: Research and rationale links
+      description: Link the research docs, precedent surveys, or prior issues that explain why this proposal exists.
+      placeholder: research/language/...
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: implementation_scope
+    attributes:
+      label: Implementation scope
+      description: Select the layers this proposal is expected to affect.
+      options:
+        - label: Parser
+        - label: Type checker
+        - label: Runtime engine
+        - label: Language server (diagnostics, completions, semantic tokens)
+        - label: TextMate grammar / syntax highlighting
+        - label: MCP tools or DTOs
+        - label: Sample files
+        - label: Spec or design documentation
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: What must be true for this proposal to be considered implemented?
+      placeholder: |
+        - [ ] Parser accepts ...
+        - [ ] Runtime returns ...
+        - [ ] Docs updated ...
+        - [ ] MCP regression pass: Round 1 (compile surface), Round 2 (runtime path coverage — all 7 outcomes), Round 3 (stateless), Round 4 (edge cases)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: wave
+    attributes:
+      label: Suggested wave
+      description: Which milestone wave does this belong in?
+      options:
+        - Wave 1: Core Expression Power
+        - Wave 2: Declaration Guards + Field Constraints
+        - Wave 3: Type System Expansion
+        - Wave 4: Compactness + Composition
+        - Wave 5: Accessors + Extensions
+        - Not sure yet
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Proposal checklist
+      options:
+        - label: I understand the issue body is the canonical proposal and spec docs are updated at implementation time.
+          required: true
+        - label: I linked or referenced the research that explains the rationale for this proposal.
+          required: true
+        - label: Every locked design decision has 4-point rationale (Why / Alternatives rejected / Precedent / Tradeoff accepted).
+          required: true
+        - label: The motivation frames the problem as an integrity or prevention gap, not just convenience.
+          required: true
+        - label: MCP regression testing (all 4 rounds) completed and passed after implementation — verify before closing the PR.

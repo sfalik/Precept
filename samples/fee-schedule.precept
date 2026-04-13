@@ -1,0 +1,18 @@
+precept FeeSchedule
+
+# A stateless data-only precept representing a pricing configuration object.
+# No lifecycle states or events — this precept governs what a valid fee schedule
+# looks like and which pricing fields the host application is allowed to adjust.
+#
+# TaxRate and CurrencyCode are intentionally locked (not editable) — these are
+# jurisdiction-level settings that must go through a separate administrative
+# approval flow, not direct editing.
+
+field BaseFee as decimal default 0 nonnegative maxplaces 2
+field DiscountPercent as decimal default 0 nonnegative max 100 maxplaces 2
+field TaxRate as decimal default 0.1 nonnegative maxplaces 4
+field MinimumCharge as decimal default 0 nonnegative maxplaces 2
+field CurrencyCode as string default "USD"
+
+# Only pricing levers are editable; TaxRate and CurrencyCode are locked.
+edit BaseFee, DiscountPercent, MinimumCharge

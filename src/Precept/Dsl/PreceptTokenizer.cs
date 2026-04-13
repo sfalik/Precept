@@ -58,15 +58,12 @@ public static class PreceptTokenizerBuilder
         builder.Match(Span.EqualTo("!="), PreceptToken.NotEquals);
         builder.Match(Span.EqualTo(">="), PreceptToken.GreaterThanOrEqual);
         builder.Match(Span.EqualTo("<="), PreceptToken.LessThanOrEqual);
-        builder.Match(Span.EqualTo("&&"), PreceptToken.And);
-        builder.Match(Span.EqualTo("||"), PreceptToken.Or);
         builder.Match(Span.EqualTo("->"), PreceptToken.Arrow);
 
         // 5. Single-char operators
         builder.Match(Character.EqualTo('>'), PreceptToken.GreaterThan);
         builder.Match(Character.EqualTo('<'), PreceptToken.LessThan);
         builder.Match(Character.EqualTo('='), PreceptToken.Assign);
-        builder.Match(Character.EqualTo('!'), PreceptToken.Not);
         builder.Match(Character.EqualTo('+'), PreceptToken.Plus);
         builder.Match(Character.EqualTo('-'), PreceptToken.Minus);
         builder.Match(Character.EqualTo('*'), PreceptToken.Star);

@@ -24,9 +24,27 @@ public sealed class PreceptEngine
     // Editability: state → set of editable field names (union of all matching edit blocks)
     private readonly IReadOnlyDictionary<string, HashSet<string>> _editableFieldsByState;
 
+    /// <summary>Guarded edit blocks evaluated per-call: block.WhenGuard != null entries stored here.</summary>
+    private readonly IReadOnlyList<PreceptEditBlock> _guardedEditBlocks;
+
+    /// <summary>Computed field evaluation order (topological sort). Null when no computed fields.</summary>
+    private readonly IReadOnlyList<string>? _computedFieldOrder;
+
+    /// <summary>
+    /// For each computed field, the set of stored (non-computed) field names that transitively feed it.
+    /// Used to expand violation targets when a rule fails on a computed field.
+    /// </summary>
+    private readonly IReadOnlyDictionary<string, IReadOnlyList<string>>? _computedFieldDependencies;
+
+    /// <summary>Editable fields for stateless (root-level) edit declarations. Null if no root edit blocks.</summary>
+    private HashSet<string>? _rootEditableFields;
+
     public string Name { get; }
     public IReadOnlyList<string> States { get; }
-    public string InitialState { get; }
+    public string? InitialState { get; }
+
+    /// <summary>True when the precept has no state declarations.</summary>
+    public bool IsStateless => States.Count == 0;
     public IReadOnlyList<PreceptEvent> Events { get; }
     public IReadOnlyList<PreceptField> Fields { get; }
     public IReadOnlyList<PreceptCollectionField> CollectionFields { get; }
@@ -35,7 +53,7 @@ public sealed class PreceptEngine
     {
         Name = model.Name;
         States = model.States.Select(s => s.Name).ToArray();
-        InitialState = model.InitialState.Name;
+        InitialState = model.InitialState?.Name;
         Events = model.Events;
         Fields = model.Fields;
         CollectionFields = model.CollectionFields;
@@ -112,32 +130,160 @@ public sealed class PreceptEngine
             list.Add(sa);
         }
 
-        // Editable fields: build per-state union of editable field names
+        // Editable fields: build per-state and root-level editable field name sets.
+        // Root-level edit blocks (block.State == null) support stateless precepts.
+        // Field list ["all"] expands to all declared scalar + collection field names.
         var editMap = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+        var guardedBlocks = new List<PreceptEditBlock>();
         if (model.EditBlocks is { Count: > 0 })
         {
             foreach (var block in model.EditBlocks)
             {
-                if (!editMap.TryGetValue(block.State, out var fieldSet))
+                // Guarded edit blocks are evaluated per-call, not precomputed
+                if (block.WhenGuard is not null)
                 {
-                    fieldSet = new HashSet<string>(StringComparer.Ordinal);
-                    editMap[block.State] = fieldSet;
+                    guardedBlocks.Add(block);
+                    continue;
                 }
-                foreach (var fieldName in block.FieldNames)
-                    fieldSet.Add(fieldName);
+
+                var expandedNames = ExpandEditFieldNames(block.FieldNames);
+                if (block.State is null)
+                {
+                    _rootEditableFields ??= new HashSet<string>(StringComparer.Ordinal);
+                    foreach (var fn in expandedNames)
+                        _rootEditableFields.Add(fn);
+                }
+                else
+                {
+                    if (!editMap.TryGetValue(block.State, out var fieldSet))
+                    {
+                        fieldSet = new HashSet<string>(StringComparer.Ordinal);
+                        editMap[block.State] = fieldSet;
+                    }
+                    foreach (var fn in expandedNames)
+                        fieldSet.Add(fn);
+                }
             }
         }
         _editableFieldsByState = editMap;
+        _guardedEditBlocks = guardedBlocks;
+
+        // Computed fields: store evaluation order and build transitive dependency map
+        _computedFieldOrder = model.ComputedFieldOrder;
+        if (_computedFieldOrder is { Count: > 0 })
+        {
+            var computedSet = new HashSet<string>(_computedFieldOrder, StringComparer.Ordinal);
+            var deps = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
+            foreach (var cfName in _computedFieldOrder)
+            {
+                var field = _fieldMap[cfName];
+                var directRefs = ExpressionSubjects.Extract(field.DerivedExpression!).FieldReferences;
+                var stored = new List<string>();
+                foreach (var dep in directRefs)
+                {
+                    if (computedSet.Contains(dep) && deps.TryGetValue(dep, out var transitive))
+                    {
+                        // Computed dependency — inherit its stored fields
+                        foreach (var t in transitive)
+                            if (!stored.Contains(t)) stored.Add(t);
+                    }
+                    else if (!computedSet.Contains(dep))
+                    {
+                        // Stored field — add directly
+                        if (!stored.Contains(dep)) stored.Add(dep);
+                    }
+                }
+                deps[cfName] = stored;
+            }
+            _computedFieldDependencies = deps;
+        }
+    }
+
+    /// <summary>
+    /// Expands ["all"] to all declared field names, or returns the list unchanged.
+    /// "all" means all scalar fields + all collection fields, excluding computed fields
+    /// (computed fields are read-only and cannot be edited).
+    /// </summary>
+    private IEnumerable<string> ExpandEditFieldNames(IReadOnlyList<string> fieldNames)
+    {
+        if (fieldNames.Count == 1 && string.Equals(fieldNames[0], "all", StringComparison.Ordinal))
+            return Fields.Where(static f => !f.IsComputed).Select(static f => f.Name)
+                .Concat(CollectionFields.Select(static f => f.Name));
+        return fieldNames;
+    }
+
+    /// <summary>
+    /// Evaluates guarded edit blocks for the given state against instance data.
+    /// Returns the set of field names granted by passing guards.
+    /// Fail-closed: guard evaluation error → field not granted.
+    /// </summary>
+    private HashSet<string> EvaluateGuardedEditFields(string state, IReadOnlyDictionary<string, object?> data)
+    {
+        var result = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var block in _guardedEditBlocks)
+        {
+            if (block.State is null || !string.Equals(block.State, state, StringComparison.Ordinal))
+                continue;
+
+            // Fail-closed: any evaluation error → guard treated as false
+            try
+            {
+                var guardResult = PreceptExpressionRuntimeEvaluator.Evaluate(block.WhenGuard!, data);
+                if (!guardResult.Success || guardResult.Value is not true)
+                    continue;
+            }
+            catch
+            {
+                continue; // Fail-closed
+            }
+
+            foreach (var fieldName in ExpandEditFieldNames(block.FieldNames))
+                result.Add(fieldName);
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// Recomputes all computed/derived fields in dependency order against the current data dictionary.
+    /// Evaluates each field's <see cref="PreceptField.DerivedExpression"/> and updates data in-place.
+    /// </summary>
+    private void RecomputeDerivedFields(Dictionary<string, object?> data)
+    {
+        if (_computedFieldOrder is null)
+            return;
+
+        foreach (var fieldName in _computedFieldOrder)
+        {
+            var field = _fieldMap[fieldName];
+            var result = PreceptExpressionRuntimeEvaluator.Evaluate(field.DerivedExpression!, data, _fieldMap);
+            if (result.Success)
+                data[fieldName] = result.Value;
+        }
     }
 
     public PreceptInstance CreateInstance(
         IReadOnlyDictionary<string, object?>? instanceData = null)
-        => CreateInstance(InitialState, instanceData);
+    {
+        if (IsStateless)
+        {
+            var statelessData = BuildInitialInstanceData(instanceData);
+            // SYNC:CONSTRAINT:C35
+            if (!TryValidateDataContract(statelessData, out var dataError))
+                throw new InvalidOperationException(dataError);
+            return new PreceptInstance(Name, null, null, DateTimeOffset.UtcNow, statelessData);
+        }
+        return CreateInstance(InitialState!, instanceData);
+    }
 
     public PreceptInstance CreateInstance(
         string initialState,
         IReadOnlyDictionary<string, object?>? instanceData = null)
     {
+        if (IsStateless)
+            throw new ArgumentException(
+                $"Precept '{Name}' is stateless. Use CreateInstance(instanceData) — the state argument is not valid.",
+                nameof(initialState));
+
         // SYNC:CONSTRAINT:C33
         if (string.IsNullOrWhiteSpace(initialState))
             throw new ArgumentException(DiagnosticCatalog.C33.FormatMessage(), nameof(initialState));
@@ -161,9 +307,22 @@ public sealed class PreceptEngine
 
     private IReadOnlyDictionary<string, object?> BuildInitialInstanceData(IReadOnlyDictionary<string, object?>? instanceData)
     {
+        // Reject computed field values in caller-provided data (Terraform model: explicit rejection)
+        if (instanceData is not null && _computedFieldOrder is { Count: > 0 })
+        {
+            foreach (var cfName in _computedFieldOrder)
+            {
+                if (instanceData.ContainsKey(cfName))
+                    throw new InvalidOperationException(
+                        $"Cannot provide a value for computed field '{cfName}'. " +
+                        $"Computed fields are derived automatically from their expression.");
+            }
+        }
+
         var hasDefaults = Fields.Any(field => field.HasDefaultValue);
         var hasCollections = CollectionFields.Count > 0;
-        if (!hasDefaults && !hasCollections && instanceData is null)
+        var hasComputed = _computedFieldOrder is { Count: > 0 };
+        if (!hasDefaults && !hasCollections && !hasComputed && instanceData is null)
             return EmptyInstanceData.Instance;
 
         var merged = new Dictionary<string, object?>(StringComparer.Ordinal);
@@ -195,6 +354,19 @@ public sealed class PreceptEngine
                 }
 
                 merged[pair.Key] = pair.Value;
+            }
+        }
+
+        // Compute initial values for derived fields
+        if (hasComputed)
+        {
+            var hydrated = HydrateInstanceData(merged);
+            RecomputeDerivedFields(hydrated);
+            // Copy computed values back to clean format
+            foreach (var cfName in _computedFieldOrder!)
+            {
+                if (hydrated.TryGetValue(cfName, out var cfValue))
+                    merged[cfName] = cfValue;
             }
         }
 
@@ -260,8 +432,17 @@ public sealed class PreceptEngine
                 $"Instance workflow '{instance.WorkflowName}' does not match compiled workflow '{Name}'.");
         }
 
-        if (!States.Contains(instance.CurrentState, StringComparer.Ordinal))
-            return PreceptCompatibilityResult.NotCompatible($"Instance state '{instance.CurrentState}' is not defined in workflow '{Name}'.");
+        if (IsStateless)
+        {
+            if (instance.CurrentState is not null)
+                return PreceptCompatibilityResult.NotCompatible(
+                    $"Stateless precept '{Name}' expects CurrentState to be null, but got '{instance.CurrentState}'.");
+        }
+        else
+        {
+            if (!States.Contains(instance.CurrentState!, StringComparer.Ordinal))
+                return PreceptCompatibilityResult.NotCompatible($"Instance state '{instance.CurrentState}' is not defined in workflow '{Name}'.");
+        }
 
         if (!TryValidateDataContract(instance.InstanceData, out var dataError))
             return PreceptCompatibilityResult.NotCompatible(dataError);
@@ -270,7 +451,8 @@ public sealed class PreceptEngine
         var internalData = HydrateInstanceData(instance.InstanceData);
         var ruleViolations = new List<ConstraintViolation>();
         ruleViolations.AddRange(EvaluateInvariants(internalData));
-        ruleViolations.AddRange(EvaluateStateAssertions(AssertAnchor.In, instance.CurrentState, internalData));
+        if (instance.CurrentState is not null)
+            ruleViolations.AddRange(EvaluateStateAssertions(AssertAnchor.In, instance.CurrentState, internalData));
         if (ruleViolations.Count > 0)
             return PreceptCompatibilityResult.NotCompatible(
                 $"Instance violates {ruleViolations.Count} rule(s): {string.Join("; ", ruleViolations.Select(v => v.Message))}");
@@ -287,12 +469,17 @@ public sealed class PreceptEngine
         if (!compatibility.IsCompatible)
             return EventInspectionResult.Undefined(instance.CurrentState, eventName, compatibility.Reason!);
 
+        // Stateless precepts have no transition surface.
+        if (IsStateless)
+            return EventInspectionResult.Undefined(instance.CurrentState, eventName,
+                $"Precept '{Name}' is stateless — events have no transition surface.");
+
         // Hydrate clean InstanceData to internal format for engine evaluation
         var internalData = HydrateInstanceData(instance.InstanceData);
 
         // Fast-path: if all rows for (state, event) have when guards, try evaluating without
         // event args. If all guards fail → NotApplicable (avoids requiring event args for discovery).
-        if (_transitionRowMap.TryGetValue((instance.CurrentState, eventName), out var preCheckRows))
+        if (_transitionRowMap.TryGetValue((instance.CurrentState!, eventName), out var preCheckRows))
         {
             bool allGuardsPresent = preCheckRows.All(r => r.WhenGuard is not null);
             if (allGuardsPresent)
@@ -300,7 +487,7 @@ public sealed class PreceptEngine
                 var instanceOnlyContext = BuildEvaluationData(internalData, eventName, null);
                 bool anyGuardPasses = preCheckRows.Any(r =>
                 {
-                    var whenResult = PreceptExpressionRuntimeEvaluator.Evaluate(r.WhenGuard!, instanceOnlyContext);
+                    var whenResult = PreceptExpressionRuntimeEvaluator.Evaluate(r.WhenGuard!, instanceOnlyContext, _fieldMap);
                     return whenResult.Success && whenResult.Value is true;
                 });
                 if (!anyGuardPasses)
@@ -323,7 +510,7 @@ public sealed class PreceptEngine
                 return EventInspectionResult.Rejected(instance.CurrentState, eventName, eventAssertViolations);
         }
 
-        var resolution = ResolveTransition(instance.CurrentState, eventName, evaluationArguments);
+        var resolution = ResolveTransition(instance.CurrentState!, eventName, evaluationArguments);
         if (resolution.Kind == TransitionResolutionKind.Undefined)
             return EventInspectionResult.Undefined(instance.CurrentState, eventName, resolution.NotDefinedReason!);
 
@@ -344,7 +531,7 @@ public sealed class PreceptEngine
         var simulatedCollections = CloneCollections(simulatedData);
 
         // Exit actions
-        ExecuteStateActions(AssertAnchor.From, instance.CurrentState,
+        ExecuteStateActions(AssertAnchor.From, instance.CurrentState!,
             simulatedData, simulatedCollections, eventName, eventArguments);
 
         // Row mutations
@@ -363,10 +550,11 @@ public sealed class PreceptEngine
             simulatedData, simulatedCollections, eventName, eventArguments);
 
         CommitCollections(simulatedData, simulatedCollections);
+        RecomputeDerivedFields(simulatedData);
 
         // Validate invariants + state asserts
         var violations = CollectConstraintViolations(
-            instance.CurrentState, targetState, simulatedData);
+            instance.CurrentState!, targetState, simulatedData);
         if (violations.Count > 0)
             return EventInspectionResult.ConstraintFailure(instance.CurrentState, eventName, violations);
 
@@ -389,6 +577,18 @@ public sealed class PreceptEngine
                 instance.CurrentState,
                 instance.InstanceData,
                 Array.Empty<EventInspectionResult>());
+
+        // Stateless precepts: return all events with Undefined outcome.
+        if (IsStateless)
+        {
+            var statelessEventResults = Events
+                .Select(e => EventInspectionResult.Undefined(
+                    null, e.Name,
+                    $"Precept '{Name}' is stateless — events have no transition surface."))
+                .ToArray();
+            var statelessEditableFields = BuildEditableFieldInfosForStateless(instance.InstanceData);
+            return new InspectionResult(null, instance.InstanceData, statelessEventResults, statelessEditableFields);
+        }
 
         var eventDeclarationOrder = Events
             .Select((e, i) => (e.Name, i))
@@ -454,14 +654,34 @@ public sealed class PreceptEngine
             return new InspectionResult(baseResult.CurrentState, baseResult.InstanceData, baseResult.Events, violatedInfos);
         }
 
-        // Check editability
-        var editableNames = _editableFieldsByState.TryGetValue(instance.CurrentState, out var editable)
-            ? editable : null;
+        // Check editability — union of static + guarded edit blocks
+        HashSet<string>? editableNames;
+        if (IsStateless)
+        {
+            editableNames = _rootEditableFields;
+        }
+        else
+        {
+            editableNames = _editableFieldsByState.TryGetValue(instance.CurrentState!, out var editable)
+                ? new HashSet<string>(editable, StringComparer.Ordinal) : null;
+
+            if (_guardedEditBlocks.Count > 0 && instance.CurrentState is not null)
+            {
+                var hydrated = HydrateInstanceData(instance.InstanceData);
+                var guardedFields = EvaluateGuardedEditFields(instance.CurrentState, hydrated);
+                if (guardedFields.Count > 0)
+                {
+                    editableNames ??= new HashSet<string>(StringComparer.Ordinal);
+                    editableNames.UnionWith(guardedFields);
+                }
+            }
+        }
         foreach (var op in operations)
         {
+            var stateLabel = IsStateless ? "(stateless)" : $"state '{instance.CurrentState}'";
             if (editableNames is null || !editableNames.Contains(op.FieldName))
             {
-                var reason = $"Field '{op.FieldName}' is not editable in state '{instance.CurrentState}'.";
+                var reason = $"Field '{op.FieldName}' is not editable in {stateLabel}.";
                 var violatedInfos = editableFieldInfos.Select(info =>
                     string.Equals(info.FieldName, op.FieldName, StringComparison.Ordinal)
                         ? info with { Violation = reason }
@@ -477,11 +697,13 @@ public sealed class PreceptEngine
 
         ApplyPatchOperations(operations, updatedData, workingCollections);
         CommitCollections(updatedData, workingCollections);
+        RecomputeDerivedFields(updatedData);
 
         // Evaluate rules on working copy
         var violations = new List<ConstraintViolation>();
         violations.AddRange(EvaluateInvariants(updatedData));
-        violations.AddRange(EvaluateStateAssertions(AssertAnchor.In, instance.CurrentState, updatedData));
+        if (instance.CurrentState is not null)
+            violations.AddRange(EvaluateStateAssertions(AssertAnchor.In, instance.CurrentState, updatedData));
 
         if (violations.Count == 0)
             return baseResult;
@@ -539,8 +761,11 @@ public sealed class PreceptEngine
         return contract.Type switch
         {
             PreceptScalarType.Number => CoerceToNumber(value),
+            PreceptScalarType.Integer => CoerceToInteger(value),
+            PreceptScalarType.Decimal => CoerceToDecimal(value),
             PreceptScalarType.Boolean => CoerceToBoolean(value),
             PreceptScalarType.String => value?.ToString(),
+            PreceptScalarType.Choice => value?.ToString(),
             PreceptScalarType.Null => null,
             _ => value
         };
@@ -551,13 +776,25 @@ public sealed class PreceptEngine
         return element.ValueKind switch
         {
             System.Text.Json.JsonValueKind.String => element.GetString(),
-            System.Text.Json.JsonValueKind.Number => element.GetDouble(),
+            // Distinguish integer vs floating-point JSON numbers
+            System.Text.Json.JsonValueKind.Number => element.TryGetInt64(out var l) ? (object?)l : element.GetDouble(),
             System.Text.Json.JsonValueKind.True => (object?)true,
             System.Text.Json.JsonValueKind.False => false,
             System.Text.Json.JsonValueKind.Null => null,
             System.Text.Json.JsonValueKind.Undefined => null,
             _ => element.GetRawText()
         };
+    }
+
+    private static object? CoerceToInteger(object value)
+    {
+        if (value is long) return value;
+        if (value is int i) return (long)i;
+        if (value is short s) return (long)s;
+        if (value is byte b) return (long)b;
+        if (value is sbyte sb) return (long)sb;
+        if (value is string str && long.TryParse(str, out var l)) return l;
+        return value;
     }
 
     private static object? CoerceToNumber(object value)
@@ -581,6 +818,18 @@ public sealed class PreceptEngine
         return value;
     }
 
+    private static object? CoerceToDecimal(object value)
+    {
+        if (value is decimal) return value;
+        if (value is double d) return (decimal)d;
+        if (value is float f) return (decimal)f;
+        if (value is long l) return (decimal)l;
+        if (value is int i) return (decimal)i;
+        if (value is string str && decimal.TryParse(str, System.Globalization.NumberStyles.Number,
+            System.Globalization.CultureInfo.InvariantCulture, out var parsed)) return parsed;
+        return value;
+    }
+
     public FireResult Fire(
         PreceptInstance instance,
         string eventName,
@@ -593,6 +842,11 @@ public sealed class PreceptEngine
             return FireResult.Undefined(instance.CurrentState, eventName, new[] { compatibility.Reason! });
         }
 
+        // Stateless precepts have no transition surface — Fire always returns Undefined.
+        if (IsStateless)
+            return FireResult.Undefined(instance.CurrentState, eventName,
+                new[] { $"Precept '{Name}' is stateless — events have no transition surface." });
+
         if (!TryValidateEventArguments(eventName, eventArguments, out var eventArgError))
             return FireResult.Rejected(instance.CurrentState, eventName, new[] { ConstraintViolation.Simple(eventArgError!) });
 
@@ -604,7 +858,7 @@ public sealed class PreceptEngine
             return FireResult.Rejected(instance.CurrentState, eventName, eventAssertViolations);
 
         // Stage 2: First-match row selection
-        var resolution = ResolveTransition(instance.CurrentState, eventName, evaluationArguments);
+        var resolution = ResolveTransition(instance.CurrentState!, eventName, evaluationArguments);
         if (resolution.Kind == TransitionResolutionKind.Undefined)
             return FireResult.Undefined(instance.CurrentState, eventName, new[] { resolution.NotDefinedReason! });
 
@@ -627,11 +881,12 @@ public sealed class PreceptEngine
                 return FireResult.Rejected(instance.CurrentState, eventName, new[] { ConstraintViolation.Simple(mutError) });
 
             CommitCollections(updatedData, workingCollections);
+            RecomputeDerivedFields(updatedData);
 
             // Validate: invariants + 'in' asserts for current state
             var violations = new List<ConstraintViolation>();
             violations.AddRange(EvaluateInvariants(updatedData));
-            violations.AddRange(EvaluateStateAssertions(AssertAnchor.In, instance.CurrentState, updatedData));
+            violations.AddRange(EvaluateStateAssertions(AssertAnchor.In, instance.CurrentState!, updatedData));
             if (violations.Count > 0)
                 return FireResult.ConstraintFailure(instance.CurrentState, eventName, violations);
 
@@ -648,7 +903,7 @@ public sealed class PreceptEngine
         var targetState = ((StateTransition)matchedRow.Outcome).TargetState;
 
         // Stage 3: Exit actions (from <sourceState> -> ...)
-        ExecuteStateActions(AssertAnchor.From, instance.CurrentState,
+        ExecuteStateActions(AssertAnchor.From, instance.CurrentState!,
             updatedData, workingCollections, eventName, eventArguments);
 
         // Stage 4: Row mutations (set assignments + collection mutations)
@@ -661,10 +916,11 @@ public sealed class PreceptEngine
             updatedData, workingCollections, eventName, eventArguments);
 
         CommitCollections(updatedData, workingCollections);
+        RecomputeDerivedFields(updatedData);
 
         // Stage 6: Validation (invariants + state asserts, collect-all)
         var validationViolations = CollectConstraintViolations(
-            instance.CurrentState, targetState, updatedData);
+            instance.CurrentState!, targetState, updatedData);
         if (validationViolations.Count > 0)
             return FireResult.ConstraintFailure(instance.CurrentState, eventName, validationViolations);
 
@@ -698,14 +954,51 @@ public sealed class PreceptEngine
         if (operations.Count == 0)
             return UpdateResult.Failed(UpdateOutcome.InvalidInput, new[] { "Patch is empty." });
 
-        // Stage 1: Editability check — all fields in patch must be editable in current state
-        var editableFields = _editableFieldsByState.TryGetValue(instance.CurrentState, out var editable)
-            ? editable : null;
+        // Reject patches targeting computed fields (Terraform model: explicit rejection)
+        if (_computedFieldOrder is { Count: > 0 })
+        {
+            var computedSet = new HashSet<string>(_computedFieldOrder, StringComparer.Ordinal);
+            foreach (var op in operations)
+            {
+                if (computedSet.Contains(op.FieldName))
+                    return UpdateResult.Failed(UpdateOutcome.InvalidInput,
+                        new[] { $"Cannot update computed field '{op.FieldName}'. Computed fields are derived automatically from their expression." });
+            }
+        }
+
+        // Hydrate instance data early — needed for guarded edit evaluation
+        var internalData = HydrateInstanceData(instance.InstanceData);
+
+        // Stage 1: Editability check — all fields in patch must be editable.
+        // Union of static (unconditional) + dynamic (guarded) edit blocks.
+        HashSet<string>? editableFields;
+        if (IsStateless)
+        {
+            editableFields = _rootEditableFields;
+        }
+        else
+        {
+            editableFields = _editableFieldsByState.TryGetValue(instance.CurrentState!, out var editable)
+                ? new HashSet<string>(editable, StringComparer.Ordinal) : null;
+
+            // Add fields from guarded edit blocks that pass their guards
+            if (_guardedEditBlocks.Count > 0 && instance.CurrentState is not null)
+            {
+                var guardedFields = EvaluateGuardedEditFields(instance.CurrentState, internalData);
+                if (guardedFields.Count > 0)
+                {
+                    editableFields ??= new HashSet<string>(StringComparer.Ordinal);
+                    editableFields.UnionWith(guardedFields);
+                }
+            }
+        }
+
         var notAllowed = new List<string>();
         foreach (var op in operations)
         {
+            var stateLabel = IsStateless ? "(stateless)" : $"state '{instance.CurrentState}'";
             if (editableFields is null || !editableFields.Contains(op.FieldName))
-                notAllowed.Add($"Field '{op.FieldName}' is not editable in state '{instance.CurrentState}'.");
+                notAllowed.Add($"Field '{op.FieldName}' is not editable in {stateLabel}.");
         }
         if (notAllowed.Count > 0)
             return UpdateResult.Failed(UpdateOutcome.UneditableField, notAllowed);
@@ -718,8 +1011,7 @@ public sealed class PreceptEngine
                 return UpdateResult.Failed(UpdateOutcome.InvalidInput, new[] { typeError });
         }
 
-        // Stage 3: Atomic mutation on working copy
-        var internalData = HydrateInstanceData(instance.InstanceData);
+        // Stage 3: Atomic mutation on working copy (internalData already hydrated above)
         var updatedData = new Dictionary<string, object?>(internalData, StringComparer.Ordinal);
         var workingCollections = CloneCollections(updatedData);
 
@@ -728,11 +1020,13 @@ public sealed class PreceptEngine
             return UpdateResult.Failed(UpdateOutcome.InvalidInput, new[] { mutError });
 
         CommitCollections(updatedData, workingCollections);
+        RecomputeDerivedFields(updatedData);
 
         // Stage 4: Rules evaluation (invariants + 'in' state asserts)
         var violations = new List<ConstraintViolation>();
         violations.AddRange(EvaluateInvariants(updatedData));
-        violations.AddRange(EvaluateStateAssertions(AssertAnchor.In, instance.CurrentState, updatedData));
+        if (instance.CurrentState is not null)
+            violations.AddRange(EvaluateStateAssertions(AssertAnchor.In, instance.CurrentState, updatedData));
         if (violations.Count > 0)
             return UpdateResult.Failed(UpdateOutcome.ConstraintFailure, violations);
 
@@ -851,14 +1145,56 @@ public sealed class PreceptEngine
         return null;
     }
 
+    private IReadOnlyList<PreceptEditableFieldInfo>? BuildEditableFieldInfosForStateless(
+        IReadOnlyDictionary<string, object?> instanceData)
+    {
+        if (_rootEditableFields is null || _rootEditableFields.Count == 0)
+            return null;
+
+        var result = new List<PreceptEditableFieldInfo>();
+        foreach (var field in Fields)
+        {
+            if (!_rootEditableFields.Contains(field.Name))
+                continue;
+            instanceData.TryGetValue(field.Name, out var currentValue);
+            var typeName = field.Type.ToString().ToLowerInvariant();
+            result.Add(new PreceptEditableFieldInfo(field.Name, typeName, field.IsNullable, currentValue));
+        }
+        foreach (var col in CollectionFields)
+        {
+            if (!_rootEditableFields.Contains(col.Name))
+                continue;
+            instanceData.TryGetValue(col.Name, out var currentValue);
+            var typeName = $"{col.CollectionKind.ToString().ToLowerInvariant()}<{col.InnerType.ToString().ToLowerInvariant()}>";
+            result.Add(new PreceptEditableFieldInfo(col.Name, typeName, false, currentValue));
+        }
+        return result;
+    }
+
     /// <summary>
     /// Returns the set of editable field names for the given state, or empty if none.
     /// </summary>
-    internal IReadOnlySet<string> GetEditableFieldNames(string state)
+    internal IReadOnlySet<string> GetEditableFieldNames(string? state, IReadOnlyDictionary<string, object?>? instanceData = null)
     {
-        if (_editableFieldsByState.TryGetValue(state, out var fields))
-            return fields;
-        return EmptyStringSet.Instance;
+        if (state is null)
+            return _rootEditableFields is not null ? _rootEditableFields : EmptyStringSet.Instance;
+
+        HashSet<string>? combined = null;
+        if (_editableFieldsByState.TryGetValue(state, out var staticFields))
+            combined = new HashSet<string>(staticFields, StringComparer.Ordinal);
+
+        if (_guardedEditBlocks.Count > 0 && instanceData is not null)
+        {
+            var hydrated = HydrateInstanceData(instanceData);
+            var guardedFields = EvaluateGuardedEditFields(state, hydrated);
+            if (guardedFields.Count > 0)
+            {
+                combined ??= new HashSet<string>(StringComparer.Ordinal);
+                combined.UnionWith(guardedFields);
+            }
+        }
+
+        return combined is not null ? combined : EmptyStringSet.Instance;
     }
 
     /// <summary>
@@ -867,13 +1203,33 @@ public sealed class PreceptEngine
     /// Returns null when no edit declarations exist for this engine.
     /// </summary>
     private IReadOnlyList<PreceptEditableFieldInfo>? BuildEditableFieldInfos(
-        string state, IReadOnlyDictionary<string, object?> instanceData)
+        string? state, IReadOnlyDictionary<string, object?> instanceData)
     {
-        if (_editableFieldsByState.Count == 0)
-            return null;
+        // Stateless path handled by dedicated BuildEditableFieldInfosForStateless
+        if (state is null)
+            return BuildEditableFieldInfosForStateless(instanceData);
 
-        if (!_editableFieldsByState.TryGetValue(state, out var editableNames) || editableNames.Count == 0)
-            return Array.Empty<PreceptEditableFieldInfo>();
+        // Build combined editable field set: static + guarded
+        HashSet<string>? editableNames = null;
+        if (_editableFieldsByState.TryGetValue(state, out var staticNames) && staticNames.Count > 0)
+            editableNames = new HashSet<string>(staticNames, StringComparer.Ordinal);
+
+        if (_guardedEditBlocks.Count > 0)
+        {
+            var hydrated = HydrateInstanceData(instanceData);
+            var guardedFields = EvaluateGuardedEditFields(state, hydrated);
+            if (guardedFields.Count > 0)
+            {
+                editableNames ??= new HashSet<string>(StringComparer.Ordinal);
+                editableNames.UnionWith(guardedFields);
+            }
+        }
+
+        if (editableNames is null || editableNames.Count == 0)
+        {
+            // Return null only if there are NO edit blocks at all (static or guarded)
+            return (_editableFieldsByState.Count == 0 && _guardedEditBlocks.Count == 0) ? null : Array.Empty<PreceptEditableFieldInfo>();
+        }
 
         var result = new List<PreceptEditableFieldInfo>();
         // Maintain declaration order: iterate Fields then CollectionFields
@@ -908,7 +1264,8 @@ public sealed class PreceptEngine
     {
         var violations = new List<ConstraintViolation>();
         violations.AddRange(EvaluateInvariants(instance.InstanceData));
-        violations.AddRange(EvaluateStateAssertions(AssertAnchor.In, instance.CurrentState, instance.InstanceData));
+        if (instance.CurrentState is not null)
+            violations.AddRange(EvaluateStateAssertions(AssertAnchor.In, instance.CurrentState, instance.InstanceData));
         return violations;
     }
 
@@ -940,7 +1297,7 @@ public sealed class PreceptEngine
         {
             if (row.WhenGuard is not null)
             {
-                var guardResult = PreceptExpressionRuntimeEvaluator.Evaluate(row.WhenGuard, evaluationData);
+                var guardResult = PreceptExpressionRuntimeEvaluator.Evaluate(row.WhenGuard, evaluationData, _fieldMap);
                 if (!guardResult.Success || guardResult.Value is not bool guardBool || !guardBool)
                 {
                     reasons.Add(row.WhenText is not null
@@ -1198,6 +1555,14 @@ public sealed class PreceptEngine
         var violations = new List<ConstraintViolation>();
         foreach (var assert in asserts)
         {
+            // Guard pre-flight: when guard is present and evaluates false, skip this assertion
+            if (assert.WhenGuard is not null)
+            {
+                var guardResult = PreceptExpressionRuntimeEvaluator.Evaluate(assert.WhenGuard, evaluationData);
+                if (!guardResult.Success || guardResult.Value is not true)
+                    continue;
+            }
+
             var result = PreceptExpressionRuntimeEvaluator.Evaluate(assert.Expression, evaluationData);
             if (!result.Success || result.Value is not bool boolVal || !boolVal)
             {
@@ -1224,6 +1589,14 @@ public sealed class PreceptEngine
         var violations = new List<ConstraintViolation>();
         foreach (var inv in _invariants)
         {
+            // Guard pre-flight: when guard is present and evaluates false, skip this invariant
+            if (inv.WhenGuard is not null)
+            {
+                var guardResult = PreceptExpressionRuntimeEvaluator.Evaluate(inv.WhenGuard, data);
+                if (!guardResult.Success || guardResult.Value is not true)
+                    continue;
+            }
+
             var result = PreceptExpressionRuntimeEvaluator.Evaluate(inv.Expression, data);
             if (!result.Success || result.Value is not bool boolVal || !boolVal)
             {
@@ -1231,6 +1604,7 @@ public sealed class PreceptEngine
                 var targets = new List<ConstraintTarget>();
                 foreach (var fieldName in subjects.FieldReferences)
                     targets.Add(new ConstraintTarget.FieldTarget(fieldName));
+                ExpandComputedFieldTargets(subjects.FieldReferences, targets);
                 targets.Add(new ConstraintTarget.DefinitionTarget());
 
                 violations.Add(new ConstraintViolation(
@@ -1254,6 +1628,14 @@ public sealed class PreceptEngine
         var violations = new List<ConstraintViolation>();
         foreach (var assert in asserts)
         {
+            // Guard pre-flight: when guard is present and evaluates false, skip this assertion
+            if (assert.WhenGuard is not null)
+            {
+                var guardResult = PreceptExpressionRuntimeEvaluator.Evaluate(assert.WhenGuard, data);
+                if (!guardResult.Success || guardResult.Value is not true)
+                    continue;
+            }
+
             var result = PreceptExpressionRuntimeEvaluator.Evaluate(assert.Expression, data);
             if (!result.Success || result.Value is not bool boolVal || !boolVal)
             {
@@ -1261,6 +1643,7 @@ public sealed class PreceptEngine
                 var targets = new List<ConstraintTarget>();
                 foreach (var fieldName in subjects.FieldReferences)
                     targets.Add(new ConstraintTarget.FieldTarget(fieldName));
+                ExpandComputedFieldTargets(subjects.FieldReferences, targets);
                 targets.Add(new ConstraintTarget.StateTarget(assert.State, assert.Anchor));
 
                 violations.Add(new ConstraintViolation(
@@ -1270,6 +1653,25 @@ public sealed class PreceptEngine
             }
         }
         return violations;
+    }
+
+    /// <summary>
+    /// Expands violation targets through computed field dependency closure.
+    /// When a rule references a computed field, surfaces the stored fields that transitively feed it.
+    /// </summary>
+    private void ExpandComputedFieldTargets(IReadOnlyList<string> fieldReferences, List<ConstraintTarget> targets)
+    {
+        if (_computedFieldDependencies is null)
+            return;
+
+        foreach (var fieldName in fieldReferences)
+        {
+            if (_computedFieldDependencies.TryGetValue(fieldName, out var storedDeps))
+            {
+                foreach (var dep in storedDeps)
+                    targets.Add(new ConstraintTarget.FieldTarget(dep));
+            }
+        }
     }
 
     /// <summary>
@@ -1513,10 +1915,40 @@ public sealed class PreceptEngine
                 error = $"Event argument validation failed: {error}";
                 return false;
             }
+
+            // Choice membership check for event args
+            if (arg.Type == PreceptScalarType.Choice &&
+                value is string argStrVal &&
+                arg.ChoiceValues is not null &&
+                !arg.ChoiceValues.Contains(argStrVal, StringComparer.Ordinal))
+            {
+                error = $"Event argument validation failed: '{argStrVal}' is not a member of choice({string.Join(", ", arg.ChoiceValues.Select(v => $"\"{v}\""))}) for argument '{arg.Name}'.";
+                return false;
+            }
         }
 
         error = null;
         return true;
+    }
+
+    private static bool TryToDecimalValue(object? value, out decimal d)
+    {
+        switch (value)
+        {
+            case decimal dec: d = dec; return true;
+            case double dbl: d = (decimal)dbl; return true;
+            case float flt: d = (decimal)flt; return true;
+            case long l: d = l; return true;
+            case int i: d = i; return true;
+            default: d = default; return false;
+        }
+    }
+
+    private static bool ViolatesMaxplaces(decimal value, int places)
+    {
+        // Count actual decimal places by removing trailing zeros
+        var scale = (int)BitConverter.GetBytes(decimal.GetBits(value)[3])[2];
+        return scale > places;
     }
 
     private bool TryValidateAssignedValue(string dataFieldName, object? value, out string error)
@@ -1527,14 +1959,47 @@ public sealed class PreceptEngine
             return true;
         }
 
-        if (TryValidateScalarValue(contract.Name, contract.Type, contract.IsNullable, value, out error))
-            return true;
+        if (!TryValidateScalarValue(contract.Name, contract.Type, contract.IsNullable, value, out error))
+        {
+            error = $"Data assignment failed: {error}";
+            return false;
+        }
 
-        error = $"Data assignment failed: {error}";
-        return false;
+        if (value is null)
+        {
+            error = string.Empty;
+            return true;
+        }
+
+        // maxplaces constraint check for decimal fields
+        if (contract.Type == PreceptScalarType.Decimal && contract.Constraints is not null)
+        {
+            foreach (var c in contract.Constraints)
+            {
+                if (c is FieldConstraint.Maxplaces mp && TryToDecimalValue(value, out var dv) &&
+                    ViolatesMaxplaces(dv, mp.Places))
+                {
+                    error = $"Data assignment failed: '{contract.Name}' value exceeds maxplaces {mp.Places}.";
+                    return false;
+                }
+            }
+        }
+
+        // Choice membership check
+        if (contract.Type == PreceptScalarType.Choice &&
+            value is string strVal &&
+            contract.ChoiceValues is not null &&
+            !contract.ChoiceValues.Contains(strVal, StringComparer.Ordinal))
+        {
+            error = $"Data assignment failed: '{strVal}' is not a member of choice({string.Join(", ", contract.ChoiceValues.Select(v => $"\"{v}\""))}) for field '{contract.Name}'.";
+            return false;
+        }
+
+        error = string.Empty;
+        return true;
     }
 
-    private static bool TryValidateScalarValue(string name, PreceptScalarType type, bool isNullable, object? value, out string? error)
+    private static bool TryValidateScalarValue(string name, PreceptScalarType type, bool isNullable, object? value, out string error)
     {
         if (value is null)
         {
@@ -1553,6 +2018,9 @@ public sealed class PreceptEngine
             PreceptScalarType.String => value is string,
             PreceptScalarType.Boolean => value is bool,
             PreceptScalarType.Number => value is byte or sbyte or short or ushort or int or uint or long or ulong or float or double or decimal,
+            PreceptScalarType.Integer => value is long or int or short or byte or sbyte,
+            PreceptScalarType.Decimal => value is decimal or double or float or long or int or short or byte or sbyte,
+            PreceptScalarType.Choice => value is string,
             PreceptScalarType.Null => false,
             _ => false
         };
@@ -1595,23 +2063,26 @@ public static class PreceptCompiler
 
         var diagnostics = new List<PreceptValidationDiagnostic>();
 
-        // SYNC:CONSTRAINT:C27
-        if (string.IsNullOrWhiteSpace(model.InitialState.Name))
+        if (!model.IsStateless)
         {
-            diagnostics.Add(new PreceptValidationDiagnostic(
-                DiagnosticCatalog.C27,
-                DiagnosticCatalog.C27.FormatMessage(),
-                model.SourceLine));
-        }
+            // SYNC:CONSTRAINT:C27
+            if (string.IsNullOrWhiteSpace(model.InitialState!.Name))
+            {
+                diagnostics.Add(new PreceptValidationDiagnostic(
+                    DiagnosticCatalog.C27,
+                    DiagnosticCatalog.C27.FormatMessage(),
+                    model.SourceLine));
+            }
 
-        // SYNC:CONSTRAINT:C28
-        if (!model.States.Any(state => string.Equals(state.Name, model.InitialState.Name, StringComparison.Ordinal)))
-        {
-            diagnostics.Add(new PreceptValidationDiagnostic(
-                DiagnosticCatalog.C28,
-                DiagnosticCatalog.C28.FormatMessage(("stateName", model.InitialState.Name), ("workflowName", model.Name)),
-                model.InitialState.SourceLine > 0 ? model.InitialState.SourceLine : model.SourceLine,
-                StateContext: model.InitialState.Name));
+            // SYNC:CONSTRAINT:C28
+            if (!model.States.Any(state => string.Equals(state.Name, model.InitialState!.Name, StringComparison.Ordinal)))
+            {
+                diagnostics.Add(new PreceptValidationDiagnostic(
+                    DiagnosticCatalog.C28,
+                    DiagnosticCatalog.C28.FormatMessage(("stateName", model.InitialState!.Name), ("workflowName", model.Name)),
+                    model.InitialState!.SourceLine > 0 ? model.InitialState!.SourceLine : model.SourceLine,
+                    StateContext: model.InitialState!.Name));
+            }
         }
 
         // SYNC:CONSTRAINT:C38
@@ -1625,12 +2096,16 @@ public static class PreceptCompiler
         var typeCheck = PreceptTypeChecker.Check(model);
         diagnostics.AddRange(typeCheck.Diagnostics);
 
+        // Thread computed field evaluation order onto the model for runtime consumption
+        if (typeCheck.ComputedFieldOrder is not null)
+            model = model with { ComputedFieldOrder = typeCheck.ComputedFieldOrder };
+
         CollectCompileTimeDiagnostics(model, diagnostics);
 
         if (!diagnostics.Any(diagnostic => diagnostic.Constraint.Id is "C27" or "C28"))
             diagnostics.AddRange(PreceptAnalysis.Analyze(model).Diagnostics);
 
-        return new ValidationResult(diagnostics, typeCheck.TypeContext);
+        return new ValidationResult(diagnostics, typeCheck.TypeContext, model);
     }
 
     public static CompileFromTextResult CompileFromText(string text)
@@ -1640,18 +2115,20 @@ public static class PreceptCompiler
             return new CompileFromTextResult(null, null, parseDiagnostics.Select(ToDiagnostic).ToArray());
 
         var validation = Validate(model);
+        var validatedModel = validation.ValidatedModel ?? model;
         var diagnostics = validation.Diagnostics.Select(ToDiagnostic).ToArray();
         if (validation.HasErrors)
-            return new CompileFromTextResult(model, null, diagnostics);
+            return new CompileFromTextResult(validatedModel, null, diagnostics);
 
-        return new CompileFromTextResult(model, new PreceptEngine(model), diagnostics);
+        return new CompileFromTextResult(validatedModel, new PreceptEngine(validatedModel), diagnostics);
     }
 
     public static PreceptEngine Compile(PreceptDefinition model)
     {
         var validation = Validate(model);
         ThrowIfValidationFailed(validation);
-        return new PreceptEngine(model);
+        var validatedModel = validation.ValidatedModel ?? model;
+        return new PreceptEngine(validatedModel);
     }
 
     private static PreceptDiagnostic ToDiagnostic(ParseDiagnostic diagnostic)
@@ -1679,13 +2156,55 @@ public static class PreceptCompiler
         CollectDuplicateStateAssertDiagnostics(model, diagnostics);
         CollectSubsumedStateAssertDiagnostics(model, diagnostics);
 
+        // SYNC:CONSTRAINT:C55
+        if (!model.IsStateless && model.EditBlocks is { Count: > 0 })
+        {
+            foreach (var eb in model.EditBlocks.Where(static eb => eb.State is null))
+            {
+                diagnostics.Add(new PreceptValidationDiagnostic(
+                    DiagnosticCatalog.C55,
+                    DiagnosticCatalog.C55.FormatMessage(),
+                    eb.SourceLine));
+            }
+        }
+
         var defaultData = BuildDefaultData(model);
 
+        // Recompute derived fields so compile-time invariant checks see fresh computed values
+        if (model.ComputedFieldOrder is { Count: > 0 })
+        {
+            var mutableData = new Dictionary<string, object?>(defaultData, StringComparer.Ordinal);
+            var fieldMap = model.Fields.ToDictionary(static f => f.Name, StringComparer.Ordinal);
+            foreach (var cfName in model.ComputedFieldOrder)
+            {
+                if (fieldMap.TryGetValue(cfName, out var cf) && cf.DerivedExpression is not null)
+                {
+                    var result = PreceptExpressionRuntimeEvaluator.Evaluate(cf.DerivedExpression, mutableData, fieldMap);
+                    if (result.Success)
+                        mutableData[cfName] = result.Value;
+                }
+            }
+            defaultData = mutableData;
+        }
+
         // 1. Validate invariants against default values
+        //    Synthetic invariants (generated by field constraint desugaring) are skipped:
+        //    C59 covers bad defaults for scalar constraints; collection constraints have no
+        //    user-declared default and should not block compilation of the precept.
         if (model.Invariants is { Count: > 0 })
         {
             foreach (var inv in model.Invariants)
             {
+                if (inv.IsSynthetic) continue;
+
+                // Guard pre-flight: skip guarded invariants whose guard is false at defaults
+                if (inv.WhenGuard is not null)
+                {
+                    var guardResult = PreceptExpressionRuntimeEvaluator.Evaluate(inv.WhenGuard, defaultData);
+                    if (!guardResult.Success || guardResult.Value is not true)
+                        continue;
+                }
+
                 var result = PreceptExpressionRuntimeEvaluator.Evaluate(inv.Expression, defaultData);
                 if (!result.Success || result.Value is not bool boolVal || !boolVal)
                 {
@@ -1699,15 +2218,24 @@ public static class PreceptCompiler
         }
 
         // 2. Validate initial state asserts (in + to) against default data
-        if (model.StateAsserts is { Count: > 0 })
+        // Stateless precepts have no state asserts — InitialState is null and this block is unreachable for them.
+        if (!model.IsStateless && model.StateAsserts is { Count: > 0 })
         {
-            var initialStateName = model.InitialState.Name;
+            var initialStateName = model.InitialState!.Name;
             foreach (var sa in model.StateAsserts)
             {
                 if (!string.Equals(sa.State, initialStateName, StringComparison.Ordinal))
                     continue;
                 if (sa.Anchor is not (AssertAnchor.In or AssertAnchor.To))
                     continue;
+
+                // Guard pre-flight: skip guarded state asserts whose guard is false at defaults
+                if (sa.WhenGuard is not null)
+                {
+                    var guardResult = PreceptExpressionRuntimeEvaluator.Evaluate(sa.WhenGuard, defaultData);
+                    if (!guardResult.Success || guardResult.Value is not true)
+                        continue;
+                }
 
                 var result = PreceptExpressionRuntimeEvaluator.Evaluate(sa.Expression, defaultData);
                 if (!result.Success || result.Value is not bool boolVal || !boolVal)
@@ -1754,6 +2282,14 @@ public static class PreceptCompiler
 
                 if (!allArgsHaveDefaults)
                     continue;
+
+                // Guard pre-flight: skip guarded event asserts whose guard is false at defaults
+                if (ea.WhenGuard is not null)
+                {
+                    var guardResult = PreceptExpressionRuntimeEvaluator.Evaluate(ea.WhenGuard, eventDefaults);
+                    if (!guardResult.Success || guardResult.Value is not true)
+                        continue;
+                }
 
                 var result = PreceptExpressionRuntimeEvaluator.Evaluate(ea.Expression, eventDefaults);
                 if (!result.Success || result.Value is not bool boolVal || !boolVal)
@@ -1885,7 +2421,7 @@ public static class PreceptCompiler
 
 public sealed record PreceptInstance(
     string WorkflowName,
-    string CurrentState,
+    string? CurrentState,
     string? LastEvent,
     DateTimeOffset UpdatedAt,
     IReadOnlyDictionary<string, object?> InstanceData);
@@ -1917,7 +2453,7 @@ internal sealed class EmptyInstanceData : IReadOnlyDictionary<string, object?>
 
 public sealed record EventInspectionResult(
     TransitionOutcome Outcome,
-    string CurrentState,
+    string? CurrentState,
     string EventName,
     string? TargetState,
     IReadOnlyList<string> RequiredEventArgumentKeys,
@@ -1926,28 +2462,28 @@ public sealed record EventInspectionResult(
     public bool IsSuccess => Outcome is TransitionOutcome.Transition
         or TransitionOutcome.NoTransition;
 
-    internal static EventInspectionResult Transitioned(string state, string evt, string target, IReadOnlyList<string> requiredEventArgumentKeys) =>
+    internal static EventInspectionResult Transitioned(string? state, string evt, string target, IReadOnlyList<string> requiredEventArgumentKeys) =>
         new(TransitionOutcome.Transition, state, evt, target, requiredEventArgumentKeys, Array.Empty<ConstraintViolation>());
 
-    internal static EventInspectionResult NoTransition(string state, string evt) =>
+    internal static EventInspectionResult NoTransition(string? state, string evt) =>
         new(TransitionOutcome.NoTransition, state, evt, state, Array.Empty<string>(), Array.Empty<ConstraintViolation>());
 
-    internal static EventInspectionResult Undefined(string state, string evt, string reason) =>
+    internal static EventInspectionResult Undefined(string? state, string evt, string reason) =>
         new(TransitionOutcome.Undefined, state, evt, null, Array.Empty<string>(),
             new[] { ConstraintViolation.Simple(reason) });
 
-    internal static EventInspectionResult Unmatched(string state, string evt) =>
+    internal static EventInspectionResult Unmatched(string? state, string evt) =>
         new(TransitionOutcome.Unmatched, state, evt, null, Array.Empty<string>(), Array.Empty<ConstraintViolation>());
 
-    internal static EventInspectionResult Rejected(string state, string evt, IReadOnlyList<ConstraintViolation> violations) =>
+    internal static EventInspectionResult Rejected(string? state, string evt, IReadOnlyList<ConstraintViolation> violations) =>
         new(TransitionOutcome.Rejected, state, evt, null, Array.Empty<string>(), violations);
 
-    internal static EventInspectionResult ConstraintFailure(string state, string evt, IReadOnlyList<ConstraintViolation> violations) =>
+    internal static EventInspectionResult ConstraintFailure(string? state, string evt, IReadOnlyList<ConstraintViolation> violations) =>
         new(TransitionOutcome.ConstraintFailure, state, evt, null, Array.Empty<string>(), violations);
 }
 
 public sealed record InspectionResult(
-    string CurrentState,
+    string? CurrentState,
     IReadOnlyDictionary<string, object?> InstanceData,
     IReadOnlyList<EventInspectionResult> Events,
     IReadOnlyList<PreceptEditableFieldInfo>? EditableFields = null);
@@ -2140,7 +2676,7 @@ internal sealed class EmptyStringSet : IReadOnlySet<string>
 
 public sealed record FireResult(
     TransitionOutcome Outcome,
-    string PreviousState,
+    string? PreviousState,
     string EventName,
     string? NewState,
     IReadOnlyList<ConstraintViolation> Violations,
@@ -2149,25 +2685,25 @@ public sealed record FireResult(
     public bool IsSuccess => Outcome is TransitionOutcome.Transition
         or TransitionOutcome.NoTransition;
 
-    internal static FireResult Transitioned(string state, string evt, string newState, PreceptInstance updated) =>
+    internal static FireResult Transitioned(string? state, string evt, string newState, PreceptInstance updated) =>
         new(TransitionOutcome.Transition, state, evt, newState, Array.Empty<ConstraintViolation>(), updated);
 
-    internal static FireResult NoTransition(string state, string evt, PreceptInstance updated) =>
+    internal static FireResult NoTransition(string? state, string evt, PreceptInstance updated) =>
         new(TransitionOutcome.NoTransition, state, evt, state, Array.Empty<ConstraintViolation>(), updated);
 
-    internal static FireResult Undefined(string state, string evt, IReadOnlyList<string> reasons) =>
+    internal static FireResult Undefined(string? state, string evt, IReadOnlyList<string> reasons) =>
         new(TransitionOutcome.Undefined, state, evt, null,
             reasons.Select(r => new ConstraintViolation(r,
                 new ConstraintSource.InvariantSource("", r),
                 new[] { new ConstraintTarget.DefinitionTarget() as ConstraintTarget })).ToList(), null);
 
-    internal static FireResult Unmatched(string state, string evt) =>
+    internal static FireResult Unmatched(string? state, string evt) =>
         new(TransitionOutcome.Unmatched, state, evt, null, Array.Empty<ConstraintViolation>(), null);
 
-    internal static FireResult Rejected(string state, string evt, IReadOnlyList<ConstraintViolation> violations) =>
+    internal static FireResult Rejected(string? state, string evt, IReadOnlyList<ConstraintViolation> violations) =>
         new(TransitionOutcome.Rejected, state, evt, null, violations, null);
 
-    internal static FireResult ConstraintFailure(string state, string evt, IReadOnlyList<ConstraintViolation> violations) =>
+    internal static FireResult ConstraintFailure(string? state, string evt, IReadOnlyList<ConstraintViolation> violations) =>
         new(TransitionOutcome.ConstraintFailure, state, evt, null, violations, null);
 }
 

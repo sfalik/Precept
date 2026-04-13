@@ -14,7 +14,7 @@ public static class UpdateTool
     [Description("Apply a direct field edit to a precept instance and return the result — including any constraint violations.")]
     public static UpdateToolResult Update(
         [Description("The precept definition text")] string text,
-        [Description("Current state name")] string currentState,
+        [Description("Current state name. Pass null for stateless precepts.")] string? currentState,
         [Description("Current instance data (field name → value)")] Dictionary<string, object?>? data = null,
         [Description("Fields to update (field name → new value)")] Dictionary<string, object?>? fields = null)
     {
@@ -28,7 +28,12 @@ public static class UpdateTool
         PreceptInstance instance;
         try
         {
-            instance = engine.CreateInstance(currentState, nativeData?.AsReadOnly());
+            if (engine.IsStateless)
+                instance = engine.CreateInstance(nativeData?.AsReadOnly());
+            else if (string.IsNullOrWhiteSpace(currentState))
+                return UpdateToolResult.WithError("currentState is required for stateful precepts.");
+            else
+                instance = engine.CreateInstance(currentState, nativeData?.AsReadOnly());
         }
         catch (Exception ex)
         {
@@ -40,11 +45,19 @@ public static class UpdateTool
 
         var nativeFields = JsonConvert.ToNativeDict(fields)!;
 
-        var updateResult = engine.Update(instance, patch =>
+        UpdateResult updateResult;
+        try
         {
-            foreach (var kvp in nativeFields)
-                patch.Set(kvp.Key, kvp.Value);
-        });
+            updateResult = engine.Update(instance, patch =>
+            {
+                foreach (var kvp in nativeFields)
+                    patch.Set(kvp.Key, kvp.Value);
+            });
+        }
+        catch (Exception ex)
+        {
+            return UpdateToolResult.WithError($"Update failed: {ex.Message}");
+        }
 
         var violations = updateResult.Violations.Select(ViolationDtoMapper.Map).ToList();
 

@@ -8,7 +8,8 @@ field Severity as number default 3
 field AssignedAgent as string nullable
 field LastQueuedAgent as string nullable
 field ResolutionNote as string nullable
-field ReopenCount as number default 0
+field ReopenCount as integer default 0
+field Priority as choice("Low","Medium","High","Critical") default "Low"
 
 field AgentQueue as queue of string
 
@@ -23,13 +24,14 @@ state Resolved
 state Closed
 
 in Assigned assert AssignedAgent != null because "Assigned tickets must name an agent"
+in New edit Priority
 
 event RegisterAgent with AgentName as string
 on RegisterAgent assert AgentName != "" because "An agent name is required"
 
 event Triage with Title as string, Level as number default 3
 on Triage assert Title != "" because "A ticket title is required"
-on Triage assert Level >= 1 && Level <= 5 because "Severity must stay within the supported range"
+on Triage assert Level >= 1 and Level <= 5 because "Severity must stay within the supported range"
 
 event Assign
 
@@ -40,7 +42,7 @@ on Resolve assert Note != "" because "A resolution note is required"
 event CloseTicket
 
 event Reopen with Note as string nullable default null
-on Reopen assert Note == null || Note != "" because "A supplied reopen note cannot be blank"
+on Reopen assert Note == null or Note != "" because "A supplied reopen note cannot be blank"
 
 from New on RegisterAgent -> enqueue AgentQueue RegisterAgent.AgentName -> no transition
 from Assigned on RegisterAgent -> enqueue AgentQueue RegisterAgent.AgentName -> no transition

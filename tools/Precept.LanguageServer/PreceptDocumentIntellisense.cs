@@ -17,8 +17,9 @@ internal static class PreceptDocumentIntellisense
     private static readonly Regex PreceptDeclRegex = new("^\\s*precept\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Compiled);
     private static readonly Regex StateDeclRegex = new("^\\s*state\\s+(?<rest>.+)$", RegexOptions.Compiled);
     private static readonly Regex EventDeclRegex = new("^\\s*event\\s+(?<rest>.+)$", RegexOptions.Compiled);
-    private static readonly Regex FieldDeclRegex = new("^\\s*field\\s+(?<rest>(?:[A-Za-z_][A-Za-z0-9_]*\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*)\\s+as\\s+(?<type>string|number|boolean)(?:\\s|$)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-    private static readonly Regex CollectionFieldDeclRegex = new("^\\s*field\\s+(?<rest>(?:[A-Za-z_][A-Za-z0-9_]*\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*)\\s+as\\s+(?<kind>set|queue|stack)\\s+of\\s+(?<type>string|number|boolean)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex FieldDeclRegex = new("^\\s*field\\s+(?<rest>(?:[A-Za-z_]\\w*\\s*,\\s*)*[A-Za-z_]\\w*)\\s+as\\s+(?<type>string|number|boolean|integer|decimal)(?:\\s|$)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex ChoiceFieldDeclRegex = new("^\\s*field\\s+(?<rest>(?:[A-Za-z_]\\w*\\s*,\\s*)*[A-Za-z_]\\w*)\\s+as\\s+choice\\(", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex CollectionFieldDeclRegex = new("^\\s*field\\s+(?<rest>(?:[A-Za-z_]\\w*\\s*,\\s*)*[A-Za-z_]\\w*)\\s+as\\s+(?<kind>set|queue|stack)\\s+of\\s+(?<type>string|number|boolean|integer|decimal|choice)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex EventWithArgsRegex = new("^\\s*event\\s+(?<names>(?:[A-Za-z_][A-Za-z0-9_]*\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*)\\s+with\\s+(?<args>.+)$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex IdentifierPattern = new("[A-Za-z_][A-Za-z0-9_]*", RegexOptions.Compiled);
     private static readonly HashSet<string> StateKeywords = new(StringComparer.Ordinal) { "initial" };
@@ -27,6 +28,29 @@ internal static class PreceptDocumentIntellisense
     private static readonly Regex StateClauseRegex = new("^\\s*(?<prep>in|to|from)\\s+(?<states>any|[A-Za-z_][A-Za-z0-9_]*(?:\\s*,\\s*[A-Za-z_][A-Za-z0-9_]*)*)\\s+(?<tail>assert|edit|->)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex EventAssertRegex = new("^\\s*on\\s+(?<event>[A-Za-z_][A-Za-z0-9_]*)\\s+assert\\s+", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex TransitionOutcomeRegex = new("\\btransition\\s+(?<state>[A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    /// <summary>Hover content for built-in function names, keyed by function name.</summary>
+    private static readonly Dictionary<string, string> FunctionHoverContent = new(StringComparer.Ordinal)
+    {
+        ["abs"] = "```precept\nabs(value)\n```\n\nAbsolute value. Returns the non-negative magnitude.\n\nExample: `abs(-5)` → `5`",
+        ["floor"] = "```precept\nfloor(value)\n```\n\nRound down to the nearest integer.\n\nExample: `floor(3.7)` → `3`",
+        ["ceil"] = "```precept\nceil(value)\n```\n\nRound up to the nearest integer.\n\nExample: `ceil(3.2)` → `4`",
+        ["round"] = "```precept\nround(value)\nround(value, places)\n```\n\nRound to nearest integer (1-arg) or to N decimal places (2-arg).\n\nExample: `round(3.456, 2)` → `3.46`",
+        ["truncate"] = "```precept\ntruncate(value)\n```\n\nTruncate toward zero, removing the fractional part.\n\nExample: `truncate(3.9)` → `3`",
+        ["min"] = "```precept\nmin(a, b, ...)\n```\n\nMinimum of two or more values.\n\nExample: `min(Price, Limit)` → the smaller value",
+        ["max"] = "```precept\nmax(a, b, ...)\n```\n\nMaximum of two or more values.\n\nExample: `max(Score, Threshold)` → the larger value",
+        ["pow"] = "```precept\npow(base, exponent)\n```\n\nRaise to an integer power.\n\nExample: `pow(2, 3)` → `8`",
+        ["sqrt"] = "```precept\nsqrt(value)\n```\n\nSquare root. Requires non-negative argument (compile-time proof).\n\nExample: `sqrt(16)` → `4`",
+        ["clamp"] = "```precept\nclamp(value, lo, hi)\n```\n\nClamp value to range [lo, hi].\n\nExample: `clamp(Score, 0, 100)` → value bounded to 0–100",
+        ["toLower"] = "```precept\ntoLower(str)\n```\n\nConvert string to lowercase.\n\nExample: `toLower(Email)` → `\"user@example.com\"`",
+        ["toUpper"] = "```precept\ntoUpper(str)\n```\n\nConvert string to uppercase.\n\nExample: `toUpper(Code)` → `\"ABC\"`",
+        ["startsWith"] = "```precept\nstartsWith(str, prefix)\n```\n\nCheck if string starts with prefix. Returns boolean.\n\nExample: `startsWith(Email, \"admin@\")`",
+        ["endsWith"] = "```precept\nendsWith(str, suffix)\n```\n\nCheck if string ends with suffix. Returns boolean.\n\nExample: `endsWith(File, \".pdf\")`",
+        ["trim"] = "```precept\ntrim(str)\n```\n\nRemove leading and trailing whitespace.\n\nExample: `trim(Name)` → `\"Alice\"`",
+        ["left"] = "```precept\nleft(str, count)\n```\n\nFirst N characters (1-indexed, clamping).\n\nExample: `left(Code, 3)` → `\"ABC\"` from `\"ABCDEF\"`",
+        ["right"] = "```precept\nright(str, count)\n```\n\nLast N characters (clamping).\n\nExample: `right(Code, 3)` → `\"DEF\"` from `\"ABCDEF\"`",
+        ["mid"] = "```precept\nmid(str, start, count)\n```\n\nSubstring from position (1-indexed, clamping).\n\nExample: `mid(Code, 2, 3)` → `\"BCD\"` from `\"ABCDEF\"`",
+    };
 
     internal static PreceptDocumentInfo Analyze(string text)
     {
@@ -170,6 +194,27 @@ internal static class PreceptDocumentIntellisense
             };
         }
 
+        // Check if the word is a built-in function name followed by (
+        if (FunctionHoverContent.TryGetValue(word, out var functionHover))
+        {
+            // Verify it's actually a function call (followed by '(' on the line)
+            var afterEnd = end;
+            while (afterEnd < line.Length && char.IsWhiteSpace(line[afterEnd]))
+                afterEnd++;
+            if (afterEnd < line.Length && line[afterEnd] == '(')
+            {
+                return new Hover
+                {
+                    Contents = new MarkedStringsOrMarkupContent(new MarkupContent
+                    {
+                        Kind = MarkupKind.Markdown,
+                        Value = functionHover
+                    }),
+                    Range = CreateRange((int)position.Line, start, end)
+                };
+            }
+        }
+
         // Fall back to token keyword description (Tier 1)
         var tokenDict = PreceptTokenMeta.BuildKeywordDictionary();
         if (tokenDict.TryGetValue(word, out var token))
@@ -260,6 +305,28 @@ internal static class PreceptDocumentIntellisense
             TryBuildCollectionAccessorSymbol(collectionDeclaration, identifier, collectionKind, out var accessorSymbol))
         {
             resolved = new PreceptResolvedSymbol(accessorSymbol, referenceRange);
+            return true;
+        }
+
+        if (string.Equals(identifier, "length", StringComparison.Ordinal) &&
+            info.Declarations.Fields.TryGetValue(leftIdentifier, out var stringFieldDecl) &&
+            info.FieldTypeKinds.TryGetValue(leftIdentifier, out var fieldKind) &&
+            (fieldKind & StaticValueKind.String) != 0)
+        {
+            var isNullable = (fieldKind & StaticValueKind.Null) != 0;
+            var doc = isNullable
+                ? $"```precept\n{leftIdentifier}.length\n```\n\nString accessor returning `number` (UTF-16 code unit count).\nRequires null guard: `{leftIdentifier} != null and {leftIdentifier}.length ...`"
+                : $"```precept\n{leftIdentifier}.length\n```\n\nString accessor returning `number` (UTF-16 code unit count).";
+            resolved = new PreceptResolvedSymbol(
+                new PreceptDeclaredSymbol(
+                    $"{leftIdentifier}.length",
+                    PreceptDeclaredSymbolKind.CollectionAccessor,
+                    "number",
+                    stringFieldDecl.Range,
+                    stringFieldDecl.SelectionRange,
+                    stringFieldDecl.ContainerName,
+                    doc),
+                referenceRange);
             return true;
         }
 
@@ -452,6 +519,30 @@ internal static class PreceptDocumentIntellisense
                 continue;
             }
 
+            var choiceFieldMatch = ChoiceFieldDeclRegex.Match(line);
+            if (choiceFieldMatch.Success)
+            {
+                var namesGroup = choiceFieldMatch.Groups["rest"];
+                foreach (Match nameMatch in IdentifierPattern.Matches(namesGroup.Value))
+                {
+                    var name = nameMatch.Value;
+                    fieldsByName.TryGetValue(name, out var field);
+                    var detail = field is not null ? FormatScalarFieldDetail(field) : "choice";
+                    var nameStart = namesGroup.Index + nameMatch.Index;
+                    var symbol = new PreceptDeclaredSymbol(
+                        name,
+                        PreceptDeclaredSymbolKind.Field,
+                        detail,
+                        CreateLineRange(lineIndex, line),
+                        CreateRange(lineIndex, nameStart, nameStart + name.Length),
+                        null,
+                        BuildFieldMarkdown(name, field));
+                    fields[name] = symbol;
+                    ordered.Add(symbol);
+                }
+                continue;
+            }
+
             var stateMatch = StateDeclRegex.Match(line);
             if (stateMatch.Success)
             {
@@ -462,7 +553,7 @@ internal static class PreceptDocumentIntellisense
                     var name = nameMatch.Value;
                     if (StateKeywords.Contains(name))
                         continue;
-                    var isInitial = model is not null && string.Equals(model.InitialState.Name, name, StringComparison.Ordinal);
+                    var isInitial = model is not null && string.Equals(model.InitialState?.Name, name, StringComparison.Ordinal);
                     var nameStart = restStart + nameMatch.Index;
                     var symbol = new PreceptDeclaredSymbol(
                         name,
@@ -664,17 +755,90 @@ internal static class PreceptDocumentIntellisense
         if (field is null)
             return $"```precept\nfield {name}\n```\n\nField declaration.";
 
-        var lines = new List<string>
+        var typeLabel = field.Type == PreceptScalarType.Choice && field.ChoiceValues?.Count > 0
+            ? $"choice({string.Join(", ", field.ChoiceValues.Select(v => $"\"{v}\""))})"
+            : FormatScalarType(field.Type, field.IsNullable);
+
+        if (field.IsComputed)
         {
-            $"```precept\nfield {name} as {FormatScalarType(field.Type, field.IsNullable)}{(field.HasDefaultValue ? $" default {field.DefaultValue}" : string.Empty)}\n```",
-            string.Empty,
-            $"Type: `{FormatScalarType(field.Type, field.IsNullable)}`"
-        };
+            var exprText = field.DerivedExpressionText ?? "?";
+            var deps = CollectDependencyFields(field.DerivedExpression);
+            var depsLine = deps.Count > 0
+                ? $"Dependencies: {string.Join(", ", deps)}"
+                : string.Empty;
+            var lines = new List<string>
+            {
+                $"```precept\nfield {name} as {typeLabel} -> {exprText}\n```",
+                string.Empty,
+                $"**computed** field `{name}` as `{typeLabel}` → `{exprText}`"
+            };
+            if (depsLine.Length > 0)
+                lines.Add(depsLine);
+            return string.Join("\n", lines);
+        }
 
-        if (field.HasDefaultValue)
-            lines.Add($"Default: `{field.DefaultValue ?? "null"}`");
+        {
+            var suffix = new System.Text.StringBuilder();
+            if (field.IsNullable) suffix.Append(" nullable");
+            if (field.IsOrdered) suffix.Append(" ordered");
+            if (field.HasDefaultValue) suffix.Append($" default {field.DefaultValue}");
 
-        return string.Join("\n", lines);
+            var lines = new List<string>
+            {
+                $"```precept\nfield {name} as {typeLabel}{suffix}\n```",
+                string.Empty,
+                $"Type: `{typeLabel}`"
+            };
+
+            if (field.IsOrdered)
+                lines.Add($"Ordered: values compare in declaration order");
+
+            if (field.HasDefaultValue)
+                lines.Add($"Default: `{field.DefaultValue ?? "null"}`");
+
+            return string.Join("\n", lines);
+        }
+    }
+
+    /// <summary>
+    /// Collects the names of field identifiers referenced by a derived expression,
+    /// in declaration order (first occurrence, depth-first).
+    /// </summary>
+    private static IReadOnlyList<string> CollectDependencyFields(PreceptExpression? expr)
+    {
+        if (expr is null) return Array.Empty<string>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var result = new List<string>();
+        CollectDeps(expr, seen, result);
+        return result;
+
+        static void CollectDeps(PreceptExpression node, HashSet<string> visited, List<string> output)
+        {
+            switch (node)
+            {
+                case PreceptIdentifierExpression id:
+                    if (visited.Add(id.Name)) output.Add(id.Name);
+                    break;
+                case PreceptBinaryExpression bin:
+                    CollectDeps(bin.Left, visited, output);
+                    CollectDeps(bin.Right, visited, output);
+                    break;
+                case PreceptUnaryExpression un:
+                    CollectDeps(un.Operand, visited, output);
+                    break;
+                case PreceptParenthesizedExpression paren:
+                    CollectDeps(paren.Inner, visited, output);
+                    break;
+                case PreceptFunctionCallExpression func:
+                    foreach (var arg in func.Arguments) CollectDeps(arg, visited, output);
+                    break;
+                case PreceptConditionalExpression cond:
+                    CollectDeps(cond.Condition, visited, output);
+                    CollectDeps(cond.ThenBranch, visited, output);
+                    CollectDeps(cond.ElseBranch, visited, output);
+                    break;
+            }
+        }
     }
 
     private static string BuildEventMarkdown(string name, PreceptEvent? evt)
@@ -698,6 +862,8 @@ internal static class PreceptDocumentIntellisense
 
     private static string FormatScalarFieldDetail(PreceptField field)
     {
+        if (field.IsComputed)
+            return $"{FormatScalarType(field.Type, field.IsNullable)} (computed)";
         var detail = FormatScalarType(field.Type, field.IsNullable);
         if (field.HasDefaultValue)
             detail += $" = {field.DefaultValue ?? "null"}";

@@ -14,6 +14,7 @@ public enum TokenCategory
     Action,
     Outcome,
     Grammar,
+    Constraint,
     Type,
     Literal,
     Operator,
@@ -92,7 +93,7 @@ public enum PreceptToken
     [TokenSymbol("because")]
     Because,
 
-    [TokenCategory(TokenCategory.Control)]
+    [TokenCategory(TokenCategory.Declaration)]
     [TokenDescription("Declares a state")]
     [TokenSymbol("state")]
     State,
@@ -124,22 +125,22 @@ public enum PreceptToken
 
     // ═══ Keywords: prepositions + modifiers ═══
 
-    [TokenCategory(TokenCategory.Control)]
+    [TokenCategory(TokenCategory.Declaration)]
     [TokenDescription("While residing in a state")]
     [TokenSymbol("in")]
     In,
 
-    [TokenCategory(TokenCategory.Control)]
+    [TokenCategory(TokenCategory.Declaration)]
     [TokenDescription("Crossing into a state")]
     [TokenSymbol("to")]
     To,
 
-    [TokenCategory(TokenCategory.Control)]
+    [TokenCategory(TokenCategory.Declaration)]
     [TokenDescription("Crossing out of a state")]
     [TokenSymbol("from")]
     From,
 
-    [TokenCategory(TokenCategory.Control)]
+    [TokenCategory(TokenCategory.Declaration)]
     [TokenDescription("When an event fires")]
     [TokenSymbol("on")]
     On,
@@ -149,15 +150,92 @@ public enum PreceptToken
     [TokenSymbol("when")]
     When,
 
+    [TokenCategory(TokenCategory.Control)]
+    [TokenDescription("Conditional expression — selects between two values")]
+    [TokenSymbol("if")]
+    If,
+
+    [TokenCategory(TokenCategory.Control)]
+    [TokenDescription("Conditional expression — introduces the true branch")]
+    [TokenSymbol("then")]
+    Then,
+
+    [TokenCategory(TokenCategory.Control)]
+    [TokenDescription("Conditional expression — introduces the false branch")]
+    [TokenSymbol("else")]
+    Else,
+
     [TokenCategory(TokenCategory.Grammar)]
     [TokenDescription("Wildcard for all declared states")]
     [TokenSymbol("any")]
     Any,
 
     [TokenCategory(TokenCategory.Grammar)]
+    [TokenDescription("Quantifier for all declared fields")]
+    [TokenSymbol("all")]
+    All,
+
+    [TokenCategory(TokenCategory.Grammar)]
     [TokenDescription("Collection inner-type separator")]
     [TokenSymbol("of")]
     Of,
+
+    // ═══ Keywords: field-level constraints ═══
+
+    [TokenCategory(TokenCategory.Constraint)]
+    [TokenDescription("Constraint: value must be >= 0")]
+    [TokenSymbol("nonnegative")]
+    Nonnegative,
+
+    [TokenCategory(TokenCategory.Constraint)]
+    [TokenDescription("Constraint: value must be > 0")]
+    [TokenSymbol("positive")]
+    Positive,
+
+    [TokenCategory(TokenCategory.Constraint)]
+    [TokenDescription("Constraint: minimum value (number) or minimum count (collection)")]
+    [TokenSymbol("min")]
+    Min,
+
+    [TokenCategory(TokenCategory.Constraint)]
+    [TokenDescription("Constraint: maximum value (number) or maximum count (collection)")]
+    [TokenSymbol("max")]
+    Max,
+
+    [TokenCategory(TokenCategory.Constraint)]
+    [TokenDescription("Constraint: string or collection must not be empty")]
+    [TokenSymbol("notempty")]
+    Notempty,
+
+    [TokenCategory(TokenCategory.Constraint)]
+    [TokenDescription("Constraint: minimum string length")]
+    [TokenSymbol("minlength")]
+    Minlength,
+
+    [TokenCategory(TokenCategory.Constraint)]
+    [TokenDescription("Constraint: maximum string length")]
+    [TokenSymbol("maxlength")]
+    Maxlength,
+
+    [TokenCategory(TokenCategory.Constraint)]
+    [TokenDescription("Constraint: minimum collection element count")]
+    [TokenSymbol("mincount")]
+    Mincount,
+
+    [TokenCategory(TokenCategory.Constraint)]
+    [TokenDescription("Constraint: maximum collection element count")]
+    [TokenSymbol("maxcount")]
+    Maxcount,
+
+    [TokenCategory(TokenCategory.Constraint)]
+    [TokenDescription("Constraint: maximum decimal places (decimal fields only)")]
+    [TokenSymbol("maxplaces")]
+    Maxplaces,
+
+    [TokenCategory(TokenCategory.Constraint)]
+    [TokenDescription("Constraint: ordinal ordering for choice fields")]
+    [TokenSymbol("ordered")]
+    Ordered,
 
     // ═══ Keywords: actions ═══
 
@@ -242,6 +320,21 @@ public enum PreceptToken
     BooleanType,
 
     [TokenCategory(TokenCategory.Type)]
+    [TokenDescription("Integer scalar type")]
+    [TokenSymbol("integer")]
+    IntegerType,
+
+    [TokenCategory(TokenCategory.Type)]
+    [TokenDescription("Decimal scalar type — exact base-10 arithmetic")]
+    [TokenSymbol("decimal")]
+    DecimalType,
+
+    [TokenCategory(TokenCategory.Type)]
+    [TokenDescription("Choice type — constrained value set")]
+    [TokenSymbol("choice")]
+    ChoiceType,
+
+    [TokenCategory(TokenCategory.Type)]
     [TokenDescription("Queue collection type")]
     [TokenSymbol("queue")]
     Queue,
@@ -302,17 +395,17 @@ public enum PreceptToken
 
     [TokenCategory(TokenCategory.Operator)]
     [TokenDescription("Logical AND")]
-    [TokenSymbol("&&")]
+    [TokenSymbol("and")]
     And,
 
     [TokenCategory(TokenCategory.Operator)]
     [TokenDescription("Logical OR")]
-    [TokenSymbol("||")]
+    [TokenSymbol("or")]
     Or,
 
     [TokenCategory(TokenCategory.Operator)]
     [TokenDescription("Logical NOT")]
-    [TokenSymbol("!")]
+    [TokenSymbol("not")]
     Not,
 
     [TokenCategory(TokenCategory.Operator)]

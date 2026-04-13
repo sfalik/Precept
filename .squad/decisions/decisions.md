@@ -112,3 +112,71 @@ Treat `docs/HowWeGotHere.md` as a retrospective historical narrative, not as a l
 - Use the resulting SHA as the current branch's final planning reference until new work is intentionally started.
 
 ---
+
+# Decision: Issue #22 Design Fidelity Directive
+
+**Date:** 2026-04-08
+**By:** Shane (user directive)
+
+When implementing issue #22, if anything the team is going to implement strays from the design docs or seems ambiguous, they must stop and ask rather than guess. Design understanding is a prerequisite before coding starts.
+
+---
+
+# Decision: Issue #22 — Data-Only Precepts Design Q&A (12 Decisions)
+
+**Date:** 2026-04-08
+**By:** Shane (owner) via Squad Q&A
+**Issue:** #22 — Data-only precepts
+
+#### Decision 1: `all` keyword — field name collision
+No special handling needed. Adding `all` to `PreceptToken` with `[TokenSymbol("all")]` and `requireDelimiters: true` automatically reserves it. Using `all` as a field/state/precept name is a hard parse error by architecture.
+
+#### Decision 2: Root `edit` model representation
+Option A — make `State` nullable on the existing `PreceptEditBlock` record. Root-level edits have `State = null`. No new model type needed.
+
+#### Decision 3: Root `edit` parsing strategy
+Parser accepts both root `edit` and `in State edit` forms as valid syntax. The type checker enforces the constraint: root `edit` + states declared = compile error (C55) with migration guidance. Avoids backtracking in the Superpower parser.
+
+#### Decision 4: Events-in-stateless diagnostic code
+Reuse C49 (orphaned event). Events in stateless precepts trigger C49 — structurally they are orphaned (no state routing surface). No new diagnostic code needed.
+
+#### Decision 5: Root `edit` + states = compile error diagnostic
+New code C55, severity Error. Message: "Root-level `edit` is not valid when states are declared. Use `in any edit all` or `in <State> edit <Fields>` instead."
+
+#### Decision 6: Inspect for stateless — include events
+Include events in the Inspect result, each with outcome `Undefined`. Uses existing `TransitionOutcome.Undefined` — no new outcome needed.
+
+#### Decision 7: CreateInstance overloads for stateless
+Only the 1-arg `CreateInstance(data)` overload works for stateless precepts. The 2-arg `CreateInstance(state, data)` overload throws `ArgumentException` for any call on a stateless precept, even with null state.
+
+#### Decision 8: C50 severity upgrade — sample impact
+Confirmed safe. All 21 existing samples compile clean with zero C50 diagnostics. Upgrading from hint to warning surfaces no new warnings in the sample corpus.
+
+#### Decision 9: C29 invariant pre-flight for stateless
+C29 fires at compile time for stateless precepts, same as stateful. Invariants on default values are checked regardless of whether the precept has states.
+
+#### Decision 10: Event warnings — one per event
+One C49 warning per event. A stateless precept with 3 events produces 3 separate warnings, consistent with existing C49 behavior.
+
+#### Decision 11: Sample file names
+Use `customer-profile.precept`, `fee-schedule.precept`, `payment-method.precept` as placeholder samples. Shane plans a major sample overhaul later.
+
+#### Decision 12: Future root-level pattern
+`edit` is the only root-level declaration planned for stateless. No need to design a general extensible root-level pattern. Keep it as a single special case.
+
+---
+
+# Decision: Slice 7 Test Coverage — Known Gaps (Deferred)
+
+**Date:** 2026-04-08
+**By:** Soup Nazi (Tester)
+
+Three coverage gaps identified during Slice 7 test writing and explicitly deferred as non-blocking:
+
+1. No direct unit test for `GetEditableFieldNames(null)` internal API — covered indirectly via Inspect/Update paths.
+2. No multi-event stateless precept test — only single-event C49 path covered. Multiple C49 warnings (one per event) path is untested.
+3. `PreceptInstance.WorkflowName` mismatch on stateless Inspect not covered.
+
+These are known gaps, recorded for future test pass. Not blocking Slice 7 merge.
+
+---

@@ -833,7 +833,7 @@ public class NewSyntaxRuntimeTests
             state A initial
             state B
             event Go
-            from A on Go when X > 0 && Y > 0 -> transition B
+            from A on Go when X > 0 and Y > 0 -> transition B
             from A on Go -> no transition
             """;
 
@@ -983,5 +983,249 @@ public class NewSyntaxRuntimeTests
         var result = wf.Fire(inst, "Pay", coerced);
 
         result.Outcome.Should().Be(TransitionOutcome.NoTransition);
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // GUARDED INVARIANTS / ASSERTS — Forms 1–3 when guards
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Fire_GuardedInvariant_GuardTrue_ViolationReported()
+    {
+        const string dsl = """
+            precept Test
+            field X as number default 200
+            field Active as boolean default false
+            state Open initial, Closed
+            event Close with NewX as number
+            invariant X > 100 when Active because "X must be > 100 when active"
+            from Open on Close -> set X = Close.NewX -> transition Closed
+            """;
+
+        var wf = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
+        // Start with Active=true, X=200 (satisfies invariant) — then fire setting X=0
+        var inst = wf.CreateInstance("Open", new Dictionary<string, object?> { ["X"] = 200.0, ["Active"] = true });
+        var result = wf.Fire(inst, "Close", new Dictionary<string, object?> { ["NewX"] = 0.0 });
+
+        result.Outcome.Should().Be(TransitionOutcome.ConstraintFailure);
+        result.Violations.Should().Contain(v => v.Message.Contains("X must be > 100"));
+    }
+
+    [Fact]
+    public void Fire_GuardedInvariant_GuardFalse_NoViolation()
+    {
+        const string dsl = """
+            precept Test
+            field X as number default 200
+            field Active as boolean default false
+            state Open initial, Closed
+            event Close with NewX as number
+            invariant X > 100 when Active because "X must be > 100 when active"
+            from Open on Close -> set X = Close.NewX -> transition Closed
+            """;
+
+        var wf = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
+        // Active=false → guard is false → invariant skipped even though X becomes 0
+        var inst = wf.CreateInstance("Open", new Dictionary<string, object?> { ["X"] = 200.0, ["Active"] = false });
+        var result = wf.Fire(inst, "Close", new Dictionary<string, object?> { ["NewX"] = 0.0 });
+
+        result.Outcome.Should().Be(TransitionOutcome.Transition);
+        result.Violations.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Fire_GuardedStateAssert_GuardTrue_ViolationReported()
+    {
+        const string dsl = """
+            precept Test
+            field X as number default 10
+            field Active as boolean default false
+            state Open initial, Closed
+            event Reduce
+            in Open assert X > 0 when Active because "X must be positive when active"
+            from Open on Reduce -> set X = X - 20 -> no transition
+            """;
+
+        var wf = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
+        var inst = wf.CreateInstance("Open", new Dictionary<string, object?> { ["X"] = 10.0, ["Active"] = true });
+        var result = wf.Fire(inst, "Reduce");
+
+        result.Outcome.Should().Be(TransitionOutcome.ConstraintFailure);
+        result.Violations.Should().Contain(v => v.Message.Contains("X must be positive when active"));
+    }
+
+    [Fact]
+    public void Fire_GuardedStateAssert_GuardFalse_NoViolation()
+    {
+        const string dsl = """
+            precept Test
+            field X as number default 10
+            field Active as boolean default false
+            state Open initial, Closed
+            event Reduce
+            in Open assert X > 0 when Active because "X must be positive when active"
+            from Open on Reduce -> set X = X - 20 -> no transition
+            """;
+
+        var wf = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
+        var inst = wf.CreateInstance("Open", new Dictionary<string, object?> { ["X"] = 10.0, ["Active"] = false });
+        var result = wf.Fire(inst, "Reduce");
+
+        result.Outcome.Should().Be(TransitionOutcome.NoTransition);
+        result.Violations.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Fire_GuardedEventAssert_GuardTrue_ViolationReported()
+    {
+        const string dsl = """
+            precept Test
+            state Open initial, Closed
+            event Submit with Amount as number, Priority as number
+            on Submit assert Amount > 0 when Priority > 1 because "Amount required for high priority"
+            from Open on Submit -> transition Closed
+            """;
+
+        var wf = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
+        var inst = wf.CreateInstance("Open");
+        var result = wf.Fire(inst, "Submit", new Dictionary<string, object?> { ["Amount"] = 0.0, ["Priority"] = 5.0 });
+
+        result.Outcome.Should().Be(TransitionOutcome.Rejected);
+        result.Violations.Should().Contain(v => v.Message.Contains("Amount required for high priority"));
+    }
+
+    [Fact]
+    public void Fire_GuardedEventAssert_GuardFalse_NoViolation()
+    {
+        const string dsl = """
+            precept Test
+            state Open initial, Closed
+            event Submit with Amount as number, Priority as number
+            on Submit assert Amount > 0 when Priority > 1 because "Amount required for high priority"
+            from Open on Submit -> transition Closed
+            """;
+
+        var wf = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
+        var inst = wf.CreateInstance("Open");
+        var result = wf.Fire(inst, "Submit", new Dictionary<string, object?> { ["Amount"] = 0.0, ["Priority"] = 0.0 });
+
+        result.Outcome.Should().Be(TransitionOutcome.Transition);
+        result.Violations.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Fire_MultipleGuardedInvariants_CollectAll()
+    {
+        const string dsl = """
+            precept Test
+            field X as number default 200
+            field Y as number default 200
+            field CheckX as boolean default false
+            field CheckY as boolean default false
+            state Open initial, Closed
+            event Close with NewX as number, NewY as number
+            invariant X > 100 when CheckX because "X must be > 100"
+            invariant Y > 100 when CheckY because "Y must be > 100"
+            from Open on Close -> set X = Close.NewX -> set Y = Close.NewY -> transition Closed
+            """;
+
+        var wf = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
+        var inst = wf.CreateInstance("Open", new Dictionary<string, object?>
+        {
+            ["X"] = 200.0, ["Y"] = 200.0,
+            ["CheckX"] = true, ["CheckY"] = true
+        });
+        var result = wf.Fire(inst, "Close", new Dictionary<string, object?> { ["NewX"] = 0.0, ["NewY"] = 0.0 });
+
+        result.Outcome.Should().Be(TransitionOutcome.ConstraintFailure);
+        result.Violations.Should().HaveCountGreaterThanOrEqualTo(2);
+        result.Violations.Should().Contain(v => v.Message.Contains("X must be > 100"));
+        result.Violations.Should().Contain(v => v.Message.Contains("Y must be > 100"));
+    }
+
+    [Fact]
+    public void Fire_GuardedInvariant_WhenNot_SkipsWhenTrue()
+    {
+        const string dsl = """
+            precept Test
+            field X as number default 200
+            field Active as boolean default true
+            state Open initial, Closed
+            event Close with NewX as number
+            invariant X > 100 when not Active because "X must be > 100 when inactive"
+            from Open on Close -> set X = Close.NewX -> transition Closed
+            """;
+
+        var wf = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
+
+        // Active=true → guard (not Active) is false → invariant skipped
+        var inst1 = wf.CreateInstance("Open", new Dictionary<string, object?> { ["X"] = 200.0, ["Active"] = true });
+        var r1 = wf.Fire(inst1, "Close", new Dictionary<string, object?> { ["NewX"] = 0.0 });
+        r1.Outcome.Should().Be(TransitionOutcome.Transition);
+        r1.Violations.Should().BeEmpty();
+
+        // Active=false → guard (not Active) is true → invariant applies, X=0 fails
+        var inst2 = wf.CreateInstance("Open", new Dictionary<string, object?> { ["X"] = 200.0, ["Active"] = false });
+        var r2 = wf.Fire(inst2, "Close", new Dictionary<string, object?> { ["NewX"] = 0.0 });
+        r2.Outcome.Should().Be(TransitionOutcome.ConstraintFailure);
+        r2.Violations.Should().Contain(v => v.Message.Contains("X must be > 100 when inactive"));
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // GUARDED STATE/EVENT ASSERTS — when not
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Fire_GuardedStateAssert_WhenNot_SkipsWhenTrue()
+    {
+        const string dsl = """
+            precept Test
+            field X as number default 10
+            field Bypass as boolean default false
+            state Open initial, Closed
+            event Reduce
+            in Open assert X > 0 when not Bypass because "X must be positive unless bypassed"
+            from Open on Reduce -> set X = X - 20 -> no transition
+            """;
+
+        var wf = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
+
+        // Bypass=true → guard (not Bypass) is false → assert skipped, no violation
+        var inst1 = wf.CreateInstance("Open", new Dictionary<string, object?> { ["X"] = 10.0, ["Bypass"] = true });
+        var r1 = wf.Fire(inst1, "Reduce");
+        r1.Outcome.Should().Be(TransitionOutcome.NoTransition);
+        r1.Violations.Should().BeEmpty();
+
+        // Bypass=false → guard (not Bypass) is true → assert applies, X=-10 fails
+        var inst2 = wf.CreateInstance("Open", new Dictionary<string, object?> { ["X"] = 10.0, ["Bypass"] = false });
+        var r2 = wf.Fire(inst2, "Reduce");
+        r2.Outcome.Should().Be(TransitionOutcome.ConstraintFailure);
+        r2.Violations.Should().Contain(v => v.Message.Contains("X must be positive unless bypassed"));
+    }
+
+    [Fact]
+    public void Fire_GuardedEventAssert_WhenNot_SkipsWhenTrue()
+    {
+        const string dsl = """
+            precept Test
+            state Open initial, Closed
+            event Submit with Amount as number, IsDraft as boolean
+            on Submit assert Submit.Amount > 0 when not Submit.IsDraft because "Amount required for non-draft"
+            from Open on Submit -> transition Closed
+            """;
+
+        var wf = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
+        var inst = wf.CreateInstance("Open");
+
+        // IsDraft=true → guard (not IsDraft) is false → assert skipped, Amount=0 allowed
+        var r1 = wf.Fire(inst, "Submit", new Dictionary<string, object?> { ["Amount"] = 0.0, ["IsDraft"] = true });
+        r1.Outcome.Should().Be(TransitionOutcome.Transition);
+        r1.Violations.Should().BeEmpty();
+
+        // IsDraft=false → guard (not IsDraft) is true → assert applies, Amount=0 fails
+        var inst2 = wf.CreateInstance("Open");
+        var r2 = wf.Fire(inst2, "Submit", new Dictionary<string, object?> { ["Amount"] = 0.0, ["IsDraft"] = false });
+        r2.Outcome.Should().Be(TransitionOutcome.Rejected);
+        r2.Violations.Should().Contain(v => v.Message.Contains("Amount required for non-draft"));
     }
 }

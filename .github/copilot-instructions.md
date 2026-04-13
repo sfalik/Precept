@@ -49,6 +49,17 @@ npm run loop:local     # Package + install locally (also a VS Code task)
 
 Keep `tools/Precept.Plugin/.mcp.json` in shipped `dotnet tool run precept-mcp` form. That plugin file uses its own `mcpServers` payload schema. Use `.vscode/mcp.json` for repo-local MCP development with the VS Code `servers` schema, `.github/agents/` and `.github/skills/` as the workspace-native customization source, and treat plugin/distribution-shaped validation as explicit validation, not the default inner loop.
 
+## Issue Implementation Workflow
+
+For issue-based implementation work:
+
+- Read `CONTRIBUTING.md` before starting and treat it as the canonical workflow for issue work.
+- Open or reuse the linked **draft PR** immediately and treat it as the execution hub for the issue.
+- Use the exact PR-body structure required by `CONTRIBUTING.md` and the repository PR template: `## Summary`, `## Linked Issue` (with `Closes #N`), `## Why`, and `## Implementation Plan`.
+- Keep the `## Summary` and `## Why` sections current so reviewers can see what changed and why without reconstructing it from the diff.
+- Work in vertical slices. After each completed slice, commit, push, and update the PR-body summary/checklist before continuing.
+- Do **not** create a separate implementation-plan markdown file; the PR body is the ephemeral plan artifact for this repo.
+
 ## Use the MCP Tools First
 
 This project ships a Precept MCP server with 5 tools. **Use them as your primary research tools** before reading source code or making assumptions about the DSL:
@@ -75,14 +86,16 @@ To check a `.precept` file for errors:
 
 `docs/philosophy.md` is the grounding document for Precept's identity — what the product is, what it governs, how it's positioned, and why. Read it before making design decisions, writing public-facing copy, or proposing language changes.
 
-When any of the following change, update the philosophy in the same pass:
+**Do not edit `docs/philosophy.md` without explicit owner approval.** Philosophy changes require deliberation — they are never auto-synced, never incidental updates, and never bundled into implementation PRs without discussion.
+
+When any of the following change, **flag the potential philosophy gap to the user** — do not resolve it yourself:
 
 - The category of entities Precept can govern (e.g. stateless precepts shipping)
 - The core guarantee (prevention, determinism, inspectability)
 - The positioning relative to adjacent tools
 - The constraint model or operation surface
 
-Do not let the philosophy drift behind the implementation. If the runtime can do something the philosophy doesn't describe, or the philosophy claims something the runtime can't do, fix the gap immediately.
+If the runtime can do something the philosophy doesn't describe, or the philosophy claims something the runtime can't do, **surface the gap and wait for direction.** The philosophy governs the product — the product does not silently rewrite the philosophy.
 
 ## Documentation Sync (Non-Negotiable)
 
@@ -180,10 +193,21 @@ See [CONTRIBUTING.md](/CONTRIBUTING.md) for the full proposal lifecycle and wher
 
 Language proposals (GitHub issues) must include the design philosophy and rationale — not just the syntax and acceptance criteria. When a proposal is revised or a new feature is decided through design discussion:
 
-1. **Capture the reasoning in `docs/research/`** — research evidence, precedent surveys, dead ends explored, and why alternatives were rejected. This is the durable record that explains *why*.
+1. **Capture the reasoning in `research/`** — research evidence, precedent surveys, dead ends explored, and why alternatives were rejected. This is the durable record that explains *why*.
 2. **Reference research from the proposal issue** — the issue body should link to the research file(s) that ground its decisions.
-3. **Update the issue map** in `docs/research/language/README.md` — connect each proposal to its research starting points.
+3. **Update the issue map** in `research/language/README.md` — connect each proposal to its research starting points.
 4. **Design doc updates happen at implementation time** — `docs/PreceptLanguageDesign.md` tracks what EXISTS in the runtime. Proposals describe what's PLANNED. The design doc is updated in the same PR that implements the feature, not before.
+
+### Per-Decision Rationale Requirement
+
+When writing or reviewing proposals, ensure every locked design decision includes:
+
+- **Rationale** — why this choice, not just what it is
+- **Alternatives considered and rejected** — with reasons for rejection
+- **Precedent from the research base** — the evidence that grounds the decision
+- **Tradeoff accepted** — the known downside the team is deliberately taking on
+
+A proposal that states WHAT without WHY is incomplete. Flag it for rationale before it advances.
 
 This ensures philosophy and rationale survive across sessions and make their way back into the design doc when features ship.
 

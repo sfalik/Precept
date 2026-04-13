@@ -161,7 +161,7 @@ public class PreceptConstraintViolationTests
         const string dsl = """
             precept Test
             field Priority as number default 3
-            invariant Priority >= 1 && Priority <= 5 because "Priority must be between 1 and 5"
+            invariant Priority >= 1 and Priority <= 5 because "Priority must be between 1 and 5"
             state Open initial
             in Open edit Priority
             """;
@@ -341,7 +341,7 @@ public class PreceptConstraintViolationTests
             state Expired initial
             state Signing
             event ExtendExpiry
-            from Expired on ExtendExpiry when !ExpiryExtended -> set ExpiryExtended = true -> transition Signing
+            from Expired on ExtendExpiry when not ExpiryExtended -> set ExpiryExtended = true -> transition Signing
             """;
         var wf = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
         var instance = wf.CreateInstance("Expired", new Dictionary<string, object?> { ["ExpiryExtended"] = true });

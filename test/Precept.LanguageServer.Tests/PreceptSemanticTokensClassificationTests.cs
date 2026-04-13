@@ -38,6 +38,24 @@ public class PreceptSemanticTokensClassificationTests
     }
 
     [Fact]
+    public void GetClassifiedTokens_RejectString_IsPreceptMessage()
+    {
+        const string dsl = """
+            precept M
+            state Active initial
+            state Closed
+            event Go
+            from Active on Go -> reject "Cannot complete this transition"
+            """;
+
+        var tokens = PreceptSemanticTokensHandler.GetClassifiedTokens(dsl);
+
+        tokens.Should().Contain(t =>
+            t.Text == "\"Cannot complete this transition\"" &&
+            t.Type == "preceptMessage");
+    }
+
+    [Fact]
     public void GetClassifiedTokens_DefaultString_IsPreceptValue()
     {
         const string dsl = """
@@ -53,6 +71,54 @@ public class PreceptSemanticTokensClassificationTests
         tokens.Should().Contain(t =>
             t.Text == "\"pending\"" &&
             t.Type == "preceptValue");
+    }
+
+    [Fact]
+    public void GetClassifiedTokens_GrammarKeywords_ArePreceptKeywordGrammar()
+    {
+        const string dsl = """
+            precept M
+            field Note as string default "pending"
+            state Active initial
+            event Go with Reason as string
+            from any on Go -> no transition
+            """;
+
+        var tokens = PreceptSemanticTokensHandler.GetClassifiedTokens(dsl);
+
+        tokens.Should().Contain(t =>
+            t.Text == "default" &&
+            t.Type == "preceptKeywordGrammar");
+
+        tokens.Should().Contain(t =>
+            t.Text == "initial" &&
+            t.Type == "preceptKeywordGrammar");
+
+        tokens.Should().Contain(t =>
+            t.Text == "with" &&
+            t.Type == "preceptKeywordGrammar");
+
+        tokens.Should().Contain(t =>
+            t.Text == "any" &&
+            t.Type == "preceptKeywordGrammar");
+    }
+
+    [Fact]
+    public void GetClassifiedTokens_ConstraintKeyword_IsPreceptKeywordGrammar()
+    {
+        const string dsl = """
+            precept M
+            field Count as number nonnegative
+            state Active initial
+            event Go
+            from Active on Go -> no transition
+            """;
+
+        var tokens = PreceptSemanticTokensHandler.GetClassifiedTokens(dsl);
+
+        tokens.Should().Contain(t =>
+            t.Text == "nonnegative" &&
+            t.Type == "preceptKeywordGrammar");
     }
 
     [Fact]
@@ -91,5 +157,32 @@ public class PreceptSemanticTokensClassificationTests
             t.Text == "Active" &&
             t.Type == "preceptState" &&
             t.Modifier == "preceptConstrained");
+    }
+
+    [Fact]
+    public void GetClassifiedTokens_ConditionalKeywords_ArePreceptKeywordSemantic()
+    {
+        const string dsl = """
+            precept M
+            field Balance as number default 0
+            field Label as string default ""
+            state Active initial
+            event Go with Amount as number
+            from Active on Go -> set Label = if Amount > 0 then "positive" else "zero" -> no transition
+            """;
+
+        var tokens = PreceptSemanticTokensHandler.GetClassifiedTokens(dsl);
+
+        tokens.Should().Contain(t =>
+            t.Text == "if" &&
+            t.Type == "preceptKeywordSemantic");
+
+        tokens.Should().Contain(t =>
+            t.Text == "then" &&
+            t.Type == "preceptKeywordSemantic");
+
+        tokens.Should().Contain(t =>
+            t.Text == "else" &&
+            t.Type == "preceptKeywordSemantic");
     }
 }

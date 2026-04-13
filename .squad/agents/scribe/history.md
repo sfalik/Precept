@@ -1,3 +1,22 @@
+## 2026-04-11T00:00:00Z - Slice 9 language design doc sync (#25, #27, #29)
+
+- Updated `docs/PreceptLanguageDesign.md`: grammar BNF (ConstraintSuffix, ScalarType), reserved keywords, scalar types section (integer/decimal/choice), field-level constraints table (maxplaces/ordered), built-in functions subsection (round()), and diagnostic codes (C60–C66).
+- `docs/McpServerDesign.md`: confirmed already complete (Newman's Slice 6 commit). No changes needed.
+- `README.md`: no dedicated types/constraints table exists; no update needed.
+- `research/language/README.md`: #25, #27, #29 already present in domain index and open proposal issue map. No update needed.
+- **Docs gap noted:** The `## Status` section at the end of `PreceptLanguageDesign.md` lists locked design decisions but does not mention integer, decimal, or choice types being locked. These should be added to the locked list in a follow-up pass if the team wants the status section kept current.
+
+---
+
+## 2026-04-08T13:37:07Z - Issue #17 wording clarification recorded
+
+- Wrote a brief session log and a canonical decision entry for the Issue #17 review consensus.
+- Recorded that the disagreement is wording ambiguity around "constraints," not a semantic contradiction in the computed-fields proposal.
+- Captured the wording direction: computed fields cannot have field-level constraint declarations attached, but remain readable in guards, invariants, and state asserts.
+- Touched only `.squad/` logging and decision files; `.squad/decisions/inbox/` was already empty.
+
+---
+
 ## 2026-05-18T00:25:00Z - README image-width adjustment recorded
 
 - Wrote orchestration logs for Kramer and Elaine plus a brief session log for the README DSL hero width pass.
@@ -109,6 +128,20 @@ Team cast on 2026-04-04: Frank (Lead), George (Runtime), Kramer (Tooling), Elain
 
 ---
 
+### 2026-04-12T19:45:41Z - Squad `@copilot` lane retirement recorded
+- Wrote orchestration logs for Newman and Frank plus a session log for the Squad operations contract change.
+- Merged 2 relevant inbox items into one canonical `decisions.md` entry, recording the lane retirement and marking the earlier direct-`@copilot` directive as superseded.
+- Updated affected cross-agent memory for Frank and Ralph, then cleared the processed inbox files.
+
+### 2026-04-08T13:29:23Z - Language research corpus closeout recorded
+- Merged the remaining `.squad/decisions/inbox/` backlog into `.squad/decisions.md`, recorded 61 entries, skipped 2 superseded duplicate(s), and cleared the inbox.
+- Wrote the missing closeout orchestration/session logs, updated `now.md` plus the Frank/George/Steinbrenner histories, and captured the finishing corpus commit `3cc5343`.
+- This pass touched only `.squad/` bookkeeping so the branch can return to a clean state.
+
+### 2026-04-08T07:16:23Z - Language research corpus recorded
+- Wrote orchestration logs for Frank, Steinbrenner, and George plus a session log for the language research corpus pass.
+- Merged 3 language-research inbox notes into `.squad/decisions.md`, corrected the canonical map reference back to `docs/research/language/domain-map.md`, and deleted the processed inbox files.
+- Updated the affected agent histories. No decision-archive move or history summarization was needed; Batch 3 research and the final README/index sweep are still outstanding.
 
 ### 2026-04-06T00:48:04Z - Kramer Concept 26 bounded configurability recorded
 - Wrote a lightweight session log capturing Kramer's Concept 26 direction: layout presets, split resizing, and per-panel collapse without freeform docking.

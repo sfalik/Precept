@@ -5,26 +5,24 @@
 
 > **pre·cept** *(noun)*: A general rule intended to regulate behavior or thought.
 
-**Precept is a domain integrity engine for .NET.** By treating business constraints as unbreakable precepts, it governs how an entity's data evolves under business rules across its lifecycle — binding fields, constraints, and transitions into a single executable contract where invalid configurations are structurally impossible.
+**Precept is a domain integrity engine for .NET.** Most systems scatter business rules across validators, handlers, and state checks — independent, forgettable, gaps waiting to happen. Precept compiles them into unbreakable precepts, a single contract where invalid configurations are structurally impossible and every operation enforces the complete logic.
+
+Precept treats AI as a first-class author. A dedicated MCP server exposes five typed tools — compile, inspect, fire, update, and language reference — so AI agents operate on definitions with the same precision as the runtime itself. A Copilot agent and purpose-built skills complete the AI authoring loop. Humans get a VS Code extension with live preview, syntax highlighting, and IntelliSense. Compile the definition, enforce the contract, produce the same outcome every time. AI is unpredictable. Precept is not.
 
 ---
 
 ## Quick Example
 
-> Temporary hero sample — using the current top-rated Subscription Billing candidate while the final hero decision stays open.
-
 ![Precept Subscription hero](design/brand/readme-hero.svg)
 
 **The Contract**
-
-GitHub cannot render the styled DSL treatment faithfully, so the README uses the rendered contract and keeps the source copyable below.
 
 ![Rendered Precept Subscription contract](design/brand/readme-hero-dsl.png)
 
 <details>
 <summary>Copyable DSL</summary>
 
-```text
+```precept
 precept Subscription
 
 field PlanName as string nullable
@@ -71,13 +69,17 @@ var result = eng.Fire(inst, "Activate", args);
 code --install-extension sfalik.precept-vscode
 ```
 
-Syntax highlighting and live diagnostics are active immediately.
+Syntax highlighting, live diagnostics, and AI tooling are active immediately.
 
-### 2. Create Your First Precept File
+### 2. Add the Copilot Plugin
 
-Create `Subscription.precept` and type along with the temporary example above. The language server provides completions, hover docs, and error detection in real time.
+Install the Precept plugin from the GitHub Copilot or Claude marketplace. It adds five MCP tools, a dedicated Precept Author agent, and two skills (authoring and debugging) — so AI agents can compile, inspect, fire events, and iterate on `.precept` definitions with full type safety.
 
-### 3. Add the NuGet Package
+### 3. Create Your First Precept File
+
+Create `Subscription.precept` and type along with the example above. The language server provides completions, hover docs, and error detection in real time. The Copilot plugin gives AI agents the same structured access.
+
+### 4. Integrate the Runtime
 
 ```bash
 dotnet add package Precept
@@ -89,16 +91,21 @@ See the [Quickstart Guide](docs/RuntimeApiDesign.md) for a complete runtime inte
 
 ## What Makes Precept Different
 
-**AI-Native Tooling** — MCP server with 5 core tools, GitHub Copilot plugin, and language server give AI agents structured access to validate, inspect, and iterate on `.precept` files.
+**AI-First Authoring** — The Copilot plugin gives AI agents five MCP tools to compile, inspect, fire events, and validate `.precept` definitions — no guessing at syntax or semantics. The VS Code extension provides completions, semantic highlighting, inline diagnostics, and a live state diagram that updates as you edit. AI brings the fluency; the engine brings the guarantee.
 
-**Unified Domain Integrity** — State machines, validators, and rules engines often disagree when split across libraries. Precept unifies them into one definition.
+**Unified Domain Integrity** — In most codebases, entity governance is scattered: validators in one layer, state checks in another, editability rules in a third, conditional logic in service handlers that bypass everything else. Each layer exists because the one before it wasn't enough. Precept consolidates all of it into a single `.precept` declaration that the runtime compiles and enforces structurally — no code path outside the contract, no window where an invalid configuration can exist.
 
-- Prevention, not detection — invalid configurations are structurally impossible
+- Prevention, not detection — invalid configurations are structurally impossible, not caught after the fact
 - One file, all rules — guards, constraints, invariants, and transitions together
+- Lifecycle optional — stateless precepts enforce field declarations, invariants, and constraints without a state machine
 - Full inspectability — preview any action's outcome without executing it
 - Compile-time checking — unreachable states and type errors caught before runtime
+- **Stateful or stateless** — precepts can govern stateful workflows (with lifecycle states and transitions) or stateless domain objects (fields and edit rules only, no states)
+- **Conditional declarations** — `when` guards on invariants, asserts, and edit blocks make rules apply only when a precondition is met
+- **Conditional expressions** — `if...then...else` selects between values inline, replacing row duplication for data-dependent field assignments
+- **Computed fields** — `field X as number -> A + B` declares a derived value that recomputes automatically after every mutation, eliminating manual synchronization
 
-**Live Editor Experience** — Completions, semantic highlighting, inline diagnostics, and a live state diagram preview in VS Code.
+Precept is not a workflow orchestrator, event sourcing framework, or ORM — it integrates with all of them. It governs the entity contract; they handle orchestration, persistence, and storage. Think: scattered governance across six service classes — Precept puts it in one file.
 
 ---
 
@@ -106,36 +113,27 @@ See the [Quickstart Guide](docs/RuntimeApiDesign.md) for a complete runtime inte
 
 | Resource | Description |
 |----------|-------------|
+| [Product Philosophy](docs/philosophy.md) | What Precept governs, how it's positioned, and why |
 | [Language Reference](docs/PreceptLanguageDesign.md) | Full DSL syntax and construct reference |
-| [Sample Catalog](samples/) | 20+ domain models in `.precept` |
-| [Quickstart Guide](docs/RuntimeApiDesign.md) | Step-by-step integration walkthrough |
+| [Quickstart Guide](docs/RuntimeApiDesign.md) | Step-by-step runtime integration walkthrough |
 | [MCP Server Docs](docs/McpServerDesign.md) | Tool reference for AI agent integration |
+| [Sample Catalog](samples/) | 21 domain models in `.precept` |
+
+**Highlighted samples:**
+
+| Sample | Pattern |
+|--------|---------|
+| [Loan Application](samples/loan-application.precept) | Multi-stage approval with cross-field guards |
+| [Insurance Claim](samples/insurance-claim.precept) | Claims lifecycle with conditional invariants |
+| [Hiring Pipeline](samples/hiring-pipeline.precept) | Pipeline stages with typed event arguments |
+| [Subscription Retention](samples/subscription-cancellation-retention.precept) | Retention flow with branching outcomes |
+| [Traffic Light](samples/trafficlight.precept) | Minimal lifecycle — great starting point |
 
 ---
 
 ## Contributing
 
-Precept is built with .NET 10.0 and TypeScript.
-
-```bash
-dotnet build            # Build everything
-dotnet test             # Run all tests
-```
-
-First-time local setup in a new clone:
-
-1. Run task `build`.
-2. Run task `extension: install`, then reload the window.
-
-If you previously used an older local plugin-registration flow, remove any stale `chat.pluginLocations` entry that points at `tools/Precept.Plugin/`. The current local model uses workspace-native `.github/agents/`, `.github/skills/`, and `.vscode/mcp.json` instead.
-
-| What you changed | Command | Reload? |
-|------------------|---------|---------|
-| C# runtime or language server | `Ctrl+Shift+B` | No |
-| TypeScript, webview, or syntax | Task: `extension: install` | Yes |
-| Agent or skill markdown in `.github/agents/` or `.github/skills/` | Reload Window | Yes |
-
-See [ArtifactOperatingModelDesign.md](docs/ArtifactOperatingModelDesign.md) for the local-vs-distribution operating model, worktree rules, the workspace `.vscode/mcp.json` `servers` schema, and the plugin payload sync boundary.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow, build commands, first-time setup, and reload rules.
 
 ---
 
