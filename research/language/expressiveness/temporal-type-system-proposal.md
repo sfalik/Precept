@@ -462,7 +462,7 @@ field CustomerTimezone as timezone nullable
 
 ### `zoneddatetime`
 
-**What it makes explicit:** This is an instant bound to the timezone that gives it local meaning. Not two separate fields the author must keep in sync — the binding is structural, and conversion functions that accept a `zoneddatetime` preserve timezone provenance across decomposition and recomposition.
+**What it makes explicit:** This is a datetime with timezone context — an instant resolved to local date and time in a specific timezone. The zone travels with the value, so component access and calendar arithmetic are always deterministic: the bound timezone resolves calendar components, and DST transitions are handled via the proposal's lenient resolver strategy (see [DST ambiguity resolution](#dst-ambiguity-resolution)). Conversion functions that accept a `zoneddatetime` preserve timezone provenance across decomposition and recomposition.
 
 **Backing type:** `NodaTime.ZonedDateTime`
 
@@ -483,21 +483,39 @@ field FilingContext as zoneddatetime nullable
 
 | Expression | Produces | Rationale |
 |---|---|---|
-| `==`, `!=` | `boolean` | Comparison by underlying instant (UTC moment). Two contexts for the same instant are equal. |
-| `<`, `>`, `<=`, `>=` | `boolean` | Ordering by underlying instant. |
+| `zoneddatetime + days(n)` | `zoneddatetime` | Calendar arithmetic. DST resolved via lenient strategy. |
+| `zoneddatetime + months(n)` | `zoneddatetime` | Calendar arithmetic via Period. Month-end truncation applies. |
+| `zoneddatetime + years(n)` | `zoneddatetime` | Calendar arithmetic. Leap year handling. |
+| `zoneddatetime + weeks(n)` | `zoneddatetime` | Calendar arithmetic (= 7N days). |
+| `zoneddatetime + hours(n)` | `zoneddatetime` | Timeline arithmetic. Duration added to underlying instant, re-resolved in zone. |
+| `zoneddatetime + minutes(n)` | `zoneddatetime` | Timeline arithmetic. |
+| `zoneddatetime + duration` | `zoneddatetime` | Timeline arithmetic with composed duration. |
+| `zoneddatetime - duration` | `zoneddatetime` | Timeline arithmetic backward. |
+| `zoneddatetime - zoneddatetime` | `duration` | Elapsed time between two points (instant subtraction). |
+| `==`, `!=`, `<`, `>`, `<=`, `>=` | `boolean` | Comparison by underlying instant. |
+
+Calendar arithmetic on `zoneddatetime` uses the same lenient resolver strategy defined in [DST ambiguity resolution](#dst-ambiguity-resolution): gaps map to the post-gap instant, overlaps map to the later instant. This applies to `+ days(n)`, `+ months(n)`, `+ years(n)`, and `+ weeks(n)`. Timeline arithmetic (`+ hours(n)`, `+ minutes(n)`, `+ duration`) operates on the underlying instant and re-resolves in the bound timezone — no ambiguity arises.
 
 | **Not supported** | **Why** |
 |---|---|
-| `.year`, `.month`, `.day`, `.hour` | Component accessors require TZ database evaluation. Compile error — use conversion functions: `toLocalDate(zdt).year`. |
-| `zoneddatetime + days(n)` | Arithmetic on a composite is ambiguous (calendar vs. timeline). Decompose first: `zdt.instant + hours(n)` for timeline arithmetic, or `toLocalDate(zdt) + days(n)` for calendar arithmetic. |
-| `zoneddatetime - zoneddatetime` | Use `zdt1.instant - zdt2.instant` for elapsed duration. |
+| `zoneddatetime + zoneddatetime` | Adding two zoned datetimes is meaningless — same as `date + date`. |
+| `zoneddatetime + integer` | Bare integers don't carry unit semantics. Use `+ days(n)` or `+ hours(n)`. |
 
 **Accessors:**
 
 | Accessor | Returns | Description |
 |---|---|---|
-| `.instant` | `instant` | The UTC point in time |
-| `.timezone` | `timezone` | The IANA timezone identifier |
+| `.instant` | `instant` | The underlying UTC point in time. |
+| `.timezone` | `timezone` | The bound IANA timezone. |
+| `.date` | `date` | Local calendar date in the bound timezone. |
+| `.time` | `time` | Local time of day in the bound timezone. |
+| `.year` | `integer` | Local calendar year in the bound timezone. |
+| `.month` | `integer` | Local month (1–12) in the bound timezone. |
+| `.day` | `integer` | Local day of month (1–31) in the bound timezone. |
+| `.hour` | `integer` | Local hour (0–23) in the bound timezone. |
+| `.minute` | `integer` | Local minute (0–59) in the bound timezone. |
+| `.second` | `integer` | Local second (0–59) in the bound timezone. |
+| `.dayOfWeek` | `integer` | ISO day of week (Monday=1, Sunday=7) in the bound timezone. |
 
 **Constraints:** `nullable`. No `default` — there is no universally sensible default timezone, so there is no universally sensible default `zoneddatetime`. Fields are either `nullable` or populated by events.
 
@@ -516,8 +534,7 @@ field FilingContext as zoneddatetime nullable
 
 | Invalid code | Error message |
 |---|---|
-| `zdt.year` | Cannot access calendar components directly on a zoneddatetime — use `toLocalDate(zdt).year`. |
-| `zdt + days(5)` | Cannot add to a zoneddatetime directly — use `zdt.instant + hours(n)` for timeline arithmetic or `toLocalDate(zdt) + days(n)` for calendar arithmetic. |
+| `zdt + 5` | Cannot add an integer to a zoneddatetime — use `zdt + days(5)` or `zdt + hours(5)` to specify the unit. |
 | `field X as zoneddatetime default zoneddatetime(...)` | zoneddatetime fields cannot have a default — there is no universally sensible default timezone. Use `nullable` or populate via events. |
 
 ---
@@ -801,6 +818,15 @@ The following matrix defines what operations are valid between temporal types. A
 | `datetime` | `+` | `minutes(n)` | `datetime` | Time arithmetic |
 | `datetime` | `+` | `duration` | `datetime` | Offset forward by composed duration (e.g., `days(5) + hours(7)`) |
 | `datetime` | `-` | `duration` | `datetime` | Offset backward by composed duration |
+| `zoneddatetime` | `+` | `days(n)` | `zoneddatetime` | Calendar arithmetic; DST via lenient resolver |
+| `zoneddatetime` | `+` | `months(n)` | `zoneddatetime` | Calendar arithmetic; month-end truncation |
+| `zoneddatetime` | `+` | `years(n)` | `zoneddatetime` | Calendar arithmetic; leap years |
+| `zoneddatetime` | `+` | `weeks(n)` | `zoneddatetime` | = 7N days |
+| `zoneddatetime` | `+` | `hours(n)` | `zoneddatetime` | Timeline arithmetic |
+| `zoneddatetime` | `+` | `minutes(n)` | `zoneddatetime` | Timeline arithmetic |
+| `zoneddatetime` | `+` | `duration` | `zoneddatetime` | Timeline arithmetic with composed duration |
+| `zoneddatetime` | `-` | `duration` | `zoneddatetime` | Timeline arithmetic backward |
+| `zoneddatetime` | `-` | `zoneddatetime` | `duration` | Elapsed time (instant subtraction) |
 | `zoneddatetime` | `==`, `!=`, `<`, `>`, `<=`, `>=` | `zoneddatetime` | `boolean` | Comparison by underlying instant |
 
 ### Comparison rules
@@ -830,9 +856,8 @@ Cross-type comparison is always a type error:
 | `duration * decimal` / `duration / decimal` | `decimal → double` is lossy. Use `number` for scaling operands. |
 | `integer / duration` / `number / duration` | Dimensionally meaningless (what is "5 / 3 hours"?). |
 | `timezone + anything` | Timezones are metadata, not temporal values. |
-| `zoneddatetime + days(n)` | Arithmetic on composite is ambiguous. Use conversion functions to decompose, then add. |
-| `zoneddatetime - zoneddatetime` | Use `zdt1.instant - zdt2.instant` for elapsed duration. |
-| `zoneddatetime.year` | Calendar components require timezone evaluation. Use `toLocalDate(zdt).year`. |
+| `zoneddatetime + integer` | Bare integers don't carry unit semantics. Use `zoneddatetime + days(n)` or `+ hours(n)`. |
+| `zoneddatetime + zoneddatetime` | Adding two zoned datetimes is meaningless. |
 
 ### Nullable behavior
 
@@ -1000,15 +1025,13 @@ George's design review of the original #26 proposal raised four challenges. The 
 
 Each exclusion includes rationale — items are excluded for reasons, not convenience.
 
-### `ZonedDateTime` as a field type — Excluded
+### `zoneddatetime` as a field type — Proposed (full surface)
 
-A full NodaTime-style `ZonedDateTime` with component accessors (`.year`, `.month`, `.hour`), arithmetic (`zdt + days(1)`), and ambiguity resolution is permanently excluded. Component accessors depend on the TZ database — `instant.InZone(tz).Hour` produces different results depending on DST rules, which change with TZ database updates. This creates non-deterministic expressions that violate Precept's core guarantee.
+The `zoneddatetime` type provides the full operation surface of a datetime with timezone context: component accessors (`.year`, `.hour`, `.date`, `.time`, etc.), calendar arithmetic (`+ days(n)`, `+ months(n)`), timeline arithmetic (`+ hours(n)`, `+ duration`), and subtraction (`zdt - zdt → duration`). The bound timezone makes all operations deterministic — component access resolves against the zone, and DST transitions are handled by the lenient resolver strategy defined in this proposal.
 
-**The minimal `zoneddatetime` composite** (instant + timezone, `.instant`/`.timezone` accessors only, comparison by instant, no component accessors, no arithmetic) is now **Proposed** — see the `zoneddatetime` type section above and the [zoneddatetime reconsideration](../../../.squad/decisions/inbox/frank-zoneddatetime-reconsideration.md) decision for the provenance erasure analysis that upgraded it.
+This replaces the earlier "permanently excluded" assessment. The original exclusion rationale — that component accessors depend on the TZ database — applied to `instant`, which lacks a timezone. `zoneddatetime` carries the timezone, making the dependency explicit and the resolution deterministic. The [zoneddatetime reconsideration](../../../.squad/decisions/inbox/frank-zoneddatetime-reconsideration.md) analysis upgraded it from Deferred to Proposed based on the provenance erasure problem; this revision opens the full surface based on the recognition that the `instant`-inherited bans were inapplicable.
 
-### Minimal `zoneddatetime` composite — Proposed
-
-A composite type bundling `instant + timezone` as a single field with co-assignment enforcement and provenance-safe conversion function overloads. The assessment in `timezone-type-storability-analysis.md` downgraded it from Fatal to Deferred; the [zoneddatetime reconsideration](../../../.squad/decisions/inbox/frank-zoneddatetime-reconsideration.md) analysis upgrades it from Deferred to **Proposed** based on the provenance erasure problem — the decomposed `instant + timezone` approach creates timezone provenance loss that makes zone-mismatch bugs compiler-invisible. See the `### zoneddatetime` type section in Proposed Types for the full specification.
+See the `### zoneddatetime` type section in Proposed Types for the full specification.
 
 ### `OffsetDateTime` — Excluded
 
@@ -1062,9 +1085,10 @@ No `date(format)`, `instant(precision)`, or `duration(unit)`. Temporal type beha
 - Accessor resolution: per-type accessor tables.
 - Constructor validation: ISO 8601 format check for literals (compile-time). `zoneddatetime(instant, timezone)` constructor argument type validation.
 - Constraint validation: which constraints apply to which temporal types. `zoneddatetime` allows `nullable`, rejects `default`.
-- Cross-type arithmetic rejection: `date + instant`, `date + integer`, `instant + months(n)`, `zoneddatetime + days(n)`, etc.
+- Cross-type arithmetic rejection: `date + instant`, `date + integer`, `instant + months(n)`, `zoneddatetime + integer`, etc.
 - `instant` component accessor rejection (new diagnostic).
-- `zoneddatetime` component accessor rejection (`.year`, `.hour`, etc. — teachable error directing to conversion functions).
+- `zoneddatetime` arithmetic: calendar (`+ days`, `+ months`, `+ years`, `+ weeks`) and timeline (`+ hours`, `+ minutes`, `+ duration`, `- duration`) operators, `zdt - zdt → duration`.
+- `zoneddatetime` accessor resolution: `.instant`, `.timezone`, `.date`, `.time`, `.year`, `.month`, `.day`, `.hour`, `.minute`, `.second`, `.dayOfWeek`.
 - `timezone` ordering rejection (new diagnostic).
 - Duration constructor argument validation: `hours(n)` requires `integer` argument.
 - Conversion function overload resolution: `toLocalDate(zoneddatetime)`, `toLocalTime(zoneddatetime)`, `toInstant(date, time, zoneddatetime)`.
@@ -1076,6 +1100,7 @@ No `date(format)`, `instant(precision)`, or `duration(unit)`. Temporal type beha
 - `instant` arithmetic via `Instant.Plus(Duration)`, `Instant.Minus(Duration)`.
 - `duration` arithmetic via `Duration.Plus`, `Duration.Minus`.
 - `datetime` arithmetic via `LocalDateTime` methods.
+- `zoneddatetime` calendar arithmetic via `ZonedDateTime.Plus(Period)` with `LenientResolver`; timeline arithmetic via underlying `Instant.Plus(Duration)` re-resolved in zone; subtraction via `zdt.ToInstant() - zdt.ToInstant()`.
 - Conversion functions: `ZonedDateTimeExtensions` / `DateTimeZoneProviders.Tzdb` for timezone lookups.
 - DST resolution via NodaTime's `LenientResolver` (or chosen strategy).
 - Accessor evaluation: `.year` → `localDate.Year`, etc.
@@ -1197,12 +1222,16 @@ No `date(format)`, `instant(precision)`, or `duration(unit)`. Temporal type beha
 - [ ] `field X as zoneddatetime` parses and type-checks.
 - [ ] `zoneddatetime(instant, timezone)` constructor validates at compile time.
 - [ ] `.instant → instant`, `.timezone → timezone` accessors work.
-- [ ] `.year`, `.hour`, etc. are compile errors with teachable messages.
-- [ ] `zoneddatetime + days(n)` is a type error with a teachable message.
+- [ ] `.date → date`, `.time → time` decomposition works.
+- [ ] `.year`, `.month`, `.day`, `.hour`, `.minute`, `.second`, `.dayOfWeek` return `integer` resolved in the bound timezone.
+- [ ] `zoneddatetime + days(n)`, `+ months(n)`, `+ years(n)`, `+ weeks(n)` calendar arithmetic works with DST lenient resolution.
+- [ ] `zoneddatetime + hours(n)`, `+ minutes(n)`, `+ duration`, `- duration` timeline arithmetic works.
+- [ ] `zoneddatetime - zoneddatetime → duration` (instant subtraction).
+- [ ] `zoneddatetime + integer` is a type error with a teachable message.
 - [ ] `zoneddatetime == zoneddatetime` compares by instant.
-- [ ] `toLocalDate(zoneddatetime) → date` uses the bound timezone.
-- [ ] `toLocalTime(zoneddatetime) → time` uses the bound timezone.
-- [ ] `toInstant(date, time, zoneddatetime) → instant` recomposes using the bound timezone.
+- [ ] `toLocalDate(zoneddatetime)` overload returns date in the bound timezone.
+- [ ] `toLocalTime(zoneddatetime)` overload returns time in the bound timezone.
+- [ ] `toInstant(date, time, zoneddatetime)` overload converts using the bound timezone.
 - [ ] Nullable works. No default allowed (compile error if specified).
 - [ ] MCP tools serialize as two-property JSON object.
 
