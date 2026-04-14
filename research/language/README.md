@@ -55,6 +55,25 @@ Use this table when you already know the issue number and need its research grou
 | `#65` | Event action hooks (stateless) | Event action hooks | [expressiveness/event-hooks.md](./expressiveness/event-hooks.md), [references/state-machine-expressiveness.md](./references/state-machine-expressiveness.md) |
 | `#112` | Stateless events — `on EventName` mutation surface | Stateless events | [expressiveness/stateless-events.md](./expressiveness/stateless-events.md), [expressiveness/data-only-precepts-research.md](./expressiveness/data-only-precepts-research.md) |
 
+## Temporal type research trail
+
+The temporal type strategy was developed through five rounds of design discussion, each building on the previous. Read in order for the full reasoning arc:
+
+| Round | File | Key outcome |
+|---|---|---|
+| 1 | [expressiveness/nodatime-precept-alignment.md](./expressiveness/nodatime-precept-alignment.md) | NodaTime adopted as backing library. `LocalDate` for `date`. Initial `Instant`/`ZonedDateTime` exclusion. |
+| 2 | [expressiveness/instant-zoneddatetime-reconsideration.md](./expressiveness/instant-zoneddatetime-reconsideration.md) | `Instant` exclusion reversed — comparison is deterministic, SLA use case is real. |
+| 3 | [expressiveness/enterprise-timezone-analysis.md](./expressiveness/enterprise-timezone-analysis.md) | Timezone conversion functions proposed. "Hosting layer handles it" found insufficient for multi-timezone domain rules. |
+| 4 | [expressiveness/timezone-type-storability-analysis.md](./expressiveness/timezone-type-storability-analysis.md) | `timezone` type accepted. `ZonedDateTime` downgraded from Fatal to Deferred. |
+| 5 | [expressiveness/temporal-type-strategy.md](./expressiveness/temporal-type-strategy.md) | **Unified strategy** — philosophy-driven type model, operator design, determinism model, phasing, and proposal impact. |
+
+Supporting evidence:
+
+| File | Role |
+|---|---|
+| [references/nodatime-type-model.md](./references/nodatime-type-model.md) | Comprehensive NodaTime type inventory, arithmetic algebra, serialization |
+| [expressiveness/sample-temporal-pattern-catalog.md](./expressiveness/sample-temporal-pattern-catalog.md) | Empirical evidence: 91 temporal markers across 15 sample precepts |
+
 ## Cross-cutting research that supports multiple domains
 
 | File | Why it matters |
