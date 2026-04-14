@@ -118,7 +118,7 @@ field IncidentTimezone as timezone
 
 invariant FiledTimestamp <= toInstant(
     toLocalDate(IncidentTimestamp, IncidentTimezone) + days(30),
-    time("23:59:00"),
+    localtime("23:59:00"),
     IncidentTimezone
 ) because "Claim must be filed by 11:59 PM local time on the 30th day after the incident"
 ```
@@ -634,7 +634,7 @@ With them, the entire rule lives in one file:
 # WITH conversion functions — rule is complete
 invariant FiledTimestamp <= toInstant(
     toLocalDate(IncidentTimestamp, IncidentTimezone) + days(30),
-    time("23:59:00"),
+    localtime("23:59:00"),
     IncidentTimezone
 ) because "Claim must be filed by 11:59 PM local time on the 30th day after the incident"
 ```
@@ -970,19 +970,19 @@ Each locked decision follows the 4-point rationale format required by CONTRIBUTI
 - **Precedent:** Every system that handles timezone-sensitive data (banking, healthcare, aviation) manages TZ database freshness. This is standard operational practice, not a new burden Precept introduces.
 - **Tradeoff accepted:** The input surface for determinism expands to include TZ database version. Practically near-zero risk — the US last changed DST rules in 2007; TZ database changes affect ~1–3 jurisdictions per update.
 
-### 10. Temporal arithmetic requires explicit duration constructors (not bare integers)
+### 10. Temporal arithmetic requires explicit constructor functions — period/duration split is visible
 
-- **Why:** `date + 2` is implicit — what does `2` mean? Days? Months? Weeks? This is exactly the ambiguity NodaTime was designed to prevent. In NodaTime, you write `date.PlusDays(2)` or `date + Period.FromDays(2)` — never `date + 2`. Precept applies the same principle: `date + days(2)`, `date + months(1)`, `time + hours(3)`. The duration constructor names the unit; the compiler enforces it. Shane's directive: *“date + integer is implicit.”*
-- **Alternatives rejected:** `date + integer` meaning “add N days” — the previous locked decision in this proposal. While NodaTime’s `PlusDays(int)` takes an `int`, the DSL author sees `date + 2` without the `PlusDays` context. The bare integer silently assumes "days" — a unit choice the author never made explicit. `date + number` — allows fractional day offsets that have no calendar meaning. `date + decimal` — same problem.
-- **Precedent:** NodaTime’s API requires named methods (`PlusDays`, `PlusMonths`, `Plus(Period)`) for all temporal arithmetic — the type alone doesn’t carry unit information. FEEL uses `duration("P2D")` for explicit day offsets, not bare integers. Shane’s governing directive aligns Precept with this precedent.
-- **Tradeoff accepted:** More verbose than `date + 2`. The verbosity is the point — it forces the author to name the unit, making the intent unambiguous to readers, auditors, and AI consumers.
+- **Why:** `date + 2` is implicit — what does `2` mean? Days? Months? Weeks? This is exactly the ambiguity NodaTime was designed to prevent. Precept applies the same principle: `date + days(2)`, `date + months(1)`, `time + hours(3)`. The constructor function names the unit; the compiler enforces it. Furthermore, the period/duration split is exposed at the DSL surface: calendar constructors (`days`, `months`, `years`, `weeks`) produce `period` values, while timeline constructors (`hours`, `minutes`, `seconds`) produce `duration` values. This matches NodaTime’s `Period`/`Duration` distinction exactly. Shane’s directive: *“NodaTime has already solved this hard problem. I see no reason to diverge.”*
+- **Alternatives rejected:** `date + integer` meaning “add N days” — a previous position in this proposal. Merged `duration` hiding the Period/Duration distinction — the original position in this proposal. NodaTime deliberately keeps `Period` and `Duration` separate because months have no fixed length while hours do.
+- **Precedent:** NodaTime’s API requires named methods (`PlusDays`, `PlusMonths`, `Plus(Period)`) for all temporal arithmetic, and keeps `Period` and `Duration` as separate types. FEEL uses `duration("P2D")` for explicit offsets.
+- **Tradeoff accepted:** More verbose than `date + 2`. Two constructor result types (`period` and `duration`) rather than one. The verbosity and distinction are the point.
 
-### 11. `date - date → duration` (not → integer or → number)
+### 11. `localdate - localdate` returns `period` (not integer, number, or duration)
 
-- **Why:** The result of subtracting two dates is a temporal quantity — it should carry unit semantics, not collapse to a bare integer. `date - date → integer` produces a number that has lost its meaning: is `30` thirty days? Thirty somethings? Returning a `duration` preserves the unit information and enables further temporal arithmetic (`elapsed > days(30)`). This follows the same explicitness principle as Decision #10 — the type system carries meaning that bare numbers lose.
-- **Alternatives rejected:** `→ integer` — the previous locked decision. Loses unit semantics; the caller must *remember* that the integer means days. `→ number` — the original #26 proposal. Floating-point is unnecessary and misleading for a value that is structurally a day count.
-- **Precedent:** NodaTime’s `Period.Between(d1, d2)` returns a `Period`, not an `int`. The period carries structural unit information. Shane’s directive establishes that implicit results are as problematic as implicit operands.
-- **Tradeoff accepted:** `duration` result requires `.totalHours` or comparison with `days(n)` to extract a numeric value. The indirection is intentional — it forces the consumer to acknowledge the unit.
+- **Why:** The result of subtracting two dates is a calendar quantity — it should carry unit semantics, not collapse to a bare integer or a timeline duration. `date - date → integer` produces a number that has lost its meaning. `date - date → duration` conflates calendar and timeline domains — it implies the result is a fixed-length time span, when in fact it’s a `Period` that knows it’s “2 months 3 days” without converting to a fixed number of hours. Returning a `period` preserves the structural calendar units and matches NodaTime’s `Period.Between(d1, d2)` exactly.
+- **Alternatives rejected:** `→ integer` — loses unit semantics; the caller must *remember* that the integer means days. `→ duration` — the previous position in this proposal. Assumes the result is a fixed-length time span when the domain quantity is calendar-based. `→ number` — floating-point is unnecessary and misleading.
+- **Precedent:** NodaTime’s `Period.Between(d1, d2)` returns a `Period`, not a `Duration` or `int`. This is deliberate — the result represents calendar distance (months, days), not timeline distance (nanoseconds).
+- **Tradeoff accepted:** `period` result requires accessor inspection (`.days`, `.months`) or comparison with `days(n)` to extract values. The indirection is intentional — it preserves the calendar structure NodaTime was designed to express.
 
 ---
 
@@ -1002,9 +1002,9 @@ George's design review of the original #26 proposal raised four challenges. The 
 
 **Resolution:** This is presented as an open option in this proposal (see "Option: `nullable` + `default` for temporal fields" above). The question is orthogonal to temporal types and applies to all types — it should be resolved as a cross-cutting design decision. The NodaTime backing type has no opinion here.
 
-### Challenge 4: `date - date → number` should be `→ integer`
+### Challenge 4: `date - date` result type
 
-**Resolution:** Now `date - date → duration` — even more explicit than `→ integer`. The result is a duration value that carries unit semantics (days), not a bare number or integer that has lost its meaning. The consumer can compare it directly with `days(n)` expressions (`elapsed > days(30)`) or extract a numeric value via `.totalHours`. This aligns with Shane’s directive that implicit results are as problematic as implicit operands.
+**Resolution:** Now `date - date` returns `period` — even more explicit than returning `integer` or `duration`. The result is a `period` value that preserves structural calendar units (“2 months 3 days”), not a bare number that has lost its meaning or a `duration` that collapses calendar distance into nanoseconds. The consumer can inspect components (`.days`, `.months`) or compare with `days(n)` expressions. This aligns with NodaTime’s `Period.Between(d1, d2)` and Shane’s directive that implicit results are as problematic as implicit operands.
 
 ---
 
@@ -1013,7 +1013,7 @@ George's design review of the original #26 proposal raised four challenges. The 
 | Issue | Relationship |
 |---|---|
 | #25 (choice type) | Currency codes as `choice("USD", "EUR", ...)` complement `decimal` for money; `choice` for state/region complements `timezone` for jurisdiction lookups. |
-| #26 (date type) | **Superseded by this proposal.** The `localdate` section here incorporates all of #26’s design plus NodaTime backing, explicit-duration-only arithmetic, and month/year arithmetic. |
+| #26 (date type) | **Superseded by this proposal.** The `localdate` section here incorporates all of #26’s design plus NodaTime backing, explicit constructor functions (period/duration split), and month/year arithmetic. |
 | #27 (decimal type) | Complementary numeric type. `decimal` and temporal types do not interact arithmetically (`decimal + date` is a type error). `duration.totalHours` returns `number`, not `decimal`. |
 | #29 (integer type) | Duration constructor function args are `integer`. The `integer` type is a dependency for correct temporal arithmetic. |
 | #16 (built-in functions) | `round()` from #27; `toLocalDate`, `toLocalTime`, `toInstant`, `months`, `years`, `weeks`, `hours`, `minutes`, `seconds` from this proposal. |
@@ -1074,7 +1074,7 @@ No `date(format)`, `instant(precision)`, or `duration(unit)`. Temporal type beha
 - Add `localdate`, `localtime`, `instant`, `duration`, `timezone`, `zoneddatetime`, `localdatetime` as type keywords.
 - Add `days`, `months`, `years`, `weeks`, `hours`, `minutes`, `seconds` as function keywords.
 - Add `toLocalDate`, `toLocalTime`, `toInstant` as function keywords.
-- Parse constructor forms: `date("...")`, `time("...")`, `instant("...")`, `timezone("...")`, `datetime("...")`, `zoneddatetime(expr, expr)`.
+- Parse constructor forms: `localdate("...")`, `localtime("...")`, `instant("...")`, `period("...")`, `duration("...")`, `timezone("...")`, `localdatetime("...")`, `zoneddatetime(expr, expr)`.
 - Parse function calls: `days(expr)`, `months(expr)`, `hours(expr)`, `toLocalDate(expr, expr)`, `toLocalDate(expr)`, `toInstant(expr, expr, expr)`, `toInstant(expr, expr, expr_zdt)`.
 - Parse accessors: `.year`, `.month`, `.day`, `.dayOfWeek`, `.hour`, `.minute`, `.second`, `.date`, `.time`, `.totalHours`, `.totalMinutes`, `.totalSeconds`, `.instant`, `.timezone`.
 
@@ -1162,23 +1162,28 @@ No `date(format)`, `instant(precision)`, or `duration(unit)`. Temporal type beha
 
 ### `localdate` type
 
-- [ ] `field X as date` parses and type-checks.
-- [ ] `date("2026-03-15")` literal validates ISO 8601 at compile time.
-- [ ] `date("2026-02-30")` produces compile-time error.
-- [ ] `date + days(n) → date` works; `date + integer`, `date + number`, and `date + decimal` are type errors.
-- [ ] `date + months(n)`, `date + years(n)`, `date + weeks(n)` work with correct truncation.
-- [ ] `date - date → duration` (not `integer` or `number`).
+- [ ] `field X as localdate` parses and type-checks.
+- [ ] `localdate("2026-03-15")` literal validates ISO 8601 at compile time.
+- [ ] `localdate("2026-02-30")` produces compile-time error.
+- [ ] `localdate + days(n) → localdate` works; `localdate + integer`, `localdate + number`, and `localdate + decimal` are type errors.
+- [ ] `localdate + months(n)`, `localdate + years(n)`, `localdate + weeks(n)` work with correct truncation.
+- [ ] `localdate + period → localdate`, `localdate - period → localdate` work.
+- [ ] `localdate - localdate → period` (not `integer`, `number`, or `duration`).
+- [ ] `localdate + duration` is a type error (duration is timeline-only; use calendar constructors or `+ period`).
 - [ ] `.year`, `.month`, `.day`, `.dayOfWeek` return `integer`.
 - [ ] Nullable and default work. Constraints `nonnegative`, `min`, `max`, etc. are compile errors.
 - [ ] MCP tools serialize as ISO 8601 string.
 
 ### `localtime` type
 
-- [ ] `field X as time` parses and type-checks.
-- [ ] `time("14:30:00")` and `time("14:30")` validate at compile time.
-- [ ] `time + hours(n)` and `time + minutes(n)` wrap at midnight correctly.
+- [ ] `field X as localtime` parses and type-checks.
+- [ ] `localtime("14:30:00")` and `localtime("14:30")` validate at compile time.
+- [ ] `localtime + hours(n)` and `localtime + minutes(n)` wrap at midnight correctly.
+- [ ] `localtime + seconds(n)` works with proper wrapping.
+- [ ] `localtime - localtime → period` (time-unit period: hours, minutes, seconds).
+- [ ] `localtime + days(n)` is a type error (days are not meaningful for wall-clock time).
 - [ ] `.hour`, `.minute`, `.second` return `integer`.
-- [ ] `time + integer` is a type error.
+- [ ] `localtime + integer` is a type error.
 
 ### `instant` type
 
@@ -1186,16 +1191,18 @@ No `date(format)`, `instant(precision)`, or `duration(unit)`. Temporal type beha
 - [ ] `instant("2026-04-13T14:30:00Z")` validates. Without `Z`: compile error.
 - [ ] `instant - instant → duration`.
 - [ ] `instant + duration → instant`, `instant - duration → instant`.
+- [ ] `instant + period` is a type error (instant is timeline-only; use `+ duration`).
 - [ ] `instant.year` is a compile error with a teachable message.
 - [ ] `instant + integer` is a type error with a teachable message.
 - [ ] MCP tools serialize as ISO 8601 UTC string.
 
 ### `duration` type
 
-- [ ] `days(7)`, `hours(72)`, `minutes(30)`, `seconds(3600)` produce duration values.
-- [ ] `duration("PT72H")` parses as 72 hours. `duration("P5DT7H32S")` parses as composite.
+- [ ] `hours(72)`, `minutes(30)`, `seconds(3600)` produce duration values (timeline constructors only).
+- [ ] `duration("PT72H")` parses as 72 hours. `duration("PT5H7M32S")` parses as composite.
+- [ ] `duration("P5D")` is a compile error with a teachable message (days are calendar units; use `period("P5D")` or `days(5)` for calendar arithmetic).
 - [ ] `duration("8 hours")` is a compile error with a teachable message (not ISO 8601).
-- [ ] `duration + duration → duration` (composing: `days(5) + hours(7)`).
+- [ ] `days(n)`, `months(n)`, `years(n)`, `weeks(n)` produce `period` values, NOT `duration`.
 - [ ] `duration + duration → duration`, `duration - duration → duration`.
 - [ ] `duration * integer → duration`, `duration * number → duration` (scaling).
 - [ ] `duration / integer → duration`, `duration / number → duration` (scaling).
@@ -1203,10 +1210,26 @@ No `date(format)`, `instant(precision)`, or `duration(unit)`. Temporal type beha
 - [ ] `duration / duration → number` (ratio).
 - [ ] `duration * duration` is a type error.
 - [ ] `integer * duration`, `number * duration` are type errors (duration must be left operand).
+- [ ] `duration + period` and `duration - period` are type errors (cannot mix timeline and calendar units).
 - [ ] `.totalHours`, `.totalMinutes`, `.totalSeconds` return `number`.
 - [ ] `duration == duration`, `duration < duration` comparison works.
 - [ ] If field type: `field X as duration default hours(0)` parses.
 - [ ] Duration constructor syntax chosen (function call, postfix suffix, or both) and all examples in the proposal consistently reflect the chosen form.
+
+### `period` type
+
+- [ ] `field X as period` parses and type-checks.
+- [ ] `days(n)`, `months(n)`, `years(n)`, `weeks(n)` produce `period` values (calendar constructors).
+- [ ] `period("P1Y2M3D")` literal parses ISO 8601 duration string as a calendar period.
+- [ ] `period("PT5H")` is a compile error (time-only ISO strings are `duration`, not `period`).
+- [ ] `period + period → period`, `period - period → period`.
+- [ ] `period == period` and `period != period` work.
+- [ ] `period < period`, `period > period`, etc. are type errors (periods are not orderable; months have variable length).
+- [ ] `period * integer` is a type error (period scaling is not supported; construct the value you need directly).
+- [ ] `period + duration` and `period - duration` are type errors (cannot mix calendar and timeline units).
+- [ ] `.years`, `.months`, `.weeks`, `.days` accessors return `integer`.
+- [ ] If field type: `field X as period default days(0)` parses.
+- [ ] MCP tools serialize as ISO 8601 period string.
 
 ### `timezone` type
 
@@ -1222,44 +1245,51 @@ No `date(format)`, `instant(precision)`, or `duration(unit)`. Temporal type beha
 - [ ] `field X as zoneddatetime` parses and type-checks.
 - [ ] `zoneddatetime(instant, timezone)` constructor validates at compile time.
 - [ ] `.instant → instant`, `.timezone → timezone` accessors work.
-- [ ] `.date → date`, `.time → time` decomposition works.
+- [ ] `.date → localdate`, `.time → localtime` decomposition works.
 - [ ] `.year`, `.month`, `.day`, `.hour`, `.minute`, `.second`, `.dayOfWeek` return `integer` resolved in the bound timezone.
-- [ ] `zoneddatetime + days(n)`, `+ months(n)`, `+ years(n)`, `+ weeks(n)` calendar arithmetic works with DST lenient resolution.
-- [ ] `zoneddatetime + hours(n)`, `+ minutes(n)`, `+ duration`, `- duration` timeline arithmetic works.
+- [ ] `zoneddatetime + hours(n)`, `+ minutes(n)`, `+ seconds(n)`, `+ duration`, `- duration` timeline arithmetic works.
 - [ ] `zoneddatetime - zoneddatetime → duration` (instant subtraction).
+- [ ] `zoneddatetime + days(n)`, `+ months(n)`, `+ years(n)`, `+ weeks(n)`, `+ period`, `- period` are type errors with a teachable message directing the user to decompose via `.date` for calendar arithmetic, then reconstruct.
 - [ ] `zoneddatetime + integer` is a type error with a teachable message.
-- [ ] `zoneddatetime == zoneddatetime` compares by instant.
-- [ ] `toLocalDate(zoneddatetime)` overload returns date in the bound timezone.
-- [ ] `toLocalTime(zoneddatetime)` overload returns time in the bound timezone.
-- [ ] `toInstant(date, time, zoneddatetime)` overload converts using the bound timezone.
+- [ ] `zoneddatetime == zoneddatetime` uses multi-dimensional comparison (primary: instant, tiebreaker: local datetime, final: timezone ID lexicographic). Two ZDTs at the same instant in different timezones are NOT equal.
+- [ ] `zoneddatetime < zoneddatetime` compares by instant.
+- [ ] `toLocalDate(zoneddatetime)` overload returns localdate in the bound timezone.
+- [ ] `toLocalTime(zoneddatetime)` overload returns localtime in the bound timezone.
+- [ ] `toInstant(localdate, localtime, zoneddatetime)` overload converts using the bound timezone.
 - [ ] Nullable works. No default allowed (compile error if specified).
 - [ ] MCP tools serialize as two-property JSON object.
 
 ### `localdatetime` type (if included)
 
-- [ ] `field X as datetime` parses and type-checks.
-- [ ] `datetime("2026-04-13T14:30:00")` validates (no timezone suffix).
-- [ ] `.date → date`, `.time → time` decomposition works.
+- [ ] `field X as localdatetime` parses and type-checks.
+- [ ] `localdatetime("2026-04-13T14:30:00")` validates (no timezone suffix).
+- [ ] `.date → localdate`, `.time → localtime` decomposition works.
 - [ ] All component accessors (`.year`, `.month`, `.day`, `.hour`, `.minute`, `.second`) return `integer`.
+- [ ] `localdatetime + days(n)`, `+ months(n)`, `+ years(n)`, `+ weeks(n)` calendar arithmetic works.
+- [ ] `localdatetime + hours(n)`, `+ minutes(n)`, `+ seconds(n)` time arithmetic works.
+- [ ] `localdatetime + period → localdatetime`, `localdatetime - period → localdatetime` work.
+- [ ] `localdatetime - localdatetime → period`.
+- [ ] `localdatetime + duration` and `localdatetime - duration` are type errors (convert to instant first for timeline arithmetic).
+- [ ] `localdatetime + integer` is a type error.
 
 ### Conversion functions
 
-- [ ] `toLocalDate(instant, timezone) → date` works.
-- [ ] `toLocalTime(instant, timezone) → time` works.
-- [ ] `toInstant(date, time, timezone) → instant` works.
+- [ ] `toLocalDate(instant, timezone) → localdate` works.
+- [ ] `toLocalTime(instant, timezone) → localtime` works.
+- [ ] `toInstant(localdate, localtime, timezone) → instant` works.
 - [ ] DST gap resolution: maps to post-gap instant.
 - [ ] DST overlap resolution: maps to later instant.
 - [ ] Invalid timezone in field value produces constraint violation at fire time.
 - [ ] Conversion function results compose with existing type operations.
-- [ ] `toLocalDate(zoneddatetime)` overload returns date in the bound timezone.
-- [ ] `toLocalTime(zoneddatetime)` overload returns time in the bound timezone.
-- [ ] `toInstant(date, time, zoneddatetime)` overload converts using the bound timezone.
+- [ ] `toLocalDate(zoneddatetime)` overload returns localdate in the bound timezone.
+- [ ] `toLocalTime(zoneddatetime)` overload returns localtime in the bound timezone.
+- [ ] `toInstant(localdate, localtime, zoneddatetime)` overload converts using the bound timezone.
 
 ### Tooling
 
-- [ ] TextMate grammar highlights all temporal type keywords.
-- [ ] Language server offers temporal types in completions after `as`.
-- [ ] Language server offers temporal accessors after `.` on temporal fields.
+- [ ] TextMate grammar highlights all temporal type keywords (including `period`).
+- [ ] Language server offers temporal types in completions after `as` (including `period`).
+- [ ] Language server offers temporal accessors after `.` on temporal fields (including `.years`, `.months`, `.weeks`, `.days` on `period`).
 - [ ] Language server offers constructor/conversion functions in expression positions.
 - [ ] Semantic tokens color temporal keywords as types and functions.
 - [ ] All diagnostics (type errors, invalid literals, invalid timezones) display with teachable messages.
@@ -1267,8 +1297,17 @@ No `date(format)`, `instant(precision)`, or `duration(unit)`. Temporal type beha
 ### Cross-type
 
 - [ ] All entries in the "Not supported" tables produce type errors, not runtime exceptions.
-- [ ] Cross-type comparison (`date == instant`, etc.) is a type error.
-- [ ] No implicit mixing of `localdate`/`number`, `localdate`/`decimal`, `localdate`/`integer`, `instant`/`integer`, etc. Only explicit duration constructors are valid temporal arithmetic operands.
+- [ ] Cross-type comparison (`localdate == instant`, etc.) is a type error.
+- [ ] No implicit mixing of `localdate`/`number`, `localdate`/`decimal`, `localdate`/`integer`, `instant`/`integer`, etc. Only explicit constructor functions are valid temporal arithmetic operands.
+- [ ] `localdate + duration` is a type error (duration is timeline-only; use calendar constructors or `+ period`).
+- [ ] `localtime + duration` is a type error (use `hours(n)`, `minutes(n)`, `seconds(n)`).
+- [ ] `localdatetime + duration` is a type error (convert to instant first for timeline arithmetic).
+- [ ] `instant + period` is a type error (instant is timeline-only; use `+ duration`).
+- [ ] `zoneddatetime + period` is a type error (decompose via `.date` for calendar arithmetic).
+- [ ] `zoneddatetime + days(n)`, `+ months(n)`, `+ years(n)`, `+ weeks(n)` are type errors (decompose via `.date`).
+- [ ] `duration + period`, `period + duration` are type errors (cannot mix timeline and calendar).
+- [ ] `period * integer`, `period / integer` are type errors (period scaling is not supported).
+- [ ] `period < period` is a type error (periods are not orderable).
 
 ---
 
