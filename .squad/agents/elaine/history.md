@@ -7,6 +7,21 @@
 
 ## Recent Updates
 
+### 2026-04-13 - PR #70 loop continuation: committed manifest and pushed all unpushed design work to origin
+
+- Committed `design/system/semantic-visual-system-manifest.md` — the first-pass canonical manifest that was sitting uncommitted in the worktree. This closes out the semantic foundation artifact for the preview redesign lane.
+- Pushed all 25+ unpushed local commits to `origin/design/semantic-visual-system-review`, making the full design iteration visible on PR #70. This includes 14 prototype HTML files (`event-button-ux-exploration-v2` through `v5`, `header-badge-exploration`, `river-flow-*`, `state-diagram-specimen-exploration`, `timeline-*`), research docs, and major iterations on `semantic-visual-system.html`.
+- The manifest is an explicit boundary document: faithful projection over runtime truth, three target surfaces (state diagram, timeline, data form), open questions surfaced rather than elided, and a clear mapping between what the current runtime already supports and what richer surface semantics still need.
+- The "continue in-progress design iteration" checklist item on PR #70 remains open until Shane reviews the prototype work and confirms the design iteration is sufficient to mark the PR ready for review.
+
+### 2026-04-13 - Semantic Visual System manifest draft boundary
+
+- Created `design/system/semantic-visual-system-manifest.md` as the first-pass canonical manifest structure for the Semantic Visual System.
+- Locked the draft around three target surfaces: state diagram, timeline, and data form.
+- Restated the boundary rule explicitly: the manifest is a faithful projection over runtime truth, not a second semantic system.
+- Recorded that current public runtime contracts appear sufficient for much present-tense semantics, while timeline history and some richer surface semantics likely need public runtime support or host-owned receipts/history.
+- Marked the data form as the least resolved surface and elevated its semantic questions into an explicit open-questions section instead of implying false closure.
+
 ### 2026-04-12 - Header Badge Exploration: Variant 11 — Layout Flip (full card restructure)
 
 - Added Variant 11 ("Layout Flip") to `design/prototypes/header-badge-exploration.html` — a complete card layout restructure, not just a header badge.
