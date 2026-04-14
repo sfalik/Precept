@@ -343,15 +343,15 @@ These are thin wrappers around `Duration.FromHours`, `Duration.FromMinutes`, `Du
 |---|---|---|
 | `duration + duration` | `duration` | Combined elapsed time. |
 | `duration - duration` | `duration` | Difference in elapsed time. |
-| `duration * number` | `duration` | Scaling — e.g., `SlaWindow * 2` doubles the window. NodaTime: `Duration * double`. |
-| `duration / number` | `duration` | Scaling — e.g., `SlaWindow / 2` halves the window. NodaTime: `Duration / double`. |
+| `duration * numeric` | `duration` | Scaling — e.g., `SlaWindow * 2`, `BaseDuration * Rate`. Operand may be `integer`, `decimal`, or `number`. NodaTime: `Duration * double` (all widen to `double` internally). |
+| `duration / numeric` | `duration` | Scaling — e.g., `SlaWindow / 2`. Operand may be `integer`, `decimal`, or `number`. NodaTime: `Duration / double`. |
 | `duration / duration` | `number` | Ratio — e.g., `Elapsed / ShiftLength` counts how many shifts fit. NodaTime: `Duration / Duration → double`. |
 | `==`, `!=`, `<`, `>`, `<=`, `>=` | `boolean` | Full ordering — nanosecond comparison. |
 
 | **Not supported** | **Why** |
 |---|---|
 | `duration * duration` | Multiplying two durations is dimensionally meaningless. |
-| `number * duration` | Use `duration * number` — duration is always the left operand, matching the Precept convention for temporal types. |
+| `numeric * duration` | Use `duration * numeric` — duration is always the left operand, matching the Precept convention for temporal types. |
 
 **Accessors:**
 
@@ -610,8 +610,8 @@ The following matrix defines what operations are valid between temporal types. A
 | `instant` | `-` | `duration` | `instant` | Point offset backward |
 | `duration` | `+` | `duration` | `duration` | Combined elapsed time |
 | `duration` | `-` | `duration` | `duration` | Difference |
-| `duration` | `*` | `number` | `duration` | Scaling (e.g., double window) |
-| `duration` | `/` | `number` | `duration` | Scaling (e.g., halve window) |
+| `duration` | `*` | `integer`, `decimal`, or `number` | `duration` | Scaling (e.g., `SlaWindow * ShiftCount`) |
+| `duration` | `/` | `integer`, `decimal`, or `number` | `duration` | Scaling (e.g., `SlaWindow / 2`) |
 | `duration` | `/` | `duration` | `number` | Ratio (e.g., how many shifts fit) |
 | `time` | `+` | `hours(n)` | `time` | Wraps at midnight |
 | `time` | `+` | `minutes(n)` | `time` | Wraps at midnight |
@@ -644,8 +644,8 @@ Cross-type comparison is always a type error:
 | `instant.year` | Requires a timezone. Use `toLocalDate(instant, timezone).year`. |
 | `time - time` | Ambiguous sign (see `time` section). |
 | `duration * duration` | Dimensionally meaningless. |
-| `number * duration` | Use `duration * number` — duration is always the left operand. |
-| `number / duration` | Dimensionally meaningless (what is "5 / 3 hours"?). |
+| `numeric * duration` | Use `duration * numeric` — duration is always the left operand. |
+| `numeric / duration` | Dimensionally meaningless (what is "5 / 3 hours"?). |
 | `timezone + anything` | Timezones are metadata, not temporal values. |
 
 ### Nullable behavior
@@ -980,9 +980,11 @@ No `date(format)`, `instant(precision)`, or `duration(unit)`. Temporal type beha
 
 - [ ] `days(7)`, `hours(72)`, `minutes(30)`, `seconds(3600)` produce duration values.
 - [ ] `duration + duration → duration`, `duration - duration → duration`.
-- [ ] `duration * number → duration`, `duration / number → duration` (scaling).
+- [ ] `duration * integer → duration`, `duration * decimal → duration`, `duration * number → duration` (scaling with any numeric type).
+- [ ] `duration / integer → duration`, `duration / decimal → duration`, `duration / number → duration` (scaling with any numeric type).
 - [ ] `duration / duration → number` (ratio).
 - [ ] `duration * duration` is a type error.
+- [ ] `integer * duration`, `decimal * duration`, `number * duration` are type errors (duration must be left operand).
 - [ ] `.totalHours`, `.totalMinutes`, `.totalSeconds` return `number`.
 - [ ] `duration == duration`, `duration < duration` comparison works.
 - [ ] If field type: `field X as duration default hours(0)` parses.
