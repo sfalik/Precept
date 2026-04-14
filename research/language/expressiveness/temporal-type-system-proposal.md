@@ -337,6 +337,24 @@ seconds(3600)   # 3600 seconds
 
 These are thin wrappers around `Duration.FromHours`, `Duration.FromMinutes`, `Duration.FromSeconds`.
 
+**Composite durations** are built with duration arithmetic:
+
+```precept
+days(5) + hours(7) + seconds(32)    # 5 days, 7 hours, and 32 seconds
+```
+
+**Literal / Constructor syntax:** `duration("<ISO-8601-duration>")` — ISO 8601 duration format. `duration("PT72H")` is valid (72 hours). `duration("PT8H30M")` is valid (8 hours 30 minutes). `duration("P5DT7H32S")` is valid (5 days, 7 hours, 32 seconds). Parsing via `NodaTime.Text.DurationPattern`.
+
+| Expression | Valid? | Notes |
+|---|---|---|
+| `duration("PT72H")` | Yes | 72 hours |
+| `duration("PT8H30M")` | Yes | 8 hours 30 minutes |
+| `duration("P5DT7H32S")` | Yes | 5 days, 7 hours, 32 seconds |
+| `duration("8 hours")` | No | Not ISO 8601 format. Use `duration("PT8H")` or `hours(8)`. |
+| `duration("")` | No | Empty duration string. Use `hours(0)` for zero duration. |
+
+The string constructor and the function constructors are interchangeable — `duration("PT72H")` and `hours(72)` produce the same value. The function constructors are preferred for single-unit durations (more readable); the string constructor serves composite durations that would otherwise require chained addition.
+
 **Operators:**
 
 | Expression | Produces | Rationale |
@@ -981,6 +999,9 @@ No `date(format)`, `instant(precision)`, or `duration(unit)`. Temporal type beha
 ### `duration` type
 
 - [ ] `days(7)`, `hours(72)`, `minutes(30)`, `seconds(3600)` produce duration values.
+- [ ] `duration("PT72H")` parses as 72 hours. `duration("P5DT7H32S")` parses as composite.
+- [ ] `duration("8 hours")` is a compile error with a teachable message (not ISO 8601).
+- [ ] `duration + duration → duration` (composing: `days(5) + hours(7)`).
 - [ ] `duration + duration → duration`, `duration - duration → duration`.
 - [ ] `duration * integer → duration`, `duration * number → duration` (scaling).
 - [ ] `duration / integer → duration`, `duration / number → duration` (scaling).
