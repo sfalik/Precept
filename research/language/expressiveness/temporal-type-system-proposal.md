@@ -483,6 +483,8 @@ field ScheduledFor as datetime default datetime("2026-04-13T09:00:00")
 | `datetime + days(n)` | `datetime` | Add N calendar days. Same as date + days(n). |
 | `datetime + months(n)` | `datetime` | Calendar arithmetic via Period. |
 | `datetime + years(n)` | `datetime` | Calendar arithmetic via Period. |
+| `datetime + duration` | `datetime` | Offset forward by a composed duration (e.g., `days(5) + hours(7)`). |
+| `datetime - duration` | `datetime` | Offset backward by a composed duration. |
 | `==`, `!=`, `<`, `>`, `<=`, `>=` | `boolean` | Full ordering within the same calendar. |
 
 | **Not supported** | **Why** |
@@ -608,6 +610,69 @@ Duration constructors are the **required interface** for all temporal arithmetic
 
 Internally, calendar-unit constructors (`days`, `months`, `years`, `weeks`) produce `NodaTime.Period` values, while timeline constructors (`hours`, `minutes`, `seconds`) produce `NodaTime.Duration` values. The DSL author does not see this distinction — all seven are "duration constructors" at the language surface. `Period` is not exposed as a DSL type.
 
+#### Option: Duration constructor syntax — function call vs. postfix suffix
+
+##### Option A: Function-call syntax only (current)
+
+```precept
+set DueDate = CreatedDate + days(30)
+set Deadline = StartDate + days(GracePeriodDays)
+set EndTime = StartTime + hours(ShiftLength)
+```
+
+**Pros:** Consistent for both literals and variables. No new grammar construct — function calls are already parsed. Familiar to programmers.
+
+**Cons:** Less natural for literal constants. `days(30)` reads like a function call, not "30 days."
+
+##### Option B: Postfix suffix syntax only
+
+```precept
+set DueDate = CreatedDate + 30 days
+set Deadline = StartDate + GracePeriodDays days
+set EndTime = StartTime + ShiftLength hours
+```
+
+**Pros:** Reads like natural English for literals: `DueDate + 30 days`. Aligns with Principle #2 (English-ish). Matches Kotlin, Ruby, PromQL, and CSS — languages optimized for readability use postfix.
+
+**Cons:** Awkward with variables: `GracePeriodDays days` lacks the visual cue that a function call provides. Parser impact: `days`, `hours`, etc. become context-sensitive keywords (after numeric literals or identifiers in expression position). Superpower handles this as single-token lookahead, but it's still new grammar surface.
+
+##### Option C: Both syntaxes (dual form)
+
+Suffix for literals, function call for variables and complex expressions:
+
+```precept
+set DueDate = CreatedDate + 30 days
+set Deadline = StartDate + days(GracePeriodDays)
+set EndTime = StartTime + hours(BaseHours + Overtime)
+```
+
+**Pros:** Best of both — natural English for the common literal case, clean syntax for the variable case. Authors choose the form that reads best.
+
+**Cons:** Two ways to do the same thing. Language surface is larger. Grammar is more complex. Teaching burden: "when do I use which?"
+
+##### External precedent
+
+| Language | Syntax | Family |
+|---|---|---|
+| Kotlin | `5.days`, `5.hours` | Postfix (extension property) |
+| Ruby | `5.days`, `5.hours` | Postfix (monkey-patch) |
+| Swift | No built-in suffix | Function call |
+| Scala | `5.days`, `5.hours` (via FiniteDuration) | Postfix (implicit conversion) |
+| Go | `5 * time.Hour` | Multiplication |
+| Rust | No built-in suffix | Function call |
+| PromQL | `5d`, `5h` | Postfix (abbreviation) |
+| CSS | `5s`, `500ms` | Postfix (unit) |
+| PostgreSQL | `INTERVAL '5 days'` | String parse |
+| Terraform | `"5h"`, `"30m"` | String parse |
+| Kubernetes | `5d`, `30m` | Postfix (abbreviation) |
+| F# | No built-in suffix | Function call (`TimeSpan.FromDays 5.0`) |
+
+**Key finding:** Languages optimized for readability (Kotlin, Ruby, Scala) adopt postfix suffix. Languages optimized for precision/generality (Rust, Go, F#) use function calls. Precept's Principle #2 ("English-ish but not English") suggests readability is a priority, but Principle #8 ("Sound, compile-time-first") suggests the variable case must be clean too.
+
+**Parser note:** Postfix suffix requires `days`, `hours`, `minutes`, `seconds`, `weeks`, `months`, `years` to be recognized as unit keywords when they follow a numeric literal or identifier in expression position. Superpower handles this as single-token lookahead — trivial to implement. The keywords would be context-sensitive (only treated as unit suffixes in expression position after a number/identifier, not as bare identifiers elsewhere).
+
+**Recommendation:** Open — needs design discussion. The literal readability advantage of suffix syntax is compelling (Principle #2), but the variable awkwardness is a real concern. If both forms are offered (Option C), the language surface grows but authors get the most readable form for each context.
+
 ---
 
 ## Semantic Rules
@@ -639,6 +704,8 @@ The following matrix defines what operations are valid between temporal types. A
 | `datetime` | `+` | `years(n)` | `datetime` | Calendar arithmetic |
 | `datetime` | `+` | `hours(n)` | `datetime` | Time arithmetic |
 | `datetime` | `+` | `minutes(n)` | `datetime` | Time arithmetic |
+| `datetime` | `+` | `duration` | `datetime` | Offset forward by composed duration (e.g., `days(5) + hours(7)`) |
+| `datetime` | `-` | `duration` | `datetime` | Offset backward by composed duration |
 
 ### Comparison rules
 
@@ -1012,6 +1079,7 @@ No `date(format)`, `instant(precision)`, or `duration(unit)`. Temporal type beha
 - [ ] `.totalHours`, `.totalMinutes`, `.totalSeconds` return `number`.
 - [ ] `duration == duration`, `duration < duration` comparison works.
 - [ ] If field type: `field X as duration default hours(0)` parses.
+- [ ] Duration constructor syntax chosen (function call, postfix suffix, or both) and all examples in the proposal consistently reflect the chosen form.
 
 ### `timezone` type
 
