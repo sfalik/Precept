@@ -15,12 +15,11 @@
 
 This proposal presents a unified design for reducing Precept's reliance on `nullable` — not by replacing it with `Option<T>` types or monadic wrappers (the research ruled those out), but by recognizing that **the state machine is already Precept's optionality mechanism** and making that relationship explicit in the language surface.
 
-The proposal covers four interconnected changes:
+The proposal covers three interconnected changes:
 
-1. **Rename `nullable` to `optional`** — aligning with Precept's English-ish principle.
-2. **Eliminate `null` as a language keyword** — replacing it with `none` (value literal), `is present`/`is absent` (guard/assertion operators), and `clear` (action keyword).
-3. **State-scoped field visibility** — fields that only exist in the states where they're meaningful, eliminating ~65% of current `nullable` usage.
-4. **Absence-eliminates model for computed fields** — when a computed field's inputs are structurally absent, the computed field is also absent.
+1. **Replace null vocabulary with domain language** — rename `nullable` to `optional`, eliminate `null` as a keyword, introduce `none` (absence value), `is present`/`is absent` (presence operators), and `clear` (action keyword counterpart to `set`).
+2. **State-scoped field visibility** — fields that only exist in the states where they're meaningful, eliminating ~65% of current `nullable` usage.
+3. **Absence-eliminates model for computed fields** — when a computed field's inputs are structurally absent, the computed field is also absent.
 
 Each section presents concrete syntax options, decision points with tradeoffs, and recommendations grounded in the research base and Precept's philosophy.
 
@@ -82,90 +81,68 @@ These are irreducible. They need a keyword. The question is whether that keyword
 
 ---
 
-## 3. Proposal: Rename `nullable` to `optional`
+## 3. Proposal: Replace Null Vocabulary with Domain Language
 
-### Why the rename
+Precept currently uses three implementation-derived tokens: `nullable` (type modifier), `null` (value literal), and null-comparison operators (`== null`, `!= null`). All three come from C#, SQL, and database schemas — they describe type-system mechanics, not domain concepts. This section proposes replacing the entire null vocabulary with English-ish alternatives that express intent rather than implementation.
 
-The current keyword `nullable` is technically accurate but semantically misleading in Precept's context:
+### Why the change
 
-1. **`nullable` is implementation language** — it describes a type-system property (can this reference be null?). It comes from C#, SQL, and database schemas. It's the right word for a language where null is a value in the type system.
+1. **`nullable` is implementation language; `optional` is domain language.** "Field Nickname as string optional" reads as "the Nickname field is a string and it's optional." Compare with "field Nickname as string nullable" — jargon that requires explaining what null is. The word `optional` is instantly understood by domain experts. CUE uses `?` (optional), Dhall uses `Optional`, Protobuf uses `optional` — the industry word for "might not have a value" is overwhelmingly "optional."
 
-2. **`optional` is domain language** — it describes intent (is this data required or optional?). It reads naturally in English-ish syntax: "field Nickname as string optional" reads as "the Nickname field is a string and it's optional." Compare with "field Nickname as string nullable" — "the nickname field is a string and it's nullable" is jargon.
+2. **`null` is not a domain concept — it's an implementation artifact.** Tony Hoare called it his "billion dollar mistake." The domain concepts are:
+   - **"No value was provided"** → `none`
+   - **"Does this field have a value?"** → `is present` / `is absent`
+   - **"Remove the value from this field"** → `clear`
 
-3. **Precept's philosophy demands English-ish, not implementation-ish** — Principle #2: "Keywords like `with`, `because`, `from`, `on` read naturally but don't attempt full sentences." The word `optional` is instantly understood by domain experts. The word `nullable` requires explaining what null is.
+3. **Precept's philosophy demands English-ish, not implementation-ish** — Principle #2: keywords read naturally but don't attempt full sentences. Principle #12: AI is a first-class consumer, so domain meaning matters more than implementation convention.
 
-4. **`optional` describes the DOMAIN fact** — the data is optional. `nullable` describes the IMPLEMENTATION fact — the field can hold null. In a language designed for "AI is a first-class consumer" (Principle #12), the domain meaning is what matters.
+4. **Precedent from null-free languages**: Rust (`Option<T>`), Haskell (`Maybe`), Elm (`Maybe`), Datomic (no null — absence as non-assertion) all demonstrate that languages work better when "no value" has domain-appropriate vocabulary rather than a universal `null` token.
 
-5. **Precedent**: CUE uses `?` (optional), Dhall uses `Optional`, Protobuf uses `optional`, JSON Schema uses the absence from `required` array, GraphQL defaults to nullable but calls `!` non-null. The industry word for "might not have a value" is overwhelmingly "optional."
+### The complete replacement table
 
-### Syntax change
+| Current | Replacement | Position | English reading |
+|---|---|---|---|
+| `nullable` | `optional` | Field/arg type modifier | "this field is optional" |
+| `default null` | `default none` | Field/arg default value | "the default is: no value" |
+| `when Field != null` | `when Field is present` | Guard expression | "when the field has a value" |
+| `when Field == null` | `when Field is absent` | Guard expression | "when the field has no value" |
+| `assert X != null` | `assert X is present` | Assertion | "X must have a value" |
+| `assert X == null` | `assert X is absent` | Assertion | "X must have no value" |
+| `set Field = null` | `clear Field` | Transition action | "remove the field's value" |
+
+### Syntax — full before/after
 
 **Before:**
 ```precept
-field AssignedAgent as string nullable
 field Nickname as string nullable
 field Note as string nullable default null
 
 event Approve with Note as string nullable default null
+
+from Review on Approve when DecisionNote != null -> ...
+in Approved assert DecisionNote != null because "Decision must be documented"
+on Reopen assert Note == null or Note != "" because "A supplied note cannot be blank"
+
+from Approved on Revoke -> set ApprovedBy = null -> transition Draft
 ```
 
 **After:**
 ```precept
-field AssignedAgent as string optional
 field Nickname as string optional
 field Note as string optional default none
 
 event Approve with Note as string optional default none
+
+from Review on Approve when DecisionNote is present -> ...
+in Approved assert DecisionNote is present because "Decision must be documented"
+on Reopen assert Note is absent or Note != "" because "A supplied note cannot be blank"
+
+from Approved on Revoke -> clear ApprovedBy -> transition Draft
 ```
-
-Every position where `nullable` currently appears would accept `optional` instead. The semantics are identical — `optional` means "this field/argument may have no value."
-
-### Migration decision point
-
-| Option | Description | Pros | Cons |
-|---|---|---|---|
-| **A. Hard break** | `nullable` is removed. Only `optional` is accepted. All existing `.precept` files must be updated. | Clean language surface. No legacy baggage. Single keyword to learn. | Breaking change to all existing files. Requires migration tooling or manual edits. |
-| **B. Soft deprecation** | Both `nullable` and `optional` are accepted. `nullable` emits a deprecation warning. After N versions, `nullable` becomes an error. | Smooth migration path. Authors can update at their own pace. | Two keywords for the same concept during the deprecation period. Confusing for new authors. |
-| **C. Permanent alias** | Both `nullable` and `optional` are accepted indefinitely. No warnings. | Zero migration effort. Backwards compatible forever. | Language has two words for the same thing permanently. Violates minimal-ceremony principle (cognitive overhead). |
-
-**Recommendation: Option B (soft deprecation)**
-
-Rationale:
-- Precept is pre-1.0. The language surface should get cleaner, not accumulate synonyms.
-- A deprecation warning provides clear migration guidance without forced breakage.
-- The deprecation period can be generous (2-3 minor versions) since the change is mechanical.
-- A codemod script (`nullable` → `optional`) is trivial to provide.
-- After deprecation expires, the language has one word for one concept — consistent with Principle #3 (minimal ceremony).
-
----
-
-## 3a. Proposal: Eliminate `null` as a Keyword
-
-### Why `null` must go
-
-If `nullable` → `optional` is the right rename, the logical completion is eliminating `null` itself from the DSL surface. The word `null` is the most implementation-specific token in Precept's vocabulary — it comes from C, C#, Java, SQL, and speaks to pointers and reference types, not domain concepts. A language designed around English-ish clarity and "AI is a first-class consumer" (Principles #2 and #12) should not force domain experts or AI agents to reason about null.
-
-The insight: **`null` is not a domain concept — it's an implementation artifact.** The domain concepts are:
-- **"No value was provided"** — expressed as `none`
-- **"Does this field have a value?"** — expressed as `is present` / `is absent`
-- **"Remove the value from this field"** — expressed as `clear`
-
-Each of these reads naturally in English and communicates intent rather than implementation. Together, they complete the vision of a null-free DSL surface.
-
-### The replacements
-
-| Current usage | Replacement | Position | Rationale |
-|---|---|---|---|
-| `default null` | `default none` | Field/arg default value | `none` is the English word for "no value" — English-ish principle |
-| `when Field != null` | `when Field is present` | Guard expression | Tests for presence, not null comparison |
-| `when Field == null` | `when Field is absent` | Guard expression | Tests for absence, not null comparison |
-| `assert X != null` | `assert X is present` | Event/state assertion | Assertion that a value exists |
-| `assert X == null` | `assert X is absent` | Event/state assertion | Assertion that no value exists |
-| `set Field = null` | `clear Field` | Transition action | `clear` is the natural counterpart to `set` |
 
 ### `clear` — the counterpart to `set`
 
-Precept already has `set` as the action keyword for assigning values. `clear` is its natural pair:
+Precept's action keywords are verbs: `set`, `transition`, `reject`, `enqueue`, `dequeue`, `add`, `remove`. `clear` fits naturally in this family as the counterpart to `set`:
 
 ```precept
 # Setting a value
@@ -175,59 +152,29 @@ from Draft on Approve -> set ApprovedBy = Approve.Reviewer -> transition Approve
 from Approved on Revoke -> clear ApprovedBy -> transition Draft
 ```
 
-The `set`/`clear` pairing mirrors everyday English: "set the alarm" / "clear the alarm." It's immediately intuitive without explanation. By contrast, `set Field = null` requires understanding what `null` means — a concept foreign to domain experts.
+The `set`/`clear` pairing mirrors everyday English: "set the alarm" / "clear the alarm." It's immediately intuitive without explanation.
 
-`clear` as a standalone action keyword (rather than `set Field = none`) has several advantages:
+Why `clear` as a standalone action keyword rather than `set Field = none`:
 - **Distinct intent**: `set` means "assign a value," `clear` means "remove a value." These are semantically different operations, not the same operation with a special value.
-- **Reads naturally**: "clear the ApprovedBy field" vs. "set the ApprovedBy field to none."
 - **Datomic precedent**: Datomic uses **retraction** as a distinct operation from assertion. Retracting an attribute is not "asserting null" — it's removing the attribute entirely. `clear` captures this same distinction.
-- **Symmetry with the action vocabulary**: Precept's action keywords are verbs — `set`, `transition`, `reject`, `enqueue`, `dequeue`, `add`, `remove`. `clear` fits naturally in this family. `none` used as an action argument (`set Field = none`) would be the only non-verb action form.
+- **No non-verb action forms**: `set Field = none` would be the only action where the RHS is a keyword rather than an expression. `clear Field` keeps the action vocabulary consistently verb-driven.
 
-### `none` — the absence literal
+### `none` — the absence value
 
-`none` replaces `null` as the value representing "no value" in default clauses:
+`none` replaces `null` in `default` clauses to express "the default is: no value." It is a keyword restricted to `default` clauses — it does not participate in arbitrary expressions or comparisons.
 
-```precept
-# Before
-event Reopen with Note as string optional default null
+**Why keyword, not general-purpose literal?** A literal would imply it can appear anywhere a value can — in `set` RHS expressions, in comparisons, in computed field formulas. Restricting `none` to `default` clauses keeps the language surface clean: `default none` to declare absence, `is present`/`is absent` to test for it, `clear` to produce it. Three mechanisms, each with one job.
 
-# After
-event Reopen with Note as string optional default none
-```
+**Implicit default for optional fields**: `optional` without an explicit `default` clause implies `default none`. The explicit form `optional default none` is also accepted for readability. This avoids forcing ceremony while keeping the option for authors who prefer explicitness.
 
-`none` is a keyword, not a general-purpose value literal — it appears in `default` clauses to express "the default is: no value." It does not participate in arbitrary expressions or comparisons.
+### `is present` / `is absent` — presence operators
 
-**Why keyword, not literal?** A literal would imply it can appear anywhere a value can — in `set` RHS expressions, in comparisons, in computed field formulas. But the whole point of eliminating `null` is to prevent those patterns. `none` as a keyword restricted to `default` clauses keeps the language surface clean: you use `default none` to declare absence, `is present`/`is absent` to test for it, and `clear` to produce it.
+These operators replace null comparisons and serve double duty:
 
-**Why not just make `default` implicit for optional fields?**
+1. **Optional value checking** — for `optional` fields, `is present` tests whether the field has a value.
+2. **Visibility checking** — for state-scoped fields in `from any` rows (Section 4), `is present` tests whether the field exists in the current state.
 
-If every `optional` field with no explicit `default` clause implicitly defaults to `none`, do we need `none` at all? Yes, for two reasons:
-1. **Readability**: `default none` makes the absence explicit. An author reading `field Note as string optional` has to know the implicit rule. `field Note as string optional default none` is unambiguous.
-2. **Consistency**: Non-optional fields already require explicit defaults when they have them. Making optional fields silently default to `none` creates an asymmetry.
-
-That said, `default none` could be made optional as syntactic sugar — `optional` without a `default` clause implies `default none`. This is a design decision for implementation time.
-
-### `is present` / `is absent` — guard and assertion operators
-
-These binary operators replace null comparisons for testing whether an optional field has a value:
-
-```precept
-# Before
-from Review on Approve when DecisionNote != null -> ...
-in Approved assert DecisionNote != null because "Decision must be documented"
-
-# After
-from Review on Approve when DecisionNote is present -> ...
-in Approved assert DecisionNote is present because "Decision must be documented"
-```
-
-`is present` and `is absent` serve double duty:
-1. **Optional value checking** — for `optional` fields, `is present` tests whether the field has a value (not `none`), `is absent` tests whether it's `none`.
-2. **Visibility checking** — for state-scoped fields in `from any` rows, `is present` tests whether the field exists in the current state.
-
-This unifies two concepts (optional value checking and visibility checking) under one pair of operators, which is cleaner than having separate mechanisms.
-
-**Type narrowing**: `when Field is present` narrows the field's type in the row body, just as `when Field != null` does today. After the presence check, the field is known to have a concrete value and can be used without further absence guards.
+**Type narrowing**: `when Field is present` narrows the field's type in the row body, just as `when Field != null` does today. After the presence check, the field is known to have a concrete value and can be used without further guards.
 
 ### Interaction with the C# runtime API
 
@@ -240,27 +187,23 @@ At the C# API boundary, `none` maps to `null`:
 | `is absent` | `value == null` (or key missing from dictionary) |
 | `clear Field` | Sets the dictionary value to `null` |
 
-The DSL is null-free. The runtime is not — C# uses `null` internally because that's idiomatic C#. The boundary translation is transparent to DSL authors. This is the same pattern as Elm's `Nothing` mapping to JavaScript's `null/undefined`, or Kotlin's nullable types compiling to JVM null — the abstraction exists at the language surface, not the execution platform.
+The DSL is null-free; the runtime uses `null` internally because that's idiomatic C#. The boundary translation is transparent to DSL authors — the same pattern as Elm's `Nothing` mapping to JavaScript's `null/undefined`.
 
-### Migration approach
+### Migration
 
-The same soft-deprecation strategy (Decision #1) applies:
-- **Phase 1**: `none`, `is present`, `is absent`, and `clear` are accepted alongside `null`, `!= null`, `== null`, and `set Field = null`. The `null` forms emit deprecation warnings.
-- **Phase 2**: After the deprecation period, `null` becomes a parse error.
-
-A codemod script handles the mechanical transformation:
-- `default null` → `default none`
-- `!= null` → `is present`
-- `== null` → `is absent`
-- `set <Field> = null` → `clear <Field>`
+Soft deprecation (same approach for `nullable` and `null`):
+- Both old and new forms are accepted. Old forms emit deprecation warnings.
+- After the deprecation period, `nullable` and `null` become parse errors.
+- A codemod script handles the mechanical transformation: `nullable` → `optional`, `default null` → `default none`, `!= null` → `is present`, `== null` → `is absent`, `set Field = null` → `clear Field`.
 
 ### Decision points
 
-| # | Decision | Options | Key tradeoff |
-|---|---|---|---|
-| a | `none` as keyword vs. implicit | `default none` explicit / `optional` implies absent / both (explicit preferred, implicit allowed) | Readability vs. ceremony |
-| b | `clear` syntax | Standalone action keyword / `set Field = none` / both | Semantic distinction vs. language surface size |
-| c | `null` migration | Same soft deprecation as `nullable` / separate timeline | Migration coordination vs. complexity |
+| # | Decision | Options | Recommendation | Key Tradeoff |
+|---|---|---|---|---|
+| 1 | Migration approach | A. Hard break / B. Soft deprecation / C. Permanent alias | **B. Soft deprecation** | Migration effort vs. permanent synonym baggage |
+| 2 | `none` as keyword vs. implicit | Explicit `default none` required / implicit when `optional` has no `default` / both | **Both (implicit allowed, explicit accepted)** | Readability vs. ceremony |
+| 3 | `clear` syntax | Standalone action keyword / `set Field = none` / both | **Standalone action keyword** | Semantic distinction vs. language surface size |
+| 4 | `none` in comparisons | Allowed (`when Field == none`) / restricted to `default` only | **Restricted to `default` only** | Use `is present`/`is absent` for testing — one way to do it |
 
 ---
 
@@ -681,11 +624,11 @@ The same word, same behavior principle keeps the language small. The *why* behin
 
 **With state-scoped visibility**: Guards referencing a field not visible in the current state are compile errors. No need for null checks on visibility-scoped fields — they're either present (with a concrete value) or absent (and can't be referenced).
 
-**With `optional` fields**: `when Field is present` replaces `when Field != null`, with the same type-narrowing behavior. The keyword changes from `nullable` to `optional` and presence testing moves from null comparisons to the `is present`/`is absent` operators (Section 3a).
+**With `optional` fields**: `when Field is present` replaces `when Field != null`, with the same type-narrowing behavior. The keyword changes from `nullable` to `optional` and presence testing moves from null comparisons to the `is present`/`is absent` operators (Section 3).
 
 **Presence testing with `is present` / `is absent`:**
 
-With `null` eliminated from the language (Section 3a), `is present` and `is absent` are the standard operators for testing whether an optional field has a value. They also serve as the mechanism for cross-visibility field references:
+With `null` eliminated from the language (Section 3), `is present` and `is absent` are the standard operators for testing whether an optional field has a value. They also serve as the mechanism for cross-visibility field references:
 
 **For optional fields:**
 ```precept
@@ -998,17 +941,17 @@ from Resolved on Reopen -> set ReopenCount = ReopenCount + 1 -> transition New
 
 | # | Decision | Options | Recommendation | Key Tradeoff |
 |---|---|---|---|---|
-| 1 | Rename `nullable` → `optional` | A. Hard break / B. Soft deprecation / C. Permanent alias | **B. Soft deprecation** | Migration effort vs. permanent synonym baggage |
-| 2 | State-scoped visibility syntax | A. Implicit inference / B. Explicit `visible in/after` clause / C. State blocks | **B. Explicit `visible in/after`** | Zero-ceremony inference vs. explicit-but-readable declarations |
-| 3 | Cycle/re-entrance behavior | Sticky visibility / State-determined / Author-declared | **Sticky (default)** | Data preservation vs. clean re-entry semantics |
-| 4 | Computed field absence | Automatic inference / Opt-in declaration | **Automatic inference** | Implicit deduction vs. explicit declaration ceremony |
-| 5 | Cross-visibility field references | Compiler prevents without guard / `is present` guard required | **`is present` guard required** | Presence operators serve double duty — optional checking and visibility checking |
-| 6 | Same `optional` keyword for fields and event args | Same keyword / Different keywords | **Same keyword** | Semantic precision vs. language simplicity |
-| 7 | `visible after` shorthand | Include / Omit (only `visible in`) | **Include** | Convenience vs. additional syntactic sugar to maintain |
-| 8 | `visible` + `optional` combination allowed | Yes / No | **Yes** | Handles "introduced at lifecycle point but genuinely optional" |
-| 9 | Eliminate `null` keyword | `none` literal + `clear` action + `is present`/`is absent` operators | **Yes — full elimination** | Implementation vocabulary removed from DSL surface |
-| 10 | `clear` syntax | Standalone action keyword / `set Field = none` / both | **Standalone action keyword** | Semantic distinction (`set` assigns, `clear` removes) vs. language surface size |
-| 11 | `none` semantics | Explicit `default none` / implicit (no `default` = absent) / both | **Explicit preferred, implicit allowed** | Readability vs. ceremony reduction |
+| 1 | Null vocabulary migration | A. Hard break / B. Soft deprecation / C. Permanent alias | **B. Soft deprecation** | Migration effort vs. permanent synonym baggage |
+| 2 | `none` default semantics | Explicit `default none` required / implicit when `optional` has no `default` / both | **Both (implicit allowed, explicit accepted)** | Readability vs. ceremony |
+| 3 | `clear` syntax | Standalone action keyword / `set Field = none` / both | **Standalone action keyword** | Semantic distinction (`set` assigns, `clear` removes) vs. language surface size |
+| 4 | `none` in comparisons | Allowed (`when Field == none`) / restricted to `default` only | **Restricted to `default` only** | Use `is present`/`is absent` for testing — one way to do it |
+| 5 | State-scoped visibility syntax | A. Implicit inference / B. Explicit `visible in/after` clause / C. State blocks | **B. Explicit `visible in/after`** | Zero-ceremony inference vs. explicit-but-readable declarations |
+| 6 | Cycle/re-entrance behavior | Sticky visibility / State-determined / Author-declared | **Sticky (default)** | Data preservation vs. clean re-entry semantics |
+| 7 | Computed field absence | Automatic inference / Opt-in declaration | **Automatic inference** | Implicit deduction vs. explicit declaration ceremony |
+| 8 | Cross-visibility field references | Compiler prevents without guard / `is present` guard required | **`is present` guard required** | Presence operators serve double duty — optional checking and visibility checking |
+| 9 | Same `optional` keyword for fields and event args | Same keyword / Different keywords | **Same keyword** | Semantic precision vs. language simplicity |
+| 10 | `visible after` shorthand | Include / Omit (only `visible in`) | **Include** | Convenience vs. additional syntactic sugar to maintain |
+| 11 | `visible` + `optional` combination allowed | Yes / No | **Yes** | Handles "introduced at lifecycle point but genuinely optional" |
 
 ---
 
@@ -1038,7 +981,7 @@ from Resolved on Reopen -> set ReopenCount = ReopenCount + 1 -> transition New
 
 10. **Performance implications.** Does computing per-state field visibility add meaningful cost to compilation? For typical precepts (5-15 states, 10-30 fields), this should be negligible. Worth measuring if precepts grow much larger.
 
-### Questions Added by Null Elimination (Section 3a)
+### Questions Added by Null Elimination
 
 11. **How does `clear` interact with visibility-scoped fields?** Can you `clear` a required (non-optional) field? Likely not — only `optional` fields can be cleared, since clearing a required field would violate its non-optional constraint. `clear` on a `visible after` field that is not `optional` should be a compile error.
 
