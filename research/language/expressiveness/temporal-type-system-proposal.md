@@ -3,13 +3,13 @@
 **Author:** Frank (Lead/Architect, Language Designer)
 **Date:** 2026-04-13
 **Status:** Proposal — ready for owner review
-**Supersedes:** Issue #26 (`date` type as standalone proposal)
+**Supersedes:** Issue #26 (`localdate` type as standalone proposal)
 
 ---
 
 ## Summary
 
-Add seven temporal types to the Precept DSL — `date`, `time`, `instant`, `duration`, `timezone`, `zoneddatetime`, and `datetime` — backed by NodaTime as a runtime dependency. Include three timezone conversion functions (`toLocalDate`, `toLocalTime`, `toInstant`) with provenance-safe `zoneddatetime` overloads, and duration constructor functions (`days`, `months`, `years`, `weeks`, `hours`, `minutes`, `seconds`). Together, these types and functions give domain authors the vocabulary to express calendar constraints, SLA enforcement, multi-timezone compliance rules, and elapsed-time tracking — all within the governing contract, with no temporal logic delegated to the hosting layer. Every type earns its place by eliminating a specific ambiguity that would otherwise force authors into lossy encodings (`string`, `number`, `integer`) where the compiler cannot enforce domain intent.
+Add seven temporal types to the Precept DSL — `localdate`, `localtime`, `instant`, `duration`, `timezone`, `zoneddatetime`, and `localdatetime` — backed by NodaTime as a runtime dependency. Include three timezone conversion functions (`toLocalDate`, `toLocalTime`, `toInstant`) with provenance-safe `zoneddatetime` overloads, and duration constructor functions (`days`, `months`, `years`, `weeks`, `hours`, `minutes`, `seconds`). Together, these types and functions give domain authors the vocabulary to express calendar constraints, SLA enforcement, multi-timezone compliance rules, and elapsed-time tracking — all within the governing contract, with no temporal logic delegated to the hosting layer. Every type earns its place by eliminating a specific ambiguity that would otherwise force authors into lossy encodings (`string`, `number`, `integer`) where the compiler cannot enforce domain intent.
 
 ---
 
@@ -21,20 +21,20 @@ This shared philosophy is the lens through which every type decision in this pro
 
 | Precept applies it to... | NodaTime applies it to... | The shared principle |
 |---|---|---|
-| `date` over `string` | `LocalDate` over `DateTime` | Be explicit that this is a calendar date |
+| `localdate` over `string` | `LocalDate` over `DateTime` | Be explicit that this is a calendar date |
 | `instant` over `number` | `Instant` over `DateTime` | Be explicit that this is a point on the timeline |
 | `timezone` over `string` | `DateTimeZone` over `string` | Be explicit about the allowed values |
 | `duration` over `integer` | `Duration` over `TimeSpan` | Be explicit about what units mean |
-| `time` over `integer` | `LocalTime` over `int minutesSinceMidnight` | Be explicit that this is a time of day |
-| `datetime` over `string` | `LocalDateTime` over `DateTime` | Be explicit about combined date+time without timezone |
+| `localtime` over `integer` | `LocalTime` over `int minutesSinceMidnight` | Be explicit that this is a time of day |
+| `localdatetime` over `string` | `LocalDateTime` over `DateTime` | Be explicit about combined date+time without timezone |
 | `zoneddatetime` over `instant` + `timezone` | `ZonedDateTime` over separate `Instant` + `DateTimeZone` | Be explicit that this instant and timezone are semantically bound |
 
 Precept's design principles ground this directly:
 
-- **Principle #1 (Deterministic, inspectable model):** NodaTime's type separation makes it structurally clear which operations are deterministic and which require external context. All types proposed here are deterministic by construction — `instant` comparison is nanosecond math, `date` arithmetic uses the fixed ISO calendar, and timezone conversion functions make the TZ database input explicit in the expression.
-- **Principle #2 (English-ish but not English):** The DSL names — `date`, `time`, `instant`, `duration`, `timezone`, `datetime` — are English words that communicate exactly what the data is. `field FiledAt as instant` needs no comment.
+- **Principle #1 (Deterministic, inspectable model):** NodaTime's type separation makes it structurally clear which operations are deterministic and which require external context. All types proposed here are deterministic by construction — `instant` comparison is nanosecond math, `localdate` arithmetic uses the fixed ISO calendar, and timezone conversion functions make the TZ database input explicit in the expression.
+- **Principle #2 (English-ish but not English):** The DSL names — `localdate`, `localtime`, `instant`, `duration`, `timezone`, `localdatetime` — are English words that communicate exactly what the data is. `field FiledAt as instant` needs no comment.
 - **Principle #8 (Sound, compile-time-first static analysis):** NodaTime's type separation enables the compiler to catch temporal misuse statically. `date + instant` is a type error. `instant.year` is a compile error. The types carry enough information for the compiler to reject nonsensical expressions without runtime evaluation.
-- **Principle #12 (AI is a first-class consumer):** Named temporal types with precise semantics give AI consumers a vocabulary to reason about entity data and generate correct precepts. An AI that sees `field DueDate as date` knows the field supports calendar arithmetic — it does not need to infer this from naming conventions on a `string` field.
+- **Principle #12 (AI is a first-class consumer):** Named temporal types with precise semantics give AI consumers a vocabulary to reason about entity data and generate correct precepts. An AI that sees `field DueDate as localdate` knows the field supports calendar arithmetic — it does not need to infer this from naming conventions on a `string` field.
 
 The governing question for every decision: **"If a domain author has this kind of data, does giving it a named type help them be explicit about what it means?"**
 
@@ -74,11 +74,11 @@ invariant DueDayOffset + GracePeriodDays >= CurrentDayOffset because "Within gra
 **After** — with temporal types:
 
 ```precept
-field DueDate as date default date("2026-06-01")
+field DueDate as localdate default localdate("2026-06-01")
 field GracePeriodDays as integer default 30
 
 # Type-safe: DueDate + MealsTotal is a compile error
-invariant DueDate + days(GracePeriodDays) >= date("2026-01-01") because "Within grace period"
+invariant DueDate + days(GracePeriodDays) >= localdate("2026-01-01") because "Within grace period"
 ```
 
 **Before** — encoding SLA rules with raw numbers:
@@ -138,17 +138,17 @@ The second form satisfies the philosophy's "one file, complete rules" guarantee.
 
 ### Why NodaTime, not System.DateOnly / TimeOnly / DateTime
 
-NodaTime is adopted as a runtime dependency for the entire temporal type system. The DSL author never sees NodaTime type names — `field DueDate as date` is the surface, `NodaTime.LocalDate` is the implementation, just as `field Amount as decimal` has `System.Decimal` behind it.
+NodaTime is adopted as a runtime dependency for the entire temporal type system. The DSL author never sees NodaTime type names — `field DueDate as localdate` is the surface, `NodaTime.LocalDate` is the implementation, just as `field Amount as decimal` has `System.Decimal` behind it.
 
 **Rationale:**
 
 1. **Philosophy alignment.** NodaTime's core design philosophy is: *"Force you to think about what kind of data you really have."* Distinct types for distinct temporal concepts — `LocalDate` is not `Instant` is not `ZonedDateTime`. This is Precept's prevention guarantee applied to temporal data.
 
-2. **Type separation enables compile-time safety.** NodaTime makes it structurally impossible to mix a calendar date with a global timestamp. Precept's type checker inherits this separation: `date + instant` is a type error by construction.
+2. **Type separation enables compile-time safety.** NodaTime makes it structurally impossible to mix a calendar date with a global timestamp. Precept's type checker inherits this separation: `localdate + instant` is a type error by construction.
 
 3. **Battle-tested arithmetic.** `LocalDate.PlusDays(int)`, `LocalDate.Plus(Period.FromMonths(n))`, month-end truncation (Jan 31 + 1 month = Feb 28), leap-year handling — all rigorously tested since 2012. Building the same guarantees on `System.DateOnly` would require Precept to own temporal arithmetic correctness, a domain Precept has no expertise in.
 
-4. **Lower marginal cost.** NodaTime has higher up-front cost (dependency + serialization) but significantly lower marginal cost for each subsequent temporal type. `System.DateOnly` is cheaper for `date` alone but increasingly expensive as temporal features accumulate — `TimeOnly` lacks integration with date arithmetic, and `DateTime` reintroduces the ambiguity problems NodaTime was designed to solve.
+4. **Lower marginal cost.** NodaTime has higher up-front cost (dependency + serialization) but significantly lower marginal cost for each subsequent temporal type. `System.DateOnly` is cheaper for `localdate` alone but increasingly expensive as temporal features accumulate — `TimeOnly` lacks integration with date arithmetic, and `DateTime` reintroduces the ambiguity problems NodaTime was designed to solve.
 
 5. **Coherent future path.** `LocalDate`, `LocalTime`, `LocalDateTime`, `Instant`, `Duration`, `DateTimeZone` — the entire temporal vocabulary maps from NodaTime types with consistent semantics. Using BCL types would require mixing `DateOnly`, `TimeOnly`, `DateTime`, `DateTimeOffset`, and `TimeSpan` — types with overlapping, inconsistent semantics.
 
@@ -166,7 +166,7 @@ NodaTime is adopted as a runtime dependency for the entire temporal type system.
 
 ## Proposed Types
 
-### `date`
+### `localdate`
 
 **What it makes explicit:** This is a calendar date — not a timestamp, not a string that looks like a date. Day-granularity arithmetic is meaningful. "2026-03-15" means the same calendar day everywhere.
 
@@ -175,31 +175,31 @@ NodaTime is adopted as a runtime dependency for the entire temporal type system.
 **Declaration:**
 
 ```precept
-field DueDate as date default date("2026-06-01")
-field FilingDate as date nullable
-field ContractEnd as date default date("2099-12-31")
+field DueDate as localdate default localdate("2026-06-01")
+field FilingDate as localdate nullable
+field ContractEnd as localdate default localdate("2099-12-31")
 ```
 
-**Literal / Constructor syntax:** `date("<YYYY-MM-DD>")` — ISO 8601, always. No custom formats. `date("2026-03-15")` is valid. `date("03/15/2026")` is a compile error with a teachable message.
+**Literal / Constructor syntax:** `localdate("<YYYY-MM-DD>")` — ISO 8601, always. No custom formats. `localdate("2026-03-15")` is valid. `localdate("03/15/2026")` is a compile error with a teachable message.
 
 **Operators:**
 
 | Expression | Produces | Rationale |
 |---|---|---|
-| `date + days(n)` | `date` | Add N calendar days. `LocalDate.PlusDays(int)`. |
-| `date - days(n)` | `date` | Subtract N calendar days. |
-| `date + months(n)` | `date` | Add N months. Truncates at month end (Jan 31 + 1 mo = Feb 28). |
-| `date + years(n)` | `date` | Add N years. Handles leap years (Feb 29 + 1 yr = Feb 28). |
-| `date + weeks(n)` | `date` | Add N weeks (= 7N days). |
-| `date - date` | `duration` | Elapsed days between dates. The result is a duration carrying day-unit semantics. |
+| `localdate + days(n)` | `localdate` | Add N calendar days. `LocalDate.PlusDays(int)`. |
+| `localdate - days(n)` | `localdate` | Subtract N calendar days. |
+| `localdate + months(n)` | `localdate` | Add N months. Truncates at month end (Jan 31 + 1 mo = Feb 28). |
+| `localdate + years(n)` | `localdate` | Add N years. Handles leap years (Feb 29 + 1 yr = Feb 28). |
+| `localdate + weeks(n)` | `localdate` | Add N weeks (= 7N days). |
+| `localdate - localdate` | `duration` | Elapsed days between dates. The result is a duration carrying day-unit semantics. |
 | `==`, `!=`, `<`, `>`, `<=`, `>=` | `boolean` | Full ordering. ISO calendar only. |
 
 | **Not supported** | **Why** |
 |---|---|
-| `date + date` | Adding two dates is meaningless — no temporal concept this could represent. |
-| `date + integer` | Bare integers don't carry unit semantics — days? months? weeks? Use `date + days(n)`. |
-| `date + decimal` | Fractional days are meaningless at day granularity. Type error. |
-| `date + number` | `number` is floating-point; temporal arithmetic requires explicit duration constructors. |
+| `localdate + localdate` | Adding two dates is meaningless — no temporal concept this could represent. |
+| `localdate + integer` | Bare integers don't carry unit semantics — days? months? weeks? Use `localdate + days(n)`. |
+| `localdate + decimal` | Fractional days are meaningless at day granularity. Type error. |
+| `localdate + number` | `number` is floating-point; temporal arithmetic requires explicit duration constructors. |
 
 **Accessors:**
 
@@ -210,7 +210,7 @@ field ContractEnd as date default date("2099-12-31")
 | `.day` | `integer` | Day of month (1–31) |
 | `.dayOfWeek` | `integer` | ISO day of week (Monday=1, Sunday=7) |
 
-**Constraints:** `nullable`, `default date(...)`. Constraints `nonnegative`, `positive`, `min`, `max`, `maxplaces`, `minlength`, `maxlength` are not valid on `date` (compile error).
+**Constraints:** `nullable`, `default localdate(...)`. Constraints `nonnegative`, `positive`, `min`, `max`, `maxplaces`, `minlength`, `maxlength` are not valid on `localdate` (compile error).
 
 **Serialization:** ISO 8601 string in MCP JSON payloads: `"2026-03-15"`.
 
@@ -218,16 +218,16 @@ field ContractEnd as date default date("2099-12-31")
 
 | Invalid code | Error message |
 |---|---|
-| `field X as date default "2026-01-01"` | Date defaults require the date constructor: `default date("2026-01-01")`. Bare strings are not dates. |
-| `date("2026-02-30")` | Invalid date: February 30 does not exist. Use a valid calendar date in ISO 8601 format (YYYY-MM-DD). |
-| `date("01/15/2026")` | Invalid date format: expected ISO 8601 (YYYY-MM-DD), got '01/15/2026'. Use `date("2026-01-15")`. |
+| `field X as localdate default "2026-01-01"` | Date defaults require the localdate constructor: `default localdate("2026-01-01")`. Bare strings are not dates. |
+| `localdate("2026-02-30")` | Invalid date: February 30 does not exist. Use a valid calendar date in ISO 8601 format (YYYY-MM-DD). |
+| `localdate("01/15/2026")` | Invalid date format: expected ISO 8601 (YYYY-MM-DD), got '01/15/2026'. Use `localdate("2026-01-15")`. |
 | `DueDate + FilingDate` | Cannot add two dates. Did you mean `DueDate - FilingDate` (duration) or `DueDate + days(n)` (offset)? |
 | `DueDate + 2` | Cannot add an integer to a date. Temporal arithmetic requires explicit duration constructors. Use `DueDate + days(2)` to add 2 calendar days. |
 | `DueDate + 2.5` | Cannot add a number to a date. Temporal arithmetic requires explicit duration constructors. Use `DueDate + days(2)` or `DueDate + months(n)`. |
 
 ---
 
-### `time`
+### `localtime`
 
 **What it makes explicit:** This is a time of day — not a duration, not a timestamp, not an integer encoding minutes-since-midnight.
 
@@ -236,24 +236,24 @@ field ContractEnd as date default date("2099-12-31")
 **Declaration:**
 
 ```precept
-field AppointmentTime as time default time("09:00:00")
-field CheckInTime as time nullable
+field AppointmentTime as localtime default localtime("09:00:00")
+field CheckInTime as localtime nullable
 ```
 
-**Literal / Constructor syntax:** `time("<HH:mm:ss>")` — ISO 8601 extended time. `time("14:30:00")` is valid. Seconds may be omitted: `time("14:30")` is valid (implies `:00`).
+**Literal / Constructor syntax:** `localtime("<HH:mm:ss>")` — ISO 8601 extended time. `localtime("14:30:00")` is valid. Seconds may be omitted: `localtime("14:30")` is valid (implies `:00`).
 
 **Operators:**
 
 | Expression | Produces | Rationale |
 |---|---|---|
-| `time + hours(n)` | `time` | Wraps at midnight. `LocalTime.PlusHours(long)`. |
-| `time + minutes(n)` | `time` | Wraps at midnight. `LocalTime.PlusMinutes(long)`. |
+| `localtime + hours(n)` | `localtime` | Wraps at midnight. `LocalTime.PlusHours(long)`. |
+| `localtime + minutes(n)` | `localtime` | Wraps at midnight. `LocalTime.PlusMinutes(long)`. |
 | `==`, `!=`, `<`, `>`, `<=`, `>=` | `boolean` | Full ordering within a day. |
 
 | **Not supported** | **Why** |
 |---|---|
-| `time - time` | Ambiguous: does 23:00 - 01:00 = 22 hours or -22 hours? Defer until use case is clear. |
-| `time + integer` | What unit? Use `hours(n)` or `minutes(n)` explicitly. |
+| `localtime - localtime` | Ambiguous: does 23:00 - 01:00 = 22 hours or -22 hours? Defer until use case is clear. |
+| `localtime + integer` | What unit? Use `hours(n)` or `minutes(n)` explicitly. |
 
 **Accessors:**
 
@@ -263,7 +263,7 @@ field CheckInTime as time nullable
 | `.minute` | `integer` | Minute (0–59) |
 | `.second` | `integer` | Second (0–59) |
 
-**Constraints:** `nullable`, `default time(...)`.
+**Constraints:** `nullable`, `default localtime(...)`.
 
 **Serialization:** ISO 8601 time string: `"14:30:00"`.
 
@@ -271,8 +271,8 @@ field CheckInTime as time nullable
 
 | Invalid code | Error message |
 |---|---|
-| `time("25:00:00")` | Invalid time: hour must be 0–23, got 25. |
-| `AppointmentTime + 30` | Cannot add an integer to a time. Use `time + minutes(30)` or `time + hours(1)` to specify the unit. |
+| `localtime("25:00:00")` | Invalid time: hour must be 0–23, got 25. |
+| `AppointmentTime + 30` | Cannot add an integer to a time. Use `localtime + minutes(30)` or `localtime + hours(1)` to specify the unit. |
 
 ---
 
@@ -404,9 +404,9 @@ field ActualHours as duration default hours(0)
 
 **Pros:** Smaller type system surface. Duration fields are modeled as `integer` or `decimal` with naming conventions.
 
-**Cons:** The same type-safety gap that justified `date` over `string` applies: `integer` fields lose domain semantics, and `EstimatedHours + InvoiceTotal` compiles.
+**Cons:** The same type-safety gap that justified `localdate` over `string` applies: `integer` fields lose domain semantics, and `EstimatedHours + InvoiceTotal` compiles.
 
-**Recommendation:** Option A — `duration` as a declared field type. The corpus evidence (9 fields across 6 samples) and the type-safety parity argument with `date` both support it. The "zero" duration (`hours(0)`) is a natural default.
+**Recommendation:** Option A — `duration` as a declared field type. The corpus evidence (9 fields across 6 samples) and the type-safety parity argument with `localdate` both support it. The "zero" duration (`hours(0)`) is a natural default.
 
 **Constraints (if field type):** `nullable`, `default hours(...)` or `default minutes(...)`, `nonnegative`.
 
@@ -456,7 +456,7 @@ field CustomerTimezone as timezone nullable
 | `timezone("Pacific Standard Time")` | "Pacific Standard Time" is a Windows timezone name, not an IANA identifier. Use `timezone("America/Los_Angeles")`. |
 | `timezone("Not/A/Timezone")` | Unknown IANA timezone identifier: "Not/A/Timezone". See https://en.wikipedia.org/wiki/List_of_tz_database_time_zones for valid identifiers. |
 
-**Why `timezone` over `string`:** The `date`-over-`string` argument applies with equal force. `field IncidentTimezone as string` means the compiler can't reject `"Not/A/Timezone"` or `"California"`. The `timezone` type validates at compile time (literals) and fire time (event args), closing the type-safety gap that the `date` type closes for calendar dates.
+**Why `timezone` over `string`:** The `localdate`-over-`string` argument applies with equal force. `field IncidentTimezone as string` means the compiler can't reject `"Not/A/Timezone"` or `"California"`. The `timezone` type validates at compile time (literals) and fire time (event args), closing the type-safety gap that the `localdate` type closes for calendar dates.
 
 ---
 
@@ -507,8 +507,8 @@ Calendar arithmetic on `zoneddatetime` uses the same lenient resolver strategy d
 |---|---|---|
 | `.instant` | `instant` | The underlying UTC point in time. |
 | `.timezone` | `timezone` | The bound IANA timezone. |
-| `.date` | `date` | Local calendar date in the bound timezone. |
-| `.time` | `time` | Local time of day in the bound timezone. |
+| `.date` | `localdate` | Local calendar date in the bound timezone. |
+| `.time` | `localtime` | Local time of day in the bound timezone. |
 | `.year` | `integer` | Local calendar year in the bound timezone. |
 | `.month` | `integer` | Local month (1–12) in the bound timezone. |
 | `.day` | `integer` | Local day of month (1–31) in the bound timezone. |
@@ -539,7 +539,7 @@ Calendar arithmetic on `zoneddatetime` uses the same lenient resolver strategy d
 
 ---
 
-### `datetime`
+### `localdatetime`
 
 **What it makes explicit:** This is a date and time together — not a point on the global timeline, not two separate fields pretending to be coupled. No timezone.
 
@@ -548,35 +548,35 @@ Calendar arithmetic on `zoneddatetime` uses the same lenient resolver strategy d
 **Declaration:**
 
 ```precept
-field DetectedAt as datetime nullable
-field ScheduledFor as datetime default datetime("2026-04-13T09:00:00")
+field DetectedAt as localdatetime nullable
+field ScheduledFor as localdatetime default localdatetime("2026-04-13T09:00:00")
 ```
 
-**Literal / Constructor syntax:** `datetime("<YYYY-MM-DD>T<HH:mm:ss>")` — ISO 8601 combined. No timezone suffix (that would make it a `ZonedDateTime`). `datetime("2026-04-13T14:30:00")` is valid.
+**Literal / Constructor syntax:** `localdatetime("<YYYY-MM-DD>T<HH:mm:ss>")` — ISO 8601 combined. No timezone suffix (that would make it a `ZonedDateTime`). `localdatetime("2026-04-13T14:30:00")` is valid.
 
 **Operators:**
 
 | Expression | Produces | Rationale |
 |---|---|---|
-| `datetime + hours(n)` | `datetime` | Offset by hours. |
-| `datetime + minutes(n)` | `datetime` | Offset by minutes. |
-| `datetime + days(n)` | `datetime` | Add N calendar days. Same as date + days(n). |
-| `datetime + months(n)` | `datetime` | Calendar arithmetic via Period. |
-| `datetime + years(n)` | `datetime` | Calendar arithmetic via Period. |
-| `datetime + duration` | `datetime` | Offset forward by a composed duration (e.g., `days(5) + hours(7)`). |
-| `datetime - duration` | `datetime` | Offset backward by a composed duration. |
+| `localdatetime + hours(n)` | `localdatetime` | Offset by hours. |
+| `localdatetime + minutes(n)` | `localdatetime` | Offset by minutes. |
+| `localdatetime + days(n)` | `localdatetime` | Add N calendar days. Same as localdate + days(n). |
+| `localdatetime + months(n)` | `localdatetime` | Calendar arithmetic via Period. |
+| `localdatetime + years(n)` | `localdatetime` | Calendar arithmetic via Period. |
+| `localdatetime + duration` | `localdatetime` | Offset forward by a composed duration (e.g., `days(5) + hours(7)`). |
+| `localdatetime - duration` | `localdatetime` | Offset backward by a composed duration. |
 | `==`, `!=`, `<`, `>`, `<=`, `>=` | `boolean` | Full ordering within the same calendar. |
 
 | **Not supported** | **Why** |
 |---|---|
-| `datetime - datetime` | Ambiguous without timezone context. If both datetimes are in the same implied local context, is the subtraction calendar-based or timeline-based? Defer pending use case clarity. |
+| `localdatetime - localdatetime` | Ambiguous without timezone context. If both localdatetimes are in the same implied local context, is the subtraction calendar-based or timeline-based? Defer pending use case clarity. |
 
 **Accessors:**
 
 | Accessor | Returns | Description |
 |---|---|---|
-| `.date` | `date` | Date component extraction. |
-| `.time` | `time` | Time component extraction. |
+| `.date` | `localdate` | Date component extraction. |
+| `.time` | `localtime` | Time component extraction. |
 | `.year` | `integer` | Calendar year. |
 | `.month` | `integer` | Month (1–12). |
 | `.day` | `integer` | Day of month (1–31). |
@@ -584,21 +584,21 @@ field ScheduledFor as datetime default datetime("2026-04-13T09:00:00")
 | `.minute` | `integer` | Minute (0–59). |
 | `.second` | `integer` | Second (0–59). |
 
-**Constraints:** `nullable`, `default datetime(...)`.
+**Constraints:** `nullable`, `default localdatetime(...)`.
 
 **Serialization:** ISO 8601 string without timezone: `"2026-04-13T14:30:00"`.
 
-#### Option: `datetime` inclusion vs. deferral
+#### Option: `localdatetime` inclusion vs. deferral
 
-##### Option A: Include `datetime` in the initial proposal
+##### Option A: Include `localdatetime` in the initial proposal
 
-**Pros:** Completes the local type vocabulary. Security-incident sample (6 NIST compliance timestamps) demonstrates real need. Enables `toInstant(date, time, timezone)` alternative as `datetime + timezone → instant` conversion.
+**Pros:** Completes the local type vocabulary. Security-incident sample (6 NIST compliance timestamps) demonstrates real need. Enables `toInstant(localdate, localtime, timezone)` alternative as `localdatetime + timezone → instant` conversion.
 
-**Cons:** Only 1 of 15 samples requires it. Most combined date+time use cases can be handled with `date` + `time` as separate fields. Higher implementation cost for thin corpus evidence.
+**Cons:** Only 1 of 15 samples requires it. Most combined date+time use cases can be handled with `localdate` + `localtime` as separate fields. Higher implementation cost for thin corpus evidence.
 
-##### Option B: Defer `datetime` to a follow-up proposal
+##### Option B: Defer `localdatetime` to a follow-up proposal
 
-**Pros:** Smaller initial surface. Focus resources on the high-frequency types (`date`, `instant`, `duration`, `time`, `timezone`). Ship `datetime` when enterprise adoption demonstrates that separate `date` + `time` fields create friction.
+**Pros:** Smaller initial surface. Focus resources on the high-frequency types (`localdate`, `instant`, `duration`, `localtime`, `timezone`). Ship `localdatetime` when enterprise adoption demonstrates that separate `localdate` + `localtime` fields create friction.
 
 **Cons:** Security-incident and audit-trail domains remain underserved. Authors who need sub-day local timestamps encode them as strings.
 
@@ -614,9 +614,9 @@ Conversion functions bridge the timeline domain (instants, durations) and the ca
 
 | Function | Signature | Semantics |
 |---|---|---|
-| `toLocalDate` | `(instant, timezone) → date` | Extract the local calendar date for an instant in a timezone. "What date is it at this moment in this timezone?" |
-| `toLocalTime` | `(instant, timezone) → time` | Extract the local time-of-day for an instant in a timezone. "What time is it at this moment in this timezone?" |
-| `toInstant` | `(date, time, timezone) → instant` | Convert local date + time-of-day + timezone → UTC instant. "What UTC moment corresponds to this local time in this timezone?" |
+| `toLocalDate` | `(instant, timezone) → localdate` | Extract the local calendar date for an instant in a timezone. "What date is it at this moment in this timezone?" |
+| `toLocalTime` | `(instant, timezone) → localtime` | Extract the local time-of-day for an instant in a timezone. "What time is it at this moment in this timezone?" |
+| `toInstant` | `(localdate, localtime, timezone) → instant` | Convert local date + time-of-day + timezone → UTC instant. "What UTC moment corresponds to this local time in this timezone?" |
 
 ### Why these functions exist
 
@@ -654,7 +654,7 @@ Gaps → post-gap instant. Overlaps → later instant. Deterministic. Matches No
 
 **Pros:** Simple mental model. Favors compliance safety (later deadline is safer for filers). Single deterministic strategy — no author choice needed.
 
-**Cons:** "Lenient" means the resolution silently adjusts invalid local times. Authors may not realize `time("02:30:00")` at a spring-forward boundary was adjusted to `time("03:00:00")`.
+**Cons:** "Lenient" means the resolution silently adjusts invalid local times. Authors may not realize `localtime("02:30:00")` at a spring-forward boundary was adjusted to `localtime("03:00:00")`.
 
 ##### Option B: Strict resolver — reject ambiguous conversions
 
@@ -670,8 +670,8 @@ Gaps and overlaps produce constraint violations. The author must handle DST boun
 
 Conversion functions produce and consume existing types — they are bridges, not new types:
 
-- `toLocalDate` returns a `date` — all date operations (comparison, `.year`, `+ days(n)`, `+ months(n)`) work.
-- `toLocalTime` returns a `time` — all time operations (comparison, `.hour`) work.
+- `toLocalDate` returns a `localdate` — all localdate operations (comparison, `.year`, `+ days(n)`, `+ months(n)`) work.
+- `toLocalTime` returns a `localtime` — all localtime operations (comparison, `.hour`) work.
 - `toInstant` returns an `instant` — all instant comparison and duration arithmetic work.
 
 ### `zoneddatetime` overloads
@@ -680,9 +680,9 @@ The conversion functions gain `zoneddatetime` overloads that **preserve timezone
 
 | Function | New Overload | Semantics |
 |---|---|---|
-| `toLocalDate` | `(zoneddatetime) → date` | Extract local date using the **bound** timezone. Provenance-safe. |
-| `toLocalTime` | `(zoneddatetime) → time` | Extract local time using the bound timezone. |
-| `toInstant` | `(date, time, zoneddatetime) → instant` | Convert back to instant using the **same timezone** the original conversion came from. |
+| `toLocalDate` | `(zoneddatetime) → localdate` | Extract local date using the **bound** timezone. Provenance-safe. |
+| `toLocalTime` | `(zoneddatetime) → localtime` | Extract local time using the bound timezone. |
+| `toInstant` | `(localdate, localtime, zoneddatetime) → instant` | Convert back to instant using the **same timezone** the original conversion came from. |
 
 The provenance-safe pattern:
 
@@ -690,18 +690,18 @@ The provenance-safe pattern:
 # Provenance-safe: zone is carried by the composite
 invariant FiledTimestamp <= toInstant(
     toLocalDate(IncidentContext) + days(30),
-    time("23:59:00"),
+    localtime("23:59:00"),
     IncidentContext
 ) because "Claim must be filed by 11:59 PM local time on the 30th day after the incident"
 ```
 
-The `IncidentContext` carries both the instant and the timezone. `toLocalDate(IncidentContext)` extracts the local date using the bound zone. `toInstant(date, time, IncidentContext)` recomposes using the same zone. The zone mismatch bug from the decomposed approach **cannot be expressed**.
+The `IncidentContext` carries both the instant and the timezone. `toLocalDate(IncidentContext)` extracts the local date using the bound zone. `toInstant(localdate, localtime, IncidentContext)` recomposes using the same zone. The zone mismatch bug from the decomposed approach **cannot be expressed**.
 
 The two-argument forms remain — both patterns coexist:
 
 ```
-toLocalDate(instant, timezone) → date     # still valid
-toLocalDate(zoneddatetime) → date         # new overload — provenance-safe
+toLocalDate(instant, timezone) → localdate     # still valid
+toLocalDate(zoneddatetime) → localdate         # new overload — provenance-safe
 ```
 
 Authors who prefer decomposed storage use the two-argument form. Authors who use `zoneddatetime` get the overload that preserves provenance. No breaking change.
@@ -712,11 +712,11 @@ Duration constructors are the **required interface** for all temporal arithmetic
 
 | Function | Signature | Semantics |
 |---|---|---|
-| `days(n)` | `(integer) → duration` | Calendar period of N days. Used with `date +`, `datetime +`. Internally `Period.FromDays`. |
+| `days(n)` | `(integer) → duration` | Calendar period of N days. Used with `localdate +`, `localdatetime +`. Internally `Period.FromDays`. |
 | `months(n)` | `(integer) → duration` | Calendar period of N months. Truncates at month end (Jan 31 + 1 mo = Feb 28). Internally `Period.FromMonths`. |
 | `years(n)` | `(integer) → duration` | Calendar period of N years. Handles leap years. Internally `Period.FromYears`. |
 | `weeks(n)` | `(integer) → duration` | Calendar period of N weeks (= 7N days). Internally `Period.FromWeeks`. |
-| `hours(n)` | `(integer) → duration` | Duration of N hours. Used with `time +`, `instant +`, `datetime +`. Internally `Duration.FromHours`. |
+| `hours(n)` | `(integer) → duration` | Duration of N hours. Used with `localtime +`, `instant +`, `localdatetime +`. Internally `Duration.FromHours`. |
 | `minutes(n)` | `(integer) → duration` | Duration of N minutes. Internally `Duration.FromMinutes`. |
 | `seconds(n)` | `(integer) → duration` | Duration of N seconds. Internally `Duration.FromSeconds`. |
 
@@ -795,12 +795,12 @@ The following matrix defines what operations are valid between temporal types. A
 
 | Left operand | Operator | Right operand | Result | Notes |
 |---|---|---|---|---|
-| `date` | `+` | `days(n)` | `date` | Add N calendar days |
-| `date` | `-` | `days(n)` | `date` | Subtract N calendar days |
-| `date` | `+` | `months(n)` | `date` | Calendar arithmetic; truncates at month end |
-| `date` | `+` | `years(n)` | `date` | Calendar arithmetic; handles leap years |
-| `date` | `+` | `weeks(n)` | `date` | = 7N days |
-| `date` | `-` | `date` | `duration` | Elapsed days between dates |
+| `localdate` | `+` | `days(n)` | `localdate` | Add N calendar days |
+| `localdate` | `-` | `days(n)` | `localdate` | Subtract N calendar days |
+| `localdate` | `+` | `months(n)` | `localdate` | Calendar arithmetic; truncates at month end |
+| `localdate` | `+` | `years(n)` | `localdate` | Calendar arithmetic; handles leap years |
+| `localdate` | `+` | `weeks(n)` | `localdate` | = 7N days |
+| `localdate` | `-` | `localdate` | `duration` | Elapsed days between dates |
 | `instant` | `-` | `instant` | `duration` | Elapsed time between two points |
 | `instant` | `+` | `duration` | `instant` | Point offset forward |
 | `instant` | `-` | `duration` | `instant` | Point offset backward |
@@ -809,15 +809,15 @@ The following matrix defines what operations are valid between temporal types. A
 | `duration` | `*` | `integer` or `number` | `duration` | Scaling (e.g., `SlaWindow * ShiftCount`) |
 | `duration` | `/` | `integer` or `number` | `duration` | Scaling (e.g., `SlaWindow / 2`) |
 | `duration` | `/` | `duration` | `number` | Ratio (e.g., how many shifts fit) |
-| `time` | `+` | `hours(n)` | `time` | Wraps at midnight |
-| `time` | `+` | `minutes(n)` | `time` | Wraps at midnight |
-| `datetime` | `+` | `days(n)` | `datetime` | Add N days |
-| `datetime` | `+` | `months(n)` | `datetime` | Calendar arithmetic |
-| `datetime` | `+` | `years(n)` | `datetime` | Calendar arithmetic |
-| `datetime` | `+` | `hours(n)` | `datetime` | Time arithmetic |
-| `datetime` | `+` | `minutes(n)` | `datetime` | Time arithmetic |
-| `datetime` | `+` | `duration` | `datetime` | Offset forward by composed duration (e.g., `days(5) + hours(7)`) |
-| `datetime` | `-` | `duration` | `datetime` | Offset backward by composed duration |
+| `localtime` | `+` | `hours(n)` | `localtime` | Wraps at midnight |
+| `localtime` | `+` | `minutes(n)` | `localtime` | Wraps at midnight |
+| `localdatetime` | `+` | `days(n)` | `localdatetime` | Add N days |
+| `localdatetime` | `+` | `months(n)` | `localdatetime` | Calendar arithmetic |
+| `localdatetime` | `+` | `years(n)` | `localdatetime` | Calendar arithmetic |
+| `localdatetime` | `+` | `hours(n)` | `localdatetime` | Time arithmetic |
+| `localdatetime` | `+` | `minutes(n)` | `localdatetime` | Time arithmetic |
+| `localdatetime` | `+` | `duration` | `localdatetime` | Offset forward by composed duration (e.g., `days(5) + hours(7)`) |
+| `localdatetime` | `-` | `duration` | `localdatetime` | Offset backward by composed duration |
 | `zoneddatetime` | `+` | `days(n)` | `zoneddatetime` | Calendar arithmetic; DST via lenient resolver |
 | `zoneddatetime` | `+` | `months(n)` | `zoneddatetime` | Calendar arithmetic; month-end truncation |
 | `zoneddatetime` | `+` | `years(n)` | `zoneddatetime` | Calendar arithmetic; leap years |
@@ -831,26 +831,26 @@ The following matrix defines what operations are valid between temporal types. A
 
 ### Comparison rules
 
-All temporal types support `==`, `!=`. `date`, `time`, `instant`, `duration`, `datetime`, `zoneddatetime` support `<`, `>`, `<=`, `>=`. `timezone` supports only `==`, `!=` — no ordering.
+All temporal types support `==`, `!=`. `localdate`, `localtime`, `instant`, `duration`, `localdatetime`, `zoneddatetime` support `<`, `>`, `<=`, `>=`. `timezone` supports only `==`, `!=` — no ordering.
 
 Cross-type comparison is always a type error:
-- `date == instant` → type error
-- `time == duration` → type error
-- `date == datetime` → type error
+- `localdate == instant` → type error
+- `localtime == duration` → type error
+- `localdate == localdatetime` → type error
 
 ### Cross-type arithmetic: what's NOT allowed (and why)
 
 | Expression | Why it's a type error |
 |---|---|
-| `date + date` | Adding two dates is meaningless. |
-| `date + instant` | Different temporal domains (calendar vs. timeline). |
-| `date + integer` | Bare integers don't carry unit semantics. Use `date + days(n)` for day offsets. |
-| `date + decimal` | Fractional days are meaningless at day granularity. |
-| `date + number` | `number` is floating-point; temporal arithmetic requires explicit duration constructors. |
+| `localdate + localdate` | Adding two dates is meaningless. |
+| `localdate + instant` | Different temporal domains (calendar vs. timeline). |
+| `localdate + integer` | Bare integers don't carry unit semantics. Use `localdate + days(n)` for day offsets. |
+| `localdate + decimal` | Fractional days are meaningless at day granularity. |
+| `localdate + number` | `number` is floating-point; temporal arithmetic requires explicit duration constructors. |
 | `instant + integer` | Ambiguous unit. Use `instant + hours(n)` or `instant + seconds(n)`. |
-| `instant + months(n)` | Months are calendar units with no fixed duration. Convert to date, add, convert back. |
+| `instant + months(n)` | Months are calendar units with no fixed duration. Convert to localdate, add, convert back. |
 | `instant.year` | Requires a timezone. Use `toLocalDate(instant, timezone).year`. |
-| `time - time` | Ambiguous sign (see `time` section). |
+| `localtime - localtime` | Ambiguous sign (see `localtime` section). |
 | `duration * duration` | Dimensionally meaningless. |
 | `integer * duration` / `number * duration` | Use `duration * integer` or `duration * number` — duration is always the left operand. |
 | `duration * decimal` / `duration / decimal` | `decimal → double` is lossy. Use `number` for scaling operands. |
@@ -869,13 +869,13 @@ All temporal types support `nullable`. Nullable temporal fields follow existing 
 
 | Type | Default value | Notes |
 |---|---|---|
-| `date` | `default date("...")` | Author specifies the date. |
-| `time` | `default time("...")` | Author specifies the time. |
+| `localdate` | `default localdate("...")` | Author specifies the date. |
+| `localtime` | `default localtime("...")` | Author specifies the time. |
 | `instant` | `default instant("...")` | Author specifies the UTC instant. |
 | `duration` | `default hours(0)` (or `minutes(0)`, etc.) | Zero duration is natural. |
 | `timezone` | No default | No universally sensible default timezone. |
 | `zoneddatetime` | No default | No universally sensible default timezone (same as `timezone`). |
-| `datetime` | `default datetime("...")` | Author specifies the datetime. |
+| `localdatetime` | `default localdatetime("...")` | Author specifies the localdatetime. |
 
 #### Option: `nullable` + `default` for temporal fields
 
@@ -893,7 +893,7 @@ When both are specified, the field starts at the default value but can be set to
 
 **Pros:** Maximum flexibility. No arbitrary restriction.
 
-**Cons:** `default date("2026-01-01") nullable` — if the field starts at the default, when is it ever null? The semantics are confusing. `null` becomes "explicitly cleared" rather than "never set."
+**Cons:** `default localdate("2026-01-01") nullable` — if the field starts at the default, when is it ever null? The semantics are confusing. `null` becomes "explicitly cleared" rather than "never set."
 
 ##### Option C: Allow `nullable` + `default` — default is the initial value, null is a valid assignment target
 
@@ -910,16 +910,16 @@ Each locked decision follows the 4-point rationale format required by CONTRIBUTI
 ### 1. NodaTime as the backing library for all temporal types
 
 - **Why:** NodaTime's type model matches Precept's philosophy (explicit over implicit), provides battle-tested arithmetic, and creates a coherent path for the full temporal vocabulary. Building temporal arithmetic on BCL types would require Precept to own correctness in a domain it has no expertise in.
-- **Alternatives rejected:** `System.DateOnly` / `TimeOnly` — cheaper for `date` alone but creates increasing debt for `time`, `datetime`, and cross-type conversions. `System.DateTime` — conflates concepts; the exact problem NodaTime was created to solve. No backing library (custom implementation) — unmaintainable temporal arithmetic with no precedent or test coverage.
+- **Alternatives rejected:** `System.DateOnly` / `TimeOnly` — cheaper for `localdate` alone but creates increasing debt for `localtime`, `localdatetime`, and cross-type conversions. `System.DateTime` — conflates concepts; the exact problem NodaTime was created to solve. No backing library (custom implementation) — unmaintainable temporal arithmetic with no precedent or test coverage.
 - **Precedent:** NRules inherits `System.Decimal` from .NET. Precept inherits NodaTime's temporal model. The pattern is: use the best domain-specific library, expose only DSL-appropriate operations.
 - **Tradeoff accepted:** Additional NuGet dependency (~1.1 MB, well-maintained).
 
-### 2. Day granularity for `date` — no time-of-day component
+### 2. Day granularity for `localdate` — no time-of-day component
 
 - **Why:** "2026-03-15" means the same calendar day everywhere. Adding time-of-day introduces timezone dependency. Precept's determinism guarantee requires identical results regardless of evaluation location.
-- **Alternatives rejected:** `datetime` as the only calendar type — forces timezone reasoning on every author for rules operating at day granularity. Optional timezone — creates two semantics in one type.
+- **Alternatives rejected:** `localdatetime` as the only calendar type — forces timezone reasoning on every author for rules operating at day granularity. Optional timezone — creates two semantics in one type.
 - **Precedent:** SQL's `DATE`, FEEL's `date()`, Cedar's `datetime` — all timezone-naive at the date level.
-- **Tradeoff accepted:** Authors needing time-of-day use `time` (separate type) or `datetime`.
+- **Tradeoff accepted:** Authors needing time-of-day use `localtime` (separate type) or `localdatetime`.
 
 ### 3. ISO 8601 as the sole format — no custom format strings
 
@@ -930,12 +930,12 @@ Each locked decision follows the 4-point rationale format required by CONTRIBUTI
 
 ### 4. Constructor form for all temporal literals
 
-- **Why:** `date("2026-03-15")`, not bare `"2026-03-15"`. A bare string is type-ambiguous. Context-dependent type resolution violates Principle #9 (tooling drives syntax) — IntelliSense and semantic tokens can't determine type without full expression analysis. The constructor form makes type intent visible at the lexical level.
+- **Why:** `localdate("2026-03-15")`, not bare `"2026-03-15"`. A bare string is type-ambiguous. Context-dependent type resolution violates Principle #9 (tooling drives syntax) — IntelliSense and semantic tokens can't determine type without full expression analysis. The constructor form makes type intent visible at the lexical level.
 - **Alternatives rejected:** Bare strings with inferred type — ambiguous. Sigil prefix (`#2026-03-15`) — no precedent. Method-style `Date.parse()` — implies namespaces Precept doesn't have.
 - **Precedent:** FEEL `date(...)`, Cedar `datetime(...)`, Precept's existing `choice(...)` convention.
 - **Tradeoff accepted:** Slightly more verbose than a bare literal.
 
-### 5. No timezone on `date`, `time`, or `datetime`
+### 5. No timezone on `localdate`, `localtime`, or `localdatetime`
 
 - **Why:** These are calendar/clock types — they represent what's written on a calendar or displayed on a wall clock, independent of location. Timezone-aware local types would create non-deterministic comparisons ("Is it still March 15?" depends on where you are).
 - **Alternatives rejected:** UTC-anchored dates — comparisons against "today" depend on timezone. Timezone as required metadata — forces timezone reasoning on calendar-day rules.
@@ -951,10 +951,10 @@ Each locked decision follows the 4-point rationale format required by CONTRIBUTI
 
 ### 7. `timezone` as a first-class type, not `string`
 
-- **Why:** Encoding timezone identifiers as `string` loses type safety — `"California"`, `"EST"`, `"Pacific Standard Time"` all compile fine as strings. The same argument that justified `date` over `string` applies with equal force: the type communicates intent, and the compiler enforces validity.
+- **Why:** Encoding timezone identifiers as `string` loses type safety — `"California"`, `"EST"`, `"Pacific Standard Time"` all compile fine as strings. The same argument that justified `localdate` over `string` applies with equal force: the type communicates intent, and the compiler enforces validity.
 - **Alternatives rejected:** `string` with naming conventions — the compiler can't enforce convention. `choice` with all IANA identifiers — ~600 choices is unergonomic and requires manual updates when the IANA database changes.
-- **Precedent:** NodaTime's `DateTimeZone` is a first-class type with validation. The `date`-over-`string` parallel in Precept is already established.
-- **Tradeoff accepted:** New type in the type system. Minimal operational cost — `timezone` is an equality-only validated identifier, closer to `choice` than to `date` in complexity.
+- **Precedent:** NodaTime's `DateTimeZone` is a first-class type with validation. The `localdate`-over-`string` parallel in Precept is already established.
+- **Tradeoff accepted:** New type in the type system. Minimal operational cost — `timezone` is an equality-only validated identifier, closer to `choice` than to `localdate` in complexity.
 
 ### 8. Conversion functions take explicit timezone parameters
 
@@ -1013,7 +1013,7 @@ George's design review of the original #26 proposal raised four challenges. The 
 | Issue | Relationship |
 |---|---|
 | #25 (choice type) | Currency codes as `choice("USD", "EUR", ...)` complement `decimal` for money; `choice` for state/region complements `timezone` for jurisdiction lookups. |
-| #26 (date type) | **Superseded by this proposal.** The `date` section here incorporates all of #26’s design plus NodaTime backing, explicit-duration-only arithmetic, and month/year arithmetic. |
+| #26 (date type) | **Superseded by this proposal.** The `localdate` section here incorporates all of #26’s design plus NodaTime backing, explicit-duration-only arithmetic, and month/year arithmetic. |
 | #27 (decimal type) | Complementary numeric type. `decimal` and temporal types do not interact arithmetically (`decimal + date` is a type error). `duration.totalHours` returns `number`, not `decimal`. |
 | #29 (integer type) | Duration constructor function args are `integer`. The `integer` type is a dependency for correct temporal arithmetic. |
 | #16 (built-in functions) | `round()` from #27; `toLocalDate`, `toLocalTime`, `toInstant`, `months`, `years`, `weeks`, `hours`, `minutes`, `seconds` from this proposal. |
@@ -1047,7 +1047,7 @@ Year-month pair (billing period, fiscal month, credit card expiry). Real demand 
 
 ### `DateInterval` / `daterange` — Deferred
 
-Range between two calendar dates. Two `date` fields with an invariant (`StartDate <= EndDate`) cover the use case with existing machinery. The marginal benefit of a composite type is co-assignment enforcement and `contains(date)` operations.
+Range between two calendar dates. Two `localdate` fields with an invariant (`StartDate <= EndDate`) cover the use case with existing machinery. The marginal benefit of a composite type is co-assignment enforcement and `contains(localdate)` operations.
 
 ### Fiscal/business calendars — Excluded
 
@@ -1071,7 +1071,7 @@ No `date(format)`, `instant(precision)`, or `duration(unit)`. Temporal type beha
 
 ### Parser / Tokenizer
 
-- Add `date`, `time`, `instant`, `duration`, `timezone`, `zoneddatetime`, `datetime` as type keywords.
+- Add `localdate`, `localtime`, `instant`, `duration`, `timezone`, `zoneddatetime`, `localdatetime` as type keywords.
 - Add `days`, `months`, `years`, `weeks`, `hours`, `minutes`, `seconds` as function keywords.
 - Add `toLocalDate`, `toLocalTime`, `toInstant` as function keywords.
 - Parse constructor forms: `date("...")`, `time("...")`, `instant("...")`, `timezone("...")`, `datetime("...")`, `zoneddatetime(expr, expr)`.
@@ -1080,7 +1080,7 @@ No `date(format)`, `instant(precision)`, or `duration(unit)`. Temporal type beha
 
 ### Type Checker
 
-- New type entries for `date`, `time`, `instant`, `duration`, `timezone`, `zoneddatetime`, `datetime`.
+- New type entries for `localdate`, `localtime`, `instant`, `duration`, `timezone`, `zoneddatetime`, `localdatetime`.
 - Operator resolution: the full cross-type interaction matrix above.
 - Accessor resolution: per-type accessor tables.
 - Constructor validation: ISO 8601 format check for literals (compile-time). `zoneddatetime(instant, timezone)` constructor argument type validation.
@@ -1095,11 +1095,11 @@ No `date(format)`, `instant(precision)`, or `duration(unit)`. Temporal type beha
 
 ### Expression Evaluator
 
-- `date` arithmetic via `LocalDate.PlusDays`, `LocalDate.Plus(Period)`.
-- `time` arithmetic via `LocalTime.PlusHours`, `LocalTime.PlusMinutes`.
+- `localdate` arithmetic via `LocalDate.PlusDays`, `LocalDate.Plus(Period)`.
+- `localtime` arithmetic via `LocalTime.PlusHours`, `LocalTime.PlusMinutes`.
 - `instant` arithmetic via `Instant.Plus(Duration)`, `Instant.Minus(Duration)`.
 - `duration` arithmetic via `Duration.Plus`, `Duration.Minus`.
-- `datetime` arithmetic via `LocalDateTime` methods.
+- `localdatetime` arithmetic via `LocalDateTime` methods.
 - `zoneddatetime` calendar arithmetic via `ZonedDateTime.Plus(Period)` with `LenientResolver`; timeline arithmetic via underlying `Instant.Plus(Duration)` re-resolved in zone; subtraction via `zdt.ToInstant() - zdt.ToInstant()`.
 - Conversion functions: `ZonedDateTimeExtensions` / `DateTimeZoneProviders.Tzdb` for timezone lookups.
 - DST resolution via NodaTime's `LenientResolver` (or chosen strategy).
@@ -1116,7 +1116,7 @@ No `date(format)`, `instant(precision)`, or `duration(unit)`. Temporal type beha
 
 ### TextMate Grammar
 
-- Add `date`, `time`, `instant`, `duration`, `timezone`, `zoneddatetime`, `datetime` to `typeKeywords` alternation.
+- Add `localdate`, `localtime`, `instant`, `duration`, `timezone`, `zoneddatetime`, `localdatetime` to `typeKeywords` alternation.
 - Add `days`, `months`, `years`, `weeks`, `hours`, `minutes`, `seconds` to function keyword patterns.
 - Add `toLocalDate`, `toLocalTime`, `toInstant` to function keyword patterns.
 - Temporal accessors (`.year`, `.totalHours`, etc.) handled by existing member-access pattern.
@@ -1130,13 +1130,13 @@ No `date(format)`, `instant(precision)`, or `duration(unit)`. Temporal type beha
 
 ### MCP Tools
 
-- `precept_language`: Include `date`, `time`, `instant`, `duration`, `timezone`, `zoneddatetime`, `datetime` in type keywords. Include all constructor and conversion functions (including `zoneddatetime` overloads). TZ database version in environment info.
+- `precept_language`: Include `localdate`, `localtime`, `instant`, `duration`, `timezone`, `zoneddatetime`, `localdatetime` in type keywords. Include all constructor and conversion functions (including `zoneddatetime` overloads). TZ database version in environment info.
 - `precept_compile`: Temporal field DTOs include type, constraints, and assessed properties. New diagnostics for temporal type errors.
 - `precept_fire` / `precept_inspect` / `precept_update`: Temporal values serialized as ISO 8601 strings. Timezone values as IANA identifiers. Duration values as ISO 8601 duration strings.
 
 ### Samples
 
-- Update existing samples with `FUTURE(date)` markers to use `date` fields.
+- Update existing samples with `FUTURE(localdate)` markers to use `localdate` fields.
 - Replace day-counter simulation machinery (3 samples) with date arithmetic.
 - Add or update at least one sample demonstrating `instant` / `duration` / `timezone` / conversion functions (e.g., multi-region insurance claim).
 
@@ -1160,7 +1160,7 @@ No `date(format)`, `instant(precision)`, or `duration(unit)`. Temporal type beha
 
 ## Acceptance Criteria
 
-### `date` type
+### `localdate` type
 
 - [ ] `field X as date` parses and type-checks.
 - [ ] `date("2026-03-15")` literal validates ISO 8601 at compile time.
@@ -1172,7 +1172,7 @@ No `date(format)`, `instant(precision)`, or `duration(unit)`. Temporal type beha
 - [ ] Nullable and default work. Constraints `nonnegative`, `min`, `max`, etc. are compile errors.
 - [ ] MCP tools serialize as ISO 8601 string.
 
-### `time` type
+### `localtime` type
 
 - [ ] `field X as time` parses and type-checks.
 - [ ] `time("14:30:00")` and `time("14:30")` validate at compile time.
@@ -1235,7 +1235,7 @@ No `date(format)`, `instant(precision)`, or `duration(unit)`. Temporal type beha
 - [ ] Nullable works. No default allowed (compile error if specified).
 - [ ] MCP tools serialize as two-property JSON object.
 
-### `datetime` type (if included)
+### `localdatetime` type (if included)
 
 - [ ] `field X as datetime` parses and type-checks.
 - [ ] `datetime("2026-04-13T14:30:00")` validates (no timezone suffix).
@@ -1268,7 +1268,7 @@ No `date(format)`, `instant(precision)`, or `duration(unit)`. Temporal type beha
 
 - [ ] All entries in the "Not supported" tables produce type errors, not runtime exceptions.
 - [ ] Cross-type comparison (`date == instant`, etc.) is a type error.
-- [ ] No implicit mixing of `date`/`number`, `date`/`decimal`, `date`/`integer`, `instant`/`integer`, etc. Only explicit duration constructors are valid temporal arithmetic operands.
+- [ ] No implicit mixing of `localdate`/`number`, `localdate`/`decimal`, `localdate`/`integer`, `instant`/`integer`, etc. Only explicit duration constructors are valid temporal arithmetic operands.
 
 ---
 
@@ -1285,7 +1285,7 @@ No `date(format)`, `instant(precision)`, or `duration(unit)`. Temporal type beha
 | [NodaTime type model survey](../references/nodatime-type-model.md) | Comprehensive inventory of NodaTime types, arithmetic, serialization, BCL correspondence. |
 | [Precept Language Design](../../../docs/PreceptLanguageDesign.md) | Design principles (Principles #1, #2, #8, #12 cited throughout). |
 | [Product Philosophy](../../../docs/philosophy.md) | Prevention guarantee, one-file completeness, determinism model. |
-| Issue #26 body | Original `date` type proposal — superseded by this document's `date` section. |
+| Issue #26 body | Original `localdate` type proposal — superseded by this document's `localdate` section. |
 | Issue #27 body | `decimal` type proposal — cross-interaction rules with temporal types. |
 | Issue #29 body | `integer` type proposal — duration constructor function args are `integer`. |
 | [zoneddatetime reconsideration](../../../.squad/decisions/inbox/frank-zoneddatetime-reconsideration.md) | Provenance erasure analysis. Upgrade from Deferred to Proposed. |
