@@ -9,7 +9,7 @@
 
 ## Summary
 
-Add six temporal types to the Precept DSL — `date`, `time`, `instant`, `duration`, `timezone`, and `datetime` — backed by NodaTime as a runtime dependency. Include three timezone conversion functions (`toLocalDate`, `toLocalTime`, `toInstant`) and duration constructor functions (`days`, `months`, `years`, `weeks`, `hours`, `minutes`, `seconds`). Together, these types and functions give domain authors the vocabulary to express calendar constraints, SLA enforcement, multi-timezone compliance rules, and elapsed-time tracking — all within the governing contract, with no temporal logic delegated to the hosting layer. Every type earns its place by eliminating a specific ambiguity that would otherwise force authors into lossy encodings (`string`, `number`, `integer`) where the compiler cannot enforce domain intent.
+Add seven temporal types to the Precept DSL — `date`, `time`, `instant`, `duration`, `timezone`, `zoneddatetime`, and `datetime` — backed by NodaTime as a runtime dependency. Include three timezone conversion functions (`toLocalDate`, `toLocalTime`, `toInstant`) with provenance-safe `zoneddatetime` overloads, and duration constructor functions (`days`, `months`, `years`, `weeks`, `hours`, `minutes`, `seconds`). Together, these types and functions give domain authors the vocabulary to express calendar constraints, SLA enforcement, multi-timezone compliance rules, and elapsed-time tracking — all within the governing contract, with no temporal logic delegated to the hosting layer. Every type earns its place by eliminating a specific ambiguity that would otherwise force authors into lossy encodings (`string`, `number`, `integer`) where the compiler cannot enforce domain intent.
 
 ---
 
@@ -27,6 +27,7 @@ This shared philosophy is the lens through which every type decision in this pro
 | `duration` over `integer` | `Duration` over `TimeSpan` | Be explicit about what units mean |
 | `time` over `integer` | `LocalTime` over `int minutesSinceMidnight` | Be explicit that this is a time of day |
 | `datetime` over `string` | `LocalDateTime` over `DateTime` | Be explicit about combined date+time without timezone |
+| `zoneddatetime` over `instant` + `timezone` | `ZonedDateTime` over separate `Instant` + `DateTimeZone` | Be explicit that this instant and timezone are semantically bound |
 
 Precept's design principles ground this directly:
 
@@ -459,6 +460,68 @@ field CustomerTimezone as timezone nullable
 
 ---
 
+### `zoneddatetime`
+
+**What it makes explicit:** This is an instant bound to the timezone that gives it local meaning. Not two separate fields the author must keep in sync — the binding is structural, and conversion functions that accept a `zoneddatetime` preserve timezone provenance across decomposition and recomposition.
+
+**Backing type:** `NodaTime.ZonedDateTime`
+
+**Declaration:**
+
+```precept
+field IncidentContext as zoneddatetime
+field FilingContext as zoneddatetime nullable
+```
+
+**Constructor syntax:** `zoneddatetime(instant_expr, timezone_expr)` — two required arguments. Both must be present; co-assignment is structural.
+
+```precept
+-> set IncidentContext = zoneddatetime(Submit.Timestamp, Submit.Timezone)
+```
+
+**Operators:**
+
+| Expression | Produces | Rationale |
+|---|---|---|
+| `==`, `!=` | `boolean` | Comparison by underlying instant (UTC moment). Two contexts for the same instant are equal. |
+| `<`, `>`, `<=`, `>=` | `boolean` | Ordering by underlying instant. |
+
+| **Not supported** | **Why** |
+|---|---|
+| `.year`, `.month`, `.day`, `.hour` | Component accessors require TZ database evaluation. Compile error — use conversion functions: `toLocalDate(zdt).year`. |
+| `zoneddatetime + days(n)` | Arithmetic on a composite is ambiguous (calendar vs. timeline). Decompose first: `zdt.instant + hours(n)` for timeline arithmetic, or `toLocalDate(zdt) + days(n)` for calendar arithmetic. |
+| `zoneddatetime - zoneddatetime` | Use `zdt1.instant - zdt2.instant` for elapsed duration. |
+
+**Accessors:**
+
+| Accessor | Returns | Description |
+|---|---|---|
+| `.instant` | `instant` | The UTC point in time |
+| `.timezone` | `timezone` | The IANA timezone identifier |
+
+**Constraints:** `nullable`. No `default` — there is no universally sensible default timezone, so there is no universally sensible default `zoneddatetime`. Fields are either `nullable` or populated by events.
+
+**Serialization:** Two-property JSON object in MCP payloads:
+
+```json
+{
+  "IncidentContext": {
+    "instant": "2026-04-13T14:30:00Z",
+    "timezone": "America/Los_Angeles"
+  }
+}
+```
+
+**Teachable error messages:**
+
+| Invalid code | Error message |
+|---|---|
+| `zdt.year` | Cannot access calendar components directly on a zoneddatetime — use `toLocalDate(zdt).year`. |
+| `zdt + days(5)` | Cannot add to a zoneddatetime directly — use `zdt.instant + hours(n)` for timeline arithmetic or `toLocalDate(zdt) + days(n)` for calendar arithmetic. |
+| `field X as zoneddatetime default zoneddatetime(...)` | zoneddatetime fields cannot have a default — there is no universally sensible default timezone. Use `nullable` or populate via events. |
+
+---
+
 ### `datetime`
 
 **What it makes explicit:** This is a date and time together — not a point on the global timeline, not two separate fields pretending to be coupled. No timezone.
@@ -594,6 +657,38 @@ Conversion functions produce and consume existing types — they are bridges, no
 - `toLocalTime` returns a `time` — all time operations (comparison, `.hour`) work.
 - `toInstant` returns an `instant` — all instant comparison and duration arithmetic work.
 
+### `zoneddatetime` overloads
+
+The conversion functions gain `zoneddatetime` overloads that **preserve timezone provenance**. The bound timezone travels with the value — the author cannot accidentally pair a date produced from one timezone with a recomposition using a different timezone.
+
+| Function | New Overload | Semantics |
+|---|---|---|
+| `toLocalDate` | `(zoneddatetime) → date` | Extract local date using the **bound** timezone. Provenance-safe. |
+| `toLocalTime` | `(zoneddatetime) → time` | Extract local time using the bound timezone. |
+| `toInstant` | `(date, time, zoneddatetime) → instant` | Convert back to instant using the **same timezone** the original conversion came from. |
+
+The provenance-safe pattern:
+
+```precept
+# Provenance-safe: zone is carried by the composite
+invariant FiledTimestamp <= toInstant(
+    toLocalDate(IncidentContext) + days(30),
+    time("23:59:00"),
+    IncidentContext
+) because "Claim must be filed by 11:59 PM local time on the 30th day after the incident"
+```
+
+The `IncidentContext` carries both the instant and the timezone. `toLocalDate(IncidentContext)` extracts the local date using the bound zone. `toInstant(date, time, IncidentContext)` recomposes using the same zone. The zone mismatch bug from the decomposed approach **cannot be expressed**.
+
+The two-argument forms remain — both patterns coexist:
+
+```
+toLocalDate(instant, timezone) → date     # still valid
+toLocalDate(zoneddatetime) → date         # new overload — provenance-safe
+```
+
+Authors who prefer decomposed storage use the two-argument form. Authors who use `zoneddatetime` get the overload that preserves provenance. No breaking change.
+
 ### Duration constructor functions
 
 Duration constructors are the **required interface** for all temporal arithmetic. Bare integers are never valid temporal offsets — every arithmetic operation on a temporal type requires an explicit duration constructor that names the unit.
@@ -706,10 +801,11 @@ The following matrix defines what operations are valid between temporal types. A
 | `datetime` | `+` | `minutes(n)` | `datetime` | Time arithmetic |
 | `datetime` | `+` | `duration` | `datetime` | Offset forward by composed duration (e.g., `days(5) + hours(7)`) |
 | `datetime` | `-` | `duration` | `datetime` | Offset backward by composed duration |
+| `zoneddatetime` | `==`, `!=`, `<`, `>`, `<=`, `>=` | `zoneddatetime` | `boolean` | Comparison by underlying instant |
 
 ### Comparison rules
 
-All temporal types support `==`, `!=`. `date`, `time`, `instant`, `duration`, `datetime` support `<`, `>`, `<=`, `>=`. `timezone` supports only `==`, `!=` — no ordering.
+All temporal types support `==`, `!=`. `date`, `time`, `instant`, `duration`, `datetime`, `zoneddatetime` support `<`, `>`, `<=`, `>=`. `timezone` supports only `==`, `!=` — no ordering.
 
 Cross-type comparison is always a type error:
 - `date == instant` → type error
@@ -734,6 +830,9 @@ Cross-type comparison is always a type error:
 | `duration * decimal` / `duration / decimal` | `decimal → double` is lossy. Use `number` for scaling operands. |
 | `integer / duration` / `number / duration` | Dimensionally meaningless (what is "5 / 3 hours"?). |
 | `timezone + anything` | Timezones are metadata, not temporal values. |
+| `zoneddatetime + days(n)` | Arithmetic on composite is ambiguous. Use conversion functions to decompose, then add. |
+| `zoneddatetime - zoneddatetime` | Use `zdt1.instant - zdt2.instant` for elapsed duration. |
+| `zoneddatetime.year` | Calendar components require timezone evaluation. Use `toLocalDate(zdt).year`. |
 
 ### Nullable behavior
 
@@ -750,6 +849,7 @@ All temporal types support `nullable`. Nullable temporal fields follow existing 
 | `instant` | `default instant("...")` | Author specifies the UTC instant. |
 | `duration` | `default hours(0)` (or `minutes(0)`, etc.) | Zero duration is natural. |
 | `timezone` | No default | No universally sensible default timezone. |
+| `zoneddatetime` | No default | No universally sensible default timezone (same as `timezone`). |
 | `datetime` | `default datetime("...")` | Author specifies the datetime. |
 
 #### Option: `nullable` + `default` for temporal fields
@@ -904,11 +1004,11 @@ Each exclusion includes rationale — items are excluded for reasons, not conven
 
 A full NodaTime-style `ZonedDateTime` with component accessors (`.year`, `.month`, `.hour`), arithmetic (`zdt + days(1)`), and ambiguity resolution is permanently excluded. Component accessors depend on the TZ database — `instant.InZone(tz).Hour` produces different results depending on DST rules, which change with TZ database updates. This creates non-deterministic expressions that violate Precept's core guarantee.
 
-**The minimal `zoneddatetime` composite** (instant + timezone, `.instant`/`.timezone` accessors only, comparison by instant, no component accessors, no arithmetic) is safe but deferred — see below.
+**The minimal `zoneddatetime` composite** (instant + timezone, `.instant`/`.timezone` accessors only, comparison by instant, no component accessors, no arithmetic) is now **Proposed** — see the `zoneddatetime` type section above and the [zoneddatetime reconsideration](../../../.squad/decisions/inbox/frank-zoneddatetime-reconsideration.md) decision for the provenance erasure analysis that upgraded it.
 
-### Minimal `zoneddatetime` composite — Deferred
+### Minimal `zoneddatetime` composite — Proposed
 
-A composite type bundling `instant + timezone` as a single field with co-assignment enforcement. This is **safe** (the assessment in `timezone-type-storability-analysis.md` downgraded it from Fatal to Deferred) but not yet justified by the cost/benefit analysis. The type system cost (constructor syntax, composite accessors, null/default semantics, collection behavior) is significant, and the primary benefit over two separate fields is co-assignment enforcement. Ship when enterprise adoption demonstrates the co-assignment failure mode.
+A composite type bundling `instant + timezone` as a single field with co-assignment enforcement and provenance-safe conversion function overloads. The assessment in `timezone-type-storability-analysis.md` downgraded it from Fatal to Deferred; the [zoneddatetime reconsideration](../../../.squad/decisions/inbox/frank-zoneddatetime-reconsideration.md) analysis upgrades it from Deferred to **Proposed** based on the provenance erasure problem — the decomposed `instant + timezone` approach creates timezone provenance loss that makes zone-mismatch bugs compiler-invisible. See the `### zoneddatetime` type section in Proposed Types for the full specification.
 
 ### `OffsetDateTime` — Excluded
 
@@ -948,24 +1048,26 @@ No `date(format)`, `instant(precision)`, or `duration(unit)`. Temporal type beha
 
 ### Parser / Tokenizer
 
-- Add `date`, `time`, `instant`, `duration`, `timezone`, `datetime` as type keywords.
+- Add `date`, `time`, `instant`, `duration`, `timezone`, `zoneddatetime`, `datetime` as type keywords.
 - Add `days`, `months`, `years`, `weeks`, `hours`, `minutes`, `seconds` as function keywords.
 - Add `toLocalDate`, `toLocalTime`, `toInstant` as function keywords.
-- Parse constructor forms: `date("...")`, `time("...")`, `instant("...")`, `timezone("...")`, `datetime("...")`.
-- Parse function calls: `days(expr)`, `months(expr)`, `hours(expr)`, `toLocalDate(expr, expr)`, `toInstant(expr, expr, expr)`.
-- Parse accessors: `.year`, `.month`, `.day`, `.dayOfWeek`, `.hour`, `.minute`, `.second`, `.date`, `.time`, `.totalHours`, `.totalMinutes`, `.totalSeconds`.
+- Parse constructor forms: `date("...")`, `time("...")`, `instant("...")`, `timezone("...")`, `datetime("...")`, `zoneddatetime(expr, expr)`.
+- Parse function calls: `days(expr)`, `months(expr)`, `hours(expr)`, `toLocalDate(expr, expr)`, `toLocalDate(expr)`, `toInstant(expr, expr, expr)`, `toInstant(expr, expr, expr_zdt)`.
+- Parse accessors: `.year`, `.month`, `.day`, `.dayOfWeek`, `.hour`, `.minute`, `.second`, `.date`, `.time`, `.totalHours`, `.totalMinutes`, `.totalSeconds`, `.instant`, `.timezone`.
 
 ### Type Checker
 
-- New type entries for `date`, `time`, `instant`, `duration`, `timezone`, `datetime`.
+- New type entries for `date`, `time`, `instant`, `duration`, `timezone`, `zoneddatetime`, `datetime`.
 - Operator resolution: the full cross-type interaction matrix above.
 - Accessor resolution: per-type accessor tables.
-- Constructor validation: ISO 8601 format check for literals (compile-time).
-- Constraint validation: which constraints apply to which temporal types.
-- Cross-type arithmetic rejection: `date + instant`, `date + integer`, `instant + months(n)`, etc.
+- Constructor validation: ISO 8601 format check for literals (compile-time). `zoneddatetime(instant, timezone)` constructor argument type validation.
+- Constraint validation: which constraints apply to which temporal types. `zoneddatetime` allows `nullable`, rejects `default`.
+- Cross-type arithmetic rejection: `date + instant`, `date + integer`, `instant + months(n)`, `zoneddatetime + days(n)`, etc.
 - `instant` component accessor rejection (new diagnostic).
+- `zoneddatetime` component accessor rejection (`.year`, `.hour`, etc. — teachable error directing to conversion functions).
 - `timezone` ordering rejection (new diagnostic).
 - Duration constructor argument validation: `hours(n)` requires `integer` argument.
+- Conversion function overload resolution: `toLocalDate(zoneddatetime)`, `toLocalTime(zoneddatetime)`, `toInstant(date, time, zoneddatetime)`.
 
 ### Expression Evaluator
 
@@ -989,7 +1091,7 @@ No `date(format)`, `instant(precision)`, or `duration(unit)`. Temporal type beha
 
 ### TextMate Grammar
 
-- Add `date`, `time`, `instant`, `duration`, `timezone`, `datetime` to `typeKeywords` alternation.
+- Add `date`, `time`, `instant`, `duration`, `timezone`, `zoneddatetime`, `datetime` to `typeKeywords` alternation.
 - Add `days`, `months`, `years`, `weeks`, `hours`, `minutes`, `seconds` to function keyword patterns.
 - Add `toLocalDate`, `toLocalTime`, `toInstant` to function keyword patterns.
 - Temporal accessors (`.year`, `.totalHours`, etc.) handled by existing member-access pattern.
@@ -1003,7 +1105,7 @@ No `date(format)`, `instant(precision)`, or `duration(unit)`. Temporal type beha
 
 ### MCP Tools
 
-- `precept_language`: Include `date`, `time`, `instant`, `duration`, `timezone`, `datetime` in type keywords. Include all constructor and conversion functions. TZ database version in environment info.
+- `precept_language`: Include `date`, `time`, `instant`, `duration`, `timezone`, `zoneddatetime`, `datetime` in type keywords. Include all constructor and conversion functions (including `zoneddatetime` overloads). TZ database version in environment info.
 - `precept_compile`: Temporal field DTOs include type, constraints, and assessed properties. New diagnostics for temporal type errors.
 - `precept_fire` / `precept_inspect` / `precept_update`: Temporal values serialized as ISO 8601 strings. Timezone values as IANA identifiers. Duration values as ISO 8601 duration strings.
 
@@ -1090,6 +1192,20 @@ No `date(format)`, `instant(precision)`, or `duration(unit)`. Temporal type beha
 - [ ] `timezone == timezone` works. `timezone < timezone` is a type error.
 - [ ] Event args typed `as timezone` validated at fire time.
 
+### `zoneddatetime` type
+
+- [ ] `field X as zoneddatetime` parses and type-checks.
+- [ ] `zoneddatetime(instant, timezone)` constructor validates at compile time.
+- [ ] `.instant → instant`, `.timezone → timezone` accessors work.
+- [ ] `.year`, `.hour`, etc. are compile errors with teachable messages.
+- [ ] `zoneddatetime + days(n)` is a type error with a teachable message.
+- [ ] `zoneddatetime == zoneddatetime` compares by instant.
+- [ ] `toLocalDate(zoneddatetime) → date` uses the bound timezone.
+- [ ] `toLocalTime(zoneddatetime) → time` uses the bound timezone.
+- [ ] `toInstant(date, time, zoneddatetime) → instant` recomposes using the bound timezone.
+- [ ] Nullable works. No default allowed (compile error if specified).
+- [ ] MCP tools serialize as two-property JSON object.
+
 ### `datetime` type (if included)
 
 - [ ] `field X as datetime` parses and type-checks.
@@ -1106,6 +1222,9 @@ No `date(format)`, `instant(precision)`, or `duration(unit)`. Temporal type beha
 - [ ] DST overlap resolution: maps to later instant.
 - [ ] Invalid timezone in field value produces constraint violation at fire time.
 - [ ] Conversion function results compose with existing type operations.
+- [ ] `toLocalDate(zoneddatetime)` overload returns date in the bound timezone.
+- [ ] `toLocalTime(zoneddatetime)` overload returns time in the bound timezone.
+- [ ] `toInstant(date, time, zoneddatetime)` overload converts using the bound timezone.
 
 ### Tooling
 
@@ -1140,3 +1259,4 @@ No `date(format)`, `instant(precision)`, or `duration(unit)`. Temporal type beha
 | Issue #26 body | Original `date` type proposal — superseded by this document's `date` section. |
 | Issue #27 body | `decimal` type proposal — cross-interaction rules with temporal types. |
 | Issue #29 body | `integer` type proposal — duration constructor function args are `integer`. |
+| [zoneddatetime reconsideration](../../../.squad/decisions/inbox/frank-zoneddatetime-reconsideration.md) | Provenance erasure analysis. Upgrade from Deferred to Proposed. |
