@@ -9,7 +9,7 @@
 
 ## Summary
 
-Add six temporal types to the Precept DSL — `date`, `time`, `instant`, `duration`, `timezone`, and `datetime` — backed by NodaTime as a runtime dependency. Include three timezone conversion functions (`toLocalDate`, `toLocalTime`, `toInstant`) and calendar/duration constructor functions (`months`, `years`, `weeks`, `hours`, `minutes`, `seconds`). Together, these types and functions give domain authors the vocabulary to express calendar constraints, SLA enforcement, multi-timezone compliance rules, and elapsed-time tracking — all within the governing contract, with no temporal logic delegated to the hosting layer. Every type earns its place by eliminating a specific ambiguity that would otherwise force authors into lossy encodings (`string`, `number`, `integer`) where the compiler cannot enforce domain intent.
+Add six temporal types to the Precept DSL — `date`, `time`, `instant`, `duration`, `timezone`, and `datetime` — backed by NodaTime as a runtime dependency. Include three timezone conversion functions (`toLocalDate`, `toLocalTime`, `toInstant`) and duration constructor functions (`days`, `months`, `years`, `weeks`, `hours`, `minutes`, `seconds`). Together, these types and functions give domain authors the vocabulary to express calendar constraints, SLA enforcement, multi-timezone compliance rules, and elapsed-time tracking — all within the governing contract, with no temporal logic delegated to the hosting layer. Every type earns its place by eliminating a specific ambiguity that would otherwise force authors into lossy encodings (`string`, `number`, `integer`) where the compiler cannot enforce domain intent.
 
 ---
 
@@ -77,7 +77,7 @@ field DueDate as date default date("2026-06-01")
 field GracePeriodDays as integer default 30
 
 # Type-safe: DueDate + MealsTotal is a compile error
-invariant DueDate + GracePeriodDays >= date("2026-01-01") because "Within grace period"
+invariant DueDate + days(GracePeriodDays) >= date("2026-01-01") because "Within grace period"
 ```
 
 **Before** — encoding SLA rules with raw numbers:
@@ -116,7 +116,7 @@ field FiledTimestamp as instant
 field IncidentTimezone as timezone
 
 invariant FiledTimestamp <= toInstant(
-    toLocalDate(IncidentTimestamp, IncidentTimezone) + 30,
+    toLocalDate(IncidentTimestamp, IncidentTimezone) + days(30),
     time("23:59:00"),
     IncidentTimezone
 ) because "Claim must be filed by 11:59 PM local time on the 30th day after the incident"
@@ -185,19 +185,20 @@ field ContractEnd as date default date("2099-12-31")
 
 | Expression | Produces | Rationale |
 |---|---|---|
-| `date + integer` | `date` | Add N calendar days. `LocalDate.PlusDays(int)`. |
-| `date - integer` | `date` | Subtract N calendar days. |
+| `date + days(n)` | `date` | Add N calendar days. `LocalDate.PlusDays(int)`. |
+| `date - days(n)` | `date` | Subtract N calendar days. |
 | `date + months(n)` | `date` | Add N months. Truncates at month end (Jan 31 + 1 mo = Feb 28). |
 | `date + years(n)` | `date` | Add N years. Handles leap years (Feb 29 + 1 yr = Feb 28). |
 | `date + weeks(n)` | `date` | Add N weeks (= 7N days). |
-| `date - date` | `integer` | Day count between dates. Always a whole number. |
+| `date - date` | `duration` | Elapsed days between dates. The result is a duration carrying day-unit semantics. |
 | `==`, `!=`, `<`, `>`, `<=`, `>=` | `boolean` | Full ordering. ISO calendar only. |
 
 | **Not supported** | **Why** |
 |---|---|
 | `date + date` | Adding two dates is meaningless — no temporal concept this could represent. |
+| `date + integer` | Bare integers don't carry unit semantics — days? months? weeks? Use `date + days(n)`. |
 | `date + decimal` | Fractional days are meaningless at day granularity. Type error. |
-| `date + number` | `number` is floating-point; day arithmetic requires integers. Use `date + integer`. |
+| `date + number` | `number` is floating-point; temporal arithmetic requires explicit duration constructors. |
 
 **Accessors:**
 
@@ -219,8 +220,9 @@ field ContractEnd as date default date("2099-12-31")
 | `field X as date default "2026-01-01"` | Date defaults require the date constructor: `default date("2026-01-01")`. Bare strings are not dates. |
 | `date("2026-02-30")` | Invalid date: February 30 does not exist. Use a valid calendar date in ISO 8601 format (YYYY-MM-DD). |
 | `date("01/15/2026")` | Invalid date format: expected ISO 8601 (YYYY-MM-DD), got '01/15/2026'. Use `date("2026-01-15")`. |
-| `DueDate + FilingDate` | Cannot add two dates. Did you mean `DueDate - FilingDate` (day count) or `DueDate + integer` (offset)? |
-| `DueDate + 2.5` | Cannot add a fractional value to a date. Day arithmetic requires integer offsets. Use `DueDate + 2`. |
+| `DueDate + FilingDate` | Cannot add two dates. Did you mean `DueDate - FilingDate` (duration) or `DueDate + days(n)` (offset)? |
+| `DueDate + 2` | Cannot add an integer to a date. Temporal arithmetic requires explicit duration constructors. Use `DueDate + days(2)` to add 2 calendar days. |
+| `DueDate + 2.5` | Cannot add a number to a date. Temporal arithmetic requires explicit duration constructors. Use `DueDate + days(2)` or `DueDate + months(n)`. |
 
 ---
 
@@ -455,7 +457,7 @@ field ScheduledFor as datetime default datetime("2026-04-13T09:00:00")
 |---|---|---|
 | `datetime + hours(n)` | `datetime` | Offset by hours. |
 | `datetime + minutes(n)` | `datetime` | Offset by minutes. |
-| `datetime + integer` | `datetime` | Add N calendar days. Same as date + integer. |
+| `datetime + days(n)` | `datetime` | Add N calendar days. Same as date + days(n). |
 | `datetime + months(n)` | `datetime` | Calendar arithmetic via Period. |
 | `datetime + years(n)` | `datetime` | Calendar arithmetic via Period. |
 | `==`, `!=`, `<`, `>`, `<=`, `>=` | `boolean` | Full ordering within the same calendar. |
@@ -526,7 +528,7 @@ With them, the entire rule lives in one file:
 ```precept
 # WITH conversion functions — rule is complete
 invariant FiledTimestamp <= toInstant(
-    toLocalDate(IncidentTimestamp, IncidentTimezone) + 30,
+    toLocalDate(IncidentTimestamp, IncidentTimezone) + days(30),
     time("23:59:00"),
     IncidentTimezone
 ) because "Claim must be filed by 11:59 PM local time on the 30th day after the incident"
@@ -563,29 +565,25 @@ Gaps and overlaps produce constraint violations. The author must handle DST boun
 
 Conversion functions produce and consume existing types — they are bridges, not new types:
 
-- `toLocalDate` returns a `date` — all date operations (comparison, `.year`, `+ months(n)`) work.
+- `toLocalDate` returns a `date` — all date operations (comparison, `.year`, `+ days(n)`, `+ months(n)`) work.
 - `toLocalTime` returns a `time` — all time operations (comparison, `.hour`) work.
 - `toInstant` returns an `instant` — all instant comparison and duration arithmetic work.
 
-### Calendar-unit constructor functions
-
-| Function | Signature | Semantics |
-|---|---|---|
-| `months(n)` | `(integer) → *period*` | Calendar period of N months (used with `date +` or `datetime +`). |
-| `years(n)` | `(integer) → *period*` | Calendar period of N years. |
-| `weeks(n)` | `(integer) → *period*` | Calendar period of N weeks (= 7N days). |
-
-These internally produce `NodaTime.Period` values but do not expose `Period` as a DSL type. They are consumed by `date +` and `datetime +` arithmetic operators.
-
 ### Duration constructor functions
 
+Duration constructors are the **required interface** for all temporal arithmetic. Bare integers are never valid temporal offsets — every arithmetic operation on a temporal type requires an explicit duration constructor that names the unit.
+
 | Function | Signature | Semantics |
 |---|---|---|
-| `hours(n)` | `(integer) → duration` | Duration of N hours. |
-| `minutes(n)` | `(integer) → duration` | Duration of N minutes. |
-| `seconds(n)` | `(integer) → duration` | Duration of N seconds. |
+| `days(n)` | `(integer) → duration` | Calendar period of N days. Used with `date +`, `datetime +`. Internally `Period.FromDays`. |
+| `months(n)` | `(integer) → duration` | Calendar period of N months. Truncates at month end (Jan 31 + 1 mo = Feb 28). Internally `Period.FromMonths`. |
+| `years(n)` | `(integer) → duration` | Calendar period of N years. Handles leap years. Internally `Period.FromYears`. |
+| `weeks(n)` | `(integer) → duration` | Calendar period of N weeks (= 7N days). Internally `Period.FromWeeks`. |
+| `hours(n)` | `(integer) → duration` | Duration of N hours. Used with `time +`, `instant +`, `datetime +`. Internally `Duration.FromHours`. |
+| `minutes(n)` | `(integer) → duration` | Duration of N minutes. Internally `Duration.FromMinutes`. |
+| `seconds(n)` | `(integer) → duration` | Duration of N seconds. Internally `Duration.FromSeconds`. |
 
-These produce `NodaTime.Duration` values used in instant arithmetic and duration comparison.
+Internally, calendar-unit constructors (`days`, `months`, `years`, `weeks`) produce `NodaTime.Period` values, while timeline constructors (`hours`, `minutes`, `seconds`) produce `NodaTime.Duration` values. The DSL author does not see this distinction — all seven are "duration constructors" at the language surface. `Period` is not exposed as a DSL type.
 
 ---
 
@@ -597,12 +595,12 @@ The following matrix defines what operations are valid between temporal types. A
 
 | Left operand | Operator | Right operand | Result | Notes |
 |---|---|---|---|---|
-| `date` | `+` | `integer` | `date` | Add N days |
-| `date` | `-` | `integer` | `date` | Subtract N days |
+| `date` | `+` | `days(n)` | `date` | Add N calendar days |
+| `date` | `-` | `days(n)` | `date` | Subtract N calendar days |
 | `date` | `+` | `months(n)` | `date` | Calendar arithmetic; truncates at month end |
 | `date` | `+` | `years(n)` | `date` | Calendar arithmetic; handles leap years |
 | `date` | `+` | `weeks(n)` | `date` | = 7N days |
-| `date` | `-` | `date` | `integer` | Day count (always whole) |
+| `date` | `-` | `date` | `duration` | Elapsed days between dates |
 | `instant` | `-` | `instant` | `duration` | Elapsed time between two points |
 | `instant` | `+` | `duration` | `instant` | Point offset forward |
 | `instant` | `-` | `duration` | `instant` | Point offset backward |
@@ -610,7 +608,7 @@ The following matrix defines what operations are valid between temporal types. A
 | `duration` | `-` | `duration` | `duration` | Difference |
 | `time` | `+` | `hours(n)` | `time` | Wraps at midnight |
 | `time` | `+` | `minutes(n)` | `time` | Wraps at midnight |
-| `datetime` | `+` | `integer` | `datetime` | Add N days |
+| `datetime` | `+` | `days(n)` | `datetime` | Add N days |
 | `datetime` | `+` | `months(n)` | `datetime` | Calendar arithmetic |
 | `datetime` | `+` | `years(n)` | `datetime` | Calendar arithmetic |
 | `datetime` | `+` | `hours(n)` | `datetime` | Time arithmetic |
@@ -631,9 +629,9 @@ Cross-type comparison is always a type error:
 |---|---|
 | `date + date` | Adding two dates is meaningless. |
 | `date + instant` | Different temporal domains (calendar vs. timeline). |
-| `date + duration` | Duration is timeline-based (nanoseconds); date is calendar-based. Use `date + integer` for day offsets. |
+| `date + integer` | Bare integers don't carry unit semantics. Use `date + days(n)` for day offsets. |
 | `date + decimal` | Fractional days are meaningless at day granularity. |
-| `date + number` | `number` is floating-point; day arithmetic requires integers. |
+| `date + number` | `number` is floating-point; temporal arithmetic requires explicit duration constructors. |
 | `instant + integer` | Ambiguous unit. Use `instant + hours(n)` or `instant + seconds(n)`. |
 | `instant + months(n)` | Months are calendar units with no fixed duration. Convert to date, add, convert back. |
 | `instant.year` | Requires a timezone. Use `toLocalDate(instant, timezone).year`. |
@@ -751,19 +749,19 @@ Each locked decision follows the 4-point rationale format required by CONTRIBUTI
 - **Precedent:** Every system that handles timezone-sensitive data (banking, healthcare, aviation) manages TZ database freshness. This is standard operational practice, not a new burden Precept introduces.
 - **Tradeoff accepted:** The input surface for determinism expands to include TZ database version. Practically near-zero risk — the US last changed DST rules in 2007; TZ database changes affect ~1–3 jurisdictions per update.
 
-### 10. `date + integer` (not `date + number` or `date + decimal`)
+### 10. Temporal arithmetic requires explicit duration constructors (not bare integers)
 
-- **Why:** Day arithmetic operates on whole days. `LocalDate.PlusDays(int)` takes an `int` — NodaTime's API enforces this constraint. `date + 2.5` is meaningless at day granularity.
-- **Alternatives rejected:** `date + number` — allows fractional day offsets that have no calendar meaning. `date + decimal` — same problem with exact representation.
-- **Precedent:** NodaTime's `PlusDays(int)` — the API takes an integer, not a floating-point value.
-- **Tradeoff accepted:** None significant. This resolves George's Challenge #2 from the original #26 review.
+- **Why:** `date + 2` is implicit — what does `2` mean? Days? Months? Weeks? This is exactly the ambiguity NodaTime was designed to prevent. In NodaTime, you write `date.PlusDays(2)` or `date + Period.FromDays(2)` — never `date + 2`. Precept applies the same principle: `date + days(2)`, `date + months(1)`, `time + hours(3)`. The duration constructor names the unit; the compiler enforces it. Shane's directive: *“date + integer is implicit.”*
+- **Alternatives rejected:** `date + integer` meaning “add N days” — the previous locked decision in this proposal. While NodaTime’s `PlusDays(int)` takes an `int`, the DSL author sees `date + 2` without the `PlusDays` context. The bare integer silently assumes "days" — a unit choice the author never made explicit. `date + number` — allows fractional day offsets that have no calendar meaning. `date + decimal` — same problem.
+- **Precedent:** NodaTime’s API requires named methods (`PlusDays`, `PlusMonths`, `Plus(Period)`) for all temporal arithmetic — the type alone doesn’t carry unit information. FEEL uses `duration("P2D")` for explicit day offsets, not bare integers. Shane’s governing directive aligns Precept with this precedent.
+- **Tradeoff accepted:** More verbose than `date + 2`. The verbosity is the point — it forces the author to name the unit, making the intent unambiguous to readers, auditors, and AI consumers.
 
-### 11. `date - date → integer` (not `→ number`)
+### 11. `date - date → duration` (not → integer or → number)
 
-- **Why:** Day counts between dates are always whole numbers. No interpretation produces a fractional day count. `Period.Between(d1, d2, PeriodUnits.Days).Days` returns `int`.
-- **Alternatives rejected:** `→ number` — the original #26 proposal. Floating-point is unnecessary and misleading for a value that is structurally an integer.
-- **Precedent:** NodaTime's `Period.Days` is `int`. Resolves George's Challenge #4.
-- **Tradeoff accepted:** None.
+- **Why:** The result of subtracting two dates is a temporal quantity — it should carry unit semantics, not collapse to a bare integer. `date - date → integer` produces a number that has lost its meaning: is `30` thirty days? Thirty somethings? Returning a `duration` preserves the unit information and enables further temporal arithmetic (`elapsed > days(30)`). This follows the same explicitness principle as Decision #10 — the type system carries meaning that bare numbers lose.
+- **Alternatives rejected:** `→ integer` — the previous locked decision. Loses unit semantics; the caller must *remember* that the integer means days. `→ number` — the original #26 proposal. Floating-point is unnecessary and misleading for a value that is structurally a day count.
+- **Precedent:** NodaTime’s `Period.Between(d1, d2)` returns a `Period`, not an `int`. The period carries structural unit information. Shane’s directive establishes that implicit results are as problematic as implicit operands.
+- **Tradeoff accepted:** `duration` result requires `.totalHours` or comparison with `days(n)` to extract a numeric value. The indirection is intentional — it forces the consumer to acknowledge the unit.
 
 ---
 
@@ -773,13 +771,11 @@ George's design review of the original #26 proposal raised four challenges. The 
 
 ### Challenge 1: `DueDate + MealsTotal` compiles because `date + number → date`
 
-**Resolution:** `date + number` is no longer defined. The operator is `date + integer → date`. Since `MealsTotal` is typically `decimal` (a monetary amount — see #27), `DueDate + MealsTotal` is now a **type error**: `date + decimal` is not in the operator table. NodaTime's `LocalDate.PlusDays(int)` enforces integer-only arithmetic. The type system now structurally prevents the exact cross-domain error George identified.
-
-If `MealsTotal` were `integer`, the compiler still reports: *"Cannot add a date and an integer field in this context. Is `MealsTotal` being used as a day offset?"* — a semantic hint based on field naming. (This is a tooling-quality heuristic, not a type rule.)
+**Resolution:** No form of `date + <non-duration>` is defined. The only valid temporal arithmetic uses explicit duration constructors: `date + days(n)`, `date + months(n)`, etc. `DueDate + MealsTotal` is a **type error** regardless of whether `MealsTotal` is `decimal`, `number`, or `integer` — none of these are duration values. This is strictly stronger than the previous `date + integer` rule, which would have allowed `DueDate + MealsTotal` if `MealsTotal` happened to be `integer`. The explicit-duration requirement eliminates the cross-domain error structurally.
 
 ### Challenge 2: `date + 2.5` should reject fractional offsets
 
-**Resolution:** `date + 2.5` is a type error. `2.5` is a `number` (floating-point) literal. `date + number` is not defined. Only `date + integer` is valid. NodaTime's API enforces this: `LocalDate.PlusDays(int)` does not accept `double` or `float`. The design is correct by construction — fractional day offsets are rejected by the type system, not by a runtime check.
+**Resolution:** `date + 2.5` is a type error — and now `date + 2` is *also* a type error. No bare numeric value (integer, number, or decimal) is a valid operand for temporal arithmetic. Only explicit duration constructors are accepted: `date + days(2)`, `date + months(1)`, etc. The fractional offset `2.5` is rejected not by a granularity check but by the fundamental rule: temporal arithmetic requires duration constructors that name the unit. This is strictly stronger than the previous resolution — it eliminates *all* implicit temporal arithmetic, not just fractional offsets.
 
 ### Challenge 3: `nullable + default` prohibition seems arbitrary
 
@@ -787,7 +783,7 @@ If `MealsTotal` were `integer`, the compiler still reports: *"Cannot add a date 
 
 ### Challenge 4: `date - date → number` should be `→ integer`
 
-**Resolution:** Accepted. `date - date → integer`. Day counts between dates are always whole numbers — `Period.Between(d1, d2, PeriodUnits.Days).Days` returns `int`. This is locked in this proposal.
+**Resolution:** Now `date - date → duration` — even more explicit than `→ integer`. The result is a duration value that carries unit semantics (days), not a bare number or integer that has lost its meaning. The consumer can compare it directly with `days(n)` expressions (`elapsed > days(30)`) or extract a numeric value via `.totalHours`. This aligns with Shane’s directive that implicit results are as problematic as implicit operands.
 
 ---
 
@@ -796,9 +792,9 @@ If `MealsTotal` were `integer`, the compiler still reports: *"Cannot add a date 
 | Issue | Relationship |
 |---|---|
 | #25 (choice type) | Currency codes as `choice("USD", "EUR", ...)` complement `decimal` for money; `choice` for state/region complements `timezone` for jurisdiction lookups. |
-| #26 (date type) | **Superseded by this proposal.** The `date` section here incorporates all of #26's design plus NodaTime backing, `integer`-only arithmetic, and month/year arithmetic. |
+| #26 (date type) | **Superseded by this proposal.** The `date` section here incorporates all of #26’s design plus NodaTime backing, explicit-duration-only arithmetic, and month/year arithmetic. |
 | #27 (decimal type) | Complementary numeric type. `decimal` and temporal types do not interact arithmetically (`decimal + date` is a type error). `duration.totalHours` returns `number`, not `decimal`. |
-| #29 (integer type) | `date + integer`, `date - date → integer`, duration constructor args are `integer`. The `integer` type is a dependency for correct temporal arithmetic. |
+| #29 (integer type) | Duration constructor function args are `integer`. The `integer` type is a dependency for correct temporal arithmetic. |
 | #16 (built-in functions) | `round()` from #27; `toLocalDate`, `toLocalTime`, `toInstant`, `months`, `years`, `weeks`, `hours`, `minutes`, `seconds` from this proposal. |
 | #13 (field-level constraints) | `nullable`, `default`, `nonnegative` — constraint-zone architecture that temporal fields use. |
 
@@ -857,10 +853,10 @@ No `date(format)`, `instant(precision)`, or `duration(unit)`. Temporal type beha
 ### Parser / Tokenizer
 
 - Add `date`, `time`, `instant`, `duration`, `timezone`, `datetime` as type keywords.
-- Add `months`, `years`, `weeks`, `hours`, `minutes`, `seconds` as function keywords.
+- Add `days`, `months`, `years`, `weeks`, `hours`, `minutes`, `seconds` as function keywords.
 - Add `toLocalDate`, `toLocalTime`, `toInstant` as function keywords.
 - Parse constructor forms: `date("...")`, `time("...")`, `instant("...")`, `timezone("...")`, `datetime("...")`.
-- Parse function calls: `months(expr)`, `hours(expr)`, `toLocalDate(expr, expr)`, `toInstant(expr, expr, expr)`.
+- Parse function calls: `days(expr)`, `months(expr)`, `hours(expr)`, `toLocalDate(expr, expr)`, `toInstant(expr, expr, expr)`.
 - Parse accessors: `.year`, `.month`, `.day`, `.dayOfWeek`, `.hour`, `.minute`, `.second`, `.date`, `.time`, `.totalHours`, `.totalMinutes`, `.totalSeconds`.
 
 ### Type Checker
@@ -870,7 +866,7 @@ No `date(format)`, `instant(precision)`, or `duration(unit)`. Temporal type beha
 - Accessor resolution: per-type accessor tables.
 - Constructor validation: ISO 8601 format check for literals (compile-time).
 - Constraint validation: which constraints apply to which temporal types.
-- Cross-type arithmetic rejection: `date + instant`, `instant + months(n)`, etc.
+- Cross-type arithmetic rejection: `date + instant`, `date + integer`, `instant + months(n)`, etc.
 - `instant` component accessor rejection (new diagnostic).
 - `timezone` ordering rejection (new diagnostic).
 - Duration constructor argument validation: `hours(n)` requires `integer` argument.
@@ -885,8 +881,8 @@ No `date(format)`, `instant(precision)`, or `duration(unit)`. Temporal type beha
 - Conversion functions: `ZonedDateTimeExtensions` / `DateTimeZoneProviders.Tzdb` for timezone lookups.
 - DST resolution via NodaTime's `LenientResolver` (or chosen strategy).
 - Accessor evaluation: `.year` → `localDate.Year`, etc.
-- Duration constructor functions: `hours(n)` → `Duration.FromHours(n)`.
-- Calendar constructor functions: `months(n)` → `Period.FromMonths(n)`.
+- Duration constructor functions: `days(n)` → `Period.FromDays(n)`, `hours(n)` → `Duration.FromHours(n)`, etc.
+- Calendar constructor functions: `months(n)` → `Period.FromMonths(n)`, `years(n)` → `Period.FromYears(n)`, `weeks(n)` → `Period.FromWeeks(n)`.
 
 ### Runtime Engine
 
@@ -898,7 +894,7 @@ No `date(format)`, `instant(precision)`, or `duration(unit)`. Temporal type beha
 ### TextMate Grammar
 
 - Add `date`, `time`, `instant`, `duration`, `timezone`, `datetime` to `typeKeywords` alternation.
-- Add `months`, `years`, `weeks`, `hours`, `minutes`, `seconds` to function keyword patterns.
+- Add `days`, `months`, `years`, `weeks`, `hours`, `minutes`, `seconds` to function keyword patterns.
 - Add `toLocalDate`, `toLocalTime`, `toInstant` to function keyword patterns.
 - Temporal accessors (`.year`, `.totalHours`, etc.) handled by existing member-access pattern.
 
@@ -946,9 +942,9 @@ No `date(format)`, `instant(precision)`, or `duration(unit)`. Temporal type beha
 - [ ] `field X as date` parses and type-checks.
 - [ ] `date("2026-03-15")` literal validates ISO 8601 at compile time.
 - [ ] `date("2026-02-30")` produces compile-time error.
-- [ ] `date + integer → date` works; `date + number` and `date + decimal` are type errors.
+- [ ] `date + days(n) → date` works; `date + integer`, `date + number`, and `date + decimal` are type errors.
 - [ ] `date + months(n)`, `date + years(n)`, `date + weeks(n)` work with correct truncation.
-- [ ] `date - date → integer` (not `number`).
+- [ ] `date - date → duration` (not `integer` or `number`).
 - [ ] `.year`, `.month`, `.day`, `.dayOfWeek` return `integer`.
 - [ ] Nullable and default work. Constraints `nonnegative`, `min`, `max`, etc. are compile errors.
 - [ ] MCP tools serialize as ISO 8601 string.
@@ -973,7 +969,7 @@ No `date(format)`, `instant(precision)`, or `duration(unit)`. Temporal type beha
 
 ### `duration` type
 
-- [ ] `hours(72)`, `minutes(30)`, `seconds(3600)` produce duration values.
+- [ ] `days(7)`, `hours(72)`, `minutes(30)`, `seconds(3600)` produce duration values.
 - [ ] `duration + duration → duration`, `duration - duration → duration`.
 - [ ] `.totalHours`, `.totalMinutes`, `.totalSeconds` return `number`.
 - [ ] `duration == duration`, `duration < duration` comparison works.
@@ -1018,7 +1014,7 @@ No `date(format)`, `instant(precision)`, or `duration(unit)`. Temporal type beha
 
 - [ ] All entries in the "Not supported" tables produce type errors, not runtime exceptions.
 - [ ] Cross-type comparison (`date == instant`, etc.) is a type error.
-- [ ] No implicit mixing of `date`/`number`, `date`/`decimal`, `instant`/`integer`, etc.
+- [ ] No implicit mixing of `date`/`number`, `date`/`decimal`, `date`/`integer`, `instant`/`integer`, etc. Only explicit duration constructors are valid temporal arithmetic operands.
 
 ---
 
@@ -1037,4 +1033,4 @@ No `date(format)`, `instant(precision)`, or `duration(unit)`. Temporal type beha
 | [Product Philosophy](../../../docs/philosophy.md) | Prevention guarantee, one-file completeness, determinism model. |
 | Issue #26 body | Original `date` type proposal — superseded by this document's `date` section. |
 | Issue #27 body | `decimal` type proposal — cross-interaction rules with temporal types. |
-| Issue #29 body | `integer` type proposal — `date + integer` arithmetic, constructor function args. |
+| Issue #29 body | `integer` type proposal — duration constructor function args are `integer`. |
