@@ -248,7 +248,33 @@ public class PreceptIntegerTypeTests
         result.Diagnostics.Should().ContainSingle();
         result.Diagnostics[0].Constraint.Id.Should().Be("C60");
         result.Diagnostics[0].DiagnosticCode.Should().Be("PRECEPT060");
-        result.Diagnostics[0].Message.Should().Contain("explicit conversion");
+        result.Diagnostics[0].Message.Should().Contain("floor()");
+        result.Diagnostics[0].Message.Should().Contain("ceil()");
+        result.Diagnostics[0].Message.Should().Contain("truncate()");
+        result.Diagnostics[0].Message.Should().Contain("round()");
+        result.Diagnostics[0].Message.Should().Contain("integer");
+    }
+
+    [Fact]
+    public void TypeCheck_IntegerField_AssignDecimalField_EmitsC60WithRoundGuidance()
+    {
+        const string dsl = """
+            precept M
+            field Source as decimal default 3.14
+            field Count as integer default 0
+            state A initial
+            state B
+            event Go
+            from A on Go -> set Count = Source -> transition B
+            """;
+
+        var result = PreceptCompiler.Validate(PreceptParser.Parse(dsl));
+
+        var diagnostic = result.Diagnostics.Should().ContainSingle().Subject;
+        diagnostic.Constraint.Id.Should().Be("C60");
+        diagnostic.DiagnosticCode.Should().Be("PRECEPT060");
+        diagnostic.Message.Should().Contain("round()");
+        diagnostic.Message.Should().Contain("floor()");
     }
 
     [Fact]

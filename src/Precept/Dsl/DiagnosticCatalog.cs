@@ -479,10 +479,15 @@ public static class DiagnosticCatalog
     // ═══════════════════════════════════════════════════════════════
 
     /// <summary>Narrowing assignment: cannot assign a non-integer numeric value to an integer field without explicit conversion.</summary>
+    /// <remarks>
+    /// floor(), ceil(), and truncate() return integer for both number and decimal sources.
+    /// round() returns integer for all numeric sources (integer, decimal, and number).
+    /// The runtime message is generated per source type — see PreceptTypeChecker.BuildC60Message.
+    /// </remarks>
     public static readonly LanguageConstraint C60 = Register(
         "C60", "compile",
         "Narrowing assignment: cannot assign non-integer value to integer field without explicit conversion.",
-        "Narrowing assignment: cannot assign '{actual}' to integer field '{name}' without explicit conversion. An explicit integer conversion function is planned; see documentation.");
+        "Narrowing assignment: {actual} cannot be implicitly narrowed to integer field '{name}'. Use floor(), ceil(), truncate(), or round() to produce an integer value.");
 
     /// <summary>'maxplaces' constraint applies only to decimal fields.</summary>
     public static readonly LanguageConstraint C61 = Register(
@@ -618,7 +623,7 @@ public static class DiagnosticCatalog
     public static readonly LanguageConstraint C79 = Register(
         "C79", "compile",
         "Conditional expression branches must produce the same scalar type.",
-        "Conditional expression branches must produce the same scalar type, but got {thenType} and {elseType}.");
+        "Conditional expression branches produce incompatible types: {thenType} and {elseType}. {hint}");
 
     // ═══════════════════════════════════════════════════════════════
     // Parse-phase constraints: computed/derived fields (C80–C82)

@@ -128,7 +128,7 @@ The `vocabulary` object contains the following keyword lists, each reflecting `P
 | `abs(value)` | numeric | `int→int`, `dec→dec`, `num→num` | Absolute value (type-preserving) |
 | `floor(value)` | numeric | `dec→int`, `num→int` | Round toward negative infinity |
 | `ceil(value)` | numeric | `dec→int`, `num→int` | Round toward positive infinity |
-| `round(value)` | numeric | `int→int`, `dec→int`, `num→num` | Banker's rounding to nearest integer |
+| `round(value)` | numeric | `int→int`, `dec→int`, `num→int` | Banker's rounding to nearest integer |
 | `round(value, places)` | numeric | `(num, int-literal)→dec` | Precision rounding |
 | `truncate(value)` | numeric | `dec→int`, `num→int` | Truncate toward zero |
 | `min(a, b, ...)` | numeric | `int*→int`, `dec*→dec`, `num*→num` | Smallest of 2+ values (variadic) |

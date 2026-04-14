@@ -226,6 +226,48 @@ public class PreceptDecimalTypeTests
         result.Diagnostics.Should().NotContain(d => d.Constraint.Id == "C61");
     }
 
+    [Fact]
+    public void TypeCheck_NumberToDecimalAssignment_EmitsC39WithRoundGuidance()
+    {
+        // number → decimal is not implicit — author must use round(expr, N) or change field type.
+        const string dsl = """
+            precept M
+            field Price as decimal default 0.0
+            field Rate as number default 0
+            state A initial
+            state B
+            event Apply
+            from A on Apply -> set Price = Rate -> transition B
+            """;
+
+        var result = PreceptCompiler.Validate(PreceptParser.Parse(dsl));
+
+        var c39 = result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C39").Which;
+        c39.Message.Should().Contain("round(");
+        c39.Message.Should().Contain("decimal");
+    }
+
+    [Fact]
+    public void TypeCheck_DecimalToNumberAssignment_EmitsC39WithUnsupportedGuidance()
+    {
+        // decimal → number is intentionally unsupported — diagnostic should say so and suggest alternatives.
+        const string dsl = """
+            precept M
+            field Total as number default 0
+            field Tax as decimal default 0.0
+            state A initial
+            state B
+            event Apply
+            from A on Apply -> set Total = Tax -> transition B
+            """;
+
+        var result = PreceptCompiler.Validate(PreceptParser.Parse(dsl));
+
+        var c39 = result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C39").Which;
+        c39.Message.Should().Contain("intentionally unsupported");
+        c39.Message.Should().Contain("floor()");
+    }
+
     // ════════════════════════════════════════════════════════════════════
     // RUNTIME — decimal arithmetic and round()
     // ════════════════════════════════════════════════════════════════════
