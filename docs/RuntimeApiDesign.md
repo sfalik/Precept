@@ -224,7 +224,7 @@ Call this on arguments obtained from JSON deserialization (e.g. CLI input or HTT
 ```csharp
 public sealed record PreceptInstance(
     string WorkflowName,
-    string CurrentState,
+    string? CurrentState,
     string? LastEvent,
     DateTimeOffset UpdatedAt,
     IReadOnlyDictionary<string, object?> InstanceData)
