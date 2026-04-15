@@ -82,7 +82,7 @@ The `vocabulary` object contains the following keyword lists, each reflecting `P
 | Property | `TokenCategory` | Keywords |
 |---|---|---|
 | `ControlKeywords` | `Control` | `when` |
-| `DeclarationKeywords` | `Declaration` | `precept`, `field`, `invariant`, `state`, `event`, `assert`, `edit`, `in`, `to`, `from`, `on` |
+| `DeclarationKeywords` | `Declaration` | `precept`, `field`, `rule`, `state`, `event`, `ensure`, `edit`, `in`, `to`, `from`, `on` |
 | `GrammarKeywords` | `Grammar` | `as`, `with`, `nullable`, `default`, `because`, `any`, `all`, `of`, `into`, `initial` |
 | `ActionKeywords` | `Action` | `set`, `add`, `remove`, `enqueue`, `dequeue`, `push`, `pop`, `clear` |
 | `OutcomeKeywords` | `Outcome` | `transition`, `no`, `reject` |
@@ -234,9 +234,9 @@ The `functions` section in the JSON output provides structured `FunctionDto` obj
 
 | Array | Item shape |
 |-------|------------|
-| `invariants` | `{ expression, when?, reason, line, isSynthetic }` |
-| `stateAsserts` | `{ anchor, state, expression, when?, reason, line }` |
-| `eventAsserts` | `{ event, expression, when?, reason, line }` |
+| `rules` | `{ expression, when?, reason, line, isSynthetic }` |
+| `stateEnsures` | `{ anchor, state, expression, when?, reason, line }` |
+| `eventEnsures` | `{ event, expression, when?, reason, line }` |
 | `editBlocks` | `{ state?, when?, fields[], line }` |
 
 The `when` property is present only when the declaration includes a `when <Guard>` clause. It contains the guard expression text.
@@ -312,7 +312,7 @@ The `eventArgs` field is optional. When provided, the specified args are used fo
         {
           "message": "Cannot leave InProgress without completion note",
           "source": {
-            "kind": "state-assertion",
+            "kind": "state-ensure",
             "stateName": "InProgress",
             "anchor": "from",
             "expressionText": "CompletionNote != null",
@@ -407,7 +407,7 @@ The `currentState` and `data` inputs match the same shape as `precept_inspect`. 
     {
       "message": "Cannot leave InProgress without completion note",
       "source": {
-        "kind": "state-assertion",
+        "kind": "state-ensure",
         "stateName": "InProgress",
         "anchor": "from",
         "expressionText": "CompletionNote != null",
@@ -484,7 +484,7 @@ The `fields` object contains the field names and new values to apply. At least o
   "violations": [
     {
       "message": "Priority must be between 1 and 5",
-      "source": { "kind": "invariant", "expressionText": "Priority >= 1 and Priority <= 5", "reason": "Priority must be between 1 and 5", "sourceLine": 8 },
+      "source": { "kind": "rule", "expressionText": "Priority >= 1 and Priority <= 5", "reason": "Priority must be between 1 and 5", "sourceLine": 8 },
       "targets": [{ "kind": "field", "fieldName": "Priority" }]
     }
   ],
@@ -516,7 +516,7 @@ Fields: `line` (1-based), `column` (0-based, optional), `message`, `code` (optio
 {
   "message": "Approved total cannot exceed requested total",
   "source": {
-    "kind": "invariant",
+    "kind": "rule",
     "stateName": null,
     "anchor": null,
     "expressionText": "ApprovedTotal <= RequestedTotal",
@@ -538,8 +538,8 @@ Fields: `line` (1-based), `column` (0-based, optional), `message`, `code` (optio
 
 `ViolationDto` is a full projection of core `ConstraintViolation`:
 
-- **`source`** — projects `ConstraintSource` (4 subtypes: `invariant`, `state-assertion`, `event-assertion`, `transition-rejection`). Each subtype carries its relevant fields (expression text, reason, state name, anchor, event name, source line).
-- **`targets`** — projects `ConstraintTarget[]` (5 subtypes: `field`, `event-arg`, `event`, `state`, `definition`). Each subtype carries its relevant identifiers. For field-based rule violations, `targets` represents the full semantic dependency set, not just the field names written literally in the rule text: if a violated invariant or state assertion reads a computed field, the violation includes that computed field and every transitive field input beneath it, while still carrying the normal scope target.
+- **`source`** — projects `ConstraintSource` (4 subtypes: `rule`, `state-ensure`, `event-ensure`, `transition-rejection`). Each subtype carries its relevant fields (expression text, reason, state name, anchor, event name, source line).
+- **`targets`** — projects `ConstraintTarget[]` (5 subtypes: `field`, `event-arg`, `event`, `state`, `definition`). Each subtype carries its relevant identifiers. For field-based rule violations, `targets` represents the full semantic dependency set, not just the field names written literally in the rule text: if a violated rule or state ensure reads a computed field, the violation includes that computed field and every transitive field input beneath it, while still carrying the normal scope target.
 
 This means `precept_inspect`, `precept_fire`, and `precept_update` report the entity data the violated rule actually depends on, explicitly and implicitly, so AI and UI consumers can attribute the failure to the real editable surface without reconstructing the computed-field graph themselves.
 

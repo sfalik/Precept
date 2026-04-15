@@ -21,7 +21,7 @@ Background: `#0c0c0f`
 
 | # | Family | Hex | Typography | Tokens |
 |---|--------|-----|------------|--------|
-| 1 | Structure · Semantic | `#4338CA` | **bold** | `precept`, `field`, `state`, `event`, `invariant`, `from`, `on`, `in`, `to`, `set`, `transition`, `edit`, `assert`, `reject`, `when`, `no` |
+| 1 | Structure · Semantic | `#4338CA` | **bold** | `precept`, `field`, `state`, `event`, `rule`, `from`, `on`, `in`, `to`, `set`, `transition`, `edit`, `ensure`, `reject`, `when`, `no` |
 | 2 | Structure · Grammar | `#6366F1` | normal | `as`, `with`, `default`, `nullable`, `any`, `all`, `of`, `into`, `because`, `initial`, constraint keywords, `=`, `->`, operators, punctuation |
 | 3 | States | `#A898F5` | normal / *italic if constrained* | State names |
 | 4 | Events | `#30B8E8` | normal / *italic if constrained* | Event names |
@@ -83,7 +83,7 @@ Current classification:
 | `TokenCategory` | Semantic type | Tokens |
 |------------------|---------------|--------|
 | Control | `preceptKeywordSemantic` | `when` |
-| Declaration | `preceptKeywordSemantic` | `precept`, `field`, `invariant`, `state`, `event`, `assert`, `edit`, `in`, `to`, `from`, `on` |
+| Declaration | `preceptKeywordSemantic` | `precept`, `field`, `rule`, `state`, `event`, `ensure`, `edit`, `in`, `to`, `from`, `on` |
 | Action | `preceptKeywordSemantic` | `set`, `add`, `remove`, `enqueue`, `dequeue`, `push`, `pop`, `clear` |
 | Outcome | `preceptKeywordSemantic` | `transition`, `reject`, `no` |
 | Grammar | `preceptKeywordGrammar` | `as`, `with`, `nullable`, `default`, `because`, `initial`, `any`, `all`, `of`, `into` |
@@ -210,7 +210,7 @@ Then the `package.json` rules would use `keyword:declaration` for semantic and `
 | `with` | Declaration | **Grammar** | Argument list introducer |
 | `nullable` | Declaration | **Grammar** | Type modifier |
 | `default` | Declaration | **Grammar** | Value modifier — lighter weight than behavioral drivers |
-| `because` | Declaration | **Grammar** | Links reject/assert to message string |
+| `because` | Declaration | **Grammar** | Links reject/ensure to message string |
 | `any` | Control | **Grammar** | Wildcard modifier, not flow control |
 | `all` | Quantifier-only keyword | **Grammar** | Field-target quantifier in `edit` declarations |
 | `of` | Control | **Grammar** | Type connector ("set of string") |
@@ -269,9 +269,9 @@ This is new capability. The handler must determine which states, events, and fie
 
 **Required analysis (performed once per document):**
 
-1. **Constrained states:** Collect all state names that appear in `in <State> assert`, `to <State> assert`, or `from <State> assert` blocks.
-2. **Constrained events:** Collect all event names that have `on <Event> assert` blocks.
-3. **Guarded fields:** Collect all field names referenced in `invariant` expressions.
+1. **Constrained states:** Collect all state names that appear in `in <State> ensure`, `to <State> ensure`, or `from <State> ensure` blocks.
+2. **Constrained events:** Collect all event names that have `on <Event> ensure` blocks.
+3. **Guarded fields:** Collect all field names referenced in `rule` expressions.
 
 **Implementation approach:** Before the per-token loop, extract constraint sets from the analyzer's `PreceptDefinition` for the document, building three `HashSet<string>` collections: `constrainedStates`, `constrainedEvents`, `guardedFields`. Then during token emission, when an identifier is classified as `preceptState`/`preceptEvent`/`preceptFieldName`, check membership and add the modifier. If the parse is incomplete or failed, skip italic entirely (fail open).
 
@@ -297,7 +297,7 @@ Add the custom semantic token type contributions, semantic-token-to-scope mappin
     { "id": "preceptMessage",         "description": "Precept rule message string" }
   ],
   "semanticTokenModifiers": [
-    { "id": "preceptConstrained", "description": "Token is under constraint/invariant pressure" }
+    { "id": "preceptConstrained", "description": "Token is under constraint/rule pressure" }
   ],
   "semanticTokenScopes": [
     {

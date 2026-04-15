@@ -2,7 +2,7 @@
 
 Date: 2026-03-04
 
-Status: **Runtime implemented.** Parser/model support was included in the language redesign; the runtime `Update` API, `IUpdatePatchBuilder`, editability enforcement, invariant/assert rule evaluation, and `Inspect` integration are now implemented.
+Status: **Runtime implemented.** Parser/model support was included in the language redesign; the runtime `Update` API, `IUpdatePatchBuilder`, editability enforcement, rule/ensure evaluation, and `Inspect` integration are now implemented.
 
 > **Inspector UX note (2026-03-06):** The preview inspector applies direct field edits in explicit **Edit** mode. While typing, draft values are validated through `Inspect(...)`-based preview checks and violations are surfaced inline; runtime data is not committed until the user clicks **Save**. **Cancel** discards draft edits.
 >
@@ -12,7 +12,7 @@ Status: **Runtime implemented.** Parser/model support was included in the langua
 >
 > Attribution is owned by the preview service layer, not the webview. The webview renders the authoritative `EditableFields[i].Violation`, `FieldErrors`, and `FormErrors` returned by `inspectUpdate`; it does not infer ownership client-side from the raw runtime payload.
 
-> **Language redesign note (2026-03-05, reconciled 2026-04-13):** Editable fields now use flat keyword-anchored declarations: stateful `in <State> [when <Guard>] edit <Field>, <Field>` and stateless root-level `edit <Field>, <Field> [when <Guard>]` / `edit all [when <Guard>]`. The `in` preposition remains the stateful form because editability is about what you can do **while residing in** a state, matching `in <State> assert` semantics. Parser, type-checker, runtime `Update`, and `Inspect` support for guarded root-level edit are all implemented.
+> **Language redesign note (2026-03-05, reconciled 2026-04-13):** Editable fields now use flat keyword-anchored declarations: stateful `in <State> [when <Guard>] edit <Field>, <Field>` and stateless root-level `edit <Field>, <Field> [when <Guard>]` / `edit all [when <Guard>]`. The `in` preposition remains the stateful form because editability is about what you can do **while residing in** a state, matching `in <State> ensure` semantics. Parser, type-checker, runtime `Update`, and `Inspect` support for guarded root-level edit are all implemented.
 
 Depends on: **Rules** (docs/RulesDesign.md) — ✅ rules are now implemented. The prerequisite dependency is satisfied. Rules enforce data invariants on every mutation regardless of path, making direct field editing safe.
 
@@ -46,7 +46,7 @@ The DSL's event pipeline maps cleanly to the actor model: private state, message
 
 ### Rules as the safety net
 
-Editable fields are viable *because* rules exist. Without rules, direct field editing would bypass all data integrity constraints. With rules, the DSL author declares invariants once (`rule Balance >= 0 "..."`) and those invariants are enforced regardless of whether the field changes via an event `set` assignment or a direct `Update` call.
+Editable fields are viable *because* rules exist. Without rules, direct field editing would bypass all data integrity constraints. With rules, the DSL author declares rules once (`rule Balance >= 0 "..."`) and those rules are enforced regardless of whether the field changes via an event `set` assignment or a direct `Update` call.
 
 ## Syntax
 
@@ -100,7 +100,7 @@ in Resolved edit ResolutionSummary
 
 ### Multi-state support
 
-Multi-state `in` is already supported for state asserts (`in Open, InProgress assert ...`). Edit declarations reuse the same syntax — the parser handles comma-separated state lists identically.
+Multi-state `in` is already supported for state ensures (`in Open, InProgress ensure ...`). Edit declarations reuse the same syntax — the parser handles comma-separated state lists identically.
 
 ### `in any edit`
 
@@ -153,14 +153,14 @@ in Open edit Description
 # In state Closed: only Notes is editable
 ```
 
-This is consistent with how `in any assert` coexists with state-specific `in State assert` declarations — they are independent declarations, not overrides.
+This is consistent with how `in any ensure` coexists with state-specific `in State ensure` declarations — they are independent declarations, not overrides.
 
 ### Independence from events
 
 Edit declarations and event transitions are independent features. A field can be both editable (via `in ... edit`) and modified by event `set` assignments. There is no conflict — they are different mutation paths with different semantics:
 
 - **Event path**: lifecycle action with guards, branching, state transitions, audit trail
-- **Edit path**: direct data modification with editability scope and invariant/assert enforcement
+- **Edit path**: direct data modification with editability scope and rule/ensure enforcement
 
 ### No special terminal state treatment
 

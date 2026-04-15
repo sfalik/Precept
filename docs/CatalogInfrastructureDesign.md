@@ -65,7 +65,7 @@ Classifies each token into a semantic group.
 public enum TokenCategory
 {
     Control,       // precept, state, initial, from, on, when, any, in, to, of, with
-    Declaration,   // field, as, nullable, default, invariant, because, event, assert
+    Declaration,   // field, as, nullable, default, rule, because, event, ensure
     Action,        // set, add, remove, enqueue, dequeue, push, pop, clear, into
     Outcome,       // transition, no, reject
     Type,          // string, number, boolean

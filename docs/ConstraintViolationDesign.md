@@ -35,10 +35,10 @@ Make the runtime the source of truth for "which constraint was violated and what
 
 A precept is a collection of rules among other things. Invariants, asserts, and rejects are all constraints — each expresses a condition the engine enforces. When a constraint is violated, the engine reports a `ConstraintViolation`.
 
-### A. Event asserts
+### A. Event ensures
 
 ```precept
-on MakePayment assert Amount > 0 because "Amount must be positive"
+on MakePayment ensure Amount > 0 because "Amount must be positive"
 ```
 
 - **Scope:** Event args only (enforced at parse time).
@@ -46,10 +46,10 @@ on MakePayment assert Amount > 0 because "Amount must be positive"
 - **Author-supplied reason:** Yes (`because`).
 - **Targets:** Expression-referenced arg(s) + `Event(name)`.
 
-### B. Invariants
+### B. Rules
 
 ```precept
-invariant Balance >= 0 because "Balance cannot go negative"
+rule Balance >= 0 because "Balance cannot go negative"
 ```
 
 - **Scope:** Fields only.
@@ -57,12 +57,12 @@ invariant Balance >= 0 because "Balance cannot go negative"
 - **Author-supplied reason:** Yes (`because`).
 - **Targets:** Directly referenced field(s), any transitive field dependencies beneath referenced computed fields, + `Definition()`.
 
-### C. State asserts
+### C. State ensures
 
 ```precept
-in Assigned assert AssignedAgent != null because "Must have an assigned agent"
-from Draft assert Email != null because "Must provide email before submitting"
-to Submitted assert Items.count > 0 because "Must have items to submit"
+in Assigned ensure AssignedAgent != null because "Must have an assigned agent"
+from Draft ensure Email != null because "Must provide email before submitting"
+to Submitted ensure Items.count > 0 because "Must have items to submit"
 ```
 
 - **Scope:** Fields only.
@@ -101,9 +101,9 @@ Every scoped constraint includes its scope alongside its semantic subjects:
 
 | Source | Targets |
 |---|---|
-| Event assertion | Expression-referenced arg(s) + `Event(name)` |
-| Invariant | Directly referenced field(s) + transitive dependencies beneath referenced computed fields + `Definition()` |
-| State assertion | Directly referenced field(s) + transitive dependencies beneath referenced computed fields + `State(name, anchor)` |
+| Event ensure | Expression-referenced arg(s) + `Event(name)` |
+| Rule | Directly referenced field(s) + transitive dependencies beneath referenced computed fields + `Definition()` |
+| State ensure | Directly referenced field(s) + transitive dependencies beneath referenced computed fields + `State(name, anchor)` |
 | Transition rejection | `Event(name)` |
 
 ## Runtime Model
@@ -131,14 +131,14 @@ public abstract record ConstraintTarget(ConstraintTargetKind Kind)
     public sealed record EventTarget(string EventName)
         : ConstraintTarget(ConstraintTargetKind.Event);
 
-    public sealed record StateTarget(string StateName, AssertAnchor? Anchor = null)
+    public sealed record StateTarget(string StateName, EnsureAnchor? Anchor = null)
         : ConstraintTarget(ConstraintTargetKind.State);
 
     public sealed record DefinitionTarget()
         : ConstraintTarget(ConstraintTargetKind.Definition);
 }
 
-public enum AssertAnchor { In, To, From }
+public enum EnsureAnchor { In, To, From }
 ```
 
 ### `ConstraintSource` — where it came from
@@ -146,24 +146,24 @@ public enum AssertAnchor { In, To, From }
 ```csharp
 public enum ConstraintSourceKind
 {
-    Invariant,
-    StateAssertion,
-    EventAssertion,
+    Rule,
+    StateEnsure,
+    EventEnsure,
     TransitionRejection
 }
 
 public abstract record ConstraintSource(ConstraintSourceKind Kind, int? SourceLine = null)
 {
-    public sealed record InvariantSource(string ExpressionText, string Reason, int? SourceLine = null)
-        : ConstraintSource(ConstraintSourceKind.Invariant, SourceLine);
+    public sealed record RuleSource(string ExpressionText, string Reason, int? SourceLine = null)
+        : ConstraintSource(ConstraintSourceKind.Rule, SourceLine);
 
-    public sealed record StateAssertionSource(string ExpressionText, string Reason,
-        string StateName, AssertAnchor Anchor, int? SourceLine = null)
-        : ConstraintSource(ConstraintSourceKind.StateAssertion, SourceLine);
+    public sealed record StateEnsureSource(string ExpressionText, string Reason,
+        string StateName, EnsureAnchor Anchor, int? SourceLine = null)
+        : ConstraintSource(ConstraintSourceKind.StateEnsure, SourceLine);
 
-    public sealed record EventAssertionSource(string ExpressionText, string Reason,
+    public sealed record EventEnsureSource(string ExpressionText, string Reason,
         string EventName, int? SourceLine = null)
-        : ConstraintSource(ConstraintSourceKind.EventAssertion, SourceLine);
+        : ConstraintSource(ConstraintSourceKind.EventEnsure, SourceLine);
 
     public sealed record TransitionRejectionSource(string Reason, string EventName, int? SourceLine = null)
         : ConstraintSource(ConstraintSourceKind.TransitionRejection, SourceLine);
@@ -293,9 +293,9 @@ public sealed record UpdateResult(
 **Prefix rule (middle-ground):** Keep `Precept` on types whose bare name is too generic for C# (`PreceptField`, `PreceptState`, `PreceptEvent`, `PreceptInstance`, `PreceptDefinition`, `PreceptRuntime`, `PreceptEngine`, `PreceptCompiler`, `PreceptInvariant`, `PreceptTransitionRow`, `PreceptEditableFieldInfo`). Drop it on domain-specific types (`FireResult`, `EventInspectionResult`, `ConstraintViolation`, `TransitionOutcome`, `AssertAnchor`, etc.).
 
 **Model type renames:**
-- `PreceptStateAssert` → `StateAssertion`
-- `PreceptEventAssert` → `EventAssertion`
-- `PreceptAssertPreposition` → `AssertAnchor` (members: `In`, `To`, `From`)
+- `PreceptStateAssert` → `StateEnsure`
+- `PreceptEventAssert` → `EventEnsure`
+- `PreceptAssertPreposition` → `EnsureAnchor` (members: `In`, `To`, `From`)
 - `PreceptRejection` → `Rejection`
 - `PreceptStateTransition` → `StateTransition`
 - `PreceptNoTransition` → `NoTransition`

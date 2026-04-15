@@ -135,7 +135,7 @@ Use this as the primary API for rendering a state-machine inspector view.
 public InspectionResult Inspect(PreceptInstance instance, Action<IUpdatePatchBuilder> patch)
 ```
 
-Applies a hypothetical patch to a working copy of instance data, runs the full rule evaluation pipeline (editability check, type check, invariant/assert evaluation), and returns an `InspectionResult` with violations reflected in `EditableFields`. **No commit occurs** — the instance is unchanged. Used for per-keystroke rule checking in the preview UI.
+Applies a hypothetical patch to a working copy of instance data, runs the full rule evaluation pipeline (editability check, type check, rule/ensure evaluation), and returns an `InspectionResult` with violations reflected in `EditableFields`. **No commit occurs** — the instance is unchanged. Used for per-keystroke rule checking in the preview UI.
 
 ### `Update`
 
@@ -143,7 +143,7 @@ Applies a hypothetical patch to a working copy of instance data, runs the full r
 public UpdateResult Update(PreceptInstance instance, Action<IUpdatePatchBuilder> patch)
 ```
 
-Atomically updates editable fields. For **stateful** precepts, only fields granted by the effective edit set for the current state are mutable: unconditional `in <State> edit` declarations plus any guarded edit blocks whose guards pass. For **stateless** precepts, only fields granted by the effective root-level edit set are mutable: unconditional root-level `edit` declarations plus guarded root-level `edit ... when ...` / `edit all when ...` blocks whose guards pass (`CurrentState` is `null` throughout). Evaluation sequence: editability check → type check → atomic mutation on working copy → invariant/state-assert evaluation → commit or rollback. Returns `UpdateResult`.
+Atomically updates editable fields. For **stateful** precepts, only fields granted by the effective edit set for the current state are mutable: unconditional `in <State> edit` declarations plus any guarded edit blocks whose guards pass. For **stateless** precepts, only fields granted by the effective root-level edit set are mutable: unconditional root-level `edit` declarations plus guarded root-level `edit ... when ...` / `edit all when ...` blocks whose guards pass (`CurrentState` is `null` throughout). Evaluation sequence: editability check → type check → atomic mutation on working copy → rule/state-ensure evaluation → commit or rollback. Returns `UpdateResult`.
 
 ### `Fire`
 
@@ -172,8 +172,8 @@ Mutating event execution. Returns `FireResult`.
 10. **State rules** — checked against the *target* state (only for `transition` outcomes, not `no transition`); returns `Rejected` if violated.
 
 **`when` guard evaluation on declarations:**
-- **Event asserts (stage 3):** If an event assert has a `when` guard, the guard is evaluated against event args before the assert body. If the guard is false, that assert is skipped. Guards on event asserts are arg-scoped only.
-- **Invariants and state asserts (stage 9–10):** If an invariant or state assert has a `when` guard, the guard is evaluated against post-mutation field data before the assertion body. If the guard is false, that rule is skipped. Collect-all semantics are preserved — guard-skipped declarations don't short-circuit other declarations.
+- **Event ensures (stage 3):** If an event ensure has a `when` guard, the guard is evaluated against event args before the ensure body. If the guard is false, that ensure is skipped. Guards on event ensures are arg-scoped only.
+- **Rules and state ensures (stage 9–10):** If a rule or state ensure has a `when` guard, the guard is evaluated against post-mutation field data before the ensure body. If the guard is false, that rule is skipped. Collect-all semantics are preserved — guard-skipped declarations don’t short-circuit other declarations.
 - **Edit blocks (`Update`/`Inspect`):** If an edit declaration has a `when` guard, the guard is evaluated against current instance data at each `Update`/`Inspect` call. Fail-closed: guard evaluation error → field not granted editability.
 
 On any rejection, the original instance is unchanged — all stages are fully rolled back.
@@ -270,7 +270,7 @@ public enum TransitionOutcome
 
     // Failure
     Rejected,            // Explicit reject outcome in transition row
-    ConstraintFailure,   // Invariant or state assert violated post-mutation
+    ConstraintFailure,   // Rule or state ensure violated post-mutation
     Unmatched,           // All when-guards failed, no row matched
     Undefined            // Event or state is unknown to the engine
 }
@@ -442,9 +442,9 @@ The following types are returned by `PreceptParser.Parse` and consumed by `Prece
 | `PreceptEventArg` | One typed argument: name, `PreceptScalarType`, nullability, optional default |
 | `PreceptField` | One scalar data field: name, `PreceptScalarType`, nullability, optional default, optional derived expression (`IsComputed`, `DerivedExpression`, `DerivedExpressionText`) |
 | `PreceptCollectionField` | One collection field: name, `PreceptCollectionKind`, `PreceptScalarType` inner type |
-| `PreceptInvariant` | A global data rule: `invariant <expr> because "reason"` — always holds |
-| `StateAssertion` | A state-scoped assert: `in/to/from <State> assert <expr> because "reason"` |
-| `EventAssertion` | An event-scoped arg validator: `on <Event> assert <expr> because "reason"` |
+| `PreceptRule` | A global data rule: `rule <expr> because "reason"` — always holds |
+| `StateEnsure` | A state-scoped ensure: `in/to/from <State> ensure <expr> because "reason"` |
+| `EventEnsure` | An event-scoped arg validator: `on <Event> ensure <expr> because "reason"` |
 | `PreceptTransitionRow` | One flat transition row: `from <State> on <Event> [when <expr>] → <outcome>` |
 | `StateTransition` | Row outcome: `transition <State>` |
 | `Rejection` | Row outcome: `reject "<message>"` |

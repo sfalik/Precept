@@ -67,7 +67,7 @@ The key insight is that the webview calls `acquireVsCodeApi()` on load and then 
 | Data list | `#data-list` | Shows current field values |
 | Diagram SVG | `#diagram` | State diagram with nodes and edges |
 | Event bar | `#event-bar` | Container for all event buttons and arg fields |
-| Rule violations banner | `#rule-violations-banner` | Shown when invariant rules are violated |
+| Rule violations banner | `#rule-violations-banner` | Shown when rules are violated |
 | Diagram toast | `#diagram-toast` | Transition feedback messages |
 
 ---
