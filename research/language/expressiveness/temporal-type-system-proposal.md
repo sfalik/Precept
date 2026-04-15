@@ -1,15 +1,15 @@
 # Proposal: Unified Temporal Type System — NodaTime-Aligned
 
 **Author:** Frank (Lead/Architect, Language Designer)
-**Date:** 2026-04-15 (v3 — locked literal surface rewrite)
+**Date:** 2026-04-15 (v4 — `local*` naming, dot-accessor mediation, strict hierarchy)
 **Status:** Proposal — ready for owner review
-**Supersedes:** Issue #26 (`date` type as standalone proposal), v1 (collapsed `Period`), v2 (constructor-based literals)
+**Supersedes:** Issue #26 (`localdate` type as standalone proposal), v1 (collapsed `Period`), v2 (constructor-based literals), v3 (function-call timezone mediation)
 
 ---
 
 ## Summary
 
-Add eight temporal types to the Precept DSL — `date`, `time`, `instant`, `duration`, `period`, `timezone`, `zoneddatetime`, and `datetime` — backed by NodaTime as a runtime dependency. Include three timezone conversion functions (`toLocalDate`, `toLocalTime`, `toInstant`), a unified postfix unit system for constructing temporal quantities, and single-quoted typed constants for formatted values. Together, these types, literal forms, and functions give domain authors the vocabulary to express calendar constraints, SLA enforcement, multi-timezone compliance rules, and elapsed-time tracking — all within the governing contract, with no temporal logic delegated to the hosting layer. Critically, the literal mechanisms established here — the typed constant delimiter (`'...'`) and the postfix quantity system (`N unit`) — are not temporal-specific. They are the language's expansion joints for all future non-primitive types. Temporal types are the gateway.
+Add eight temporal types to the Precept DSL — `localdate`, `localtime`, `instant`, `duration`, `period`, `timezone`, `zoneddatetime`, and `localdatetime` — backed by NodaTime as a runtime dependency. Include a single timezone mediation operation (`.inZone(tz)`) accessed via dot syntax, a unified postfix unit system for constructing temporal quantities, and single-quoted typed constants for formatted values. Together, these types, literal forms, and the dot-accessor mediation chain give domain authors the vocabulary to express calendar constraints, SLA enforcement, multi-timezone compliance rules, and elapsed-time tracking — all within the governing contract, with no temporal logic delegated to the hosting layer. Critically, the literal mechanisms established here — the typed constant delimiter (`'...'`) and the postfix quantity system (`N unit`) — are not temporal-specific. They are the language's expansion joints for all future non-primitive types. Temporal types are the gateway.
 
 **Temporal quantity construction** uses two postfix atom forms and one combination operator:
 - **Bare postfix:** `30 days`, `72 hours`, `12 months` — integer literal + unit keyword
@@ -17,19 +17,48 @@ Add eight temporal types to the Precept DSL — `date`, `time`, `instant`, `dura
 - **Combination via `+`:** `2 years + 6 months + 15 days` — standard addition operator
 
 **Typed constants** use the single-quoted `'...'` delimiter — the typed constant delimiter — with type inferred from content shape. Temporal types are the first inhabitants of this mechanism; the delimiter is not temporal-specific:
-- `'2026-06-01'` (date), `'14:30:00'` (time), `'2026-04-13T14:30:00Z'` (instant), `'2026-04-13T09:00:00'` (datetime), `'2026-04-13T14:30:00[America/New_York]'` (zoneddatetime), `'America/New_York'` (timezone)
+- `'2026-06-01'` (localdate), `'14:30:00'` (localtime), `'2026-04-13T14:30:00Z'` (instant), `'2026-04-13T09:00:00'` (localdatetime), `'2026-04-13T14:30:00[America/New_York]'` (zoneddatetime), `'America/New_York'` (timezone)
 
-**What changed in v3:** Four locked decisions from the 2026-04-15 session rewrote the literal surface:
+**Timezone mediation** uses a single dot-accessor operation — `.inZone(tz)` — that produces a `zoneddatetime`, with navigation to local types via dot chains:
+- `myInstant.inZone(tz)` → `zoneddatetime`
+- `myInstant.inZone(tz).localdate` → `localdate`
+- `myInstant.inZone(tz).localtime` → `localtime`
+- `myInstant.inZone(tz).localdatetime` → `localdatetime`
+- `myLDT.inZone(tz).instant` → reverse navigation back to `instant`
+
+**Type hierarchy (strict — no skip-level accessors):**
+```
+instant                              ← universal timeline point
+  ↓ .inZone(tz)       ↑ .instant
+zoneddatetime                        ← date + time + timezone
+  ↓ .localdatetime     ↑ .inZone(tz)
+localdatetime                        ← date + time (no timezone)
+  ↓ .localdate  ↓ .localtime        ↑ localdate + localtime
+localdate       localtime            ← date / time (no timezone)
+```
+
+Plus orthogonal value types:
+```
+duration    ← timeline arithmetic (hours, minutes, seconds)
+period      ← calendar arithmetic (years, months, days)
+timezone    ← IANA timezone identifier
+```
+
+**What changed in v4:** Six locked decisions from the 2026-04-15 session revised the type surface and timezone mediation:
+1. **`local*` naming** (D10) — `date` → `localdate`, `time` → `localtime`, `datetime` → `localdatetime`. Returns to v1 naming convention, explicitly communicating "no timezone" in the type name — the same naming strategy NodaTime uses (`LocalDate`, `LocalTime`, `LocalDateTime`).
+2. **Dot-vs-function rule** (D8) — "If the value owns it, dot. If the operation is freestanding, function." `inZone` is a dot accessor because the instant owns the mediation to a timezone. Component accessors (`.year`, `.localdate`, etc.) are dot because the value owns its components.
+3. **`inZone` as dot accessor** (D11) — One mediation operation, accessed via dot: `myInstant.inZone(tz)`. Replaces three standalone functions (`toLocalDate`, `toLocalTime`, `toInstant`). Navigation via dot chains: `.localdate`, `.localtime`, `.localdatetime`.
+4. **Strict hierarchy** (D12) — No skip-level accessors. `instant.localdate` is a compile error — must go `instant.inZone(tz).localdate`. Forces explicit timezone mediation at every boundary crossing.
+5. **`pin` eliminated** (D13) — Reverse navigation from `localdatetime` → `instant` uses `ldt.inZone(tz).instant`. One mediation operation in both directions. `pin` was redundant with dot-chain composition.
+6. **Instant restricted semantics** (D18) — `instant` supports comparison, duration arithmetic, and `.inZone(tz)` navigation — NO component accessors, no period arithmetic. An instant is a UTC timeline point with no calendar context.
+
+**What changed in v3:** Four locked decisions from the earlier 2026-04-15 session rewrote the literal surface:
 1. **Unified postfix model** — All 7 function-call constructors (`days()`, `months()`, `hours()`, etc.) eliminated. Postfix is the sole quantity construction syntax.
 2. **`+` as sole combiner** — Composite juxtaposition (`2 years 6 months`) eliminated. Only `2 years + 6 months`.
 3. **No duration/period constructor literals** — `duration(PT72H)` and `period(P1Y6M)` eliminated. Postfix units are the only surface.
-4. **Single-quoted typed constants** — `date(2026-01-15)` constructor form replaced by `'2026-01-15'`. All 6 formatted temporal types use the `'...'` typed constant delimiter with type inferred from content shape. Temporal types are the first inhabitants of this mechanism — not its definition.
+4. **Single-quoted typed constants** — `date(2026-01-15)` constructor form replaced by `'2026-01-15'`. All 6 formatted temporal types use the `'...'` typed constant delimiter with type inferred from content shape.
 
 **What changed in v2:** Shane's owner directive: *"No obscurity, expose NodaTime. Don't reinvent the wheel. Force authors to think about the details."* The v1 proposal collapsed `Period` and `Duration` into a single surface type (`duration`) with custom dispatch rules. This was wrong. NodaTime deliberately keeps `Period` and `Duration` as separate types because they represent fundamentally different quantities — calendar distance vs. timeline distance. The v2 proposal exposes this distinction faithfully: `period` and `duration` are separate surface types, calendar units resolve to `period`, timeline units resolve to `duration`, and the type checker inherits NodaTime's enforcement for free. No custom operator dispatch. No re-inventing the wheel.
-
----
-
-## Design Philosophy
 
 NodaTime exists because `System.DateTime` lets you be implicit about what your temporal data means. Precept exists because scattered service-layer code lets you be implicit about what your business rules mean. Both libraries are responses to the same failure mode: **implicit behavior creates bugs; explicit behavior creates predictability.**
 
@@ -37,20 +66,20 @@ This shared philosophy is the lens through which every type decision in this pro
 
 | Precept applies it to... | NodaTime applies it to... | The shared principle |
 |---|---|---|
-| `date` over `string` | `LocalDate` over `DateTime` | Be explicit that this is a calendar date |
+| `localdate` over `string` | `LocalDate` over `DateTime` | Be explicit that this is a calendar date |
 | `instant` over `number` | `Instant` over `DateTime` | Be explicit that this is a point on the timeline |
 | `timezone` over `string` | `DateTimeZone` over `string` | Be explicit about the allowed values |
 | `duration` over `integer` | `Duration` over `TimeSpan` | Be explicit about what fixed-length units mean |
 | `period` over `integer` | `Period` over `int monthCount` | Be explicit that calendar units have variable length |
-| `time` over `integer` | `LocalTime` over `int minutesSinceMidnight` | Be explicit that this is a time of day |
-| `datetime` over `string` | `LocalDateTime` over `DateTime` | Be explicit about combined date+time without timezone |
+| `localtime` over `integer` | `LocalTime` over `int minutesSinceMidnight` | Be explicit that this is a time of day |
+| `localdatetime` over `string` | `LocalDateTime` over `DateTime` | Be explicit about combined date+time without timezone |
 
 Precept's design principles ground this directly:
 
-- **Principle #1 (Deterministic, inspectable model):** NodaTime's type separation makes it structurally clear which operations are deterministic and which require external context. All types proposed here are deterministic by construction — `instant` comparison is nanosecond math, `date` arithmetic uses the fixed ISO calendar, and timezone conversion functions make the TZ database input explicit in the expression.
-- **Principle #2 (English-ish but not English):** The DSL names — `date`, `time`, `instant`, `duration`, `period`, `timezone` — are English words that communicate exactly what the data is. `field FiledAt as instant` needs no comment. Postfix units extend this: `DueDate + 30 days` reads as domain prose.
-- **Principle #8 (Sound, compile-time-first static analysis):** NodaTime's type separation enables the compiler to catch temporal misuse statically. `date + instant` is a type error. `instant + period` is a type error. `instant.year` is a compile error. Crucially, the `period`/`duration` split means the compiler rejects `instant + 1 month` because `months` always resolves to `period` and instants only accept `duration` — NodaTime's enforcement inherited for free.
-- **Principle #12 (AI is a first-class consumer):** Named temporal types with precise semantics give AI consumers a vocabulary to reason about entity data and generate correct precepts. An AI that sees `field DueDate as date` knows the field supports calendar arithmetic — it does not need to infer this from naming conventions on a `string` field.
+- **Principle #1 (Deterministic, inspectable model):** NodaTime's type separation makes it structurally clear which operations are deterministic and which require external context. All types proposed here are deterministic by construction — `instant` comparison is nanosecond math, `localdate` arithmetic uses the fixed ISO calendar, and the `.inZone(tz)` dot accessor makes the TZ database input explicit in the expression.
+- **Principle #2 (English-ish but not English):** The DSL names — `localdate`, `localtime`, `instant`, `duration`, `period`, `timezone` — communicate exactly what the data is. The `local` prefix explicitly signals "no timezone" — the same naming strategy NodaTime uses. `field FiledAt as instant` needs no comment. Postfix units extend this: `DueDate + 30 days` reads as domain prose.
+- **Principle #8 (Sound, compile-time-first static analysis):** NodaTime's type separation enables the compiler to catch temporal misuse statically. `localdate + instant` is a type error. `instant + period` is a type error. `instant.year` is a compile error. Crucially, the `period`/`duration` split means the compiler rejects `instant + 1 month` because `months` always resolves to `period` and instants only accept `duration` — NodaTime's enforcement inherited for free.
+- **Principle #12 (AI is a first-class consumer):** Named temporal types with precise semantics give AI consumers a vocabulary to reason about entity data and generate correct precepts. An AI that sees `field DueDate as localdate` knows the field supports calendar arithmetic — it does not need to infer this from naming conventions on a `string` field.
 
 The governing question for every decision: **"If a domain author has this kind of data, does giving it a named type help them be explicit about what it means?"**
 
@@ -104,14 +133,14 @@ field GracePeriodDays as number default 30
 invariant DueDayOffset + GracePeriodDays >= CurrentDayOffset because "Within grace period"
 ```
 
-**After** — with temporal types (v3: postfix units + single-quoted literals):
+**After** — with temporal types (v4: postfix units + single-quoted literals + `local*` naming):
 
 ```precept
-field DueDate as date default '2026-06-01'
+field DueDate as localdate default '2026-06-01'
 field GracePeriod as period default 30 days
 
 # Type-safe: DueDate + MealsTotal is a compile error
-# Explicit: 30 days resolves to period, date + period → date
+# Explicit: 30 days resolves to period, localdate + period → localdate
 invariant DueDate + GracePeriod >= '2026-01-01' because "Within grace period"
 ```
 
@@ -143,18 +172,18 @@ field FilingDeadline as number  # Pre-computed by hosting layer
 invariant FiledAt <= FilingDeadline because "Filing deadline has passed"
 ```
 
-**After** — complete rule in the contract (v3: `30 days` resolves to `period`, `date + period → date`):
+**After** — complete rule in the contract (v4: dot-accessor mediation, `localdate + period → localdate`):
 
 ```precept
 field IncidentTimestamp as instant
 field FiledTimestamp as instant
 field IncidentTimezone as timezone
 
-invariant FiledTimestamp <= toInstant(
-    toLocalDate(IncidentTimestamp, IncidentTimezone) + 30 days,
-    '23:59:00',
-    IncidentTimezone
-) because "Claim must be filed by 11:59 PM local time on the 30th day after the incident"
+# Dot-chain mediation: instant → .inZone(tz) → zoneddatetime → .localdate → localdate
+# Then calendar arithmetic, reconstruct back via .inZone(tz).instant
+invariant FiledTimestamp <= (
+    IncidentTimestamp.inZone(IncidentTimezone).localdate + 30 days + '23:59:00'
+).inZone(IncidentTimezone).instant because "Claim must be filed by 11:59 PM local time on the 30th day after the incident"
 ```
 
 **Before** — encoding a loan term as a bare integer:
@@ -169,9 +198,9 @@ field StartDate as string  # "2026-01-15" — but the compiler doesn't know that
 
 ```precept
 field LoanTerm as period default 12 months
-field StartDate as date default '2026-01-15'
+field StartDate as localdate default '2026-01-15'
 
-# date + period → date. The period carries its calendar semantics.
+# localdate + period → localdate. The period carries its calendar semantics.
 # 12 months != 365 days — NodaTime's truth, exposed faithfully.
 invariant StartDate + LoanTerm >= '2026-01-01' because "Maturity date must be in the future"
 ```
@@ -192,17 +221,17 @@ The second form satisfies the philosophy's "one file, complete rules" guarantee.
 
 ### Why NodaTime, not System.DateOnly / TimeOnly / DateTime
 
-NodaTime is adopted as a runtime dependency for the entire temporal type system. The DSL author never sees NodaTime type names — `field DueDate as date` is the surface, `NodaTime.LocalDate` is the implementation, just as `field Amount as decimal` has `System.Decimal` behind it.
+NodaTime is adopted as a runtime dependency for the entire temporal type system. The DSL author never sees NodaTime type names — `field DueDate as localdate` is the surface, `NodaTime.LocalDate` is the implementation, just as `field Amount as decimal` has `System.Decimal` behind it.
 
 **Rationale:**
 
 1. **Philosophy alignment.** NodaTime's core design philosophy is: *"We want to force you to think about decisions you really need to think about. In particular, what kind of data do you really have and really need?"* (NodaTime 3.3.x Design Philosophy). Distinct types for distinct temporal concepts — `LocalDate` is not `Instant` is not `Period` is not `Duration`. This is Precept's prevention guarantee applied to temporal data.
 
-2. **Type separation enables compile-time safety.** NodaTime makes it structurally impossible to mix a calendar date with a global timestamp, or a calendar period with a timeline duration. Precept's type checker inherits this separation: `date + instant` is a type error. `instant + period` is a type error. No custom dispatch needed.
+2. **Type separation enables compile-time safety.** NodaTime makes it structurally impossible to mix a calendar date with a global timestamp, or a calendar period with a timeline duration. Precept's type checker inherits this separation: `localdate + instant` is a type error. `instant + period` is a type error. No custom dispatch needed.
 
 3. **Battle-tested arithmetic.** `LocalDate.PlusDays(int)`, `LocalDate.Plus(Period.FromMonths(n))`, month-end truncation, leap-year handling, `Period.Between(d1, d2)` — all rigorously tested since 2012. Building the same guarantees on `System.DateOnly` would require Precept to own temporal arithmetic correctness, a domain Precept has no expertise in.
 
-4. **The `Period`/`Duration` split is the decisive factor.** The v1 proposal collapsed `Period` into `Duration` and had to build custom unit-compatibility dispatch. This was re-inventing enforcement logic that NodaTime already provides through type separation. The v2+ proposal exposes the separation directly: calendar units resolve to `period`, timeline units resolve to `duration`, and the type checker simply checks `date + period ✓`, `instant + duration ✓`, `instant + period ✗`. Zero custom dispatch.
+4. **The `Period`/`Duration` split is the decisive factor.** The v1 proposal collapsed `Period` into `Duration` and had to build custom unit-compatibility dispatch. This was re-inventing enforcement logic that NodaTime already provides through type separation. The v2+ proposal exposes the separation directly: calendar units resolve to `period`, timeline units resolve to `duration`, and the type checker simply checks `localdate + period ✓`, `instant + duration ✓`, `instant + period ✗`. Zero custom dispatch.
 
 5. **Coherent future path.** `LocalDate`, `LocalTime`, `LocalDateTime`, `Instant`, `Duration`, `Period`, `DateTimeZone` — the entire temporal vocabulary maps from NodaTime types with consistent semantics.
 
@@ -220,42 +249,42 @@ NodaTime is adopted as a runtime dependency for the entire temporal type system.
 
 ## Proposed Types
 
-### `date`
+### `localdate`
 
-**What it makes explicit:** This is a calendar date — not a timestamp, not a string that looks like a date. Day-granularity arithmetic is meaningful. "2026-03-15" means the same calendar day everywhere.
+**What it makes explicit:** This is a calendar date — not a timestamp, not a string that looks like a date. Day-granularity arithmetic is meaningful. "2026-03-15" means the same calendar day everywhere. The `local` prefix explicitly signals: no timezone.
 
 **Backing type:** `NodaTime.LocalDate`
 
 **Declaration:**
 
 ```precept
-field DueDate as date default '2026-06-01'
-field FilingDate as date nullable
-field ContractEnd as date default '2099-12-31'
+field DueDate as localdate default '2026-06-01'
+field FilingDate as localdate nullable
+field ContractEnd as localdate default '2099-12-31'
 ```
 
-**Single-quoted literal:** `'2026-03-15'` — the single-quote delimiter signals a typed constant. Type is inferred from content shape: `YYYY-MM-DD` (digits and hyphens, no `T`) → `date`. The date's content shape is what qualifies it for the typed constant delimiter — distinguishable from every other inhabitant. Content is validated at compile time. `'2026-03-15'` is valid. `'03/15/2026'` is a compile error with a teachable message. See Locked Decision #18.
+**Single-quoted literal:** `'2026-03-15'` — the single-quote delimiter signals a typed constant. Type is inferred from content shape: `YYYY-MM-DD` (digits and hyphens, no `T`) → `localdate`. The date's content shape is what qualifies it for the typed constant delimiter — distinguishable from every other inhabitant. Content is validated at compile time. `'2026-03-15'` is valid. `'03/15/2026'` is a compile error with a teachable message. See Locked Decision #18.
 
 **Operators:**
 
 | Expression | Produces | Rationale |
 |---|---|---|
-| `date + period` | `date` | Calendar arithmetic. `LocalDate.Plus(Period)`. Handles truncation. |
-| `date - period` | `date` | Calendar arithmetic backward. `LocalDate.Minus(Period)`. |
-| `date + 30 days` | `date` | Postfix unit — `30 days` resolves to `period` in date context. |
-| `date + (GraceDays) days` | `date` | Paren postfix — variable expression resolves to `period` in date context. |
-| `date + 3 months` | `date` | Truncates at month end (Jan 31 + 1 month = Feb 28). |
-| `date + 1 year` | `date` | Leap years (Feb 29 + 1 year = Feb 28). |
-| `date + 2 weeks` | `date` | = 14 days. |
-| `date - date` | `period` | Calendar distance. `Period.Between(d1, d2)`. Preserves structural components. |
+| `localdate + period` | `localdate` | Calendar arithmetic. `LocalDate.Plus(Period)`. Handles truncation. |
+| `localdate - period` | `localdate` | Calendar arithmetic backward. `LocalDate.Minus(Period)`. |
+| `localdate + 30 days` | `localdate` | Postfix unit — `30 days` resolves to `period` in localdate context. |
+| `localdate + (GraceDays) days` | `localdate` | Paren postfix — variable expression resolves to `period` in localdate context. |
+| `localdate + 3 months` | `localdate` | Truncates at month end (Jan 31 + 1 month = Feb 28). |
+| `localdate + 1 year` | `localdate` | Leap years (Feb 29 + 1 year = Feb 28). |
+| `localdate + 2 weeks` | `localdate` | = 14 days. |
+| `localdate - localdate` | `period` | Calendar distance. `Period.Between(d1, d2)`. Preserves structural components. |
 | `==`, `!=`, `<`, `>`, `<=`, `>=` | `boolean` | Full ordering. ISO calendar only. |
 
 | **Not supported** | **Why** |
 |---|---|
-| `date + date` | Adding two dates is meaningless. |
-| `date + integer` | Bare integers don't carry unit semantics. Use `date + (n) days`. See Locked Decision #10. |
-| `date + decimal` / `date + number` | Fractional/floating-point days are meaningless at day granularity. |
-| `date + duration` | **Duration is timeline-only (hours, minutes, seconds). Date is calendar-only (days, months, years).** Mixing them is what NodaTime was designed to prevent. `date + 3 hours` makes no sense — a date has no time component. |
+| `localdate + localdate` | Adding two dates is meaningless. |
+| `localdate + integer` | Bare integers don't carry unit semantics. Use `localdate + (n) days`. See Locked Decision #10. |
+| `localdate + decimal` / `localdate + number` | Fractional/floating-point days are meaningless at day granularity. |
+| `localdate + duration` | **Duration is timeline-only (hours, minutes, seconds). Localdate is calendar-only (days, months, years).** Mixing them is what NodaTime was designed to prevent. `localdate + 3 hours` makes no sense — a date has no time component. |
 
 **Accessors:**
 
@@ -266,7 +295,7 @@ field ContractEnd as date default '2099-12-31'
 | `.day` | `integer` | Day of month (1–31) |
 | `.dayOfWeek` | `integer` | ISO day of week (Monday=1, Sunday=7) |
 
-**Constraints:** `nullable`, `default '...'` (single-quoted date). Numeric constraints (`nonnegative`, `min`, `max`, `maxplaces`, `minlength`, `maxlength`) are compile errors on `date`.
+**Constraints:** `nullable`, `default '...'` (single-quoted date). Numeric constraints (`nonnegative`, `min`, `max`, `maxplaces`, `minlength`, `maxlength`) are compile errors on `localdate`.
 
 **Serialization:** ISO 8601 string: `"2026-03-15"`.
 
@@ -274,47 +303,47 @@ field ContractEnd as date default '2099-12-31'
 
 | Invalid code | Error message |
 |---|---|
-| `field X as date default "2026-01-01"` | Date defaults require a single-quoted typed constant: `default '2026-01-01'`. Double-quoted strings are not dates. |
+| `field X as localdate default "2026-01-01"` | Date defaults require a single-quoted typed constant: `default '2026-01-01'`. Double-quoted strings are not dates. |
 | `'2026-02-30'` | Invalid date: February 30 does not exist. Use a valid calendar date in ISO 8601 format (YYYY-MM-DD). |
 | `'01/15/2026'` | Invalid date format: expected ISO 8601 (YYYY-MM-DD), got '01/15/2026'. Use `'2026-01-15'`. |
 | `DueDate + FilingDate` | Cannot add two dates. Did you mean `DueDate - FilingDate` (period between dates) or `DueDate + (n) days` (offset)? |
 | `DueDate + 2` | Cannot add an integer to a date. Temporal arithmetic requires explicit units. Use `DueDate + 2 days` to add 2 calendar days. |
-| `DueDate + 3 hours` | Cannot add a duration to a date — dates have no time-of-day component. Use `DueDate + (n) days` for calendar offsets. If you need time-of-day arithmetic, use `datetime` or `instant`. |
+| `DueDate + 3 hours` | Cannot add a duration to a date — dates have no time-of-day component. Use `DueDate + (n) days` for calendar offsets. If you need time-of-day arithmetic, use `localdatetime` or `instant`. |
 
 ---
 
-### `time`
+### `localtime`
 
-**What it makes explicit:** This is a time of day — not a duration, not a timestamp, not an integer encoding minutes-since-midnight.
+**What it makes explicit:** This is a time of day — not a duration, not a timestamp, not an integer encoding minutes-since-midnight. The `local` prefix explicitly signals: no timezone.
 
 **Backing type:** `NodaTime.LocalTime`
 
 **Declaration:**
 
 ```precept
-field AppointmentTime as time default '09:00:00'
-field CheckInTime as time nullable
+field AppointmentTime as localtime default '09:00:00'
+field CheckInTime as localtime nullable
 ```
 
-**Single-quoted literal:** `'14:30:00'` — content shape `HH:mm:ss` (colons without hyphens-before-T) → `time`. The time's content shape is what qualifies it for the typed constant delimiter — distinguishable from all other inhabitants. Seconds may be omitted: `'14:30'` is valid (implies `:00`). See Locked Decision #18.
+**Single-quoted literal:** `'14:30:00'` — content shape `HH:mm:ss` (colons without hyphens-before-T) → `localtime`. The time's content shape is what qualifies it for the typed constant delimiter — distinguishable from all other inhabitants. Seconds may be omitted: `'14:30'` is valid (implies `:00`). See Locked Decision #18.
 
 **Operators:**
 
 | Expression | Produces | Rationale |
 |---|---|---|
-| `time + period` | `time` | `LocalTime.Plus(Period)`. Uses time components (hours, minutes, seconds); date components (years, months, weeks, days) are ignored. NodaTime native. |
-| `time + duration` | `time` | Sub-day bridging. Wraps at midnight. Runtime: nanosecond arithmetic on `LocalTime` (see Decision #16). For sub-day units, `duration` and `period` represent identical physical quantities — the type checker bridges this. |
-| `time + 3 hours` | `time` | Postfix unit — resolves via sub-day bridging. Wraps at midnight. |
-| `time + 30 minutes` | `time` | Same bridging. Wraps at midnight. |
-| `time + 45 seconds` | `time` | Same bridging. Wraps at midnight. |
-| `time - time` | `period` | Time-component period between two times. `Period.Between(t1, t2)` returns period with `.hours`, `.minutes`, `.seconds` components. NodaTime faithful. |
+| `localtime + period` | `localtime` | `LocalTime.Plus(Period)`. Uses time components (hours, minutes, seconds); date components (years, months, weeks, days) are ignored. NodaTime native. |
+| `localtime + duration` | `localtime` | Sub-day bridging. Wraps at midnight. Runtime: nanosecond arithmetic on `LocalTime` (see Decision #16). For sub-day units, `duration` and `period` represent identical physical quantities — the type checker bridges this. |
+| `localtime + 3 hours` | `localtime` | Postfix unit — resolves via sub-day bridging. Wraps at midnight. |
+| `localtime + 30 minutes` | `localtime` | Same bridging. Wraps at midnight. |
+| `localtime + 45 seconds` | `localtime` | Same bridging. Wraps at midnight. |
+| `localtime - localtime` | `period` | Time-component period between two times. `Period.Between(t1, t2)` returns period with `.hours`, `.minutes`, `.seconds` components. NodaTime faithful. |
 | `==`, `!=`, `<`, `>`, `<=`, `>=` | `boolean` | Full ordering within a day. |
 
-**Note:** `time + period` uses only the period's time components. Date components are silently ignored — this is `LocalTime.Plus(Period)` behavior in NodaTime. `time + 5 days` is valid but a no-op. `time + 3 months + 2 hours` adds only the 2 hours.
+**Note:** `localtime + period` uses only the period's time components. Date components are silently ignored — this is `LocalTime.Plus(Period)` behavior in NodaTime. `localtime + 5 days` is valid but a no-op. `localtime + 3 months + 2 hours` adds only the 2 hours.
 
 | **Not supported** | **Why** |
 |---|---|
-| `time + integer` | What unit? Use `(n) hours` or `(n) minutes`. |
+| `localtime + integer` | What unit? Use `(n) hours` or `(n) minutes`. |
 
 **Accessors:**
 
@@ -333,8 +362,8 @@ field CheckInTime as time nullable
 | Invalid code | Error message |
 |---|---|
 | `'25:00:00'` | Invalid time: hour must be 0–23, got 25. |
-| `AppointmentTime + 30` | Cannot add an integer to a time. Use `time + 30 minutes` or `time + 1 hour` to specify the unit. |
-| `AppointmentTime + 1 day` | Warning: Adding a date-only period to a time has no effect — date components are ignored. Did you mean `AppointmentTime + 1 hour`, or did you intend `datetime` + `1 day` arithmetic? |
+| `AppointmentTime + 30` | Cannot add an integer to a time. Use `localtime + 30 minutes` or `localtime + 1 hour` to specify the unit. |
+| `AppointmentTime + 1 day` | Warning: Adding a date-only period to a time has no effect — date components are ignored. Did you mean `AppointmentTime + 1 hour`, or did you intend `localdatetime` + `1 day` arithmetic? |
 
 ---
 
@@ -367,14 +396,25 @@ field IncidentTimestamp as instant
 
 | **Not supported** | **Why** |
 |---|---|
-| `instant.year`, `.month`, `.hour`, etc. | **Compile error.** Extracting calendar components requires a timezone — implicit behavior hiding a timezone dependency. Use `toLocalDate(instant, timezone).year`. |
+| `instant.year`, `.month`, `.hour`, etc. | **Compile error.** Extracting calendar components requires a timezone — implicit behavior hiding a timezone dependency. Use `myInstant.inZone(tz).localdate.year`. Strict hierarchy enforces explicit timezone mediation (Decision #22). |
+| `instant.localdate`, `instant.localtime` | **Compile error.** Skip-level accessors violate the strict hierarchy. Must go `instant.inZone(tz).localdate`. Forces explicit timezone mediation at every boundary crossing (Decision #22). |
 | `instant + integer` | Ambiguous unit. Use `instant + (n) hours` or `instant + (n) seconds`. |
-| `instant + period` | **Periods are calendar units, instants live on the timeline.** "Add 1 month to an instant" is undefined — months have variable nanosecond length. Convert to a date via `toLocalDate`, add the month, convert back via `toInstant`. NodaTime's `Instant` accepts only `Duration`, not `Period`. |
+| `instant + period` | **Periods are calendar units, instants live on the timeline.** "Add 1 month to an instant" is undefined — months have variable nanosecond length. Convert to a localdate via `myInstant.inZone(tz).localdate`, add the month, navigate back via `.inZone(tz).instant`. NodaTime's `Instant` accepts only `Duration`, not `Period`. |
 | `instant + 3 months` | `months` always resolves to `period` regardless of expression context. `instant + period` is a type error. Same applies to `(n) months`, `(n) years`. |
 
 **Note on `days`/`weeks` in instant context:** `instant + 3 days` and `instant + (n) days` are both valid — `days` and `weeks` resolve to `duration` (`Duration.FromDays`) in instant context. This is the key capability of context-dependent type resolution: the same unit keyword (`days`) resolves to `period` in calendar contexts and `duration` in timeline contexts. `months` and `years` have no duration equivalent (no `Duration.FromMonths` in NodaTime), so they always resolve to `period`.
 
-**Accessors:** **None.** Deliberately empty. To get calendar components, call `toLocalDate(instant, timezone)` and access `.year` on the result.
+**Navigation via `.inZone(tz)` (the sole mediation path):**
+
+| Expression | Produces | Description |
+|---|---|---|
+| `instant.inZone(tz)` | `zoneddatetime` | "View this moment in this timezone." The single mediation operation. |
+| `instant.inZone(tz).localdate` | `localdate` | Calendar date at this moment in this timezone. |
+| `instant.inZone(tz).localtime` | `localtime` | Time of day at this moment in this timezone. |
+| `instant.inZone(tz).localdatetime` | `localdatetime` | Combined local date+time in this timezone. |
+| `instant.inZone(tz).year` | `integer` | Calendar year — same as `.localdate.year`. |
+
+**Accessors:** `.inZone(tz)` only. No component accessors. Deliberately empty — to get calendar components, navigate via `.inZone(tz)`.
 
 **Constraints:** `nullable`, `default '...'` (single-quoted instant).
 
@@ -384,10 +424,11 @@ field IncidentTimestamp as instant
 
 | Invalid code | Error message |
 |---|---|
-| `'2026-04-13T14:30:00'` in instant context | Instant requires UTC designation. Use `'2026-04-13T14:30:00Z'` (note trailing Z). Without Z, this is a `datetime`, not an `instant`. |
-| `FiledAt.year` | Cannot access calendar components on an instant — this requires a timezone. Use `toLocalDate(FiledAt, tz).year` to extract the year in a specific timezone. |
+| `'2026-04-13T14:30:00'` in instant context | Instant requires UTC designation. Use `'2026-04-13T14:30:00Z'` (note trailing Z). Without Z, this is a `localdatetime`, not an `instant`. |
+| `FiledAt.year` | Cannot access calendar components on an instant — this requires a timezone. Use `FiledAt.inZone(tz).localdate.year` to extract the year in a specific timezone. |
+| `FiledAt.localdate` | Cannot access `.localdate` directly on an instant — this skips timezone mediation. Use `FiledAt.inZone(tz).localdate` to get the date in a specific timezone. |
 | `FiledAt + 3600` | Cannot add an integer to an instant. Use `FiledAt + 1 hour` or `FiledAt + 3600 seconds`. |
-| `FiledAt + 1 month` | Cannot add a period to an instant — periods are calendar units with variable length. Convert to a date first: `toLocalDate(FiledAt, tz) + 1 month`, then convert back with `toInstant(...)`. |
+| `FiledAt + 1 month` | Cannot add a period to an instant — periods are calendar units with variable length. Convert to a date first: `FiledAt.inZone(tz).localdate + 1 month`, then navigate back with `.inZone(tz).instant`. |
 
 ---
 
@@ -506,7 +547,7 @@ These resolve to `Period.FromDays`, `Period.FromMonths`, `Period.FromYears`, `Pe
 | `PT5H` | `5 hours` (in period field context) |
 | `P1DT12H` | `1 day + 12 hours` |
 
-**Decision: Precept's `period` is the full NodaTime `Period` — date AND time components (v2.1 correction).** The v2 proposal restricted `period` to date-only components. This created a structural contradiction with NodaTime's `LocalTime` API: `LocalTime.Plus(Period)` is the native arithmetic method, and `Period.Between(LocalTime, LocalTime)` returns time-component periods. The date-only restriction forced `time` arithmetic through `duration` via a non-existent `LocalTime.Plus(Duration)` method. The full NodaTime `Period` resolves all three contradictions and honors the "expose NodaTime faithfully" directive. See Locked Decision #13 (revised).
+**Decision: Precept's `period` is the full NodaTime `Period` — date AND time components (v2.1 correction).** The v2 proposal restricted `period` to date-only components. This created a structural contradiction with NodaTime's `LocalTime` API: `LocalTime.Plus(Period)` is the native arithmetic method, and `Period.Between(LocalTime, LocalTime)` returns time-component periods. The date-only restriction forced `localtime` arithmetic through `duration` via a non-existent `LocalTime.Plus(Duration)` method. The full NodaTime `Period` resolves all three contradictions and honors the "expose NodaTime faithfully" directive. See Locked Decision #13 (revised).
 
 **Operators:**
 
@@ -568,7 +609,7 @@ field ExtendedWarranty as period default 2 years + 6 months
 |---|---|
 | `1 month > 30 days` | Cannot compare periods with `<`, `>`, `<=`, `>=` — "is 1 month greater than 30 days?" depends on which month. Periods support `==` and `!=` only (structural equality). |
 | `1 month == 30 days` | Evaluates to `false` — 1 month is structurally different from 30 days. NodaTime's period equality is structural, not calendrical. |
-| `FiledAt + 1 month` | Cannot add a period to an instant — periods may contain calendar units with variable length. Convert to a date first: `toLocalDate(FiledAt, tz) + 1 month`, then convert back. |
+| `FiledAt + 1 month` | Cannot add a period to an instant — periods may contain calendar units with variable length. Convert to a date first: `FiledAt.inZone(tz).localdate + 1 month`, then navigate back. |
 | `GracePeriod * 2` | Cannot multiply a period. Construct the value directly: `60 days` instead of `30 days * 2`. |
 
 ---
@@ -612,7 +653,7 @@ field CustomerTimezone as timezone nullable
 
 ### `zoneddatetime`
 
-**What it makes explicit:** A datetime with timezone context — an instant resolved to local date and time in a specific timezone.
+**What it makes explicit:** A localdatetime with timezone context — an instant resolved to local date and time in a specific timezone.
 
 **Backing type:** `NodaTime.ZonedDateTime`
 
@@ -625,7 +666,17 @@ field FilingContext as zoneddatetime nullable
 
 **Single-quoted literal:** `'2026-04-13T14:30:00[America/New_York]'` — content shape includes `T` and bracket-enclosed timezone `[...]` → `zoneddatetime`. The bracket-enclosed timezone `[...]` is the distinguishing shape signal. See Locked Decision #18.
 
-**Construction from expressions:** `zoneddatetime(instant_expr, timezone_expr)` — constructs a `zoneddatetime` from a computed instant and timezone. This is a construction function (analogous to `toInstant`), not a typed literal.
+**Construction via `.inZone(tz)` dot accessor:**
+
+```precept
+# From instant — "view this moment in this timezone"
+-> set Context = FiledAt.inZone(IncidentTimezone)
+
+# From localdatetime — "anchor this local reading to the timeline in this timezone"
+-> set PinnedContext = DetectedAt.inZone(IncidentTimezone)
+```
+
+No standalone construction function exists. `zoneddatetime` is always reached via `.inZone(tz)` from either an `instant` or a `localdatetime`.
 
 **Operators:**
 
@@ -640,7 +691,7 @@ field FilingContext as zoneddatetime nullable
 
 | **Not supported** | **Why** |
 |---|---|
-| `zoneddatetime + period` | **Calendar arithmetic on `zoneddatetime` requires decomposition.** NodaTime's `ZonedDateTime` deliberately excludes `Period` arithmetic — forces explicit conversion. Decompose via `.date`, add the period, reconstruct. |
+| `zoneddatetime + period` | **Calendar arithmetic on `zoneddatetime` requires decomposition.** NodaTime's `ZonedDateTime` deliberately excludes `Period` arithmetic — forces explicit conversion. Navigate to `.localdate`, add the period, reconstruct via `.inZone(tz)`. |
 | `zoneddatetime + 3 months` | `months` always resolves to `period`. Same rule. |
 | `zoneddatetime + integer` | Bare integers don't carry unit semantics. |
 
@@ -650,8 +701,9 @@ field FilingContext as zoneddatetime nullable
 |---|---|---|
 | `.instant` | `instant` | The underlying UTC point. |
 | `.timezone` | `timezone` | The bound IANA timezone. |
-| `.date` | `date` | Local calendar date in bound timezone. |
-| `.time` | `time` | Local time in bound timezone. |
+| `.localdatetime` | `localdatetime` | Local date+time in bound timezone. |
+| `.localdate` | `localdate` | Local calendar date in bound timezone. |
+| `.localtime` | `localtime` | Local time in bound timezone. |
 | `.year`, `.month`, `.day`, `.hour`, `.minute`, `.second`, `.dayOfWeek` | `integer` | Local components in bound timezone. |
 
 **Constraints:** `nullable`. No `default`.
@@ -662,78 +714,125 @@ field FilingContext as zoneddatetime nullable
 
 | Invalid code | Error message |
 |---|---|
-| `zdt + 1 month` | Cannot add a period to a zoneddatetime — calendar arithmetic requires decomposition. Use `zdt.date + 1 month` to get the new date, then reconstruct. |
-| `zdt + 5` | Cannot add an integer to a zoneddatetime — use `zdt + 5 hours` for timeline offset, or decompose via `.date` for calendar arithmetic. |
+| `zdt + 1 month` | Cannot add a period to a zoneddatetime — calendar arithmetic requires decomposition. Navigate to `.localdate`, add the period, then reconstruct via `.inZone(tz)`. |
+| `zdt + 5` | Cannot add an integer to a zoneddatetime — use `zdt + 5 hours` for timeline offset, or navigate via `.localdate` for calendar arithmetic. |
 
 ---
 
-### `datetime`
+### `localdatetime`
 
-**What it makes explicit:** A date and time together — not a point on the global timeline, not two separate fields. No timezone.
+**What it makes explicit:** A date and time together — not a point on the global timeline, not two separate fields. No timezone. The `local` prefix explicitly signals: no timezone.
 
 **Backing type:** `NodaTime.LocalDateTime`
 
 **Declaration:**
 
 ```precept
-field DetectedAt as datetime nullable
-field ScheduledFor as datetime default '2026-04-13T09:00:00'
+field DetectedAt as localdatetime nullable
+field ScheduledFor as localdatetime default '2026-04-13T09:00:00'
 ```
 
-**Single-quoted literal:** `'2026-04-13T09:00:00'` — content shape includes `T` but no trailing `Z` and no bracket-enclosed timezone → `datetime`. The presence of `T` without `Z` or `[` is the distinguishing shape signal. See Locked Decision #18.
+**Single-quoted literal:** `'2026-04-13T09:00:00'` — content shape includes `T` but no trailing `Z` and no bracket-enclosed timezone → `localdatetime`. The presence of `T` without `Z` or `[` is the distinguishing shape signal. See Locked Decision #18.
 
 **Operators:**
 
 | Expression | Produces | Rationale |
 |---|---|---|
-| `datetime + period` | `datetime` | Calendar arithmetic. `LocalDateTime.Plus(Period)`. |
-| `datetime + duration` | `datetime` | Time arithmetic. Duration bridging — same mechanism as `time + duration` (Decision #16). NodaTime's `LocalDateTime` has no `Plus(Duration)` — uses nanosecond arithmetic on the time component, preserving date component. |
-| `datetime + 30 days`, `+ 3 months`, `+ 1 year`, `+ 2 weeks` | `datetime` | Postfix units — resolve to `period` in datetime context. |
-| `datetime + 3 hours`, `+ 30 minutes`, `+ 45 seconds` | `datetime` | Postfix units — resolve to `duration`. |
-| `datetime - datetime` | `period` | `Period.Between(ldt1, ldt2)`. |
+| `localdatetime + period` | `localdatetime` | Calendar arithmetic. `LocalDateTime.Plus(Period)`. |
+| `localdatetime + duration` | `localdatetime` | Time arithmetic. Duration bridging — same mechanism as `localtime + duration` (Decision #16). NodaTime's `LocalDateTime` has no `Plus(Duration)` — uses nanosecond arithmetic on the time component, preserving date component. |
+| `localdatetime + 30 days`, `+ 3 months`, `+ 1 year`, `+ 2 weeks` | `localdatetime` | Postfix units — resolve to `period` in localdatetime context. |
+| `localdatetime + 3 hours`, `+ 30 minutes`, `+ 45 seconds` | `localdatetime` | Postfix units — resolve to `duration`. |
+| `localdatetime - localdatetime` | `period` | `Period.Between(ldt1, ldt2)`. |
 | `==`, `!=`, `<`, `>`, `<=`, `>=` | `boolean` | Full ordering. |
 
-Note: `datetime` and `time` both accept `period` and `duration`. For `datetime`, all components of both types are meaningful. For `time`, only time components of `period` are used (date components ignored — NodaTime's `LocalTime.Plus(Period)` behavior). `datetime` is the only type where every component of both `period` and `duration` applies. Both `time + duration` and `datetime + duration` use the same duration bridging mechanism (Decision #16) — NodaTime's `LocalTime` and `LocalDateTime` natively accept `Period`, not `Duration`, so the type checker translates sub-day Duration components into equivalent nanosecond arithmetic.
+Note: `localdatetime` and `localtime` both accept `period` and `duration`. For `localdatetime`, all components of both types are meaningful. For `localtime`, only time components of `period` are used (date components ignored — NodaTime's `LocalTime.Plus(Period)` behavior). `localdatetime` is the only type where every component of both `period` and `duration` applies. Both `localtime + duration` and `localdatetime + duration` use the same duration bridging mechanism (Decision #16) — NodaTime's `LocalTime` and `LocalDateTime` natively accept `Period`, not `Duration`, so the type checker translates sub-day Duration components into equivalent nanosecond arithmetic.
 
 | **Not supported** | **Why** |
 |---|---|
-| `datetime + integer` | Bare integers don't carry unit semantics. |
+| `localdatetime + integer` | Bare integers don't carry unit semantics. |
+
+**Navigation via `.inZone(tz)` (reverse mediation — local → universal):**
+
+| Expression | Produces | Description |
+|---|---|---|
+| `localdatetime.inZone(tz)` | `zoneddatetime` | "Anchor this local reading to the timeline in this timezone." |
+| `localdatetime.inZone(tz).instant` | `instant` | Reverse navigation to UTC instant. Replaces the eliminated `pin` function. |
 
 **Accessors:**
 
 | Accessor | Returns | Description |
 |---|---|---|
-| `.date` | `date` | Date component. |
-| `.time` | `time` | Time component. |
+| `.localdate` | `localdate` | Date component. |
+| `.localtime` | `localtime` | Time component. |
 | `.year`, `.month`, `.day`, `.hour`, `.minute`, `.second` | `integer` | Direct components. |
 
-**Constraints:** `nullable`, `default '...'` (single-quoted datetime).
+**Constraints:** `nullable`, `default '...'` (single-quoted localdatetime).
 
 **Serialization:** ISO 8601 without timezone: `"2026-04-13T14:30:00"`.
 
-#### Option: `datetime` inclusion vs. deferral
+#### Option: `localdatetime` inclusion vs. deferral
 
-**Option A (Include):** Completes the local type vocabulary. 6 NIST compliance fields in security-incident sample. `datetime` is uniquely the bridge type that accepts both `period` and `duration`.
+**Option A (Include):** Completes the local type vocabulary. 6 NIST compliance fields in security-incident sample. `localdatetime` is uniquely the bridge type that accepts both `period` and `duration`.
 
-**Option B (Defer):** Smaller initial surface. 1 of 15 samples. Separate `date` + `time` fields cover most cases.
+**Option B (Defer):** Smaller initial surface. 1 of 15 samples. Separate `localdate` + `localtime` fields cover most cases.
 
 **Recommendation:** Open — needs design discussion.
 
 ---
 
-## Conversion Functions
+## Timezone Mediation — `.inZone(tz)` Dot Accessor
 
-### The timezone bridge
+### The single mediation operation
 
-| Function | Signature | Semantics |
+All timezone mediation flows through one operation — `.inZone(tz)` — accessed via dot syntax on the value that owns it. There are no standalone conversion functions.
+
+| Expression | Produces | Semantics |
 |---|---|---|
-| `toLocalDate` | `(instant, timezone) → date` | "What date is it at this moment in this timezone?" |
-| `toLocalTime` | `(instant, timezone) → time` | "What time is it at this moment in this timezone?" |
-| `toInstant` | `(date, time, timezone) → instant` | "What UTC moment corresponds to this local time?" |
+| `instant.inZone(tz)` | `zoneddatetime` | "View this moment in this timezone." |
+| `localdatetime.inZone(tz)` | `zoneddatetime` | "Anchor this local reading to the timeline in this timezone." |
 
-### Why these functions exist
+From `zoneddatetime`, navigation to any local type or back to `instant` uses dot accessors on the result:
 
-Without them, multi-timezone compliance rules must be split between the precept and the hosting layer. With them, the entire rule lives in one file. See the before/after examples in the Motivation section.
+| Dot chain | Produces | Semantics |
+|---|---|---|
+| `myInstant.inZone(tz).localdate` | `localdate` | "What date is it at this moment in this timezone?" |
+| `myInstant.inZone(tz).localtime` | `localtime` | "What time is it at this moment in this timezone?" |
+| `myInstant.inZone(tz).localdatetime` | `localdatetime` | "What local date+time is it at this moment in this timezone?" |
+| `myInstant.inZone(tz).year` | `integer` | "What year is it at this moment in this timezone?" |
+| `myLDT.inZone(tz).instant` | `instant` | "What UTC moment corresponds to this local date+time?" (reverse navigation) |
+
+### Why one operation, not three functions
+
+The v3 proposal had three standalone conversion functions: `toLocalDate(instant, tz)`, `toLocalTime(instant, tz)`, `toInstant(date, time, tz)`. Shane locked three decisions that collapsed these to one:
+
+1. **D8 — Dot-vs-function rule:** "If the value owns it, dot." An instant owns its mediation to a timezone. Therefore `instant.inZone(tz)`, not `inZone(instant, tz)`.
+
+2. **D11 — `inZone` as dot accessor:** `toLocalDate(instant, tz)` was a freestanding function doing two things: mediate timezone AND extract date. With dot chains, these are separate operations: `instant.inZone(tz)` (mediate) then `.localdate` (extract). Cleaner separation of concerns. Better IntelliSense — after typing `.inZone(tz).`, the completion list shows all available components.
+
+3. **D13 — `pin` eliminated:** The reverse direction (`localdatetime → instant`) was originally a separate function `pin(ldt, tz)`. But `localdatetime.inZone(tz).instant` achieves the same result via the same `.inZone(tz)` operation. One mediation operation in both directions — no reason for two.
+
+### Strict hierarchy — no skip-level accessors (Decision #22)
+
+Navigation must follow the type hierarchy step by step. No skip-level accessors exist.
+
+```
+instant → .inZone(tz) → zoneddatetime → .localdatetime → localdatetime → .localdate / .localtime
+                                       → .localdate → localdate
+                                       → .localtime → localtime
+                                       → .instant → instant (reverse)
+```
+
+| Valid | Invalid (compile error) | Why |
+|---|---|---|
+| `myInstant.inZone(tz).localdate` | `myInstant.localdate` | Skips timezone mediation — where's the timezone? |
+| `myInstant.inZone(tz).year` | `myInstant.year` | Same — year depends on timezone. |
+| `myLDT.inZone(tz).instant` | `myLDT.instant` | Skips timezone mediation — which timezone? |
+| `zdt.localdatetime.localdate` | — | Valid: step-by-step navigation. |
+| `zdt.localdate` | — | Also valid: `zoneddatetime` provides direct `.localdate` as one-step navigation within the zone-aware tier. |
+
+**Rationale:** The strict hierarchy forces explicit timezone mediation at every boundary crossing between the universal tier (`instant`) and the local tier (`localdate`, `localtime`, `localdatetime`). This prevents the most common temporal bug: extracting calendar components from a UTC timestamp without specifying which timezone to interpret it in.
+
+**Exception:** `zoneddatetime` provides `.localdate`, `.localtime`, and component accessors (`.year`, etc.) directly because it already carries a timezone. The timezone mediation has already happened — the hierarchy step was the `.inZone(tz)` call that produced the `zoneddatetime`.
 
 ### DST ambiguity resolution
 
@@ -742,21 +841,32 @@ Without them, multi-timezone compliance rules must be split between the precept 
 
 **Recommendation:** Lenient resolver. Deterministic. The 99% case is unaffected.
 
-### Composability
+### Composability with existing operations
 
-Conversion functions produce and consume existing types:
+The `.inZone(tz)` accessor produces and consumes existing types — all existing operations chain naturally:
 
-- `toLocalDate` returns `date` — all date operations work.
-- `toLocalTime` returns `time` — all time operations work.
-- `toInstant` returns `instant` — all instant operations work.
+- `myInstant.inZone(tz).localdate` returns `localdate` — all localdate operations work.
+- `myInstant.inZone(tz).localtime` returns `localtime` — all localtime operations work.
+- `myLDT.inZone(tz).instant` returns `instant` — all instant operations work.
 
-### `zoneddatetime` overloads
+**Example — complete multi-timezone compliance rule (dot form):**
 
-| Function | New Overload | Semantics |
-|---|---|---|
-| `toLocalDate` | `(zoneddatetime) → date` | Extract date using bound timezone. |
-| `toLocalTime` | `(zoneddatetime) → time` | Extract time using bound timezone. |
-| `toInstant` | `(date, time, zoneddatetime) → instant` | Convert using bound timezone. |
+```precept
+field ClinicTimezone as timezone default 'America/New_York'
+field ShiftStart as instant
+field ShiftLocalDateTime as localdatetime
+field ShiftLocalDate as localdate
+field ShiftLocalTime as localtime
+
+# Timezone mediation — dot-accessor chains
+-> set ShiftLocalDateTime = ShiftStart.inZone(ClinicTimezone).localdatetime
+-> set ShiftLocalDate = ShiftStart.inZone(ClinicTimezone).localdate
+-> set ShiftLocalTime = ShiftStart.inZone(ClinicTimezone).localtime
+-> set IsOvernight = ShiftStart.inZone(ClinicTimezone).localtime >= '22:00'
+
+# Reverse navigation (pin eliminated — use dot chain)
+-> set BackToInstant = ShiftLocalDateTime.inZone(ClinicTimezone).instant
+```
 
 ---
 
@@ -816,14 +926,14 @@ The type of a postfix unit expression (`period` or `duration`) is determined by 
 
 | Expression context | `3 days` / `(n) days` resolves to | NodaTime call |
 |---|---|---|
-| `date + _` | `period` | `Period.FromDays(3)` / `Period.FromDays(n)` |
-| `datetime + _` | `period` | `Period.FromDays(3)` / `Period.FromDays(n)` |
+| `localdate + _` | `period` | `Period.FromDays(3)` / `Period.FromDays(n)` |
+| `localdatetime + _` | `period` | `Period.FromDays(3)` / `Period.FromDays(n)` |
 | `instant + _` | `duration` | `Duration.FromDays(3)` / `Duration.FromDays(n)` |
 | `zoneddatetime + _` | `duration` | `Duration.FromDays(3)` / `Duration.FromDays(n)` |
-| `time + _` | depends on unit | Sub-day bridging applies (Decision #16) |
+| `localtime + _` | depends on unit | Sub-day bridging applies (Decision #16) |
 | `field X as period default _` | `period` | `Period.FromDays(3)` |
 | `field X as duration default _` | `duration` | `Duration.FromDays(3)` |
-| No context / ambiguous | **compile error** | "Cannot infer temporal type for `3 days` — provide context: `date_field + 3 days` or `instant_field + 3 days`" |
+| No context / ambiguous | **compile error** | "Cannot infer temporal type for `3 days` — provide context: `localdate_field + 3 days` or `instant_field + 3 days`" |
 
 **For `months` and `years` — always `period`:**
 
@@ -831,8 +941,8 @@ The type of a postfix unit expression (`period` or `duration`) is determined by 
 
 | Expression context | `3 months` / `(n) months` resolves to | Result |
 |---|---|---|
-| `date + _` | `period` | ✓ `date + period → date` |
-| `datetime + _` | `period` | ✓ `datetime + period → datetime` |
+| `localdate + _` | `period` | ✓ `localdate + period → localdate` |
+| `localdatetime + _` | `period` | ✓ `localdatetime + period → localdatetime` |
 | `instant + _` | `period` | ✗ **type error** — `instant + period` |
 | `zoneddatetime + _` | `period` | ✗ **type error** — `zoneddatetime + period` |
 | `field X as period default _` | `period` | ✓ |
@@ -844,11 +954,11 @@ The type of a postfix unit expression (`period` or `duration`) is determined by 
 |---|---|---|
 | `instant + _` | `duration` | `Duration.FromHours(3)` |
 | `zoneddatetime + _` | `duration` | `Duration.FromHours(3)` |
-| `time + _` | bridges to duration | Sub-day bridging (Decision #16) |
-| `datetime + _` | `duration` | `Duration.FromHours(3)` |
+| `localtime + _` | bridges to duration | Sub-day bridging (Decision #16) |
+| `localdatetime + _` | `duration` | `Duration.FromHours(3)` |
 | `field X as duration default _` | `duration` | `Duration.FromHours(3)` |
 | `field X as period default _` | `period` | `Period.FromHours(3)` |
-| `date + _` | **warning** | "Adding hours to a date has no effect — dates have no time component." |
+| `localdate + _` | **warning** | "Adding hours to a date has no effect — dates have no time component." |
 | No context / ambiguous | **compile error** | "Cannot infer temporal type for `3 hours`" |
 
 **Owner's rationale (Shane):** "The author IS thinking about the details — they wrote `instant + 3 days`, which means '3 fixed 24-hour days on the timeline.' The context makes the intent unambiguous."
@@ -857,11 +967,11 @@ The type of a postfix unit expression (`period` or `duration`) is determined by 
 
 | Invalid code | Error message |
 |---|---|
-| `set X = 3 days` (no type context) | Cannot infer temporal type for `3 days` — the target type is ambiguous. Provide context: `date_field + 3 days` or `instant_field + 3 days`. |
+| `set X = 3 days` (no type context) | Cannot infer temporal type for `3 days` — the target type is ambiguous. Provide context: `localdate_field + 3 days` or `instant_field + 3 days`. |
 | `GraceDays days` | Postfix unit literals require an integer constant or parenthesized expression. Use `(GraceDays) days` for variable arguments. |
-| `date + 3 hours` | Warning: Adding hours to a date has no effect — dates have no time-of-day component. Did you mean `datetime + 3 hours`, or did you intend `date + 3 days`? |
+| `localdate + 3 hours` | Warning: Adding hours to a date has no effect — dates have no time-of-day component. Did you mean `localdatetime + 3 hours`, or did you intend `localdate + 3 days`? |
 | `2 years 6 months` | Postfix unit expressions must be combined with `+`. Use `2 years + 6 months`. |
-| `instant + 3 months` | Cannot add a period to an instant — `months` always resolves to `period` (variable-length calendar units). Convert to a date first: `toLocalDate(inst, tz) + 3 months`, then convert back. |
+| `instant + 3 months` | Cannot add a period to an instant — `months` always resolves to `period` (variable-length calendar units). Convert to a date first: `inst.inZone(tz).localdate + 3 months`, then navigate back via `.inZone(tz).instant`. |
 
 ---
 
@@ -874,7 +984,7 @@ Every non-primitive value in Precept enters through one of three doors. This is 
 | Door | Delimiter | What it carries | Type resolution | Temporal proof |
 |------|-----------|----------------|-----------------|----------------|
 | **1. String** | `"..."` | Text values | Always `string` | N/A — strings remain strings |
-| **2. Typed constant** | `'...'` | Formatted non-primitive constants | Inferred from content shape | `date`, `time`, `datetime`, `instant`, `zoneddatetime`, `timezone` |
+| **2. Typed constant** | `'...'` | Formatted non-primitive constants | Inferred from content shape | `localdate`, `localtime`, `localdatetime`, `instant`, `zoneddatetime`, `timezone` |
 | **3. Quantity** | `N unit` | Magnitude + unit values | Context-dependent (`period` or `duration`) | `30 days`, `72 hours`, `3 months` |
 
 **Zero constructors exist.** There is no `type(value)` form in the language — no `date(2026-01-15)`, no `duration(PT72H)`, no `money("100", "USD")`. Every value enters through one of the three doors above.
@@ -887,9 +997,9 @@ The current inhabitants demonstrate shape uniqueness:
 
 | Inhabitant | Shape signal | Why it's unique |
 |------------|-------------|-----------------|
-| `date` | `YYYY-MM-DD` | Digits + hyphens, no `T` |
-| `time` | `HH:MM:SS` | Digits + colons, no hyphen |
-| `datetime` | `...T...` | `T` present, no `Z`, no `[` |
+| `localdate` | `YYYY-MM-DD` | Digits + hyphens, no `T` |
+| `localtime` | `HH:MM:SS` | Digits + colons, no hyphen |
+| `localdatetime` | `...T...` | `T` present, no `Z`, no `[` |
 | `instant` | `...T...Z` | `T` + trailing `Z` |
 | `zoneddatetime` | `...T...[...]` | `T` + bracket-enclosed zone |
 | `timezone` | `Word/Word` | Alpha + `/`, no digits-first |
@@ -926,15 +1036,15 @@ This is what makes temporal types the gateway: they don't just add temporal capa
 
 | Left | Op | Right | Result | Notes |
 |---|---|---|---|---|
-| `date` | `+` | `period` | `date` | Calendar arithmetic. Truncation at month end. |
-| `date` | `-` | `period` | `date` | Calendar arithmetic backward. |
-| `date` | `-` | `date` | `period` | Calendar distance. `Period.Between`. |
+| `localdate` | `+` | `period` | `localdate` | Calendar arithmetic. Truncation at month end. |
+| `localdate` | `-` | `period` | `localdate` | Calendar arithmetic backward. |
+| `localdate` | `-` | `localdate` | `period` | Calendar distance. `Period.Between`. |
 | `period` | `+` | `period` | `period` | Combined. |
 | `period` | `-` | `period` | `period` | Difference. |
-| `datetime` | `+` | `period` | `datetime` | Calendar arithmetic on date part. |
-| `datetime` | `-` | `period` | `datetime` | Backward. |
-| `datetime` | `-` | `datetime` | `period` | Calendar distance. |
-| `time` | `+` | `period` | `time` | `LocalTime.Plus(Period)`. Time components only; date components ignored. |
+| `localdatetime` | `+` | `period` | `localdatetime` | Calendar arithmetic on date part. |
+| `localdatetime` | `-` | `period` | `localdatetime` | Backward. |
+| `localdatetime` | `-` | `localdatetime` | `period` | Calendar distance. |
+| `localtime` | `+` | `period` | `localtime` | `LocalTime.Plus(Period)`. Time components only; date components ignored. |
 
 **Timeline domain (uses `duration`):**
 
@@ -948,30 +1058,30 @@ This is what makes temporal types the gateway: they don't just add temporal capa
 | `duration` | `*` | `integer`/`number` | `duration` | Scaling. |
 | `duration` | `/` | `integer`/`number` | `duration` | Scaling. |
 | `duration` | `/` | `duration` | `number` | Ratio. |
-| `time` | `+` | `duration` | `time` | Wraps at midnight. |
-| `time` | `-` | `time` | `period` | Time-unit period. |
+| `localtime` | `+` | `duration` | `localtime` | Wraps at midnight. |
+| `localtime` | `-` | `localtime` | `period` | Time-unit period. |
 | `zoneddatetime` | `+` | `duration` | `zoneddatetime` | Timeline arithmetic. |
 | `zoneddatetime` | `-` | `duration` | `zoneddatetime` | Backward. |
 | `zoneddatetime` | `-` | `zoneddatetime` | `duration` | Instant subtraction. |
 
-**Bridge type (`datetime` — accepts both):**
+**Bridge type (`localdatetime` — accepts both):**
 
 | Left | Op | Right | Result | Notes |
 |---|---|---|---|---|
-| `datetime` | `+` | `duration` | `datetime` | Time arithmetic. |
-| `datetime` | `-` | `duration` | `datetime` | Backward. |
+| `localdatetime` | `+` | `duration` | `localdatetime` | Time arithmetic. |
+| `localdatetime` | `-` | `duration` | `localdatetime` | Backward. |
 
 ### Comparison rules
 
 | Type | `==`, `!=` | `<`, `>`, `<=`, `>=` | Ordering semantics |
 |---|---|---|---|
-| `date` | ✓ | ✓ | ISO calendar |
-| `time` | ✓ | ✓ | Within-day |
+| `localdate` | ✓ | ✓ | ISO calendar |
+| `localtime` | ✓ | ✓ | Within-day |
 | `instant` | ✓ | ✓ | Nanoseconds on global timeline |
 | `duration` | ✓ | ✓ | Nanoseconds |
 | `period` | ✓ | **✗** | **No natural ordering.** See Decision #14. |
 | `timezone` | ✓ | ✗ | Equality by IANA identifier. |
-| `datetime` | ✓ | ✓ | Same-calendar |
+| `localdatetime` | ✓ | ✓ | Same-calendar |
 | `zoneddatetime` | ✓ | ✓ | By underlying instant |
 
 Cross-type comparison is always a type error.
@@ -980,16 +1090,17 @@ Cross-type comparison is always a type error.
 
 | Expression | Why it's a type error |
 |---|---|
-| `date + duration` | Duration is timeline-only. Date needs period (calendar) arithmetic. |
+| `localdate + duration` | Duration is timeline-only. Localdate needs period (calendar) arithmetic. |
 | `instant + period` | Period may contain calendar units with variable length. Instant needs duration (timeline) arithmetic. |
 | `duration + period` | Cannot mix timeline and calendar units in arithmetic. |
 | `zoneddatetime + period` | Calendar arithmetic on ZDT requires decomposition. |
-| `date + integer` | Bare integers don't carry unit semantics. Use `(n) days`. |
+| `localdate + integer` | Bare integers don't carry unit semantics. Use `(n) days`. |
 | `instant + integer` | Ambiguous unit. Use `(n) hours` or `(n) seconds`. |
 | `period < period` | Periods are not orderable. |
 | `period * integer` | Period scaling not supported. |
-| `date + date` / `instant + instant` | Adding two points is meaningless. |
-| `instant.year` | Requires timezone. Use `toLocalDate(instant, tz).year`. |
+| `localdate + localdate` / `instant + instant` | Adding two points is meaningless. |
+| `instant.year` | Requires timezone. Use `myInstant.inZone(tz).localdate.year`. |
+| `instant.localdate` | Skips timezone mediation. Use `myInstant.inZone(tz).localdate`. |
 | `duration * duration` | Dimensionally meaningless. |
 | `duration * decimal` | Lossy narrowing. Use `number`. |
 
@@ -999,14 +1110,14 @@ All temporal types support `nullable`. All follow existing null propagation rule
 
 | Type | Default value | Notes |
 |---|---|---|
-| `date` | `default '...'` | Author specifies (single-quoted date). |
-| `time` | `default '...'` | Author specifies (single-quoted time). |
+| `localdate` | `default '...'` | Author specifies (single-quoted date). |
+| `localtime` | `default '...'` | Author specifies (single-quoted time). |
 | `instant` | `default '...'` | Author specifies (single-quoted instant). |
 | `duration` | `default 0 hours` | Zero duration. |
 | `period` | `default 0 days` | Zero period. |
 | `timezone` | No default | No universally sensible default. |
 | `zoneddatetime` | No default | Same as timezone. |
-| `datetime` | `default '...'` | Author specifies (single-quoted datetime). |
+| `localdatetime` | `default '...'` | Author specifies (single-quoted localdatetime). |
 
 **`nullable` + `default`:** Open — George's Challenge #3. Deferred to cross-cutting decision.
 
@@ -1021,12 +1132,12 @@ All temporal types support `nullable`. All follow existing null propagation rule
 - **Precedent:** NRules inherits `System.Decimal`. Precept inherits NodaTime's temporal model.
 - **Tradeoff:** Additional NuGet dependency (~1.1 MB).
 
-### 2. Day granularity for `date`
+### 2. Day granularity for `localdate`
 
 - **Why:** "2026-03-15" means the same calendar day everywhere. No timezone dependency.
-- **Alternatives rejected:** `datetime` as only calendar type. Optional timezone.
+- **Alternatives rejected:** `localdatetime` as only calendar type. Optional timezone.
 - **Precedent:** SQL `DATE`, FEEL `date()`.
-- **Tradeoff:** Time-of-day needs separate `time` type or `datetime`.
+- **Tradeoff:** Time-of-day needs separate `localtime` type or `localdatetime`.
 
 ### 3. ISO 8601 as the sole format
 
@@ -1037,26 +1148,26 @@ All temporal types support `nullable`. All follow existing null propagation rule
 
 ### 4. Single-quoted delimiter is the typed constant delimiter — not temporal-specific (revised — locked 2026-04-15)
 
-- **Why:** The `'...'` delimiter is the **typed constant delimiter** for any non-primitive type whose content shape is unambiguous — not a temporal-specific feature. The three literal mechanisms are a closed set: `"..."` (string), `'...'` (typed constant, shape-inferred), `N unit` (quantity). Zero constructors exist in the language. A type qualifies for `'...'` if and only if its content shape is distinguishable from every other single-quote inhabitant (the admission rule). Temporal types are the **first inhabitants**: `date` (`YYYY-MM-DD`), `time` (`HH:MM:SS`), `datetime` (`...T...`), `instant` (`...T...Z`), `zoneddatetime` (`...T...[zone]`), `timezone` (`Word/Word`). This follows Precept's literal grain: `"hello"` doesn't need `string("hello")`, so `'2026-01-15'` doesn't need `date(2026-01-15)`.
+- **Why:** The `'...'` delimiter is the **typed constant delimiter** for any non-primitive type whose content shape is unambiguous — not a temporal-specific feature. The three literal mechanisms are a closed set: `"..."` (string), `'...'` (typed constant, shape-inferred), `N unit` (quantity). Zero constructors exist in the language. A type qualifies for `'...'` if and only if its content shape is distinguishable from every other single-quote inhabitant (the admission rule). Temporal types are the **first inhabitants**: `localdate` (`YYYY-MM-DD`), `localtime` (`HH:MM:SS`), `localdatetime` (`...T...`), `instant` (`...T...Z`), `zoneddatetime` (`...T...[zone]`), `timezone` (`Word/Word`). This follows Precept's literal grain: `"hello"` doesn't need `string("hello")`, so `'2026-01-15'` doesn't need `localdate(2026-01-15)`.
 - **Alternatives rejected:** (A) `date(2026-01-15)` (unquoted constructor — original Decision #4/18) — the team's unanimous initial recommendation. Shane challenged it with the string-delimiter precedent insight: if strings use `"..."` without a `string()` wrapper, temporal values should use a delimiter too. See "Double-Quote Alternative Analysis" below. (B) `date("2026-01-15")` (string constructor) — quotes suggest "a string being parsed." (C) Bare ISO `2024-01-15` — lexer ambiguity with subtraction. (D) `"2026-01-15"` (double-quoted, context-resolved) — explored and rejected; see "Double-Quote Alternative Analysis." (E) Sigil prefix (`#2026-01-15`) — non-obvious, not Precept's voice.
 - **Precedent:** SQL `'2026-01-15'` for value literals. Python `b'...'` / `r'...'` for typed string variants with distinct delimiters.
 - **Tradeoff:** Type is implicit in content shape rather than explicit in a keyword. Readers must recognize ISO formats. Mitigated by: (a) ISO date formats are culturally universal, (b) field declarations provide type context, (c) syntax highlighting colors single-quoted content distinctly.
 
 **`char` type permanent exclusion (supporting decision):** Precept will never have a `char` type — characters are programming-language implementation details, not business-domain data. Single quotes are permanently reserved for the typed constant delimiter with zero future collision risk. Confirmed by Frank and George.
 
-### 5. No timezone on `date`, `time`, or `datetime`
+### 5. No timezone on `localdate`, `localtime`, or `localdatetime`
 
-- **Why:** Calendar/clock types represent what's on a calendar or wall clock.
+- **Why:** Calendar/clock types represent what's on a calendar or wall clock. The `local` prefix makes this explicit.
 - **Alternatives rejected:** UTC-anchored dates. Timezone as required metadata.
-- **Precedent:** NodaTime `Local*` types.
-- **Tradeoff:** Timezone conversion requires explicit function calls.
+- **Precedent:** NodaTime `Local*` types. The naming convention directly mirrors NodaTime's `LocalDate`, `LocalTime`, `LocalDateTime`.
+- **Tradeoff:** Timezone conversion requires explicit `.inZone(tz)` dot-accessor chains.
 
-### 6. `instant` has no component accessors
+### 6. `instant` has no component accessors — restricted semantics (strengthened in v4)
 
-- **Why:** Extracting `.year` from an instant requires a timezone. NodaTime's `Instant` has no date/time accessors.
+- **Why:** Extracting `.year` from an instant requires a timezone. NodaTime's `Instant` has no date/time accessors. `instant` supports only: comparison, duration arithmetic, and `.inZone(tz)` navigation. No component accessors, no period arithmetic.
 - **Alternatives rejected:** Accessors with mandatory timezone parameter. Implicit UTC.
 - **Precedent:** NodaTime `Instant`.
-- **Tradeoff:** More verbose than `FiledAt.year`.
+- **Tradeoff:** More verbose than `FiledAt.year`. Verbosity is the point — it forces explicit timezone mediation.
 
 ### 7. `timezone` as a first-class type
 
@@ -1065,12 +1176,12 @@ All temporal types support `nullable`. All follow existing null propagation rule
 - **Precedent:** NodaTime's `DateTimeZone`.
 - **Tradeoff:** New type in the system.
 
-### 8. Conversion functions take explicit timezone parameters
+### 8. Timezone mediation via `.inZone(tz)` dot accessor (rewritten in v4)
 
-- **Why:** Dependency visible in expression. No hidden timezone.
-- **Alternatives rejected:** Timezone in composite type. System timezone.
-- **Precedent:** NodaTime requires explicit `DateTimeZone`.
-- **Tradeoff:** Verbose. Verbosity is the point.
+- **Why:** D8 (dot-vs-function rule): "If the value owns it, dot." An instant owns its mediation to a timezone. D11: `.inZone(tz)` produces a `zoneddatetime`; navigation to local types uses dot chains (`.localdate`, `.localtime`, `.localdatetime`). This replaces three standalone functions (`toLocalDate`, `toLocalTime`, `toInstant`) with one composable operation. Better IntelliSense: after `.inZone(tz).`, the completion list shows all available components.
+- **Alternatives rejected:** Three standalone functions (`toLocalDate(instant, tz)`, `toLocalTime(instant, tz)`, `toInstant(date, time, tz)`) — v3 position. Conflated mediation+extraction in one call. `pin(ldt, tz)` for reverse direction — redundant with `ldt.inZone(tz).instant`.
+- **Precedent:** NodaTime's own `Instant.InZone(DateTimeZone)` returns `ZonedDateTime`. Java's `Instant.atZone(ZoneId)` returns `ZonedDateTime`. The dot-accessor form is the universal pattern.
+- **Tradeoff:** Longer expression for simple cases: `myInstant.inZone(tz).localdate` vs. `toLocalDate(myInstant, tz)`. The verbosity is intentional — two separate operations (mediate, then extract) are visually distinct.
 
 ### 9. Determinism is relative to the runtime environment
 
@@ -1079,14 +1190,14 @@ All temporal types support `nullable`. All follow existing null propagation rule
 - **Precedent:** Every timezone-sensitive system manages TZ database freshness.
 - **Tradeoff:** Determinism input surface includes TZ database version.
 
-### 10. `date + integer` is a type error — use `date + (n) days`
+### 10. `localdate + integer` is a type error — use `localdate + (n) days`
 
-- **Why:** `date + 2` is implicit — what does `2` mean? NodaTime requires `LocalDate.Plus(Period.FromDays(n))` — the `Period` makes the unit visible. Now that `period` is a surface type, `(n) days` resolves to `period` and the type checker validates `date + period`. The shortcut `date + integer` would bypass this type-level enforcement.
-- **Alternatives rejected:** `date + integer` meaning "add N days" — the v1 position. Convenient but implicit. In a proposal with both `(n) days` and `(n) months` as period constructors, `+ 5` is genuinely ambiguous. NodaTime's `LocalDate` has no `operator+(int)` — it requires `Plus(Period)`.
+- **Why:** `localdate + 2` is implicit — what does `2` mean? NodaTime requires `LocalDate.Plus(Period.FromDays(n))` — the `Period` makes the unit visible. Now that `period` is a surface type, `(n) days` resolves to `period` and the type checker validates `localdate + period`. The shortcut `localdate + integer` would bypass this type-level enforcement.
+- **Alternatives rejected:** `localdate + integer` meaning "add N days" — the v1 position. Convenient but implicit. In a proposal with both `(n) days` and `(n) months` as period constructors, `+ 5` is genuinely ambiguous. NodaTime's `LocalDate` has no `operator+(int)` — it requires `Plus(Period)`.
 - **Precedent:** NodaTime `LocalDate` has no integer arithmetic operator. FEEL requires explicit offsets.
 - **Tradeoff:** `DueDate + 5 days` is more verbose than `DueDate + 5`. The verbosity forces the author to name the unit.
 
-### 11. `date - date` returns `period` (not integer, not duration)
+### 11. `localdate - localdate` returns `period` (not integer, not duration)
 
 - **Why:** The result of subtracting two dates is a calendar quantity. NodaTime's `Period.Between(d1, d2)` returns `Period` — it preserves structural calendar components. Returning `integer` loses unit semantics. Returning `duration` conflates calendar distance with timeline distance.
 - **Alternatives rejected:** `→ integer` — loses unit semantics. `→ duration` (v1 position) — conflates calendar and timeline. NodaTime deliberately returns `Period`.
@@ -1102,10 +1213,10 @@ All temporal types support `nullable`. All follow existing null propagation rule
 
 ### 13. `period` is full NodaTime Period — date AND time components (v2.1 revision)
 
-- **Why:** NodaTime's `Period` includes both date components (years, months, weeks, days) and time components (hours, minutes, seconds). The v2 date-only restriction contradicted the "expose NodaTime faithfully" directive in three ways: (1) `LocalTime.Plus(Period)` is NodaTime's native API for time arithmetic, but date-only `period` couldn't carry time results; (2) `Period.Between(LocalTime, LocalTime)` returns time-component Periods with no home in a date-only type; (3) timeline constructors returning `duration` plus `LocalTime` not accepting `Duration` left no clean implementation path for `time + 3 hours`. `Period.FromHours()`, `.FromMinutes()`, `.FromSeconds()` all exist in NodaTime.
+- **Why:** NodaTime's `Period` includes both date components (years, months, weeks, days) and time components (hours, minutes, seconds). The v2 date-only restriction contradicted the "expose NodaTime faithfully" directive in three ways: (1) `LocalTime.Plus(Period)` is NodaTime's native API for time arithmetic, but date-only `period` couldn't carry time results; (2) `Period.Between(LocalTime, LocalTime)` returns time-component Periods with no home in a date-only type; (3) timeline constructors returning `duration` plus `LocalTime` not accepting `Duration` left no clean implementation path for `localtime + 3 hours`. `Period.FromHours()`, `.FromMinutes()`, `.FromSeconds()` all exist in NodaTime.
 - **Alternatives rejected:** Date-only `period` (v2 position) — created the three structural contradictions above. Re-invents a boundary NodaTime chose not to draw.
 - **Precedent:** NodaTime `Period` — full date+time components. `Period.HasDateComponent` / `Period.HasTimeComponent` for introspection.
-- **Tradeoff:** `date + period` where the period has time components: the date type ignores the time portion (NodaTime's `LocalDate.Plus(Period)` behavior). Some expressions are valid but semantically empty for one component. This matches NodaTime — they made the same choice.
+- **Tradeoff:** `localdate + period` where the period has time components: the localdate type ignores the time portion (NodaTime's `LocalDate.Plus(Period)` behavior). Some expressions are valid but semantically empty for one component. This matches NodaTime — they made the same choice.
 
 ### 14. No ordering on `period` — `==` and `!=` only
 
@@ -1121,12 +1232,12 @@ All temporal types support `nullable`. All follow existing null propagation rule
 - **Precedent:** NodaTime standard `Period` equality.
 - **Tradeoff:** `7 days == 1 week` is `false`. Structurally different representations.
 
-### 16. Sub-day duration bridging — `time + duration` via thin type-checker translation
+### 16. Sub-day duration bridging — `localtime + duration` via thin type-checker translation
 
-- **Why:** `hours`, `minutes`, `seconds` in most expression contexts resolve to `duration` (fixed-length quantities — Duration's natural type). NodaTime's `LocalTime` accepts `Period`, not `Duration`. But for sub-day units, `Duration` and `Period` represent identical physical quantities — an hour is always exactly 3600 seconds regardless of whether it's stored as `Duration.FromHours(1)` or `Period.FromHours(1)`. The type checker allows `time + duration → time`. Runtime: nanosecond arithmetic on `LocalTime` (NodaTime stores `LocalTime` as nanosecond-of-day internally). This uses NodaTime's own primitives, not a reimplementation.
+- **Why:** `hours`, `minutes`, `seconds` in most expression contexts resolve to `duration` (fixed-length quantities — Duration's natural type). NodaTime's `LocalTime` accepts `Period`, not `Duration`. But for sub-day units, `Duration` and `Period` represent identical physical quantities — an hour is always exactly 3600 seconds regardless of whether it's stored as `Duration.FromHours(1)` or `Period.FromHours(1)`. The type checker allows `localtime + duration → localtime`. Runtime: nanosecond arithmetic on `LocalTime` (NodaTime stores `LocalTime` as nanosecond-of-day internally). This uses NodaTime's own primitives, not a reimplementation.
 - **Alternatives rejected:** (A) Time units always producing `period` — `instant + 3 hours` fails unless compiler can guarantee no date components, which is impossible for period fields at compile time. Violates Principle #8. (C) Context-dependent return type — implicit, violates the directive. (D) Separate unit keywords for duration vs. period — two names for the same physical quantity; verbose duplication.
 - **Precedent:** NodaTime has BOTH `Duration.FromHours(1)` AND `Period.FromHours(1)` for the same physical quantity. Precept picks one entry point (`duration`) and bridges at the type-checker level.
-- **Tradeoff:** `time + duration` is not a direct NodaTime API call. The translation layer is thin — nanosecond arithmetic — not a reimplementation. NodaTime's own `LocalTime.PlusHours()` convenience methods do the same nanosecond manipulation internally.
+- **Tradeoff:** `localtime + duration` is not a direct NodaTime API call. The translation layer is thin — nanosecond arithmetic — not a reimplementation. NodaTime's own `LocalTime.PlusHours()` convenience methods do the same nanosecond manipulation internally.
 
 ### 17. Unified postfix model — sole mechanism for temporal quantity construction (rewritten 2026-04-15)
 
@@ -1146,7 +1257,7 @@ All temporal types support `nullable`. All follow existing null propagation rule
 - **Precedent:** CSS (`30px` bare, `calc()` for expressions), Kotlin (`3.days`, extension functions), F# units of measure (`3<kg>`), mathematical notation, ISO 80000-1.
 - **Tradeoff:** Context-dependent type resolution is implicit — `3 days` alone has no fixed type. Mitigated by: (1) compile error on ambiguous standalone usage, (2) the context that determines the type (`date +` vs `instant +`) is visible in the same expression, (3) `months`/`years` have NO duration equivalent, so they always resolve to `period` without ambiguity.
 
-**Context-dependent type resolution unchanged:** `date +` context → `period`, `instant +` context → `duration`, field default → match declared type, no context → compile error.
+**Context-dependent type resolution unchanged:** `localdate +` context → `period`, `instant +` context → `duration`, field default → match declared type, no context → compile error.
 
 **Left-associative `+` subtlety:** `date + 1 month + 1 month` applies sequentially with truncation (Jan 31 → Feb 28 → Mar 28). `date + (1 month + 1 month)` builds period first then applies once (Jan 31 → Mar 31). Both valid — parens available for "build-then-apply" semantics.
 
@@ -1182,20 +1293,62 @@ All temporal types support `nullable`. All follow existing null propagation rule
 **Design evolution:** The `date(2026-01-15)` constructor form was the team's unanimous initial recommendation (original Decision #18). Shane then challenged it with the string-delimiter precedent insight: strings don't need `string("hello")` — the `"..."` delimiter IS the type signal. Why should temporal values need `date(...)` when a distinct delimiter can carry the same information? This led to exploring `"..."` with context resolution (rejected — see "Double-Quote Alternative Analysis" below), then to single quotes as the clean solution.
 
 - **Why:** (1) Follows Precept's literal grain — the delimiter IS the type signal. (2) Single token in the tokenizer (`'[^']*'`), same as `NumberLiteral` and `StringLiteral`. (3) Uniform across all 6 types. (4) `'` is an unambiguous IntelliSense trigger for temporal completions and progressive validation. (5) No `char` type collision — permanently safe.
-- **Alternatives rejected:** (A) `date(2026-01-15)` (unquoted constructor) — team's initial choice, superseded by delimiter insight. (B) `date("2026-01-15")` (string constructor) — quotes suggest "string being parsed." (C) `"2026-01-15"` (double-quoted, context-resolved) — explored and rejected; see "Double-Quote Alternative Analysis." (D) Bare ISO `2024-01-15` — lexer ambiguity with subtraction. (E) SQL-style `DATE '2026-01-15'` — redundant keyword when content shape is sufficient.
+- **Alternatives rejected:** (A) `localdate(2026-01-15)` (unquoted constructor) — team's initial choice, superseded by delimiter insight. (B) `localdate("2026-01-15")` (string constructor) — quotes suggest "string being parsed." (C) `"2026-01-15"` (double-quoted, context-resolved) — explored and rejected; see "Double-Quote Alternative Analysis." (D) Bare ISO `2024-01-15` — lexer ambiguity with subtraction. (E) SQL-style `DATE '2026-01-15'` — redundant keyword when content shape is sufficient.
 - **Precedent:** SQL `'...'` for value literals including dates. Precept's own `"..."` → string pattern.
 - **Tradeoff:** Type is implicit in content shape rather than explicit in a keyword. Readers must recognize ISO formats. Mitigated by: (a) ISO formats are culturally universal, (b) field declarations provide type context, (c) syntax highlighting can color single-quoted content distinctly.
 
 **Tooling implications:**
 - **IntelliSense:** `'` triggers temporal completions with format-aware ghost text. After `'2024-`, show `-MM-DD` placeholder. After `'14:`, show `mm:ss`. Content-shape detection enables type-specific validation as the author types.
 - **Hover content (invariant culture, deterministic):**
-  - `'2024-01-15'` → "date: January 15, 2024 (Monday)"
-  - `'14:30'` → "time: 2:30 PM"
-  - `'2024-01-15T14:30:00'` → "datetime: January 15, 2024 at 2:30 PM (Monday)"
+  - `'2024-01-15'` → "localdate: January 15, 2024 (Monday)"
+  - `'14:30'` → "localtime: 2:30 PM"
+  - `'2024-01-15T14:30:00'` → "localdatetime: January 15, 2024 at 2:30 PM (Monday)"
   - `'2024-01-15T14:30:00Z'` → "instant: 2024-01-15T14:30:00Z (UTC)" — NO day-of-week (requires timezone)
   - `'America/New_York'` → "timezone: America/New_York (UTC-05:00 / UTC-04:00 DST)"
 - **Timezone completions:** `'` in timezone context triggers IANA timezone completion from `DateTimeZoneProviders.Tzdb.Ids` with UTC offset descriptions.
 - **Hover is always invariant culture English** — not locale-dependent. Same `.precept` file, same hover everywhere.
+
+### 19. `local*` naming convention — `localdate`, `localtime`, `localdatetime` (locked v4)
+
+- **Why:** NodaTime's own naming convention uses `LocalDate`, `LocalTime`, `LocalDateTime` — the `Local` prefix explicitly signals "no timezone." The v1 proposal used `local*` naming, v2–v3 switched to bare English words (`date`, `time`, `datetime`). Shane's explicit lock (D10) returns to `local*` because: (1) symmetry with NodaTime types eliminates a naming translation layer, (2) the `local` prefix is semantically precise — these types represent *local* observations without timezone context, (3) it avoids ambiguity with generic English words (`datetime` could be confused with `System.DateTime`).
+- **Alternatives rejected:** Bare English names (`date`, `time`, `datetime`) — v2–v3 position. Natural-sounding but lose the "no timezone" semantic signal. `calendardate` / `walltime` — descriptive but diverge from NodaTime naming.
+- **Precedent:** NodaTime (`LocalDate`, `LocalTime`, `LocalDateTime`), Java 8 (`LocalDate`, `LocalTime`, `LocalDateTime`), Kotlin datetime library. Every major temporal library that distinguishes local from zoned types uses the `Local` prefix.
+- **Tradeoff:** Slightly longer type names (`localdate` vs `date`). Worth it — the precision eliminates an entire class of "does this type carry a timezone?" confusion.
+
+### 20. Dot-vs-function rule — "If the value owns it, dot" (locked v4)
+
+- **Why:** This is a language-wide design principle, not just a temporal decision. Applied to temporal types: `myInstant.inZone(tz)` (the instant owns its mediation), `zdt.localdate` (the zoneddatetime owns its components), `myPeriod.years` (the period owns its structural components). Freestanding functions remain for operations that don't belong to any particular value: `abs()`, `min()`, `trim()`.
+- **Alternatives rejected:** All operations as freestanding functions — v3 position (`toLocalDate(instant, tz)`). Loses IntelliSense discoverability (see Elaine's research). Functions don't chain naturally.
+- **Precedent:** NodaTime uses instance methods (`instant.InZone(tz)`, `zdt.LocalDateTime`). Java uses instance methods (`instant.atZone(tz)`, `zdt.toLocalDate()`). C# `System.DateTime` uses instance properties (`.Date`, `.TimeOfDay`). Dot access is the universal pattern.
+- **Tradeoff:** Dot chains can become long (`myInstant.inZone(tz).localdate.year`). Mitigated by set-to-variables pattern and intermediate field assignments.
+
+### 21. `inZone` as the sole timezone mediation operation (locked v4)
+
+- **Why:** One operation in both directions. `instant.inZone(tz)` → `zoneddatetime` (universal→local). `localdatetime.inZone(tz)` → `zoneddatetime` (local→universal). Navigation to specific types via dot chains on the result. Eliminates three standalone functions (`toLocalDate`, `toLocalTime`, `toInstant`) and the eliminated `pin` function. Cleaner separation of concerns — mediation and extraction are separate dot operations, not conflated in one function call.
+- **Alternatives rejected:** Three standalone functions (v3 position) — conflated mediation+extraction, poor IntelliSense discoverability. Two functions (`inZone` + `pin`) — `pin` is redundant with `ldt.inZone(tz).instant`.
+- **Precedent:** NodaTime `Instant.InZone(DateTimeZone) → ZonedDateTime`. Java `Instant.atZone(ZoneId) → ZonedDateTime`.
+- **Tradeoff:** `myInstant.inZone(tz).localdate` is longer than `toLocalDate(myInstant, tz)`. The verbosity makes the two-step process (mediate, then extract) visually explicit.
+
+### 22. Strict type hierarchy — no skip-level accessors (locked v4)
+
+- **Why:** Forces explicit timezone mediation at every boundary crossing between the universal tier (`instant`) and the local tier (`localdate`, `localtime`, `localdatetime`). `instant.localdate` is a compile error — must go `instant.inZone(tz).localdate`. This prevents the most common temporal bug: extracting calendar components from a UTC timestamp without specifying which timezone.
+- **Alternatives rejected:** Skip-level convenience accessors (`instant.localdate(tz)` — parameter on the accessor) — conflates mediation into the accessor, inconsistent with other accessor patterns. Implicit UTC extraction (`instant.year` defaults to UTC) — exactly what NodaTime was designed to prevent.
+- **Precedent:** NodaTime's `Instant` has no date/time properties at all — `InZone()` is required. Java's `Instant` has no `getYear()` — `atZone()` is required.
+- **Tradeoff:** Verbose chains for simple extractions. `myInstant.inZone(tz).localdate.year` requires understanding the full hierarchy. Mitigated by: assign intermediate results to named fields for readability.
+
+### 23. `pin` eliminated — reverse navigation via dot chain (locked v4)
+
+- **Why:** `localdatetime.inZone(tz).instant` achieves the same result as the proposed `pin(ldt, tz)` function. One mediation operation (`.inZone(tz)`) in both directions is simpler than two operations (`inZone` for forward, `pin` for reverse). Fewer concepts to learn, fewer function names to remember.
+- **Alternatives rejected:** `pin(localdatetime, tz) → instant` — dedicated reverse-direction function. Redundant with dot-chain composition.
+- **Precedent:** NodaTime uses `LocalDateTime.InZoneLeniently(DateTimeZone).ToInstant()` — the same composition pattern.
+- **Tradeoff:** `ldt.inZone(tz).instant` is slightly longer than `pin(ldt, tz)`. The consistency of using the same `.inZone(tz)` operation in both directions outweighs the character count.
+
+### 24. Instant restricted semantics — comparison, duration arithmetic, and `.inZone(tz)` only (locked v4)
+
+- **Why:** An instant is a point on the UTC timeline with no calendar context. The only operations that make physical sense on a UTC timeline point are: comparison (which came first?), duration arithmetic (add/subtract fixed time), and timezone mediation (view in a timezone). Component accessors (`.year`, `.localdate`) are compile errors because they require a timezone. Period arithmetic (`+ 1 month`) is a type error because months have variable duration. This is NodaTime's `Instant` design, exposed faithfully.
+- **Alternatives rejected:** Instant with implicit UTC component accessors (`instant.year` meaning "year in UTC") — hides a timezone dependency behind convenience. Instant with period arithmetic via implicit UTC conversion — implicit behavior is what NodaTime was designed to prevent.
+- **Precedent:** NodaTime `Instant`: no date/time properties, no period arithmetic, only comparison + duration + `InZone()`.
+- **Tradeoff:** Every calendar operation on an instant requires `.inZone(tz)` first. Verbosity is the point — it makes timezone dependencies explicit.
 
 ---
 
@@ -1206,9 +1359,9 @@ After the `date(2026-01-15)` constructor form was challenged by the delimiter in
 ### The compiler CAN resolve it in ~99% of cases
 
 Context resolution is technically feasible. The compiler knows the target type from:
-- Field declarations: `field DueDate as date default "2026-01-15"` → the field is `date`, the string is a date.
-- Binary operators: `DueDate + "2026-01-15"` → left operand is `date`, right must be `date` (for comparison) or `period` (for arithmetic).
-- Function arguments: `toInstant("2026-01-15", tz)` → first parameter typed as `date`.
+- Field declarations: `field DueDate as localdate default '2026-01-15'` → the field is `localdate`, the literal is a localdate.
+- Binary operators: `DueDate + '2026-01-15'` → left operand is `localdate`, right must be `localdate` (for comparison) or `period` (for arithmetic).
+- Dot-accessor context: `myInstant.inZone(tz).localdate` → the chain produces a `localdate`.
 
 The ~1% failure case is genuinely ambiguous positions (pure variable assignment without type annotation), which could be mitigated by requiring explicit type annotation in those rare positions.
 
@@ -1216,7 +1369,7 @@ The ~1% failure case is genuinely ambiguous positions (pure variable assignment 
 
 Three arguments against double-quoted temporal resolution, in order of strength:
 
-1. **Refactoring safety.** Changing `field DueDate as date` to `field DueDate as string` silently changes the meaning of every `"2026-01-15"` assigned to it. With constructor syntax (`date(2026-01-15)`) or single quotes (`'2026-01-15'`), those expressions immediately become type errors, flagging every usage site for review. Type changes should produce compile errors at affected usage sites — not silent semantic shifts.
+1. **Refactoring safety.** Changing `field DueDate as localdate` to `field DueDate as string` silently changes the meaning of every `"2026-01-15"` assigned to it. With single quotes (`'2026-01-15'`), those expressions immediately become type errors, flagging every usage site for review. Type changes should produce compile errors at affected usage sites — not silent semantic shifts.
 
 2. **IntelliSense quality.** `"` is the trigger for string completions. If `"` sometimes starts a temporal literal, the completion engine needs full expression-context analysis before offering suggestions. `'` is an unambiguous trigger — inside single quotes, always offer temporal completions with format-aware ghost text and progressive validation.
 
@@ -1226,7 +1379,7 @@ Three arguments against double-quoted temporal resolution, in order of strength:
 
 An important counter-argument was considered: Precept's `choice` fields already use `"..."` double-quoted strings where the meaning depends on the field declaration. `choice("Draft", "Active", "Closed")` defines allowed values — `"Draft"` is only valid in the context of that field.
 
-However, the distinction matters: **choice is a constraint on a value within the same type** — a string field constrained to specific string values. The string `"Draft"` is still a string; the field merely limits which strings are valid. Temporal would be a **type-family conversion** — the string `"2026-01-15"` would need to become a fundamentally different type (`date`). This crosses from value-constraint to type-conversion, which is the stronger argument for a distinct delimiter.
+However, the distinction matters: **choice is a constraint on a value within the same type** — a string field constrained to specific string values. The string `"Draft"` is still a string; the field merely limits which strings are valid. Temporal would be a **type-family conversion** — the string `"2026-01-15"` would need to become a fundamentally different type (`localdate`). This crosses from value-constraint to type-conversion, which is the stronger argument for a distinct delimiter.
 
 ### Conclusion
 
@@ -1236,21 +1389,21 @@ Single quotes win on all three criteria that matter for a DSL: refactoring safet
 
 ## George's Challenges — Resolution
 
-### Challenge 1: `DueDate + MealsTotal` compiles because `date + number → date`
+### Challenge 1: `DueDate + MealsTotal` compiles because `localdate + number → localdate`
 
-**Resolution (v2 — strengthened):** No form of `date + <non-period>` is defined. `DueDate + MealsTotal` is a type error regardless of `MealsTotal`'s type — none of `integer`, `number`, `decimal`, or `duration` are `period`.
+**Resolution (v2 — strengthened):** No form of `localdate + <non-period>` is defined. `DueDate + MealsTotal` is a type error regardless of `MealsTotal`'s type — none of `integer`, `number`, `decimal`, or `duration` are `period`.
 
-### Challenge 2: `date + 2.5` should reject fractional offsets
+### Challenge 2: `localdate + 2.5` should reject fractional offsets
 
-**Resolution (v2 — strengthened):** `date + 2.5` is a type error — `2.5` is not a `period`. `date + 2` is also a type error. `(2.5) days` is a type error — `days` requires `integer` (bare postfix) or integer-typed expression (paren postfix).
+**Resolution (v2 — strengthened):** `localdate + 2.5` is a type error — `2.5` is not a `period`. `localdate + 2` is also a type error. `(2.5) days` is a type error — `days` requires `integer` (bare postfix) or integer-typed expression (paren postfix).
 
 ### Challenge 3: `nullable + default` prohibition
 
 **Resolution:** Open. Deferred to cross-cutting design decision.
 
-### Challenge 4: `date - date` result type
+### Challenge 4: `localdate - localdate` result type
 
-**Resolution (v2 — redesigned):** `date - date → period`. Preserves structural calendar units. Matches `Period.Between(d1, d2)`.
+**Resolution (v2 — redesigned):** `localdate - localdate → period`. Preserves structural calendar units. Matches `Period.Between(d1, d2)`.
 
 ---
 
@@ -1259,7 +1412,7 @@ Single quotes win on all three criteria that matter for a DSL: refactoring safet
 | Issue | Relationship |
 |---|---|
 | #25 (choice type) | Complementary. |
-| #26 (date type) | **Superseded.** `date` section here incorporates all of #26 plus NodaTime, period-based arithmetic, postfix unit construction. |
+| #26 (date type) | **Superseded.** `localdate` section here incorporates all of #26 plus NodaTime, period-based arithmetic, postfix unit construction. |
 | #27 (decimal type) | Complementary. No cross-type arithmetic. |
 | #29 (integer type) | Postfix unit expressions take `integer`. Dependency. |
 | #16 (built-in functions) | Conversion functions from this proposal. Constructor functions eliminated — replaced by postfix units. |
@@ -1285,24 +1438,24 @@ Single quotes win on all three criteria that matter for a DSL: refactoring safet
 
 ### Parser / Tokenizer
 
-- Add `date`, `time`, `instant`, `duration`, `period`, `timezone`, `zoneddatetime`, `datetime` as type keywords.
+- Add `localdate`, `localtime`, `instant`, `duration`, `period`, `timezone`, `zoneddatetime`, `localdatetime` as type keywords.
 - Add `days`, `months`, `years`, `weeks`, `hours`, `minutes`, `seconds` as unit keywords for postfix expressions.
-- Add `toLocalDate`, `toLocalTime`, `toInstant` as conversion function keywords.
+- Add `inZone` as dot-accessor keyword for timezone mediation.
 - **Single-quoted typed constants:** New token type `TypedConstantLiteral`. The tokenizer matches `'[^']*'` as a single token. The parser validates content shape and infers the specific type. Content inside single quotes is a constant pattern, not an expression — no operator precedence, no identifier resolution. `'2026-03-15'` is valid. `'03/15/2026'` is a compile error with a teachable message. Compile-time validated per inferred type. Temporal types are the first inhabitants; the mechanism is not temporal-specific.
 - **Postfix unit expressions:** New expression form. Two combinators:
   - `PostfixUnitExprBare`: `<integer-literal> <unit-keyword>`. Must precede `NumberAtom` in atom chain (both start with `NumberLiteral`).
   - `PostfixUnitExprParen`: `( <expression> ) <unit-keyword>`. Must precede `ParenExpr` in atom chain (both start with `LeftParen`). Uses `.Try()` — backtracking on missing unit keyword is clean.
 - Unit keywords in postfix position must not be consumed as identifiers.
-- Parse all conversion function call forms (`toLocalDate`, `toLocalTime`, `toInstant`).
-- Parse accessors: `.year`, `.month`, `.day`, `.dayOfWeek`, `.hour`, `.minute`, `.second`, `.date`, `.time`, `.totalHours`, `.totalMinutes`, `.totalSeconds`, `.instant`, `.timezone`, `.years`, `.months`, `.weeks`, `.days`, `.hours`, `.minutes`, `.seconds`, `.hasDateComponent`, `.hasTimeComponent`.
+- Parse `.inZone(tz)` dot-accessor form for timezone mediation on `instant` and `localdatetime` types.
+- Parse accessors: `.year`, `.month`, `.day`, `.dayOfWeek`, `.hour`, `.minute`, `.second`, `.localdate`, `.localtime`, `.localdatetime`, `.totalHours`, `.totalMinutes`, `.totalSeconds`, `.instant`, `.timezone`, `.years`, `.months`, `.weeks`, `.days`, `.hours`, `.minutes`, `.seconds`, `.hasDateComponent`, `.hasTimeComponent`.
 
 ### Type Checker
 
 - 8 new type entries.
-- **Period/duration split enforcement:** `date + period ✓`, `date + duration ✗`, `instant + duration ✓`, `instant + period ✗`. Standard type-checking — no custom dispatch.
-- **Postfix unit type resolution:** Resolve `<value> <unit-keyword>` expressions to `period` or `duration` based on expression context. `date +` / `datetime +` context → `period`. `instant +` / `zoneddatetime +` context → `duration`. `months`/`years` → always `period`. Field default context → match declared field type. No context → compile error.
-- **Typed constant type inference:** Determine specific type from content shape via the admission rule. Current inhabitants (temporal — first wave): `YYYY-MM-DD` without `T` = date, `HH:MM:SS` without `-` = time, `...T...` without `Z` or `[` = datetime, `...T...Z` = instant, `...T...[zone]` = zoneddatetime, IANA pattern = timezone. Framework is extensible to future inhabitants whose shapes pass the admission rule.
-- **Meaningless combination warnings:** `date + 3 hours` (hours on a date) → warning. `date + 3 minutes` → warning.
+- **Period/duration split enforcement:** `localdate + period ✓`, `localdate + duration ✗`, `instant + duration ✓`, `instant + period ✗`. Standard type-checking — no custom dispatch.
+- **Postfix unit type resolution:** Resolve `<value> <unit-keyword>` expressions to `period` or `duration` based on expression context. `localdate +` / `localdatetime +` context → `period`. `instant +` / `zoneddatetime +` context → `duration`. `months`/`years` → always `period`. Field default context → match declared field type. No context → compile error.
+- **Typed constant type inference:** Determine specific type from content shape via the admission rule. Current inhabitants (temporal — first wave): `YYYY-MM-DD` without `T` = localdate, `HH:MM:SS` without `-` = localtime, `...T...` without `Z` or `[` = localdatetime, `...T...Z` = instant, `...T...[zone]` = zoneddatetime, IANA pattern = timezone. Framework is extensible to future inhabitants whose shapes pass the admission rule.
+- **Meaningless combination warnings:** `localdate + 3 hours` (hours on a localdate) → warning. `localdate + 3 minutes` → warning.
 - Full cross-type interaction matrix.
 - `period` ordering rejection (`<`, `>`, `<=`, `>=`).
 - `period` scaling rejection (`* integer`).
@@ -1312,18 +1465,18 @@ Single quotes win on all three criteria that matter for a DSL: refactoring safet
 
 ### Expression Evaluator
 
-- `date` arithmetic via `LocalDate.Plus(Period)`, `LocalDate.Minus(Period)`.
-- `date - date` via `Period.Between(d1, d2)`.
+- `localdate` arithmetic via `LocalDate.Plus(Period)`, `LocalDate.Minus(Period)`.
+- `localdate - localdate` via `Period.Between(d1, d2)`.
 - `period` arithmetic via `Period + Period`, `Period - Period`.
-- `time + period` via `LocalTime.Plus(Period)` — NodaTime native.
-- `time + duration` via nanosecond arithmetic on `LocalTime` — thin translation (Decision #16).
-- `time - time` via `Period.Between(t1, t2)` → time-component period.
+- `localtime + period` via `LocalTime.Plus(Period)` — NodaTime native.
+- `localtime + duration` via nanosecond arithmetic on `LocalTime` — thin translation (Decision #16).
+- `localtime - localtime` via `Period.Between(t1, t2)` → time-component period.
 - `instant` arithmetic via `Instant.Plus(Duration)`, `Instant.Minus(Duration)`.
 - `duration` arithmetic via `Duration` operators.
-- `datetime` arithmetic via `LocalDateTime.Plus(Period)`. `datetime + duration` uses duration bridging — same thin translation as `time + duration` (Decision #16).
+- `localdatetime` arithmetic via `LocalDateTime.Plus(Period)`. `localdatetime + duration` uses duration bridging — same thin translation as `localtime + duration` (Decision #16).
 - `zoneddatetime` timeline arithmetic via underlying instant.
 - Postfix unit resolution: bare/paren postfix → `Period.FromDays(n)`, `Duration.FromHours(n)`, etc., based on resolved type.
-- Conversion functions with timezone lookups.
+- `.inZone(tz)` mediation: `instant.inZone(tz)` via `Instant.InZone(DateTimeZone)`, `localdatetime.inZone(tz)` via `LocalDateTime.InZoneLeniently(DateTimeZone)`.
 
 ### Runtime Engine
 
@@ -1336,7 +1489,7 @@ Single quotes win on all three criteria that matter for a DSL: refactoring safet
 - Add all 8 type keywords to `typeKeywords`.
 - Add all 7 unit keywords to appropriate keyword group.
 - Add single-quoted literal pattern: `'[^']*'` as typed constant token.
-- Add conversion function names.
+- Add `inZone` as dot-accessor keyword.
 
 ### Language Server
 
@@ -1360,26 +1513,26 @@ Single quotes win on all three criteria that matter for a DSL: refactoring safet
 
 ## Acceptance Criteria
 
-### `date` type
+### `localdate` type
 
-- [ ] `field X as date` parses and type-checks.
-- [ ] `'2026-03-15'` validates at compile time as a date. `'2026-02-30'` is a compile error.
-- [ ] `date + 30 days`, `+ 3 months`, `+ 1 year`, `+ 2 weeks` work (postfix units resolve to `period` in date context).
-- [ ] `date + (GraceDays) days` works (paren postfix resolves to `period`).
-- [ ] `date + period → date`, `date - period → date` work for any `period`.
-- [ ] `date - date → period` (not integer, number, or duration).
-- [ ] `date + integer`, `date + number`, `date + decimal` are type errors.
-- [ ] **`date + duration` is a type error** with teachable message.
-- [ ] **`date + 3 hours` produces a warning** (hours meaningless on dates).
+- [ ] `field X as localdate` parses and type-checks.
+- [ ] `'2026-03-15'` validates at compile time as a localdate. `'2026-02-30'` is a compile error.
+- [ ] `localdate + 30 days`, `+ 3 months`, `+ 1 year`, `+ 2 weeks` work (postfix units resolve to `period` in localdate context).
+- [ ] `localdate + (GraceDays) days` works (paren postfix resolves to `period`).
+- [ ] `localdate + period → localdate`, `localdate - period → localdate` work for any `period`.
+- [ ] `localdate - localdate → period` (not integer, number, or duration).
+- [ ] `localdate + integer`, `localdate + number`, `localdate + decimal` are type errors.
+- [ ] **`localdate + duration` is a type error** with teachable message.
+- [ ] **`localdate + 3 hours` produces a warning** (hours meaningless on localdates).
 - [ ] `.year`, `.month`, `.day`, `.dayOfWeek` return `integer`.
 - [ ] Nullable, default (single-quoted), serialization work.
 
-### `time` type
+### `localtime` type
 
-- [ ] `time + 3 hours`, `+ 30 minutes`, `+ 45 seconds` wrap at midnight.
-- [ ] `time + duration → time` works (sub-day bridging, Decision #16).
-- [ ] `time + period → time` works (`LocalTime.Plus(Period)` — time components used, date components ignored).
-- [ ] `time - time → period` (returns time-component period with `.hours`, `.minutes`, `.seconds`).
+- [ ] `localtime + 3 hours`, `+ 30 minutes`, `+ 45 seconds` wrap at midnight.
+- [ ] `localtime + duration → localtime` works (sub-day bridging, Decision #16).
+- [ ] `localtime + period → localtime` works (`LocalTime.Plus(Period)` — time components used, date components ignored).
+- [ ] `localtime - localtime → period` (returns time-component period with `.hours`, `.minutes`, `.seconds`).
 - [ ] `.hour`, `.minute`, `.second` return `integer`.
 
 ### `instant` type
@@ -1391,7 +1544,10 @@ Single quotes win on all three criteria that matter for a DSL: refactoring safet
 - [ ] `instant + 72 hours + 30 minutes` works (postfix units resolve to `duration`).
 - [ ] **`instant + period` is a type error** (covers `+ 3 months`, `+ (n) months`, `+ (n) years`).
 - [ ] **`instant + 3 months` is a type error** (`months` always resolves to `period`, never `duration`).
-- [ ] `instant.year` is a compile error.
+- [ ] `instant.year` is a compile error — skip-level accessor requires `.inZone(tz)` first.
+- [ ] `instant.inZone(tz)` produces `zoneddatetime`.
+- [ ] `instant.inZone(tz).localdate` works (full dot chain).
+- [ ] `instant.localdate` is a compile error with teachable message: "instant has no .localdate — use instant.inZone(tz).localdate".
 
 ### `duration` type
 
@@ -1423,24 +1579,38 @@ Single quotes win on all three criteria that matter for a DSL: refactoring safet
 - [ ] Timeline arithmetic (`+ duration`, `+ 3 days`, `+ 72 hours`) works.
 - [ ] **`+ period` is a type error** (including `+ 3 months`, `+ (n) months`).
 - [ ] Single-quoted literal `'2026-01-15T14:30:00[America/New_York]'` parses.
-- [ ] Accessors work. Serialization works.
+- [ ] `.localdatetime` returns `localdatetime`, `.localdate` returns `localdate`, `.localtime` returns `localtime`.
+- [ ] `.instant` returns `instant`, `.timezone` returns `timezone`.
+- [ ] Accessors, serialization work.
 
-### `datetime` type (if included)
+### `localdatetime` type
 
 - [ ] `+ period` and `+ duration` both work (bridge type).
-- [ ] `datetime + 30 days` works (postfix unit resolves to `period` in datetime context).
-- [ ] `datetime - datetime → period`.
+- [ ] `localdatetime + 30 days` works (postfix unit resolves to `period` in localdatetime context).
+- [ ] `localdatetime - localdatetime → period`.
+- [ ] `.localdate` returns `localdate`, `.localtime` returns `localtime`.
+- [ ] `localdatetime.inZone(tz)` produces `zoneddatetime`.
+- [ ] `localdatetime.inZone(tz).instant` works (reverse navigation — replaces `pin`).
 
-### Conversion functions
+### Timezone mediation — `.inZone(tz)` dot accessor
 
-- [ ] All three functions work with both `(instant, timezone)` and `(zoneddatetime)` overloads.
+- [ ] `instant.inZone(tz) → zoneddatetime` works.
+- [ ] `localdatetime.inZone(tz) → zoneddatetime` works.
+- [ ] `instant.inZone(tz).localdate` works (full dot-chain extraction).
+- [ ] `instant.inZone(tz).localtime` works.
+- [ ] `instant.inZone(tz).localdatetime` works.
+- [ ] `localdatetime.inZone(tz).instant` works (reverse navigation).
+- [ ] `instant.localdate` is a compile error — strict hierarchy, no skip-level accessors.
+- [ ] `instant.localdatetime` is a compile error.
+- [ ] `localdate.inZone(tz)` is a type error — `localdate` has no time component for mediation.
+- [ ] `localtime.inZone(tz)` is a type error — `localtime` has no date component for mediation.
 - [ ] DST resolution is deterministic (lenient resolver).
 
 ### Postfix unit literals (Decision #17 — rewritten)
 
 - [ ] **Bare postfix:** `<integer-literal> <unit-keyword>` parses.
 - [ ] **Paren postfix:** `( <expression> ) <unit-keyword>` parses.
-- [ ] `date + 30 days` resolves `30 days` to `period` (`Period.FromDays(30)`).
+- [ ] `localdate + 30 days` resolves `30 days` to `period` (`Period.FromDays(30)`).
 - [ ] `instant + 3 days` resolves `3 days` to `duration` (`Duration.FromDays(3)`).
 - [ ] `instant + (DayCount) days` resolves to `Duration.FromDays(n)` in instant context.
 - [ ] `instant + 72 hours` resolves to `Duration.FromHours(72)`.
@@ -1450,21 +1620,21 @@ Single quotes win on all three criteria that matter for a DSL: refactoring safet
 - [ ] **Juxtaposition: `2 years 6 months` (without `+`) → compile error.**
 - [ ] **Ambiguous standalone: `set X = 3 days` with no typed context → compile error.**
 - [ ] **Variable bare postfix: `GraceDays days` → compile error** with teachable message directing to `(GraceDays) days`.
-- [ ] **Meaningless combination: `date + 3 hours` → warning.**
+- [ ] **Meaningless combination: `localdate + 3 hours` → warning.**
 - [ ] **`instant + 3 months` → type error** (`months` never resolves to `duration`).
 
 ### Single-quoted typed constants (Decision #18 — rewritten)
 
-- [ ] `'2026-01-15'` parses as a `date` literal.
-- [ ] `'14:30'` and `'14:30:00'` parse as `time` literals. Seconds optional.
-- [ ] `'2026-01-15T14:30:00Z'` parses as an `instant`. `'2026-01-15T14:30:00'` (no Z) parses as `datetime`.
+- [ ] `'2026-01-15'` parses as a `localdate` literal.
+- [ ] `'14:30'` and `'14:30:00'` parse as `localtime` literals. Seconds optional.
+- [ ] `'2026-01-15T14:30:00Z'` parses as an `instant`. `'2026-01-15T14:30:00'` (no Z) parses as `localdatetime`.
 - [ ] `'2026-01-15T14:30:00[America/New_York]'` parses as a `zoneddatetime`.
 - [ ] `'America/New_York'` parses as a `timezone`.
 - [ ] **Compile-time validation:** `'2026-13-45'` is a compile error with a teachable message.
 - [ ] **Not an expression:** Content inside single quotes is NOT parsed as an expression — `'2024-01-15'` does NOT resolve `2024-01-15` as subtraction.
 - [ ] **Double-quoted string distinction:** `"2026-01-15"` remains a string. `'2026-01-15'` is a date. Using the wrong delimiter produces a teachable error.
 - [ ] **IntelliSense:** `'` triggers typed constant completions with format-aware ghost text.
-- [ ] **Hover content:** `'2024-01-15'` shows "date: January 15, 2024 (Monday)" in invariant culture English.
+- [ ] **Hover content:** `'2024-01-15'` shows "localdate: January 15, 2024 (Monday)" in invariant culture English.
 - [ ] **Timezone completions:** `'` in timezone context triggers IANA timezone completion from `DateTimeZoneProviders.Tzdb.Ids`.
 
 ### Cross-type enforcement
