@@ -109,6 +109,7 @@
       { "id": "preceptState",           "description": "Precept state name" },
       { "id": "preceptEvent",           "description": "Precept event name" },
       { "id": "preceptFieldName",       "description": "Precept field or argument name" },
+      { "id": "preceptName",           "description": "Precept declaration name" },
       { "id": "preceptType",            "description": "Precept type keyword" },
       { "id": "preceptValue",           "description": "Precept literal value" },
       { "id": "preceptMessage",         "description": "Precept rule message string" }
@@ -149,6 +150,9 @@
           "preceptFieldName.preceptConstrained": [
             "variable.other.field.constrained.precept"
           ],
+          "preceptName": [
+            "entity.name.type.precept.precept"
+          ],
           "preceptType": [
             "storage.type.precept"
           ],
@@ -179,6 +183,9 @@
           },
           "preceptMessage": {
             "foreground": "#FBBF24"
+          },
+          "preceptName": {
+            "foreground": "#6366F1"
           }
         }
       },
