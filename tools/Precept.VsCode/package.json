@@ -115,7 +115,7 @@
     ],
 
     "semanticTokenModifiers": [
-      { "id": "preceptConstrained", "description": "Token is under constraint/invariant pressure" }
+      { "id": "preceptConstrained", "description": "Token is under constraint pressure" }
     ],
 
     "semanticTokenScopes": [

@@ -3,7 +3,7 @@ name: precept-authoring
 description: >-
   Create and edit Precept DSL state-machine definitions. Use when building a new
   precept from scratch, adding states/events/fields to an existing precept,
-  writing guards and invariants, modeling a business workflow as a state machine,
+  writing guards and rules, modeling a business workflow as a state machine,
   or generating a state diagram. Triggers on: create precept, new precept, add
   state, add event, add field, model workflow, state machine, precept definition,
   write precept, edit precept, state diagram.
@@ -28,9 +28,9 @@ Before writing code, outline the domain model:
 1. **States** — identify the distinct lifecycle stages. Mark one as `initial`.
 2. **Fields** — identify the data tracked across states. Choose types (`string`, `number`, `boolean`), set defaults, and mark nullable fields.
 3. **Events** — identify the actions that cause transitions. Define event arguments with types and defaults.
-4. **Invariants** — identify rules that must hold in every state.
-5. **State constraints** — identify assertions that must be true when entering or remaining in a specific state.
-6. **Event assertions** — identify validation rules on event arguments.
+4. **Rules** — identify rules that must hold in every state.
+5. **State constraints** — identify ensures that must be true when entering or remaining in a specific state.
+6. **Event ensures** — identify validation rules on event arguments.
 7. **Transitions** — map out `from <State> on <Event>` rules with guards (`when`), field mutations (`set`), and outcomes (`transition`, `no transition`, `reject`).
 8. **Edit declarations** — identify which fields are directly editable in which states.
 
@@ -46,21 +46,21 @@ precept <Name>
 # Fields
 field <Name> as <type> [nullable] [default <value>]
 
-# Invariants
-invariant <expr> because "<message>"
+# Rules
+rule <expr> because "<message>"
 
 # States
 state <Name> [initial]
 
 # State constraints
-in <State> assert <expr> because "<message>"
+in <State> ensure <expr> because "<message>"
 
 # Edit declarations
 in <State> edit <Field1>, <Field2>
 
-# Events and event assertions
+# Events and event ensures
 event <Name> [with <Arg> as <type> [default <value>], ...]
-on <Event> assert <expr> because "<message>"
+on <Event> ensure <expr> because "<message>"
 
 # Transitions
 from <State|any> on <Event> [when <guard>] -> <action chain>

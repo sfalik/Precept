@@ -271,7 +271,7 @@ public class PreceptEditTests
         var r1 = engine.Fire(instance, "Assign", new Dictionary<string, object?> { ["Technician"] = "A" });
         var r2 = engine.Fire(r1.UpdatedInstance!, "Resolve", new Dictionary<string, object?> { ["Summary"] = "done" });
 
-        // In Resolved, ResolutionSummary is editable. Setting it to null violates the assert.
+        // In Resolved, ResolutionSummary is editable. Setting it to null violates the ensure.
         var r3 = engine.Update(r2.UpdatedInstance!, p => p.Set("ResolutionSummary", null));
         r3.Outcome.Should().Be(UpdateOutcome.ConstraintFailure);
         r3.Violations.Should().ContainSingle().Which.Message.Should().Contain("Resolution requires a summary");

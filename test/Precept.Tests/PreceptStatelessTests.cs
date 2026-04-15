@@ -223,7 +223,7 @@ public class PreceptStatelessTypeCheckerTests
             edit BaseFee, Discount
             """;
 
-        // Compiles OK because default values satisfy the invariant (0 <= 0)
+        // Compiles OK because default values satisfy the rule (0 <= 0)
         var result = PreceptCompiler.CompileFromText(dsl);
 
         result.Engine.Should().NotBeNull();

@@ -117,10 +117,10 @@ internal static class PreceptDocumentIntellisense
         if (TryResolveDottedSymbol(info, line, identifier, start, referenceRange, out var dotted))
             return dotted;
 
-        var eventAssertMatch = EventEnsureRegex.Match(line);
-        if (eventAssertMatch.Success)
+        var eventEnsureMatch = EventEnsureRegex.Match(line);
+        if (eventEnsureMatch.Success)
         {
-            var eventName = eventAssertMatch.Groups["event"].Value;
+            var eventName = eventEnsureMatch.Groups["event"].Value;
             if (TryGetEventArg(info, eventName, identifier, out var argDeclaration))
                 return new PreceptResolvedSymbol(argDeclaration, referenceRange);
 
@@ -380,8 +380,8 @@ internal static class PreceptDocumentIntellisense
         if (transitionMatch.Success && string.Equals(transitionMatch.Groups["event"].Value, identifier, StringComparison.Ordinal))
             return true;
 
-        var eventAssertMatch = EventEnsureRegex.Match(line);
-        if (eventAssertMatch.Success && string.Equals(eventAssertMatch.Groups["event"].Value, identifier, StringComparison.Ordinal))
+        var eventEnsureMatch = EventEnsureRegex.Match(line);
+        if (eventEnsureMatch.Success && string.Equals(eventEnsureMatch.Groups["event"].Value, identifier, StringComparison.Ordinal))
             return true;
 
         if (identifierStart < line.Length && line[Math.Min(identifierStart + identifier.Length, line.Length - 1)] == '.')

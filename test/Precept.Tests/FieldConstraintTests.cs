@@ -717,7 +717,7 @@ public class FieldConstraintTests
     public void Fire_EventArgNotempty_EmptyString_ProducesRejected()
     {
         // `notempty` on an event arg desugars to an on-event ensure.
-        // When the assert fires, the outcome is Rejected (not ConstraintFailure).
+        // When the ensure fires, the outcome is Rejected (not ConstraintFailure).
         // This distinguishes event-arg constraint desugaring from field constraint desugaring.
         const string dsl = """
             precept M

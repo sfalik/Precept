@@ -1190,13 +1190,13 @@ public class NewSyntaxRuntimeTests
 
         var wf = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
 
-        // Bypass=true → guard (not Bypass) is false → assert skipped, no violation
+        // Bypass=true → guard (not Bypass) is false → ensure skipped, no violation
         var inst1 = wf.CreateInstance("Open", new Dictionary<string, object?> { ["X"] = 10.0, ["Bypass"] = true });
         var r1 = wf.Fire(inst1, "Reduce");
         r1.Outcome.Should().Be(TransitionOutcome.NoTransition);
         r1.Violations.Should().BeEmpty();
 
-        // Bypass=false → guard (not Bypass) is true → assert applies, X=-10 fails
+        // Bypass=false → guard (not Bypass) is true → ensure applies, X=-10 fails
         var inst2 = wf.CreateInstance("Open", new Dictionary<string, object?> { ["X"] = 10.0, ["Bypass"] = false });
         var r2 = wf.Fire(inst2, "Reduce");
         r2.Outcome.Should().Be(TransitionOutcome.ConstraintFailure);
@@ -1217,12 +1217,12 @@ public class NewSyntaxRuntimeTests
         var wf = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
         var inst = wf.CreateInstance("Open");
 
-        // IsDraft=true → guard (not IsDraft) is false → assert skipped, Amount=0 allowed
+        // IsDraft=true → guard (not IsDraft) is false → ensure skipped, Amount=0 allowed
         var r1 = wf.Fire(inst, "Submit", new Dictionary<string, object?> { ["Amount"] = 0.0, ["IsDraft"] = true });
         r1.Outcome.Should().Be(TransitionOutcome.Transition);
         r1.Violations.Should().BeEmpty();
 
-        // IsDraft=false → guard (not IsDraft) is true → assert applies, Amount=0 fails
+        // IsDraft=false → guard (not IsDraft) is true → ensure applies, Amount=0 fails
         var inst2 = wf.CreateInstance("Open");
         var r2 = wf.Fire(inst2, "Submit", new Dictionary<string, object?> { ["Amount"] = 0.0, ["IsDraft"] = false });
         r2.Outcome.Should().Be(TransitionOutcome.Rejected);

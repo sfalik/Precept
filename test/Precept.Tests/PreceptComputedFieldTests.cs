@@ -1336,8 +1336,8 @@ public class PreceptComputedFieldRuntimeTests
     public void ViolationTargets_RuleInvolvingComputedField_IncludesDependencyFields()
     {
         // Use a state ensure on non-initial state to bypass C30 compile-time check.
-        // C30 only checks initial-state ensures; S2 assert is not checked at compile time.
-        // At runtime, transition to S2 triggers the assert, which references computed field Sum.
+        // C30 only checks initial-state ensures; S2 ensure is not checked at compile time.
+        // At runtime, transition to S2 triggers the ensure, which references computed field Sum.
         // ExpandComputedFieldTargets should surface A and B as dependency targets.
         const string dsl = """
             precept Test

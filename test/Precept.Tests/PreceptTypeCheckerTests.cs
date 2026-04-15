@@ -583,7 +583,7 @@ public class PreceptTypeCheckerTests
             precept M
             field Name as string default ""
             state A initial
-            rule Name because "non-boolean invariant"
+            rule Name because "non-boolean rule"
             """;
 
         var result = Check(dsl);
@@ -618,7 +618,7 @@ public class PreceptTypeCheckerTests
             precept M
             field Balance as number default 10
             state Open initial
-            in Open ensure Balance because "non-boolean assert"
+            in Open ensure Balance because "non-boolean ensure"
             """;
 
         var result = Check(dsl);
@@ -709,7 +709,7 @@ public class PreceptTypeCheckerTests
             event Go
             """;
 
-        // This should compile clean — the invariant body (X > 100) fails at defaults,
+        // This should compile clean — the rule body (X > 100) fails at defaults,
         // but the guard (Active == false at defaults) means it's skipped.
         var compiled = PreceptCompiler.CompileFromText(dsl);
         compiled.HasErrors.Should().BeFalse("guarded rule with false guard should not trigger pre-compile violation");
@@ -821,7 +821,7 @@ public class PreceptTypeCheckerTests
     public void TypeCheck_GuardedStateEnsure_ExcludedFromNarrowing()
     {
         // A guarded state ensure should NOT contribute to type narrowing.
-        // Without the guard filter, the assert "MaybeNull != null" would narrow
+        // Without the guard filter, the ensure "MaybeNull != null" would narrow
         // MaybeNull to non-nullable, making `set Value = MaybeNull` pass.
         // With the filter, it remains nullable → C42.
         const string dsl = """
