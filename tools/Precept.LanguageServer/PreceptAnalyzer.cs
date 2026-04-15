@@ -933,7 +933,7 @@ internal sealed class PreceptAnalyzer
     {
         var diagnostics = new List<Diagnostic>();
 
-        AddEntryAssertDiagnostics(model, lines, diagnostics);
+        AddEntryEnsureDiagnostics(model, lines, diagnostics);
 
         return diagnostics;
     }
@@ -965,19 +965,19 @@ internal sealed class PreceptAnalyzer
         };
     }
 
-    private static void AddEntryAssertDiagnostics(
+    private static void AddEntryEnsureDiagnostics(
         PreceptDefinition model,
         string[] lines,
         List<Diagnostic> diagnostics)
     {
         if (model.StateEnsures is not null)
         {
-            var statesWithToAsserts = model.StateEnsures
+            var statesWithToEnsures = model.StateEnsures
                 .Where(sa => sa.Anchor == EnsureAnchor.To)
                 .Select(sa => sa.State)
                 .Distinct(StringComparer.Ordinal)
                 .ToList();
-            if (statesWithToAsserts.Count > 0)
+            if (statesWithToEnsures.Count > 0)
             {
                 var targetedStates = new HashSet<string>(
                     (model.TransitionRows ?? Array.Empty<PreceptTransitionRow>())
@@ -985,7 +985,7 @@ internal sealed class PreceptAnalyzer
                         .OfType<StateTransition>()
                         .Select(st => st.TargetState),
                     StringComparer.Ordinal);
-                foreach (var stateName in statesWithToAsserts)
+                foreach (var stateName in statesWithToEnsures)
                 {
                     if (!targetedStates.Contains(stateName))
                     {

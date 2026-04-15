@@ -1172,7 +1172,7 @@ public class NewSyntaxRuntimeTests
     }
 
     // ════════════════════════════════════════════════════════════════════
-    // GUARDED STATE/EVENT ASSERTS — when not
+    // GUARDED STATE/EVENT ENSURES — when not
     // ════════════════════════════════════════════════════════════════════
 
     [Fact]
