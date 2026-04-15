@@ -279,11 +279,11 @@ internal sealed class PreceptPreviewHandler : IJsonRpcRequestHandler<PreceptPrev
             .ToArray();
 
         var ruleDefinitions = new List<PreceptPreviewRuleInfo>();
-        foreach (var inv in session.Model.Invariants ?? Array.Empty<PreceptInvariant>())
-            ruleDefinitions.Add(new PreceptPreviewRuleInfo("invariant", inv.ExpressionText, inv.Reason));
-        foreach (var sa in session.Model.StateAsserts ?? Array.Empty<StateAssertion>())
+        foreach (var inv in session.Model.Rules ?? Array.Empty<PreceptRule>())
+            ruleDefinitions.Add(new PreceptPreviewRuleInfo("rule", inv.ExpressionText, inv.Reason));
+        foreach (var sa in session.Model.StateEnsures ?? Array.Empty<StateEnsure>())
             ruleDefinitions.Add(new PreceptPreviewRuleInfo($"state:{sa.Anchor.ToString().ToLowerInvariant()}:{sa.State}", sa.ExpressionText, sa.Reason));
-        foreach (var ea in session.Model.EventAsserts ?? Array.Empty<EventAssertion>())
+        foreach (var ea in session.Model.EventEnsures ?? Array.Empty<EventEnsure>())
             ruleDefinitions.Add(new PreceptPreviewRuleInfo($"event:{ea.EventName}", ea.ExpressionText, ea.Reason));
 
         var activeRuleViolations = session.Engine.EvaluateCurrentRules(session.Instance);

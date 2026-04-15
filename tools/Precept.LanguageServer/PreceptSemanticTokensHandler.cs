@@ -282,16 +282,16 @@ internal sealed class PreceptSemanticTokensHandler : SemanticTokensHandlerBase
         var events = new HashSet<string>(StringComparer.Ordinal);
         var fields = new HashSet<string>(StringComparer.Ordinal);
 
-        if (definition.StateAsserts != null)
-            foreach (var sa in definition.StateAsserts)
+        if (definition.StateEnsures != null)
+            foreach (var sa in definition.StateEnsures)
                 states.Add(sa.State);
 
-        if (definition.EventAsserts != null)
-            foreach (var ea in definition.EventAsserts)
+        if (definition.EventEnsures != null)
+            foreach (var ea in definition.EventEnsures)
                 events.Add(ea.EventName);
 
-        if (definition.Invariants != null)
-            foreach (var inv in definition.Invariants)
+        if (definition.Rules != null)
+            foreach (var inv in definition.Rules)
                 CollectFieldNames(inv.Expression, fields);
 
         return (states, events, fields);

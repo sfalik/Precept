@@ -134,7 +134,7 @@ internal sealed class PreceptCodeActionHandler : ICodeActionHandler
         var lines = text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
         var eventLine = FindEventLine(lines, eventName);
         var lineIndexes = new List<int> { eventLine };
-        lineIndexes.AddRange((model.EventAsserts ?? Array.Empty<EventAssertion>())
+        lineIndexes.AddRange((model.EventEnsures ?? Array.Empty<EventEnsure>())
             .Where(assertion => string.Equals(assertion.EventName, eventName, StringComparison.Ordinal))
             .Select(assertion => Math.Max(0, assertion.SourceLine - 1)));
 
