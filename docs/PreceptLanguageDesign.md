@@ -380,7 +380,7 @@ When the `when` expression constrains a nullable field (e.g. `when OfficerName !
 
 ### Scope restriction
 
-`when` expressions may only reference declared instance data fields and their properties. Event argument references (`EventName.ArgName`) in a `when` expression are a parse error. Arguments are not yet available when availability is evaluated — use additional rows with argument-dependent `when` guards for argument-dependent routing.
+`when` expressions may reference declared instance data fields and their properties. In transition rows, event arguments are also valid, but only in dotted form (`EventName.ArgName`). Bare arg names are not valid in transition guards, and event args are not available outside the row forms that bind them.
 
 ### Multiple rows for the same state+event
 
