@@ -1130,6 +1130,10 @@ internal sealed class PreceptAnalyzer
             // Exclude expression-only control keywords from statement-start completions
             if (symbol is "if" or "then" or "else") continue;
 
+            // Exclude grammar modifiers/connectives — only valid within declarations, not at statement start
+            if (symbol is "as" or "nullable" or "default" or "because" or "initial"
+                or "with" or "any" or "all" or "of" or "into") continue;
+
             items.Add(new CompletionItem
             {
                 Label = symbol,

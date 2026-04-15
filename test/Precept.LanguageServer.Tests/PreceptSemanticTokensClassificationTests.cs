@@ -74,7 +74,7 @@ public class PreceptSemanticTokensClassificationTests
     }
 
     [Fact]
-    public void GetClassifiedTokens_GrammarKeywords_ArePreceptKeywordGrammar()
+    public void GetClassifiedTokens_GrammarKeywords_ArePreceptKeywordSemantic()
     {
         const string dsl = """
             precept M
@@ -88,19 +88,19 @@ public class PreceptSemanticTokensClassificationTests
 
         tokens.Should().Contain(t =>
             t.Text == "default" &&
-            t.Type == "preceptKeywordGrammar");
+            t.Type == "preceptKeywordSemantic");
 
         tokens.Should().Contain(t =>
             t.Text == "initial" &&
-            t.Type == "preceptKeywordGrammar");
+            t.Type == "preceptKeywordSemantic");
 
         tokens.Should().Contain(t =>
             t.Text == "with" &&
-            t.Type == "preceptKeywordGrammar");
+            t.Type == "preceptKeywordSemantic");
 
         tokens.Should().Contain(t =>
             t.Text == "any" &&
-            t.Type == "preceptKeywordGrammar");
+            t.Type == "preceptKeywordSemantic");
     }
 
     [Fact]
