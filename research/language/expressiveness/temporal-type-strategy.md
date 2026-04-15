@@ -60,7 +60,7 @@ A type earns its place in the DSL when:
 | `LocalDateTime` | `datetime` | This is a date and time together — not a point on the global timeline, not two separate fields pretending to be coupled. | `NodaTime.LocalDateTime` | **Phase 3** | 6 fields in security-incident (NIST compliance timestamps). Rare in the current corpus but real for incident response and audit trails where sub-day precision matters and the timezone context is handled separately. |
 | `Instant` | `instant` | This is a point on the global timeline — UTC, no timezone ambiguity. Not a date, not a "number of seconds since epoch" encoded as an integer. | `NodaTime.Instant` | **Phase 2** | SLA enforcement, regulatory filing windows, audit ordering. The insurance claim "filed within 72 hours of incident" pattern appears in at least 5 surveyed domains. Without `instant`, authors encode UTC timestamps as `number` — losing type safety and writing guards like `FiledAt - IncidentAt < 259200` instead of `FiledAt - IncidentAt <= hours(72)`. |
 | `Duration` | `duration` | This is an elapsed amount of time — fixed nanoseconds on the timeline. Not a calendar interval, not a number-of-hours encoded as an integer. | `NodaTime.Duration` | **Phase 2** | 9 fields across 6 samples (MTBF, repair hours, work hours). Ships as both a declared field type and the result type of `instant - instant`. Duration constructor functions — `hours(n)`, `minutes(n)`, `seconds(n)` — provide readable SLA expressions. |
-| `Period` | *(internal mechanism)* | Calendar-unit arithmetic: "1 month" means 1 month, not 30 days. "1 year" means 1 year, not 365 days. | `NodaTime.Period` | **Phase 2** | 10 period fields across 7 samples. Period is the *mechanism* for calendar arithmetic (`date + months(1)`), not a declared field type. Domain fields that hold period-like values (`GracePeriodDays`, `TermLengthMonths`) are more precisely modeled as `integer` fields consumed by period constructor functions: `StartDate + months(TermLengthMonths)`. NodaTime's `Period` backs the functions; the DSL author doesn't see it. |
+| `Period` | `period` | Calendar-unit quantity: "1 month" means 1 month, not 30 days. "1 year" means 1 year, not 365 days. The length depends on what the period is applied to — fundamentally different from duration's fixed nanoseconds. | `NodaTime.Period` | **Phase 1** (with `date`) | 10 period fields across 7 samples. `period` is a full surface type (field type AND expression type). `days(n)`, `months(n)`, `years(n)`, `weeks(n)` return `period`. `date + period → date`, `date - date → period`. No natural ordering (`months(1) > days(30)` is a type error — depends on which month). Structural equality (`months(1) != days(30)`). Full NodaTime Period with date AND time components — `.hours`, `.minutes`, `.seconds` accessors alongside `.years`, `.months`, `.weeks`, `.days`. `time + period → time` (NodaTime's `LocalTime.Plus(Period)`), `time - time → period`. Owner directive (2026-04-14): *"No obscurity, expose NodaTime. Someone smarter designed it."* |
 | `DateTimeZone` | `timezone` | This is a valid IANA timezone identifier — not an arbitrary string that might hold "California" or "EST" or "Pacific Standard Time". | `NodaTime.DateTimeZone` | **Phase 2** | Required for multi-timezone compliance rules (insurance, healthcare, finance). The `date`-over-`string` argument applies with equal force: encoding timezone identifiers as `string` means the compiler can't reject `"Not/A/Timezone"` or `"EST"` (not an IANA identifier). The `timezone` type validates at compile time (literals) and fire time (event args). |
 | `DateInterval` | `daterange` | This is a range between two calendar dates — not two separate fields whose relationship is enforced only by invariants. | `NodaTime.DateInterval` | **Deferred** | Real demand (vacation periods, policy terms, enrollment windows), but two `date` fields with an invariant (`StartDate <= EndDate`) cover the use case with existing type machinery. The marginal benefit of a composite type is co-assignment enforcement and `contains(date)` operations. Worth evaluating after core temporal types are proven. |
 | `AnnualDate` | `annualdate` | This is a recurring month-day combination — a birthday, an anniversary, an annual deadline. Not a full date with an arbitrary year. | `NodaTime.AnnualDate` | **Deferred** | Niche but real: HR renewal dates, insurance anniversaries, annual compliance deadlines. The `.inYear(n) → date` method would enable "next occurrence" calculations. Low priority given corpus frequency; evaluate demand post-Phase 2. |
@@ -75,28 +75,29 @@ A type earns its place in the DSL when:
 
 | Category | Supported | Produces | Rationale |
 |---|---|---|---|
-| **Arithmetic** | `date + integer → date` | Date N days later | `LocalDate.PlusDays(int)` — integer-only by API design. `date + 2.5` is a type error. |
-| | `date - integer → date` | Date N days earlier | `LocalDate.PlusDays(-n)` |
-| | `date + months(n) → date` | Date N months later | `LocalDate.Plus(Period.FromMonths(n))` — truncates at month end (Jan 31 + 1mo = Feb 28) |
-| | `date + years(n) → date` | Date N years later | `LocalDate.Plus(Period.FromYears(n))` — handles leap years (Feb 29 + 1yr = Feb 28) |
-| | `date - date → integer` | Day count between dates | `Period.Between(d1, d2, PeriodUnits.Days).Days` — always a whole number |
+| **Arithmetic** | `date + period → date` | Date offset by calendar period | `LocalDate.Plus(Period)` — handles truncation (Jan 31 + months(1) = Feb 28), leap years (Feb 29 + years(1) = Feb 28). `days(n)`, `months(n)`, `years(n)`, `weeks(n)` all return `period`. |
+| | `date - period → date` | Date offset backward by calendar period | `LocalDate.Minus(Period)` |
+| | `date - date → period` | Calendar distance between dates | `Period.Between(d1, d2)` — returns a `period` with structural components (`.years`, `.months`, `.days`), NOT a bare integer or duration. Owner directive: expose NodaTime's `Period.Between` faithfully. |
 | **Comparison** | `==`, `!=`, `<`, `>`, `<=`, `>=` | `boolean` | Full ordering; ISO calendar only |
 | **Accessors** | `.year`, `.month`, `.day` | `integer` | Calendar component extraction |
 | | `.dayOfWeek` | `integer` | ISO day of week (Monday=1, Sunday=7) |
 | **Not supported** | `date + date` | — | Adding two dates is meaningless — there is no temporal concept this could represent |
-| | `date + decimal` | — | Fractional days are meaningless at day granularity. This is caught as a type error. |
-| | `date + number` | — | `number` is floating-point; day arithmetic requires integers. Use `date + integer`. |
+| | `date + integer` | — | Bare integers don't carry unit semantics. Use `date + days(n)`. Owner directive: force authors to be explicit. NodaTime requires `Plus(Period)`, not `operator+(int)`. |
+| | `date + decimal` / `date + number` | — | Fractional/floating-point values are meaningless at day granularity. Type error. |
+| | `date + duration` | — | Duration is timeline-only (hours, minutes, seconds). Date needs calendar (period) arithmetic. `date + hours(3)` is meaningless — a date has no time component. |
 
 ### `time` (Phase 2)
 
 | Category | Supported | Produces | Rationale |
 |---|---|---|---|
-| **Arithmetic** | `time + hours(n) → time` | Time with hours added | Wraps at midnight. `LocalTime.PlusHours(long)` |
-| | `time + minutes(n) → time` | Time with minutes added | Wraps at midnight. `LocalTime.PlusMinutes(long)` |
+| **Arithmetic** | `time + period → time` | Time offset by time-component period | `LocalTime.Plus(Period)`. Date components ignored. NodaTime native. |
+| | `time + duration → time` | Time offset by duration | Sub-day bridging. Wraps at midnight. Runtime: nanosecond arithmetic on `LocalTime`. See proposal Decision #16. |
+| | `time + hours(n) → time` | Time with hours added | `hours(n)` returns `duration` → sub-day bridging. Wraps at midnight. |
+| | `time + minutes(n) → time` | Time with minutes added | Wraps at midnight. |
+| | `time - time → period` | Time-component period between two times | `Period.Between(t1, t2)`. Returns period with `.hours`, `.minutes`, `.seconds`. NodaTime faithful. |
 | **Comparison** | `==`, `!=`, `<`, `>`, `<=`, `>=` | `boolean` | Full ordering within a day |
 | **Accessors** | `.hour`, `.minute`, `.second` | `integer` | Time component extraction |
-| **Not supported** | `time - time → duration` | — | Ambiguous: does 23:00 - 01:00 = 22 hours or -22 hours? Defer until use case is clear. |
-| | `time + integer` | — | What unit? An integer without a unit function is ambiguous. Use `hours(n)` or `minutes(n)`. |
+| **Not supported** | `time + integer` | — | What unit? An integer without a unit function is ambiguous. Use `hours(n)` or `minutes(n)`. |
 
 ### `instant` (Phase 2)
 
@@ -127,7 +128,7 @@ A type earns its place in the DSL when:
 | Category | Supported | Produces | Rationale |
 |---|---|---|---|
 | **Comparison** | `==`, `!=` | `boolean` | Equality by canonical IANA identifier. No ordering — timezones have no meaningful sort order. |
-| **Validation** | Compile-time literal check | *(diagnostic)* | `timezone("Not/A/Timezone")` is a compile error. `timezone("EST")` warns (abbreviation, not IANA). `timezone("US/Pacific")` warns (deprecated alias). |
+| **Validation** | Compile-time literal check | *(diagnostic)* | `timezone(Not/A/Timezone)` is a compile error. `timezone(EST)` warns (abbreviation, not IANA). `timezone(US/Pacific)` warns (deprecated alias). |
 | | Runtime event-arg validation | *(constraint violation)* | Invalid timezone strings in event args are rejected at the fire boundary — same pattern as `date` literal validation. |
 | **Accessors** | *None* | — | A timezone is a metadata identifier, not a temporal value. No `.offset`, no `.rules`. Timezone data is consumed by conversion functions, not inspected directly. |
 | **Not supported** | Arithmetic of any kind | — | You cannot add, subtract, or compare timezones in a domain-meaningful way. |
@@ -225,7 +226,7 @@ With them, the entire rule lives in one file:
 # WITH conversion functions — rule is complete
 invariant FiledTimestamp <= toInstant(
     toLocalDate(IncidentTimestamp, IncidentTimezone) + days(30),
-    time(23, 59, 0),
+    time(23:59:00),
     IncidentTimezone
 ) because "Claim must be filed by 11:59 PM local time on the 30th day after the incident"
 ```
@@ -264,8 +265,9 @@ The sample temporal catalog provides empirical evidence:
 | Temporal concept | Corpus frequency | Types required | Phase |
 |---|---|---|---|
 | Calendar dates (filing, approval, renewal) | 56 fields across 15 samples | `date` | Phase 1 |
-| Calendar deadlines (date + days/months) | 15 fields across 13 samples | `date` + `months()` / `years()` functions | Phase 1 |
-| Day-counter simulation workarounds | 3 samples, ~90 lines of boilerplate | `date` + arithmetic (replaces workaround) | Phase 1 |
+| Calendar deadlines (date + days/months) | 15 fields across 13 samples | `date` + `period` (via `months()` / `years()` / `days()` / `weeks()` constructors) | Phase 1 |
+| Calendar spans (grace periods, loan terms) | 10 fields across 7 samples | `period` as field type (`field LoanTerm as period default months(12)`) | Phase 1 |
+| Day-counter simulation workarounds | 3 samples, ~90 lines of boilerplate | `date` + `period` arithmetic (replaces workaround) | Phase 1 |
 | SLA / compliance timing (instant comparison) | Present in 5+ surveyed domains | `instant`, `duration` | Phase 2 |
 | Elapsed time (work hours, MTBF) | 9 fields across 6 samples | `duration` | Phase 2 |
 | Multi-timezone compliance rules | Insurance, healthcare, finance | `instant`, `timezone`, conversion functions | Phase 2 |
@@ -274,21 +276,31 @@ The sample temporal catalog provides empirical evidence:
 | Recurring dates, billing periods | Niche but real | `annualdate`, `yearmonth` | Deferred |
 | Instant + timezone composite | Co-assignment enforcement | `zoneddatetime` (minimal) | Deferred |
 
-### Phase 1: Calendar Types — `date`
+### Phase 1: Calendar Types — `date` + `period`
 
 **Ships with:** Proposal #26 (revised for NodaTime backing).
 
 **What it includes:**
 - `date` type backed by `NodaTime.LocalDate`
-- ISO 8601 literal: `date("2026-01-15")`
-- Day arithmetic: `date + integer → date`, `date - date → integer`
-- Calendar arithmetic: `date + months(n) → date`, `date + years(n) → date`, `date + weeks(n) → date`
-- Accessors: `.year`, `.month`, `.day`, `.dayOfWeek`
-- Comparison: full ordering
+- `period` type backed by `NodaTime.Period` (full: date components — years, months, weeks, days — AND time components — hours, minutes, seconds)
+- ISO 8601 date typed literal: `date(2026-01-15)`
+- ISO 8601 period typed literal: `period(P1Y2M3D)`
+- Calendar constructor functions: `days(n)`, `months(n)`, `years(n)`, `weeks(n)` → `period`
+- **Postfix unit literals:** `30 days`, `3 months`, `2 years 6 months` — context-dependent type resolution. Resolves to `period` in date/datetime context, `duration` in instant/zoneddatetime context. Both function-call and postfix syntaxes coexist (Decision #17). Postfix works only with integer literals; variable arguments require function-call syntax (`days(GraceDays)`).
+- Calendar arithmetic: `date + period → date`, `date - period → date`, `date - date → period`
+- Period arithmetic: `period + period`, `period - period`, unary negation
+- Period equality: structural (`months(1) != days(30)`). No ordering.
+- Period accessors: `.years`, `.months`, `.weeks`, `.days`, `.hours`, `.minutes`, `.seconds`
+- Period introspection: `.hasDateComponent`, `.hasTimeComponent`
+- Period as field type: `field LoanTerm as period default months(12)` or `field LoanTerm as period default 12 months`
+- Date accessors: `.year`, `.month`, `.day`, `.dayOfWeek`
+- Date comparison: full ordering
 
-**What it covers:** 78% of the temporal markers in the sample corpus (56 pure dates + 15 computed deadlines). Eliminates the day-counter simulation pattern in 3 samples.
+**`date + integer` is a type error.** Use `date + days(n)` or `date + 30 days`. Owner directive: force authors to be explicit.
 
-**Why this is the right first phase:** Calendar dates are overwhelmingly the most common temporal concept in business domains. Shipping `date` with full arithmetic (including month/year via Period) covers the largest surface area with the smallest type system cost.
+**What it covers:** 78% of temporal markers (56 pure dates + 15 deadlines) PLUS 10 calendar-span fields that were previously `integer` surrogates. Eliminates the day-counter simulation pattern in 3 samples.
+
+**Why `period` ships in Phase 1:** The calendar constructor functions (`days`, `months`, `years`, `weeks`) are essential for `date` arithmetic. Since these return `period`, the `period` type must exist. Once it exists, exposing it as a field type is zero marginal cost and eliminates 10 `integer` surrogates. The alternative — shipping `date` with constructors that return an invisible internal type — contradicts the “no obscurity, expose NodaTime” directive.
 
 ### Phase 2: Timeline Types — `instant`, `duration`, `time`, `timezone`, conversion functions
 
@@ -297,15 +309,18 @@ The sample temporal catalog provides empirical evidence:
 - `instant - instant` produces `duration` — both types are needed together.
 - `toInstant(date, time, timezone)` requires the `time` and `timezone` types.
 - `toLocalDate(instant, timezone)` requires the `timezone` type.
-- SLA expressions like `FiledAt - IncidentAt <= hours(72)` require both `instant` and `duration`.
+- SLA expressions like `FiledAt - IncidentAt <= hours(72)` (or postfix: `FiledAt - IncidentAt <= 72 hours`) require both `instant` and `duration`.
 
 **What it includes:**
 - `instant` type backed by `NodaTime.Instant` — comparison and duration arithmetic only
-- `duration` type backed by `NodaTime.Duration` — both a field type and an expression-result type
+- `duration` type backed by `NodaTime.Duration` — both a field type and an expression-result type. **Timeline-only** (hours, minutes, seconds).
 - `time` type backed by `NodaTime.LocalTime` — time-of-day without timezone
 - `timezone` type backed by `NodaTime.DateTimeZone` — validated IANA identifier
-- Constructor functions: `hours(n)`, `minutes(n)`, `seconds(n)` → duration
+- Constructor functions: `hours(n)`, `minutes(n)`, `seconds(n)` → `duration`
+- Postfix unit literals in duration context: `instant + 3 days` → `Duration.FromDays(3)`, `instant + 72 hours` → `Duration.FromHours(72)` (Decision #17, shipped in Phase 1 with postfix literal infrastructure)
 - Conversion functions: `toLocalDate`, `toLocalTime`, `toInstant`
+
+Note: Calendar constructors (`days`, `months`, `years`, `weeks`) already shipped in Phase 1 with `period`.
 
 **What it covers:** The remaining 22% of temporal markers, plus the SLA/compliance patterns identified across 5+ domains, plus the multi-timezone compliance rules that the enterprise analysis identified as a philosophy gap.
 
@@ -317,7 +332,7 @@ The sample temporal catalog provides empirical evidence:
 
 **What it includes:**
 - `datetime` type backed by `NodaTime.LocalDateTime`
-- ISO 8601 literal: `datetime("2026-04-13T14:30:00")`
+- ISO 8601 typed literal: `datetime(2026-04-13T14:30:00)`
 - Arithmetic with calendar and time units
 - Decomposition accessors: `.date → date`, `.time → time`
 
@@ -338,15 +353,15 @@ These types have real use cases but insufficient corpus evidence for immediate i
 
 ### What changes in #26
 
-1. **Backing type:** `System.DateOnly` → `NodaTime.LocalDate`. The DSL surface (`date`, `date("2026-01-15")`) is unchanged. Authors see no difference.
+1. **Backing type:** `System.DateOnly` → `NodaTime.LocalDate`. The DSL surface (`date`, `date(2026-01-15)`) is unchanged. Authors see no difference.
 
-2. **Day arithmetic:** `date + number → date` → `date + integer → date`. Mirrors `LocalDate.PlusDays(int)`. `date + 2.5` becomes a type error by construction (resolves George's Challenge #2).
+2. **Day arithmetic:** `date + number → date` → `date + period → date`. No bare integer/number arithmetic. `date + days(n)` is the only day-offset form. `days(n)` returns `period`, not `duration`. This is strictly stronger than the v1 strategy's `date + integer` rule.
 
-3. **Date subtraction:** `date - date → number` → `date - date → integer`. Day counts are always whole numbers (resolves George's Challenge #4).
+3. **Date subtraction:** `date - date → number` → `date - date → period`. Returns a `period` preserving structural calendar components, not a bare number or duration. Matches `Period.Between(d1, d2)`.
 
-4. **Month/year arithmetic (NEW):** `date + months(n) → date`, `date + years(n) → date`, `date + weeks(n) → date`. These are thin wrappers around `Period.FromMonths`, `Period.FromYears`, `Period.FromWeeks`. Truncation rules are NodaTime's (documented, deterministic). This was deferred in the original #26; the corpus evidence (10 period fields across 7 samples) justifies including it in Phase 1.
+4. **Month/year arithmetic (ships in Phase 1 with `period`):** `date + months(n) → date`, `date + years(n) → date`, `date + weeks(n) → date`. All constructors return `period`. `period` is a full surface type in Phase 1, not deferred to Phase 2.
 
-5. **Parsing:** `date("2026-01-15")` → `LocalDatePattern.Iso.Parse(value)`. Stricter ISO 8601 validation and better error messages than `DateOnly.ParseExact`.
+5. **Parsing:** `date(2026-01-15)` → `LocalDatePattern.Iso.Parse(value)`. Stricter ISO 8601 validation and better error messages than `DateOnly.ParseExact`.
 
 6. **Serialization:** MCP tools emit `"2026-01-15"` (ISO 8601 string). `NodaTime.Serialization.SystemTextJson` handles JSON serialization.
 
@@ -355,7 +370,7 @@ These types have real use cases but insufficient corpus evidence for immediate i
 ### What doesn't change in #26
 
 - DSL surface: `field DueDate as date` — unchanged.
-- Literal syntax: `date("2026-01-15")` — unchanged.
+- Typed literal syntax: `date(2026-01-15)` — unquoted ISO content inside typed parens (Decision #18).
 - Comparison operators — unchanged.
 - Accessors: `.year`, `.month`, `.day` — unchanged (new: `.dayOfWeek`).
 - Constraints: `nullable`, `default`, etc. — unchanged.

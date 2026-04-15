@@ -101,6 +101,15 @@
 
 ## Recent Updates
 
+### 2026-04-15 — Temporal Conversion Function Naming Analysis
+- **Shane's critique accepted as correct:** The four proposed conversion functions (`toLocalDate`, `toLocalTime`, `toInstant`, `zoneddatetime()`) use type-system names, not domain-operation names. The existing 18-function registry names operations (`floor`, `trim`, `left`), never output types. The temporal functions should follow the same principle.
+- **Key structural insight: 4 functions should be 2.** `zoneddatetime` already has `.date`, `.time`, `.year` etc. accessors. `toLocalDate(inst, tz)` ≡ `zoneddatetime(inst, tz).date`. Two extraction functions are redundant with accessor chains on the construction function.
+- **Timezone mediation is a 2-direction operation:** Universal→Local (`inZone`) and Local→Universal (`pin`). Each direction = one function. The accessor system handles component extraction.
+- **Recommended names: `inZone` / `pin`.** `inZone(instant, timezone) → zoneddatetime` ("view this moment in this timezone"). `pin(datetime, timezone) → instant` or `pin(date, time, timezone) → instant` ("anchor this local reading to the timeline"). Zero type-system exposure.
+- **Also resolves audit Issue 2:** `zoneddatetime()` construction function that conflicted with "zero constructors" claim becomes `inZone()` — an operation, not a constructor.
+- **2 alternatives also presented:** (B) 4-function model with domain names (`dateIn`/`timeIn`/`pin`/`inZone`) — keeps convenience but adds discoverability split. (C) 2-function model with different verbs (`atZone`/`anchor`) — Java-inspired forward direction, nautical metaphor reverse.
+- Decision filed: `.squad/decisions/inbox/frank-temporal-function-naming.md`
+
 ### 2025-07-22 — Temporal proposal v2 rewrite (NodaTime alignment directive)
 - **Full rewrite** of `research/language/expressiveness/temporal-type-system-proposal.md` per two owner directives: "No obscurity, expose NodaTime" and "Don't reinvent the wheel."
 - **`period` promoted to full surface type in Phase 1.** Backed by `NodaTime.Period`. Fields (`field LoanTerm as period`), expressions, constructors (`days`, `months`, `years`, `weeks` → `period`), arithmetic (`date + period`, `date - date → period`), equality (structural, no ordering).
@@ -816,3 +825,11 @@ All proposals are additive and Superpower-compatible. No structural redesign req
 - **Verdict: APPROVED for Forms 1–3.** Form 4 (`in State when guard edit`) deferred to a follow-on issue — concept is sound, implementation requires per-call guard evaluation rather than static dictionary.
 - B3 (research base absent) cleared: both cited research files confirmed present at `research/language/expressiveness/conditional-logic-strategy.md` and `research/language/references/conditional-invariant-survey.md`. Issue body had wrong `docs/` path prefix — corrected in the same session.
 - All six locked design decisions upheld as architecturally sound. No philosophy gaps found. Zero grammar changes required.
+
+### 2026-04-15 — Temporal type system proposal v3 audit
+- Conducted full audit of `research/language/expressiveness/temporal-type-system-proposal.md` (v3 — locked literal surface rewrite) against all collected research, 11 locked directives, and 5 team analyses.
+- **One factual error found and fixed:** `datetime + duration` section claimed `LocalDateTime.Plus(Duration)` as a NodaTime API. It's NOT — NodaTime's `LocalDateTime` has `Plus(Period)` only. Fixed to reference duration bridging mechanism (same as `time + duration`, Decision #16). The operation is still valid; implementation uses nanosecond arithmetic, same thin translation already designed.
+- **Three items flagged for owner attention:** (1) `zoneddatetime()` construction function naming — inconsistent with `to*` pattern and undermines "zero constructors" claim; (2) Duration serialization format (`"PT72H"`) diverges from NodaTime's default (`"72:00:00"`) — needs acknowledgment; (3) Timezone content shape `Word/Word` is imprecise — doesn't cover `UTC`, multi-segment `America/Argentina/Buenos_Aires`, or `Etc/GMT+1`.
+- **Key audit learning:** Always cross-check API claims against the NodaTime type model research. The proposal used `LocalDateTime.Plus(Duration)` plausibly because `ZonedDateTime.Plus(Duration)` exists, but the local types (LocalDate, LocalTime, LocalDateTime) consistently accept Period, NOT Duration. The bridging pattern from Decision #16 applies to `datetime` as well as `time`.
+- **Verdict: 9/10.** Proposal is in excellent shape. V3 rewrite successfully incorporates all four locked decisions from the 2026-04-15 session. Gateway narrative, typed constant delimiter framing, and NodaTime alignment are clean.
+- Audit filed at `.squad/decisions/inbox/frank-proposal-audit.md`.

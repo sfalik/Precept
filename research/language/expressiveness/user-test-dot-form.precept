@@ -1,0 +1,51 @@
+precept ShiftSchedule
+
+# A clinic schedules staff shifts. Each shift has a start time filed as
+# an instant (UTC). The clinic operates in a specific timezone, and
+# scheduling rules depend on the local date and local time of day.
+#
+# SYNTAX STYLE: dot accessor form — field.inZone(timezone)
+
+field ClinicTimezone as timezone default 'America/New_York'
+field ShiftStart as instant
+field ShiftLocalDateTime as localdatetime
+field ShiftLocalDate as localdate
+field ShiftLocalTime as localtime
+field StaffName as string nullable
+field IsOvernight as boolean default false
+
+invariant ShiftLocalTime >= '06:00' or IsOvernight
+    because "Non-overnight shifts cannot start before 6 AM local time"
+invariant ShiftLocalDate.dayOfWeek != 'Sunday' or StaffName != null
+    because "Sunday shifts must have a staff assignment"
+
+state Unscheduled initial
+state Scheduled
+state Confirmed
+state Completed
+
+in Scheduled edit StaffName
+
+event ScheduleShift with Start as instant
+event AssignStaff with Name as string
+on AssignStaff assert Name != "" because "Staff name is required"
+event ConfirmShift
+event CompleteShift
+
+from Unscheduled on ScheduleShift
+    -> set ShiftStart = ScheduleShift.Start
+    -> set ShiftLocalDateTime = ScheduleShift.Start.inZone(ClinicTimezone).localdatetime
+    -> set ShiftLocalDate = ScheduleShift.Start.inZone(ClinicTimezone).localdate
+    -> set ShiftLocalTime = ScheduleShift.Start.inZone(ClinicTimezone).localtime
+    -> set IsOvernight = ScheduleShift.Start.inZone(ClinicTimezone).localtime >= '22:00'
+    -> transition Scheduled
+
+from Scheduled on AssignStaff
+    -> set StaffName = AssignStaff.Name
+    -> no transition
+
+from Scheduled on ConfirmShift when StaffName != null
+    -> transition Confirmed
+
+from Confirmed on CompleteShift
+    -> transition Completed

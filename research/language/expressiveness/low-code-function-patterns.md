@@ -1,0 +1,399 @@
+# Function-Call vs Dot-Access in Business Tools and Low-Code Platforms
+
+**Author:** Steinbrenner (PM)
+**Date:** 2026-04-15
+**Purpose:** External research for Shane's temporal operation syntax decision — `inZone(instant, tz)` vs `instant.inZone(tz)`
+
+---
+
+## Summary Table
+
+| Platform | Primary Pattern | Dot Properties (zero-arg) | Dot Methods (with args) | Target Audience | Date/Time Example |
+|---|---|---|---|---|---|
+| **Excel / Google Sheets** | Pure function | No | No | Business users, analysts | `YEAR(date)`, `DATEADD(date, 1)` |
+| **Power Fx (Microsoft)** | Pure function | Data drilling only¹ | No | Citizen developers, "Excel writers" | `Year(date)`, `DateAdd(date, 1, TimeUnit.Days)` |
+| **Power Automate** | Pure function | No | No | Automation builders | `addDays(timestamp, 10)`, `convertFromUtc(ts, tz)` |
+| **Appian** | Pure function | No | No | Citizen developers | Spreadsheet-style function calls |
+| **Smartsheet** | Pure function | No | No | PMs, operations | `YEAR(date)`, `MONTH(date)` |
+| **FEEL (DMN/Camunda)** | **Hybrid: properties + functions** | **Yes** — `.year`, `.month`, `.hour`, `.timezone` | No | Business analysts, process modelers | `date.year` (property), `day of week(date)` (function) |
+| **Notion 2.0** | **Hybrid: both forms** | **Yes** — `.length()` | **Yes** — `.includes()`, `.filter()`, `.map()`, `.every()` | Knowledge workers, PMs | `dateAdd(now(), 1, "days")`, `prop("Date").length()` |
+| **Coda** | **Heavy dot-method** | **Yes** — `.Count()` | **Yes** — `.DateTimeTruncate("minute")`, `.Sort()`, `.Filter()` | Knowledge workers, ops teams | `Time(1,30,45).DateTimeTruncate("minute")` |
+
+¹ Power Fx uses dot notation for navigating data structures (`.Employee.'First Name'`), not for calling methods on values.
+
+---
+
+## Detailed Findings
+
+### 1. Spreadsheet Formula Languages (Excel, Google Sheets, LibreOffice Calc, Apple Numbers)
+
+**Pattern:** Universally function-based. No dot notation of any kind.
+
+**Syntax examples:**
+```
+=LEN("Hello World")           // not "Hello World".length
+=YEAR(A1)                     // not A1.year
+=DATEADD(A1, 1, "month")      // Google Sheets: EDATE(A1, 1)
+=TEXT(NOW(), "yyyy-MM-dd")
+```
+
+**Target audience:** Business users, accountants, analysts — the broadest non-developer audience.
+
+**IntelliSense:** Function name autocomplete from a flat global list. No contextual "what can I do with this value?" discovery.
+
+**Relevance:** This is the baseline mental model Precept's audience carries. Every spreadsheet user worldwide has been trained on `FUNCTION(value)` syntax.
+
+---
+
+### 2. Power Fx (Microsoft) — THE CLOSEST COMPARABLE
+
+**Pattern:** Exclusively function-based. **Explicitly rejects object-oriented syntax.**
+
+The Power Fx documentation states this directly:
+
+> *"Excel isn't object-oriented, and neither is Power Fx. For example, in some languages, the length of a string is expressed as a property of the string, such as `"Hello World".length` in JavaScript. Excel and Power Fx instead express this in terms of a function, as `Len( "Hello World" )`."*
+
+**Syntax examples:**
+```
+Len("Hello World")                    // not "Hello World".length
+Right(Input.Text, Len(Input.Text))    // nested functions
+DateAdd(Now(), 1, TimeUnit.Days)      // date arithmetic
+Year(Today())                         // component extraction
+```
+
+**Dot notation — data drilling only:**
+```
+LookUp(Orders, ID = 5).Employee.'First Name'   // navigating record relationships
+```
+
+The dot is used exclusively for navigating data structure hierarchies, NEVER for calling methods on a value.
+
+**Target audience:** The EXACT same persona as Precept — "hundreds of millions of people who create worksheets with Excel every day." Power Fx's stated goal is to let them build apps using Excel concepts they already know.
+
+**Design principles (relevant):**
+- Excel consistency first, SQL second
+- "Not object-oriented" — a stated, deliberate design principle
+- Functional approach preferred over object methods
+- Strongly typed with type inference
+
+**IntelliSense:** Rich formula bar with autocomplete for function names and data structure paths. IntelliSense follows the dot for DATA navigation (showing table columns), but never for method suggestions.
+
+**Date/time and timezone operations:**
+```
+DateAdd(myDate, 5, TimeUnit.Days)
+DateDiff(startDate, endDate, TimeUnit.Months)
+Year(Today())
+Month(Now())
+TimeZoneOffset()      // returns offset, no conversion function visible in Power Fx itself
+```
+
+**Key takeaway:** Microsoft built the world's largest low-code formula language and deliberately chose pure functions over dot methods. Their reasoning: the audience already knows Excel, so don't introduce object-oriented concepts.
+
+---
+
+### 3. Power Automate / Azure Logic Apps
+
+**Pattern:** 100% function-based. No dot notation for operations.
+
+**Syntax examples:**
+```
+addDays('2018-03-15T00:00:00Z', 10)
+dayOfMonth('2018-03-15T13:27:36Z')
+convertFromUtc('2018-01-01T08:00:00Z', 'Pacific Standard Time')
+convertTimeZone('2018-01-01T08:00:00Z', 'UTC', 'Pacific Standard Time')
+formatDateTime('03/15/2018', 'yyyy-MM-dd')
+length('abcd')
+toLower('Hello World')
+```
+
+**Timezone conversion specifically:** `convertFromUtc(timestamp, targetTimeZone)` and `convertTimeZone(timestamp, sourceTimeZone, destinationTimeZone)` — pure function form.
+
+**Target audience:** Business automation builders, citizen developers creating workflows.
+
+**IntelliSense:** Expression editor with categorized function browser (String functions, Date functions, etc.).
+
+---
+
+### 4. FEEL (DMN/Camunda) — THE DIRECT HYBRID PRECEDENT
+
+**Pattern:** Zero-arg dot properties for component reads + functions for parameterized operations. **This is exactly Precept's current hybrid pattern.**
+
+**Dot properties (zero-arg reads):**
+```
+date("2020-04-06").year          // 2020
+date("2020-04-06").month         // 4
+date("2020-04-06").weekday       // 1
+time("08:00:00").hour            // 8
+date and time("...+02:00").time offset    // duration("PT2H")
+date and time("...@Europe/Berlin").timezone  // "Europe/Berlin"
+duration("PT2H30M").hours        // 2
+duration("PT2H30M").minutes      // 30
+duration("P6M").months           // 6
+```
+
+**Functions (parameterized operations):**
+```
+date("2020-04-06")                        // constructor
+day of week(date("2019-09-17"))           // "Tuesday"
+month of year(date("2019-09-17"))         // "September"
+years and months duration(date1, date2)   // compute duration
+last day of month(date("2022-10-01"))     // date("2022-10-31")
+```
+
+**The key distinction:** Properties extract components that already exist on the value. Functions perform computations or transformations that require arguments. Dot access = reading. Function call = operating.
+
+**Target audience:** Business analysts implementing DMN decision tables, process modelers building BPMN workflows.
+
+**IntelliSense:** The Camunda modeler provides autocomplete for both function names and (after typing a value with a dot) available properties.
+
+**Relevance:** FEEL is an OMG standard (part of DMN), used in enterprise decision automation by business analysts — a close Precept audience analog. It proves the hybrid pattern (dot properties + function operations) works for non-developers in a rules context.
+
+---
+
+### 5. Notion Formulas 2.0 — THE HYBRID DOT-METHOD PRECEDENT
+
+**Pattern:** Both `function(value)` and `value.method()` forms coexist. Some operations are available in BOTH forms.
+
+**Traditional function form:**
+```
+length("hello")                          // 5
+dateAdd(now(), 1, "days")                // date arithmetic
+dateBetween(date1, date2, "days")        // difference
+year(now())                              // component extraction
+month(parseDate("2023-07-10"))           // 7
+format(1234)                             // "1234"
+```
+
+**Dot-method form:**
+```
+prop("Title").length()                   // text length via dot
+prop("Tags").includes("Finance")         // list membership test
+prop("Tasks").filter(current.prop("Status") !== "Done")   // list filtering
+prop("Person").at(0).name()              // chained dot-method access
+prop("Pioneers").map(current.email())    // list iteration
+" notion ".trim()                        // string operation as dot method
+prop("Tasks").length()                   // count via dot
+```
+
+**Both forms for the SAME operation:**
+```
+length("hello") = 5                      // function form
+prop("Text").length()                    // dot method form
+```
+
+**Date/time operations — function-only:**
+```
+dateAdd(now(), 1, "days")
+dateBetween(prop("Birthday"), now(), "days")
+formatDate(now(), "MMMM D, Y")
+year(now())
+```
+
+Notion uses dot methods heavily for list operations (`.filter()`, `.map()`, `.every()`, `.includes()`) and property/entity access (`.name()`, `.email()`), but keeps date/time arithmetic as pure functions.
+
+**Target audience:** Knowledge workers, project managers, team leads — non-developers using Notion databases.
+
+**IntelliSense:** Formula editor with left panel showing available properties, built-ins, and functions. As of 2.0, typing a dot after a value shows available methods.
+
+**Relevance:** Notion proves that a non-developer audience CAN learn and use dot-method syntax. Their 2.0 formula redesign deliberately added dot methods alongside existing functions. However, they kept date/time operations as functions.
+
+---
+
+### 6. Coda — THE STRONGEST DOT-METHOD PRECEDENT
+
+**Pattern:** Extensively dot-method oriented. Almost all operations support `value.Method()` syntax, INCLUDING on temporal values.
+
+**Dot methods on temporal/date values:**
+```
+Time(1, 30, 45).DateTimeTruncate("minute")      // 1:30 AM — parameterized dot method on time!
+ToDateTime("2013-03-14 18:13:23").ToTime()       // 6:13:23 PM — conversion as dot method
+```
+
+**Dot methods on collections/lists:**
+```
+Planets.Count()                                  // count via dot
+List(1, 2, 3).Sort()                             // sort via dot
+List("Dog", "Cat").ForEach(Upper(CurrentValue))   // iteration via dot
+List(1,2,3,4).Filter(CurrentValue > 2)           // filtering via dot
+Planets.MaxBy(Diameter)                          // aggregate via dot
+List(3, 5, 7).MinBy(CurrentValue % 6)            // computed aggregate
+```
+
+**Dot methods on entities/rows:**
+```
+thisRow.RowId()                    // entity method
+thisRow.CreatedBy()                // entity method
+thisTable.PageName()               // context method
+```
+
+**Dot methods on other types:**
+```
+True().Not()                       // boolean method
+List(1, 2, 3).Any(CurrentValue > 2)   // predicate method
+```
+
+**Traditional function form ALSO works for many operations:**
+```
+Year(dateTime)                     // component extraction
+Month(dateTime)                    // component extraction
+Day(dateTime)                      // component extraction
+Length("Hello world")              // string length
+Not(False())                       // boolean negation
+```
+
+**Date/time functions (mostly function-based):**
+```
+Year(Date(2019, 2, 5))            // 2019
+Month(Date(2013, 4, 18))          // 4
+EndOfMonth(Today(), 3)             // function form
+RelativeDate(Date(2016, 1, 1), 2)  // function form
+NetWorkingDays(start, end)         // function form
+CurrentTimezone()                  // function form — returns tz info
+DocumentTimezone()                 // function form — returns doc tz
+```
+
+**Target audience:** Operations teams, PMs, knowledge workers. Coda positions itself as "the doc that brings it all together" for non-developers.
+
+**IntelliSense:** After typing a value and a dot, Coda shows available methods filtered by the value type. This is the strongest IntelliSense discovery precedent.
+
+**Relevance:** Coda is the most aggressive dot-method adopter among low-code platforms. It proves that non-developer audiences can work with `value.Method(arg)` syntax. Critically, it uses dot methods on temporal values specifically — `Time(1,30,45).DateTimeTruncate("minute")` is a direct precedent for Precept's `instant.inZone(tz)` question.
+
+---
+
+### 7. Appian
+
+**Pattern:** Function-based, described as "immediately familiar to anyone experienced building formulas in spreadsheet software."
+
+**Target audience:** Citizen developers building enterprise apps on the Appian platform.
+
+**Relevance:** Reinforces the spreadsheet-formula baseline.
+
+---
+
+### 8. Workflow/Automation Platforms (Zapier, Make/Integromat, n8n)
+
+**Pattern:** These platforms generally don't expose a full expression language. Zapier and Make use field mapping with some basic function transformations, not formula-style expressions.
+
+Where expressions exist (e.g., n8n's JavaScript expressions or Make's function syntax), they follow the function-based pattern:
+```
+// Make (Integromat)
+formatDate(now; "YYYY-MM-DD")
+addDays(now; 5)
+parseDate("2021-04-15"; "YYYY-MM-DD")
+```
+
+**Target audience:** Non-technical automation builders.
+
+**Relevance:** Reinforces the function-first pattern for the automation-builder persona.
+
+---
+
+## Analysis: The Spectrum
+
+The low-code expression landscape is NOT uniformly function-based. It falls on a spectrum:
+
+```
+Pure Function          Hybrid Properties       Hybrid Both Forms      Heavy Dot-Method
+─────────────────────────────────────────────────────────────────────────────────────
+Excel                  FEEL (DMN)              Notion 2.0              Coda
+Google Sheets          PRECEPT (current)
+Power Fx
+Power Automate
+Smartsheet
+Appian
+Make
+```
+
+### Pattern 1: Pure Function (majority position)
+`FUNCTION(value, args)` for everything. No dot notation.
+**Used by:** Excel, Power Fx, Power Automate, Smartsheet, Appian, Make.
+**Audience:** Broadest — anyone who's used a spreadsheet.
+
+### Pattern 2: Hybrid Properties + Functions (FEEL, Precept today)
+Zero-arg dot access for property reads, functions for parameterized operations.
+**Used by:** FEEL (DMN), Precept (current: `.count`, `.length`, `Event.Arg`).
+**Key rule:** Dot = read a property. Function = perform an operation.
+**Audience:** Business analysts, rules authors.
+
+### Pattern 3: Hybrid Both Forms (Notion 2.0)
+Functions AND dot methods coexist. Some operations available both ways.
+**Used by:** Notion 2.0.
+**Audience:** Knowledge workers, PMs.
+
+### Pattern 4: Heavy Dot-Method (Coda)
+Most operations support `value.Method()`. Functions also available for some.
+**Used by:** Coda.
+**Audience:** Knowledge workers, operations teams.
+
+---
+
+## Key Answers
+
+### Q1: Among tools that target business analysts and citizen developers, is there ANY precedent for `value.method(arg)` dot syntax?
+
+**YES.** Two major platforms targeting non-developers use parameterized dot methods:
+
+1. **Coda** — extensively uses `value.Method(args)`. Critically, includes temporal values: `Time(1,30,45).DateTimeTruncate("minute")`.
+2. **Notion 2.0** — uses `value.method(args)` for list operations: `.filter()`, `.includes()`, `.map()`, `.every()`.
+
+Both platforms target knowledge workers and PMs, not professional developers. Both have been successful with their audiences.
+
+However, **the majority of low-code tools do NOT use dot methods.** Excel, Power Fx, Power Automate, Smartsheet, and Appian are all pure function. The dot-method pattern is the minority position.
+
+### Q2: Does any low-code tool use dot access for property-style reads while keeping parameterized operations as functions?
+
+**YES — FEEL (DMN) does exactly this.** It's also Precept's current pattern.
+
+- Properties: `date.year`, `date.month`, `time.hour`, `duration.days`, `datetime.timezone`
+- Functions: `day of week(date)`, `month of year(date)`, `years and months duration(d1, d2)`
+
+The FEEL precedent is particularly strong because it targets the same kind of user (business rules authors) and operates in a similar domain (structured business logic with formal semantics).
+
+### Q3: For timezone conversion specifically, what patterns exist?
+
+| Platform | Syntax | Form |
+|---|---|---|
+| Power Automate | `convertFromUtc(timestamp, 'Pacific Standard Time')` | Pure function |
+| Power Automate | `convertTimeZone(timestamp, 'UTC', 'PST')` | Pure function |
+| FEEL | `datetime.timezone` (read property) | Dot property (read-only) |
+| Coda | `CurrentTimezone()` / `DocumentTimezone()` | Function (read-only) |
+
+No low-code platform was found that uses `value.inZone(tz)` style syntax for timezone conversion. All platforms with timezone support use the function form: `convertTimeZone(value, targetZone)`.
+
+---
+
+## What This Means for Precept
+
+### Precept's current hybrid pattern has strong external grounding
+Precept today uses Pattern 2 (FEEL-style): dot properties for zero-arg reads (`.count`, `.length`, `Event.Arg`) and functions for parameterized operations (18 functions in `function(value)` form). This pattern is validated by FEEL/DMN — an OMG standard used in enterprise decision automation.
+
+### The question is whether to extend dot notation to parameterized operations
+
+The research shows this is NOT without precedent (Coda, Notion 2.0), but it IS the minority pattern. The considerations:
+
+**Arguments FOR `instant.inZone(tz)` (dot-method form):**
+1. **IntelliSense discovery** — typing `MyField.` shows available operations. This is a genuine UX advantage that Coda and Notion exploit.
+2. **Consistency** — Precept already has dot accessors; adding dot methods makes the pattern more uniform rather than having a bifurcated system.
+3. **Coda precedent** — specifically does `Time(1,30,45).DateTimeTruncate("minute")`, proving non-developers can handle parameterized dot methods on temporal values.
+
+**Arguments FOR `inZone(instant, tz)` (pure function form):**
+1. **Mental model alignment** — the majority of tools Precept's audience uses (Excel, Power Fx, Power Automate, Smartsheet) are pure function. Power Fx explicitly rejected dot methods for this reason.
+2. **Clean boundary** — Precept's current hybrid is Pattern 2 (properties vs functions). Adding dot methods would shift to Pattern 3/4, requiring the audience to learn "when is it `.method()` and when is it `function()`?"
+3. **Power Fx precedent** — the strongest comparable (same audience, same design philosophy, Microsoft-scale validation) deliberately chose pure functions.
+4. **Simplicity** — 18 functions already exist in function form. Adding dot methods for new operations creates two syntactic patterns for the same kind of thing.
+
+**The decisive consideration: where is the audience coming FROM?**
+
+Precept's audience comes from Excel/Power Fx/Smartsheet — tools that train them on `FUNCTION(value)`. They do NOT primarily come from Coda or Notion formulas. Adding `instant.inZone(tz)` asks them to learn a convention their primary tools don't use.
+
+**The IntelliSense trade-off is real but solvable.** Coda and Notion demonstrate that dot autocomplete helps discoverability. However, function-based tools solve this with categorized function browsers and parameter hints — which Precept's language server already provides.
+
+### Bottom line
+
+The safest choice for Precept's current audience is `inZone(instant, tz)` — pure function form — because:
+1. It matches the majority pattern across low-code tools
+2. It matches the tools Precept's audience actually uses day-to-day
+3. It preserves Precept's clean hybrid (dot for properties, functions for operations)
+4. Power Fx — the closest comparable system by audience and philosophy — explicitly chose this path
+
+The dot-method form is a defensible alternative (Coda/Notion precedent), but it would be the minority bet, require clear documentation of when to use which form, and break the current clean boundary between property reads and function operations.

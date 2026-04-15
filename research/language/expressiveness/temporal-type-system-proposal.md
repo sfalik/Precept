@@ -1,15 +1,31 @@
 # Proposal: Unified Temporal Type System — NodaTime-Aligned
 
 **Author:** Frank (Lead/Architect, Language Designer)
-**Date:** 2026-04-13
+**Date:** 2026-04-15 (v3 — locked literal surface rewrite)
 **Status:** Proposal — ready for owner review
-**Supersedes:** Issue #26 (`localdate` type as standalone proposal)
+**Supersedes:** Issue #26 (`date` type as standalone proposal), v1 (collapsed `Period`), v2 (constructor-based literals)
 
 ---
 
 ## Summary
 
-Add seven temporal types to the Precept DSL — `localdate`, `localtime`, `instant`, `duration`, `timezone`, `zoneddatetime`, and `localdatetime` — backed by NodaTime as a runtime dependency. Include three timezone conversion functions (`toLocalDate`, `toLocalTime`, `toInstant`) with provenance-safe `zoneddatetime` overloads, and duration constructor functions (`days`, `months`, `years`, `weeks`, `hours`, `minutes`, `seconds`). Together, these types and functions give domain authors the vocabulary to express calendar constraints, SLA enforcement, multi-timezone compliance rules, and elapsed-time tracking — all within the governing contract, with no temporal logic delegated to the hosting layer. Every type earns its place by eliminating a specific ambiguity that would otherwise force authors into lossy encodings (`string`, `number`, `integer`) where the compiler cannot enforce domain intent.
+Add eight temporal types to the Precept DSL — `date`, `time`, `instant`, `duration`, `period`, `timezone`, `zoneddatetime`, and `datetime` — backed by NodaTime as a runtime dependency. Include three timezone conversion functions (`toLocalDate`, `toLocalTime`, `toInstant`), a unified postfix unit system for constructing temporal quantities, and single-quoted typed constants for formatted values. Together, these types, literal forms, and functions give domain authors the vocabulary to express calendar constraints, SLA enforcement, multi-timezone compliance rules, and elapsed-time tracking — all within the governing contract, with no temporal logic delegated to the hosting layer. Critically, the literal mechanisms established here — the typed constant delimiter (`'...'`) and the postfix quantity system (`N unit`) — are not temporal-specific. They are the language's expansion joints for all future non-primitive types. Temporal types are the gateway.
+
+**Temporal quantity construction** uses two postfix atom forms and one combination operator:
+- **Bare postfix:** `30 days`, `72 hours`, `12 months` — integer literal + unit keyword
+- **Paren postfix:** `(GraceDays) days`, `(X + 5) hours` — parenthesized expression + unit keyword
+- **Combination via `+`:** `2 years + 6 months + 15 days` — standard addition operator
+
+**Typed constants** use the single-quoted `'...'` delimiter — the typed constant delimiter — with type inferred from content shape. Temporal types are the first inhabitants of this mechanism; the delimiter is not temporal-specific:
+- `'2026-06-01'` (date), `'14:30:00'` (time), `'2026-04-13T14:30:00Z'` (instant), `'2026-04-13T09:00:00'` (datetime), `'2026-04-13T14:30:00[America/New_York]'` (zoneddatetime), `'America/New_York'` (timezone)
+
+**What changed in v3:** Four locked decisions from the 2026-04-15 session rewrote the literal surface:
+1. **Unified postfix model** — All 7 function-call constructors (`days()`, `months()`, `hours()`, etc.) eliminated. Postfix is the sole quantity construction syntax.
+2. **`+` as sole combiner** — Composite juxtaposition (`2 years 6 months`) eliminated. Only `2 years + 6 months`.
+3. **No duration/period constructor literals** — `duration(PT72H)` and `period(P1Y6M)` eliminated. Postfix units are the only surface.
+4. **Single-quoted typed constants** — `date(2026-01-15)` constructor form replaced by `'2026-01-15'`. All 6 formatted temporal types use the `'...'` typed constant delimiter with type inferred from content shape. Temporal types are the first inhabitants of this mechanism — not its definition.
+
+**What changed in v2:** Shane's owner directive: *"No obscurity, expose NodaTime. Don't reinvent the wheel. Force authors to think about the details."* The v1 proposal collapsed `Period` and `Duration` into a single surface type (`duration`) with custom dispatch rules. This was wrong. NodaTime deliberately keeps `Period` and `Duration` as separate types because they represent fundamentally different quantities — calendar distance vs. timeline distance. The v2 proposal exposes this distinction faithfully: `period` and `duration` are separate surface types, calendar units resolve to `period`, timeline units resolve to `duration`, and the type checker inherits NodaTime's enforcement for free. No custom operator dispatch. No re-inventing the wheel.
 
 ---
 
@@ -21,22 +37,39 @@ This shared philosophy is the lens through which every type decision in this pro
 
 | Precept applies it to... | NodaTime applies it to... | The shared principle |
 |---|---|---|
-| `localdate` over `string` | `LocalDate` over `DateTime` | Be explicit that this is a calendar date |
+| `date` over `string` | `LocalDate` over `DateTime` | Be explicit that this is a calendar date |
 | `instant` over `number` | `Instant` over `DateTime` | Be explicit that this is a point on the timeline |
 | `timezone` over `string` | `DateTimeZone` over `string` | Be explicit about the allowed values |
-| `duration` over `integer` | `Duration` over `TimeSpan` | Be explicit about what units mean |
-| `localtime` over `integer` | `LocalTime` over `int minutesSinceMidnight` | Be explicit that this is a time of day |
-| `localdatetime` over `string` | `LocalDateTime` over `DateTime` | Be explicit about combined date+time without timezone |
-| `zoneddatetime` over `instant` + `timezone` | `ZonedDateTime` over separate `Instant` + `DateTimeZone` | Be explicit that this instant and timezone are semantically bound |
+| `duration` over `integer` | `Duration` over `TimeSpan` | Be explicit about what fixed-length units mean |
+| `period` over `integer` | `Period` over `int monthCount` | Be explicit that calendar units have variable length |
+| `time` over `integer` | `LocalTime` over `int minutesSinceMidnight` | Be explicit that this is a time of day |
+| `datetime` over `string` | `LocalDateTime` over `DateTime` | Be explicit about combined date+time without timezone |
 
 Precept's design principles ground this directly:
 
-- **Principle #1 (Deterministic, inspectable model):** NodaTime's type separation makes it structurally clear which operations are deterministic and which require external context. All types proposed here are deterministic by construction — `instant` comparison is nanosecond math, `localdate` arithmetic uses the fixed ISO calendar, and timezone conversion functions make the TZ database input explicit in the expression.
-- **Principle #2 (English-ish but not English):** The DSL names — `localdate`, `localtime`, `instant`, `duration`, `timezone`, `localdatetime` — are English words that communicate exactly what the data is. `field FiledAt as instant` needs no comment.
-- **Principle #8 (Sound, compile-time-first static analysis):** NodaTime's type separation enables the compiler to catch temporal misuse statically. `date + instant` is a type error. `instant.year` is a compile error. The types carry enough information for the compiler to reject nonsensical expressions without runtime evaluation.
-- **Principle #12 (AI is a first-class consumer):** Named temporal types with precise semantics give AI consumers a vocabulary to reason about entity data and generate correct precepts. An AI that sees `field DueDate as localdate` knows the field supports calendar arithmetic — it does not need to infer this from naming conventions on a `string` field.
+- **Principle #1 (Deterministic, inspectable model):** NodaTime's type separation makes it structurally clear which operations are deterministic and which require external context. All types proposed here are deterministic by construction — `instant` comparison is nanosecond math, `date` arithmetic uses the fixed ISO calendar, and timezone conversion functions make the TZ database input explicit in the expression.
+- **Principle #2 (English-ish but not English):** The DSL names — `date`, `time`, `instant`, `duration`, `period`, `timezone` — are English words that communicate exactly what the data is. `field FiledAt as instant` needs no comment. Postfix units extend this: `DueDate + 30 days` reads as domain prose.
+- **Principle #8 (Sound, compile-time-first static analysis):** NodaTime's type separation enables the compiler to catch temporal misuse statically. `date + instant` is a type error. `instant + period` is a type error. `instant.year` is a compile error. Crucially, the `period`/`duration` split means the compiler rejects `instant + 1 month` because `months` always resolves to `period` and instants only accept `duration` — NodaTime's enforcement inherited for free.
+- **Principle #12 (AI is a first-class consumer):** Named temporal types with precise semantics give AI consumers a vocabulary to reason about entity data and generate correct precepts. An AI that sees `field DueDate as date` knows the field supports calendar arithmetic — it does not need to infer this from naming conventions on a `string` field.
 
 The governing question for every decision: **"If a domain author has this kind of data, does giving it a named type help them be explicit about what it means?"**
+
+### Temporal types as the gateway beyond primitives
+
+Precept's type system today consists of primitives: `string`, `number`, `integer`, `decimal`, `boolean`. Temporal types are the **first step beyond primitives** — the gateway to a richer type vocabulary that lets domain authors express what their data *is*, not just what storage shape it occupies. The literal mechanisms established in this proposal — single-quoted typed constants (`'...'`) and postfix quantities (`N unit`) — are not temporal features. They are the language's **expansion joints** for all future non-primitive types. Every design decision here carries weight beyond temporal: the admission rule for typed constants, the context-dependent resolution for postfix units, and the zero-constructor discipline all set precedent for how the language grows.
+
+### The NodaTime alignment directive
+
+Shane's directive (2026-04-14): *"No obscurity, expose NodaTime. Someone way smarter than us designed NodaTime. Don't try to re-invent the wheel."*
+
+This means:
+1. When NodaTime keeps two concepts separate, Precept keeps them separate.
+2. When NodaTime exposes a distinction, Precept exposes it.
+3. When NodaTime's type system prevents a nonsensical operation, Precept inherits that prevention.
+4. When NodaTime has no natural ordering on a type, Precept has no natural ordering on that type.
+5. When NodaTime uses structural equality, Precept uses structural equality.
+
+The v1 proposal violated all five. It collapsed `Period` into `Duration`, hid the calendar/timeline distinction behind custom dispatch, and required Precept to implement its own unit-compatibility enforcement. The v2 proposal trusts NodaTime's design and exposes it.
 
 ---
 
@@ -71,14 +104,15 @@ field GracePeriodDays as number default 30
 invariant DueDayOffset + GracePeriodDays >= CurrentDayOffset because "Within grace period"
 ```
 
-**After** — with temporal types:
+**After** — with temporal types (v3: postfix units + single-quoted literals):
 
 ```precept
-field DueDate as localdate default localdate("2026-06-01")
-field GracePeriodDays as integer default 30
+field DueDate as date default '2026-06-01'
+field GracePeriod as period default 30 days
 
 # Type-safe: DueDate + MealsTotal is a compile error
-invariant DueDate + days(GracePeriodDays) >= localdate("2026-01-01") because "Within grace period"
+# Explicit: 30 days resolves to period, date + period → date
+invariant DueDate + GracePeriod >= '2026-01-01' because "Within grace period"
 ```
 
 **Before** — encoding SLA rules with raw numbers:
@@ -98,7 +132,7 @@ field FiledAt as instant
 field IncidentAt as instant
 
 # Self-documenting, type-safe, deterministic
-invariant FiledAt - IncidentAt <= hours(72) because "HIPAA: must file within 72 hours of incident"
+invariant FiledAt - IncidentAt <= 72 hours because "HIPAA: must file within 72 hours of incident"
 ```
 
 **Before** — multi-timezone compliance pushes logic to hosting layer:
@@ -109,7 +143,7 @@ field FilingDeadline as number  # Pre-computed by hosting layer
 invariant FiledAt <= FilingDeadline because "Filing deadline has passed"
 ```
 
-**After** — complete rule in the contract:
+**After** — complete rule in the contract (v3: `30 days` resolves to `period`, `date + period → date`):
 
 ```precept
 field IncidentTimestamp as instant
@@ -117,10 +151,29 @@ field FiledTimestamp as instant
 field IncidentTimezone as timezone
 
 invariant FiledTimestamp <= toInstant(
-    toLocalDate(IncidentTimestamp, IncidentTimezone) + days(30),
-    localtime("23:59:00"),
+    toLocalDate(IncidentTimestamp, IncidentTimezone) + 30 days,
+    '23:59:00',
     IncidentTimezone
 ) because "Claim must be filed by 11:59 PM local time on the 30th day after the incident"
+```
+
+**Before** — encoding a loan term as a bare integer:
+
+```precept
+field TermLengthMonths as integer default 12
+field StartDate as string  # "2026-01-15" — but the compiler doesn't know that
+# What does StartDate + TermLengthMonths even mean? The compiler can't help.
+```
+
+**After** — with `period` as a first-class type:
+
+```precept
+field LoanTerm as period default 12 months
+field StartDate as date default '2026-01-15'
+
+# date + period → date. The period carries its calendar semantics.
+# 12 months != 365 days — NodaTime's truth, exposed faithfully.
+invariant StartDate + LoanTerm >= '2026-01-01' because "Maturity date must be in the future"
 ```
 
 The second form satisfies the philosophy's "one file, complete rules" guarantee. An auditor reads the precept and sees the entire business rule — 30 days, 11:59 PM, incident timezone.
@@ -131,6 +184,7 @@ The second form satisfies the philosophy's "one file, complete rules" guarantee.
 - SLA and compliance timing rules stay in the hosting layer. The contract has a visible gap in its primary target domains (insurance, healthcare, finance).
 - Day-counter simulation events remain as boilerplate in 3+ samples.
 - The "one file, complete rules" philosophy claim is undermined for any domain with temporal constraints.
+- The literal mechanism framework (typed constant delimiter, postfix quantity system) that would serve all future non-primitive types has no proving ground — future type proposals would each need to invent their own syntax.
 
 ---
 
@@ -138,27 +192,27 @@ The second form satisfies the philosophy's "one file, complete rules" guarantee.
 
 ### Why NodaTime, not System.DateOnly / TimeOnly / DateTime
 
-NodaTime is adopted as a runtime dependency for the entire temporal type system. The DSL author never sees NodaTime type names — `field DueDate as localdate` is the surface, `NodaTime.LocalDate` is the implementation, just as `field Amount as decimal` has `System.Decimal` behind it.
+NodaTime is adopted as a runtime dependency for the entire temporal type system. The DSL author never sees NodaTime type names — `field DueDate as date` is the surface, `NodaTime.LocalDate` is the implementation, just as `field Amount as decimal` has `System.Decimal` behind it.
 
 **Rationale:**
 
-1. **Philosophy alignment.** NodaTime's core design philosophy is: *"Force you to think about what kind of data you really have."* Distinct types for distinct temporal concepts — `LocalDate` is not `Instant` is not `ZonedDateTime`. This is Precept's prevention guarantee applied to temporal data.
+1. **Philosophy alignment.** NodaTime's core design philosophy is: *"We want to force you to think about decisions you really need to think about. In particular, what kind of data do you really have and really need?"* (NodaTime 3.3.x Design Philosophy). Distinct types for distinct temporal concepts — `LocalDate` is not `Instant` is not `Period` is not `Duration`. This is Precept's prevention guarantee applied to temporal data.
 
-2. **Type separation enables compile-time safety.** NodaTime makes it structurally impossible to mix a calendar date with a global timestamp. Precept's type checker inherits this separation: `localdate + instant` is a type error by construction.
+2. **Type separation enables compile-time safety.** NodaTime makes it structurally impossible to mix a calendar date with a global timestamp, or a calendar period with a timeline duration. Precept's type checker inherits this separation: `date + instant` is a type error. `instant + period` is a type error. No custom dispatch needed.
 
-3. **Battle-tested arithmetic.** `LocalDate.PlusDays(int)`, `LocalDate.Plus(Period.FromMonths(n))`, month-end truncation (Jan 31 + 1 month = Feb 28), leap-year handling — all rigorously tested since 2012. Building the same guarantees on `System.DateOnly` would require Precept to own temporal arithmetic correctness, a domain Precept has no expertise in.
+3. **Battle-tested arithmetic.** `LocalDate.PlusDays(int)`, `LocalDate.Plus(Period.FromMonths(n))`, month-end truncation, leap-year handling, `Period.Between(d1, d2)` — all rigorously tested since 2012. Building the same guarantees on `System.DateOnly` would require Precept to own temporal arithmetic correctness, a domain Precept has no expertise in.
 
-4. **Lower marginal cost.** NodaTime has higher up-front cost (dependency + serialization) but significantly lower marginal cost for each subsequent temporal type. `System.DateOnly` is cheaper for `localdate` alone but increasingly expensive as temporal features accumulate — `TimeOnly` lacks integration with date arithmetic, and `DateTime` reintroduces the ambiguity problems NodaTime was designed to solve.
+4. **The `Period`/`Duration` split is the decisive factor.** The v1 proposal collapsed `Period` into `Duration` and had to build custom unit-compatibility dispatch. This was re-inventing enforcement logic that NodaTime already provides through type separation. The v2+ proposal exposes the separation directly: calendar units resolve to `period`, timeline units resolve to `duration`, and the type checker simply checks `date + period ✓`, `instant + duration ✓`, `instant + period ✗`. Zero custom dispatch.
 
-5. **Coherent future path.** `LocalDate`, `LocalTime`, `LocalDateTime`, `Instant`, `Duration`, `DateTimeZone` — the entire temporal vocabulary maps from NodaTime types with consistent semantics. Using BCL types would require mixing `DateOnly`, `TimeOnly`, `DateTime`, `DateTimeOffset`, and `TimeSpan` — types with overlapping, inconsistent semantics.
+5. **Coherent future path.** `LocalDate`, `LocalTime`, `LocalDateTime`, `Instant`, `Duration`, `Period`, `DateTimeZone` — the entire temporal vocabulary maps from NodaTime types with consistent semantics.
 
 **Dependencies added:**
 - `NodaTime` (core library)
 - `NodaTime.Serialization.SystemTextJson` (JSON serialization for MCP tools)
 
 **Decision format:**
-- **Why:** NodaTime's type model matches Precept's philosophy; battle-tested arithmetic avoids reimplementing solved problems.
-- **Alternatives rejected:** `System.DateOnly`/`TimeOnly` — cheaper for v1 but creates increasing technical debt; month/year arithmetic requires `DateTime` conversion. Raw `System.DateTime` — conflates multiple temporal concepts in one type; the exact problem NodaTime was created to solve.
+- **Why:** NodaTime's type model matches Precept's philosophy; the `Period`/`Duration` split eliminates custom dispatch logic; battle-tested arithmetic avoids reimplementing solved problems.
+- **Alternatives rejected:** `System.DateOnly`/`TimeOnly` — cheaper for v1 but no `Period` equivalent; month/year arithmetic requires `DateTime` conversion. Raw `System.DateTime` — conflates concepts; the exact problem NodaTime solved. Collapsed `Period`/`Duration` surface (v1 approach) — requires custom dispatch, re-invents enforcement NodaTime provides for free, contradicts the "expose NodaTime faithfully" directive.
 - **Precedent:** NRules inherits `System.Decimal` from .NET for exact arithmetic; Precept inherits NodaTime's temporal model for the same reason.
 - **Tradeoff accepted:** Additional NuGet dependency (~1.1 MB). Acceptable — NodaTime is authored by Jon Skeet, stable since 2012, SemVer-compliant, used in production at Google and across the .NET ecosystem.
 
@@ -166,7 +220,7 @@ NodaTime is adopted as a runtime dependency for the entire temporal type system.
 
 ## Proposed Types
 
-### `localdate`
+### `date`
 
 **What it makes explicit:** This is a calendar date — not a timestamp, not a string that looks like a date. Day-granularity arithmetic is meaningful. "2026-03-15" means the same calendar day everywhere.
 
@@ -175,31 +229,33 @@ NodaTime is adopted as a runtime dependency for the entire temporal type system.
 **Declaration:**
 
 ```precept
-field DueDate as localdate default localdate("2026-06-01")
-field FilingDate as localdate nullable
-field ContractEnd as localdate default localdate("2099-12-31")
+field DueDate as date default '2026-06-01'
+field FilingDate as date nullable
+field ContractEnd as date default '2099-12-31'
 ```
 
-**Literal / Constructor syntax:** `localdate("<YYYY-MM-DD>")` — ISO 8601, always. No custom formats. `localdate("2026-03-15")` is valid. `localdate("03/15/2026")` is a compile error with a teachable message.
+**Single-quoted literal:** `'2026-03-15'` — the single-quote delimiter signals a typed constant. Type is inferred from content shape: `YYYY-MM-DD` (digits and hyphens, no `T`) → `date`. The date's content shape is what qualifies it for the typed constant delimiter — distinguishable from every other inhabitant. Content is validated at compile time. `'2026-03-15'` is valid. `'03/15/2026'` is a compile error with a teachable message. See Locked Decision #18.
 
 **Operators:**
 
 | Expression | Produces | Rationale |
 |---|---|---|
-| `localdate + days(n)` | `localdate` | Add N calendar days. `LocalDate.PlusDays(int)`. |
-| `localdate - days(n)` | `localdate` | Subtract N calendar days. |
-| `localdate + months(n)` | `localdate` | Add N months. Truncates at month end (Jan 31 + 1 mo = Feb 28). |
-| `localdate + years(n)` | `localdate` | Add N years. Handles leap years (Feb 29 + 1 yr = Feb 28). |
-| `localdate + weeks(n)` | `localdate` | Add N weeks (= 7N days). |
-| `localdate - localdate` | `duration` | Elapsed days between dates. The result is a duration carrying day-unit semantics. |
+| `date + period` | `date` | Calendar arithmetic. `LocalDate.Plus(Period)`. Handles truncation. |
+| `date - period` | `date` | Calendar arithmetic backward. `LocalDate.Minus(Period)`. |
+| `date + 30 days` | `date` | Postfix unit — `30 days` resolves to `period` in date context. |
+| `date + (GraceDays) days` | `date` | Paren postfix — variable expression resolves to `period` in date context. |
+| `date + 3 months` | `date` | Truncates at month end (Jan 31 + 1 month = Feb 28). |
+| `date + 1 year` | `date` | Leap years (Feb 29 + 1 year = Feb 28). |
+| `date + 2 weeks` | `date` | = 14 days. |
+| `date - date` | `period` | Calendar distance. `Period.Between(d1, d2)`. Preserves structural components. |
 | `==`, `!=`, `<`, `>`, `<=`, `>=` | `boolean` | Full ordering. ISO calendar only. |
 
 | **Not supported** | **Why** |
 |---|---|
-| `localdate + localdate` | Adding two dates is meaningless — no temporal concept this could represent. |
-| `localdate + integer` | Bare integers don't carry unit semantics — days? months? weeks? Use `localdate + days(n)`. |
-| `localdate + decimal` | Fractional days are meaningless at day granularity. Type error. |
-| `localdate + number` | `number` is floating-point; temporal arithmetic requires explicit duration constructors. |
+| `date + date` | Adding two dates is meaningless. |
+| `date + integer` | Bare integers don't carry unit semantics. Use `date + (n) days`. See Locked Decision #10. |
+| `date + decimal` / `date + number` | Fractional/floating-point days are meaningless at day granularity. |
+| `date + duration` | **Duration is timeline-only (hours, minutes, seconds). Date is calendar-only (days, months, years).** Mixing them is what NodaTime was designed to prevent. `date + 3 hours` makes no sense — a date has no time component. |
 
 **Accessors:**
 
@@ -210,24 +266,24 @@ field ContractEnd as localdate default localdate("2099-12-31")
 | `.day` | `integer` | Day of month (1–31) |
 | `.dayOfWeek` | `integer` | ISO day of week (Monday=1, Sunday=7) |
 
-**Constraints:** `nullable`, `default localdate(...)`. Constraints `nonnegative`, `positive`, `min`, `max`, `maxplaces`, `minlength`, `maxlength` are not valid on `localdate` (compile error).
+**Constraints:** `nullable`, `default '...'` (single-quoted date). Numeric constraints (`nonnegative`, `min`, `max`, `maxplaces`, `minlength`, `maxlength`) are compile errors on `date`.
 
-**Serialization:** ISO 8601 string in MCP JSON payloads: `"2026-03-15"`.
+**Serialization:** ISO 8601 string: `"2026-03-15"`.
 
 **Teachable error messages:**
 
 | Invalid code | Error message |
 |---|---|
-| `field X as localdate default "2026-01-01"` | Date defaults require the localdate constructor: `default localdate("2026-01-01")`. Bare strings are not dates. |
-| `localdate("2026-02-30")` | Invalid date: February 30 does not exist. Use a valid calendar date in ISO 8601 format (YYYY-MM-DD). |
-| `localdate("01/15/2026")` | Invalid date format: expected ISO 8601 (YYYY-MM-DD), got '01/15/2026'. Use `localdate("2026-01-15")`. |
-| `DueDate + FilingDate` | Cannot add two dates. Did you mean `DueDate - FilingDate` (duration) or `DueDate + days(n)` (offset)? |
-| `DueDate + 2` | Cannot add an integer to a date. Temporal arithmetic requires explicit duration constructors. Use `DueDate + days(2)` to add 2 calendar days. |
-| `DueDate + 2.5` | Cannot add a number to a date. Temporal arithmetic requires explicit duration constructors. Use `DueDate + days(2)` or `DueDate + months(n)`. |
+| `field X as date default "2026-01-01"` | Date defaults require a single-quoted typed constant: `default '2026-01-01'`. Double-quoted strings are not dates. |
+| `'2026-02-30'` | Invalid date: February 30 does not exist. Use a valid calendar date in ISO 8601 format (YYYY-MM-DD). |
+| `'01/15/2026'` | Invalid date format: expected ISO 8601 (YYYY-MM-DD), got '01/15/2026'. Use `'2026-01-15'`. |
+| `DueDate + FilingDate` | Cannot add two dates. Did you mean `DueDate - FilingDate` (period between dates) or `DueDate + (n) days` (offset)? |
+| `DueDate + 2` | Cannot add an integer to a date. Temporal arithmetic requires explicit units. Use `DueDate + 2 days` to add 2 calendar days. |
+| `DueDate + 3 hours` | Cannot add a duration to a date — dates have no time-of-day component. Use `DueDate + (n) days` for calendar offsets. If you need time-of-day arithmetic, use `datetime` or `instant`. |
 
 ---
 
-### `localtime`
+### `time`
 
 **What it makes explicit:** This is a time of day — not a duration, not a timestamp, not an integer encoding minutes-since-midnight.
 
@@ -236,24 +292,29 @@ field ContractEnd as localdate default localdate("2099-12-31")
 **Declaration:**
 
 ```precept
-field AppointmentTime as localtime default localtime("09:00:00")
-field CheckInTime as localtime nullable
+field AppointmentTime as time default '09:00:00'
+field CheckInTime as time nullable
 ```
 
-**Literal / Constructor syntax:** `localtime("<HH:mm:ss>")` — ISO 8601 extended time. `localtime("14:30:00")` is valid. Seconds may be omitted: `localtime("14:30")` is valid (implies `:00`).
+**Single-quoted literal:** `'14:30:00'` — content shape `HH:mm:ss` (colons without hyphens-before-T) → `time`. The time's content shape is what qualifies it for the typed constant delimiter — distinguishable from all other inhabitants. Seconds may be omitted: `'14:30'` is valid (implies `:00`). See Locked Decision #18.
 
 **Operators:**
 
 | Expression | Produces | Rationale |
 |---|---|---|
-| `localtime + hours(n)` | `localtime` | Wraps at midnight. `LocalTime.PlusHours(long)`. |
-| `localtime + minutes(n)` | `localtime` | Wraps at midnight. `LocalTime.PlusMinutes(long)`. |
+| `time + period` | `time` | `LocalTime.Plus(Period)`. Uses time components (hours, minutes, seconds); date components (years, months, weeks, days) are ignored. NodaTime native. |
+| `time + duration` | `time` | Sub-day bridging. Wraps at midnight. Runtime: nanosecond arithmetic on `LocalTime` (see Decision #16). For sub-day units, `duration` and `period` represent identical physical quantities — the type checker bridges this. |
+| `time + 3 hours` | `time` | Postfix unit — resolves via sub-day bridging. Wraps at midnight. |
+| `time + 30 minutes` | `time` | Same bridging. Wraps at midnight. |
+| `time + 45 seconds` | `time` | Same bridging. Wraps at midnight. |
+| `time - time` | `period` | Time-component period between two times. `Period.Between(t1, t2)` returns period with `.hours`, `.minutes`, `.seconds` components. NodaTime faithful. |
 | `==`, `!=`, `<`, `>`, `<=`, `>=` | `boolean` | Full ordering within a day. |
+
+**Note:** `time + period` uses only the period's time components. Date components are silently ignored — this is `LocalTime.Plus(Period)` behavior in NodaTime. `time + 5 days` is valid but a no-op. `time + 3 months + 2 hours` adds only the 2 hours.
 
 | **Not supported** | **Why** |
 |---|---|
-| `localtime - localtime` | Ambiguous: does 23:00 - 01:00 = 22 hours or -22 hours? Defer until use case is clear. |
-| `localtime + integer` | What unit? Use `hours(n)` or `minutes(n)` explicitly. |
+| `time + integer` | What unit? Use `(n) hours` or `(n) minutes`. |
 
 **Accessors:**
 
@@ -263,7 +324,7 @@ field CheckInTime as localtime nullable
 | `.minute` | `integer` | Minute (0–59) |
 | `.second` | `integer` | Second (0–59) |
 
-**Constraints:** `nullable`, `default localtime(...)`.
+**Constraints:** `nullable`, `default '...'` (single-quoted time).
 
 **Serialization:** ISO 8601 time string: `"14:30:00"`.
 
@@ -271,8 +332,9 @@ field CheckInTime as localtime nullable
 
 | Invalid code | Error message |
 |---|---|
-| `localtime("25:00:00")` | Invalid time: hour must be 0–23, got 25. |
-| `AppointmentTime + 30` | Cannot add an integer to a time. Use `localtime + minutes(30)` or `localtime + hours(1)` to specify the unit. |
+| `'25:00:00'` | Invalid time: hour must be 0–23, got 25. |
+| `AppointmentTime + 30` | Cannot add an integer to a time. Use `time + 30 minutes` or `time + 1 hour` to specify the unit. |
+| `AppointmentTime + 1 day` | Warning: Adding a date-only period to a time has no effect — date components are ignored. Did you mean `AppointmentTime + 1 hour`, or did you intend `datetime` + `1 day` arithmetic? |
 
 ---
 
@@ -289,89 +351,96 @@ field FiledAt as instant nullable
 field IncidentTimestamp as instant
 ```
 
-**Literal / Constructor syntax:** `instant("<ISO-8601-UTC>")` — trailing `Z` required. `instant("2026-04-13T14:30:00Z")` is valid. Without `Z`: compile error.
+**Single-quoted literal:** `'2026-04-13T14:30:00Z'` — content shape includes `T` and trailing `Z` → `instant`. The trailing `Z` is the distinguishing shape signal that qualifies `instant` for the typed constant delimiter. Without `Z`: compile error. See Locked Decision #18.
 
 **Operators:**
 
 | Expression | Produces | Rationale |
 |---|---|---|
 | `instant - instant` | `duration` | Elapsed time between two points. Pure nanosecond subtraction. |
-| `instant + duration` | `instant` | Point in time offset by duration. |
-| `instant - duration` | `instant` | Point in time offset backward. |
+| `instant + duration` | `instant` | Point offset forward. `Instant.Plus(Duration)`. |
+| `instant - duration` | `instant` | Point offset backward. `Instant.Minus(Duration)`. |
+| `instant + 3 days` | `instant` | Postfix unit — `3 days` resolves to `Duration.FromDays(3)` in instant context. |
+| `instant + (DayCount) days` | `instant` | Paren postfix — variable expression resolves to `Duration.FromDays(n)` in instant context. |
+| `instant + 72 hours` | `instant` | Postfix unit — `72 hours` resolves to `Duration.FromHours(72)` in instant context. |
 | `==`, `!=`, `<`, `>`, `<=`, `>=` | `boolean` | Full ordering — nanosecond comparison. |
 
 | **Not supported** | **Why** |
 |---|---|
-| `instant.year`, `.month`, `.hour`, etc. | **Compile error.** Extracting calendar components from an instant requires a timezone — it would be implicit behavior hiding a timezone dependency. Use `toLocalDate(instant, timezone).year` instead. This is the canonical implicit-timezone bug that NodaTime was designed to prevent. |
-| `instant + integer` | What unit? Use `instant + hours(n)` or `instant + minutes(n)`. |
-| `instant + months(n)` | Months are calendar units, not timeline units. "1 month" has no fixed duration. Convert to a local date, add the month, convert back. |
+| `instant.year`, `.month`, `.hour`, etc. | **Compile error.** Extracting calendar components requires a timezone — implicit behavior hiding a timezone dependency. Use `toLocalDate(instant, timezone).year`. |
+| `instant + integer` | Ambiguous unit. Use `instant + (n) hours` or `instant + (n) seconds`. |
+| `instant + period` | **Periods are calendar units, instants live on the timeline.** "Add 1 month to an instant" is undefined — months have variable nanosecond length. Convert to a date via `toLocalDate`, add the month, convert back via `toInstant`. NodaTime's `Instant` accepts only `Duration`, not `Period`. |
+| `instant + 3 months` | `months` always resolves to `period` regardless of expression context. `instant + period` is a type error. Same applies to `(n) months`, `(n) years`. |
 
-**Accessors:** **None.** Deliberately empty. To get calendar components, call `toLocalDate(instant, timezone)` and access `.year` on the result. The conversion makes the timezone dependency explicit.
+**Note on `days`/`weeks` in instant context:** `instant + 3 days` and `instant + (n) days` are both valid — `days` and `weeks` resolve to `duration` (`Duration.FromDays`) in instant context. This is the key capability of context-dependent type resolution: the same unit keyword (`days`) resolves to `period` in calendar contexts and `duration` in timeline contexts. `months` and `years` have no duration equivalent (no `Duration.FromMonths` in NodaTime), so they always resolve to `period`.
 
-**Constraints:** `nullable`, `default instant(...)`.
+**Accessors:** **None.** Deliberately empty. To get calendar components, call `toLocalDate(instant, timezone)` and access `.year` on the result.
 
-**Serialization:** ISO 8601 UTC string: `"2026-04-13T14:30:00Z"` (always trailing `Z`).
+**Constraints:** `nullable`, `default '...'` (single-quoted instant).
+
+**Serialization:** ISO 8601 UTC string: `"2026-04-13T14:30:00Z"`.
 
 **Teachable error messages:**
 
 | Invalid code | Error message |
 |---|---|
-| `instant("2026-04-13T14:30:00")` | Instant requires UTC designation. Add trailing Z: `instant("2026-04-13T14:30:00Z")`. |
-| `FiledAt.year` | Cannot access calendar components on an instant — this requires a timezone. Use `toLocalDate(FiledAt, timezone_field).year` to extract the year in a specific timezone. |
-| `FiledAt + 3600` | Cannot add an integer to an instant. Use `FiledAt + hours(1)` or `FiledAt + seconds(3600)`. |
+| `'2026-04-13T14:30:00'` in instant context | Instant requires UTC designation. Use `'2026-04-13T14:30:00Z'` (note trailing Z). Without Z, this is a `datetime`, not an `instant`. |
+| `FiledAt.year` | Cannot access calendar components on an instant — this requires a timezone. Use `toLocalDate(FiledAt, tz).year` to extract the year in a specific timezone. |
+| `FiledAt + 3600` | Cannot add an integer to an instant. Use `FiledAt + 1 hour` or `FiledAt + 3600 seconds`. |
+| `FiledAt + 1 month` | Cannot add a period to an instant — periods are calendar units with variable length. Convert to a date first: `toLocalDate(FiledAt, tz) + 1 month`, then convert back with `toInstant(...)`. |
 
 ---
 
 ### `duration`
 
-**What it makes explicit:** This is an elapsed amount of time — a fixed count of nanoseconds. Not a calendar interval, not an hour-count encoded as an integer.
+**What it makes explicit:** This is an elapsed amount of time — a fixed count of nanoseconds on the timeline. Not a calendar interval, not an hour-count encoded as an integer.
 
 **Backing type:** `NodaTime.Duration`
 
-**Constructor functions:**
+**What v2 changed:** In v1, `duration` held both calendar units (months, years) and timeline units (hours, minutes) — requiring custom dispatch. In v2+, `duration` holds **only timeline units**. Calendar units live in `period`. The type checker handles the rest.
+
+**Construction via postfix units:**
 
 ```precept
-hours(72)       # 72 hours as a duration
-minutes(30)     # 30 minutes
-seconds(3600)   # 3600 seconds
+72 hours              # 72 hours as a duration
+30 minutes            # 30 minutes
+3600 seconds          # 3600 seconds
+(SlaHours) hours      # variable — paren postfix form
 ```
 
-These are thin wrappers around `Duration.FromHours`, `Duration.FromMinutes`, `Duration.FromSeconds`.
+These resolve to `Duration.FromHours`, `Duration.FromMinutes`, `Duration.FromSeconds` respectively.
 
-**Composite durations** are built with duration arithmetic:
+**Combined durations:**
 
 ```precept
-days(5) + hours(7) + seconds(32)    # 5 days, 7 hours, and 32 seconds
+5 hours + 30 minutes + 15 seconds    # 5 hours, 30 minutes, 15 seconds
 ```
 
-**Literal / Constructor syntax:** `duration("<ISO-8601-duration>")` — ISO 8601 duration format. `duration("PT72H")` is valid (72 hours). `duration("PT8H30M")` is valid (8 hours 30 minutes). `duration("P5DT7H32S")` is valid (5 days, 7 hours, 32 seconds). Parsing via `NodaTime.Text.DurationPattern`.
+**Duration and period have no constructor literal form** (Locked Decision — 2026-04-15). ISO 8601 duration notation (`PT72H`, `PT8H30M`) is specialist serialization syntax designed for machines, not humans. The postfix unit system with `+` combination handles every duration expressible in ISO 8601:
 
-| Expression | Valid? | Notes |
-|---|---|---|
-| `duration("PT72H")` | Yes | 72 hours |
-| `duration("PT8H30M")` | Yes | 8 hours 30 minutes |
-| `duration("P5DT7H32S")` | Yes | 5 days, 7 hours, 32 seconds |
-| `duration("8 hours")` | No | Not ISO 8601 format. Use `duration("PT8H")` or `hours(8)`. |
-| `duration("")` | No | Empty duration string. Use `hours(0)` for zero duration. |
-
-The string constructor and the function constructors are interchangeable — `duration("PT72H")` and `hours(72)` produce the same value. The function constructors are preferred for single-unit durations (more readable); the string constructor serves composite durations that would otherwise require chained addition.
+| ISO notation | Precept equivalent |
+|---|---|
+| `PT72H` | `72 hours` |
+| `PT2H30M` | `2 hours + 30 minutes` |
+| `PT0.5S` | `(0.5) seconds` |
 
 **Operators:**
 
 | Expression | Produces | Rationale |
 |---|---|---|
 | `duration + duration` | `duration` | Combined elapsed time. |
-| `duration - duration` | `duration` | Difference in elapsed time. |
-| `duration * integer` or `duration * number` | `duration` | Scaling — e.g., `SlaWindow * 2`, `BaseDuration * Rate`. NodaTime: `Duration * long`, `Duration * double`. `decimal` excluded — `decimal → double` is a lossy narrowing conversion, violating explicit-over-implicit. |
-| `duration / integer` or `duration / number` | `duration` | Scaling — e.g., `SlaWindow / 2`. NodaTime: `Duration / long`, `Duration / double`. Same `decimal` exclusion. |
-| `duration / duration` | `number` | Ratio — e.g., `Elapsed / ShiftLength` counts how many shifts fit. NodaTime: `Duration / Duration → double`. |
+| `duration - duration` | `duration` | Difference. |
+| `duration * integer` or `duration * number` | `duration` | Scaling. NodaTime: `Duration * long`, `Duration * double`. |
+| `duration / integer` or `duration / number` | `duration` | Scaling. |
+| `duration / duration` | `number` | Ratio (e.g., how many shifts fit). |
 | `==`, `!=`, `<`, `>`, `<=`, `>=` | `boolean` | Full ordering — nanosecond comparison. |
 
 | **Not supported** | **Why** |
 |---|---|
-| `duration * duration` | Multiplying two durations is dimensionally meaningless. |
-| `duration * decimal` | `decimal → double` is a lossy narrowing conversion. Use `number` for scaling operands. |
-| `integer * duration` / `number * duration` | Use `duration * integer` or `duration * number` — duration is always the left operand, matching the Precept convention for temporal types. |
+| `duration * duration` | Dimensionally meaningless. |
+| `duration * decimal` | `decimal → double` is lossy. Use `number`. |
+| `integer * duration` / `number * duration` | Duration is the left operand convention. |
+| `duration + period` / `duration - period` | **Cannot mix timeline and calendar units.** `3 hours + 1 month` is nonsensical. |
 
 **Accessors:**
 
@@ -381,40 +450,132 @@ The string constructor and the function constructors are interchangeable — `du
 | `.totalMinutes` | `number` | Total elapsed minutes. |
 | `.totalSeconds` | `number` | Total elapsed seconds. |
 
-Note: Accessors return `number` because these are unit conversions that may produce fractional results (e.g., 90 minutes = 1.5 hours).
-
-**Serialization:** ISO 8601 duration-style string based on total hours: `"PT72H"` for 72 hours.
-
-#### Option: `duration` as declared field type vs. expression-result only
-
-##### Option A: `duration` as a declared field type
+**As a declared field type:**
 
 ```precept
-field EstimatedHours as duration default hours(8)
-field ActualHours as duration default hours(0)
+field EstimatedHours as duration default 8 hours
+field ActualHours as duration default 0 hours
 ```
 
-**Pros:** 9 fields across 6 samples in the corpus (MTBF, repair hours, work hours) are naturally `duration`. Avoids encoding elapsed time as `integer` or `decimal`. Authoring intent is clear. `nullable`, `default`, and constraints like `nonnegative` apply naturally.
+9 fields across 6 samples (MTBF, repair hours, work hours) are naturally `duration`.
 
-**Cons:** Adds a storable type to the serialization surface. Default semantics need definition (what is the "zero" duration? `hours(0)` is natural).
+**Constraints:** `nullable`, `default 8 hours` or `default 30 minutes`, `nonnegative`.
 
-##### Option B: Expression-result only (like `Period` in NodaTime's internal role)
+**Serialization:** ISO 8601 time-duration string: `"PT72H"`.
 
-`duration` exists as the result type of `instant - instant` and in constructor functions (`hours(n)`, etc.) but cannot be declared as a field type.
+---
 
-**Pros:** Smaller type system surface. Duration fields are modeled as `integer` or `decimal` with naming conventions.
+### `period`
 
-**Cons:** The same type-safety gap that justified `localdate` over `string` applies: `integer` fields lose domain semantics, and `EstimatedHours + InvoiceTotal` compiles.
+**What it makes explicit:** This is a calendar-and-time quantity backed by the full `NodaTime.Period` type. Calendar components (years, months, weeks, days) have variable length — "1 month" means 1 month, not 30 days. Time components (hours, minutes, seconds) are structurally preserved alongside date components. A period can hold date-only, time-only, or mixed date+time components.
 
-**Recommendation:** Option A — `duration` as a declared field type. The corpus evidence (9 fields across 6 samples) and the type-safety parity argument with `localdate` both support it. The "zero" duration (`hours(0)`) is a natural default.
+**Backing type:** `NodaTime.Period`
 
-**Constraints (if field type):** `nullable`, `default hours(...)` or `default minutes(...)`, `nonnegative`.
+**Why this type exists (v2 → v2.1 evolution):** Shane's directive: *"Someone way smarter than us designed NodaTime. Don't try to re-invent the wheel."* NodaTime deliberately separates `Period` (variable-length calendar+time units) from `Duration` (fixed nanoseconds on the timeline). The v1 proposal collapsed this distinction. The v2 proposal exposed the separation but restricted `period` to date-only components. The v2.1 correction removes the date-only restriction because it contradicted NodaTime in three ways: (1) `LocalTime.Plus(Period)` is NodaTime's API for time arithmetic — but date-only `period` couldn't carry time results; (2) `Period.Between(LocalTime, LocalTime)` returns time-component Periods with no home in a date-only type; (3) timeline constructors returning `duration` plus `LocalTime` not accepting `Duration` left no faithful implementation path for `time + 3 hours`.
+
+NodaTime's `Period` type is intentionally comprehensive: `Period.FromHours()`, `Period.FromMinutes()`, `Period.FromSeconds()` all exist alongside `Period.FromDays()`, `Period.FromMonths()`, `Period.FromYears()`. `Period.HasDateComponent` and `Period.HasTimeComponent` introspection properties exist. The full Period is the faithful exposure.
+
+The key insight from NodaTime's design philosophy: *"Some of these periods represent different lengths of time depending on what they're applied to."* (NodaTime 3.3.x Core Concepts). A `Period` of 1 month added to January 31 gives February 28; added to March 1 gives April 1. A `Duration` of 30 days is always exactly 2,592,000,000,000,000 nanoseconds. These are fundamentally different concepts.
+
+**Construction via postfix units:**
+
+```precept
+30 days               # 30 calendar days
+3 months              # 3 months — NOT 90 days
+1 year                # 1 year — NOT 365 days
+2 weeks               # 2 weeks (= 14 days)
+(GraceDays) days      # variable — paren postfix form
+```
+
+These resolve to `Period.FromDays`, `Period.FromMonths`, `Period.FromYears`, `Period.FromWeeks` respectively.
+
+**Combined periods:**
+
+```precept
+1 year + 6 months               # 1 year and 6 months
+3 months + 15 days              # 3 months and 15 days
+```
+
+**Period has no constructor literal form** (Locked Decision — 2026-04-15). ISO 8601 period notation (`P1Y6M`, `P2W`) is specialist serialization syntax. The postfix unit system with `+` combination handles every period expressible in ISO 8601:
+
+| ISO notation | Precept equivalent |
+|---|---|
+| `P1Y6M` | `1 year + 6 months` |
+| `P1Y6M15D` | `1 year + 6 months + 15 days` |
+| `P30D` | `30 days` |
+| `PT5H` | `5 hours` (in period field context) |
+| `P1DT12H` | `1 day + 12 hours` |
+
+**Decision: Precept's `period` is the full NodaTime `Period` — date AND time components (v2.1 correction).** The v2 proposal restricted `period` to date-only components. This created a structural contradiction with NodaTime's `LocalTime` API: `LocalTime.Plus(Period)` is the native arithmetic method, and `Period.Between(LocalTime, LocalTime)` returns time-component periods. The date-only restriction forced `time` arithmetic through `duration` via a non-existent `LocalTime.Plus(Duration)` method. The full NodaTime `Period` resolves all three contradictions and honors the "expose NodaTime faithfully" directive. See Locked Decision #13 (revised).
+
+**Operators:**
+
+| Expression | Produces | Rationale |
+|---|---|---|
+| `period + period` | `period` | Combined calendar period. `Period + Period`. |
+| `period - period` | `period` | Calendar period difference. `Period - Period`. |
+| `-period` | `period` | Unary negation. `-(3 months)` is equivalent to negating the period. |
+| `==`, `!=` | `boolean` | **Structural equality.** `1 month != 30 days` — structurally different. NodaTime's equality is structural. |
+
+| **Not supported** | **Why** |
+|---|---|
+| `<`, `>`, `<=`, `>=` | **No natural ordering.** "Is 1 month greater than 30 days?" depends on which month. NodaTime's `Period` has no `IComparable`. See Locked Decision #14. |
+| `period * integer` | No multiplication operator on NodaTime's `Period`. Construct directly: `3 months` not `1 month * 3`. |
+| `period + duration` / `period - duration` | **Cannot mix calendar and timeline units.** |
+
+**Accessors:**
+
+| Accessor | Returns | Description |
+|---|---|---|
+| `.years` | `integer` | Years component (structural, not normalized) |
+| `.months` | `integer` | Months component |
+| `.weeks` | `integer` | Weeks component |
+| `.days` | `integer` | Days component |
+| `.hours` | `integer` | Hours component |
+| `.minutes` | `integer` | Minutes component |
+| `.seconds` | `integer` | Seconds component |
+
+Note: These are structural components. `14 months` has `.months == 14` and `.years == 0`. The period is NOT automatically normalized. This matches NodaTime: *"Period is NOT normalized by default."* (NodaTime 3.3.x Arithmetic).
+
+**Introspection:**
+
+| Property | Returns | Description |
+|---|---|---|
+| `.hasDateComponent` | `boolean` | `true` if any of years, months, weeks, days is non-zero |
+| `.hasTimeComponent` | `boolean` | `true` if any of hours, minutes, seconds is non-zero |
+
+These map to NodaTime's `Period.HasDateComponent` and `Period.HasTimeComponent`.
+
+**As a declared field type:**
+
+```precept
+field GracePeriod as period default 30 days
+field LoanTerm as period default 12 months
+field WarrantyLength as period default 2 years
+field NoticePeriod as period default 2 weeks
+field ExtendedWarranty as period default 2 years + 6 months
+```
+
+10 period fields across 7 samples (`GracePeriodDays`, `TermLengthMonths`, `WarrantyMonths`, etc.) are currently `integer` surrogates. See Locked Decision #12.
+
+**Constraints:** `nullable`, `default 30 days` / `default 12 months` / `default 2 years` / `default 2 weeks`, or combined: `default 2 years + 6 months`.
+
+**Serialization:** ISO 8601 period string: `"P1Y2M3D"`, `"PT5H30M"`, `"P1MT2H"`. Via `PeriodPattern.Roundtrip`.
+
+**Teachable error messages:**
+
+| Invalid code | Error message |
+|---|---|
+| `1 month > 30 days` | Cannot compare periods with `<`, `>`, `<=`, `>=` — "is 1 month greater than 30 days?" depends on which month. Periods support `==` and `!=` only (structural equality). |
+| `1 month == 30 days` | Evaluates to `false` — 1 month is structurally different from 30 days. NodaTime's period equality is structural, not calendrical. |
+| `FiledAt + 1 month` | Cannot add a period to an instant — periods may contain calendar units with variable length. Convert to a date first: `toLocalDate(FiledAt, tz) + 1 month`, then convert back. |
+| `GracePeriod * 2` | Cannot multiply a period. Construct the value directly: `60 days` instead of `30 days * 2`. |
 
 ---
 
 ### `timezone`
 
-**What it makes explicit:** This is a valid IANA timezone identifier — not an arbitrary string that might hold "California" or "EST" or "Pacific Standard Time".
+**What it makes explicit:** This is a valid IANA timezone identifier — not an arbitrary string.
 
 **Backing type:** `NodaTime.DateTimeZone`
 
@@ -425,26 +586,17 @@ field IncidentTimezone as timezone
 field CustomerTimezone as timezone nullable
 ```
 
-**Literal / Constructor syntax:** `timezone("<IANA-identifier>")` — validated at compile time. `timezone("America/Los_Angeles")` is valid. `timezone("EST")` produces a warning (abbreviation, not IANA). `timezone("Not/A/Timezone")` is a compile error.
+**Single-quoted literal:** `'America/New_York'` — content shape is an IANA timezone identifier (forward-slash-separated components, no ISO date characters) → `timezone`. The `Word/Word` pattern is what qualifies `timezone` for the typed constant delimiter — distinguishable from all other inhabitants. Validated at compile time against the IANA TZ database bundled with NodaTime. See Locked Decision #18.
 
-**Operators:**
+**Operators:** `==`, `!=` only. No ordering, no arithmetic.
 
-| Expression | Produces | Rationale |
-|---|---|---|
-| `==`, `!=` | `boolean` | Equality by canonical IANA identifier. |
-
-| **Not supported** | **Why** |
-|---|---|
-| `<`, `>`, `<=`, `>=` | Timezones have no meaningful sort order. |
-| Arithmetic of any kind | You cannot add, subtract, or compare timezones in a domain-meaningful way. |
-
-**Accessors:** None. A timezone is a metadata identifier, not a temporal value. Timezone data is consumed by conversion functions, not inspected directly.
+**Accessors:** None.
 
 **Validation:**
-- **Compile-time:** Literal timezone strings are validated against the IANA TZ database bundled with NodaTime. Deprecated aliases (e.g., `"US/Pacific"`) produce warnings suggesting the canonical form.
-- **Runtime:** Event arguments declared `as timezone` are validated at fire time. Invalid timezone strings produce a constraint-violation-style rejection, not a runtime exception.
+- **Compile-time:** Literal strings validated against IANA TZ database bundled with NodaTime. Deprecated aliases produce warnings.
+- **Runtime:** Event arguments typed `as timezone` validated at fire time.
 
-**Constraints:** `nullable`. No `default` — there is no universally sensible default timezone.
+**Constraints:** `nullable`. No `default`.
 
 **Serialization:** IANA identifier string: `"America/Los_Angeles"`.
 
@@ -452,17 +604,15 @@ field CustomerTimezone as timezone nullable
 
 | Invalid code | Error message |
 |---|---|
-| `timezone("EST")` | Warning: "EST" is a timezone abbreviation, not an IANA identifier. Did you mean `timezone("America/New_York")`? |
-| `timezone("Pacific Standard Time")` | "Pacific Standard Time" is a Windows timezone name, not an IANA identifier. Use `timezone("America/Los_Angeles")`. |
-| `timezone("Not/A/Timezone")` | Unknown IANA timezone identifier: "Not/A/Timezone". See https://en.wikipedia.org/wiki/List_of_tz_database_time_zones for valid identifiers. |
-
-**Why `timezone` over `string`:** The `localdate`-over-`string` argument applies with equal force. `field IncidentTimezone as string` means the compiler can't reject `"Not/A/Timezone"` or `"California"`. The `timezone` type validates at compile time (literals) and fire time (event args), closing the type-safety gap that the `localdate` type closes for calendar dates.
+| `'EST'` in timezone context | Warning: "EST" is a timezone abbreviation, not an IANA identifier. Did you mean `'America/New_York'`? |
+| `'Pacific Standard Time'` in timezone context | "Pacific Standard Time" is a Windows timezone name, not an IANA identifier. Use `'America/Los_Angeles'`. |
+| `'Not/A/Timezone'` | Unknown IANA timezone identifier. |
 
 ---
 
 ### `zoneddatetime`
 
-**What it makes explicit:** This is a datetime with timezone context — an instant resolved to local date and time in a specific timezone. The zone travels with the value, so component access and calendar arithmetic are always deterministic: the bound timezone resolves calendar components, and DST transitions are handled via the proposal's lenient resolver strategy (see [DST ambiguity resolution](#dst-ambiguity-resolution)). Conversion functions that accept a `zoneddatetime` preserve timezone provenance across decomposition and recomposition.
+**What it makes explicit:** A datetime with timezone context — an instant resolved to local date and time in a specific timezone.
 
 **Backing type:** `NodaTime.ZonedDateTime`
 
@@ -473,136 +623,101 @@ field IncidentContext as zoneddatetime
 field FilingContext as zoneddatetime nullable
 ```
 
-**Constructor syntax:** `zoneddatetime(instant_expr, timezone_expr)` — two required arguments. Both must be present; co-assignment is structural.
+**Single-quoted literal:** `'2026-04-13T14:30:00[America/New_York]'` — content shape includes `T` and bracket-enclosed timezone `[...]` → `zoneddatetime`. The bracket-enclosed timezone `[...]` is the distinguishing shape signal. See Locked Decision #18.
 
-```precept
--> set IncidentContext = zoneddatetime(Submit.Timestamp, Submit.Timezone)
-```
+**Construction from expressions:** `zoneddatetime(instant_expr, timezone_expr)` — constructs a `zoneddatetime` from a computed instant and timezone. This is a construction function (analogous to `toInstant`), not a typed literal.
 
 **Operators:**
 
 | Expression | Produces | Rationale |
 |---|---|---|
-| `zoneddatetime + days(n)` | `zoneddatetime` | Calendar arithmetic. DST resolved via lenient strategy. |
-| `zoneddatetime + months(n)` | `zoneddatetime` | Calendar arithmetic via Period. Month-end truncation applies. |
-| `zoneddatetime + years(n)` | `zoneddatetime` | Calendar arithmetic. Leap year handling. |
-| `zoneddatetime + weeks(n)` | `zoneddatetime` | Calendar arithmetic (= 7N days). |
-| `zoneddatetime + hours(n)` | `zoneddatetime` | Timeline arithmetic. Duration added to underlying instant, re-resolved in zone. |
-| `zoneddatetime + minutes(n)` | `zoneddatetime` | Timeline arithmetic. |
-| `zoneddatetime + duration` | `zoneddatetime` | Timeline arithmetic with composed duration. |
+| `zoneddatetime + duration` | `zoneddatetime` | Timeline arithmetic on underlying instant. |
 | `zoneddatetime - duration` | `zoneddatetime` | Timeline arithmetic backward. |
-| `zoneddatetime - zoneddatetime` | `duration` | Elapsed time between two points (instant subtraction). |
+| `zoneddatetime + 3 hours` | `zoneddatetime` | Postfix unit — resolves to `duration`. |
+| `zoneddatetime + 3 days` | `zoneddatetime` | Postfix unit — `days` resolves to `duration` in zoneddatetime context (timeline arithmetic). |
+| `zoneddatetime - zoneddatetime` | `duration` | Instant subtraction. |
 | `==`, `!=`, `<`, `>`, `<=`, `>=` | `boolean` | Comparison by underlying instant. |
-
-Calendar arithmetic on `zoneddatetime` uses the same lenient resolver strategy defined in [DST ambiguity resolution](#dst-ambiguity-resolution): gaps map to the post-gap instant, overlaps map to the later instant. This applies to `+ days(n)`, `+ months(n)`, `+ years(n)`, and `+ weeks(n)`. Timeline arithmetic (`+ hours(n)`, `+ minutes(n)`, `+ duration`) operates on the underlying instant and re-resolves in the bound timezone — no ambiguity arises.
 
 | **Not supported** | **Why** |
 |---|---|
-| `zoneddatetime + zoneddatetime` | Adding two zoned datetimes is meaningless — same as `date + date`. |
-| `zoneddatetime + integer` | Bare integers don't carry unit semantics. Use `+ days(n)` or `+ hours(n)`. |
+| `zoneddatetime + period` | **Calendar arithmetic on `zoneddatetime` requires decomposition.** NodaTime's `ZonedDateTime` deliberately excludes `Period` arithmetic — forces explicit conversion. Decompose via `.date`, add the period, reconstruct. |
+| `zoneddatetime + 3 months` | `months` always resolves to `period`. Same rule. |
+| `zoneddatetime + integer` | Bare integers don't carry unit semantics. |
 
 **Accessors:**
 
 | Accessor | Returns | Description |
 |---|---|---|
-| `.instant` | `instant` | The underlying UTC point in time. |
+| `.instant` | `instant` | The underlying UTC point. |
 | `.timezone` | `timezone` | The bound IANA timezone. |
-| `.date` | `localdate` | Local calendar date in the bound timezone. |
-| `.time` | `localtime` | Local time of day in the bound timezone. |
-| `.year` | `integer` | Local calendar year in the bound timezone. |
-| `.month` | `integer` | Local month (1–12) in the bound timezone. |
-| `.day` | `integer` | Local day of month (1–31) in the bound timezone. |
-| `.hour` | `integer` | Local hour (0–23) in the bound timezone. |
-| `.minute` | `integer` | Local minute (0–59) in the bound timezone. |
-| `.second` | `integer` | Local second (0–59) in the bound timezone. |
-| `.dayOfWeek` | `integer` | ISO day of week (Monday=1, Sunday=7) in the bound timezone. |
+| `.date` | `date` | Local calendar date in bound timezone. |
+| `.time` | `time` | Local time in bound timezone. |
+| `.year`, `.month`, `.day`, `.hour`, `.minute`, `.second`, `.dayOfWeek` | `integer` | Local components in bound timezone. |
 
-**Constraints:** `nullable`. No `default` — there is no universally sensible default timezone, so there is no universally sensible default `zoneddatetime`. Fields are either `nullable` or populated by events.
+**Constraints:** `nullable`. No `default`.
 
-**Serialization:** Two-property JSON object in MCP payloads:
-
-```json
-{
-  "IncidentContext": {
-    "instant": "2026-04-13T14:30:00Z",
-    "timezone": "America/Los_Angeles"
-  }
-}
-```
+**Serialization:** Two-property JSON: `{ "instant": "..Z", "timezone": "..." }`.
 
 **Teachable error messages:**
 
 | Invalid code | Error message |
 |---|---|
-| `zdt + 5` | Cannot add an integer to a zoneddatetime — use `zdt + days(5)` or `zdt + hours(5)` to specify the unit. |
-| `field X as zoneddatetime default zoneddatetime(...)` | zoneddatetime fields cannot have a default — there is no universally sensible default timezone. Use `nullable` or populate via events. |
+| `zdt + 1 month` | Cannot add a period to a zoneddatetime — calendar arithmetic requires decomposition. Use `zdt.date + 1 month` to get the new date, then reconstruct. |
+| `zdt + 5` | Cannot add an integer to a zoneddatetime — use `zdt + 5 hours` for timeline offset, or decompose via `.date` for calendar arithmetic. |
 
 ---
 
-### `localdatetime`
+### `datetime`
 
-**What it makes explicit:** This is a date and time together — not a point on the global timeline, not two separate fields pretending to be coupled. No timezone.
+**What it makes explicit:** A date and time together — not a point on the global timeline, not two separate fields. No timezone.
 
 **Backing type:** `NodaTime.LocalDateTime`
 
 **Declaration:**
 
 ```precept
-field DetectedAt as localdatetime nullable
-field ScheduledFor as localdatetime default localdatetime("2026-04-13T09:00:00")
+field DetectedAt as datetime nullable
+field ScheduledFor as datetime default '2026-04-13T09:00:00'
 ```
 
-**Literal / Constructor syntax:** `localdatetime("<YYYY-MM-DD>T<HH:mm:ss>")` — ISO 8601 combined. No timezone suffix (that would make it a `ZonedDateTime`). `localdatetime("2026-04-13T14:30:00")` is valid.
+**Single-quoted literal:** `'2026-04-13T09:00:00'` — content shape includes `T` but no trailing `Z` and no bracket-enclosed timezone → `datetime`. The presence of `T` without `Z` or `[` is the distinguishing shape signal. See Locked Decision #18.
 
 **Operators:**
 
 | Expression | Produces | Rationale |
 |---|---|---|
-| `localdatetime + hours(n)` | `localdatetime` | Offset by hours. |
-| `localdatetime + minutes(n)` | `localdatetime` | Offset by minutes. |
-| `localdatetime + days(n)` | `localdatetime` | Add N calendar days. Same as localdate + days(n). |
-| `localdatetime + months(n)` | `localdatetime` | Calendar arithmetic via Period. |
-| `localdatetime + years(n)` | `localdatetime` | Calendar arithmetic via Period. |
-| `localdatetime + duration` | `localdatetime` | Offset forward by a composed duration (e.g., `days(5) + hours(7)`). |
-| `localdatetime - duration` | `localdatetime` | Offset backward by a composed duration. |
-| `==`, `!=`, `<`, `>`, `<=`, `>=` | `boolean` | Full ordering within the same calendar. |
+| `datetime + period` | `datetime` | Calendar arithmetic. `LocalDateTime.Plus(Period)`. |
+| `datetime + duration` | `datetime` | Time arithmetic. Duration bridging — same mechanism as `time + duration` (Decision #16). NodaTime's `LocalDateTime` has no `Plus(Duration)` — uses nanosecond arithmetic on the time component, preserving date component. |
+| `datetime + 30 days`, `+ 3 months`, `+ 1 year`, `+ 2 weeks` | `datetime` | Postfix units — resolve to `period` in datetime context. |
+| `datetime + 3 hours`, `+ 30 minutes`, `+ 45 seconds` | `datetime` | Postfix units — resolve to `duration`. |
+| `datetime - datetime` | `period` | `Period.Between(ldt1, ldt2)`. |
+| `==`, `!=`, `<`, `>`, `<=`, `>=` | `boolean` | Full ordering. |
+
+Note: `datetime` and `time` both accept `period` and `duration`. For `datetime`, all components of both types are meaningful. For `time`, only time components of `period` are used (date components ignored — NodaTime's `LocalTime.Plus(Period)` behavior). `datetime` is the only type where every component of both `period` and `duration` applies. Both `time + duration` and `datetime + duration` use the same duration bridging mechanism (Decision #16) — NodaTime's `LocalTime` and `LocalDateTime` natively accept `Period`, not `Duration`, so the type checker translates sub-day Duration components into equivalent nanosecond arithmetic.
 
 | **Not supported** | **Why** |
 |---|---|
-| `localdatetime - localdatetime` | Ambiguous without timezone context. If both localdatetimes are in the same implied local context, is the subtraction calendar-based or timeline-based? Defer pending use case clarity. |
+| `datetime + integer` | Bare integers don't carry unit semantics. |
 
 **Accessors:**
 
 | Accessor | Returns | Description |
 |---|---|---|
-| `.date` | `localdate` | Date component extraction. |
-| `.time` | `localtime` | Time component extraction. |
-| `.year` | `integer` | Calendar year. |
-| `.month` | `integer` | Month (1–12). |
-| `.day` | `integer` | Day of month (1–31). |
-| `.hour` | `integer` | Hour (0–23). |
-| `.minute` | `integer` | Minute (0–59). |
-| `.second` | `integer` | Second (0–59). |
+| `.date` | `date` | Date component. |
+| `.time` | `time` | Time component. |
+| `.year`, `.month`, `.day`, `.hour`, `.minute`, `.second` | `integer` | Direct components. |
 
-**Constraints:** `nullable`, `default localdatetime(...)`.
+**Constraints:** `nullable`, `default '...'` (single-quoted datetime).
 
-**Serialization:** ISO 8601 string without timezone: `"2026-04-13T14:30:00"`.
+**Serialization:** ISO 8601 without timezone: `"2026-04-13T14:30:00"`.
 
-#### Option: `localdatetime` inclusion vs. deferral
+#### Option: `datetime` inclusion vs. deferral
 
-##### Option A: Include `localdatetime` in the initial proposal
+**Option A (Include):** Completes the local type vocabulary. 6 NIST compliance fields in security-incident sample. `datetime` is uniquely the bridge type that accepts both `period` and `duration`.
 
-**Pros:** Completes the local type vocabulary. Security-incident sample (6 NIST compliance timestamps) demonstrates real need. Enables `toInstant(localdate, localtime, timezone)` alternative as `localdatetime + timezone → instant` conversion.
+**Option B (Defer):** Smaller initial surface. 1 of 15 samples. Separate `date` + `time` fields cover most cases.
 
-**Cons:** Only 1 of 15 samples requires it. Most combined date+time use cases can be handled with `localdate` + `localtime` as separate fields. Higher implementation cost for thin corpus evidence.
-
-##### Option B: Defer `localdatetime` to a follow-up proposal
-
-**Pros:** Smaller initial surface. Focus resources on the high-frequency types (`localdate`, `instant`, `duration`, `localtime`, `timezone`). Ship `localdatetime` when enterprise adoption demonstrates that separate `localdate` + `localtime` fields create friction.
-
-**Cons:** Security-incident and audit-trail domains remain underserved. Authors who need sub-day local timestamps encode them as strings.
-
-**Recommendation:** Open — needs design discussion. The corpus evidence is thin (6 fields in 1 sample), but the use case is real (NIST incident response). Including it completes the type vocabulary cleanly; deferring it reduces the initial surface.
+**Recommendation:** Open — needs design discussion.
 
 ---
 
@@ -610,180 +725,196 @@ field ScheduledFor as localdatetime default localdatetime("2026-04-13T09:00:00")
 
 ### The timezone bridge
 
-Conversion functions bridge the timeline domain (instants, durations) and the calendar domain (dates, times). They make the timezone dependency explicit — visible in the expression, typed at the call boundary, inspectable by `precept_inspect`.
-
 | Function | Signature | Semantics |
 |---|---|---|
-| `toLocalDate` | `(instant, timezone) → localdate` | Extract the local calendar date for an instant in a timezone. "What date is it at this moment in this timezone?" |
-| `toLocalTime` | `(instant, timezone) → localtime` | Extract the local time-of-day for an instant in a timezone. "What time is it at this moment in this timezone?" |
-| `toInstant` | `(localdate, localtime, timezone) → instant` | Convert local date + time-of-day + timezone → UTC instant. "What UTC moment corresponds to this local time in this timezone?" |
+| `toLocalDate` | `(instant, timezone) → date` | "What date is it at this moment in this timezone?" |
+| `toLocalTime` | `(instant, timezone) → time` | "What time is it at this moment in this timezone?" |
+| `toInstant` | `(date, time, timezone) → instant` | "What UTC moment corresponds to this local time?" |
 
 ### Why these functions exist
 
-Without them, multi-timezone compliance rules must be split between the precept and the hosting layer:
-
-```precept
-# WITHOUT conversion functions — rule is split
-field FilingDeadline as instant  # Computed by hosting layer — the MEANING is not in this file
-invariant FiledTimestamp <= FilingDeadline because "Filing deadline has passed"
-```
-
-With them, the entire rule lives in one file:
-
-```precept
-# WITH conversion functions — rule is complete
-invariant FiledTimestamp <= toInstant(
-    toLocalDate(IncidentTimestamp, IncidentTimezone) + days(30),
-    localtime("23:59:00"),
-    IncidentTimezone
-) because "Claim must be filed by 11:59 PM local time on the 30th day after the incident"
-```
+Without them, multi-timezone compliance rules must be split between the precept and the hosting layer. With them, the entire rule lives in one file. See the before/after examples in the Motivation section.
 
 ### DST ambiguity resolution
 
-When `toInstant` converts local date + time + timezone → UTC instant, DST transitions can create ambiguity:
+- **Gap (spring forward):** Map to the instant *after* the gap. NodaTime's `LenientResolver`.
+- **Overlap (fall back):** Map to the *later* instant. Safer for deadline calculations.
 
-- **Gap (clocks spring forward):** The local time doesn't exist. Resolution: map to the instant *after* the gap (standard spring-forward behavior). This is NodaTime's `Resolvers.LenientResolver` for gaps.
-- **Overlap (clocks fall back):** The local time occurs twice. Resolution: map to the *later* instant (the offset after the transition). This is the safer choice for deadline calculations — it gives the later, more generous deadline.
-
-#### Option: DST resolution strategy
-
-##### Option A: Lenient resolver (recommended above)
-
-Gaps → post-gap instant. Overlaps → later instant. Deterministic. Matches NodaTime's `LenientResolver`. Favors the more generous interpretation for deadline calculations.
-
-**Pros:** Simple mental model. Favors compliance safety (later deadline is safer for filers). Single deterministic strategy — no author choice needed.
-
-**Cons:** "Lenient" means the resolution silently adjusts invalid local times. Authors may not realize `localtime("02:30:00")` at a spring-forward boundary was adjusted to `localtime("03:00:00")`.
-
-##### Option B: Strict resolver — reject ambiguous conversions
-
-Gaps and overlaps produce constraint violations. The author must handle DST boundaries explicitly.
-
-**Pros:** No silent adjustment. The author is forced to account for DST.
-
-**Cons:** Extremely burdensome for the common case. Most timezone conversions will never hit a DST boundary. Requiring DST handling in every conversion penalizes the 99% case for the 1% edge case.
-
-**Recommendation:** Option A — lenient resolver. The determinism guarantee is preserved (same inputs = same output), and the 99% case is unaffected. The resolution strategy should be documented in `PreceptLanguageDesign.md` and visible in `precept_inspect` output when a DST adjustment occurs.
+**Recommendation:** Lenient resolver. Deterministic. The 99% case is unaffected.
 
 ### Composability
 
-Conversion functions produce and consume existing types — they are bridges, not new types:
+Conversion functions produce and consume existing types:
 
-- `toLocalDate` returns a `localdate` — all localdate operations (comparison, `.year`, `+ days(n)`, `+ months(n)`) work.
-- `toLocalTime` returns a `localtime` — all localtime operations (comparison, `.hour`) work.
-- `toInstant` returns an `instant` — all instant comparison and duration arithmetic work.
+- `toLocalDate` returns `date` — all date operations work.
+- `toLocalTime` returns `time` — all time operations work.
+- `toInstant` returns `instant` — all instant operations work.
 
 ### `zoneddatetime` overloads
 
-The conversion functions gain `zoneddatetime` overloads that **preserve timezone provenance**. The bound timezone travels with the value — the author cannot accidentally pair a date produced from one timezone with a recomposition using a different timezone.
-
 | Function | New Overload | Semantics |
 |---|---|---|
-| `toLocalDate` | `(zoneddatetime) → localdate` | Extract local date using the **bound** timezone. Provenance-safe. |
-| `toLocalTime` | `(zoneddatetime) → localtime` | Extract local time using the bound timezone. |
-| `toInstant` | `(localdate, localtime, zoneddatetime) → instant` | Convert back to instant using the **same timezone** the original conversion came from. |
+| `toLocalDate` | `(zoneddatetime) → date` | Extract date using bound timezone. |
+| `toLocalTime` | `(zoneddatetime) → time` | Extract time using bound timezone. |
+| `toInstant` | `(date, time, zoneddatetime) → instant` | Convert using bound timezone. |
 
-The provenance-safe pattern:
+---
 
-```precept
-# Provenance-safe: zone is carried by the composite
-invariant FiledTimestamp <= toInstant(
-    toLocalDate(IncidentContext) + days(30),
-    localtime("23:59:00"),
-    IncidentContext
-) because "Claim must be filed by 11:59 PM local time on the 30th day after the incident"
-```
+### Postfix Unit Literals
 
-The `IncidentContext` carries both the instant and the timezone. `toLocalDate(IncidentContext)` extracts the local date using the bound zone. `toInstant(localdate, localtime, IncidentContext)` recomposes using the same zone. The zone mismatch bug from the decomposed approach **cannot be expressed**.
+**Status:** Locked (Decision #17 — rewritten 2026-04-15). Unified postfix model — the sole mechanism for constructing temporal quantities.
 
-The two-argument forms remain — both patterns coexist:
+Postfix unit literals provide an English-reading syntax for temporal quantities. All 7 function-call constructors (`days()`, `months()`, `years()`, `weeks()`, `hours()`, `minutes()`, `seconds()`) have been eliminated. The postfix system is the only quantity construction surface.
+
+#### Two atom forms
+
+**Bare postfix** — integer literal + unit keyword:
 
 ```
-toLocalDate(instant, timezone) → localdate     # still valid
-toLocalDate(zoneddatetime) → localdate         # new overload — provenance-safe
+<integer-literal> <unit-keyword>
 ```
-
-Authors who prefer decomposed storage use the two-argument form. Authors who use `zoneddatetime` get the overload that preserves provenance. No breaking change.
-
-### Duration constructor functions
-
-Duration constructors are the **required interface** for all temporal arithmetic. Bare integers are never valid temporal offsets — every arithmetic operation on a temporal type requires an explicit duration constructor that names the unit.
-
-| Function | Signature | Semantics |
-|---|---|---|
-| `days(n)` | `(integer) → duration` | Calendar period of N days. Used with `localdate +`, `localdatetime +`. Internally `Period.FromDays`. |
-| `months(n)` | `(integer) → duration` | Calendar period of N months. Truncates at month end (Jan 31 + 1 mo = Feb 28). Internally `Period.FromMonths`. |
-| `years(n)` | `(integer) → duration` | Calendar period of N years. Handles leap years. Internally `Period.FromYears`. |
-| `weeks(n)` | `(integer) → duration` | Calendar period of N weeks (= 7N days). Internally `Period.FromWeeks`. |
-| `hours(n)` | `(integer) → duration` | Duration of N hours. Used with `localtime +`, `instant +`, `localdatetime +`. Internally `Duration.FromHours`. |
-| `minutes(n)` | `(integer) → duration` | Duration of N minutes. Internally `Duration.FromMinutes`. |
-| `seconds(n)` | `(integer) → duration` | Duration of N seconds. Internally `Duration.FromSeconds`. |
-
-Internally, calendar-unit constructors (`days`, `months`, `years`, `weeks`) produce `NodaTime.Period` values, while timeline constructors (`hours`, `minutes`, `seconds`) produce `NodaTime.Duration` values. The DSL author does not see this distinction — all seven are "duration constructors" at the language surface. `Period` is not exposed as a DSL type.
-
-#### Option: Duration constructor syntax — function call vs. postfix suffix
-
-##### Option A: Function-call syntax only (current)
-
-```precept
-set DueDate = CreatedDate + days(30)
-set Deadline = StartDate + days(GracePeriodDays)
-set EndTime = StartTime + hours(ShiftLength)
-```
-
-**Pros:** Consistent for both literals and variables. No new grammar construct — function calls are already parsed. Familiar to programmers.
-
-**Cons:** Less natural for literal constants. `days(30)` reads like a function call, not "30 days."
-
-##### Option B: Postfix suffix syntax only
 
 ```precept
 set DueDate = CreatedDate + 30 days
-set Deadline = StartDate + GracePeriodDays days
-set EndTime = StartTime + ShiftLength hours
+invariant FiledAt - IncidentAt <= 72 hours because "SLA"
+field GracePeriod as period default 30 days
 ```
 
-**Pros:** Reads like natural English for literals: `DueDate + 30 days`. Aligns with Principle #2 (English-ish). Matches Kotlin, Ruby, PromQL, and CSS — languages optimized for readability use postfix.
+**Paren postfix** — parenthesized expression + unit keyword:
 
-**Cons:** Awkward with variables: `GracePeriodDays days` lacks the visual cue that a function call provides. Parser impact: `days`, `hours`, etc. become context-sensitive keywords (after numeric literals or identifiers in expression position). Superpower handles this as single-token lookahead, but it's still new grammar surface.
-
-##### Option C: Both syntaxes (dual form)
-
-Suffix for literals, function call for variables and complex expressions:
+```
+( <expression> ) <unit-keyword>
+```
 
 ```precept
-set DueDate = CreatedDate + 30 days
-set Deadline = StartDate + days(GracePeriodDays)
-set EndTime = StartTime + hours(BaseHours + Overtime)
+set Deadline = StartDate + (GraceDays) days       # variable argument
+set SlaLimit = (SlaHours * 2) hours                # computed expression
+set Expiry = StartDate + (TermMonths + 6) months   # arithmetic inside parens
 ```
 
-**Pros:** Best of both — natural English for the common literal case, clean syntax for the variable case. Authors choose the form that reads best.
+Unit keywords: `days`, `months`, `years`, `weeks`, `hours`, `minutes`, `seconds`.
 
-**Cons:** Two ways to do the same thing. Language surface is larger. Grammar is more complex. Teaching burden: "when do I use which?"
+#### Combination via `+` only
 
-##### External precedent
+Multiple quantities combine using the standard `+` operator:
 
-| Language | Syntax | Family |
+```precept
+field ExtendedWarranty as period default 2 years + 6 months
+set Expiry = StartDate + 1 year + 3 months + 15 days
+invariant FiledAt - IncidentAt <= 72 hours + 30 minutes because "SLA window"
+```
+
+No composite juxtaposition. `2 years 6 months` (without `+`) is a compile error. This eliminates ~45–60 lines of parser machinery (composite combinator, composite AST node, composite validation, composite desugaring) and uses the existing `Parse.Chain` at the additive precedence level.
+
+**Left-associative `+` subtlety:** `date + 1 month + 1 month` applies sequential truncation (Jan 31 → Feb 28 → Mar 28). `date + (1 month + 1 month)` builds the period first, then applies once (Jan 31 → Mar 31). Both are valid. Parens are available when "build-then-apply" semantics are needed.
+
+#### Type resolution rules — context-dependent
+
+The type of a postfix unit expression (`period` or `duration`) is determined by the expression context. `3 days` is not inherently `period` or `duration` — the surrounding expression resolves it. This applies equally to bare and paren postfix forms.
+
+**For `days` and `weeks` — context-dependent:**
+
+| Expression context | `3 days` / `(n) days` resolves to | NodaTime call |
 |---|---|---|
-| Kotlin | `5.days`, `5.hours` | Postfix (extension property) |
-| Ruby | `5.days`, `5.hours` | Postfix (monkey-patch) |
-| Swift | No built-in suffix | Function call |
-| Scala | `5.days`, `5.hours` (via FiniteDuration) | Postfix (implicit conversion) |
-| Go | `5 * time.Hour` | Multiplication |
-| Rust | No built-in suffix | Function call |
-| PromQL | `5d`, `5h` | Postfix (abbreviation) |
-| CSS | `5s`, `500ms` | Postfix (unit) |
-| PostgreSQL | `INTERVAL '5 days'` | String parse |
-| Terraform | `"5h"`, `"30m"` | String parse |
-| Kubernetes | `5d`, `30m` | Postfix (abbreviation) |
-| F# | No built-in suffix | Function call (`TimeSpan.FromDays 5.0`) |
+| `date + _` | `period` | `Period.FromDays(3)` / `Period.FromDays(n)` |
+| `datetime + _` | `period` | `Period.FromDays(3)` / `Period.FromDays(n)` |
+| `instant + _` | `duration` | `Duration.FromDays(3)` / `Duration.FromDays(n)` |
+| `zoneddatetime + _` | `duration` | `Duration.FromDays(3)` / `Duration.FromDays(n)` |
+| `time + _` | depends on unit | Sub-day bridging applies (Decision #16) |
+| `field X as period default _` | `period` | `Period.FromDays(3)` |
+| `field X as duration default _` | `duration` | `Duration.FromDays(3)` |
+| No context / ambiguous | **compile error** | "Cannot infer temporal type for `3 days` — provide context: `date_field + 3 days` or `instant_field + 3 days`" |
 
-**Key finding:** Languages optimized for readability (Kotlin, Ruby, Scala) adopt postfix suffix. Languages optimized for precision/generality (Rust, Go, F#) use function calls. Precept's Principle #2 ("English-ish but not English") suggests readability is a priority, but Principle #8 ("Sound, compile-time-first") suggests the variable case must be clean too.
+**For `months` and `years` — always `period`:**
 
-**Parser note:** Postfix suffix requires `days`, `hours`, `minutes`, `seconds`, `weeks`, `months`, `years` to be recognized as unit keywords when they follow a numeric literal or identifier in expression position. Superpower handles this as single-token lookahead — trivial to implement. The keywords would be context-sensitive (only treated as unit suffixes in expression position after a number/identifier, not as bare identifiers elsewhere).
+`months` and `years` ALWAYS resolve to `period` regardless of expression context. No `Duration.FromMonths` or `Duration.FromYears` exists in NodaTime — months and years have variable nanosecond length.
 
-**Recommendation:** Open — needs design discussion. The literal readability advantage of suffix syntax is compelling (Principle #2), but the variable awkwardness is a real concern. If both forms are offered (Option C), the language surface grows but authors get the most readable form for each context.
+| Expression context | `3 months` / `(n) months` resolves to | Result |
+|---|---|---|
+| `date + _` | `period` | ✓ `date + period → date` |
+| `datetime + _` | `period` | ✓ `datetime + period → datetime` |
+| `instant + _` | `period` | ✗ **type error** — `instant + period` |
+| `zoneddatetime + _` | `period` | ✗ **type error** — `zoneddatetime + period` |
+| `field X as period default _` | `period` | ✓ |
+| `field X as duration default _` | `period` | ✗ **type error** |
+
+**For `hours`, `minutes`, `seconds` — context-dependent (with `period` bridging):**
+
+| Expression context | `3 hours` / `(n) hours` resolves to | NodaTime call |
+|---|---|---|
+| `instant + _` | `duration` | `Duration.FromHours(3)` |
+| `zoneddatetime + _` | `duration` | `Duration.FromHours(3)` |
+| `time + _` | bridges to duration | Sub-day bridging (Decision #16) |
+| `datetime + _` | `duration` | `Duration.FromHours(3)` |
+| `field X as duration default _` | `duration` | `Duration.FromHours(3)` |
+| `field X as period default _` | `period` | `Period.FromHours(3)` |
+| `date + _` | **warning** | "Adding hours to a date has no effect — dates have no time component." |
+| No context / ambiguous | **compile error** | "Cannot infer temporal type for `3 hours`" |
+
+**Owner's rationale (Shane):** "The author IS thinking about the details — they wrote `instant + 3 days`, which means '3 fixed 24-hour days on the timeline.' The context makes the intent unambiguous."
+
+#### Teachable error messages
+
+| Invalid code | Error message |
+|---|---|
+| `set X = 3 days` (no type context) | Cannot infer temporal type for `3 days` — the target type is ambiguous. Provide context: `date_field + 3 days` or `instant_field + 3 days`. |
+| `GraceDays days` | Postfix unit literals require an integer constant or parenthesized expression. Use `(GraceDays) days` for variable arguments. |
+| `date + 3 hours` | Warning: Adding hours to a date has no effect — dates have no time-of-day component. Did you mean `datetime + 3 hours`, or did you intend `date + 3 days`? |
+| `2 years 6 months` | Postfix unit expressions must be combined with `+`. Use `2 years + 6 months`. |
+| `instant + 3 months` | Cannot add a period to an instant — `months` always resolves to `period` (variable-length calendar units). Convert to a date first: `toLocalDate(inst, tz) + 3 months`, then convert back. |
+
+---
+
+## Literal Mechanism Architecture
+
+Every non-primitive value in Precept enters through one of three doors. This is a **closed set of mechanisms** — a top-level design element of the language, not an incidental feature of temporal types.
+
+### The three doors
+
+| Door | Delimiter | What it carries | Type resolution | Temporal proof |
+|------|-----------|----------------|-----------------|----------------|
+| **1. String** | `"..."` | Text values | Always `string` | N/A — strings remain strings |
+| **2. Typed constant** | `'...'` | Formatted non-primitive constants | Inferred from content shape | `date`, `time`, `datetime`, `instant`, `zoneddatetime`, `timezone` |
+| **3. Quantity** | `N unit` | Magnitude + unit values | Context-dependent (`period` or `duration`) | `30 days`, `72 hours`, `3 months` |
+
+**Zero constructors exist.** There is no `type(value)` form in the language — no `date(2026-01-15)`, no `duration(PT72H)`, no `money("100", "USD")`. Every value enters through one of the three doors above.
+
+### The admission rule
+
+A type qualifies for Door 2 (`'...'`) **if and only if** its content shape is distinguishable from every other single-quote inhabitant. No shape may match two types. This is a formal criterion — not a judgment call — that prevents ambiguity from accumulating as the language grows.
+
+The current inhabitants demonstrate shape uniqueness:
+
+| Inhabitant | Shape signal | Why it's unique |
+|------------|-------------|-----------------|
+| `date` | `YYYY-MM-DD` | Digits + hyphens, no `T` |
+| `time` | `HH:MM:SS` | Digits + colons, no hyphen |
+| `datetime` | `...T...` | `T` present, no `Z`, no `[` |
+| `instant` | `...T...Z` | `T` + trailing `Z` |
+| `zoneddatetime` | `...T...[...]` | `T` + bracket-enclosed zone |
+| `timezone` | `Word/Word` | Alpha + `/`, no digits-first |
+
+When a future type is proposed, the question is **"which door?"** — not "does it need new syntax?" If its values have a shape-recognizable constant form that passes the admission rule, it enters through Door 2. If its values are magnitude+unit quantities, it enters through Door 3. If neither applies, it remains a string (Door 1).
+
+### Why three doors are sufficient
+
+The three-door model covers all value categories a business DSL encounters:
+
+- **Opaque identifiers with internal structure** (dates, times, UUIDs, emails, URIs) → Door 2: the structure *is* the shape signal.
+- **Quantities with units** (durations, periods, currency amounts, physical measurements) → Door 3: magnitude and unit are the natural representation.
+- **Plain text** (names, descriptions, codes without distinguishing shape) → Door 1: the default.
+
+No fourth category has been identified. Values are either text, structured constants, or quantities. The three-door model is closed by construction — it does not need extensibility because it covers the domain.
+
+### Temporal types prove the framework
+
+Temporal types are the **first inhabitants** of Doors 2 and 3 — the gateway through which the language moves beyond primitives. They prove that:
+
+1. **The typed constant delimiter works.** Six types with unambiguous shapes coexist in `'...'` without collision. The admission rule holds.
+2. **The postfix quantity system works.** Seven unit keywords with context-dependent resolution handle both calendar and timeline quantities. The `+` combiner handles composites.
+3. **Zero constructors are sufficient.** Every temporal value that constructors would have expressed (`date(2026-01-15)`, `duration(PT72H)`) has a more readable representation through Doors 2 and 3.
+
+This is what makes temporal types the gateway: they don't just add temporal capability — they **validate the literal architecture** that all future non-primitive types will use.
 
 ---
 
@@ -791,220 +922,335 @@ set EndTime = StartTime + hours(BaseHours + Overtime)
 
 ### Type-interaction matrix
 
-The following matrix defines what operations are valid between temporal types. Anything not listed is a type error.
+**Calendar domain (uses `period`):**
 
-| Left operand | Operator | Right operand | Result | Notes |
+| Left | Op | Right | Result | Notes |
 |---|---|---|---|---|
-| `localdate` | `+` | `days(n)` | `localdate` | Add N calendar days |
-| `localdate` | `-` | `days(n)` | `localdate` | Subtract N calendar days |
-| `localdate` | `+` | `months(n)` | `localdate` | Calendar arithmetic; truncates at month end |
-| `localdate` | `+` | `years(n)` | `localdate` | Calendar arithmetic; handles leap years |
-| `localdate` | `+` | `weeks(n)` | `localdate` | = 7N days |
-| `localdate` | `-` | `localdate` | `duration` | Elapsed days between dates |
-| `instant` | `-` | `instant` | `duration` | Elapsed time between two points |
-| `instant` | `+` | `duration` | `instant` | Point offset forward |
-| `instant` | `-` | `duration` | `instant` | Point offset backward |
-| `duration` | `+` | `duration` | `duration` | Combined elapsed time |
-| `duration` | `-` | `duration` | `duration` | Difference |
-| `duration` | `*` | `integer` or `number` | `duration` | Scaling (e.g., `SlaWindow * ShiftCount`) |
-| `duration` | `/` | `integer` or `number` | `duration` | Scaling (e.g., `SlaWindow / 2`) |
-| `duration` | `/` | `duration` | `number` | Ratio (e.g., how many shifts fit) |
-| `localtime` | `+` | `hours(n)` | `localtime` | Wraps at midnight |
-| `localtime` | `+` | `minutes(n)` | `localtime` | Wraps at midnight |
-| `localdatetime` | `+` | `days(n)` | `localdatetime` | Add N days |
-| `localdatetime` | `+` | `months(n)` | `localdatetime` | Calendar arithmetic |
-| `localdatetime` | `+` | `years(n)` | `localdatetime` | Calendar arithmetic |
-| `localdatetime` | `+` | `hours(n)` | `localdatetime` | Time arithmetic |
-| `localdatetime` | `+` | `minutes(n)` | `localdatetime` | Time arithmetic |
-| `localdatetime` | `+` | `duration` | `localdatetime` | Offset forward by composed duration (e.g., `days(5) + hours(7)`) |
-| `localdatetime` | `-` | `duration` | `localdatetime` | Offset backward by composed duration |
-| `zoneddatetime` | `+` | `days(n)` | `zoneddatetime` | Calendar arithmetic; DST via lenient resolver |
-| `zoneddatetime` | `+` | `months(n)` | `zoneddatetime` | Calendar arithmetic; month-end truncation |
-| `zoneddatetime` | `+` | `years(n)` | `zoneddatetime` | Calendar arithmetic; leap years |
-| `zoneddatetime` | `+` | `weeks(n)` | `zoneddatetime` | = 7N days |
-| `zoneddatetime` | `+` | `hours(n)` | `zoneddatetime` | Timeline arithmetic |
-| `zoneddatetime` | `+` | `minutes(n)` | `zoneddatetime` | Timeline arithmetic |
-| `zoneddatetime` | `+` | `duration` | `zoneddatetime` | Timeline arithmetic with composed duration |
-| `zoneddatetime` | `-` | `duration` | `zoneddatetime` | Timeline arithmetic backward |
-| `zoneddatetime` | `-` | `zoneddatetime` | `duration` | Elapsed time (instant subtraction) |
-| `zoneddatetime` | `==`, `!=`, `<`, `>`, `<=`, `>=` | `zoneddatetime` | `boolean` | Comparison by underlying instant |
+| `date` | `+` | `period` | `date` | Calendar arithmetic. Truncation at month end. |
+| `date` | `-` | `period` | `date` | Calendar arithmetic backward. |
+| `date` | `-` | `date` | `period` | Calendar distance. `Period.Between`. |
+| `period` | `+` | `period` | `period` | Combined. |
+| `period` | `-` | `period` | `period` | Difference. |
+| `datetime` | `+` | `period` | `datetime` | Calendar arithmetic on date part. |
+| `datetime` | `-` | `period` | `datetime` | Backward. |
+| `datetime` | `-` | `datetime` | `period` | Calendar distance. |
+| `time` | `+` | `period` | `time` | `LocalTime.Plus(Period)`. Time components only; date components ignored. |
+
+**Timeline domain (uses `duration`):**
+
+| Left | Op | Right | Result | Notes |
+|---|---|---|---|---|
+| `instant` | `-` | `instant` | `duration` | Elapsed time. |
+| `instant` | `+` | `duration` | `instant` | Offset forward. |
+| `instant` | `-` | `duration` | `instant` | Offset backward. |
+| `duration` | `+` | `duration` | `duration` | Combined. |
+| `duration` | `-` | `duration` | `duration` | Difference. |
+| `duration` | `*` | `integer`/`number` | `duration` | Scaling. |
+| `duration` | `/` | `integer`/`number` | `duration` | Scaling. |
+| `duration` | `/` | `duration` | `number` | Ratio. |
+| `time` | `+` | `duration` | `time` | Wraps at midnight. |
+| `time` | `-` | `time` | `period` | Time-unit period. |
+| `zoneddatetime` | `+` | `duration` | `zoneddatetime` | Timeline arithmetic. |
+| `zoneddatetime` | `-` | `duration` | `zoneddatetime` | Backward. |
+| `zoneddatetime` | `-` | `zoneddatetime` | `duration` | Instant subtraction. |
+
+**Bridge type (`datetime` — accepts both):**
+
+| Left | Op | Right | Result | Notes |
+|---|---|---|---|---|
+| `datetime` | `+` | `duration` | `datetime` | Time arithmetic. |
+| `datetime` | `-` | `duration` | `datetime` | Backward. |
 
 ### Comparison rules
 
-All temporal types support `==`, `!=`. `localdate`, `localtime`, `instant`, `duration`, `localdatetime`, `zoneddatetime` support `<`, `>`, `<=`, `>=`. `timezone` supports only `==`, `!=` — no ordering.
+| Type | `==`, `!=` | `<`, `>`, `<=`, `>=` | Ordering semantics |
+|---|---|---|---|
+| `date` | ✓ | ✓ | ISO calendar |
+| `time` | ✓ | ✓ | Within-day |
+| `instant` | ✓ | ✓ | Nanoseconds on global timeline |
+| `duration` | ✓ | ✓ | Nanoseconds |
+| `period` | ✓ | **✗** | **No natural ordering.** See Decision #14. |
+| `timezone` | ✓ | ✗ | Equality by IANA identifier. |
+| `datetime` | ✓ | ✓ | Same-calendar |
+| `zoneddatetime` | ✓ | ✓ | By underlying instant |
 
-Cross-type comparison is always a type error:
-- `localdate == instant` → type error
-- `localtime == duration` → type error
-- `localdate == localdatetime` → type error
+Cross-type comparison is always a type error.
 
 ### Cross-type arithmetic: what's NOT allowed (and why)
 
 | Expression | Why it's a type error |
 |---|---|
-| `localdate + localdate` | Adding two dates is meaningless. |
-| `localdate + instant` | Different temporal domains (calendar vs. timeline). |
-| `localdate + integer` | Bare integers don't carry unit semantics. Use `localdate + days(n)` for day offsets. |
-| `localdate + decimal` | Fractional days are meaningless at day granularity. |
-| `localdate + number` | `number` is floating-point; temporal arithmetic requires explicit duration constructors. |
-| `instant + integer` | Ambiguous unit. Use `instant + hours(n)` or `instant + seconds(n)`. |
-| `instant + months(n)` | Months are calendar units with no fixed duration. Convert to localdate, add, convert back. |
-| `instant.year` | Requires a timezone. Use `toLocalDate(instant, timezone).year`. |
-| `localtime - localtime` | Ambiguous sign (see `localtime` section). |
+| `date + duration` | Duration is timeline-only. Date needs period (calendar) arithmetic. |
+| `instant + period` | Period may contain calendar units with variable length. Instant needs duration (timeline) arithmetic. |
+| `duration + period` | Cannot mix timeline and calendar units in arithmetic. |
+| `zoneddatetime + period` | Calendar arithmetic on ZDT requires decomposition. |
+| `date + integer` | Bare integers don't carry unit semantics. Use `(n) days`. |
+| `instant + integer` | Ambiguous unit. Use `(n) hours` or `(n) seconds`. |
+| `period < period` | Periods are not orderable. |
+| `period * integer` | Period scaling not supported. |
+| `date + date` / `instant + instant` | Adding two points is meaningless. |
+| `instant.year` | Requires timezone. Use `toLocalDate(instant, tz).year`. |
 | `duration * duration` | Dimensionally meaningless. |
-| `integer * duration` / `number * duration` | Use `duration * integer` or `duration * number` — duration is always the left operand. |
-| `duration * decimal` / `duration / decimal` | `decimal → double` is lossy. Use `number` for scaling operands. |
-| `integer / duration` / `number / duration` | Dimensionally meaningless (what is "5 / 3 hours"?). |
-| `timezone + anything` | Timezones are metadata, not temporal values. |
-| `zoneddatetime + integer` | Bare integers don't carry unit semantics. Use `zoneddatetime + days(n)` or `+ hours(n)`. |
-| `zoneddatetime + zoneddatetime` | Adding two zoned datetimes is meaningless. |
+| `duration * decimal` | Lossy narrowing. Use `number`. |
 
-### Nullable behavior
+### Nullable and default behavior
 
-All temporal types support `nullable`. Nullable temporal fields follow existing null semantics:
-- Comparison with null follows existing null propagation rules.
-- Accessors on a nullable field require null-check narrowing (same as collection accessors).
-
-### Default behavior
+All temporal types support `nullable`. All follow existing null propagation rules.
 
 | Type | Default value | Notes |
 |---|---|---|
-| `localdate` | `default localdate("...")` | Author specifies the date. |
-| `localtime` | `default localtime("...")` | Author specifies the time. |
-| `instant` | `default instant("...")` | Author specifies the UTC instant. |
-| `duration` | `default hours(0)` (or `minutes(0)`, etc.) | Zero duration is natural. |
-| `timezone` | No default | No universally sensible default timezone. |
-| `zoneddatetime` | No default | No universally sensible default timezone (same as `timezone`). |
-| `localdatetime` | `default localdatetime("...")` | Author specifies the localdatetime. |
+| `date` | `default '...'` | Author specifies (single-quoted date). |
+| `time` | `default '...'` | Author specifies (single-quoted time). |
+| `instant` | `default '...'` | Author specifies (single-quoted instant). |
+| `duration` | `default 0 hours` | Zero duration. |
+| `period` | `default 0 days` | Zero period. |
+| `timezone` | No default | No universally sensible default. |
+| `zoneddatetime` | No default | Same as timezone. |
+| `datetime` | `default '...'` | Author specifies (single-quoted datetime). |
 
-#### Option: `nullable` + `default` for temporal fields
-
-##### Option A: Prohibit `nullable` + `default` on temporal fields
-
-A field is either nullable (absent until populated) or has a default (always present). This was the original #26 position.
-
-**Pros:** Clear semantics — a field is either "unknown" or "has a known starting value." Prevents the ambiguity of "is null the default, or is the default the default?"
-
-**Cons:** Some domain patterns naturally want both: "this field starts as null (unknown), but once populated, reverts to a default on reset." This feels like arbitrary restriction.
-
-##### Option B: Allow `nullable` + `default` — null means "not yet provided," default is the initial value
-
-When both are specified, the field starts at the default value but can be set to null explicitly. Null means "cleared/unknown."
-
-**Pros:** Maximum flexibility. No arbitrary restriction.
-
-**Cons:** `default localdate("2026-01-01") nullable` — if the field starts at the default, when is it ever null? The semantics are confusing. `null` becomes "explicitly cleared" rather than "never set."
-
-##### Option C: Allow `nullable` + `default` — default is the initial value, null is a valid assignment target
-
-Same as Option B but with clearer documentation: the field initializes to the default and `null` is a valid value that can be assigned via events.
-
-**Recommendation:** Open — this is George's Challenge #3 from the original #26 review. The question is orthogonal to temporal types and applies to all types. Defer to a cross-cutting design decision rather than deciding it here.
+**`nullable` + `default`:** Open — George's Challenge #3. Deferred to cross-cutting decision.
 
 ---
 
 ## Locked Design Decisions
 
-Each locked decision follows the 4-point rationale format required by CONTRIBUTING.md.
-
 ### 1. NodaTime as the backing library for all temporal types
 
-- **Why:** NodaTime's type model matches Precept's philosophy (explicit over implicit), provides battle-tested arithmetic, and creates a coherent path for the full temporal vocabulary. Building temporal arithmetic on BCL types would require Precept to own correctness in a domain it has no expertise in.
-- **Alternatives rejected:** `System.DateOnly` / `TimeOnly` — cheaper for `localdate` alone but creates increasing debt for `localtime`, `localdatetime`, and cross-type conversions. `System.DateTime` — conflates concepts; the exact problem NodaTime was created to solve. No backing library (custom implementation) — unmaintainable temporal arithmetic with no precedent or test coverage.
-- **Precedent:** NRules inherits `System.Decimal` from .NET. Precept inherits NodaTime's temporal model. The pattern is: use the best domain-specific library, expose only DSL-appropriate operations.
-- **Tradeoff accepted:** Additional NuGet dependency (~1.1 MB, well-maintained).
+- **Why:** Philosophy match; `Period`/`Duration` split eliminates custom dispatch; battle-tested arithmetic.
+- **Alternatives rejected:** BCL types (no `Period` equivalent). Custom implementation (unmaintainable). Collapsed `Period`/`Duration` (v1 — requires custom dispatch, contradicts directive).
+- **Precedent:** NRules inherits `System.Decimal`. Precept inherits NodaTime's temporal model.
+- **Tradeoff:** Additional NuGet dependency (~1.1 MB).
 
-### 2. Day granularity for `localdate` — no time-of-day component
+### 2. Day granularity for `date`
 
-- **Why:** "2026-03-15" means the same calendar day everywhere. Adding time-of-day introduces timezone dependency. Precept's determinism guarantee requires identical results regardless of evaluation location.
-- **Alternatives rejected:** `localdatetime` as the only calendar type — forces timezone reasoning on every author for rules operating at day granularity. Optional timezone — creates two semantics in one type.
-- **Precedent:** SQL's `DATE`, FEEL's `date()`, Cedar's `datetime` — all timezone-naive at the date level.
-- **Tradeoff accepted:** Authors needing time-of-day use `localtime` (separate type) or `localdatetime`.
+- **Why:** "2026-03-15" means the same calendar day everywhere. No timezone dependency.
+- **Alternatives rejected:** `datetime` as only calendar type. Optional timezone.
+- **Precedent:** SQL `DATE`, FEEL `date()`.
+- **Tradeoff:** Time-of-day needs separate `time` type or `datetime`.
 
-### 3. ISO 8601 as the sole format — no custom format strings
+### 3. ISO 8601 as the sole format
 
-- **Why:** A single canonical format eliminates parsing ambiguity. Is `01/02/2026` January 2nd or February 1st? ISO 8601 is unambiguous by construction. Same literal, same meaning, always.
-- **Alternatives rejected:** Configurable format strings — adds parsing complexity and creates precepts interpretable only with the format specifier. Auto-detection — heuristic and non-deterministic.
-- **Precedent:** Cedar (RFC 3339), FEEL (ISO 8601), SQL DATE (ISO format).
-- **Tradeoff accepted:** Authors from `MM/DD/YYYY` regions must adapt. One-time learning cost.
+- **Why:** Single canonical format eliminates parsing ambiguity.
+- **Alternatives rejected:** Configurable formats. Auto-detection.
+- **Precedent:** Cedar (RFC 3339), FEEL, SQL.
+- **Tradeoff:** Authors from `MM/DD/YYYY` regions must adapt.
 
-### 4. Constructor form for all temporal literals
+### 4. Single-quoted delimiter is the typed constant delimiter — not temporal-specific (revised — locked 2026-04-15)
 
-- **Why:** `localdate("2026-03-15")`, not bare `"2026-03-15"`. A bare string is type-ambiguous. Context-dependent type resolution violates Principle #9 (tooling drives syntax) — IntelliSense and semantic tokens can't determine type without full expression analysis. The constructor form makes type intent visible at the lexical level.
-- **Alternatives rejected:** Bare strings with inferred type — ambiguous. Sigil prefix (`#2026-03-15`) — no precedent. Method-style `Date.parse()` — implies namespaces Precept doesn't have.
-- **Precedent:** FEEL `date(...)`, Cedar `datetime(...)`, Precept's existing `choice(...)` convention.
-- **Tradeoff accepted:** Slightly more verbose than a bare literal.
+- **Why:** The `'...'` delimiter is the **typed constant delimiter** for any non-primitive type whose content shape is unambiguous — not a temporal-specific feature. The three literal mechanisms are a closed set: `"..."` (string), `'...'` (typed constant, shape-inferred), `N unit` (quantity). Zero constructors exist in the language. A type qualifies for `'...'` if and only if its content shape is distinguishable from every other single-quote inhabitant (the admission rule). Temporal types are the **first inhabitants**: `date` (`YYYY-MM-DD`), `time` (`HH:MM:SS`), `datetime` (`...T...`), `instant` (`...T...Z`), `zoneddatetime` (`...T...[zone]`), `timezone` (`Word/Word`). This follows Precept's literal grain: `"hello"` doesn't need `string("hello")`, so `'2026-01-15'` doesn't need `date(2026-01-15)`.
+- **Alternatives rejected:** (A) `date(2026-01-15)` (unquoted constructor — original Decision #4/18) — the team's unanimous initial recommendation. Shane challenged it with the string-delimiter precedent insight: if strings use `"..."` without a `string()` wrapper, temporal values should use a delimiter too. See "Double-Quote Alternative Analysis" below. (B) `date("2026-01-15")` (string constructor) — quotes suggest "a string being parsed." (C) Bare ISO `2024-01-15` — lexer ambiguity with subtraction. (D) `"2026-01-15"` (double-quoted, context-resolved) — explored and rejected; see "Double-Quote Alternative Analysis." (E) Sigil prefix (`#2026-01-15`) — non-obvious, not Precept's voice.
+- **Precedent:** SQL `'2026-01-15'` for value literals. Python `b'...'` / `r'...'` for typed string variants with distinct delimiters.
+- **Tradeoff:** Type is implicit in content shape rather than explicit in a keyword. Readers must recognize ISO formats. Mitigated by: (a) ISO date formats are culturally universal, (b) field declarations provide type context, (c) syntax highlighting colors single-quoted content distinctly.
 
-### 5. No timezone on `localdate`, `localtime`, or `localdatetime`
+**`char` type permanent exclusion (supporting decision):** Precept will never have a `char` type — characters are programming-language implementation details, not business-domain data. Single quotes are permanently reserved for the typed constant delimiter with zero future collision risk. Confirmed by Frank and George.
 
-- **Why:** These are calendar/clock types — they represent what's written on a calendar or displayed on a wall clock, independent of location. Timezone-aware local types would create non-deterministic comparisons ("Is it still March 15?" depends on where you are).
-- **Alternatives rejected:** UTC-anchored dates — comparisons against "today" depend on timezone. Timezone as required metadata — forces timezone reasoning on calendar-day rules.
-- **Precedent:** NodaTime's `Local*` types are timezone-free by construction.
-- **Tradeoff accepted:** Timezone conversion requires explicit function calls (`toLocalDate`, etc.).
+### 5. No timezone on `date`, `time`, or `datetime`
+
+- **Why:** Calendar/clock types represent what's on a calendar or wall clock.
+- **Alternatives rejected:** UTC-anchored dates. Timezone as required metadata.
+- **Precedent:** NodaTime `Local*` types.
+- **Tradeoff:** Timezone conversion requires explicit function calls.
 
 ### 6. `instant` has no component accessors
 
-- **Why:** Extracting `.year`, `.month`, `.hour` from an instant requires a timezone. Allowing it would hide a timezone dependency inside what looks like a property access — the canonical implicit-timezone bug. Precept makes the dependency explicit: `toLocalDate(instant, timezone).year`.
-- **Alternatives rejected:** Component accessors with mandatory timezone parameter — syntax doesn't fit accessor pattern. Implicit UTC extraction — hides the timezone dependency.
-- **Precedent:** NodaTime's `Instant` has no date/time component accessors. Same design decision, same rationale.
-- **Tradeoff accepted:** More verbose than `FiledAt.year`. The verbosity makes the timezone dependency visible.
+- **Why:** Extracting `.year` from an instant requires a timezone. NodaTime's `Instant` has no date/time accessors.
+- **Alternatives rejected:** Accessors with mandatory timezone parameter. Implicit UTC.
+- **Precedent:** NodaTime `Instant`.
+- **Tradeoff:** More verbose than `FiledAt.year`.
 
-### 7. `timezone` as a first-class type, not `string`
+### 7. `timezone` as a first-class type
 
-- **Why:** Encoding timezone identifiers as `string` loses type safety — `"California"`, `"EST"`, `"Pacific Standard Time"` all compile fine as strings. The same argument that justified `localdate` over `string` applies with equal force: the type communicates intent, and the compiler enforces validity.
-- **Alternatives rejected:** `string` with naming conventions — the compiler can't enforce convention. `choice` with all IANA identifiers — ~600 choices is unergonomic and requires manual updates when the IANA database changes.
-- **Precedent:** NodaTime's `DateTimeZone` is a first-class type with validation. The `localdate`-over-`string` parallel in Precept is already established.
-- **Tradeoff accepted:** New type in the type system. Minimal operational cost — `timezone` is an equality-only validated identifier, closer to `choice` than to `localdate` in complexity.
+- **Why:** `"California"`, `"EST"` compile as strings. The `date`-over-`string` argument applies.
+- **Alternatives rejected:** `string` with conventions. `choice` with all IANA identifiers.
+- **Precedent:** NodaTime's `DateTimeZone`.
+- **Tradeoff:** New type in the system.
 
 ### 8. Conversion functions take explicit timezone parameters
 
-- **Why:** The timezone dependency is visible in the expression: `toLocalDate(IncidentTimestamp, IncidentTimezone)` shows exactly what timezone is used. No hidden timezone in a type, no implicit system timezone, no deployment-context coupling.
-- **Alternatives rejected:** Timezone stored inside a composite type (`ZonedDateTime`) — hides the dependency in the type rather than making it explicit in the expression. System timezone — deployment-dependent, non-deterministic.
-- **Precedent:** NodaTime requires explicit `DateTimeZone` for all instant ↔ local conversions.
-- **Tradeoff accepted:** More verbose than `ZonedDateTime.LocalDate`. Verbosity is the point — explicitness.
+- **Why:** Dependency visible in expression. No hidden timezone.
+- **Alternatives rejected:** Timezone in composite type. System timezone.
+- **Precedent:** NodaTime requires explicit `DateTimeZone`.
+- **Tradeoff:** Verbose. Verbosity is the point.
 
 ### 9. Determinism is relative to the runtime environment
 
-- **Why:** "Same inputs = same output" means same `.precept` file + same entity data + same operation + same runtime environment (including .NET version, NodaTime version, TZ database version). The TZ database is an explicit, versioned, operationally managed dependency — the same category as the .NET runtime or NodaTime package version.
-- **Alternatives rejected:** Excluding all timezone operations to avoid TZ database dependency — the dependency exists the moment NodaTime is adopted (the TZ database is bundled). Refusing to use it just means the hosting layer uses it instead. Mandatory TZ database version pinning — operationally impractical; breaks automatic security updates.
-- **Precedent:** Every system that handles timezone-sensitive data (banking, healthcare, aviation) manages TZ database freshness. This is standard operational practice, not a new burden Precept introduces.
-- **Tradeoff accepted:** The input surface for determinism expands to include TZ database version. Practically near-zero risk — the US last changed DST rules in 2007; TZ database changes affect ~1–3 jurisdictions per update.
+- **Why:** "Same inputs = same output" includes TZ database version.
+- **Alternatives rejected:** Excluding all timezone operations. Mandatory TZ pinning.
+- **Precedent:** Every timezone-sensitive system manages TZ database freshness.
+- **Tradeoff:** Determinism input surface includes TZ database version.
 
-### 10. Temporal arithmetic requires explicit constructor functions — period/duration split is visible
+### 10. `date + integer` is a type error — use `date + (n) days`
 
-- **Why:** `date + 2` is implicit — what does `2` mean? Days? Months? Weeks? This is exactly the ambiguity NodaTime was designed to prevent. Precept applies the same principle: `date + days(2)`, `date + months(1)`, `time + hours(3)`. The constructor function names the unit; the compiler enforces it. Furthermore, the period/duration split is exposed at the DSL surface: calendar constructors (`days`, `months`, `years`, `weeks`) produce `period` values, while timeline constructors (`hours`, `minutes`, `seconds`) produce `duration` values. This matches NodaTime’s `Period`/`Duration` distinction exactly. Shane’s directive: *“NodaTime has already solved this hard problem. I see no reason to diverge.”*
-- **Alternatives rejected:** `date + integer` meaning “add N days” — a previous position in this proposal. Merged `duration` hiding the Period/Duration distinction — the original position in this proposal. NodaTime deliberately keeps `Period` and `Duration` separate because months have no fixed length while hours do.
-- **Precedent:** NodaTime’s API requires named methods (`PlusDays`, `PlusMonths`, `Plus(Period)`) for all temporal arithmetic, and keeps `Period` and `Duration` as separate types. FEEL uses `duration("P2D")` for explicit offsets.
-- **Tradeoff accepted:** More verbose than `date + 2`. Two constructor result types (`period` and `duration`) rather than one. The verbosity and distinction are the point.
+- **Why:** `date + 2` is implicit — what does `2` mean? NodaTime requires `LocalDate.Plus(Period.FromDays(n))` — the `Period` makes the unit visible. Now that `period` is a surface type, `(n) days` resolves to `period` and the type checker validates `date + period`. The shortcut `date + integer` would bypass this type-level enforcement.
+- **Alternatives rejected:** `date + integer` meaning "add N days" — the v1 position. Convenient but implicit. In a proposal with both `(n) days` and `(n) months` as period constructors, `+ 5` is genuinely ambiguous. NodaTime's `LocalDate` has no `operator+(int)` — it requires `Plus(Period)`.
+- **Precedent:** NodaTime `LocalDate` has no integer arithmetic operator. FEEL requires explicit offsets.
+- **Tradeoff:** `DueDate + 5 days` is more verbose than `DueDate + 5`. The verbosity forces the author to name the unit.
 
-### 11. `localdate - localdate` returns `period` (not integer, number, or duration)
+### 11. `date - date` returns `period` (not integer, not duration)
 
-- **Why:** The result of subtracting two dates is a calendar quantity — it should carry unit semantics, not collapse to a bare integer or a timeline duration. `date - date → integer` produces a number that has lost its meaning. `date - date → duration` conflates calendar and timeline domains — it implies the result is a fixed-length time span, when in fact it’s a `Period` that knows it’s “2 months 3 days” without converting to a fixed number of hours. Returning a `period` preserves the structural calendar units and matches NodaTime’s `Period.Between(d1, d2)` exactly.
-- **Alternatives rejected:** `→ integer` — loses unit semantics; the caller must *remember* that the integer means days. `→ duration` — the previous position in this proposal. Assumes the result is a fixed-length time span when the domain quantity is calendar-based. `→ number` — floating-point is unnecessary and misleading.
-- **Precedent:** NodaTime’s `Period.Between(d1, d2)` returns a `Period`, not a `Duration` or `int`. This is deliberate — the result represents calendar distance (months, days), not timeline distance (nanoseconds).
-- **Tradeoff accepted:** `period` result requires accessor inspection (`.days`, `.months`) or comparison with `days(n)` to extract values. The indirection is intentional — it preserves the calendar structure NodaTime was designed to express.
+- **Why:** The result of subtracting two dates is a calendar quantity. NodaTime's `Period.Between(d1, d2)` returns `Period` — it preserves structural calendar components. Returning `integer` loses unit semantics. Returning `duration` conflates calendar distance with timeline distance.
+- **Alternatives rejected:** `→ integer` — loses unit semantics. `→ duration` (v1 position) — conflates calendar and timeline. NodaTime deliberately returns `Period`.
+- **Precedent:** NodaTime `Period.Between(LocalDate, LocalDate)`.
+- **Tradeoff:** Period result requires accessor inspection or comparison. Indirection is intentional.
+
+### 12. `period` is a surface type (field type AND expression type)
+
+- **Why:** Shane's directive: *"No obscurity, expose NodaTime."* 10 period fields across 7 samples are `integer` surrogates. The integer loses the unit; the period carries it. NodaTime provides full factories, operators, equality, and serialization for `Period`.
+- **Alternatives rejected:** `period` as expression-result only, with `integer` surrogates (v1 position) — same type-safety gap as `string` for dates.
+- **Precedent:** NodaTime `Period` — full factories, operators, equality, `PeriodPattern.Roundtrip`.
+- **Tradeoff:** Larger type system surface. Worth it — `field LoanTerm as period default 12 months` is strictly more expressive than `field TermLengthMonths as integer default 12`.
+
+### 13. `period` is full NodaTime Period — date AND time components (v2.1 revision)
+
+- **Why:** NodaTime's `Period` includes both date components (years, months, weeks, days) and time components (hours, minutes, seconds). The v2 date-only restriction contradicted the "expose NodaTime faithfully" directive in three ways: (1) `LocalTime.Plus(Period)` is NodaTime's native API for time arithmetic, but date-only `period` couldn't carry time results; (2) `Period.Between(LocalTime, LocalTime)` returns time-component Periods with no home in a date-only type; (3) timeline constructors returning `duration` plus `LocalTime` not accepting `Duration` left no clean implementation path for `time + 3 hours`. `Period.FromHours()`, `.FromMinutes()`, `.FromSeconds()` all exist in NodaTime.
+- **Alternatives rejected:** Date-only `period` (v2 position) — created the three structural contradictions above. Re-invents a boundary NodaTime chose not to draw.
+- **Precedent:** NodaTime `Period` — full date+time components. `Period.HasDateComponent` / `Period.HasTimeComponent` for introspection.
+- **Tradeoff:** `date + period` where the period has time components: the date type ignores the time portion (NodaTime's `LocalDate.Plus(Period)` behavior). Some expressions are valid but semantically empty for one component. This matches NodaTime — they made the same choice.
+
+### 14. No ordering on `period` — `==` and `!=` only
+
+- **Why:** NodaTime's `Period` has no `IComparable`. "Is 1 month greater than 30 days?" depends on which month. NodaTime requires `CreateComparer(LocalDateTime)` — a reference date. Precept exposes this truth.
+- **Alternatives rejected:** Reference-date ordering (adds complexity). Approximate ordering (incorrect — violates "force authors to think about the details").
+- **Precedent:** NodaTime `Period` — no `IComparable`.
+- **Tradeoff:** Cannot sort by period or use `<`/`>` guards. Compare concrete dates instead: `StartDate + GracePeriod < Deadline`.
+
+### 15. Structural equality on `period` — `1 month != 30 days`
+
+- **Why:** NodaTime's equality is structural — "24 hours" ≠ "1 day" unless `NormalizingEqualityComparer` is used. Calendar units are non-equivalent: 1 month is 28–31 days.
+- **Alternatives rejected:** Normalizing equality (requires reference date). Calendar-aware equality (which month?).
+- **Precedent:** NodaTime standard `Period` equality.
+- **Tradeoff:** `7 days == 1 week` is `false`. Structurally different representations.
+
+### 16. Sub-day duration bridging — `time + duration` via thin type-checker translation
+
+- **Why:** `hours`, `minutes`, `seconds` in most expression contexts resolve to `duration` (fixed-length quantities — Duration's natural type). NodaTime's `LocalTime` accepts `Period`, not `Duration`. But for sub-day units, `Duration` and `Period` represent identical physical quantities — an hour is always exactly 3600 seconds regardless of whether it's stored as `Duration.FromHours(1)` or `Period.FromHours(1)`. The type checker allows `time + duration → time`. Runtime: nanosecond arithmetic on `LocalTime` (NodaTime stores `LocalTime` as nanosecond-of-day internally). This uses NodaTime's own primitives, not a reimplementation.
+- **Alternatives rejected:** (A) Time units always producing `period` — `instant + 3 hours` fails unless compiler can guarantee no date components, which is impossible for period fields at compile time. Violates Principle #8. (C) Context-dependent return type — implicit, violates the directive. (D) Separate unit keywords for duration vs. period — two names for the same physical quantity; verbose duplication.
+- **Precedent:** NodaTime has BOTH `Duration.FromHours(1)` AND `Period.FromHours(1)` for the same physical quantity. Precept picks one entry point (`duration`) and bridges at the type-checker level.
+- **Tradeoff:** `time + duration` is not a direct NodaTime API call. The translation layer is thin — nanosecond arithmetic — not a reimplementation. NodaTime's own `LocalTime.PlusHours()` convenience methods do the same nanosecond manipulation internally.
+
+### 17. Unified postfix model — sole mechanism for temporal quantity construction (rewritten 2026-04-15)
+
+**What:** The temporal quantity grammar is standardized to two atom forms and one combination operator:
+
+1. **Bare postfix:** `30 days`, `72 hours`, `12 months` — integer literal + unit keyword
+2. **Paren postfix:** `(GraceDays) days`, `(X + 5) hours` — parenthesized expression + unit keyword
+3. **Combination via `+`:** `2 years + 6 months + 15 days` — standard addition operator
+
+**What was eliminated:**
+- All 7 function-call constructors: `days()`, `months()`, `years()`, `weeks()`, `hours()`, `minutes()`, `seconds()`
+- Composite literal form (greedy juxtaposition): `2 years 6 months 15 days`
+- `and` as a composite combiner (explored and rejected — dual meaning with boolean `and`)
+
+- **Why:** One syntax, zero redundancy. Postfix reads as English prose (Principle #2). `+` is already the operator for combining quantities — no new grammar concepts needed. Eliminates ~45–60 lines of parser machinery (composite combinator, AST node, validation, desugaring). CSS precedent: literals are bare (`30px`), expressions require grouping (`calc(...)`). Mathematical notation precedent: $(x + 5)\text{ kg}$ — grouping before unit. The function-call form was broken anyway — `days(n)` always returned `period`, useless for `instant + duration` contexts. With paren postfix, `(GraceDays) days` in instant context correctly resolves to `Duration.FromDays(n)` — something `days(GraceDays)` could never do.
+- **Alternatives rejected:** (A) Function-call only — leaves three NodaTime alignment gaps: `days(n)` always returns `period`, no way to get `Duration.FromDays(n)`; `hours(n)` always returns `duration`, no way to get `Period.FromHours(n)` for period defaults; no access to both NodaTime factory families. (B) Both syntaxes coexist (original Decision #17 — "Option C") — redundant, dual syntax for the same concepts, confusing for authors and AI consumers. Function calls and postfix had DIFFERENT semantics (`days(n)` always `period`, `3 days` contextual), creating a teaching trap. (C) Composites via juxtaposition — requires ~45–60 lines of parser machinery, dual semantics with left-associative `+`, no advantage over explicit `+`.
+- **Precedent:** CSS (`30px` bare, `calc()` for expressions), Kotlin (`3.days`, extension functions), F# units of measure (`3<kg>`), mathematical notation, ISO 80000-1.
+- **Tradeoff:** Context-dependent type resolution is implicit — `3 days` alone has no fixed type. Mitigated by: (1) compile error on ambiguous standalone usage, (2) the context that determines the type (`date +` vs `instant +`) is visible in the same expression, (3) `months`/`years` have NO duration equivalent, so they always resolve to `period` without ambiguity.
+
+**Context-dependent type resolution unchanged:** `date +` context → `period`, `instant +` context → `duration`, field default → match declared type, no context → compile error.
+
+**Left-associative `+` subtlety:** `date + 1 month + 1 month` applies sequentially with truncation (Jan 31 → Feb 28 → Mar 28). `date + (1 month + 1 month)` builds period first then applies once (Jan 31 → Mar 31). Both valid — parens available for "build-then-apply" semantics.
+
+**Supersedes:** Original Decision #17's "Option C — both syntaxes coexist" rationale and composite literal rules.
+
+### 18. Single-quoted typed constants — `'...'` as the typed constant delimiter (rewritten 2026-04-15, reframed 2026-04-15)
+
+**What:** The `'...'` delimiter is the **typed constant delimiter** — a language-level mechanism for any non-primitive type whose content shape is unambiguous. Temporal types are the first inhabitants, not the definition. Constants for `date`, `time`, `datetime`, `instant`, `zoneddatetime`, and `timezone` use `'...'` with type inferred from content shape.
+
+| Type | Literal | Content shape |
+|------|---------|--------------|
+| date | `'2026-01-15'` | `YYYY-MM-DD` |
+| time | `'14:30:00'` | `HH:MM:SS` |
+| datetime | `'2026-01-15T14:30:00'` | `...T...` (no `Z`, no `[`) |
+| instant | `'2026-01-15T14:30:00Z'` | `...T...Z` |
+| zoneddatetime | `'2026-01-15T14:30:00[America/New_York]'` | `...T...[zone]` |
+| timezone | `'America/New_York'` | IANA identifier |
+
+**Delimiter semantics — the three-mechanism model:**
+
+| Delimiter | Meaning | Type resolution |
+|-----------|---------|-----------------|
+| `"..."` | String | Always `string` |
+| `'...'` | Typed constant | Inferred from content shape — admits any type whose shape is distinguishable from all other inhabitants |
+| `N unit` | Quantity | Magnitude + unit keyword — resolves to `period` or `duration` by expression context |
+
+**Admission rule:** A type qualifies for `'...'` if and only if its content shape is distinguishable from every other single-quote inhabitant. No shape may match two types. This formal criterion prevents ambiguity from accumulating as new types are admitted.
+
+**Current inhabitants (temporal — first wave):** The six temporal types listed above. **Future candidates (illustrative, not committed):** UUID (`'550e8400-...'` — `8-4-4-4-12` hex), email (`'user@example.com'` — `@` present), URI (`'https://...'` — scheme `://`), semver (`'2.1.0'` — `N.N.N`). Each would need to pass the admission rule before entering.
+
+**Duration and period have no literal form** — postfix units only (see Decision #17).
+
+**Design evolution:** The `date(2026-01-15)` constructor form was the team's unanimous initial recommendation (original Decision #18). Shane then challenged it with the string-delimiter precedent insight: strings don't need `string("hello")` — the `"..."` delimiter IS the type signal. Why should temporal values need `date(...)` when a distinct delimiter can carry the same information? This led to exploring `"..."` with context resolution (rejected — see "Double-Quote Alternative Analysis" below), then to single quotes as the clean solution.
+
+- **Why:** (1) Follows Precept's literal grain — the delimiter IS the type signal. (2) Single token in the tokenizer (`'[^']*'`), same as `NumberLiteral` and `StringLiteral`. (3) Uniform across all 6 types. (4) `'` is an unambiguous IntelliSense trigger for temporal completions and progressive validation. (5) No `char` type collision — permanently safe.
+- **Alternatives rejected:** (A) `date(2026-01-15)` (unquoted constructor) — team's initial choice, superseded by delimiter insight. (B) `date("2026-01-15")` (string constructor) — quotes suggest "string being parsed." (C) `"2026-01-15"` (double-quoted, context-resolved) — explored and rejected; see "Double-Quote Alternative Analysis." (D) Bare ISO `2024-01-15` — lexer ambiguity with subtraction. (E) SQL-style `DATE '2026-01-15'` — redundant keyword when content shape is sufficient.
+- **Precedent:** SQL `'...'` for value literals including dates. Precept's own `"..."` → string pattern.
+- **Tradeoff:** Type is implicit in content shape rather than explicit in a keyword. Readers must recognize ISO formats. Mitigated by: (a) ISO formats are culturally universal, (b) field declarations provide type context, (c) syntax highlighting can color single-quoted content distinctly.
+
+**Tooling implications:**
+- **IntelliSense:** `'` triggers temporal completions with format-aware ghost text. After `'2024-`, show `-MM-DD` placeholder. After `'14:`, show `mm:ss`. Content-shape detection enables type-specific validation as the author types.
+- **Hover content (invariant culture, deterministic):**
+  - `'2024-01-15'` → "date: January 15, 2024 (Monday)"
+  - `'14:30'` → "time: 2:30 PM"
+  - `'2024-01-15T14:30:00'` → "datetime: January 15, 2024 at 2:30 PM (Monday)"
+  - `'2024-01-15T14:30:00Z'` → "instant: 2024-01-15T14:30:00Z (UTC)" — NO day-of-week (requires timezone)
+  - `'America/New_York'` → "timezone: America/New_York (UTC-05:00 / UTC-04:00 DST)"
+- **Timezone completions:** `'` in timezone context triggers IANA timezone completion from `DateTimeZoneProviders.Tzdb.Ids` with UTC offset descriptions.
+- **Hover is always invariant culture English** — not locale-dependent. Same `.precept` file, same hover everywhere.
+
+---
+
+## Double-Quote Alternative Analysis
+
+After the `date(2026-01-15)` constructor form was challenged by the delimiter insight, the team explored whether double-quoted strings (`"2026-01-15"`) could serve as temporal literals with the type inferred from context (field declaration, expression position).
+
+### The compiler CAN resolve it in ~99% of cases
+
+Context resolution is technically feasible. The compiler knows the target type from:
+- Field declarations: `field DueDate as date default "2026-01-15"` → the field is `date`, the string is a date.
+- Binary operators: `DueDate + "2026-01-15"` → left operand is `date`, right must be `date` (for comparison) or `period` (for arithmetic).
+- Function arguments: `toInstant("2026-01-15", tz)` → first parameter typed as `date`.
+
+The ~1% failure case is genuinely ambiguous positions (pure variable assignment without type annotation), which could be mitigated by requiring explicit type annotation in those rare positions.
+
+### Why it was rejected
+
+Three arguments against double-quoted temporal resolution, in order of strength:
+
+1. **Refactoring safety.** Changing `field DueDate as date` to `field DueDate as string` silently changes the meaning of every `"2026-01-15"` assigned to it. With constructor syntax (`date(2026-01-15)`) or single quotes (`'2026-01-15'`), those expressions immediately become type errors, flagging every usage site for review. Type changes should produce compile errors at affected usage sites — not silent semantic shifts.
+
+2. **IntelliSense quality.** `"` is the trigger for string completions. If `"` sometimes starts a temporal literal, the completion engine needs full expression-context analysis before offering suggestions. `'` is an unambiguous trigger — inside single quotes, always offer temporal completions with format-aware ghost text and progressive validation.
+
+3. **Error clarity.** When `"2026-01-15"` fails validation in a date context, the error is: "Invalid date format in string." With `'2026-01-15'`, the error is: "Invalid date: ..." — the system knows this was intended as a temporal value because the author used the temporal delimiter. The error can be specific and actionable.
+
+### The choice-type precedent
+
+An important counter-argument was considered: Precept's `choice` fields already use `"..."` double-quoted strings where the meaning depends on the field declaration. `choice("Draft", "Active", "Closed")` defines allowed values — `"Draft"` is only valid in the context of that field.
+
+However, the distinction matters: **choice is a constraint on a value within the same type** — a string field constrained to specific string values. The string `"Draft"` is still a string; the field merely limits which strings are valid. Temporal would be a **type-family conversion** — the string `"2026-01-15"` would need to become a fundamentally different type (`date`). This crosses from value-constraint to type-conversion, which is the stronger argument for a distinct delimiter.
+
+### Conclusion
+
+Single quotes win on all three criteria that matter for a DSL: refactoring safety (silent semantic shift → compile error), IntelliSense (unambiguous trigger), and error clarity (intent-aware messages). The ~99% context-resolution success rate is insufficient when the 1% failure mode is silent type conversion.
 
 ---
 
 ## George's Challenges — Resolution
 
-George's design review of the original #26 proposal raised four challenges. The unified temporal type system, backed by NodaTime, resolves all four:
-
 ### Challenge 1: `DueDate + MealsTotal` compiles because `date + number → date`
 
-**Resolution:** No form of `date + <non-duration>` is defined. The only valid temporal arithmetic uses explicit duration constructors: `date + days(n)`, `date + months(n)`, etc. `DueDate + MealsTotal` is a **type error** regardless of whether `MealsTotal` is `decimal`, `number`, or `integer` — none of these are duration values. This is strictly stronger than the previous `date + integer` rule, which would have allowed `DueDate + MealsTotal` if `MealsTotal` happened to be `integer`. The explicit-duration requirement eliminates the cross-domain error structurally.
+**Resolution (v2 — strengthened):** No form of `date + <non-period>` is defined. `DueDate + MealsTotal` is a type error regardless of `MealsTotal`'s type — none of `integer`, `number`, `decimal`, or `duration` are `period`.
 
 ### Challenge 2: `date + 2.5` should reject fractional offsets
 
-**Resolution:** `date + 2.5` is a type error — and now `date + 2` is *also* a type error. No bare numeric value (integer, number, or decimal) is a valid operand for temporal arithmetic. Only explicit duration constructors are accepted: `date + days(2)`, `date + months(1)`, etc. The fractional offset `2.5` is rejected not by a granularity check but by the fundamental rule: temporal arithmetic requires duration constructors that name the unit. This is strictly stronger than the previous resolution — it eliminates *all* implicit temporal arithmetic, not just fractional offsets.
+**Resolution (v2 — strengthened):** `date + 2.5` is a type error — `2.5` is not a `period`. `date + 2` is also a type error. `(2.5) days` is a type error — `days` requires `integer` (bare postfix) or integer-typed expression (paren postfix).
 
-### Challenge 3: `nullable + default` prohibition seems arbitrary
+### Challenge 3: `nullable + default` prohibition
 
-**Resolution:** This is presented as an open option in this proposal (see "Option: `nullable` + `default` for temporal fields" above). The question is orthogonal to temporal types and applies to all types — it should be resolved as a cross-cutting design decision. The NodaTime backing type has no opinion here.
+**Resolution:** Open. Deferred to cross-cutting design decision.
 
 ### Challenge 4: `date - date` result type
 
-**Resolution:** Now `date - date` returns `period` — even more explicit than returning `integer` or `duration`. The result is a `period` value that preserves structural calendar units (“2 months 3 days”), not a bare number that has lost its meaning or a `duration` that collapses calendar distance into nanoseconds. The consumer can inspect components (`.days`, `.months`) or compare with `days(n)` expressions. This aligns with NodaTime’s `Period.Between(d1, d2)` and Shane’s directive that implicit results are as problematic as implicit operands.
+**Resolution (v2 — redesigned):** `date - date → period`. Preserves structural calendar units. Matches `Period.Between(d1, d2)`.
 
 ---
 
@@ -1012,58 +1258,26 @@ George's design review of the original #26 proposal raised four challenges. The 
 
 | Issue | Relationship |
 |---|---|
-| #25 (choice type) | Currency codes as `choice("USD", "EUR", ...)` complement `decimal` for money; `choice` for state/region complements `timezone` for jurisdiction lookups. |
-| #26 (date type) | **Superseded by this proposal.** The `localdate` section here incorporates all of #26’s design plus NodaTime backing, explicit constructor functions (period/duration split), and month/year arithmetic. |
-| #27 (decimal type) | Complementary numeric type. `decimal` and temporal types do not interact arithmetically (`decimal + date` is a type error). `duration.totalHours` returns `number`, not `decimal`. |
-| #29 (integer type) | Duration constructor function args are `integer`. The `integer` type is a dependency for correct temporal arithmetic. |
-| #16 (built-in functions) | `round()` from #27; `toLocalDate`, `toLocalTime`, `toInstant`, `months`, `years`, `weeks`, `hours`, `minutes`, `seconds` from this proposal. |
-| #13 (field-level constraints) | `nullable`, `default`, `nonnegative` — constraint-zone architecture that temporal fields use. |
+| #25 (choice type) | Complementary. |
+| #26 (date type) | **Superseded.** `date` section here incorporates all of #26 plus NodaTime, period-based arithmetic, postfix unit construction. |
+| #27 (decimal type) | Complementary. No cross-type arithmetic. |
+| #29 (integer type) | Postfix unit expressions take `integer`. Dependency. |
+| #16 (built-in functions) | Conversion functions from this proposal. Constructor functions eliminated — replaced by postfix units. |
+| #13 (field-level constraints) | `nullable`, `default`, `nonnegative` architecture. |
 
 ---
 
 ## Explicit Exclusions / Out of Scope
 
-Each exclusion includes rationale — items are excluded for reasons, not convenience.
-
-### `zoneddatetime` as a field type — Proposed (full surface)
-
-The `zoneddatetime` type provides the full operation surface of a datetime with timezone context: component accessors (`.year`, `.hour`, `.date`, `.time`, etc.), calendar arithmetic (`+ days(n)`, `+ months(n)`), timeline arithmetic (`+ hours(n)`, `+ duration`), and subtraction (`zdt - zdt → duration`). The bound timezone makes all operations deterministic — component access resolves against the zone, and DST transitions are handled by the lenient resolver strategy defined in this proposal.
-
-This replaces the earlier "permanently excluded" assessment. The original exclusion rationale — that component accessors depend on the TZ database — applied to `instant`, which lacks a timezone. `zoneddatetime` carries the timezone, making the dependency explicit and the resolution deterministic. The [zoneddatetime reconsideration](../../../.squad/decisions/inbox/frank-zoneddatetime-reconsideration.md) analysis upgraded it from Deferred to Proposed based on the provenance erasure problem; this revision opens the full surface based on the recognition that the `instant`-inherited bans were inapplicable.
-
-See the `### zoneddatetime` type section in Proposed Types for the full specification.
-
-### `OffsetDateTime` — Excluded
-
-Carries a UTC offset without timezone rules. Same determinism concerns as `ZonedDateTime`, weaker than full timezone — offset without rules is misleading. Not useful in entity modeling.
-
-### `AnnualDate` — Deferred
-
-Recurring month-day combination (birthday, anniversary, annual deadline). Real demand in HR and insurance, but low corpus frequency. Evaluate after core temporal types are in use to measure demand.
-
-### `YearMonth` — Deferred
-
-Year-month pair (billing period, fiscal month, credit card expiry). Real demand in SaaS billing, but low priority given current evidence.
-
-### `DateInterval` / `daterange` — Deferred
-
-Range between two calendar dates. Two `localdate` fields with an invariant (`StartDate <= EndDate`) cover the use case with existing machinery. The marginal benefit of a composite type is co-assignment enforcement and `contains(localdate)` operations.
-
-### Fiscal/business calendars — Excluded
-
-Precept uses the ISO calendar exclusively. Non-Gregorian calendars (Hebrew, Islamic, Julian) and fiscal calendars (4-4-5) are outside scope. NodaTime supports multiple calendar systems; Precept does not expose them.
-
-### Leap seconds — Excluded
-
-NodaTime's `Instant` does not model leap seconds (it uses a "smoothed" UTC scale). This matches the reality of virtually all business computing and is not a limitation for entity governance.
-
-### `Period` as a DSL type — Excluded
-
-`Period` is the internal mechanism for calendar arithmetic (`date + months(1)` uses `Period.FromMonths`). Domain fields that hold period-like values (`GracePeriodDays`, `TermLengthMonths`) are more precisely modeled as `integer` fields consumed by constructor functions: `StartDate + months(TermLengthMonths)`. NodaTime's `Period` backs the functions; the DSL author doesn't see it.
-
-### Parameterized temporal types — Excluded
-
-No `date(format)`, `instant(precision)`, or `duration(unit)`. Temporal type behavior is fixed by the type name. Parameterized types require infrastructure that doesn't exist and provide zero practical benefit.
+| Item | Status | Rationale |
+|---|---|---|
+| `OffsetDateTime` | Excluded | UTC offset without timezone rules. Weaker than full timezone. |
+| `AnnualDate` | Deferred | Real demand (HR, insurance), low corpus frequency. Evaluate post-Phase 2. |
+| `YearMonth` | Deferred | Real demand (billing), low priority. |
+| `DateInterval` / `daterange` | Deferred | Two `date` fields + invariant covers it. |
+| Fiscal/business calendars | Excluded | ISO calendar only. |
+| Leap seconds | Excluded | NodaTime `Instant` uses smoothed UTC. Not a limitation. |
+| Parameterized temporal types | Excluded | No type parameterization. |
 
 ---
 
@@ -1071,260 +1285,291 @@ No `date(format)`, `instant(precision)`, or `duration(unit)`. Temporal type beha
 
 ### Parser / Tokenizer
 
-- Add `localdate`, `localtime`, `instant`, `duration`, `timezone`, `zoneddatetime`, `localdatetime` as type keywords.
-- Add `days`, `months`, `years`, `weeks`, `hours`, `minutes`, `seconds` as function keywords.
-- Add `toLocalDate`, `toLocalTime`, `toInstant` as function keywords.
-- Parse constructor forms: `localdate("...")`, `localtime("...")`, `instant("...")`, `period("...")`, `duration("...")`, `timezone("...")`, `localdatetime("...")`, `zoneddatetime(expr, expr)`.
-- Parse function calls: `days(expr)`, `months(expr)`, `hours(expr)`, `toLocalDate(expr, expr)`, `toLocalDate(expr)`, `toInstant(expr, expr, expr)`, `toInstant(expr, expr, expr_zdt)`.
-- Parse accessors: `.year`, `.month`, `.day`, `.dayOfWeek`, `.hour`, `.minute`, `.second`, `.date`, `.time`, `.totalHours`, `.totalMinutes`, `.totalSeconds`, `.instant`, `.timezone`.
+- Add `date`, `time`, `instant`, `duration`, `period`, `timezone`, `zoneddatetime`, `datetime` as type keywords.
+- Add `days`, `months`, `years`, `weeks`, `hours`, `minutes`, `seconds` as unit keywords for postfix expressions.
+- Add `toLocalDate`, `toLocalTime`, `toInstant` as conversion function keywords.
+- **Single-quoted typed constants:** New token type `TypedConstantLiteral`. The tokenizer matches `'[^']*'` as a single token. The parser validates content shape and infers the specific type. Content inside single quotes is a constant pattern, not an expression — no operator precedence, no identifier resolution. `'2026-03-15'` is valid. `'03/15/2026'` is a compile error with a teachable message. Compile-time validated per inferred type. Temporal types are the first inhabitants; the mechanism is not temporal-specific.
+- **Postfix unit expressions:** New expression form. Two combinators:
+  - `PostfixUnitExprBare`: `<integer-literal> <unit-keyword>`. Must precede `NumberAtom` in atom chain (both start with `NumberLiteral`).
+  - `PostfixUnitExprParen`: `( <expression> ) <unit-keyword>`. Must precede `ParenExpr` in atom chain (both start with `LeftParen`). Uses `.Try()` — backtracking on missing unit keyword is clean.
+- Unit keywords in postfix position must not be consumed as identifiers.
+- Parse all conversion function call forms (`toLocalDate`, `toLocalTime`, `toInstant`).
+- Parse accessors: `.year`, `.month`, `.day`, `.dayOfWeek`, `.hour`, `.minute`, `.second`, `.date`, `.time`, `.totalHours`, `.totalMinutes`, `.totalSeconds`, `.instant`, `.timezone`, `.years`, `.months`, `.weeks`, `.days`, `.hours`, `.minutes`, `.seconds`, `.hasDateComponent`, `.hasTimeComponent`.
 
 ### Type Checker
 
-- New type entries for `localdate`, `localtime`, `instant`, `duration`, `timezone`, `zoneddatetime`, `localdatetime`.
-- Operator resolution: the full cross-type interaction matrix above.
-- Accessor resolution: per-type accessor tables.
-- Constructor validation: ISO 8601 format check for literals (compile-time). `zoneddatetime(instant, timezone)` constructor argument type validation.
-- Constraint validation: which constraints apply to which temporal types. `zoneddatetime` allows `nullable`, rejects `default`.
-- Cross-type arithmetic rejection: `date + instant`, `date + integer`, `instant + months(n)`, `zoneddatetime + integer`, etc.
-- `instant` component accessor rejection (new diagnostic).
-- `zoneddatetime` arithmetic: calendar (`+ days`, `+ months`, `+ years`, `+ weeks`) and timeline (`+ hours`, `+ minutes`, `+ duration`, `- duration`) operators, `zdt - zdt → duration`.
-- `zoneddatetime` accessor resolution: `.instant`, `.timezone`, `.date`, `.time`, `.year`, `.month`, `.day`, `.hour`, `.minute`, `.second`, `.dayOfWeek`.
-- `timezone` ordering rejection (new diagnostic).
-- Duration constructor argument validation: `hours(n)` requires `integer` argument.
-- Conversion function overload resolution: `toLocalDate(zoneddatetime)`, `toLocalTime(zoneddatetime)`, `toInstant(date, time, zoneddatetime)`.
+- 8 new type entries.
+- **Period/duration split enforcement:** `date + period ✓`, `date + duration ✗`, `instant + duration ✓`, `instant + period ✗`. Standard type-checking — no custom dispatch.
+- **Postfix unit type resolution:** Resolve `<value> <unit-keyword>` expressions to `period` or `duration` based on expression context. `date +` / `datetime +` context → `period`. `instant +` / `zoneddatetime +` context → `duration`. `months`/`years` → always `period`. Field default context → match declared field type. No context → compile error.
+- **Typed constant type inference:** Determine specific type from content shape via the admission rule. Current inhabitants (temporal — first wave): `YYYY-MM-DD` without `T` = date, `HH:MM:SS` without `-` = time, `...T...` without `Z` or `[` = datetime, `...T...Z` = instant, `...T...[zone]` = zoneddatetime, IANA pattern = timezone. Framework is extensible to future inhabitants whose shapes pass the admission rule.
+- **Meaningless combination warnings:** `date + 3 hours` (hours on a date) → warning. `date + 3 minutes` → warning.
+- Full cross-type interaction matrix.
+- `period` ordering rejection (`<`, `>`, `<=`, `>=`).
+- `period` scaling rejection (`* integer`).
+- `duration + period` / `period + duration` rejection.
+- **Sub-day duration bridging:** `time + duration → time` allowed by type checker. See Decision #16.
+- All v1 type-checker items apply.
 
 ### Expression Evaluator
 
-- `localdate` arithmetic via `LocalDate.PlusDays`, `LocalDate.Plus(Period)`.
-- `localtime` arithmetic via `LocalTime.PlusHours`, `LocalTime.PlusMinutes`.
+- `date` arithmetic via `LocalDate.Plus(Period)`, `LocalDate.Minus(Period)`.
+- `date - date` via `Period.Between(d1, d2)`.
+- `period` arithmetic via `Period + Period`, `Period - Period`.
+- `time + period` via `LocalTime.Plus(Period)` — NodaTime native.
+- `time + duration` via nanosecond arithmetic on `LocalTime` — thin translation (Decision #16).
+- `time - time` via `Period.Between(t1, t2)` → time-component period.
 - `instant` arithmetic via `Instant.Plus(Duration)`, `Instant.Minus(Duration)`.
-- `duration` arithmetic via `Duration.Plus`, `Duration.Minus`.
-- `localdatetime` arithmetic via `LocalDateTime` methods.
-- `zoneddatetime` calendar arithmetic via `ZonedDateTime.Plus(Period)` with `LenientResolver`; timeline arithmetic via underlying `Instant.Plus(Duration)` re-resolved in zone; subtraction via `zdt.ToInstant() - zdt.ToInstant()`.
-- Conversion functions: `ZonedDateTimeExtensions` / `DateTimeZoneProviders.Tzdb` for timezone lookups.
-- DST resolution via NodaTime's `LenientResolver` (or chosen strategy).
-- Accessor evaluation: `.year` → `localDate.Year`, etc.
-- Duration constructor functions: `days(n)` → `Period.FromDays(n)`, `hours(n)` → `Duration.FromHours(n)`, etc.
-- Calendar constructor functions: `months(n)` → `Period.FromMonths(n)`, `years(n)` → `Period.FromYears(n)`, `weeks(n)` → `Period.FromWeeks(n)`.
+- `duration` arithmetic via `Duration` operators.
+- `datetime` arithmetic via `LocalDateTime.Plus(Period)`. `datetime + duration` uses duration bridging — same thin translation as `time + duration` (Decision #16).
+- `zoneddatetime` timeline arithmetic via underlying instant.
+- Postfix unit resolution: bare/paren postfix → `Period.FromDays(n)`, `Duration.FromHours(n)`, etc., based on resolved type.
+- Conversion functions with timezone lookups.
 
 ### Runtime Engine
 
-- Value carriers for all temporal types (NodaTime structs).
-- Serialization/deserialization for fire/update/inspect payloads.
-- Constraint enforcement for temporal fields.
-- Timezone validation at fire boundary (event args typed as `timezone`).
+- Value carriers for all 8 temporal types.
+- `period` serialization via `PeriodPattern.Roundtrip`.
+- Constraint enforcement, timezone validation at fire boundary.
 
 ### TextMate Grammar
 
-- Add `localdate`, `localtime`, `instant`, `duration`, `timezone`, `zoneddatetime`, `localdatetime` to `typeKeywords` alternation.
-- Add `days`, `months`, `years`, `weeks`, `hours`, `minutes`, `seconds` to function keyword patterns.
-- Add `toLocalDate`, `toLocalTime`, `toInstant` to function keyword patterns.
-- Temporal accessors (`.year`, `.totalHours`, etc.) handled by existing member-access pattern.
+- Add all 8 type keywords to `typeKeywords`.
+- Add all 7 unit keywords to appropriate keyword group.
+- Add single-quoted literal pattern: `'[^']*'` as typed constant token.
+- Add conversion function names.
 
 ### Language Server
 
-- **Completions:** Temporal types offered after `as` in field/event-arg declarations. Constructor functions offered in expression positions. Accessors offered after `.` on temporal-typed fields. Conversion functions offered in expression positions.
-- **Hover:** Temporal field hover shows type, constraints, and backing NodaTime type. Constructor hover shows format requirements. Conversion function hover shows signature and DST resolution behavior.
-- **Diagnostics:** All type errors from the type checker. Compile-time invalid temporal literals. Compile-time invalid timezone identifiers.
-- **Semantic tokens:** Temporal type keywords colored as types (automatic via `[TokenCategory(Type)]`). Constructor/function keywords colored as functions.
+- Completions, hover, diagnostics for all 8 types including full `period` (date+time components).
+- Single-quote trigger for typed constant completions with format-aware ghost text.
+- Period-specific diagnostics (ordering rejection, scaling rejection, cross-domain rejection for `instant + period`).
+- Sub-day bridging documentation in hover for `time + duration`.
 
 ### MCP Tools
 
-- `precept_language`: Include `localdate`, `localtime`, `instant`, `duration`, `timezone`, `zoneddatetime`, `localdatetime` in type keywords. Include all constructor and conversion functions (including `zoneddatetime` overloads). TZ database version in environment info.
-- `precept_compile`: Temporal field DTOs include type, constraints, and assessed properties. New diagnostics for temporal type errors.
-- `precept_fire` / `precept_inspect` / `precept_update`: Temporal values serialized as ISO 8601 strings. Timezone values as IANA identifiers. Duration values as ISO 8601 duration strings.
+- `precept_language`: All 8 types. Postfix unit system description. Typed constant delimiter syntax.
+- `precept_compile`/`fire`/`inspect`/`update`: `period` as ISO 8601 string (`P1Y2M3D`), `duration` as time-duration (`PT72H`).
 
-### Samples
+### Samples, Documentation, Tests
 
-- Update existing samples with `FUTURE(localdate)` markers to use `localdate` fields.
-- Replace day-counter simulation machinery (3 samples) with date arithmetic.
-- Add or update at least one sample demonstrating `instant` / `duration` / `timezone` / conversion functions (e.g., multi-region insurance claim).
-
-### Documentation
-
-- `docs/PreceptLanguageDesign.md`: New section for temporal types covering syntax, operators, accessors, constraints, semantic rules.
-- `docs/RuntimeApiDesign.md`: Value carrier types, serialization format, NodaTime dependency.
-- `docs/McpServerDesign.md`: Temporal value serialization in MCP payloads.
-- `README.md`: Update feature claims and examples to include temporal types.
-
-### Tests
-
-- Parser tests: all declaration forms, constructor forms, function calls.
-- Type checker tests: full cross-type interaction matrix, all error cases.
-- Evaluator tests: arithmetic edge cases (month-end truncation, leap years, midnight wrapping, DST boundaries).
-- Runtime tests: temporal value serialization, constraint enforcement, timezone validation.
-- Language server tests: completions, hover, diagnostics for temporal constructs.
-- MCP tests: temporal values in compile/fire/inspect/update payloads.
+- Update samples with `period` field type usage.
+- All documentation sync per copilot-instructions.
+- Full test coverage for period/duration split enforcement.
 
 ---
 
 ## Acceptance Criteria
 
-### `localdate` type
+### `date` type
 
-- [ ] `field X as localdate` parses and type-checks.
-- [ ] `localdate("2026-03-15")` literal validates ISO 8601 at compile time.
-- [ ] `localdate("2026-02-30")` produces compile-time error.
-- [ ] `localdate + days(n) → localdate` works; `localdate + integer`, `localdate + number`, and `localdate + decimal` are type errors.
-- [ ] `localdate + months(n)`, `localdate + years(n)`, `localdate + weeks(n)` work with correct truncation.
-- [ ] `localdate + period → localdate`, `localdate - period → localdate` work.
-- [ ] `localdate - localdate → period` (not `integer`, `number`, or `duration`).
-- [ ] `localdate + duration` is a type error (duration is timeline-only; use calendar constructors or `+ period`).
+- [ ] `field X as date` parses and type-checks.
+- [ ] `'2026-03-15'` validates at compile time as a date. `'2026-02-30'` is a compile error.
+- [ ] `date + 30 days`, `+ 3 months`, `+ 1 year`, `+ 2 weeks` work (postfix units resolve to `period` in date context).
+- [ ] `date + (GraceDays) days` works (paren postfix resolves to `period`).
+- [ ] `date + period → date`, `date - period → date` work for any `period`.
+- [ ] `date - date → period` (not integer, number, or duration).
+- [ ] `date + integer`, `date + number`, `date + decimal` are type errors.
+- [ ] **`date + duration` is a type error** with teachable message.
+- [ ] **`date + 3 hours` produces a warning** (hours meaningless on dates).
 - [ ] `.year`, `.month`, `.day`, `.dayOfWeek` return `integer`.
-- [ ] Nullable and default work. Constraints `nonnegative`, `min`, `max`, etc. are compile errors.
-- [ ] MCP tools serialize as ISO 8601 string.
+- [ ] Nullable, default (single-quoted), serialization work.
 
-### `localtime` type
+### `time` type
 
-- [ ] `field X as localtime` parses and type-checks.
-- [ ] `localtime("14:30:00")` and `localtime("14:30")` validate at compile time.
-- [ ] `localtime + hours(n)` and `localtime + minutes(n)` wrap at midnight correctly.
-- [ ] `localtime + seconds(n)` works with proper wrapping.
-- [ ] `localtime - localtime → period` (time-unit period: hours, minutes, seconds).
-- [ ] `localtime + days(n)` is a type error (days are not meaningful for wall-clock time).
+- [ ] `time + 3 hours`, `+ 30 minutes`, `+ 45 seconds` wrap at midnight.
+- [ ] `time + duration → time` works (sub-day bridging, Decision #16).
+- [ ] `time + period → time` works (`LocalTime.Plus(Period)` — time components used, date components ignored).
+- [ ] `time - time → period` (returns time-component period with `.hours`, `.minutes`, `.seconds`).
 - [ ] `.hour`, `.minute`, `.second` return `integer`.
-- [ ] `localtime + integer` is a type error.
 
 ### `instant` type
 
-- [ ] `field X as instant` parses and type-checks.
-- [ ] `instant("2026-04-13T14:30:00Z")` validates. Without `Z`: compile error.
 - [ ] `instant - instant → duration`.
-- [ ] `instant + duration → instant`, `instant - duration → instant`.
-- [ ] `instant + period` is a type error (instant is timeline-only; use `+ duration`).
-- [ ] `instant.year` is a compile error with a teachable message.
-- [ ] `instant + integer` is a type error with a teachable message.
-- [ ] MCP tools serialize as ISO 8601 UTC string.
+- [ ] `instant + duration → instant`.
+- [ ] `instant + 3 days` works (postfix unit resolves to `Duration.FromDays(3)` in instant context).
+- [ ] `instant + (DayCount) days` works (paren postfix resolves to `Duration.FromDays(n)` in instant context).
+- [ ] `instant + 72 hours + 30 minutes` works (postfix units resolve to `duration`).
+- [ ] **`instant + period` is a type error** (covers `+ 3 months`, `+ (n) months`, `+ (n) years`).
+- [ ] **`instant + 3 months` is a type error** (`months` always resolves to `period`, never `duration`).
+- [ ] `instant.year` is a compile error.
 
 ### `duration` type
 
-- [ ] `hours(72)`, `minutes(30)`, `seconds(3600)` produce duration values (timeline constructors only).
-- [ ] `duration("PT72H")` parses as 72 hours. `duration("PT5H7M32S")` parses as composite.
-- [ ] `duration("P5D")` is a compile error with a teachable message (days are calendar units; use `period("P5D")` or `days(5)` for calendar arithmetic).
-- [ ] `duration("8 hours")` is a compile error with a teachable message (not ISO 8601).
-- [ ] `days(n)`, `months(n)`, `years(n)`, `weeks(n)` produce `period` values, NOT `duration`.
-- [ ] `duration + duration → duration`, `duration - duration → duration`.
-- [ ] `duration * integer → duration`, `duration * number → duration` (scaling).
-- [ ] `duration / integer → duration`, `duration / number → duration` (scaling).
-- [ ] `duration * decimal` is a type error (lossy narrowing; use `number`).
-- [ ] `duration / duration → number` (ratio).
-- [ ] `duration * duration` is a type error.
-- [ ] `integer * duration`, `number * duration` are type errors (duration must be left operand).
-- [ ] `duration + period` and `duration - period` are type errors (cannot mix timeline and calendar units).
+- [ ] `72 hours`, `30 minutes`, `3600 seconds` produce `duration` in appropriate contexts.
+- [ ] **`duration + period` is a type error.**
+- [ ] Arithmetic, comparison, scaling, ratio work.
 - [ ] `.totalHours`, `.totalMinutes`, `.totalSeconds` return `number`.
-- [ ] `duration == duration`, `duration < duration` comparison works.
-- [ ] If field type: `field X as duration default hours(0)` parses.
-- [ ] Duration constructor syntax chosen (function call, postfix suffix, or both) and all examples in the proposal consistently reflect the chosen form.
 
 ### `period` type
 
-- [ ] `field X as period` parses and type-checks.
-- [ ] `days(n)`, `months(n)`, `years(n)`, `weeks(n)` produce `period` values (calendar constructors).
-- [ ] `period("P1Y2M3D")` literal parses ISO 8601 duration string as a calendar period.
-- [ ] `period("PT5H")` is a compile error (time-only ISO strings are `duration`, not `period`).
+- [ ] `30 days`, `3 months`, `1 year`, `2 weeks` produce `period` in appropriate contexts.
 - [ ] `period + period → period`, `period - period → period`.
-- [ ] `period == period` and `period != period` work.
-- [ ] `period < period`, `period > period`, etc. are type errors (periods are not orderable; months have variable length).
-- [ ] `period * integer` is a type error (period scaling is not supported; construct the value you need directly).
-- [ ] `period + duration` and `period - duration` are type errors (cannot mix calendar and timeline units).
-- [ ] `.years`, `.months`, `.weeks`, `.days` accessors return `integer`.
-- [ ] If field type: `field X as period default days(0)` parses.
-- [ ] MCP tools serialize as ISO 8601 period string.
+- [ ] **`1 month != 30 days` — structural equality.**
+- [ ] **`period < period` is a type error.**
+- [ ] **`period * integer` is a type error.**
+- [ ] **`period + duration` is a type error.**
+- [ ] `.years`, `.months`, `.weeks`, `.days`, `.hours`, `.minutes`, `.seconds` return `integer`.
+- [ ] `.hasDateComponent`, `.hasTimeComponent` return `boolean`.
+- [ ] `field X as period default 12 months` parses.
+- [ ] `field X as period default 2 years + 6 months` parses.
 
 ### `timezone` type
 
-- [ ] `field X as timezone` parses and type-checks.
-- [ ] `timezone("America/Los_Angeles")` validates at compile time.
-- [ ] `timezone("EST")` produces a warning.
-- [ ] `timezone("Not/A/Thing")` is a compile error.
-- [ ] `timezone == timezone` works. `timezone < timezone` is a type error.
-- [ ] Event args typed `as timezone` validated at fire time.
+- [ ] Compile-time validation on single-quoted IANA identifiers, fire-time validation on event args.
+- [ ] `==`, `!=` work. `<`, `>` are type errors.
 
 ### `zoneddatetime` type
 
-- [ ] `field X as zoneddatetime` parses and type-checks.
-- [ ] `zoneddatetime(instant, timezone)` constructor validates at compile time.
-- [ ] `.instant → instant`, `.timezone → timezone` accessors work.
-- [ ] `.date → localdate`, `.time → localtime` decomposition works.
-- [ ] `.year`, `.month`, `.day`, `.hour`, `.minute`, `.second`, `.dayOfWeek` return `integer` resolved in the bound timezone.
-- [ ] `zoneddatetime + hours(n)`, `+ minutes(n)`, `+ seconds(n)`, `+ duration`, `- duration` timeline arithmetic works.
-- [ ] `zoneddatetime - zoneddatetime → duration` (instant subtraction).
-- [ ] `zoneddatetime + days(n)`, `+ months(n)`, `+ years(n)`, `+ weeks(n)`, `+ period`, `- period` are type errors with a teachable message directing the user to decompose via `.date` for calendar arithmetic, then reconstruct.
-- [ ] `zoneddatetime + integer` is a type error with a teachable message.
-- [ ] `zoneddatetime == zoneddatetime` uses multi-dimensional comparison (primary: instant, tiebreaker: local datetime, final: timezone ID lexicographic). Two ZDTs at the same instant in different timezones are NOT equal.
-- [ ] `zoneddatetime < zoneddatetime` compares by instant.
-- [ ] `toLocalDate(zoneddatetime)` overload returns localdate in the bound timezone.
-- [ ] `toLocalTime(zoneddatetime)` overload returns localtime in the bound timezone.
-- [ ] `toInstant(localdate, localtime, zoneddatetime)` overload converts using the bound timezone.
-- [ ] Nullable works. No default allowed (compile error if specified).
-- [ ] MCP tools serialize as two-property JSON object.
+- [ ] Timeline arithmetic (`+ duration`, `+ 3 days`, `+ 72 hours`) works.
+- [ ] **`+ period` is a type error** (including `+ 3 months`, `+ (n) months`).
+- [ ] Single-quoted literal `'2026-01-15T14:30:00[America/New_York]'` parses.
+- [ ] Accessors work. Serialization works.
 
-### `localdatetime` type (if included)
+### `datetime` type (if included)
 
-- [ ] `field X as localdatetime` parses and type-checks.
-- [ ] `localdatetime("2026-04-13T14:30:00")` validates (no timezone suffix).
-- [ ] `.date → localdate`, `.time → localtime` decomposition works.
-- [ ] All component accessors (`.year`, `.month`, `.day`, `.hour`, `.minute`, `.second`) return `integer`.
-- [ ] `localdatetime + days(n)`, `+ months(n)`, `+ years(n)`, `+ weeks(n)` calendar arithmetic works.
-- [ ] `localdatetime + hours(n)`, `+ minutes(n)`, `+ seconds(n)` time arithmetic works.
-- [ ] `localdatetime + period → localdatetime`, `localdatetime - period → localdatetime` work.
-- [ ] `localdatetime - localdatetime → period`.
-- [ ] `localdatetime + duration` and `localdatetime - duration` are type errors (convert to instant first for timeline arithmetic).
-- [ ] `localdatetime + integer` is a type error.
+- [ ] `+ period` and `+ duration` both work (bridge type).
+- [ ] `datetime + 30 days` works (postfix unit resolves to `period` in datetime context).
+- [ ] `datetime - datetime → period`.
 
 ### Conversion functions
 
-- [ ] `toLocalDate(instant, timezone) → localdate` works.
-- [ ] `toLocalTime(instant, timezone) → localtime` works.
-- [ ] `toInstant(localdate, localtime, timezone) → instant` works.
-- [ ] DST gap resolution: maps to post-gap instant.
-- [ ] DST overlap resolution: maps to later instant.
-- [ ] Invalid timezone in field value produces constraint violation at fire time.
-- [ ] Conversion function results compose with existing type operations.
-- [ ] `toLocalDate(zoneddatetime)` overload returns localdate in the bound timezone.
-- [ ] `toLocalTime(zoneddatetime)` overload returns localtime in the bound timezone.
-- [ ] `toInstant(localdate, localtime, zoneddatetime)` overload converts using the bound timezone.
+- [ ] All three functions work with both `(instant, timezone)` and `(zoneddatetime)` overloads.
+- [ ] DST resolution is deterministic (lenient resolver).
 
-### Tooling
+### Postfix unit literals (Decision #17 — rewritten)
 
-- [ ] TextMate grammar highlights all temporal type keywords (including `period`).
-- [ ] Language server offers temporal types in completions after `as` (including `period`).
-- [ ] Language server offers temporal accessors after `.` on temporal fields (including `.years`, `.months`, `.weeks`, `.days` on `period`).
-- [ ] Language server offers constructor/conversion functions in expression positions.
-- [ ] Semantic tokens color temporal keywords as types and functions.
-- [ ] All diagnostics (type errors, invalid literals, invalid timezones) display with teachable messages.
+- [ ] **Bare postfix:** `<integer-literal> <unit-keyword>` parses.
+- [ ] **Paren postfix:** `( <expression> ) <unit-keyword>` parses.
+- [ ] `date + 30 days` resolves `30 days` to `period` (`Period.FromDays(30)`).
+- [ ] `instant + 3 days` resolves `3 days` to `duration` (`Duration.FromDays(3)`).
+- [ ] `instant + (DayCount) days` resolves to `Duration.FromDays(n)` in instant context.
+- [ ] `instant + 72 hours` resolves to `Duration.FromHours(72)`.
+- [ ] `field X as period default 30 days` resolves postfix unit in field-type context.
+- [ ] `field X as duration default 8 hours` resolves postfix unit in field-type context.
+- [ ] Combination: `2 years + 6 months` works with standard `+` operator.
+- [ ] **Juxtaposition: `2 years 6 months` (without `+`) → compile error.**
+- [ ] **Ambiguous standalone: `set X = 3 days` with no typed context → compile error.**
+- [ ] **Variable bare postfix: `GraceDays days` → compile error** with teachable message directing to `(GraceDays) days`.
+- [ ] **Meaningless combination: `date + 3 hours` → warning.**
+- [ ] **`instant + 3 months` → type error** (`months` never resolves to `duration`).
 
-### Cross-type
+### Single-quoted typed constants (Decision #18 — rewritten)
 
-- [ ] All entries in the "Not supported" tables produce type errors, not runtime exceptions.
-- [ ] Cross-type comparison (`localdate == instant`, etc.) is a type error.
-- [ ] No implicit mixing of `localdate`/`number`, `localdate`/`decimal`, `localdate`/`integer`, `instant`/`integer`, etc. Only explicit constructor functions are valid temporal arithmetic operands.
-- [ ] `localdate + duration` is a type error (duration is timeline-only; use calendar constructors or `+ period`).
-- [ ] `localtime + duration` is a type error (use `hours(n)`, `minutes(n)`, `seconds(n)`).
-- [ ] `localdatetime + duration` is a type error (convert to instant first for timeline arithmetic).
-- [ ] `instant + period` is a type error (instant is timeline-only; use `+ duration`).
-- [ ] `zoneddatetime + period` is a type error (decompose via `.date` for calendar arithmetic).
-- [ ] `zoneddatetime + days(n)`, `+ months(n)`, `+ years(n)`, `+ weeks(n)` are type errors (decompose via `.date`).
-- [ ] `duration + period`, `period + duration` are type errors (cannot mix timeline and calendar).
-- [ ] `period * integer`, `period / integer` are type errors (period scaling is not supported).
-- [ ] `period < period` is a type error (periods are not orderable).
+- [ ] `'2026-01-15'` parses as a `date` literal.
+- [ ] `'14:30'` and `'14:30:00'` parse as `time` literals. Seconds optional.
+- [ ] `'2026-01-15T14:30:00Z'` parses as an `instant`. `'2026-01-15T14:30:00'` (no Z) parses as `datetime`.
+- [ ] `'2026-01-15T14:30:00[America/New_York]'` parses as a `zoneddatetime`.
+- [ ] `'America/New_York'` parses as a `timezone`.
+- [ ] **Compile-time validation:** `'2026-13-45'` is a compile error with a teachable message.
+- [ ] **Not an expression:** Content inside single quotes is NOT parsed as an expression — `'2024-01-15'` does NOT resolve `2024-01-15` as subtraction.
+- [ ] **Double-quoted string distinction:** `"2026-01-15"` remains a string. `'2026-01-15'` is a date. Using the wrong delimiter produces a teachable error.
+- [ ] **IntelliSense:** `'` triggers typed constant completions with format-aware ghost text.
+- [ ] **Hover content:** `'2024-01-15'` shows "date: January 15, 2024 (Monday)" in invariant culture English.
+- [ ] **Timezone completions:** `'` in timezone context triggers IANA timezone completion from `DateTimeZoneProviders.Tzdb.Ids`.
+
+### Cross-type enforcement
+
+- [ ] `date + duration` → type error.
+- [ ] `instant + period` → type error.
+- [ ] `duration + period` → type error.
+- [ ] `period < period` → type error.
+- [ ] `period == duration` → type error.
+- [ ] `time + duration → time` (sub-day bridging — NOT a type error).
+- [ ] `time + period → time` (NodaTime native — NOT a type error).
+- [ ] All "Not supported" tables produce type errors, not runtime exceptions.
 
 ---
 
-## Research Trail
+## Forward Design: Temporal Types as the Gateway Beyond Primitives
 
-| Document | Role |
-|---|---|
-| [temporal-type-strategy.md](temporal-type-strategy.md) | Unified strategy document — the synthesis that this proposal realizes. |
-| [nodatime-precept-alignment.md](nodatime-precept-alignment.md) | NodaTime feasibility analysis. Type mapping, philosophy alignment, #26 impact. |
-| [instant-zoneddatetime-reconsideration.md](instant-zoneddatetime-reconsideration.md) | Instant exclusion reversed. SLA use case validated. ZonedDateTime Fatal rating maintained. |
-| [enterprise-timezone-analysis.md](enterprise-timezone-analysis.md) | Multi-timezone compliance gap. Conversion functions proposed. Determinism argument reframed. |
-| [timezone-type-storability-analysis.md](timezone-type-storability-analysis.md) | `timezone` type accepted. ZonedDateTime downgraded from Fatal to Deferred. |
-| [sample-temporal-pattern-catalog.md](sample-temporal-pattern-catalog.md) | Empirical evidence: 91 temporal markers across 15 samples, type frequency analysis. |
-| [NodaTime type model survey](../references/nodatime-type-model.md) | Comprehensive inventory of NodaTime types, arithmetic, serialization, BCL correspondence. |
-| [Precept Language Design](../../../docs/PreceptLanguageDesign.md) | Design principles (Principles #1, #2, #8, #12 cited throughout). |
-| [Product Philosophy](../../../docs/philosophy.md) | Prevention guarantee, one-file completeness, determinism model. |
-| Issue #26 body | Original `localdate` type proposal — superseded by this document's `localdate` section. |
-| Issue #27 body | `decimal` type proposal — cross-interaction rules with temporal types. |
-| Issue #29 body | `integer` type proposal — duration constructor function args are `integer`. |
-| [zoneddatetime reconsideration](../../../.squad/decisions/inbox/frank-zoneddatetime-reconsideration.md) | Provenance erasure analysis. Upgrade from Deferred to Proposed. |
+Temporal types are not just a feature — they are the **gateway** to Precept's evolution beyond primitive types. The literal mechanisms established in this proposal — the single-quoted typed constant delimiter (`'...'`) and the postfix quantity system (`N unit`) — are the language's **expansion joints** for all future non-primitive types. Every non-primitive value in Precept enters through one of three doors: `"..."` (string), `'...'` (typed constant), or `N unit` (quantity). When a future type is proposed, the question is "which door?" — not "does it need new syntax?"
+
+The `<number> <unit>` postfix literal pattern and the `'...'` typed constant delimiter are both foundational grammar patterns that naturally extend to other business-domain types. This section documents the extensibility implications so that temporal design decisions account for the broader framework they are establishing.
+
+### Why this matters now
+
+The inventory unit-of-measure use case makes this concrete. A single SKU in an inventory system has multiple valid units with entity-specific conversion factors:
+
+| UOM Context | Unit | Conversion | Example |
+|-------------|------|------------|---------|
+| Purchasing | case | 1 case = 24 each | Buy in cases |
+| Stocking | each | base unit | Store as individual items |
+| Pricing | each | $4.17/each | Retail price |
+| Issuing | six-pack | 1 six-pack = 6 each | Sell as six-packs |
+
+The critical insight: "case" means 24 for beer and 12 for wine. Conversion factors are **data on the entity**, not universal constants. This is fundamentally different from temporal units (which are globally defined by NodaTime) or physical units (which are globally defined by UCUM/SI).
+
+### Natural extension domains
+
+| Domain | Example literals | Unit registry | Complexity |
+|--------|-----------------|---------------|------------|
+| **Currency/money** | `100 USD`, `50.25 EUR` | ISO 4217 (3-letter codes, ~180 active) | Low |
+| **Percentage** | `10 percent` or `10%` | Single unit | Trivial |
+| **Physical quantity** | `5 kg`, `150 lbs` | UCUM subset | Medium |
+| **Entity-scoped units** | `24 each`, `5 cases` | Per-entity `units` block | High |
+
+Each domain follows the grammar shapes established by this proposal — entering through one of the three literal doors:
+
+**Door 2 — Typed constant (`'...'`):** For values with a shape-recognizable constant form. Future candidates beyond temporal: UUID (`'550e8400-...'` — `8-4-4-4-12` hex), email (`'user@example.com'` — `@` present), URI (`'https://...'` — scheme `://`), semver (`'2.1.0'` — `N.N.N`). Each qualifies only if its content shape is distinguishable from all existing inhabitants via the admission rule.
+
+**Door 3 — Postfix quantity (`N unit`):** For magnitude+unit values. Temporal types proved the pattern; future domains extend it:
+1. **Postfix literal** for the common case (`100 USD`, `24 each`)
+2. **Paren postfix** for computed values (`(Subtotal) USD`, `(Quantity) each`)
+3. **Context-dependent resolution** where a unit could resolve differently depending on field type
+
+**Door 1 — String (`"..."`):** For values with no distinguishing shape. Three-letter currency codes like `USD` are indistinguishable from other short strings — so currency *amounts* use postfix (`100 USD`), but standalone currency codes remain strings.
+
+The two-mechanism design — the typed constant delimiter (`'...'`) for shape-recognizable constants and the postfix quantity system (`N unit`) for magnitude+unit values — covers **all** anticipated future non-primitive types without requiring new grammar concepts. When a future type is proposed, the first question is always: "which door?" — not "does it need new syntax?"
+
+### Unit registry model — three resolution scopes
+
+The temporal design establishes the pattern; future domains fill new resolution scopes:
+
+| Scope | Source of truth | Examples | Resolution timing |
+|-------|----------------|---------|-------------------|
+| **Language-level** | Backing library (NodaTime) | `days`, `hours`, `months` | Compile-time — closed set |
+| **Standard registry** | External standard (ISO 4217, UCUM subset) | `USD`, `EUR`, `kg`, `lbs` | Compile-time — large but closed set |
+| **Entity-scoped** | `units` block in precept definition | `each`, `case`, `six-pack` | Compile-time within the precept — conversions are entity data |
+
+The grammar `<number> <unit>` is the same across all three scopes. What changes is where the unit identifier resolves from.
+
+### Design implications for temporal decisions
+
+These implications inform the temporal decisions being made now:
+
+1. **Unit suffix as resolvable identifier.** The unit keyword in `<number> <unit>` should be treated as an identifier resolved from a scope chain — not a hard-coded keyword list. `days` resolves from the temporal scope (NodaTime). `USD` would resolve from a standard registry scope (ISO 4217). `cases` would resolve from the entity's own `units` block. Same grammar, different resolution.
+
+2. **Context-dependent resolution generalizes.** The mechanism designed for period vs. duration resolution (`3 days` → `period` in date context, `duration` in instant context) is the same mechanism needed for entity-scoped unit disambiguation (`24 items` → quantity-in-purchasing-units vs. quantity-in-stocking-units depending on field declaration).
+
+3. **`convert()` boundary enforcement.** Not needed for temporal types (NodaTime handles unit compatibility internally), but essential for entity-scoped units where the type checker must require explicit conversion at unit boundaries (`convert(issueQty, baseUnit)`). The temporal grammar should not preclude adding conversion enforcement later.
+
+4. **IntelliSense scalability.** Temporal unit completion is a finite list from NodaTime. Future domains need completion from open-ended sets — standard registries (ISO 4217 currencies) and per-entity declarations. The completion infrastructure should be designed for pluggable unit sources.
+
+### Three design levels for quantity types
+
+| Level | Description | Example | Precept fit |
+|-------|-------------|---------|-------------|
+| **A — Scalars with names** | Numbers + field names carry semantics | `field unitPrice as number` | Works today. No type-level help. |
+| **B — Tagged numbers** | Fields declare their unit; type checker enforces unit compatibility and requires explicit conversion | `field quantityOnHand as quantity in baseUnit` | Sweet spot for Precept — entity declares its own unit system, type checker enforces it |
+| **C — Unit algebra** | Compound types, dimensional cancellation | `field unitPrice as money per issueUnit` | Powerful but significant type system feature |
+
+**Recommendation:** Level B is the natural Precept-shaped answer. The entity definition IS the type system — the entity's conversion table is declared right in the precept, so the type checker knows the conversion graph at compile time. This is the intersection nobody has built: a DSL where the entity declares its own unit system, and the type checker uses those declarations to enforce correctness.
+
+### Standards landscape for future reference
+
+| Standard | Maintainer | Scope | TZDB analog? |
+|----------|-----------|-------|-------------|
+| **ISO 4217** | ISO | Currency codes (~180 active) | Yes — `USD` is as unambiguous as `'America/New_York'` |
+| **UCUM** | Regenstrief Institute | All units — SI, customary, dimensionless | Yes — formal grammar, parseable codes, canonical registry |
+| **QUDT** | NASA / TopQuadrant | Units + quantities + dimensions as linked data | Broader — full ontology with dimensional analysis |
+| **UN/CEFACT Rec 20** | United Nations | Trade/commerce units | Code table, not a live database |
+
+For .NET: **UnitsNet** (~150 quantity types, 2000+ conversions) is the dominant library, analogous to NodaTime's role for temporal types.
+
+### What exists today (gap analysis)
+
+No programming language combines entity-scoped unit declarations, type-level enforcement, and explicit conversion requirements. Physics-oriented UOM systems (F# units of measure, Frink, Boost.Units) use global constants. ERP systems (SAP, Oracle, Dynamics 365) handle entity-scoped units as runtime data with no type-level enforcement. Precept's structural advantage — the entity definition IS the type system — positions it to close this gap.
+
+### Scope boundary
+
+This section is a **forward design note**, not a commitment. It documents why the literal mechanism decisions in this proposal carry more weight than temporal types alone — they establish the language's entire framework for moving beyond primitives. Temporal types are the gateway: they prove the typed constant delimiter, the postfix quantity system, and the zero-constructor discipline. The actual design of future types (UUID, email, currency, physical quantity) belongs in separate proposals when demand warrants it. The temporal decisions should be made with this framework in mind, but should not be over-engineered to serve hypothetical future needs.

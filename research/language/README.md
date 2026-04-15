@@ -53,6 +53,7 @@ Use this table when you already know the issue number and need its research grou
 | `#29` | `integer` type | Type system expansion | [expressiveness/type-system-domain-survey.md](./expressiveness/type-system-domain-survey.md), [references/type-system-survey.md](./references/type-system-survey.md) |
 | `#31` | Logical keyword forms (`and` / `or` / `not`) | Expression expansion | [expressiveness/expression-expansion-domain.md](./expressiveness/expression-expansion-domain.md), [references/expression-evaluation.md](./references/expression-evaluation.md) |
 | `#65` | Event action hooks (stateless) | Event action hooks | [expressiveness/event-hooks.md](./expressiveness/event-hooks.md), [references/state-machine-expressiveness.md](./references/state-machine-expressiveness.md) |
+| `#92` | Keyword clarity audit | Cross-cutting | [expressiveness/keyword-clarity-audit.md](./expressiveness/keyword-clarity-audit.md) |
 | `#112` | Stateless events — `on EventName` mutation surface | Stateless events | [expressiveness/stateless-events.md](./expressiveness/stateless-events.md), [expressiveness/data-only-precepts-research.md](./expressiveness/data-only-precepts-research.md) |
 
 ## Temporal type research trail
@@ -73,6 +74,7 @@ Supporting evidence:
 |---|---|
 | [references/nodatime-type-model.md](./references/nodatime-type-model.md) | Comprehensive NodaTime type inventory, arithmetic algebra, serialization |
 | [expressiveness/sample-temporal-pattern-catalog.md](./expressiveness/sample-temporal-pattern-catalog.md) | Empirical evidence: 91 temporal markers across 15 sample precepts |
+| [expressiveness/native-date-time-literals.md](./expressiveness/native-date-time-literals.md) | External research: native ISO date/time literals — VB precedent, language survey (TOML/YAML/SQL/Elixir/FEEL), lexer risks, four options |
 
 ## Cross-cutting research that supports multiple domains
 
@@ -80,6 +82,7 @@ Supporting evidence:
 |---|---|
 | [expressiveness/expression-language-audit.md](./expressiveness/expression-language-audit.md) | Runtime-grounded inventory of current expression limits and proposal pressure. |
 | [expressiveness/internal-verbosity-analysis.md](./expressiveness/internal-verbosity-analysis.md) | Corpus evidence for compactness and declaration-pressure work. |
+| [expressiveness/keyword-clarity-audit.md](./expressiveness/keyword-clarity-audit.md) | Systematic keyword evaluation: learnability, overload inventory, contender pairs. Supports `#92`. |
 | [expressiveness/conditional-logic-strategy.md](./expressiveness/conditional-logic-strategy.md) | Guard vocabulary and conditional-shape guidance across the language surface. |
 | [expressiveness/case-insensitive-comparison-survey.md](./expressiveness/case-insensitive-comparison-survey.md) | `~=` precedent survey, CI comparison patterns across 15+ systems, cascade analysis. Supports `#16`. |
 | [domain-map.md](./domain-map.md) | Full durable map of every language research domain. |
