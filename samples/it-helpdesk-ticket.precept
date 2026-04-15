@@ -13,9 +13,9 @@ field Priority as choice("Low","Medium","High","Critical") default "Low"
 
 field AgentQueue as queue of string
 
-invariant Severity >= 1 because "Severity cannot be lower than 1"
-invariant Severity <= 5 because "Severity cannot be higher than 5"
-invariant ReopenCount >= 0 because "Reopen count cannot be negative"
+rule Severity >= 1 because "Severity cannot be lower than 1"
+rule Severity <= 5 because "Severity cannot be higher than 5"
+rule ReopenCount >= 0 because "Reopen count cannot be negative"
 
 state New initial
 state Assigned
@@ -23,26 +23,26 @@ state WaitingOnCustomer
 state Resolved
 state Closed
 
-in Assigned assert AssignedAgent != null because "Assigned tickets must name an agent"
+in Assigned ensure AssignedAgent != null because "Assigned tickets must name an agent"
 in New edit Priority
 
 event RegisterAgent with AgentName as string
-on RegisterAgent assert AgentName != "" because "An agent name is required"
+on RegisterAgent ensure AgentName != "" because "An agent name is required"
 
 event Triage with Title as string, Level as number default 3
-on Triage assert Title != "" because "A ticket title is required"
-on Triage assert Level >= 1 and Level <= 5 because "Severity must stay within the supported range"
+on Triage ensure Title != "" because "A ticket title is required"
+on Triage ensure Level >= 1 and Level <= 5 because "Severity must stay within the supported range"
 
 event Assign
 
 event CustomerReply
 event Resolve with Note as string
-on Resolve assert Note != "" because "A resolution note is required"
+on Resolve ensure Note != "" because "A resolution note is required"
 
 event CloseTicket
 
 event Reopen with Note as string nullable default null
-on Reopen assert Note == null or Note != "" because "A supplied reopen note cannot be blank"
+on Reopen ensure Note == null or Note != "" because "A supplied reopen note cannot be blank"
 
 from New on RegisterAgent -> enqueue AgentQueue RegisterAgent.AgentName -> no transition
 from Assigned on RegisterAgent -> enqueue AgentQueue RegisterAgent.AgentName -> no transition

@@ -13,12 +13,12 @@ field ExistingDebt as number default 0
 field DecisionNote as string nullable
 field DocumentsVerified as boolean default false
 
-invariant RequestedAmount >= 0 because "Requested amount cannot be negative"
-invariant ApprovedAmount >= 0 because "Approved amount cannot be negative"
-invariant ApprovedAmount <= RequestedAmount because "Approved amount cannot exceed the request"
-invariant AnnualIncome >= 0 because "Annual income cannot be negative"
-invariant ExistingDebt >= 0 because "Existing debt cannot be negative"
-invariant ExistingDebt <= AnnualIncome * 3 when DocumentsVerified because "Verified applications must have a debt-to-income ratio of 3x or less"
+rule RequestedAmount >= 0 because "Requested amount cannot be negative"
+rule ApprovedAmount >= 0 because "Approved amount cannot be negative"
+rule ApprovedAmount <= RequestedAmount because "Approved amount cannot exceed the request"
+rule AnnualIncome >= 0 because "Annual income cannot be negative"
+rule ExistingDebt >= 0 because "Existing debt cannot be negative"
+rule ExistingDebt <= AnnualIncome * 3 when DocumentsVerified because "Verified applications must have a debt-to-income ratio of 3x or less"
 
 state Draft initial
 state UnderReview
@@ -26,27 +26,27 @@ state Approved
 state Funded
 state Declined
 
-in Approved assert DocumentsVerified because "Approved loans must have verified documents"
-in UnderReview assert CreditScore >= 300 when DocumentsVerified because "Verified applicants must have a minimum credit score of 300"
-in Funded assert ApprovedAmount > 0 because "Funded loans must have a positive approved amount"
+in Approved ensure DocumentsVerified because "Approved loans must have verified documents"
+in UnderReview ensure CreditScore >= 300 when DocumentsVerified because "Verified applicants must have a minimum credit score of 300"
+in Funded ensure ApprovedAmount > 0 because "Funded loans must have a positive approved amount"
 
 in UnderReview when DocumentsVerified edit DecisionNote
 
 event Submit with Applicant as string, Amount as number, Score as number, Income as number, Debt as number
-on Submit assert Applicant != "" because "An applicant name is required"
-on Submit assert Amount > 0 because "Loan requests must be positive"
-on Submit assert Score >= 0 because "Credit score cannot be negative"
-on Submit assert Income >= 0 because "Income cannot be negative"
-on Submit assert Debt >= 0 because "Debt cannot be negative"
+on Submit ensure Applicant != "" because "An applicant name is required"
+on Submit ensure Amount > 0 because "Loan requests must be positive"
+on Submit ensure Score >= 0 because "Credit score cannot be negative"
+on Submit ensure Income >= 0 because "Income cannot be negative"
+on Submit ensure Debt >= 0 because "Debt cannot be negative"
 
 event VerifyDocuments
 
 event Approve with Amount as number, Note as string nullable default null
-on Approve assert Amount > 0 because "Approved amounts must be positive"
-on Approve assert Note == null or Note != "" because "A supplied decision note cannot be blank"
+on Approve ensure Amount > 0 because "Approved amounts must be positive"
+on Approve ensure Note == null or Note != "" because "A supplied decision note cannot be blank"
 
 event Decline with Note as string
-on Decline assert Note != "" because "A decline note is required"
+on Decline ensure Note != "" because "A decline note is required"
 
 event FundLoan
 

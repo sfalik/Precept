@@ -18,8 +18,8 @@ state Approved
 state MoveInReady
 state Declined
 
-in Approved assert MonthlyIncome >= RequestedRent * 3 because "Approved applicants must satisfy the 3x rent rule"
-in MoveInReady assert DepositPaid and LeaseSigned because "Move-in ready applications need both a deposit and a signed lease"
+in Approved ensure MonthlyIncome >= RequestedRent * 3 because "Approved applicants must satisfy the 3x rent rule"
+in MoveInReady ensure DepositPaid and LeaseSigned because "Move-in ready applications need both a deposit and a signed lease"
 
 event Submit with Name as string notempty, Income as number nonnegative, Rent as number positive, Score as number nonnegative, Household as number default 1 positive
 

@@ -13,8 +13,8 @@ field BadgePrinted as boolean default false
 
 field RequestedFloors as set of number
 
-invariant RequestedFloors.count == 0 or LowestRequestedFloor <= HighestRequestedFloor because "Requested floor bounds must stay ordered"
-invariant AccessReason == null or AccessReason.length <= 200 because "Access reasons cannot exceed 200 characters"
+rule RequestedFloors.count == 0 or LowestRequestedFloor <= HighestRequestedFloor because "Requested floor bounds must stay ordered"
+rule AccessReason == null or AccessReason.length <= 200 because "Access reasons cannot exceed 200 characters"
 
 state Draft initial
 state Submitted
@@ -25,24 +25,24 @@ state Rejected
 # Requesters can revise the request while it is still being prepared.
 in Draft edit EmployeeName, Department, AccessReason, RequestedFloors
 
-in Approved assert LowestRequestedFloor > 0 because "Approved badges must grant at least one floor"
-in Approved assert HighestRequestedFloor >= LowestRequestedFloor because "Approved floor bounds must stay ordered"
-in Issued assert BadgePrinted because "Issued badges must be printed"
+in Approved ensure LowestRequestedFloor > 0 because "Approved badges must grant at least one floor"
+in Approved ensure HighestRequestedFloor >= LowestRequestedFloor because "Approved floor bounds must stay ordered"
+in Issued ensure BadgePrinted because "Issued badges must be printed"
 
 to Approved -> set BadgePrinted = false
 
 event AddFloor with Floor as number
-on AddFloor assert Floor > 0 because "Floors must be positive"
+on AddFloor ensure Floor > 0 because "Floors must be positive"
 
 event RemoveFloor with Floor as number
-on RemoveFloor assert Floor > 0 because "Floors must be positive"
+on RemoveFloor ensure Floor > 0 because "Floors must be positive"
 
 event Submit
 event Approve with Note as string nullable default null
-on Approve assert Note == null or Note != "" because "An approval note cannot be blank when supplied"
+on Approve ensure Note == null or Note != "" because "An approval note cannot be blank when supplied"
 
 event Reject with Reason as string
-on Reject assert Reason != "" because "A rejection reason is required"
+on Reject ensure Reason != "" because "A rejection reason is required"
 
 event PrintBadge
 
