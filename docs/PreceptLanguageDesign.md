@@ -723,7 +723,7 @@ After the first branch rejects on `null`, the language server knows every subseq
 
 **`when` narrowing:** A `when` expression also narrows. `from Active on Fire when OfficerName != null` makes `OfficerName` non-nullable inside the entire row body. See the `when` Preconditions section.
 
-**Rules:** Rules inherit the same strict null model. A nullable field used in a rule expression without an explicit null guard is a compile-time error in the rule. See [docs/RulesDesign.md](RulesDesign.md#Nullable-Behaviour-in-Rules) for rule-specific examples.
+**Rules:** Rules inherit the same strict null model. A nullable field used in a rule expression without an explicit null guard is a compile-time error in the rule, just as it is in guards and ensure expressions.
 
 
 ---

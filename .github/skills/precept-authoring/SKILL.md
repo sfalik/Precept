@@ -31,7 +31,7 @@ Before writing code, outline the domain model:
 4. **Rules** — identify rules that must hold in every state.
 5. **State constraints** — identify ensures that must be true when entering or remaining in a specific state.
 6. **Event ensures** — identify validation rules on event arguments.
-7. **Transitions** — map out `from <State> on <Event>` rules with guards (`when`), field mutations (`set`), and outcomes (`transition`, `no transition`, `reject`).
+7. **Transitions** — map out `from <State> on <Event>` rows with guards (`when`), field mutations (`set`), and outcomes (`transition`, `no transition`, `reject`).
 8. **Edit declarations** — identify which fields are directly editable in which states.
 
 ## Step 4: Write the Precept
@@ -125,7 +125,7 @@ stateDiagram-v2
 ## Common Patterns
 
 ### Guard priority
-Place more specific guards before less specific ones. The first matching `from/on` rule wins.
+Place more specific guards before less specific ones. The first matching `from/on` row wins.
 
 ```
 from Red on Advance when LeftTurnQueued -> ...

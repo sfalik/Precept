@@ -1489,8 +1489,8 @@ public static class PreceptParser
             if (field.Constraints is not { Count: > 0 }) continue;
             foreach (var constraint in field.Constraints)
             {
-                var inv = BuildFieldRule(field.Name, field.Type, field.IsNullable, constraint);
-                if (inv is not null) rules.Add(inv);
+                var rule = BuildFieldRule(field.Name, field.Type, field.IsNullable, constraint);
+                if (rule is not null) rules.Add(rule);
             }
         }
 
@@ -1499,8 +1499,8 @@ public static class PreceptParser
             if (col.Constraints is not { Count: > 0 }) continue;
             foreach (var constraint in col.Constraints)
             {
-                var inv = BuildCollectionFieldRule(col.Name, constraint);
-                if (inv is not null) rules.Add(inv);
+                var rule = BuildCollectionFieldRule(col.Name, constraint);
+                if (rule is not null) rules.Add(rule);
             }
         }
 

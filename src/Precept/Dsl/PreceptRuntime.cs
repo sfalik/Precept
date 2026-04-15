@@ -2252,26 +2252,26 @@ public static class PreceptCompiler
         //    user-declared default and should not block compilation of the precept.
         if (model.Rules is { Count: > 0 })
         {
-            foreach (var inv in model.Rules)
+            foreach (var rule in model.Rules)
             {
-                if (inv.IsSynthetic) continue;
+                if (rule.IsSynthetic) continue;
 
                 // Guard pre-flight: skip guarded rules whose guard is false at defaults
-                if (inv.WhenGuard is not null)
+                if (rule.WhenGuard is not null)
                 {
-                    var guardResult = PreceptExpressionRuntimeEvaluator.Evaluate(inv.WhenGuard, defaultData);
+                    var guardResult = PreceptExpressionRuntimeEvaluator.Evaluate(rule.WhenGuard, defaultData);
                     if (!guardResult.Success || guardResult.Value is not true)
                         continue;
                 }
 
-                var result = PreceptExpressionRuntimeEvaluator.Evaluate(inv.Expression, defaultData);
+                var result = PreceptExpressionRuntimeEvaluator.Evaluate(rule.Expression, defaultData);
                 if (!result.Success || result.Value is not bool boolVal || !boolVal)
                 {
                     // SYNC:CONSTRAINT:C29
                     diagnostics.Add(new PreceptValidationDiagnostic(
                         DiagnosticCatalog.C29,
-                        DiagnosticCatalog.C29.FormatMessage(("reason", inv.Reason)),
-                        inv.SourceLine));
+                        DiagnosticCatalog.C29.FormatMessage(("reason", rule.Reason)),
+                        rule.SourceLine));
                 }
             }
         }
@@ -2384,15 +2384,15 @@ public static class PreceptCompiler
                 [assignment.Key] = constantEval.Value
             };
 
-            foreach (var inv in rules)
+            foreach (var rule in rules)
             {
-                var result = PreceptExpressionRuntimeEvaluator.Evaluate(inv.Expression, ctx);
+                var result = PreceptExpressionRuntimeEvaluator.Evaluate(rule.Expression, ctx);
                 if (!result.Success || result.Value is not bool boolVal || !boolVal)
                 {
                     // SYNC:CONSTRAINT:C32
                     diagnostics.Add(new PreceptValidationDiagnostic(
                         DiagnosticCatalog.C32,
-                        DiagnosticCatalog.C32.FormatMessage(("sourceLine", assignment.SourceLine), ("key", assignment.Key), ("expression", assignment.ExpressionText), ("reason", inv.Reason)),
+                        DiagnosticCatalog.C32.FormatMessage(("sourceLine", assignment.SourceLine), ("key", assignment.Key), ("expression", assignment.ExpressionText), ("reason", rule.Reason)),
                         assignment.SourceLine));
                 }
             }

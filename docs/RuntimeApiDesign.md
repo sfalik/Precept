@@ -107,11 +107,11 @@ Non-mutating evaluation of a single event. Returns `EventInspectionResult`.
 - Accepts calls with missing/partial event arguments — this is a discovery API. `RequiredEventArgumentKeys` on the result tells callers what is needed before `Fire`.
 - When event arguments are provided, validates them against the event's argument contract. Unknown keys are rejected.
 - Evaluates ordered `if`/`else if`/`else` guards; the first matching clause determines the outcome.
-- Simulates `set` assignments and collection mutations on a working copy, then evaluates field, top-level, and target-state rules. Rejects if any rule would be violated.
+- Simulates `set` assignments and collection mutations on a working copy, then evaluates field rules, top-level rules, and target-state ensures. Returns `ConstraintFailure` if any post-mutation validation would be violated.
 - Does **not** mutate the instance.
 
 **Event argument validation during Inspect:**
-Arguments are only validated and event rules are only run when `eventArguments != null`. Calling `Inspect` without arguments is explicitly supported for discover-mode callers.
+Arguments are only validated and event ensures are only run when `eventArguments != null`. Calling `Inspect` without arguments is explicitly supported for discover-mode callers.
 
 ### `Inspect` (aggregate)
 
@@ -162,25 +162,25 @@ Mutating event execution. Returns `FireResult`.
 
 1. **Compatibility check** — same as `CheckCompatibility`; returns `Undefined` if incompatible.
 2. **Event argument validation** — validates types against the event's argument contract; returns `Rejected` on unknown keys or wrong types.
-3. **Event rules** — evaluated against event-argument-only context (field data does not shadow args); returns `Rejected` on violation.
+3. **Event ensures** — evaluated against event-argument-only context (field data does not shadow args); returns `Rejected` on violation.
 4. **`when` precondition** — if present and false, returns `Unmatched`.
 5. **Guard evaluation** — evaluates ordered `if`/`else if`/`else` clauses; returns `Rejected` if all guards fail.
 6. **`set` assignments** — executed on a working copy of instance data; returns `Rejected` if an expression fails or the result violates a field's declared type.
 7. **Collection mutations** — `add`/`remove`/`enqueue`/`dequeue`/`push`/`pop`/`clear` operations on working copies.
 8. **Derived field recomputation** — re-evaluates all computed fields in dependency order against post-mutation data. Computed values are current before validation.
-9. **Field and top-level rules** — checked against post-mutation working data (including recomputed derived fields); returns `Rejected` if violated.
-10. **State rules** — checked against the *target* state (only for `transition` outcomes, not `no transition`); returns `Rejected` if violated.
+9. **Field and top-level rules** — checked against post-mutation working data (including recomputed derived fields); returns `ConstraintFailure` if violated.
+10. **State ensures** — checked against the *target* state (only for `transition` outcomes, not `no transition`); returns `ConstraintFailure` if violated.
 
 **`when` guard evaluation on declarations:**
 - **Event ensures (stage 3):** If an event ensure has a `when` guard, the guard is evaluated against event args before the ensure body. If the guard is false, that ensure is skipped. Guards on event ensures are arg-scoped only.
-- **Rules and state ensures (stage 9–10):** If a rule or state ensure has a `when` guard, the guard is evaluated against post-mutation field data before the ensure body. If the guard is false, that rule is skipped. Collect-all semantics are preserved — guard-skipped declarations don’t short-circuit other declarations.
+- **Rules and state ensures (stage 9–10):** If a rule or state ensure has a `when` guard, the guard is evaluated against post-mutation field data before the declaration body. If the guard is false, that declaration is skipped. Collect-all semantics are preserved — guard-skipped declarations don’t short-circuit other declarations.
 - **Edit blocks (`Update`/`Inspect`):** If an edit declaration has a `when` guard, the guard is evaluated against current instance data at each `Update`/`Inspect` call. Fail-closed: guard evaluation error → field not granted editability.
 
-On any rejection, the original instance is unchanged — all stages are fully rolled back.
+On any failure outcome, the original instance is unchanged — all stages are fully rolled back.
 
 On success, returns `FireResult` with `UpdatedInstance != null`. The `UpdatedInstance` carries the new `CurrentState`, the updated `InstanceData`, and the current `UpdatedAt` timestamp.
 
-`no transition` outcomes execute `set` and collection mutations but do **not** trigger state rules.
+`no transition` outcomes execute `set` and collection mutations but do **not** trigger state ensures.
 
 ### `CheckCompatibility`
 
@@ -193,7 +193,7 @@ Validates that an externally loaded or deserialized instance is compatible with 
 1. `WorkflowName` matches `Name`.
 2. For stateful precepts: `CurrentState` is a known declared state. For stateless precepts: `CurrentState` must be `null`.
 3. `InstanceData` satisfies the field type contract (no unknown fields with wrong types).
-4. All data rules (field rules + top-level rules) and the current state's entry rules pass.
+4. All data rules (field rules + top-level rules) and the current state's `in` ensures pass.
 
 Returns `PreceptCompatibilityResult(IsCompatible, Reason?)`. If `IsCompatible` is false, `Reason` contains a human-readable explanation.
 
@@ -270,7 +270,7 @@ public enum TransitionOutcome
 
     // Failure
     Rejected,            // Explicit reject outcome in transition row
-    ConstraintFailure,   // Rule or state ensure violated post-mutation
+    ConstraintFailure,   // Post-mutation rule or state ensure violation
     Unmatched,           // All when-guards failed, no row matched
     Undefined            // Event or state is unknown to the engine
 }

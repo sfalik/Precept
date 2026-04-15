@@ -191,7 +191,25 @@ The `functions` section in the JSON output provides structured `FunctionDto` obj
     }
   ],
   "transitions": [
-    { "from": "InProgress", "on": "Block", "branches": ["if → Blocked", "else → reject"] }
+    {
+      "from": "InProgress",
+      "on": "Block",
+      "branches": [
+        { "guard": null, "outcome": "transition", "target": "Blocked", "reason": null }
+      ]
+    }
+  ],
+  "rules": [
+    { "expression": "Priority >= 1", "reason": "Priority must be positive", "line": 4, "isSynthetic": false }
+  ],
+  "stateEnsures": [
+    { "anchor": "in", "state": "Blocked", "expression": "Assignee != null", "reason": "Must have an assignee while blocked", "line": 11 }
+  ],
+  "eventEnsures": [
+    { "event": "Block", "expression": "Reason != \"\"", "reason": "Reason required", "line": 15 }
+  ],
+  "editBlocks": [
+    { "state": "InProgress", "fields": ["Priority"], "line": 18 }
   ],
   "diagnostics": [
     { "line": 0, "message": "State 'Archived' is unreachable from the initial state.", "code": "PRECEPT048", "severity": "warning" }
@@ -240,6 +258,8 @@ The `functions` section in the JSON output provides structured `FunctionDto` obj
 | `stateEnsures` | `{ anchor, state, expression, when?, reason, line }` |
 | `eventEnsures` | `{ event, expression, when?, reason, line }` |
 | `editBlocks` | `{ state?, when?, fields[], line }` |
+
+The per-state `states[].rules` array is a lightweight summary of state-ensure reasons for that state. The authoritative declaration-level data lives in the top-level `rules`, `stateEnsures`, `eventEnsures`, and `editBlocks` arrays.
 
 The `when` property is present only when the declaration includes a `when <Guard>` clause. It contains the guard expression text.
 

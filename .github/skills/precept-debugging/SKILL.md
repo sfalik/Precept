@@ -55,7 +55,7 @@ If the problem involves a specific event, call `precept_fire` with the precept t
 
 Useful checkpoints when comparing outcomes:
 1. Event ensures
-2. Transition rule selection
+2. Transition row selection
 3. Guard pass or fail
 4. Field mutations
 5. State-entry constraints
@@ -68,15 +68,15 @@ If the problem involves field editing or constraint violations during data entry
 ## Common Diagnostic Patterns
 
 ### Guard ordering issues
-Rules are evaluated top-to-bottom. The first matching `from/on` rule wins.
+Transition rows are evaluated top-to-bottom. The first matching `from/on` row wins.
 
 ```
-# BUG: the unguarded rule matches first
+# BUG: the unguarded row matches first
 from Draft on Submit -> transition Review
 from Draft on Submit when IsValid -> transition Approved
 ```
 
-Move the guarded rule above the catch-all.
+Move the guarded row above the catch-all.
 
 ### Unreachable states
 A state has no incoming transitions. Either add a transition that targets it or remove the state.

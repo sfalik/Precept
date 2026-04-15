@@ -14,7 +14,7 @@ Status: **Runtime implemented.** Parser/model support was included in the langua
 
 > **Language redesign note (2026-03-05, reconciled 2026-04-13):** Editable fields now use flat keyword-anchored declarations: stateful `in <State> [when <Guard>] edit <Field>, <Field>` and stateless root-level `edit <Field>, <Field> [when <Guard>]` / `edit all [when <Guard>]`. The `in` preposition remains the stateful form because editability is about what you can do **while residing in** a state, matching `in <State> ensure` semantics. Parser, type-checker, runtime `Update`, and `Inspect` support for guarded root-level edit are all implemented.
 
-Depends on: **Rules** (docs/RulesDesign.md) — ✅ rules are now implemented. The prerequisite dependency is satisfied. Rules enforce data invariants on every mutation regardless of path, making direct field editing safe.
+Depends on: the implemented `rule` system. Rules enforce data invariants on every mutation regardless of path, making direct field editing safe.
 
 ## Overview
 

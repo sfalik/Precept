@@ -318,6 +318,22 @@ public class NewSyntaxParserTests
         diagnostics.Should().NotBeEmpty("the old 'assert' keyword should produce a parse error");
     }
 
+    [Fact]
+    public void Parse_OldEventAssertKeyword_ProducesParseError()
+    {
+        var dsl = """
+            precept Test
+            field Balance as number default 100
+            state Active initial
+            event Finish
+            on Finish assert Balance > 0 because "Finish requires positive balance"
+            from Active on Finish -> no transition
+            """;
+
+        var (model, diagnostics) = PreceptParser.ParseWithDiagnostics(dsl);
+        diagnostics.Should().NotBeEmpty("the old event-level 'assert' keyword should produce a parse error");
+    }
+
     // ════════════════════════════════════════════════════════════════════
     // PARSING — State ensures (in/to/from <State> ensure ...)
     // ════════════════════════════════════════════════════════════════════

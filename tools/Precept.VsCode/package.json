@@ -111,7 +111,7 @@
       { "id": "preceptFieldName",       "description": "Precept field or argument name" },
       { "id": "preceptType",            "description": "Precept type keyword" },
       { "id": "preceptValue",           "description": "Precept literal value" },
-      { "id": "preceptMessage",         "description": "Precept rule message string" }
+      { "id": "preceptMessage",         "description": "Precept name or because/reject message string" }
     ],
 
     "semanticTokenModifiers": [

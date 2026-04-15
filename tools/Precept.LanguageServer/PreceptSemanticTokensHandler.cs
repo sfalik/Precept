@@ -291,8 +291,8 @@ internal sealed class PreceptSemanticTokensHandler : SemanticTokensHandlerBase
                 events.Add(ea.EventName);
 
         if (definition.Rules != null)
-            foreach (var inv in definition.Rules)
-                CollectFieldNames(inv.Expression, fields);
+            foreach (var rule in definition.Rules)
+                CollectFieldNames(rule.Expression, fields);
 
         return (states, events, fields);
     }
