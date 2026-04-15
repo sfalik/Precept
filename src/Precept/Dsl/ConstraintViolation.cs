@@ -24,7 +24,7 @@ public abstract record ConstraintTarget(ConstraintTargetKind Kind)
     public sealed record EventTarget(string EventName)
         : ConstraintTarget(ConstraintTargetKind.Event);
 
-    public sealed record StateTarget(string StateName, AssertAnchor? Anchor = null)
+    public sealed record StateTarget(string StateName, EnsureAnchor? Anchor = null)
         : ConstraintTarget(ConstraintTargetKind.State);
 
     public sealed record DefinitionTarget()
@@ -35,24 +35,24 @@ public abstract record ConstraintTarget(ConstraintTargetKind Kind)
 
 public enum ConstraintSourceKind
 {
-    Invariant,
-    StateAssertion,
-    EventAssertion,
+    Rule,
+    StateEnsure,
+    EventEnsure,
     TransitionRejection
 }
 
 public abstract record ConstraintSource(ConstraintSourceKind Kind, int? SourceLine = null)
 {
-    public sealed record InvariantSource(string ExpressionText, string Reason, int? SourceLine = null)
-        : ConstraintSource(ConstraintSourceKind.Invariant, SourceLine);
+    public sealed record RuleSource(string ExpressionText, string Reason, int? SourceLine = null)
+        : ConstraintSource(ConstraintSourceKind.Rule, SourceLine);
 
-    public sealed record StateAssertionSource(string ExpressionText, string Reason,
-        string StateName, AssertAnchor Anchor, int? SourceLine = null)
-        : ConstraintSource(ConstraintSourceKind.StateAssertion, SourceLine);
+    public sealed record StateEnsureSource(string ExpressionText, string Reason,
+        string StateName, EnsureAnchor Anchor, int? SourceLine = null)
+        : ConstraintSource(ConstraintSourceKind.StateEnsure, SourceLine);
 
-    public sealed record EventAssertionSource(string ExpressionText, string Reason,
+    public sealed record EventEnsureSource(string ExpressionText, string Reason,
         string EventName, int? SourceLine = null)
-        : ConstraintSource(ConstraintSourceKind.EventAssertion, SourceLine);
+        : ConstraintSource(ConstraintSourceKind.EventEnsure, SourceLine);
 
     public sealed record TransitionRejectionSource(string Reason, string EventName, int? SourceLine = null)
         : ConstraintSource(ConstraintSourceKind.TransitionRejection, SourceLine);
@@ -71,7 +71,7 @@ public sealed record ConstraintViolation(
     /// </summary>
     internal static ConstraintViolation Simple(string message)
         => new(message,
-            new ConstraintSource.InvariantSource("", message),
+            new ConstraintSource.RuleSource("", message),
             new ConstraintTarget[] { new ConstraintTarget.DefinitionTarget() });
 }
 
@@ -100,7 +100,7 @@ public sealed record ExpressionSubjects(
     /// Walks an expression AST intended for an event-assert scope where bare names
     /// are arg references, not field references.
     /// </summary>
-    public static ExpressionSubjects ExtractForEventAssert(PreceptExpression expression, string eventName)
+    public static ExpressionSubjects ExtractForEventEnsure(PreceptExpression expression, string eventName)
     {
         var bareNames = new List<string>();
         var args = new List<(string, string)>();
