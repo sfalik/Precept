@@ -13,14 +13,14 @@ namespace Precept.LanguageServer.Tests;
 public class PreceptAnalyzerCompletionTests
 {
     [Fact]
-    public void Completions_InvariantScope_ExcludesEventArgs()
+    public void Completions_RuleScope_ExcludesEventArgs()
     {
         const string text = """
             precept M
             field Balance as number default 0
             state A initial
             event Deposit with Amount as number
-            invariant Bal$$
+            rule Bal$$
             from A on Deposit -> no transition
             """;
 
@@ -33,14 +33,14 @@ public class PreceptAnalyzerCompletionTests
     }
 
     [Fact]
-    public void Completions_EventAssertScope_IncludesBareArgsAndExcludesFields()
+    public void Completions_EventEnsureScope_IncludesBareArgsAndExcludesFields()
     {
         const string text = """
             precept M
             field Balance as number default 0
             state A initial
             event Deposit with Amount as number
-            on Deposit assert $$
+            on Deposit ensure $$
             from A on Deposit -> no transition
             """;
 
@@ -69,7 +69,7 @@ public class PreceptAnalyzerCompletionTests
     }
 
     [Fact]
-    public void Completions_FromStateClause_SuggestsOnAssertAndArrow()
+    public void Completions_FromStateClause_SuggestsOnEnsureAndArrow()
     {
         const string text = """
             precept M
@@ -83,7 +83,7 @@ public class PreceptAnalyzerCompletionTests
         var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
 
         completions.Should().Contain("on");
-        completions.Should().Contain("assert");
+        completions.Should().Contain("ensure");
         completions.Should().Contain("->");
     }
 
@@ -504,12 +504,12 @@ public class PreceptAnalyzerCompletionTests
     }
 
     [Fact]
-    public void Completions_AfterInvariantExpression_SuggestsBecause()
+    public void Completions_AfterRuleExpression_SuggestsBecause()
     {
         const string text = """
             precept M
             field Balance as number default 0
-            invariant Balance >= 0 $$
+            rule Balance >= 0 $$
             state A initial
             event Go
             from A on Go -> no transition
@@ -522,13 +522,13 @@ public class PreceptAnalyzerCompletionTests
     }
 
     [Fact]
-    public void Completions_AfterEventAssertExpression_SuggestsBecause()
+    public void Completions_AfterEventEnsureExpression_SuggestsBecause()
     {
         const string text = """
             precept M
             state A initial
             event Submit with Comment as string
-            on Submit assert Comment != "" $$
+            on Submit ensure Comment != "" $$
             from A on Submit -> no transition
             """;
 
@@ -539,13 +539,13 @@ public class PreceptAnalyzerCompletionTests
     }
 
     [Fact]
-    public void Completions_AfterStateAssertExpression_SuggestsBecause()
+    public void Completions_AfterStateEnsureExpression_SuggestsBecause()
     {
         const string text = """
             precept M
             field Balance as number default 0
             state Open initial
-            in Open assert Balance >= 0 $$
+            in Open ensure Balance >= 0 $$
             event Go
             from Open on Go -> no transition
             """;
@@ -1061,7 +1061,7 @@ public class PreceptAnalyzerCompletionTests
         completions.Should().Contain("state");
         completions.Should().Contain("event");
         completions.Should().Contain("from");
-        completions.Should().Contain("invariant");
+        completions.Should().Contain("rule");
 
         // Action/outcome/grammar keywords should NOT be at top level
         completions.Should().NotContain("set", because: "set is an action keyword, not a top-level declaration");
@@ -1192,14 +1192,14 @@ public class PreceptAnalyzerCompletionTests
     }
 
     [Fact]
-    public void Completions_InvariantExpr_SuggestsIfSnippet()
+    public void Completions_RuleExpr_SuggestsIfSnippet()
     {
         const string text = """
             precept M
             field Balance as number default 0
             state A initial
             event Go
-            invariant $$
+            rule $$
             from A on Go -> no transition
             """;
 
@@ -1207,7 +1207,7 @@ public class PreceptAnalyzerCompletionTests
         var completions = AnalyzeCompletions(code, position).Select(static item => item.Label).ToArray();
 
         completions.Should().Contain(c => c.StartsWith("if", StringComparison.Ordinal),
-            because: "conditional expression must be offered in invariant body");
+            because: "conditional expression must be offered in rule body");
     }
 
     [Fact]
@@ -1446,12 +1446,12 @@ public class PreceptAnalyzerCompletionTests
     // ════════════════════════════════════════════════════════════════════
 
     [Fact]
-    public void Completions_AfterInvariantExpression_OffersWhen()
+    public void Completions_AfterRuleExpression_OffersWhen()
     {
         const string text = """
             precept M
             field X as number default 0
-            invariant X > 0 $$
+            rule X > 0 $$
             state A initial
             event Go
             from A on Go -> no transition
@@ -1464,13 +1464,13 @@ public class PreceptAnalyzerCompletionTests
     }
 
     [Fact]
-    public void Completions_AfterStateAssertExpression_OffersWhen()
+    public void Completions_AfterStateEnsureExpression_OffersWhen()
     {
         const string text = """
             precept M
             field X as number default 0
             state Open initial
-            in Open assert X > 0 $$
+            in Open ensure X > 0 $$
             event Go
             from Open on Go -> no transition
             """;
@@ -1482,13 +1482,13 @@ public class PreceptAnalyzerCompletionTests
     }
 
     [Fact]
-    public void Completions_AfterEventAssertExpression_OffersWhen()
+    public void Completions_AfterEventEnsureExpression_OffersWhen()
     {
         const string text = """
             precept M
             state A initial
             event Submit with Amount as number
-            on Submit assert Amount > 0 $$
+            on Submit ensure Amount > 0 $$
             from A on Submit -> no transition
             """;
 
@@ -1517,13 +1517,13 @@ public class PreceptAnalyzerCompletionTests
     }
 
     [Fact]
-    public void Completions_AfterWhenKeyword_InInvariant_OffersFields()
+    public void Completions_AfterWhenKeyword_InRule_OffersFields()
     {
         const string text = """
             precept M
             field X as number default 0
             field Active as boolean default true
-            invariant X > 0 when $$
+            rule X > 0 when $$
             state A initial
             event Go
             from A on Go -> no transition
@@ -1537,13 +1537,13 @@ public class PreceptAnalyzerCompletionTests
     }
 
     [Fact]
-    public void Completions_AfterWhenGuard_InInvariant_OffersBecause()
+    public void Completions_AfterWhenGuard_InRule_OffersBecause()
     {
         const string text = """
             precept M
             field X as number default 0
             field Active as boolean default true
-            invariant X > 0 when Active $$
+            rule X > 0 when Active $$
             state A initial
             event Go
             from A on Go -> no transition

@@ -396,13 +396,13 @@ public class PreceptKeywordLogicalOperatorTests
     // ────────────────────────────────────────────────────────────────────
 
     [Fact]
-    public void Invariant_Or_ParsesAndEvaluatesCorrectly()
+    public void Rule_Or_ParsesAndEvaluatesCorrectly()
     {
         const string dsl = """
             precept Test
             field Amount as number default 0
             field IsExempt as boolean default true
-            invariant Amount > 0 or IsExempt because "Amount must be positive or entity is exempt"
+            rule Amount > 0 or IsExempt because "Amount must be positive or entity is exempt"
             state Active initial
             in Active edit Amount, IsExempt
             event Update
@@ -427,13 +427,13 @@ public class PreceptKeywordLogicalOperatorTests
     }
 
     [Fact]
-    public void Invariant_And_ParsesAndEvaluatesCorrectly()
+    public void Rule_And_ParsesAndEvaluatesCorrectly()
     {
         const string dsl = """
             precept Test
             field Min as number default 1
             field Max as number default 10
-            invariant Min >= 1 and Max <= 100 because "Min must be at least 1 and Max at most 100"
+            rule Min >= 1 and Max <= 100 because "Min must be at least 1 and Max at most 100"
             state Active initial
             in Active edit Min, Max
             event Go

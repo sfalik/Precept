@@ -214,7 +214,7 @@ public class CompileToolTests
         var text = """
             precept Test
             field Priority as number default 0
-            invariant Priority >= 1 because "Must be positive"
+            rule Priority >= 1 because "Must be positive"
             state Open initial
             """;
 
@@ -347,7 +347,7 @@ public class CompileToolTests
     }
 
     [Fact]
-    public void StringLengthInvariant_CompilesCleanly()
+    public void StringLengthRule_CompilesCleanly()
     {
         var text = """
             precept Test
@@ -355,7 +355,7 @@ public class CompileToolTests
             state A initial
             state B
             event Go
-            invariant Name.length <= 100 because "Name must be \u2264100 characters"
+            rule Name.length <= 100 because "Name must be \u2264100 characters"
             from A on Go -> transition B
             """;
 
@@ -370,13 +370,13 @@ public class CompileToolTests
     // ════════════════════════════════════════════════════════════════════
 
     [Fact]
-    public void Compile_WhenGuardedInvariant_InvariantsArrayPopulated()
+    public void Compile_WhenGuardedRule_RulesArrayPopulated()
     {
         var text = """
             precept Test
             field X as number default 0
             field Active as boolean default false
-            invariant X >= 0 when Active because "X must be non-negative when active"
+            rule X >= 0 when Active because "X must be non-negative when active"
             state A initial
             event Go
             from A on Go -> no transition
@@ -385,22 +385,22 @@ public class CompileToolTests
         var result = CompileTool.Run(text);
 
         result.Valid.Should().BeTrue();
-        result.Invariants.Should().NotBeNull();
-        var guarded = result.Invariants!.FirstOrDefault(i => i.When is not null);
-        guarded.Should().NotBeNull("a when-guarded invariant should have When populated");
+        result.Rules.Should().NotBeNull();
+        var guarded = result.Rules!.FirstOrDefault(i => i.When is not null);
+        guarded.Should().NotBeNull("a when-guarded rule should have When populated");
         guarded!.When.Should().Contain("Active");
         guarded.Expression.Should().Contain("X >= 0");
     }
 
     [Fact]
-    public void Compile_WhenGuardedStateAssert_StateAssertsArrayPopulated()
+    public void Compile_WhenGuardedStateEnsure_StateEnsuresArrayPopulated()
     {
         var text = """
             precept Test
             field X as number default 0
             field Active as boolean default false
             state Open initial
-            in Open assert X >= 0 when Active because "X must be non-negative when active"
+            in Open ensure X >= 0 when Active because "X must be non-negative when active"
             event Go
             from Open on Go -> no transition
             """;
@@ -408,31 +408,31 @@ public class CompileToolTests
         var result = CompileTool.Run(text);
 
         result.Valid.Should().BeTrue();
-        result.StateAsserts.Should().NotBeNull();
-        var guarded = result.StateAsserts!.FirstOrDefault(sa => sa.When is not null);
-        guarded.Should().NotBeNull("a when-guarded state assert should have When populated");
+        result.StateEnsures.Should().NotBeNull();
+        var guarded = result.StateEnsures!.FirstOrDefault(sa => sa.When is not null);
+        guarded.Should().NotBeNull("a when-guarded state ensure should have When populated");
         guarded!.When.Should().Contain("Active");
         guarded.State.Should().Be("Open");
     }
 
     [Fact]
-    public void Compile_WhenGuardedEventAssert_EventAssertsArrayPopulated()
+    public void Compile_WhenGuardedEventEnsure_EventEnsuresArrayPopulated()
     {
         var text = """
             precept Test
             field X as number default 0
             state A initial
             event Submit with Amount as number, Priority as number
-            on Submit assert Amount > 0 when Priority > 1 because "Amount required for high priority"
+            on Submit ensure Amount > 0 when Priority > 1 because "Amount required for high priority"
             from A on Submit -> no transition
             """;
 
         var result = CompileTool.Run(text);
 
         result.Valid.Should().BeTrue();
-        result.EventAsserts.Should().NotBeNull();
-        var guarded = result.EventAsserts!.FirstOrDefault(ea => ea.When is not null);
-        guarded.Should().NotBeNull("a when-guarded event assert should have When populated");
+        result.EventEnsures.Should().NotBeNull();
+        var guarded = result.EventEnsures!.FirstOrDefault(ea => ea.When is not null);
+        guarded.Should().NotBeNull("a when-guarded event ensure should have When populated");
         guarded!.When.Should().Contain("Priority > 1");
         guarded.Event.Should().Be("Submit");
     }
@@ -462,12 +462,12 @@ public class CompileToolTests
     }
 
     [Fact]
-    public void Compile_UnguardedInvariant_WhenIsNull()
+    public void Compile_UnguardedRule_WhenIsNull()
     {
         var text = """
             precept Test
             field X as number default 1
-            invariant X > 0 because "X must be positive"
+            rule X > 0 because "X must be positive"
             state A initial
             event Go
             from A on Go -> no transition
@@ -476,10 +476,10 @@ public class CompileToolTests
         var result = CompileTool.Run(text);
 
         result.Valid.Should().BeTrue();
-        result.Invariants.Should().NotBeNull();
-        var unguarded = result.Invariants!.FirstOrDefault(i => i.Expression.Contains("X > 0"));
+        result.Rules.Should().NotBeNull();
+        var unguarded = result.Rules!.FirstOrDefault(i => i.Expression.Contains("X > 0"));
         unguarded.Should().NotBeNull();
-        unguarded!.When.Should().BeNull("an unguarded invariant should have When = null");
+        unguarded!.When.Should().BeNull("an unguarded rule should have When = null");
     }
 
     // ════════════════════════════════════════════════════════════════════

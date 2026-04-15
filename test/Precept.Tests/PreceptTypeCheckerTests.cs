@@ -154,7 +154,7 @@ public class PreceptTypeCheckerTests
     }
 
     [Fact]
-    public void Check_FromAny_UsesPerStateExpansionAndStateAssertNarrowing()
+    public void Check_FromAny_UsesPerStateExpansionAndStateEnsureNarrowing()
     {
         const string dsl = """
             precept M
@@ -162,7 +162,7 @@ public class PreceptTypeCheckerTests
             field TechnicianName as string default ""
             state Scheduled initial
             state Open
-            in Scheduled assert AssignedTechnician != null because "scheduled work must have a technician"
+            in Scheduled ensure AssignedTechnician != null because "scheduled work must have a technician"
             event Snapshot
             from any on Snapshot -> set TechnicianName = AssignedTechnician -> no transition
             """;
@@ -256,7 +256,7 @@ public class PreceptTypeCheckerTests
     }
 
     [Fact]
-    public void Check_StateAction_WithStateAssertNarrowing_NarrowsSuccessfully()
+    public void Check_StateAction_WithStateEnsureNarrowing_NarrowsSuccessfully()
     {
         const string dsl = """
             precept M
@@ -264,7 +264,7 @@ public class PreceptTypeCheckerTests
             field MaybeNull as number nullable
             state Open initial
             state Closed
-            in Closed assert MaybeNull != null because "closed requires value"
+            in Closed ensure MaybeNull != null because "closed requires value"
             event Close
             from Open on Close -> transition Closed
             to Closed -> set Value = MaybeNull
@@ -541,13 +541,13 @@ public class PreceptTypeCheckerTests
     }
 
     [Fact]
-    public void Check_EventAssertStillAcceptsBareArgName()
+    public void Check_EventEnsureStillAcceptsBareArgName()
     {
         const string dsl = """
             precept M
             state A initial
             event Go with Count as number
-            on Go assert Count > 0 because "count must be positive"
+            on Go ensure Count > 0 because "count must be positive"
             """;
 
         var result = Check(dsl);
@@ -577,20 +577,20 @@ public class PreceptTypeCheckerTests
     }
 
     [Fact]
-    public void Check_StringExpressionInInvariant_ProducesC46()
+    public void Check_StringExpressionInRule_ProducesC46()
     {
         const string dsl = """
             precept M
             field Name as string default ""
             state A initial
-            invariant Name because "non-boolean invariant"
+            rule Name because "non-boolean invariant"
             """;
 
         var result = Check(dsl);
 
         result.Diagnostics.Should().ContainSingle();
         result.Diagnostics[0].Constraint.Id.Should().Be("C46");
-        result.Diagnostics[0].Message.Should().Contain("invariant");
+        result.Diagnostics[0].Message.Should().Contain("rule");
     }
 
     [Fact]
@@ -612,13 +612,13 @@ public class PreceptTypeCheckerTests
     }
 
     [Fact]
-    public void Check_NumberInStateAssert_ProducesC46()
+    public void Check_NumberInStateEnsure_ProducesC46()
     {
         const string dsl = """
             precept M
             field Balance as number default 10
             state Open initial
-            in Open assert Balance because "non-boolean assert"
+            in Open ensure Balance because "non-boolean assert"
             """;
 
         var result = Check(dsl);
@@ -695,16 +695,16 @@ public class PreceptTypeCheckerTests
     // ─── Issue #14 Slice 9: When-guard type checker tests ───────────
 
     [Fact]
-    public void Check_Invariant_WhenGuardFalse_AtDefaultData_NoPrecompileViolation()
+    public void Check_Rule_WhenGuardFalse_AtDefaultData_NoPrecompileViolation()
     {
-        // EC-3: A guarded invariant whose guard is false at default data
+        // EC-3: A guarded rule whose guard is false at default data
         // should NOT produce a pre-compile violation.
         const string dsl = """
             precept Test
             field X as number default 0
             field Active as boolean default false
             state A initial
-            invariant X > 100 when Active because "X must be high when active"
+            rule X > 100 when Active because "X must be high when active"
             from A on Go -> no transition
             event Go
             """;
@@ -712,18 +712,18 @@ public class PreceptTypeCheckerTests
         // This should compile clean — the invariant body (X > 100) fails at defaults,
         // but the guard (Active == false at defaults) means it's skipped.
         var compiled = PreceptCompiler.CompileFromText(dsl);
-        compiled.HasErrors.Should().BeFalse("guarded invariant with false guard should not trigger pre-compile violation");
+        compiled.HasErrors.Should().BeFalse("guarded rule with false guard should not trigger pre-compile violation");
     }
 
     [Fact]
-    public void TypeCheck_InvariantGuard_ValidBooleanField_NoDiagnostic()
+    public void TypeCheck_RuleGuard_ValidBooleanField_NoDiagnostic()
     {
         const string dsl = """
             precept M
             field X as number default 0
             field Active as boolean default false
             state A initial
-            invariant X >= 0 when Active because "guarded"
+            rule X >= 0 when Active because "guarded"
             """;
 
         var result = Check(dsl);
@@ -732,14 +732,14 @@ public class PreceptTypeCheckerTests
     }
 
     [Fact]
-    public void TypeCheck_InvariantGuard_NonBooleanField_DiagnosticEmitted()
+    public void TypeCheck_RuleGuard_NonBooleanField_DiagnosticEmitted()
     {
         const string dsl = """
             precept M
             field X as number default 0
             field Count as number default 0
             state A initial
-            invariant X >= 0 when Count because "count is not boolean"
+            rule X >= 0 when Count because "count is not boolean"
             """;
 
         var result = Check(dsl);
@@ -749,14 +749,14 @@ public class PreceptTypeCheckerTests
     }
 
     [Fact]
-    public void TypeCheck_EventAssertGuard_ValidArgReference_NoDiagnostic()
+    public void TypeCheck_EventEnsureGuard_ValidArgReference_NoDiagnostic()
     {
         const string dsl = """
             precept M
             state A initial
             state B
             event Submit with Amount as number, Priority as number
-            on Submit assert Amount > 0 when Priority > 1 because "high priority needs amount"
+            on Submit ensure Amount > 0 when Priority > 1 because "high priority needs amount"
             from A on Submit -> transition B
             """;
 
@@ -766,7 +766,7 @@ public class PreceptTypeCheckerTests
     }
 
     [Fact]
-    public void TypeCheck_C69_InvariantGuard_EventArgReference_Emitted()
+    public void TypeCheck_C69_RuleGuard_EventArgReference_Emitted()
     {
         const string dsl = """
             precept M
@@ -774,7 +774,7 @@ public class PreceptTypeCheckerTests
             state A initial
             state B
             event Go with Amount as number
-            invariant X >= 0 when Go.Amount > 0 because "bad guard"
+            rule X >= 0 when Go.Amount > 0 because "bad guard"
             from A on Go -> transition B
             """;
 
@@ -784,7 +784,7 @@ public class PreceptTypeCheckerTests
     }
 
     [Fact]
-    public void TypeCheck_C69_EventAssertGuard_EntityFieldReference_Emitted()
+    public void TypeCheck_C69_EventEnsureGuard_EntityFieldReference_Emitted()
     {
         const string dsl = """
             precept M
@@ -792,7 +792,7 @@ public class PreceptTypeCheckerTests
             state A initial
             state B
             event Submit with Amount as number
-            on Submit assert Amount > 0 when Total > 0 because "bad guard scope"
+            on Submit ensure Amount > 0 when Total > 0 because "bad guard scope"
             from A on Submit -> transition B
             """;
 
@@ -818,9 +818,9 @@ public class PreceptTypeCheckerTests
     }
 
     [Fact]
-    public void TypeCheck_GuardedStateAssert_ExcludedFromNarrowing()
+    public void TypeCheck_GuardedStateEnsure_ExcludedFromNarrowing()
     {
-        // A guarded state assert should NOT contribute to type narrowing.
+        // A guarded state ensure should NOT contribute to type narrowing.
         // Without the guard filter, the assert "MaybeNull != null" would narrow
         // MaybeNull to non-nullable, making `set Value = MaybeNull` pass.
         // With the filter, it remains nullable → C42.
@@ -831,7 +831,7 @@ public class PreceptTypeCheckerTests
             field Active as boolean default false
             state Open initial
             state Closed
-            in Closed assert MaybeNull != null when Active because "conditional guarantee"
+            in Closed ensure MaybeNull != null when Active because "conditional guarantee"
             event Close
             from Open on Close -> transition Closed
             to Closed -> set Value = MaybeNull

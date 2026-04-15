@@ -95,13 +95,13 @@ public class ConditionalExpressionTests
     }
 
     [Fact]
-    public void Parse_ConditionalInInvariant()
+    public void Parse_ConditionalInRule()
     {
         const string dsl = """
             precept Test
             field Active as boolean default true
             field Score as number default 10
-            invariant (if Active then Score > 0 else true) because "active needs score"
+            rule (if Active then Score > 0 else true) because "active needs score"
             state A initial
             event Go
             from A on Go -> no transition
@@ -110,7 +110,7 @@ public class ConditionalExpressionTests
         var (model, diags) = PreceptParser.ParseWithDiagnostics(dsl);
         diags.Should().BeEmpty();
         model.Should().NotBeNull();
-        model!.Invariants.Should().ContainSingle();
+        model!.Rules.Should().ContainSingle();
     }
 
     [Fact]
@@ -525,13 +525,13 @@ public class ConditionalExpressionTests
     }
 
     [Fact]
-    public void Fire_InvariantWithConditional_ValidatesCorrectly()
+    public void Fire_RuleWithConditional_ValidatesCorrectly()
     {
         const string dsl = """
             precept Test
             field Active as boolean default true
             field Score as number default 10
-            invariant (if Active then Score > 0 else true) because "active needs score"
+            rule (if Active then Score > 0 else true) because "active needs score"
             state A initial
             state B
             event Go with NewScore as number

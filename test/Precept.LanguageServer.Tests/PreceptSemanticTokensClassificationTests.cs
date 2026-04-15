@@ -24,7 +24,7 @@ public class PreceptSemanticTokensClassificationTests
         const string dsl = """
             precept M
             field Balance as number default 0
-            invariant Balance >= 0 because "Balance must not go negative"
+            rule Balance >= 0 because "Balance must not go negative"
             state Active initial
             event Go
             from Active on Go -> no transition
@@ -146,7 +146,7 @@ public class PreceptSemanticTokensClassificationTests
             field Balance as number default 0
             state Active initial
             state Closed
-            in Active assert Balance >= 0 because "ok"
+            in Active ensure Balance >= 0 because "ok"
             event Go
             from Active on Go -> transition Closed
             """;

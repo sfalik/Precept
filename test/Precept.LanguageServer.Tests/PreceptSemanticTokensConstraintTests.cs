@@ -8,14 +8,14 @@ namespace Precept.LanguageServer.Tests;
 public class PreceptSemanticTokensConstraintTests
 {
     [Fact]
-    public void ExtractConstraintSets_StateInInAssertBlock_IsConstrained()
+    public void ExtractConstraintSets_StateInInEnsureBlock_IsConstrained()
     {
         const string dsl = """
             precept M
             field Balance as number default 0
             state Active initial
             state Inactive
-            in Active assert Balance >= 0 because "Balance must not go negative"
+            in Active ensure Balance >= 0 because "Balance must not go negative"
             event Go
             from Active on Go -> transition Inactive
             """;
@@ -45,13 +45,13 @@ public class PreceptSemanticTokensConstraintTests
     }
 
     [Fact]
-    public void ExtractConstraintSets_EventWithOnAssert_IsConstrained()
+    public void ExtractConstraintSets_EventWithOnEnsure_IsConstrained()
     {
         const string dsl = """
             precept M
             state A initial
             event Deposit with Amount as number
-            on Deposit assert Amount > 0 because "Amount must be positive"
+            on Deposit ensure Amount > 0 because "Amount must be positive"
             from A on Deposit -> no transition
             """;
 
@@ -62,12 +62,12 @@ public class PreceptSemanticTokensConstraintTests
     }
 
     [Fact]
-    public void ExtractConstraintSets_FieldInInvariant_IsGuarded()
+    public void ExtractConstraintSets_FieldInRule_IsGuarded()
     {
         const string dsl = """
             precept M
             field Balance as number default 0
-            invariant Balance >= 0 because "Balance must not go negative"
+            rule Balance >= 0 because "Balance must not go negative"
             state A initial
             event Go
             from A on Go -> no transition
@@ -96,13 +96,13 @@ public class PreceptSemanticTokensConstraintTests
     // ════════════════════════════════════════════════════════════════════
 
     [Fact]
-    public void ExtractConstraintSets_WhenGuardedInvariant_FieldStillConstrained()
+    public void ExtractConstraintSets_WhenGuardedRule_FieldStillConstrained()
     {
         const string dsl = """
             precept M
             field Balance as number default 0
             field Active as boolean default true
-            invariant Balance >= 0 when Active because "Balance must not go negative when active"
+            rule Balance >= 0 when Active because "Balance must not go negative when active"
             state A initial
             event Go
             from A on Go -> no transition
@@ -112,11 +112,11 @@ public class PreceptSemanticTokensConstraintTests
         var (_, _, fields) = PreceptSemanticTokensHandler.ExtractConstraintSets(definition!);
 
         fields.Should().Contain("Balance",
-            "a when-guarded invariant still constrains its target field for semantic token purposes");
+            "a when-guarded rule still constrains its target field for semantic token purposes");
     }
 
     [Fact]
-    public void ExtractConstraintSets_WhenGuardedStateAssert_StateStillConstrained()
+    public void ExtractConstraintSets_WhenGuardedStateEnsure_StateStillConstrained()
     {
         const string dsl = """
             precept M
@@ -124,7 +124,7 @@ public class PreceptSemanticTokensConstraintTests
             field Active as boolean default true
             state Open initial
             state Closed
-            in Open assert Balance >= 0 when Active because "Balance guard"
+            in Open ensure Balance >= 0 when Active because "Balance guard"
             event Go
             from Open on Go -> transition Closed
             """;
@@ -133,17 +133,17 @@ public class PreceptSemanticTokensConstraintTests
         var (states, _, _) = PreceptSemanticTokensHandler.ExtractConstraintSets(definition!);
 
         states.Should().Contain("Open",
-            "a when-guarded state assert still constrains its anchor state for semantic token purposes");
+            "a when-guarded state ensure still constrains its anchor state for semantic token purposes");
     }
 
     [Fact]
-    public void ExtractConstraintSets_WhenGuardedEventAssert_EventStillConstrained()
+    public void ExtractConstraintSets_WhenGuardedEventEnsure_EventStillConstrained()
     {
         const string dsl = """
             precept M
             state A initial
             event Submit with Amount as number, Priority as number
-            on Submit assert Amount > 0 when Priority > 1 because "Amount required for high priority"
+            on Submit ensure Amount > 0 when Priority > 1 because "Amount required for high priority"
             from A on Submit -> no transition
             """;
 
@@ -151,6 +151,6 @@ public class PreceptSemanticTokensConstraintTests
         var (_, events, _) = PreceptSemanticTokensHandler.ExtractConstraintSets(definition!);
 
         events.Should().Contain("Submit",
-            "a when-guarded event assert still constrains its event for semantic token purposes");
+            "a when-guarded event ensure still constrains its event for semantic token purposes");
     }
 }

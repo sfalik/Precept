@@ -27,7 +27,7 @@ public class FieldConstraintTests
     // ========================================================================================
 
     [Fact] // READY
-    public void Baseline_NonnegativeEquivalentInvariant_SetToNeg1_ProducesConstraintFailure()
+    public void Baseline_NonnegativeEquivalentRule_SetToNeg1_ProducesConstraintFailure()
     {
         // Desugar target: nonnegative → invariant Amount >= 0
         // Confirms that the runtime ConstraintFailure mechanism works correctly
@@ -35,7 +35,7 @@ public class FieldConstraintTests
         const string dsl = """
             precept M
             field Amount as number default 0
-            invariant Amount >= 0 because "Amount must be non-negative"
+            rule Amount >= 0 because "Amount must be non-negative"
             state Active initial
             event Set with Value as number
             from Active on Set -> set Amount = Set.Value -> no transition
@@ -49,14 +49,14 @@ public class FieldConstraintTests
     }
 
     [Fact] // READY
-    public void Baseline_PositiveEquivalentInvariant_SetToZero_ProducesConstraintFailure()
+    public void Baseline_PositiveEquivalentRule_SetToZero_ProducesConstraintFailure()
     {
         // Desugar target: positive → invariant Amount > 0
         // 0 is NOT positive — constraint failure expected.
         const string dsl = """
             precept M
             field Amount as number default 1
-            invariant Amount > 0 because "Amount must be positive"
+            rule Amount > 0 because "Amount must be positive"
             state Active initial
             event Set with Value as number
             from Active on Set -> set Amount = Set.Value -> no transition
@@ -70,15 +70,15 @@ public class FieldConstraintTests
     }
 
     [Fact] // READY
-    public void Baseline_MinMaxEquivalentInvariant_OutOfRangeValues_ProduceConstraintFailure()
+    public void Baseline_MinMaxEquivalentRule_OutOfRangeValues_ProduceConstraintFailure()
     {
         // Desugar target: min 1 max 10 → invariant Amount >= 1 and Amount <= 10
         // Setting to 0 or 11 should fail.
         const string dsl = """
             precept M
             field Amount as number default 5
-            invariant Amount >= 1 because "Amount must be at least 1"
-            invariant Amount <= 10 because "Amount must be at most 10"
+            rule Amount >= 1 because "Amount must be at least 1"
+            rule Amount <= 10 because "Amount must be at most 10"
             state Active initial
             event Set with Value as number
             from Active on Set -> set Amount = Set.Value -> no transition
@@ -408,7 +408,7 @@ public class FieldConstraintTests
         //   independently of the stronger one. This is the definition of a redundant
         //   (subsumed) constraint.
         //
-        // This is analogous to C44 (duplicate state assert) — not contradictory, but
+        // This is analogous to C44 (duplicate state ensure) — not contradictory, but
         // the weaker assertion is entirely inert. C58 covers both contradictions AND
         // redundancies.
         //
@@ -716,7 +716,7 @@ public class FieldConstraintTests
     [Fact]
     public void Fire_EventArgNotempty_EmptyString_ProducesRejected()
     {
-        // `notempty` on an event arg desugars to an on-event assert.
+        // `notempty` on an event arg desugars to an on-event ensure.
         // When the assert fires, the outcome is Rejected (not ConstraintFailure).
         // This distinguishes event-arg constraint desugaring from field constraint desugaring.
         const string dsl = """

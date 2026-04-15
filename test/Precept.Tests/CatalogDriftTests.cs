@@ -73,16 +73,16 @@ public class CatalogDriftTests
             "field-declaration" =>
                 $"{header}\n{construct.Example}\n{string.Join("\n", states)}",
 
-            "invariant" =>
+            "rule" =>
                 $"{header}\nfield Priority as number default 1\n{construct.Example}\n{string.Join("\n", states)}",
 
             "event-declaration" =>
                 $"{header}\n{string.Join("\n", states)}\n{construct.Example}",
 
-            "state-assert" =>
+            "state-ensure" =>
                 $"{header}\n{string.Join("\n", fields)}\n{string.Join("\n", states)}\n{construct.Example}",
 
-            "event-assert" =>
+            "event-ensure" =>
                 $"{header}\n{string.Join("\n", states)}\nevent Submit with Comment as string\n{construct.Example}",
 
             "state-action" =>
@@ -408,14 +408,14 @@ public class CatalogDriftTests
         // C13: No initial state
         ["C13"] = new(H + "state A\n", "initial"),
 
-        // C14: Event assert with wrong dotted prefix
-        ["C14"] = new(H + S + "event Submit with Comment as string default \"x\"\non Submit assert Other.Comment != null because \"bad\"\n", "unknown prefix"),
+        // C14: Event ensure with wrong dotted prefix
+        ["C14"] = new(H + S + "event Submit with Comment as string default \"x\"\non Submit ensure Other.Comment != null because \"bad\"\n", "unknown prefix"),
 
-        // C15: Event assert dotted member not a declared arg
-        ["C15"] = new(H + S + "event Submit with Comment as string default \"x\"\non Submit assert Submit.Nope != null because \"bad\"\n", "not an event argument"),
+        // C15: Event ensure dotted member not a declared arg
+        ["C15"] = new(H + S + "event Submit with Comment as string default \"x\"\non Submit ensure Submit.Nope != null because \"bad\"\n", "not an event argument"),
 
-        // C16: Event assert plain identifier not a declared arg
-        ["C16"] = new(H + S + "event Submit with Comment as string default \"x\"\non Submit assert Nope != null because \"bad\"\n", "not an event argument"),
+        // C16: Event ensure plain identifier not a declared arg
+        ["C16"] = new(H + S + "event Submit with Comment as string default \"x\"\non Submit ensure Nope != null because \"bad\"\n", "not an event argument"),
 
         // C17: Non-nullable field without default
         ["C17"] = new(H + "field X as string\n" + S, "requires a default"),
@@ -476,22 +476,22 @@ public class CatalogDriftTests
         }),
 
         // C29: Invariant violated by default values
-        ["C29"] = new(H + "field Score as number default 0\ninvariant Score > 0 because \"must be positive\"\n" + S, "invariant violation"),
+        ["C29"] = new(H + "field Score as number default 0\nrule Score > 0 because \"must be positive\"\n" + S, "rule violation"),
 
-        // C30: State assert on initial state violated by defaults
-        ["C30"] = new(H + "field Balance as number default 0\nstate Active initial\nin Active assert Balance > 0 because \"must be positive\"\n", "state assert violation"),
+        // C30: State ensure on initial state violated by defaults
+        ["C30"] = new(H + "field Balance as number default 0\nstate Active initial\nin Active ensure Balance > 0 because \"must be positive\"\n", "state ensure violation"),
 
-        // C31: Event assert violated by default arg values
-        ["C31"] = new(H + S + "event Submit with Amount as number default 0\non Submit assert Amount > 0 because \"must be positive\"\n", "event assert violation"),
+        // C31: Event ensure violated by default arg values
+        ["C31"] = new(H + S + "event Submit with Amount as number default 0\non Submit ensure Amount > 0 because \"must be positive\"\n", "event ensure violation"),
 
-        // C32: Literal set assignment violates invariant
-        ["C32"] = new(H + "field Balance as number default 100\ninvariant Balance >= 0 because \"no negative\"\n" + S2 + "event Go\nfrom A on Go -> set Balance = -5 -> transition B\n", "violates invariant"),
+        // C32: Literal set assignment violates rule
+        ["C32"] = new(H + "field Balance as number default 100\nrule Balance >= 0 because \"no negative\"\n" + S2 + "event Go\nfrom A on Go -> set Balance = -5 -> transition B\n", "violates rule"),
 
-        // C44: Duplicate state assert (same preposition, state, expression)
-        ["C44"] = new(H + "field X as number default 10\n" + S2 + "in B assert X > 0 because \"first\"\nin B assert X > 0 because \"duplicate\"\nevent Go\nfrom A on Go -> transition B\n", "Duplicate state assert"),
+        // C44: Duplicate state ensure (same preposition, state, expression)
+        ["C44"] = new(H + "field X as number default 10\n" + S2 + "in B ensure X > 0 because \"first\"\nin B ensure X > 0 because \"duplicate\"\nevent Go\nfrom A on Go -> transition B\n", "Duplicate state ensure"),
 
-        // C45: Subsumed state assert (to redundant with identical in)
-        ["C45"] = new(H + "field X as number default 10\n" + S2 + "in B assert X > 0 because \"in covers entry\"\nto B assert X > 0 because \"to is redundant\"\nevent Go\nfrom A on Go -> transition B\n", "Subsumed state assert"),
+        // C45: Subsumed state ensure (to redundant with identical in)
+        ["C45"] = new(H + "field X as number default 10\n" + S2 + "in B ensure X > 0 because \"in covers entry\"\nto B ensure X > 0 because \"to is redundant\"\nevent Go\nfrom A on Go -> transition B\n", "Subsumed state ensure"),
 
         // C46: Non-boolean expression in rule position (guard, invariant, assert)
         ["C46"] = new(H + "field X as number default 0\n" + S2 + "event Go\nfrom A on Go when X -> transition B\nfrom A on Go -> reject \"blocked\"\n", "PRECEPT046"),
@@ -592,10 +592,10 @@ public class CatalogDriftTests
         ["C68"] = new(H + "field Status as choice(\"Open\",\"Closed\") default \"Open\"\n" + S2 +
             "event Go\nfrom A on Go -> set Status = \"Invalid\" -> no transition\n", "not a member"),
 
-        // C69: cross-scope guard reference — invariant guard referencing event arg
+        // C69: cross-scope guard reference — rule guard referencing event arg
         ["C69"] = new(H + "field X as number default 0\n" + S2 +
             "event Go with Amount as number\n" +
-            "invariant X >= 0 when Go.Amount > 0 because \"bad\"\n" +
+            "rule X >= 0 when Go.Amount > 0 because \"bad\"\n" +
             "from A on Go -> no transition\n", "different scope"),
 
         // C70: duplicate modifier on field/arg declaration
@@ -1207,9 +1207,9 @@ public class CatalogDriftTests
         typeof(PreceptEventArg),
         typeof(PreceptField),
         typeof(PreceptCollectionField),
-        typeof(PreceptInvariant),
-        typeof(StateAssertion),
-        typeof(EventAssertion),
+        typeof(PreceptRule),
+        typeof(StateEnsure),
+        typeof(EventEnsure),
         typeof(PreceptTransitionRow),
         typeof(PreceptEditBlock),
         typeof(PreceptStateAction),
@@ -1305,14 +1305,14 @@ public class CatalogDriftTests
         // C13: no initial state — state decl on line 3
         ["C13"] = ("precept Test\nfield X as number default 0\nstate A, B\nevent Go\nfrom A on Go -> transition B\n", "parse", 3),
 
-        // C14: event assert with wrong dotted prefix — assert on line 4
-        ["C14"] = ("precept Test\nstate A initial\nevent Submit with Comment as string default \"x\"\non Submit assert Other.Comment != null because \"bad\"\n", "parse", 4),
+        // C14: event ensure with wrong dotted prefix — assert on line 4
+        ["C14"] = ("precept Test\nstate A initial\nevent Submit with Comment as string default \"x\"\non Submit ensure Other.Comment != null because \"bad\"\n", "parse", 4),
 
-        // C15: event assert dotted member not a declared arg — assert on line 4
-        ["C15"] = ("precept Test\nstate A initial\nevent Submit with Comment as string default \"x\"\non Submit assert Submit.Nope != null because \"bad\"\n", "parse", 4),
+        // C15: event ensure dotted member not a declared arg — assert on line 4
+        ["C15"] = ("precept Test\nstate A initial\nevent Submit with Comment as string default \"x\"\non Submit ensure Submit.Nope != null because \"bad\"\n", "parse", 4),
 
-        // C16: event assert plain identifier not a declared arg — assert on line 4
-        ["C16"] = ("precept Test\nstate A initial\nevent Submit with Comment as string default \"x\"\non Submit assert Nope != null because \"bad\"\n", "parse", 4),
+        // C16: event ensure plain identifier not a declared arg — assert on line 4
+        ["C16"] = ("precept Test\nstate A initial\nevent Submit with Comment as string default \"x\"\non Submit ensure Nope != null because \"bad\"\n", "parse", 4),
 
         // C17: non-nullable field without default — field on line 4
         ["C17"] = ("precept Test\nfield Title as string nullable\nfield Description as string nullable\nfield Blah as string\n", "parse", 4),
@@ -1347,16 +1347,16 @@ public class CatalogDriftTests
         // ── Compile-phase: type checker + analysis ────
 
         // C29: invariant violated by defaults — invariant on line 3
-        ["C29"] = ("precept Test\nfield Score as number default 0\ninvariant Score > 0 because \"must be positive\"\nstate A initial\n", "compile", 3),
+        ["C29"] = ("precept Test\nfield Score as number default 0\nrule Score > 0 because \"must be positive\"\nstate A initial\n", "compile", 3),
 
-        // C30: state assert on initial state violated by defaults — assert on line 3
-        ["C30"] = ("precept Test\nfield Balance as number default 0\nin Active assert Balance > 0 because \"must be positive\"\nstate Active initial\n", "compile", 3),
+        // C30: state ensure on initial state violated by defaults — assert on line 3
+        ["C30"] = ("precept Test\nfield Balance as number default 0\nin Active ensure Balance > 0 because \"must be positive\"\nstate Active initial\n", "compile", 3),
 
-        // C31: event assert violated by default arg values — assert on line 3
-        ["C31"] = ("precept Test\nstate A initial\non Submit assert Amount > 0 because \"must be positive\"\nevent Submit with Amount as number default 0\n", "compile", 3),
+        // C31: event ensure violated by default arg values — assert on line 3
+        ["C31"] = ("precept Test\nstate A initial\non Submit ensure Amount > 0 because \"must be positive\"\nevent Submit with Amount as number default 0\n", "compile", 3),
 
-        // C32: literal set violates invariant — row on line 6
-        ["C32"] = ("precept Test\nfield Balance as number default 100\ninvariant Balance >= 0 because \"no negative\"\nstate A initial\nstate B\nevent Go\nfrom A on Go -> set Balance = -5 -> transition B\n", "compile", 7),
+        // C32: literal set violates rule — row on line 6
+        ["C32"] = ("precept Test\nfield Balance as number default 100\nrule Balance >= 0 because \"no negative\"\nstate A initial\nstate B\nevent Go\nfrom A on Go -> set Balance = -5 -> transition B\n", "compile", 7),
 
         // C38: unknown identifier in expression — row on line 5
         ["C38"] = ("precept Test\nfield X as number default 0\nstate A initial\nstate B\nevent Go\nfrom A on Go -> set X = Missing -> transition B\n", "compile", 6),
@@ -1376,11 +1376,11 @@ public class CatalogDriftTests
         // C43: collection pop/dequeue into target type mismatch — row on line 5
         ["C43"] = ("precept Test\nfield X as number default 0\nfield Items as stack of string\nstate A initial\nstate B\nevent Go\nfrom A on Go when Items.count > 0 -> pop Items into X -> transition B\n", "compile", 7),
 
-        // C44: duplicate state assert — second assert on line 5
-        ["C44"] = ("precept Test\nfield X as number default 10\nstate A initial\nstate B\nin B assert X > 0 because \"first\"\nin B assert X > 0 because \"duplicate\"\nevent Go\nfrom A on Go -> transition B\n", "compile", 6),
+        // C44: duplicate state ensure — second ensure on line 5
+        ["C44"] = ("precept Test\nfield X as number default 10\nstate A initial\nstate B\nin B ensure X > 0 because \"first\"\nin B ensure X > 0 because \"duplicate\"\nevent Go\nfrom A on Go -> transition B\n", "compile", 6),
 
-        // C45: subsumed state assert — redundant assert on line 5
-        ["C45"] = ("precept Test\nfield X as number default 10\nstate A initial\nstate B\nin B assert X > 0 because \"in covers entry\"\nto B assert X > 0 because \"to is redundant\"\nevent Go\nfrom A on Go -> transition B\n", "compile", 6),
+        // C45: subsumed state ensure — redundant ensure on line 5
+        ["C45"] = ("precept Test\nfield X as number default 10\nstate A initial\nstate B\nin B ensure X > 0 because \"in covers entry\"\nto B ensure X > 0 because \"to is redundant\"\nevent Go\nfrom A on Go -> transition B\n", "compile", 6),
 
         // C46: non-boolean expression in guard — row on line 5
         ["C46"] = ("precept Test\nfield X as number default 0\nstate A initial\nstate B\nevent Go\nfrom A on Go when X -> transition B\nfrom A on Go -> reject \"blocked\"\n", "compile", 6),
@@ -1440,7 +1440,7 @@ public class CatalogDriftTests
         ["C68"] = ("precept Test\nfield Status as choice(\"Open\",\"Closed\") default \"Open\"\nstate A initial\nstate B\nevent Go\nfrom A on Go -> set Status = \"Invalid\" -> no transition\n", "compile", 6),
 
         // C69: cross-scope guard reference — invariant on line 4
-        ["C69"] = ("precept Test\nfield X as number default 0\nstate A initial\nstate B\nevent Go with Amount as number\ninvariant X >= 0 when Go.Amount > 0 because \"bad\"\nfrom A on Go -> no transition\n", "compile", 6),
+        ["C69"] = ("precept Test\nfield X as number default 0\nstate A initial\nstate B\nevent Go with Amount as number\nrule X >= 0 when Go.Amount > 0 because \"bad\"\nfrom A on Go -> no transition\n", "compile", 6),
 
         // C70: duplicate modifier — field on line 2
         ["C70"] = ("precept Test\nfield X as number default 0 default 1\nstate A initial\n", "parse", 2),

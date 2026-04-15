@@ -20,14 +20,14 @@ public class PreceptEditTests
         field AssignedTo as string default ""
         field ResolutionSummary as string nullable
 
-        invariant Priority >= 1 and Priority <= 5 because "Priority must be between 1 and 5"
+        rule Priority >= 1 and Priority <= 5 because "Priority must be between 1 and 5"
 
         state Open initial
         state InProgress
         state Resolved
         state Closed
 
-        in Resolved assert ResolutionSummary != null because "Resolution requires a summary"
+        in Resolved ensure ResolutionSummary != null because "Resolution requires a summary"
 
         event Assign with Technician as string
         event StartWork
@@ -238,7 +238,7 @@ public class PreceptEditTests
     // ─── Update: invariant enforcement ───
 
     [Fact]
-    public void Update_InvariantViolation_Blocked()
+    public void Update_RuleViolation_Blocked()
     {
         var (engine, instance) = CompileAndCreate(WorkOrderDsl);
 
@@ -251,7 +251,7 @@ public class PreceptEditTests
     }
 
     [Fact]
-    public void Update_InvariantPasses_Updated()
+    public void Update_RulePasses_Updated()
     {
         var (engine, instance) = CompileAndCreate(WorkOrderDsl);
 
@@ -260,10 +260,10 @@ public class PreceptEditTests
         result.UpdatedInstance!.InstanceData["Priority"].Should().Be(5.0);
     }
 
-    // ─── Update: state assert enforcement ───
+    // ─── Update: state ensure enforcement ───
 
     [Fact]
-    public void Update_StateAssertViolation_Blocked()
+    public void Update_StateEnsureViolation_Blocked()
     {
         var (engine, instance) = CompileAndCreate(WorkOrderDsl);
 
@@ -499,7 +499,7 @@ public class PreceptEditTests
     // ─── Update: atomicity ───
 
     [Fact]
-    public void Update_AtomicRollback_OnInvariantViolation()
+    public void Update_AtomicRollback_OnRuleViolation()
     {
         var (engine, instance) = CompileAndCreate(WorkOrderDsl);
 
