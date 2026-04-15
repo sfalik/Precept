@@ -279,8 +279,8 @@ internal sealed class PreceptPreviewHandler : IJsonRpcRequestHandler<PreceptPrev
             .ToArray();
 
         var ruleDefinitions = new List<PreceptPreviewRuleInfo>();
-        foreach (var inv in session.Model.Rules ?? Array.Empty<PreceptRule>())
-            ruleDefinitions.Add(new PreceptPreviewRuleInfo("rule", inv.ExpressionText, inv.Reason));
+        foreach (var rule in session.Model.Rules ?? Array.Empty<PreceptRule>())
+            ruleDefinitions.Add(new PreceptPreviewRuleInfo("rule", rule.ExpressionText, rule.Reason));
         foreach (var sa in session.Model.StateEnsures ?? Array.Empty<StateEnsure>())
             ruleDefinitions.Add(new PreceptPreviewRuleInfo($"state:{sa.Anchor.ToString().ToLowerInvariant()}:{sa.State}", sa.ExpressionText, sa.Reason));
         foreach (var ea in session.Model.EventEnsures ?? Array.Empty<EventEnsure>())

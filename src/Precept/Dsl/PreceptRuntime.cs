@@ -1646,20 +1646,20 @@ public sealed class PreceptEngine
             return Array.Empty<ConstraintViolation>();
 
         var violations = new List<ConstraintViolation>();
-        foreach (var inv in _rules)
+        foreach (var rule in _rules)
         {
             // Guard pre-flight: when guard is present and evaluates false, skip this rule
-            if (inv.WhenGuard is not null)
+            if (rule.WhenGuard is not null)
             {
-                var guardResult = PreceptExpressionRuntimeEvaluator.Evaluate(inv.WhenGuard, data);
+                var guardResult = PreceptExpressionRuntimeEvaluator.Evaluate(rule.WhenGuard, data);
                 if (!guardResult.Success || guardResult.Value is not true)
                     continue;
             }
 
-            var result = PreceptExpressionRuntimeEvaluator.Evaluate(inv.Expression, data);
+            var result = PreceptExpressionRuntimeEvaluator.Evaluate(rule.Expression, data);
             if (!result.Success || result.Value is not bool boolVal || !boolVal)
             {
-                var subjects = ExpressionSubjects.Extract(inv.Expression);
+                var subjects = ExpressionSubjects.Extract(rule.Expression);
                 var targets = new List<ConstraintTarget>();
                 foreach (var fieldName in subjects.FieldReferences)
                     targets.Add(new ConstraintTarget.FieldTarget(fieldName));
@@ -1667,8 +1667,8 @@ public sealed class PreceptEngine
                 targets.Add(new ConstraintTarget.DefinitionTarget());
 
                 violations.Add(new ConstraintViolation(
-                    inv.Reason,
-                    new ConstraintSource.RuleSource(inv.ExpressionText, inv.Reason, inv.SourceLine),
+                    rule.Reason,
+                    new ConstraintSource.RuleSource(rule.ExpressionText, rule.Reason, rule.SourceLine),
                     targets));
             }
         }

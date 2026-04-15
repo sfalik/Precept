@@ -81,18 +81,20 @@ The `vocabulary` object contains the following keyword lists, each reflecting `P
 
 | Property | `TokenCategory` | Keywords |
 |---|---|---|
-| `ControlKeywords` | `Control` | `when` |
-| `DeclarationKeywords` | `Declaration` | `precept`, `field`, `rule`, `state`, `event`, `ensure`, `edit`, `in`, `to`, `from`, `on` |
-| `GrammarKeywords` | `Grammar` | `as`, `with`, `nullable`, `default`, `because`, `any`, `all`, `of`, `into`, `initial` |
+| `ControlKeywords` | `Control` | `when`, `if`, `then`, `else` |
+| `DeclarationKeywords` | `Declaration` | `precept`, `field`, `as`, `nullable`, `default`, `because`, `state`, `initial`, `event`, `with`, `edit`, `in`, `to`, `from`, `on`, `any`, `all`, `of`, `into` |
+| `GrammarKeywords` | `Grammar` | `rule`, `ensure` |
 | `ActionKeywords` | `Action` | `set`, `add`, `remove`, `enqueue`, `dequeue`, `push`, `pop`, `clear` |
 | `OutcomeKeywords` | `Outcome` | `transition`, `no`, `reject` |
 | `TypeKeywords` | `Type` | `set`, `string`, `number`, `boolean`, `integer`, `decimal`, `choice`, `queue`, `stack` |
 | `ConstraintKeywords` | `Constraint` | `nonnegative`, `positive`, `min`, `max`, `notempty`, `minlength`, `maxlength`, `mincount`, `maxcount`, `maxplaces`, `ordered` |
 | `LiteralKeywords` | `Literal` | `true`, `false`, `null` |
 
-`GrammarKeywords` contains connective and modifier keywords that serve a structural grammar role — they join, qualify, or introduce parts of declarations — rather than performing computation or control flow.
+`GrammarKeywords` contains the constraint-declaration keywords `rule` and `ensure` — the two keywords that define data-truth rules and movement-truth ensures respectively. These get special visual treatment (gold highlighting) in the editor.
 
-`ControlKeywords` is intentionally narrow: it is reserved for actual guard/control-flow tokens. Statement anchors such as `state`, `in`, `to`, `from`, and `on` are emitted under `DeclarationKeywords` so the vocabulary mirrors the runtime token metadata used by syntax highlighting and semantic tokens.
+`DeclarationKeywords` contains statement anchors (`precept`, `field`, `state`, `event`, `edit`, `in`, `to`, `from`, `on`) and connective/modifier keywords (`as`, `with`, `nullable`, `default`, `because`, `initial`, `any`, `all`, `of`, `into`) that join, qualify, or introduce parts of declarations.
+
+`ControlKeywords` is intentionally narrow: it is reserved for actual guard/control-flow tokens (`when`, `if`, `then`, `else`). Statement anchors such as `state`, `in`, `to`, `from`, and `on` are emitted under `DeclarationKeywords` so the vocabulary mirrors the runtime token metadata used by syntax highlighting and semantic tokens.
 
 **Scalar type reference** — the `typeKeywords` list includes:
 
