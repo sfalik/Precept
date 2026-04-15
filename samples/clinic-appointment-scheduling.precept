@@ -1,7 +1,7 @@
 precept ClinicAppointmentScheduling
 
 # Appointment slots are kept intentionally simple: a day number and minute-of-day.
-# The event asserts show that modulo checks belong on event arguments, not fields.
+# The event ensures show that modulo checks belong on event arguments, not fields.
 
 field PatientName as string nullable
 field ScheduledDay as number default 0

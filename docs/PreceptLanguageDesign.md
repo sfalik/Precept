@@ -28,7 +28,7 @@ These principles have driven every syntax and semantics decision:
 
 3. **Minimal ceremony.** No colons, no curly braces, no semicolons. `because` is the sentinel between expressions and reasons. Keyword anchoring replaces punctuation for structure.
 
-4. **Locality of reference.** Rules live near the things they describe — invariants near fields, state asserts near states, event asserts near events. Cross-cutting auditing is a tooling concern, not a syntax concern.
+4. **Locality of reference.** Rules live near the things they describe — rules near fields, state ensures near states, event ensures near events. Cross-cutting auditing is a tooling concern, not a syntax concern.
 
 5. **Data truth vs movement truth.** `rule` = static data constraints (always hold). `ensure` = movement constraints (checked when something happens — an event fires, a state is entered or exited). The keyword tells you the category.
 
@@ -80,7 +80,7 @@ Four prepositions are used throughout the language to dereference named entities
 
 This is unambiguous at the token level — no lookahead beyond the keyword following the identifier is needed.
 
-**Multi-target shorthand:** State prepositions (`in`, `to`, `from`) accept comma-separated state names or `any` (expands to all declared states). Event prepositions (`on`) do **not** — event asserts are arg-scoped, and different events have different arg shapes.
+**Multi-target shorthand:** State prepositions (`in`, `to`, `from`) accept comma-separated state names or `any` (expands to all declared states). Event prepositions (`on`) do **not** — event ensures are arg-scoped, and different events have different arg shapes.
 
 ```precept
 # Comma-separated — one ensure per listed state internally
@@ -163,9 +163,9 @@ A `.precept` file is a flat sequence of keyword-anchored statements:
 
 While the parser accepts statements in any order, the recommended convention is:
 
-1. Fields and invariants
-2. States, state asserts, and state entry/exit actions
-3. Events and event asserts
+1. Fields and rules
+2. States, state ensures, and state entry/exit actions
+3. Events and event ensures
 4. Transition rows
 
 The language server uses this ordering for IntelliSense: it prioritizes completions for constructs that typically appear next based on what has already been declared (e.g., after fields are defined, `state` and state-related keywords are suggested first). All statement-starting keywords are valid at any point, but the LS re-ranks them based on semantic context.
@@ -264,11 +264,11 @@ Blank              := (whitespace only)
 Notes:
 - `Rule` = data truth. Always holds, checked post-commit. May reference any declared fields.
 - `StateInEnsure` = state-scoped field rule. Checked post-commit on any transition where the resulting state is the named state (entry **and** NoTransition).
-- `StateToAssert` = entry gate. Checked post-commit only when crossing **into** the named state from a different state.
-- `StateFromAssert` = exit gate. Checked post-commit only when crossing **out of** the named state to a different state.
+- `StateEnsure` (with `EnsureAnchor.To`) = entry gate. Checked post-commit only when crossing **into** the named state from a different state.
+- `StateEnsure` (with `EnsureAnchor.From`) = exit gate. Checked post-commit only when crossing **out of** the named state to a different state.
 - All three state ensure forms evaluate against the **proposed world** (post-mutation, pre-commit). Fields-scoped.
-- `EventAssert` = movement truth. Checked pre-transition when the named event fires. Scoped to that event's args only.
-- Whether `EventAssert` must appear after its `EventDecl` is not locked yet; recommended to keep asserts near the related event for readability.
+- `EventEnsure` = movement truth. Checked pre-transition when the named event fires. Scoped to that event's args only.
+- Whether `EventEnsure` must appear after its `EventDecl` is not locked yet; recommended to keep ensures near the related event for readability.
 - **`when` guards on declarations** — `WhenOpt` is an optional `when <BoolExpr>` clause on rules, state ensures, event ensures, and edit declarations. When present, the guard acts as a precondition: if false, the declaration is skipped entirely (rule/ensure not checked, edit fields not granted). Guard scope is inherited from the declaration form: rule/state-ensure/edit guards reference entity fields only; event-ensure guards reference event args only. C69 fires for cross-scope guard references (e.g. entity field in an event-ensure guard). Guarded state ensures are excluded from unconditional null-narrowing at compile time.
 - **Compile-time error:** duplicate `in` + `to` on the same state with the same expression (syntactic identity after whitespace normalization). `in` already subsumes `to`.
 - **Compile-time error:** duplicate ensure — same preposition + same state + same expression appearing more than once.
@@ -803,7 +803,7 @@ Compile-time checks (Locked):
 | 1 | `in` + `to` subsumption | Same state, same expression (syntactic identity) | Error |
 | 2 | Duplicate ensure | Same preposition + state + expression | Error |
 | 3 | `in` on initial state vs defaults | Default field values violate `in <InitialState>` expression | Error |
-| 4 | Same-preposition contradiction | Multiple asserts with same preposition on same state, conjoined per-field domains are empty | Error |
+| 4 | Same-preposition contradiction | Multiple ensures with same preposition on same state, conjoined per-field domains are empty | Error |
 | 5 | Cross-preposition deadlock | `in`/`to` vs `from` on same state, conjoined per-field domains are empty → unexitable | Error |
 
 All domain checks (#3–#5) use per-field interval/set analysis on the expression AST. Expressions involving `contains` or cross-field relationships that cannot be reduced to per-field domains are assumed satisfiable (sound — no false positives).
@@ -850,14 +850,14 @@ Forms:
 Constraints:
 - No `in <State> ->` actions (in-place mutations on every event would be surprising and dangerous)
 - No outcomes (`transition`, `no transition`, `reject`) — actions are mutations only
-- Multi-state and `any` supported (same as asserts)
+- Multi-state and `any` supported (same as ensures)
 - Fields-scoped only (no event args available)
 
 Execution order:
 1. Exit actions (`from <SourceState> ->`) run first
 2. Transition row mutations (`->` chain) run second
 3. Entry actions (`to <TargetState> ->`) run third
-4. Validation (asserts, invariants) runs last
+4. Validation (ensures, rules) runs last
 
 For `no transition` / NoTransition: no exit or entry actions fire (you didn't leave or arrive).
 
@@ -877,7 +877,7 @@ Form:
 
 - `in <StateTarget> edit <FieldList>`
 
-Where `<FieldList>` is a comma-separated list of declared field names. `<StateTarget>` follows the same rules as state asserts: a single state, comma-separated states, or `any`.
+Where `<FieldList>` is a comma-separated list of declared field names. `<StateTarget>` follows the same rules as state ensures: a single state, comma-separated states, or `any`.
 
 Examples:
 
@@ -994,7 +994,7 @@ The runtime `Update` API, `IUpdatePatchBuilder`, validation pipeline, and inspec
 
 ---
 
-## Events (Locked: event-level asserts are arg-only)
+## Events (Locked: event-level ensures are arg-only)
 
 ### Event declarations
 
@@ -1049,12 +1049,12 @@ Scope (Locked):
 - `<BoolExpr>` may reference **only** that event’s argument identifiers.
 - Dotted access on args is permitted if the underlying expression language supports it (e.g., `items.count`).
 - Referencing any non-arg identifier (including fields) is a parse/validation error.
-- Validation that combines event args with field state belongs in `when` guards on transition rows, not in event asserts. Event asserts answer "is this event well-formed?" — `when` guards answer "does this event apply given the current state?"
+- Validation that combines event args with field state belongs in `when` guards on transition rows, not in event ensures. Event ensures answer "is this event well-formed?" — `when` guards answer "does this event apply given the current state?"
 
 **`when` guards on event ensures:** Event ensures accept an optional `when <Guard>` clause: `on <Event> ensure <Expr> when <Guard> because "..."`. Guards on event ensures are **arg-scoped only** — consistent with the event-ensure body scope. C69 fires for entity field references in event-ensure guards. When the guard is false, the ensure is skipped.
 
 Semantics (Locked ordering):
-- Event asserts run **before** transition selection.
+- Event ensures run **before** transition selection.
 - If an event ensure is false, the fire/inspect outcome is `Rejected` with the provided reason.
 
 Example:
@@ -1249,7 +1249,7 @@ from <StateTarget> on <EventName> [when <BoolExpr>] [-> <Action>]* -> <Outcome>
 - `from Open, InProgress on Close -> transition Closed`
 - `from any on Prioritize -> set Priority = Prioritize.Level -> no transition`
 
-Same expansion as state asserts — one row per state internally.
+Same expansion as state ensures — one row per state internally.
 
 ### First-match evaluation
 
@@ -1333,7 +1333,7 @@ When a transition row matches:
 5. **Entry actions** (`to <TargetState> ->`) — automatic mutations on entering target state.
 6. **Validation** — rules, state ensures (`in`/`to`/`from`), field rules. Collect-all. If any fail → full rollback, `ConstraintFailure` (see `ConstraintViolationDesign.md` for the `Rejected` vs `ConstraintFailure` distinction — `Rejected` is reserved for author-explicit `reject` outcomes and event ensure failures).
 
-For `no transition`: steps 3 and 5 are skipped (no state change). `in <State>` asserts still run (the resulting state is the current state).
+For `no transition`: steps 3 and 5 are skipped (no state change). `in <State>` ensures still run (the resulting state is the current state).
 
 ### Compile-time checks
 
@@ -1571,7 +1571,7 @@ The current type-checking surface is intentionally conservative and already comp
 
 | Area | Current behavior | Likely direction |
 |---|---|---|
-| Event-arg scope and narrowing (Locked) | Transition rows require dotted form (`Event.Arg`); event asserts use bare arg names. Narrowing applies to exact symbol form. | No design change needed — enforce dotted-only in transition row symbol tables and add tests |
+| Event-arg scope and narrowing (Locked) | Transition rows require dotted form (`Event.Arg`); event ensures use bare arg names. Narrowing applies to exact symbol form. | No design change needed — enforce dotted-only in transition row symbol tables and add tests |
 | Event-ensure scope isolation (Locked) | Event ensures are arg-only; field references are a compile-time error (C14/C15/C16) | No change needed — arg+state validation belongs in `when` guards, not event ensures |
 | Boolean-only rule positions | `when`, `ensure`, and `rule` are expected to produce boolean | Continue hardening so every non-boolean rule position is rejected uniformly |
 | Collection mutation contracts (Locked) | Inner-type and `into` checks exist; nullable values require explicit narrowing | No change needed — existing C42 null-flow violation enforces this consistently across all collection verbs |
@@ -1598,8 +1598,8 @@ Locked in this discussion:
   - `from <State> ensure` — exit gate; only on cross-state exit
   - `on <Event> ensure` — event-fire constraint, arg-only
 - State entry/exit actions: `to <State> -> <actions>`, `from <State> -> <actions>`; fields-scoped, no outcomes, no `in` actions
-- All state asserts/actions evaluate against the proposed world (post-mutation, pre-commit); fields-scoped
-- Multi-state and `any` for state asserts, state actions, and transition rows; not for event asserts
+- All state ensures/actions evaluate against the proposed world (post-mutation, pre-commit); fields-scoped
+- Multi-state and `any` for state ensures, state actions, and transition rows; not for event ensures
 - `in X` strictly subsumes `to X`; duplicate = compile-time error
 - Cross-checking `in`/`to` vs `from` on same state for contradictions via per-field domain analysis; provably unexitable state = compile-time error
 - Event declarations use `with` instead of parentheses: `event Submit with items as set of string`
@@ -1609,7 +1609,7 @@ Locked in this discussion:
 - `->` pipeline: sequential, read-your-writes, separates context from actions
 - First-match evaluation for multiple rows on same `(state, event)`; no catch-all required
 - `when` = applicability precondition → `Unmatched` if no row matches
-- Execution order: event asserts → when guard → exit actions → row mutations → entry actions → validation
+- Execution order: event ensures → when guard → exit actions → row mutations → entry actions → validation
 - Coverage warning (not error) for reachable `(state, event)` pairs without transition rows
 - Unreachable row after unguarded row = compile-time error
 - Editable field declarations: stateful form `in <StateTarget> [when <Guard>] edit <FieldList>` and stateless root form `edit <FieldList> [when <Guard>]` / `edit all [when <Guard>]` — flat comma-separated syntax, additive across declarations, `any` support for stateful forms, runtime `Update`/`Inspect` integration implemented.

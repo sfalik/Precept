@@ -1,7 +1,7 @@
 precept MaintenanceWorkOrder
 
 # A facilities work order from intake through scheduling and completion.
-# This sample introduces stronger guard logic and a from-state assertion.
+# This sample introduces stronger guard logic and a from-state ensure.
 
 field RequesterName as string nullable
 field Location as string nullable
