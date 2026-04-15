@@ -1061,15 +1061,16 @@ This is what makes temporal types the gateway: they don't just add temporal capa
 
 | Left | Op | Right | Result | Notes |
 |---|---|---|---|---|
-| `date` | `+` | `period` | `date` | Calendar arithmetic. Truncation at month end. |
-| `date` | `-` | `period` | `date` | Calendar arithmetic backward. |
+| `date` | `+` | `period dateonly` | `date` | Calendar arithmetic. Truncation at month end. Period must be provably date-only (Decision #26) — NodaTime throws on time components. `date + period` (unconstrained) is a compile error. |
+| `date` | `-` | `period dateonly` | `date` | Calendar arithmetic backward. Same constraint — period must be provably date-only. `date - period` (unconstrained) is a compile error. |
 | `date` | `-` | `date` | `period` | Calendar distance. `Period.Between`. |
 | `period` | `+` | `period` | `period` | Combined. |
 | `period` | `-` | `period` | `period` | Difference. |
-| `datetime` | `+` | `period` | `datetime` | Calendar arithmetic on date part. |
-| `datetime` | `-` | `period` | `datetime` | Backward. |
+| `datetime` | `+` | `period` | `datetime` | Calendar arithmetic on date part. No constraint — `LocalDateTime.Plus(Period)` accepts all components. |
+| `datetime` | `-` | `period` | `datetime` | Backward. No constraint — same as addition. |
 | `datetime` | `-` | `datetime` | `period` | Calendar distance. |
-| `time` | `+` | `period` | `time` | `LocalTime.Plus(Period)`. Time components only; date components ignored. |
+| `time` | `+` | `period timeonly` | `time` | `LocalTime.Plus(Period)`. Period must be provably time-only (Decision #26) — NodaTime throws on date components. `time + period` (unconstrained) is a compile error. |
+| `time` | `-` | `period timeonly` | `time` | `LocalTime.Minus(Period)`. Same constraint — period must be provably time-only. `time - period` (unconstrained) is a compile error. |
 
 **Timeline domain (uses `duration`):**
 
@@ -1084,6 +1085,7 @@ This is what makes temporal types the gateway: they don't just add temporal capa
 | `duration` | `/` | `integer`/`number` | `duration` | Scaling. |
 | `duration` | `/` | `duration` | `number` | Ratio. |
 | `time` | `+` | `duration` | `time` | Wraps at midnight. |
+| `time` | `-` | `duration` | `time` | Wraps at midnight (backward). |
 | `time` | `-` | `time` | `period` | Time-unit period. |
 | `zoneddatetime` | `+` | `duration` | `zoneddatetime` | Timeline arithmetic. |
 | `zoneddatetime` | `-` | `duration` | `zoneddatetime` | Backward. |
