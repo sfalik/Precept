@@ -46,7 +46,7 @@ The DSL's event pipeline maps cleanly to the actor model: private state, message
 
 ### Rules as the safety net
 
-Editable fields are viable *because* rules exist. Without rules, direct field editing would bypass all data integrity constraints. With rules, the DSL author declares rules once (`rule Balance >= 0 "..."`) and those rules are enforced regardless of whether the field changes via an event `set` assignment or a direct `Update` call.
+Editable fields are viable *because* rules exist. Without rules, direct field editing would bypass all data integrity constraints. With rules, the DSL author declares rules once (`rule Balance >= 0 because "..."`) and those rules are enforced regardless of whether the field changes via an event `set` assignment or a direct `Update` call.
 
 ## Syntax
 

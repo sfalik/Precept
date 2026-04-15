@@ -22,13 +22,13 @@ Background: `#0c0c0f`
 | # | Family | Hex | Typography | Tokens |
 |---|--------|-----|------------|--------|
 | 1 | Structure · Semantic | `#4338CA` | **bold** | `precept`, `field`, `as`, `nullable`, `default`, `state`, `initial`, `event`, `with`, `edit`, `in`, `to`, `from`, `on`, `when`, `if`, `then`, `else`, `any`, `all`, `of`, `into`, `set`, `transition`, `reject`, `no` |
-| 2 | Structure · Grammar | `#6366F1` | normal | `rule`, `ensure`, constraint keywords, `=`, `->`, operators, punctuation |
+| 2 | Constraint · Operators | `#6366F1` | normal | constraint keywords, `=`, `->`, operators, punctuation |
 | 3 | States | `#A898F5` | normal / *italic if constrained* | State names |
 | 4 | Events | `#30B8E8` | normal / *italic if constrained* | Event names |
 | 5 | Data · Names | `#B0BEC5` | normal / *italic if guarded* | Field names, argument names |
 | 6 | Data · Types | `#9AA8B5` | normal | `string`, `number`, `boolean`, `integer`, `decimal`, `choice`, `set`, `queue`, `stack` |
 | 7 | Data · Values | `#84929F` | normal | `true`, `false`, `null`, string literals, number literals |
-| 8 | Rules · Messages | `#FBBF24` | normal | String content in `because` / `reject`, and the precept name |
+| 8 | Rule Grammar · Messages | `#FBBF24` | normal | `rule`, `ensure`, string content in `because` / `reject`, and the precept name |
 
 Verdict colors (`#34D399` enabled, `#F87171` blocked, `#FDE047` warning) are runtime-only — never in syntax highlighting.
 
@@ -87,11 +87,13 @@ Current classification:
 | Action | `preceptKeywordSemantic` | `set`, `add`, `remove`, `enqueue`, `dequeue`, `push`, `pop`, `clear` |
 | Outcome | `preceptKeywordSemantic` | `transition`, `reject`, `no` |
 | Grammar | `preceptKeywordGrammar` | `rule`, `ensure` |
-| Constraint | `preceptKeywordGrammar` | `nonnegative`, `positive`, `min`, `max`, `notempty`, `minlength`, `maxlength`, `mincount`, `maxcount`, `maxplaces`, `ordered` |
+| Constraint | `preceptKeywordGrammar` (constraint fallback lane in the locked palette) | `nonnegative`, `positive`, `min`, `max`, `notempty`, `minlength`, `maxlength`, `mincount`, `maxcount`, `maxplaces`, `ordered` |
 | Type | `preceptType` | `string`, `number`, `boolean`, `integer`, `decimal`, `choice`, `set`, `queue`, `stack` |
 | Literal | `preceptValue` | `true`, `false`, `null` |
 | Operator | `preceptKeywordGrammar` | All comparison, logical, arithmetic, assignment, and `contains` operators |
 | Punctuation | `preceptKeywordGrammar` | `->` only |
+
+The semantic-token legend still reuses `preceptKeywordGrammar` for both `Grammar` and `Constraint` categories, but the locked package/TextMate color map renders them differently: `rule` / `ensure` land in the gold grammar lane, while constraint keywords keep the indigo constraint lane.
 
 Identifier classification (context-aware via `ClassifyIdentifier()`):
 
