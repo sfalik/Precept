@@ -20,6 +20,100 @@
 - Reconciled the editability/documentation story across `docs/PreceptLanguageDesign.md`, `docs/EditableFieldsDesign.md`, `docs/RuntimeApiDesign.md`, and `docs/McpServerDesign.md`.
 - Validation recorded on branch `squad/88-docs-reconcile-editability`: `git diff --check` and `dotnet test --no-restore`.
 - Commit `9ea5609` pushed; PR #90 checklist updated and left clean for review.
+### 2026-04-15 — `+`-Only Combination: Drop Composites Entirely
+- **Verdict: APPROVED (UNCONDITIONAL).** Shane proposed dropping composite temporal literals (`2 years 6 months` juxtaposition) and the `and` combiner, standardizing on `+` as the sole combination operator. Supersedes prior APPROVED WITH CONDITIONS.
+- **Parser simplification quantified:** Removes ~45–60 lines: composite combinator, composite model type, composite type-check pass, composite desugaring, composite-specific diagnostics. Postfix atoms (bare + paren) and existing `Parse.Chain` at Level 3 (additive) handle everything.
+- **Precedence chain verified:** `Parse.Chain` produces left-associative `+`. `CreatedDate + 2 years + 6 months + 15 days` → `((CreatedDate + (2 years)) + (6 months)) + (15 days)`. Each step: `date + period → date`. Standard, predictable.
+- **Month-end truncation noted:** Left-associative `date + 1 month + 1 month` applies sequential truncation (→ Mar 29), while compound period `date + (1 month + 1 month)` applies once (→ Mar 31). Not a problem: left-assoc is the universal standard, users have explicit paren control, no hidden dual semantics.
+- **`and` as combiner correctly rejected:** Dual-meaning with boolean `and`, wrong precedence level, violates keyword-symbol framework.
+- **All 5 prior conditions dispositioned:** Condition #1 (composites literal-only) eliminated — no composites exist. Conditions 2–8 retained from unified postfix analysis (atom ordering, context resolution, ambiguous-standalone error, decision rewrites).
+- **5 design principles improved, 0 degraded:** #1 (deterministic — no hidden desugaring), #3 (minimal ceremony — one mechanism), #8 (compile-time — standard binary type-check), #9 (tooling — one completion pattern), #12 (AI — one combination pattern).
+- Decision filed: `.squad/decisions/inbox/frank-plus-only-no-composites.md`
+
+### 2026-04-15 — Unified Postfix Model Analysis: Eliminate Function-Call Constructors
+- **Verdict: APPROVED WITH CONDITIONS.** Shane proposed eliminating all 7 function-call temporal constructors (`days(30)`, `hours(3)`, etc.) and replacing with a unified postfix model: `<integer> <unit>` for literals, `( <expression> ) <unit>` for expressions.
+- **Parser feasibility confirmed.** `PostfixUnitExprParen` combinator using `.Try()` before `ParenExpr` in atom chain. Backtracking on missing unit keyword is clean — Superpower token-stream pointer arithmetic, negligible cost.
+- **Critical atom ordering:** `PostfixUnitExprBare` must precede `NumberAtom` (both start with NumberLiteral). `PostfixUnitExprParen` must precede `ParenExpr` (both start with LeftParen).
+- **No disambiguation loss in practice.** The "fixed return type" of `days(n) → period` was only a one-directional escape hatch. For instant context, function calls were ALREADY insufficient (`instant + days(3)` = type error). Typed literals (`period(P30D)`, `duration(PT72H)`) remain for explicit disambiguation.
+- **Composite literals: literal-only condition.** `2 years 6 months` stays. `(X) years (Y) months` → use `(X) years + (Y) months` with explicit addition. CSS parallel: constants are bare composites, computation uses operators.
+- **Net complexity: NEGATIVE.** Eliminates 7 function signatures, `FunctionRegistry` entries, `FunctionCallAtom`-vs-`TypedLiteralAtom` disambiguation, and dual-syntax teaching burden. Adds ~15-line combinator + ~5-line model type.
+- **Decisions affected:** #17 rationale must be rewritten (no "three gaps" without function calls to gap against). #18 "distinction from function calls" clause eliminated. Constructor tables replaced by single unit-keywords table.
+- **Three design principles strengthened:** #2 (English-ish — `(GraceDays) days` reads naturally), #3 (minimal ceremony — one form not two), #12 (AI consumer — one pattern to learn).
+- **Forward design: improved.** `(expression) unit` generalizes better to future domains (currency, physical, entity-scoped) than function-call constructors.
+- Decision filed: `.squad/decisions/inbox/frank-unified-postfix-analysis.md`
+
+### 2026-04-14 — Postfix Unit Literals added to Temporal Proposal (Decision #17)
+- **Owner directive accepted:** Shane approved Option C (both function-call and postfix syntax) with context-dependent type resolution. Captures the insight that `instant + 3 days` is unambiguous — the author wrote it in a typed context.
+
+### 2026-04-14 — External Research: Native ISO Date/Time Literals
+- **Deliverable:** `research/language/expressiveness/native-date-time-literals.md`
+- **VB precedent fully analyzed:** Four distinct VB problems (locale ambiguity, type conflation, non-standard delimiter, weak backing type). All four addressed by Precept's ISO-only format + NodaTime + separate types. **VB precedent does NOT apply.**
+- **14-system precedent survey:** TOML (success, no expressions), SQL (success, keyword-prefixed), Elixir (success, sigil-prefixed), YAML (failure, implicit typing = Norway Problem), VB (failure), FEEL/DMN (constructors), Crystal/Ruby/Kotlin/Ballerina (no date literals), GraphQL (anti-example), CSS (unit literal precedent), Power Fx (function calls).
+- **Key finding: No successful precedent for bare ISO dates inside expression languages with arithmetic operators.** Every success story uses no expressions (TOML), keyword prefix (SQL), or sigil prefix (Elixir). This is a NEW risk not covered by the VB-era objections.
+- **Lexer risk confirmed:** `2024-01-15` vs `2024 - 01 - 15` requires either whitespace-sensitive tokenization, context-sensitive parsing (fights Superpower), or greedy matching with validation. Solvable but adds permanent parser complexity.
+- **Asymmetry problem:** Native literals only work cleanly for `date`. `time` (colon conflicts), `instant`/`datetime` (T/Z characters), `duration`/`period` (ISO P-notation) all still need constructors. One type with native literals, five without = style asymmetry.
+- **Four options presented:** (A) Stay with constructors only, (B) Native date literals only, (C) SQL-style keyword-prefixed literals, (D) Defer — ship constructors, measure demand, decide later.
+- Updated research README temporal trail with new file.
+- **Three NodaTime alignment gaps closed:** (1) `Duration.FromDays` divergence — `days(n)` only returns `period`, postfix `3 days` resolves to `duration` in instant context. (2) No time-unit Period factories — `hours(n)` only returns `duration`, postfix `8 hours` resolves to `period` in period-field default context. (3) No `Duration.FromDays` access path — `instant + 3 days` now maps to `Duration.FromDays(3)`.
+- **Key design constraint:** Postfix literals work ONLY with integer literals. Variable arguments require function-call syntax. `GraceDays days` is a compile error. Ambiguous standalone `3 days` (no type context) is a compile error.
+- **Composite literal syntax:** `2 years 6 months 15 days` parses as a single composite — desugars to addition of unit components. All components must resolve to the same target type.
+- **Parser implications:** New expression form `<integer-literal> <unit-keyword>` with greedy composite parsing. Unit keywords in postfix position must not be consumed as identifiers. The parser must recognize unit keywords only after integer literals.
+- **Type checker implications:** Context-dependent resolution is the inverse of what the type checker normally does (types flow outward from leaves, here the target type flows inward from context). Needs careful bidirectional type inference design.
+- **Files updated:** `temporal-type-system-proposal.md` (constructor syntax decision, new Postfix Unit Literals section, Decision #17, updated type sections with postfix examples, expanded parser/type-checker impl scope, 14 new acceptance criteria). `temporal-type-strategy.md` (Phase 1 and Phase 2 include notes).
+- **Precedent base:** F# units of measure, CSS unit literals (`3px`, `2em`), FEEL duration literals, Kotlin duration extensions (`3.days`).
+
+### 2026-07-23 — Deep Dive: Expression Languages with Temporal Values
+- **Deliverable:** New §3 in `research/language/expressiveness/native-date-time-literals.md` — 200+ lines of documentation-verified findings from 10+ language ecosystems.
+- **FEEL/DMN is the decisive precedent.** The OMG standard for business expressions explicitly states "Date literals are not supported in FEEL." Uses `date("2017-06-23")` constructor with full operator-based arithmetic (`date - date = duration`, `datetime + duration`). DMN 1.3+ added `@"..."` prefix notation — still prefix-annotated, not bare. FEEL targets exactly Precept's audience (business analysts).
+- **Flux is the only partial counterexample.** Has bare datetime literals (`2018-01-01`) but PREVENTS arithmetic operators on Time values — `Time` is explicitly NOT Subtractable or NOT Addable. Date arithmetic via function calls only (`date.add()`). Bare literals work because the `2024-01-15` vs `2024 - 01 - 15` ambiguity is structurally impossible. Deprecated in favor of SQL-based InfluxDB 3.
+- **KQL/Kusto validates constructor + postfix pattern.** `datetime(2015-12-31)` constructor with full operator arithmetic. Postfix duration units (`1d`, `5h`, `1s`) are exactly Precept's Decision #17 pattern. Microsoft's primary time-series query language chose constructors despite every incentive to optimize for date entry.
+- **"Compile-time validated constructor" pattern named.** Cedar, KQL, FEEL, and Precept all independently converge on: constructor takes string literal → validator checks at compile/analysis time → functionally equivalent to native literal for constants. The only difference is syntax, not capability.
+- **Postfix duration units validated across ecosystems.** Solidity (`1 days`, `24 hours` — numeric multipliers), KQL (`1d`, `5h`), PromQL (`5m`, `1h30m`), Pkl (`5.min`, `3.d`). Solidity removed `years` suffix in v0.5.0 — cautionary precedent.
+- **Original finding CONFIRMED:** Every language that supports BOTH temporal values AND operator-based arithmetic on those values uses constructors, not bare literals. The `date("2024-01-15")` pattern IS the proven design.
+
+### 2026-04-12 — Issue #17 Design Review: Computed Fields Proposal
+- **Verdict: APPROVED.** Strongest language proposal this project has produced. All 7 philosophy filter questions passed. All 3 impact categories covered. 11/11 locked decisions have complete 4-point rationale. ~37 behavioral ACs.
+- **Key architectural observation:** The `->` dual role (action introducer in transitions, derivation operator in fields) is cleanly disambiguated by parser context. `FieldDecl` tries `-> Expression ConstraintSuffix*` vs `FieldModifier*`. Constraint keywords after the derived expression are token-type-distinct from expression identifiers — Superpower handles this naturally.
+- **Parser concern flagged (W5):** Expression-then-constraint boundary (`field X as number -> A + B nonnegative`) relies on constraint keywords being reserved tokens that the expression parser won't consume. Works, but implementers should be aware.
+- **Multi-name declaration concern flagged (W6):** `field A, B as number -> expr` is not addressed. Recommended: disallow at parser level — each computed field should have its own declaration for readable dependency tracking.
+- **Recomputation contract confirmed correct:** One pass after ALL mutation phases (exit + row + entry in Fire, field edits in Update, simulated on clone in Inspect), before constraint evaluation. No per-phase recomputation. This is the single most important semantic contract.
+- **Research quality:** 24-system survey across all 7 philosophy positioning categories with cross-category structural gap finding — no surveyed system combines field-level derivation with lifecycle-aware constraint enforcement. Dead-end analysis covers 5 rejected directions with reasons.
+- **6 non-blocking warnings filed:** syntax highlighting not explicitly listed, `precept_language` vocabulary gap, no stateless precept AC, conditional expression not explicitly addressed, expression-then-constraint parsing, multi-name declaration interaction.
+- Full review: `temp/frank-proposal-review-17.json`
+
+### 2026-04-11 — Modifier any-order investigation (Issue #13)
+- **Key architecture finding:** The fixed modifier order (`nullable → default → constraints → ordered`) is enforced ONLY by two parser combinator chains (`FieldDecl` line 697, `EventArg` line 774). Model types, type checker, runtime, grammar, and MCP are all already order-independent.
+- **Constraint zone is already any-order:** `ConstraintSuffix.Many()` already allows constraints in any order. The rigidity is only between the four zones (nullable, default, constraints, ordered).
+- **Completions are the heavy lift:** `PreceptAnalyzer.cs` has ~30 regex patterns that hardcode position-dependent modifier sequences. These must be replaced with a dynamic "remaining modifiers" approach. The parser change itself is ~50 lines.
+- **Doc inconsistency found:** `PreceptLanguageDesign.md` prose says constraints appear "between the type (and `nullable`) and the `default` clause" but the grammar spec and parser put default BEFORE constraints. Needs correction regardless of this issue.
+- **Implementation approach:** Discriminated union `FieldModifier` with `.Many()` combinator. Extract properties from modifier list post-parse. Duplicate modifier detection via type checker (consistent with C58 precedent).
+- **Event arg comma boundary:** Superpower's `.Many()` uses `TryParse` internally — modifier parsing naturally stops at comma delimiters. Needs explicit test verification.
+- **Collection fields unaffected:** They only take constraints (no nullable/default/ordered), so they're already flexible.
+- **Recommended slicing:** (A) parser + type checker + tests, (B) completions rework, (C) docs.
+- Full analysis: `.squad/decisions/inbox/frank-modifier-any-order-investigation.md`
+
+### 2026-04-11 — Variadic min/max decision (Issue #16)
+- Updated proposal for comprehensive built-in functions to make min/max variadic (≥ 2 args, no upper limit) per Shane's approved decision.
+- Binary-only min/max was the original draft; variadic is the locked form. The mathematical arity-independence of min/max justifies the exception to fixed-arity signatures.
+- Collection overloads for min/max rejected — `.min`/`.max` accessors already serve that role. Added as explicit exclusion.
+- Key proposal changes: 6 signature updates, new locked decision #8, exclusion rewrite, new semantic rule, teachable error message, acceptance criteria updates, 3-arg example.
+- Decision filed: `.squad/decisions/inbox/frank-variadic-min-max.md`
+
+## Recent Updates
+
+### 2025-07-22 — Temporal proposal v2 rewrite (NodaTime alignment directive)
+- **Full rewrite** of `research/language/expressiveness/temporal-type-system-proposal.md` per two owner directives: "No obscurity, expose NodaTime" and "Don't reinvent the wheel."
+- **`period` promoted to full surface type in Phase 1.** Backed by `NodaTime.Period`. Fields (`field LoanTerm as period`), expressions, constructors (`days`, `months`, `years`, `weeks` → `period`), arithmetic (`date + period`, `date - date → period`), equality (structural, no ordering).
+- **`date + integer` is now a type error.** NodaTime `LocalDate` has no `operator+(int)`. With `period` exposed, bare integers are ambiguous. Use `date + days(n)`.
+- **`date - date → period`** (was `→ duration` in v1). Maps to `Period.Between(LocalDate, LocalDate)`.
+- **`period` is date-only** — years, months, weeks, days. No time components.
+- **No custom operator dispatch.** Period/duration type separation eliminates the v1 `TemporalOperatorDispatch` mechanism entirely.
+- **15 locked decisions** (was 11 in v1). New: `period` as surface type, constructor return types, period equality/ordering, period date-only, `date + integer` type error.
+- **8 types total** (was 6 in v1): `date`, `time`, `instant`, `duration`, `period`, `timezone`, `zoneddatetime`, `datetime`.
+- Strategy file updated: phasing, operator tables, constructor split.
+- v1 backed up as `temporal-type-system-proposal-v1.md`.
+- Decision filed: `.squad/decisions/inbox/frank-temporal-proposal-v2.md`
+
 ### 2026-04-13 — Unified temporal type system proposal
 
 - Wrote the complete, unified temporal type proposal at `research/language/expressiveness/temporal-type-system-proposal.md`.
@@ -114,6 +208,14 @@
 - **Stateful case (Issue B):** Deferred as Issue B. Three unresolved questions: execution order position (Frank recommends Option 3 — after row mutations, before exit actions — citing SCXML §3.13 as normative precedent), outcome-scoping (fires on Unmatched?), and explicit Principle 7 exception rationale.
 - C49 revision required for Issue A: events with hooks suppress C49; events with asserts but no hooks get lower-severity warning.
 - Confirmed `ActionChain` reuse: `EventActionDecl` shares the existing parser combinator, no changes needed.
+
+### 2026-04-14 — Period full-NodaTime correction + sub-day duration bridging (Decision #16)
+- **Fixed structural contradiction:** `period` was date-only in v2 proposal, but NodaTime's `LocalTime.Plus(Period)` is the native API for time arithmetic, `Period.Between(LocalTime, LocalTime)` returns time-component periods, and `LocalTime` has no `Plus(Duration)` method. Date-only period created three breaks with NodaTime.
+- **Decision #13 revised:** `period` is now the full `NodaTime.Period` — date AND time components. `.hours`, `.minutes`, `.seconds` accessors. `.hasDateComponent`, `.hasTimeComponent` introspection. `period("PT5H")` and `period("P1MT2H")` are valid.
+- **Decision #16 added:** Sub-day duration bridging. `hours(n)` → `duration` stays. Type checker allows `time + duration → time` via thin nanosecond translation on `LocalTime`. For sub-day units, Duration and Period represent identical physical quantities (1 hour = 3600s regardless). Option E selected over A (compile-time impossible for period fields), C (implicit), D (verbose duplication).
+- **Key NodaTime facts confirmed:** `LocalTime.Plus(Period)` exists, `LocalTime.Plus(Duration)` does NOT. `Period.Between(LocalTime, LocalTime)` returns time-only Period. `Period.ToDuration()` safe for time-only periods. NodaTime has both `Duration.FromHours(1)` and `Period.FromHours(1)`.
+- Files updated: proposal (period section rewritten, time section fixed, decisions #13/#16, cross-type matrix, ACs, exclusions, implementation scope) and strategy (type table, time table, Phase 1 description).
+- Decision filed: `.squad/decisions/inbox/frank-period-full-nodatime.md`
 
 
 
