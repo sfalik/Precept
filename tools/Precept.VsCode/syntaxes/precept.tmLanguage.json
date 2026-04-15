@@ -86,7 +86,7 @@
           "match": "^(\\s*)(precept)(\\s+)([A-Za-z_][A-Za-z0-9_]*)",
           "captures": {
             "2": { "name": "keyword.control.precept" },
-            "4": { "name": "entity.name.precept.message.precept" }
+            "4": { "name": "entity.name.type.precept.precept" }
           }
         }
       ]
