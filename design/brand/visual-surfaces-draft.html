@@ -24,8 +24,8 @@
 <p><strong>Color application:</strong> Use the complete 8-shade authoring palette (§4) exactly as locked. Syntax highlighting tokens map to the semantic system:</p>
 <ul style="margin-left: 16px; color: #a1a1aa;">
   <li><strong>Indigo shades</strong> (#4338CA semantic, #6366F1 grammar) for structure keywords and grammar — establishes the control backbone of the file</li>
-  <li><strong>Violet</strong> (#A898F5) for state names; italic if constrained by `assert`</li>
-  <li><strong>Cyan</strong> (#30B8E8) for event names; italic if constrained by `assert`</li>
+  <li><strong>Violet</strong> (#A898F5) for state names; italic if constrained by `ensure`</li>
+  <li><strong>Cyan</strong> (#30B8E8) for event names; italic if constrained by `ensure`</li>
   <li><strong>Slate shades</strong> (#B0BEC5 names, #9AA8B5 types, #84929F values) for data — three depths separate at a glance</li>
   <li><strong>Gold</strong> (#FBBF24) for message strings in `because` and `reject` — the human explanation earns the warm interrupt</li>
   <li><strong>Comments</strong> (#9096A6, italic) — intentionally muted, outside the semantic palette</li>
@@ -34,8 +34,8 @@
 
 <p><strong>Typography application:</strong> Cascadia Cove monospace, standard rendering sizes (13–14px in VS Code). Typography is the second signal channel alongside color:</p>
 <ul style="margin-left: 16px; color: #a1a1aa;">
-  <li><strong>Bold:</strong> Structure semantic keywords — `precept`, `field`, `state`, `event`, `invariant`, etc. Weight signals "this word drives behavior"</li>
-  <li><strong>Italic:</strong> Constrained states, constrained events, and invariant-guarded field names. Italic says "this token is under rule pressure"</li>
+  <li><strong>Bold:</strong> Structure semantic keywords — `precept`, `field`, `state`, `event`, `rule`, etc. Weight signals "this word drives behavior"</li>
+  <li><strong>Italic:</strong> Constrained states, constrained events, and rule-referenced field names. Italic says "this token is under rule pressure"</li>
   <li><strong>Normal weight:</strong> Structure grammar, unconstrained actors, data types, values, and rule message text</li>
 </ul>
 
@@ -60,7 +60,7 @@
 <p><strong>Primary visual concerns:</strong></p>
 <ul style="margin-left: 16px; color: #a1a1aa;">
   <li>Visual hierarchy of state roles — initial, intermediate, and terminal states must be instantly distinguishable by shape and color</li>
-  <li>Event labeling — transition arrows must clearly show which event fires the edge, and conditional transitions need guards/assertions visible</li>
+  <li>Event labeling — transition arrows must clearly show which event fires the edge, and conditional transitions need guards and ensures visible</li>
   <li>Layout legibility — node spacing, edge routing, and label placement must prevent visual tangles even with 10+ states</li>
   <li>Runtime outcome visualization — during inspection, nodes may highlight to show enabled/blocked state transitions</li>
 </ul>
@@ -83,7 +83,7 @@
 <ul style="margin-left: 16px; color: #a1a1aa;">
   <li><strong>State names:</strong> 12–13px, centered on node, violet text. Legible even at small zoom</li>
   <li><strong>Event labels:</strong> 11–12px, positioned above or below edge, cyan text. Label placement must avoid edge occlusion</li>
-  <li><strong>Guard/assertion markers:</strong> If conditional transitions show their guards, use 10–11px gold (#FBBF24) text, positioned on or near the edge</li>
+  <li><strong>Guard/ensure markers:</strong> If conditional transitions show their guards or state/event ensures, use 10–11px gold (#FBBF24) text, positioned on or near the edge</li>
 </ul>
 
 <p><strong>Accessibility notes:</strong></p>
@@ -106,26 +106,26 @@
 
 <p><strong>Primary visual concerns:</strong></p>
 <ul style="margin-left: 16px; color: #a1a1aa;">
-  <li>Field visibility and hierarchy — which fields are set, which are null/default, which are guarded by invariants</li>
-  <li>Constraint feedback — if a field violates an invariant, the violation must be obvious without requiring text parsing</li>
+  <li>Field visibility and hierarchy — which fields are set, which are null/default, which are referenced by rules or ensures</li>
+  <li>Constraint feedback — if a field violates a rule or ensure, the violation must be obvious without requiring text parsing</li>
   <li>Event argument preview — when firing an event, the panel shows what arguments are available and their values</li>
   <li>State transition clarity — before and after state, with visual indication of which fields changed</li>
 </ul>
 
 <p><strong>Color application:</strong> Inspector uses the data and verdict color systems:</p>
 <ul style="margin-left: 16px; color: #a1a1aa;">
-  <li><strong>Field names:</strong> Slate (#B0BEC5), normal or italic if guarded by invariant. Same as syntax highlighting so the reader recognizes the field</li>
+  <li><strong>Field names:</strong> Slate (#B0BEC5), normal or italic if referenced by a rule. Same as syntax highlighting so the reader recognizes the field</li>
   <li><strong>Field types:</strong> Slate (#9AA8B5). Type info is secondary to the name and value</li>
   <li><strong>Field values:</strong> Slate (#84929F) for normal values, or verdict colors if a constraint is violated</li>
   <li><strong>Current state label:</strong> Violet (#A898F5) — matches syntax highlighting and diagram state naming</li>
-  <li><strong>Constraint violation indicators:</strong> Blocked (#F87171) for invariant violations, Warning (#FDE047) for unmatched guards. Verdict colors signal runtime constraint feedback</li>
+  <li><strong>Constraint violation indicators:</strong> Blocked (#F87171) for rule or ensure violations, Warning (#FDE047) for unmatched guards. Verdict colors signal runtime constraint feedback</li>
   <li><strong>Enabled indicators:</strong> Enabled (#34D399) for valid state, successful transitions, or non-violated fields</li>
   <li><strong>Read-only field indicators:</strong> Dusk indigo (#9096A6) or a neutral shade for fields that cannot be modified directly (computed, state-derived)</li>
 </ul>
 
 <p><strong>Typography application:</strong> Cascadia Cove monospace, 12–13px for field names and values:</p>
 <ul style="margin-left: 16px; color: #a1a1aa;">
-  <li><strong>Field name:</strong> Normal weight, 12px, left-aligned. Field names that are invariant-guarded can be italic</li>
+  <li><strong>Field name:</strong> Normal weight, 12px, left-aligned. Field names that are rule-referenced can be italic</li>
   <li><strong>Field value:</strong> 12px, monospace to match code appearance. Wider line-height (1.6–1.8) for readability in a tabular layout</li>
   <li><strong>Constraint message:</strong> 11px, gold (#FBBF24) text below the violated field. Message text is the human explanation, so it earns color emphasis and smaller size to distinguish from data values</li>
 </ul>

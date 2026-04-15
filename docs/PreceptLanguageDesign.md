@@ -268,14 +268,12 @@ Notes:
 - `StateEnsure` (with `EnsureAnchor.From`) = exit gate. Checked post-commit only when crossing **out of** the named state to a different state.
 - All three state ensure forms evaluate against the **proposed world** (post-mutation, pre-commit). Fields-scoped.
 - `EventEnsure` = movement truth. Checked pre-transition when the named event fires. Scoped to that event's args only.
-- Whether `EventEnsure` must appear after its `EventDecl` is not locked yet; recommended to keep ensures near the related event for readability.
+- `EventEnsure` may appear before or after its `EventDecl`; keeping ensures near the related event is still recommended for readability.
 - **`when` guards on declarations** — `WhenOpt` is an optional `when <BoolExpr>` clause on rules, state ensures, event ensures, and edit declarations. When present, the guard acts as a precondition: if false, the declaration is skipped entirely (rule/ensure not checked, edit fields not granted). Guard scope is inherited from the declaration form: rule/state-ensure/edit guards reference entity fields only; event-ensure guards reference event args only. C69 fires for cross-scope guard references (e.g. entity field in an event-ensure guard). Guarded state ensures are excluded from unconditional null-narrowing at compile time.
 - **Compile-time error:** duplicate `in` + `to` on the same state with the same expression (syntactic identity after whitespace normalization). `in` already subsumes `to`.
 - **Compile-time error:** duplicate ensure — same preposition + same state + same expression appearing more than once.
 - **Compile-time error:** `in` on the initial state where default field values violate the expression. Both defaults and initial state are statically known.
-- **Compile-time error (contradiction):** multiple ensures with the same preposition on the same state whose conjoined per-field domains are empty (e.g. two `in Open` ensures that require contradictory values for the same field).
-- **Compile-time error (deadlock):** `in`/`to` vs `from` ensures on the same state whose conjoined per-field domains are empty — the state is provably unexitable.
-- All domain checks use interval/set analysis on the expression AST. Expressions involving `contains` or cross-field relationships that cannot be reduced to per-field domains are assumed satisfiable (no false positives).
+- No broader contradiction/deadlock analysis currently runs across distinct state-ensure declarations beyond duplicate detection and initial-state default validation.
 - **Stateless precept** — a precept with no `state` declarations. Root-level declarations such as `field`, `rule`, and root-level `edit` are valid; state-scoped declarations are not. C12 requires at least one `field` or `state`. C55 rejects root-level `edit` when states are declared. C49 warns per event declared in a stateless precept (events have no transition surface).
 
 ---
@@ -521,7 +519,7 @@ Defaults:
 - Non-nullable scalar fields must declare a `default ...`.
 - Nullable scalar fields default to `null` when `default ...` is omitted.
 - Collection fields default to empty when `default ...` is omitted.
-- Collection defaults may be expressed using a list literal, e.g. `default ["a", "b"]` (exact literal rules TBD).
+- Collection defaults may be expressed using a list literal, e.g. `default ["a", "b"]`.
 
 Constraints:
 - No duplicate field names (within a single declaration or across declarations).
