@@ -698,15 +698,9 @@ internal static class PreceptExpressionRuntimeEvaluator
             return EvaluationResult.Ok(Math.Round(d, places, MidpointRounding.ToEven));
         }
 
-        // 1-arg: type-preserving banker's rounding
+        // 1-arg: always returns integer (long) — banker's rounding for all numeric inputs
         var rounded = Math.Round(d, 0, MidpointRounding.ToEven);
-        return valResult.Value switch
-        {
-            long => EvaluationResult.Ok((long)rounded),
-            decimal => EvaluationResult.Ok((long)rounded),
-            double => EvaluationResult.Ok((double)rounded),
-            _ => EvaluationResult.Ok(rounded)
-        };
+        return EvaluationResult.Ok((long)rounded);
     }
 
     private static bool TryToDecimal(object? value, out decimal d)

@@ -123,8 +123,8 @@ Evaluates all events that have at least one transition from the instance's curre
 
 - Events are ordered by declaration position.
 - Each event is evaluated as `Inspect(instance, eventName)` with no event arguments (discovery mode).
-- **Stateless precepts:** All events return `Undefined` outcome (no transition surface). `EditableFields` is populated from root-level `edit` declarations if any exist.
-- `EditableFields` is `null` when no `in ... edit` declarations exist (stateful) or no root-level `edit` declarations exist (stateless), or contains the union of all matching edit declarations for the current state.
+- **Stateless precepts:** All events return `Undefined` outcome (no transition surface). `EditableFields` is populated from the effective root-level editable set, including guarded root-level edit blocks whose guards currently pass.
+- `EditableFields` is `null` when the engine has no edit declarations at all, an empty list when edit declarations exist but none are currently effective, or the union of all matching unconditional edit declarations plus any guarded edit declarations whose guards currently pass.
 - If the instance fails `CheckCompatibility`, returns a result with an empty events list.
 
 Use this as the primary API for rendering a state-machine inspector view.
@@ -143,7 +143,7 @@ Applies a hypothetical patch to a working copy of instance data, runs the full r
 public UpdateResult Update(PreceptInstance instance, Action<IUpdatePatchBuilder> patch)
 ```
 
-Atomically updates editable fields. For **stateful** precepts, only fields declared in an `in <State> edit` block for the current state are mutable. For **stateless** precepts, only fields declared in a root-level `edit` block are mutable (`CurrentState` is `null` throughout). Evaluation sequence: editability check → type check → atomic mutation on working copy → invariant/state-assert evaluation → commit or rollback. Returns `UpdateResult`.
+Atomically updates editable fields. For **stateful** precepts, only fields granted by the effective edit set for the current state are mutable: unconditional `in <State> edit` declarations plus any guarded edit blocks whose guards pass. For **stateless** precepts, only fields granted by the effective root-level edit set are mutable: unconditional root-level `edit` declarations plus guarded root-level `edit ... when ...` / `edit all when ...` blocks whose guards pass (`CurrentState` is `null` throughout). Evaluation sequence: editability check → type check → atomic mutation on working copy → invariant/state-assert evaluation → commit or rollback. Returns `UpdateResult`.
 
 ### `Fire`
 
@@ -167,12 +167,13 @@ Mutating event execution. Returns `FireResult`.
 5. **Guard evaluation** — evaluates ordered `if`/`else if`/`else` clauses; returns `Rejected` if all guards fail.
 6. **`set` assignments** — executed on a working copy of instance data; returns `Rejected` if an expression fails or the result violates a field's declared type.
 7. **Collection mutations** — `add`/`remove`/`enqueue`/`dequeue`/`push`/`pop`/`clear` operations on working copies.
-8. **Field and top-level rules** — checked against post-`set` working data; returns `Rejected` if violated.
-9. **State rules** — checked against the *target* state (only for `transition` outcomes, not `no transition`); returns `Rejected` if violated.
+8. **Derived field recomputation** — re-evaluates all computed fields in dependency order against post-mutation data. Computed values are current before validation.
+9. **Field and top-level rules** — checked against post-mutation working data (including recomputed derived fields); returns `Rejected` if violated.
+10. **State rules** — checked against the *target* state (only for `transition` outcomes, not `no transition`); returns `Rejected` if violated.
 
 **`when` guard evaluation on declarations:**
 - **Event asserts (stage 3):** If an event assert has a `when` guard, the guard is evaluated against event args before the assert body. If the guard is false, that assert is skipped. Guards on event asserts are arg-scoped only.
-- **Invariants and state asserts (stage 8–9):** If an invariant or state assert has a `when` guard, the guard is evaluated against post-mutation field data before the assertion body. If the guard is false, that rule is skipped. Collect-all semantics are preserved — guard-skipped declarations don't short-circuit other declarations.
+- **Invariants and state asserts (stage 9–10):** If an invariant or state assert has a `when` guard, the guard is evaluated against post-mutation field data before the assertion body. If the guard is false, that rule is skipped. Collect-all semantics are preserved — guard-skipped declarations don't short-circuit other declarations.
 - **Edit blocks (`Update`/`Inspect`):** If an edit declaration has a `when` guard, the guard is evaluated against current instance data at each `Update`/`Inspect` call. Fail-closed: guard evaluation error → field not granted editability.
 
 On any rejection, the original instance is unchanged — all stages are fully rolled back.
@@ -303,7 +304,7 @@ public sealed record InspectionResult(
     IReadOnlyList<PreceptEditableFieldInfo>? EditableFields = null)
 ```
 
-Returned by the aggregate `Inspect(instance)` overload. `InstanceData` is the same clean dictionary as `instance.InstanceData`. `CurrentState` is `null` for stateless instances. `EditableFields` is `null` when no `in ... edit` declarations exist (stateful) or no root-level `edit` declarations exist (stateless), or contains the effective editable field set for the current state.
+Returned by the aggregate `Inspect(instance)` overload. `InstanceData` is the same clean dictionary as `instance.InstanceData`. `CurrentState` is `null` for stateless instances. `EditableFields` is `null` when the engine has no edit declarations, an empty list when edit declarations exist but none are currently effective, or the effective editable field set for the current state/root context after guarded edit blocks are evaluated against the current data.
 
 ### `PreceptEditableFieldInfo`
 
@@ -418,7 +419,7 @@ else
         Console.WriteLine(v.Message);
 }
 
-// 6. Direct field editing (for fields declared with `in <State> edit`)
+// 6. Direct field editing (for fields granted by state-scoped `in <State> edit` or stateless root-level `edit`)
 var editResult = engine.Update(instance, patch => patch
     .Set("Notes", "Customer called back")
     .Set("Priority", 1.0));
@@ -439,7 +440,7 @@ The following types are returned by `PreceptParser.Parse` and consumed by `Prece
 | `PreceptState` | State declaration |
 | `PreceptEvent` | Event with argument contract |
 | `PreceptEventArg` | One typed argument: name, `PreceptScalarType`, nullability, optional default |
-| `PreceptField` | One scalar data field: name, `PreceptScalarType`, nullability, optional default |
+| `PreceptField` | One scalar data field: name, `PreceptScalarType`, nullability, optional default, optional derived expression (`IsComputed`, `DerivedExpression`, `DerivedExpressionText`) |
 | `PreceptCollectionField` | One collection field: name, `PreceptCollectionKind`, `PreceptScalarType` inner type |
 | `PreceptInvariant` | A global data rule: `invariant <expr> because "reason"` — always holds |
 | `StateAssertion` | A state-scoped assert: `in/to/from <State> assert <expr> because "reason"` |
@@ -448,7 +449,7 @@ The following types are returned by `PreceptParser.Parse` and consumed by `Prece
 | `StateTransition` | Row outcome: `transition <State>` |
 | `Rejection` | Row outcome: `reject "<message>"` |
 | `NoTransition` | Row outcome: `no transition` |
-| `PreceptEditBlock` | Editable field declaration: `in <State> edit <Field>, ...` |
+| `PreceptEditBlock` | Editable field declaration: state-scoped `in <State> [when <Guard>] edit <Field>, ...` or stateless root-level `edit <Field>, ... [when <Guard>]` |
 
 ### Scalar and Collection Enums
 

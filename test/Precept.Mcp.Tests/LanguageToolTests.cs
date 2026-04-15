@@ -93,19 +93,19 @@ public class LanguageToolTests
     }
 
     [Fact]
-    public void ExpressionScopesHasFiveEntries()
+    public void ExpressionScopesHasSixEntries()
     {
         var result = LanguageTool.Run();
 
-        result.ExpressionScopes.Should().HaveCount(5);
+        result.ExpressionScopes.Should().HaveCount(6);
     }
 
     [Fact]
-    public void FirePipelineHasSixStages()
+    public void FirePipelineHasSevenStages()
     {
         var result = LanguageTool.Run();
 
-        result.FirePipeline.Should().HaveCount(6);
+        result.FirePipeline.Should().HaveCount(7);
     }
 
     [Fact]

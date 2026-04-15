@@ -759,25 +759,86 @@ internal static class PreceptDocumentIntellisense
             ? $"choice({string.Join(", ", field.ChoiceValues.Select(v => $"\"{v}\""))})"
             : FormatScalarType(field.Type, field.IsNullable);
 
-        var suffix = new System.Text.StringBuilder();
-        if (field.IsNullable) suffix.Append(" nullable");
-        if (field.IsOrdered) suffix.Append(" ordered");
-        if (field.HasDefaultValue) suffix.Append($" default {field.DefaultValue}");
-
-        var lines = new List<string>
+        if (field.IsComputed)
         {
-            $"```precept\nfield {name} as {typeLabel}{suffix}\n```",
-            string.Empty,
-            $"Type: `{typeLabel}`"
-        };
+            var exprText = field.DerivedExpressionText ?? "?";
+            var deps = CollectDependencyFields(field.DerivedExpression);
+            var depsLine = deps.Count > 0
+                ? $"Dependencies: {string.Join(", ", deps)}"
+                : string.Empty;
+            var lines = new List<string>
+            {
+                $"```precept\nfield {name} as {typeLabel} -> {exprText}\n```",
+                string.Empty,
+                $"**computed** field `{name}` as `{typeLabel}` → `{exprText}`"
+            };
+            if (depsLine.Length > 0)
+                lines.Add(depsLine);
+            return string.Join("\n", lines);
+        }
 
-        if (field.IsOrdered)
-            lines.Add($"Ordered: values compare in declaration order");
+        {
+            var suffix = new System.Text.StringBuilder();
+            if (field.IsNullable) suffix.Append(" nullable");
+            if (field.IsOrdered) suffix.Append(" ordered");
+            if (field.HasDefaultValue) suffix.Append($" default {field.DefaultValue}");
 
-        if (field.HasDefaultValue)
-            lines.Add($"Default: `{field.DefaultValue ?? "null"}`");
+            var lines = new List<string>
+            {
+                $"```precept\nfield {name} as {typeLabel}{suffix}\n```",
+                string.Empty,
+                $"Type: `{typeLabel}`"
+            };
 
-        return string.Join("\n", lines);
+            if (field.IsOrdered)
+                lines.Add($"Ordered: values compare in declaration order");
+
+            if (field.HasDefaultValue)
+                lines.Add($"Default: `{field.DefaultValue ?? "null"}`");
+
+            return string.Join("\n", lines);
+        }
+    }
+
+    /// <summary>
+    /// Collects the names of field identifiers referenced by a derived expression,
+    /// in declaration order (first occurrence, depth-first).
+    /// </summary>
+    private static IReadOnlyList<string> CollectDependencyFields(PreceptExpression? expr)
+    {
+        if (expr is null) return Array.Empty<string>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var result = new List<string>();
+        CollectDeps(expr, seen, result);
+        return result;
+
+        static void CollectDeps(PreceptExpression node, HashSet<string> visited, List<string> output)
+        {
+            switch (node)
+            {
+                case PreceptIdentifierExpression id:
+                    if (visited.Add(id.Name)) output.Add(id.Name);
+                    break;
+                case PreceptBinaryExpression bin:
+                    CollectDeps(bin.Left, visited, output);
+                    CollectDeps(bin.Right, visited, output);
+                    break;
+                case PreceptUnaryExpression un:
+                    CollectDeps(un.Operand, visited, output);
+                    break;
+                case PreceptParenthesizedExpression paren:
+                    CollectDeps(paren.Inner, visited, output);
+                    break;
+                case PreceptFunctionCallExpression func:
+                    foreach (var arg in func.Arguments) CollectDeps(arg, visited, output);
+                    break;
+                case PreceptConditionalExpression cond:
+                    CollectDeps(cond.Condition, visited, output);
+                    CollectDeps(cond.ThenBranch, visited, output);
+                    CollectDeps(cond.ElseBranch, visited, output);
+                    break;
+            }
+        }
     }
 
     private static string BuildEventMarkdown(string name, PreceptEvent? evt)
@@ -801,6 +862,8 @@ internal static class PreceptDocumentIntellisense
 
     private static string FormatScalarFieldDetail(PreceptField field)
     {
+        if (field.IsComputed)
+            return $"{FormatScalarType(field.Type, field.IsNullable)} (computed)";
         var detail = FormatScalarType(field.Type, field.IsNullable);
         if (field.HasDefaultValue)
             detail += $" = {field.DefaultValue ?? "null"}";

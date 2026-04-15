@@ -541,4 +541,70 @@ public class CompileToolTests
         result.Valid.Should().BeFalse();
         result.Diagnostics.Should().Contain(d => d.Code == "PRECEPT079");
     }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Computed fields (issue #17)
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Compile_ComputedField_IsComputedTrue()
+    {
+        var text = """
+            precept Test
+            field A as number default 1
+            field B as number default 2
+            field Total as number -> A + B
+            state Open initial
+            event Go
+            from Open on Go -> no transition
+            """;
+
+        var result = CompileTool.Run(text);
+
+        result.Valid.Should().BeTrue();
+        var total = result.Fields!.FirstOrDefault(f => f.Name == "Total");
+        total.Should().NotBeNull();
+        total!.IsComputed.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Compile_ComputedField_ExpressionPopulated()
+    {
+        var text = """
+            precept Test
+            field A as number default 1
+            field B as number default 2
+            field Total as number -> A + B
+            state Open initial
+            event Go
+            from Open on Go -> no transition
+            """;
+
+        var result = CompileTool.Run(text);
+
+        result.Valid.Should().BeTrue();
+        var total = result.Fields!.FirstOrDefault(f => f.Name == "Total");
+        total.Should().NotBeNull();
+        total!.Expression.Should().Be("A + B");
+    }
+
+    [Fact]
+    public void Compile_NonComputedField_IsComputedNull()
+    {
+        var text = """
+            precept Test
+            field A as number default 1
+            state Open initial
+            event Go
+            from Open on Go -> no transition
+            """;
+
+        var result = CompileTool.Run(text);
+
+        result.Valid.Should().BeTrue();
+        var a = result.Fields!.FirstOrDefault(f => f.Name == "A");
+        a.Should().NotBeNull();
+        a!.IsComputed.Should().BeNull();
+        a.Expression.Should().BeNull();
+    }
 }

@@ -45,11 +45,19 @@ public static class UpdateTool
 
         var nativeFields = JsonConvert.ToNativeDict(fields)!;
 
-        var updateResult = engine.Update(instance, patch =>
+        UpdateResult updateResult;
+        try
         {
-            foreach (var kvp in nativeFields)
-                patch.Set(kvp.Key, kvp.Value);
-        });
+            updateResult = engine.Update(instance, patch =>
+            {
+                foreach (var kvp in nativeFields)
+                    patch.Set(kvp.Key, kvp.Value);
+            });
+        }
+        catch (Exception ex)
+        {
+            return UpdateToolResult.WithError($"Update failed: {ex.Message}");
+        }
 
         var violations = updateResult.Violations.Select(ViolationDtoMapper.Map).ToList();
 

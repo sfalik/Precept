@@ -1,0 +1,28 @@
+precept InvoiceLineItem
+
+# A stateless precept governing individual invoice line-item calculations.
+# The host application edits UnitPrice, Quantity, and DiscountPercent; derived
+# totals are computed automatically and cannot be directly manipulated.
+# This sample demonstrates computed fields in a data-only precept — there are
+# no lifecycle states or events, just structural constraints and derived math.
+
+field Description as string nullable
+field UnitPrice as number default 0
+field Quantity as number default 1
+field DiscountPercent as number default 0
+field TaxRate as number default 8
+
+# Computed fields — derived from editable source fields.
+field Subtotal as number -> UnitPrice * Quantity
+field DiscountAmount as number -> Subtotal * DiscountPercent / 100
+field TaxableAmount as number -> Subtotal - DiscountAmount
+field TaxAmount as number -> TaxableAmount * TaxRate / 100
+field LineTotal as number -> TaxableAmount + TaxAmount nonnegative
+
+# Only source fields are editable; derived totals are locked.
+edit Description, UnitPrice, Quantity, DiscountPercent
+
+invariant Quantity >= 1 because "Quantity must be at least 1"
+invariant UnitPrice >= 0 because "Unit price cannot be negative"
+invariant DiscountPercent >= 0 because "Discount cannot be negative"
+invariant DiscountPercent <= 100 because "Discount cannot exceed 100%"

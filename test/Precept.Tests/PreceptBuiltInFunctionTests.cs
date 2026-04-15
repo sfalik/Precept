@@ -156,48 +156,48 @@ public class PreceptBuiltInFunctionTests
     public void Eval_Round_BankersRounding_HalfToEven_RoundsDown()
     {
         var fire = FireForSet(
-            "field Input as number default 0\nfield Output as number default 0",
+            "field Input as number default 0\nfield Output as integer default 0",
             "Output", "round(Input)",
-            new Dictionary<string, object?> { ["Input"] = 2.5, ["Output"] = 0.0 });
+            new Dictionary<string, object?> { ["Input"] = 2.5, ["Output"] = 0L });
 
         fire.Outcome.Should().Be(TransitionOutcome.Transition);
-        fire.UpdatedInstance!.InstanceData["Output"].Should().Be(2.0);
+        fire.UpdatedInstance!.InstanceData["Output"].Should().Be(2L);
     }
 
     [Fact]
     public void Eval_Round_BankersRounding_HalfToEven_RoundsUp()
     {
         var fire = FireForSet(
-            "field Input as number default 0\nfield Output as number default 0",
+            "field Input as number default 0\nfield Output as integer default 0",
             "Output", "round(Input)",
-            new Dictionary<string, object?> { ["Input"] = 3.5, ["Output"] = 0.0 });
+            new Dictionary<string, object?> { ["Input"] = 3.5, ["Output"] = 0L });
 
         fire.Outcome.Should().Be(TransitionOutcome.Transition);
-        fire.UpdatedInstance!.InstanceData["Output"].Should().Be(4.0);
+        fire.UpdatedInstance!.InstanceData["Output"].Should().Be(4L);
     }
 
     [Fact]
     public void Eval_Round_BelowHalf_RoundsDown()
     {
         var fire = FireForSet(
-            "field Input as number default 0\nfield Output as number default 0",
+            "field Input as number default 0\nfield Output as integer default 0",
             "Output", "round(Input)",
-            new Dictionary<string, object?> { ["Input"] = 2.4, ["Output"] = 0.0 });
+            new Dictionary<string, object?> { ["Input"] = 2.4, ["Output"] = 0L });
 
         fire.Outcome.Should().Be(TransitionOutcome.Transition);
-        fire.UpdatedInstance!.InstanceData["Output"].Should().Be(2.0);
+        fire.UpdatedInstance!.InstanceData["Output"].Should().Be(2L);
     }
 
     [Fact]
     public void Eval_Round_AboveHalf_RoundsUp()
     {
         var fire = FireForSet(
-            "field Input as number default 0\nfield Output as number default 0",
+            "field Input as number default 0\nfield Output as integer default 0",
             "Output", "round(Input)",
-            new Dictionary<string, object?> { ["Input"] = 2.6, ["Output"] = 0.0 });
+            new Dictionary<string, object?> { ["Input"] = 2.6, ["Output"] = 0L });
 
         fire.Outcome.Should().Be(TransitionOutcome.Transition);
-        fire.UpdatedInstance!.InstanceData["Output"].Should().Be(3.0);
+        fire.UpdatedInstance!.InstanceData["Output"].Should().Be(3L);
     }
 
     [Fact]

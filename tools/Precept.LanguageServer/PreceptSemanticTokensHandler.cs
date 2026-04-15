@@ -34,6 +34,7 @@ internal sealed class PreceptSemanticTokensHandler : SemanticTokensHandlerBase
             "preceptState",
             "preceptEvent",
             "preceptFieldName",
+            "preceptName",
             "preceptType",
             "preceptValue",
             "preceptMessage"
@@ -319,7 +320,7 @@ internal sealed class PreceptSemanticTokensHandler : SemanticTokensHandlerBase
 
     /// <summary>
     /// Classifies an identifier token based on the preceding token:
-    /// - After precept → "preceptMessage" (gold — the contract name)
+    /// - After precept → "preceptName"
     /// - After state/from/transition/in/to → "preceptState"
     /// - After event/on → "preceptEvent"
     /// - After field/set/add/remove/.../into → "preceptFieldName"
@@ -328,7 +329,7 @@ internal sealed class PreceptSemanticTokensHandler : SemanticTokensHandlerBase
     /// </summary>
     private static string ClassifyIdentifier(PreceptToken? previousKind, DeclContext context) => previousKind switch
     {
-        PreceptToken.Precept => "preceptMessage",
+        PreceptToken.Precept => "preceptName",
         PreceptToken.From => "preceptState",
         PreceptToken.Dot => "preceptFieldName",
         PreceptToken.Comma when context == DeclContext.State => "preceptState",

@@ -2,13 +2,13 @@
 
 Date: 2026-04-03
 
-Status: **Design locked.** The 8-shade semantic palette is frozen. Implementation now uses custom semantic token types plus `semanticTokenScopes`, with color lock carried by Precept-specific TextMate fallback scopes.
+Status: **Design locked.** The 9-shade semantic palette is frozen. Implementation now uses custom semantic token types plus `semanticTokenScopes`, with color lock carried by Precept-specific TextMate fallback scopes.
 
 > Brand source of truth: `brand/brand-decisions.md § Semantic palette` and `brand/brand-spec.html § Color System`.
 
 ## Overview
 
-Precept syntax highlighting uses a fixed, dark-mode-only 8-shade palette where every color encodes compiler-known meaning. Nothing is decorative. Typography (bold, italic) adds a second information channel for constraint visibility.
+Precept syntax highlighting uses a fixed, dark-mode-only 9-shade palette where every color encodes compiler-known meaning. Nothing is decorative. Typography (bold, italic) adds a second information channel for constraint visibility.
 
 The system has two axes:
 
@@ -23,12 +23,13 @@ Background: `#0c0c0f`
 |---|--------|-----|------------|--------|
 | 1 | Structure · Semantic | `#4338CA` | **bold** | `precept`, `field`, `state`, `event`, `invariant`, `from`, `on`, `in`, `to`, `set`, `transition`, `edit`, `assert`, `reject`, `when`, `no` |
 | 2 | Structure · Grammar | `#6366F1` | normal | `as`, `with`, `default`, `nullable`, `any`, `all`, `of`, `into`, `because`, `initial`, constraint keywords, `=`, `->`, operators, punctuation |
-| 3 | States | `#A898F5` | normal / *italic if constrained* | State names |
-| 4 | Events | `#30B8E8` | normal / *italic if constrained* | Event names |
-| 5 | Data · Names | `#B0BEC5` | normal / *italic if guarded* | Field names, argument names |
-| 6 | Data · Types | `#9AA8B5` | normal | `string`, `number`, `boolean`, `integer`, `decimal`, `choice`, `set`, `queue`, `stack` |
-| 7 | Data · Values | `#84929F` | normal | `true`, `false`, `null`, string literals, number literals |
-| 8 | Rules · Messages | `#FBBF24` | normal | String content in `because` / `reject`, and the precept name |
+| 3 | Structure · Hero | `#A5B4FC` | normal | Precept name (the contract identity) |
+| 4 | States | `#A898F5` | normal / *italic if constrained* | State names |
+| 5 | Events | `#30B8E8` | normal / *italic if constrained* | Event names |
+| 6 | Data · Names | `#B0BEC5` | normal / *italic if guarded* | Field names, argument names |
+| 7 | Data · Types | `#9AA8B5` | normal | `string`, `number`, `boolean`, `integer`, `decimal`, `choice`, `set`, `queue`, `stack` |
+| 8 | Data · Values | `#84929F` | normal | `true`, `false`, `null`, string literals, number literals |
+| 9 | Rules · Messages | `#FBBF24` | normal | String content in `because` / `reject` |
 
 Verdict colors (`#34D399` enabled, `#F87171` blocked, `#FDE047` warning) are runtime-only — never in syntax highlighting.
 
@@ -100,7 +101,7 @@ Identifier classification (context-aware via `ClassifyIdentifier()`):
 | After `state`, `transition`, `in`, `to` | `preceptState` | state names |
 | After `event`, `on` | `preceptEvent` | event names |
 | After `field`, `set`, `add`, `remove`, etc. | `preceptFieldName` | field names |
-| After `precept` | `preceptMessage` | precept name |
+| After `precept` | `preceptName` | precept name |
 | After `.` | `preceptFieldName` | member access |
 | Default | `preceptFieldName` | bare identifiers |
 
@@ -257,7 +258,7 @@ Every category now maps to exactly one shade — no per-token overrides needed.
 | After state-context tokens | `type` → `preceptState` |
 | After event-context tokens | `function` → `preceptEvent` |
 | After field-context tokens | `variable` → `preceptFieldName` |
-| After `precept` | `type` → **`preceptMessage`** (gold — the contract identity) |
+| After `precept` | `type` → **`preceptName`** (Structure · Hero — the contract identity) |
 | After `.` | `variable` → `preceptFieldName` (member access) |
 | Default (bare identifier) | `variable` → `preceptFieldName` |
 
@@ -279,7 +280,7 @@ This is new capability. The handler must determine which states, events, and fie
 
 **✅ Decided.** Mechanical — follows directly from A and B. Comments are scanned from raw text and emitted as a Precept-specific semantic token (`preceptComment`). In practice, many themes still define aggressive styling for the standard semantic selector `comment`, so the extension also ships a targeted semantic token color override for `preceptComment` and `comment:precept` to force the Precept comment color to win.
 
-Similarly, `preceptMessage` (rule/rejection message strings and the precept name) gets a direct semantic color override. The scope-map fallback (`entity.name.precept.message.precept`, `string.quoted.double.message.precept`) also resolves to gold via the TextMate rules, but the direct override ensures the gold treatment wins unambiguously regardless of theme-installed semantic token rules that might otherwise match string or name selectors.
+Similarly, `preceptMessage` (rule/rejection message strings) and `preceptName` (the precept declaration name) each get direct semantic color overrides. The scope-map fallback for `preceptMessage` resolves to gold via `string.quoted.double.message.precept` TextMate rules. `preceptName` resolves via `entity.name.type.precept.precept` to the Structure · Hero color (`#A5B4FC`), ensuring the dedicated precept-name treatment wins regardless of theme semantic token interference.
 
 Add the custom semantic token type contributions, semantic-token-to-scope mappings, and Precept-owned fallback scope rules:
 
@@ -292,6 +293,7 @@ Add the custom semantic token type contributions, semantic-token-to-scope mappin
     { "id": "preceptState",           "description": "Precept state name" },
     { "id": "preceptEvent",           "description": "Precept event name" },
     { "id": "preceptFieldName",       "description": "Precept field or argument name" },
+    { "id": "preceptName",            "description": "Precept declaration name" },
     { "id": "preceptType",            "description": "Precept type keyword" },
     { "id": "preceptValue",           "description": "Precept literal value" },
     { "id": "preceptMessage",         "description": "Precept rule message string" }
@@ -312,9 +314,10 @@ Add the custom semantic token type contributions, semantic-token-to-scope mappin
         "preceptEvent.preceptConstrained": ["entity.name.function.event.constrained.precept"],
         "preceptFieldName": ["variable.other.field.precept"],
         "preceptFieldName.preceptConstrained": ["variable.other.field.constrained.precept"],
+        "preceptName": ["entity.name.type.precept.precept"],
         "preceptType": ["storage.type.precept"],
         "preceptValue": ["constant.other.value.precept"],
-        "preceptMessage": ["entity.name.precept.message.precept", "string.quoted.double.message.precept"]
+        "preceptMessage": ["string.quoted.double.message.precept"]
       }
     }
   ],
@@ -324,6 +327,7 @@ Add the custom semantic token type contributions, semantic-token-to-scope mappin
       "rules": {
         "preceptComment": { "foreground": "#9096A6", "italic": true },
         "comment:precept": { "foreground": "#9096A6", "italic": true },
+        "preceptName": { "foreground": "#A5B4FC" },
         "preceptMessage": { "foreground": "#FBBF24" }
       }
     },
@@ -338,9 +342,9 @@ Add the custom semantic token type contributions, semantic-token-to-scope mappin
           { "scope": "entity.name.function.event.constrained.precept", "settings": { "foreground": "#30B8E8", "fontStyle": "italic" } },
           { "scope": "variable.other.field.precept",                "settings": { "foreground": "#B0BEC5" } },
           { "scope": "variable.other.field.constrained.precept",    "settings": { "foreground": "#B0BEC5", "fontStyle": "italic" } },
+          { "scope": "entity.name.type.precept.precept",            "settings": { "foreground": "#A5B4FC" } },
           { "scope": "storage.type.precept",                        "settings": { "foreground": "#9AA8B5" } },
           { "scope": "constant.other.value.precept",                "settings": { "foreground": "#84929F" } },
-          { "scope": "entity.name.precept.message.precept",         "settings": { "foreground": "#FBBF24" } },
           { "scope": "string.quoted.double.message.precept",        "settings": { "foreground": "#FBBF24" } }
         ]
       }
@@ -351,7 +355,7 @@ Add the custom semantic token type contributions, semantic-token-to-scope mappin
 
 #### F. TextMate Grammar — Fallback Color Anchoring
 
-**✅ Decided.** Strings default to slate (Data · Values) in generic fallback, but dedicated message-string scopes (`string.quoted.double.message.precept`) and the dedicated precept-name scope (`entity.name.precept.message.precept`) are colored gold immediately. This keeps the two most important Rules · Messages cases correct even when VS Code is rendering through the semantic-token scope map fallback.
+**✅ Decided.** Strings default to slate (Data · Values) in generic fallback, but dedicated message-string scopes (`string.quoted.double.message.precept`) are colored gold immediately, and the dedicated precept-name scope (`entity.name.type.precept.precept`) is colored Structure · Hero (`#A5B4FC`). This keeps the critical cases correct even when VS Code is rendering through the semantic-token scope map fallback.
 
 The TextMate grammar already assigns specific scopes. To lock fallback colors before the language server loads, add `tokenColorCustomizations` in `configurationDefaults`:
 
@@ -372,6 +376,7 @@ The TextMate grammar already assigns specific scopes. To lock fallback colors be
       { "scope": "constant.language.precept",              "settings": { "foreground": "#84929F" } },
       { "scope": "constant.numeric.precept",               "settings": { "foreground": "#84929F" } },
       { "scope": "string.quoted.double.precept",           "settings": { "foreground": "#84929F" } },
+      { "scope": "entity.name.type.precept.precept",       "settings": { "foreground": "#A5B4FC" } },
       { "scope": "keyword.operator.comparison.precept",    "settings": { "foreground": "#6366F1" } },
       { "scope": "keyword.operator.logical.precept",       "settings": { "foreground": "#6366F1" } },
       { "scope": "keyword.operator.arithmetic.precept",    "settings": { "foreground": "#6366F1" } },

@@ -196,8 +196,17 @@
 - 2026-05-02 — Subscription is no longer the best mockup sample for *scaling* evaluation. InsuranceClaim (6 states, 7 events, set collection, 12 rules, guarded reject rows with compound expressions) is the minimum-complexity sample that tests all visual dimensions.
 - 2026-05-02 — The fire pipeline's 6 stages (event asserts → row selection → exit actions → row mutations → entry actions → validation) is the most important invisible structure in the preview. No concept visualizes it; Concept 12 (Execution Trace) fills this gap.
 - 2026-05-02 — Observable's reactive-cell pattern directly maps to Precept's hypothetical-patch inspect API: change a data field → all event outcomes re-evaluate. This should be the core interaction pattern for the Notebook concept.
+- Owns UX/design across README form, brand-spec presentation, semantic visual surfaces, and preview/mockup direction.
+- Keeps visual decisions aligned with runtime semantics: Emerald/Amber/Rose are semantic runtime signals; Gold is a restrained brand accent.
+- Historical summary (pre-2026-04-13): led README layout/hero passes, semantic-visual-system refinements, preview-concept explorations, and verdict-modifier UX analysis.
 
-### 2026-05-02 — Interactive Guidance System for Concept 17
+## Learnings
+
+- README form work is mostly hierarchy, line economy, and plaintext resilience.
+- Preview concepts must be validated against realistic sample complexity, not only small demo precepts.
+- Verdict modifiers are strongest as subtle authored-intent cues layered beneath runtime outcomes.
+
+## Recent Updates
 
 - Added three-layer interactive guidance to the Interactive Journey prototype (Concept 17): visual emphasis on controls, 5-step coach mark tour, and contextual step hints with golden-path suggestion.
 - Visual emphasis pattern: CSS pulse-ring animation (::after pseudo-element) on Fire ▶ buttons draws the eye without blocking interaction. Low-opacity (≤45%), slow cycle (2.4s), cyan for suggested events.
@@ -334,3 +343,6 @@
 - 2026-04-12 — Sticky subsection labels in `design/system/foundations/semantic-visual-system.html` should follow the same typography reset as the active rail: no small-caps override and no OpenType small-caps feature. Natural title case keeps the left navigation vocabulary consistent without disturbing the baseline-led alignment model.
 - 2026-04-12 — `design/prototypes/` should stay visually quiet at the root: active prototype work or orientation only. Once a prototype set becomes preserved reference material rather than active top-level work, move the whole coupled artifact group into `design/prototypes/archive/` and fix any relative links to shared system assets in the same pass.
 - 2026-04-13 — The disabled-controls neutral reads warmer than intended if the border/path tone carries too much charcoal-brown and the text gray leans too close to muted prose. Keeping disabled states convincingly unavailable works better when both tones shift slightly bluer while staying low-chroma and dim.
+### 2026-04-11 — Verdict modifiers UX perspective
+- Recommended badge-level authored verdict cues, not full-surface fills, to preserve clarity and avoid false confidence.
+- Identified state verdicts as novel differentiator territory for Precept tooling and storytelling.

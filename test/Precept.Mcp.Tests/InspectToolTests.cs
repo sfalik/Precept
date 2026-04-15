@@ -400,4 +400,63 @@ from Open on Update -> set Name = Update.NewName -> transition Done
         finish!.Outcome.Should().Be("Transition");
         finish.ResultState.Should().Be("Done");
     }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Computed fields (issue #17)
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Inspect_ComputedFieldValues_AppearInPreview()
+    {
+        var text = """
+            precept Test
+            field Price as number default 10
+            field Qty as number default 2
+            field Total as number -> Price * Qty
+            state Open initial
+            state Closed
+            event Close
+            from Open on Close -> transition Closed
+            """;
+
+        var data = new Dictionary<string, object?>
+        {
+            ["Price"] = 10.0,
+            ["Qty"] = 2.0
+        };
+
+        var result = InspectTool.Inspect(text, "Open", data);
+
+        result.Error.Should().BeNull();
+        // The computed field Total should be present in the instance data
+        result.Data.Should().ContainKey("Total");
+        result.Data!["Total"].Should().Be(20.0);
+    }
+
+    [Fact]
+    public void Inspect_ComputedFieldNotEditable()
+    {
+        var text = """
+            precept Test
+            field Base as number default 5
+            field Derived as number -> Base + 1
+            state Open initial
+            in Open edit Base
+            event Go
+            from Open on Go -> no transition
+            """;
+
+        var data = new Dictionary<string, object?>
+        {
+            ["Base"] = 5.0
+        };
+
+        var result = InspectTool.Inspect(text, "Open", data);
+
+        result.Error.Should().BeNull();
+        // Computed field "Derived" should NOT appear in the editable fields list
+        result.EditableFields.Should().NotBeNull();
+        result.EditableFields.Should().Contain(f => f.Name == "Base");
+        result.EditableFields.Should().NotContain(f => f.Name == "Derived");
+    }
 }

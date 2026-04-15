@@ -75,10 +75,10 @@ internal static class FunctionRegistry
 
         Register(new FunctionDefinition("round", "Rounds a numeric value. 1-arg: banker's rounding to nearest integer. 2-arg: rounds to specified decimal places.",
         [
-            // 1-arg: type-specific overloads
+            // 1-arg: type-specific overloads — all return integer
             new([new("value", StaticValueKind.Integer)], StaticValueKind.Integer),
             new([new("value", StaticValueKind.Decimal)], StaticValueKind.Integer),
-            new([new("value", StaticValueKind.Number)], StaticValueKind.Number),
+            new([new("value", StaticValueKind.Number)], StaticValueKind.Integer),
             // 2-arg: precision rounding (accepts any numeric, returns decimal)
             new(
             [

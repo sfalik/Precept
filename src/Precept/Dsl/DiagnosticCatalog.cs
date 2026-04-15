@@ -479,10 +479,15 @@ public static class DiagnosticCatalog
     // ═══════════════════════════════════════════════════════════════
 
     /// <summary>Narrowing assignment: cannot assign a non-integer numeric value to an integer field without explicit conversion.</summary>
+    /// <remarks>
+    /// floor(), ceil(), and truncate() return integer for both number and decimal sources.
+    /// round() returns integer for all numeric sources (integer, decimal, and number).
+    /// The runtime message is generated per source type — see PreceptTypeChecker.BuildC60Message.
+    /// </remarks>
     public static readonly LanguageConstraint C60 = Register(
         "C60", "compile",
         "Narrowing assignment: cannot assign non-integer value to integer field without explicit conversion.",
-        "Narrowing assignment: cannot assign '{actual}' to integer field '{name}' without explicit conversion. An explicit integer conversion function is planned; see documentation.");
+        "Narrowing assignment: {actual} cannot be implicitly narrowed to integer field '{name}'. Use floor(), ceil(), truncate(), or round() to produce an integer value.");
 
     /// <summary>'maxplaces' constraint applies only to decimal fields.</summary>
     public static readonly LanguageConstraint C61 = Register(
@@ -618,5 +623,76 @@ public static class DiagnosticCatalog
     public static readonly LanguageConstraint C79 = Register(
         "C79", "compile",
         "Conditional expression branches must produce the same scalar type.",
-        "Conditional expression branches must produce the same scalar type, but got {thenType} and {elseType}.");
+        "Conditional expression branches produce incompatible types: {thenType} and {elseType}. {hint}");
+
+    // ═══════════════════════════════════════════════════════════════
+    // Parse-phase constraints: computed/derived fields (C80–C82)
+    // ═══════════════════════════════════════════════════════════════
+
+    /// <summary>A field cannot have both a default value and a derived expression.</summary>
+    // SYNC:CONSTRAINT:C80
+    public static readonly LanguageConstraint C80 = Register(
+        "C80", "parse",
+        "A field cannot have both a default value and a derived expression.",
+        "Field '{fieldName}' has both a default value and a derived expression. Use one or the other.");
+
+    /// <summary>A nullable field cannot have a derived expression.</summary>
+    // SYNC:CONSTRAINT:C81
+    public static readonly LanguageConstraint C81 = Register(
+        "C81", "parse",
+        "A nullable field cannot have a derived expression.",
+        "Field '{fieldName}' is nullable and has a derived expression. Computed fields cannot be nullable.");
+
+    /// <summary>Multi-name field declarations cannot have a derived expression.</summary>
+    // SYNC:CONSTRAINT:C82
+    public static readonly LanguageConstraint C82 = Register(
+        "C82", "parse",
+        "Multi-name field declarations cannot have a derived expression.",
+        "Multi-name field declaration cannot have a derived expression. Each computed field must be declared separately.");
+
+    // ═══════════════════════════════════════════════════════════════
+    // Compile-phase constraints: computed field validation (C83–C88)
+    // ═══════════════════════════════════════════════════════════════
+
+    /// <summary>Computed field expression references a nullable field.</summary>
+    // SYNC:CONSTRAINT:C83
+    public static readonly LanguageConstraint C83 = Register(
+        "C83", "compile",
+        "Computed field expression references a nullable field.",
+        "Computed field expression references nullable field '{fieldName}'. Computed fields must always produce a value — use only non-nullable fields or collection accessors that guarantee a result.");
+
+    /// <summary>Computed field expression references an event argument.</summary>
+    // SYNC:CONSTRAINT:C84
+    public static readonly LanguageConstraint C84 = Register(
+        "C84", "compile",
+        "Computed field expression references an event argument.",
+        "Computed field expression references event argument '{name}'. Computed fields can only reference persistent fields and safe collection accessors.");
+
+    /// <summary>Computed field expression uses an unsafe collection accessor.</summary>
+    // SYNC:CONSTRAINT:C85
+    public static readonly LanguageConstraint C85 = Register(
+        "C85", "compile",
+        "Computed field expression uses an unsafe collection accessor.",
+        "Computed field expression uses '.{accessor}' which is undefined on empty collections. Only '.count' is allowed in computed expressions.");
+
+    /// <summary>Circular dependency detected among computed fields.</summary>
+    // SYNC:CONSTRAINT:C86
+    public static readonly LanguageConstraint C86 = Register(
+        "C86", "compile",
+        "Circular dependency detected among computed fields.",
+        "Circular dependency detected: {cycle}. Computed fields cannot reference each other in a cycle.");
+
+    /// <summary>Computed field cannot appear in edit declarations.</summary>
+    // SYNC:CONSTRAINT:C87
+    public static readonly LanguageConstraint C87 = Register(
+        "C87", "compile",
+        "Computed field cannot appear in edit declarations.",
+        "'{fieldName}' is a computed field and cannot appear in edit declarations. Computed fields are read-only.");
+
+    /// <summary>Computed field cannot be assigned via set.</summary>
+    // SYNC:CONSTRAINT:C88
+    public static readonly LanguageConstraint C88 = Register(
+        "C88", "compile",
+        "Computed field cannot be assigned via set.",
+        "'{fieldName}' is a computed field and cannot be assigned. Its value is always derived from: {expression}.");
 }

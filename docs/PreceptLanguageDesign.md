@@ -229,7 +229,7 @@ ClearAction        := "clear" Identifier
 
 EditDecl           := StateEditDecl | RootEditDecl
 StateEditDecl      := "in" StateTarget WhenOpt "edit" FieldTarget
-RootEditDecl       := "edit" FieldTarget
+RootEditDecl       := "edit" FieldTarget WhenOpt
 FieldTarget        := "all" | Identifier ("," Identifier)*
 
 EventDecl          := "event" Identifier ("," Identifier)* ("with" ArgList)?
@@ -276,7 +276,7 @@ Notes:
 - **Compile-time error (contradiction):** multiple asserts with the same preposition on the same state whose conjoined per-field domains are empty (e.g. two `in Open` asserts that require contradictory values for the same field).
 - **Compile-time error (deadlock):** `in`/`to` vs `from` asserts on the same state whose conjoined per-field domains are empty — the state is provably unexitable.
 - All domain checks use interval/set analysis on the expression AST. Expressions involving `contains` or cross-field relationships that cannot be reduced to per-field domains are assumed satisfiable (no false positives).
-- **Stateless precept** — a precept with no `state` declarations. Only `field`, `invariant`, and root-level `edit` declarations are valid. C12 requires at least one `field` or `state`. C55 rejects root-level `edit` when states are declared. C49 warns per event declared in a stateless precept (events have no transition surface).
+- **Stateless precept** — a precept with no `state` declarations. Root-level declarations such as `field`, `invariant`, and root-level `edit` are valid; state-scoped declarations are not. C12 requires at least one `field` or `state`. C55 rejects root-level `edit` when states are declared. C49 warns per event declared in a stateless precept (events have no transition surface).
 
 ---
 
@@ -313,7 +313,7 @@ edit all
 ### Constraints
 
 - **C12 (parse):** At least one `field` or `state` must be declared. A `precept` header alone is not valid.
-- **C55 (compile):** Root-level `edit` is not valid when states are declared. Use `in <State> edit` instead.
+- **C55 (compile):** Root-level `edit` is not valid when states are declared. Use `in any edit all` or `in <State> edit <Fields>` instead.
 - **C49 (compile, Warning):** Event declared in a stateless precept is unreachable — no transition surface exists.
 - C13 ("Exactly one state must be initial") is suppressed for stateless precepts — no states means no initial state required.
 
@@ -324,8 +324,8 @@ edit all
 - `CreateInstance(state, data?)` — throws `ArgumentException` for stateless precepts.
 - `Fire` on a stateless instance — returns `Undefined` outcome. Events have no transition surface.
 - `Inspect(instance, event)` on stateless — returns `Undefined` outcome.
-- `Inspect(instance)` on stateless — returns all events as `Undefined`; `EditableFields` reflects root-editable fields.
-- `Update` on stateless — applies to root-editable fields; `CurrentState` is `null`.
+- `Inspect(instance)` on stateless — returns all events as `Undefined`; `EditableFields` reflects the effective root-editable set (unconditional root blocks union passing guarded root blocks). It is `null` only when no root-level `edit` declarations exist, and an empty list when declarations exist but none currently grant editability.
+- `Update` on stateless — applies to the same effective root-editable set; `CurrentState` is `null`.
 
 ---
 
@@ -544,6 +544,53 @@ field Tags as set of string default ["priority", "vip"]
 # Multi-name form — shared type and default
 field MinAmount, MaxAmount as number default 0
 field FirstName, LastName, MiddleName as string nullable
+```
+
+### Computed (derived) fields (Locked)
+
+Computed fields are fields whose values are calculated from other fields and re-evaluated automatically after every state transition, field edit, or inspect operation. They eliminate manual synchronization — the formula is declared once, and the value is always current.
+
+Form:
+
+- `field <Name> as <Type> -> <Expression> [<constraint>...]`
+
+The bare `->` signals derivation, consistent with Principle 11 ("`->` means results in"). A computed field is a formula that always results in a value.
+
+Semantic rules:
+
+- **Mutually exclusive with `default`:** A field is either initialized (`default`) or derived (`->`), never both (C80).
+- **Cannot be `nullable`:** Computed fields always produce a value (C81).
+- **Multi-name declarations not allowed:** Each computed field must have its own expression (C82).
+- **Field-level constraints allowed:** Type-appropriate constraints may be declared after the expression (e.g., `nonnegative`).
+- **Expression scope:** Only persistent fields and safe collection accessors (`.count`). Event arguments are rejected (C84) — store via `set` first if needed. Nullable field references are rejected (C83). Unsafe collection accessors (`.peek`, `.min`, `.max`) are rejected (C85).
+- **Dependency ordering:** Computed fields referencing other computed fields are evaluated in topological order. Circular dependencies are compile errors (C86) with cycle path reporting.
+- **Read-only:** Cannot appear in `edit` declarations (C87) or as targets of `set` actions (C88). The formula is the single authority on the field's value.
+- **Recomputation timing:** Recomputed after ALL mutations committed, before constraint evaluation — in Fire, Update, and Inspect pipelines. One recomputation pass per operation.
+- **External input rejection:** Caller-provided values for computed fields in `CreateInstance`, `Update`, or MCP payloads are rejected with a descriptive error. The formula is the only authority.
+
+Examples:
+
+```precept
+# Simple arithmetic derivation
+field Quantity as number default 10
+field UnitPrice as number default 5.00
+field TotalCost as number -> Quantity * UnitPrice
+
+# Collection accessor reference
+field AllRejections as set default []
+field RejectionCount as number -> AllRejections.count
+
+# Chained computation — depends on another computed field
+field SubTotal as number -> Quantity * UnitPrice
+field Tax as number default 0
+field GrandTotal as number -> SubTotal + Tax
+
+# Conditional expression in computed field
+field Score as number default 0
+field Priority as choice("high", "medium", "low") -> if Score >= 90 then "high" else "low"
+
+# Computed field with constraint
+field RequestedTotal as number -> LodgingTotal + MealsTotal + MileageTotal nonnegative
 ```
 
 ### Field-level constraints (Locked)
@@ -891,14 +938,25 @@ Stateless precepts (no `state` declarations) use a root-level `edit` form withou
 ```
 edit all
 edit Field1, Field2
+edit Field1 when Guard
+edit all when Guard
 ```
 
 - `edit all` — declares all declared fields as editable. The `all` sentinel is stored as `["all"]` in `FieldNames` and expanded to all scalar and collection field names at engine construction via `ExpandEditFieldNames()`.
 - `edit Field1, Field2` — declares specific named fields as editable.
+- `edit Field1 when Guard` — declares fields as editable only when the guard expression evaluates to `true`. The guard uses the same `WhenOpt` grammar as state-scoped edit declarations.
+- `edit all when Guard` — declares all fields as editable only when the guard is satisfied.
 
-Root-level `edit` is only valid on stateless precepts. Using it alongside `state` declarations produces **C55 (Error)**: `"Root-level \`edit\` is not valid when states are declared. Use \`in any edit all\` or \`in <State> edit <Fields>\` instead."`
+**Guard semantics** follow the same rules as state-scoped guarded edits:
 
-At runtime, `Update` on a stateless instance pulls the editable field set from `_rootEditableFields` (the internal set built from root edit blocks). The `BuildEditableFieldInfosForStateless()` method is used by `Inspect(instance)` to surface root-editable fields for stateless instances.
+- **Additive union:** Unconditional and guarded root-level edit blocks combine. A field is editable if ANY unconditional or passing-guard block grants it.
+- **Fail-closed:** Guard evaluation error → field not granted.
+- **Dynamic evaluation:** Guards are evaluated on each `Update` / `Inspect` call with current instance data.
+- **Type checking:** Guard must be a non-nullable boolean expression. C69 fires for out-of-scope references; C46 rejects nullable or non-boolean guard expressions.
+
+Root-level `edit` (with or without guards) is only valid on stateless precepts. Using it alongside `state` declarations produces **C55 (Error)**: `"Root-level \`edit\` is not valid when states are declared. Use \`in any edit all\` or \`in <State> edit <Fields>\` instead."`
+
+At runtime, `Update` on a stateless instance pulls the editable field set from the union of `_rootEditableFields` (unconditional root edit blocks) and any guarded root-level edit blocks whose guards pass. `EvaluateGuardedEditFields(null, data)` evaluates root-level guards by matching on `null` state. The `BuildEditableFieldInfosForStateless()` method is used by `Inspect(instance)` to surface the combined editable field set for stateless instances.
 
 ### Compile-time checks
 
@@ -912,20 +970,27 @@ At runtime, `Update` on a stateless instance pulls the editable field set from `
 
 ### Model
 
-The parser produces one `DslEditBlock` per state after expansion:
+The parser produces one `PreceptEditBlock` per expanded edit target:
 
 ```csharp
-public sealed record DslEditBlock(
-    string State,
+public sealed record PreceptEditBlock(
+    string? State,          // null for root-level (stateless) edit declarations
     IReadOnlyList<string> FieldNames,
+    string? WhenText = null,
+    PreceptExpression? WhenGuard = null,
     int SourceLine = 0);
 ```
 
-`DslWorkflowModel` gains an optional `IReadOnlyList<DslEditBlock>? EditBlocks` property.
+- `State` is `null` for root-level `edit` declarations on stateless precepts.
+- `WhenText` and `WhenGuard` are populated for guarded edit declarations.
+- `in any edit` expands to one `PreceptEditBlock` per declared state.
+- `in StateA, StateB edit` expands to one `PreceptEditBlock` per listed state.
+
+`PreceptDefinition` carries these via `IReadOnlyList<PreceptEditBlock>? EditBlocks`.
 
 ### Runtime
 
-The runtime `Update` API, `IUpdatePatchBuilder`, validation pipeline, and inspect integration are fully implemented. See `docs/EditableFieldsDesign.md` for the design.
+The runtime `Update` API, `IUpdatePatchBuilder`, validation pipeline, and inspect integration are fully implemented for both state-scoped guarded edits and stateless root-level guarded edits. See `docs/EditableFieldsDesign.md` for the implementation design notes.
 
 ---
 
@@ -1036,7 +1101,7 @@ Built-in functions:
 | `abs(value)` | `integer → integer`, `decimal → decimal`, `number → number` | Same as input | Absolute value. Type-preserving. |
 | `floor(value)` | `decimal → integer`, `number → integer` | `integer` | Rounds toward negative infinity. |
 | `ceil(value)` | `decimal → integer`, `number → integer` | `integer` | Rounds toward positive infinity. |
-| `round(value)` | `integer → integer`, `decimal → integer`, `number → number` | See signatures | 1-arg: banker's rounding (MidpointRounding.ToEven) to nearest integer. |
+| `round(value)` | `integer → integer`, `decimal → integer`, `number → integer` | `integer` | 1-arg: banker's rounding (MidpointRounding.ToEven) to nearest integer. |
 | `round(value, places)` | `(numeric, integer-literal) → decimal` | `decimal` | 2-arg: precision rounding. `places` must be a non-negative integer literal (C74). |
 | `truncate(value)` | `decimal → integer`, `number → integer` | `integer` | Truncates toward zero (not toward negative infinity like `floor`). |
 | `min(a, b, ...)` | `integer* → integer`, `decimal* → decimal`, `number* → number` | Same as input | Smallest of 2+ values. Variadic. All args must match the same numeric type. |
@@ -1124,7 +1189,7 @@ set Note = if Score >= 90 then "excellent" else if Score >= 70 then "good" else 
 | Code | Condition | Message |
 |---|---|---|
 | C78 | Condition is not a non-nullable boolean | `Conditional expression condition must be a non-nullable boolean, but got {actual}.` |
-| C79 | Branch types incompatible | `Conditional expression branches must produce the same scalar type, but got {thenType} and {elseType}.` Integer widens to number/decimal; number ↔ decimal is a hard error. |
+| C79 | Branch types incompatible | `Conditional expression branches produce incompatible types: {thenType} and {elseType}. {hint}` For numeric kinds: integer widens to both number and decimal, but number and decimal do not unify with each other. |
 
 ### Examples
 
@@ -1487,10 +1552,10 @@ Type checking for `from any` rows expands to per-state checking. Each state may 
 | C41 / PRECEPT041 | Binary operator type error (includes `contains` RHS mismatch) |
 | C42 / PRECEPT042 | Null-flow violation (assigning `T\|null` to `T` without narrowing) |
 | C43 / PRECEPT043 | Collection `pop`/`dequeue into` target type mismatch |
-| C60 / PRECEPT060 | Narrowing assignment: assigning a `number` or `decimal` value to an `integer` field requires an explicit integer-producing expression (no implicit truncation) |
+| C60 / PRECEPT060 | Narrowing assignment: `number` or `decimal` cannot be implicitly narrowed to `integer`. Use `floor()`, `ceil()`, `truncate()`, or `round()` to produce an integer value. (`round(value)` returns `integer` for all numeric input types.) |
 | C69 / PRECEPT069 | Cross-scope guard reference in `when` clause |
 | C78 / PRECEPT078 | Conditional expression condition must be a non-nullable boolean |
-| C79 / PRECEPT079 | Conditional expression branches must produce the same scalar type |
+| C79 / PRECEPT079 | Conditional expression branches produce incompatible types. For numeric mismatches: explains that integer widens to both number and decimal, but number and decimal do not unify. |
 
 ### Design principle
 
@@ -1547,7 +1612,7 @@ Locked in this discussion:
 - Execution order: event asserts → when guard → exit actions → row mutations → entry actions → validation
 - Coverage warning (not error) for reachable `(state, event)` pairs without transition rows
 - Unreachable row after unguarded row = compile-time error
-- Editable field declarations: `in <StateTarget> edit <FieldList>` — flat comma-separated syntax, `in` preposition (consistent with "while residing in"), additive across declarations, `any` support. Syntax and model included in language redesign; runtime `Update` API deferred (see `docs/EditableFieldsDesign.md`).
+- Editable field declarations: stateful form `in <StateTarget> [when <Guard>] edit <FieldList>` and stateless root form `edit <FieldList> [when <Guard>]` / `edit all [when <Guard>]` — flat comma-separated syntax, additive across declarations, `any` support for stateful forms, runtime `Update`/`Inspect` integration implemented.
 - Collection mutation nullability: `add`/`enqueue`/`push`/`remove` with a `T|null` value into a non-nullable collection require prior narrowing. The shared type checker enforces this via C42 (null-flow violation). Guard narrowing (`when Value != null`) and cross-branch narrowing (prior row handles null case) both satisfy the requirement.
 - Event-arg reference form: transition rows (guards, set RHS, mutation values) require the dotted form (`EventName.ArgName`). Bare arg names are valid only inside event asserts (`on <Event> assert`), where scope is arg-only. Narrowing applies to the exact symbol form used — no cross-form mirroring. Cross-event arg references (`EventB.Arg` in a row for `EventA`) are invalid.
 - Event-assert scope: permanently arg-only. Field references in event asserts are a compile-time error (C14/C15/C16). Validation combining event args with field state belongs in `when` guards, not event asserts.
@@ -1556,6 +1621,7 @@ Locked in this discussion:
 - Diagnostic severity: three-tier model. **Error** = provably wrong (blocks compilation). **Warning** = structural quality concern (does not block). **Hint** = informational observation. The checker never guesses; uncertain cases are left to the inspector.
 - Diagnostic codes: overload existing codes for same conceptual category; new codes only for genuinely new categories. C38–C45 are stable and will not be split. New codes start at C46.
 - Conditional expressions: `if <condition> then <value> else <value>` — pure value expressions valid in set RHS, invariant, assert, and guard positions. Both branches type-checked; condition must be non-nullable boolean (C78). Branches must produce compatible scalar types with integer widening (C79). Null-narrowing applies in then-branch when condition is a null check. No ternary syntax, no statement-level `if`, no short-circuit evaluation.
+- Computed (derived) fields: `field <Name> as <Type> -> <Expression>` — bare `->` signals derivation (Principle 11). Mutually exclusive with `default` (C80) and `nullable` (C81). Multi-name declarations rejected (C82). Expression scope: fields and `.count` only — no event arguments (C84), no nullable field references (C83), no unsafe collection accessors (C85). Dependency ordering via topological sort; circular dependencies are compile errors (C86). Read-only: excluded from `edit` (C87) and `set` (C88). Recomputed after all mutations, before constraint evaluation in Fire, Update, and Inspect. External input rejected (Terraform model). Type-appropriate field constraints allowed after the expression.
 
 Not yet locked:
 - Full EBNF and tokenization rules
