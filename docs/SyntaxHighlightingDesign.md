@@ -21,8 +21,8 @@ Background: `#0c0c0f`
 
 | # | Family | Hex | Typography | Tokens |
 |---|--------|-----|------------|--------|
-| 1 | Structure · Semantic | `#4338CA` | **bold** | `precept`, `field`, `state`, `event`, `rule`, `from`, `on`, `in`, `to`, `set`, `transition`, `edit`, `ensure`, `reject`, `when`, `no` |
-| 2 | Structure · Grammar | `#6366F1` | normal | `as`, `with`, `default`, `nullable`, `any`, `all`, `of`, `into`, `because`, `initial`, constraint keywords, `=`, `->`, operators, punctuation |
+| 1 | Structure · Semantic | `#4338CA` | **bold** | `precept`, `field`, `state`, `event`, `from`, `on`, `in`, `to`, `set`, `transition`, `edit`, `reject`, `when`, `no` |
+| 2 | Structure · Grammar | `#6366F1` | normal | `rule`, `ensure`, `as`, `with`, `default`, `nullable`, `any`, `all`, `of`, `into`, `because`, `initial`, constraint keywords, `=`, `->`, operators, punctuation |
 | 3 | States | `#A898F5` | normal / *italic if constrained* | State names |
 | 4 | Events | `#30B8E8` | normal / *italic if constrained* | Event names |
 | 5 | Data · Names | `#B0BEC5` | normal / *italic if guarded* | Field names, argument names |
@@ -83,10 +83,10 @@ Current classification:
 | `TokenCategory` | Semantic type | Tokens |
 |------------------|---------------|--------|
 | Control | `preceptKeywordSemantic` | `when` |
-| Declaration | `preceptKeywordSemantic` | `precept`, `field`, `rule`, `state`, `event`, `ensure`, `edit`, `in`, `to`, `from`, `on` |
+| Declaration | `preceptKeywordSemantic` | `precept`, `field`, `state`, `event`, `edit`, `in`, `to`, `from`, `on`, `with`, `default`, `nullable`, `because`, `initial`, `any`, `all`, `of`, `into` |
 | Action | `preceptKeywordSemantic` | `set`, `add`, `remove`, `enqueue`, `dequeue`, `push`, `pop`, `clear` |
 | Outcome | `preceptKeywordSemantic` | `transition`, `reject`, `no` |
-| Grammar | `preceptKeywordGrammar` | `as`, `with`, `nullable`, `default`, `because`, `initial`, `any`, `all`, `of`, `into` |
+| Grammar | `preceptKeywordGrammar` | `rule`, `ensure`, `as` |
 | Constraint | `preceptKeywordGrammar` | `nonnegative`, `positive`, `min`, `max`, `notempty`, `minlength`, `maxlength`, `mincount`, `maxcount`, `maxplaces`, `ordered` |
 | Type | `preceptType` | `string`, `number`, `boolean`, `integer`, `decimal`, `choice`, `set`, `queue`, `stack` |
 | Literal | `preceptValue` | `true`, `false`, `null` |

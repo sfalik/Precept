@@ -1352,7 +1352,7 @@ For `no transition`: steps 3 and 5 are skipped (no state change). `in <State>` e
 | Event never succeeds | Event has rows but every reachable state either has no rows or all rows reject for that event | Warning | C52 |
 | Empty precept | Precept declares no events | Hint | C53 |
 
-Checks C48–C53 are graph-level structural analysis, evaluated after parsing succeeds as part of structured compile validation. They do not block compilation unless an error-severity diagnostic is also present — they are advisory diagnostics that surface structural quality issues in the VS Code Problems panel and in MCP tool output. See Phase I in `PreceptLanguageImplementationPlan.md` for implementation details.
+Checks C48–C53 are graph-level structural analysis, evaluated after parsing succeeds as part of structured compile validation. They do not block compilation unless an error-severity diagnostic is also present — they are advisory diagnostics that surface structural quality issues in the VS Code Problems panel and in MCP tool output. See Phase I in `archive/PreceptLanguageImplementationPlan.md` for implementation details.
 
 No catch-all row is required — if all guarded rows fail, the result is `Unmatched`.
 

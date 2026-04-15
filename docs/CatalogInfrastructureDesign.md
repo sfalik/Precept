@@ -1,7 +1,7 @@
 # Catalog Infrastructure Design
 
 Date: 2025-03-05
-Status: Design complete — implementation tracked in `docs/PreceptLanguageImplementationPlan.md`
+Status: Design complete — implementation tracked in `docs/archive/PreceptLanguageImplementationPlan.md`
 
 ---
 
@@ -17,7 +17,7 @@ Language knowledge today is scattered across multiple components, each with its 
 | Semantic tokens (`PreceptSemanticTokensHandler.cs`) | Keyword lists, operator patterns | 12+ regex patterns per line |
 | Completions (`PreceptAnalyzer.cs`) | Keywords by context, identifier scoping | 8+ regex patterns for context detection |
 | TextMate grammar (`precept.tmLanguage.json`) | Keyword alternations, operator patterns | JSON regex patterns |
-| Docs (`DesignNotes.md`, `README.md`) | Full syntax contract, constraint list | Prose |
+| Docs (`PreceptLanguageDesign.md`, `README.md`) | Full syntax contract, constraint list | Prose |
 
 Adding a keyword requires touching **7 files** and hoping nothing drifts. The MCP `precept_language` tool would add an 8th copy — or worse, a hand-maintained JSON file that drifts from all the others.
 
