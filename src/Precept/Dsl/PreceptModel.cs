@@ -78,7 +78,7 @@ public enum PreceptCollectionKind
 
 /// <summary>
 /// A single declaration-level constraint attached to a field, collection field, or event argument.
-/// Constraints desugar to <c>invariant</c> / <c>on E assert</c> at parse time.
+/// Constraints desugar to <c>rule</c> / <c>on E ensure</c> at parse time.
 /// </summary>
 public abstract record FieldConstraint
 {
@@ -185,7 +185,7 @@ public sealed record Rejection(string? Reason = null) : PreceptClauseOutcome;
 /// <summary>The <c>no transition</c> outcome — event is accepted but state does not change.</summary>
 public sealed record NoTransition : PreceptClauseOutcome;
 
-/// <summary>Preposition for state asserts: <c>in</c>, <c>to</c>, <c>from</c>.</summary>
+/// <summary>Preposition for state ensures: <c>in</c>, <c>to</c>, <c>from</c>.</summary>
 public enum EnsureAnchor
 {
     /// <summary><c>in &lt;State&gt;</c> — while residing in the state (entry + AcceptedInPlace).</summary>
@@ -197,7 +197,7 @@ public enum EnsureAnchor
 }
 
 /// <summary>
-/// A global data invariant: <c>invariant &lt;expr&gt; because "reason"</c>.
+/// A global data rule: <c>rule &lt;expr&gt; because "reason"</c>.
 /// Always holds, checked post-commit on every transition.
 /// </summary>
 public sealed record PreceptRule(
@@ -210,7 +210,7 @@ public sealed record PreceptRule(
     PreceptExpression? WhenGuard = null);
 
 /// <summary>
-/// A state-scoped assert: <c>in/to/from &lt;State&gt; assert &lt;expr&gt; because "reason"</c>.
+/// A state-scoped ensure: <c>in/to/from &lt;State&gt; ensure &lt;expr&gt; because "reason"</c>.
 /// Temporal scope depends on <see cref="Anchor"/>.
 /// </summary>
 public sealed record StateEnsure(
@@ -235,7 +235,7 @@ public sealed record PreceptStateAction(
     int SourceLine = 0);
 
 /// <summary>
-/// An event-scoped assert: <c>on &lt;Event&gt; assert &lt;expr&gt; because "reason"</c>.
+/// An event-scoped ensure: <c>on &lt;Event&gt; ensure &lt;expr&gt; because "reason"</c>.
 /// Arg-only validation, checked pre-transition.
 /// </summary>
 public sealed record EventEnsure(

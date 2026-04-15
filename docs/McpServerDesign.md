@@ -230,7 +230,7 @@ The `functions` section in the JSON output provides structured `FunctionDto` obj
 
 **Implementation:** Calls `PreceptCompiler.CompileFromText(text)` — a composed pipeline that runs parse → structured validation → compile. Returns the full model projection when parsing succeeds (even with type errors), diagnostics only when parsing fails. Graph analysis findings (C48–C53) appear as warning/hint-severity diagnostics alongside any type errors. The tool is a thin projection of the core result into JSON.
 
-**Declaration arrays:** The compile output includes four arrays surfacing invariants, state asserts, event asserts, and edit blocks from the parsed definition:
+**Declaration arrays:** The compile output includes four arrays surfacing rules, state ensures, event ensures, and edit blocks from the parsed definition:
 
 | Array | Item shape |
 |-------|------------|

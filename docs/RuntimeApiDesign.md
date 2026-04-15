@@ -436,7 +436,7 @@ The following types are returned by `PreceptParser.Parse` and consumed by `Prece
 
 | Type | Description |
 |------|-------------|
-| `PreceptDefinition` | Root record — name, states, events, transition rows, fields, invariants, asserts |
+| `PreceptDefinition` | Root record — name, states, events, transition rows, fields, rules, ensures |
 | `PreceptState` | State declaration |
 | `PreceptEvent` | Event with argument contract |
 | `PreceptEventArg` | One typed argument: name, `PreceptScalarType`, nullability, optional default |

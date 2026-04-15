@@ -193,7 +193,7 @@ Collection editing supports both granular operations (add/remove individual elem
 The compiler validates edit declarations at compile time:
 
 - **Unknown field names**: every field listed in an `edit` declaration must be a declared instance data field.
-- **Unknown state names**: every state in the `in` clause must be a declared state (same validation as state asserts).
+- **Unknown state names**: every state in the `in` clause must be a declared state (same validation as state ensures).
 - **Duplicate field in same declaration**: a field listed twice in the same `edit` declaration is a warning.
 - **No fields**: an `edit` declaration with no field names is a parse error.
 
@@ -225,9 +225,9 @@ public sealed record PreceptDefinition(
     IReadOnlyList<PreceptTransitionRow> TransitionRows,
     IReadOnlyList<PreceptField> Fields,
     IReadOnlyList<PreceptCollectionField> CollectionFields,
-    IReadOnlyList<PreceptInvariant>? Invariants = null,
-    IReadOnlyList<StateAssertion>? StateAsserts = null,
-    IReadOnlyList<EventAssertion>? EventAsserts = null,
+    IReadOnlyList<PreceptRule>? Rules = null,
+    IReadOnlyList<StateEnsure>? StateEnsures = null,
+    IReadOnlyList<EventEnsure>? EventEnsures = null,
     IReadOnlyList<PreceptEditBlock>? EditBlocks = null);
 ```
 
@@ -326,7 +326,7 @@ When `Update` is called, the runtime executes the following steps in order:
 
 3. **Atomic mutation** — Apply all patch operations to a working copy of instance data, in declaration order within the patch. This is the same working-copy pattern used by `set` assignments in transitions.
 
-4. **Constraint evaluation** — Evaluate invariants, state asserts (`in <CurrentState>` asserts), and field invariants against the post-mutation working copy. If any fail, all mutations are rolled back and the outcome is `ConstraintFailure` with violations. (Note: state asserts are checked because the data must remain valid for the state we're in, even though no state entry occurs.)
+4. **Constraint evaluation** — Evaluate rules, state ensures (`in <CurrentState>` ensures), and field rules against the post-mutation working copy. If any fail, all mutations are rolled back and the outcome is `ConstraintFailure` with violations. (Note: state ensures are checked because the data must remain valid for the state we're in, even though no state entry occurs.)
 
 5. **Commit** — If all validations pass, the working copy replaces the live instance data.
 
@@ -406,7 +406,7 @@ public sealed record PreceptEditableFieldInfo(
 
 ### `Inspect(instance, patches)` — hypothetical-patch inspection
 
-A new `Inspect` overload applies a patch to a working copy of instance data, runs the full rule evaluation pipeline (editability check, type check, invariant/assert evaluation), and returns an `InspectionResult` with violations reflected in `EditableFields`. **No commit occurs** — the session instance is unchanged. This is the runtime primitive used for per-keystroke rule checking in the preview UI.
+A new `Inspect` overload applies a patch to a working copy of instance data, runs the full rule evaluation pipeline (editability check, type check, rule/ensure evaluation), and returns an `InspectionResult` with violations reflected in `EditableFields`. **No commit occurs** — the session instance is unchanged. This is the runtime primitive used for per-keystroke rule checking in the preview UI.
 
 ```csharp
 InspectionResult Inspect(PreceptInstance instance, Action<IUpdatePatchBuilder> patch)
@@ -440,15 +440,15 @@ field Tags as set of string
 field EstimatedHours as number nullable
 field ResolutionSummary as string nullable
 
-# Invariants protect data integrity regardless of mutation path
-invariant Priority >= 1 and Priority <= 5 because "Priority must be between 1 and 5"
+# Rules protect data integrity regardless of mutation path
+rule Priority >= 1 and Priority <= 5 because "Priority must be between 1 and 5"
 
 state Open initial
 state InProgress
 state Resolved
 state Closed
 
-in Resolved assert ResolutionSummary != null because "Resolution requires a summary"
+in Resolved ensure ResolutionSummary != null because "Resolution requires a summary"
 
 event Assign with Technician as string
 event StartWork
@@ -550,7 +550,7 @@ Editability now has both state-scoped and root-level productions in the DSL gram
 
 The `edit` keyword is a reserved word. It appears either in the state-scoped `in ... edit` position or as the root-level stateless declaration keyword — it cannot be used as a field name, state name, or event name.
 
-**Disambiguation:** `in <State>` is followed by either `assert` (state-scoped invariant) or `edit` (editable field declaration). The parser disambiguates at LL(2).
+**Disambiguation:** `in <State>` is followed by either `ensure` (state-scoped rule) or `edit` (editable field declaration). The parser disambiguates at LL(2).
 
 ## Preview Protocol Extension
 
@@ -634,7 +634,7 @@ The data panel has two modes — **read-only** and **edit mode**:
 - On each input change, the webview debounces and sends an `"inspect"` action with the full current patch buffer. No commit occurs.
 - The server applies patches to a working copy, runs the full validation pipeline, and returns a snapshot with `editableFields[i].violationIndex` populated for any violations.
 - Inputs with violations are highlighted red; the violation reason appears below the input.
-- The full patch buffer is sent each time (not just the changed field) so multi-field invariants are evaluated correctly.
+- The full patch buffer is sent each time (not just the changed field) so multi-field rules are evaluated correctly.
 
 ### Collection field edit controls
 
@@ -675,7 +675,7 @@ internal sealed record PreceptPreviewPatchOp(
 
 - The `EditDecl` parser combinator recognizes both `in <states> [when <guard>] edit <fieldList>` and root-level `edit <fieldList> [when <guard>]` as statements (no regex needed — Superpower token stream).
 - Report errors for unknown fields, unknown states, empty field lists.
-- Expand multi-state and `any` targets (same as state asserts).
+- Expand multi-state and `any` targets (same as state ensures).
 - Generate one `PreceptEditBlock` per source state, or a single `State == null` block for each root-level stateless declaration.
 
 ### Analyzer
@@ -686,13 +686,13 @@ internal sealed record PreceptPreviewPatchOp(
 
 ### Completions
 
-- After `in <states>`, suggest both `assert` and `edit` as continuations.
+- After `in <states>`, suggest both `ensure` and `edit` as continuations.
 - After `in <states> when <guard>` or root-level `edit`, suggest declared field names (comma-separated context).
 - After a root-level field list in a stateless precept, allow `when` as the guarded continuation.
 
 ### Semantic tokens
 
-- `edit` keyword highlighted consistently with `assert`, `transition`, etc.
+- `edit` keyword highlighted consistently with `ensure`, `transition`, etc.
 - Field names in edit declarations highlighted as variable references.
 
 4. Verify JSON is valid after changes.

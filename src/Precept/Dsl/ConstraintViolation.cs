@@ -97,7 +97,7 @@ public sealed record ExpressionSubjects(
     }
 
     /// <summary>
-    /// Walks an expression AST intended for an event-assert scope where bare names
+    /// Walks an expression AST intended for an event-ensure scope where bare names
     /// are arg references, not field references.
     /// </summary>
     public static ExpressionSubjects ExtractForEventEnsure(PreceptExpression expression, string eventName)
@@ -106,7 +106,7 @@ public sealed record ExpressionSubjects(
         var args = new List<(string, string)>();
         Walk(expression, bareNames, args);
 
-        // In event-assert scope, bare identifiers are arg references, not fields
+        // In event-ensure scope, bare identifiers are arg references, not fields
         foreach (var name in bareNames)
             args.Add((eventName, name));
 

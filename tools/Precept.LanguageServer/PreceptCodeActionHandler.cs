@@ -135,8 +135,8 @@ internal sealed class PreceptCodeActionHandler : ICodeActionHandler
         var eventLine = FindEventLine(lines, eventName);
         var lineIndexes = new List<int> { eventLine };
         lineIndexes.AddRange((model.EventEnsures ?? Array.Empty<EventEnsure>())
-            .Where(assertion => string.Equals(assertion.EventName, eventName, StringComparison.Ordinal))
-            .Select(assertion => Math.Max(0, assertion.SourceLine - 1)));
+            .Where(ensure => string.Equals(ensure.EventName, eventName, StringComparison.Ordinal))
+            .Select(ensure => Math.Max(0, ensure.SourceLine - 1)));
 
         var ranges = BuildContiguousLineDeletionRanges(lines, lineIndexes);
         var edits = ranges

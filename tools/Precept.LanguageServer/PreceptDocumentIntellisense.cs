@@ -688,16 +688,16 @@ internal static class PreceptDocumentIntellisense
 
         if (model?.Rules is not null)
         {
-            foreach (var invariant in model.Rules)
+            foreach (var rule in model.Rules)
             {
-                var lineIndex = Math.Max(0, invariant.SourceLine - 1);
+                var lineIndex = Math.Max(0, rule.SourceLine - 1);
                 if (lineIndex >= lines.Length)
                     continue;
 
                 children.Add(new DocumentSymbol
                 {
                     Name = "rule",
-                    Detail = invariant.ExpressionText,
+                    Detail = rule.ExpressionText,
                     Kind = SymbolKind.Boolean,
                     Range = CreateLineRange(lineIndex, lines[lineIndex]),
                     SelectionRange = CreateLineRange(lineIndex, lines[lineIndex])
