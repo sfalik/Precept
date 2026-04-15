@@ -392,7 +392,7 @@ public class PreceptKeywordLogicalOperatorTests
     }
 
     // ────────────────────────────────────────────────────────────────────
-    // 7. Invariant context (not just guards)
+    // 7. Rule context (not just guards)
     // ────────────────────────────────────────────────────────────────────
 
     [Fact]

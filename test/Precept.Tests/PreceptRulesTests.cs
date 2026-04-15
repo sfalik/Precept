@@ -65,10 +65,10 @@ public class PreceptRulesTests
 
         var machine = PreceptParser.Parse(dsl);
 
-        var assert = machine.StateEnsures.Should().ContainSingle().Subject;
-        assert.State.Should().Be("Paid");
-        assert.ExpressionText.Should().Be("AmountPaid > 0");
-        assert.Reason.Should().Be("Must have paid");
+        var stateEnsure = machine.StateEnsures.Should().ContainSingle().Subject;
+        stateEnsure.State.Should().Be("Paid");
+        stateEnsure.ExpressionText.Should().Be("AmountPaid > 0");
+        stateEnsure.Reason.Should().Be("Must have paid");
     }
 
     [Fact]
@@ -102,10 +102,10 @@ public class PreceptRulesTests
 
         var machine = PreceptParser.Parse(dsl);
 
-        var assert = machine.EventEnsures.Should().ContainSingle().Subject;
-        assert.EventName.Should().Be("Pay");
-        assert.ExpressionText.Should().Be("Amount > 0");
-        assert.Reason.Should().Be("Amount must be positive");
+        var eventEnsure = machine.EventEnsures.Should().ContainSingle().Subject;
+        eventEnsure.EventName.Should().Be("Pay");
+        eventEnsure.ExpressionText.Should().Be("Amount > 0");
+        eventEnsure.Reason.Should().Be("Amount must be positive");
     }
 
     [Fact]
@@ -120,9 +120,9 @@ public class PreceptRulesTests
 
         var machine = PreceptParser.Parse(dsl);
 
-        var assert = machine.EventEnsures.Should().ContainSingle().Subject;
-        assert.EventName.Should().Be("Pay");
-        assert.ExpressionText.Should().Be("Pay.Amount > 0");
+        var eventEnsure = machine.EventEnsures.Should().ContainSingle().Subject;
+        eventEnsure.EventName.Should().Be("Pay");
+        eventEnsure.ExpressionText.Should().Be("Pay.Amount > 0");
     }
 
     [Fact]
@@ -175,7 +175,7 @@ public class PreceptRulesTests
 
         var act = () => PreceptParser.Parse(dsl);
 
-        // Invariants can reference any declared field — not scoped to a single field
+        // Rules can reference any declared field — not scoped to a single field
         act.Should().NotThrow();
     }
 

@@ -1003,7 +1003,7 @@ public class NewSyntaxRuntimeTests
             """;
 
         var wf = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
-        // Start with Active=true, X=200 (satisfies invariant) — then fire setting X=0
+        // Start with Active=true, X=200 (satisfies rule) — then fire setting X=0
         var inst = wf.CreateInstance("Open", new Dictionary<string, object?> { ["X"] = 200.0, ["Active"] = true });
         var result = wf.Fire(inst, "Close", new Dictionary<string, object?> { ["NewX"] = 0.0 });
 
@@ -1025,7 +1025,7 @@ public class NewSyntaxRuntimeTests
             """;
 
         var wf = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
-        // Active=false → guard is false → invariant skipped even though X becomes 0
+        // Active=false → guard is false → rule skipped even though X becomes 0
         var inst = wf.CreateInstance("Open", new Dictionary<string, object?> { ["X"] = 200.0, ["Active"] = false });
         var result = wf.Fire(inst, "Close", new Dictionary<string, object?> { ["NewX"] = 0.0 });
 
@@ -1158,13 +1158,13 @@ public class NewSyntaxRuntimeTests
 
         var wf = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
 
-        // Active=true → guard (not Active) is false → invariant skipped
+        // Active=true → guard (not Active) is false → rule skipped
         var inst1 = wf.CreateInstance("Open", new Dictionary<string, object?> { ["X"] = 200.0, ["Active"] = true });
         var r1 = wf.Fire(inst1, "Close", new Dictionary<string, object?> { ["NewX"] = 0.0 });
         r1.Outcome.Should().Be(TransitionOutcome.Transition);
         r1.Violations.Should().BeEmpty();
 
-        // Active=false → guard (not Active) is true → invariant applies, X=0 fails
+        // Active=false → guard (not Active) is true → rule applies, X=0 fails
         var inst2 = wf.CreateInstance("Open", new Dictionary<string, object?> { ["X"] = 200.0, ["Active"] = false });
         var r2 = wf.Fire(inst2, "Close", new Dictionary<string, object?> { ["NewX"] = 0.0 });
         r2.Outcome.Should().Be(TransitionOutcome.ConstraintFailure);

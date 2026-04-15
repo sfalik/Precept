@@ -20,16 +20,16 @@ public class FieldConstraintTests
 {
     // ========================================================================================
     // BASELINE TESTS (READY NOW)
-    // Verify the desugar destination already works — current invariant expressions that
+    // Verify the desugar destination already works — current rule expressions that
     // express the same semantics as field-level constraint keywords.  Once issue #13 ships,
     // `field Amount as number nonnegative` must produce identical ConstraintFailure behavior
-    // to the invariant forms tested here.
+    // to the rule forms tested here.
     // ========================================================================================
 
     [Fact] // READY
     public void Baseline_NonnegativeEquivalentRule_SetToNeg1_ProducesConstraintFailure()
     {
-        // Desugar target: nonnegative → invariant Amount >= 0
+        // Desugar target: nonnegative → rule Amount >= 0
         // Confirms that the runtime ConstraintFailure mechanism works correctly
         // for the semantics that `nonnegative` will desugar to.
         const string dsl = """
@@ -51,7 +51,7 @@ public class FieldConstraintTests
     [Fact] // READY
     public void Baseline_PositiveEquivalentRule_SetToZero_ProducesConstraintFailure()
     {
-        // Desugar target: positive → invariant Amount > 0
+        // Desugar target: positive → rule Amount > 0
         // 0 is NOT positive — constraint failure expected.
         const string dsl = """
             precept M
@@ -72,7 +72,7 @@ public class FieldConstraintTests
     [Fact] // READY
     public void Baseline_MinMaxEquivalentRule_OutOfRangeValues_ProduceConstraintFailure()
     {
-        // Desugar target: min 1 max 10 → invariant Amount >= 1 and Amount <= 10
+        // Desugar target: min 1 max 10 → rule Amount >= 1 and Amount <= 10
         // Setting to 0 or 11 should fail.
         const string dsl = """
             precept M
@@ -578,7 +578,7 @@ public class FieldConstraintTests
     [Fact]
     public void Fire_Nonnegative_SetToNeg1_ProducesConstraintFailure()
     {
-        // `nonnegative` constraint on a field desugars to invariant Amount >= 0.
+        // `nonnegative` constraint on a field desugars to rule Amount >= 0.
         // Setting Amount = -1 must produce ConstraintFailure.
         const string dsl = """
             precept M
@@ -671,9 +671,9 @@ public class FieldConstraintTests
     [Fact] // requires Issue #13 runtime (collection desugaring)
     public void Fire_Notempty_OnCollectionField_WhenEmpty_ProducesConstraintFailure()
     {
-        // `notempty` on a collection desugars to invariant Tags.count > 0.
+        // `notempty` on a collection desugars to rule Tags.count > 0.
         // Start with a non-empty Tags (satisfies the constraint), then remove the last item,
-        // making the collection empty. The invariant fires → ConstraintFailure.
+        // making the collection empty. The rule fires → ConstraintFailure.
         const string dsl = """
             precept M
             field Tags as set of string notempty
@@ -695,7 +695,7 @@ public class FieldConstraintTests
     [Fact] // requires Issue #13 runtime (collection desugaring)
     public void Fire_Mincount2_OnCollectionField_Count1_ProducesConstraintFailure()
     {
-        // `mincount 2` desugars to invariant Members.count >= 2.
+        // `mincount 2` desugars to rule Members.count >= 2.
         // Start with 2 members (valid), then remove one → count becomes 1 → ConstraintFailure.
         const string dsl = """
             precept M

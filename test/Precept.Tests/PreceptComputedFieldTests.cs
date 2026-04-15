@@ -1049,7 +1049,7 @@ public class PreceptComputedFieldRuntimeTests
     [Fact]
     public void Fire_RuleReferencingComputedField_SeesFreshValueAfterMutation()
     {
-        // Invariant references input fields (A + B) rather than the computed field directly,
+        // Rule references input fields (A + B) rather than the computed field directly,
         // because BuildDefaultData doesn't include computed values → C29 can't evaluate them.
         // The computed field is still exercised: it recomputes and we verify its value.
         const string dsl = """
@@ -1072,7 +1072,7 @@ public class PreceptComputedFieldRuntimeTests
         ok.Outcome.Should().Be(TransitionOutcome.Transition);
         ok.UpdatedInstance!.InstanceData["Sum"].Should().Be(15.0);
 
-        // A = 100, Sum = 105 → invariant fails
+        // A = 100, Sum = 105 → rule fails
         var fail = engine.Fire(instance, "Bump",
             new Dictionary<string, object?> { ["NewA"] = 100.0 });
         fail.Outcome.Should().Be(TransitionOutcome.ConstraintFailure);
@@ -1159,7 +1159,7 @@ public class PreceptComputedFieldRuntimeTests
     [Fact]
     public void Update_RuleEvaluatesAgainstRecomputedValues()
     {
-        // Invariant uses stored fields so C29 can evaluate at compile time.
+        // Rule uses stored fields so C29 can evaluate at compile time.
         // Computed field Sum still recomputes and we verify its value.
         const string dsl = """
             precept Test
@@ -1178,7 +1178,7 @@ public class PreceptComputedFieldRuntimeTests
         ok.Outcome.Should().Be(UpdateOutcome.Update);
         ok.UpdatedInstance!.InstanceData["Sum"].Should().Be(13.0);
 
-        // A = 20, Sum = 25 → invariant fails
+        // A = 20, Sum = 25 → rule fails
         var fail = engine.Update(instance, p => p.Set("A", 20.0));
         fail.Outcome.Should().Be(UpdateOutcome.ConstraintFailure);
     }
@@ -1448,14 +1448,14 @@ public class PreceptComputedFieldRuntimeTests
     }
 
     // ════════════════════════════════════════════════════════════════════
-    // Stateless invariant vs. recomputed values (review B3)
+    // Stateless rule vs. recomputed values (review B3)
     // ════════════════════════════════════════════════════════════════════
 
     [Fact]
     public void StatelessRule_EnforcedAgainstRecomputedValue()
     {
-        // Stateless precept with computed field + invariant.
-        // Updating dependency to make recomputed value violate the invariant.
+        // Stateless precept with computed field + rule.
+        // Updating dependency to make recomputed value violate the rule.
         const string dsl = """
             precept Test
             field Qty as number default 1

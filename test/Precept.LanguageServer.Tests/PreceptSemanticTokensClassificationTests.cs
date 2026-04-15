@@ -185,4 +185,29 @@ public class PreceptSemanticTokensClassificationTests
             t.Text == "else" &&
             t.Type == "preceptKeywordSemantic");
     }
+
+    [Fact]
+    public void GetClassifiedTokens_RuleEnsureKeywords_ArePreceptKeywordGrammar()
+    {
+        const string dsl = """
+            precept M
+            field Balance as number default 100
+            rule Balance >= 0 because "Must be positive"
+            state Active initial
+            state Done
+            in Done ensure Balance > 0 because "Done needs balance"
+            event Go
+            from Active on Go -> no transition
+            """;
+
+        var tokens = PreceptSemanticTokensHandler.GetClassifiedTokens(dsl);
+
+        tokens.Should().Contain(t =>
+            t.Text == "rule" &&
+            t.Type == "preceptKeywordGrammar");
+
+        tokens.Should().Contain(t =>
+            t.Text == "ensure" &&
+            t.Type == "preceptKeywordGrammar");
+    }
 }

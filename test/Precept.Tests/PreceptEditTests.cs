@@ -235,7 +235,7 @@ public class PreceptEditTests
         result.Outcome.Should().Be(UpdateOutcome.UneditableField);
     }
 
-    // ─── Update: invariant enforcement ───
+    // ─── Update: rule enforcement ───
 
     [Fact]
     public void Update_RuleViolation_Blocked()

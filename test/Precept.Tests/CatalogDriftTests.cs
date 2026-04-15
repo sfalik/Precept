@@ -367,7 +367,7 @@ public class CatalogDriftTests
         ["C3"] = new("state", "parse"),
 
         // C4: Invalid expression — ParseExpression is a standalone entry point
-        //      (invariant/guard expressions are parsed inline by the combinator)
+        //      (rule/guard expressions are parsed inline by the combinator)
         ["C4"] = new("_unused_", "parse expression", DirectAction: () =>
         {
             PreceptParser.ParseExpression("and");
@@ -475,7 +475,7 @@ public class CatalogDriftTests
             PreceptCompiler.Compile(model);
         }),
 
-        // C29: Invariant violated by default values
+        // C29: Rule violated by default values
         ["C29"] = new(H + "field Score as number default 0\nrule Score > 0 because \"must be positive\"\n" + S, "rule violation"),
 
         // C30: State ensure on initial state violated by defaults
@@ -493,7 +493,7 @@ public class CatalogDriftTests
         // C45: Subsumed state ensure (to redundant with identical in)
         ["C45"] = new(H + "field X as number default 10\n" + S2 + "in B ensure X > 0 because \"in covers entry\"\nto B ensure X > 0 because \"to is redundant\"\nevent Go\nfrom A on Go -> transition B\n", "Subsumed state ensure"),
 
-        // C46: Non-boolean expression in rule position (guard, invariant, assert)
+        // C46: Non-boolean expression in rule position (guard, rule, ensure)
         ["C46"] = new(H + "field X as number default 0\n" + S2 + "event Go\nfrom A on Go when X -> transition B\nfrom A on Go -> reject \"blocked\"\n", "PRECEPT046"),
 
         // C47: Identical guard on duplicate transition rows for the same state+event pair
@@ -1346,7 +1346,7 @@ public class CatalogDriftTests
 
         // ── Compile-phase: type checker + analysis ────
 
-        // C29: invariant violated by defaults — invariant on line 3
+        // C29: rule violated by defaults — rule on line 3
         ["C29"] = ("precept Test\nfield Score as number default 0\nrule Score > 0 because \"must be positive\"\nstate A initial\n", "compile", 3),
 
         // C30: state ensure on initial state violated by defaults — assert on line 3
@@ -1439,7 +1439,7 @@ public class CatalogDriftTests
         // C68: literal not in choice set — row on line 5
         ["C68"] = ("precept Test\nfield Status as choice(\"Open\",\"Closed\") default \"Open\"\nstate A initial\nstate B\nevent Go\nfrom A on Go -> set Status = \"Invalid\" -> no transition\n", "compile", 6),
 
-        // C69: cross-scope guard reference — invariant on line 4
+        // C69: cross-scope guard reference — rule on line 4
         ["C69"] = ("precept Test\nfield X as number default 0\nstate A initial\nstate B\nevent Go with Amount as number\nrule X >= 0 when Go.Amount > 0 because \"bad\"\nfrom A on Go -> no transition\n", "compile", 6),
 
         // C70: duplicate modifier — field on line 2

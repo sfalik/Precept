@@ -246,7 +246,7 @@ public class NewSyntaxParserTests
     }
 
     // ════════════════════════════════════════════════════════════════════
-    // PARSING — Invariant declarations
+    // PARSING — Rule declarations
     // ════════════════════════════════════════════════════════════════════
 
     [Fact]
@@ -285,8 +285,41 @@ public class NewSyntaxParserTests
         model.Rules.Should().HaveCount(2);
     }
 
+    [Fact]
+    public void Parse_OldInvariantKeyword_ProducesParseError()
+    {
+        var dsl = """
+            precept Test
+            field Balance as number default 100
+            invariant Balance >= 0 because "Must be non-negative"
+            state Active initial
+            event Go
+            from Active on Go -> no transition
+            """;
+
+        var (model, diagnostics) = PreceptParser.ParseWithDiagnostics(dsl);
+        diagnostics.Should().NotBeEmpty("the old 'invariant' keyword should produce a parse error");
+    }
+
+    [Fact]
+    public void Parse_OldAssertKeyword_ProducesParseError()
+    {
+        var dsl = """
+            precept Test
+            field Balance as number default 100
+            state Active initial
+            state Done
+            in Done assert Balance > 0 because "Done requires positive balance"
+            event Finish
+            from Active on Finish -> transition Done
+            """;
+
+        var (model, diagnostics) = PreceptParser.ParseWithDiagnostics(dsl);
+        diagnostics.Should().NotBeEmpty("the old 'assert' keyword should produce a parse error");
+    }
+
     // ════════════════════════════════════════════════════════════════════
-    // PARSING — State ensures (in/to/from <State> assert ...)
+    // PARSING — State ensures (in/to/from <State> ensure ...)
     // ════════════════════════════════════════════════════════════════════
 
     [Fact]
@@ -382,7 +415,7 @@ public class NewSyntaxParserTests
     }
 
     // ════════════════════════════════════════════════════════════════════
-    // PARSING — Event ensures (on <Event> assert ...)
+    // PARSING — Event ensures (on <Event> ensure ...)
     // ════════════════════════════════════════════════════════════════════
 
     [Fact]
@@ -924,7 +957,7 @@ public class NewSyntaxParserTests
     }
 
     // ════════════════════════════════════════════════════════════════════
-    // PARSING — Source line tracking on asserts (Category A gaps)
+    // PARSING — Source line tracking on ensures (Category A gaps)
     // ════════════════════════════════════════════════════════════════════
 
     [Fact]
