@@ -199,6 +199,7 @@
             { "scope": "variable.other.field.constrained.precept", "settings": { "foreground": "#B0BEC5", "fontStyle": "italic" } },
             { "scope": "variable.other.property.precept",        "settings": { "foreground": "#B0BEC5" } },
             { "scope": "variable.other.precept",                 "settings": { "foreground": "#B0BEC5" } },
+            { "scope": "variable.parameter.precept",             "settings": { "foreground": "#B0BEC5" } },
             { "scope": "storage.type.precept",                   "settings": { "foreground": "#9AA8B5" } },
             { "scope": "constant.other.value.precept",           "settings": { "foreground": "#84929F" } },
             { "scope": "constant.language.precept",              "settings": { "foreground": "#84929F" } },
