@@ -49,25 +49,25 @@ The current target set is intentionally small.
 
 ### State Diagram
 
-The state diagram is the topology-reading surface. It should answer:
+The state diagram is the topology-reading surface for the overall process. It should answer:
 
 - Where can this entity be?
 - Where is it now, when state exists?
 - Which event paths currently inspect as available, blocked, rejected, or terminal?
 - Which reasons are attached to those paths?
 
-The state diagram is strongest when helping a user read structural possibility and current callable movement. It should not be asked to carry the entire burden of data comprehension.
+The state diagram is strongest when helping a user read structural possibility, overall process shape, and current callable movement. It should not be asked to carry the entire burden of data comprehension or local sequential narrative.
 
 ### Timeline
 
-The timeline is the temporal-reading surface. It should answer:
+The timeline is the local-journey-reading surface. It should answer:
 
-- What happened?
-- What was attempted by event or direct edit?
-- What changed?
-- What reason or verdict accompanied that attempt?
+- Where did we start?
+- What has happened?
+- Where are we now in this journey?
+- What is next from here?
 
-The timeline is where governed attempts become legible as a sequence. It is the right place for receipts, outcomes, and visible reasons over time. A durable timeline likely needs either first-class runtime support or host-owned receipts and change history; current instance truth alone is not enough to reconstruct a trustworthy event or edit history.
+The timeline is where governed attempts become legible as a local sequence from starting point through current position toward immediate next possibilities. It is the right place for receipts, outcomes, visible reasons over time, and nearby next-step affordances or inspected next possibilities that help a reader understand what comes next from the current position. A durable timeline likely needs either first-class runtime support or host-owned receipts and change history for the past-tense portions of that story; current instance truth alone is not enough to reconstruct a trustworthy event or edit history.
 
 ### Data Form
 
@@ -169,7 +169,7 @@ In practice, that means:
 
 - Current-state semantics are mostly projection work. The current public runtime already exposes much of what a surface needs for present-tense reading.
 - Hypothetical semantics are partly projection work. Inspection and update-preview results can support event and edit affordance reading, but surfaces must keep that distinct from what is currently true of the entity.
-- History semantics are not yet fully projection work. A timeline that claims durable event history or field-change history needs either first-class runtime support or host-owned receipts and history.
+- Past-tense timeline semantics are not yet fully projection work. A timeline that claims durable event history or field-change history needs either first-class runtime support or host-owned receipts and history. Present position and immediate next possibilities can be projected more directly from current truth plus inspection, but they must remain distinct from reconstructed history.
 - Richer surface semantics should be treated as provisional until their supporting truth is public and stable.
 
 ## Required Runtime Support
@@ -192,7 +192,7 @@ This is enough to ground significant portions of the state diagram and the prese
 
 ### Likely Needed for Timeline and Richer Surface Semantics
 
-The following likely need additional public runtime support, or a clearly sanctioned host-owned receipt model, before the manifest can treat them as fully canonical:
+The following likely need additional public runtime support, or a clearly sanctioned host-owned receipt model, before the manifest can treat the timeline's past-tense narrative as fully canonical:
 
 - Durable event-attempt history across time
 - Durable field-edit history across time
@@ -200,7 +200,7 @@ The following likely need additional public runtime support, or a clearly sancti
 - Consistent structured reason coverage across outcomes, without losing the reasons already present in current public contracts
 - Clear support for showing what changed as the result of an accepted event or edit, likely through receipt-level change-set detail
 
-The practical boundary is simple: if a surface needs a trustworthy past-tense narrative, current instance state is not enough by itself.
+The practical boundary is simple: if a surface needs a trustworthy past-tense narrative, current instance state is not enough by itself. The timeline can still show where the entity is now and what is next from here using current truth plus inspection, but it must not imply unsupported history.
 
 ### Likely Needed for the Data Form's Richer Semantics
 
