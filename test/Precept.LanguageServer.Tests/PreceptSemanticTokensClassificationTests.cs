@@ -122,7 +122,7 @@ public class PreceptSemanticTokensClassificationTests
     }
 
     [Fact]
-    public void GetClassifiedTokens_PreceptName_IsPreceptMessage()
+    public void GetClassifiedTokens_PreceptName_IsPreceptName()
     {
         const string dsl = """
             precept ApartmentRentalApplication
@@ -135,7 +135,7 @@ public class PreceptSemanticTokensClassificationTests
 
         tokens.Should().Contain(t =>
             t.Text == "ApartmentRentalApplication" &&
-            t.Type == "preceptMessage");
+            t.Type == "preceptName");
     }
 
     [Fact]

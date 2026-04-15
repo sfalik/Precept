@@ -109,6 +109,7 @@
       { "id": "preceptState",           "description": "Precept state name" },
       { "id": "preceptEvent",           "description": "Precept event name" },
       { "id": "preceptFieldName",       "description": "Precept field or argument name" },
+      { "id": "preceptName",           "description": "Precept declaration name" },
       { "id": "preceptType",            "description": "Precept type keyword" },
       { "id": "preceptValue",           "description": "Precept literal value" },
       { "id": "preceptMessage",         "description": "Precept rule message string" }
@@ -149,6 +150,9 @@
           "preceptFieldName.preceptConstrained": [
             "variable.other.field.constrained.precept"
           ],
+          "preceptName": [
+            "entity.name.type.precept.precept"
+          ],
           "preceptType": [
             "storage.type.precept"
           ],
@@ -156,7 +160,6 @@
             "constant.other.value.precept"
           ],
           "preceptMessage": [
-            "entity.name.precept.message.precept",
             "string.quoted.double.message.precept"
           ]
         }
@@ -180,6 +183,9 @@
           },
           "preceptMessage": {
             "foreground": "#FBBF24"
+          },
+          "preceptName": {
+            "foreground": "#6366F1"
           }
         }
       },
@@ -204,7 +210,7 @@
             { "scope": "constant.other.value.precept",           "settings": { "foreground": "#84929F" } },
             { "scope": "constant.language.precept",              "settings": { "foreground": "#84929F" } },
             { "scope": "constant.numeric.precept",               "settings": { "foreground": "#84929F" } },
-            { "scope": "entity.name.precept.message.precept",    "settings": { "foreground": "#FBBF24" } },
+            { "scope": "entity.name.type.precept.precept",         "settings": { "foreground": "#6366F1" } },
             { "scope": "string.quoted.double.precept",           "settings": { "foreground": "#84929F" } },
             { "scope": "string.quoted.double.message.precept",   "settings": { "foreground": "#FBBF24" } },
             { "scope": "keyword.operator.comparison.precept",    "settings": { "foreground": "#6366F1" } },
