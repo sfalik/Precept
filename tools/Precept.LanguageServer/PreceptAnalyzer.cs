@@ -272,8 +272,7 @@ internal sealed class PreceptAnalyzer
 
             if (Regex.IsMatch(beforeCursor, "^\\s*from\\s+(?:[A-Za-z_][A-Za-z0-9_]*\\s*,\\s*)*(?:any|[A-Za-z_][A-Za-z0-9_]*)\\s+$", RegexOptions.IgnoreCase))
             {
-                items.Add(new CompletionItem { Label = "assert", Kind = CompletionItemKind.Keyword });
-                items.Add(new CompletionItem { Label = "->", Kind = CompletionItemKind.Operator, Detail = "state exit actions" });
+                items.Add(new CompletionItem { Label = "ensure", Kind = CompletionItemKind.Keyword });                items.Add(new CompletionItem { Label = "->", Kind = CompletionItemKind.Operator, Detail = "state exit actions" });
             }
 
             return DistinctAndSort(items);
@@ -307,48 +306,48 @@ internal sealed class PreceptAnalyzer
         if (Regex.IsMatch(beforeCursor, @"^\s*field\s+(?:[A-Za-z_]\w*\s*(?:,\s*)?)*[A-Za-z_]\w*\s+$", RegexOptions.IgnoreCase))
             return [new CompletionItem { Label = "as", Kind = CompletionItemKind.Keyword }, new CompletionItem { Label = ",", Kind = CompletionItemKind.Operator, Detail = "add another field name" }];
 
-        // ── New-syntax: invariant/assert expressions ──
-        // After "invariant <expr> when <guard> " (completed guard) → suggest because
-        if (Regex.IsMatch(beforeCursor, @"^\s*invariant\s+.+\s+when\s+.+\s+$", RegexOptions.IgnoreCase) && EndsWithCompletedExpression(beforeCursor))
+        // ── New-syntax: rule/ensure expressions ──
+        // After "rule <expr> when <guard> " (completed guard) → suggest because
+        if (Regex.IsMatch(beforeCursor, @"^\s*rule\s+.+\s+when\s+.+\s+$", RegexOptions.IgnoreCase) && EndsWithCompletedExpression(beforeCursor))
             return [BecauseItem];
 
-        // After "invariant <expr> when " (guard in progress) → suggest field names for guard expression
-        if (Regex.IsMatch(beforeCursor, @"^\s*invariant\s+.+\s+when\s+[^\n]*$", RegexOptions.IgnoreCase))
+        // After "rule <expr> when " (guard in progress) → suggest field names for guard expression
+        if (Regex.IsMatch(beforeCursor, @"^\s*rule\s+.+\s+when\s+[^\n]*$", RegexOptions.IgnoreCase))
             return BuildDataExpressionCompletions(dataFields, collectionKinds);
 
-        // After a completed invariant expression, suggest when or because.
-        if (Regex.IsMatch(beforeCursor, "^\\s*invariant\\s+.+\\s+$", RegexOptions.IgnoreCase) && EndsWithCompletedExpression(beforeCursor))
+        // After a completed rule expression, suggest when or because.
+        if (Regex.IsMatch(beforeCursor, "^\\s*rule\\s+.+\\s+$", RegexOptions.IgnoreCase) && EndsWithCompletedExpression(beforeCursor))
             return [WhenItem, BecauseItem];
 
-        // After "invariant " → suggest expression completions (field names, operators)
-        if (Regex.IsMatch(beforeCursor, "^\\s*invariant\\s+[^\\n]*$", RegexOptions.IgnoreCase))
+        // After "rule " → suggest expression completions (field names, operators)
+        if (Regex.IsMatch(beforeCursor, "^\\s*rule\\s+[^\\n]*$", RegexOptions.IgnoreCase))
             return BuildDataExpressionCompletions(dataFields, collectionKinds);
 
-        // After "on Event assert <expr> when <guard> " (completed guard) → suggest because
-        if (Regex.IsMatch(beforeCursor, @"^\s*on\s+[A-Za-z_][A-Za-z0-9_]*\s+assert\s+.+\s+when\s+.+\s+$", RegexOptions.IgnoreCase) && EndsWithCompletedExpression(beforeCursor))
+        // After "on Event ensure <expr> when <guard> " (completed guard) → suggest because
+        if (Regex.IsMatch(beforeCursor, @"^\s*on\s+[A-Za-z_][A-Za-z0-9_]*\s+ensure\s+.+\s+when\s+.+\s+$", RegexOptions.IgnoreCase) && EndsWithCompletedExpression(beforeCursor))
             return [BecauseItem];
 
-        // After "on Event assert <expr> when " (guard in progress) → suggest event arg completions
-        if (Regex.IsMatch(beforeCursor, @"^\s*on\s+[A-Za-z_][A-Za-z0-9_]*\s+assert\s+.+\s+when\s+[^\n]*$", RegexOptions.IgnoreCase))
+        // After "on Event ensure <expr> when " (guard in progress) → suggest event arg completions
+        if (Regex.IsMatch(beforeCursor, @"^\s*on\s+[A-Za-z_][A-Za-z0-9_]*\s+ensure\s+.+\s+when\s+[^\n]*$", RegexOptions.IgnoreCase))
         {
             var eventName = Regex.Match(beforeCursor, @"^\s*on\s+(?<evt>[A-Za-z_][A-Za-z0-9_]*)").Groups["evt"].Value;
-            return BuildEventAssertCompletions(eventName, eventArgs);
+            return BuildEventEnsureCompletions(eventName, eventArgs);
         }
 
-        // After a completed event assert expression, suggest when or because.
-        if (Regex.IsMatch(beforeCursor, "^\\s*on\\s+[A-Za-z_][A-Za-z0-9_]*\\s+assert\\s+.+\\s+$", RegexOptions.IgnoreCase) && EndsWithCompletedExpression(beforeCursor))
+        // After a completed event ensure expression, suggest when or because.
+        if (Regex.IsMatch(beforeCursor, "^\\s*on\\s+[A-Za-z_][A-Za-z0-9_]*\\s+ensure\\s+.+\\s+$", RegexOptions.IgnoreCase) && EndsWithCompletedExpression(beforeCursor))
             return [WhenItem, BecauseItem];
 
-        // After "on EventName assert " → suggest expression completions (event args)
-        if (Regex.IsMatch(beforeCursor, "^\\s*on\\s+[A-Za-z_][A-Za-z0-9_]*\\s+assert\\s+[^\\n]*$", RegexOptions.IgnoreCase))
+        // After "on EventName ensure " → suggest expression completions (event args)
+        if (Regex.IsMatch(beforeCursor, "^\\s*on\\s+[A-Za-z_][A-Za-z0-9_]*\\s+ensure\\s+[^\\n]*$", RegexOptions.IgnoreCase))
         {
             var eventName = Regex.Match(beforeCursor, "^\\s*on\\s+(?<evt>[A-Za-z_][A-Za-z0-9_]*)").Groups["evt"].Value;
-            return BuildEventAssertCompletions(eventName, eventArgs);
+            return BuildEventEnsureCompletions(eventName, eventArgs);
         }
 
-        // After "on EventName " → suggest "assert"
+        // After "on EventName " → suggest "ensure"
         if (Regex.IsMatch(beforeCursor, "^\\s*on\\s+[A-Za-z_][A-Za-z0-9_]*\\s+$", RegexOptions.IgnoreCase))
-            return [new CompletionItem { Label = "assert", Kind = CompletionItemKind.Keyword }];
+            return [new CompletionItem { Label = "ensure", Kind = CompletionItemKind.Keyword }];
 
         // After "on " (typing or choosing event name) → suggest event names
         if (Regex.IsMatch(beforeCursor, @"^\s*on\s+\w*$", RegexOptions.IgnoreCase))
@@ -369,11 +368,11 @@ internal sealed class PreceptAnalyzer
         if (Regex.IsMatch(beforeCursor, @"^\s*in\s+[A-Za-z_][A-Za-z0-9_]*(?:\s*,\s*[A-Za-z_][A-Za-z0-9_]*)*\s+when\s+[^\n]*$", RegexOptions.IgnoreCase))
             return BuildDataExpressionCompletions(dataFields, collectionKinds);
 
-        // After "in/to StateName " → suggest assert, ->, edit (in only), when (in only)
+        // After "in/to StateName " → suggest ensure, ->, edit (in only), when (in only)
         if (Regex.IsMatch(beforeCursor, "^\\s*in\\s+[A-Za-z_][A-Za-z0-9_]*(?:\\s*,\\s*[A-Za-z_][A-Za-z0-9_]*)*\\s+$", RegexOptions.IgnoreCase))
             return
             [
-                new CompletionItem { Label = "assert", Kind = CompletionItemKind.Keyword },
+                new CompletionItem { Label = "ensure", Kind = CompletionItemKind.Keyword },
                 new CompletionItem { Label = "edit", Kind = CompletionItemKind.Keyword },
                 WhenItem,
                 new CompletionItem { Label = "->", Kind = CompletionItemKind.Operator, Detail = "action chain" }
@@ -382,29 +381,29 @@ internal sealed class PreceptAnalyzer
         if (Regex.IsMatch(beforeCursor, "^\\s*to\\s+[A-Za-z_][A-Za-z0-9_]*(?:\\s*,\\s*[A-Za-z_][A-Za-z0-9_]*)*\\s+$", RegexOptions.IgnoreCase))
             return
             [
-                new CompletionItem { Label = "assert", Kind = CompletionItemKind.Keyword },
+                new CompletionItem { Label = "ensure", Kind = CompletionItemKind.Keyword },
                 new CompletionItem { Label = "->", Kind = CompletionItemKind.Operator, Detail = "action chain" }
             ];
 
         // After "in/to " (typing state name) → suggest state names
-        // Only matches while still in the state-target portion (identifiers/commas), not after a keyword like edit/assert
+        // Only matches while still in the state-target portion (identifiers/commas), not after a keyword like edit/ensure
         if (Regex.IsMatch(beforeCursor, "^\\s*(?:in|to)\\s+(?:[A-Za-z_][A-Za-z0-9_]*\\s*,\\s*)*(?:[A-Za-z_][A-Za-z0-9_]*)?$", RegexOptions.IgnoreCase))
             return BuildItems(states.Append("any"), CompletionItemKind.EnumMember);
 
-        // After "in/to/from State assert <expr> when <guard> " (completed guard) → suggest because
-        if (Regex.IsMatch(beforeCursor, @"^\s*(?:in|to|from)\s+[^\n]*\s+assert\s+.+\s+when\s+.+\s+$", RegexOptions.IgnoreCase) && EndsWithCompletedExpression(beforeCursor))
+        // After "in/to/from State ensure <expr> when <guard> " (completed guard) → suggest because
+        if (Regex.IsMatch(beforeCursor, @"^\s*(?:in|to|from)\s+[^\n]*\s+ensure\s+.+\s+when\s+.+\s+$", RegexOptions.IgnoreCase) && EndsWithCompletedExpression(beforeCursor))
             return [BecauseItem];
 
-        // After "in/to/from State assert <expr> when " (guard in progress) → suggest field completions
-        if (Regex.IsMatch(beforeCursor, @"^\s*(?:in|to|from)\s+[^\n]*\s+assert\s+.+\s+when\s+[^\n]*$", RegexOptions.IgnoreCase))
+        // After "in/to/from State ensure <expr> when " (guard in progress) → suggest field completions
+        if (Regex.IsMatch(beforeCursor, @"^\s*(?:in|to|from)\s+[^\n]*\s+ensure\s+.+\s+when\s+[^\n]*$", RegexOptions.IgnoreCase))
             return BuildDataExpressionCompletions(dataFields, collectionKinds);
 
-        // After a completed state assert expression, suggest when or because.
-        if (Regex.IsMatch(beforeCursor, "^\\s*(?:in|to|from)\\s+[^\\n]*\\s+assert\\s+.+\\s+$", RegexOptions.IgnoreCase) && EndsWithCompletedExpression(beforeCursor))
+        // After a completed state ensure expression, suggest when or because.
+        if (Regex.IsMatch(beforeCursor, "^\\s*(?:in|to|from)\\s+[^\\n]*\\s+ensure\\s+.+\\s+$", RegexOptions.IgnoreCase) && EndsWithCompletedExpression(beforeCursor))
             return [WhenItem, BecauseItem];
 
-        // After "in/to/from State assert " → expression completions
-        if (Regex.IsMatch(beforeCursor, "^\\s*(?:in|to|from)\\s+[^\\n]*\\s+assert\\s+[^\\n]*$", RegexOptions.IgnoreCase))
+        // After "in/to/from State ensure " → expression completions
+        if (Regex.IsMatch(beforeCursor, "^\\s*(?:in|to|from)\\s+[^\\n]*\\s+ensure\\s+[^\\n]*$", RegexOptions.IgnoreCase))
             return BuildDataExpressionCompletions(dataFields, collectionKinds);
 
         // After "because " → suggest string template
@@ -843,7 +842,7 @@ internal sealed class PreceptAnalyzer
         return DistinctAndSort(items);
     }
 
-    private static IReadOnlyList<CompletionItem> BuildEventAssertCompletions(
+    private static IReadOnlyList<CompletionItem> BuildEventEnsureCompletions(
         string eventName,
         IReadOnlyDictionary<string, IReadOnlyList<string>> eventArgs)
     {
@@ -971,10 +970,10 @@ internal sealed class PreceptAnalyzer
         string[] lines,
         List<Diagnostic> diagnostics)
     {
-        if (model.StateAsserts is not null)
+        if (model.StateEnsures is not null)
         {
-            var statesWithToAsserts = model.StateAsserts
-                .Where(sa => sa.Anchor == AssertAnchor.To)
+            var statesWithToAsserts = model.StateEnsures
+                .Where(sa => sa.Anchor == EnsureAnchor.To)
                 .Select(sa => sa.State)
                 .Distinct(StringComparer.Ordinal)
                 .ToList();
@@ -995,7 +994,7 @@ internal sealed class PreceptAnalyzer
                         diagnostics.Add(new Diagnostic
                         {
                             Severity = DiagnosticSeverity.Warning,
-                            Message = $"State '{stateName}' has entry asserts but no transition targets it — entry asserts are never checked.",
+                            Message = $"State '{stateName}' has entry ensures but no transition targets it — entry ensures are never checked.",
                             Source = "precept",
                             Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
                                 new Position(stateLineIdx, 0),
@@ -1197,7 +1196,7 @@ internal sealed class PreceptAnalyzer
         SnippetItem("from/on with when", "from ${1:any} on ${2:Event} when ${3:guard} -> ${4:transition ${5:State}}", "Guarded transition row"),
         SnippetItem("from/on with set", "from ${1:any} on ${2:Event} -> set ${3:Field} = ${4:value} -> transition ${5:State}", "Row with data assignment"),
         SnippetItem("field declaration", "field ${1:Name} as ${2:string}", "Field declaration"),
-        SnippetItem("invariant", "invariant ${1:Expr} because \"${2:Reason}\"", "Global invariant"),
+        SnippetItem("rule", "rule ${1:Expr} because \"${2:Reason}\"", "Global rule"),
         SnippetItem("event with args", "event ${1:Name} with ${2:Arg} as ${3:string}", "Event with arguments")
     ];
 

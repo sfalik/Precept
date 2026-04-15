@@ -12,8 +12,8 @@
     { "include": "#eventDeclaration" },
     { "include": "#fieldCollectionDeclaration" },
     { "include": "#fieldScalarDeclaration" },
-    { "include": "#invariantStatement" },
-    { "include": "#assertStatement" },
+    { "include": "#ruleStatement" },
+    { "include": "#ensureStatement" },
     { "include": "#fromOnHeader" },
     { "include": "#transitionTarget" },
     { "include": "#eventArgReference" },
@@ -287,28 +287,28 @@
         }
       ]
     },
-    "invariantStatement": {
-      "comment": "invariant Expr because \"Reason\"",
+    "ruleStatement": {
+      "comment": "rule Expr because \"Reason\"",
       "patterns": [
         {
-          "name": "meta.invariant.precept",
-          "match": "^(\\s*)(invariant)\\b",
+          "name": "meta.rule.precept",
+          "match": "^(\\s*)(rule)\\b",
           "captures": {
-            "2": { "name": "keyword.other.precept" }
+            "2": { "name": "keyword.other.grammar.precept" }
           }
         }
       ]
     },
-    "assertStatement": {
-      "comment": "on EventName assert Expr because \"Reason\"",
+    "ensureStatement": {
+      "comment": "on EventName ensure Expr because \"Reason\"",
       "patterns": [
         {
-          "name": "meta.assert.precept",
-          "match": "^(\\s*)(on)(\\s+)([A-Za-z_][A-Za-z0-9_]*)(\\s+)(assert)\\b",
+          "name": "meta.ensure.precept",
+          "match": "^(\\s*)(on)(\\s+)([A-Za-z_][A-Za-z0-9_]*)(\\s+)(ensure)\\b",
           "captures": {
             "2": { "name": "keyword.control.precept" },
             "4": { "name": "entity.name.function.event.precept" },
-            "6": { "name": "keyword.other.precept" }
+            "6": { "name": "keyword.other.grammar.precept" }
           }
         }
       ]
@@ -419,7 +419,7 @@
       "patterns": [
         {
           "name": "keyword.other.precept",
-          "match": "\\b(precept|state|event|field|invariant|assert|edit|from|on|in|to)\\b"
+          "match": "\\b(precept|state|event|field|edit|from|on|in|to)\\b"
         }
       ]
     },
@@ -427,7 +427,7 @@
       "patterns": [
         {
           "name": "keyword.other.grammar.precept",
-          "match": "\\b(as|nullable|default|because|initial|with|any|all|of|into)\\b"
+          "match": "\\b(as|nullable|default|because|initial|with|any|all|of|into|rule|ensure)\\b"
         }
       ]
     },
