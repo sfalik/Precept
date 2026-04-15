@@ -16,7 +16,7 @@ A `.precept` file declares the entity's **fields** (scalar values and typed coll
 
 - **CreateInstance**: start an entity in its initial state with default field values.
 - **Inspect**: ask "what would happen if I fired this event?" for every event, from any state. Non-mutating. The answer is always available.
-- **Fire**: execute a transition. The engine validates input arguments, selects a matching transition row via guards, executes mutations, evaluates all applicable constraints against the resulting configuration, and commits only if every constraint holds. If any fails, the transition is rejected — the invalid configuration never exists. An event can also be explicitly forbidden — a deliberate prohibition, not just an unrouted trigger.
+- **Fire**: execute a transition. The engine validates input arguments, selects a matching transition row via guards, executes mutations, evaluates all applicable constraints against the resulting configuration, and commits only if every constraint holds. If any fails, the operation does not commit — the invalid configuration never exists. An event can also be explicitly forbidden — a deliberate prohibition, not just an unrouted trigger.
 - **Update**: edit a field directly. The same constraint enforcement applies. Which fields can change depends on where the entity is in its lifecycle — the definition declares this, and the engine enforces it.
 
 The engine is deterministic — same definition, same data, same outcome. Nothing is hidden.

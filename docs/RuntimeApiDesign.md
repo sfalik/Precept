@@ -169,7 +169,7 @@ Mutating event execution. Returns `FireResult`.
 7. **Collection mutations** — `add`/`remove`/`enqueue`/`dequeue`/`push`/`pop`/`clear` operations on working copies.
 8. **Derived field recomputation** — re-evaluates all computed fields in dependency order against post-mutation data. Computed values are current before validation.
 9. **Field and top-level rules** — checked against post-mutation working data (including recomputed derived fields); returns `ConstraintFailure` if violated.
-10. **State ensures** — checked against the *target* state (only for `transition` outcomes, not `no transition`); returns `ConstraintFailure` if violated.
+10. **State ensures** — checked against the resulting state. Cross-state `transition` outcomes evaluate `from <Source>`, `to <Target>`, and `in <Target>` ensures; `no transition` outcomes evaluate only `in <CurrentState>` ensures. Returns `ConstraintFailure` if violated.
 
 **`when` guard evaluation on declarations:**
 - **Event ensures (stage 3):** If an event ensure has a `when` guard, the guard is evaluated against event args before the ensure body. If the guard is false, that ensure is skipped. Guards on event ensures are arg-scoped only.
@@ -180,7 +180,7 @@ On any failure outcome, the original instance is unchanged — all stages are fu
 
 On success, returns `FireResult` with `UpdatedInstance != null`. The `UpdatedInstance` carries the new `CurrentState`, the updated `InstanceData`, and the current `UpdatedAt` timestamp.
 
-`no transition` outcomes execute `set` and collection mutations but do **not** trigger state ensures.
+`no transition` outcomes execute `set` and collection mutations, skip entry/exit actions, and still evaluate `in <CurrentState>` ensures before commit.
 
 ### `CheckCompatibility`
 

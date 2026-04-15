@@ -117,7 +117,7 @@ Precept is not a workflow orchestrator, event sourcing framework, or ORM — it 
 | [Language Reference](docs/PreceptLanguageDesign.md) | Full DSL syntax and construct reference |
 | [Quickstart Guide](docs/RuntimeApiDesign.md) | Step-by-step runtime integration walkthrough |
 | [MCP Server Docs](docs/McpServerDesign.md) | Tool reference for AI agent integration |
-| [Sample Catalog](samples/) | 21 domain models in `.precept` |
+| [Sample Catalog](samples/) | 25 domain models in `.precept` |
 
 **Highlighted samples:**
 

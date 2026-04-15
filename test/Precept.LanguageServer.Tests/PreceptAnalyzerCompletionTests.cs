@@ -85,6 +85,7 @@ public class PreceptAnalyzerCompletionTests
         completions.Should().Contain("on");
         completions.Should().Contain("ensure");
         completions.Should().Contain("->");
+        completions.Should().NotContain("assert");
     }
 
     [Fact]

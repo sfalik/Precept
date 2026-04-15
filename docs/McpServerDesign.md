@@ -195,7 +195,7 @@ The `functions` section in the JSON output provides structured `FunctionDto` obj
       "from": "InProgress",
       "on": "Block",
       "branches": [
-        { "guard": null, "outcome": "transition", "target": "Blocked", "reason": null }
+        { "outcome": "transition", "target": "Blocked" }
       ]
     }
   ],
@@ -539,8 +539,6 @@ Fields: `line` (1-based), `column` (0-based, optional), `message`, `code` (optio
   "message": "Approved total cannot exceed requested total",
   "source": {
     "kind": "rule",
-    "stateName": null,
-    "anchor": null,
     "expressionText": "ApprovedTotal <= RequestedTotal",
     "reason": "Approved total cannot exceed requested total",
     "sourceLine": 18
