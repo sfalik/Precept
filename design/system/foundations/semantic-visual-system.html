@@ -949,7 +949,7 @@ pre {
           <div class="arch-card" style="--card-color: var(--rule)">
             <div class="arch-card-swatch"></div>
             <div class="arch-card-name ru">Rule</div>
-            <div class="arch-card-role">Invariants, assertions, rejection messages</div>
+            <div class="arch-card-role">Rules, ensures, rejection messages</div>
           </div>
         </div>
       </div>
@@ -1480,7 +1480,7 @@ pre {
           <div class="typography-card-kicker">Constraint signal</div>
           <h3>Italic — semantic pressure only</h3>
         </div>
-        <p>Italic belongs to constrained states, constrained events, invariant-guarded data names, and rule-adjacent annotation in code specimens. It marks that something is under explicit rule attention. It is not used for general emphasis, decorative headings, or editorial flourish. If a reader cannot trust italic to mean pressure, the second semantic channel has been wasted.</p>
+        <p>Italic belongs to constrained states, constrained events, rule-constrained data names, and rule-adjacent annotation in code specimens. It marks that something is under explicit rule attention. It is not used for general emphasis, decorative headings, or editorial flourish. If a reader cannot trust italic to mean pressure, the second semantic channel has been wasted.</p>
         <div class="typography-specimen">
           <div class="typography-specimen-bar">
             <span>Pressure markers</span>
@@ -1535,8 +1535,8 @@ pre {
         <h3>Governing keywords are bold.</h3>
         <p>Semantic indigo keywords render at font-weight 700. Grammar indigo stays normal for connective tokens and logical operators. Color identifies the family; weight distinguishes governing keywords from connective grammar.</p>
         <div class="typography-keyword-sample">
-          <span class="typography-keywords">precept field state event from on set transition assert reject when</span>
-          <span class="typography-keywords-soft">as default == and or not</span>
+          <span class="typography-keywords">precept field state event from on set transition reject when</span>
+          <span class="typography-keywords-soft">rule ensure as default == and or not</span>
         </div>
       </div>
       <div class="typography-rule-card typography-rule-card--wide">
@@ -2433,7 +2433,7 @@ pre {
 
 <span class="s">state</span> <span class="st">Open</span> <span class="s">initial</span>, <span class="st">Closed</span>
 
-<span class="s">in</span> <span class="st">Closed</span> <span class="s">assert</span> <span class="da">Done</span> == <span class="dv">true</span>
+<span class="s">in</span> <span class="st">Closed</span> <span class="s">ensure</span> <span class="da">Done</span> == <span class="dv">true</span>
   <span class="s">because</span> <span class="ru">"Closed means done"</span>
 
 <span class="s">event</span> <span class="ev">Close</span>
@@ -2522,7 +2522,7 @@ pre {
 
 <span class="s">state</span> <span class="st">Open</span> <span class="s">initial</span>, <span class="st">Closed</span>
 
-<span class="s">in</span> <span class="st">Closed</span> <span class="s">assert</span> <span class="da">Done</span> == <span class="dv">true</span>
+<span class="s">in</span> <span class="st">Closed</span> <span class="s">ensure</span> <span class="da">Done</span> == <span class="dv">true</span>
   <span class="s">because</span> <span class="ru">"Closed means done"</span>
 
 <span class="s">event</span> <span class="ev">Close</span>
@@ -2622,7 +2622,7 @@ pre {
 
 <span class="s">state</span> <span class="st">Open</span> <span class="s">initial</span>, <span class="st">Closed</span>
 
-<span class="s">in</span> <span class="st">Closed</span> <span class="s">assert</span> <span class="da">Done</span> == <span class="dv">true</span>
+<span class="s">in</span> <span class="st">Closed</span> <span class="s">ensure</span> <span class="da">Done</span> == <span class="dv">true</span>
   <span class="s">because</span> <span class="ru">"Closed means done"</span>
 
 <span class="s">event</span> <span class="ev">Close</span>
@@ -2720,7 +2720,7 @@ pre {
 
 <span class="s">state</span> <span class="st">Open</span> <span class="s">initial</span>, <span class="st">Closed</span>
 
-<span class="s">in</span> <span class="st">Closed</span> <span class="s">assert</span> <span class="da">Done</span> == <span class="dv">true</span>
+<span class="s">in</span> <span class="st">Closed</span> <span class="s">ensure</span> <span class="da">Done</span> == <span class="dv">true</span>
   <span class="s">because</span> <span class="ru">"Closed means done"</span>
 
 <span class="s">event</span> <span class="ev">Close</span>
@@ -2838,7 +2838,7 @@ pre {
 
 <span class="s">state</span> <span class="st">Open</span> <span class="s">initial</span>, <span class="st">Closed</span>
 
-<span class="s">in</span> <span class="st">Closed</span> <span class="s">assert</span> <span class="da">Done</span> == <span class="dv">true</span>
+<span class="s">in</span> <span class="st">Closed</span> <span class="s">ensure</span> <span class="da">Done</span> == <span class="dv">true</span>
   <span class="s">because</span> <span class="ru">"Closed means done"</span>
 
 <span class="s">event</span> <span class="ev">Close</span>
@@ -2897,7 +2897,7 @@ pre {
       <div>
         <div class="eyebrow" style="margin-bottom:12px">Semantic modifiers</div>
         <div class="construct-modifiers">
-          <span class="modifier-tag s" style="border-color:rgba(99,102,241,0.35);">assert / because &mdash; rule keyword</span>
+          <span class="modifier-tag s" style="border-color:rgba(99,102,241,0.35);">rule / ensure / because &mdash; constraint grammar</span>
         </div>
         <div style="margin-top:8px;display:grid;gap:4px;">
           <div class="callout-demo callout-demo--satisfied">&checkmark; satisfied &mdash; condition met, transition allowed</div>
@@ -2955,7 +2955,7 @@ pre {
 
 <span class="s">event</span> <span class="ev">OpenReview</span>
 
-<span class="s">on</span> <span class="ev">OpenReview</span> <span class="s">assert</span> <span class="da">ClaimAmount</span> &gt; <span class="so">0</span> <span class="sg">and</span> <span class="da">PolicyHolder</span> != <span class="so">null</span> <span class="s">because</span> <span class="ru">"Claim must be complete"</span>
+<span class="s">on</span> <span class="ev">OpenReview</span> <span class="s">ensure</span> <span class="da">ClaimAmount</span> &gt; <span class="so">0</span> <span class="sg">and</span> <span class="da">PolicyHolder</span> != <span class="so">null</span> <span class="s">because</span> <span class="ru">"Claim must be complete"</span>
 
 <span class="s">from</span> <span class="st">Filed</span> <span class="s">on</span> <span class="ev">OpenReview</span> -> <span class="s">transition</span> <span class="st">UnderReview</span></pre>
     </div>
@@ -3032,8 +3032,8 @@ pre {
       <div class="surface-h3">Explanatory Docs</div>
       <p class="sf-note">Documentation uses the reading typeface for prose and mono for named constructs, with semantic colour in inline references and rule callouts.</p>
       <p style="font-size:14px;margin-bottom:10px">The <span class="ev">Submit</span> event transitions a <span class="st">Draft</span> loan to <span class="st">UnderReview</span>. Two rules govern the transition:</p>
-      <div class="rule-callout" style="margin-bottom:6px"><p>on Submit assert ApplicantName != null</p></div>
-      <div class="rule-callout"><p>on Submit assert RequestedAmount &gt; 0</p></div>
+      <div class="rule-callout" style="margin-bottom:6px"><p>on Submit ensure ApplicantName != null</p></div>
+      <div class="rule-callout"><p>on Submit ensure RequestedAmount &gt; 0</p></div>
       <p style="font-size:14px;margin-top:10px">If either rule fails, the event is blocked and the entity remains in <span class="st">Draft</span>.</p>
     </div>
 
@@ -3610,7 +3610,7 @@ pre.doc-code-body {
       <span class="doc-ref st">Draft</span> state, the
       <span class="doc-ref ev">Submit</span> event becomes available. Firing it transitions the entity
       to <span class="doc-ref st">Submitted</span>. The <span class="doc-ref da">Amount</span> field
-      must satisfy the <span class="doc-ref ru">minimum-amount</span> invariant before
+      must satisfy the <span class="doc-ref ru">minimum-amount</span> rule before
       <span class="doc-ref ev">Submit</span> is allowed.
     </p>
     <div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--line);display:flex;gap:24px;align-items:baseline;flex-wrap:wrap">
@@ -3669,7 +3669,7 @@ pre.doc-code-body {
         <tr>
           <td><span class="doc-name ev">Submit</span></td>
           <td><span class="doc-pill ev" style="font-size:10px">Event</span></td>
-          <td class="doc-desc">Transitions from <span class="doc-ref st" style="font-size:0.88em">Draft</span> to <span class="doc-ref st" style="font-size:0.88em">Submitted</span>. Blocked if <span class="doc-ref da" style="font-size:0.88em">Amount</span> fails invariant.</td>
+          <td class="doc-desc">Transitions from <span class="doc-ref st" style="font-size:0.88em">Draft</span> to <span class="doc-ref st" style="font-size:0.88em">Submitted</span>. Blocked if <span class="doc-ref da" style="font-size:0.88em">Amount</span> fails the rule.</td>
         </tr>
         <tr>
           <td><span class="doc-name da">Amount</span></td>
@@ -3679,7 +3679,7 @@ pre.doc-code-body {
         <tr>
           <td><span class="doc-name ru">minimum-amount</span></td>
           <td><span class="doc-pill ru" style="font-size:10px">Rule</span></td>
-          <td class="doc-desc">Invariant on <span class="doc-ref da" style="font-size:0.88em">Amount</span>. Enforced before any transition that reads the field.</td>
+          <td class="doc-desc">Rule on <span class="doc-ref da" style="font-size:0.88em">Amount</span>. Enforced before any transition that reads the field.</td>
         </tr>
       </tbody>
     </table>
@@ -3829,7 +3829,7 @@ pre.doc-code-body {
         <a class="doc-sp-link child" href="#">Fields</a>
         <a class="doc-sp-link child" href="#">States</a>
         <a class="doc-sp-link child" href="#">Events &amp; Transitions</a>
-        <a class="doc-sp-link child" href="#">Rules &amp; Invariants</a>
+        <a class="doc-sp-link child" href="#">Rules &amp; Ensures</a>
         <a class="doc-sp-link" href="#">Runtime API</a>
         <a class="doc-sp-link" href="#">MCP Tools</a>
         <span class="doc-sp-section">Reference</span>
@@ -3905,7 +3905,7 @@ pre.doc-code-body {
           <div class="doc-callout-accent"></div>
           <div class="doc-callout-body">
             <span class="doc-callout-label">Note</span>
-            <p>Rules inside a transition block are scoped to that event. Invariants declared at the precept level are evaluated on every transition, regardless of which event fired.</p>
+            <p>Event ensures are scoped to the event that declares them. Rules declared at the precept level are evaluated on every transition, regardless of which event fired.</p>
           </div>
         </div>
 
@@ -3968,7 +3968,7 @@ pre.doc-code-body {
         <div style="display:grid;gap:12px;padding:20px 24px;background:var(--panel);border:1px solid var(--line)">
           <span style="font-family:var(--mono);font-size:9px;letter-spacing:0.22em;text-transform:uppercase;color:var(--soft)">Next</span>
           <ol class="dsp-list dsp-olist" style="margin:0">
-            <li>Add invariants to enforce field constraints across all transitions</li>
+            <li>Add rules to enforce field constraints across all transitions</li>
             <li>Use <span class="doc-ref ev">precept_inspect</span> to preview what events are available from any state</li>
             <li>Connect the precept to a host application via the Runtime API</li>
           </ol>
