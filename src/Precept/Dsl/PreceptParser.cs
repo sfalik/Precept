@@ -329,7 +329,7 @@ public static class PreceptParser
             "conditional-expression",
             "if <condition> then <value> else <value>",
             "expression",
-            "Selects between two values based on a boolean condition. Valid in set RHS, invariant, assert, and guard expressions. Nesting via parentheses: if A then (if B then 1 else 2) else 3.",
+            "Selects between two values based on a boolean condition. Valid in set RHS, rule, ensure, and guard expressions. Nesting via parentheses: if A then (if B then 1 else 2) else 3.",
             "from Idle on Apply -> set Label = if Priority > 5 then \"urgent\" else \"normal\" -> no transition"));
 
     // Built-in function call: FunctionName(expr, expr, ...)
@@ -359,7 +359,7 @@ public static class PreceptParser
             "function-call",
             "round (<Expr>, ...)",
             "expression",
-            "Calls a built-in function. 18 functions available: abs, ceil, clamp, endsWith, floor, left, max, mid, min, pow, right, round, sqrt, startsWith, toLower, toUpper, trim, truncate. Valid in set RHS and invariant/assert expressions.",
+            "Calls a built-in function. 18 functions available: abs, ceil, clamp, endsWith, floor, left, max, mid, min, pow, right, round, sqrt, startsWith, toLower, toUpper, trim, truncate. Valid in set RHS and rule/ensure expressions.",
             "from Idle on Apply -> set Rate = round(Apply.Amount, 2) -> no transition"));
 
     private static readonly TokenListParser<PreceptToken, PreceptExpression> Atom =
@@ -888,25 +888,25 @@ public static class PreceptParser
                 "Declares a scalar, collection, or computed data field",
                 "field Priority as number default 3"));
 
-    // invariant <BoolExpr> because "reason"
-    private static readonly TokenListParser<PreceptToken, StatementResult> InvariantDecl =
-        (from kw in Token.EqualTo(PreceptToken.Invariant)
+    // rule <BoolExpr> because "reason"
+    private static readonly TokenListParser<PreceptToken, StatementResult> RuleDecl =
+        (from kw in Token.EqualTo(PreceptToken.Rule)
          from expr in BoolExpr
          from whenGuard in OptionalWhenGuardParser
          from _ in Token.EqualTo(PreceptToken.Because)
          from reason in Token.EqualTo(PreceptToken.StringLiteral)
-         select (StatementResult)new InvariantResult(new PreceptInvariant(
+         select (StatementResult)new RuleResult(new PreceptRule(
              ReconstituteExpr(expr), expr, reason.ToStringLiteralValue(),
              SourceLine: kw.Span.Position.Line,
              WhenText: whenGuard is not null ? ReconstituteExpr(whenGuard) : null,
              WhenGuard: whenGuard)))
-        .Named("invariant declaration")
+        .Named("rule declaration")
             .Register(new ConstructInfo(
-                "invariant",
-                "invariant <Expr> [when <Guard>] because \"<Reason>\"",
+                "rule",
+                "rule <Expr> [when <Guard>] because \"<Reason>\"",
                 "top-level",
                 "Global data constraint checked after every mutation",
-                "invariant Priority >= 1 because \"Priority must be positive\""));
+                "rule Priority >= 1 because \"Priority must be positive\""));
 
     // state <Name> [initial] (, <Name> [initial])*
     private sealed record StateNameEntry(string Name, bool IsInitial, int Line, int Column);
@@ -958,67 +958,67 @@ public static class PreceptParser
                 "event Submit with Comment as string"));
 
     // ═══════════════════════════════════════════════════════════════════
-    // Assert Statements
+    // Ensure Statements
     // ═══════════════════════════════════════════════════════════════════
 
-    // in/to/from <StateTarget> assert <BoolExpr> because "reason"
-    private static readonly TokenListParser<PreceptToken, StatementResult> StateAssertDecl =
+    // in/to/from <StateTarget> ensure <BoolExpr> because "reason"
+    private static readonly TokenListParser<PreceptToken, StatementResult> StateEnsureDecl =
         (from kw in Token.EqualTo(PreceptToken.In)
                          .Or(Token.EqualTo(PreceptToken.To))
                          .Or(Token.EqualTo(PreceptToken.From))
          from states in StateTarget
-         from _ in Token.EqualTo(PreceptToken.Assert)
+         from _ in Token.EqualTo(PreceptToken.Ensure)
          from expr in BoolExpr
          from whenGuard in OptionalWhenGuardParser
          from __ in Token.EqualTo(PreceptToken.Because)
          from reason in Token.EqualTo(PreceptToken.StringLiteral)
-         select (StatementResult)new StateAssertResult(
-             kw.Kind == PreceptToken.In ? AssertAnchor.In :
-             kw.Kind == PreceptToken.To ? AssertAnchor.To :
-             AssertAnchor.From,
+         select (StatementResult)new StateEnsureResult(
+             kw.Kind == PreceptToken.In ? EnsureAnchor.In :
+             kw.Kind == PreceptToken.To ? EnsureAnchor.To :
+             EnsureAnchor.From,
              states,
              ReconstituteExpr(expr), expr, reason.ToStringLiteralValue(),
              SourceLine: kw.Span.Position.Line,
              WhenText: whenGuard is not null ? ReconstituteExpr(whenGuard) : null,
              WhenGuard: whenGuard))
-        .Named("state assert")
+        .Named("state ensure")
             .Register(new ConstructInfo(
-                "state-assert",
-                "in|to|from <State> assert <Expr> [when <Guard>] because \"<Reason>\"",
+                "state-ensure",
+                "in|to|from <State> ensure <Expr> [when <Guard>] because \"<Reason>\"",
                 "top-level",
                 "State-scoped data constraint checked on entry, exit, or residency",
-                "in Open assert Assignee != null because \"Must have an assignee\""));
+                "in Open ensure Assignee != null because \"Must have an assignee\""));
 
-    // on <Event> assert <BoolExpr> because "reason"
-    private static readonly TokenListParser<PreceptToken, StatementResult> EventAssertDecl =
+    // on <Event> ensure <BoolExpr> because "reason"
+    private static readonly TokenListParser<PreceptToken, StatementResult> EventEnsureDecl =
         (from kwOn in Token.EqualTo(PreceptToken.On)
          from eventName in Token.EqualTo(PreceptToken.Identifier)
-         from _ in Token.EqualTo(PreceptToken.Assert)
+         from _ in Token.EqualTo(PreceptToken.Ensure)
          from expr in BoolExpr
          from whenGuard in OptionalWhenGuardParser
          from __ in Token.EqualTo(PreceptToken.Because)
          from reason in Token.EqualTo(PreceptToken.StringLiteral)
-         select (StatementResult)new EventAssertResult(new EventAssertion(
+         select (StatementResult)new EventEnsureResult(new EventEnsure(
              eventName.ToText(), ReconstituteExpr(expr), expr, reason.ToStringLiteralValue(),
              SourceLine: kwOn.Span.Position.Line,
              WhenText: whenGuard is not null ? ReconstituteExpr(whenGuard) : null,
              WhenGuard: whenGuard)))
-        .Named("event assert")
+        .Named("event ensure")
             .Register(new ConstructInfo(
-                "event-assert",
-                "on <Event> assert <Expr> [when <Guard>] because \"<Reason>\"",
+                "event-ensure",
+                "on <Event> ensure <Expr> [when <Guard>] because \"<Reason>\"",
                 "top-level",
                 "Event-scoped argument constraint checked before firing",
-                "on Submit assert Comment != \"\" because \"Comment required\""));
+                "on Submit ensure Comment != \"\" because \"Comment required\""));
 
     // ═══════════════════════════════════════════════════════════════════
     // State Entry/Exit Actions
     // ═══════════════════════════════════════════════════════════════════
 
     // to/from <StateTarget> -> <ActionChain>
-    private static readonly TokenListParser<PreceptToken, (AssertAnchor Prep, string[] States)> StateActionPrefix =
-        Token.EqualTo(PreceptToken.To).Value(AssertAnchor.To)
-            .Or(Token.EqualTo(PreceptToken.From).Value(AssertAnchor.From))
+    private static readonly TokenListParser<PreceptToken, (EnsureAnchor Prep, string[] States)> StateActionPrefix =
+        Token.EqualTo(PreceptToken.To).Value(EnsureAnchor.To)
+            .Or(Token.EqualTo(PreceptToken.From).Value(EnsureAnchor.From))
             .Then(prep => StateTarget.Select(states => (prep, states)));
 
     private static readonly TokenListParser<PreceptToken, ParsedAction[]> ActionChain =
@@ -1128,14 +1128,14 @@ public static class PreceptParser
     private abstract record StatementResult;
     private sealed record FieldResult(PreceptField[] Fields) : StatementResult;
     private sealed record CollectionFieldResult(PreceptCollectionField[] Fields) : StatementResult;
-    private sealed record InvariantResult(PreceptInvariant Invariant) : StatementResult;
+    private sealed record RuleResult(PreceptRule Rule) : StatementResult;
     private sealed record StateResult(PreceptState[] States, bool[] InitialFlags) : StatementResult;
     private sealed record EventResult(PreceptEvent[] Events) : StatementResult;
-    private sealed record StateAssertResult(AssertAnchor Prep, string[] States,
+    private sealed record StateEnsureResult(EnsureAnchor Prep, string[] States,
         string ExprText, PreceptExpression Expr, string Reason, int SourceLine = 0,
         string? WhenText = null, PreceptExpression? WhenGuard = null) : StatementResult;
-    private sealed record EventAssertResult(EventAssertion Assert) : StatementResult;
-    private sealed record StateActionResult(AssertAnchor Prep, string[] States,
+    private sealed record EventEnsureResult(EventEnsure Ensure) : StatementResult;
+    private sealed record StateActionResult(EnsureAnchor Prep, string[] States,
         ParsedAction[] Actions) : StatementResult;
     private sealed record EditResult(string[] States, string[] Fields,
         string? WhenText = null, PreceptExpression? WhenGuard = null, int SourceLine = 0) : StatementResult;
@@ -1147,14 +1147,14 @@ public static class PreceptParser
     /// <summary>Union parser: tries each statement kind in priority order.</summary>
     private static readonly TokenListParser<PreceptToken, StatementResult> Statement =
         // Order matters: more specific patterns before general ones
-        // 'in ... edit' before 'in ... assert' (both start with In)
+        // 'in ... edit' before 'in ... ensure' (both start with In)
         EditDecl.Try()
         .Or(RootEditDecl.Try())
-        // Event assert: 'on <Event> assert'
-        .Or(EventAssertDecl.Try())
-        // State assert: 'in/to/from <State> assert'
+        // Event ensure: 'on <Event> ensure'
+        .Or(EventEnsureDecl.Try())
+        // State ensure: 'in/to/from <State> ensure'
         // Must come before state action and transition row
-        .Or(StateAssertDecl.Try())
+        .Or(StateEnsureDecl.Try())
         // Transition row: 'from <State> on <Event> ...'
         // Must come before state action (both can start with from)
         .Or(TransitionRowParser.Try())
@@ -1162,7 +1162,7 @@ public static class PreceptParser
         .Or(StateActionDecl.Try())
         // Simple declarations
         .Or(FieldDecl.Try())
-        .Or(InvariantDecl.Try())
+        .Or(RuleDecl.Try())
         .Or(StateDecl.Try())
         .Or(EventDecl);
 
@@ -1190,10 +1190,10 @@ public static class PreceptParser
         var events = new List<PreceptEvent>();
         var fields = new List<PreceptField>();
         var collectionFields = new List<PreceptCollectionField>();
-        var invariants = new List<PreceptInvariant>();
-        var stateAsserts = new List<StateAssertion>();
+        var rules = new List<PreceptRule>();
+        var stateEnsures = new List<StateEnsure>();
         var stateActions = new List<PreceptStateAction>();
-        var eventAsserts = new List<EventAssertion>();
+        var eventEnsures = new List<EventEnsure>();
         var transitionRows = new List<PreceptTransitionRow>();
         var editBlocks = new List<PreceptEditBlock>();
 
@@ -1221,8 +1221,8 @@ public static class PreceptParser
                     }
                     break;
 
-                case InvariantResult ir:
-                    invariants.Add(ir.Invariant);
+                case RuleResult ir:
+                    rules.Add(ir.Rule);
                     break;
 
                 case StateResult sr:
@@ -1253,15 +1253,15 @@ public static class PreceptParser
                     }
                     break;
 
-                case StateAssertResult sar:
+                case StateEnsureResult sar:
                     ExpandStateTargets(sar.States, states).ForEach(stateName =>
-                        stateAsserts.Add(new StateAssertion(
+                        stateEnsures.Add(new StateEnsure(
                             sar.Prep, stateName, sar.ExprText, sar.Expr, sar.Reason, sar.SourceLine,
                             WhenText: sar.WhenText, WhenGuard: sar.WhenGuard)));
                     break;
 
-                case EventAssertResult ear:
-                    eventAsserts.Add(ear.Assert);
+                case EventEnsureResult ear:
+                    eventEnsures.Add(ear.Ensure);
                     break;
 
                 case StateActionResult sact:
@@ -1334,8 +1334,8 @@ public static class PreceptParser
             // SYNC:CONSTRAINT:C13
             throw DiagnosticCatalog.C13.ToException(states[0].SourceLine);
 
-        // Validate event assert scope: expressions may only reference event argument identifiers
-        foreach (var ea in eventAsserts)
+        // Validate event ensure scope: expressions may only reference event argument identifiers
+        foreach (var ea in eventEnsures)
         {
             var evt = events.FirstOrDefault(e => e.Name == ea.EventName);
             if (evt is null) continue;
@@ -1457,40 +1457,40 @@ public static class PreceptParser
                 seenUnguarded.Add(key);
         }
 
-        // Desugar field-level constraints into synthetic invariants and event asserts.
-        DesugarFieldConstraints(fields, collectionFields, events, invariants, eventAsserts);
+        // Desugar field-level constraints into synthetic rules and event ensures.
+        DesugarFieldConstraints(fields, collectionFields, events, rules, eventEnsures);
 
         return new PreceptDefinition(
             name, states, initialState, events,
             fields, collectionFields,
-            invariants.Count > 0 ? invariants : null,
-            stateAsserts.Count > 0 ? stateAsserts : null,
+            rules.Count > 0 ? rules : null,
+            stateEnsures.Count > 0 ? stateEnsures : null,
             stateActions.Count > 0 ? stateActions : null,
-            eventAsserts.Count > 0 ? eventAsserts : null,
+            eventEnsures.Count > 0 ? eventEnsures : null,
             transitionRows.Count > 0 ? transitionRows : null,
             editBlocks.Count > 0 ? editBlocks : null,
             sourceLine);
     }
 
     /// <summary>
-    /// Desugars field/arg-level constraint suffixes into synthetic <see cref="PreceptInvariant"/>
-    /// and <see cref="EventAssertion"/> nodes, appending them to the existing lists.
+    /// Desugars field/arg-level constraint suffixes into synthetic <see cref="PreceptRule"/>
+    /// and <see cref="EventEnsure"/> nodes, appending them to the existing lists.
     /// Constraint validation (C57/C58/C59) runs later in <see cref="PreceptTypeChecker"/>.
     /// </summary>
     private static void DesugarFieldConstraints(
         List<PreceptField> fields,
         List<PreceptCollectionField> collectionFields,
         List<PreceptEvent> events,
-        List<PreceptInvariant> invariants,
-        List<EventAssertion> eventAsserts)
+        List<PreceptRule> rules,
+        List<EventEnsure> eventEnsures)
     {
         foreach (var field in fields)
         {
             if (field.Constraints is not { Count: > 0 }) continue;
             foreach (var constraint in field.Constraints)
             {
-                var inv = BuildFieldInvariant(field.Name, field.Type, field.IsNullable, constraint);
-                if (inv is not null) invariants.Add(inv);
+                var inv = BuildFieldRule(field.Name, field.Type, field.IsNullable, constraint);
+                if (inv is not null) rules.Add(inv);
             }
         }
 
@@ -1499,8 +1499,8 @@ public static class PreceptParser
             if (col.Constraints is not { Count: > 0 }) continue;
             foreach (var constraint in col.Constraints)
             {
-                var inv = BuildCollectionFieldInvariant(col.Name, constraint);
-                if (inv is not null) invariants.Add(inv);
+                var inv = BuildCollectionFieldRule(col.Name, constraint);
+                if (inv is not null) rules.Add(inv);
             }
         }
 
@@ -1511,22 +1511,22 @@ public static class PreceptParser
                 if (arg.Constraints is not { Count: > 0 }) continue;
                 foreach (var constraint in arg.Constraints)
                 {
-                    var assert = BuildEventArgAssert(evt.Name, arg.Name, arg.Type, arg.IsNullable, constraint);
-                    if (assert is not null) eventAsserts.Add(assert);
+                    var ensure = BuildEventArgEnsure(evt.Name, arg.Name, arg.Type, arg.IsNullable, constraint);
+                    if (ensure is not null) eventEnsures.Add(ensure);
                 }
             }
         }
     }
 
-    private static PreceptInvariant? BuildFieldInvariant(
+    private static PreceptRule? BuildFieldRule(
         string name, PreceptScalarType type, bool isNullable, FieldConstraint constraint)
     {
         var (exprText, expr, reason) = BuildScalarConstraintExpr(name, type, isNullable, constraint);
         if (expr is null) return null;
-        return new PreceptInvariant(exprText, expr, reason, IsSynthetic: true);
+        return new PreceptRule(exprText, expr, reason, IsSynthetic: true);
     }
 
-    private static PreceptInvariant? BuildCollectionFieldInvariant(string name, FieldConstraint constraint)
+    private static PreceptRule? BuildCollectionFieldRule(string name, FieldConstraint constraint)
     {
         var countExpr = new PreceptIdentifierExpression(name, "count");
         var (exprText, expr, reason) = constraint switch
@@ -1546,16 +1546,16 @@ public static class PreceptParser
             _ => (string.Empty, null, string.Empty)
         };
         if (expr is null) return null;
-        return new PreceptInvariant(exprText, expr, reason, IsSynthetic: true);
+        return new PreceptRule(exprText, expr, reason, IsSynthetic: true);
     }
 
-    private static EventAssertion? BuildEventArgAssert(
+    private static EventEnsure? BuildEventArgEnsure(
         string eventName, string argName,
         PreceptScalarType type, bool isNullable, FieldConstraint constraint)
     {
         var (exprText, expr, reason) = BuildScalarConstraintExpr(argName, type, isNullable, constraint);
         if (expr is null) return null;
-        return new EventAssertion(eventName, exprText, expr, reason);
+        return new EventEnsure(eventName, exprText, expr, reason);
     }
 
     /// <summary>

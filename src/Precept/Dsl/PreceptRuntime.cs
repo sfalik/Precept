@@ -13,13 +13,13 @@ public sealed class PreceptEngine
     private readonly Dictionary<string, Dictionary<string, PreceptEventArg>> _eventArgContractMap;
 
     // New constraint storage
-    private readonly IReadOnlyList<PreceptInvariant> _invariants;
-    private readonly IReadOnlyList<EventAssertion> _eventAsserts;
-    private readonly Dictionary<string, List<EventAssertion>> _eventAssertMap;
-    private readonly IReadOnlyList<StateAssertion> _stateAsserts;
+    private readonly IReadOnlyList<PreceptRule> _rules;
+    private readonly IReadOnlyList<EventEnsure> _eventEnsures;
+    private readonly Dictionary<string, List<EventEnsure>> _eventEnsureMap;
+    private readonly IReadOnlyList<StateEnsure> _stateEnsures;
     private readonly IReadOnlyList<PreceptStateAction> _stateActions;
-    private readonly Dictionary<(AssertAnchor Prep, string State), List<StateAssertion>> _stateAssertMap;
-    private readonly Dictionary<(AssertAnchor Prep, string State), List<PreceptStateAction>> _stateActionMap;
+    private readonly Dictionary<(EnsureAnchor Prep, string State), List<StateEnsure>> _stateEnsureMap;
+    private readonly Dictionary<(EnsureAnchor Prep, string State), List<PreceptStateAction>> _stateActionMap;
 
     // Editability: state → set of editable field names (union of all matching edit blocks)
     private readonly IReadOnlyDictionary<string, HashSet<string>> _editableFieldsByState;
@@ -86,39 +86,39 @@ public sealed class PreceptEngine
                 evt => evt.Args.ToDictionary(a => a.Name, a => a, StringComparer.Ordinal),
                 StringComparer.Ordinal);
 
-        // Invariants
-        _invariants = model.Invariants ?? Array.Empty<PreceptInvariant>();
+        // Rules
+        _rules = model.Rules ?? Array.Empty<PreceptRule>();
 
-        // Event asserts
-        _eventAsserts = model.EventAsserts ?? Array.Empty<EventAssertion>();
-        _eventAssertMap = new Dictionary<string, List<EventAssertion>>(StringComparer.Ordinal);
-        foreach (var ea in _eventAsserts)
+        // Event ensures
+        _eventEnsures = model.EventEnsures ?? Array.Empty<EventEnsure>();
+        _eventEnsureMap = new Dictionary<string, List<EventEnsure>>(StringComparer.Ordinal);
+        foreach (var ea in _eventEnsures)
         {
-            if (!_eventAssertMap.TryGetValue(ea.EventName, out var list))
+            if (!_eventEnsureMap.TryGetValue(ea.EventName, out var list))
             {
-                list = new List<EventAssertion>();
-                _eventAssertMap[ea.EventName] = list;
+                list = new List<EventEnsure>();
+                _eventEnsureMap[ea.EventName] = list;
             }
             list.Add(ea);
         }
 
-        // State asserts (preposition-aware)
-        _stateAsserts = model.StateAsserts ?? Array.Empty<StateAssertion>();
-        _stateAssertMap = new Dictionary<(AssertAnchor Prep, string State), List<StateAssertion>>();
-        foreach (var sa in _stateAsserts)
+        // State ensures (preposition-aware)
+        _stateEnsures = model.StateEnsures ?? Array.Empty<StateEnsure>();
+        _stateEnsureMap = new Dictionary<(EnsureAnchor Prep, string State), List<StateEnsure>>();
+        foreach (var sa in _stateEnsures)
         {
             var key = (sa.Anchor, sa.State);
-            if (!_stateAssertMap.TryGetValue(key, out var list))
+            if (!_stateEnsureMap.TryGetValue(key, out var list))
             {
-                list = new List<StateAssertion>();
-                _stateAssertMap[key] = list;
+                list = new List<StateEnsure>();
+                _stateEnsureMap[key] = list;
             }
             list.Add(sa);
         }
 
         // State actions (entry/exit automatic mutations)
         _stateActions = model.StateActions ?? Array.Empty<PreceptStateAction>();
-        _stateActionMap = new Dictionary<(AssertAnchor Prep, string State), List<PreceptStateAction>>();
+        _stateActionMap = new Dictionary<(EnsureAnchor Prep, string State), List<PreceptStateAction>>();
         foreach (var sa in _stateActions)
         {
             var key = (sa.Anchor, sa.State);
@@ -448,12 +448,12 @@ public sealed class PreceptEngine
         if (!TryValidateDataContract(instance.InstanceData, out var dataError))
             return PreceptCompatibilityResult.NotCompatible(dataError);
 
-        // Verify the instance satisfies all current constraints (invariants + state asserts).
+        // Verify the instance satisfies all current constraints (rules + state ensures).
         var internalData = HydrateInstanceData(instance.InstanceData);
         var ruleViolations = new List<ConstraintViolation>();
-        ruleViolations.AddRange(EvaluateInvariants(internalData));
+        ruleViolations.AddRange(EvaluateRules(internalData));
         if (instance.CurrentState is not null)
-            ruleViolations.AddRange(EvaluateStateAssertions(AssertAnchor.In, instance.CurrentState, internalData));
+            ruleViolations.AddRange(EvaluateStateEnsures(EnsureAnchor.In, instance.CurrentState, internalData));
         if (ruleViolations.Count > 0)
             return PreceptCompatibilityResult.NotCompatible(
                 $"Instance violates {ruleViolations.Count} rule(s): {string.Join("; ", ruleViolations.Select(v => v.Message))}");
@@ -503,12 +503,12 @@ public sealed class PreceptEngine
 
         var evaluationArguments = BuildEvaluationData(internalData, eventName, eventArguments);
 
-        // Check event asserts — only when caller provides event arguments.
+        // Check event ensures — only when caller provides event arguments.
         if (eventArguments != null)
         {
-            var eventAssertViolations = EvaluateEventAssertions(eventName, BuildDirectEvaluationData(eventName, eventArguments));
-            if (eventAssertViolations.Count > 0)
-                return EventInspectionResult.Rejected(instance.CurrentState, eventName, eventAssertViolations);
+            var eventEnsureViolations = EvaluateEventEnsures(eventName, BuildDirectEvaluationData(eventName, eventArguments));
+            if (eventEnsureViolations.Count > 0)
+                return EventInspectionResult.Rejected(instance.CurrentState, eventName, eventEnsureViolations);
         }
 
         var resolution = ResolveTransition(instance.CurrentState!, eventName, evaluationArguments);
@@ -532,7 +532,7 @@ public sealed class PreceptEngine
         var simulatedCollections = CloneCollections(simulatedData);
 
         // Exit actions
-        ExecuteStateActions(AssertAnchor.From, instance.CurrentState!,
+        ExecuteStateActions(EnsureAnchor.From, instance.CurrentState!,
             simulatedData, simulatedCollections, eventName, eventArguments);
 
         // Row mutations
@@ -547,13 +547,13 @@ public sealed class PreceptEngine
             ExecuteCollectionMutations(mutations, simulatedCollections, simulatedData, eventName, eventArguments);
 
         // Entry actions
-        ExecuteStateActions(AssertAnchor.To, targetState,
+        ExecuteStateActions(EnsureAnchor.To, targetState,
             simulatedData, simulatedCollections, eventName, eventArguments);
 
         CommitCollections(simulatedData, simulatedCollections);
         RecomputeDerivedFields(simulatedData);
 
-        // Validate invariants + state asserts
+        // Validate rules + state ensures
         var violations = CollectConstraintViolations(
             instance.CurrentState!, targetState, simulatedData);
         if (violations.Count > 0)
@@ -714,9 +714,9 @@ public sealed class PreceptEngine
 
         // Evaluate rules on working copy
         var violations = new List<ConstraintViolation>();
-        violations.AddRange(EvaluateInvariants(updatedData));
+        violations.AddRange(EvaluateRules(updatedData));
         if (instance.CurrentState is not null)
-            violations.AddRange(EvaluateStateAssertions(AssertAnchor.In, instance.CurrentState, updatedData));
+            violations.AddRange(EvaluateStateEnsures(EnsureAnchor.In, instance.CurrentState, updatedData));
 
         if (violations.Count == 0)
             return baseResult;
@@ -865,10 +865,10 @@ public sealed class PreceptEngine
 
         var evaluationArguments = BuildEvaluationData(internalData, eventName, eventArguments);
 
-        // Stage 1: Event asserts (args-only context, pre-transition)
-        var eventAssertViolations = EvaluateEventAssertions(eventName, BuildDirectEvaluationData(eventName, eventArguments));
-        if (eventAssertViolations.Count > 0)
-            return FireResult.Rejected(instance.CurrentState, eventName, eventAssertViolations);
+        // Stage 1: Event ensures (args-only context, pre-transition)
+        var eventEnsureViolations = EvaluateEventEnsures(eventName, BuildDirectEvaluationData(eventName, eventArguments));
+        if (eventEnsureViolations.Count > 0)
+            return FireResult.Rejected(instance.CurrentState, eventName, eventEnsureViolations);
 
         // Stage 2: First-match row selection
         var resolution = ResolveTransition(instance.CurrentState!, eventName, evaluationArguments);
@@ -896,10 +896,10 @@ public sealed class PreceptEngine
             CommitCollections(updatedData, workingCollections);
             RecomputeDerivedFields(updatedData);
 
-            // Validate: invariants + 'in' asserts for current state
+            // Validate: rules + 'in' ensures for current state
             var violations = new List<ConstraintViolation>();
-            violations.AddRange(EvaluateInvariants(updatedData));
-            violations.AddRange(EvaluateStateAssertions(AssertAnchor.In, instance.CurrentState!, updatedData));
+            violations.AddRange(EvaluateRules(updatedData));
+            violations.AddRange(EvaluateStateEnsures(EnsureAnchor.In, instance.CurrentState!, updatedData));
             if (violations.Count > 0)
                 return FireResult.ConstraintFailure(instance.CurrentState, eventName, violations);
 
@@ -916,7 +916,7 @@ public sealed class PreceptEngine
         var targetState = ((StateTransition)matchedRow.Outcome).TargetState;
 
         // Stage 3: Exit actions (from <sourceState> -> ...)
-        ExecuteStateActions(AssertAnchor.From, instance.CurrentState!,
+        ExecuteStateActions(EnsureAnchor.From, instance.CurrentState!,
             updatedData, workingCollections, eventName, eventArguments);
 
         // Stage 4: Row mutations (set assignments + collection mutations)
@@ -925,13 +925,13 @@ public sealed class PreceptEngine
             return FireResult.Rejected(instance.CurrentState, eventName, new[] { ConstraintViolation.Simple(rowMutError) });
 
         // Stage 5: Entry actions (to <targetState> -> ...)
-        ExecuteStateActions(AssertAnchor.To, targetState,
+        ExecuteStateActions(EnsureAnchor.To, targetState,
             updatedData, workingCollections, eventName, eventArguments);
 
         CommitCollections(updatedData, workingCollections);
         RecomputeDerivedFields(updatedData);
 
-        // Stage 6: Validation (invariants + state asserts, collect-all)
+        // Stage 6: Validation (rules + state ensures, collect-all)
         var validationViolations = CollectConstraintViolations(
             instance.CurrentState!, targetState, updatedData);
         if (validationViolations.Count > 0)
@@ -951,7 +951,7 @@ public sealed class PreceptEngine
     /// <summary>
     /// Atomically updates editable fields on an instance. Only fields declared in an
     /// <c>in &lt;State&gt; edit</c> block for the current state are mutable.
-    /// After applying edits, evaluates all invariants and state asserts.
+    /// After applying edits, evaluates all rules and state ensures.
     /// </summary>
     public UpdateResult Update(PreceptInstance instance, Action<IUpdatePatchBuilder> patch)
     {
@@ -1047,11 +1047,11 @@ public sealed class PreceptEngine
         CommitCollections(updatedData, workingCollections);
         RecomputeDerivedFields(updatedData);
 
-        // Stage 4: Rules evaluation (invariants + 'in' state asserts)
+        // Stage 4: Rules evaluation (rules + 'in' state ensures)
         var violations = new List<ConstraintViolation>();
-        violations.AddRange(EvaluateInvariants(updatedData));
+        violations.AddRange(EvaluateRules(updatedData));
         if (instance.CurrentState is not null)
-            violations.AddRange(EvaluateStateAssertions(AssertAnchor.In, instance.CurrentState, updatedData));
+            violations.AddRange(EvaluateStateEnsures(EnsureAnchor.In, instance.CurrentState, updatedData));
         if (violations.Count > 0)
             return UpdateResult.Failed(UpdateOutcome.ConstraintFailure, violations);
 
@@ -1316,15 +1316,15 @@ public sealed class PreceptEngine
     }
 
     /// <summary>
-    /// Evaluates all invariants and the current state's 'in' asserts against the
+    /// Evaluates all rules and the current state's 'in' ensures against the
     /// instance's current data. Returns a flat list of violation reason strings.
     /// </summary>
     internal IReadOnlyList<ConstraintViolation> EvaluateCurrentRules(PreceptInstance instance)
     {
         var violations = new List<ConstraintViolation>();
-        violations.AddRange(EvaluateInvariants(instance.InstanceData));
+        violations.AddRange(EvaluateRules(instance.InstanceData));
         if (instance.CurrentState is not null)
-            violations.AddRange(EvaluateStateAssertions(AssertAnchor.In, instance.CurrentState, instance.InstanceData));
+            violations.AddRange(EvaluateStateEnsures(EnsureAnchor.In, instance.CurrentState, instance.InstanceData));
         return violations;
     }
 
@@ -1606,49 +1606,49 @@ public sealed class PreceptEngine
 
     // ---- Constraint evaluation helpers ----
 
-    private IReadOnlyList<ConstraintViolation> EvaluateEventAssertions(string eventName, IReadOnlyDictionary<string, object?> evaluationData)
+    private IReadOnlyList<ConstraintViolation> EvaluateEventEnsures(string eventName, IReadOnlyDictionary<string, object?> evaluationData)
     {
-        if (!_eventAssertMap.TryGetValue(eventName, out var asserts) || asserts.Count == 0)
+        if (!_eventEnsureMap.TryGetValue(eventName, out var ensures) || ensures.Count == 0)
             return Array.Empty<ConstraintViolation>();
 
         var violations = new List<ConstraintViolation>();
-        foreach (var assert in asserts)
+        foreach (var ensure in ensures)
         {
-            // Guard pre-flight: when guard is present and evaluates false, skip this assertion
-            if (assert.WhenGuard is not null)
+            // Guard pre-flight: when guard is present and evaluates false, skip this ensure
+            if (ensure.WhenGuard is not null)
             {
-                var guardResult = PreceptExpressionRuntimeEvaluator.Evaluate(assert.WhenGuard, evaluationData);
+                var guardResult = PreceptExpressionRuntimeEvaluator.Evaluate(ensure.WhenGuard, evaluationData);
                 if (!guardResult.Success || guardResult.Value is not true)
                     continue;
             }
 
-            var result = PreceptExpressionRuntimeEvaluator.Evaluate(assert.Expression, evaluationData);
+            var result = PreceptExpressionRuntimeEvaluator.Evaluate(ensure.Expression, evaluationData);
             if (!result.Success || result.Value is not bool boolVal || !boolVal)
             {
-                var subjects = ExpressionSubjects.ExtractForEventAssert(assert.Expression, eventName);
+                var subjects = ExpressionSubjects.ExtractForEventEnsure(ensure.Expression, eventName);
                 var targets = new List<ConstraintTarget>();
                 foreach (var (evt, arg) in subjects.ArgReferences)
                     targets.Add(new ConstraintTarget.EventArgTarget(evt, arg));
                 targets.Add(new ConstraintTarget.EventTarget(eventName));
 
                 violations.Add(new ConstraintViolation(
-                    assert.Reason,
-                    new ConstraintSource.EventAssertionSource(assert.ExpressionText, assert.Reason, eventName, assert.SourceLine),
+                    ensure.Reason,
+                    new ConstraintSource.EventEnsureSource(ensure.ExpressionText, ensure.Reason, eventName, ensure.SourceLine),
                     targets));
             }
         }
         return violations;
     }
 
-    private IReadOnlyList<ConstraintViolation> EvaluateInvariants(IReadOnlyDictionary<string, object?> data)
+    private IReadOnlyList<ConstraintViolation> EvaluateRules(IReadOnlyDictionary<string, object?> data)
     {
-        if (_invariants.Count == 0)
+        if (_rules.Count == 0)
             return Array.Empty<ConstraintViolation>();
 
         var violations = new List<ConstraintViolation>();
-        foreach (var inv in _invariants)
+        foreach (var inv in _rules)
         {
-            // Guard pre-flight: when guard is present and evaluates false, skip this invariant
+            // Guard pre-flight: when guard is present and evaluates false, skip this rule
             if (inv.WhenGuard is not null)
             {
                 var guardResult = PreceptExpressionRuntimeEvaluator.Evaluate(inv.WhenGuard, data);
@@ -1668,7 +1668,7 @@ public sealed class PreceptEngine
 
                 violations.Add(new ConstraintViolation(
                     inv.Reason,
-                    new ConstraintSource.InvariantSource(inv.ExpressionText, inv.Reason, inv.SourceLine),
+                    new ConstraintSource.RuleSource(inv.ExpressionText, inv.Reason, inv.SourceLine),
                     targets));
             }
         }
@@ -1676,38 +1676,38 @@ public sealed class PreceptEngine
     }
 
     /// <summary>
-    /// Evaluates state asserts for a given preposition and state.
+    /// Evaluates state ensures for a given preposition and state.
     /// </summary>
-    private IReadOnlyList<ConstraintViolation> EvaluateStateAssertions(
-        AssertAnchor preposition, string state, IReadOnlyDictionary<string, object?> data)
+    private IReadOnlyList<ConstraintViolation> EvaluateStateEnsures(
+        EnsureAnchor preposition, string state, IReadOnlyDictionary<string, object?> data)
     {
-        if (!_stateAssertMap.TryGetValue((preposition, state), out var asserts) || asserts.Count == 0)
+        if (!_stateEnsureMap.TryGetValue((preposition, state), out var ensures) || ensures.Count == 0)
             return Array.Empty<ConstraintViolation>();
 
         var violations = new List<ConstraintViolation>();
-        foreach (var assert in asserts)
+        foreach (var ensure in ensures)
         {
-            // Guard pre-flight: when guard is present and evaluates false, skip this assertion
-            if (assert.WhenGuard is not null)
+            // Guard pre-flight: when guard is present and evaluates false, skip this ensure
+            if (ensure.WhenGuard is not null)
             {
-                var guardResult = PreceptExpressionRuntimeEvaluator.Evaluate(assert.WhenGuard, data);
+                var guardResult = PreceptExpressionRuntimeEvaluator.Evaluate(ensure.WhenGuard, data);
                 if (!guardResult.Success || guardResult.Value is not true)
                     continue;
             }
 
-            var result = PreceptExpressionRuntimeEvaluator.Evaluate(assert.Expression, data);
+            var result = PreceptExpressionRuntimeEvaluator.Evaluate(ensure.Expression, data);
             if (!result.Success || result.Value is not bool boolVal || !boolVal)
             {
-                var subjects = ExpressionSubjects.Extract(assert.Expression);
+                var subjects = ExpressionSubjects.Extract(ensure.Expression);
                 var targets = new List<ConstraintTarget>();
                 foreach (var fieldName in subjects.FieldReferences)
                     targets.Add(new ConstraintTarget.FieldTarget(fieldName));
                 ExpandComputedFieldTargets(subjects.FieldReferences, targets);
-                targets.Add(new ConstraintTarget.StateTarget(assert.State, assert.Anchor));
+                targets.Add(new ConstraintTarget.StateTarget(ensure.State, ensure.Anchor));
 
                 violations.Add(new ConstraintViolation(
-                    assert.Reason,
-                    new ConstraintSource.StateAssertionSource(assert.ExpressionText, assert.Reason, assert.State, assert.Anchor, assert.SourceLine),
+                    ensure.Reason,
+                    new ConstraintSource.StateEnsureSource(ensure.ExpressionText, ensure.Reason, ensure.State, ensure.Anchor, ensure.SourceLine),
                     targets));
             }
         }
@@ -1734,28 +1734,28 @@ public sealed class PreceptEngine
     }
 
     /// <summary>
-    /// Collects all validation violations post-mutation: invariants + preposition-aware state asserts.
+    /// Collects all validation violations post-mutation: rules + preposition-aware state ensures.
     /// </summary>
     private IReadOnlyList<ConstraintViolation> CollectConstraintViolations(
         string sourceState, string targetState, IReadOnlyDictionary<string, object?> data)
     {
         var violations = new List<ConstraintViolation>();
 
-        // Invariants (always)
-        violations.AddRange(EvaluateInvariants(data));
+        // Rules (always)
+        violations.AddRange(EvaluateRules(data));
 
         if (string.Equals(sourceState, targetState, StringComparison.Ordinal))
         {
-            // AcceptedInPlace / self-transition: evaluate 'to' + 'in' asserts
-            violations.AddRange(EvaluateStateAssertions(AssertAnchor.To, targetState, data));
-            violations.AddRange(EvaluateStateAssertions(AssertAnchor.In, sourceState, data));
+            // AcceptedInPlace / self-transition: evaluate 'to' + 'in' ensures
+            violations.AddRange(EvaluateStateEnsures(EnsureAnchor.To, targetState, data));
+            violations.AddRange(EvaluateStateEnsures(EnsureAnchor.In, sourceState, data));
         }
         else
         {
             // State transition: evaluate 'from' source + 'to' target + 'in' target
-            violations.AddRange(EvaluateStateAssertions(AssertAnchor.From, sourceState, data));
-            violations.AddRange(EvaluateStateAssertions(AssertAnchor.To, targetState, data));
-            violations.AddRange(EvaluateStateAssertions(AssertAnchor.In, targetState, data));
+            violations.AddRange(EvaluateStateEnsures(EnsureAnchor.From, sourceState, data));
+            violations.AddRange(EvaluateStateEnsures(EnsureAnchor.To, targetState, data));
+            violations.AddRange(EvaluateStateEnsures(EnsureAnchor.In, targetState, data));
         }
 
         return violations;
@@ -1765,7 +1765,7 @@ public sealed class PreceptEngine
     /// Executes state entry/exit actions (automatic mutations).
     /// </summary>
     private void ExecuteStateActions(
-        AssertAnchor preposition, string state,
+        EnsureAnchor preposition, string state,
         Dictionary<string, object?> data, Dictionary<string, CollectionValue> workingCollections,
         string eventName, IReadOnlyDictionary<string, object?>? eventArguments)
     {
@@ -2211,9 +2211,9 @@ public static class PreceptCompiler
 
     private static void CollectCompileTimeDiagnostics(PreceptDefinition model, List<PreceptValidationDiagnostic> diagnostics)
     {
-        // Structural checks: duplicate and subsumed state asserts
-        CollectDuplicateStateAssertDiagnostics(model, diagnostics);
-        CollectSubsumedStateAssertDiagnostics(model, diagnostics);
+        // Structural checks: duplicate and subsumed state ensures
+        CollectDuplicateStateEnsureDiagnostics(model, diagnostics);
+        CollectSubsumedStateEnsureDiagnostics(model, diagnostics);
 
         // SYNC:CONSTRAINT:C55
         if (!model.IsStateless && model.EditBlocks is { Count: > 0 })
@@ -2229,7 +2229,7 @@ public static class PreceptCompiler
 
         var defaultData = BuildDefaultData(model);
 
-        // Recompute derived fields so compile-time invariant checks see fresh computed values
+        // Recompute derived fields so compile-time rule checks see fresh computed values
         if (model.ComputedFieldOrder is { Count: > 0 })
         {
             var mutableData = new Dictionary<string, object?>(defaultData, StringComparer.Ordinal);
@@ -2246,17 +2246,17 @@ public static class PreceptCompiler
             defaultData = mutableData;
         }
 
-        // 1. Validate invariants against default values
-        //    Synthetic invariants (generated by field constraint desugaring) are skipped:
+        // 1. Validate rules against default values
+        //    Synthetic rules (generated by field constraint desugaring) are skipped:
         //    C59 covers bad defaults for scalar constraints; collection constraints have no
         //    user-declared default and should not block compilation of the precept.
-        if (model.Invariants is { Count: > 0 })
+        if (model.Rules is { Count: > 0 })
         {
-            foreach (var inv in model.Invariants)
+            foreach (var inv in model.Rules)
             {
                 if (inv.IsSynthetic) continue;
 
-                // Guard pre-flight: skip guarded invariants whose guard is false at defaults
+                // Guard pre-flight: skip guarded rules whose guard is false at defaults
                 if (inv.WhenGuard is not null)
                 {
                     var guardResult = PreceptExpressionRuntimeEvaluator.Evaluate(inv.WhenGuard, defaultData);
@@ -2276,19 +2276,19 @@ public static class PreceptCompiler
             }
         }
 
-        // 2. Validate initial state asserts (in + to) against default data
-        // Stateless precepts have no state asserts — InitialState is null and this block is unreachable for them.
-        if (!model.IsStateless && model.StateAsserts is { Count: > 0 })
+        // 2. Validate initial state ensures (in + to) against default data
+        // Stateless precepts have no state ensures — InitialState is null and this block is unreachable for them.
+        if (!model.IsStateless && model.StateEnsures is { Count: > 0 })
         {
             var initialStateName = model.InitialState!.Name;
-            foreach (var sa in model.StateAsserts)
+            foreach (var sa in model.StateEnsures)
             {
                 if (!string.Equals(sa.State, initialStateName, StringComparison.Ordinal))
                     continue;
-                if (sa.Anchor is not (AssertAnchor.In or AssertAnchor.To))
+                if (sa.Anchor is not (EnsureAnchor.In or EnsureAnchor.To))
                     continue;
 
-                // Guard pre-flight: skip guarded state asserts whose guard is false at defaults
+                // Guard pre-flight: skip guarded state ensures whose guard is false at defaults
                 if (sa.WhenGuard is not null)
                 {
                     var guardResult = PreceptExpressionRuntimeEvaluator.Evaluate(sa.WhenGuard, defaultData);
@@ -2309,11 +2309,11 @@ public static class PreceptCompiler
             }
         }
 
-        // 3. Validate event asserts against event argument defaults (when all args have defaults)
-        if (model.EventAsserts is { Count: > 0 })
+        // 3. Validate event ensures against event argument defaults (when all args have defaults)
+        if (model.EventEnsures is { Count: > 0 })
         {
             var eventsByName = model.Events.ToDictionary(e => e.Name, e => e, StringComparer.Ordinal);
-            foreach (var ea in model.EventAsserts)
+            foreach (var ea in model.EventEnsures)
             {
                 if (!eventsByName.TryGetValue(ea.EventName, out var evt))
                     continue;
@@ -2342,7 +2342,7 @@ public static class PreceptCompiler
                 if (!allArgsHaveDefaults)
                     continue;
 
-                // Guard pre-flight: skip guarded event asserts whose guard is false at defaults
+                // Guard pre-flight: skip guarded event ensures whose guard is false at defaults
                 if (ea.WhenGuard is not null)
                 {
                     var guardResult = PreceptExpressionRuntimeEvaluator.Evaluate(ea.WhenGuard, eventDefaults);
@@ -2362,15 +2362,15 @@ public static class PreceptCompiler
             }
         }
 
-        // 4. Validate literal set assignments against invariants
+        // 4. Validate literal set assignments against rules
         CollectLiteralSetAssignmentDiagnostics(model, defaultData, diagnostics);
     }
 
     private static void CollectLiteralSetAssignmentDiagnostics(PreceptDefinition model, IReadOnlyDictionary<string, object?> defaultData, List<PreceptValidationDiagnostic> diagnostics)
     {
-        var invariants = model.Invariants ?? Array.Empty<PreceptInvariant>();
+        var rules = model.Rules ?? Array.Empty<PreceptRule>();
 
-        if (invariants.Count == 0)
+        if (rules.Count == 0)
             return;
 
         void CheckLiteralAssignment(PreceptSetAssignment assignment)
@@ -2384,7 +2384,7 @@ public static class PreceptCompiler
                 [assignment.Key] = constantEval.Value
             };
 
-            foreach (var inv in invariants)
+            foreach (var inv in rules)
             {
                 var result = PreceptExpressionRuntimeEvaluator.Evaluate(inv.Expression, ctx);
                 if (!result.Success || result.Value is not bool boolVal || !boolVal)
@@ -2409,13 +2409,13 @@ public static class PreceptCompiler
     }
 
     // SYNC:CONSTRAINT:C44
-    private static void CollectDuplicateStateAssertDiagnostics(PreceptDefinition model, List<PreceptValidationDiagnostic> diagnostics)
+    private static void CollectDuplicateStateEnsureDiagnostics(PreceptDefinition model, List<PreceptValidationDiagnostic> diagnostics)
     {
-        if (model.StateAsserts is not { Count: > 1 })
+        if (model.StateEnsures is not { Count: > 1 })
             return;
 
-        var seen = new HashSet<(AssertAnchor Anchor, string State, string Expression)>();
-        foreach (var sa in model.StateAsserts)
+        var seen = new HashSet<(EnsureAnchor Anchor, string State, string Expression)>();
+        foreach (var sa in model.StateEnsures)
         {
             if (!seen.Add((sa.Anchor, sa.State, sa.ExpressionText)))
             {
@@ -2432,24 +2432,24 @@ public static class PreceptCompiler
     }
 
     // SYNC:CONSTRAINT:C45
-    private static void CollectSubsumedStateAssertDiagnostics(PreceptDefinition model, List<PreceptValidationDiagnostic> diagnostics)
+    private static void CollectSubsumedStateEnsureDiagnostics(PreceptDefinition model, List<PreceptValidationDiagnostic> diagnostics)
     {
-        if (model.StateAsserts is not { Count: > 1 })
+        if (model.StateEnsures is not { Count: > 1 })
             return;
 
-        var inAsserts = new HashSet<(string State, string Expr)>();
-        foreach (var sa in model.StateAsserts)
+        var inEnsures = new HashSet<(string State, string Expr)>();
+        foreach (var sa in model.StateEnsures)
         {
-            if (sa.Anchor == AssertAnchor.In)
-                inAsserts.Add((sa.State, sa.ExpressionText));
+            if (sa.Anchor == EnsureAnchor.In)
+                inEnsures.Add((sa.State, sa.ExpressionText));
         }
 
-        if (inAsserts.Count == 0)
+        if (inEnsures.Count == 0)
             return;
 
-        foreach (var sa in model.StateAsserts)
+        foreach (var sa in model.StateEnsures)
         {
-            if (sa.Anchor == AssertAnchor.To && inAsserts.Contains((sa.State, sa.ExpressionText)))
+            if (sa.Anchor == EnsureAnchor.To && inEnsures.Contains((sa.State, sa.ExpressionText)))
             {
                 diagnostics.Add(new PreceptValidationDiagnostic(
                     DiagnosticCatalog.C45,
@@ -2577,7 +2577,7 @@ public sealed record UpdateResult(
 
     internal static UpdateResult Failed(UpdateOutcome outcome, IReadOnlyList<string> reasons) =>
         new(outcome, reasons.Select(r => new ConstraintViolation(r,
-            new ConstraintSource.InvariantSource("", r),
+            new ConstraintSource.RuleSource("", r),
             new[] { new ConstraintTarget.DefinitionTarget() as ConstraintTarget })).ToList(), null);
 }
 
@@ -2753,7 +2753,7 @@ public sealed record FireResult(
     internal static FireResult Undefined(string? state, string evt, IReadOnlyList<string> reasons) =>
         new(TransitionOutcome.Undefined, state, evt, null,
             reasons.Select(r => new ConstraintViolation(r,
-                new ConstraintSource.InvariantSource("", r),
+                new ConstraintSource.RuleSource("", r),
                 new[] { new ConstraintTarget.DefinitionTarget() as ConstraintTarget })).ToList(), null);
 
     internal static FireResult Unmatched(string? state, string evt) =>

@@ -83,10 +83,10 @@ public enum PreceptToken
     [TokenSymbol("default")]
     Default,
 
-    [TokenCategory(TokenCategory.Declaration)]
-    [TokenDescription("Global data invariant")]
-    [TokenSymbol("invariant")]
-    Invariant,
+    [TokenCategory(TokenCategory.Grammar)]
+    [TokenDescription("Global data rule — a truth that must always hold")]
+    [TokenSymbol("rule")]
+    Rule,
 
     [TokenCategory(TokenCategory.Grammar)]
     [TokenDescription("Reason sentinel for constraints")]
@@ -113,10 +113,10 @@ public enum PreceptToken
     [TokenSymbol("with")]
     With,
 
-    [TokenCategory(TokenCategory.Declaration)]
-    [TokenDescription("Movement constraint")]
-    [TokenSymbol("assert")]
-    Assert,
+    [TokenCategory(TokenCategory.Grammar)]
+    [TokenDescription("Temporal enforcement — checked at a specific lifecycle moment")]
+    [TokenSymbol("ensure")]
+    Ensure,
 
     [TokenCategory(TokenCategory.Declaration)]
     [TokenDescription("Editable field declaration")]
