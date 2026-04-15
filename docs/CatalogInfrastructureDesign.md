@@ -64,10 +64,12 @@ Classifies each token into a semantic group.
 ```csharp
 public enum TokenCategory
 {
-    Control,       // precept, state, initial, from, on, when, any, in, to, of, with
-    Declaration,   // field, as, nullable, default, rule, because, event, ensure
-    Action,        // set, add, remove, enqueue, dequeue, push, pop, clear, into
+    Control,       // when, if, then, else
+    Declaration,   // precept, field, as, nullable, default, because, state, initial, event, with, edit, in, to, from, on, any, all, of, into
+    Action,        // set, add, remove, enqueue, dequeue, push, pop, clear
     Outcome,       // transition, no, reject
+    Grammar,       // rule, ensure
+    Constraint,    // nonnegative, positive, min, max, minlength, ...
     Type,          // string, number, boolean
     Literal,       // true, false, null
     Operator,      // ==, !=, >, >=, <, <=, &&, ||, !, contains, =

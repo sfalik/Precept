@@ -21,8 +21,8 @@ Background: `#0c0c0f`
 
 | # | Family | Hex | Typography | Tokens |
 |---|--------|-----|------------|--------|
-| 1 | Structure · Semantic | `#4338CA` | **bold** | `precept`, `field`, `state`, `event`, `from`, `on`, `in`, `to`, `set`, `transition`, `edit`, `reject`, `when`, `no` |
-| 2 | Structure · Grammar | `#6366F1` | normal | `rule`, `ensure`, `as`, `with`, `default`, `nullable`, `any`, `all`, `of`, `into`, `because`, `initial`, constraint keywords, `=`, `->`, operators, punctuation |
+| 1 | Structure · Semantic | `#4338CA` | **bold** | `precept`, `field`, `as`, `nullable`, `default`, `state`, `initial`, `event`, `with`, `edit`, `in`, `to`, `from`, `on`, `when`, `if`, `then`, `else`, `any`, `all`, `of`, `into`, `set`, `transition`, `reject`, `no` |
+| 2 | Structure · Grammar | `#6366F1` | normal | `rule`, `ensure`, constraint keywords, `=`, `->`, operators, punctuation |
 | 3 | States | `#A898F5` | normal / *italic if constrained* | State names |
 | 4 | Events | `#30B8E8` | normal / *italic if constrained* | Event names |
 | 5 | Data · Names | `#B0BEC5` | normal / *italic if guarded* | Field names, argument names |
@@ -82,11 +82,11 @@ Current classification:
 
 | `TokenCategory` | Semantic type | Tokens |
 |------------------|---------------|--------|
-| Control | `preceptKeywordSemantic` | `when` |
+| Control | `preceptKeywordSemantic` | `when`, `if`, `then`, `else` |
 | Declaration | `preceptKeywordSemantic` | `precept`, `field`, `state`, `event`, `edit`, `in`, `to`, `from`, `on`, `with`, `default`, `nullable`, `because`, `initial`, `any`, `all`, `of`, `into` |
 | Action | `preceptKeywordSemantic` | `set`, `add`, `remove`, `enqueue`, `dequeue`, `push`, `pop`, `clear` |
 | Outcome | `preceptKeywordSemantic` | `transition`, `reject`, `no` |
-| Grammar | `preceptKeywordGrammar` | `rule`, `ensure`, `as` |
+| Grammar | `preceptKeywordGrammar` | `rule`, `ensure` |
 | Constraint | `preceptKeywordGrammar` | `nonnegative`, `positive`, `min`, `max`, `notempty`, `minlength`, `maxlength`, `mincount`, `maxcount`, `maxplaces`, `ordered` |
 | Type | `preceptType` | `string`, `number`, `boolean`, `integer`, `decimal`, `choice`, `set`, `queue`, `stack` |
 | Literal | `preceptValue` | `true`, `false`, `null` |
@@ -202,22 +202,14 @@ Then the `package.json` rules would use `keyword:declaration` for semantic and `
 
 **✅ Implemented: Add `Grammar` category to `PreceptToken.cs`.** The semantic/grammar split is a first-class DSL concept, not just a visual hack. The `precept_language` MCP tool surfaces it automatically.
 
-**Grammar keyword realignment (10 tokens):**
+**Grammar keyword realignment (locked):**
 
-| Token | Old category | New category | Rationale |
-|-------|-------------|-------------|-----------|
-| `as` | Declaration | **Grammar** | Type annotation glue |
-| `with` | Declaration | **Grammar** | Argument list introducer |
-| `nullable` | Declaration | **Grammar** | Type modifier |
-| `default` | Declaration | **Grammar** | Value modifier — lighter weight than behavioral drivers |
-| `because` | Declaration | **Grammar** | Links reject/ensure to message string |
-| `any` | Control | **Grammar** | Wildcard modifier, not flow control |
-| `all` | Quantifier-only keyword | **Grammar** | Field-target quantifier in `edit` declarations |
-| `of` | Control | **Grammar** | Type connector ("set of string") |
-| `into` | Action | **Grammar** | Capture preposition, connective role |
-| `initial` | Control | **Grammar** | State modifier — lighter weight, same as `nullable`/`default` |
+| Token | Category | Rationale |
+|-------|----------|-----------|
+| `rule` | **Grammar** | Deliberate gold treatment for timeless constraint declarations |
+| `ensure` | **Grammar** | Deliberate gold treatment for temporal constraint declarations |
 
-**Declaration realignment (Frank follow-up):** `state`, `in`, `to`, `from`, and `on` now live under `Declaration`, leaving `when` as the only `Control` keyword. This keeps statement anchors grouped together while reserving `Control` for actual guard flow.
+**Declaration / control split (implemented):** connective and modifier keywords such as `as`, `with`, `nullable`, `default`, `because`, `initial`, `any`, `all`, `of`, and `into` remain `Declaration` tokens and therefore stay in the semantic keyword family. `Control` is reserved for actual flow-control keywords: `when`, `if`, `then`, and `else`.
 
 **`BuildSemanticTypeMap()` reclassification:**
 
