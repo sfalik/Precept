@@ -2420,9 +2420,9 @@
 <script>
   (function () {
     var semanticKeywords = new Set(['precept', 'field', 'state', 'event', 'from', 'on', 'in', 'to', 'set', 'transition', 'edit', 'reject', 'when', 'no']);
-    var grammarKeywords = new Set(['rule', 'ensure', 'as', 'with', 'default', 'nullable', 'any', 'of', 'into', 'because']);
+    var grammarKeywords = new Set(['rule', 'ensure', 'as', 'with', 'default', 'nullable', 'any', 'of', 'into', 'because', 'and', 'or', 'not']);
     var typeKeywords = new Set(['string', 'number', 'boolean', 'set', 'queue', 'stack']);
-    var operatorPattern = /^(->|=|==|!=|>=|<=|>|<|\+|-|&&|,|\.)$/;
+    var operatorPattern = /^(->|=|==|!=|>=|<=|>|<|\+|-|,|\.)$/;
     var literalPattern = /^(true|false|null|".*"|\d+)$/;
 
     function collectConstrainedNames(blockText) {
