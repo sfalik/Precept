@@ -38,12 +38,12 @@ internal static class ViolationDtoMapper
 
     private static ViolationSourceDto MapSource(ConstraintSource source) => source switch
     {
-        ConstraintSource.InvariantSource inv =>
-            new ViolationSourceDto("invariant", null, null, null, inv.ExpressionText, inv.Reason, inv.SourceLine),
-        ConstraintSource.StateAssertionSource sa =>
-            new ViolationSourceDto("state-assertion", sa.StateName, sa.Anchor.ToString().ToLowerInvariant(), null, sa.ExpressionText, sa.Reason, sa.SourceLine),
-        ConstraintSource.EventAssertionSource ea =>
-            new ViolationSourceDto("event-assertion", null, null, ea.EventName, ea.ExpressionText, ea.Reason, ea.SourceLine),
+        ConstraintSource.RuleSource inv =>
+            new ViolationSourceDto("rule", null, null, null, inv.ExpressionText, inv.Reason, inv.SourceLine),
+        ConstraintSource.StateEnsureSource sa =>
+            new ViolationSourceDto("state-ensure", sa.StateName, sa.Anchor.ToString().ToLowerInvariant(), null, sa.ExpressionText, sa.Reason, sa.SourceLine),
+        ConstraintSource.EventEnsureSource ea =>
+            new ViolationSourceDto("event-ensure", null, null, ea.EventName, ea.ExpressionText, ea.Reason, ea.SourceLine),
         ConstraintSource.TransitionRejectionSource tr =>
             new ViolationSourceDto("transition-rejection", null, null, tr.EventName, null, tr.Reason, tr.SourceLine),
         _ => new ViolationSourceDto("unknown", null, null, null, null, null, source.SourceLine)
