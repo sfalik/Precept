@@ -21,15 +21,15 @@ Background: `#0c0c0f`
 
 | # | Family | Hex | Typography | Tokens |
 |---|--------|-----|------------|--------|
-| 1 | Structure · Semantic | `#4338CA` | **bold** | `precept`, `field`, `as`, `nullable`, `default`, `state`, `initial`, `event`, `with`, `edit`, `in`, `to`, `from`, `on`, `when`, `if`, `then`, `else`, `any`, `all`, `of`, `into`, `set`, `transition`, `reject`, `no` |
-| 2 | Constraint · Operators | `#6366F1` | normal | constraint keywords, `=`, `->`, operators, punctuation |
+| 1 | Structure · Semantic | `#4338CA` | **bold** | `precept`, `field`, `as`, `nullable`, `default`, `state`, `initial`, `event`, `with`, `edit`, `in`, `to`, `from`, `on`, `when`, `if`, `then`, `else`, `any`, `all`, `of`, `into`, `set`, `transition`, `reject`, `no`, `rule`, `ensure` |
+| 2 | Operators · Punctuation | `#6366F1` | normal | `=`, `->`, operators, all punctuation (parens, commas, dots) |
 | 3 | Contract Identity | `#A5B4FC` | normal | Precept name |
 | 4 | States | `#A898F5` | normal / *italic if constrained* | State names |
 | 5 | Events | `#30B8E8` | normal / *italic if constrained* | Event names |
 | 6 | Data · Names | `#B0BEC5` | normal / *italic if guarded* | Field names, argument names |
 | 7 | Data · Types | `#9AA8B5` | normal | `string`, `number`, `boolean`, `integer`, `decimal`, `choice`, `set`, `queue`, `stack` |
 | 8 | Data · Values | `#84929F` | normal | `true`, `false`, `null`, string literals, number literals |
-| 9 | Rule Grammar · Messages | `#FBBF24` | normal | `rule`, `ensure`, string content in `because` / `reject` |
+| 9 | Constraint · Messages | `#FBBF24` | normal | constraint keywords (`nonnegative`, `positive`, `min`, `max`, etc.), string content in `because` / `reject` |
 
 Verdict colors (`#34D399` enabled, `#F87171` blocked, `#FDE047` warning) are runtime-only — never in syntax highlighting.
 
@@ -48,7 +48,7 @@ Current scope assignments:
 | Token class | TextMate scope |
 |-------------|---------------|
 | Control keywords | `keyword.control.precept` |
-| Grammar keywords | `keyword.other.grammar.precept` |
+| Grammar keywords (`rule`, `ensure`) | `keyword.other.precept` (same as declaration keywords — bold indigo) |
 | Declaration keywords | `keyword.other.precept` |
 | Action keywords | `keyword.other.precept` |
 | Constraint keywords | `keyword.other.constraint.precept` |
@@ -87,14 +87,14 @@ Current classification:
 | Declaration | `preceptKeywordSemantic` | `precept`, `field`, `state`, `event`, `edit`, `in`, `to`, `from`, `on`, `with`, `default`, `nullable`, `because`, `initial`, `any`, `all`, `of`, `into` |
 | Action | `preceptKeywordSemantic` | `set`, `add`, `remove`, `enqueue`, `dequeue`, `push`, `pop`, `clear` |
 | Outcome | `preceptKeywordSemantic` | `transition`, `reject`, `no` |
-| Grammar | `preceptKeywordGrammar` | `rule`, `ensure` |
-| Constraint | `preceptKeywordGrammar` (constraint fallback lane in the locked palette) | `nonnegative`, `positive`, `min`, `max`, `notempty`, `minlength`, `maxlength`, `mincount`, `maxcount`, `maxplaces`, `ordered` |
+| Grammar | `preceptKeywordSemantic` | `rule`, `ensure` |
+| Constraint | `preceptKeywordGrammar` | `nonnegative`, `positive`, `min`, `max`, `notempty`, `minlength`, `maxlength`, `mincount`, `maxcount`, `maxplaces`, `ordered` |
 | Type | `preceptType` | `string`, `number`, `boolean`, `integer`, `decimal`, `choice`, `set`, `queue`, `stack` |
 | Literal | `preceptValue` | `true`, `false`, `null` |
 | Operator | `operator` | All comparison, logical, arithmetic, assignment, and `contains` operators |
-| Punctuation | `operator` | `->` only |
+| Punctuation | `operator` | All punctuation (`->`, `,`, `.`, `(`, `)`, `{`, `}`) |
 
-The semantic-token legend intentionally reuses `preceptKeywordGrammar` for both `Grammar` and `Constraint` categories, and the locked package color map renders that shared lane in gold. That means `rule`, `ensure`, and constraint modifiers such as `nonnegative` all receive the same gold treatment under semantic highlighting.
+Grammar tokens (`rule`, `ensure`) map to `preceptKeywordSemantic` — the same bold indigo lane as other structural keywords. They are declaration-anchoring keywords that introduce constraint blocks, not constraint modifiers themselves. Constraint tokens (`nonnegative`, `positive`, etc.) map to `preceptKeywordGrammar` — the gold lane shared with reason text. This separation reflects the distinction between *declaring* a rule and *modifying* a field with a constraint.
 
 Identifier classification (context-aware via `ClassifyIdentifier()`):
 
@@ -211,8 +211,8 @@ Then the `package.json` rules would use `keyword:declaration` for semantic and `
 
 | Token | Category | Rationale |
 |-------|----------|-----------|
-| `rule` | **Grammar** | Deliberate gold treatment for timeless constraint declarations |
-| `ensure` | **Grammar** | Deliberate gold treatment for temporal constraint declarations |
+| `rule` | **Grammar** | Bold indigo — declaration-anchoring keyword for timeless constraint blocks, same lane as `state`, `event`, `field` |
+| `ensure` | **Grammar** | Bold indigo — declaration-anchoring keyword for temporal constraint blocks, same lane as `state`, `event`, `field` |
 
 **Declaration / control split (implemented):** connective and modifier keywords such as `as`, `with`, `nullable`, `default`, `because`, `initial`, `any`, `all`, `of`, and `into` remain `Declaration` tokens and therefore stay in the semantic keyword family. `Control` is reserved for actual flow-control keywords: `when`, `if`, `then`, and `else`.
 
@@ -224,12 +224,12 @@ Then the `package.json` rules would use `keyword:declaration` for semantic and `
 | Declaration | `keyword` → `preceptKeywordSemantic` |
 | Action | `keyword` → `preceptKeywordSemantic` |
 | Outcome | `keyword` → `preceptKeywordSemantic` |
-| Grammar | *(new)* → `preceptKeywordGrammar` |
+| Grammar | *(new)* → `preceptKeywordSemantic` |
 | Constraint | `keyword` → `preceptKeywordGrammar` |
 | Type | `type` → `preceptType` |
 | Literal | `keyword` → `preceptValue` |
 | Operator | `operator` → `operator` |
-| Punctuation (Arrow) | `operator` → `operator` |
+| Punctuation | `operator` → `operator` (all punctuation, not just Arrow) |
 
 Every category now maps to exactly one shade — no per-token overrides needed.
 
@@ -386,7 +386,7 @@ The TextMate grammar already assigns specific scopes. To lock fallback colors be
 }
 ```
 
-**Note:** The TextMate grammar now splits grammar-role keywords into `keyword.other.grammar.precept` and constraint keywords into `keyword.other.constraint.precept`, so cold-start fallback matches the lighter Structure · Grammar treatment immediately. Behavioral declaration and action keywords still use `keyword.other.precept`, which keeps the semantic-vs-grammar distinction explicit without waiting for the language server. Comments remain the exception to the pure scope-map path: they also get a targeted semantic override because themes commonly hard-style the standard `comment` semantic selector.
+**Note:** The TextMate grammar assigns grammar-role keywords (`rule`, `ensure`) to `keyword.other.precept` — the same scope as declaration keywords — so cold-start fallback renders them in bold indigo. Constraint keywords use `keyword.other.constraint.precept` for the gold treatment. Bracket pair colorization is disabled for `.precept` files via `"colorizedBracketPairs": []` in `language-configuration.json`, ensuring semantic token colors for parentheses and other punctuation are not overridden by the bracket colorizer. Comments remain the exception to the pure scope-map path: they also get a targeted semantic override because themes commonly hard-style the standard `comment` semantic selector.
 
 #### G. String Literal Context — Messages vs. Plain Strings
 
@@ -420,7 +420,7 @@ VS Code semantic token rules support `"bold": true` in `settings.json` / `config
 
 ### R5: TextMate keyword scope granularity — ✅ Resolved
 
-The grammar now assigns grammar-role keywords to `keyword.other.grammar.precept` and constraint keywords to `keyword.other.constraint.precept`, so TextMate fallback no longer collapses them into the heavier semantic keyword treatment during cold start. **Decision:** Keep the split in sync with `TokenCategory.Grammar` and `TokenCategory.Constraint` so fallback and semantic highlighting stay aligned.
+The grammar assigns grammar-role keywords (`rule`, `ensure`) to `keyword.other.precept` — the same scope as declaration keywords — so cold-start fallback renders them in bold indigo. Constraint keywords use `keyword.other.constraint.precept` for the gold treatment. **Decision:** Keep the scope assignments in sync with the semantic token mapping: Grammar → `preceptKeywordSemantic` (bold indigo), Constraint → `preceptKeywordGrammar` (gold).
 
 ### R6: Dual-category tokens — ✅ Accepted
 
