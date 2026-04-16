@@ -560,7 +560,7 @@ public class PreceptIntegerTypeTests
     [Fact]
     public void Runtime_IntegerField_NonnegativeConstraint_EnforcedAtRuntime()
     {
-        // nonnegative desugars to `invariant Count >= 0`
+        // nonnegative desugars to `rule Count >= 0`
         const string dsl = """
             precept M
             field Count as integer default 0 nonnegative
@@ -579,7 +579,7 @@ public class PreceptIntegerTypeTests
     [Fact]
     public void Runtime_IntegerField_PositiveConstraint_EnforcedAtRuntime()
     {
-        // positive desugars to `invariant Count > 0`; zero is not positive
+        // positive desugars to `rule Count > 0`; zero is not positive
         const string dsl = """
             precept M
             field Count as integer default 1 positive

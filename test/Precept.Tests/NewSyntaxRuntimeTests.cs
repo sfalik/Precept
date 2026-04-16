@@ -9,23 +9,23 @@ namespace Precept.Tests;
 
 /// <summary>
 /// Runtime tests for the new Precept language constructs:
-/// invariant/because, state asserts (in/to/from), event asserts (on),
+/// rule/because, state ensures (in/to/from), event ensures (on),
 /// state actions (to/from ->), transition rows, and edit blocks.
-/// All DSL snippets use the new syntax (field/as, invariant/because, -> pipeline).
+/// All DSL snippets use the new syntax (field/as, rule/because, -> pipeline).
 /// </summary>
 public class NewSyntaxRuntimeTests
 {
     // ════════════════════════════════════════════════════════════════════
-    // INVARIANT — always checked post-commit
+    // RULE — always checked post-commit
     // ════════════════════════════════════════════════════════════════════
 
     [Fact]
-    public void Invariant_Satisfied_TransitionAccepted()
+    public void Rule_Satisfied_TransitionAccepted()
     {
         const string dsl = """
             precept Test
             field Balance as number default 100
-            invariant Balance >= 0 because "Balance must be non-negative"
+            rule Balance >= 0 because "Balance must be non-negative"
             state Active initial
             state Done
             event Spend with Amount as number
@@ -42,12 +42,12 @@ public class NewSyntaxRuntimeTests
     }
 
     [Fact]
-    public void Invariant_Violated_TransitionRejected()
+    public void Rule_Violated_TransitionRejected()
     {
         const string dsl = """
             precept Test
             field Balance as number default 100
-            invariant Balance >= 0 because "Balance must be non-negative"
+            rule Balance >= 0 because "Balance must be non-negative"
             state Active initial
             state Done
             event Spend with Amount as number
@@ -63,12 +63,12 @@ public class NewSyntaxRuntimeTests
     }
 
     [Fact]
-    public void Invariant_Violated_AtCompileTime_Throws()
+    public void Rule_Violated_AtCompileTime_Throws()
     {
         const string dsl = """
             precept Test
             field Balance as number default 100
-            invariant Balance >= 0 because "Balance must be non-negative"
+            rule Balance >= 0 because "Balance must be non-negative"
             state Active initial
             event Reset
             from Active on Reset -> set Balance = -5 -> transition Active
@@ -79,12 +79,12 @@ public class NewSyntaxRuntimeTests
     }
 
     [Fact]
-    public void Invariant_LiteralSetViolation_AtCompileTime_Throws()
+    public void Rule_LiteralSetViolation_AtCompileTime_Throws()
     {
         const string dsl = """
             precept Test
             field Balance as number default 100
-            invariant Balance >= 0 because "Balance must be non-negative"
+            rule Balance >= 0 because "Balance must be non-negative"
             state Active initial
             event Reset
             from Active on Reset -> set Balance = -1 -> transition Active
@@ -95,14 +95,14 @@ public class NewSyntaxRuntimeTests
     }
 
     [Fact]
-    public void Invariant_Multiple_AllChecked()
+    public void Rule_Multiple_AllChecked()
     {
         const string dsl = """
             precept Test
             field X as number default 10
             field Y as number default 10
-            invariant X >= 0 because "X non-negative"
-            invariant Y >= 0 because "Y non-negative"
+            rule X >= 0 because "X non-negative"
+            rule Y >= 0 because "Y non-negative"
             state Active initial
             event Adjust with Dx as number, Dy as number
             from Active on Adjust -> set X = X + Adjust.Dx -> set Y = Y + Adjust.Dy -> transition Active
@@ -117,12 +117,12 @@ public class NewSyntaxRuntimeTests
     }
 
     [Fact]
-    public void Invariant_CheckedOnNoTransition()
+    public void Rule_CheckedOnNoTransition()
     {
         const string dsl = """
             precept Test
             field Counter as number default 5
-            invariant Counter >= 0 because "Counter non-negative"
+            rule Counter >= 0 because "Counter non-negative"
             state Active initial
             event Reduce
             from Active on Reduce -> set Counter = Counter - 10 -> no transition
@@ -137,17 +137,17 @@ public class NewSyntaxRuntimeTests
     }
 
     // ════════════════════════════════════════════════════════════════════
-    // STATE ASSERT — in/to/from prepositions
+    // STATE ENSURE — in/to/from prepositions
     // ════════════════════════════════════════════════════════════════════
 
     [Fact]
-    public void StateAssert_In_CheckedWhileResiding()
+    public void StateEnsure_In_CheckedWhileResiding()
     {
         const string dsl = """
             precept Test
             field Score as number default 10
             state Active initial
-            in Active assert Score > 0 because "Score positive while active"
+            in Active ensure Score > 0 because "Score positive while active"
             event Adjust
             from Active on Adjust -> set Score = Score - 20 -> no transition
             """;
@@ -161,14 +161,14 @@ public class NewSyntaxRuntimeTests
     }
 
     [Fact]
-    public void StateAssert_To_CheckedOnEntry()
+    public void StateEnsure_To_CheckedOnEntry()
     {
         const string dsl = """
             precept Test
             field Score as number default 0
             state Draft initial
             state Published
-            to Published assert Score >= 10 because "Need enough score to publish"
+            to Published ensure Score >= 10 because "Need enough score to publish"
             event Publish
             from Draft on Publish -> transition Published
             """;
@@ -182,14 +182,14 @@ public class NewSyntaxRuntimeTests
     }
 
     [Fact]
-    public void StateAssert_To_SatisfiedOnEntry()
+    public void StateEnsure_To_SatisfiedOnEntry()
     {
         const string dsl = """
             precept Test
             field Score as number default 0
             state Draft initial
             state Published
-            to Published assert Score >= 10 because "Need enough score to publish"
+            to Published ensure Score >= 10 because "Need enough score to publish"
             event Publish
             from Draft on Publish -> transition Published
             """;
@@ -203,14 +203,14 @@ public class NewSyntaxRuntimeTests
     }
 
     [Fact]
-    public void StateAssert_From_CheckedOnExit()
+    public void StateEnsure_From_CheckedOnExit()
     {
         const string dsl = """
             precept Test
             field ClearedForExit as boolean default false
             state Active initial
             state Done
-            from Active assert ClearedForExit == true because "Must be cleared before leaving Active"
+            from Active ensure ClearedForExit == true because "Must be cleared before leaving Active"
             event Finish
             from Active on Finish -> transition Done
             """;
@@ -224,13 +224,13 @@ public class NewSyntaxRuntimeTests
     }
 
     [Fact]
-    public void StateAssert_SelfTransition_ChecksTo()
+    public void StateEnsure_SelfTransition_ChecksTo()
     {
         const string dsl = """
             precept Test
             field Score as number default 10
             state Active initial
-            to Active assert Score > 0 because "Score must be positive to enter Active"
+            to Active ensure Score > 0 because "Score must be positive to enter Active"
             event Penalize with Amount as number
             from Active on Penalize -> set Score = Score - Penalize.Amount -> transition Active
             """;
@@ -244,14 +244,14 @@ public class NewSyntaxRuntimeTests
     }
 
     [Fact]
-    public void StateAssert_Any_ExpandsToAllStates()
+    public void StateEnsure_Any_ExpandsToAllStates()
     {
         const string dsl = """
             precept Test
             field Health as number default 100
             state Alive initial
             state Dead
-            in any assert Health >= 0 because "Health never negative"
+            in any ensure Health >= 0 because "Health never negative"
             event TakeDamage with Amount as number
             from Alive on TakeDamage when Health - TakeDamage.Amount > 0 -> set Health = Health - TakeDamage.Amount -> transition Alive
             from Alive on TakeDamage -> set Health = 0 -> transition Dead
@@ -267,17 +267,17 @@ public class NewSyntaxRuntimeTests
     }
 
     // ════════════════════════════════════════════════════════════════════
-    // EVENT ASSERT — checked pre-transition (args only)
+    // EVENT ENSURE — checked pre-transition (args only)
     // ════════════════════════════════════════════════════════════════════
 
     [Fact]
-    public void EventAssert_Violated_TransitionRejected()
+    public void EventEnsure_Violated_TransitionRejected()
     {
         const string dsl = """
             precept Test
             state Active initial
             event Pay with Amount as number
-            on Pay assert Amount > 0 because "Payment must be positive"
+            on Pay ensure Amount > 0 because "Payment must be positive"
             from Active on Pay -> transition Active
             """;
 
@@ -290,13 +290,13 @@ public class NewSyntaxRuntimeTests
     }
 
     [Fact]
-    public void EventAssert_Satisfied_TransitionAccepted()
+    public void EventEnsure_Satisfied_TransitionAccepted()
     {
         const string dsl = """
             precept Test
             state Active initial
             event Pay with Amount as number
-            on Pay assert Amount > 0 because "Payment must be positive"
+            on Pay ensure Amount > 0 because "Payment must be positive"
             from Active on Pay -> transition Active
             """;
 
@@ -308,13 +308,13 @@ public class NewSyntaxRuntimeTests
     }
 
     [Fact]
-    public void EventAssert_InspectWithoutArgs_Skipped()
+    public void EventEnsure_InspectWithoutArgs_Skipped()
     {
         const string dsl = """
             precept Test
             state Active initial
             event Pay with Amount as number
-            on Pay assert Amount > 0 because "Payment must be positive"
+            on Pay ensure Amount > 0 because "Payment must be positive"
             from Active on Pay -> transition Active
             """;
 
@@ -322,7 +322,7 @@ public class NewSyntaxRuntimeTests
         var inst = wf.CreateInstance("Active");
         var result = wf.Inspect(inst, "Pay");
 
-        // Inspect without args should not evaluate event asserts
+        // Inspect without args should not evaluate event ensures
         (result.Outcome is TransitionOutcome.Transition or TransitionOutcome.NoTransition).Should().BeTrue();
     }
 
@@ -622,17 +622,17 @@ public class NewSyntaxRuntimeTests
     // ════════════════════════════════════════════════════════════════════
 
     [Fact]
-    public void FullPipeline_EventAssert_ThenActions_ThenInvariant()
+    public void FullPipeline_EventEnsure_ThenActions_ThenRule()
     {
         const string dsl = """
             precept OrderSystem
             field Total as number default 0
             field OrderCount as number default 0
-            invariant Total >= 0 because "Total cannot be negative"
+            rule Total >= 0 because "Total cannot be negative"
             state Open initial
             state Closed
             event Purchase with Amount as number
-            on Purchase assert Amount > 0 because "Amount must be positive"
+            on Purchase ensure Amount > 0 because "Amount must be positive"
             to Closed -> set OrderCount = OrderCount + 1
             from Open on Purchase -> set Total = Total + Purchase.Amount -> transition Closed
             """;
@@ -640,7 +640,7 @@ public class NewSyntaxRuntimeTests
         var wf = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
         var inst = wf.CreateInstance("Open", new Dictionary<string, object?> { ["Total"] = 0.0, ["OrderCount"] = 0.0 });
 
-        // Negative amount blocked by event assert
+        // Negative amount blocked by event ensure
         var r1 = wf.Fire(inst, "Purchase", new Dictionary<string, object?> { ["Amount"] = -10.0 });
         r1.Outcome.Should().Be(TransitionOutcome.Rejected);
         r1.Violations.Should().ContainSingle().Which.Message.Should().Contain("Amount must be positive");
@@ -663,7 +663,7 @@ public class NewSyntaxRuntimeTests
             state Done
             event Finish
             event Retry
-            to Done assert Score >= 20 because "Need 20 to finish"
+            to Done ensure Score >= 20 because "Need 20 to finish"
             from Active on Finish -> transition Done
             from Active on Retry -> set Score = Score + 5 -> transition Active
             """;
@@ -964,14 +964,14 @@ public class NewSyntaxRuntimeTests
     }
 
     [Fact]
-    public void CoerceEventArguments_StringNumber_ThenFire_EvaluatesAssert()
+    public void CoerceEventArguments_StringNumber_ThenFire_EvaluatesEnsure()
     {
-        // End-to-end: string "50" coerced to 50.0 then used in event assert evaluation
+        // End-to-end: string "50" coerced to 50.0 then used in event ensure evaluation
         const string dsl = """
             precept Test
             state Active initial
             event Pay with Amount as number
-            on Pay assert Amount > 0 because "Must be positive"
+            on Pay ensure Amount > 0 because "Must be positive"
             from Active on Pay -> no transition
             """;
 
@@ -986,11 +986,11 @@ public class NewSyntaxRuntimeTests
     }
 
     // ════════════════════════════════════════════════════════════════════
-    // GUARDED INVARIANTS / ASSERTS — Forms 1–3 when guards
+    // GUARDED RULES / ENSURES — Forms 1–3 when guards
     // ════════════════════════════════════════════════════════════════════
 
     [Fact]
-    public void Fire_GuardedInvariant_GuardTrue_ViolationReported()
+    public void Fire_GuardedRule_GuardTrue_ViolationReported()
     {
         const string dsl = """
             precept Test
@@ -998,12 +998,12 @@ public class NewSyntaxRuntimeTests
             field Active as boolean default false
             state Open initial, Closed
             event Close with NewX as number
-            invariant X > 100 when Active because "X must be > 100 when active"
+            rule X > 100 when Active because "X must be > 100 when active"
             from Open on Close -> set X = Close.NewX -> transition Closed
             """;
 
         var wf = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
-        // Start with Active=true, X=200 (satisfies invariant) — then fire setting X=0
+        // Start with Active=true, X=200 (satisfies rule) — then fire setting X=0
         var inst = wf.CreateInstance("Open", new Dictionary<string, object?> { ["X"] = 200.0, ["Active"] = true });
         var result = wf.Fire(inst, "Close", new Dictionary<string, object?> { ["NewX"] = 0.0 });
 
@@ -1012,7 +1012,7 @@ public class NewSyntaxRuntimeTests
     }
 
     [Fact]
-    public void Fire_GuardedInvariant_GuardFalse_NoViolation()
+    public void Fire_GuardedRule_GuardFalse_NoViolation()
     {
         const string dsl = """
             precept Test
@@ -1020,12 +1020,12 @@ public class NewSyntaxRuntimeTests
             field Active as boolean default false
             state Open initial, Closed
             event Close with NewX as number
-            invariant X > 100 when Active because "X must be > 100 when active"
+            rule X > 100 when Active because "X must be > 100 when active"
             from Open on Close -> set X = Close.NewX -> transition Closed
             """;
 
         var wf = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
-        // Active=false → guard is false → invariant skipped even though X becomes 0
+        // Active=false → guard is false → rule skipped even though X becomes 0
         var inst = wf.CreateInstance("Open", new Dictionary<string, object?> { ["X"] = 200.0, ["Active"] = false });
         var result = wf.Fire(inst, "Close", new Dictionary<string, object?> { ["NewX"] = 0.0 });
 
@@ -1034,7 +1034,7 @@ public class NewSyntaxRuntimeTests
     }
 
     [Fact]
-    public void Fire_GuardedStateAssert_GuardTrue_ViolationReported()
+    public void Fire_GuardedStateEnsure_GuardTrue_ViolationReported()
     {
         const string dsl = """
             precept Test
@@ -1042,7 +1042,7 @@ public class NewSyntaxRuntimeTests
             field Active as boolean default false
             state Open initial, Closed
             event Reduce
-            in Open assert X > 0 when Active because "X must be positive when active"
+            in Open ensure X > 0 when Active because "X must be positive when active"
             from Open on Reduce -> set X = X - 20 -> no transition
             """;
 
@@ -1055,7 +1055,7 @@ public class NewSyntaxRuntimeTests
     }
 
     [Fact]
-    public void Fire_GuardedStateAssert_GuardFalse_NoViolation()
+    public void Fire_GuardedStateEnsure_GuardFalse_NoViolation()
     {
         const string dsl = """
             precept Test
@@ -1063,7 +1063,7 @@ public class NewSyntaxRuntimeTests
             field Active as boolean default false
             state Open initial, Closed
             event Reduce
-            in Open assert X > 0 when Active because "X must be positive when active"
+            in Open ensure X > 0 when Active because "X must be positive when active"
             from Open on Reduce -> set X = X - 20 -> no transition
             """;
 
@@ -1076,13 +1076,13 @@ public class NewSyntaxRuntimeTests
     }
 
     [Fact]
-    public void Fire_GuardedEventAssert_GuardTrue_ViolationReported()
+    public void Fire_GuardedEventEnsure_GuardTrue_ViolationReported()
     {
         const string dsl = """
             precept Test
             state Open initial, Closed
             event Submit with Amount as number, Priority as number
-            on Submit assert Amount > 0 when Priority > 1 because "Amount required for high priority"
+            on Submit ensure Amount > 0 when Priority > 1 because "Amount required for high priority"
             from Open on Submit -> transition Closed
             """;
 
@@ -1095,13 +1095,13 @@ public class NewSyntaxRuntimeTests
     }
 
     [Fact]
-    public void Fire_GuardedEventAssert_GuardFalse_NoViolation()
+    public void Fire_GuardedEventEnsure_GuardFalse_NoViolation()
     {
         const string dsl = """
             precept Test
             state Open initial, Closed
             event Submit with Amount as number, Priority as number
-            on Submit assert Amount > 0 when Priority > 1 because "Amount required for high priority"
+            on Submit ensure Amount > 0 when Priority > 1 because "Amount required for high priority"
             from Open on Submit -> transition Closed
             """;
 
@@ -1114,7 +1114,7 @@ public class NewSyntaxRuntimeTests
     }
 
     [Fact]
-    public void Fire_MultipleGuardedInvariants_CollectAll()
+    public void Fire_MultipleGuardedRules_CollectAll()
     {
         const string dsl = """
             precept Test
@@ -1124,8 +1124,8 @@ public class NewSyntaxRuntimeTests
             field CheckY as boolean default false
             state Open initial, Closed
             event Close with NewX as number, NewY as number
-            invariant X > 100 when CheckX because "X must be > 100"
-            invariant Y > 100 when CheckY because "Y must be > 100"
+            rule X > 100 when CheckX because "X must be > 100"
+            rule Y > 100 when CheckY because "Y must be > 100"
             from Open on Close -> set X = Close.NewX -> set Y = Close.NewY -> transition Closed
             """;
 
@@ -1144,7 +1144,7 @@ public class NewSyntaxRuntimeTests
     }
 
     [Fact]
-    public void Fire_GuardedInvariant_WhenNot_SkipsWhenTrue()
+    public void Fire_GuardedRule_WhenNot_SkipsWhenTrue()
     {
         const string dsl = """
             precept Test
@@ -1152,19 +1152,19 @@ public class NewSyntaxRuntimeTests
             field Active as boolean default true
             state Open initial, Closed
             event Close with NewX as number
-            invariant X > 100 when not Active because "X must be > 100 when inactive"
+            rule X > 100 when not Active because "X must be > 100 when inactive"
             from Open on Close -> set X = Close.NewX -> transition Closed
             """;
 
         var wf = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
 
-        // Active=true → guard (not Active) is false → invariant skipped
+        // Active=true → guard (not Active) is false → rule skipped
         var inst1 = wf.CreateInstance("Open", new Dictionary<string, object?> { ["X"] = 200.0, ["Active"] = true });
         var r1 = wf.Fire(inst1, "Close", new Dictionary<string, object?> { ["NewX"] = 0.0 });
         r1.Outcome.Should().Be(TransitionOutcome.Transition);
         r1.Violations.Should().BeEmpty();
 
-        // Active=false → guard (not Active) is true → invariant applies, X=0 fails
+        // Active=false → guard (not Active) is true → rule applies, X=0 fails
         var inst2 = wf.CreateInstance("Open", new Dictionary<string, object?> { ["X"] = 200.0, ["Active"] = false });
         var r2 = wf.Fire(inst2, "Close", new Dictionary<string, object?> { ["NewX"] = 0.0 });
         r2.Outcome.Should().Be(TransitionOutcome.ConstraintFailure);
@@ -1172,11 +1172,11 @@ public class NewSyntaxRuntimeTests
     }
 
     // ════════════════════════════════════════════════════════════════════
-    // GUARDED STATE/EVENT ASSERTS — when not
+    // GUARDED STATE/EVENT ENSURES — when not
     // ════════════════════════════════════════════════════════════════════
 
     [Fact]
-    public void Fire_GuardedStateAssert_WhenNot_SkipsWhenTrue()
+    public void Fire_GuardedStateEnsure_WhenNot_SkipsWhenTrue()
     {
         const string dsl = """
             precept Test
@@ -1184,19 +1184,19 @@ public class NewSyntaxRuntimeTests
             field Bypass as boolean default false
             state Open initial, Closed
             event Reduce
-            in Open assert X > 0 when not Bypass because "X must be positive unless bypassed"
+            in Open ensure X > 0 when not Bypass because "X must be positive unless bypassed"
             from Open on Reduce -> set X = X - 20 -> no transition
             """;
 
         var wf = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
 
-        // Bypass=true → guard (not Bypass) is false → assert skipped, no violation
+        // Bypass=true → guard (not Bypass) is false → ensure skipped, no violation
         var inst1 = wf.CreateInstance("Open", new Dictionary<string, object?> { ["X"] = 10.0, ["Bypass"] = true });
         var r1 = wf.Fire(inst1, "Reduce");
         r1.Outcome.Should().Be(TransitionOutcome.NoTransition);
         r1.Violations.Should().BeEmpty();
 
-        // Bypass=false → guard (not Bypass) is true → assert applies, X=-10 fails
+        // Bypass=false → guard (not Bypass) is true → ensure applies, X=-10 fails
         var inst2 = wf.CreateInstance("Open", new Dictionary<string, object?> { ["X"] = 10.0, ["Bypass"] = false });
         var r2 = wf.Fire(inst2, "Reduce");
         r2.Outcome.Should().Be(TransitionOutcome.ConstraintFailure);
@@ -1204,25 +1204,25 @@ public class NewSyntaxRuntimeTests
     }
 
     [Fact]
-    public void Fire_GuardedEventAssert_WhenNot_SkipsWhenTrue()
+    public void Fire_GuardedEventEnsure_WhenNot_SkipsWhenTrue()
     {
         const string dsl = """
             precept Test
             state Open initial, Closed
             event Submit with Amount as number, IsDraft as boolean
-            on Submit assert Submit.Amount > 0 when not Submit.IsDraft because "Amount required for non-draft"
+            on Submit ensure Submit.Amount > 0 when not Submit.IsDraft because "Amount required for non-draft"
             from Open on Submit -> transition Closed
             """;
 
         var wf = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
         var inst = wf.CreateInstance("Open");
 
-        // IsDraft=true → guard (not IsDraft) is false → assert skipped, Amount=0 allowed
+        // IsDraft=true → guard (not IsDraft) is false → ensure skipped, Amount=0 allowed
         var r1 = wf.Fire(inst, "Submit", new Dictionary<string, object?> { ["Amount"] = 0.0, ["IsDraft"] = true });
         r1.Outcome.Should().Be(TransitionOutcome.Transition);
         r1.Violations.Should().BeEmpty();
 
-        // IsDraft=false → guard (not IsDraft) is true → assert applies, Amount=0 fails
+        // IsDraft=false → guard (not IsDraft) is true → ensure applies, Amount=0 fails
         var inst2 = wf.CreateInstance("Open");
         var r2 = wf.Fire(inst2, "Submit", new Dictionary<string, object?> { ["Amount"] = 0.0, ["IsDraft"] = false });
         r2.Outcome.Should().Be(TransitionOutcome.Rejected);

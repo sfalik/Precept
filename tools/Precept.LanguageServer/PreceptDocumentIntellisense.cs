@@ -25,8 +25,8 @@ internal static class PreceptDocumentIntellisense
     private static readonly HashSet<string> StateKeywords = new(StringComparer.Ordinal) { "initial" };
     private static readonly HashSet<string> EmptyKeywords = new(StringComparer.Ordinal);
     private static readonly Regex TransitionRowRegex = new("^\\s*from\\s+(?<states>any|[A-Za-z_][A-Za-z0-9_]*(?:\\s*,\\s*[A-Za-z_][A-Za-z0-9_]*)*)\\s+on\\s+(?<event>[A-Za-z_][A-Za-z0-9_]*)(?<rest>.*)$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-    private static readonly Regex StateClauseRegex = new("^\\s*(?<prep>in|to|from)\\s+(?<states>any|[A-Za-z_][A-Za-z0-9_]*(?:\\s*,\\s*[A-Za-z_][A-Za-z0-9_]*)*)\\s+(?<tail>assert|edit|->)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-    private static readonly Regex EventAssertRegex = new("^\\s*on\\s+(?<event>[A-Za-z_][A-Za-z0-9_]*)\\s+assert\\s+", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex StateClauseRegex = new("^\\s*(?<prep>in|to|from)\\s+(?<states>any|[A-Za-z_][A-Za-z0-9_]*(?:\\s*,\\s*[A-Za-z_][A-Za-z0-9_]*)*)\\s+(?<tail>ensure|edit|->)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex EventEnsureRegex = new("^\\s*on\\s+(?<event>[A-Za-z_][A-Za-z0-9_]*)\\s+ensure\\s+", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex TransitionOutcomeRegex = new("\\btransition\\s+(?<state>[A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     /// <summary>Hover content for built-in function names, keyed by function name.</summary>
@@ -117,10 +117,10 @@ internal static class PreceptDocumentIntellisense
         if (TryResolveDottedSymbol(info, line, identifier, start, referenceRange, out var dotted))
             return dotted;
 
-        var eventAssertMatch = EventAssertRegex.Match(line);
-        if (eventAssertMatch.Success)
+        var eventEnsureMatch = EventEnsureRegex.Match(line);
+        if (eventEnsureMatch.Success)
         {
-            var eventName = eventAssertMatch.Groups["event"].Value;
+            var eventName = eventEnsureMatch.Groups["event"].Value;
             if (TryGetEventArg(info, eventName, identifier, out var argDeclaration))
                 return new PreceptResolvedSymbol(argDeclaration, referenceRange);
 
@@ -380,8 +380,8 @@ internal static class PreceptDocumentIntellisense
         if (transitionMatch.Success && string.Equals(transitionMatch.Groups["event"].Value, identifier, StringComparison.Ordinal))
             return true;
 
-        var eventAssertMatch = EventAssertRegex.Match(line);
-        if (eventAssertMatch.Success && string.Equals(eventAssertMatch.Groups["event"].Value, identifier, StringComparison.Ordinal))
+        var eventEnsureMatch = EventEnsureRegex.Match(line);
+        if (eventEnsureMatch.Success && string.Equals(eventEnsureMatch.Groups["event"].Value, identifier, StringComparison.Ordinal))
             return true;
 
         if (identifierStart < line.Length && line[Math.Min(identifierStart + identifier.Length, line.Length - 1)] == '.')
@@ -686,18 +686,18 @@ internal static class PreceptDocumentIntellisense
             });
         }
 
-        if (model?.Invariants is not null)
+        if (model?.Rules is not null)
         {
-            foreach (var invariant in model.Invariants)
+            foreach (var rule in model.Rules)
             {
-                var lineIndex = Math.Max(0, invariant.SourceLine - 1);
+                var lineIndex = Math.Max(0, rule.SourceLine - 1);
                 if (lineIndex >= lines.Length)
                     continue;
 
                 children.Add(new DocumentSymbol
                 {
-                    Name = "invariant",
-                    Detail = invariant.ExpressionText,
+                    Name = "rule",
+                    Detail = rule.ExpressionText,
                     Kind = SymbolKind.Boolean,
                     Range = CreateLineRange(lineIndex, lines[lineIndex]),
                     SelectionRange = CreateLineRange(lineIndex, lines[lineIndex])

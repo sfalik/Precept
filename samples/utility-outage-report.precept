@@ -14,8 +14,8 @@ field DispatchRound as number default 0
 field AffectedBlocks as set of string
 field CrewQueue as queue of string
 
-invariant EstimatedCustomers >= 0 because "Estimated customers cannot be negative"
-invariant DispatchRound >= 0 because "Dispatch rounds cannot be negative"
+rule EstimatedCustomers >= 0 because "Estimated customers cannot be negative"
+rule DispatchRound >= 0 because "Dispatch rounds cannot be negative"
 
 state Reported initial
 state VerifiedState
@@ -24,27 +24,27 @@ state Restored
 state Closed
 
 in VerifiedState edit EstimatedCustomers
-in Dispatched assert AssignedCrew != null because "Dispatched outages must name a crew"
+in Dispatched ensure AssignedCrew != null because "Dispatched outages must name a crew"
 
 event FileReport with Reporter as string, Region as string, Customers as number
-on FileReport assert Reporter != "" because "A reporter name is required"
-on FileReport assert Region != "" because "A region name is required"
-on FileReport assert Customers >= 0 because "Estimated customers cannot be negative"
+on FileReport ensure Reporter != "" because "A reporter name is required"
+on FileReport ensure Region != "" because "A region name is required"
+on FileReport ensure Customers >= 0 because "Estimated customers cannot be negative"
 
 event AddBlock with BlockName as string
-on AddBlock assert BlockName != "" because "A block name is required"
+on AddBlock ensure BlockName != "" because "A block name is required"
 
 event RemoveBlock with BlockName as string
-on RemoveBlock assert BlockName != "" because "A block name is required"
+on RemoveBlock ensure BlockName != "" because "A block name is required"
 
 event RegisterCrew with CrewName as string
-on RegisterCrew assert CrewName != "" because "A crew name is required"
+on RegisterCrew ensure CrewName != "" because "A crew name is required"
 
 event VerifyReport
 event DispatchCrew
 
 event MarkRestored with Note as string
-on MarkRestored assert Note != "" because "A restoration note is required"
+on MarkRestored ensure Note != "" because "A restoration note is required"
 
 event CloseIncident
 

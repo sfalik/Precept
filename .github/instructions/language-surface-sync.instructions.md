@@ -19,9 +19,9 @@ Every language-surface change has impact across three categories: **Runtime**, *
 |---|---|
 | New type keyword | Parses in field declarations, event args, and collection inner types |
 | New constraint keyword | Accepted in constraint zone; type-checked against valid target types |
-| New operator | Evaluates correctly in guards, invariants, and all expression contexts |
+| New operator | Evaluates correctly in guards, rules, and all expression contexts |
 | New diagnostic | Emits on the correct condition with correct code, severity, and message |
-| New expression form | Evaluates in every expression context: guard, invariant, set RHS, assert |
+| New expression form | Evaluates in every expression context: guard, rule, set RHS, ensure |
 
 **Docs to update:** `docs/PreceptLanguageDesign.md`, `docs/RuntimeApiDesign.md`, `docs/ConstraintViolationDesign.md`.
 

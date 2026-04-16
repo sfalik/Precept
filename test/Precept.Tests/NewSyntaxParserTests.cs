@@ -10,7 +10,7 @@ namespace Precept.Tests;
 /// <summary>
 /// Tests for the new Superpower-based parser (Precept language redesign syntax).
 /// Validates that the new syntax is parsed correctly into the model records
-/// (field/as, invariant/because, state asserts, event asserts, state actions,
+/// (field/as, rule/because, state ensures, event ensures, state actions,
 /// transition rows, edit blocks, and the complete pipeline through compile+fire).
 /// </summary>
 public class NewSyntaxParserTests
@@ -246,124 +246,173 @@ public class NewSyntaxParserTests
     }
 
     // ════════════════════════════════════════════════════════════════════
-    // PARSING — Invariant declarations
+    // PARSING — Rule declarations
     // ════════════════════════════════════════════════════════════════════
 
     [Fact]
-    public void Parse_Invariant()
+    public void Parse_Rule()
     {
         const string dsl = """
             precept Test
             field Balance as number default 100
-            invariant Balance >= 0 because "Balance must be non-negative"
+            rule Balance >= 0 because "Balance must be non-negative"
             state Active initial
             """;
 
         var model = PreceptParser.Parse(dsl);
 
-        model.Invariants.Should().HaveCount(1);
-        var inv = model.Invariants![0];
+        model.Rules.Should().HaveCount(1);
+        var inv = model.Rules![0];
         inv.ExpressionText.Should().Be("Balance >= 0");
         inv.Reason.Should().Be("Balance must be non-negative");
         inv.Expression.Should().BeOfType<PreceptBinaryExpression>();
     }
 
     [Fact]
-    public void Parse_MultipleInvariants()
+    public void Parse_MultipleRules()
     {
         const string dsl = """
             precept Test
             field X as number default 0
             field Y as number default 0
-            invariant X >= 0 because "X non-negative"
-            invariant Y >= 0 because "Y non-negative"
+            rule X >= 0 because "X non-negative"
+            rule Y >= 0 because "Y non-negative"
             state Active initial
             """;
 
         var model = PreceptParser.Parse(dsl);
 
-        model.Invariants.Should().HaveCount(2);
+        model.Rules.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public void Parse_OldInvariantKeyword_ProducesParseError()
+    {
+        var dsl = """
+            precept Test
+            field Balance as number default 100
+            invariant Balance >= 0 because "Must be non-negative"
+            state Active initial
+            event Go
+            from Active on Go -> no transition
+            """;
+
+        var (model, diagnostics) = PreceptParser.ParseWithDiagnostics(dsl);
+        diagnostics.Should().NotBeEmpty("the old 'invariant' keyword should produce a parse error");
+    }
+
+    [Fact]
+    public void Parse_OldAssertKeyword_ProducesParseError()
+    {
+        var dsl = """
+            precept Test
+            field Balance as number default 100
+            state Active initial
+            state Done
+            in Done assert Balance > 0 because "Done requires positive balance"
+            event Finish
+            from Active on Finish -> transition Done
+            """;
+
+        var (model, diagnostics) = PreceptParser.ParseWithDiagnostics(dsl);
+        diagnostics.Should().NotBeEmpty("the old 'assert' keyword should produce a parse error");
+    }
+
+    [Fact]
+    public void Parse_OldEventAssertKeyword_ProducesParseError()
+    {
+        var dsl = """
+            precept Test
+            field Balance as number default 100
+            state Active initial
+            event Finish
+            on Finish assert Balance > 0 because "Finish requires positive balance"
+            from Active on Finish -> no transition
+            """;
+
+        var (model, diagnostics) = PreceptParser.ParseWithDiagnostics(dsl);
+        diagnostics.Should().NotBeEmpty("the old event-level 'assert' keyword should produce a parse error");
     }
 
     // ════════════════════════════════════════════════════════════════════
-    // PARSING — State asserts (in/to/from <State> assert ...)
+    // PARSING — State ensures (in/to/from <State> ensure ...)
     // ════════════════════════════════════════════════════════════════════
 
     [Fact]
-    public void Parse_StateAssert_In()
+    public void Parse_StateEnsure_In()
     {
         const string dsl = """
             precept Test
             field Score as number default 10
             state Active initial
-            in Active assert Score > 0 because "Score must be positive while active"
+            in Active ensure Score > 0 because "Score must be positive while active"
             """;
 
         var model = PreceptParser.Parse(dsl);
 
-        model.StateAsserts.Should().HaveCount(1);
-        var sa = model.StateAsserts![0];
-        sa.Anchor.Should().Be(AssertAnchor.In);
+        model.StateEnsures.Should().HaveCount(1);
+        var sa = model.StateEnsures![0];
+        sa.Anchor.Should().Be(EnsureAnchor.In);
         sa.State.Should().Be("Active");
         sa.Reason.Should().Be("Score must be positive while active");
     }
 
     [Fact]
-    public void Parse_StateAssert_To()
+    public void Parse_StateEnsure_To()
     {
         const string dsl = """
             precept Test
             field Score as number default 10
             state Active initial
             state Done
-            to Done assert Score > 5 because "Need enough score to finish"
+            to Done ensure Score > 5 because "Need enough score to finish"
             """;
 
         var model = PreceptParser.Parse(dsl);
 
-        var sa = model.StateAsserts![0];
-        sa.Anchor.Should().Be(AssertAnchor.To);
+        var sa = model.StateEnsures![0];
+        sa.Anchor.Should().Be(EnsureAnchor.To);
         sa.State.Should().Be("Done");
     }
 
     [Fact]
-    public void Parse_StateAssert_From()
+    public void Parse_StateEnsure_From()
     {
         const string dsl = """
             precept Test
             field Score as number default 10
             state Active initial
             state Done
-            from Active assert Score >= 0 because "Cannot leave with negative score"
+            from Active ensure Score >= 0 because "Cannot leave with negative score"
             """;
 
         var model = PreceptParser.Parse(dsl);
 
-        var sa = model.StateAsserts![0];
-        sa.Anchor.Should().Be(AssertAnchor.From);
+        var sa = model.StateEnsures![0];
+        sa.Anchor.Should().Be(EnsureAnchor.From);
         sa.State.Should().Be("Active");
     }
 
     [Fact]
-    public void Parse_StateAssert_MultiState()
+    public void Parse_StateEnsure_MultiState()
     {
         const string dsl = """
             precept Test
             field Score as number default 10
             state Active initial
             state Paused
-            in Active, Paused assert Score > 0 because "Score must be positive"
+            in Active, Paused ensure Score > 0 because "Score must be positive"
             """;
 
         var model = PreceptParser.Parse(dsl);
 
-        model.StateAsserts.Should().HaveCount(2);
-        model.StateAsserts![0].State.Should().Be("Active");
-        model.StateAsserts![1].State.Should().Be("Paused");
+        model.StateEnsures.Should().HaveCount(2);
+        model.StateEnsures![0].State.Should().Be("Active");
+        model.StateEnsures![1].State.Should().Be("Paused");
     }
 
     [Fact]
-    public void Parse_StateAssert_Any()
+    public void Parse_StateEnsure_Any()
     {
         const string dsl = """
             precept Test
@@ -371,34 +420,34 @@ public class NewSyntaxParserTests
             state Active initial
             state Paused
             state Done
-            in any assert Score >= 0 because "Score never negative"
+            in any ensure Score >= 0 because "Score never negative"
             """;
 
         var model = PreceptParser.Parse(dsl);
 
         // 'any' expands to all 3 states
-        model.StateAsserts.Should().HaveCount(3);
-        model.StateAsserts!.Select(s => s.State).Should().BeEquivalentTo("Active", "Paused", "Done");
+        model.StateEnsures.Should().HaveCount(3);
+        model.StateEnsures!.Select(s => s.State).Should().BeEquivalentTo("Active", "Paused", "Done");
     }
 
     // ════════════════════════════════════════════════════════════════════
-    // PARSING — Event asserts (on <Event> assert ...)
+    // PARSING — Event ensures (on <Event> ensure ...)
     // ════════════════════════════════════════════════════════════════════
 
     [Fact]
-    public void Parse_EventAssert()
+    public void Parse_EventEnsure()
     {
         const string dsl = """
             precept Test
             state Active initial
             event Pay with Amount as number
-            on Pay assert Amount > 0 because "Amount must be positive"
+            on Pay ensure Amount > 0 because "Amount must be positive"
             """;
 
         var model = PreceptParser.Parse(dsl);
 
-        model.EventAsserts.Should().HaveCount(1);
-        var ea = model.EventAsserts![0];
+        model.EventEnsures.Should().HaveCount(1);
+        var ea = model.EventEnsures![0];
         ea.EventName.Should().Be("Pay");
         ea.Reason.Should().Be("Amount must be positive");
     }
@@ -422,7 +471,7 @@ public class NewSyntaxParserTests
 
         model.StateActions.Should().HaveCount(1);
         var sa = model.StateActions![0];
-        sa.Anchor.Should().Be(AssertAnchor.To);
+        sa.Anchor.Should().Be(EnsureAnchor.To);
         sa.State.Should().Be("Done");
         sa.SetAssignments.Should().HaveCount(1);
         sa.SetAssignments[0].Key.Should().Be("Counter");
@@ -442,7 +491,7 @@ public class NewSyntaxParserTests
         var model = PreceptParser.Parse(dsl);
 
         var sa = model.StateActions![0];
-        sa.Anchor.Should().Be(AssertAnchor.From);
+        sa.Anchor.Should().Be(EnsureAnchor.From);
         sa.State.Should().Be("Active");
     }
 
@@ -891,16 +940,16 @@ public class NewSyntaxParserTests
             field Total as number default 0
             field Notes as string nullable
             field Items as set of string
-            invariant Total >= 0 because "Total cannot be negative"
+            rule Total >= 0 because "Total cannot be negative"
             state Draft initial
             state Submitted
             state Approved
             event Submit with Amount as number
             event Approve
-            on Submit assert Amount > 0 because "Amount must be positive"
-            in Submitted assert Total > 0 because "Submitted orders must have a total"
-            to Approved assert Total >= 10 because "Need minimum total to approve"
-            from Draft assert Total >= 0 because "Cannot leave draft with negative total"
+            on Submit ensure Amount > 0 because "Amount must be positive"
+            in Submitted ensure Total > 0 because "Submitted orders must have a total"
+            to Approved ensure Total >= 10 because "Need minimum total to approve"
+            from Draft ensure Total >= 0 because "Cannot leave draft with negative total"
             to Submitted -> set Notes = "submitted"
             from Draft -> set Notes = "left draft"
             in Draft edit Notes
@@ -913,50 +962,50 @@ public class NewSyntaxParserTests
         model.Name.Should().Be("OrderWorkflow");
         model.Fields.Should().HaveCount(2);
         model.CollectionFields.Should().HaveCount(1);
-        model.Invariants.Should().HaveCount(1);
+        model.Rules.Should().HaveCount(1);
         model.States.Should().HaveCount(3);
         model.Events.Should().HaveCount(2);
-        model.EventAsserts.Should().HaveCount(1);
-        model.StateAsserts.Should().HaveCount(3);
+        model.EventEnsures.Should().HaveCount(1);
+        model.StateEnsures.Should().HaveCount(3);
         model.StateActions.Should().HaveCount(2);
         model.EditBlocks.Should().HaveCount(1);
         model.TransitionRows.Should().HaveCount(2);
     }
 
     // ════════════════════════════════════════════════════════════════════
-    // PARSING — Source line tracking on asserts (Category A gaps)
+    // PARSING — Source line tracking on ensures (Category A gaps)
     // ════════════════════════════════════════════════════════════════════
 
     [Fact]
-    public void Parse_StateAssert_SourceLineIsCorrect()
+    public void Parse_StateEnsure_SourceLineIsCorrect()
     {
         const string dsl = """
             precept Test
             field AmountPaid as number default 0
             state Idle initial
             state Paid
-            in Paid assert AmountPaid > 0 because "Must have paid"
+            in Paid ensure AmountPaid > 0 because "Must have paid"
             """;
 
         var model = PreceptParser.Parse(dsl);
 
-        var sa = model.StateAsserts.Should().ContainSingle().Subject;
+        var sa = model.StateEnsures.Should().ContainSingle().Subject;
         sa.SourceLine.Should().Be(5);
     }
 
     [Fact]
-    public void Parse_EventAssert_SourceLineIsCorrect()
+    public void Parse_EventEnsure_SourceLineIsCorrect()
     {
         const string dsl = """
             precept Test
             state Idle initial
             event Pay with Amount as number
-            on Pay assert Amount > 0 because "Amount must be positive"
+            on Pay ensure Amount > 0 because "Amount must be positive"
             """;
 
         var model = PreceptParser.Parse(dsl);
 
-        var ea = model.EventAsserts.Should().ContainSingle().Subject;
+        var ea = model.EventEnsures.Should().ContainSingle().Subject;
         ea.SourceLine.Should().Be(4);
     }
 
@@ -970,7 +1019,7 @@ public class NewSyntaxParserTests
         const string dsl = """
             precept Test
             field Balance as number default 100
-            invariant Balance >= 0 because "Must be non-negative"
+            rule Balance >= 0 because "Must be non-negative"
             state Active initial
             event Debit with Amount as number
             from Active on Debit -> set Balance = Balance - Debit.Amount -> transition Active
@@ -1501,59 +1550,59 @@ public class NewSyntaxParserTests
     // ════════════════════════════════════════════════════════════════════
 
     [Fact]
-    public void Parse_ConditionalInvariant_WhenGuardParsed()
+    public void Parse_ConditionalRule_WhenGuardParsed()
     {
         const string dsl = """
             precept Test
             field X as number default 0
             field Active as boolean default false
             state A initial
-            invariant X >= 0 when Active because "Only when active"
+            rule X >= 0 when Active because "Only when active"
             """;
 
         var model = PreceptParser.Parse(dsl);
 
-        model.Invariants.Should().HaveCount(1);
-        var inv = model.Invariants![0];
+        model.Rules.Should().HaveCount(1);
+        var inv = model.Rules![0];
         inv.WhenGuard.Should().NotBeNull();
         inv.WhenText.Should().Be("Active");
         inv.Reason.Should().Be("Only when active");
     }
 
     [Fact]
-    public void Parse_ConditionalStateAssert_WhenGuardParsed()
+    public void Parse_ConditionalStateEnsure_WhenGuardParsed()
     {
         const string dsl = """
             precept Test
             field X as number default 0
             field Active as boolean default false
             state Open initial
-            in Open assert X > 0 when Active because "Only when active"
+            in Open ensure X > 0 when Active because "Only when active"
             """;
 
         var model = PreceptParser.Parse(dsl);
 
-        model.StateAsserts.Should().HaveCount(1);
-        var sa = model.StateAsserts![0];
+        model.StateEnsures.Should().HaveCount(1);
+        var sa = model.StateEnsures![0];
         sa.WhenGuard.Should().NotBeNull();
         sa.WhenText.Should().Be("Active");
         sa.Reason.Should().Be("Only when active");
     }
 
     [Fact]
-    public void Parse_ConditionalEventAssert_WhenGuardParsed()
+    public void Parse_ConditionalEventEnsure_WhenGuardParsed()
     {
         const string dsl = """
             precept Test
             state Active initial
             event Submit with Amount as number, Priority as number
-            on Submit assert Amount > 0 when Priority > 1 because "High priority needs amount"
+            on Submit ensure Amount > 0 when Priority > 1 because "High priority needs amount"
             """;
 
         var model = PreceptParser.Parse(dsl);
 
-        model.EventAsserts.Should().HaveCount(1);
-        var ea = model.EventAsserts![0];
+        model.EventEnsures.Should().HaveCount(1);
+        var ea = model.EventEnsures![0];
         ea.WhenGuard.Should().NotBeNull();
         ea.WhenText.Should().Be("Priority > 1");
         ea.Reason.Should().Be("High priority needs amount");
@@ -1581,39 +1630,39 @@ public class NewSyntaxParserTests
     }
 
     [Fact]
-    public void Parse_ConditionalInvariant_WhenNotGuard()
+    public void Parse_ConditionalRule_WhenNotGuard()
     {
         const string dsl = """
             precept Test
             field X as number default 0
             field Active as boolean default false
             state A initial
-            invariant X >= 0 when not Active because "When not active"
+            rule X >= 0 when not Active because "When not active"
             """;
 
         var model = PreceptParser.Parse(dsl);
 
-        var inv = model.Invariants![0];
+        var inv = model.Rules![0];
         inv.WhenGuard.Should().NotBeNull();
         inv.WhenGuard.Should().BeOfType<PreceptUnaryExpression>()
             .Which.Operator.Should().Be("not");
     }
 
     [Fact]
-    public void Parse_InvariantWithoutWhen_GuardIsNull()
+    public void Parse_RuleWithoutWhen_GuardIsNull()
     {
         const string dsl = """
             precept Test
             field X as number default 0
             state A initial
-            invariant X >= 0 because "Always"
+            rule X >= 0 because "Always"
             """;
 
         var model = PreceptParser.Parse(dsl);
 
-        model.Invariants.Should().HaveCount(1);
-        model.Invariants![0].WhenGuard.Should().BeNull();
-        model.Invariants![0].WhenText.Should().BeNull();
+        model.Rules.Should().HaveCount(1);
+        model.Rules![0].WhenGuard.Should().BeNull();
+        model.Rules![0].WhenText.Should().BeNull();
     }
 
     [Fact]
@@ -1706,11 +1755,11 @@ public class NewSyntaxParserTests
     }
 
     // ════════════════════════════════════════════════════════════════════
-    // PARSING — Conditional state asserts with anchor-specific when guards
+    // PARSING — Conditional state ensures with anchor-specific when guards
     // ════════════════════════════════════════════════════════════════════
 
     [Fact]
-    public void Parse_ConditionalStateAssert_To_WhenGuardParsed()
+    public void Parse_ConditionalStateEnsure_To_WhenGuardParsed()
     {
         const string dsl = """
             precept Test
@@ -1719,15 +1768,15 @@ public class NewSyntaxParserTests
             state Draft initial
             state Approved
             event Approve
-            to Approved assert Amount > 0 when Active because "Amount required when active"
+            to Approved ensure Amount > 0 when Active because "Amount required when active"
             from Draft on Approve -> transition Approved
             """;
 
         var model = PreceptParser.Parse(dsl);
 
-        model.StateAsserts.Should().HaveCount(1);
-        var sa = model.StateAsserts![0];
-        sa.Anchor.Should().Be(AssertAnchor.To);
+        model.StateEnsures.Should().HaveCount(1);
+        var sa = model.StateEnsures![0];
+        sa.Anchor.Should().Be(EnsureAnchor.To);
         sa.State.Should().Be("Approved");
         sa.WhenGuard.Should().NotBeNull();
         sa.WhenText.Should().NotBeNull();
@@ -1735,7 +1784,7 @@ public class NewSyntaxParserTests
     }
 
     [Fact]
-    public void Parse_ConditionalStateAssert_From_WhenGuardParsed()
+    public void Parse_ConditionalStateEnsure_From_WhenGuardParsed()
     {
         const string dsl = """
             precept Test
@@ -1744,15 +1793,15 @@ public class NewSyntaxParserTests
             state Draft initial
             state Review
             event Submit
-            from Draft assert Notes != null when RequiresNotes because "Notes required before leaving Draft"
+            from Draft ensure Notes != null when RequiresNotes because "Notes required before leaving Draft"
             from Draft on Submit -> transition Review
             """;
 
         var model = PreceptParser.Parse(dsl);
 
-        model.StateAsserts.Should().HaveCount(1);
-        var sa = model.StateAsserts![0];
-        sa.Anchor.Should().Be(AssertAnchor.From);
+        model.StateEnsures.Should().HaveCount(1);
+        var sa = model.StateEnsures![0];
+        sa.Anchor.Should().Be(EnsureAnchor.From);
         sa.State.Should().Be("Draft");
         sa.WhenGuard.Should().NotBeNull();
         sa.WhenText.Should().NotBeNull();

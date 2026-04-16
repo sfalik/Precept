@@ -26,7 +26,7 @@ public class PreceptPreviewRulesTests
         const string dsl = """
             precept M
             field Balance as number default 100
-            invariant Balance >= 0 because "Balance must not go negative"
+            rule Balance >= 0 because "Balance must not go negative"
             state A initial
             state B
             event Transfer
@@ -48,9 +48,9 @@ public class PreceptPreviewRulesTests
         const string dsl = """
             precept M
             field Balance as number default 100
-            invariant Balance >= 0 because "Balance must not go negative"
+            rule Balance >= 0 because "Balance must not go negative"
             field Quantity as number default 1
-            invariant Quantity >= 1 because "Quantity must stay positive"
+            rule Quantity >= 1 because "Quantity must stay positive"
             state A initial
             event Go
             from A on Go -> transition A
@@ -81,7 +81,7 @@ public class PreceptPreviewRulesTests
         const string dsl = """
             precept M
             field Balance as number default 100
-            invariant Balance >= 0 because "Balance must not go negative"
+            rule Balance >= 0 because "Balance must not go negative"
             state Active initial
             event Debit with Amount as number
             from Active on Debit -> set Balance = Balance - Debit.Amount -> transition Active
@@ -108,7 +108,7 @@ public class PreceptPreviewRulesTests
         const string dsl = """
             precept M
             field Balance as number default 100
-            invariant Balance >= 0 because "Balance must not go negative"
+            rule Balance >= 0 because "Balance must not go negative"
             state A initial
             state B
             event Go
@@ -123,9 +123,9 @@ public class PreceptPreviewRulesTests
         response.Snapshot.Should().NotBeNull();
 
         var ruleDefs = response.Snapshot!.RuleDefinitions;
-        ruleDefs.Should().NotBeNullOrEmpty("the machine declares an invariant");
+        ruleDefs.Should().NotBeNullOrEmpty("the machine declares a rule");
         ruleDefs!.Should().ContainSingle(r =>
-            r.Scope == "invariant" &&
+            r.Scope == "rule" &&
             r.Expression == "Balance >= 0" &&
             r.Reason == "Balance must not go negative");
     }
@@ -136,7 +136,7 @@ public class PreceptPreviewRulesTests
         const string dsl = """
             precept M
             field Balance as number default 100
-            invariant Balance >= 0 because "Balance must not go negative"
+            rule Balance >= 0 because "Balance must not go negative"
             state A initial
             state B
             event Go
@@ -165,12 +165,12 @@ public class PreceptPreviewRulesTests
         const string dsl = """
             precept M
             field Balance as number default 100
-            invariant Balance >= 0 because "Balance must not go negative"
+            rule Balance >= 0 because "Balance must not go negative"
             field Quantity as number default 1
-            invariant Quantity >= 1 because "Quantity must stay positive"
+            rule Quantity >= 1 because "Quantity must stay positive"
             state A initial
             event Reduce with Amount as number
-            on Reduce assert Amount > 0 because "Amount must be positive"
+            on Reduce ensure Amount > 0 because "Amount must be positive"
             from A on Reduce -> set Balance = Balance - Reduce.Amount -> set Quantity = Quantity - Reduce.Amount -> transition A
             """;
 
@@ -207,11 +207,11 @@ public class PreceptPreviewRulesTests
             precept Test
             field balance as number default 0
             field overdraftLimit as number default 100
-            invariant balance >= 0 - overdraftLimit because "Balance must be within overdraft limit"
+            rule balance >= 0 - overdraftLimit because "Balance must be within overdraft limit"
             state GoodStanding initial
             state Overdrawn
             event Withdraw with amount as number
-            on Withdraw assert amount > 0 because "Withdraw amount must be positive"
+            on Withdraw ensure amount > 0 because "Withdraw amount must be positive"
             from GoodStanding on Withdraw when balance - Withdraw.amount >= 0 -> set balance = balance - Withdraw.amount -> no transition
             from GoodStanding on Withdraw -> set balance = balance - Withdraw.amount -> transition Overdrawn
             """;
@@ -243,7 +243,7 @@ public class PreceptPreviewRulesTests
             precept Test
             field balance as number default 0
             field overdraftLimit as number default 100
-            invariant balance >= 0 - overdraftLimit because "Balance must be within overdraft limit"
+            rule balance >= 0 - overdraftLimit because "Balance must be within overdraft limit"
             state GoodStanding initial
             state Overdrawn
             event Withdraw with amount as number
@@ -275,7 +275,7 @@ public class PreceptPreviewRulesTests
             precept DraftEdit
             field Author as string nullable
             field Age as number default 12
-            invariant Age >= 12 because "Age must be at least 12 years old"
+            rule Age >= 12 because "Age must be at least 12 years old"
             state Draft initial
             in Draft edit Author, Age
             """;
@@ -316,7 +316,7 @@ public class PreceptPreviewRulesTests
             precept DraftEdit
             field Author as string nullable
             field Age as number default 12
-            invariant Age >= 12 because "Age must be at least 12 years old"
+            rule Age >= 12 because "Age must be at least 12 years old"
             state Draft initial
             in Draft edit Author, Age
             """;
@@ -387,7 +387,7 @@ public class PreceptPreviewRulesTests
             precept DraftEdit
             field Author as string nullable
             field Age as number default 12
-            invariant Age >= 12 because "Age must be at least 12 years old"
+            rule Age >= 12 because "Age must be at least 12 years old"
             state Draft initial
             in Draft edit Author, Age
             """;
@@ -429,7 +429,7 @@ public class PreceptPreviewRulesTests
             precept DraftEdit
             field Author as string nullable
             field Age as number default 12
-            invariant Age >= 12 because "Age must be at least 12 years old"
+            rule Age >= 12 because "Age must be at least 12 years old"
             state Draft initial
             in Draft edit Author, Age
             """;

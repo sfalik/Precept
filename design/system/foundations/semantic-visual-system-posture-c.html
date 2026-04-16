@@ -427,7 +427,7 @@
           </article>
           <article class="tile event">
             <h3>Event</h3>
-            <p>Submit remains the asking gesture that activates motion and assertion.</p>
+            <p>Submit remains the asking gesture that activates motion and validation.</p>
           </article>
           <article class="tile data">
             <h3>Data</h3>
@@ -460,13 +460,13 @@
 <span class="s">field</span> <span class="da">CoverageLimit</span> <span class="s">as</span> <span class="so">number</span> <span class="s">default</span> <span class="so">0</span>
 <span class="s">field</span> <span class="da">Rationale</span> <span class="s">as</span> <span class="so">string nullable</span>
 
-<span class="ru">invariant</span> RequestedAmount &lt;= CoverageLimit <span class="ru">because</span> <span class="ru">"A decision cannot exceed coverage"</span>
+<span class="ru">rule</span> RequestedAmount &lt;= CoverageLimit <span class="ru">because</span> <span class="ru">"A decision cannot exceed coverage"</span>
 
 <span class="st">state</span> Draft <span class="st">initial</span>
 <span class="st">state</span> Reviewed
 
 <span class="ev">event</span> Submit <span class="s">with</span> Reason <span class="s">as</span> string
-<span class="ev">on</span> Submit <span class="ru">assert</span> Reason != <span class="ru">""</span> <span class="ru">because</span> <span class="ru">"A reason is required"</span>
+<span class="ev">on</span> Submit <span class="ru">ensure</span> Reason != <span class="ru">""</span> <span class="ru">because</span> <span class="ru">"A reason is required"</span>
 
 <span class="s">from</span> Draft <span class="ev">on</span> Submit -&gt; <span class="s">set</span> Rationale = Submit.Reason -&gt; <span class="s">transition</span> Reviewed</pre>
           </div>
@@ -504,7 +504,7 @@
               <span>DSL editor</span>
             </div>
             <h3>Authored contract</h3>
-            <div class="surface-line">field RequestedAmount<br>event Submit<br>invariant because "A decision cannot exceed coverage"</div>
+            <div class="surface-line">field RequestedAmount<br>event Submit<br>rule because "A decision cannot exceed coverage"</div>
             <p>The editor surface still reads as crisp authored law, with a touch more atmosphere around the frame.</p>
           </article>
           <article class="surface">

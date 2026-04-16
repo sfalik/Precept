@@ -9,8 +9,8 @@ namespace Precept.Tests;
 /// <summary>
 /// Tests for the string .length accessor (Issue #10).
 /// Covers: parser, type checker (C56 for nullable-without-guard), runtime value semantics
-/// (UTF-16 code unit contract), null guard compound evaluation, invariant context,
-/// event assert context, and guard-based routing.
+/// (UTF-16 code unit contract), null guard compound evaluation, rule context,
+/// event ensure context, and guard-based routing.
 ///
 /// George's runtime implementation (parser extension, type-checker C56 constraint,
 /// evaluator .length dispatch) must land for these tests to compile and pass.
@@ -226,16 +226,16 @@ public class StringAccessorTests
     }
 
     [Fact]
-    public void Check_Length_OnNullableStringField_InInvariantScope_ProducesC56()
+    public void Check_Length_OnNullableStringField_InRuleScope_ProducesC56()
     {
-        // Regression guard: C56 must fire in invariant scope as well as guard scope.
-        // If Name.length symbol is missing from invariant symbols, TryInferKind emits C38
+        // Regression guard: C56 must fire in rule scope as well as guard scope.
+        // If Name.length symbol is missing from rule symbols, TryInferKind emits C38
         // (unknown identifier) instead of C56 — this test distinguishes the two.
         const string dsl = """
             precept M
             field Name as string nullable
             state A initial
-            invariant Name.length > 0 because "Name required"
+            rule Name.length > 0 because "Name required"
             """;
 
         var result = Check(dsl);
@@ -286,10 +286,10 @@ public class StringAccessorTests
         result.Diagnostics.Should().BeEmpty();
     }
 
-    // NOTE: Event args (Submit.Name) are not accessible in invariant scope — invariants operate
-    // exclusively on fields. A three-level dotted form in an invariant would produce a parse or
-    // type error. No test added here; field-level invariant C56 coverage is in
-    // Check_Length_OnNullableStringField_InInvariantScope_ProducesC56.
+    // NOTE: Event args (Submit.Name) are not accessible in rule scope — rules operate
+    // exclusively on fields. A three-level dotted form in a rule would produce a parse or
+    // type error. No test added here; field-level rule C56 coverage is in
+    // Check_Length_OnNullableStringField_InRuleScope_ProducesC56.
 
     // ========================================================================================
     // RUNTIME TESTS — string value semantics
@@ -433,18 +433,18 @@ public class StringAccessorTests
     }
 
     // ========================================================================================
-    // INVARIANT CONTEXT
+    // RULE CONTEXT
     // ========================================================================================
 
     [Fact]
-    public void Fire_Invariant_LengthCheck_EmptyString_ProducesConstraintFailure()
+    public void Fire_Rule_LengthCheck_EmptyString_ProducesConstraintFailure()
     {
         // Default "x" satisfies length >= 1 at compile time. Setting Name = "" at runtime
-        // violates the invariant and produces ConstraintFailure.
+        // violates the rule and produces ConstraintFailure.
         const string dsl = """
             precept M
             field Name as string default "x"
-            invariant Name.length >= 1 because "Name cannot be empty"
+            rule Name.length >= 1 because "Name cannot be empty"
             state Active initial
             event Update with NewName as string
             from Active on Update -> set Name = Update.NewName -> no transition
@@ -459,12 +459,12 @@ public class StringAccessorTests
     }
 
     [Fact]
-    public void Fire_Invariant_LengthCheck_NonEmptyString_Passes()
+    public void Fire_Rule_LengthCheck_NonEmptyString_Passes()
     {
         const string dsl = """
             precept M
             field Name as string default "x"
-            invariant Name.length >= 1 because "Name cannot be empty"
+            rule Name.length >= 1 because "Name cannot be empty"
             state Active initial
             event Update with NewName as string
             from Active on Update -> set Name = Update.NewName -> no transition
@@ -479,19 +479,19 @@ public class StringAccessorTests
     }
 
     // ========================================================================================
-    // EVENT ASSERT (ON SUBMIT) CONTEXT
+    // EVENT ENSURE (ON SUBMIT) CONTEXT
     // ========================================================================================
 
     [Fact]
-    public void Fire_EventAssert_StringLength_TooShort_Rejects()
+    public void Fire_EventEnsure_StringLength_TooShort_Rejects()
     {
-        // Invariant fires after set action changes Name to a too-short value.
-        // On-assert scope is limited to event-arg identifiers; field .length belongs in invariant.
+        // Rule fires after set action changes Name to a too-short value.
+        // On-ensure scope is limited to event-arg identifiers; field .length belongs in rule.
         // Three-level event-arg form deferred — see issue #10.
         const string dsl = """
             precept M
             field Name as string default "Alice"
-            invariant Name.length >= 2 because "Name too short"
+            rule Name.length >= 2 because "Name too short"
             state A initial
             event Update with NewName as string
             from A on Update -> set Name = Update.NewName -> no transition
@@ -506,14 +506,14 @@ public class StringAccessorTests
     }
 
     [Fact]
-    public void Fire_EventAssert_StringLength_LongEnough_Passes()
+    public void Fire_EventEnsure_StringLength_LongEnough_Passes()
     {
-        // Uses invariant (not on-assert) — on-assert scope is limited to event-arg identifiers.
+        // Uses rule (not on-ensure) — on-ensure scope is limited to event-arg identifiers.
         // Three-level event-arg form deferred — see issue #10.
         const string dsl = """
             precept M
             field Name as string default "Alice"
-            invariant Name.length >= 2 because "Name too short"
+            rule Name.length >= 2 because "Name too short"
             state A initial
             state B
             event Submit
@@ -624,7 +624,7 @@ public class StringAccessorTests
         const string dsl = """
             precept M
             field Tags as set of string
-            invariant Tags.count <= 10 because "Too many tags"
+            rule Tags.count <= 10 because "Too many tags"
             state A initial
             state B
             event Check

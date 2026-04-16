@@ -31,7 +31,7 @@ Read the diagnostics carefully:
 From the `precept_compile` output, review:
 - **States**: which states exist, which is initial
 - **Fields**: names, types, defaults, nullability
-- **Events**: names, arguments, assertions
+- **Events**: names, arguments, ensures
 - **Transitions**: the full `from/on/when/actions` table — this is the core logic
 
 If the user reports a specific problem, locate the relevant transitions in this table.
@@ -54,8 +54,8 @@ Use `precept_fire` only after `precept_inspect` succeeds and the problem involve
 If the problem involves a specific event, call `precept_fire` with the precept text, current state, event name, data, and event arguments. Compare the actual outcome against what the user expected. The mismatch reveals the bug.
 
 Useful checkpoints when comparing outcomes:
-1. Event assertions
-2. Transition rule selection
+1. Event ensures
+2. Transition row selection
 3. Guard pass or fail
 4. Field mutations
 5. State-entry constraints
@@ -68,15 +68,15 @@ If the problem involves field editing or constraint violations during data entry
 ## Common Diagnostic Patterns
 
 ### Guard ordering issues
-Rules are evaluated top-to-bottom. The first matching `from/on` rule wins.
+Transition rows are evaluated top-to-bottom. The first matching `from/on` row wins.
 
 ```
-# BUG: the unguarded rule matches first
+# BUG: the unguarded row matches first
 from Draft on Submit -> transition Review
 from Draft on Submit when IsValid -> transition Approved
 ```
 
-Move the guarded rule above the catch-all.
+Move the guarded row above the catch-all.
 
 ### Unreachable states
 A state has no incoming transitions. Either add a transition that targets it or remove the state.
@@ -85,10 +85,10 @@ A state has no incoming transitions. Either add a transition that targets it or 
 A state has no outgoing transitions. That can be valid for terminal states, but it is often accidental.
 
 ### Constraint violations on transition
-If a state constraint fails after a transition, check whether the `set` actions produce the data that the target state's assertions require.
+If a state constraint fails after a transition, check whether the `set` actions produce the data that the target state's ensures require.
 
-### Event assertion rejection
-If an `on <Event> assert ...` fails, the event is rejected before transition logic runs. Check the provided event arguments first.
+### Event ensure rejection
+If an `on <Event> ensure ...` fails, the event is rejected before transition logic runs. Check the provided event arguments first.
 
 ## Optional State Diagram For Diagnosis
 

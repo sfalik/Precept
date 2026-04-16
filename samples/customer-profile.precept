@@ -4,7 +4,7 @@ precept CustomerProfile
 # No lifecycle states or events — this precept governs what a CustomerProfile
 # must look like at all times, and which fields the host application can edit.
 #
-# This is a stateless precept: it has fields, invariants, and editability rules,
+# This is a stateless precept: it has fields, rules, and editability rules,
 # but no states, no events, and no transitions. Use it to represent domain objects
 # that evolve through direct field edits rather than state-machine transitions.
 
@@ -14,7 +14,7 @@ field Phone as string nullable
 field PreferredContactMethod as choice("email","phone","sms") default "email"
 field MarketingOptIn as boolean default false
 
-invariant MarketingOptIn == false or Email != null because "Marketing opt-in requires an email address"
+rule MarketingOptIn == false or Email != null because "Marketing opt-in requires an email address"
 
 # All fields are editable — a customer profile can be fully updated at any time.
 edit all

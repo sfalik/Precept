@@ -480,13 +480,13 @@
 <span class="tok-structure">field</span> <span class="tok-data">CoverageLimit</span> <span class="tok-structure">as</span> <span class="tok-soft">number</span> <span class="tok-structure">default</span> <span class="tok-soft">0</span>
 <span class="tok-structure">field</span> <span class="tok-data">Rationale</span> <span class="tok-structure">as</span> <span class="tok-soft">string nullable</span>
 
-<span class="tok-rule">invariant</span> RequestedAmount &lt;= CoverageLimit <span class="tok-rule">because</span> <span class="tok-rule">"A decision cannot exceed coverage"</span>
+<span class="tok-rule">rule</span> RequestedAmount &lt;= CoverageLimit <span class="tok-rule">because</span> <span class="tok-rule">"A decision cannot exceed coverage"</span>
 
 <span class="tok-state">state</span> Draft <span class="tok-state">initial</span>
 <span class="tok-state">state</span> Reviewed
 
 <span class="tok-event">event</span> Submit <span class="tok-structure">with</span> Reason <span class="tok-structure">as</span> string
-<span class="tok-event">on</span> Submit <span class="tok-rule">assert</span> Reason != <span class="tok-rule">""</span> <span class="tok-rule">because</span> <span class="tok-rule">"A reason is required"</span>
+<span class="tok-event">on</span> Submit <span class="tok-rule">ensure</span> Reason != <span class="tok-rule">""</span> <span class="tok-rule">because</span> <span class="tok-rule">"A reason is required"</span>
 
 <span class="tok-structure">from</span> Draft <span class="tok-event">on</span> Submit -&gt; <span class="tok-structure">set</span> Rationale = Submit.Reason -&gt; <span class="tok-structure">transition</span> Reviewed</pre>
           </div>
@@ -530,7 +530,7 @@
               <span>DSL editor</span>
             </div>
             <h3>Authored contract</h3>
-            <div class="translation-line">field RequestedAmount<br>event Submit<br>invariant ... because "A decision cannot exceed coverage"</div>
+            <div class="translation-line">field RequestedAmount<br>event Submit<br>rule ... because "A decision cannot exceed coverage"</div>
             <p>The authored surface keeps the grammar crisp and inspectable, with no decorative interference.</p>
           </article>
           <article class="surface-card">

@@ -100,7 +100,7 @@ public class UpdateToolTests
         var text = """
             precept Test
             field Priority as number default 5
-            invariant Priority >= 1 because "Priority must be positive"
+            rule Priority >= 1 because "Priority must be positive"
             state Open initial
             in Open edit Priority
             """;
