@@ -271,22 +271,21 @@ field ContractEnd as date default '2099-12-31'
 |---|---|---|
 | `date ± period dateonly` | `date` | Calendar arithmetic. `LocalDate.Plus/Minus(Period)`. Handles truncation. Period must be provably date-only — NodaTime throws on time components; see Decision #26. |
 | `date ± period` (unconstrained) | **compile error** | An unconstrained period might contain time parts like hours. Use `period dateonly` or add specific units like `30 days`. |
-| `date + 30 days` | `date` | Postfix unit — `30 days` resolves to `period` in date context. |
-| `date + (GraceDays) days` | `date` | Paren postfix — variable expression resolves to `period` in date context. |
-| `date + 3 months` | `date` | Truncates at month end (Jan 31 + 1 month = Feb 28). |
-| `date + 1 year` | `date` | Leap years (Feb 29 + 1 year = Feb 28). |
-| `date + 2 weeks` | `date` | = 14 days. |
+| `date ± 30 days` | `date` | Postfix unit — `30 days` resolves to `period` in date context. |
+| `date ± (GraceDays) days` | `date` | Paren postfix — variable expression resolves to `period` in date context. |
+| `date ± 3 months` | `date` | Truncates at month end (Jan 31 ± 1 month = Feb 28). |
+| `date ± 1 year` | `date` | Leap years (Feb 29 ± 1 year = Feb 28). |
+| `date ± 2 weeks` | `date` | = 14 days. |
 | `date + time` | `datetime` | Combines a calendar date with a time of day. `LocalDate + LocalTime → LocalDateTime`. NodaTime native. |
 | `date - date` | `period` | Calendar distance. `Period.Between(d1, d2)`. Preserves structural components. |
 | `==`, `!=`, `<`, `>`, `<=`, `>=` | `boolean` | NodaTime default behavior. Thin wrapper — no custom logic. |
 
 | **Not supported** | **Why** |
 |---|---|
-| `date + date` | You can't add two dates together. To get the time between them, use `DueDate - FilingDate`. To shift a date forward, use `DueDate + 3 days`. |
-| `date + integer` | A bare number doesn't specify a unit. Use `DueDate + 2 days` to add 2 days. See Locked Decision #10. |
-| `date + decimal` / `date + number` | A bare number doesn't specify a unit. Use `DueDate + (n) days`. |
-| `date ± duration` | Durations measure hours, minutes, and seconds — they can't be added to a date. Use `DueDate + 3 days` to shift a date. |
-| `date ± integer` | A bare number doesn't specify a unit. Use `DueDate ± 2 days`. |
+| `date + date` | You can't add two dates together. To get the time between them, use `DueDate - FilingDate`. To shift a date forward, use `DueDate ± 3 days`. |
+| `date ± integer` | A bare number doesn't specify a unit. Use `DueDate ± 2 days`. See Locked Decision #10. |
+| `date ± decimal` / `date ± number` | A bare number doesn't specify a unit. Use `DueDate ± (n) days`. |
+| `date ± duration` | Durations measure hours, minutes, and seconds — they can't be added to a date. Use `DueDate ± 3 days` to shift a date. |
 
 **Accessors:**
 
@@ -336,9 +335,9 @@ field CheckInTime as time nullable
 | `time ± period timeonly` | `time` | `LocalTime.Plus/Minus(Period)`. Period must be provably time-only — NodaTime throws on date components; see Decision #26. |
 | `time ± period` (unconstrained) | **compile error** | An unconstrained period might contain date parts like months. Use `period timeonly` or add specific units like `3 hours`. |
 | `time ± duration` | `time` | Sub-day bridging. Wraps at midnight. Runtime: nanosecond arithmetic on `LocalTime` (see Decision #16). For sub-day units, `duration` and `period` represent identical physical quantities — the type checker bridges this. |
-| `time + 3 hours` | `time` | Postfix unit — resolves via sub-day bridging. Wraps at midnight. |
-| `time + 30 minutes` | `time` | Same bridging. Wraps at midnight. |
-| `time + 45 seconds` | `time` | Same bridging. Wraps at midnight. |
+| `time ± 3 hours` | `time` | Postfix unit — resolves via sub-day bridging. Wraps at midnight. |
+| `time ± 30 minutes` | `time` | Same bridging. Wraps at midnight. |
+| `time ± 45 seconds` | `time` | Same bridging. Wraps at midnight. |
 | `time + date` | `datetime` | Commutative form of `date + time`. Same result: `LocalDate + LocalTime → LocalDateTime`. |
 | `time - time` | `period` | Time-component period between two times. `Period.Between(t1, t2)` returns period with `.hours`, `.minutes`, `.seconds` components. NodaTime faithful. |
 | `==`, `!=`, `<`, `>`, `<=`, `>=` | `boolean` | NodaTime default behavior. Thin wrapper — no custom logic. |
@@ -348,9 +347,9 @@ field CheckInTime as time nullable
 | **Not supported** | **Why** |
 |---|---|
 | `time ± integer` | What unit? Use `(n) hours` or `(n) minutes`. |
-| `time + 1 day` / `time + N days` | Days can't be added to a time — times only support hours, minutes, and seconds. |
-| `time + N months` / `time + N years` | Same — months and years don't apply to a time. |
-| `time + SomePeriodField` (unconstrained) | This period field may include date parts. Declare it as `period timeonly` to use it with times, or use a `duration` field instead. |
+| `time ± 1 day` / `time ± N days` | Days can't be added to a time — times only support hours, minutes, and seconds. |
+| `time ± N months` / `time ± N years` | Same — months and years don't apply to a time. |
+| `time ± SomePeriodField` (unconstrained) | This period field may include date parts. Declare it as `period timeonly` to use it with times, or use a `duration` field instead. |
 
 **Accessors:**
 
@@ -396,12 +395,12 @@ field IncidentTimestamp as instant
 |---|---|---|
 | `instant - instant` | `duration` | Elapsed time between two points. Pure nanosecond subtraction. |
 | `instant ± duration` | `instant` | Point offset. `Instant.Plus/Minus(Duration)`. |
-| `instant + 3 days` | `instant` | Postfix unit — `3 days` resolves to `Duration.FromDays(3)` in instant context. |
-| `instant + (DayCount) days` | `instant` | Paren postfix — variable expression resolves to `Duration.FromDays(n)` in instant context. |
-| `instant + 72 hours` | `instant` | Postfix unit — `72 hours` resolves to `Duration.FromHours(72)` in instant context. |
-| `instant + 30 minutes` | `instant` | Postfix unit — resolves to `Duration.FromMinutes(30)`. |
-| `instant + 45 seconds` | `instant` | Postfix unit — resolves to `Duration.FromSeconds(45)`. |
-| `instant + 2 weeks` | `instant` | Postfix unit — `weeks` resolves to `Duration.FromDays(14)` in instant context. |
+| `instant ± 3 days` | `instant` | Postfix unit — `3 days` resolves to `Duration.FromDays(3)` in instant context. |
+| `instant ± (DayCount) days` | `instant` | Paren postfix — variable expression resolves to `Duration.FromDays(n)` in instant context. |
+| `instant ± 72 hours` | `instant` | Postfix unit — `72 hours` resolves to `Duration.FromHours(72)` in instant context. |
+| `instant ± 30 minutes` | `instant` | Postfix unit — resolves to `Duration.FromMinutes(30)`. |
+| `instant ± 45 seconds` | `instant` | Postfix unit — resolves to `Duration.FromSeconds(45)`. |
+| `instant ± 2 weeks` | `instant` | Postfix unit — `weeks` resolves to `Duration.FromDays(14)` in instant context. |
 | `==`, `!=`, `<`, `>`, `<=`, `>=` | `boolean` | NodaTime default behavior. Thin wrapper — no custom logic. |
 
 | **Not supported** | **Why** |
@@ -411,7 +410,7 @@ field IncidentTimestamp as instant
 | `instant ± integer` | A bare number doesn't specify a unit. Use `FiledAt ± 1 hour` or `FiledAt ± 3600 seconds`. |
 | `instant ± period` | Periods use months and years, which vary in length — they can't be added to an instant. Convert to a date first via `myInstant.inZone(tz).date`, add the period, then convert back. |
 
-**Note on `days`/`weeks` in instant context:** `instant + 3 days` and `instant + (n) days` are both valid — `days` and `weeks` resolve to `duration` (`Duration.FromDays`) in instant context. This is the key capability of context-dependent type resolution: the same unit keyword (`days`) resolves to `period` in calendar contexts and `duration` in timeline contexts. `months` and `years` have no duration equivalent (no `Duration.FromMonths` in NodaTime), so they always resolve to `period`.
+**Note on `days`/`weeks` in instant context:** `instant ± 3 days` and `instant ± (n) days` are both valid — `days` and `weeks` resolve to `duration` (`Duration.FromDays`) in instant context. This is the key capability of context-dependent type resolution: the same unit keyword (`days`) resolves to `period` in calendar contexts and `duration` in timeline contexts. `months` and `years` have no duration equivalent (no `Duration.FromMonths` in NodaTime), so they always resolve to `period`.
 
 **Navigation via `.inZone(tz)` (the sole mediation path):**
 
@@ -492,7 +491,7 @@ These resolve to `Duration.FromHours`, `Duration.FromMinutes`, `Duration.FromSec
 | `duration * duration` | You can't multiply two durations together. Did you mean `SomeDuration * 2` to double it? |
 | `duration * decimal` | Durations can only be multiplied by whole numbers or `number`. |
 | `duration ± period` | Durations (hours, minutes, seconds) and periods (days, months, years) can't be mixed. |
-| `duration + integer` | A bare number doesn't specify a unit. Use `SomeDuration + 30 minutes` or construct a duration with a unit like `72 hours`. |
+| `duration ± integer` | A bare number doesn't specify a unit. Use `SomeDuration ± 30 minutes` or construct a duration with a unit like `72 hours`. |
 
 **Accessors:**
 
@@ -695,13 +694,13 @@ No standalone construction function exists. `zoneddatetime` is always reached vi
 | Expression | Produces | Rationale |
 |---|---|---|
 | `zoneddatetime ± duration` | `zoneddatetime` | Timeline arithmetic on underlying instant. |
-| `zoneddatetime + 3 hours` | `zoneddatetime` | Postfix unit — resolves to `duration`. |
-| `zoneddatetime + 30 minutes` | `zoneddatetime` | Postfix unit — resolves to `duration`. |
-| `zoneddatetime + 45 seconds` | `zoneddatetime` | Postfix unit — resolves to `duration`. |
-| `zoneddatetime + 3 days` | `zoneddatetime` | Postfix unit — `days` resolves to `duration` in zoneddatetime context (timeline arithmetic). |
-| `zoneddatetime + 2 weeks` | `zoneddatetime` | Postfix unit — `weeks` resolves to `duration` in zoneddatetime context. |
-| `zoneddatetime + (N) hours` | `zoneddatetime` | Paren postfix — variable expression resolves to `duration`. |
-| `zoneddatetime + (N) days` | `zoneddatetime` | Paren postfix — `days` resolves to `duration` in zoneddatetime context. |
+| `zoneddatetime ± 3 hours` | `zoneddatetime` | Postfix unit — resolves to `duration`. |
+| `zoneddatetime ± 30 minutes` | `zoneddatetime` | Postfix unit — resolves to `duration`. |
+| `zoneddatetime ± 45 seconds` | `zoneddatetime` | Postfix unit — resolves to `duration`. |
+| `zoneddatetime ± 3 days` | `zoneddatetime` | Postfix unit — `days` resolves to `duration` in zoneddatetime context (timeline arithmetic). |
+| `zoneddatetime ± 2 weeks` | `zoneddatetime` | Postfix unit — `weeks` resolves to `duration` in zoneddatetime context. |
+| `zoneddatetime ± (N) hours` | `zoneddatetime` | Paren postfix — variable expression resolves to `duration`. |
+| `zoneddatetime ± (N) days` | `zoneddatetime` | Paren postfix — `days` resolves to `duration` in zoneddatetime context. |
 | `zoneddatetime - zoneddatetime` | `duration` | Instant subtraction. |
 | `==`, `!=`, `<`, `>`, `<=`, `>=` | `boolean` | NodaTime default behavior. Thin wrapper — no custom logic. |
 
@@ -754,8 +753,8 @@ field ScheduledFor as datetime default '2026-04-13T09:00:00'
 | Expression | Produces | Rationale |
 |---|---|---|
 | `datetime ± period` | `datetime` | Calendar arithmetic. `LocalDateTime.Plus/Minus(Period)`. Accepts all component categories — no constraint required. |
-| `datetime + 30 days`, `+ 3 months`, `+ 1 year`, `+ 2 weeks` | `datetime` | Postfix units — resolve to `period` in datetime context. |
-| `datetime + 3 hours`, `+ 30 minutes`, `+ 45 seconds` | `datetime` | Postfix units — resolve to `period` in datetime context (Decision #9). `LocalDateTime.Plus(Period.FromHours(3))`. Overflow advances the date naturally. |
+| `datetime ± 30 days`, `± 3 months`, `± 1 year`, `± 2 weeks` | `datetime` | Postfix units — resolve to `period` in datetime context. |
+| `datetime ± 3 hours`, `± 30 minutes`, `± 45 seconds` | `datetime` | Postfix units — resolve to `period` in datetime context (Decision #9). `LocalDateTime.Plus(Period.FromHours(3))`. Overflow advances the date naturally. |
 | `datetime - datetime` | `period` | `Period.Between(ldt1, ldt2)`. |
 | `==`, `!=`, `<`, `>`, `<=`, `>=` | `boolean` | NodaTime default behavior. Thin wrapper — no custom logic. |
 
@@ -943,14 +942,14 @@ The type of a postfix unit expression (`period` or `duration`) is determined by 
 
 | Expression context | `3 days` / `(n) days` resolves to | NodaTime call |
 |---|---|---|
-| `date + _` | `period` | `Period.FromDays(3)` / `Period.FromDays(n)` |
-| `datetime + _` | `period` | `Period.FromDays(3)` / `Period.FromDays(n)` |
-| `instant + _` | `duration` | `Duration.FromDays(3)` / `Duration.FromDays(n)` |
-| `zoneddatetime + _` | `duration` | `Duration.FromDays(3)` / `Duration.FromDays(n)` |
-| `time + _` | depends on unit | Sub-day bridging applies (Decision #16) |
+| `date ± _` | `period` | `Period.FromDays(3)` / `Period.FromDays(n)` |
+| `datetime ± _` | `period` | `Period.FromDays(3)` / `Period.FromDays(n)` |
+| `instant ± _` | `duration` | `Duration.FromDays(3)` / `Duration.FromDays(n)` |
+| `zoneddatetime ± _` | `duration` | `Duration.FromDays(3)` / `Duration.FromDays(n)` |
+| `time ± _` | depends on unit | Sub-day bridging applies (Decision #16) |
 | `field X as period default _` | `period` | `Period.FromDays(3)` |
 | `field X as duration default _` | `duration` | `Duration.FromDays(3)` |
-| No context / ambiguous | **compile error** | "Can't determine the type of `3 days` without context. Use it in an expression like `DueDate + 3 days` so the type is clear." |
+| No context / ambiguous | **compile error** | "Can't determine the type of `3 days` without context. Use it in an expression like `DueDate ± 3 days` so the type is clear." |
 
 **For `months` and `years` — always `period`:**
 
@@ -958,10 +957,10 @@ The type of a postfix unit expression (`period` or `duration`) is determined by 
 
 | Expression context | `3 months` / `(n) months` resolves to | Result |
 |---|---|---|
-| `date + _` | `period` | ✓ `date + period → date` |
-| `datetime + _` | `period` | ✓ `datetime + period → datetime` |
-| `instant + _` | `period` | ✗ **type error** — `instant + period` |
-| `zoneddatetime + _` | `period` | ✗ **type error** — `zoneddatetime + period` |
+| `date ± _` | `period` | ✓ `date ± period → date` |
+| `datetime ± _` | `period` | ✓ `datetime ± period → datetime` |
+| `instant ± _` | `period` | ✗ **type error** — `instant ± period` |
+| `zoneddatetime ± _` | `period` | ✗ **type error** — `zoneddatetime ± period` |
 | `field X as period default _` | `period` | ✓ |
 | `field X as duration default _` | `period` | ✗ **type error** |
 
@@ -969,13 +968,13 @@ The type of a postfix unit expression (`period` or `duration`) is determined by 
 
 | Expression context | `3 hours` / `(n) hours` resolves to | NodaTime call |
 |---|---|---|
-| `instant + _` | `duration` | `Duration.FromHours(3)` |
-| `zoneddatetime + _` | `duration` | `Duration.FromHours(3)` |
-| `time + _` | bridges to duration | Sub-day bridging (Decision #16) |
-| `datetime + _` | `duration` | `Duration.FromHours(3)` |
+| `instant ± _` | `duration` | `Duration.FromHours(3)` |
+| `zoneddatetime ± _` | `duration` | `Duration.FromHours(3)` |
+| `time ± _` | bridges to duration | Sub-day bridging (Decision #16) |
+| `datetime ± _` | `period` | `Period.FromHours(3)` (Decision #9/#27) |
 | `field X as duration default _` | `duration` | `Duration.FromHours(3)` |
 | `field X as period default _` | `period` | `Period.FromHours(3)` |
-| `date + _` | **warning** | "Adding hours to a date has no effect — dates have no time component." |
+| `date ± _` | **warning** | "Adding hours to a date has no effect — dates have no time component." |
 | No context / ambiguous | **compile error** | "Can't determine the type of `3 hours` without context." |
 
 **Owner's rationale (Shane):** "The author IS thinking about the details — they wrote `instant + 3 days`, which means '3 fixed 24-hour days on the timeline.' The context makes the intent unambiguous."
@@ -1101,16 +1100,14 @@ Cross-type comparison is always a type error.
 
 ### Cross-type arithmetic: what's NOT allowed (and why)
 
-**Note:** All rules apply symmetrically to subtraction (`-`). If `X + Y` is a type error, `X - Y` is also a type error for the same reason.
-
 | Expression | Why it's a type error |
 |---|---|
-| `date + duration` | Duration is for instants (timeline arithmetic). Dates need periods (calendar arithmetic). |
-| `instant + period` | Periods may contain calendar units with variable length. Instants need durations (fixed-length timeline arithmetic). |
-| `duration + period` | Durations (hours, minutes, seconds) and periods (days, months, years) can't be mixed. |
-| `zoneddatetime + period` | Periods can't be added directly to a zoned datetime — navigate to `.date` first. |
-| `date + integer` | A bare number doesn't specify a unit. Use `(n) days`. |
-| `instant + integer` | A bare number doesn't specify a unit. Use `(n) hours` or `(n) seconds`. |
+| `date ± duration` | Duration is for instants (timeline arithmetic). Dates need periods (calendar arithmetic). |
+| `instant ± period` | Periods may contain calendar units with variable length. Instants need durations (fixed-length timeline arithmetic). |
+| `duration ± period` | Durations (hours, minutes, seconds) and periods (days, months, years) can't be mixed. |
+| `zoneddatetime ± period` | Periods can't be added directly to a zoned datetime — navigate to `.date` first. |
+| `date ± integer` | A bare number doesn't specify a unit. Use `(n) days`. |
+| `instant ± integer` | A bare number doesn't specify a unit. Use `(n) hours` or `(n) seconds`. |
 | `period < period` | Periods can't be compared with `<` or `>`. |
 | `period * integer` | Periods can't be multiplied. |
 | `date + date` / `instant + instant` | Adding two points together isn't meaningful. |
@@ -1593,11 +1590,11 @@ Single quotes win on all three criteria that matter for a DSL: refactoring safet
 #### Arithmetic operators
 
 - [ ] `date ± period dateonly → date` (calendar arithmetic via `LocalDate.Plus/Minus(Period)`)
-- [ ] `date + 30 days → date` (postfix resolves to `period` in date context)
-- [ ] `date + (GraceDays) days → date` (paren postfix resolves to `period`)
-- [ ] `date + 3 months → date` (with month-end truncation: Jan 31 + 1 month = Feb 28)
-- [ ] `date + 1 year → date` (leap year handling: Feb 29 + 1 year = Feb 28)
-- [ ] `date + 2 weeks → date` (= 14 days)
+- [ ] `date ± 30 days → date` (postfix resolves to `period` in date context)
+- [ ] `date ± (GraceDays) days → date` (paren postfix resolves to `period`)
+- [ ] `date ± 3 months → date` (with month-end truncation: Jan 31 ± 1 month = Feb 28)
+- [ ] `date ± 1 year → date` (leap year handling: Feb 29 ± 1 year = Feb 28)
+- [ ] `date ± 2 weeks → date` (= 14 days)
 - [ ] `date + time → datetime` (Decision #25, `LocalDate + LocalTime → LocalDateTime`)
 - [ ] `date - date → period` (calendar distance via `Period.Between(d1, d2)`, preserves structural components)
 
@@ -1613,17 +1610,15 @@ Single quotes win on all three criteria that matter for a DSL: refactoring safet
 
 #### Not-supported operations (compile errors)
 
-- [ ] `date + date` is a compile error: "You can't add two dates together. To get the time between them, use `DueDate - FilingDate`. To shift a date forward, use `DueDate + 3 days`."
-- [ ] `date + integer` is a compile error: "A bare number doesn't specify a unit. Use `DueDate + 2 days` to add 2 days." (Decision #10)
-- [ ] `date + number` is a compile error
-- [ ] `date + decimal` is a compile error
-- [ ] `date + duration` is a compile error: "Durations measure hours, minutes, and seconds — they can't be added to a date. Use `DueDate + 3 days` to shift a date."
+- [ ] `date + date` is a compile error: "You can't add two dates together. To get the time between them, use `DueDate - FilingDate`. To shift a date forward, use `DueDate ± 3 days`."
+- [ ] `date ± integer` is a compile error: "A bare number doesn't specify a unit. Use `DueDate ± 2 days` to add 2 days." (Decision #10)
+- [ ] `date ± number` is a compile error
+- [ ] `date ± decimal` is a compile error
+- [ ] `date ± duration` is a compile error: "Durations measure hours, minutes, and seconds — they can't be added to a date. Use `DueDate ± 3 days` to shift a date."
 - [ ] `date ± period` (unconstrained) is a compile error (Decision #26): "This period may include time parts like hours or minutes, which don't apply to a date. Declare the field as `period dateonly` or use a specific unit like `3 days`."
-- [ ] `date ± duration` is a compile error: "Durations measure hours, minutes, and seconds — they can't be added to a date. Use `DueDate + 3 days` to shift a date."
-- [ ] `date ± integer` is a compile error: "A bare number doesn't specify a unit. Use `DueDate + 2 days` to add 2 days." (Decision #10)
-- [ ] `date + 3 hours` is a compile error: "Hours don't apply to a date — dates have no time of day. Did you mean `DueDate + 3 days`?"
-- [ ] `date + 30 minutes` is a compile error (same: time-unit period on date)
-- [ ] `date + 45 seconds` is a compile error (same)
+- [ ] `date ± 3 hours` is a compile error: "Hours don't apply to a date — dates have no time of day. Did you mean `DueDate ± 3 days`?"
+- [ ] `date ± 30 minutes` is a compile error (same: time-unit period on date)
+- [ ] `date ± 45 seconds` is a compile error (same)
 
 #### Accessors
 
@@ -1667,9 +1662,9 @@ Single quotes win on all three criteria that matter for a DSL: refactoring safet
 
 - [ ] `time ± period timeonly → time` (`LocalTime.Plus/Minus(Period)`, time components only)
 - [ ] `time ± duration → time` (sub-day bridging, wraps at midnight; Decision #16)
-- [ ] `time + 3 hours → time` (postfix resolves, wraps at midnight)
-- [ ] `time + 30 minutes → time` (wraps at midnight)
-- [ ] `time + 45 seconds → time` (wraps at midnight)
+- [ ] `time ± 3 hours → time` (postfix resolves, wraps at midnight)
+- [ ] `time ± 30 minutes → time` (wraps at midnight)
+- [ ] `time ± 45 seconds → time` (wraps at midnight)
 - [ ] `time + date → datetime` (commutative form of `date + time`; Decision #25)
 - [ ] `time - time → period` (time-component period via `Period.Between(t1, t2)`, returns `.hours`, `.minutes`, `.seconds` components)
 
@@ -1687,11 +1682,11 @@ Single quotes win on all three criteria that matter for a DSL: refactoring safet
 
 - [ ] `time ± period` (unconstrained) is a compile error (Decision #26): "This period may include date parts like days or months, which don't apply to a time. Declare the field as `period timeonly` or use a specific unit like `30 minutes`."
 - [ ] `time ± integer` is a compile error: "A bare number doesn't specify a unit. Use `StartTime + 30 minutes` or `StartTime + 1 hour`."
-- [ ] `time + 1 day` is a compile error: "Days can't be added to a time — times only support hours, minutes, and seconds."
-- [ ] `time + 5 days` is a compile error (date-unit on time)
-- [ ] `time + 3 months` is a compile error (date-unit on time)
-- [ ] `time + 1 year` is a compile error (date-unit on time)
-- [ ] `time + SomePeriodField` (unconstrained period field) is a compile error: "This period field may include date parts. Declare it as `period timeonly` to use it with times, or use a `duration` field instead."
+- [ ] `time ± 1 day` is a compile error: "Days can't be added to a time — times only support hours, minutes, and seconds."
+- [ ] `time ± 5 days` is a compile error (date-unit on time)
+- [ ] `time ± 3 months` is a compile error (date-unit on time)
+- [ ] `time ± 1 year` is a compile error (date-unit on time)
+- [ ] `time ± SomePeriodField` (unconstrained period field) is a compile error: "This period field may include date parts. Declare it as `period timeonly` to use it with times, or use a `duration` field instead."
 
 #### Accessors
 
@@ -1728,13 +1723,13 @@ Single quotes win on all three criteria that matter for a DSL: refactoring safet
 
 - [ ] `instant - instant → duration` (elapsed time, pure nanosecond subtraction)
 - [ ] `instant ± duration → instant` (offset via `Instant.Plus/Minus(Duration)`)
-- [ ] `instant + 3 days → instant` (postfix `days` resolves to `Duration.FromDays(3)` in instant context)
-- [ ] `instant + (DayCount) days → instant` (paren postfix resolves to `Duration.FromDays(n)` in instant context)
-- [ ] `instant + 72 hours → instant` (resolves to `Duration.FromHours(72)`)
-- [ ] `instant + 30 minutes → instant` (resolves to `Duration.FromMinutes(30)`)
-- [ ] `instant + 45 seconds → instant` (resolves to `Duration.FromSeconds(45)`)
-- [ ] `instant + 2 weeks → instant` (resolves to `Duration.FromDays(14)`)
-- [ ] `instant + 72 hours + 30 minutes → instant` (combined postfix units resolve to `duration`)
+- [ ] `instant ± 3 days → instant` (postfix `days` resolves to `Duration.FromDays(3)` in instant context)
+- [ ] `instant ± (DayCount) days → instant` (paren postfix resolves to `Duration.FromDays(n)` in instant context)
+- [ ] `instant ± 72 hours → instant` (resolves to `Duration.FromHours(72)`)
+- [ ] `instant ± 30 minutes → instant` (resolves to `Duration.FromMinutes(30)`)
+- [ ] `instant ± 45 seconds → instant` (resolves to `Duration.FromSeconds(45)`)
+- [ ] `instant ± 2 weeks → instant` (resolves to `Duration.FromDays(14)`)
+- [ ] `instant ± 72 hours + 30 minutes → instant` (combined postfix units resolve to `duration`)
 
 #### Comparison operators
 
@@ -1820,7 +1815,7 @@ Single quotes win on all three criteria that matter for a DSL: refactoring safet
 - [ ] `duration * duration` is a compile error: "You can't multiply two durations together. Did you mean `SomeDuration * 2` to double it?"
 - [ ] `duration * decimal` is a compile error: "Durations can only be multiplied by whole numbers or `number`."
 - [ ] `duration ± period` is a compile error: "Durations (hours, minutes, seconds) and periods (days, months, years) can't be mixed."
-- [ ] `duration + integer` is a compile error (no bare integer arithmetic)
+- [ ] `duration ± integer` is a compile error (no bare integer arithmetic)
 
 #### Accessors
 
@@ -2007,13 +2002,13 @@ Single quotes win on all three criteria that matter for a DSL: refactoring safet
 #### Arithmetic operators
 
 - [ ] `zoneddatetime ± duration → zoneddatetime` (timeline arithmetic on underlying instant)
-- [ ] `zoneddatetime + 3 hours → zoneddatetime` (postfix resolves to `duration`)
-- [ ] `zoneddatetime + 3 days → zoneddatetime` (postfix `days` resolves to `duration` in zoneddatetime context)
-- [ ] `zoneddatetime + 2 weeks → zoneddatetime` (resolves to `duration`)
-- [ ] `zoneddatetime + 30 minutes → zoneddatetime` (resolves to `duration`)
-- [ ] `zoneddatetime + 45 seconds → zoneddatetime` (resolves to `duration`)
-- [ ] `zoneddatetime + (N) hours → zoneddatetime` (paren postfix resolves to `duration`)
-- [ ] `zoneddatetime + (N) days → zoneddatetime` (paren postfix resolves to `duration`)
+- [ ] `zoneddatetime ± 3 hours → zoneddatetime` (postfix resolves to `duration`)
+- [ ] `zoneddatetime ± 3 days → zoneddatetime` (postfix `days` resolves to `duration` in zoneddatetime context)
+- [ ] `zoneddatetime ± 2 weeks → zoneddatetime` (resolves to `duration`)
+- [ ] `zoneddatetime ± 30 minutes → zoneddatetime` (resolves to `duration`)
+- [ ] `zoneddatetime ± 45 seconds → zoneddatetime` (resolves to `duration`)
+- [ ] `zoneddatetime ± (N) hours → zoneddatetime` (paren postfix resolves to `duration`)
+- [ ] `zoneddatetime ± (N) days → zoneddatetime` (paren postfix resolves to `duration`)
 - [ ] `zoneddatetime - zoneddatetime → duration` (instant subtraction)
 
 #### Comparison operators
@@ -2079,14 +2074,14 @@ Single quotes win on all three criteria that matter for a DSL: refactoring safet
 #### Arithmetic operators
 
 - [ ] `datetime ± period → datetime` (calendar arithmetic via `LocalDateTime.Plus/Minus(Period)`, accepts ALL component categories — no constraint required)
-- [ ] `datetime + 30 days → datetime` (postfix resolves to `period` in datetime context)
-- [ ] `datetime + 3 months → datetime` (resolves to `period`)
-- [ ] `datetime + 1 year → datetime` (resolves to `period`)
-- [ ] `datetime + 2 weeks → datetime` (resolves to `period`)
-- [ ] `datetime + 3 hours → datetime` (resolves to `period` in datetime context via Decision #9/#27: `LocalDateTime.Plus(Period.FromHours(3))`)
-- [ ] `datetime + 30 minutes → datetime` (resolves to `period`; overflow advances date naturally)
-- [ ] `datetime + 45 seconds → datetime` (resolves to `period`)
-- [ ] `datetime + (N) days → datetime` (paren postfix resolves to `period`)
+- [ ] `datetime ± 30 days → datetime` (postfix resolves to `period` in datetime context)
+- [ ] `datetime ± 3 months → datetime` (resolves to `period`)
+- [ ] `datetime ± 1 year → datetime` (resolves to `period`)
+- [ ] `datetime ± 2 weeks → datetime` (resolves to `period`)
+- [ ] `datetime ± 3 hours → datetime` (resolves to `period` in datetime context via Decision #9/#27: `LocalDateTime.Plus(Period.FromHours(3))`)
+- [ ] `datetime ± 30 minutes → datetime` (resolves to `period`; overflow advances date naturally)
+- [ ] `datetime ± 45 seconds → datetime` (resolves to `period`)
+- [ ] `datetime ± (N) days → datetime` (paren postfix resolves to `period`)
 - [ ] Time overflow advances date: `'2026-01-15T23:00:00' + 3 hours → '2026-01-16T02:00:00'`
 - [ ] `datetime - datetime → period` (calendar distance via `Period.Between(ldt1, ldt2)`)
 
@@ -2259,10 +2254,10 @@ Single quotes win on all three criteria that matter for a DSL: refactoring safet
 
 #### `days` and `weeks` — context-dependent
 
-- [ ] `date + 3 days` → `3 days` resolves to `period` (`Period.FromDays(3)`)
-- [ ] `datetime + 3 days` → `3 days` resolves to `period` (`Period.FromDays(3)`)
-- [ ] `instant + 3 days` → `3 days` resolves to `duration` (`Duration.FromDays(3)`)
-- [ ] `zoneddatetime + 3 days` → `3 days` resolves to `duration` (`Duration.FromDays(3)`)
+- [ ] `date ± 3 days` → `3 days` resolves to `period` (`Period.FromDays(3)`)
+- [ ] `datetime ± 3 days` → `3 days` resolves to `period` (`Period.FromDays(3)`)
+- [ ] `instant ± 3 days` → `3 days` resolves to `duration` (`Duration.FromDays(3)`)
+- [ ] `zoneddatetime ± 3 days` → `3 days` resolves to `duration` (`Duration.FromDays(3)`)
 - [ ] `field X as period default 30 days` → resolves to `period`
 - [ ] `field X as duration default 3 days` → resolves to `duration`
 - [ ] Same applies to `weeks` in all contexts above
@@ -2271,16 +2266,16 @@ Single quotes win on all three criteria that matter for a DSL: refactoring safet
 
 - [ ] `months` always resolves to `period` regardless of expression context
 - [ ] `years` always resolves to `period` regardless of expression context
-- [ ] `instant + 3 months` is a type error (instant + period)
-- [ ] `zoneddatetime + 3 months` is a type error (zoneddatetime + period)
+- [ ] `instant ± 3 months` is a type error (instant ± period)
+- [ ] `zoneddatetime ± 3 months` is a type error (zoneddatetime ± period)
 - [ ] `field X as duration default 3 months` is a type error (period in duration context)
 
 #### `hours`, `minutes`, `seconds` — context-dependent
 
-- [ ] `instant + 3 hours` → resolves to `duration` (`Duration.FromHours(3)`)
-- [ ] `zoneddatetime + 3 hours` → resolves to `duration` (`Duration.FromHours(3)`)
-- [ ] `datetime + 3 hours` → resolves to `period` (`Period.FromHours(3)`, Decision #9/#27)
-- [ ] `time + 3 hours` → bridges to duration (sub-day bridging, Decision #16)
+- [ ] `instant ± 3 hours` → resolves to `duration` (`Duration.FromHours(3)`)
+- [ ] `zoneddatetime ± 3 hours` → resolves to `duration` (`Duration.FromHours(3)`)
+- [ ] `datetime ± 3 hours` → resolves to `period` (`Period.FromHours(3)`, Decision #9/#27)
+- [ ] `time ± 3 hours` → bridges to duration (sub-day bridging, Decision #16)
 - [ ] `field X as duration default 8 hours` → resolves to `duration`
 - [ ] `field X as period default 5 hours` → resolves to `period`
 - [ ] No context / ambiguous → compile error
@@ -2328,7 +2323,7 @@ Single quotes win on all three criteria that matter for a DSL: refactoring safet
 - [ ] Runtime implementation uses nanosecond arithmetic on `LocalTime` (NodaTime stores `LocalTime` as nanosecond-of-day internally)
 - [ ] `time + 3 hours` wraps: `'23:00:00' + 3 hours → '02:00:00'`
 - [ ] `time - 3 hours` wraps: `'01:00:00' - 3 hours → '22:00:00'`
-- [ ] `datetime + duration` does NOT bridge (Decision #27 — compile error, not bridged)
+- [ ] `datetime ± duration` does NOT bridge (Decision #27 — compile error, not bridged)
 
 ---
 
@@ -2355,28 +2350,28 @@ Single quotes win on all three criteria that matter for a DSL: refactoring safet
 
 #### Enforcement at `time` arithmetic sites
 
-- [ ] `time + period timeonly → time` — OK
-- [ ] `time + period` (unconstrained field/arg) → compile error
-- [ ] `time + 3 hours` → OK (literal analysis proves time-only)
-- [ ] `time + 30 minutes` → OK (literal analysis proves time-only)
-- [ ] `time + 45 seconds` → OK (literal analysis proves time-only)
-- [ ] `time + 5 days` → compile error (date-unit, not time-only)
-- [ ] `time + 3 months` → compile error (date-unit)
-- [ ] `time + 1 year` → compile error (date-unit)
-- [ ] `time + (TimeonlyPeriodField)` where field is `period timeonly` → OK
-- [ ] `time + (UnconstrainedPeriodField)` where field is `period` → compile error
+- [ ] `time ± period timeonly → time` — OK
+- [ ] `time ± period` (unconstrained field/arg) → compile error
+- [ ] `time ± 3 hours` → OK (literal analysis proves time-only)
+- [ ] `time ± 30 minutes` → OK (literal analysis proves time-only)
+- [ ] `time ± 45 seconds` → OK (literal analysis proves time-only)
+- [ ] `time ± 5 days` → compile error (date-unit, not time-only)
+- [ ] `time ± 3 months` → compile error (date-unit)
+- [ ] `time ± 1 year` → compile error (date-unit)
+- [ ] `time ± (TimeonlyPeriodField)` where field is `period timeonly` → OK
+- [ ] `time ± (UnconstrainedPeriodField)` where field is `period` → compile error
 
 #### Enforcement at `date` arithmetic sites
 
 - [ ] `date ± period dateonly → date` — OK
-- [ ] `date + period` (unconstrained field/arg) → compile error
-- [ ] `date + 30 days` → OK (literal analysis proves date-only)
-- [ ] `date + 3 months` → OK (literal analysis proves date-only)
-- [ ] `date + 1 year` → OK (literal analysis proves date-only)
-- [ ] `date + 2 weeks` → OK (literal analysis proves date-only)
-- [ ] `date + 3 hours` → compile error (time-unit, not date-only)
-- [ ] `date + (DateonlyPeriodField)` where field is `period dateonly` → OK
-- [ ] `date + (UnconstrainedPeriodField)` where field is `period` → compile error
+- [ ] `date ± period` (unconstrained field/arg) → compile error
+- [ ] `date ± 30 days` → OK (literal analysis proves date-only)
+- [ ] `date ± 3 months` → OK (literal analysis proves date-only)
+- [ ] `date ± 1 year` → OK (literal analysis proves date-only)
+- [ ] `date ± 2 weeks` → OK (literal analysis proves date-only)
+- [ ] `date ± 3 hours` → compile error (time-unit, not date-only)
+- [ ] `date ± (DateonlyPeriodField)` where field is `period dateonly` → OK
+- [ ] `date ± (UnconstrainedPeriodField)` where field is `period` → compile error
 
 #### `datetime` accepts all — no constraint required
 
