@@ -346,6 +346,7 @@ field CheckInTime as time nullable
 
 | **Not supported** | **Why** |
 |---|---|
+| `time + time` | You can't add two times together. To get the difference between them, use `EndTime - StartTime`. To shift a time forward, use `StartTime ± 3 hours`. |
 | `time ± integer` | What unit? Use `(n) hours` or `(n) minutes`. |
 | `time ± 1 day` / `time ± N days` | Days can't be added to a time — times only support hours, minutes, and seconds. |
 | `time ± N months` / `time ± N years` | Same — months and years don't apply to a time. |
@@ -1110,7 +1111,7 @@ Cross-type comparison is always a type error.
 | `instant ± integer` | A bare number doesn't specify a unit. Use `(n) hours` or `(n) seconds`. |
 | `period < period` | Periods can't be compared with `<` or `>`. |
 | `period * integer` | Periods can't be multiplied. |
-| `date + date` / `instant + instant` | Adding two points together isn't meaningful. |
+| `date + date` / `time + time` / `instant + instant` / `datetime + datetime` / `zoneddatetime + zoneddatetime` | Adding two points together isn't meaningful. Use `-` to get the distance between them. |
 | `instant.year` | Requires timezone. Use `myInstant.inZone(tz).date.year`. |
 | `instant.date` | Skips timezone mediation. Use `myInstant.inZone(tz).date`. |
 | `duration * duration` | You can't multiply two durations together. |
@@ -1680,6 +1681,7 @@ Single quotes win on all three criteria that matter for a DSL: refactoring safet
 
 #### Not-supported operations (compile errors)
 
+- [ ] `time + time` is a compile error: "You can't add two times together. To get the difference between them, use `EndTime - StartTime`. To shift a time forward, use `StartTime ± 3 hours`."
 - [ ] `time ± period` (unconstrained) is a compile error (Decision #26): "This period may include date parts like days or months, which don't apply to a time. Declare the field as `period timeonly` or use a specific unit like `30 minutes`."
 - [ ] `time ± integer` is a compile error: "A bare number doesn't specify a unit. Use `StartTime + 30 minutes` or `StartTime + 1 hour`."
 - [ ] `time ± 1 day` is a compile error: "Days can't be added to a time — times only support hours, minutes, and seconds."
@@ -2428,6 +2430,7 @@ Single quotes win on all three criteria that matter for a DSL: refactoring safet
 - [ ] `zoneddatetime ± period` → compile error (periods can't be added directly to zoned datetime)
 - [ ] `datetime ± duration` → compile error (Decision #27)
 - [ ] `date + date` → compile error (adding two points)
+- [ ] `time + time` → compile error (adding two points)
 - [ ] `instant + instant` → compile error (adding two points)
 - [ ] `datetime + datetime` → compile error (adding two points)
 - [ ] `zoneddatetime + zoneddatetime` → compile error (adding two points)
