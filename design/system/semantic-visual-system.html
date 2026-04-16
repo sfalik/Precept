@@ -22,6 +22,7 @@
   --soft: #687281;
   --structure-d: #4338CA;
   --structure: #6366F1;
+  --structure-h: #A5B4FC;
   --state: #A898F5;
   --event: #30B8E8;
   --data: #B0BEC5;
@@ -164,6 +165,7 @@ pre {
 }
 .s  { color: var(--structure); font-weight: bold; }
 .sd { color: var(--structure-d); font-weight: bold; }
+.sh { color: var(--structure-h); font-weight: 500; }
   .sg { color: var(--structure); font-weight: 400; }
 .st { color: var(--state); }
 .ev { color: var(--event); }
@@ -3677,14 +3679,19 @@ pre {
             <div class="semantic-family-card__name">Structure</div>
             <div class="semantic-family-card__meta">Indigo · 239–245°</div>
           </div>
-          <div class="semantic-family-card__count">2 tones</div>
+          <div class="semantic-family-card__count">3 tones</div>
         </div>
-        <div class="semantic-family-swatch" style="background:#4338CA;--tone-fg:#fff;--tone-soft:rgba(255,255,255,0.5)">
-          <div>Primary driver</div>
-          <strong>#4338CA</strong>
-          <div>governing keywords</div>
+        <div class="semantic-family-swatch" style="background:#A5B4FC;--tone-fg:rgba(15,8,40,0.9);--tone-soft:rgba(15,8,40,0.5)">
+          <div>Hero identifier</div>
+          <strong>#A5B4FC</strong>
+          <div>precept name — the hero of the definition</div>
         </div>
-        <div class="semantic-family-variants">
+        <div class="semantic-family-variants semantic-family-variants--double">
+          <div class="semantic-family-variant" style="background:#4338CA;--tone-fg:#fff;--tone-soft:rgba(255,255,255,0.5)">
+            <div>Within family</div>
+            <strong>#4338CA</strong>
+            <div>governing keywords</div>
+          </div>
           <div class="semantic-family-variant" style="background:#6366F1;--tone-fg:#fff;--tone-soft:rgba(255,255,255,0.42)">
             <div>Within family</div>
             <strong>#6366F1</strong>
@@ -3693,8 +3700,8 @@ pre {
         </div>
         <div class="semantic-family-usage">
           <span class="semantic-family-usage-label">Carries</span>
-          precept · field · state · event · set · transition
-          <span class="semantic-family-usage-subtle">within family: as · default · == · and · or · not</span>
+          LoanApplication · VisitorBadgePickup — the entity name
+          <span class="semantic-family-usage-subtle">within family: governing keywords · connective grammar</span>
         </div>
       </div>
 
@@ -3943,8 +3950,8 @@ pre {
           <div class="cg-channel">
             <div class="cg-channel-name">Colour</div>
             <div class="cg-channel-body">
-              <div class="cg-channel-signal"><span class="cg-swatch" style="background:var(--structure-d)"></span><span class="cg-family-note"><span class="cg-swatch cg-swatch--secondary" style="background:var(--structure)"></span><span>Related grammar</span></span></div>
-              <p class="cg-channel-caption">Deep indigo marks governing structure, while the lighter indigo marks related grammar.</p>
+              <div class="cg-channel-signal"><span class="cg-swatch" style="background:var(--structure-h)"></span><span class="cg-family-note"><span class="cg-swatch cg-swatch--secondary" style="background:var(--structure-d)"></span><span>Governing keywords</span></span><span class="cg-family-note"><span class="cg-swatch cg-swatch--secondary" style="background:var(--structure)"></span><span>Connective grammar</span></span></div>
+              <p class="cg-channel-caption">Bright indigo marks the precept name — the hero identifier of the definition. Deep indigo marks governing keywords, mid indigo marks connective grammar.</p>
             </div>
           </div>
           <div class="cg-channel">
@@ -5887,11 +5894,11 @@ pre.doc-code-body {
     <div class="doc-code-header">
       <span class="doc-code-lang">precept</span>
     </div>
-    <pre class="doc-code-body"><span style="color:var(--structure);font-weight:bold">precept</span> <span style="color:var(--structure)">LoanApplication</span>
+    <pre class="doc-code-body"><span style="color:var(--structure);font-weight:bold">precept</span> <span style="color:var(--structure-h);font-weight:500">LoanApplication</span>
   <span style="color:var(--structure);font-weight:bold">field</span>  <span style="color:var(--data)">Amount</span>         <span style="color:var(--structure)">as</span> <span style="color:var(--data-t)">number</span> <span style="color:var(--structure)">default</span> <span style="color:var(--data-v)">0</span>
   <span style="color:var(--structure);font-weight:bold">field</span>  <span style="color:var(--data)">ApplicantName</span>  <span style="color:var(--structure)">as</span> <span style="color:var(--data-t)">string</span> <span style="color:var(--structure)">nullable</span>
 
-  <span style="color:var(--structure);font-weight:bold">state</span>  <span style="color:var(--state)">Draft</span>        <span style="color:var(--structure);font-weight:bold">initial</span>
+  <span style="color:var(--structure);font-weight:bold">state</span>  <span style="color:var(--state)">Draft</span>      <span style="color:var(--structure);font-weight:bold">initial</span>
   <span style="color:var(--structure);font-weight:bold">state</span>  <span style="color:var(--state)">Submitted</span>
 
   <span style="color:var(--structure);font-weight:bold">event</span>  <span style="color:var(--event)">Submit</span>
@@ -6138,7 +6145,7 @@ pre.doc-code-body {
           <p class="dsp-p">The following keeps the same <span class="doc-ref s">LoanApplication</span> scenario used elsewhere on the page so the guide reads as one coherent example across code, diagram, and reference views.</p>
           <div class="doc-code-block">
             <div class="doc-code-header"><span class="doc-code-lang">precept</span></div>
-            <pre class="doc-code-body"><span style="color:var(--structure);font-weight:bold">precept</span> <span style="color:var(--structure)">LoanApplication</span>
+            <pre class="doc-code-body"><span style="color:var(--structure);font-weight:bold">precept</span> <span style="color:var(--structure-h);font-weight:500">LoanApplication</span>
   <span style="color:var(--structure);font-weight:bold">field</span>  <span style="color:var(--data)">Amount</span>         <span style="color:var(--structure)">as</span> <span style="color:var(--data-t)">number</span> <span style="color:var(--structure)">default</span> <span style="color:var(--data-v)">0</span>
   <span style="color:var(--structure);font-weight:bold">field</span>  <span style="color:var(--data)">ApplicantName</span>  <span style="color:var(--structure)">as</span> <span style="color:var(--data-t)">string</span> <span style="color:var(--structure)">nullable</span>
 
@@ -6352,10 +6359,13 @@ from ReadyForPickup on Expire when PickupWindowOpen == false
     var states = new Set();
     var events = new Set();
     var argumentsByName = new Set();
+    var preceptName = null;
 
     text.replace(/\r\n/g, "\n").split("\n").forEach(function(line) {
       var trimmed = line.trim();
-      var match = /^field\s+([A-Za-z_][A-Za-z0-9_]*)/.exec(trimmed);
+      var match = /^precept\s+([A-Za-z_][A-Za-z0-9_]*)/.exec(trimmed);
+      if (match) { preceptName = match[1]; return; }
+      match = /^field\s+([A-Za-z_][A-Za-z0-9_]*)/.exec(trimmed);
       if (match) fields.add(match[1]);
       match = /^state\s+([A-Za-z_][A-Za-z0-9_]*)/.exec(trimmed);
       if (match) states.add(match[1]);
@@ -6369,7 +6379,7 @@ from ReadyForPickup on Expire when PickupWindowOpen == false
       }
     });
 
-    return { fields: fields, states: states, events: events, argumentsByName: argumentsByName };
+    return { fields: fields, states: states, events: events, argumentsByName: argumentsByName, preceptName: preceptName };
   };
 
   var renderToken = function(token, symbols) {
@@ -6377,6 +6387,7 @@ from ReadyForPickup on Expire when PickupWindowOpen == false
     if (/^\s+$/.test(token)) return token;
     if (/^"(?:[^"\\]|\\.)*"$/.test(token)) return '<span class="ru">' + escapeHtml(token) + '</span>';
     if (/^[0-9]+$/.test(token) || literalKeywords.has(token)) return '<span class="dv">' + escapeHtml(token) + '</span>';
+    if (symbols.preceptName && token === symbols.preceptName) return '<span class="sh">' + escapeHtml(token) + '</span>';
     if (symbols.states.has(token)) return '<span class="st">' + escapeHtml(token) + '</span>';
     if (symbols.events.has(token)) return '<span class="ev">' + escapeHtml(token) + '</span>';
     if (symbols.fields.has(token) || symbols.argumentsByName.has(token)) return '<span class="da">' + escapeHtml(token) + '</span>';
