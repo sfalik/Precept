@@ -79,6 +79,16 @@
 - Three new diagnostics proposed: C60 (dead warning rule), C61 (contradictory error+warning), C62 (warning-only event). C59 is already taken by field constraint default-value violation.
 - Output: `research/language/expressiveness/verdict-modifier-runtime-enforceability.md`, decision note in `.squad/decisions/inbox/george-verdict-enforceability.md`.
 - Pattern learned: when evaluating feature proposals that touch philosophy guarantees, always surface the philosophy gap explicitly and let the owner decide — don't resolve product identity questions in technical analysis.
+### 2026-04-14 — NodaTime Exception Surface Audit
+- Audited all 8 NodaTime types (LocalDate, LocalTime, LocalDateTime, Instant, Duration, Period, DateTimeZone, ZonedDateTime) by reading actual source code from `github.com/nodatime/nodatime` `main` branch.
+- Cataloged **47 distinct exception paths** across the API surface exposed by the temporal type system proposal.
+- **62% fully mitigated** by compile-time design (ISO-only calendar, `dateonly`/`timeonly` constraints, lenient resolution, non-null guarantees). **6% unmitigated** (duration division-by-zero, timezone ID validation). **32% accepted edge cases** (overflow, serialization boundaries).
+- **Critical finding: Duration division by zero (3 paths)** — `Duration / 0`, `Duration / Duration.Zero`, and `Duration / 0.0` all throw `DivideByZeroException`. Proposal exposes division but has no compile-time or runtime guard. Recommendation: literal zero rejected at compile time + dynamic zero guarded at runtime.
+- **Secondary finding: Timezone ID validation** — `IDateTimeZoneProvider[id]` throws `DateTimeZoneNotFoundException` for invalid IANA IDs. Recommendation: compile-time literal validation for timezone string arguments.
+- LocalTime confirmed safest type (all paths mitigated, wrapping arithmetic has no throws). Duration is the highest-risk type (division-by-zero + overflow).
+- Period comparison correctly excluded from proposal — `Period` has no natural ordering in NodaTime.
+- Output: `research/language/expressiveness/nodatime-exception-surface-audit.md`.
+
 ### 2026-04-12 — Issue #17 Computed Fields: Runtime Feasibility Assessment
 - **Verdict: Feasible.** No fundamental blockers, no architectural mismatches.
 - **Parser (Small):** `derivedOpt` combinator after TypeRef in FieldDecl. Arrow disambiguation is trivial — `field` keyword vs. `from` keyword disambiguates before either combinator reaches `->`. ~25 lines.

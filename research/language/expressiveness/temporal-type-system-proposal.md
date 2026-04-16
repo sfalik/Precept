@@ -413,6 +413,8 @@ field IncidentTimestamp as instant
 
 **Note on `days`/`weeks` in instant context:** `instant ± 3 days` and `instant ± (n) days` are both valid — `days` and `weeks` resolve to `duration` (`Duration.FromDays`) in instant context. This is the key capability of context-dependent type resolution: the same unit keyword (`days`) resolves to `period` in calendar contexts and `duration` in timeline contexts. `months` and `years` have no duration equivalent (no `Duration.FromMonths` in NodaTime), so they always resolve to `period`.
 
+**Overflow note:** `Instant.Plus(Duration)` can overflow if a Duration pushes the result outside NodaTime's representable range (`-9998-01-01T00:00:00Z` to `9999-12-31T23:59:59Z`). NodaTime throws `OverflowException` at runtime. The compiler cannot catch this statically because field values are only known at runtime. This is an accepted edge case — the range covers all practical business dates.
+
 **Navigation via `.inZone(tz)` (the sole mediation path):**
 
 `.inZone(tz)` is the ONLY dot-accessor on `instant`. When the author types `myInstant.`, the completion list shows exactly one entry: `.inZone(tz)`. The completion detail should explain WHY this is the only option: *"An instant is a point on the timeline with no timezone. Use `.inZone(tz)` to see it as a local date and time."* This teaches the timezone mediation rule proactively rather than waiting for the author to attempt `instant.date` and hit an error.
@@ -483,9 +485,17 @@ These resolve to `Duration.FromHours`, `Duration.FromMinutes`, `Duration.FromSec
 | `duration ± duration` | `duration` | Combined elapsed time / difference. |
 | `duration * integer` or `duration * number` | `duration` | Scaling. NodaTime: `Duration * long`, `Duration * double`. |
 | `integer * duration` or `number * duration` | `duration` | Commutative form. NodaTime supports both operand orders. |
-| `duration / integer` or `duration / number` | `duration` | Scaling. |
-| `duration / duration` | `number` | Ratio (e.g., how many shifts fit). |
+| `duration / integer` or `duration / number` | `duration` | Scaling. Divisor must be nonzero (see division-by-zero rule below). |
+| `duration / duration` | `number` | Ratio (e.g., how many shifts fit). Divisor must be nonzero (see below). |
 | `-duration` | `duration` | Unary negation. `Duration.Negate()`. |
+
+**Division-by-zero prevention:** Division by zero on `duration` throws `DivideByZeroException` in NodaTime. Precept prevents this at compile time:
+
+- **Literal zero:** `duration / 0` is a compile error: *"Division by zero."*
+- **Field divisor:** When the divisor is a field reference (e.g., `ShiftDuration / BatchSize`), the compiler requires the divisor field to have a constraint that excludes zero (e.g., `BatchSize > 0` or a `nonzero` constraint on the field). If no such constraint exists, it is a compile error: *"Division requires the divisor to be constrained as nonzero. Add a constraint like `BatchSize > 0`."*
+- **Duration divisor:** `duration / duration` follows the same rule — the divisor duration field must be constrained as nonzero (`ShiftLength != 0 hours` or equivalent).
+
+This is constraint-gated division: the type system does not allow division unless the program has already proven the divisor cannot be zero.
 | `==`, `!=`, `<`, `>`, `<=`, `>=` | `boolean` | NodaTime default behavior. Thin wrapper — no custom logic. |
 
 | **Not supported** | **Why** |
@@ -500,6 +510,7 @@ These resolve to `Duration.FromHours`, `Duration.FromMinutes`, `Duration.FromSec
 
 | Accessor | Returns | Description |
 |---|---|---|
+| `.totalDays` | `number` | Total elapsed 24-hour days (may be fractional). |
 | `.totalHours` | `number` | Total elapsed hours (may be fractional). |
 | `.totalMinutes` | `number` | Total elapsed minutes. |
 | `.totalSeconds` | `number` | Total elapsed seconds. |
@@ -513,7 +524,9 @@ field ActualHours as duration default 0 hours
 
 9 fields across 6 samples (MTBF, repair hours, work hours) are naturally `duration`.
 
-**Constraints:** `nullable`, `default 8 hours` or `default 30 minutes`, `nonnegative`.
+**Constraints:** `nullable`, `default 8 hours` or `default 30 minutes`, `nonnegative`. `min`/`max` are compile errors — constraint values are bare numbers, not duration quantities.
+
+**Implementation note:** `nonnegative` desugars to `Field >= 0` for numeric types, which would be `duration >= integer` — a type error. The desugar model must be type-aware: for `duration`, generate a comparison against `Duration.Zero` instead of the integer literal `0`.
 
 **Serialization:** ISO 8601 time-duration string: `"PT72H"`.
 
@@ -657,11 +670,12 @@ field CustomerTimezone as timezone nullable
 
 **Teachable error messages:**
 
-| Invalid code | Error message |
-|---|---|
-| `'EST'` in timezone context | 'EST' is an abbreviation, not a full timezone name. Use `'America/New_York'`. |
-| `'Pacific Standard Time'` in timezone context | 'Pacific Standard Time' is a Windows timezone name. Use `'America/Los_Angeles'`. |
-| `'Not/A/Timezone'` | 'Not/A/Timezone' is not a recognized timezone name. |
+| Invalid code | Severity | Message |
+|---|---|---|
+| `'EST'` in timezone context | **Error** | 'EST' is a legacy IANA abbreviation, not a canonical timezone. Use `'America/New_York'` (or `'America/Panama'` if you need fixed UTC-5). |
+| `'MST'`, `'CET'`, `'EET'`, `'MET'`, `'WET'`, `'HST'`, etc. | **Error** | Same pattern — legacy abbreviations are rejected. Use the canonical `Region/City` form. |
+| `'Pacific Standard Time'` in timezone context | Error | 'Pacific Standard Time' is a Windows timezone name. Use `'America/Los_Angeles'`. |
+| `'Not/A/Timezone'` | Error | 'Not/A/Timezone' is not a recognized timezone name. |
 
 ---
 
@@ -705,10 +719,11 @@ No standalone construction function exists. `zoneddatetime` is always reached vi
 | `zoneddatetime ± (N) hours` | `zoneddatetime` | Paren postfix — variable expression resolves to `duration`. |
 | `zoneddatetime ± (N) days` | `zoneddatetime` | Paren postfix — `days` resolves to `duration` in zoneddatetime context. |
 | `zoneddatetime - zoneddatetime` | `duration` | Instant subtraction. |
-| `==`, `!=`, `<`, `>`, `<=`, `>=` | `boolean` | NodaTime default behavior. Thin wrapper — no custom logic. |
+| `==`, `!=` | `boolean` | NodaTime default behavior (`ZonedDateTime.Equals()` — compares instant + calendar + zone). Thin wrapper. |
 
 | **Not supported** | **Why** |
 |---|---|
+| `zoneddatetime < zoneddatetime` (and `>`, `<=`, `>=`) | **No natural ordering.** NodaTime deliberately omits `IComparable<ZonedDateTime>` — ordering semantics are ambiguous (by instant? by local time?). Compare via accessor: `zdt1.instant < zdt2.instant` for timeline ordering, or `zdt1.datetime < zdt2.datetime` for wall-clock ordering. |
 | `zoneddatetime ± period` | Periods can't be added directly to a zoned datetime. Navigate to `.datetime` first: `(myZdt.datetime ± myPeriod).inZone(myZdt.timezone)`. |
 | `zoneddatetime ± integer` | A bare number doesn't specify a unit. Use an explicit unit like `3 days` or `1 hour`. |
 
@@ -1094,7 +1109,7 @@ This is what makes temporal types the gateway: they don't just add temporal capa
 | `period` | ✓ | **✗** | **No natural ordering.** See Decision #14. |
 | `timezone` | ✓ | ✗ | Equality by IANA identifier. |
 | `datetime` | ✓ | ✓ | Same-calendar |
-| `zoneddatetime` | ✓ | ✓ | Instant-first, then local datetime, then zone (NodaTime default — multi-dimensional) |
+| `zoneddatetime` | ✓ | **✗** | **No natural ordering.** NodaTime omits `IComparable<ZonedDateTime>`. Compare via `.instant` or `.datetime` accessor. |
 
 Cross-type comparison is always a type error.
 
@@ -1109,6 +1124,7 @@ Cross-type comparison is always a type error.
 | `date ± integer` | A bare number doesn't specify a unit. Use `(n) days`. |
 | `instant ± integer` | A bare number doesn't specify a unit. Use `(n) hours` or `(n) seconds`. |
 | `period < period` | Periods can't be compared with `<` or `>`. |
+| `zoneddatetime < zoneddatetime` | No natural ordering — NodaTime omits `IComparable<ZonedDateTime>`. Compare via `.instant` or `.datetime` accessor. |
 | `period * integer` | Periods can't be multiplied. |
 | `date + date` / `time + time` / `instant + instant` / `datetime + datetime` / `zoneddatetime + zoneddatetime` | Adding two points together isn't meaningful. Use `-` to get the distance between them. |
 | `instant.year` | Requires timezone. Use `myInstant.inZone(tz).date.year`. |
@@ -1488,6 +1504,27 @@ Single quotes win on all three criteria that matter for a DSL: refactoring safet
 | Leap seconds | Excluded | NodaTime `Instant` uses smoothed UTC. Not a limitation. |
 | Parameterized temporal types | Excluded | No type parameterization. |
 
+### Collection inner types
+
+Temporal types are valid as collection inner types where the collection's structural requirements are met.
+
+**`queue of <T>` and `stack of <T>`** — all 8 temporal types are valid. Queues and stacks are ordered by insertion, not by value comparison.
+
+**`set of <T>`** — Precept sets are backed by `SortedSet<object>` and require `IComparable<T>`. Five temporal types support this:
+
+| Inner type | `set of` | `queue of` / `stack of` |
+|---|---|---|
+| `date` | ✓ | ✓ |
+| `time` | ✓ | ✓ |
+| `instant` | ✓ | ✓ |
+| `duration` | ✓ | ✓ |
+| `datetime` | ✓ | ✓ |
+| `period` | **✗** — no natural ordering | ✓ |
+| `timezone` | **✗** — no natural ordering | ✓ |
+| `zoneddatetime` | **✗** — no natural ordering | ✓ |
+
+`set of period`, `set of timezone`, and `set of zoneddatetime` are compile errors: "This type has no natural ordering. Use `queue of <T>` or `stack of <T>` instead."
+
 ---
 
 ## Implementation Scope
@@ -1496,6 +1533,7 @@ Single quotes win on all three criteria that matter for a DSL: refactoring safet
 
 - Add `date`, `time`, `instant`, `duration`, `period`, `timezone`, `zoneddatetime`, `datetime` as type keywords.
 - Add `days`, `months`, `years`, `weeks`, `hours`, `minutes`, `seconds` as unit keywords for postfix expressions.
+  - **Breaking change:** These 7 words become reserved. Existing precepts using them as field names, event names, or event arg names will fail to parse. Scan existing definitions before upgrading.
 - Add `inZone` as dot-accessor keyword for timezone mediation.
 - **Single-quoted typed constants:** New token type `TypedConstantLiteral`. The tokenizer matches `'[^']*'` as a single token. The parser validates content shape and infers the specific type. Content inside single quotes is a constant pattern, not an expression — no operator precedence, no identifier resolution. `'2026-03-15'` is valid. `'03/15/2026'` is a compile error with a teachable message. Compile-time validated per inferred type. Temporal types are the first inhabitants; the mechanism is not temporal-specific.
 - **Postfix unit expressions:** New expression form. Two combinators:
@@ -1557,7 +1595,8 @@ Single quotes win on all three criteria that matter for a DSL: refactoring safet
 ### MCP Tools
 
 - `precept_language`: All 8 types. Postfix unit system description. Typed constant delimiter syntax.
-- `precept_compile`/`fire`/`inspect`/`update`: `period` as ISO 8601 string (`P1Y2M3D`), `duration` as time-duration (`PT72H`).
+- `precept_compile`/`fire`/`inspect`/`update`: All temporal values serialized as ISO 8601 strings. `zoneddatetime` serialized as `{ "instant": "..Z", "timezone": "..." }`.
+- **Serialization:** Configure `NodaTime.Serialization.SystemTextJson` on the serializer. Output is fully automatic — NodaTime types in instance data and DTOs serialize to ISO 8601 strings via registered converters. Input requires type-directed deserialization: MCP input arrives as generic dictionaries (values are raw strings), so the engine dispatches to the correct NodaTime converter based on the compiled field type declaration. The MCP layer stays thin — no conversion code.
 
 ### Samples, Documentation, Tests
 
@@ -1805,6 +1844,14 @@ Single quotes win on all three criteria that matter for a DSL: refactoring safet
 - [ ] `duration / duration → number` (ratio, e.g., how many shifts fit)
 - [ ] `-duration → duration` (unary negation, `Duration.Negate()`)
 
+#### Division-by-zero prevention
+
+- [ ] `duration / 0` (literal zero) is a compile error: "Division by zero."
+- [ ] `duration / Field` where `Field` has no constraint excluding zero is a compile error: "Division requires the divisor to be constrained as nonzero."
+- [ ] `duration / Field` where `Field` has `Field > 0` or equivalent constraint compiles successfully
+- [ ] `duration / duration` where divisor field has no nonzero constraint is a compile error
+- [ ] `duration / duration` where divisor field is constrained as nonzero compiles successfully
+
 #### Comparison operators
 
 - [ ] `duration == duration → boolean` (NodaTime default behavior, thin wrapper)
@@ -1825,6 +1872,7 @@ Single quotes win on all three criteria that matter for a DSL: refactoring safet
 
 #### Accessors
 
+- [ ] `duration.totalDays → number` (total elapsed 24-hour days, may be fractional)
 - [ ] `duration.totalHours → number` (total elapsed hours, may be fractional)
 - [ ] `duration.totalMinutes → number` (total elapsed minutes)
 - [ ] `duration.totalSeconds → number` (total elapsed seconds)
@@ -1945,7 +1993,9 @@ Single quotes win on all three criteria that matter for a DSL: refactoring safet
 - [ ] `'America/New_York'` validates at compile time as a `timezone` (content shape: IANA `Word/Word` pattern)
 - [ ] `'America/Los_Angeles'` validates as a `timezone`
 - [ ] `'UTC'` validates as a `timezone`
-- [ ] `'EST'` produces compile warning: "'EST' is an abbreviation, not a full timezone name. Use `'America/New_York'`."
+- [ ] `'EST'` produces compile error: "'EST' is a legacy IANA abbreviation, not a canonical timezone. Use `'America/New_York'` (or `'America/Panama'` if you need fixed UTC-5)."
+- [ ] `'MST'` produces compile error (same pattern — legacy abbreviation rejected)
+- [ ] `'CET'`, `'EET'`, `'MET'`, `'WET'`, `'HST'` all produce compile errors with canonical alternatives
 - [ ] `'Pacific Standard Time'` produces compile error: "'Pacific Standard Time' is a Windows timezone name. Use `'America/Los_Angeles'`."
 - [ ] `'Not/A/Timezone'` produces compile error: "'Not/A/Timezone' is not a recognized timezone name."
 - [ ] Compile-time validation is against the IANA TZ database bundled with NodaTime
@@ -2019,12 +2069,12 @@ Single quotes win on all three criteria that matter for a DSL: refactoring safet
 
 #### Comparison operators
 
-- [ ] `zoneddatetime == zoneddatetime → boolean` (NodaTime default behavior, thin wrapper)
+- [ ] `zoneddatetime == zoneddatetime → boolean` (NodaTime default behavior — `ZonedDateTime.Equals()` compares instant + calendar + zone)
 - [ ] `zoneddatetime != zoneddatetime → boolean` (NodaTime default behavior, thin wrapper)
-- [ ] `zoneddatetime < zoneddatetime → boolean` (instant-first, then local, then zone — NodaTime default multi-dimensional comparer)
-- [ ] `zoneddatetime > zoneddatetime → boolean` (NodaTime default behavior, thin wrapper)
-- [ ] `zoneddatetime <= zoneddatetime → boolean` (NodaTime default behavior, thin wrapper)
-- [ ] `zoneddatetime >= zoneddatetime → boolean` (NodaTime default behavior, thin wrapper)
+- [ ] `zoneddatetime < zoneddatetime` is a compile error: "No natural ordering. NodaTime deliberately omits `IComparable<ZonedDateTime>`. Compare via accessor: `zdt1.instant < zdt2.instant` for timeline ordering, or `zdt1.datetime < zdt2.datetime` for wall-clock ordering."
+- [ ] `zoneddatetime > zoneddatetime` is a compile error (same message)
+- [ ] `zoneddatetime <= zoneddatetime` is a compile error (same message)
+- [ ] `zoneddatetime >= zoneddatetime` is a compile error (same message)
 - [ ] Cross-type comparison (`zoneddatetime == instant`, `zoneddatetime < datetime`, etc.) is a type error
 
 #### Not-supported operations (compile errors)
@@ -2088,6 +2138,9 @@ Single quotes win on all three criteria that matter for a DSL: refactoring safet
 - [ ] `datetime ± 30 minutes → datetime` (resolves to `period`; overflow advances date naturally)
 - [ ] `datetime ± 45 seconds → datetime` (resolves to `period`)
 - [ ] `datetime ± (N) days → datetime` (paren postfix resolves to `period`)
+- [ ] `datetime ± (N) hours → datetime` (paren postfix resolves to `period`)
+- [ ] `datetime ± (N) minutes → datetime` (paren postfix resolves to `period`)
+- [ ] `datetime ± (N) seconds → datetime` (paren postfix resolves to `period`)
 - [ ] Time overflow advances date: `'2026-01-15T23:00:00' + 3 hours → '2026-01-16T02:00:00'`
 - [ ] `datetime - datetime → period` (calendar distance via `Period.Between(ldt1, ldt2)`)
 
@@ -2267,6 +2320,7 @@ Single quotes win on all three criteria that matter for a DSL: refactoring safet
 - [ ] `'14:30'` hover shows "time: 2:30 PM"
 - [ ] `'2024-01-15T14:30:00'` hover shows "datetime: January 15, 2024 at 2:30 PM (Monday)"
 - [ ] `'2024-01-15T14:30:00Z'` hover shows "instant: 2024-01-15T14:30:00Z (UTC)" — NO day-of-week
+- [ ] `'2024-07-04T09:00:00 America/New_York'` hover shows "zoneddatetime: July 4, 2024 at 9:00 AM America/New_York (EDT, UTC-04:00)"
 - [ ] `'America/New_York'` hover shows "timezone: America/New_York (UTC-05:00 / UTC-04:00 DST)"
 - [ ] Hover is always invariant culture English — not locale-dependent
 
@@ -2429,7 +2483,9 @@ Single quotes win on all three criteria that matter for a DSL: refactoring safet
 ### Cross-cutting: DST ambiguity resolution
 
 - [ ] Gap (spring forward): maps to the instant *after* the gap (NodaTime `LenientResolver`)
+  - [ ] `'2024-03-10T02:30:00 America/New_York'` → resolves to `2024-03-10T03:00:00-04:00` (2:30 AM doesn't exist; clocks jump 2:00→3:00)
 - [ ] Overlap (fall back): maps to the *later* instant
+  - [ ] `'2024-11-03T01:30:00 America/New_York'` → resolves to `2024-11-03T01:30:00-05:00` (EST, the later occurrence; clocks fall back 2:00→1:00)
 - [ ] Resolution is deterministic — same inputs produce same outputs
 
 ---
@@ -2472,9 +2528,12 @@ Single quotes win on all three criteria that matter for a DSL: refactoring safet
 
 ---
 
-### Cross-cutting: Event argument runtime validation for temporal types
+### Cross-cutting: Runtime input validation for temporal types
+
+All external input paths (`precept_fire` event arguments, `precept_update` field edits, and any future API surface) validate temporal values at the API boundary. Invalid values produce structured Precept rejections — never raw NodaTime or .NET exceptions propagating to the caller.
 
 - [ ] Event arguments declared with any temporal type are validated at fire time against the type's format requirements — invalid values are rejected at the API boundary, not mid-evaluation
+- [ ] Direct field edits via `precept_update` with any temporal type are validated at the API boundary — invalid values are rejected before engine evaluation
 - [ ] `event Foo with D as date` fired with `"not-a-date"` → rejected at fire time
 - [ ] `event Foo with D as date` fired with `"2026-13-01"` → rejected at fire time (invalid month)
 - [ ] `event Foo with I as instant` fired with `"2026-04-13T14:30:00"` (missing `Z`) → rejected at fire time
@@ -2483,6 +2542,7 @@ Single quotes win on all three criteria that matter for a DSL: refactoring safet
 - [ ] `event Foo with TZ as timezone` fired with `"Not/A/Timezone"` → rejected at fire time
 - [ ] `event Foo with P as period timeonly` fired with a period containing date components → rejected at fire time
 - [ ] `event Foo with P as period dateonly` fired with a period containing time components → rejected at fire time
+- [ ] No NodaTime exception (`DateTimeZoneNotFoundException`, `UnparsableValueException`, `OverflowException`, etc.) propagates to the caller from any API entry point — all are caught and converted to structured rejections
 
 ---
 
@@ -2506,7 +2566,8 @@ Single quotes win on all three criteria that matter for a DSL: refactoring safet
 - [ ] Numeric constraints on `timezone` are compile errors
 - [ ] Numeric constraints on `zoneddatetime` are compile errors
 - [ ] Numeric constraints on `period` are compile errors (only `nullable`, `default`, `timeonly`, `dateonly` are valid)
-- [ ] `nonnegative` on `duration` is allowed (the sole temporal type supporting it)
+- [ ] `nonnegative` on `duration` is allowed (the sole temporal type supporting it; type-aware desugar compares against `Duration.Zero`, not integer `0`)
+- [ ] `min`/`max` on `duration` are compile errors — constraint values are bare numbers, not duration quantities
 
 ---
 
@@ -2567,6 +2628,20 @@ Single quotes win on all three criteria that matter for a DSL: refactoring safet
 - [ ] `AppointmentTime + Elapsed` (where `Elapsed` is `duration`, `AppointmentTime` is `datetime`) names both field and type in the message
 - [ ] Inline literal expressions (e.g., `DueDate + 3 hours`) use the standard non-field-aware message
 - [ ] Field-aware messages are a presentation concern — underlying type rules are unchanged
+
+---
+
+### Cross-cutting: Collection inner types
+
+- [ ] `set of date` parses and type-checks (LocalDate has IComparable)
+- [ ] `set of time` parses and type-checks
+- [ ] `set of instant` parses and type-checks
+- [ ] `set of duration` parses and type-checks
+- [ ] `set of datetime` parses and type-checks
+- [ ] `set of period` is a compile error: "This type has no natural ordering. Use `queue of period` or `stack of period` instead."
+- [ ] `set of timezone` is a compile error (same message pattern)
+- [ ] `set of zoneddatetime` is a compile error (same message pattern)
+- [ ] `queue of <temporal>` and `stack of <temporal>` parse and type-check for all 8 temporal types
 
 ---
 
