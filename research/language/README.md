@@ -54,6 +54,7 @@ Use this table when you already know the issue number and need its research grou
 | `#31` | Logical keyword forms (`and` / `or` / `not`) | Expression expansion | [expressiveness/expression-expansion-domain.md](./expressiveness/expression-expansion-domain.md), [references/expression-evaluation.md](./references/expression-evaluation.md) |
 | `#65` | Event action hooks (stateless) | Event action hooks | [expressiveness/event-hooks.md](./expressiveness/event-hooks.md), [references/state-machine-expressiveness.md](./references/state-machine-expressiveness.md) |
 | `#92` | Keyword clarity audit | Cross-cutting | [expressiveness/keyword-clarity-audit.md](./expressiveness/keyword-clarity-audit.md) |
+| `#107` | Temporal type system (8 NodaTime-backed types) | Type system expansion | [expressiveness/nodatime-precept-alignment.md](./expressiveness/nodatime-precept-alignment.md), [expressiveness/temporal-type-strategy.md](./expressiveness/temporal-type-strategy.md), [expressiveness/nodatime-exception-surface-audit.md](./expressiveness/nodatime-exception-surface-audit.md); design doc: [docs/TemporalTypeSystemDesign.md](/docs/TemporalTypeSystemDesign.md) |
 | `#112` | Stateless events — `on EventName` mutation surface | Stateless events | [expressiveness/stateless-events.md](./expressiveness/stateless-events.md), [expressiveness/data-only-precepts-research.md](./expressiveness/data-only-precepts-research.md) |
 
 ## Temporal type research trail
