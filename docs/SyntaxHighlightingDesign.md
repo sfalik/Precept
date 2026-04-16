@@ -285,7 +285,7 @@ Add the custom semantic token type contributions, semantic-token-to-scope mappin
   "semanticTokenTypes": [
     { "id": "preceptComment",         "description": "Precept comment" },
     { "id": "preceptKeywordSemantic", "description": "Precept behavioral structure keyword" },
-    { "id": "preceptKeywordGrammar",  "description": "Precept connective grammar keyword" },
+    { "id": "preceptKeywordGrammar",  "description": "Precept constraint keyword" },
     { "id": "preceptState",           "description": "Precept state name" },
     { "id": "preceptEvent",           "description": "Precept event name" },
     { "id": "preceptFieldName",       "description": "Precept field or argument name" },
@@ -325,14 +325,14 @@ Add the custom semantic token type contributions, semantic-token-to-scope mappin
         "comment:precept": { "foreground": "#9096A6", "italic": true },
         "operator:precept": { "foreground": "#6366F1" },
         "preceptName": { "foreground": "#A5B4FC" },
-        "preceptMessage": { "foreground": "#FBBF24" }
+        "preceptMessage": { "foreground": "#FBBF24" },
+        "preceptKeywordGrammar": { "foreground": "#FBBF24" }
       }
     },
     "editor.tokenColorCustomizations": {
       "[*]": {
         "textMateRules": [
           { "scope": "keyword.other.semantic.precept",              "settings": { "foreground": "#4338CA", "fontStyle": "bold" } },
-          { "scope": "keyword.other.grammar.precept",               "settings": { "foreground": "#6366F1" } },
           { "scope": "entity.name.type.state.precept",              "settings": { "foreground": "#A898F5" } },
           { "scope": "entity.name.type.state.constrained.precept",  "settings": { "foreground": "#A898F5", "fontStyle": "italic" } },
           { "scope": "entity.name.function.event.precept",          "settings": { "foreground": "#30B8E8" } },
@@ -361,7 +361,6 @@ The TextMate grammar already assigns specific scopes. To lock fallback colors be
   "[*]": {
     "textMateRules": [
       { "scope": "keyword.control.precept",                "settings": { "foreground": "#4338CA", "fontStyle": "bold" } },
-      { "scope": "keyword.other.grammar.precept",         "settings": { "foreground": "#6366F1" } },
       { "scope": "keyword.other.constraint.precept",      "settings": { "foreground": "#6366F1" } },
       { "scope": "keyword.other.precept",                  "settings": { "foreground": "#4338CA", "fontStyle": "bold" } },
       { "scope": "entity.name.type.state.precept",         "settings": { "foreground": "#A898F5" } },

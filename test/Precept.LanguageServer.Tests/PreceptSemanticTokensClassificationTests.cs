@@ -252,9 +252,11 @@ public class PreceptSemanticTokensClassificationTests
         const string dsl = """
             precept M
             field Priority as choice("Low","High") default "Low"
+            field Tags as set of string
             state Active initial
             event Go
             from Active on Go -> no transition
+            rule Tags.count >= 0 because "always true"
             """;
 
         var tokens = PreceptSemanticTokensHandler.GetClassifiedTokens(dsl);
@@ -269,6 +271,14 @@ public class PreceptSemanticTokensClassificationTests
 
         tokens.Should().Contain(t =>
             t.Text == "," &&
+            t.Type == "operator");
+
+        tokens.Should().Contain(t =>
+            t.Text == "->" &&
+            t.Type == "operator");
+
+        tokens.Should().Contain(t =>
+            t.Text == "." &&
             t.Type == "operator");
     }
 }
