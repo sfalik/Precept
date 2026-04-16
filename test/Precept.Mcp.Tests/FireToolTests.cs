@@ -56,7 +56,7 @@ public class FireToolTests
         var text = """
             precept Test
             field Name as string nullable
-            in Done assert Name != null because "Done requires a name"
+            in Done ensure Name != null because "Done requires a name"
             state Open initial
             state Done
             event Finish
@@ -69,7 +69,7 @@ public class FireToolTests
         result.Outcome.Should().Be("ConstraintFailure");
         result.Violations.Should().NotBeEmpty();
         result.Violations[0].Message.Should().Contain("Done requires a name");
-        result.Violations[0].Source.Kind.Should().Be("state-assertion");
+        result.Violations[0].Source.Kind.Should().Be("state-ensure");
         result.Violations[0].Targets.Should().Contain(t => t.Kind == "field" && t.FieldName == "Name");
     }
 

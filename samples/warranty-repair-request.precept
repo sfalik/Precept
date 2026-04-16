@@ -21,26 +21,26 @@ state ReadyToReturn
 state Closed
 state Denied
 
-in ReadyToReturn assert RepairComplete because "Ready-to-return cases must have finished repair work"
-in Closed assert ShippingLabelSent because "Closed cases must have a return label on record"
+in ReadyToReturn ensure RepairComplete because "Ready-to-return cases must have finished repair work"
+in Closed ensure ShippingLabelSent because "Closed cases must have a return label on record"
 
 to ReadyToReturn -> set ShippingLabelSent = true
 
 event Submit with Customer as string, Product as string, Serial as string
-on Submit assert Customer != "" because "A customer name is required"
-on Submit assert Product != "" because "A product name is required"
-on Submit assert Serial != "" because "A serial number is required"
+on Submit ensure Customer != "" because "A customer name is required"
+on Submit ensure Product != "" because "A product name is required"
+on Submit ensure Serial != "" because "A serial number is required"
 
 event Approve with Note as string nullable default null
-on Approve assert Note == null or Note != "" because "A supplied approval note cannot be blank"
+on Approve ensure Note == null or Note != "" because "A supplied approval note cannot be blank"
 
 event Deny with Note as string
-on Deny assert Note != "" because "A denial note is required"
+on Deny ensure Note != "" because "A denial note is required"
 
 event StartRepair
 
 event LogRepairStep with StepName as string
-on LogRepairStep assert StepName != "" because "A repair step must have a description"
+on LogRepairStep ensure StepName != "" because "A repair step must have a description"
 
 event UndoLastStep
 event FinishRepair

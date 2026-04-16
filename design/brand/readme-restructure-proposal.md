@@ -252,7 +252,7 @@ Opening (1–2 sentences of "why this approach" — kept in the README, not defe
 
 Followed by bullets:
 - Prevention, not detection — invalid states are structurally impossible
-- One file, complete rules — every guard, constraint, invariant, and transition in one DSL definition
+- One file, complete rules — every guard, constraint, rule, and transition in one DSL definition
 - Full inspectability — preview any action and its outcome without mutation
 - Compile-time checking — unreachable states, dead ends, type mismatches, null-safety violations caught before runtime
 
@@ -374,7 +374,7 @@ Two labeled blocks, separated by a blank line, under the `## Quick Example` head
 
 - **Length:** 18-20 lines (18 is the target; 20 is the ceiling)
 - **Line length:** ≤60 characters per line (viewport constraint #8)
-- **Contents:** `precept` declaration, 2-3 fields, 3 states (`initial` marked), 2 events, 3-4 `from/on` transition rows including one guard, one `invariant` or `assert`
+- **Contents:** `precept` declaration, 2-3 fields, 3 states (`initial` marked), 2 events, 3-4 `from/on` transition rows including one guard, one `rule` or `ensure`
 - **Domain:** Business-relevant (Order, Subscription, LoanApplication) — not a toy or pop-culture reference
 - **Language tag:** ` ```precept ` — required for AI parseability (constraint #11)
 

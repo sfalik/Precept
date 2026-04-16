@@ -11,14 +11,14 @@ namespace Precept.LanguageServer.Tests;
 public class PreceptAnalyzerRuleWarningTests
 {
     [Fact]
-    public void Diagnostics_ToStateAssertWithoutIncomingTransition_ProducesWarning()
+    public void Diagnostics_ToStateEnsureWithoutIncomingTransition_ProducesWarning()
     {
         const string text = """
             precept M
             field Ready as boolean default true
             state Draft initial
             state Approved
-            to Approved assert Ready because "approved items must be ready"
+            to Approved ensure Ready because "approved items must be ready"
             event Submit
             from Draft on Submit -> no transition
             """;
@@ -26,7 +26,7 @@ public class PreceptAnalyzerRuleWarningTests
         var diagnostics = Analyze(text);
 
         var warning = diagnostics.Single(diagnostic =>
-            diagnostic.Message.Contains("entry asserts are never checked", StringComparison.Ordinal));
+            diagnostic.Message.Contains("entry ensures are never checked", StringComparison.Ordinal));
 
         warning.Severity.Should().Be(DiagnosticSeverity.Warning);
     }

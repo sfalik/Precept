@@ -68,27 +68,27 @@ public enum PreceptToken
     [TokenSymbol("field")]
     Field,
 
-    [TokenCategory(TokenCategory.Grammar)]
+    [TokenCategory(TokenCategory.Declaration)]
     [TokenDescription("Type annotation separator")]
     [TokenSymbol("as")]
     As,
 
-    [TokenCategory(TokenCategory.Grammar)]
+    [TokenCategory(TokenCategory.Declaration)]
     [TokenDescription("Marks a field as nullable")]
     [TokenSymbol("nullable")]
     Nullable,
 
-    [TokenCategory(TokenCategory.Grammar)]
+    [TokenCategory(TokenCategory.Declaration)]
     [TokenDescription("Specifies a default value")]
     [TokenSymbol("default")]
     Default,
 
-    [TokenCategory(TokenCategory.Declaration)]
-    [TokenDescription("Global data invariant")]
-    [TokenSymbol("invariant")]
-    Invariant,
-
     [TokenCategory(TokenCategory.Grammar)]
+    [TokenDescription("Global data rule — a truth that must always hold")]
+    [TokenSymbol("rule")]
+    Rule,
+
+    [TokenCategory(TokenCategory.Declaration)]
     [TokenDescription("Reason sentinel for constraints")]
     [TokenSymbol("because")]
     Because,
@@ -98,7 +98,7 @@ public enum PreceptToken
     [TokenSymbol("state")]
     State,
 
-    [TokenCategory(TokenCategory.Grammar)]
+    [TokenCategory(TokenCategory.Declaration)]
     [TokenDescription("Marks the initial state")]
     [TokenSymbol("initial")]
     Initial,
@@ -108,15 +108,15 @@ public enum PreceptToken
     [TokenSymbol("event")]
     Event,
 
-    [TokenCategory(TokenCategory.Grammar)]
+    [TokenCategory(TokenCategory.Declaration)]
     [TokenDescription("Introduces event arguments")]
     [TokenSymbol("with")]
     With,
 
-    [TokenCategory(TokenCategory.Declaration)]
-    [TokenDescription("Movement constraint")]
-    [TokenSymbol("assert")]
-    Assert,
+    [TokenCategory(TokenCategory.Grammar)]
+    [TokenDescription("Temporal enforcement — checked at a specific lifecycle moment")]
+    [TokenSymbol("ensure")]
+    Ensure,
 
     [TokenCategory(TokenCategory.Declaration)]
     [TokenDescription("Editable field declaration")]
@@ -165,17 +165,17 @@ public enum PreceptToken
     [TokenSymbol("else")]
     Else,
 
-    [TokenCategory(TokenCategory.Grammar)]
+    [TokenCategory(TokenCategory.Declaration)]
     [TokenDescription("Wildcard for all declared states")]
     [TokenSymbol("any")]
     Any,
 
-    [TokenCategory(TokenCategory.Grammar)]
+    [TokenCategory(TokenCategory.Declaration)]
     [TokenDescription("Quantifier for all declared fields")]
     [TokenSymbol("all")]
     All,
 
-    [TokenCategory(TokenCategory.Grammar)]
+    [TokenCategory(TokenCategory.Declaration)]
     [TokenDescription("Collection inner-type separator")]
     [TokenSymbol("of")]
     Of,
@@ -280,7 +280,7 @@ public enum PreceptToken
     [TokenSymbol("clear")]
     Clear,
 
-    [TokenCategory(TokenCategory.Grammar)]
+    [TokenCategory(TokenCategory.Declaration)]
     [TokenDescription("Captures dequeue/pop result into a field")]
     [TokenSymbol("into")]
     Into,

@@ -9,10 +9,10 @@ public sealed record PreceptDefinition(
     IReadOnlyList<PreceptEvent> Events,
     IReadOnlyList<PreceptField> Fields,
     IReadOnlyList<PreceptCollectionField> CollectionFields,
-    IReadOnlyList<PreceptInvariant>? Invariants = null,
-    IReadOnlyList<StateAssertion>? StateAsserts = null,
+    IReadOnlyList<PreceptRule>? Rules = null,
+    IReadOnlyList<StateEnsure>? StateEnsures = null,
     IReadOnlyList<PreceptStateAction>? StateActions = null,
-    IReadOnlyList<EventAssertion>? EventAsserts = null,
+    IReadOnlyList<EventEnsure>? EventEnsures = null,
     IReadOnlyList<PreceptTransitionRow>? TransitionRows = null,
     IReadOnlyList<PreceptEditBlock>? EditBlocks = null,
     int SourceLine = 0,
@@ -78,7 +78,7 @@ public enum PreceptCollectionKind
 
 /// <summary>
 /// A single declaration-level constraint attached to a field, collection field, or event argument.
-/// Constraints desugar to <c>invariant</c> / <c>on E assert</c> at parse time.
+/// Constraints desugar to <c>rule</c> / <c>on E ensure</c> at parse time.
 /// </summary>
 public abstract record FieldConstraint
 {
@@ -185,8 +185,8 @@ public sealed record Rejection(string? Reason = null) : PreceptClauseOutcome;
 /// <summary>The <c>no transition</c> outcome — event is accepted but state does not change.</summary>
 public sealed record NoTransition : PreceptClauseOutcome;
 
-/// <summary>Preposition for state asserts: <c>in</c>, <c>to</c>, <c>from</c>.</summary>
-public enum AssertAnchor
+/// <summary>Preposition for state ensures: <c>in</c>, <c>to</c>, <c>from</c>.</summary>
+public enum EnsureAnchor
 {
     /// <summary><c>in &lt;State&gt;</c> — while residing in the state (entry + AcceptedInPlace).</summary>
     In,
@@ -197,10 +197,10 @@ public enum AssertAnchor
 }
 
 /// <summary>
-/// A global data invariant: <c>invariant &lt;expr&gt; because "reason"</c>.
+/// A global data rule: <c>rule &lt;expr&gt; because "reason"</c>.
 /// Always holds, checked post-commit on every transition.
 /// </summary>
-public sealed record PreceptInvariant(
+public sealed record PreceptRule(
     string ExpressionText,
     PreceptExpression Expression,
     string Reason,
@@ -210,11 +210,11 @@ public sealed record PreceptInvariant(
     PreceptExpression? WhenGuard = null);
 
 /// <summary>
-/// A state-scoped assert: <c>in/to/from &lt;State&gt; assert &lt;expr&gt; because "reason"</c>.
+/// A state-scoped ensure: <c>in/to/from &lt;State&gt; ensure &lt;expr&gt; because "reason"</c>.
 /// Temporal scope depends on <see cref="Anchor"/>.
 /// </summary>
-public sealed record StateAssertion(
-    AssertAnchor Anchor,
+public sealed record StateEnsure(
+    EnsureAnchor Anchor,
     string State,
     string ExpressionText,
     PreceptExpression Expression,
@@ -228,17 +228,17 @@ public sealed record StateAssertion(
 /// Automatic mutations that fire on state change.
 /// </summary>
 public sealed record PreceptStateAction(
-    AssertAnchor Anchor,
+    EnsureAnchor Anchor,
     string State,
     IReadOnlyList<PreceptSetAssignment> SetAssignments,
     IReadOnlyList<PreceptCollectionMutation>? CollectionMutations = null,
     int SourceLine = 0);
 
 /// <summary>
-/// An event-scoped assert: <c>on &lt;Event&gt; assert &lt;expr&gt; because "reason"</c>.
+/// An event-scoped ensure: <c>on &lt;Event&gt; ensure &lt;expr&gt; because "reason"</c>.
 /// Arg-only validation, checked pre-transition.
 /// </summary>
-public sealed record EventAssertion(
+public sealed record EventEnsure(
     string EventName,
     string ExpressionText,
     PreceptExpression Expression,

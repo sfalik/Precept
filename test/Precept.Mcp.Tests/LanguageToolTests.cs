@@ -22,6 +22,16 @@ public class LanguageToolTests
     }
 
     [Fact]
+    public void VocabularyDoesNotExposeLegacyConstraintKeywords()
+    {
+        var result = LanguageTool.Run();
+
+        result.Vocabulary.DeclarationKeywords.Should().NotContain("invariant");
+        result.Vocabulary.GrammarKeywords.Should().NotContain("assert");
+        result.Vocabulary.ControlKeywords.Should().NotContain("assert");
+    }
+
+    [Fact]
     public void EveryKeywordInTokenEnumAppearsInAllMatchingVocabularyLists()
     {
         var result = LanguageTool.Run();

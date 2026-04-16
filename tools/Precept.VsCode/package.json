@@ -105,18 +105,18 @@
     "semanticTokenTypes": [
       { "id": "preceptComment",         "description": "Precept comment" },
       { "id": "preceptKeywordSemantic", "description": "Precept behavioral structure keyword" },
-      { "id": "preceptKeywordGrammar",  "description": "Precept connective grammar keyword" },
+      { "id": "preceptKeywordGrammar",  "description": "Precept constraint keyword" },
       { "id": "preceptState",           "description": "Precept state name" },
       { "id": "preceptEvent",           "description": "Precept event name" },
       { "id": "preceptFieldName",       "description": "Precept field or argument name" },
-      { "id": "preceptName",           "description": "Precept declaration name" },
+      { "id": "preceptName",            "description": "Precept declaration name" },
       { "id": "preceptType",            "description": "Precept type keyword" },
       { "id": "preceptValue",           "description": "Precept literal value" },
       { "id": "preceptMessage",         "description": "Precept rule message string" }
     ],
 
     "semanticTokenModifiers": [
-      { "id": "preceptConstrained", "description": "Token is under constraint/invariant pressure" }
+      { "id": "preceptConstrained", "description": "Token is under constraint pressure" }
     ],
 
     "semanticTokenScopes": [
@@ -181,11 +181,17 @@
             "foreground": "#9096A6",
             "italic": true
           },
-          "preceptMessage": {
-            "foreground": "#FBBF24"
+          "operator:precept": {
+            "foreground": "#6366F1"
           },
           "preceptName": {
             "foreground": "#A5B4FC"
+          },
+          "preceptMessage": {
+            "foreground": "#FBBF24"
+          },
+          "preceptKeywordGrammar": {
+            "foreground": "#FBBF24"
           }
         }
       },
@@ -193,7 +199,6 @@
         "[*]": {
           "textMateRules": [
             { "scope": "keyword.other.semantic.precept",              "settings": { "foreground": "#4338CA", "fontStyle": "bold" } },
-            { "scope": "keyword.other.grammar.precept",               "settings": { "foreground": "#6366F1" } },
             { "scope": "keyword.other.constraint.precept",            "settings": { "foreground": "#6366F1" } },
             { "scope": "keyword.control.precept",                "settings": { "foreground": "#4338CA", "fontStyle": "bold" } },
             { "scope": "keyword.other.precept",                  "settings": { "foreground": "#4338CA", "fontStyle": "bold" } },
@@ -206,11 +211,11 @@
             { "scope": "variable.other.property.precept",        "settings": { "foreground": "#B0BEC5" } },
             { "scope": "variable.other.precept",                 "settings": { "foreground": "#B0BEC5" } },
             { "scope": "variable.parameter.precept",             "settings": { "foreground": "#B0BEC5" } },
+            { "scope": "entity.name.type.precept.precept",       "settings": { "foreground": "#A5B4FC" } },
             { "scope": "storage.type.precept",                   "settings": { "foreground": "#9AA8B5" } },
             { "scope": "constant.other.value.precept",           "settings": { "foreground": "#84929F" } },
             { "scope": "constant.language.precept",              "settings": { "foreground": "#84929F" } },
             { "scope": "constant.numeric.precept",               "settings": { "foreground": "#84929F" } },
-            { "scope": "entity.name.type.precept.precept",         "settings": { "foreground": "#A5B4FC" } },
             { "scope": "string.quoted.double.precept",           "settings": { "foreground": "#84929F" } },
             { "scope": "string.quoted.double.message.precept",   "settings": { "foreground": "#FBBF24" } },
             { "scope": "keyword.operator.comparison.precept",    "settings": { "foreground": "#6366F1" } },
@@ -220,6 +225,8 @@
             { "scope": "punctuation.separator.arrow.precept",    "settings": { "foreground": "#6366F1" } },
             { "scope": "punctuation.separator.comma.precept",    "settings": { "foreground": "#6366F1" } },
             { "scope": "punctuation.accessor.precept",           "settings": { "foreground": "#6366F1" } },
+            { "scope": "punctuation.section.group.begin.precept", "settings": { "foreground": "#6366F1" } },
+            { "scope": "punctuation.section.group.end.precept",   "settings": { "foreground": "#6366F1" } },
             { "scope": "comment.line.number-sign.precept",       "settings": { "foreground": "#9096A6", "fontStyle": "italic" } }
           ]
         }

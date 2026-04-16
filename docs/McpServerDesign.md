@@ -81,18 +81,20 @@ The `vocabulary` object contains the following keyword lists, each reflecting `P
 
 | Property | `TokenCategory` | Keywords |
 |---|---|---|
-| `ControlKeywords` | `Control` | `when` |
-| `DeclarationKeywords` | `Declaration` | `precept`, `field`, `invariant`, `state`, `event`, `assert`, `edit`, `in`, `to`, `from`, `on` |
-| `GrammarKeywords` | `Grammar` | `as`, `with`, `nullable`, `default`, `because`, `any`, `all`, `of`, `into`, `initial` |
+| `ControlKeywords` | `Control` | `when`, `if`, `then`, `else` |
+| `DeclarationKeywords` | `Declaration` | `precept`, `field`, `as`, `nullable`, `default`, `because`, `state`, `initial`, `event`, `with`, `edit`, `in`, `to`, `from`, `on`, `any`, `all`, `of`, `into` |
+| `GrammarKeywords` | `Grammar` | `rule`, `ensure` |
 | `ActionKeywords` | `Action` | `set`, `add`, `remove`, `enqueue`, `dequeue`, `push`, `pop`, `clear` |
 | `OutcomeKeywords` | `Outcome` | `transition`, `no`, `reject` |
 | `TypeKeywords` | `Type` | `set`, `string`, `number`, `boolean`, `integer`, `decimal`, `choice`, `queue`, `stack` |
 | `ConstraintKeywords` | `Constraint` | `nonnegative`, `positive`, `min`, `max`, `notempty`, `minlength`, `maxlength`, `mincount`, `maxcount`, `maxplaces`, `ordered` |
 | `LiteralKeywords` | `Literal` | `true`, `false`, `null` |
 
-`GrammarKeywords` contains connective and modifier keywords that serve a structural grammar role — they join, qualify, or introduce parts of declarations — rather than performing computation or control flow.
+`GrammarKeywords` contains the constraint-declaration keywords `rule` and `ensure` — the two keywords that define data-truth rules and movement-truth ensures respectively. These get special visual treatment (gold highlighting) in the editor.
 
-`ControlKeywords` is intentionally narrow: it is reserved for actual guard/control-flow tokens. Statement anchors such as `state`, `in`, `to`, `from`, and `on` are emitted under `DeclarationKeywords` so the vocabulary mirrors the runtime token metadata used by syntax highlighting and semantic tokens.
+`DeclarationKeywords` contains statement anchors (`precept`, `field`, `state`, `event`, `edit`, `in`, `to`, `from`, `on`) and connective/modifier keywords (`as`, `with`, `nullable`, `default`, `because`, `initial`, `any`, `all`, `of`, `into`) that join, qualify, or introduce parts of declarations.
+
+`ControlKeywords` is intentionally narrow: it is reserved for actual guard/control-flow tokens (`when`, `if`, `then`, `else`). Statement anchors such as `state`, `in`, `to`, `from`, and `on` are emitted under `DeclarationKeywords` so the vocabulary mirrors the runtime token metadata used by syntax highlighting and semantic tokens.
 
 **Scalar type reference** — the `typeKeywords` list includes:
 
@@ -189,7 +191,25 @@ The `functions` section in the JSON output provides structured `FunctionDto` obj
     }
   ],
   "transitions": [
-    { "from": "InProgress", "on": "Block", "branches": ["if → Blocked", "else → reject"] }
+    {
+      "from": "InProgress",
+      "on": "Block",
+      "branches": [
+        { "outcome": "transition", "target": "Blocked" }
+      ]
+    }
+  ],
+  "rules": [
+    { "expression": "Priority >= 1", "reason": "Priority must be positive", "line": 4, "isSynthetic": false }
+  ],
+  "stateEnsures": [
+    { "anchor": "in", "state": "Blocked", "expression": "Assignee != null", "reason": "Must have an assignee while blocked", "line": 11 }
+  ],
+  "eventEnsures": [
+    { "event": "Block", "expression": "Reason != \"\"", "reason": "Reason required", "line": 15 }
+  ],
+  "editBlocks": [
+    { "state": "InProgress", "fields": ["Priority"], "line": 18 }
   ],
   "diagnostics": [
     { "line": 0, "message": "State 'Archived' is unreachable from the initial state.", "code": "PRECEPT048", "severity": "warning" }
@@ -230,14 +250,16 @@ The `functions` section in the JSON output provides structured `FunctionDto` obj
 
 **Implementation:** Calls `PreceptCompiler.CompileFromText(text)` — a composed pipeline that runs parse → structured validation → compile. Returns the full model projection when parsing succeeds (even with type errors), diagnostics only when parsing fails. Graph analysis findings (C48–C53) appear as warning/hint-severity diagnostics alongside any type errors. The tool is a thin projection of the core result into JSON.
 
-**Declaration arrays:** The compile output includes four arrays surfacing invariants, state asserts, event asserts, and edit blocks from the parsed definition:
+**Declaration arrays:** The compile output includes four arrays surfacing rules, state ensures, event ensures, and edit blocks from the parsed definition:
 
 | Array | Item shape |
 |-------|------------|
-| `invariants` | `{ expression, when?, reason, line, isSynthetic }` |
-| `stateAsserts` | `{ anchor, state, expression, when?, reason, line }` |
-| `eventAsserts` | `{ event, expression, when?, reason, line }` |
+| `rules` | `{ expression, when?, reason, line, isSynthetic }` |
+| `stateEnsures` | `{ anchor, state, expression, when?, reason, line }` |
+| `eventEnsures` | `{ event, expression, when?, reason, line }` |
 | `editBlocks` | `{ state?, when?, fields[], line }` |
+
+The per-state `states[].rules` array is a lightweight summary of state-ensure reasons for that state. The authoritative declaration-level data lives in the top-level `rules`, `stateEnsures`, `eventEnsures`, and `editBlocks` arrays.
 
 The `when` property is present only when the declaration includes a `when <Guard>` clause. It contains the guard expression text.
 
@@ -312,7 +334,7 @@ The `eventArgs` field is optional. When provided, the specified args are used fo
         {
           "message": "Cannot leave InProgress without completion note",
           "source": {
-            "kind": "state-assertion",
+            "kind": "state-ensure",
             "stateName": "InProgress",
             "anchor": "from",
             "expressionText": "CompletionNote != null",
@@ -407,7 +429,7 @@ The `currentState` and `data` inputs match the same shape as `precept_inspect`. 
     {
       "message": "Cannot leave InProgress without completion note",
       "source": {
-        "kind": "state-assertion",
+        "kind": "state-ensure",
         "stateName": "InProgress",
         "anchor": "from",
         "expressionText": "CompletionNote != null",
@@ -484,7 +506,7 @@ The `fields` object contains the field names and new values to apply. At least o
   "violations": [
     {
       "message": "Priority must be between 1 and 5",
-      "source": { "kind": "invariant", "expressionText": "Priority >= 1 and Priority <= 5", "reason": "Priority must be between 1 and 5", "sourceLine": 8 },
+      "source": { "kind": "rule", "expressionText": "Priority >= 1 and Priority <= 5", "reason": "Priority must be between 1 and 5", "sourceLine": 8 },
       "targets": [{ "kind": "field", "fieldName": "Priority" }]
     }
   ],
@@ -516,9 +538,7 @@ Fields: `line` (1-based), `column` (0-based, optional), `message`, `code` (optio
 {
   "message": "Approved total cannot exceed requested total",
   "source": {
-    "kind": "invariant",
-    "stateName": null,
-    "anchor": null,
+    "kind": "rule",
     "expressionText": "ApprovedTotal <= RequestedTotal",
     "reason": "Approved total cannot exceed requested total",
     "sourceLine": 18
@@ -538,8 +558,8 @@ Fields: `line` (1-based), `column` (0-based, optional), `message`, `code` (optio
 
 `ViolationDto` is a full projection of core `ConstraintViolation`:
 
-- **`source`** — projects `ConstraintSource` (4 subtypes: `invariant`, `state-assertion`, `event-assertion`, `transition-rejection`). Each subtype carries its relevant fields (expression text, reason, state name, anchor, event name, source line).
-- **`targets`** — projects `ConstraintTarget[]` (5 subtypes: `field`, `event-arg`, `event`, `state`, `definition`). Each subtype carries its relevant identifiers. For field-based rule violations, `targets` represents the full semantic dependency set, not just the field names written literally in the rule text: if a violated invariant or state assertion reads a computed field, the violation includes that computed field and every transitive field input beneath it, while still carrying the normal scope target.
+- **`source`** — projects `ConstraintSource` (4 subtypes: `rule`, `state-ensure`, `event-ensure`, `transition-rejection`). Each subtype carries its relevant fields (expression text, reason, state name, anchor, event name, source line).
+- **`targets`** — projects `ConstraintTarget[]` (5 subtypes: `field`, `event-arg`, `event`, `state`, `definition`). Each subtype carries its relevant identifiers. For field-based rule violations, `targets` represents the full semantic dependency set, not just the field names written literally in the rule text: if a violated rule or state ensure reads a computed field, the violation includes that computed field and every transitive field input beneath it, while still carrying the normal scope target.
 
 This means `precept_inspect`, `precept_fire`, and `precept_update` report the entity data the violated rule actually depends on, explicitly and implicitly, so AI and UI consumers can attribute the failure to the real editable surface without reconstructing the computed-field graph themselves.
 

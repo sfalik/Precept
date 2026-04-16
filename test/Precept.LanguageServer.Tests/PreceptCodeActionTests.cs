@@ -82,7 +82,7 @@ public class PreceptCodeActionTests
             event Go
 
             event Unused with Amount as number
-            on Unused assert Amount > 0 because "Amount must be positive"
+            on Unused ensure Amount > 0 because "Amount must be positive"
 
             from A on Go -> no transition
             """;

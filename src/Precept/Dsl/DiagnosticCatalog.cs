@@ -172,23 +172,23 @@ public static class DiagnosticCatalog
         "Exactly one state must be marked initial.",
         "Exactly one state must be marked initial. Use 'state <Name> initial'.");
 
-    /// <summary>Event assert expressions using dotted access must use the event name as prefix.</summary>
+    /// <summary>Event ensure expressions using dotted access must use the event name as prefix.</summary>
     public static readonly LanguageConstraint C14 = Register(
         "C14", "parse",
-        "Event assert expressions using dotted access must use the event name as prefix.",
-        "'on {eventName} assert' can only reference event argument identifiers. '{prefix}.{member}' uses an unknown prefix.");
+        "Event ensure expressions using dotted access must use the event name as prefix.",
+        "'on {eventName} ensure' can only reference event argument identifiers. '{prefix}.{member}' uses an unknown prefix.");
 
-    /// <summary>Event assert dotted member must be a declared argument of the event.</summary>
+    /// <summary>Event ensure dotted member must be a declared argument of the event.</summary>
     public static readonly LanguageConstraint C15 = Register(
         "C15", "parse",
-        "Event assert dotted member must be a declared argument of the event.",
-        "'on {eventName} assert' can only reference event argument identifiers. '{member}' is not an event argument of '{eventName}'.");
+        "Event ensure dotted member must be a declared argument of the event.",
+        "'on {eventName} ensure' can only reference event argument identifiers. '{member}' is not an event argument of '{eventName}'.");
 
-    /// <summary>Event assert plain identifiers must be declared arguments of the event.</summary>
+    /// <summary>Event ensure plain identifiers must be declared arguments of the event.</summary>
     public static readonly LanguageConstraint C16 = Register(
         "C16", "parse",
-        "Event assert plain identifiers must be declared arguments of the event.",
-        "'on {eventName} assert' can only reference event argument identifiers. '{identifier}' is not an event argument of '{eventName}'.");
+        "Event ensure plain identifiers must be declared arguments of the event.",
+        "'on {eventName} ensure' can only reference event argument identifiers. '{identifier}' is not an event argument of '{eventName}'.");
 
     /// <summary>Non-nullable fields must have a default value.</summary>
     public static readonly LanguageConstraint C17 = Register(
@@ -266,29 +266,29 @@ public static class DiagnosticCatalog
         "The initial state must be a declared state in the workflow (compile-time validation).",
         "Initial state '{stateName}' is not defined in workflow '{workflowName}'.");
 
-    /// <summary>Invariants must hold for default field values at compile time.</summary>
+    /// <summary>Rules must hold for default field values at compile time.</summary>
     public static readonly LanguageConstraint C29 = Register(
         "C29", "compile",
-        "Invariants must hold for default field values at compile time.",
-        "Compile-time invariant violation: \"{reason}\" is violated by default field values.");
+        "Rules must hold for default field values at compile time.",
+        "Compile-time rule violation: \"{reason}\" is violated by default field values.");
 
-    /// <summary>State asserts (in/to) on the initial state must hold for default data at compile time.</summary>
+    /// <summary>State ensures (in/to) on the initial state must hold for default data at compile time.</summary>
     public static readonly LanguageConstraint C30 = Register(
         "C30", "compile",
-        "State asserts (in/to) on the initial state must hold for default data at compile time.",
-        "Compile-time state assert violation: \"{reason}\" on initial state '{stateName}' is violated by default data.");
+        "State ensures (in/to) on the initial state must hold for default data at compile time.",
+        "Compile-time state ensure violation: \"{reason}\" on initial state '{stateName}' is violated by default data.");
 
-    /// <summary>Event asserts must hold for default argument values at compile time (when all args have defaults).</summary>
+    /// <summary>Event ensures must hold for default argument values at compile time (when all args have defaults).</summary>
     public static readonly LanguageConstraint C31 = Register(
         "C31", "compile",
-        "Event asserts must hold for default argument values at compile time (when all args have defaults).",
-        "Compile-time event assert violation: \"{reason}\" on event '{eventName}' is violated by default argument values.");
+        "Event ensures must hold for default argument values at compile time (when all args have defaults).",
+        "Compile-time event ensure violation: \"{reason}\" on event '{eventName}' is violated by default argument values.");
 
-    /// <summary>Literal set assignments in transition rows must not violate invariants at compile time.</summary>
+    /// <summary>Literal set assignments in transition rows must not violate rules at compile time.</summary>
     public static readonly LanguageConstraint C32 = Register(
         "C32", "compile",
-        "Literal set assignments in transition rows must not violate invariants at compile time.",
-        "Line {sourceLine}: literal assignment 'set {key} = {expression}' violates invariant \"{reason}\".");
+        "Literal set assignments in transition rows must not violate rules at compile time.",
+        "Line {sourceLine}: literal assignment 'set {key} = {expression}' violates rule \"{reason}\".");
 
     // ═══════════════════════════════════════════════════════════════
     // Runtime-phase constraints (C33–C37)
@@ -368,22 +368,22 @@ public static class DiagnosticCatalog
     // Compile-phase structural constraints (C44–C47)
     // ═══════════════════════════════════════════════════════════════
 
-    /// <summary>Duplicate assert: same preposition, state, and expression text appearing more than once.</summary>
+    /// <summary>Duplicate ensure: same preposition, state, and expression text appearing more than once.</summary>
     public static readonly LanguageConstraint C44 = Register(
         "C44", "compile",
-        "Duplicate assert: same preposition, state, and expression appearing more than once.",
-        "Duplicate state assert: '{preposition} {state} assert {expression}' appears more than once (line {sourceLine}).");
+        "Duplicate ensure: same preposition, state, and expression appearing more than once.",
+        "Duplicate state ensure: '{preposition} {state} ensure {expression}' appears more than once (line {sourceLine}).");
 
-    /// <summary>Subsumed assert: 'to' assert is redundant when an identical 'in' assert exists on the same state.</summary>
+    /// <summary>Subsumed ensure: 'to' ensure is redundant when an identical 'in' ensure exists on the same state.</summary>
     public static readonly LanguageConstraint C45 = Register(
         "C45", "compile",
-        "Subsumed assert: 'to' assert is redundant when an identical 'in' assert exists on the same state.",
-        "Subsumed state assert: 'to {state} assert {expression}' is redundant — an identical 'in {state} assert' already covers entry (line {sourceLine}).");
+        "Subsumed ensure: 'to' ensure is redundant when an identical 'in' ensure exists on the same state.",
+        "Subsumed state ensure: 'to {state} ensure {expression}' is redundant — an identical 'in {state} ensure' already covers entry (line {sourceLine}).");
 
-    /// <summary>Expressions in rule positions (guards, invariants, asserts) must produce a boolean value.</summary>
+    /// <summary>Expressions in rule positions (guards, rules, ensures) must produce a boolean value.</summary>
     public static readonly LanguageConstraint C46 = Register(
         "C46", "compile",
-        "Expressions in rule positions (guards, invariants, asserts) must produce a boolean value.",
+        "Expressions in rule positions (guards, rules, ensures) must produce a boolean value.",
         "{context} must be a boolean expression, but expression produces {actual}.");
 
     /// <summary>Identical guard on duplicate transition rows for the same state+event pair.</summary>
@@ -549,7 +549,7 @@ public static class DiagnosticCatalog
     public static readonly LanguageConstraint C69 = Register(
         "C69", "compile",
         "Cross-scope guard reference in when clause.",
-        "Guard expression references '{name}' which belongs to a different scope. Invariant and edit guards can only reference entity fields; event assert guards can only reference event arguments.");
+        "Guard expression references '{name}' which belongs to a different scope. Rule and edit guards can only reference entity fields; event ensure guards can only reference event arguments.");
 
     // ═══════════════════════════════════════════════════════════════
     // Modifier diagnostics (C70+)

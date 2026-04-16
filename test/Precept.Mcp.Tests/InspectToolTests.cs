@@ -227,7 +227,7 @@ public class InspectToolTests
         var text = """
             precept Test
             field Name as string nullable
-            in Done assert Name != null because "Done requires a name"
+            in Done ensure Name != null because "Done requires a name"
             state Open initial
             state Done
             event Finish
@@ -241,7 +241,7 @@ public class InspectToolTests
         finish!.Outcome.Should().Be("ConstraintFailure");
         finish.Violations.Should().NotBeEmpty();
         finish.Violations[0].Message.Should().Contain("Done requires a name");
-        finish.Violations[0].Source.Kind.Should().Be("state-assertion");
+        finish.Violations[0].Source.Kind.Should().Be("state-ensure");
         finish.Violations[0].Targets.Should().Contain(t => t.Kind == "field" && t.FieldName == "Name");
     }
 
@@ -288,7 +288,7 @@ field Name as string default "valid"
 state Open initial
 state Done
 event Update with NewName as string
-invariant Name.length >= 2 because "Name must be at least 2 characters"
+rule Name.length >= 2 because "Name must be at least 2 characters"
 from Open on Update -> set Name = Update.NewName -> transition Done
 """;
 
@@ -312,20 +312,20 @@ from Open on Update -> set Name = Update.NewName -> transition Done
     // ════════════════════════════════════════════════════════════════════
 
     [Fact]
-    public void Inspect_GuardedInvariant_GuardFalse_NoViolation()
+    public void Inspect_GuardedRule_GuardFalse_NoViolation()
     {
         var text = """
             precept Test
             field X as number default 0
             field Active as boolean default false
-            invariant X > 0 when Active because "X must be positive when active"
+            rule X > 0 when Active because "X must be positive when active"
             state Open initial
             state Done
             event Finish
             from Open on Finish -> transition Done
             """;
 
-        // Active = false → guard is false → invariant should not fire
+        // Active = false → guard is false → rule should not fire
         var data = new Dictionary<string, object?>
         {
             ["X"] = 0.0,
@@ -338,7 +338,7 @@ from Open on Update -> set Name = Update.NewName -> transition Done
         var finish = result.Events.FirstOrDefault(e => e.Event == "Finish");
         finish.Should().NotBeNull();
         finish!.Outcome.Should().Be("Transition",
-            "when the invariant guard is false, the invariant should be skipped and the transition should succeed");
+            "when the rule guard is false, the rule should be skipped and the transition should succeed");
     }
 
     [Fact]

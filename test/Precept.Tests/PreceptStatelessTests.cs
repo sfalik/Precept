@@ -210,7 +210,7 @@ public class PreceptStatelessParserTests
 public class PreceptStatelessTypeCheckerTests
 {
     [Fact]
-    public void TypeCheck_StatelessWithInvariant_EnforcedAtCompile()
+    public void TypeCheck_StatelessWithRule_EnforcedAtCompile()
     {
         const string dsl = """
             precept FeeSchedule
@@ -218,12 +218,12 @@ public class PreceptStatelessTypeCheckerTests
             field BaseFee as number default 0
             field Discount as number default 0
 
-            invariant Discount <= BaseFee because "Discount cannot exceed base fee"
+            rule Discount <= BaseFee because "Discount cannot exceed base fee"
 
             edit BaseFee, Discount
             """;
 
-        // Compiles OK because default values satisfy the invariant (0 <= 0)
+        // Compiles OK because default values satisfy the rule (0 <= 0)
         var result = PreceptCompiler.CompileFromText(dsl);
 
         result.Engine.Should().NotBeNull();
@@ -587,20 +587,20 @@ public class PreceptStatelessUpdateTests
     }
 
     [Fact]
-    public void Update_Stateless_InvariantViolation_ReturnsViolation()
+    public void Update_Stateless_RuleViolation_ReturnsViolation()
     {
         const string dsl = """
             precept FeeSchedule
             field BaseFee as number default 50
             field Discount as number default 0
-            invariant Discount <= BaseFee because "Discount cannot exceed base fee"
+            rule Discount <= BaseFee because "Discount cannot exceed base fee"
             edit BaseFee, Discount
             """;
 
         var engine = PreceptCompiler.Compile(PreceptParser.Parse(dsl));
         var instance = engine.CreateInstance();
 
-        // Set Discount to 200 while BaseFee is 50 — violates invariant
+        // Set Discount to 200 while BaseFee is 50 — violates rule
         var result = engine.Update(instance, patch => patch.Set("Discount", 200.0));
 
         result.Outcome.Should().Be(UpdateOutcome.ConstraintFailure);
@@ -755,7 +755,7 @@ public class PreceptStatelessIntegrationTests
     }
 
     [Fact]
-    public void Integration_StatelessWithInvariant_ViolationCaughtOnUpdate()
+    public void Integration_StatelessWithRule_ViolationCaughtOnUpdate()
     {
         const string dsl = """
             precept BudgetProfile
@@ -763,7 +763,7 @@ public class PreceptStatelessIntegrationTests
             field Budget as number default 1000
             field Spent as number default 0
 
-            invariant Spent <= Budget because "Cannot exceed budget"
+            rule Spent <= Budget because "Cannot exceed budget"
 
             edit Budget, Spent
             """;

@@ -10,16 +10,16 @@ field WalkInOpen as boolean default true
 
 field PartyQueue as queue of string
 
-invariant EstimatedWaitMinutes >= 0 because "Estimated wait time cannot be negative"
+rule EstimatedWaitMinutes >= 0 because "Estimated wait time cannot be negative"
 
 state Accepting initial
 state Seating
 state Closed
 
-in Seating assert CurrentParty != null because "The seating state must know which party is being seated"
+in Seating ensure CurrentParty != null because "The seating state must know which party is being seated"
 
 event JoinWaitlist with PartyName as string
-on JoinWaitlist assert PartyName != "" because "A party name is required"
+on JoinWaitlist ensure PartyName != "" because "A party name is required"
 
 event SeatNextParty
 event MarkSeated

@@ -71,12 +71,12 @@
 <span class="k">field</span> <span class="d">PlanName</span> <span class="k">as</span> <span class="n">string</span> <span class="k">nullable</span>
 <span class="k">field</span> <span class="d">MonthlyPrice</span> <span class="k">as</span> <span class="n">number</span> <span class="k">default</span> <span class="n">0</span>
 
-<span class="k">invariant</span> <span class="d">MonthlyPrice</span> <span class="n">&gt;= 0</span> <span class="k">because</span> <span class="m">"Monthly price cannot be negative"</span>
+<span class="k">rule</span> <span class="d">MonthlyPrice</span> <span class="n">&gt;= 0</span> <span class="k">because</span> <span class="m">"Monthly price cannot be negative"</span>
 
 <span class="k">state</span> <span class="s">Trial</span> <span class="k">initial</span><span class="n">,</span> <span class="s">Active</span><span class="n">,</span> <span class="s">Cancelled</span>
 
 <span class="k">event</span> <span class="e">Activate</span> <span class="k">with</span> <span class="d">Plan</span> <span class="k">as</span> <span class="n">string</span><span class="n">,</span> <span class="d">Price</span> <span class="k">as</span> <span class="n">number</span>
-<span class="k">on</span> <span class="e">Activate</span> <span class="k">assert</span> <span class="d">Price</span> <span class="n">&gt; 0</span> <span class="k">because</span> <span class="m">"Plan price must be positive"</span>
+<span class="k">on</span> <span class="e">Activate</span> <span class="k">ensure</span> <span class="d">Price</span> <span class="n">&gt; 0</span> <span class="k">because</span> <span class="m">"Plan price must be positive"</span>
 
 <span class="k">event</span> <span class="e">Cancel</span>
 
@@ -85,7 +85,6 @@
   <span class="n">-&gt;</span> <span class="k">set</span> <span class="d">MonthlyPrice</span> <span class="n">=</span> <span class="e">Activate</span><span class="n">.</span><span class="d">Price</span>
   <span class="n">-&gt;</span> <span class="k">transition</span> <span class="s">Active</span>
 <span class="k">from</span> <span class="s">Active</span> <span class="k">on</span> <span class="e">Activate</span> <span class="n">-&gt;</span> <span class="k">set</span> <span class="d">MonthlyPrice</span> <span class="n">=</span> <span class="e">Activate</span><span class="n">.</span><span class="d">Price</span> <span class="n">-&gt;</span> <span class="k">no transition</span>
-<span class="k">from</span> <span class="s">Active</span> <span class="k">on</span> <span class="e">Cancel</span> <span class="n">-&gt;</span> <span class="k">transition</span> <span class="s">Cancelled</span>
-<span class="k">from</span> <span class="s">Cancelled</span> <span class="k">on</span> <span class="e">Activate</span> <span class="n">-&gt;</span> <span class="k">reject</span> <span class="m">"Cancelled subscriptions cannot be reactivated"</span></code></pre>
+<span class="k">from</span> <span class="s">Active</span> <span class="k">on</span> <span class="e">Cancel</span> <span class="n">-&gt;</span> <span class="k">transition</span> <span class="s">Cancelled</span></code></pre>
 </body>
 </html>

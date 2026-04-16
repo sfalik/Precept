@@ -119,9 +119,9 @@ internal static class PreceptTypeChecker
             field => field,
             StringComparer.Ordinal);
 
-        var stateAssertNarrowings = BuildStateAssertNarrowings(model, dataFieldKinds);
-        ValidateTransitionRows(model, dataFieldKinds, eventArgKinds, collectionFieldMap, stateAssertNarrowings, diagnostics, expressions, scopes);
-        ValidateStateActions(model, dataFieldKinds, collectionFieldMap, stateAssertNarrowings, diagnostics, expressions, scopes);
+        var stateEnsureNarrowings = BuildStateEnsureNarrowings(model, dataFieldKinds);
+        ValidateTransitionRows(model, dataFieldKinds, eventArgKinds, collectionFieldMap, stateEnsureNarrowings, diagnostics, expressions, scopes);
+        ValidateStateActions(model, dataFieldKinds, collectionFieldMap, stateEnsureNarrowings, diagnostics, expressions, scopes);
         ValidateFieldConstraints(model, diagnostics);
         ValidateRules(model, dataFieldKinds, eventArgKinds, diagnostics, expressions, scopes);
 
@@ -193,7 +193,7 @@ internal static class PreceptTypeChecker
         IReadOnlyDictionary<string, StaticValueKind> dataFieldKinds,
         IReadOnlyDictionary<string, Dictionary<string, StaticValueKind>> eventArgKinds,
         IReadOnlyDictionary<string, PreceptCollectionField> collectionFieldMap,
-        IReadOnlyDictionary<string, IReadOnlyDictionary<string, StaticValueKind>> stateAssertNarrowings,
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, StaticValueKind>> stateEnsureNarrowings,
         List<PreceptValidationDiagnostic> diagnostics,
         List<PreceptTypeExpressionInfo> expressions,
         List<PreceptTypeScopeInfo> scopes)
@@ -219,7 +219,7 @@ internal static class PreceptTypeChecker
                     eventArgKinds,
                     eventName,
                     model.CollectionFields,
-                    stateAssertNarrowings.TryGetValue(stateGroup.Key, out var stateNarrowing) ? stateNarrowing : null);
+                    stateEnsureNarrowings.TryGetValue(stateGroup.Key, out var stateNarrowing) ? stateNarrowing : null);
                 scopes.Add(new PreceptTypeScopeInfo(
                     stateGroup.Min(x => x.Row.SourceLine),
                     "transition-base",
@@ -342,7 +342,7 @@ internal static class PreceptTypeChecker
         PreceptDefinition model,
         IReadOnlyDictionary<string, StaticValueKind> dataFieldKinds,
         IReadOnlyDictionary<string, PreceptCollectionField> collectionFieldMap,
-        IReadOnlyDictionary<string, IReadOnlyDictionary<string, StaticValueKind>> stateAssertNarrowings,
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, StaticValueKind>> stateEnsureNarrowings,
         List<PreceptValidationDiagnostic> diagnostics,
         List<PreceptTypeExpressionInfo> expressions,
         List<PreceptTypeScopeInfo> scopes)
@@ -356,9 +356,9 @@ internal static class PreceptTypeChecker
 
         foreach (var action in model.StateActions)
         {
-            // Build data-only symbols with collection accessors, narrowed by state asserts
+            // Build data-only symbols with collection accessors, narrowed by state ensures
             var baseSymbols = new Dictionary<string, StaticValueKind>(
-                stateAssertNarrowings.TryGetValue(action.State, out var narrowed) ? narrowed : dataFieldKinds,
+                stateEnsureNarrowings.TryGetValue(action.State, out var narrowed) ? narrowed : dataFieldKinds,
                 StringComparer.Ordinal);
 
             foreach (var col in model.CollectionFields)
@@ -437,7 +437,7 @@ internal static class PreceptTypeChecker
     /// Validates field/arg-level constraint suffixes for type compatibility (C57),
     /// contradiction/duplicate (C58), and default-value violations (C59).
     /// Runs before <see cref="ValidateRules"/> so errors are attributed to constraints,
-    /// not to the synthetic invariants they generate.
+    /// not to the synthetic rules they generate.
     /// </summary>
     private static void ValidateFieldConstraints(
         PreceptDefinition model,
@@ -1111,115 +1111,115 @@ internal static class PreceptTypeChecker
 
         scopes.Add(new PreceptTypeScopeInfo(1, "data-rules", new Dictionary<string, StaticValueKind>(dataSymbols, StringComparer.Ordinal)));
 
-        if (model.Invariants is not null)
+        if (model.Rules is not null)
         {
-            foreach (var invariant in model.Invariants)
+            foreach (var rule in model.Rules)
             {
                 ValidateExpression(
-                    invariant.Expression,
-                    invariant.ExpressionText,
-                    invariant.SourceLine,
+                    rule.Expression,
+                    rule.ExpressionText,
+                    rule.SourceLine,
                     dataSymbols,
                     StaticValueKind.Boolean,
-                    "invariant",
+                    "rule",
                     diagnostics,
                     expressions,
                     isBooleanRulePosition: true);
 
-                if (invariant.WhenGuard is not null)
+                if (rule.WhenGuard is not null)
                 {
                     ValidateExpression(
-                        invariant.WhenGuard,
-                        invariant.WhenText!,
-                        invariant.SourceLine,
+                        rule.WhenGuard,
+                        rule.WhenText!,
+                        rule.SourceLine,
                         dataSymbols,
                         StaticValueKind.Boolean,
-                        "invariant when guard",
+                        "rule when guard",
                         diagnostics,
                         expressions,
                         isBooleanRulePosition: true);
 
                     // SYNC:CONSTRAINT:C69
-                    CheckCrossScopeGuardIdentifiers(invariant.WhenGuard, dataSymbols, invariant.SourceLine, diagnostics);
+                    CheckCrossScopeGuardIdentifiers(rule.WhenGuard, dataSymbols, rule.SourceLine, diagnostics);
                 }
             }
         }
 
-        if (model.StateAsserts is not null)
+        if (model.StateEnsures is not null)
         {
-            foreach (var stateAssert in model.StateAsserts)
+            foreach (var stateEnsure in model.StateEnsures)
             {
                 ValidateExpression(
-                    stateAssert.Expression,
-                    stateAssert.ExpressionText,
-                    stateAssert.SourceLine,
+                    stateEnsure.Expression,
+                    stateEnsure.ExpressionText,
+                    stateEnsure.SourceLine,
                     dataSymbols,
                     StaticValueKind.Boolean,
-                    $"state assert on '{stateAssert.State}'",
+                    $"state ensure on '{stateEnsure.State}'",
                     diagnostics,
                     expressions,
-                    stateContext: stateAssert.State,
+                    stateContext: stateEnsure.State,
                     isBooleanRulePosition: true);
 
-                if (stateAssert.WhenGuard is not null)
+                if (stateEnsure.WhenGuard is not null)
                 {
                     ValidateExpression(
-                        stateAssert.WhenGuard,
-                        stateAssert.WhenText!,
-                        stateAssert.SourceLine,
+                        stateEnsure.WhenGuard,
+                        stateEnsure.WhenText!,
+                        stateEnsure.SourceLine,
                         dataSymbols,
                         StaticValueKind.Boolean,
-                        "state assert when guard",
+                        "state ensure when guard",
                         diagnostics,
                         expressions,
-                        stateContext: stateAssert.State,
+                        stateContext: stateEnsure.State,
                         isBooleanRulePosition: true);
 
                     // SYNC:CONSTRAINT:C69
-                    CheckCrossScopeGuardIdentifiers(stateAssert.WhenGuard, dataSymbols, stateAssert.SourceLine, diagnostics);
+                    CheckCrossScopeGuardIdentifiers(stateEnsure.WhenGuard, dataSymbols, stateEnsure.SourceLine, diagnostics);
                 }
             }
         }
 
-        if (model.EventAsserts is not null)
+        if (model.EventEnsures is not null)
         {
-            foreach (var eventAssert in model.EventAsserts)
+            foreach (var eventEnsure in model.EventEnsures)
             {
-                var symbols = BuildEventAssertSymbols(model, eventArgKinds, eventAssert.EventName);
+                var symbols = BuildEventEnsureSymbols(model, eventArgKinds, eventEnsure.EventName);
                 scopes.Add(new PreceptTypeScopeInfo(
-                    eventAssert.SourceLine,
-                    "event-assert",
+                    eventEnsure.SourceLine,
+                    "event-ensure",
                     new Dictionary<string, StaticValueKind>(symbols, StringComparer.Ordinal),
                     null,
-                    eventAssert.EventName));
+                    eventEnsure.EventName));
                 ValidateExpression(
-                    eventAssert.Expression,
-                    eventAssert.ExpressionText,
-                    eventAssert.SourceLine,
+                    eventEnsure.Expression,
+                    eventEnsure.ExpressionText,
+                    eventEnsure.SourceLine,
                     symbols,
                     StaticValueKind.Boolean,
-                    $"event assert on '{eventAssert.EventName}'",
+                    $"event ensure on '{eventEnsure.EventName}'",
                     diagnostics,
                     expressions,
-                    eventName: eventAssert.EventName,
+                    eventName: eventEnsure.EventName,
                     isBooleanRulePosition: true);
 
-                if (eventAssert.WhenGuard is not null)
+                if (eventEnsure.WhenGuard is not null)
                 {
                     ValidateExpression(
-                        eventAssert.WhenGuard,
-                        eventAssert.WhenText!,
-                        eventAssert.SourceLine,
+                        eventEnsure.WhenGuard,
+                        eventEnsure.WhenText!,
+                        eventEnsure.SourceLine,
                         symbols,
                         StaticValueKind.Boolean,
-                        "event assert when guard",
+                        "event ensure when guard",
                         diagnostics,
                         expressions,
-                        eventName: eventAssert.EventName,
+                        eventName: eventEnsure.EventName,
                         isBooleanRulePosition: true);
 
                     // SYNC:CONSTRAINT:C69
-                    CheckCrossScopeGuardIdentifiers(eventAssert.WhenGuard, symbols, eventAssert.SourceLine, diagnostics);
+                    CheckCrossScopeGuardIdentifiers(eventEnsure.WhenGuard, symbols, eventEnsure.SourceLine, diagnostics);
                 }
             }
         }
@@ -1296,7 +1296,7 @@ internal static class PreceptTypeChecker
         }
     }
 
-    private static IReadOnlyDictionary<string, StaticValueKind> BuildEventAssertSymbols(
+    private static IReadOnlyDictionary<string, StaticValueKind> BuildEventEnsureSymbols(
         PreceptDefinition model,
         IReadOnlyDictionary<string, Dictionary<string, StaticValueKind>> eventArgKinds,
         string eventName)
@@ -1327,22 +1327,22 @@ internal static class PreceptTypeChecker
         return [row.FromState];
     }
 
-    private static IReadOnlyDictionary<string, IReadOnlyDictionary<string, StaticValueKind>> BuildStateAssertNarrowings(
+    private static IReadOnlyDictionary<string, IReadOnlyDictionary<string, StaticValueKind>> BuildStateEnsureNarrowings(
         PreceptDefinition model,
         IReadOnlyDictionary<string, StaticValueKind> dataFieldKinds)
     {
         var result = new Dictionary<string, IReadOnlyDictionary<string, StaticValueKind>>(StringComparer.Ordinal);
-        if (model.StateAsserts is null || model.StateAsserts.Count == 0)
+        if (model.StateEnsures is null || model.StateEnsures.Count == 0)
             return result;
 
-        foreach (var group in model.StateAsserts
-            .Where(static stateAssert => stateAssert.Anchor == AssertAnchor.In && stateAssert.WhenGuard is null)
-            .GroupBy(static stateAssert => stateAssert.State, StringComparer.Ordinal))
+        foreach (var group in model.StateEnsures
+            .Where(static stateEnsure => stateEnsure.Anchor == EnsureAnchor.In && stateEnsure.WhenGuard is null)
+            .GroupBy(static stateEnsure => stateEnsure.State, StringComparer.Ordinal))
         {
             IReadOnlyDictionary<string, StaticValueKind> narrowed = new Dictionary<string, StaticValueKind>(dataFieldKinds, StringComparer.Ordinal);
 
-            foreach (var stateAssert in group)
-                narrowed = ApplyNarrowing(stateAssert.Expression, narrowed, assumeTrue: true);
+            foreach (var stateEnsure in group)
+                narrowed = ApplyNarrowing(stateEnsure.Expression, narrowed, assumeTrue: true);
 
             result[group.Key] = narrowed;
         }
@@ -1366,7 +1366,7 @@ internal static class PreceptTypeChecker
             foreach (var pair in eventArgs)
             {
                 // Only dotted form (EventName.ArgName) is valid in transition-row scope.
-                // Bare arg names are valid only in event-assert scope (see BuildEventAssertSymbols).
+                // Bare arg names are valid only in event-ensure scope (see BuildEventEnsureSymbols).
                 symbols[$"{eventName}.{pair.Key}"] = pair.Value;
                 if (HasFlag(pair.Value, StaticValueKind.String))
                     symbols[$"{eventName}.{pair.Key}.length"] = StaticValueKind.Number;

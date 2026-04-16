@@ -1047,9 +1047,9 @@ public class PreceptComputedFieldRuntimeTests
     }
 
     [Fact]
-    public void Fire_InvariantReferencingComputedField_SeesFreshValueAfterMutation()
+    public void Fire_RuleReferencingComputedField_SeesFreshValueAfterMutation()
     {
-        // Invariant references input fields (A + B) rather than the computed field directly,
+        // Rule references input fields (A + B) rather than the computed field directly,
         // because BuildDefaultData doesn't include computed values → C29 can't evaluate them.
         // The computed field is still exercised: it recomputes and we verify its value.
         const string dsl = """
@@ -1057,7 +1057,7 @@ public class PreceptComputedFieldRuntimeTests
             field A as number default 5
             field B as number default 5
             field Sum as number -> A + B
-            invariant A + B <= 20 because "Sum must not exceed 20"
+            rule A + B <= 20 because "Sum must not exceed 20"
             state S1 initial
             state S2
             event Bump with NewA as number
@@ -1072,7 +1072,7 @@ public class PreceptComputedFieldRuntimeTests
         ok.Outcome.Should().Be(TransitionOutcome.Transition);
         ok.UpdatedInstance!.InstanceData["Sum"].Should().Be(15.0);
 
-        // A = 100, Sum = 105 → invariant fails
+        // A = 100, Sum = 105 → rule fails
         var fail = engine.Fire(instance, "Bump",
             new Dictionary<string, object?> { ["NewA"] = 100.0 });
         fail.Outcome.Should().Be(TransitionOutcome.ConstraintFailure);
@@ -1157,16 +1157,16 @@ public class PreceptComputedFieldRuntimeTests
     }
 
     [Fact]
-    public void Update_InvariantEvaluatesAgainstRecomputedValues()
+    public void Update_RuleEvaluatesAgainstRecomputedValues()
     {
-        // Invariant uses stored fields so C29 can evaluate at compile time.
+        // Rule uses stored fields so C29 can evaluate at compile time.
         // Computed field Sum still recomputes and we verify its value.
         const string dsl = """
             precept Test
             field A as number default 5
             field B as number default 5
             field Sum as number -> A + B
-            invariant A + B <= 15 because "Sum must not exceed 15"
+            rule A + B <= 15 because "Sum must not exceed 15"
             state Active initial
             in Active edit A
             """;
@@ -1178,7 +1178,7 @@ public class PreceptComputedFieldRuntimeTests
         ok.Outcome.Should().Be(UpdateOutcome.Update);
         ok.UpdatedInstance!.InstanceData["Sum"].Should().Be(13.0);
 
-        // A = 20, Sum = 25 → invariant fails
+        // A = 20, Sum = 25 → rule fails
         var fail = engine.Update(instance, p => p.Set("A", 20.0));
         fail.Outcome.Should().Be(UpdateOutcome.ConstraintFailure);
     }
@@ -1333,11 +1333,11 @@ public class PreceptComputedFieldRuntimeTests
     // ════════════════════════════════════════════════════════════════════
 
     [Fact]
-    public void ViolationTargets_InvariantInvolvingComputedField_IncludesDependencyFields()
+    public void ViolationTargets_RuleInvolvingComputedField_IncludesDependencyFields()
     {
-        // Use a state assert on non-initial state to bypass C30 compile-time check.
-        // C30 only checks initial-state asserts; S2 assert is not checked at compile time.
-        // At runtime, transition to S2 triggers the assert, which references computed field Sum.
+        // Use a state ensure on non-initial state to bypass C30 compile-time check.
+        // C30 only checks initial-state ensures; S2 ensure is not checked at compile time.
+        // At runtime, transition to S2 triggers the ensure, which references computed field Sum.
         // ExpandComputedFieldTargets should surface A and B as dependency targets.
         const string dsl = """
             precept Test
@@ -1346,7 +1346,7 @@ public class PreceptComputedFieldRuntimeTests
             field Sum as number -> A + B
             state S1 initial
             state S2
-            in S2 assert Sum <= 1 because "Sum too large"
+            in S2 ensure Sum <= 1 because "Sum too large"
             event Go
             from S1 on Go -> transition S2
             """;
@@ -1448,20 +1448,20 @@ public class PreceptComputedFieldRuntimeTests
     }
 
     // ════════════════════════════════════════════════════════════════════
-    // Stateless invariant vs. recomputed values (review B3)
+    // Stateless rule vs. recomputed values (review B3)
     // ════════════════════════════════════════════════════════════════════
 
     [Fact]
-    public void StatelessInvariant_EnforcedAgainstRecomputedValue()
+    public void StatelessRule_EnforcedAgainstRecomputedValue()
     {
-        // Stateless precept with computed field + invariant.
-        // Updating dependency to make recomputed value violate the invariant.
+        // Stateless precept with computed field + rule.
+        // Updating dependency to make recomputed value violate the rule.
         const string dsl = """
             precept Test
             field Qty as number default 1
             field Total as number -> Qty + Qty
             edit Qty
-            invariant Total <= 10 because "Total exceeds limit"
+            rule Total <= 10 because "Total exceeds limit"
             """;
 
         var (engine, instance) = CompileAndCreate(dsl);

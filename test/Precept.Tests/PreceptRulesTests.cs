@@ -23,13 +23,13 @@ public class PreceptRulesTests
         const string dsl = """
             precept Test
             field Balance as number default 0
-            invariant Balance >= 0 because "Must be non-negative"
+            rule Balance >= 0 because "Must be non-negative"
             state Idle initial
             """;
 
         var machine = PreceptParser.Parse(dsl);
 
-        var inv = machine.Invariants.Should().ContainSingle().Subject;
+        var inv = machine.Rules.Should().ContainSingle().Subject;
         inv.ExpressionText.Should().Be("Balance >= 0");
         inv.Reason.Should().Be("Must be non-negative");
     }
@@ -40,16 +40,16 @@ public class PreceptRulesTests
         const string dsl = """
             precept Test
             field Rating as number default 1
-            invariant Rating >= 1 because "Too low"
-            invariant Rating <= 5 because "Too high"
+            rule Rating >= 1 because "Too low"
+            rule Rating <= 5 because "Too high"
             state Idle initial
             """;
 
         var machine = PreceptParser.Parse(dsl);
 
-        machine.Invariants.Should().HaveCount(2);
-        machine.Invariants![0].Reason.Should().Be("Too low");
-        machine.Invariants[1].Reason.Should().Be("Too high");
+        machine.Rules.Should().HaveCount(2);
+        machine.Rules![0].Reason.Should().Be("Too low");
+        machine.Rules[1].Reason.Should().Be("Too high");
     }
 
     [Fact]
@@ -60,15 +60,15 @@ public class PreceptRulesTests
             field AmountPaid as number default 0
             state Idle initial
             state Paid
-            in Paid assert AmountPaid > 0 because "Must have paid"
+            in Paid ensure AmountPaid > 0 because "Must have paid"
             """;
 
         var machine = PreceptParser.Parse(dsl);
 
-        var assert = machine.StateAsserts.Should().ContainSingle().Subject;
-        assert.State.Should().Be("Paid");
-        assert.ExpressionText.Should().Be("AmountPaid > 0");
-        assert.Reason.Should().Be("Must have paid");
+        var stateEnsure = machine.StateEnsures.Should().ContainSingle().Subject;
+        stateEnsure.State.Should().Be("Paid");
+        stateEnsure.ExpressionText.Should().Be("AmountPaid > 0");
+        stateEnsure.Reason.Should().Be("Must have paid");
     }
 
     [Fact]
@@ -78,16 +78,16 @@ public class PreceptRulesTests
             precept Test
             field Score as number default 0
             state A initial
-            in A assert Score >= 0 because "Non-negative in A"
+            in A ensure Score >= 0 because "Non-negative in A"
             state B
-            in B assert Score >= 10 because "Must be 10 in B"
+            in B ensure Score >= 10 because "Must be 10 in B"
             """;
 
         var machine = PreceptParser.Parse(dsl);
 
-        machine.StateAsserts.Should().HaveCount(2);
-        machine.StateAsserts!.Single(sa => sa.State == "A").Reason.Should().Be("Non-negative in A");
-        machine.StateAsserts!.Single(sa => sa.State == "B").Reason.Should().Be("Must be 10 in B");
+        machine.StateEnsures.Should().HaveCount(2);
+        machine.StateEnsures!.Single(sa => sa.State == "A").Reason.Should().Be("Non-negative in A");
+        machine.StateEnsures!.Single(sa => sa.State == "B").Reason.Should().Be("Must be 10 in B");
     }
 
     [Fact]
@@ -97,15 +97,15 @@ public class PreceptRulesTests
             precept Test
             state Idle initial
             event Pay with Amount as number
-            on Pay assert Amount > 0 because "Amount must be positive"
+            on Pay ensure Amount > 0 because "Amount must be positive"
             """;
 
         var machine = PreceptParser.Parse(dsl);
 
-        var assert = machine.EventAsserts.Should().ContainSingle().Subject;
-        assert.EventName.Should().Be("Pay");
-        assert.ExpressionText.Should().Be("Amount > 0");
-        assert.Reason.Should().Be("Amount must be positive");
+        var eventEnsure = machine.EventEnsures.Should().ContainSingle().Subject;
+        eventEnsure.EventName.Should().Be("Pay");
+        eventEnsure.ExpressionText.Should().Be("Amount > 0");
+        eventEnsure.Reason.Should().Be("Amount must be positive");
     }
 
     [Fact]
@@ -115,14 +115,14 @@ public class PreceptRulesTests
             precept Test
             state Idle initial
             event Pay with Amount as number
-            on Pay assert Pay.Amount > 0 because "Amount must be positive"
+            on Pay ensure Pay.Amount > 0 because "Amount must be positive"
             """;
 
         var machine = PreceptParser.Parse(dsl);
 
-        var assert = machine.EventAsserts.Should().ContainSingle().Subject;
-        assert.EventName.Should().Be("Pay");
-        assert.ExpressionText.Should().Be("Pay.Amount > 0");
+        var eventEnsure = machine.EventEnsures.Should().ContainSingle().Subject;
+        eventEnsure.EventName.Should().Be("Pay");
+        eventEnsure.ExpressionText.Should().Be("Pay.Amount > 0");
     }
 
     [Fact]
@@ -131,13 +131,13 @@ public class PreceptRulesTests
         const string dsl = """
             precept Test
             field Approvers as set of string
-            invariant Approvers.count >= 1 because "Need at least one approver"
+            rule Approvers.count >= 1 because "Need at least one approver"
             state Idle initial
             """;
 
         var machine = PreceptParser.Parse(dsl);
 
-        var inv = machine.Invariants.Should().ContainSingle().Subject;
+        var inv = machine.Rules.Should().ContainSingle().Subject;
         inv.ExpressionText.Should().Be("Approvers.count >= 1");
         inv.Reason.Should().Be("Need at least one approver");
     }
@@ -148,13 +148,13 @@ public class PreceptRulesTests
         const string dsl = """
             precept Test
             field Balance as number default 0
-            invariant Balance >= 0 because "Must be non-negative"
+            rule Balance >= 0 because "Must be non-negative"
             state Idle initial
             """;
 
         var machine = PreceptParser.Parse(dsl);
 
-        var inv = machine.Invariants.Should().ContainSingle().Subject;
+        var inv = machine.Rules.Should().ContainSingle().Subject;
         inv.SourceLine.Should().Be(3);
     }
 
@@ -169,13 +169,13 @@ public class PreceptRulesTests
             precept Test
             field Balance as number default 100
             field Limit as number default 1000
-            invariant Balance <= Limit because "Cannot exceed limit"
+            rule Balance <= Limit because "Cannot exceed limit"
             state Idle initial
             """;
 
         var act = () => PreceptParser.Parse(dsl);
 
-        // Invariants can reference any declared field — not scoped to a single field
+        // Rules can reference any declared field — not scoped to a single field
         act.Should().NotThrow();
     }
 
@@ -185,7 +185,7 @@ public class PreceptRulesTests
         const string dsl = """
             precept Test
             field Balance as number default 0
-            invariant Balance >= 0 because "Must be non-negative"
+            rule Balance >= 0 because "Must be non-negative"
             state Idle initial
             """;
 
@@ -200,7 +200,7 @@ public class PreceptRulesTests
         const string dsl = """
             precept Test
             field Tags as set of string
-            invariant Tags.count <= 10 because "Too many tags"
+            rule Tags.count <= 10 because "Too many tags"
             state Idle initial
             """;
 
@@ -217,7 +217,7 @@ public class PreceptRulesTests
             field Balance as number default 100
             state Idle initial
             event Pay with Amount as number
-            on Pay assert Amount <= Balance because "Cannot exceed balance"
+            on Pay ensure Amount <= Balance because "Cannot exceed balance"
             """;
 
         var act = () => PreceptParser.Parse(dsl);
@@ -233,7 +233,7 @@ public class PreceptRulesTests
             precept Test
             state Idle initial
             event Pay with Amount as number, Discount as number
-            on Pay assert Amount > Discount because "Amount must exceed discount"
+            on Pay ensure Amount > Discount because "Amount must exceed discount"
             """;
 
         var act = () => PreceptParser.Parse(dsl);
@@ -252,14 +252,14 @@ public class PreceptRulesTests
         const string dsl = """
             precept Test
             field Balance as number default 0
-            invariant Balance >= 10 because "Balance must be at least 10"
+            rule Balance >= 10 because "Balance must be at least 10"
             state Idle initial
             """;
 
         var act = () => PreceptCompiler.Compile(PreceptParser.Parse(dsl));
 
         act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*invariant violation*Balance must be at least 10*");
+            .WithMessage("*rule violation*Balance must be at least 10*");
     }
 
     [Fact]
@@ -268,7 +268,7 @@ public class PreceptRulesTests
         const string dsl = """
             precept Test
             field Balance as number default 100
-            invariant Balance >= 0 because "Must be non-negative"
+            rule Balance >= 0 because "Must be non-negative"
             state Idle initial
             """;
 
@@ -285,14 +285,14 @@ public class PreceptRulesTests
             field Quantity as number default 0
             field UnitPrice as number default 10
             field TotalPrice as number default 999
-            invariant Quantity * UnitPrice == TotalPrice because "Price must be consistent"
+            rule Quantity * UnitPrice == TotalPrice because "Price must be consistent"
             state Idle initial
             """;
 
         var act = () => PreceptCompiler.Compile(PreceptParser.Parse(dsl));
 
         act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*invariant violation*Price must be consistent*");
+            .WithMessage("*rule violation*Price must be consistent*");
     }
 
     [Fact]
@@ -302,7 +302,7 @@ public class PreceptRulesTests
             precept Test
             field Balance as number default 100
             field Limit as number default 1000
-            invariant Balance <= Limit because "Cannot exceed limit"
+            rule Balance <= Limit because "Cannot exceed limit"
             state Idle initial
             """;
 
@@ -318,13 +318,13 @@ public class PreceptRulesTests
             precept Test
             field AmountPaid as number default 0
             state Paid initial
-            in Paid assert AmountPaid > 0 because "Must have paid"
+            in Paid ensure AmountPaid > 0 because "Must have paid"
             """;
 
         var act = () => PreceptCompiler.Compile(PreceptParser.Parse(dsl));
 
         act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*state assert violation*Must have paid*initial state*");
+            .WithMessage("*state ensure violation*Must have paid*initial state*");
     }
 
     [Fact]
@@ -335,7 +335,7 @@ public class PreceptRulesTests
             field AmountPaid as number default 0
             state Idle initial
             state Paid
-            in Paid assert AmountPaid > 0 because "Must have paid"
+            in Paid ensure AmountPaid > 0 because "Must have paid"
             event Pay
             from Idle on Pay -> transition Paid
             """;
@@ -351,14 +351,14 @@ public class PreceptRulesTests
         const string dsl = """
             precept Test
             field Approvers as set of string
-            invariant Approvers.count >= 1 because "Need at least one approver"
+            rule Approvers.count >= 1 because "Need at least one approver"
             state Idle initial
             """;
 
         var act = () => PreceptCompiler.Compile(PreceptParser.Parse(dsl));
 
         act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*invariant violation*Need at least one approver*");
+            .WithMessage("*rule violation*Need at least one approver*");
     }
 
     [Fact]
@@ -367,7 +367,7 @@ public class PreceptRulesTests
         const string dsl = """
             precept Test
             field Tags as set of string
-            invariant Tags.count <= 10 because "Too many tags"
+            rule Tags.count <= 10 because "Too many tags"
             state Idle initial
             """;
 
@@ -383,13 +383,13 @@ public class PreceptRulesTests
             precept Test
             state Idle initial
             event Submit with Priority as number default 0
-            on Submit assert Priority > 0 because "Priority must be positive"
+            on Submit ensure Priority > 0 because "Priority must be positive"
             """;
 
         var act = () => PreceptCompiler.Compile(PreceptParser.Parse(dsl));
 
         act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*event assert violation*Priority must be positive*");
+            .WithMessage("*event ensure violation*Priority must be positive*");
     }
 
     [Fact]
@@ -399,7 +399,7 @@ public class PreceptRulesTests
             precept Test
             state Idle initial
             event Submit with Priority as number default 1
-            on Submit assert Priority > 0 because "Priority must be positive"
+            on Submit ensure Priority > 0 because "Priority must be positive"
             """;
 
         var act = () => PreceptCompiler.Compile(PreceptParser.Parse(dsl));
@@ -414,7 +414,7 @@ public class PreceptRulesTests
             precept Test
             state Idle initial
             event Submit with Priority as number
-            on Submit assert Priority > 0 because "Priority must be positive"
+            on Submit ensure Priority > 0 because "Priority must be positive"
             """;
 
         // Cannot check at compile time because Priority has no default
@@ -429,7 +429,7 @@ public class PreceptRulesTests
         const string dsl = """
             precept Test
             field Balance as number default 100
-            invariant Balance >= 0 because "Must be non-negative"
+            rule Balance >= 0 because "Must be non-negative"
             state Active initial
             event Reset
             from Active on Reset -> set Balance = -1 -> transition Active
@@ -438,7 +438,7 @@ public class PreceptRulesTests
         var act = () => PreceptCompiler.Compile(PreceptParser.Parse(dsl));
 
         act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*literal assignment*violates invariant*Must be non-negative*");
+            .WithMessage("*literal assignment*violates rule*Must be non-negative*");
     }
 
     [Fact]
@@ -447,7 +447,7 @@ public class PreceptRulesTests
         const string dsl = """
             precept Test
             field Balance as number default 100
-            invariant Balance >= 0 because "Must be non-negative"
+            rule Balance >= 0 because "Must be non-negative"
             state Active initial
             event Adjust
             from Active on Adjust -> set Balance = 50 -> transition Active
@@ -459,19 +459,19 @@ public class PreceptRulesTests
     }
 
     // ========================================================================================
-    // COMPILE-TIME — duplicate and subsumed state assert detection
+    // COMPILE-TIME — duplicate and subsumed state ensure detection
     // ========================================================================================
 
     [Fact]
-    public void Compile_DuplicateStateAssert_SamePrepositionStateExpression_Throws()
+    public void Compile_DuplicateStateEnsure_SamePrepositionStateExpression_Throws()
     {
         const string dsl = """
             precept Test
             field Score as number default 0
             state Idle initial
             state Active
-            in Active assert Score >= 0 because "first"
-            in Active assert Score >= 0 because "duplicate"
+            in Active ensure Score >= 0 because "first"
+            in Active ensure Score >= 0 because "duplicate"
             event Go
             from Idle on Go -> transition Active
             """;
@@ -479,19 +479,19 @@ public class PreceptRulesTests
         var act = () => PreceptCompiler.Compile(PreceptParser.Parse(dsl));
 
         act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*Duplicate state assert*in Active assert*Score >= 0*");
+            .WithMessage("*Duplicate state ensure*in Active ensure*Score >= 0*");
     }
 
     [Fact]
-    public void Compile_DuplicateStateAssert_DifferentPreposition_Succeeds()
+    public void Compile_DuplicateStateEnsure_DifferentPreposition_Succeeds()
     {
         const string dsl = """
             precept Test
             field Score as number default 0
             state Idle initial
             state Active
-            in Active assert Score >= 0 because "in-scope"
-            to Active assert Score >= 0 because "entry-scope"
+            in Active ensure Score >= 0 because "in-scope"
+            to Active ensure Score >= 0 because "entry-scope"
             event Go
             from Idle on Go -> transition Active
             """;
@@ -502,11 +502,11 @@ public class PreceptRulesTests
 
         // This will throw for subsumption (C45), not duplicate (C44)
         act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*Subsumed state assert*");
+            .WithMessage("*Subsumed state ensure*");
     }
 
     [Fact]
-    public void Compile_DuplicateStateAssert_DifferentExpression_Succeeds()
+    public void Compile_DuplicateStateEnsure_DifferentExpression_Succeeds()
     {
         const string dsl = """
             precept Test
@@ -514,8 +514,8 @@ public class PreceptRulesTests
             field Limit as number default 100
             state Idle initial
             state Active
-            in Active assert Score >= 0 because "score check"
-            in Active assert Limit > 0 because "limit check"
+            in Active ensure Score >= 0 because "score check"
+            in Active ensure Limit > 0 because "limit check"
             event Go
             from Idle on Go -> transition Active
             """;
@@ -526,7 +526,7 @@ public class PreceptRulesTests
     }
 
     [Fact]
-    public void Compile_DuplicateStateAssert_DifferentState_Succeeds()
+    public void Compile_DuplicateStateEnsure_DifferentState_Succeeds()
     {
         const string dsl = """
             precept Test
@@ -534,8 +534,8 @@ public class PreceptRulesTests
             state Idle initial
             state Active
             state Done
-            in Active assert Score >= 0 because "active check"
-            in Done assert Score >= 0 because "done check"
+            in Active ensure Score >= 0 because "active check"
+            in Done ensure Score >= 0 because "done check"
             event Go
             from Idle on Go -> transition Active
             """;
@@ -546,15 +546,15 @@ public class PreceptRulesTests
     }
 
     [Fact]
-    public void Compile_SubsumedAssert_ToRedundantWithIn_Throws()
+    public void Compile_SubsumedEnsure_ToRedundantWithIn_Throws()
     {
         const string dsl = """
             precept Test
             field Score as number default 0
             state Idle initial
             state Active
-            in Active assert Score >= 0 because "in covers entry and in-place"
-            to Active assert Score >= 0 because "to only covers entry — redundant"
+            in Active ensure Score >= 0 because "in covers entry and in-place"
+            to Active ensure Score >= 0 because "to only covers entry — redundant"
             event Go
             from Idle on Go -> transition Active
             """;
@@ -562,11 +562,11 @@ public class PreceptRulesTests
         var act = () => PreceptCompiler.Compile(PreceptParser.Parse(dsl));
 
         act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*Subsumed state assert*to Active assert*Score >= 0*redundant*in Active assert*");
+            .WithMessage("*Subsumed state ensure*to Active ensure*Score >= 0*redundant*in Active ensure*");
     }
 
     [Fact]
-    public void Compile_SubsumedAssert_DifferentExpression_Succeeds()
+    public void Compile_SubsumedEnsure_DifferentExpression_Succeeds()
     {
         const string dsl = """
             precept Test
@@ -574,8 +574,8 @@ public class PreceptRulesTests
             field Limit as number default 100
             state Idle initial
             state Active
-            in Active assert Score >= 0 because "score check"
-            to Active assert Limit > 0 because "limit check"
+            in Active ensure Score >= 0 because "score check"
+            to Active ensure Limit > 0 because "limit check"
             event Go
             from Idle on Go -> transition Active
             """;
@@ -586,7 +586,7 @@ public class PreceptRulesTests
     }
 
     [Fact]
-    public void Compile_SubsumedAssert_FromNotSubsumedByIn_Succeeds()
+    public void Compile_SubsumedEnsure_FromNotSubsumedByIn_Succeeds()
     {
         const string dsl = """
             precept Test
@@ -594,8 +594,8 @@ public class PreceptRulesTests
             state Idle initial
             state Active
             state Done
-            in Active assert Score >= 0 because "in-active check"
-            from Active assert Score >= 0 because "exit check is distinct"
+            in Active ensure Score >= 0 because "in-active check"
+            from Active ensure Score >= 0 because "exit check is distinct"
             event Go
             from Idle on Go -> transition Active
             from Active on Go -> transition Done
@@ -607,14 +607,14 @@ public class PreceptRulesTests
     }
 
     [Fact]
-    public void Compile_SubsumedAssert_ToWithoutMatchingIn_Succeeds()
+    public void Compile_SubsumedEnsure_ToWithoutMatchingIn_Succeeds()
     {
         const string dsl = """
             precept Test
             field Score as number default 0
             state Idle initial
             state Active
-            to Active assert Score >= 0 because "entry only"
+            to Active ensure Score >= 0 because "entry only"
             event Go
             from Idle on Go -> transition Active
             """;
@@ -636,7 +636,7 @@ public class PreceptRulesTests
             state Idle initial
             state Done
             event Pay with Amount as number
-            on Pay assert Amount > 0 because "Amount must be positive"
+            on Pay ensure Amount > 0 because "Amount must be positive"
             from Idle on Pay -> transition Done
             """;
 
@@ -658,7 +658,7 @@ public class PreceptRulesTests
             state Idle initial
             state Done
             event Pay with Amount as number
-            on Pay assert Amount > 0 because "Amount must be positive"
+            on Pay ensure Amount > 0 because "Amount must be positive"
             from Idle on Pay -> transition Done
             """;
 
@@ -681,7 +681,7 @@ public class PreceptRulesTests
             state Idle initial
             state Done
             event Pay with Amount as number
-            on Pay assert Amount > 0 because "Amount must be positive"
+            on Pay ensure Amount > 0 because "Amount must be positive"
             from Idle on Pay when Balance > 1000 -> transition Done
             from Idle on Pay -> reject "Not enough balance"
             """;
@@ -703,8 +703,8 @@ public class PreceptRulesTests
             state Idle initial
             state Done
             event Transfer with Amount as number, Fee as number
-            on Transfer assert Amount > 0 because "Amount must be positive"
-            on Transfer assert Fee >= 0 because "Fee must be non-negative"
+            on Transfer ensure Amount > 0 because "Amount must be positive"
+            on Transfer ensure Fee >= 0 because "Fee must be non-negative"
             from Idle on Transfer -> transition Done
             """;
 
@@ -735,7 +735,7 @@ public class PreceptRulesTests
             state Apply initial
             state UnderReview
             event Submit with CreditScore as number
-            on Submit assert CreditScore >= 300 because "Credit score must be at least 300"
+            on Submit ensure CreditScore >= 300 because "Credit score must be at least 300"
             from Apply on Submit -> transition UnderReview
             """;
 
@@ -762,7 +762,7 @@ public class PreceptRulesTests
         const string dsl = """
             precept Test
             field Balance as number default 100
-            invariant Balance >= 0 because "Balance must not go negative"
+            rule Balance >= 0 because "Balance must not go negative"
             state Active initial
             event Debit with Amount as number
             from Active on Debit -> set Balance = Balance - Debit.Amount -> transition Active
@@ -784,7 +784,7 @@ public class PreceptRulesTests
         const string dsl = """
             precept Test
             field Balance as number default 100
-            invariant Balance >= 0 because "Balance must not go negative"
+            rule Balance >= 0 because "Balance must not go negative"
             state Active initial
             event Debit with Amount as number
             from Active on Debit -> set Balance = Balance - Debit.Amount -> transition Active
@@ -805,7 +805,7 @@ public class PreceptRulesTests
         const string dsl = """
             precept Test
             field Balance as number default 100
-            invariant Balance >= 0 because "Balance must not go negative"
+            rule Balance >= 0 because "Balance must not go negative"
             field TransactionCount as number default 0
             state Active initial
             event Debit with Amount as number
@@ -832,9 +832,9 @@ public class PreceptRulesTests
         const string dsl = """
             precept Test
             field Balance as number default 100
-            invariant Balance >= 0 because "Balance must not go negative"
+            rule Balance >= 0 because "Balance must not go negative"
             field Quantity as number default 5
-            invariant Quantity >= 0 because "Quantity must be non-negative"
+            rule Quantity >= 0 because "Quantity must be non-negative"
             state Active initial
             event BadEvent with BalanceAdjust as number, QuantityAdjust as number
             from Active on BadEvent -> set Balance = Balance + BadEvent.BalanceAdjust -> set Quantity = Quantity + BadEvent.QuantityAdjust -> transition Active
@@ -871,7 +871,7 @@ public class PreceptRulesTests
             field Quantity as number default 5
             field UnitPrice as number default 10
             field TotalPrice as number default 50
-            invariant Quantity * UnitPrice == TotalPrice because "Price must be consistent"
+            rule Quantity * UnitPrice == TotalPrice because "Price must be consistent"
             state Active initial
             event AdjustQuantity with NewQty as number
             from Active on AdjustQuantity -> set Quantity = AdjustQuantity.NewQty -> transition Active
@@ -899,7 +899,7 @@ public class PreceptRulesTests
             field Quantity as number default 5
             field UnitPrice as number default 10
             field TotalPrice as number default 50
-            invariant Quantity * UnitPrice == TotalPrice because "Price must be consistent"
+            rule Quantity * UnitPrice == TotalPrice because "Price must be consistent"
             state Active initial
             event AdjustAll with NewQty as number, NewTotal as number
             from Active on AdjustAll -> set Quantity = AdjustAll.NewQty -> set TotalPrice = AdjustAll.NewTotal -> transition Active
@@ -936,7 +936,7 @@ public class PreceptRulesTests
             field AmountPaid as number default 0
             state Draft initial
             state Paid
-            in Paid assert AmountPaid > 0 because "Must have paid something"
+            in Paid ensure AmountPaid > 0 because "Must have paid something"
             event Checkout with Payment as number
             from Draft on Checkout -> set AmountPaid = Checkout.Payment -> transition Paid
             """;
@@ -958,7 +958,7 @@ public class PreceptRulesTests
             field AmountPaid as number default 0
             state Draft initial
             state Paid
-            in Paid assert AmountPaid > 0 because "Must have paid something"
+            in Paid ensure AmountPaid > 0 because "Must have paid something"
             event Checkout with Payment as number
             from Draft on Checkout -> set AmountPaid = Checkout.Payment -> transition Paid
             """;
@@ -980,7 +980,7 @@ public class PreceptRulesTests
             precept Test
             field Score as number default 10
             state Active initial
-            in Active assert Score > 0 because "Score must be positive while active"
+            in Active ensure Score > 0 because "Score must be positive while active"
             event Penalize with Points as number
             from Active on Penalize -> set Score = Score - Penalize.Points -> transition Active
             """;
@@ -1004,7 +1004,7 @@ public class PreceptRulesTests
             field Score as number default 5
             state Lobby initial
             state Active
-            to Active assert Score > 0 because "Score must be positive"
+            to Active ensure Score > 0 because "Score must be positive"
             event Enter
             event AttemptFail with Penalty as number
             from Lobby on Enter -> set Score = 5 -> transition Active
@@ -1042,7 +1042,7 @@ public class PreceptRulesTests
             state Idle initial
             state Done
             event Pay with Amount as number
-            on Pay assert Amount > 0 because "Amount must be positive"
+            on Pay ensure Amount > 0 because "Amount must be positive"
             from Idle on Pay when Balance > 9999 -> transition Done
             from Idle on Pay -> reject "Not enough balance"
             """;
@@ -1066,7 +1066,7 @@ public class PreceptRulesTests
         const string dsl = """
             precept Test
             field Balance as number default 100
-            invariant Balance >= 0 because "Must be non-negative"
+            rule Balance >= 0 because "Must be non-negative"
             state Active initial
             event ZeroOut
             from Active on ZeroOut -> set Balance = 0 -> transition Active
@@ -1094,7 +1094,7 @@ public class PreceptRulesTests
         const string dsl = """
             precept Test
             field Balance as number default 100
-            invariant Balance >= 0 because "Balance must not go negative"
+            rule Balance >= 0 because "Balance must not go negative"
             state Active initial
             event Debit with Amount as number
             from Active on Debit -> set Balance = Balance - Debit.Amount -> transition Active
@@ -1117,7 +1117,7 @@ public class PreceptRulesTests
         const string dsl = """
             precept Test
             field Balance as number default 100
-            invariant Balance >= 0 because "Balance must not go negative"
+            rule Balance >= 0 because "Balance must not go negative"
             state Active initial
             event Debit with Amount as number
             from Active on Debit -> set Balance = Balance - Debit.Amount -> transition Active
@@ -1141,7 +1141,7 @@ public class PreceptRulesTests
         const string dsl = """
             precept Test
             field Balance as number nullable
-            invariant Balance == null or Balance >= 0 because "Balance must be null or non-negative"
+            rule Balance == null or Balance >= 0 because "Balance must be null or non-negative"
             state Active initial
             event ClearBalance with NewBalance as number nullable
             from Active on ClearBalance -> set Balance = ClearBalance.NewBalance -> transition Active
@@ -1169,7 +1169,7 @@ public class PreceptRulesTests
         const string dsl = """
             precept Test
             field Tags as set of string
-            invariant Tags.count <= 2 because "Too many tags"
+            rule Tags.count <= 2 because "Too many tags"
             state Active initial
             event AddTag with Tag as string
             from Active on AddTag -> add Tags AddTag.Tag -> transition Active
@@ -1203,7 +1203,7 @@ public class PreceptRulesTests
             state Draft initial
             state Review
             state Paid
-            in Paid assert AmountPaid > 0 because "Must have paid to be in Paid"
+            in Paid ensure AmountPaid > 0 because "Must have paid to be in Paid"
             event Pay with Payment as number
             from any on Pay -> set AmountPaid = Pay.Payment -> transition Paid
             """;
@@ -1234,7 +1234,7 @@ public class PreceptRulesTests
             state Idle initial
             state Done
             event Pay with Amount as number
-            on Pay assert Amount > 0 because "Amount must be positive"
+            on Pay ensure Amount > 0 because "Amount must be positive"
             from Idle on Pay -> transition Done
             """;
 
@@ -1256,7 +1256,7 @@ public class PreceptRulesTests
             state Idle initial
             state Done
             event Pay with Amount as number
-            on Pay assert Amount > 0 because "Amount must be positive"
+            on Pay ensure Amount > 0 because "Amount must be positive"
             from Idle on Pay -> transition Done
             """;
 
@@ -1280,7 +1280,7 @@ public class PreceptRulesTests
             state Apply initial
             state UnderReview
             event Submit with CreditScore as number
-            on Submit assert CreditScore >= 300 because "Credit score must be at least 300"
+            on Submit ensure CreditScore >= 300 because "Credit score must be at least 300"
             from Apply on Submit -> transition UnderReview
             """;
 
@@ -1301,7 +1301,7 @@ public class PreceptRulesTests
         const string dsl = """
             precept Test
             field Balance as number default 100
-            invariant Balance >= 0 because "Balance must not go negative"
+            rule Balance >= 0 because "Balance must not go negative"
             state Active initial
             event Debit with Amount as number
             from Active on Debit -> set Balance = Balance - Debit.Amount -> transition Active
@@ -1324,7 +1324,7 @@ public class PreceptRulesTests
             field AmountPaid as number default 0
             state Draft initial
             state Paid
-            in Paid assert AmountPaid > 0 because "Must have paid"
+            in Paid ensure AmountPaid > 0 because "Must have paid"
             event Checkout with Payment as number
             from Draft on Checkout -> set AmountPaid = Checkout.Payment -> transition Paid
             """;
@@ -1346,7 +1346,7 @@ public class PreceptRulesTests
             state Idle initial
             state Done
             event Pay with Amount as number, Note as string nullable, Fee as number default 5
-            on Pay assert Amount > 0 because "Amount must be positive"
+            on Pay ensure Amount > 0 because "Amount must be positive"
             from Idle on Pay -> transition Done
             """;
 
@@ -1372,7 +1372,7 @@ public class PreceptRulesTests
             state Idle initial
             state Done
             event Pay with Amount as number
-            on Pay assert Amount > 0 because "Amount must be positive"
+            on Pay ensure Amount > 0 because "Amount must be positive"
             from Idle on Pay -> transition Done
             """;
 
@@ -1399,13 +1399,13 @@ public class PreceptRulesTests
 
         var machine = PreceptParser.Parse(dsl);
 
-        machine.Invariants.Should().BeNull();
-        machine.StateAsserts.Should().BeNull();
-        machine.EventAsserts.Should().BeNull();
+        machine.Rules.Should().BeNull();
+        machine.StateEnsures.Should().BeNull();
+        machine.EventEnsures.Should().BeNull();
     }
 
     [Fact]
-    public void Parse_NoRules_EventAssertsAreNull()
+    public void Parse_NoRules_EventEnsuresAreNull()
     {
         const string dsl = """
             precept Test
@@ -1415,7 +1415,7 @@ public class PreceptRulesTests
 
         var machine = PreceptParser.Parse(dsl);
 
-        machine.EventAsserts.Should().BeNull();
+        machine.EventEnsures.Should().BeNull();
     }
 }
 

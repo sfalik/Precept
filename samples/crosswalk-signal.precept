@@ -8,14 +8,14 @@ field RequestPending as boolean default false
 field CycleCount as integer default 0
 field CountdownSeconds as integer default 0
 
-invariant CycleCount >= 0 because "Cycle count cannot be negative"
-invariant CountdownSeconds >= 0 because "Countdown seconds cannot be negative"
+rule CycleCount >= 0 because "Cycle count cannot be negative"
+rule CountdownSeconds >= 0 because "Countdown seconds cannot be negative"
 
 state DontWalk initial
 state Walk
 state FlashingDontWalk
 
-in Walk assert CountdownSeconds > 0 because "Walk phase requires a positive countdown"
+in Walk ensure CountdownSeconds > 0 because "Walk phase requires a positive countdown"
 
 in DontWalk edit RequestPending
 

@@ -99,12 +99,12 @@ internal sealed class PreceptSemanticTokensHandler : SemanticTokensHandlerBase
                 TokenCategory.Declaration => "preceptKeywordSemantic",
                 TokenCategory.Action => "preceptKeywordSemantic",
                 TokenCategory.Outcome => "preceptKeywordSemantic",
-                TokenCategory.Grammar => "preceptKeywordGrammar",
+                TokenCategory.Grammar => "preceptKeywordSemantic",
                 TokenCategory.Constraint => "preceptKeywordGrammar",
                 TokenCategory.Type => "preceptType",
                 TokenCategory.Literal => "preceptValue",
-                TokenCategory.Operator => "preceptKeywordGrammar",
-                TokenCategory.Punctuation => member == PreceptToken.Arrow ? "preceptKeywordGrammar" : null,
+                TokenCategory.Operator => "operator",
+                TokenCategory.Punctuation => "operator",
                 _ => null
             };
             if (semanticType != null)
@@ -283,17 +283,17 @@ internal sealed class PreceptSemanticTokensHandler : SemanticTokensHandlerBase
         var events = new HashSet<string>(StringComparer.Ordinal);
         var fields = new HashSet<string>(StringComparer.Ordinal);
 
-        if (definition.StateAsserts != null)
-            foreach (var sa in definition.StateAsserts)
+        if (definition.StateEnsures != null)
+            foreach (var sa in definition.StateEnsures)
                 states.Add(sa.State);
 
-        if (definition.EventAsserts != null)
-            foreach (var ea in definition.EventAsserts)
+        if (definition.EventEnsures != null)
+            foreach (var ea in definition.EventEnsures)
                 events.Add(ea.EventName);
 
-        if (definition.Invariants != null)
-            foreach (var inv in definition.Invariants)
-                CollectFieldNames(inv.Expression, fields);
+        if (definition.Rules != null)
+            foreach (var rule in definition.Rules)
+                CollectFieldNames(rule.Expression, fields);
 
         return (states, events, fields);
     }
@@ -320,7 +320,7 @@ internal sealed class PreceptSemanticTokensHandler : SemanticTokensHandlerBase
 
     /// <summary>
     /// Classifies an identifier token based on the preceding token:
-    /// - After precept → "preceptName"
+    /// - After precept → "preceptName" (the contract identity)
     /// - After state/from/transition/in/to → "preceptState"
     /// - After event/on → "preceptEvent"
     /// - After field/set/add/remove/.../into → "preceptFieldName"

@@ -13,11 +13,11 @@ field FineAmount as number default 0
 field ConditionNote as string nullable
 field LostReported as boolean default false
 
-invariant CurrentDay >= 0 because "The day counter cannot be negative"
-invariant CheckoutDay >= 0 because "The checkout day cannot be negative"
-invariant DueDay >= 0 because "The due day cannot be negative"
-invariant RenewalCount >= 0 because "Renewal counts cannot be negative"
-invariant FineAmount >= 0 because "Fines cannot be negative"
+rule CurrentDay >= 0 because "The day counter cannot be negative"
+rule CheckoutDay >= 0 because "The checkout day cannot be negative"
+rule DueDay >= 0 because "The due day cannot be negative"
+rule RenewalCount >= 0 because "Renewal counts cannot be negative"
+rule FineAmount >= 0 because "Fines cannot be negative"
 
 state Available initial
 state CheckedOut
@@ -29,30 +29,30 @@ state Lost
 in CheckedOut edit DueDay
 in Overdue edit DueDay, FineAmount
 
-in Available assert BorrowerId == null because "Available books cannot still be assigned to a borrower"
-in CheckedOut assert BorrowerId != null because "Checked-out books must record a borrower"
-in Overdue assert BorrowerId != null because "Overdue books must still record a borrower"
-in Overdue assert CurrentDay > DueDay because "Overdue books must be past their due day"
-in Returned assert BorrowerId == null because "Returned books must clear the borrower"
-in Lost assert LostReported because "Lost books must be marked as reported lost"
-in Lost assert BorrowerId != null because "Lost books must still record the last borrower"
+in Available ensure BorrowerId == null because "Available books cannot still be assigned to a borrower"
+in CheckedOut ensure BorrowerId != null because "Checked-out books must record a borrower"
+in Overdue ensure BorrowerId != null because "Overdue books must still record a borrower"
+in Overdue ensure CurrentDay > DueDay because "Overdue books must be past their due day"
+in Returned ensure BorrowerId == null because "Returned books must clear the borrower"
+in Lost ensure LostReported because "Lost books must be marked as reported lost"
+in Lost ensure BorrowerId != null because "Lost books must still record the last borrower"
 
 event Checkout with Title as string, PatronId as string, LoanDays as number default 14
-on Checkout assert Title != "" because "A book title is required"
-on Checkout assert PatronId != "" because "A patron id is required"
-on Checkout assert LoanDays > 0 because "Loan days must be positive"
+on Checkout ensure Title != "" because "A book title is required"
+on Checkout ensure PatronId != "" because "A patron id is required"
+on Checkout ensure LoanDays > 0 because "Loan days must be positive"
 
 event Renew with ExtraDays as number default 7
-on Renew assert ExtraDays > 0 because "Renewal days must be positive"
+on Renew ensure ExtraDays > 0 because "Renewal days must be positive"
 
 event AdvanceDay with DayNumber as number
-on AdvanceDay assert DayNumber >= 0 because "The day counter cannot be negative"
+on AdvanceDay ensure DayNumber >= 0 because "The day counter cannot be negative"
 
 event ReturnBook with Condition as string nullable default null
-on ReturnBook assert Condition == null or Condition != "" because "A supplied condition note cannot be blank"
+on ReturnBook ensure Condition == null or Condition != "" because "A supplied condition note cannot be blank"
 
 event ReportLost with Note as string nullable default null
-on ReportLost assert Note == null or Note != "" because "A supplied loss note cannot be blank"
+on ReportLost ensure Note == null or Note != "" because "A supplied loss note cannot be blank"
 
 event Shelve
 

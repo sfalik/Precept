@@ -2,7 +2,7 @@
 
 Date: 2026-03-03
 
-Status: **Implemented.** Parser, compiler, runtime, and language server all support rules. See implementation in `src/Precept/Dsl/PreceptParser.cs`, `src/Precept/Dsl/PreceptRuntime.cs`, and `tools/Precept.LanguageServer/PreceptAnalyzer.cs`. Covered by `test/Precept.Tests/DslRulesTests.cs`.
+Status: **Not implemented — superseded.** The unified `rule` keyword described in this document was never implemented. No `Rule` token exists in `PreceptToken.cs`, no parser support exists in `PreceptParser.cs`, and no `DslRulesTests.cs` test file exists. The design described here — a single `rule` keyword across four scopes (field, top-level, state, event) — has been superseded by [issue #96](https://github.com/sfalik/Precept/issues/96), which proposes a two-keyword approach: `rule` (replacing `invariant` — timeless data truths) and `ensure` (replacing `assert` — enforcement at a specific moment). The two-keyword split preserves the data-truth vs movement-truth distinction of Design Principle #5 under more accessible, domain-expert-friendly vocabulary, rather than collapsing both constraint categories into a single keyword. Issue #8 (named rule declarations) has been rejected as too close to function semantics for a declarative DSL.
 
 ## Overview
 

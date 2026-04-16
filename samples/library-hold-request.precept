@@ -14,15 +14,15 @@ field CurrentDay as number default 0
 field HoldQueue as queue of string
 field BorrowerHistory as stack of string
 
-invariant CurrentDay >= 0 because "The day counter cannot be negative"
-invariant PickupExpiryDay >= 0 because "Pickup expiry cannot be negative"
+rule CurrentDay >= 0 because "The day counter cannot be negative"
+rule PickupExpiryDay >= 0 because "Pickup expiry cannot be negative"
 
 state OnShelf initial
 state CheckedOut
 state HoldReady
 
-in HoldReady assert ReadyPatron != null because "A ready hold must name the patron"
-in HoldReady assert PickupCode != null because "A ready hold must have a pickup code"
+in HoldReady ensure ReadyPatron != null because "A ready hold must name the patron"
+in HoldReady ensure PickupCode != null because "A ready hold must have a pickup code"
 
 # Entering HoldReady sets the temporary pickup details for the promoted patron.
 to HoldReady -> set ReadyPatron = PromotedPatron -> set PickupCode = "READY" -> set PickupExpiryDay = CurrentDay + 3
@@ -31,20 +31,20 @@ to HoldReady -> set ReadyPatron = PromotedPatron -> set PickupCode = "READY" -> 
 from HoldReady -> set PromotedPatron = null -> set ReadyPatron = null -> set PickupCode = null
 
 event Checkout with PatronId as string
-on Checkout assert PatronId != "" because "A patron id is required to check out a book"
+on Checkout ensure PatronId != "" because "A patron id is required to check out a book"
 
 event ReturnBook
 
 event PlaceHold with PatronId as string
-on PlaceHold assert PatronId != "" because "A patron id is required for a hold"
+on PlaceHold ensure PatronId != "" because "A patron id is required for a hold"
 
 event ProcessNextHold
 
 event CollectHold with PatronId as string
-on CollectHold assert PatronId != "" because "The collecting patron must be identified"
+on CollectHold ensure PatronId != "" because "The collecting patron must be identified"
 
 event AdvanceDay with DayNumber as number
-on AdvanceDay assert DayNumber >= 0 because "The day counter cannot be negative"
+on AdvanceDay ensure DayNumber >= 0 because "The day counter cannot be negative"
 
 from OnShelf on Checkout -> set CurrentBorrower = Checkout.PatronId -> push BorrowerHistory Checkout.PatronId -> transition CheckedOut
 

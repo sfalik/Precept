@@ -11,9 +11,9 @@ field RetentionDiscount as number default 0
 field CancellationReason as string nullable
 field LastAgentNote as string nullable
 
-invariant MonthlyPrice >= 0 because "Monthly price cannot be negative"
-invariant RetentionDiscount >= 0 because "Retention discounts cannot be negative"
-invariant RetentionDiscount <= 100 because "Retention discounts are percentages and must stay within 0-100"
+rule MonthlyPrice >= 0 because "Monthly price cannot be negative"
+rule RetentionDiscount >= 0 because "Retention discounts cannot be negative"
+rule RetentionDiscount <= 100 because "Retention discounts are percentages and must stay within 0-100"
 
 state Active initial
 state RetentionReview
@@ -22,19 +22,19 @@ state Cancelled
 in RetentionReview edit LastAgentNote
 
 event RequestCancellation with Name as string, Plan as string, Price as number, Reason as string
-on RequestCancellation assert Name != "" because "The subscriber name is required"
-on RequestCancellation assert Plan != "" because "The plan name is required"
-on RequestCancellation assert Price >= 0 because "The plan price cannot be negative"
-on RequestCancellation assert Reason != "" because "A cancellation reason is required"
+on RequestCancellation ensure Name != "" because "The subscriber name is required"
+on RequestCancellation ensure Plan != "" because "The plan name is required"
+on RequestCancellation ensure Price >= 0 because "The plan price cannot be negative"
+on RequestCancellation ensure Reason != "" because "A cancellation reason is required"
 
 event MakeSaveOffer with DiscountPercent as number default 10
-on MakeSaveOffer assert DiscountPercent > 0 because "Save offers must include a positive discount"
-on MakeSaveOffer assert DiscountPercent <= 100 because "Save offers cannot exceed 100 percent"
+on MakeSaveOffer ensure DiscountPercent > 0 because "Save offers must include a positive discount"
+on MakeSaveOffer ensure DiscountPercent <= 100 because "Save offers cannot exceed 100 percent"
 
 event AcceptOffer
 
 event DeclineOffer with Note as string nullable default null
-on DeclineOffer assert Note == null or Note != "" because "A supplied decline note cannot be blank"
+on DeclineOffer ensure Note == null or Note != "" because "A supplied decline note cannot be blank"
 
 from Active on RequestCancellation -> set SubscriberName = RequestCancellation.Name -> set PlanName = RequestCancellation.Plan -> set MonthlyPrice = RequestCancellation.Price -> set CancellationReason = RequestCancellation.Reason -> set SaveOfferAccepted = false -> transition RetentionReview
 

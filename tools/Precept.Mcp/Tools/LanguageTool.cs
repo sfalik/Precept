@@ -157,9 +157,9 @@ public static class LanguageTool
 
     private static readonly IReadOnlyList<ExpressionScopeDto> ExpressionScopes =
     [
-        new("invariant expression", "All data fields, collection accessors"),
-        new("state assert expression", "All data fields, collection accessors"),
-        new("event assert expression", "That event's args only (bare ArgName or EventName.ArgName)"),
+        new("rule expression", "All data fields, collection accessors"),
+        new("state ensure expression", "All data fields, collection accessors"),
+        new("event ensure expression", "That event's args only (bare ArgName or EventName.ArgName)"),
         new("when guard", "All data fields, EventName.ArgName, collection accessors"),
         new("set RHS", "All data fields (read-your-writes), EventName.ArgName, collection accessors"),
         new("computed field expression", "Data fields and .count only \u2014 no event arguments (C84), no nullable field references (C83), no unsafe collection accessors like .peek/.min/.max (C85)")
@@ -167,13 +167,13 @@ public static class LanguageTool
 
     private static readonly IReadOnlyList<FirePipelineStageDto> FirePipeline =
     [
-        new(1, "Event asserts", "Validate event args against 'on <Event> assert' rules. Failure → Rejected."),
+        new(1, "Event ensures", "Validate event args against 'on <Event> ensure' rules. Failure → Rejected."),
         new(2, "Row selection", "Iterate transition rows for (state, event) in source order. First 'when' match wins. No match → Unmatched."),
         new(3, "Exit actions", "Run 'from <SourceState> ->' automatic mutations."),
         new(4, "Row mutations", "Execute the matched row's '-> set/add/remove/...' action chain in declaration order."),
         new(5, "Entry actions", "Run 'to <TargetState> ->' automatic mutations."),
         new(6, "Derived field recomputation", "Re-evaluate all computed fields in dependency order after all mutations are committed. Computed values are current before validation."),
-        new(7, "Validation", "Check invariants, state asserts (in/to/from with temporal scoping). Any failure \u2192 full rollback, ConstraintFailure.")
+        new(7, "Validation", "Check rules, state ensures (in/to/from with temporal scoping). Any failure → full rollback, ConstraintFailure.")
     ];
 
     private static readonly IReadOnlyList<OutcomeKindDto> OutcomeKinds =

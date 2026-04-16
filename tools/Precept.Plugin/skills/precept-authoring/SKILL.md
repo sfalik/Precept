@@ -3,7 +3,7 @@ name: precept-authoring
 description: >-
   Create and edit Precept DSL state-machine definitions. Use when building a new
   precept from scratch, adding states/events/fields to an existing precept,
-  writing guards and invariants, modeling a business workflow as a state machine,
+  writing guards and rules, modeling a business workflow as a state machine,
   or generating a state diagram. Triggers on: create precept, new precept, add
   state, add event, add field, model workflow, state machine, precept definition,
   write precept, edit precept, state diagram.
@@ -28,10 +28,10 @@ Before writing code, outline the domain model:
 1. **States** — identify the distinct lifecycle stages. Mark one as `initial`.
 2. **Fields** — identify the data tracked across states. Choose types (`string`, `number`, `boolean`), set defaults, and mark nullable fields.
 3. **Events** — identify the actions that cause transitions. Define event arguments with types and defaults.
-4. **Invariants** — identify rules that must hold in every state.
-5. **State constraints** — identify assertions that must be true when entering or remaining in a specific state.
-6. **Event assertions** — identify validation rules on event arguments.
-7. **Transitions** — map out `from <State> on <Event>` rules with guards (`when`), field mutations (`set`), and outcomes (`transition`, `no transition`, `reject`).
+4. **Rules** — identify rules that must hold in every state.
+5. **State constraints** — identify ensures that must be true when entering or remaining in a specific state.
+6. **Event ensures** — identify validation rules on event arguments.
+7. **Transitions** — map out `from <State> on <Event>` rows with guards (`when`), field mutations (`set`), and outcomes (`transition`, `no transition`, `reject`).
 8. **Edit declarations** — identify which fields are directly editable in which states.
 
 ## Step 4: Write the Precept
@@ -46,21 +46,21 @@ precept <Name>
 # Fields
 field <Name> as <type> [nullable] [default <value>]
 
-# Invariants
-invariant <expr> because "<message>"
+# Rules
+rule <expr> because "<message>"
 
 # States
 state <Name> [initial]
 
 # State constraints
-in <State> assert <expr> because "<message>"
+in <State> ensure <expr> because "<message>"
 
 # Edit declarations
 in <State> edit <Field1>, <Field2>
 
-# Events and event assertions
+# Events and event ensures
 event <Name> [with <Arg> as <type> [default <value>], ...]
-on <Event> assert <expr> because "<message>"
+on <Event> ensure <expr> because "<message>"
 
 # Transitions
 from <State|any> on <Event> [when <guard>] -> <action chain>
@@ -125,7 +125,7 @@ stateDiagram-v2
 ## Common Patterns
 
 ### Guard priority
-Place more specific guards before less specific ones. The first matching `from/on` rule wins.
+Place more specific guards before less specific ones. The first matching `from/on` row wins.
 
 ```
 from Red on Advance when LeftTurnQueued -> ...
@@ -146,13 +146,3 @@ Set a nullable field to `null` to clear it.
 ```
 from FlashingRed on ClearEmergency -> set EmergencyReason = null -> transition Red
 ```
-
-## Language Evolution — Designing New Syntax
-
-When proposing syntax for a new DSL construct (not just authoring within existing syntax), apply these heuristics in order:
-
-1. **Reuse before invention.** Check whether existing DSL tokens already carry the needed semantic. `->` means "results in" (broadly: context → consequence). Don't introduce new keywords for relationships that existing tokens already express.
-2. **Subtract before adding.** Start from the minimal unambiguous form and justify each added token. If removing a keyword changes nothing for the parser or reader, it's ceremony.
-3. **Read principles broadly.** Design principles describe intent, not specific constructs. Extend them to new constructs rather than working around them.
-4. **Test against rhythm.** Paste the proposed syntax into an actual sample file. Does it blend with existing `field`, `state`, `event`, and `from...on` declarations?
-5. **Generate from principles, don't enumerate options.** Ask: what relationship does this express? Which existing token means that? What's the minimal sequence? The answer IS the proposal.
