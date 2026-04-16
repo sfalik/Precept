@@ -122,7 +122,7 @@ public class PreceptSemanticTokensClassificationTests
     }
 
     [Fact]
-    public void GetClassifiedTokens_PreceptName_IsPreceptMessage()
+    public void GetClassifiedTokens_PreceptName_IsPreceptName()
     {
         const string dsl = """
             precept ApartmentRentalApplication
@@ -135,7 +135,42 @@ public class PreceptSemanticTokensClassificationTests
 
         tokens.Should().Contain(t =>
             t.Text == "ApartmentRentalApplication" &&
-            t.Type == "preceptMessage");
+            t.Type == "preceptName");
+    }
+
+    [Fact]
+    public void GetClassifiedTokens_RuleOperators_AreStandardOperators()
+    {
+        const string dsl = """
+            precept InvoiceLineItem
+            field UnitPrice as number default 0
+            field Quantity as number default 1
+            field DiscountPercent as number default 0
+            rule Quantity >= 1 because "Quantity must be at least 1"
+            rule UnitPrice * Quantity - DiscountPercent + 1 <= 100 because "Math should stay numeric"
+            """;
+
+        var tokens = PreceptSemanticTokensHandler.GetClassifiedTokens(dsl);
+
+        tokens.Should().Contain(t =>
+            t.Text == ">=" &&
+            t.Type == "operator");
+
+        tokens.Should().Contain(t =>
+            t.Text == "*" &&
+            t.Type == "operator");
+
+        tokens.Should().Contain(t =>
+            t.Text == "-" &&
+            t.Type == "operator");
+
+        tokens.Should().Contain(t =>
+            t.Text == "+" &&
+            t.Type == "operator");
+
+        tokens.Should().Contain(t =>
+            t.Text == "<=" &&
+            t.Type == "operator");
     }
 
     [Fact]
@@ -187,7 +222,7 @@ public class PreceptSemanticTokensClassificationTests
     }
 
     [Fact]
-    public void GetClassifiedTokens_RuleEnsureKeywords_ArePreceptKeywordGrammar()
+    public void GetClassifiedTokens_RuleEnsureKeywords_ArePreceptKeywordSemantic()
     {
         const string dsl = """
             precept M
@@ -204,10 +239,36 @@ public class PreceptSemanticTokensClassificationTests
 
         tokens.Should().Contain(t =>
             t.Text == "rule" &&
-            t.Type == "preceptKeywordGrammar");
+            t.Type == "preceptKeywordSemantic");
 
         tokens.Should().Contain(t =>
             t.Text == "ensure" &&
-            t.Type == "preceptKeywordGrammar");
+            t.Type == "preceptKeywordSemantic");
+    }
+
+    [Fact]
+    public void GetClassifiedTokens_Punctuation_IsOperator()
+    {
+        const string dsl = """
+            precept M
+            field Priority as choice("Low","High") default "Low"
+            state Active initial
+            event Go
+            from Active on Go -> no transition
+            """;
+
+        var tokens = PreceptSemanticTokensHandler.GetClassifiedTokens(dsl);
+
+        tokens.Should().Contain(t =>
+            t.Text == "(" &&
+            t.Type == "operator");
+
+        tokens.Should().Contain(t =>
+            t.Text == ")" &&
+            t.Type == "operator");
+
+        tokens.Should().Contain(t =>
+            t.Text == "," &&
+            t.Type == "operator");
     }
 }

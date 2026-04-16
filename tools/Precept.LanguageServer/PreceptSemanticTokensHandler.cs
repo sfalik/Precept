@@ -34,6 +34,7 @@ internal sealed class PreceptSemanticTokensHandler : SemanticTokensHandlerBase
             "preceptState",
             "preceptEvent",
             "preceptFieldName",
+            "preceptName",
             "preceptType",
             "preceptValue",
             "preceptMessage"
@@ -98,12 +99,12 @@ internal sealed class PreceptSemanticTokensHandler : SemanticTokensHandlerBase
                 TokenCategory.Declaration => "preceptKeywordSemantic",
                 TokenCategory.Action => "preceptKeywordSemantic",
                 TokenCategory.Outcome => "preceptKeywordSemantic",
-                TokenCategory.Grammar => "preceptKeywordGrammar",
+                TokenCategory.Grammar => "preceptKeywordSemantic",
                 TokenCategory.Constraint => "preceptKeywordGrammar",
                 TokenCategory.Type => "preceptType",
                 TokenCategory.Literal => "preceptValue",
-                TokenCategory.Operator => "preceptKeywordGrammar",
-                TokenCategory.Punctuation => member == PreceptToken.Arrow ? "preceptKeywordGrammar" : null,
+                TokenCategory.Operator => "operator",
+                TokenCategory.Punctuation => "operator",
                 _ => null
             };
             if (semanticType != null)
@@ -319,7 +320,7 @@ internal sealed class PreceptSemanticTokensHandler : SemanticTokensHandlerBase
 
     /// <summary>
     /// Classifies an identifier token based on the preceding token:
-    /// - After precept → "preceptMessage" (gold — the contract name)
+    /// - After precept → "preceptName" (the contract identity)
     /// - After state/from/transition/in/to → "preceptState"
     /// - After event/on → "preceptEvent"
     /// - After field/set/add/remove/.../into → "preceptFieldName"
@@ -328,7 +329,7 @@ internal sealed class PreceptSemanticTokensHandler : SemanticTokensHandlerBase
     /// </summary>
     private static string ClassifyIdentifier(PreceptToken? previousKind, DeclContext context) => previousKind switch
     {
-        PreceptToken.Precept => "preceptMessage",
+        PreceptToken.Precept => "preceptName",
         PreceptToken.From => "preceptState",
         PreceptToken.Dot => "preceptFieldName",
         PreceptToken.Comma when context == DeclContext.State => "preceptState",

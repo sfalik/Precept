@@ -860,7 +860,7 @@ public class CatalogDriftTests
         var grammarText = File.ReadAllText(grammarPath);
 
         // Extract the fieldScalarDeclaration pattern
-        var match = Regex.Match(grammarText, @"""fieldScalarDeclaration"".*?""match"":\s*""([^""]+)""", RegexOptions.Singleline);
+        var match = Regex.Match(grammarText, @"""fieldScalarDeclaration"".*?""match"":\s*""((?:[^""\\]|\\.)+)""", RegexOptions.Singleline);
         match.Success.Should().BeTrue("fieldScalarDeclaration pattern must exist");
 
         var pattern = match.Groups[1].Value;
@@ -874,6 +874,42 @@ public class CatalogDriftTests
     }
 
     [Fact]
+    public void GrammarChoiceType_HasDedicatedPatternBeforeGenericTypeFallback()
+    {
+        var srcRoot = FindRepoRoot();
+        var grammarPath = Path.Combine(srcRoot, "tools", "Precept.VsCode", "syntaxes", "precept.tmLanguage.json");
+        using var document = JsonDocument.Parse(File.ReadAllText(grammarPath));
+
+        var root = document.RootElement;
+        var includes = root.GetProperty("patterns")
+            .EnumerateArray()
+            .Select(p => p.GetProperty("include").GetString())
+            .ToList();
+
+        includes.Should().Contain("#choiceType");
+        includes.IndexOf("#choiceType").Should().BeLessThan(includes.IndexOf("#typeKeywords"),
+            "choice(...) must be matched before the generic type keyword fallback");
+
+        var choiceType = root.GetProperty("repository").GetProperty("choiceType");
+        var choicePattern = choiceType.GetProperty("patterns")[0];
+
+        choicePattern.GetProperty("beginCaptures").GetProperty("1").GetProperty("name").GetString()
+            .Should().Be("storage.type.precept");
+        choicePattern.GetProperty("beginCaptures").GetProperty("2").GetProperty("name").GetString()
+            .Should().Be("punctuation.section.group.begin.precept");
+        choicePattern.GetProperty("endCaptures").GetProperty("0").GetProperty("name").GetString()
+            .Should().Be("punctuation.section.group.end.precept");
+
+        var nestedPatterns = choicePattern.GetProperty("patterns").EnumerateArray().ToList();
+        nestedPatterns.Any(p =>
+            p.TryGetProperty("include", out var include) && include.GetString() == "#strings")
+            .Should().BeTrue("choice values should use the normal Precept string scope");
+        nestedPatterns.Any(p =>
+            p.TryGetProperty("name", out var name) && name.GetString() == "punctuation.separator.comma.precept")
+            .Should().BeTrue("choice separators should use explicit punctuation scopes");
+    }
+
+    [Fact]
     public void GrammarFieldCollectionDeclaration_CoversAllSimpleScalarTypes()
     {
         var srcRoot = FindRepoRoot();
@@ -881,7 +917,7 @@ public class CatalogDriftTests
         var grammarText = File.ReadAllText(grammarPath);
 
         // Extract the fieldCollectionDeclaration pattern
-        var match = Regex.Match(grammarText, @"""fieldCollectionDeclaration"".*?""match"":\s*""([^""]+)""", RegexOptions.Singleline);
+        var match = Regex.Match(grammarText, @"""fieldCollectionDeclaration"".*?""match"":\s*""((?:[^""\\]|\\.)+)""", RegexOptions.Singleline);
         match.Success.Should().BeTrue("fieldCollectionDeclaration pattern must exist");
 
         var pattern = match.Groups[1].Value;

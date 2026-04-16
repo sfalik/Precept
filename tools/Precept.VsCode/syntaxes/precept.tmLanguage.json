@@ -24,6 +24,7 @@
     { "include": "#controlKeywords" },
     { "include": "#declarationKeywords" },
     { "include": "#grammarKeywords" },
+    { "include": "#choiceType" },
     { "include": "#typeKeywords" },
     { "include": "#actionKeywords" },
     { "include": "#constraintKeywords" },
@@ -86,7 +87,7 @@
           "match": "^(\\s*)(precept)(\\s+)([A-Za-z_][A-Za-z0-9_]*)",
           "captures": {
             "2": { "name": "keyword.control.precept" },
-            "4": { "name": "entity.name.precept.message.precept" }
+            "4": { "name": "entity.name.type.precept.precept" }
           }
         }
       ]
@@ -169,6 +170,7 @@
             "6": { "name": "keyword.other.precept" },
             "8": {
               "patterns": [
+                { "include": "#choiceType" },
                 { "include": "#typeKeywords" },
                 { "include": "#constraintKeywords" },
                 { "include": "#declarationKeywords" },
@@ -221,7 +223,7 @@
       "patterns": [
         {
           "name": "meta.field-declaration.collection.precept",
-          "match": "^(\\s*)(field)(\\s+)((?:[A-Za-z_][A-Za-z0-9_]*\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*)(\\s+)(as)(\\s+)(set|queue|stack)(\\s+)(of)(\\s+)(string|number|boolean|integer|decimal)",
+          "match": "^(\\s*)(field)(\\s+)((?:[A-Za-z_][A-Za-z0-9_]*\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*)(\\s+)(as)(\\s+)(set|queue|stack)(\\s+)(of)(\\s+)(choice\\((?:\\s*\"(?:\\\\.|[^\"\\\\])*\"\\s*(?:,\\s*\"(?:\\\\.|[^\"\\\\])*\"\\s*)*)?\\)|string|number|boolean|integer|decimal)",
           "captures": {
             "2": { "name": "keyword.other.precept" },
             "4": {
@@ -239,7 +241,28 @@
             "6": { "name": "keyword.other.precept" },
             "8": { "name": "storage.type.precept" },
             "10": { "name": "keyword.other.precept" },
-            "12": { "name": "storage.type.precept" }
+            "12": {
+              "patterns": [
+                {
+                  "name": "storage.type.precept",
+                  "match": "\\bchoice\\b"
+                },
+                {
+                  "name": "punctuation.section.group.begin.precept",
+                  "match": "\\("
+                },
+                {
+                  "name": "punctuation.section.group.end.precept",
+                  "match": "\\)"
+                },
+                { "include": "#strings" },
+                {
+                  "name": "punctuation.separator.comma.precept",
+                  "match": ","
+                },
+                { "include": "#typeKeywords" }
+              ]
+            }
           }
         }
       ]
@@ -249,7 +272,7 @@
       "patterns": [
         {
           "name": "meta.field-declaration.scalar.precept",
-          "match": "^(\\s*)(field)(\\s+)((?:[A-Za-z_][A-Za-z0-9_]*\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*)(\\s+)(as)(\\s+)(string|number|boolean|integer|decimal)(.*)",
+          "match": "^(\\s*)(field)(\\s+)((?:[A-Za-z_][A-Za-z0-9_]*\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*)(\\s+)(as)(\\s+)(choice\\((?:\\s*\"(?:\\\\.|[^\"\\\\])*\"\\s*(?:,\\s*\"(?:\\\\.|[^\"\\\\])*\"\\s*)*)?\\)|string|number|boolean|integer|decimal)(.*)",
           "captures": {
             "2": { "name": "keyword.other.precept" },
             "4": {
@@ -265,7 +288,28 @@
               ]
             },
             "6": { "name": "keyword.other.precept" },
-            "8": { "name": "storage.type.precept" },
+            "8": {
+              "patterns": [
+                {
+                  "name": "storage.type.precept",
+                  "match": "\\bchoice\\b"
+                },
+                {
+                  "name": "punctuation.section.group.begin.precept",
+                  "match": "\\("
+                },
+                {
+                  "name": "punctuation.section.group.end.precept",
+                  "match": "\\)"
+                },
+                { "include": "#strings" },
+                {
+                  "name": "punctuation.separator.comma.precept",
+                  "match": ","
+                },
+                { "include": "#typeKeywords" }
+              ]
+            },
             "9": {
               "patterns": [
                 { "include": "#constraintKeywords" },
@@ -294,7 +338,7 @@
           "name": "meta.rule.precept",
           "match": "^(\\s*)(rule)\\b",
           "captures": {
-            "2": { "name": "keyword.other.grammar.precept" }
+            "2": { "name": "keyword.other.precept" }
           }
         }
       ]
@@ -323,7 +367,7 @@
                 }
               ]
             },
-            "6": { "name": "keyword.other.grammar.precept" }
+            "6": { "name": "keyword.other.precept" }
           }
         },
         {
@@ -332,7 +376,7 @@
           "captures": {
             "2": { "name": "keyword.control.precept" },
             "4": { "name": "entity.name.function.event.precept" },
-            "6": { "name": "keyword.other.grammar.precept" }
+            "6": { "name": "keyword.other.precept" }
           }
         }
       ]
@@ -419,6 +463,31 @@
       ]
     },
 
+    "choiceType": {
+      "comment": "choice(\"A\", \"B\") type syntax with explicit punctuation scopes.",
+      "patterns": [
+        {
+          "name": "meta.type.choice.precept",
+          "begin": "\\b(choice)(\\()",
+          "beginCaptures": {
+            "1": { "name": "storage.type.precept" },
+            "2": { "name": "punctuation.section.group.begin.precept" }
+          },
+          "end": "\\)",
+          "endCaptures": {
+            "0": { "name": "punctuation.section.group.end.precept" }
+          },
+          "patterns": [
+            { "include": "#strings" },
+            {
+              "name": "punctuation.separator.comma.precept",
+              "match": ","
+            }
+          ]
+        }
+      ]
+    },
+
     "functionCall": {
       "comment": "Built-in function calls: function name followed by ( — must precede constraintKeywords so min(/max( match as functions, not constraints",
       "patterns": [
@@ -450,7 +519,7 @@
     "grammarKeywords": {
       "patterns": [
         {
-          "name": "keyword.other.grammar.precept",
+          "name": "keyword.other.precept",
           "match": "\\b(rule|ensure)\\b"
         }
       ]
