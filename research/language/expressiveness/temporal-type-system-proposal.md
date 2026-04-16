@@ -485,17 +485,17 @@ These resolve to `Duration.FromHours`, `Duration.FromMinutes`, `Duration.FromSec
 | `duration ± duration` | `duration` | Combined elapsed time / difference. |
 | `duration * integer` or `duration * number` | `duration` | Scaling. NodaTime: `Duration * long`, `Duration * double`. |
 | `integer * duration` or `number * duration` | `duration` | Commutative form. NodaTime supports both operand orders. |
-| `duration / integer` or `duration / number` | `duration` | Scaling. Divisor must be nonzero (see division-by-zero rule below). |
-| `duration / duration` | `number` | Ratio (e.g., how many shifts fit). Divisor must be nonzero (see below). |
+| `duration / integer` or `duration / number` | `duration` | Scaling. Divisor safety applies (see below). |
+| `duration / duration` | `number` | Ratio (e.g., how many shifts fit). Divisor safety applies (see below). |
 | `-duration` | `duration` | Unary negation. `Duration.Negate()`. |
 
-**Division-by-zero prevention:** Division by zero on `duration` throws `DivideByZeroException` in NodaTime. Precept prevents this at compile time:
+**Division-by-zero prevention:** Division by zero on `duration` throws `DivideByZeroException` in NodaTime. Precept catches this via the unified narrowing system (Issue #106):
 
-- **Literal zero:** `duration / 0` is a compile error: *"Division by zero."*
-- **Field divisor:** When the divisor is a field reference (e.g., `ShiftDuration / BatchSize`), the compiler requires the divisor field to have a constraint that excludes zero (e.g., `BatchSize > 0` or a `nonzero` constraint on the field). If no such constraint exists, it is a compile error: *"Division requires the divisor to be constrained as nonzero. Add a constraint like `BatchSize > 0`."*
-- **Duration divisor:** `duration / duration` follows the same rule — the divisor duration field must be constrained as nonzero (`ShiftLength != 0 hours` or equivalent).
+- **Literal zero:** `duration / 0` is a compile **error** — provably always wrong.
+- **Unproven field divisor:** `duration / Field` where no nonzero proof exists emits a compile **warning**. Proofs come from any of: `positive` constraint, explicit `rule Field > 0`, `when Field != 0` guard, or `in State ensure Field > 0`.
+- **Compound expressions:** `duration / (Rate + 1)` assumes satisfiable — no warning (consistent with #106's conservatism).
 
-This is constraint-gated division: the type system does not allow division unless the program has already proven the divisor cannot be zero.
+Duration division is not a special case — it inherits the same divisor safety as numeric division. The only temporal-specific note is that `DivideByZeroException` (instead of IEEE 754 `Infinity`) makes the runtime consequence more severe for duration than for float.
 | `==`, `!=`, `<`, `>`, `<=`, `>=` | `boolean` | NodaTime default behavior. Thin wrapper — no custom logic. |
 
 | **Not supported** | **Why** |
@@ -1844,13 +1844,18 @@ Temporal types are valid as collection inner types where the collection's struct
 - [ ] `duration / duration → number` (ratio, e.g., how many shifts fit)
 - [ ] `-duration → duration` (unary negation, `Duration.Negate()`)
 
-#### Division-by-zero prevention
+#### Division-by-zero prevention (Issue #106)
 
-- [ ] `duration / 0` (literal zero) is a compile error: "Division by zero."
-- [ ] `duration / Field` where `Field` has no constraint excluding zero is a compile error: "Division requires the divisor to be constrained as nonzero."
-- [ ] `duration / Field` where `Field` has `Field > 0` or equivalent constraint compiles successfully
-- [ ] `duration / duration` where divisor field has no nonzero constraint is a compile error
-- [ ] `duration / duration` where divisor field is constrained as nonzero compiles successfully
+Duration division inherits the unified divisor safety from Issue #106. No temporal-specific mechanism needed.
+
+- [ ] `duration / 0` (literal zero) is a compile error
+- [ ] `duration / Field` where `Field` has no nonzero proof emits a compile warning
+- [ ] No warning when divisor field has `positive` constraint
+- [ ] No warning when explicit `rule Field > 0` or `rule Field != 0` exists
+- [ ] No warning when `when Field != 0` guard is present
+- [ ] No warning when state `ensure Field > 0` is present
+- [ ] No warning when divisor is a compound expression (assumes satisfiable)
+- [ ] `duration / duration` follows the same divisor safety rules
 
 #### Comparison operators
 
