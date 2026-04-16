@@ -355,6 +355,9 @@ field CheckInTime as time nullable
 |---|---|
 | `time + integer` | What unit? Use `(n) hours` or `(n) minutes`. |
 | `time - integer` | Same — a bare number doesn't specify a unit. |
+| `time + 1 day` / `time + N days` | Days can't be added to a time — times only support hours, minutes, and seconds. |
+| `time + N months` / `time + N years` | Same — months and years don't apply to a time. |
+| `time + SomePeriodField` (unconstrained) | This period field may include date parts. Declare it as `period timeonly` to use it with times, or use a `duration` field instead. |
 
 **Accessors:**
 
@@ -404,6 +407,9 @@ field IncidentTimestamp as instant
 | `instant + 3 days` | `instant` | Postfix unit — `3 days` resolves to `Duration.FromDays(3)` in instant context. |
 | `instant + (DayCount) days` | `instant` | Paren postfix — variable expression resolves to `Duration.FromDays(n)` in instant context. |
 | `instant + 72 hours` | `instant` | Postfix unit — `72 hours` resolves to `Duration.FromHours(72)` in instant context. |
+| `instant + 30 minutes` | `instant` | Postfix unit — resolves to `Duration.FromMinutes(30)`. |
+| `instant + 45 seconds` | `instant` | Postfix unit — resolves to `Duration.FromSeconds(45)`. |
+| `instant + 2 weeks` | `instant` | Postfix unit — `weeks` resolves to `Duration.FromDays(14)` in instant context. |
 | `==`, `!=`, `<`, `>`, `<=`, `>=` | `boolean` | NodaTime default behavior. Thin wrapper — no custom logic. |
 
 | **Not supported** | **Why** |
@@ -498,6 +504,7 @@ These resolve to `Duration.FromHours`, `Duration.FromMinutes`, `Duration.FromSec
 | `duration * duration` | You can't multiply two durations together. Did you mean `SomeDuration * 2` to double it? |
 | `duration * decimal` | Durations can only be multiplied by whole numbers or `number`. |
 | `duration + period` / `duration - period` | Durations (hours, minutes, seconds) and periods (days, months, years) can't be mixed. |
+| `duration + integer` | A bare number doesn't specify a unit. Use `SomeDuration + 30 minutes` or construct a duration with a unit like `72 hours`. |
 
 **Accessors:**
 
@@ -703,7 +710,12 @@ No standalone construction function exists. `zoneddatetime` is always reached vi
 | `zoneddatetime + duration` | `zoneddatetime` | Timeline arithmetic on underlying instant. |
 | `zoneddatetime - duration` | `zoneddatetime` | Timeline arithmetic backward. |
 | `zoneddatetime + 3 hours` | `zoneddatetime` | Postfix unit — resolves to `duration`. |
+| `zoneddatetime + 30 minutes` | `zoneddatetime` | Postfix unit — resolves to `duration`. |
+| `zoneddatetime + 45 seconds` | `zoneddatetime` | Postfix unit — resolves to `duration`. |
 | `zoneddatetime + 3 days` | `zoneddatetime` | Postfix unit — `days` resolves to `duration` in zoneddatetime context (timeline arithmetic). |
+| `zoneddatetime + 2 weeks` | `zoneddatetime` | Postfix unit — `weeks` resolves to `duration` in zoneddatetime context. |
+| `zoneddatetime + (N) hours` | `zoneddatetime` | Paren postfix — variable expression resolves to `duration`. |
+| `zoneddatetime + (N) days` | `zoneddatetime` | Paren postfix — `days` resolves to `duration` in zoneddatetime context. |
 | `zoneddatetime - zoneddatetime` | `duration` | Instant subtraction. |
 | `==`, `!=`, `<`, `>`, `<=`, `>=` | `boolean` | NodaTime default behavior. Thin wrapper — no custom logic. |
 
@@ -1091,12 +1103,14 @@ This is what makes temporal types the gateway: they don't just add temporal capa
 | `zoneddatetime` | `-` | `duration` | `zoneddatetime` | Backward. |
 | `zoneddatetime` | `-` | `zoneddatetime` | `duration` | Instant subtraction. |
 
-**Bridge type (`datetime` — accepts both):**
+**Composition (cross-type operations that produce a new type):**
 
 | Left | Op | Right | Result | Notes |
 |---|---|---|---|---|
-| `datetime` | `+` | `duration` | `datetime` | Time arithmetic. |
-| `datetime` | `-` | `duration` | `datetime` | Backward. |
+| `date` | `+` | `time` | `datetime` | `LocalDate + LocalTime → LocalDateTime`. Decision #25. |
+| `time` | `+` | `date` | `datetime` | Commutative — same result as `date + time`. |
+
+**Note:** The v3 proposal had a "Bridge type" section listing `datetime ± duration → datetime`. Decision #27 reversed this — `datetime + duration` and `datetime - duration` are now **compile errors.** `datetime` uses `period` for all arithmetic; `duration` is reserved for timeline types (`instant`, `zoneddatetime`). See Decision #27.
 
 ### Comparison rules
 
@@ -2043,7 +2057,9 @@ Single quotes win on all three criteria that matter for a DSL: refactoring safet
 - [ ] `zoneddatetime + 3 days → zoneddatetime` (postfix `days` resolves to `duration` in zoneddatetime context)
 - [ ] `zoneddatetime + 2 weeks → zoneddatetime` (resolves to `duration`)
 - [ ] `zoneddatetime + 30 minutes → zoneddatetime` (resolves to `duration`)
+- [ ] `zoneddatetime + 45 seconds → zoneddatetime` (resolves to `duration`)
 - [ ] `zoneddatetime + (N) hours → zoneddatetime` (paren postfix resolves to `duration`)
+- [ ] `zoneddatetime + (N) days → zoneddatetime` (paren postfix resolves to `duration`)
 - [ ] `zoneddatetime - zoneddatetime → duration` (instant subtraction)
 
 #### Comparison operators
