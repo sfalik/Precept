@@ -1065,4 +1065,30 @@ public class PreceptTypeCheckerTests
 
         result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C76" || d.Constraint.Id == "C77");
     }
+
+    // ─── Issue #106 Slice 3: Guarded rule exclusion from proof iteration ────
+
+    [Fact]
+    public void Check_GuardedRule_ExcludedFromProofIteration_SqrtStillC76()
+    {
+        // A guarded rule (rule D >= 0 when IsActive) should NOT inject $nonneg: unconditionally.
+        // The fact D >= 0 only holds when IsActive is true — injecting it always would be unsound.
+        // sqrt(D) should still produce C76 because no unconditional proof exists.
+        const string dsl = """
+            precept Test
+            field D as number default 1
+            field IsActive as boolean default true
+            state Active initial
+            state Done
+            event Finish
+            event Check
+            from Active on Finish -> transition Done
+            rule D >= 0 when IsActive because "D nonneg only when active"
+            from Active on Check when sqrt(D) > 0 -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C76");
+    }
 }

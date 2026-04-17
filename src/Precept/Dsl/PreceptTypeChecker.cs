@@ -92,18 +92,21 @@ internal static class PreceptTypeChecker
         var expressions = new List<PreceptTypeExpressionInfo>();
         var scopes = new List<PreceptTypeScopeInfo>();
 
-        var dataFieldKinds = model.Fields.ToDictionary(
+        IReadOnlyDictionary<string, StaticValueKind> dataFieldKinds = model.Fields.ToDictionary(
             field => field.Name,
             MapFieldContractKind,
             StringComparer.Ordinal);
 
-        // Inject non-negative proof markers for sqrt() compile-time checking.
-        // Fields with nonnegative, positive, or min >= 0 constraints are provably non-negative.
-        foreach (var field in model.Fields)
+        // Replace bespoke constraint-inspection loop with unified narrowing from rules.
+        // Constraints desugar to synthetic rules at parse time (e.g., `positive` → `rule Field > 0`).
+        // Unguarded rules are unconditional proofs; guarded rules are excluded because the
+        // fact only holds when the guard is true.
+        if (model.Rules is not null)
         {
-            if (field.Constraints is not null &&
-                field.Constraints.Any(static c => c is FieldConstraint.Nonnegative or FieldConstraint.Positive or FieldConstraint.Min { Value: >= 0 }))
-                dataFieldKinds[$"$nonneg:{field.Name}"] = StaticValueKind.Boolean;
+            foreach (var rule in model.Rules.Where(r => r.WhenGuard is null))
+            {
+                dataFieldKinds = ApplyNarrowing(rule.Expression, dataFieldKinds, assumeTrue: true);
+            }
         }
 
         var eventArgKinds = model.Events.ToDictionary(
