@@ -161,4 +161,125 @@ public class PreceptCodeActionTests
 
         return Math.Min(lineStart + (int)position.Character, text.Length);
     }
+
+    // ═══════════════════════════════════════════════════════════════
+    // C93 — Unproven divisor safety code actions
+    // ═══════════════════════════════════════════════════════════════
+
+    [Fact]
+    public async Task CodeActions_C93_FieldDivisor_OffersAddPositiveConstraint()
+    {
+        const string text = """
+            precept P
+            field Rate as number default 1
+            field Result as number default 0
+            state A initial
+            event Calculate
+            from A on Calculate -> set Result = 100 / Rate -> no transition
+            """;
+
+        var (actions, uri, _) = await GetC93CodeActionsAsync(text);
+
+        var codeAction = actions
+            .Select(a => a.CodeAction)
+            .FirstOrDefault(a => a is not null && a.Title.Contains("Add `positive` constraint", StringComparison.Ordinal));
+
+        codeAction.Should().NotBeNull();
+        var updatedText = ApplyWorkspaceEdit(text, uri, codeAction!.Edit!);
+        updatedText.Should().Contain("field Rate as number positive default 1");
+    }
+
+    [Fact]
+    public async Task CodeActions_C93_EventArgDivisor_OffersAddPositiveConstraint()
+    {
+        const string text = """
+            precept P
+            field Result as number default 0
+            state A initial
+            event Calculate with Divisor as number
+            from A on Calculate -> set Result = 100 / Calculate.Divisor -> no transition
+            """;
+
+        var (actions, uri, _) = await GetC93CodeActionsAsync(text);
+
+        var codeAction = actions
+            .Select(a => a.CodeAction)
+            .FirstOrDefault(a => a is not null && a.Title.Contains("Add `positive` constraint", StringComparison.Ordinal));
+
+        codeAction.Should().NotBeNull();
+        var updatedText = ApplyWorkspaceEdit(text, uri, codeAction!.Edit!);
+        updatedText.Should().Contain("event Calculate with Divisor as number positive");
+    }
+
+    [Fact]
+    public async Task CodeActions_C93_EventArgDivisor_OffersAddEnsure()
+    {
+        const string text = """
+            precept P
+            field Result as number default 0
+            state A initial
+            event Calculate with Divisor as number
+            from A on Calculate -> set Result = 100 / Calculate.Divisor -> no transition
+            """;
+
+        var (actions, uri, _) = await GetC93CodeActionsAsync(text);
+
+        var codeAction = actions
+            .Select(a => a.CodeAction)
+            .FirstOrDefault(a => a is not null && a.Title.Contains("ensure Divisor > 0", StringComparison.Ordinal));
+
+        codeAction.Should().NotBeNull();
+        var updatedText = ApplyWorkspaceEdit(text, uri, codeAction!.Edit!);
+        updatedText.Should().Contain("on Calculate ensure Divisor > 0 because \"Divisor must be nonzero\"");
+    }
+
+    [Fact]
+    public async Task CodeActions_C93_WhenGuard_AppendsToExistingGuard()
+    {
+        const string text = """
+            precept P
+            field Rate as number default 1
+            field Amount as number default 0
+            field Result as number default 0
+            state A initial
+            event Calculate
+            from A on Calculate when Amount > 0 -> set Result = Amount / Rate -> no transition
+            """;
+
+        var (actions, uri, _) = await GetC93CodeActionsAsync(text);
+
+        var codeAction = actions
+            .Select(a => a.CodeAction)
+            .FirstOrDefault(a => a is not null && a.Title.Contains("when Rate != 0", StringComparison.Ordinal));
+
+        codeAction.Should().NotBeNull();
+        var updatedText = ApplyWorkspaceEdit(text, uri, codeAction!.Edit!);
+        updatedText.Should().Contain("when Amount > 0 and Rate != 0 ->");
+    }
+
+    private static async Task<(CommandOrCodeActionContainer Actions, DocumentUri Uri, string Text)> GetC93CodeActionsAsync(string text)
+    {
+        var analyzer = PreceptTextDocumentSyncHandler.SharedAnalyzer;
+        var uri = DocumentUri.From($"file:///tmp/{Guid.NewGuid():N}.precept");
+        analyzer.SetDocumentText(uri, text);
+        var diagnostics = analyzer.GetDiagnostics(uri).ToArray();
+        var c93Diagnostic = diagnostics.FirstOrDefault(d => d.Code is { String: "PRECEPT093" });
+        c93Diagnostic.Should().NotBeNull("Expected a C93 diagnostic but none was found");
+
+        var handler = new PreceptCodeActionHandler();
+        var actions = await handler.Handle(
+            new CodeActionParams
+            {
+                TextDocument = new TextDocumentIdentifier(uri),
+                Range = c93Diagnostic!.Range,
+                Context = new CodeActionContext
+                {
+                    Diagnostics = new Container<Diagnostic>(c93Diagnostic)
+                }
+            },
+            CancellationToken.None);
+
+        actions.Should().NotBeNull();
+        return (actions!, uri, text);
+    }
 }

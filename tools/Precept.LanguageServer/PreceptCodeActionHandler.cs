@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
@@ -64,6 +65,22 @@ internal sealed class PreceptCodeActionHandler : ICodeActionHandler
                 Diagnostics = relatedDiagnostics is { Length: > 0 } ? new Container<Diagnostic>(relatedDiagnostics) : null,
                 Edit = edit
             });
+        }
+
+        // ── C93: Unproven divisor safety ──
+        var c93Diagnostics = (request.Context.Diagnostics ?? Enumerable.Empty<Diagnostic>())
+            .Where(d => d.Code is { String: "PRECEPT093" })
+            .ToArray();
+
+        if (c93Diagnostics.Length > 0)
+        {
+            var (model, parseDiags) = PreceptParser.ParseWithDiagnostics(text);
+            if (parseDiags.Count == 0 && model is not null)
+            {
+                var lines = text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+                foreach (var c93 in c93Diagnostics)
+                    AddC93CodeActions(actions, lines, text, request.TextDocument.Uri, model, c93);
+            }
         }
 
         return Task.FromResult<CommandOrCodeActionContainer?>(new CommandOrCodeActionContainer(actions));
@@ -239,5 +256,225 @@ internal sealed class PreceptCodeActionHandler : ICodeActionHandler
             if (trimmed.StartsWith(prefix, StringComparison.Ordinal))
                 yield return i;
         }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // C93 — Unproven divisor safety code actions
+    // ═══════════════════════════════════════════════════════════════
+
+    private static void AddC93CodeActions(
+        List<CommandOrCodeAction> actions,
+        string[] lines,
+        string text,
+        DocumentUri uri,
+        PreceptDefinition model,
+        Diagnostic diagnostic)
+    {
+        var divisorName = ExtractC93DivisorName(diagnostic.Message);
+        if (divisorName is null)
+            return;
+
+        var isDotted = divisorName.Contains('.');
+        string? eventName = null;
+        string? argName = null;
+        string? fieldName = null;
+
+        if (isDotted)
+        {
+            var dotIndex = divisorName.IndexOf('.');
+            eventName = divisorName[..dotIndex];
+            argName = divisorName[(dotIndex + 1)..];
+        }
+        else
+        {
+            fieldName = divisorName;
+        }
+
+        // Action 1: Add `positive` constraint
+        var positiveEdit = isDotted
+            ? BuildAddPositiveToEventArgEdit(lines, uri, model, eventName!, argName!)
+            : BuildAddPositiveToFieldEdit(lines, uri, model, fieldName!);
+
+        if (positiveEdit is not null)
+        {
+            var displayName = isDotted ? argName! : fieldName!;
+            actions.Add(new CodeAction
+            {
+                Title = $"Add `positive` constraint to field `{displayName}`",
+                Kind = CodeActionKind.QuickFix,
+                Diagnostics = new Container<Diagnostic>(diagnostic),
+                Edit = positiveEdit
+            });
+        }
+
+        // Action 2: Add ensure (event-arg only)
+        if (isDotted)
+        {
+            var ensureEdit = BuildAddEnsureEdit(lines, text, uri, model, eventName!, argName!);
+            if (ensureEdit is not null)
+            {
+                actions.Add(new CodeAction
+                {
+                    Title = $"Add `ensure {argName} > 0` to event",
+                    Kind = CodeActionKind.QuickFix,
+                    Diagnostics = new Container<Diagnostic>(diagnostic),
+                    Edit = ensureEdit
+                });
+            }
+        }
+
+        // Action 3: Add `when` guard
+        var guardName = isDotted ? divisorName : fieldName!;
+        var guardEdit = BuildAddWhenGuardEdit(lines, uri, (int)diagnostic.Range.Start.Line, guardName);
+        if (guardEdit is not null)
+        {
+            actions.Add(new CodeAction
+            {
+                Title = $"Add `when {guardName} != 0` guard",
+                Kind = CodeActionKind.QuickFix,
+                Diagnostics = new Container<Diagnostic>(diagnostic),
+                Edit = guardEdit
+            });
+        }
+    }
+
+    private static string? ExtractC93DivisorName(string message)
+    {
+        var match = Regex.Match(message, @"Divisor '([^']+)'");
+        return match.Success ? match.Groups[1].Value : null;
+    }
+
+    private static WorkspaceEdit? BuildAddPositiveToFieldEdit(
+        string[] lines, DocumentUri uri, PreceptDefinition model, string fieldName)
+    {
+        var field = model.Fields.FirstOrDefault(f =>
+            string.Equals(f.Name, fieldName, StringComparison.Ordinal));
+        if (field is null)
+            return null;
+
+        var lineIndex = field.SourceLine - 1;
+        if (lineIndex < 0 || lineIndex >= lines.Length)
+            return null;
+
+        var line = lines[lineIndex];
+        var typeMatch = Regex.Match(line, @"as\s+(?:number|integer|decimal)\??");
+        if (!typeMatch.Success)
+            return null;
+
+        var insertPos = typeMatch.Index + typeMatch.Length;
+        var newLine = line[..insertPos] + " positive" + line[insertPos..];
+
+        return MakeSingleLineEdit(uri, lineIndex, line.Length, newLine);
+    }
+
+    private static WorkspaceEdit? BuildAddPositiveToEventArgEdit(
+        string[] lines, DocumentUri uri, PreceptDefinition model, string eventName, string argName)
+    {
+        var evt = model.Events.FirstOrDefault(e =>
+            string.Equals(e.Name, eventName, StringComparison.Ordinal));
+        if (evt is null)
+            return null;
+
+        var lineIndex = evt.SourceLine - 1;
+        if (lineIndex < 0 || lineIndex >= lines.Length)
+            return null;
+
+        var line = lines[lineIndex];
+        var pattern = Regex.Escape(argName) + @"\s+as\s+(?:number|integer|decimal)\??";
+        var argMatch = Regex.Match(line, pattern);
+        if (!argMatch.Success)
+            return null;
+
+        var insertPos = argMatch.Index + argMatch.Length;
+        var newLine = line[..insertPos] + " positive" + line[insertPos..];
+
+        return MakeSingleLineEdit(uri, lineIndex, line.Length, newLine);
+    }
+
+    private static WorkspaceEdit? BuildAddEnsureEdit(
+        string[] lines, string text, DocumentUri uri, PreceptDefinition model, string eventName, string argName)
+    {
+        var evt = model.Events.FirstOrDefault(e =>
+            string.Equals(e.Name, eventName, StringComparison.Ordinal));
+        if (evt is null)
+            return null;
+
+        var lineIndex = evt.SourceLine - 1;
+        if (lineIndex < 0 || lineIndex >= lines.Length)
+            return null;
+
+        var eventLine = lines[lineIndex];
+        var indent = eventLine.Length - eventLine.TrimStart().Length;
+        var indentStr = eventLine[..indent];
+
+        var newline = text.Contains("\r\n") ? "\r\n" : "\n";
+        var ensureLine = $"{indentStr}on {eventName} ensure {argName} > 0 because \"{argName} must be nonzero\"";
+
+        var insertPosition = new Position(lineIndex + 1, 0);
+
+        return new WorkspaceEdit
+        {
+            Changes = new Dictionary<DocumentUri, IEnumerable<TextEdit>>
+            {
+                [uri] = new[]
+                {
+                    new TextEdit
+                    {
+                        Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
+                            insertPosition, insertPosition),
+                        NewText = ensureLine + newline
+                    }
+                }
+            }
+        };
+    }
+
+    private static WorkspaceEdit? BuildAddWhenGuardEdit(
+        string[] lines, DocumentUri uri, int diagnosticLineIndex, string guardName)
+    {
+        if (diagnosticLineIndex < 0 || diagnosticLineIndex >= lines.Length)
+            return null;
+
+        var line = lines[diagnosticLineIndex];
+        var arrowIndex = line.IndexOf("->", StringComparison.Ordinal);
+        if (arrowIndex < 0)
+            return null;
+
+        var prefix = line[..arrowIndex];
+        var suffix = line[arrowIndex..];
+
+        string newLine;
+        if (prefix.Contains(" when ", StringComparison.Ordinal))
+        {
+            // Existing when clause — append with `and`
+            newLine = prefix.TrimEnd() + $" and {guardName} != 0 " + suffix;
+        }
+        else
+        {
+            // No when clause — insert before ->
+            newLine = prefix.TrimEnd() + $" when {guardName} != 0 " + suffix;
+        }
+
+        return MakeSingleLineEdit(uri, diagnosticLineIndex, line.Length, newLine);
+    }
+
+    private static WorkspaceEdit MakeSingleLineEdit(DocumentUri uri, int lineIndex, int lineLength, string newText)
+    {
+        return new WorkspaceEdit
+        {
+            Changes = new Dictionary<DocumentUri, IEnumerable<TextEdit>>
+            {
+                [uri] = new[]
+                {
+                    new TextEdit
+                    {
+                        Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
+                            new Position(lineIndex, 0),
+                            new Position(lineIndex, lineLength)),
+                        NewText = newText
+                    }
+                }
+            }
+        };
     }
 }
