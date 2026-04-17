@@ -752,7 +752,7 @@ No standalone construction function exists. `zoneddatetime` is always reached vi
 
 **Constraints:** `nullable`, `default '...'` (single-quoted zoneddatetime literal with bracket-enclosed timezone).
 
-**Serialization:** Two-property JSON: `{ "instant": "..Z", "timezone": "..." }`.
+**Serialization:** NodaTime STJ converter string (includes local time, UTC offset, and IANA zone identifier). Round-trips via `ZonedDateTimePattern`.
 
 **Teachable error messages:**
 
@@ -875,12 +875,12 @@ instant → .inZone(tz) → zoneddatetime → .datetime → datetime → .date /
 
 **Exception:** `zoneddatetime` provides `.date`, `.time`, and component accessors (`.year`, etc.) directly because it already carries a timezone. The timezone mediation has already happened — the hierarchy step was the `.inZone(tz)` call that produced the `zoneddatetime`.
 
-### DST ambiguity resolution
+### DST ambiguity resolution (locked)
 
-- **Gap (spring forward):** Map to the instant *after* the gap. NodaTime's `LenientResolver`.
-- **Overlap (fall back):** Map to the *later* instant. Safer for deadline calculations.
+- **Gap (spring forward):** Map to the instant *after* the gap — `LenientResolver` default.
+- **Overlap (fall back):** Map to the *earlier* offset (first occurrence) — `LenientResolver` default.
 
-**Recommendation:** Lenient resolver. Deterministic. The 99% case is unaffected.
+**Decision:** Use NodaTime's `LenientResolver` with no custom code. Both gap and overlap behavior are the NodaTime defaults via `InZoneLeniently`. Deterministic. The 99% case is unaffected. If a future use case requires different overlap resolution, it can be added as an opt-in parameter — but the default is NodaTime-native.
 
 ### Composability with existing operations
 
@@ -1084,7 +1084,7 @@ This is what makes temporal types the gateway: they don't just add temporal capa
 | `duration` | `*` | `integer`/`number` | `duration` | Scaling. |
 | `duration` | `/` | `integer`/`number` | `duration` | Scaling. |
 | `duration` | `/` | `duration` | `number` | Ratio. |
-| `time` | `±` | `duration` | `time` | Wraps at midnight. |
+| `time` | `±` | `duration` | `time` | Sub-day bridging (Decision #16). Wraps at midnight. Precept-level extension — NodaTime's `LocalTime` has no `Plus(Duration)`, but sub-day durations and periods are physically identical. Runtime: nanosecond arithmetic on `LocalTime`. |
 | `time` | `-` | `time` | `period` | Time-unit period. |
 | `zoneddatetime` | `±` | `duration` | `zoneddatetime` | Timeline arithmetic. |
 | `zoneddatetime` | `-` | `zoneddatetime` | `duration` | Instant subtraction. |
@@ -1159,7 +1159,7 @@ All temporal types support `nullable`. All follow existing null propagation rule
 | `zoneddatetime` | `default '...'` | Author specifies (single-quoted zoneddatetime). No ambient implicit — explicit per field. |
 | `datetime` | `default '...'` | Author specifies (single-quoted datetime). |
 
-**`nullable` + `default`:** Open — George's Challenge #3. Deferred to cross-cutting decision.
+**`nullable` + `default`:** Permitted. A nullable field with a default starts at the default value but can be set to `null` via events. This follows the existing language rules — `nullable` and `default` are independent modifiers (PreceptLanguageDesign.md § Field Declarations).
 
 ---
 
@@ -1188,7 +1188,7 @@ All temporal types support `nullable`. All follow existing null propagation rule
 
 ### 4. Single-quoted delimiter is the typed constant delimiter — not temporal-specific (revised — locked 2026-04-15)
 
-- **Why:** The `'...'` delimiter is the **typed constant delimiter** for any non-primitive type whose content shape is unambiguous — not a temporal-specific feature. The three literal mechanisms are a closed set: `"..."` (string), `'...'` (typed constant, shape-inferred), `N unit` (quantity). Zero constructors exist in the language. A type qualifies for `'...'` if and only if its content shape is distinguishable from every other single-quote inhabitant (the admission rule). Temporal types are the **first inhabitants**: `date` (`YYYY-MM-DD`), `time` (`HH:MM:SS`), `datetime` (`...T...`), `instant` (`...T...Z`), `zoneddatetime` (`...T...[zone]`), `timezone` (`Word/Word`). This follows Precept's literal grain: `"hello"` doesn't need `string("hello")`, so `'2026-01-15'` doesn't need `date(2026-01-15)`.
+- **Why:** The `'...'` delimiter is the **typed constant delimiter** for any non-primitive type whose content shape determines a type family — not a temporal-specific feature. The two literal mechanisms are a closed set: `"..."` (string with optional `{expr}` interpolation) and `'...'` (typed constant with optional `{expr}` interpolation, type inferred from content shape via the type-family admission rule). Zero constructors exist in the language. A type qualifies for `'...'` if and only if its content shape determines a **type family** — a finite, enumerable set of types — that is disjoint from every other family. Context narrows within the family. See [`docs/LiteralSystemDesign.md`](LiteralSystemDesign.md) for the canonical two-door model. Temporal types are the **first inhabitants**: `date` (`YYYY-MM-DD`), `time` (`HH:MM:SS`), `datetime` (`...T...`), `instant` (`...T...Z`), `zoneddatetime` (`...T...[zone]`), `timezone` (`Word/Word`). Quantities (`'30 days'`) enter through the same door with type family `{period, duration}`, narrowed by expression context. This follows Precept's literal grain: `"hello"` doesn't need `string("hello")`, so `'2026-01-15'` doesn't need `date(2026-01-15)`.
 - **Alternatives rejected:** (A) `date(2026-01-15)` (unquoted constructor — original Decision #4/18) — the team's unanimous initial recommendation. Shane challenged it with the string-delimiter precedent insight: if strings use `"..."` without a `string()` wrapper, temporal values should use a delimiter too. See "Double-Quote Alternative Analysis" below. (B) `date("2026-01-15")` (string constructor) — quotes suggest "a string being parsed." (C) Bare ISO `2024-01-15` — lexer ambiguity with subtraction. (D) `"2026-01-15"` (double-quoted, context-resolved) — explored and rejected; see "Double-Quote Alternative Analysis." (E) Sigil prefix (`#2026-01-15`) — non-obvious, not Precept's voice.
 - **Precedent:** SQL `'2026-01-15'` for value literals. Python `b'...'` / `r'...'` for typed string variants with distinct delimiters.
 - **Tradeoff:** Type is implicit in content shape rather than explicit in a keyword. Readers must recognize ISO formats. Mitigated by: (a) ISO date formats are culturally universal, (b) field declarations provide type context, (c) syntax highlighting colors single-quoted content distinctly.
@@ -1471,7 +1471,7 @@ Single quotes win on all three criteria that matter for a DSL: refactoring safet
 
 ### Challenge 3: `nullable + default` prohibition
 
-**Resolution:** Open. Deferred to cross-cutting design decision.
+**Resolution:** No prohibition. `nullable` and `default` are independent modifiers — combining them is already permitted by the existing language rules. A nullable field with a default starts at the default value and can be set to `null` via events.
 
 ### Challenge 4: `date - date` result type
 
@@ -1489,6 +1489,7 @@ Single quotes win on all three criteria that matter for a DSL: refactoring safet
 | #29 (integer type) | Postfix unit expressions take `integer`. Dependency. |
 | #16 (built-in functions) | Conversion functions from this proposal. Constructor functions eliminated — replaced by postfix units. |
 | #13 (field-level constraints) | `nullable`, `default`, `nonnegative` architecture. |
+| #106 (division-by-zero unified narrowing) | **Hard dependency for `duration` division.** NodaTime throws `DivideByZeroException` (not IEEE 754 `Infinity`) for `duration / 0` and `duration / Duration.Zero`. The compile-time literal check and runtime guard from #106 must ship before or alongside temporal types. Without #106, three division-by-zero paths remain unguarded. |
 
 ---
 
@@ -1546,7 +1547,7 @@ Temporal types are valid as collection inner types where the collection's struct
 - **Period/duration split enforcement:** `date + period ✓`, `date + duration ✗`, `instant + duration ✓`, `instant + period ✗`. Standard type-checking — no custom dispatch.
 - **Postfix unit type resolution:** Resolve quantity typed constants (`'<value> <unit>'`) to `period` or `duration` based on expression context. `date +` / `datetime +` context → `period`. `instant +` / `zoneddatetime +` context → `duration`. `months`/`years` → always `period`. Field default context → match declared field type. No context → compile error.
 - **Typed constant type inference:** Determine specific type from content shape via the type-family admission rule. Current inhabitants: `YYYY-MM-DD` without `T` = date, `HH:MM:SS` without `-` = time, `...T...` without `Z` or `[` = datetime, `...T...Z` = instant, `...T...[zone]` = zoneddatetime, IANA pattern = timezone, `<value> <unit>` = quantity (family `{period, duration}`). Framework is extensible to future inhabitants whose shapes produce disjoint families.
-- **Meaningless combination warnings:** `date + '3 hours'` (hours on a date) → warning. `date + '3 minutes'` → warning.
+- **Cross-domain unit rejection:** `date + '3 hours'` → compile error (date requires `period dateonly`; hours are time components). `time + '5 days'` → compile error (time requires `period timeonly`; days are date components). Follows Decision #26.
 - Full cross-type interaction matrix.
 - `period` ordering rejection (`<`, `>`, `<=`, `>=`).
 - `period` scaling rejection (`* integer`).
@@ -1596,8 +1597,8 @@ Temporal types are valid as collection inner types where the collection's struct
 ### MCP Tools
 
 - `precept_language`: All 8 types. Typed constant quantity syntax description. Typed constant delimiter syntax. Interpolation syntax. Reference [`docs/LiteralSystemDesign.md`](LiteralSystemDesign.md) for canonical literal model.
-- `precept_compile`/`fire`/`inspect`/`update`: All temporal values serialized as ISO 8601 strings. `zoneddatetime` serialized as `{ "instant": "..Z", "timezone": "..." }`.
-- **Serialization:** Configure `NodaTime.Serialization.SystemTextJson` on the serializer. Output is fully automatic — NodaTime types in instance data and DTOs serialize to ISO 8601 strings via registered converters. Input requires type-directed deserialization: MCP input arrives as generic dictionaries (values are raw strings), so the engine dispatches to the correct NodaTime converter based on the compiled field type declaration. The MCP layer stays thin — no conversion code.
+- `precept_compile`/`fire`/`inspect`/`update`: All temporal values serialized as strings via NodaTime STJ converters.
+- **Serialization:** Configure `NodaTime.Serialization.SystemTextJson` on the serializer. All 8 types serialize and deserialize via the registered NodaTime converters — no custom serialization code. Input requires type-directed deserialization: MCP input arrives as generic dictionaries (values are raw strings), so the engine dispatches to the correct NodaTime converter based on the compiled field type declaration. The MCP layer stays thin — no conversion code.
 
 ### Samples, Documentation, Tests
 

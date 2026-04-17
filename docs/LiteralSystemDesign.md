@@ -35,7 +35,7 @@ Precept's literal system defines **every way a value can appear in source**. The
 
 For non-primitive values, the two-door model is **closed**. There is no Door 3. All non-primitive values — including quantities like `'30 days'` and `'{GraceDays} days'` — enter through Door 1 or Door 2. There are no bare postfix keywords, no constructor functions, no `type(value)` forms. Zero constructors exist in the language.
 
-**Interpolation** uses the same `{expr}` syntax inside both doors. `"Amount is {Amount}"` substitutes the field value as a string. `'{GraceDays} days'` substitutes the expression value into the typed constant's content before shape matching. The expression subset starts narrow (field references, dot accessors, event args) and expands as needed.
+**Interpolation** uses the same `{expr}` syntax inside both doors. `"Amount is {Amount}"` substitutes the field value as a string. `'{GraceDays} days'` substitutes the expression value into the typed constant's content before shape matching. Interpolation supports any expression the language supports: field references, dot accessors, event args, and arithmetic.
 
 ### Why two doors, not three
 
@@ -512,17 +512,16 @@ Precept is the only language that uses bare `{expr}` without a prefix and withou
 
 ### Expression subset for interpolation
 
-Interpolation supports a tiered expression subset, starting narrow and expanding as needed:
+Interpolation supports any expression the language supports:
 
-| Level | Supported | Examples | Parser complexity |
-|-------|-----------|---------|-------------------|
-| 1 (initial) | Field references | `{FieldName}` | Identifier lookup |
-| 2 (initial) | Dot accessors | `{Items.count}`, `{DueDate.year}` | Dot-chain evaluation |
-| 3 (initial) | Event args | `{Approve.Amount}` | Event.Arg resolution |
-| 4 (future) | Arithmetic | `{AnnualIncome * 3}`, `{Score + Bonus}` | Full expression evaluator inside `{...}` |
-| 5 (deferred) | Conditional expressions | `{if Urgent then "URGENT" else "normal"}` | Nested quoted literals inside interpolation |
+| Category | Examples |
+|----------|----------|
+| Field references | `{FieldName}` |
+| Dot accessors | `{Items.count}`, `{DueDate.year}` |
+| Event args | `{Approve.Amount}` |
+| Arithmetic | `{AnnualIncome * 3}`, `{Score + Bonus}`, `{SlaHours * 2}` |
 
-**Why start narrow:** Levels 1–3 cover 90%+ of diagnostic use cases — field values in reject messages, collection counts in diagnostics, event arg values in rejection details. Each level is a strict superset of the previous. The grammar allows expansion without changes: `{` → evaluate expression → `}` works for any expression the parser can handle. The restriction is in the type checker, not the grammar — so expansion is a type-checker restriction lift, not a grammar change.
+**Not supported:** Conditional expressions inside interpolation (`{if X then Y else Z}`) — nested quoted literals inside `{...}` create parsing ambiguity with the `}` interpolation terminator. This is a grammar constraint, not a phasing choice.
 
 ### Philosophy alignment
 
@@ -564,12 +563,12 @@ Interpolation supports a tiered expression subset, starting narrow and expanding
 - **Precedent:** NodaTime's own type system uses context to select between `Period.FromDays(n)` and `Duration.FromDays(n)` for the same unit. The family `{period, duration}` mirrors NodaTime's factory families for `days` and `weeks`.
 - **Tradeoff:** The admission rule is more complex than "one shape = one type." Evaluating a new type's admission requires proving its family is disjoint from all existing families. The complexity is bounded — families are finite sets, disjointness is a compile-time-checkable property, and the number of families grows slowly (one per domain, not one per type).
 
-### L5. Expression subset starts at Levels 1–3 (field references, dot accessors, event args)
+### L5. Interpolation supports the full expression language
 
-- **Why:** Levels 1–3 cover 90%+ of diagnostic use cases: `{FieldName}` for field values in reject messages, `{Items.count}` for collection counts, `{Approve.Amount}` for event arg values. Starting narrow avoids embedding a full expression parser inside interpolation contexts initially and provides a clean expansion path — the grammar allows any expression inside `{...}`, so expansion is a type-checker restriction lift, not a grammar change. The grammar is future-proof; the restriction is the safety valve.
-- **Alternatives rejected:** (A) Full expressions from day one — requires handling operator precedence inside `{...}`, including the interaction between `}` (interpolation end) and `>` (comparison operator). Significant parser complexity for low initial demand. (B) Field references only (Level 1 alone) — too restrictive. `{Items.count}` and `{Approve.Amount}` are immediate needs for diagnostic messages; excluding dot accessors would force authors to create intermediate fields for every accessor chain.
-- **Precedent:** C# string interpolation supported full expressions from introduction. Python f-strings support full expressions. Precept starts narrower because the language is younger, the demand is bounded, and the expansion path is grammar-compatible.
-- **Tradeoff:** `{Amount * 2}` is not available initially. Authors must use intermediate fields: `set DoubleAmount = Amount * 2` then `"Double amount is {DoubleAmount}"`. This is a deliberate initial restriction — it ships interpolation faster with lower risk and expands later without grammar changes.
+- **Why:** Interpolation expressions (`{expr}`) use the same expression evaluator as the rest of the language — field references, dot accessors, event args, and arithmetic. `{Amount}` for field values, `{Items.count}` for collection counts, `{Approve.Amount}` for event args, `{SlaHours * 2}` for computed values. The grammar handles `{` → evaluate expression → `}` uniformly. Operator precedence inside `{...}` is the same as anywhere else in the language — the `}` interpolation terminator is unambiguous because `}` is not an operator.
+- **Alternatives rejected:** (A) Field references only — too restrictive. `{Items.count}` and `{SlaHours * 2}` are immediate needs for diagnostics and computed quantities; excluding them would force authors to create intermediate fields for every accessor or arithmetic expression. (B) Conditional expressions inside interpolation (`{if X then Y else Z}`) — nested quoted literals inside `{...}` create parsing ambiguity. This is excluded as a grammar constraint.
+- **Precedent:** C# string interpolation supports full expressions. Python f-strings support full expressions. Precept follows the same model.
+- **Tradeoff:** The `}` terminator must be disambiguated from `>=` comparisons if comparisons are ever allowed inside interpolation. Currently not an issue — comparisons return `boolean`, which is not useful in interpolation contexts. If needed, the precedent is C# which handles this with the same `}` terminator.
 
 ### L6. Escape sequences: `\"`, `\\`, `{{`, `}}`
 
@@ -666,7 +665,7 @@ The grammar `'<value> <unit>'` is the same across all three scopes. What changes
 - Interpolation expressions inside `'...'`: type-check, evaluate type of expression, verify the substituted content will produce a valid shaped constant.
 - Quantity typed constants: resolve type family `{period, duration}` based on expression context, using the same context-dependent resolution rules as before.
 - State name typed constants: validate identifier against declared states.
-- Expression subset enforcement: initially restrict to Levels 1–3 (field references, dot accessors, event args). The grammar parses any expression; the type checker rejects higher levels until they are enabled.
+- Interpolation expressions use the full expression evaluator — field references, dot accessors, event args, arithmetic. The grammar parses any expression inside `{...}`; the type checker validates types as usual.
 
 ### Language Server
 

@@ -437,7 +437,7 @@ These constraints are exactly the kind of "prevention over detection" that Prece
 
 4. **The dependency cost is low.** ~792 KB, zero transitive dependencies, Apache-2.0, actively maintained, 275M+ downloads, stable API. The serialization companion for System.Text.Json is a lightweight separate package.
 
-5. **Several NodaTime types (`ZonedDateTime`, `OffsetDateTime`, `DateTimeZone`, `CalendarSystem`, `IClock`) are definitively out of scope** for a deterministic business-entity DSL. This is a feature, not a gap — Precept should not model timezone-dependent state.
+5. **Most remaining NodaTime types (`OffsetDateTime`, `CalendarSystem`, `IClock`) are definitively out of scope.** `ZonedDateTime` and `DateTimeZone` have been promoted to first-class types — see [`docs/TemporalTypeSystemDesign.md`](../../docs/TemporalTypeSystemDesign.md). Determinism is preserved via TZ database version pinning.
 
 6. **NodaTime's two-type split for "elapsed time" (`Duration`) vs. "calendar interval" (`Period`) is a design insight that Precept's eventual `duration` proposal should address explicitly.** Business rules almost always mean `Period` ("renew in 12 months") not `Duration` ("elapsed 31,536,000 seconds").
 
