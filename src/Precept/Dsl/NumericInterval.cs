@@ -79,6 +79,10 @@ internal readonly record struct NumericInterval(
     /// </summary>
     public static NumericInterval Multiply(NumericInterval a, NumericInterval b)
     {
+        // Fast path: anything × [0,0] = [0,0] (avoids ∞*0 = NaN in IEEE 754).
+        if (a.Lower == 0 && a.Upper == 0 && a.LowerInclusive && a.UpperInclusive) return new(0, true, 0, true);
+        if (b.Lower == 0 && b.Upper == 0 && b.LowerInclusive && b.UpperInclusive) return new(0, true, 0, true);
+
         double al = a.Lower, au = a.Upper;
         double bl = b.Lower, bu = b.Upper;
         bool ali = a.LowerInclusive, aui = a.UpperInclusive;

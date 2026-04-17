@@ -1424,6 +1424,7 @@ internal static class PreceptTypeChecker
             // Translate proof markers from bare form to dotted form for transition-row scope.
             // Event ensures use bare arg names (e.g. "Days"), but transition rows use dotted names
             // (e.g. "Submit.Days"). Markers like "$positive:Days" become "$positive:Submit.Days".
+            // Relational markers like "$gt:A:B" become "$gt:Submit.A:Submit.B" (both fields dotted).
             var dottedMarkers = new Dictionary<string, StaticValueKind>(StringComparer.Ordinal);
             foreach (var pair in bareSymbols)
             {
@@ -1434,9 +1435,21 @@ internal static class PreceptTypeChecker
                 if (colonIndex < 0)
                     continue;
 
-                var prefix = pair.Key.AsSpan(0, colonIndex + 1);  // e.g. "$positive:"
-                var fieldName = pair.Key.AsSpan(colonIndex + 1);  // e.g. "Days"
-                dottedMarkers[$"{prefix}{eventName}.{fieldName}"] = pair.Value;
+                var prefix = pair.Key.AsSpan(0, colonIndex + 1);  // e.g. "$positive:" or "$gt:"
+                var rest = pair.Key.AsSpan(colonIndex + 1);        // e.g. "Days" or "A:B"
+
+                // Multi-field markers (e.g. "$gt:A:B") — dot each field independently.
+                var secondColon = rest.IndexOf(':');
+                if (secondColon >= 0)
+                {
+                    var field1 = rest.Slice(0, secondColon);
+                    var field2 = rest.Slice(secondColon + 1);
+                    dottedMarkers[$"{prefix}{eventName}.{field1}:{eventName}.{field2}"] = pair.Value;
+                }
+                else
+                {
+                    dottedMarkers[$"{prefix}{eventName}.{rest}"] = pair.Value;
+                }
             }
 
             if (dottedMarkers.Count > 0)
@@ -2331,7 +2344,9 @@ internal static class PreceptTypeChecker
                     "*" => NumericInterval.Multiply(left, right),
                     "/" => NumericInterval.Divide(left, right),
                     "%" => right.ExcludesZero
-                             ? new NumericInterval(-Math.Abs(right.Upper), false, Math.Abs(right.Upper), false)
+                             ? (left.IsNonnegative && right.IsPositive
+                                 ? new NumericInterval(0, true, Math.Abs(right.Upper), false) // [0, |B|) — tighter for non-negative dividend
+                                 : new NumericInterval(-Math.Abs(right.Upper), false, Math.Abs(right.Upper), false))
                              : NumericInterval.Unknown,
                     _   => NumericInterval.Unknown,
                 };
@@ -2396,6 +2411,8 @@ internal static class PreceptTypeChecker
         PreceptExpression divisor,
         IReadOnlyDictionary<string, StaticValueKind> symbols)
     {
+        divisor = StripParentheses(divisor);
+
         // Pattern: A - B where A and B are identifiers
         if (divisor is not PreceptBinaryExpression { Operator: "-" } sub)
             return false;
