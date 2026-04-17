@@ -1481,6 +1481,16 @@ internal static class PreceptTypeChecker
             return;
         }
 
+        // Collect any non-blocking warnings from inference (e.g., C93 unproven divisor).
+        if (diagnostic is not null)
+        {
+            diagnostics.Add(diagnostic with
+            {
+                Line = sourceLine > 0 ? sourceLine : diagnostic.Line,
+                StateContext = stateContext
+            });
+        }
+
         if (IsAssignable(actualKind, expectedKind))
         {
             expressions.Add(new PreceptTypeExpressionInfo(
@@ -2048,6 +2058,51 @@ internal static class PreceptTypeChecker
                         $"operator '{binary.Operator}' requires numeric operands.",
                         0);
                     return false;
+                }
+
+                // SYNC:CONSTRAINT:C92 — literal zero divisor
+                // SYNC:CONSTRAINT:C93 — unproven divisor safety
+                // Principle #8 ("never guess"): C92 is error (literal zero — provably wrong).
+                // C93 is warning (unproven divisor — might be wrong, but don't block).
+                // Two-tier severity: errors for deterministic proof of failure, warnings for heuristic risk.
+                if (binary.Operator is "/" or "%")
+                {
+                    if (TryGetNumericLiteral(binary.Right, out var divisorValue))
+                    {
+                        if (divisorValue == 0.0)
+                        {
+                            diagnostic = new PreceptValidationDiagnostic(
+                                DiagnosticCatalog.C92,
+                                "Division by zero: the divisor is literal 0.",
+                                0);
+                            return false;
+                        }
+                        // Non-zero literal — safe, no diagnostic
+                    }
+                    else if (TryGetIdentifierKey(binary.Right, out var key))
+                    {
+                        if (!symbols.ContainsKey($"$nonzero:{key}") && !symbols.ContainsKey($"$positive:{key}"))
+                        {
+                            var name = key;
+                            if (symbols.ContainsKey($"$nonneg:{key}"))
+                            {
+                                // Context-aware: field is nonnegative but not nonzero
+                                diagnostic = new PreceptValidationDiagnostic(
+                                    DiagnosticCatalog.C93,
+                                    $"Divisor '{name}' is nonnegative but not nonzero — 'nonnegative' allows zero. Consider 'positive' instead.",
+                                    0);
+                            }
+                            else
+                            {
+                                // Generic: no proof at all
+                                diagnostic = new PreceptValidationDiagnostic(
+                                    DiagnosticCatalog.C93,
+                                    $"Divisor '{name}' has no compile-time nonzero proof. Consider adding a 'positive' constraint, 'rule {name} != 0', or 'when {name} != 0' guard.",
+                                    0);
+                            }
+                        }
+                    }
+                    // Compound expressions (binary, function calls, etc.) — no diagnostic (Principle #8 conservatism)
                 }
 
                 kind = binary.Operator is ">" or ">=" or "<" or "<="

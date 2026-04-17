@@ -694,6 +694,16 @@ public class CatalogDriftTests
         ["C88"] = new(H + "field X as number default 0\nfield Y as number -> X + 1\n" + S2 +
             "event Go\nfrom A on Go -> set Y = 5 -> no transition\n", "computed field"),
 
+        // ── Compile-phase: divisor safety (C92–C93) ───────────────────
+
+        // C92: literal zero divisor
+        ["C92"] = new(H + "field Y as number default 10\n" + S +
+            "event Go\nfrom A on Go -> set Y = Y / 0 -> no transition\n", "Division by zero"),
+
+        // C93: unproven divisor
+        ["C93"] = new(H + "field Y as number default 10\nfield D as number default 1\n" + S +
+            "event Go\nfrom A on Go -> set Y = Y / D -> no transition\n", "no compile-time nonzero proof"),
+
         // ── Runtime-phase (C33–C37) ───────────────────────────────────
 
         // C33: CreateInstance with empty initial state
@@ -1535,6 +1545,14 @@ public class CatalogDriftTests
 
         // C88: computed field as set target — row on line 6
         ["C88"] = ("precept Test\nfield X as number default 0\nfield Y as number -> X + 1\nstate A initial\nstate B\nevent Go\nfrom A on Go -> set Y = 5 -> no transition\n", "compile", 7),
+
+        // ── Compile-phase: divisor safety (C92–C93) ───────────────────
+
+        // C92: literal zero divisor — row on line 5
+        ["C92"] = ("precept Test\nfield Y as number default 10\nstate A initial\nevent Go\nfrom A on Go -> set Y = Y / 0 -> no transition\n", "compile", 5),
+
+        // C93: unproven divisor — row on line 6
+        ["C93"] = ("precept Test\nfield Y as number default 10\nfield D as number default 1\nstate A initial\nevent Go\nfrom A on Go -> set Y = Y / D -> no transition\n", "compile", 6),
     };
 
     [Theory]

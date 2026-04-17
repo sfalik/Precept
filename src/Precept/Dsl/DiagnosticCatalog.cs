@@ -695,4 +695,23 @@ public static class DiagnosticCatalog
         "C88", "compile",
         "Computed field cannot be assigned via set.",
         "'{fieldName}' is a computed field and cannot be assigned. Its value is always derived from: {expression}.");
+
+    // ═══════════════════════════════════════════════════════════════
+    // Compile-phase constraints: divisor safety (C92–C93)
+    // ═══════════════════════════════════════════════════════════════
+
+    /// <summary>Division by zero: the divisor is literal 0.</summary>
+    // SYNC:CONSTRAINT:C92
+    public static readonly LanguageConstraint C92 = Register(
+        "C92", "compile",
+        "Division by zero: the divisor is literal 0.",
+        "Division by zero: the divisor is literal 0.");
+
+    /// <summary>Divisor has no compile-time nonzero proof.</summary>
+    // SYNC:CONSTRAINT:C93
+    public static readonly LanguageConstraint C93 = Register(
+        "C93", "compile",
+        "Divisor has no compile-time nonzero proof.",
+        "{message}",
+        ConstraintSeverity.Warning);
 }
