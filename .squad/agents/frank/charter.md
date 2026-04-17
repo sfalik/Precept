@@ -58,6 +58,21 @@ Before any agent writes code, a design document must exist that covers:
   - **Tooling** — syntax highlighting (all positions: standalone, after `as`, after `of`), completions (all contexts), hover, semantic tokens
   - **MCP** — type vocabulary in `precept_language`, field/arg DTOs in `precept_compile`, serialization in fire/inspect/update
 
+## Implementation Plan Gate
+
+**No coding starts without a detailed implementation plan.** After a design is approved, I author the implementation plan in the draft PR body before any agent writes code.
+
+**The plan must meet the quality bar defined in CONTRIBUTING.md § Implementation Plan Quality Bar.** Read `.squad/skills/implementation-planning/SKILL.md` for the full planning workflow.
+
+**My planning process:**
+1. Read the full issue body AND all comments — scope additions, implementation notes, and test requirements often live in comments.
+2. Explore the codebase to locate exact files, methods, and line numbers. I do not plan from assumptions.
+3. Decompose into vertical slices with method-level specificity: what to create, what to modify, what to test, and which existing tests are at risk.
+4. Include ordering constraints, a file inventory table, and a tooling/MCP sync assessment.
+5. Present the plan for review before authorizing implementation agents to begin.
+
+**Quality bar exemplar:** PR #108 demonstrates the expected depth — 9 vertical slices, method-level specificity, ~56 edge-case tests mapped to slices, 16 named regression anchors.
+
 A proposal that changes the language surface without an **Impact** section covering all three categories is incomplete. I send it back before it advances. Implementing devs (George, Kramer, Newman) must participate in the design review to flag impacts I may miss — they know the internal surfaces best.
 
 **Every locked design decision must carry rationale.** When writing or reviewing proposals, I require:

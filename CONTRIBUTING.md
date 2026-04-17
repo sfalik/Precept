@@ -53,8 +53,9 @@ When ready to implement:
    - `## Linked Issue` — include `Closes #N`
    - `## Why` — why this PR exists, what problem it addresses, and any implementation-specific reviewer context; do **not** duplicate the full proposal rationale or alternatives from the issue/research docs
    - `## Implementation Plan` — checkbox checklist tracking vertical slices
-4. **Check off items as you complete them.** Update the PR body after each slice or logical group — not at the end. The checkbox list is a live progress tracker; it should reflect current state throughout development so reviewers and collaborators always know where things stand. Keep the `## Summary` and `## Why` sections current too if the shipped scope or reviewer context changes during implementation. Use the GitHub UI or `mcp_github_update_pull_request` to keep the PR body current.
-5. Implement in vertical slices. Suggested order for cross-cutting changes:
+4. **Build a detailed implementation plan before coding.** The plan lives in the PR body's `## Implementation Plan` section. See the [Implementation Plan Quality Bar](#implementation-plan-quality-bar) below for requirements.
+5. **Check off items as you complete them.** Update the PR body after each slice or logical group — not at the end. The checkbox list is a live progress tracker; it should reflect current state throughout development so reviewers and collaborators always know where things stand. Keep the `## Summary` and `## Why` sections current too if the shipped scope or reviewer context changes during implementation. Use the GitHub UI or `mcp_github_update_pull_request` to keep the PR body current.
+6. Implement in vertical slices. Suggested order for cross-cutting changes:
    - Parser + model + diagnostics
    - Type checker
    - Runtime engine
@@ -98,6 +99,39 @@ The table above covers which files to touch during implementation. This table is
 | Dependencies / related issues | Tracked in the issues themselves — no migration needed |
 
 The most commonly dropped items are **deliberate exclusions** (they disappear when the issue closes) and **resolved open questions** (the resolution often stays only in an issue comment). Both are durable decisions that belong in permanent homes.
+
+#### Implementation Plan Quality Bar
+
+The `## Implementation Plan` in the PR body is the execution blueprint. A plan that says "implement narrowing" is useless; a plan that says "create `TryApplyNumericComparisonNarrowing` in `PreceptTypeChecker.cs` (~30 lines), wire into `ApplyNarrowing` after the null-comparison branch at line 2152" is actionable. Every plan must meet this bar before coding begins.
+
+**Required elements per slice:**
+
+| Element | Why |
+|---------|-----|
+| **Create vs. Modify** | Distinguish new methods/classes from changes to existing ones. Name each method, the file it lives in, and approximate size. |
+| **Exact file paths** | Every slice lists the files it touches. No ambiguity about where changes land. |
+| **Method-level specificity** | Name the methods to create or modify. Reference line numbers or structural landmarks (e.g., "after the null-comparison branch in `ApplyNarrowing`") when modifying existing code. |
+| **Tests per slice** | Each slice specifies its test methods — names, assertion style (`[Fact]` vs `[Theory]` with row counts), and what each test verifies. Tests are part of the slice, not a separate phase. |
+| **Regression anchors** | For slices that replace or refactor existing behavior, list the exact existing test method names that must pass unchanged. |
+| **Dependency ordering** | State which slices must precede others and why. A reviewer should be able to read the ordering constraints and understand the critical path. |
+
+**Required plan-level elements:**
+
+| Element | Why |
+|---------|-----|
+| **File inventory table** | A single table mapping every file to the slices that touch it. Reviewers use this to scope their review. |
+| **Tooling/MCP sync assessment** | Explicit statement per category (syntax highlighting, completions, semantic tokens, MCP) — either "changes needed" with specifics or "no changes needed" with reasoning. |
+
+**How to build a plan (process):**
+
+1. **Read the full issue body AND all comments.** Implementation notes, scope additions, test requirements, and ordering constraints often appear in comments — not the body. Missing a comment means missing scope.
+2. **Explore the codebase** before planning. Locate the exact files, methods, and line numbers involved. A plan built on assumptions about code structure will be wrong.
+3. **Organize as vertical slices** — each slice is independently testable and delivers a coherent unit of behavior. Slices are not "parser, then type checker, then tests" — they are "feature X end-to-end including its tests."
+4. **Include the dependency graph.** If Slice 2 depends on Slice 1's infrastructure, say so explicitly. If slices can be parallelized, note that too.
+
+**Quality bar exemplar:** PR #108 (`feat: compile-time divisor safety via unified narrowing`) demonstrates the expected depth — 9 vertical slices with method-level specificity, exact file paths, ~56 edge-case tests mapped to slices, 16 named regression anchors, dependency ordering, and a file inventory table.
+
+**A plan that fails this bar is incomplete.** Send it back for detail before coding begins — just as a proposal without rationale is sent back for rationale.
 
 #### 5. Merge and Close
 
