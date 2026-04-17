@@ -15,6 +15,8 @@ internal sealed class PreceptCodeActionHandler : ICodeActionHandler
         Language = "precept"
     });
 
+    private static readonly Regex C93DivisorNameRegex = new(@"Divisor '([^']+)'", RegexOptions.Compiled);
+
     public Task<CommandOrCodeActionContainer?> Handle(CodeActionParams request, CancellationToken cancellationToken)
     {
         if (!PreceptTextDocumentSyncHandler.SharedAnalyzer.TryGetDocumentText(request.TextDocument.Uri, out var text))
@@ -340,7 +342,7 @@ internal sealed class PreceptCodeActionHandler : ICodeActionHandler
 
     private static string? ExtractC93DivisorName(string message)
     {
-        var match = Regex.Match(message, @"Divisor '([^']+)'");
+        var match = C93DivisorNameRegex.Match(message);
         return match.Success ? match.Groups[1].Value : null;
     }
 
@@ -408,7 +410,7 @@ internal sealed class PreceptCodeActionHandler : ICodeActionHandler
         var indentStr = eventLine[..indent];
 
         var newline = text.Contains("\r\n") ? "\r\n" : "\n";
-        var ensureLine = $"{indentStr}on {eventName} ensure {argName} > 0 because \"{argName} must be nonzero\"";
+        var ensureLine = $"{indentStr}on {eventName} ensure {argName} > 0 because \"{argName} must be positive\"";
 
         var insertPosition = new Position(lineIndex + 1, 0);
 

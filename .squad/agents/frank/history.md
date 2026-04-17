@@ -7,6 +7,7 @@
 
 ## Learnings
 
+- PR #108 code review (issue #106): APPROVED. Unified narrowing architecture is clean — bespoke `$nonneg:` loop replaced by rule iteration through `ApplyNarrowing`, zero dead code. The C76 dotted key fix (`TryGetIdentifierKey` replacing `idArg.Name`) closed a pre-existing gap for event-arg sqrt() proofs. C42 soundness comment in `TryDecomposeNullOrPattern` is the model for dependency documentation. Three non-blocking warnings: regex allocation in code action handler, missing trailing newline, and "must be nonzero" because-message on a `> 0` ensure (should say "must be positive").
 - Divisor safety docs (Slice 9, #106): The `nonnegative ≠ nonzero` distinction is the most important teaching point — it's the one thing that trips authors. Context-aware C93 messaging makes it explicit. Proof sources for C76 and C93 are now unified: constraints, rules, ensures, and guards all feed the same narrowing markers (`$positive:`, `$nonneg:`, `$nonzero:`). Doc updates touched three files (language design, constraint violation, README) — RuntimeApiDesign.md was correctly scoped to public API and didn't need narrowing internals.
 - Computed fields: the critical semantic contract is one recomputation pass after all mutations and before constraint evaluation.
 - Modifier ordering: parser rigidity lived mostly in parser/completion surface; runtime/model layers were already largely order-independent.

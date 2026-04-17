@@ -230,7 +230,7 @@ public class PreceptCodeActionTests
 
         codeAction.Should().NotBeNull();
         var updatedText = ApplyWorkspaceEdit(text, uri, codeAction!.Edit!);
-        updatedText.Should().Contain("on Calculate ensure Divisor > 0 because \"Divisor must be nonzero\"");
+        updatedText.Should().Contain("on Calculate ensure Divisor > 0 because \"Divisor must be positive\"");
     }
 
     [Fact]

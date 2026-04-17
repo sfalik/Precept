@@ -175,6 +175,26 @@ public class PreceptTypeCheckerTests
     }
 
     [Fact]
+    public void Check_DivisorFromAny_PartialStateEnsure_C93WithContext()
+    {
+        const string dsl = """
+            precept M
+            field Y as number default 10
+            field D as number default 1
+            state A initial
+            state B
+            event Go
+            event Switch
+            in B ensure D > 0 because "D positive in B"
+            from A on Switch -> transition B
+            from any on Go -> set Y = Y / D -> no transition
+            """;
+        var result = Check(dsl);
+        // Should warn for state A (no ensure) but not state B
+        result.Diagnostics.Where(d => d.Constraint.Id == "C93").Should().ContainSingle();
+    }
+
+    [Fact]
     public void Compile_TypeError_IsCompileBlockingWithStableCode()
     {
         const string dsl = """
@@ -1429,6 +1449,20 @@ public class PreceptTypeCheckerTests
 
         var result = Check(dsl);
 
+        result.Diagnostics.Where(d => d.Constraint.Id == "C93").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_DivisorEventArg_PositiveConstraint_NoC93()
+    {
+        const string dsl = """
+            precept M
+            field Result as number default 0
+            event Calc with Divisor as number positive
+            state A initial
+            from A on Calc -> set Result = Result / Calc.Divisor -> no transition
+            """;
+        var result = Check(dsl);
         result.Diagnostics.Where(d => d.Constraint.Id == "C93").Should().BeEmpty();
     }
 
