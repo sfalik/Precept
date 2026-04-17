@@ -110,6 +110,13 @@
 - **2 alternatives also presented:** (B) 4-function model with domain names (`dateIn`/`timeIn`/`pin`/`inZone`) — keeps convenience but adds discoverability split. (C) 2-function model with different verbs (`atZone`/`anchor`) — Java-inspired forward direction, nautical metaphor reverse.
 - Decision filed: `.squad/decisions/inbox/frank-temporal-function-naming.md`
 
+### 2026-04-17 — Context Resolution Algorithm added to LiteralSystemDesign.md
+- Added `## Context Resolution Algorithm` section to `docs/LiteralSystemDesign.md`, inserted after "Integer requirement for quantity values" subsection and before `## Interpolation Syntax`.
+- Documents: how context flows inward from the nearest typed node; context source table (right-operand, field default, set expression, comparison, compound chain); concrete step-by-step walkthrough for `set DueDate = FiledAt + '30 days'`; compound left-to-right chaining; absent/ambiguous context compile error; type checker as the resolver (no new mechanism needed); unit restrictions belong to constraints, not the literal system; future UOM extensibility via admission rule + disjointness criterion.
+- Shane confirmed: constraint modifiers (`min`, `max`) handle unit-restriction business rules. Tooling/IntelliSense may filter completions — literal system stays out of it.
+- **George's B1 partially addressed.** The algorithm sketch George requested (context-dependent resolution for `'30 days'`) is now documented. Temporal-specific resolution tables were already in the doc; this section provides the algorithmic framework.
+- Decision filed: `.squad/decisions/inbox/frank-context-resolution.md`
+
 ### 2025-07-22 — Temporal proposal v2 rewrite (NodaTime alignment directive)
 - **Full rewrite** of `research/language/expressiveness/temporal-type-system-proposal.md` per two owner directives: "No obscurity, expose NodaTime" and "Don't reinvent the wheel."
 - **`period` promoted to full surface type in Phase 1.** Backed by `NodaTime.Period`. Fields (`field LoanTerm as period`), expressions, constructors (`days`, `months`, `years`, `weeks` → `period`), arithmetic (`date + period`, `date - date → period`), equality (structural, no ordering).

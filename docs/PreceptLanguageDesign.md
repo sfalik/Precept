@@ -256,7 +256,8 @@ ListLiteral        := "[" (ScalarLiteral ("," ScalarLiteral)*)? "]"
 
 BoolExpr           := <expression grammar; carried forward>
 Identifier         := <token>
-StringLiteral      := '"' ... '"'
+StringLiteral      := '"' ... '"'   # supports {expr} interpolation — see LiteralSystemDesign.md
+TypedConstant      := "'" ... "'"   # type inferred from content shape — see LiteralSystemDesign.md
 Comment            := "#" ... end-of-line
 Blank              := (whitespace only)
 ```
@@ -391,7 +392,7 @@ When multiple rows target the same `(State, Event)` pair, rows are evaluated in 
 ## Identifiers, Keywords, and Strings
 
 - Identifiers are case-sensitive and compared ordinally.
-- String literals use double quotes: `"like this"`.
+- String literals use double quotes: `"like this"`. Strings support `{expr}` interpolation for embedding field values: `"Score {CreditScore} is below minimum"`. See [`LiteralSystemDesign.md`](LiteralSystemDesign.md) for the complete literal system — primitives, strings, typed constants (`'...'`), interpolation, and escape sequences.
 - Reasons on `on ... ensure`/`rule` are **required** and must be quoted strings.
 
 ### Reserved keywords (Locked)
@@ -519,7 +520,7 @@ Defaults:
 - Non-nullable scalar fields must declare a `default ...`.
 - Nullable scalar fields default to `null` when `default ...` is omitted.
 - Collection fields default to empty when `default ...` is omitted.
-- Collection defaults may be expressed using a list literal, e.g. `default ["a", "b"]`.
+- Collection defaults may be expressed using a list literal, e.g. `default ["a", "b"]`. See [`LiteralSystemDesign.md`](LiteralSystemDesign.md) for the complete literal syntax specification.
 
 Constraints:
 - No duplicate field names (within a single declaration or across declarations).
