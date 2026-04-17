@@ -2,7 +2,16 @@
 
 Date: 2026-04-17
 
-Status: **Implementation in progress** — PR #108, Slices 11–15.
+Status: **Shipped** — PR #108, Slices 11–15 (commits `8fd9746`–`adbedfa`).
+
+### Implementation Notes (post-ship)
+
+Fixes discovered during test authoring that refine the design:
+
+- **`TryInferRelationalNonzero` must `StripParentheses`** before pattern-matching. Parenthesized divisors like `(A - B)` wrap the binary expression in `PreceptParenthesizedExpression`, which the `is not PreceptBinaryExpression` check rejected.
+- **`NumericInterval.Multiply` zero-interval fast path.** `(0,∞) × [0,0]` produces `NaN` via IEEE 754 `∞*0`. Added early return for `[0,0]` inputs.
+- **Modulo interval tightened for non-negative dividend.** When dividend is nonnegative and divisor is positive, result ∈ `[0, |B|)` (not `(-|B|, |B|)`). Enables `D % C + 1` to prove nonzero.
+- **`BuildEventEnsureNarrowings` multi-field relational markers.** Relational markers like `$gt:A:B` have two field names separated by `:`. The bare→dotted translation must dot both fields independently: `$gt:A:B` → `$gt:Go.A:Go.B`.
 
 ---
 
