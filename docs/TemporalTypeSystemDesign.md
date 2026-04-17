@@ -294,10 +294,10 @@ field ContractEnd as date default '2099-12-31'
 
 | **Not supported** | **Why** |
 |---|---|
-| `date + date` | You can't add two dates together. To get the time between them, use `DueDate - FilingDate`. To shift a date forward, use `DueDate ± 3 days`. |
+| `date + date` | You can't add two dates together. To get the time between them, use `DueDate - FilingDate`. To shift a date forward, use `DueDate + '3 days'`. |
 | `date ± integer` | A bare number doesn't specify a unit. Use `DueDate ± '2 days'`. See Locked Decision #10. |
 | `date ± decimal` / `date ± number` | A bare number doesn't specify a unit. Use `DueDate ± '{n} days'`. |
-| `date ± duration` | Durations measure hours, minutes, and seconds — they can't be added to a date. Use `DueDate ± 3 days` to shift a date. |
+| `date ± duration` | Durations measure hours, minutes, and seconds — they can't be added to a date. Use `DueDate + '3 days'` to shift a date. |
 
 **Accessors:**
 
@@ -319,7 +319,7 @@ field ContractEnd as date default '2099-12-31'
 | `field X as date default "2026-01-01"` | Date values use single quotes, not double quotes. Use `default '2026-01-01'`. |
 | `'2026-02-30'` | Invalid date: February 30 does not exist. |
 | `'01/15/2026'` | Dates must be written as YYYY-MM-DD. Use `'2026-01-15'`. |
-| `DueDate + FilingDate` | You can't add two dates together. To get the time between them, use `DueDate - FilingDate`. To shift a date forward, use `DueDate + '(n) days'`. |
+| `DueDate + FilingDate` | You can't add two dates together. To get the time between them, use `DueDate - FilingDate`. To shift a date forward, use `DueDate + '{n} days'`. |
 | `DueDate + 2` | A bare number doesn't specify a unit. Use `DueDate + '2 days'` to add 2 days. |
 | `DueDate + '3 hours'` | Hours don't apply to a date — dates have no time of day. Did you mean `DueDate + '3 days'`? |
 
@@ -345,7 +345,7 @@ field CheckInTime as time nullable
 | Expression | Produces | Rationale |
 |---|---|---|
 | `time ± period timeonly` | `time` | `LocalTime.Plus/Minus(Period)`. Period must be provably time-only — NodaTime throws on date components; see Decision #26. |
-| `time ± period` (unconstrained) | **compile error** | An unconstrained period might contain date parts like months. Use `period timeonly` or add specific units like `3 hours`. |
+| `time ± period` (unconstrained) | **compile error** | An unconstrained period might contain date parts like months. Use `period timeonly` or add specific units like `'3 hours'`. |
 | `time ± duration` | `time` | Sub-day bridging. Wraps at midnight. Runtime: nanosecond arithmetic on `LocalTime` (see Decision #16). For sub-day units, `duration` and `period` represent identical physical quantities — the type checker bridges this. |
 | `time ± '3 hours'` | `time` | Typed constant quantity — resolves via sub-day bridging. Wraps at midnight. |
 | `time ± '30 minutes'` | `time` | Same bridging. Wraps at midnight. |
@@ -354,11 +354,11 @@ field CheckInTime as time nullable
 | `time - time` | `period` | Time-component period between two times. `Period.Between(t1, t2)` returns period with `.hours`, `.minutes`, `.seconds` components. NodaTime faithful. |
 | `==`, `!=`, `<`, `>`, `<=`, `>=` | `boolean` | NodaTime default behavior. Thin wrapper — no custom logic. |
 
-**Note:** `time ± period` requires the period to be provably time-only (Decision #26). NodaTime's `LocalTime.Plus(Period)` **throws `ArgumentException`** on periods with non-zero date components — it does NOT silently ignore them. The `timeonly` constraint or literal time-unit analysis provides the compile-time proof. `time + 5 days` is a compile error. `time + 3 hours` is valid (literal analysis proves time-only).
+**Note:** `time ± period` requires the period to be provably time-only (Decision #26). NodaTime's `LocalTime.Plus(Period)` **throws `ArgumentException`** on periods with non-zero date components — it does NOT silently ignore them. The `timeonly` constraint or literal time-unit analysis provides the compile-time proof. `time + '5 days'` is a compile error. `time + '3 hours'` is valid (literal analysis proves time-only).
 
 | **Not supported** | **Why** |
 |---|---|
-| `time + time` | You can't add two times together. To get the difference between them, use `EndTime - StartTime`. To shift a time forward, use `StartTime ± 3 hours`. |
+| `time + time` | You can't add two times together. To get the difference between them, use `EndTime - StartTime`. To shift a time forward, use `StartTime + '3 hours'`. |
 | `time ± integer` | What unit? Use `'{n} hours'` or `'{n} minutes'`. |
 | `time ± '1 day'` / `time ± 'N days'` | Days can't be added to a time — times only support hours, minutes, and seconds. |
 | `time ± 'N months'` / `time ± 'N years'` | Same — months and years don't apply to a time. |
@@ -550,7 +550,7 @@ field ActualHours as duration default '0 hours'
 
 **Backing type:** `NodaTime.Period`
 
-**Why this type exists (v2 → v2.1 evolution):** Shane's directive: *"Someone way smarter than us designed NodaTime. Don't try to re-invent the wheel."* NodaTime deliberately separates `Period` (variable-length calendar+time units) from `Duration` (fixed nanoseconds on the timeline). The v1 proposal collapsed this distinction. The v2 proposal exposed the separation but restricted `period` to date-only components. The v2.1 correction removes the date-only restriction because it contradicted NodaTime in three ways: (1) `LocalTime.Plus(Period)` is NodaTime's API for time arithmetic — but date-only `period` couldn't carry time results; (2) `Period.Between(LocalTime, LocalTime)` returns time-component Periods with no home in a date-only type; (3) timeline constructors returning `duration` plus `LocalTime` not accepting `Duration` left no faithful implementation path for `time + 3 hours`.
+**Why this type exists (v2 → v2.1 evolution):** Shane's directive: *"Someone way smarter than us designed NodaTime. Don't try to re-invent the wheel."* NodaTime deliberately separates `Period` (variable-length calendar+time units) from `Duration` (fixed nanoseconds on the timeline). The v1 proposal collapsed this distinction. The v2 proposal exposed the separation but restricted `period` to date-only components. The v2.1 correction removes the date-only restriction because it contradicted NodaTime in three ways: (1) `LocalTime.Plus(Period)` is NodaTime's API for time arithmetic — but date-only `period` couldn't carry time results; (2) `Period.Between(LocalTime, LocalTime)` returns time-component Periods with no home in a date-only type; (3) timeline constructors returning `duration` plus `LocalTime` not accepting `Duration` left no faithful implementation path for `time + '3 hours'`.
 
 NodaTime's `Period` type is intentionally comprehensive: `Period.FromHours()`, `Period.FromMinutes()`, `Period.FromSeconds()` all exist alongside `Period.FromDays()`, `Period.FromMonths()`, `Period.FromYears()`. `Period.HasDateComponent` and `Period.HasTimeComponent` introspection properties exist. The full Period is the faithful exposure.
 
@@ -592,7 +592,7 @@ These resolve to `Period.FromDays`, `Period.FromMonths`, `Period.FromYears`, `Pe
 | Expression | Produces | Rationale |
 |---|---|---|
 | `period ± period` | `period` | Combined calendar period / difference. `Period ± Period`. |
-| `-period` | `period` | Unary negation. `-(3 months)` is equivalent to negating the period. |
+| `-period` | `period` | Unary negation. `-('3 months')` is equivalent to negating the period. |
 | `==`, `!=` | `boolean` | **Structural equality.** `1 month != 30 days` — structurally different. NodaTime's equality is structural. |
 
 **Compiler warning — always-false literal comparisons:** When both operands of a period `==` are constant expressions with non-overlapping components (e.g., `1 month == 30 days`), the compiler emits a warning: *"This is always `false` — `1 month` and `30 days` use different parts. Period equality compares each part (years, months, days) separately."* The comparison is legal (structural equality is well-defined), but the result is statically knowable and almost certainly not what the author intended. Similarly, `!=` between non-overlapping constants warns that it's always `true`.
@@ -793,7 +793,7 @@ Note: `datetime ± period` accepts all component categories — `LocalDateTime.P
 | **Not supported** | **Why** |
 |---|---|
 | `datetime ± integer` | A bare number doesn't specify a unit. Use `AppointmentTime + '2 hours'` or `AppointmentTime + '3 days'`. |
-| `datetime ± duration` | Durations are for instant arithmetic, not datetimes. Use units directly: `AppointmentTime + 2 hours` or `AppointmentTime + 3 days`. |
+| `datetime ± duration` | Durations are for instant arithmetic, not datetimes. Use units directly: `AppointmentTime + '2 hours'` or `AppointmentTime + '3 days'`. |
 
 **Navigation via `.inZone(tz)` (reverse mediation — local → universal):**
 
@@ -1121,8 +1121,8 @@ Cross-type comparison is always a type error.
 | `instant ± period` | Periods may contain calendar units with variable length. Instants need durations (fixed-length timeline arithmetic). |
 | `duration ± period` | Durations (hours, minutes, seconds) and periods (days, months, years) can't be mixed. |
 | `zoneddatetime ± period` | Periods can't be added directly to a zoned datetime — navigate to `.datetime` first. |
-| `date ± integer` | A bare number doesn't specify a unit. Use `(n) days`. |
-| `instant ± integer` | A bare number doesn't specify a unit. Use `(n) hours` or `(n) seconds`. |
+| `date ± integer` | A bare number doesn't specify a unit. Use `'{n} days'`. |
+| `instant ± integer` | A bare number doesn't specify a unit. Use `'{n} hours'` or `'{n} seconds'`. |
 | `period < period` | Periods can't be compared with `<` or `>`. |
 | `zoneddatetime < zoneddatetime` | No natural ordering — NodaTime omits `IComparable<ZonedDateTime>`. Compare via `.instant` or `.datetime` accessor. |
 | `period * integer` | Periods can't be multiplied. |
@@ -1138,9 +1138,9 @@ Cross-type comparison is always a type error.
 
 | Expression | With field reference | Improved message |
 |---|---|---|
-| `DueDate + Elapsed` | `Elapsed` is `duration` | "`Elapsed` is a duration (hours/minutes/seconds). Dates need calendar units like `days` or `months`. Use a `period` field instead, or add units directly: `DueDate + 3 days`." |
+| `DueDate + Elapsed` | `Elapsed` is `duration` | "`Elapsed` is a duration (hours/minutes/seconds). Dates need calendar units like `days` or `months`. Use a `period` field instead, or add units directly: `DueDate + '3 days'`." |
 | `FiledAt + GracePeriod` | `GracePeriod` is `period` | "`GracePeriod` is a period (days/months/years). Instants need fixed-length units. Convert to a date first: `FiledAt.inZone(tz).date + GracePeriod`." |
-| `AppointmentTime + Elapsed` | `Elapsed` is `duration`, `AppointmentTime` is `datetime` | "`Elapsed` is a duration. Datetimes need calendar units. Use a `period` field instead, or add units directly: `AppointmentTime + 2 hours`." |
+| `AppointmentTime + Elapsed` | `Elapsed` is `duration`, `AppointmentTime` is `datetime` | "`Elapsed` is a duration. Datetimes need calendar units. Use a `period` field instead, or add units directly: `AppointmentTime + '2 hours'`." |
 
 The type checker already knows both operand types. When either operand is a field identifier, include the field name and declared type in the diagnostic. This is a presentation concern — the underlying type rules are unchanged.
 
@@ -1230,12 +1230,12 @@ All temporal types support `nullable`. All follow existing null propagation rule
 - **Precedent:** Every timezone-sensitive system manages TZ database freshness.
 - **Tradeoff:** Determinism input surface includes TZ database version.
 
-### 10. `date + integer` is a type error — use `date + (n) days`
+### 10. `date + integer` is a type error — use `date + '{n} days'`
 
-- **Why:** `date + 2` is implicit — what does `2` mean? NodaTime requires `LocalDate.Plus(Period.FromDays(n))` — the `Period` makes the unit visible. Now that `period` is a surface type, `(n) days` resolves to `period` and the type checker validates `date + period`. The shortcut `date + integer` would bypass this type-level enforcement.
-- **Alternatives rejected:** `date + integer` meaning "add N days" — the v1 position. Convenient but implicit. In a proposal with both `(n) days` and `(n) months` as period constructors, `+ 5` is genuinely ambiguous. NodaTime's `LocalDate` has no `operator+(int)` — it requires `Plus(Period)`.
+- **Why:** `date + 2` is implicit — what does `2` mean? NodaTime requires `LocalDate.Plus(Period.FromDays(n))` — the `Period` makes the unit visible. Now that `period` is a surface type, `'{n} days'` resolves to `period` and the type checker validates `date + period`. The shortcut `date + integer` would bypass this type-level enforcement.
+- **Alternatives rejected:** `date + integer` meaning "add N days" — the v1 position. Convenient but implicit. In a proposal with both `'{n} days'` and `'{n} months'` as period constructors, `+ 5` is genuinely ambiguous. NodaTime's `LocalDate` has no `operator+(int)` — it requires `Plus(Period)`.
 - **Precedent:** NodaTime `LocalDate` has no integer arithmetic operator. FEEL requires explicit offsets.
-- **Tradeoff:** `DueDate + 5 days` is more verbose than `DueDate + 5`. The verbosity forces the author to name the unit.
+- **Tradeoff:** `DueDate + '5 days'` is more verbose than `DueDate + 5`. The verbosity forces the author to name the unit.
 
 ### 11. `date - date` returns `period` (not integer, not duration)
 
@@ -1249,11 +1249,11 @@ All temporal types support `nullable`. All follow existing null propagation rule
 - **Why:** Shane's directive: *"No obscurity, expose NodaTime."* 10 period fields across 7 samples are `integer` surrogates. The integer loses the unit; the period carries it. NodaTime provides full factories, operators, equality, and serialization for `Period`.
 - **Alternatives rejected:** `period` as expression-result only, with `integer` surrogates (v1 position) — same type-safety gap as `string` for dates.
 - **Precedent:** NodaTime `Period` — full factories, operators, equality, `PeriodPattern.Roundtrip`.
-- **Tradeoff:** Larger type system surface. Worth it — `field LoanTerm as period default 12 months` is strictly more expressive than `field TermLengthMonths as integer default 12`.
+- **Tradeoff:** Larger type system surface. Worth it — `field LoanTerm as period default '12 months'` is strictly more expressive than `field TermLengthMonths as integer default 12`.
 
 ### 13. `period` is full NodaTime Period — date AND time components (v2.1 revision)
 
-- **Why:** NodaTime's `Period` includes both date components (years, months, weeks, days) and time components (hours, minutes, seconds). The v2 date-only restriction contradicted the "expose NodaTime faithfully" directive in three ways: (1) `LocalTime.Plus(Period)` is NodaTime's native API for time arithmetic, but date-only `period` couldn't carry time results; (2) `Period.Between(LocalTime, LocalTime)` returns time-component Periods with no home in a date-only type; (3) timeline constructors returning `duration` plus `LocalTime` not accepting `Duration` left no clean implementation path for `time + 3 hours`. `Period.FromHours()`, `.FromMinutes()`, `.FromSeconds()` all exist in NodaTime.
+- **Why:** NodaTime's `Period` includes both date components (years, months, weeks, days) and time components (hours, minutes, seconds). The v2 date-only restriction contradicted the "expose NodaTime faithfully" directive in three ways: (1) `LocalTime.Plus(Period)` is NodaTime's native API for time arithmetic, but date-only `period` couldn't carry time results; (2) `Period.Between(LocalTime, LocalTime)` returns time-component Periods with no home in a date-only type; (3) timeline constructors returning `duration` plus `LocalTime` not accepting `Duration` left no clean implementation path for `time + '3 hours'`. `Period.FromHours()`, `.FromMinutes()`, `.FromSeconds()` all exist in NodaTime.
 - **Alternatives rejected:** Date-only `period` (v2 position) — created the three structural contradictions above. Re-invents a boundary NodaTime chose not to draw.
 - **Precedent:** NodaTime `Period` — full date+time components. `Period.HasDateComponent` / `Period.HasTimeComponent` for introspection.
 - **Tradeoff:** `date + period` where the period has time components: NodaTime's `LocalDate.Plus(Period)` throws `ArgumentException` on non-zero time components (`Preconditions.CheckArgument(!period.HasTimeComponent, ...)`). Precept's `dateonly` constraint catches this at compile time rather than letting it reach the runtime exception. This is stricter-earlier, not a divergence.
@@ -1546,7 +1546,7 @@ Temporal types are valid as collection inner types where the collection's struct
 - **Period/duration split enforcement:** `date + period ✓`, `date + duration ✗`, `instant + duration ✓`, `instant + period ✗`. Standard type-checking — no custom dispatch.
 - **Postfix unit type resolution:** Resolve quantity typed constants (`'<value> <unit>'`) to `period` or `duration` based on expression context. `date +` / `datetime +` context → `period`. `instant +` / `zoneddatetime +` context → `duration`. `months`/`years` → always `period`. Field default context → match declared field type. No context → compile error.
 - **Typed constant type inference:** Determine specific type from content shape via the type-family admission rule. Current inhabitants: `YYYY-MM-DD` without `T` = date, `HH:MM:SS` without `-` = time, `...T...` without `Z` or `[` = datetime, `...T...Z` = instant, `...T...[zone]` = zoneddatetime, IANA pattern = timezone, `<value> <unit>` = quantity (family `{period, duration}`). Framework is extensible to future inhabitants whose shapes produce disjoint families.
-- **Meaningless combination warnings:** `date + 3 hours` (hours on a date) → warning. `date + 3 minutes` → warning.
+- **Meaningless combination warnings:** `date + '3 hours'` (hours on a date) → warning. `date + '3 minutes'` → warning.
 - Full cross-type interaction matrix.
 - `period` ordering rejection (`<`, `>`, `<=`, `>=`).
 - `period` scaling rejection (`* integer`).
