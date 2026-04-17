@@ -65,7 +65,7 @@ When ready to implement:
    - Tests (throughout, not at the end)
    - Sample files
    - Documentation updates
-6. Mark the PR as ready for review when all acceptance criteria are met.
+7. Mark the PR as ready for review when all acceptance criteria are met.
 
 #### 4. Documentation Sync (Same PR — Non-Negotiable)
 

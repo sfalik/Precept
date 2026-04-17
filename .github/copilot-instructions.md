@@ -57,6 +57,7 @@ For issue-based implementation work:
 - Open or reuse the linked **draft PR** immediately and treat it as the execution hub for the issue.
 - Use the exact PR-body structure required by `CONTRIBUTING.md` and the repository PR template: `## Summary`, `## Linked Issue` (with `Closes #N`), `## Why`, and `## Implementation Plan`.
 - Keep the `## Summary` and `## Why` sections current so reviewers can see what changed and why without reconstructing it from the diff.
+- **Build a detailed implementation plan before coding.** The plan lives in the PR body's `## Implementation Plan` section and must meet the quality bar defined in `CONTRIBUTING.md` § Implementation Plan Quality Bar: vertical slices with method-level specificity, exact file paths, tests per slice, regression anchors, dependency ordering, file inventory, and tooling/MCP sync assessment.
 - Work in vertical slices. After each completed slice, commit, push, and update the PR-body summary/checklist before continuing.
 - Do **not** create a separate implementation-plan markdown file; the PR body is the ephemeral plan artifact for this repo.
 
