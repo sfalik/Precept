@@ -1929,10 +1929,7 @@ internal static class PreceptTypeChecker
                     PreceptLiteralExpression { Value: long lval } => lval >= 0,
                     PreceptLiteralExpression { Value: double dval } => dval >= 0,
                     PreceptLiteralExpression { Value: decimal mval } => mval >= 0,
-                    PreceptFunctionCallExpression { Name: "abs" } => true,
-                    PreceptIdentifierExpression idArg when TryGetIdentifierKey(idArg, out var idKey) =>
-                        symbols.ContainsKey($"$nonneg:{idKey}") || symbols.ContainsKey($"$positive:{idKey}"),
-                    _ => false,
+                    _ => TryInferInterval(arg, symbols).IsNonnegative,
                 };
 
                 if (!isNonNeg)
@@ -2137,7 +2134,21 @@ internal static class PreceptTypeChecker
                             }
                         }
                     }
-                    // Compound expressions (binary, function calls, etc.) — no diagnostic (Principle #8 conservatism)
+                    else
+                    {
+                        // Layer 3: interval arithmetic + Layer 4: relational inference
+                        var divisorInterval = TryInferInterval(binary.Right, symbols);
+                        if (!divisorInterval.ExcludesZero && !TryInferRelationalNonzero(binary.Right, symbols))
+                        {
+                            var description = divisorInterval.IsUnknown
+                                ? "Divisor expression has no compile-time nonzero proof."
+                                : $"Divisor expression interval [{divisorInterval.Lower}, {divisorInterval.Upper}] may include zero.";
+                            diagnostic = new PreceptValidationDiagnostic(
+                                DiagnosticCatalog.C93,
+                                $"{description} Consider restructuring into a helper field with a 'positive' constraint or 'rule != 0'.",
+                                0);
+                        }
+                    }
                 }
 
                 kind = binary.Operator is ">" or ">=" or "<" or "<="
@@ -2277,6 +2288,127 @@ internal static class PreceptTypeChecker
         if (isNonneg) return NumericInterval.Nonneg;
         // $nonzero: alone cannot be represented as a single interval — return Unknown.
         return NumericInterval.Unknown;
+    }
+
+    /// <summary>
+    /// Recursively infers the <see cref="NumericInterval"/> for <paramref name="expression"/>
+    /// using Layer 2 transfer rules (interval arithmetic) and Layer 5 conditional hull synthesis.
+    /// Each identifier leaf is initialized via <see cref="ExtractIntervalFromMarkers"/>.
+    /// Returns <see cref="NumericInterval.Unknown"/> for any expression whose bounds cannot be determined.
+    /// </summary>
+    private static NumericInterval TryInferInterval(
+        PreceptExpression expression,
+        IReadOnlyDictionary<string, StaticValueKind> symbols)
+    {
+        switch (expression)
+        {
+            case PreceptLiteralExpression { Value: long l }:
+                return new NumericInterval(l, true, l, true);
+            case PreceptLiteralExpression { Value: double d }:
+                return new NumericInterval(d, true, d, true);
+            case PreceptLiteralExpression { Value: decimal m }:
+                return new NumericInterval((double)m, true, (double)m, true);
+
+            case PreceptIdentifierExpression idExpr:
+                if (TryGetIdentifierKey(idExpr, out var idKey))
+                    return ExtractIntervalFromMarkers(idKey, symbols);
+                return NumericInterval.Unknown;
+
+            case PreceptParenthesizedExpression paren:
+                return TryInferInterval(paren.Inner, symbols);
+
+            case PreceptUnaryExpression { Operator: "-" } unary:
+                return NumericInterval.Negate(TryInferInterval(unary.Operand, symbols));
+
+            case PreceptBinaryExpression binary:
+            {
+                var left  = TryInferInterval(binary.Left,  symbols);
+                var right = TryInferInterval(binary.Right, symbols);
+                return binary.Operator switch
+                {
+                    "+" => NumericInterval.Add(left, right),
+                    "-" => NumericInterval.Subtract(left, right),
+                    "*" => NumericInterval.Multiply(left, right),
+                    "/" => NumericInterval.Divide(left, right),
+                    "%" => right.ExcludesZero
+                             ? new NumericInterval(-Math.Abs(right.Upper), false, Math.Abs(right.Upper), false)
+                             : NumericInterval.Unknown,
+                    _   => NumericInterval.Unknown,
+                };
+            }
+
+            case PreceptFunctionCallExpression fn when fn.Arguments.Length >= 1:
+            {
+                var a0 = TryInferInterval(fn.Arguments[0], symbols);
+                switch (fn.Name)
+                {
+                    case "abs":
+                        return NumericInterval.Abs(a0);
+                    case "min" when fn.Arguments.Length == 2:
+                        return NumericInterval.Min(a0, TryInferInterval(fn.Arguments[1], symbols));
+                    case "max" when fn.Arguments.Length == 2:
+                        return NumericInterval.Max(a0, TryInferInterval(fn.Arguments[1], symbols));
+                    case "clamp" when fn.Arguments.Length == 3:
+                        return NumericInterval.Clamp(a0,
+                            TryInferInterval(fn.Arguments[1], symbols),
+                            TryInferInterval(fn.Arguments[2], symbols));
+                    case "sqrt":
+                        if (a0.IsNonnegative)
+                        {
+                            var sqrtLo = Math.Sqrt(Math.Max(0, a0.Lower));
+                            var sqrtHi = double.IsPositiveInfinity(a0.Upper)
+                                ? double.PositiveInfinity
+                                : Math.Sqrt(a0.Upper);
+                            return new NumericInterval(sqrtLo, a0.LowerInclusive, sqrtHi, a0.UpperInclusive);
+                        }
+                        return NumericInterval.Unknown;
+                    case "floor":
+                        return new NumericInterval(Math.Floor(a0.Lower), true, Math.Floor(a0.Upper), true);
+                    case "ceil":
+                        return new NumericInterval(Math.Ceiling(a0.Lower), true, Math.Ceiling(a0.Upper), true);
+                    case "round":
+                        return new NumericInterval(Math.Floor(a0.Lower), true, Math.Ceiling(a0.Upper), true);
+                    default:
+                        return NumericInterval.Unknown;
+                }
+            }
+
+            case PreceptConditionalExpression cond:
+            {
+                var thenSymbols = ApplyNarrowing(cond.Condition, symbols, assumeTrue: true);
+                var thenInterval = TryInferInterval(cond.ThenBranch, thenSymbols);
+                var elseInterval = TryInferInterval(cond.ElseBranch, symbols);
+                return NumericInterval.Hull(thenInterval, elseInterval);
+            }
+
+            default:
+                return NumericInterval.Unknown;
+        }
+    }
+
+    /// <summary>
+    /// Checks whether <paramref name="divisor"/> is a subtraction of two identifiers whose
+    /// strict ordering is proven by relational markers (<c>$gt:</c>). Returns <c>true</c>
+    /// only when strict inequality guarantees the difference is nonzero.
+    /// <c>$gte:</c> allows equality (difference = 0) and does NOT satisfy this predicate.
+    /// </summary>
+    private static bool TryInferRelationalNonzero(
+        PreceptExpression divisor,
+        IReadOnlyDictionary<string, StaticValueKind> symbols)
+    {
+        // Pattern: A - B where A and B are identifiers
+        if (divisor is not PreceptBinaryExpression { Operator: "-" } sub)
+            return false;
+
+        if (!TryGetIdentifierKey(sub.Left,  out var a)) return false;
+        if (!TryGetIdentifierKey(sub.Right, out var b)) return false;
+
+        // $gt:{a}:{b}  →  a > b  →  a - b > 0  ✓
+        if (symbols.ContainsKey($"$gt:{a}:{b}")) return true;
+        // $gt:{b}:{a}  →  b > a  →  a - b < 0  ✓ (still nonzero)
+        if (symbols.ContainsKey($"$gt:{b}:{a}")) return true;
+        // $gte does NOT prove nonzero (a == b is possible)
+        return false;
     }
 
     /// <summary>
@@ -2487,6 +2619,29 @@ internal static class PreceptTypeChecker
             key = rightKey;
             lit = leftVal;
             op = FlipComparisonOperator(binary.Operator);
+        }
+        else if (leftIsId && rightIsId)
+        {
+            var relMarkers = new Dictionary<string, StaticValueKind>(symbols, StringComparer.Ordinal);
+            switch (binary.Operator)
+            {
+                case ">":
+                    relMarkers[$"$gt:{leftKey}:{rightKey}"] = StaticValueKind.Boolean;
+                    break;
+                case ">=":
+                    relMarkers[$"$gte:{leftKey}:{rightKey}"] = StaticValueKind.Boolean;
+                    break;
+                case "<":  // B < A → A > B (canonicalized)
+                    relMarkers[$"$gt:{rightKey}:{leftKey}"] = StaticValueKind.Boolean;
+                    break;
+                case "<=": // B <= A → A >= B (canonicalized)
+                    relMarkers[$"$gte:{rightKey}:{leftKey}"] = StaticValueKind.Boolean;
+                    break;
+                default:
+                    return false;
+            }
+            result = relMarkers;
+            return true;
         }
         else
         {

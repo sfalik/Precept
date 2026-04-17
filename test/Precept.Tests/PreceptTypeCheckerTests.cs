@@ -1335,10 +1335,11 @@ public class PreceptTypeCheckerTests
     [Fact]
     public void Check_DivisorCompound_Addition_NoWarning()
     {
+        // D is nonnegative → interval [0,∞). [0,∞)+[1,1]=[1,∞) excludes zero.
         const string dsl = """
             precept M
             field Y as number default 10
-            field D as number default 1
+            field D as number default 1 nonnegative
             state A initial
             event Go
             from A on Go -> set Y = Y / (D + 1) -> no transition
@@ -1352,11 +1353,12 @@ public class PreceptTypeCheckerTests
     [Fact]
     public void Check_DivisorCompound_Multiplication_NoWarning()
     {
+        // D and C are positive → (0,∞)*(0,∞)=(0,∞) excludes zero.
         const string dsl = """
             precept M
             field Y as number default 10
-            field D as number default 1
-            field C as number default 2
+            field D as number default 1 positive
+            field C as number default 2 positive
             state A initial
             event Go
             from A on Go -> set Y = Y / (D * C) -> no transition
@@ -1370,6 +1372,7 @@ public class PreceptTypeCheckerTests
     [Fact]
     public void Check_DivisorCompound_Subtraction_NoWarning()
     {
+        // D - D is provably zero — interval arithmetic detects this. MUST emit C93.
         const string dsl = """
             precept M
             field Y as number default 10
@@ -1381,16 +1384,18 @@ public class PreceptTypeCheckerTests
 
         var result = Check(dsl);
 
-        result.Diagnostics.Where(d => d.Constraint.Id is "C92" or "C93").Should().BeEmpty();
+        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C93");
     }
 
     [Fact]
     public void Check_DivisorCompound_AbsFunction_NoWarning()
     {
+        // D is positive → abs((0,∞))=(0,∞) excludes zero.
+        // Note: $nonzero: alone maps to Unknown interval; abs(Unknown)=[0,∞) does NOT exclude zero.
         const string dsl = """
             precept M
             field Y as number default 10
-            field D as number default 1
+            field D as number default 1 positive
             state A initial
             event Go
             from A on Go -> set Y = Y / abs(D) -> no transition
