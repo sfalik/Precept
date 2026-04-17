@@ -598,8 +598,8 @@ public static class DiagnosticCatalog
     /// <summary>sqrt() requires a non-negative argument proof.</summary>
     public static readonly LanguageConstraint C76 = Register(
         "C76", "compile",
-        "sqrt() requires a non-negative argument. Add a 'nonnegative' constraint or guard with '>= 0'.",
-        "sqrt() requires a non-negative argument. '{arg}' may be negative. Add a 'nonnegative' constraint or guard with '{arg} >= 0 and ...'.");
+        "sqrt() requires a non-negative argument. Add a 'nonnegative' constraint, 'rule Field >= 0', state/event 'ensure', or guard with '>= 0'.",
+        "sqrt() requires a non-negative argument. '{arg}' may be negative. Add a 'nonnegative' constraint, 'rule {arg} >= 0', state/event 'ensure', or guard with '{arg} >= 0'.");
 
     /// <summary>Function does not accept nullable arguments.</summary>
     public static readonly LanguageConstraint C77 = Register(

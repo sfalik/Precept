@@ -1895,8 +1895,8 @@ internal static class PreceptTypeChecker
                     PreceptLiteralExpression { Value: double dval } => dval >= 0,
                     PreceptLiteralExpression { Value: decimal mval } => mval >= 0,
                     PreceptFunctionCallExpression { Name: "abs" } => true,
-                    PreceptIdentifierExpression idArg =>
-                        symbols.ContainsKey($"$nonneg:{(idArg.Member is null ? idArg.Name : $"{idArg.Name}.{idArg.Member}")}"),
+                    PreceptIdentifierExpression idArg when TryGetIdentifierKey(idArg, out var idKey) =>
+                        symbols.ContainsKey($"$nonneg:{idKey}") || symbols.ContainsKey($"$positive:{idKey}"),
                     _ => false,
                 };
 
@@ -1907,7 +1907,7 @@ internal static class PreceptTypeChecker
                         : "argument";
                     diagnostic = new PreceptValidationDiagnostic(
                         DiagnosticCatalog.C76,
-                        $"sqrt() requires a non-negative argument. '{argName}' may be negative. Add a 'nonnegative' constraint or guard with '{argName} >= 0 and ...'.",
+                        $"sqrt() requires a non-negative argument. '{argName}' may be negative. Add a 'nonnegative' constraint, 'rule {argName} >= 0', state/event 'ensure', or guard with '{argName} >= 0'.",
                         0);
                     return false;
                 }
