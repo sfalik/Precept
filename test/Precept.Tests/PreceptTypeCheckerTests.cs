@@ -842,4 +842,104 @@ public class PreceptTypeCheckerTests
         result.Diagnostics.Should().ContainSingle();
         result.Diagnostics[0].Constraint.Id.Should().Be("C42");
     }
+
+    // ─── Issue #106 Slice 1: Numeric comparison narrowing ───────────
+
+    [Fact]
+    public void Check_NumericNarrowing_FieldGreaterThanZero_SqrtNoC76()
+    {
+        const string dsl = """
+            precept M
+            field Rate as number default 0
+            state A initial
+            event Go
+            from A on Go when Rate > 0 -> set Rate = sqrt(Rate) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C76").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_NumericNarrowing_FieldGreaterEqualZero_SqrtNoC76()
+    {
+        const string dsl = """
+            precept M
+            field Rate as number default 0
+            state A initial
+            event Go
+            from A on Go when Rate >= 0 -> set Rate = sqrt(Rate) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C76").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_NumericNarrowing_ReversedZeroLessThanField_SqrtNoC76()
+    {
+        const string dsl = """
+            precept M
+            field Rate as number default 0
+            state A initial
+            event Go
+            from A on Go when 0 < Rate -> set Rate = sqrt(Rate) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C76").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_NumericNarrowing_ReversedZeroLessEqualField_SqrtNoC76()
+    {
+        const string dsl = """
+            precept M
+            field Rate as number default 0
+            state A initial
+            event Go
+            from A on Go when 0 <= Rate -> set Rate = sqrt(Rate) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C76").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_NumericNarrowing_FieldNotEqualZero_SqrtStillC76()
+    {
+        // != 0 proves nonzero but NOT nonneg, so sqrt should still emit C76
+        const string dsl = """
+            precept M
+            field Rate as number default 1
+            state A initial
+            event Go
+            from A on Go when Rate != 0 -> set Rate = sqrt(Rate) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C76");
+    }
+
+    [Fact]
+    public void Check_NumericNarrowing_FieldLessThanZero_SqrtStillC76()
+    {
+        // < 0 proves nonzero but NOT nonneg, so sqrt should still emit C76
+        const string dsl = """
+            precept M
+            field Rate as number default -1
+            state A initial
+            event Go
+            from A on Go when Rate < 0 -> set Rate = sqrt(Rate) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C76");
+    }
 }

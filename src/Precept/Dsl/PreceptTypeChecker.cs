@@ -2123,10 +2123,14 @@ internal static class PreceptTypeChecker
             return ApplyNarrowing(binary.Right, leftNarrowed, assumeTrue: false);
         }
 
-        return binary.Operator is "==" or "!=" &&
-               TryApplyNullComparisonNarrowing(binary, symbols, assumeTrue, out var narrowed)
-            ? narrowed
-            : symbols;
+        if (binary.Operator is "==" or "!=" &&
+            TryApplyNullComparisonNarrowing(binary, symbols, assumeTrue, out var nullNarrowed))
+            return nullNarrowed;
+
+        if (TryApplyNumericComparisonNarrowing(binary, symbols, assumeTrue, out var numericNarrowed))
+            return numericNarrowed;
+
+        return symbols;
     }
 
     private static bool TryApplyNullComparisonNarrowing(
@@ -2173,6 +2177,113 @@ internal static class PreceptTypeChecker
             [key] = updatedKind
         };
         return true;
+    }
+
+    private static bool TryApplyNumericComparisonNarrowing(
+        PreceptBinaryExpression binary,
+        IReadOnlyDictionary<string, StaticValueKind> symbols,
+        bool assumeTrue,
+        out IReadOnlyDictionary<string, StaticValueKind> result)
+    {
+        result = symbols;
+
+        if (!assumeTrue)
+            return false;
+
+        if (binary.Operator is not (">" or ">=" or "<" or "<=" or "!=" or "=="))
+            return false;
+
+        bool leftIsId = TryGetIdentifierKey(binary.Left, out var leftKey);
+        bool rightIsId = TryGetIdentifierKey(binary.Right, out var rightKey);
+        bool leftIsLit = TryGetNumericLiteral(binary.Left, out var leftVal);
+        bool rightIsLit = TryGetNumericLiteral(binary.Right, out var rightVal);
+
+        string key;
+        double lit;
+        string op;
+
+        if (leftIsId && rightIsLit)
+        {
+            key = leftKey;
+            lit = rightVal;
+            op = binary.Operator;
+        }
+        else if (rightIsId && leftIsLit)
+        {
+            key = rightKey;
+            lit = leftVal;
+            op = FlipComparisonOperator(binary.Operator);
+        }
+        else
+        {
+            return false;
+        }
+
+        // Canonicalized: key <op> lit
+        var markers = new Dictionary<string, StaticValueKind>(symbols, StringComparer.Ordinal);
+        bool injected = false;
+
+        if (op == ">" && lit >= 0)
+        {
+            markers[$"$positive:{key}"] = StaticValueKind.Boolean;
+            markers[$"$nonneg:{key}"] = StaticValueKind.Boolean;
+            markers[$"$nonzero:{key}"] = StaticValueKind.Boolean;
+            injected = true;
+        }
+        else if (op == ">=" && lit > 0)
+        {
+            markers[$"$positive:{key}"] = StaticValueKind.Boolean;
+            markers[$"$nonneg:{key}"] = StaticValueKind.Boolean;
+            markers[$"$nonzero:{key}"] = StaticValueKind.Boolean;
+            injected = true;
+        }
+        else if (op == ">=" && lit == 0)
+        {
+            markers[$"$nonneg:{key}"] = StaticValueKind.Boolean;
+            injected = true;
+        }
+        else if (op == "!=" && lit == 0)
+        {
+            markers[$"$nonzero:{key}"] = StaticValueKind.Boolean;
+            injected = true;
+        }
+        else if (op == "<" && lit <= 0)
+        {
+            markers[$"$nonzero:{key}"] = StaticValueKind.Boolean;
+            injected = true;
+        }
+
+        if (!injected)
+            return false;
+
+        result = markers;
+        return true;
+    }
+
+    private static string FlipComparisonOperator(string op) => op switch
+    {
+        "<" => ">",
+        "<=" => ">=",
+        ">" => "<",
+        ">=" => "<=",
+        _ => op // == and != are symmetric
+    };
+
+    private static bool TryGetNumericLiteral(PreceptExpression expr, out double value)
+    {
+        var stripped = StripParentheses(expr);
+        if (stripped is PreceptLiteralExpression { Value: long l })
+        {
+            value = (double)l;
+            return true;
+        }
+        if (stripped is PreceptLiteralExpression { Value: double d })
+        {
+            value = d;
+            return true;
+        }
+        value = 0;
+        return false;
     }
 
     private static void ValidateCollectionMutations(
