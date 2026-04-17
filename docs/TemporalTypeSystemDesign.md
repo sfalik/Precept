@@ -142,7 +142,7 @@ field CurrentDayOffset as number default 0
 field GracePeriodDays as number default 30
 
 # No type safety — DueDayOffset + MealsTotal compiles
-invariant DueDayOffset + GracePeriodDays >= CurrentDayOffset because "Within grace period"
+rule DueDayOffset + GracePeriodDays >= CurrentDayOffset because "Within grace period"
 ```
 
 **After** — with temporal types (v5: quoted typed constants + bare English naming):
@@ -153,7 +153,7 @@ field GracePeriod as period default '30 days'
 
 # Type-safe: DueDate + MealsTotal is a compile error
 # Explicit: '30 days' resolves to period, date + period → date
-invariant DueDate + GracePeriod >= '2026-01-01' because "Within grace period"
+rule DueDate + GracePeriod >= '2026-01-01' because "Within grace period"
 ```
 
 **Before** — encoding SLA rules with raw numbers:
@@ -163,7 +163,7 @@ field FiledAt as number default 0       # Epoch seconds — what epoch?
 field IncidentAt as number default 0    # Same question
 field SlaSeconds as number default 259200  # 72 hours... or is it?
 
-invariant FiledAt - IncidentAt <= SlaSeconds because "Must file within SLA"
+rule FiledAt - IncidentAt <= SlaSeconds because "Must file within SLA"
 ```
 
 **After** — with instant and duration:
@@ -173,7 +173,7 @@ field FiledAt as instant
 field IncidentAt as instant
 
 # Self-documenting, type-safe, deterministic
-invariant FiledAt - IncidentAt <= '72 hours' because "HIPAA: must file within 72 hours of incident"
+rule FiledAt - IncidentAt <= '72 hours' because "HIPAA: must file within 72 hours of incident"
 ```
 
 **Before** — multi-timezone compliance pushes logic to hosting layer:
@@ -181,7 +181,7 @@ invariant FiledAt - IncidentAt <= '72 hours' because "HIPAA: must file within 72
 ```precept
 field FilingDeadline as number  # Pre-computed by hosting layer
 # The MEANING of this deadline (30 days, midnight, incident timezone) is NOT in this file
-invariant FiledAt <= FilingDeadline because "Filing deadline has passed"
+rule FiledAt <= FilingDeadline because "Filing deadline has passed"
 ```
 
 **After** — complete rule in the contract (v5: dot-accessor mediation, quoted quantities, `date + period → date`):
@@ -193,7 +193,7 @@ field IncidentTimezone as timezone
 
 # Dot-chain mediation: instant → .inZone(tz) → zoneddatetime → .date → date
 # Then calendar arithmetic, reconstruct back via .inZone(tz).instant
-invariant FiledTimestamp <= (
+rule FiledTimestamp <= (
     IncidentTimestamp.inZone(IncidentTimezone).date + '30 days' + '23:59:00'
 ).inZone(IncidentTimezone).instant because "Claim must be filed by 11:59 PM local time on the 30th day after the incident"
 ```
@@ -214,7 +214,7 @@ field StartDate as date default '2026-01-15'
 
 # date + period → date. The period carries its calendar semantics.
 # 12 months != 365 days — NodaTime's truth, exposed faithfully.
-invariant StartDate + LoanTerm >= '2026-01-01' because "Maturity date must be in the future"
+rule StartDate + LoanTerm >= '2026-01-01' because "Maturity date must be in the future"
 ```
 
 The second form satisfies the philosophy's "one file, complete rules" guarantee. An auditor reads the precept and sees the entire business rule — 30 days, 11:59 PM, incident timezone.
@@ -923,7 +923,7 @@ Temporal quantities are expressed as typed constants inside `'...'`, with option
 
 ```precept
 set DueDate = CreatedDate + '30 days'
-invariant FiledAt - IncidentAt <= '72 hours' because "SLA"
+rule FiledAt - IncidentAt <= '72 hours' because "SLA"
 field GracePeriod as period default '30 days'
 ```
 
@@ -940,7 +940,7 @@ set Expiry = StartDate + '{TermMonths + 6} months'   # arithmetic inside interpo
 ```precept
 field ExtendedWarranty as period default '2 years + 6 months'
 set Expiry = StartDate + '1 year + 3 months + 15 days'
-invariant FiledAt - IncidentAt <= '72 hours + 30 minutes' because "SLA window"
+rule FiledAt - IncidentAt <= '72 hours + 30 minutes' because "SLA window"
 ```
 
 Unit names: `days`, `months`, `years`, `weeks`, `hours`, `minutes`, `seconds`. These are **not** language keywords — they are validated strings inside `'...'`. See [`docs/LiteralSystemDesign.md`](LiteralSystemDesign.md) § Quantity unit names.
@@ -1499,7 +1499,7 @@ Single quotes win on all three criteria that matter for a DSL: refactoring safet
 | `OffsetDateTime` | Excluded | UTC offset without timezone rules. Weaker than full timezone. |
 | `AnnualDate` | Deferred | Real demand (HR, insurance), low corpus frequency. Evaluate post-Phase 2. |
 | `YearMonth` | Deferred | Real demand (billing), low priority. |
-| `DateInterval` / `daterange` | Deferred | Two `date` fields + invariant covers it. |
+| `DateInterval` / `daterange` | Deferred | Two `date` fields + rule covers it. |
 | Fiscal/business calendars | Excluded | ISO calendar only. |
 | Leap seconds | Excluded | NodaTime `Instant` uses smoothed UTC. Not a limitation. |
 | Parameterized temporal types | Excluded | No type parameterization. |

@@ -79,13 +79,13 @@ All numeric forms produce a `NumberLiteral` token. The parser's `NumberAtom` com
 
 **Negative numbers** are not a single literal token — the parser handles the unary minus operator (`-`) followed by a `NumberLiteral`. In expression contexts, `-42` is parsed as `Minus` + `NumberAtom`. In default value clauses, the parser explicitly handles the `Minus` + `NumberLiteral` sequence to produce a negative value.
 
-Numeric literals appear in guards, invariants, set expressions, default values, and constraint arguments:
+Numeric literals appear in guards, rules, set expressions, default values, and constraint arguments:
 
 ```precept
 field MaxAttempts as number default 3
 field InterestRate as number default 4.25
 
-invariant ClaimAmount >= 0 because "Claim amounts cannot be negative"
+rule ClaimAmount >= 0 because "Claim amounts cannot be negative"
 
 rule if AttemptCount > 5
   reject "Too many attempts"
@@ -162,7 +162,7 @@ List literals appear exclusively in `default` clauses for collection fields (`se
 
 ```precept
 reject "Approval requires verified documents"
-invariant ClaimAmount >= 0 because "Claim amounts cannot be negative"
+rule ClaimAmount >= 0 because "Claim amounts cannot be negative"
 set DecisionNote = "Standard tier — approved"
 ```
 
@@ -174,7 +174,7 @@ Static strings are unchanged from the current language. The `"..."` delimiter al
 reject "Credit score {CreditScore} is below the 680 minimum"
 reject "Outstanding documents: {MissingDocuments.count} remaining"
 reject "Amount {Approve.Amount} exceeds claim maximum of {ClaimAmount}"
-invariant DueDays >= 0 because "Grace period of {DueDays} days cannot be negative"
+rule DueDays >= 0 because "Grace period of {DueDays} days cannot be negative"
 ```
 
 Interpolation uses `{expr}` inside `"..."` — the expression is evaluated, coerced to string, and substituted inline. Multiple interpolations can appear in a single string.
@@ -303,7 +303,7 @@ Interpolation inside `'...'` uses the same `{expr}` syntax as strings. The expre
 ```precept
 field ExtendedWarranty as period default '2 years + 6 months'
 set Expiry = StartDate + '1 year + 3 months + 15 days'
-invariant FiledAt - IncidentAt <= '72 hours + 30 minutes' because "SLA window"
+rule FiledAt - IncidentAt <= '72 hours + 30 minutes' because "SLA window"
 ```
 
 The `+` operator inside `'...'` combines quantity components. All components must resolve to the same type family member.
