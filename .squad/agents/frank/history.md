@@ -7,6 +7,7 @@
 
 ## Learnings
 
+- Divisor safety docs (Slice 9, #106): The `nonnegative ≠ nonzero` distinction is the most important teaching point — it's the one thing that trips authors. Context-aware C93 messaging makes it explicit. Proof sources for C76 and C93 are now unified: constraints, rules, ensures, and guards all feed the same narrowing markers (`$positive:`, `$nonneg:`, `$nonzero:`). Doc updates touched three files (language design, constraint violation, README) — RuntimeApiDesign.md was correctly scoped to public API and didn't need narrowing internals.
 - Computed fields: the critical semantic contract is one recomputation pass after all mutations and before constraint evaluation.
 - Modifier ordering: parser rigidity lived mostly in parser/completion surface; runtime/model layers were already largely order-independent.
 - Guarded declarations: scope-inherited guards are the correct model; implementation gaps should be treated separately from design soundness.
