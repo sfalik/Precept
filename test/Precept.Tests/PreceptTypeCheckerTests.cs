@@ -1091,4 +1091,56 @@ public class PreceptTypeCheckerTests
 
         result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C76");
     }
+
+    // ─── Issue #106 Slice 4: Event ensure narrowing with name translation ───────
+
+    [Fact]
+    public void Check_EventEnsureNonneg_ProvesSqrt_NoC76()
+    {
+        const string dsl = """
+            precept Test
+            field Result as number default 0
+            event Submit with Days as number
+            on Submit ensure Days >= 0 because "nonneg"
+            state Draft initial
+            from Draft on Submit -> set Result = sqrt(Submit.Days) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C76").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_GuardedEventEnsure_ExcludedFromProof_SqrtC76()
+    {
+        const string dsl = """
+            precept Test
+            field Result as number default 0
+            event Submit with Days as number
+            on Submit ensure Days >= 0 when Days != null because "conditional nonneg"
+            state Draft initial
+            from Draft on Submit -> set Result = sqrt(Submit.Days) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C76");
+    }
+
+    [Fact]
+    public void Check_EventArgPositiveConstraint_ProvesSqrt_NoC76()
+    {
+        const string dsl = """
+            precept Test
+            field Result as number default 0
+            event Submit with Days as number positive
+            state Draft initial
+            from Draft on Submit -> set Result = sqrt(Submit.Days) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C76").Should().BeEmpty();
+    }
 }

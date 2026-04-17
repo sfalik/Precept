@@ -123,7 +123,8 @@ internal static class PreceptTypeChecker
             StringComparer.Ordinal);
 
         var stateEnsureNarrowings = BuildStateEnsureNarrowings(model, dataFieldKinds);
-        ValidateTransitionRows(model, dataFieldKinds, eventArgKinds, collectionFieldMap, stateEnsureNarrowings, diagnostics, expressions, scopes);
+        var eventEnsureNarrowings = BuildEventEnsureNarrowings(model, eventArgKinds);
+        ValidateTransitionRows(model, dataFieldKinds, eventArgKinds, collectionFieldMap, stateEnsureNarrowings, eventEnsureNarrowings, diagnostics, expressions, scopes);
         ValidateStateActions(model, dataFieldKinds, collectionFieldMap, stateEnsureNarrowings, diagnostics, expressions, scopes);
         ValidateFieldConstraints(model, diagnostics);
         ValidateRules(model, dataFieldKinds, eventArgKinds, diagnostics, expressions, scopes);
@@ -197,6 +198,7 @@ internal static class PreceptTypeChecker
         IReadOnlyDictionary<string, Dictionary<string, StaticValueKind>> eventArgKinds,
         IReadOnlyDictionary<string, PreceptCollectionField> collectionFieldMap,
         IReadOnlyDictionary<string, IReadOnlyDictionary<string, StaticValueKind>> stateEnsureNarrowings,
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, StaticValueKind>> eventEnsureNarrowings,
         List<PreceptValidationDiagnostic> diagnostics,
         List<PreceptTypeExpressionInfo> expressions,
         List<PreceptTypeScopeInfo> scopes)
@@ -223,6 +225,14 @@ internal static class PreceptTypeChecker
                     eventName,
                     model.CollectionFields,
                     stateEnsureNarrowings.TryGetValue(stateGroup.Key, out var stateNarrowing) ? stateNarrowing : null);
+
+                // Merge event ensure narrowings (dotted-form proof markers) into transition-row scope
+                if (eventEnsureNarrowings.TryGetValue(eventName, out var eventNarrowing))
+                {
+                    foreach (var pair in eventNarrowing)
+                        baseSymbols[pair.Key] = pair.Value;
+                }
+
                 scopes.Add(new PreceptTypeScopeInfo(
                     stateGroup.Min(x => x.Row.SourceLine),
                     "transition-base",
@@ -1353,6 +1363,54 @@ internal static class PreceptTypeChecker
         return result;
     }
 
+    private static IReadOnlyDictionary<string, IReadOnlyDictionary<string, StaticValueKind>> BuildEventEnsureNarrowings(
+        PreceptDefinition model,
+        IReadOnlyDictionary<string, Dictionary<string, StaticValueKind>> eventArgKinds)
+    {
+        var result = new Dictionary<string, IReadOnlyDictionary<string, StaticValueKind>>(StringComparer.Ordinal);
+        if (model.EventEnsures is null || model.EventEnsures.Count == 0)
+            return result;
+
+        foreach (var group in model.EventEnsures
+            .Where(static e => e.WhenGuard is null)
+            .GroupBy(static e => e.EventName, StringComparer.Ordinal))
+        {
+            var eventName = group.Key;
+            if (!eventArgKinds.TryGetValue(eventName, out var args))
+                continue;
+
+            // Build bare-name symbol table for the event's args
+            IReadOnlyDictionary<string, StaticValueKind> bareSymbols =
+                new Dictionary<string, StaticValueKind>(args, StringComparer.Ordinal);
+
+            foreach (var eventEnsure in group)
+                bareSymbols = ApplyNarrowing(eventEnsure.Expression, bareSymbols, assumeTrue: true);
+
+            // Translate proof markers from bare form to dotted form for transition-row scope.
+            // Event ensures use bare arg names (e.g. "Days"), but transition rows use dotted names
+            // (e.g. "Submit.Days"). Markers like "$positive:Days" become "$positive:Submit.Days".
+            var dottedMarkers = new Dictionary<string, StaticValueKind>(StringComparer.Ordinal);
+            foreach (var pair in bareSymbols)
+            {
+                if (pair.Key.Length == 0 || pair.Key[0] != '$')
+                    continue;
+
+                var colonIndex = pair.Key.IndexOf(':');
+                if (colonIndex < 0)
+                    continue;
+
+                var prefix = pair.Key.AsSpan(0, colonIndex + 1);  // e.g. "$positive:"
+                var fieldName = pair.Key.AsSpan(colonIndex + 1);  // e.g. "Days"
+                dottedMarkers[$"{prefix}{eventName}.{fieldName}"] = pair.Value;
+            }
+
+            if (dottedMarkers.Count > 0)
+                result[eventName] = dottedMarkers;
+        }
+
+        return result;
+    }
+
     private static Dictionary<string, StaticValueKind> BuildSymbolKinds(
         IReadOnlyDictionary<string, StaticValueKind> dataFieldKinds,
         IReadOnlyDictionary<string, Dictionary<string, StaticValueKind>> eventArgKinds,
@@ -1827,13 +1885,16 @@ internal static class PreceptTypeChecker
                     PreceptLiteralExpression { Value: double dval } => dval >= 0,
                     PreceptLiteralExpression { Value: decimal mval } => mval >= 0,
                     PreceptFunctionCallExpression { Name: "abs" } => true,
-                    PreceptIdentifierExpression idArg => symbols.ContainsKey($"$nonneg:{idArg.Name}"),
+                    PreceptIdentifierExpression idArg =>
+                        symbols.ContainsKey($"$nonneg:{(idArg.Member is null ? idArg.Name : $"{idArg.Name}.{idArg.Member}")}"),
                     _ => false,
                 };
 
                 if (!isNonNeg)
                 {
-                    var argName = arg is PreceptIdentifierExpression nid ? nid.Name : "argument";
+                    var argName = arg is PreceptIdentifierExpression nid
+                        ? (nid.Member is null ? nid.Name : $"{nid.Name}.{nid.Member}")
+                        : "argument";
                     diagnostic = new PreceptValidationDiagnostic(
                         DiagnosticCatalog.C76,
                         $"sqrt() requires a non-negative argument. '{argName}' may be negative. Add a 'nonnegative' constraint or guard with '{argName} >= 0 and ...'.",
