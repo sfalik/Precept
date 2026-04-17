@@ -503,11 +503,12 @@ These resolve to `Duration.FromHours`, `Duration.FromMinutes`, `Duration.FromSec
 
 **Division-by-zero prevention:** Division by zero on `duration` throws `DivideByZeroException` in NodaTime. Precept catches this via the unified narrowing system (Issue #106):
 
-- **Literal zero:** `duration / 0` is a compile **error** — provably always wrong.
-- **Unproven field divisor:** `duration / Field` where no nonzero proof exists emits a compile **warning**. Proofs come from any of: `positive` constraint, explicit `rule Field > 0`, `when Field != 0` guard, or `in State ensure Field > 0`.
-- **Compound expressions:** `duration / (Rate + 1)` assumes satisfiable — no warning (consistent with #106's conservatism).
+- **Literal zero:** `duration / 0` is a compile **error** (C92) — provably always wrong.
+- **Unproven numeric divisor:** `duration / Field` where Field is `number`/`integer` and no nonzero proof exists emits a compile **error** (C93). Proofs come from any of: `positive` constraint, `nonzero` constraint (#111), explicit `rule Field > 0` or `rule Field != 0`, `when Field != 0` guard, `in State ensure Field > 0`, or `on Event ensure Arg > 0`.
+- **Unproven duration divisor:** `duration / DurationField` where DurationField is `duration` and no nonzero proof exists emits a compile **error** (C93). The `nonzero` constraint on duration fields (#111) is the natural proof source. `when DurationField != '0 hours'` guard also works.
+- **Compound expressions:** `duration / (Rate + 1)` assumes satisfiable — no diagnostic (consistent with #106's Principle #8 conservatism).
 
-Duration division is not a special case — it inherits the same divisor safety as numeric division. The only temporal-specific note is that `DivideByZeroException` (instead of IEEE 754 `Infinity`) makes the runtime consequence more severe for duration than for float.
+Duration division is not a special case — it inherits the same divisor safety as numeric division. The only temporal-specific notes: (1) `DivideByZeroException` (instead of IEEE 754 `Infinity`) makes the runtime consequence more severe for duration than for float, and (2) `duration / duration` requires a duration-typed nonzero proof, which `nonzero` on duration fields provides (#111).
 | `==`, `!=`, `<`, `>`, `<=`, `>=` | `boolean` | NodaTime default behavior. Thin wrapper — no custom logic. |
 
 | **Not supported** | **Why** |
@@ -536,11 +537,13 @@ field ActualHours as duration default '0 hours'
 
 9 fields across 6 samples (MTBF, repair hours, work hours) are naturally `duration`.
 
-**Constraints:** `nullable`, `default '8 hours'` or `default '30 minutes'`, `nonnegative`. `min`/`max` are compile errors — constraint values are bare numbers, not duration quantities.
+**Constraints:** `nullable`, `default '8 hours'` or `default '30 minutes'`, `nonnegative`, `nonzero` (#111). `min`/`max` are compile errors — constraint values are bare numbers, not duration quantities.
 
-**Implementation note:** `nonnegative` desugars to `Field >= 0` for numeric types, which would be `duration >= integer` — a type error. The desugar model must be type-aware: for `duration`, generate a comparison against `Duration.Zero` instead of the integer literal `0`.
+**`nonzero` on duration:** A duration field used as a divisor (`duration / duration` → `number`) needs a nonzero proof to suppress C93. `nonzero` is the direct proof source: `field ShiftLength as duration default '8 hours' nonzero` — allows any non-zero duration (positive or negative), rejects only `Duration.Zero`. Runtime enforcement compares against `Duration.Zero`. This parallels `nonzero` on numeric types (#111) and completes the divisor safety story for `duration / duration`.
 
-**Serialization:** ISO 8601 time-duration string: `"PT72H"`.
+**Implementation note:** `nonnegative` and `nonzero` desugar to `Field >= 0` and `Field != 0` for numeric types, which would be `duration >= integer` / `duration != integer` — type errors. The desugar model must be type-aware: for `duration`, generate comparisons against `Duration.Zero` instead of the integer literal `0`. The compile-time proof markers (`$nonneg:`, `$nonzero:`) are injected identically — they are type-agnostic symbols in the narrowing system.
+
+**Serialization:** NodaTime `DurationPattern.JsonRoundtrip` (`-H:mm:ss`): `"72:00:00"`. This is the default format used by the NodaTime STJ converter — not ISO 8601 `PT` notation.
 
 ---
 
@@ -877,7 +880,7 @@ instant → .inZone(tz) → zoneddatetime → .datetime → datetime → .date /
 
 ### DST ambiguity resolution (locked)
 
-- **Gap (spring forward):** Map to the instant *after* the gap — `LenientResolver` default.
+- **Gap (spring forward):** Shift the local time forward by the gap duration — e.g. 2:30 AM → 3:30 AM when clocks spring forward at 2:00 AM (`ReturnForwardShifted`). This is the `LenientResolver` default.
 - **Overlap (fall back):** Map to the *earlier* offset (first occurrence) — `LenientResolver` default.
 
 **Decision:** Use NodaTime's `LenientResolver` with no custom code. Both gap and overlap behavior are the NodaTime defaults via `InZoneLeniently`. Deterministic. The 99% case is unaffected. If a future use case requires different overlap resolution, it can be added as an opt-in parameter — but the default is NodaTime-native.
@@ -1489,7 +1492,8 @@ Single quotes win on all three criteria that matter for a DSL: refactoring safet
 | #29 (integer type) | Postfix unit expressions take `integer`. Dependency. |
 | #16 (built-in functions) | Conversion functions from this proposal. Constructor functions eliminated — replaced by postfix units. |
 | #13 (field-level constraints) | `nullable`, `default`, `nonnegative` architecture. |
-| #106 (division-by-zero unified narrowing) | **Hard dependency for `duration` division.** NodaTime throws `DivideByZeroException` (not IEEE 754 `Infinity`) for `duration / 0` and `duration / Duration.Zero`. The compile-time literal check and runtime guard from #106 must ship before or alongside temporal types. Without #106, three division-by-zero paths remain unguarded. |
+| #106 (division-by-zero unified narrowing) | **Hard dependency for `duration` division.** NodaTime throws `DivideByZeroException` (not IEEE 754 `Infinity`) for `duration / 0` and `duration / Duration.Zero`. The compile-time literal check (C92) and unproven-divisor error (C93) from #106 must ship before or alongside temporal types. Without #106, three division-by-zero paths remain unguarded. |
+| #111 (`nonzero` modifier + C94–C99) | **Hard dependency for `duration / duration` divisor safety.** `nonzero` on duration fields provides the first-class proof source for C93 suppression when a duration is the divisor. Without #111, authors must use verbose `rule ShiftLength != '0 hours'` or `when ShiftLength != '0 hours'` guards. C94 assignment constraint enforcement may extend to temporal types in the future (requires `NumericInterval` for duration/period — deferred). |
 
 ---
 

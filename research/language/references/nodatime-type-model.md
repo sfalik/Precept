@@ -386,14 +386,21 @@ Most types implement `IXmlSerializable`. Serialized forms use the same ISO patte
 
 ---
 
+## Types Promoted to First-Class
+
+These types were originally assessed as out of scope but have since been promoted to first-class Precept types. See [`docs/TemporalTypeSystemDesign.md`](../../docs/TemporalTypeSystemDesign.md) for their full design.
+
+| NodaTime Type | Original Concern | Resolution |
+|---------------|-----------------|------------|
+| `ZonedDateTime` | Timezone-dependent calculations could compromise determinism. | Determinism preserved via TZ database version pinning and `InZoneLeniently` (NodaTime default). Now a first-class `zoneddatetime` type. |
+| `DateTimeZone` | A timezone is configuration/context, not entity data. | Timezone-aware fields are needed for business rules like SLA windows and scheduling. Now a first-class `timezone` type. |
+
 ## Types Definitively Out of Scope for Precept
 
 | NodaTime Type | Why Out of Scope |
 |---------------|-----------------|
-| `ZonedDateTime` | Business-entity field definitions should not carry timezone rules. Timezone resolution is a presentation/integration concern, not a domain-integrity concern. Precept's determinism guarantee would be compromised by timezone-dependent calculations. |
 | `OffsetDateTime` | UTC offsets are a wire-format concern. If a Precept entity needs to record "when something happened," an `Instant` or `LocalDateTime` is sufficient. The offset is metadata about the observation context, not the entity state. |
 | `OffsetDate` / `OffsetTime` | Rarely used even in general .NET development. No business-entity use case. |
-| `DateTimeZone` | A timezone is configuration/context, not entity data. Precept fields should not store timezone objects. |
 | `CalendarSystem` | Precept should use ISO calendar exclusively. Non-ISO calendars are a localization concern, not a domain-integrity concern. |
 | `IClock` | A clock is infrastructure. Precept treats "now" as an externally-supplied value, not something the DSL reads from a clock. This is consistent with Precept's determinism guarantee. |
 
@@ -437,7 +444,7 @@ These constraints are exactly the kind of "prevention over detection" that Prece
 
 4. **The dependency cost is low.** ~792 KB, zero transitive dependencies, Apache-2.0, actively maintained, 275M+ downloads, stable API. The serialization companion for System.Text.Json is a lightweight separate package.
 
-5. **Most remaining NodaTime types (`OffsetDateTime`, `CalendarSystem`, `IClock`) are definitively out of scope.** `ZonedDateTime` and `DateTimeZone` have been promoted to first-class types — see [`docs/TemporalTypeSystemDesign.md`](../../docs/TemporalTypeSystemDesign.md). Determinism is preserved via TZ database version pinning.
+5. **Most remaining NodaTime types (`OffsetDateTime`, `CalendarSystem`, `IClock`) are definitively out of scope.** `ZonedDateTime` and `DateTimeZone` have been promoted to first-class Precept types — see [`docs/TemporalTypeSystemDesign.md`](../../docs/TemporalTypeSystemDesign.md). Determinism is preserved via TZ database version pinning.
 
 6. **NodaTime's two-type split for "elapsed time" (`Duration`) vs. "calendar interval" (`Period`) is a design insight that Precept's eventual `duration` proposal should address explicitly.** Business rules almost always mean `Period` ("renew in 12 months") not `Duration` ("elapsed 31,536,000 seconds").
 

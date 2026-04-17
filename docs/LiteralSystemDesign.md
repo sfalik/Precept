@@ -204,9 +204,9 @@ When an expression inside `{...}` evaluates to a non-string type, it is coerced 
 | `time` | `HH:MM:SS` | `{StartTime}` → `"14:30:00"` |
 | `datetime` | ISO 8601 | `{DetectedAt}` → `"2026-04-15T14:30:00"` |
 | `instant` | ISO 8601 with Z | `{FiledAt}` → `"2026-04-15T14:30:00Z"` |
-| `zoneddatetime` | ISO 8601 with zone bracket | `{Context}` → `"2026-04-15T14:30:00[America/New_York]"` |
+| `zoneddatetime` | NodaTime general format | `{Context}` → `"2026-04-15T14:30:00 America/New_York (-04)"` |
 | `timezone` | IANA identifier | `{Tz}` → `"America/New_York"` |
-| `duration` | NodaTime canonical string | `{Elapsed}` → `"PT72H"` |
+| `duration` | NodaTime `JsonRoundtrip` format | `{Elapsed}` → `"72:00:00"` |
 | `period` | NodaTime canonical string | `{Grace}` → `"P30D"` |
 | `null` | Empty string `""` | `{NullableField}` → `""` |
 | Collection | **Compile error** | `{Items}` → error: "Collections cannot be interpolated directly. Use `{Items.count}` for the count." |
@@ -520,8 +520,9 @@ Interpolation supports any expression the language supports:
 | Dot accessors | `{Items.count}`, `{DueDate.year}` |
 | Event args | `{Approve.Amount}` |
 | Arithmetic | `{AnnualIncome * 3}`, `{Score + Bonus}`, `{SlaHours * 2}` |
+| Conditionals | `{if IsPremium then GraceDays else DefaultGrace}`, `'{if IsRush then 24 else 72} hours'` |
 
-**Not supported:** Conditional expressions inside interpolation (`{if X then Y else Z}`) — nested quoted literals inside `{...}` create parsing ambiguity with the `}` interpolation terminator. This is a grammar constraint, not a phasing choice.
+**Implementation note — nested quoting:** Expressions inside `{...}` may contain quoted literals (e.g. `{if Active then "yes" else "no"}`). Same-delimiter nesting (`"..."` inside `"...{...}..."`) requires a mode-switching tokenizer that tracks interpolation depth. This is a solved problem: Serilog.Expressions (built on Superpower by Superpower's author) uses a hand-written `Tokenizer<T>` subclass with bracket-balance tracking and expression-tokenizer delegation inside holes. Precept's implementation will follow the same pattern — replacing the current stateless `TokenizerBuilder` regex with a custom `Tokenizer<PreceptToken>` that emits multi-token sequences (`StringStart`, `StringText`, `InterpolationStart`, expression tokens, `InterpolationEnd`, `StringEnd`). See L5 for the full rationale.
 
 ### Philosophy alignment
 
@@ -565,10 +566,10 @@ Interpolation supports any expression the language supports:
 
 ### L5. Interpolation supports the full expression language
 
-- **Why:** Interpolation expressions (`{expr}`) use the same expression evaluator as the rest of the language — field references, dot accessors, event args, and arithmetic. `{Amount}` for field values, `{Items.count}` for collection counts, `{Approve.Amount}` for event args, `{SlaHours * 2}` for computed values. The grammar handles `{` → evaluate expression → `}` uniformly. Operator precedence inside `{...}` is the same as anywhere else in the language — the `}` interpolation terminator is unambiguous because `}` is not an operator.
-- **Alternatives rejected:** (A) Field references only — too restrictive. `{Items.count}` and `{SlaHours * 2}` are immediate needs for diagnostics and computed quantities; excluding them would force authors to create intermediate fields for every accessor or arithmetic expression. (B) Conditional expressions inside interpolation (`{if X then Y else Z}`) — nested quoted literals inside `{...}` create parsing ambiguity. This is excluded as a grammar constraint.
-- **Precedent:** C# string interpolation supports full expressions. Python f-strings support full expressions. Precept follows the same model.
-- **Tradeoff:** The `}` terminator must be disambiguated from `>=` comparisons if comparisons are ever allowed inside interpolation. Currently not an issue — comparisons return `boolean`, which is not useful in interpolation contexts. If needed, the precedent is C# which handles this with the same `}` terminator.
+- **Why:** Interpolation expressions (`{expr}`) use the same expression evaluator as the rest of the language — field references, dot accessors, event args, arithmetic, and conditionals. `{Amount}` for field values, `{Items.count}` for collection counts, `{Approve.Amount}` for event args, `{SlaHours * 2}` for computed values, `{if IsPremium then 24 else 72}` for conditional values. The grammar handles `{` → evaluate expression → `}` uniformly. Operator precedence inside `{...}` is the same as anywhere else in the language — the `}` interpolation terminator is unambiguous because `}` is not an operator, and `if/then/else` is keyword-delimited (no brace conflict).
+- **Alternatives rejected:** (A) Field references only — too restrictive. `{Items.count}` and `{SlaHours * 2}` are immediate needs for diagnostics and computed quantities; excluding them would force authors to create intermediate fields for every accessor or arithmetic expression. (B) Exclude conditionals to avoid nested quoting complexity — rejected after research showed the tokenizer architecture required for basic interpolation (mode-switching `Tokenizer<T>` subclass) already handles nested quoting at zero incremental cost. Serilog.Expressions (built on Superpower by Superpower's author) confirms this: the hand-written tokenizer delegates to the expression tokenizer inside `{...}` holes and tracks bracket balance, handling nested strings naturally.
+- **Precedent:** C# string interpolation supports full expressions including conditionals. Python 3.12+ f-strings support full expressions with arbitrary nesting. Serilog.Expressions (Superpower-based) supports full expressions inside `{...}` template holes using a hand-written `Tokenizer<ExpressionToken>` with mode switching. Precept follows the same model.
+- **Tradeoff:** The `}` terminator must be disambiguated from `>=` comparisons if comparisons are ever allowed inside interpolation. Currently not an issue — comparisons return `boolean`, which is not useful in interpolation contexts. If needed, the precedent is C# which handles this with the same `}` terminator. Same-delimiter nesting (quoted literal inside interpolation inside same-delimiter quoted context) requires a stateful tokenizer — this is the same tokenizer upgrade already required for basic interpolation support.
 
 ### L6. Escape sequences: `\"`, `\\`, `{{`, `}}`
 
@@ -602,17 +603,9 @@ The two-door model with `{expr}` interpolation provides expansion joints for fut
 
 Each domain adds validated string patterns to the typed constant shape matcher — no new keywords, no new grammar, no new doors. The admission rule ensures each new domain's shape is disjoint from existing families. The magnitude restriction (integer-only for temporal) is per-domain — currency might allow `'100.50 USD'` if the backing type accepts decimals.
 
-### Expression subset expansion
+### Grammar headroom
 
-The interpolation grammar already allows any expression inside `{...}`. Expansion is a type-checker restriction lift, not a grammar change:
-
-| Level | What's added | Grammar change needed? |
-|-------|-------------|------------------------|
-| 4. Arithmetic | `{Amount * 2}`, `{Score + Bonus}` | None — operators already parse inside `{...}` |
-| 5. Conditionals | `{if Urgent then "URGENT" else "normal"}` | None — `if...then...else` already parses |
-| 6. Function calls | `{min(A, B)}`, `{round(Rate, 2)}` | None — function calls already parse |
-
-The grammar is future-proof. The type-checker restriction is the safety valve that can be relaxed incrementally.
+The interpolation grammar already parses any expression inside `{...}` — the grammar is future-proof. Adding support for new expression forms (conditionals, function calls) requires only a type-checker change, not a grammar change.
 
 ### New typed constant inhabitants
 
