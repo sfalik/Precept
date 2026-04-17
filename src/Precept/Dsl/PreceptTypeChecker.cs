@@ -92,18 +92,21 @@ internal static class PreceptTypeChecker
         var expressions = new List<PreceptTypeExpressionInfo>();
         var scopes = new List<PreceptTypeScopeInfo>();
 
-        var dataFieldKinds = model.Fields.ToDictionary(
+        IReadOnlyDictionary<string, StaticValueKind> dataFieldKinds = model.Fields.ToDictionary(
             field => field.Name,
             MapFieldContractKind,
             StringComparer.Ordinal);
 
-        // Inject non-negative proof markers for sqrt() compile-time checking.
-        // Fields with nonnegative, positive, or min >= 0 constraints are provably non-negative.
-        foreach (var field in model.Fields)
+        // Replace bespoke constraint-inspection loop with unified narrowing from rules.
+        // Constraints desugar to synthetic rules at parse time (e.g., `positive` → `rule Field > 0`).
+        // Unguarded rules are unconditional proofs; guarded rules are excluded because the
+        // fact only holds when the guard is true.
+        if (model.Rules is not null)
         {
-            if (field.Constraints is not null &&
-                field.Constraints.Any(static c => c is FieldConstraint.Nonnegative or FieldConstraint.Positive or FieldConstraint.Min { Value: >= 0 }))
-                dataFieldKinds[$"$nonneg:{field.Name}"] = StaticValueKind.Boolean;
+            foreach (var rule in model.Rules.Where(r => r.WhenGuard is null))
+            {
+                dataFieldKinds = ApplyNarrowing(rule.Expression, dataFieldKinds, assumeTrue: true);
+            }
         }
 
         var eventArgKinds = model.Events.ToDictionary(
@@ -120,7 +123,8 @@ internal static class PreceptTypeChecker
             StringComparer.Ordinal);
 
         var stateEnsureNarrowings = BuildStateEnsureNarrowings(model, dataFieldKinds);
-        ValidateTransitionRows(model, dataFieldKinds, eventArgKinds, collectionFieldMap, stateEnsureNarrowings, diagnostics, expressions, scopes);
+        var eventEnsureNarrowings = BuildEventEnsureNarrowings(model, eventArgKinds);
+        ValidateTransitionRows(model, dataFieldKinds, eventArgKinds, collectionFieldMap, stateEnsureNarrowings, eventEnsureNarrowings, diagnostics, expressions, scopes);
         ValidateStateActions(model, dataFieldKinds, collectionFieldMap, stateEnsureNarrowings, diagnostics, expressions, scopes);
         ValidateFieldConstraints(model, diagnostics);
         ValidateRules(model, dataFieldKinds, eventArgKinds, diagnostics, expressions, scopes);
@@ -194,6 +198,7 @@ internal static class PreceptTypeChecker
         IReadOnlyDictionary<string, Dictionary<string, StaticValueKind>> eventArgKinds,
         IReadOnlyDictionary<string, PreceptCollectionField> collectionFieldMap,
         IReadOnlyDictionary<string, IReadOnlyDictionary<string, StaticValueKind>> stateEnsureNarrowings,
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, StaticValueKind>> eventEnsureNarrowings,
         List<PreceptValidationDiagnostic> diagnostics,
         List<PreceptTypeExpressionInfo> expressions,
         List<PreceptTypeScopeInfo> scopes)
@@ -220,6 +225,14 @@ internal static class PreceptTypeChecker
                     eventName,
                     model.CollectionFields,
                     stateEnsureNarrowings.TryGetValue(stateGroup.Key, out var stateNarrowing) ? stateNarrowing : null);
+
+                // Merge event ensure narrowings (dotted-form proof markers) into transition-row scope
+                if (eventEnsureNarrowings.TryGetValue(eventName, out var eventNarrowing))
+                {
+                    foreach (var pair in eventNarrowing)
+                        baseSymbols[pair.Key] = pair.Value;
+                }
+
                 scopes.Add(new PreceptTypeScopeInfo(
                     stateGroup.Min(x => x.Row.SourceLine),
                     "transition-base",
@@ -1350,6 +1363,54 @@ internal static class PreceptTypeChecker
         return result;
     }
 
+    private static IReadOnlyDictionary<string, IReadOnlyDictionary<string, StaticValueKind>> BuildEventEnsureNarrowings(
+        PreceptDefinition model,
+        IReadOnlyDictionary<string, Dictionary<string, StaticValueKind>> eventArgKinds)
+    {
+        var result = new Dictionary<string, IReadOnlyDictionary<string, StaticValueKind>>(StringComparer.Ordinal);
+        if (model.EventEnsures is null || model.EventEnsures.Count == 0)
+            return result;
+
+        foreach (var group in model.EventEnsures
+            .Where(static e => e.WhenGuard is null)
+            .GroupBy(static e => e.EventName, StringComparer.Ordinal))
+        {
+            var eventName = group.Key;
+            if (!eventArgKinds.TryGetValue(eventName, out var args))
+                continue;
+
+            // Build bare-name symbol table for the event's args
+            IReadOnlyDictionary<string, StaticValueKind> bareSymbols =
+                new Dictionary<string, StaticValueKind>(args, StringComparer.Ordinal);
+
+            foreach (var eventEnsure in group)
+                bareSymbols = ApplyNarrowing(eventEnsure.Expression, bareSymbols, assumeTrue: true);
+
+            // Translate proof markers from bare form to dotted form for transition-row scope.
+            // Event ensures use bare arg names (e.g. "Days"), but transition rows use dotted names
+            // (e.g. "Submit.Days"). Markers like "$positive:Days" become "$positive:Submit.Days".
+            var dottedMarkers = new Dictionary<string, StaticValueKind>(StringComparer.Ordinal);
+            foreach (var pair in bareSymbols)
+            {
+                if (pair.Key.Length == 0 || pair.Key[0] != '$')
+                    continue;
+
+                var colonIndex = pair.Key.IndexOf(':');
+                if (colonIndex < 0)
+                    continue;
+
+                var prefix = pair.Key.AsSpan(0, colonIndex + 1);  // e.g. "$positive:"
+                var fieldName = pair.Key.AsSpan(colonIndex + 1);  // e.g. "Days"
+                dottedMarkers[$"{prefix}{eventName}.{fieldName}"] = pair.Value;
+            }
+
+            if (dottedMarkers.Count > 0)
+                result[eventName] = dottedMarkers;
+        }
+
+        return result;
+    }
+
     private static Dictionary<string, StaticValueKind> BuildSymbolKinds(
         IReadOnlyDictionary<string, StaticValueKind> dataFieldKinds,
         IReadOnlyDictionary<string, Dictionary<string, StaticValueKind>> eventArgKinds,
@@ -1418,6 +1479,16 @@ internal static class PreceptTypeChecker
                 StateContext = stateContext
             });
             return;
+        }
+
+        // Collect any non-blocking warnings from inference (e.g., C93 unproven divisor).
+        if (diagnostic is not null)
+        {
+            diagnostics.Add(diagnostic with
+            {
+                Line = sourceLine > 0 ? sourceLine : diagnostic.Line,
+                StateContext = stateContext
+            });
         }
 
         if (IsAssignable(actualKind, expectedKind))
@@ -1824,16 +1895,19 @@ internal static class PreceptTypeChecker
                     PreceptLiteralExpression { Value: double dval } => dval >= 0,
                     PreceptLiteralExpression { Value: decimal mval } => mval >= 0,
                     PreceptFunctionCallExpression { Name: "abs" } => true,
-                    PreceptIdentifierExpression idArg => symbols.ContainsKey($"$nonneg:{idArg.Name}"),
+                    PreceptIdentifierExpression idArg when TryGetIdentifierKey(idArg, out var idKey) =>
+                        symbols.ContainsKey($"$nonneg:{idKey}") || symbols.ContainsKey($"$positive:{idKey}"),
                     _ => false,
                 };
 
                 if (!isNonNeg)
                 {
-                    var argName = arg is PreceptIdentifierExpression nid ? nid.Name : "argument";
+                    var argName = arg is PreceptIdentifierExpression nid
+                        ? (nid.Member is null ? nid.Name : $"{nid.Name}.{nid.Member}")
+                        : "argument";
                     diagnostic = new PreceptValidationDiagnostic(
                         DiagnosticCatalog.C76,
-                        $"sqrt() requires a non-negative argument. '{argName}' may be negative. Add a 'nonnegative' constraint or guard with '{argName} >= 0 and ...'.",
+                        $"sqrt() requires a non-negative argument. '{argName}' may be negative. Add a 'nonnegative' constraint, 'rule {argName} >= 0', state/event 'ensure', or guard with '{argName} >= 0'.",
                         0);
                     return false;
                 }
@@ -1986,6 +2060,51 @@ internal static class PreceptTypeChecker
                     return false;
                 }
 
+                // SYNC:CONSTRAINT:C92 — literal zero divisor
+                // SYNC:CONSTRAINT:C93 — unproven divisor safety
+                // Principle #8 ("never guess"): C92 is error (literal zero — provably wrong).
+                // C93 is error (unproven divisor — risks IEEE 754 Infinity/NaN at runtime).
+                // Two-tier: C92 = proven contradiction, C93 = unproven nonzero gap.
+                if (binary.Operator is "/" or "%")
+                {
+                    if (TryGetNumericLiteral(binary.Right, out var divisorValue))
+                    {
+                        if (divisorValue == 0.0)
+                        {
+                            diagnostic = new PreceptValidationDiagnostic(
+                                DiagnosticCatalog.C92,
+                                "Division by zero: the divisor is literal 0.",
+                                0);
+                            return false;
+                        }
+                        // Non-zero literal — safe, no diagnostic
+                    }
+                    else if (TryGetIdentifierKey(binary.Right, out var key))
+                    {
+                        if (!symbols.ContainsKey($"$nonzero:{key}") && !symbols.ContainsKey($"$positive:{key}"))
+                        {
+                            var name = key;
+                            if (symbols.ContainsKey($"$nonneg:{key}"))
+                            {
+                                // Context-aware: field is nonnegative but not nonzero
+                                diagnostic = new PreceptValidationDiagnostic(
+                                    DiagnosticCatalog.C93,
+                                    $"Divisor '{name}' is nonnegative but not nonzero — 'nonnegative' allows zero. Consider 'positive' instead.",
+                                    0);
+                            }
+                            else
+                            {
+                                // Generic: no proof at all
+                                diagnostic = new PreceptValidationDiagnostic(
+                                    DiagnosticCatalog.C93,
+                                    $"Divisor '{name}' has no compile-time nonzero proof. Consider adding a 'positive' constraint, 'rule {name} != 0', or 'when {name} != 0' guard.",
+                                    0);
+                            }
+                        }
+                    }
+                    // Compound expressions (binary, function calls, etc.) — no diagnostic (Principle #8 conservatism)
+                }
+
                 kind = binary.Operator is ">" or ">=" or "<" or "<="
                     ? StaticValueKind.Boolean
                     : ResolveNumericResultKind(leftKind, rightKind);
@@ -2117,16 +2236,27 @@ internal static class PreceptTypeChecker
         if (binary.Operator == "or")
         {
             if (assumeTrue)
+            {
+                // SOUNDNESS: This proof is sound ONLY because C42 independently prevents null fields
+                // from reaching arithmetic. If C42 is ever relaxed for nullable arithmetic, this
+                // decomposition becomes unsound.
+                if (TryDecomposeNullOrPattern(binary, symbols, out var decomposed))
+                    return decomposed;
                 return symbols;
+            }
 
             var leftNarrowed = ApplyNarrowing(binary.Left, symbols, assumeTrue: false);
             return ApplyNarrowing(binary.Right, leftNarrowed, assumeTrue: false);
         }
 
-        return binary.Operator is "==" or "!=" &&
-               TryApplyNullComparisonNarrowing(binary, symbols, assumeTrue, out var narrowed)
-            ? narrowed
-            : symbols;
+        if (binary.Operator is "==" or "!=" &&
+            TryApplyNullComparisonNarrowing(binary, symbols, assumeTrue, out var nullNarrowed))
+            return nullNarrowed;
+
+        if (TryApplyNumericComparisonNarrowing(binary, symbols, assumeTrue, out var numericNarrowed))
+            return numericNarrowed;
+
+        return symbols;
     }
 
     private static bool TryApplyNullComparisonNarrowing(
@@ -2173,6 +2303,226 @@ internal static class PreceptTypeChecker
             [key] = updatedKind
         };
         return true;
+    }
+
+    private static bool TryApplyNumericComparisonNarrowing(
+        PreceptBinaryExpression binary,
+        IReadOnlyDictionary<string, StaticValueKind> symbols,
+        bool assumeTrue,
+        out IReadOnlyDictionary<string, StaticValueKind> result)
+    {
+        result = symbols;
+
+        if (!assumeTrue)
+            return false;
+
+        if (binary.Operator is not (">" or ">=" or "<" or "<=" or "!=" or "=="))
+            return false;
+
+        bool leftIsId = TryGetIdentifierKey(binary.Left, out var leftKey);
+        bool rightIsId = TryGetIdentifierKey(binary.Right, out var rightKey);
+        bool leftIsLit = TryGetNumericLiteral(binary.Left, out var leftVal);
+        bool rightIsLit = TryGetNumericLiteral(binary.Right, out var rightVal);
+
+        string key;
+        double lit;
+        string op;
+
+        if (leftIsId && rightIsLit)
+        {
+            key = leftKey;
+            lit = rightVal;
+            op = binary.Operator;
+        }
+        else if (rightIsId && leftIsLit)
+        {
+            key = rightKey;
+            lit = leftVal;
+            op = FlipComparisonOperator(binary.Operator);
+        }
+        else
+        {
+            return false;
+        }
+
+        // Canonicalized: key <op> lit
+        var markers = new Dictionary<string, StaticValueKind>(symbols, StringComparer.Ordinal);
+        bool injected = false;
+
+        if (op == ">" && lit >= 0)
+        {
+            markers[$"$positive:{key}"] = StaticValueKind.Boolean;
+            markers[$"$nonneg:{key}"] = StaticValueKind.Boolean;
+            markers[$"$nonzero:{key}"] = StaticValueKind.Boolean;
+            injected = true;
+        }
+        else if (op == ">=" && lit > 0)
+        {
+            markers[$"$positive:{key}"] = StaticValueKind.Boolean;
+            markers[$"$nonneg:{key}"] = StaticValueKind.Boolean;
+            markers[$"$nonzero:{key}"] = StaticValueKind.Boolean;
+            injected = true;
+        }
+        else if (op == ">=" && lit == 0)
+        {
+            markers[$"$nonneg:{key}"] = StaticValueKind.Boolean;
+            injected = true;
+        }
+        else if (op == "!=" && lit == 0)
+        {
+            markers[$"$nonzero:{key}"] = StaticValueKind.Boolean;
+            injected = true;
+        }
+        else if (op == "<" && lit <= 0)
+        {
+            markers[$"$nonzero:{key}"] = StaticValueKind.Boolean;
+            injected = true;
+        }
+
+        if (!injected)
+            return false;
+
+        result = markers;
+        return true;
+    }
+
+    /// <summary>
+    /// Recognizes <c>Field == null or Field > 0</c> (or reversed ordering) produced by MaybeNullGuard
+    /// for nullable fields with numeric constraints, and extracts the numeric proof from the non-null branch.
+    /// </summary>
+    private static bool TryDecomposeNullOrPattern(
+        PreceptBinaryExpression binary,
+        IReadOnlyDictionary<string, StaticValueKind> symbols,
+        out IReadOnlyDictionary<string, StaticValueKind> result)
+    {
+        result = symbols;
+
+        if (binary.Operator != "or")
+            return false;
+
+        // Try both orderings: left=null-check + right=numeric, or left=numeric + right=null-check
+        var left = StripParentheses(binary.Left);
+        var right = StripParentheses(binary.Right);
+
+        if (TryDecomposeOrdered(left, right, symbols, out result))
+            return true;
+        if (TryDecomposeOrdered(right, left, symbols, out result))
+            return true;
+
+        return false;
+
+        static bool TryDecomposeOrdered(
+            PreceptExpression nullCandidate,
+            PreceptExpression numericCandidate,
+            IReadOnlyDictionary<string, StaticValueKind> syms,
+            out IReadOnlyDictionary<string, StaticValueKind> res)
+        {
+            res = syms;
+
+            // Null-check branch: Field == null or null == Field
+            if (nullCandidate is not PreceptBinaryExpression { Operator: "==" } nullBinary)
+                return false;
+
+            bool leftIsNull = IsNullLiteral(nullBinary.Left);
+            bool rightIsNull = IsNullLiteral(nullBinary.Right);
+            if (!leftIsNull && !rightIsNull)
+                return false;
+
+            // Both sides are null → no numeric proof to extract
+            if (leftIsNull && rightIsNull)
+                return false;
+
+            var nullSideIdExpr = leftIsNull ? nullBinary.Right : nullBinary.Left;
+            if (!TryGetIdentifierKey(nullSideIdExpr, out var nullFieldKey))
+                return false;
+
+            // Numeric branch — could be a direct comparison or a compound 'and'
+            var stripped = StripParentheses(numericCandidate);
+
+            if (stripped is PreceptBinaryExpression { Operator: "and" } andBinary)
+            {
+                // Compound: Field == null or (Field >= 0 and Field < 100)
+                // Recurse into each 'and' operand to accumulate markers
+                var accumulated = new Dictionary<string, StaticValueKind>(syms, StringComparer.Ordinal);
+                bool anyInjected = false;
+
+                foreach (var operand in new[] { andBinary.Left, andBinary.Right })
+                {
+                    // Verify same-field identity
+                    if (!TryGetNumericBranchFieldKey(operand, out var andKey) || andKey != nullFieldKey)
+                        continue;
+
+                    var narrowed = ApplyNarrowing(operand, accumulated, assumeTrue: true);
+                    if (!ReferenceEquals(narrowed, accumulated))
+                    {
+                        accumulated = new Dictionary<string, StaticValueKind>(narrowed, StringComparer.Ordinal);
+                        anyInjected = true;
+                    }
+                }
+
+                if (!anyInjected)
+                    return false;
+
+                res = accumulated;
+                return true;
+            }
+
+            // Direct comparison: Field == null or Field > 0
+            if (!TryGetNumericBranchFieldKey(stripped, out var numericFieldKey))
+                return false;
+
+            // Same-field identity check: prevent unsound cross-field decomposition
+            if (numericFieldKey != nullFieldKey)
+                return false;
+
+            var result = ApplyNarrowing(stripped, syms, assumeTrue: true);
+            if (ReferenceEquals(result, syms))
+                return false;
+
+            res = result;
+            return true;
+        }
+
+        static bool TryGetNumericBranchFieldKey(PreceptExpression expr, out string key)
+        {
+            key = string.Empty;
+            var stripped = StripParentheses(expr);
+            if (stripped is not PreceptBinaryExpression cmp)
+                return false;
+
+            if (TryGetIdentifierKey(cmp.Left, out key))
+                return true;
+            if (TryGetIdentifierKey(cmp.Right, out key))
+                return true;
+
+            return false;
+        }
+    }
+
+    private static string FlipComparisonOperator(string op) => op switch
+    {
+        "<" => ">",
+        "<=" => ">=",
+        ">" => "<",
+        ">=" => "<=",
+        _ => op // == and != are symmetric
+    };
+
+    private static bool TryGetNumericLiteral(PreceptExpression expr, out double value)
+    {
+        var stripped = StripParentheses(expr);
+        if (stripped is PreceptLiteralExpression { Value: long l })
+        {
+            value = (double)l;
+            return true;
+        }
+        if (stripped is PreceptLiteralExpression { Value: double d })
+        {
+            value = d;
+            return true;
+        }
+        value = 0;
+        return false;
     }
 
     private static void ValidateCollectionMutations(

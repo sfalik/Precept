@@ -598,8 +598,8 @@ public static class DiagnosticCatalog
     /// <summary>sqrt() requires a non-negative argument proof.</summary>
     public static readonly LanguageConstraint C76 = Register(
         "C76", "compile",
-        "sqrt() requires a non-negative argument. Add a 'nonnegative' constraint or guard with '>= 0'.",
-        "sqrt() requires a non-negative argument. '{arg}' may be negative. Add a 'nonnegative' constraint or guard with '{arg} >= 0 and ...'.");
+        "sqrt() requires a non-negative argument. Add a 'nonnegative' constraint, 'rule Field >= 0', state/event 'ensure', or guard with '>= 0'.",
+        "sqrt() requires a non-negative argument. '{arg}' may be negative. Add a 'nonnegative' constraint, 'rule {arg} >= 0', state/event 'ensure', or guard with '{arg} >= 0'.");
 
     /// <summary>Function does not accept nullable arguments.</summary>
     public static readonly LanguageConstraint C77 = Register(
@@ -695,4 +695,22 @@ public static class DiagnosticCatalog
         "C88", "compile",
         "Computed field cannot be assigned via set.",
         "'{fieldName}' is a computed field and cannot be assigned. Its value is always derived from: {expression}.");
+
+    // ═══════════════════════════════════════════════════════════════
+    // Compile-phase constraints: divisor safety (C92–C93)
+    // ═══════════════════════════════════════════════════════════════
+
+    /// <summary>Division by zero: the divisor is literal 0.</summary>
+    // SYNC:CONSTRAINT:C92
+    public static readonly LanguageConstraint C92 = Register(
+        "C92", "compile",
+        "Division by zero: the divisor is literal 0.",
+        "Division by zero: the divisor is literal 0.");
+
+    /// <summary>Divisor has no compile-time nonzero proof.</summary>
+    // SYNC:CONSTRAINT:C93
+    public static readonly LanguageConstraint C93 = Register(
+        "C93", "compile",
+        "Divisor has no compile-time nonzero proof.",
+        "{message}");
 }

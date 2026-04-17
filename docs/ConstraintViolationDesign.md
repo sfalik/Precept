@@ -648,7 +648,7 @@ Compile-phase and parse-phase diagnostics (DSL validity checks) use a separate v
 | C73 / PRECEPT073 | compile | Error | Function argument type mismatch. A specific parameter expects one type but received another. Message identifies the parameter and the expected vs. actual types. |
 | C74 / PRECEPT074 | compile | Error | `round()` precision argument must be a non-negative integer literal. The second argument to `round(value, places)` cannot be a field reference or expression — it must be a compile-time constant like `2`. |
 | C75 / PRECEPT075 | compile | Error | `pow()` exponent must be integer type. The second argument to `pow(base, exponent)` must resolve to `integer`, not `number` or `decimal`. This ensures totality — integer exponentiation always produces a finite result. |
-| C76 / PRECEPT076 | compile | Error | `sqrt()` requires a non-negative argument. The argument may be negative at runtime. Add a `nonnegative` constraint to the field, or guard the expression with `field >= 0 and ...`. Also accepted: literal values ≥ 0 and `abs()` results. |
+| C76 / PRECEPT076 | compile | Error | `sqrt()` requires a non-negative argument. The argument may be negative at runtime. Proof sources: `nonnegative` or `positive` constraint, `rule Field >= 0`, state/event `ensure`, or `when` guard with `>= 0`. Also accepted: literal values ≥ 0 and `abs()` results. |
 | C77 / PRECEPT077 | compile | Error | Function does not accept nullable arguments. The argument may be null at runtime. Add a null check (e.g., `field != null and ...`) before calling the function. Same pattern as C56 for string `.length`. |
 | C78 / PRECEPT078 | compile | Error | Conditional expression condition must be a boolean expression. The `if` clause evaluates to a non-boolean type. |
 | C79 / PRECEPT079 | compile | Error | Conditional expression branches must produce the same scalar type. The `then` and `else` branches return different types. |
@@ -661,6 +661,8 @@ Compile-phase and parse-phase diagnostics (DSL validity checks) use a separate v
 | C86 / PRECEPT086 | compile | Error | Circular dependency detected among computed fields. The cycle path is included in the message (e.g., "A → B → A"). |
 | C87 / PRECEPT087 | compile | Error | Computed field cannot appear in edit declarations. Computed fields are read-only — the formula is the only authority on the field's value. |
 | C88 / PRECEPT088 | compile | Error | Computed field cannot be assigned via set. Its value is always derived from the declared expression. |
+| C92 / PRECEPT092 | compile | Error | Division by zero: the divisor is literal `0`. The compiler proves the divisor is always zero — this is unconditionally wrong. |
+| C93 / PRECEPT093 | compile | Error | Divisor has no compile-time nonzero proof. Context-aware variant: if the field is `nonnegative`, the message explains that `nonnegative` allows zero and suggests `positive` instead. Generic variant suggests adding a `positive` constraint, `rule Field != 0`, or `when Field != 0` guard. See `PreceptLanguageDesign.md` § Divisor safety for proof sources. |
 
 **Distinction from runtime violations:** These are compile-time diagnostics, not runtime `ConstraintViolation` objects. They are reported during `PreceptCompiler.CompileFromText()` and surfaced via the language server (squiggles), MCP `precept_compile`, and CLI. They do not produce `ConstraintViolation` instances.
 

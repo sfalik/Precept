@@ -327,6 +327,56 @@ public class PreceptExpressionRuntimeEvaluatorBehaviorTests
         ex.Message.Should().Contain("PRECEPT041");
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // Float division/modulo by zero — NaN/Infinity guard
+    // ═══════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Evaluator_FloatDivisionByZero_Fails()
+    {
+        var expr = new PreceptBinaryExpression(
+            "/",
+            new PreceptIdentifierExpression("Numerator"),
+            new PreceptIdentifierExpression("Divisor"));
+
+        var context = new Dictionary<string, object?> { ["Numerator"] = 4.5, ["Divisor"] = 0.0 };
+        var result = PreceptExpressionRuntimeEvaluator.Evaluate(expr, context);
+
+        result.Success.Should().BeFalse();
+        result.Error.Should().Contain("division by zero");
+    }
+
+    [Fact]
+    public void Evaluator_FloatModuloByZero_Fails()
+    {
+        var expr = new PreceptBinaryExpression(
+            "%",
+            new PreceptIdentifierExpression("Numerator"),
+            new PreceptIdentifierExpression("Divisor"));
+
+        var context = new Dictionary<string, object?> { ["Numerator"] = 4.5, ["Divisor"] = 0.0 };
+        var result = PreceptExpressionRuntimeEvaluator.Evaluate(expr, context);
+
+        result.Success.Should().BeFalse();
+        result.Error.Should().Contain("modulo by zero");
+    }
+
+    [Fact]
+    public void Evaluator_MixedIntFloatDivisionByZero_Fails()
+    {
+        // Integer numerator with float zero divisor — hits the TryToNumber path
+        var expr = new PreceptBinaryExpression(
+            "/",
+            new PreceptIdentifierExpression("Numerator"),
+            new PreceptIdentifierExpression("Divisor"));
+
+        var context = new Dictionary<string, object?> { ["Numerator"] = 4L, ["Divisor"] = 0.0 };
+        var result = PreceptExpressionRuntimeEvaluator.Evaluate(expr, context);
+
+        result.Success.Should().BeFalse();
+        result.Error.Should().Contain("division by zero");
+    }
+
     private static string BuildDslForSet(string declarations, string targetField, string expression)
     {
         var normalizedDeclarations = ConvertToNewSyntaxFields(declarations);

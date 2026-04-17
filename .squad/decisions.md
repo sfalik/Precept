@@ -7073,6 +7073,34 @@ Reviewed issues `#8` through `#13` and added architectural comments directly on 
    - `#11` Event argument absorb shorthand
 3. **Last wave / explicit architectural review required**
    - `#12` Inline guarded fallback (`else reject`)
+
+---
+
+### 2026-04-17: Shane — Scope lock on Issue #106
+**By:** Shane (owner directive)
+**Status:** Standing directive
+
+Issue #106 (compile-time divisor safety) must be implemented completely as scoped. The team must check with Shane before removing any scope or altering the implementation approach. No retreat to a simpler design without explicit approval.
+
+---
+
+### 2026-04-17: Frank — Compile-time divisor safety design investigation
+**By:** Frank (Lead/Architect)
+**Status:** Investigation complete — implemented in Issue #106
+
+Key design insight: constraints desugar to synthetic rules at parse time. A `field Rate as number positive` and an explicit `rule Rate > 0` produce structurally identical expression trees. The old `$nonneg:` proof-marker system for sqrt() bypassed this by inspecting constraint objects directly, creating two parallel proof paths. The unified approach extends `ApplyNarrowing` to recognize numeric comparison patterns from any source (constraint keyword, explicit rule, `when` guard, state `ensure`), replacing all proof markers with a single narrowing mechanism.
+
+New diagnostics: C92 (division by potentially-zero operand), C93 (modulo by potentially-zero operand). Proof strategies: `positive` constraint, `ensure` block, `when` guard narrowing divisor away from zero. sqrt C76 reworked to use the same unified system.
+
+---
+
+### 2026-04-17: Frank — Collection defaults: fix immediately; bracket syntax for choice: reject
+**By:** Frank (Lead/Architect)
+**Status:** Investigation complete — awaiting owner decision
+
+**Proposal 1 (Collection defaults): YES — fix immediately.** The language documents and parses `default ["a", "b"]` on collection fields, but `PreceptCollectionField` lacks a `DefaultValues` property and the runtime always initializes collections as empty. This is a documentation-to-implementation gap, not a new feature. Parser accepts the syntax, model discards it. Zero of 25 samples exercise it. Fix: add `DefaultValues` to model, store parsed values, seed in `BuildInitialInstanceData`.
+
+**Proposal 2 (Bracket syntax for choice): NO — do not adopt.** `choice(...)` is consistent with function-call syntax (`round(...)`) and reads as type construction. `choice[...]` reads as array subscripting — a false cognate for 90%+ of developers. Adopting both proposals creates visual ambiguity on `set of choice(...)` fields where brackets would appear in two positions with two different meanings on the same line. The `(...)` vs `[...]` distinction carries meaning: parentheses = invocation/type construction, brackets = value literal. Breaking change with zero expressiveness gain.
    - `#13` Field-level range/basic constraints
 
 ## Architectural conclusions

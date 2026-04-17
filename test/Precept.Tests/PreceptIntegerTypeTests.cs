@@ -445,7 +445,7 @@ public class PreceptIntegerTypeTests
         const string dsl = """
             precept M
             field A as integer default 5
-            field B as integer default 2
+            field B as integer default 2 positive
             field Quotient as integer default 0
             state S initial
             event Divide
@@ -492,7 +492,7 @@ public class PreceptIntegerTypeTests
         const string dsl = """
             precept M
             field A as integer default 7
-            field B as integer default 3
+            field B as integer default 3 positive
             field Remainder as integer default 0
             state S initial
             event Mod

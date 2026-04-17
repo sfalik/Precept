@@ -520,6 +520,53 @@ public class PreceptBuiltInFunctionTests
         validation.Diagnostics.Where(d => d.Constraint.Id == "C76").Should().BeEmpty();
     }
 
+    [Fact]
+    public void TypeChecker_C76_SqrtWithRuleProof_NoDiagnostic()
+    {
+        var dsl = "precept Test\nfield X as number default 0\nrule X >= 0 because \"non-negative\"\nstate A initial\nstate B\nevent Go\nfrom A on Go when sqrt(X) > 0 -> no transition\n";
+        var model = PreceptParser.Parse(dsl);
+        var validation = PreceptCompiler.Validate(model);
+        validation.Diagnostics.Where(d => d.Constraint.Id == "C76").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void TypeChecker_C76_SqrtWithStateEnsureProof_NoDiagnostic()
+    {
+        var dsl = "precept Test\nfield X as number default 0\nstate Active initial\nstate Done\nevent Go\nin Active ensure X >= 0 because \"non-negative\"\nfrom Active on Go when sqrt(X) > 0 -> no transition\n";
+        var model = PreceptParser.Parse(dsl);
+        var validation = PreceptCompiler.Validate(model);
+        validation.Diagnostics.Where(d => d.Constraint.Id == "C76").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void TypeChecker_C76_SqrtWithGuardProof_NoDiagnostic()
+    {
+        var dsl = "precept Test\nfield X as number default 0\nfield Result as number default 0\nstate Active initial\nstate Done\nevent Calc\nfrom Active on Calc when X >= 0 -> set Result = sqrt(X) -> no transition\n";
+        var model = PreceptParser.Parse(dsl);
+        var validation = PreceptCompiler.Validate(model);
+        validation.Diagnostics.Where(d => d.Constraint.Id == "C76").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void TypeChecker_C76_SqrtDottedArgWithEventEnsure_NoDiagnostic()
+    {
+        var dsl = "precept Test\nfield Result as number default 0\nstate Draft initial\nstate Done\nevent Submit with Val as number\non Submit ensure Val >= 0 because \"non-negative\"\nfrom Draft on Submit -> set Result = sqrt(Submit.Val) -> no transition\n";
+        var model = PreceptParser.Parse(dsl);
+        var validation = PreceptCompiler.Validate(model);
+        validation.Diagnostics.Where(d => d.Constraint.Id == "C76").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void TypeChecker_C76_SqrtDottedArgWithoutProof_EmitsC76()
+    {
+        var dsl = "precept Test\nfield Result as number default 0\nstate Draft initial\nstate Done\nevent Submit with Val as number\nfrom Draft on Submit -> set Result = sqrt(Submit.Val) -> no transition\n";
+        var model = PreceptParser.Parse(dsl);
+        var validation = PreceptCompiler.Validate(model);
+        var c76 = validation.Diagnostics.Where(d => d.Constraint.Id == "C76").ToList();
+        c76.Should().ContainSingle();
+        c76[0].Message.Should().Contain("Submit.Val");
+    }
+
     // ─── Functions in rule and ensure contexts ─────────────────
 
     [Fact]
