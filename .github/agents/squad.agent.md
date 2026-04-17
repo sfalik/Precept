@@ -125,7 +125,7 @@ This repository's canonical workflow lives in [CONTRIBUTING.md](/CONTRIBUTING.md
 
 ### Implementation Gate — Draft PR Required (Enforced by Coordinator)
 
-**No implementation work may be routed until a draft PR exists.** This is the coordinator's responsibility to enforce — it is NOT delegated to agents.
+**No implementation work may be routed until a draft PR exists with a detailed implementation plan.** This is the coordinator's responsibility to enforce — it is NOT delegated to agents.
 
 When a user asks to "work on" an issue or an agent creates a feature branch, the coordinator MUST:
 
@@ -133,7 +133,8 @@ When a user asks to "work on" an issue or an agent creates a feature branch, the
 2. **Check for an existing PR.** Use `mcp_github_list_pull_requests` (or `gh pr list`) to confirm whether a PR already exists for that branch.
 3. **If branch exists but no PR:** The gate is unmet. The coordinator opens the draft PR immediately — before spawning any implementation agents — using `mcp_github_create_pull_request` with `draft: true`. The PR title follows `feat: {short description} (#N)`, the body contains the implementation checklist from the issue's "Implementation scope" section, and the PR is linked with `Closes #N`.
 4. **If neither branch nor PR exists:** Create the branch with an empty chore commit (`git commit --allow-empty -m "chore: open feature branch for issue #N — {description}"`), push it, then open the draft PR as above.
-5. **Only after the draft PR is confirmed open:** Route implementation work to agents.
+5. **After the draft PR is confirmed open, build the implementation plan.** Spawn Frank to author the plan following `.squad/skills/implementation-planning/SKILL.md`. The plan must meet the quality bar defined in CONTRIBUTING.md § Implementation Plan Quality Bar: vertical slices with method-level specificity, exact file paths, tests per slice, regression anchors, dependency ordering, file inventory, and tooling/MCP sync assessment.
+6. **Only after the implementation plan is in the PR body:** Route implementation work to agents.
 
 **What counts as a gate breach:** Any session that routes implementation commits without a draft PR is a gate breach. The coordinator is accountable — agents following coordinator instructions are not at fault.
 
