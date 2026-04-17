@@ -7121,6 +7121,54 @@ New diagnostics: C92 (division by potentially-zero operand), C93 (modulo by pote
 
 ---
 
+### 2026-04-17: Frank — Comprehensive design doc review: literal + temporal type system
+**By:** Frank (Lead/Architect & Language Designer)
+**Status:** Review complete — approved with conditions
+
+Full architecture review of `docs/LiteralSystemDesign.md`, `docs/TemporalTypeSystemDesign.md`, and the related forward references in `docs/PreceptLanguageDesign.md`.
+
+**Verdict:** APPROVED WITH CONDITIONS.
+
+**Blocker:**
+- Decision #4 in `docs/TemporalTypeSystemDesign.md` still contains stale three-door language and must be rewritten to match the locked two-door model plus the type-family admission rule.
+
+**Warnings:**
+- UTC shape coverage remains incomplete.
+- Duration min/max constraints still have an uncovered design gap.
+- Nonnegative temporal constraint desugaring needs an explicit spec.
+- Some grammar-facing text still reads as forward-looking instead of locked scope.
+- The docs need a teachable error path for `date + period` style misuse.
+
+**Locked assessment:**
+- The two-door model is sound.
+- The type-family admission rule is correctly framed.
+- Cross-document coherence is strong across the literal system and temporal type system docs.
+- The locked-decision rationale quality is high: the review found 35 locked decisions with complete rationale structure.
+
+---
+
+### 2026-04-14: George — NodaTime exception surface audit results
+**By:** George (Runtime Dev)
+**Status:** Research finding captured — design decisions still required
+
+Systematic audit of all 8 NodaTime-backed temporal types identified 47 exception paths across the proposed temporal surface.
+
+**Findings:**
+- 29 exception paths are already mitigated by the current proposal shape.
+- 15 edge cases are accepted as intentional limits.
+- 4 gaps remain unresolved: 3 duration division-by-zero paths and 1 timezone ID validation path.
+
+**Required decisions:**
+1. **Duration division by zero:** if duration division ships, literal zero divisors should be rejected at compile time and dynamic zero divisors should fail with a Precept-native runtime error rather than leaking raw NodaTime exceptions.
+2. **Timezone ID validation:** literal timezone identifiers should validate at compile time and dynamic timezone inputs should validate at ingestion boundaries.
+
+**Recommendation:**
+- Adopt compile-time plus runtime guard coverage for both gaps rather than removing the surface area entirely.
+
+**Research artifact:** `research/language/expressiveness/nodatime-exception-surface-audit.md`
+
+---
+
 # Steinbrenner — Language Proposal Intake
 
 **Date:** 2026-04-05

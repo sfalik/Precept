@@ -99,6 +99,15 @@
 - Key proposal changes: 6 signature updates, new locked decision #8, exclusion rewrite, new semantic rule, teachable error message, acceptance criteria updates, 3-arg example.
 - Decision filed: `.squad/decisions/inbox/frank-variadic-min-max.md`
 
+### 2026-04-17 — Comprehensive Design Doc Review: Literal + Temporal Type System
+- **Scope:** Full architecture review of `docs/LiteralSystemDesign.md` (new, ~696 lines), `docs/TemporalTypeSystemDesign.md` (heavily updated, ~1600 lines), and `docs/PreceptLanguageDesign.md` (minor changes).
+- **VERDICT: APPROVED WITH CONDITIONS.** One blocker, five warnings, eight positive callouts.
+- **B1 (Blocker):** Decision #4 in TemporalTypeSystemDesign.md contains two stale elements from the three-door era: (1) "three literal mechanisms" including `N unit` as a separate mechanism — should be two-door, (2) "content shape is distinguishable" — should be the type-family admission rule. Locked decision text contradicts the two-door model it claims to support.
+- **Architecture assessment:** Two-door model is sound. Type-family admission rule is well-formulated. Shape signal disjointness holds for all 8 current inhabitants. Cross-doc consistency is strong — 35 locked decisions (28 temporal + 7 literal) all have complete 4-point rationale.
+- **Design principles compliance:** Both docs align with all 12 design principles. Principle #3 ("no curly braces") creates the unique structural advantage for `{expr}` interpolation — well-articulated.
+- **Grammar/completions sync assessment produced:** 6 grammar changes, 10 completions changes identified for implementation. Both docs correctly document implementation scope.
+- **Key files:** `docs/LiteralSystemDesign.md`, `docs/TemporalTypeSystemDesign.md`, `docs/PreceptLanguageDesign.md`
+
 ## Recent Updates
 
 ### 2026-04-15 — Temporal Conversion Function Naming Analysis

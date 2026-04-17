@@ -256,6 +256,17 @@ Complete spec written covering all 4 forms and 19 change sites across 5 files. F
 - Recommended reframe: drop tautological rules, add explicit "events forbidden in stateless" as a new type-checker diagnostic.
 
 ### 2026-04-08 - Language research corpus completed
+
+### 2026-04-17 — NodaTime alignment review of temporal design docs
+- Reviewed `docs/LiteralSystemDesign.md`, `docs/TemporalTypeSystemDesign.md`, `docs/PreceptLanguageDesign.md`, and `research/language/references/nodatime-type-model.md` for API accuracy and implementation feasibility.
+- Confirmed core NodaTime surface claims: `LocalDate ± Period`, `LocalTime ± Period` with time-only restriction, `LocalDateTime ± Period`, `Instant ± Duration`, `ZonedDateTime ± Duration`, and `Period.Between(...)` forms are documented against the right native APIs.
+- Found four material review risks: (1) `time + duration` is documented as a custom bridge even though faithful NodaTime exposure is a stated design goal, and the type-interaction matrix omits that operator; (2) DST overlap text says lenient resolution maps to the later instant, but NodaTime lenient mapping uses the earlier ambiguous instant and shifts skipped values forward; (3) MCP serialization text mixes three incompatible stories for `ZonedDateTime`/temporal JSON (automatic converter strings, all-values-as-strings, and custom `{ instant, timezone }` objects); (4) the proposal promotes `timezone`/`zoneddatetime` even though the repo's prior NodaTime research marks them out of scope for deterministic entity modeling.
+- Implementation-feasibility conclusion: the design is implementable, but the docs understate the true scope. This is not just parser/runtime work; it also reaches diagnostics, hover/completions, literal-family inference, MCP boundary parsing, and philosophy alignment.
+
+## Learnings
+
+- For temporal design reviews, always cross-check DST resolver claims against the actual NodaTime mapping API. "Lenient" is deterministic, but its overlap behavior is easy to misremember.
+- If docs claim thin automatic STJ serialization, any custom wire shape for `ZonedDateTime` or provider-driven parse path must be called out explicitly as custom serialization, not described as converter-default behavior.
 - George's type-system lane now sits inside a finished language research corpus: Batch 1/2 evidence landed in `54a77da` and `48860ae`, and the closing corpus/index sweep landed in `3cc5343`.
 - Final bookkeeping preserved the domain-first indexes so the type-system survey and semantics work stay grounded in research docs rather than being pushed back into proposal-body edits.
 
