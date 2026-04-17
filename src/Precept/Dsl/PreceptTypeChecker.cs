@@ -334,6 +334,9 @@ internal static class PreceptTypeChecker
                                 assignment.SourceLine > 0 ? assignment.SourceLine : row.SourceLine,
                                 StateContext: item.State));
                         }
+
+                        // Layer 1: thread post-assignment proof state into subsequent assignments.
+                        setSymbols = ApplyAssignmentNarrowing(assignment.Key, assignment.Expression, setSymbols);
                     }
 
                     ValidateCollectionMutations(
@@ -401,6 +404,9 @@ internal static class PreceptTypeChecker
                 new Dictionary<string, StaticValueKind>(baseSymbols, StringComparer.Ordinal),
                 action.State));
 
+            // Layer 1: thread post-assignment proof state into subsequent assignments.
+            IReadOnlyDictionary<string, StaticValueKind> assignmentSymbols = baseSymbols;
+
             foreach (var assignment in action.SetAssignments)
             {
                 if (!dataFieldKinds.TryGetValue(assignment.Key, out var targetKind))
@@ -410,7 +416,7 @@ internal static class PreceptTypeChecker
                     assignment.Expression,
                     assignment.ExpressionText,
                     assignment.SourceLine > 0 ? assignment.SourceLine : action.SourceLine,
-                    baseSymbols,
+                    assignmentSymbols,
                     targetKind,
                     $"set target '{assignment.Key}'",
                     diagnostics,
@@ -431,11 +437,13 @@ internal static class PreceptTypeChecker
                         assignment.SourceLine > 0 ? assignment.SourceLine : action.SourceLine,
                         StateContext: action.State));
                 }
+
+                assignmentSymbols = ApplyAssignmentNarrowing(assignment.Key, assignment.Expression, assignmentSymbols);
             }
 
             ValidateCollectionMutations(
                 action.CollectionMutations,
-                baseSymbols,
+                assignmentSymbols,
                 dataFieldKinds,
                 collectionFieldMap,
                 diagnostics,
@@ -2209,6 +2217,68 @@ internal static class PreceptTypeChecker
                 diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C41, $"unsupported binary operator '{binary.Operator}'.", 0);
                 return false;
         }
+    }
+
+    /// <summary>
+    /// Updates proof markers in <paramref name="symbols"/> after a <c>set <paramref name="targetField"/> = <paramref name="rhs"/></c>
+    /// assignment. Called within assignment loops to thread post-mutation proof state into subsequent
+    /// assignments in the same row or state action (Layer 1: Sequential Assignment Flow).
+    /// </summary>
+    private static IReadOnlyDictionary<string, StaticValueKind> ApplyAssignmentNarrowing(
+        string targetField,
+        PreceptExpression rhs,
+        IReadOnlyDictionary<string, StaticValueKind> symbols)
+    {
+        var markers = new Dictionary<string, StaticValueKind>(symbols, StringComparer.Ordinal);
+
+        // Always kill existing numeric proof markers for the target field first.
+        markers.Remove($"$positive:{targetField}");
+        markers.Remove($"$nonneg:{targetField}");
+        markers.Remove($"$nonzero:{targetField}");
+
+        rhs = StripParentheses(rhs);
+
+        if (rhs is PreceptLiteralExpression lit)
+        {
+            double? val = lit.Value switch
+            {
+                long l => (double)l,
+                double d => d,
+                decimal m => (double)m,
+                _ => null   // null literal — all numeric markers already killed above
+            };
+
+            if (val is double numVal)
+            {
+                if (numVal > 0)
+                {
+                    markers[$"$positive:{targetField}"] = StaticValueKind.Boolean;
+                    markers[$"$nonneg:{targetField}"] = StaticValueKind.Boolean;
+                    markers[$"$nonzero:{targetField}"] = StaticValueKind.Boolean;
+                }
+                else if (numVal == 0.0)
+                {
+                    markers[$"$nonneg:{targetField}"] = StaticValueKind.Boolean;
+                }
+                else // negative literal — nonzero but not positive/nonneg
+                {
+                    markers[$"$nonzero:{targetField}"] = StaticValueKind.Boolean;
+                }
+            }
+        }
+        else if (TryGetIdentifierKey(rhs, out var sourceKey))
+        {
+            // Copy numeric proof markers from source identifier to target field.
+            if (symbols.ContainsKey($"$positive:{sourceKey}"))
+                markers[$"$positive:{targetField}"] = StaticValueKind.Boolean;
+            if (symbols.ContainsKey($"$nonneg:{sourceKey}"))
+                markers[$"$nonneg:{targetField}"] = StaticValueKind.Boolean;
+            if (symbols.ContainsKey($"$nonzero:{sourceKey}"))
+                markers[$"$nonzero:{targetField}"] = StaticValueKind.Boolean;
+        }
+        // Compound RHS: markers already killed above — conservative, no new proof.
+
+        return markers;
     }
 
     private static IReadOnlyDictionary<string, StaticValueKind> ApplyNarrowing(

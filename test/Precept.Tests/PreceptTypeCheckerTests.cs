@@ -1623,9 +1623,8 @@ public class PreceptTypeCheckerTests
     [Fact]
     public void Check_DivisorIntraRowMutation_KnownLimitation_NoC93()
     {
-        // Known limitation: set Rate = 0 followed by set X = A / Rate in the same row
-        // uses the pre-transition proof state, not the mutated value.
-        // No C93 is emitted because the type checker doesn't track intra-row mutations.
+        // Slice 11 (sequential assignment flow): set Rate = 0 kills $positive:Rate, so the
+        // subsequent set X = A / Rate correctly emits C93.
         const string dsl = """
             precept M
             field A as number default 10
@@ -1634,6 +1633,133 @@ public class PreceptTypeCheckerTests
             state S initial
             event Go
             from S on Go -> set Rate = 0 -> set X = A / Rate -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().ContainSingle(d => d.Constraint.Id == "C93");
+    }
+
+    [Fact]
+    public void Check_DivisorIntraRowMutation_SetZero_EmitsC93()
+    {
+        const string dsl = """
+            precept M
+            field A as number default 10
+            field Rate as number default 1 positive
+            field X as number default 0
+            state S initial
+            event Go
+            from S on Go -> set Rate = 0 -> set X = A / Rate -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().ContainSingle(d => d.Constraint.Id == "C93");
+    }
+
+    [Fact]
+    public void Check_DivisorIntraRowMutation_SetLiteral5_NoC93()
+    {
+        const string dsl = """
+            precept M
+            field A as number default 10
+            field Rate as number default 0
+            field X as number default 0
+            state S initial
+            event Go
+            from S on Go -> set Rate = 5 -> set X = A / Rate -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C93").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_DivisorIntraRowMutation_SetNull_Kills()
+    {
+        const string dsl = """
+            precept M
+            field A as number default 10
+            field Rate as number nullable default 1 positive
+            field X as number default 0
+            state S initial
+            event Go
+            from S on Go -> set Rate = null -> set X = A / Rate -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        // null assignment kills numeric proof; Rate is nullable so type errors fire (C41 or C42/C93)
+        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C41" || d.Constraint.Id == "C42" || d.Constraint.Id == "C93");
+    }
+
+    [Fact]
+    public void Check_DivisorIntraRowMutation_SetIdentifier_Copies()
+    {
+        const string dsl = """
+            precept M
+            field A as number default 10
+            field OtherPositive as number default 5 positive
+            field Rate as number default 0
+            field X as number default 0
+            state S initial
+            event Go
+            from S on Go -> set Rate = OtherPositive -> set X = A / Rate -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C93").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_DivisorIntraRowMutation_SetCompound_KillsMarkers()
+    {
+        const string dsl = """
+            precept M
+            field A as number default 10
+            field D as number default 5 positive
+            field Rate as number default 5 positive
+            field X as number default 0
+            state S initial
+            event Go
+            from S on Go -> set Rate = D - D -> set X = A / Rate -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C93");
+    }
+
+    [Fact]
+    public void Check_DivisorStateAction_SetZero_EmitsC93()
+    {
+        const string dsl = """
+            precept M
+            field A as number default 10
+            field Rate as number default 1 positive
+            field X as number default 0
+            state S initial
+            to S -> set Rate = 0 -> set X = A / Rate
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().ContainSingle(d => d.Constraint.Id == "C93");
+    }
+
+    [Fact]
+    public void Check_DivisorStateAction_SetLiteral_NoC93()
+    {
+        const string dsl = """
+            precept M
+            field A as number default 10
+            field Rate as number default 0
+            field X as number default 0
+            state S initial
+            to S -> set Rate = 3 -> set X = A / Rate
             """;
 
         var result = Check(dsl);
