@@ -1106,7 +1106,7 @@ Built-in functions:
 | `max(a, b, ...)` | `integer* → integer`, `decimal* → decimal`, `number* → number` | Same as input | Largest of 2+ values. Variadic. All args must match the same numeric type. |
 | `clamp(value, min, max)` | `(integer, integer, integer) → integer`, `(decimal×3) → decimal`, `(number×3) → number` | Same as input | Constrains value to [min, max]. Type-preserving. |
 | `pow(base, exponent)` | `(integer, integer) → integer`, `(decimal, integer) → decimal`, `(number, integer) → number` | Same as base | Integer exponent only (C75). Type-preserving. `pow(0, 0) = 1` (IEEE 754). |
-| `sqrt(value)` | `decimal → decimal`, `number → number` | Same as input | Square root. Requires compile-time non-negative proof: field must have `nonnegative`, `positive`, or `min >= 0` constraint, or argument must be guarded with `>= 0` (C76). |
+| `sqrt(value)` | `decimal → decimal`, `number → number` | Same as input | Square root. Requires compile-time non-negative proof: `nonnegative` or `positive` constraint, `rule Field >= 0`, state/event `ensure`, or `when` guard with `>= 0` (C76). |
 | `toLower(value)` | `string → string` | `string` | Lowercase using invariant culture. |
 | `toUpper(value)` | `string → string` | `string` | Uppercase using invariant culture. |
 | `trim(value)` | `string → string` | `string` | Removes leading and trailing whitespace. |
@@ -1123,6 +1123,35 @@ Function arguments must be non-nullable — passing a nullable field without a n
 Exact operator precedence and literal forms should align with the runtime expression parser.
 
 See [Keyword vs Symbol Design Framework](#keyword-vs-symbol-design-framework-locked) for the rationale behind using keywords for logical operators and symbols for math/comparison.
+
+### Divisor safety (Locked)
+
+The compiler checks the right operand of `/` and `%` for a compile-time nonzero proof. This prevents division-by-zero errors that would surface only at runtime.
+
+**Two-tier severity (Principle #8):**
+
+| Condition | Diagnostic | Severity | Message |
+|---|---|---|---|
+| Divisor is literal `0` or `0.0` | C92 | Error | `Division by zero: the divisor is literal 0.` |
+| Divisor is an identifier with no nonzero proof | C93 | Warning | `Divisor '{name}' has no compile-time nonzero proof. Consider adding a 'positive' constraint, 'rule {name} != 0', or 'when {name} != 0' guard.` |
+| Divisor is nonnegative but not nonzero | C93 | Warning | `Divisor '{name}' is nonnegative but not nonzero — 'nonnegative' allows zero. Consider 'positive' instead.` |
+
+C92 is an **error** because the compiler can prove a contradiction — dividing by literal zero is always wrong. C93 is a **warning** because the compiler cannot prove the divisor is zero, only that it lacks a proof of nonzero. Compound expressions (binary operations, function calls) are assumed satisfiable and produce no warning — the inspector catches those at simulation time.
+
+**Proof sources that suppress C93:**
+
+| Proof source | Example | Marker |
+|---|---|---|
+| `positive` constraint | `field Quantity as number positive` | `$positive:` |
+| `min N` where N > 0 | `field Rate as number min 1` | `$positive:` |
+| `rule Field > 0` | `rule Quantity > 0 because "..."` | `$positive:` |
+| `rule Field != 0` | `rule Divisor != 0 because "..."` | `$nonzero:` |
+| `when Field != 0` guard | `when Divisor != 0 -> set Result = Total / Divisor` | `$nonzero:` |
+| `when Field > 0` guard | `when Quantity > 0 -> set Average = Total / Quantity` | `$positive:` |
+| State `ensure Field > 0` | `in Active ensure Quantity > 0 because "..."` | `$positive:` |
+| Event `ensure Arg > 0` | `on Submit ensure Amount > 0 because "..."` | `$positive:` |
+
+**The `nonnegative` ≠ nonzero distinction:** `nonnegative` (and `min 0`) prove `Field >= 0` — a `$nonneg:` marker. This does *not* prove nonzero, because zero is a valid nonnegative value. Dividing by a nonnegative field triggers C93 with a context-aware message explaining that `nonnegative` allows zero and suggesting `positive` instead.
 
 ---
 
@@ -1360,8 +1389,8 @@ All diagnostics follow a three-tier severity model:
 
 | Severity | Meaning | Examples |
 |---|---|---|
-| **Error** | Provably wrong — the checker can prove a contradiction from types, null-flow, or structural rules. Blocks compilation. | Type mismatches (C39–C41), null-flow violations (C42), unknown identifiers (C38), non-boolean rule positions (C46), identical-guard duplicates (C47), unreachable rows, missing outcomes |
-| **Warning** | Probably wrong — structural quality issue that is almost certainly a mistake but could be intentional. Does not block compilation. | Reject-only (state, event) pairs (C51), events that never succeed (C52), unreachable states (C48), orphaned events (C49) |
+| **Error** | Provably wrong — the checker can prove a contradiction from types, null-flow, or structural rules. Blocks compilation. | Type mismatches (C39–C41), null-flow violations (C42), unknown identifiers (C38), non-boolean rule positions (C46), identical-guard duplicates (C47), unreachable rows, missing outcomes, literal zero divisor (C92) |
+| **Warning** | Probably wrong — structural quality issue that is almost certainly a mistake but could be intentional. Does not block compilation. | Reject-only (state, event) pairs (C51), events that never succeed (C52), unreachable states (C48), orphaned events (C49), unproven divisor (C93) |
 | **Hint** | Informational — observation that may or may not indicate a problem. | Dead-end states (C50), empty precept (C53) |
 
 The rule: if the checker can **prove** it, it’s an **error**. If the analyzer can **observe** a structural concern, it’s a **warning** or **hint**. The checker never guesses — uncertain cases are left to the inspector.

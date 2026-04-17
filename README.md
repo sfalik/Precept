@@ -99,7 +99,7 @@ See the [Quickstart Guide](docs/RuntimeApiDesign.md) for a complete runtime inte
 - One file, all rules — guards, constraints, rules, and transitions together
 - Lifecycle optional — stateless precepts enforce field declarations, rules, and constraints without a state machine
 - Full inspectability — preview any action's outcome without executing it
-- Compile-time checking — unreachable states and type errors caught before runtime
+- Compile-time checking — unreachable states, type errors, null-flow violations, and divisor safety caught before runtime
 - **Stateful or stateless** — precepts can govern stateful workflows (with lifecycle states and transitions) or stateless domain objects (fields and edit rules only, no states)
 - **Conditional declarations** — `when` guards on rules, ensures, and edit blocks make rules apply only when a precondition is met
 - **Conditional expressions** — `if...then...else` selects between values inline, replacing row duplication for data-dependent field assignments
