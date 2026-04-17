@@ -366,8 +366,519 @@ The proof engine operates on `double` (IEEE 754 binary64) internally. This intro
 
 - **Disjunctive intervals:** `Nonzero` is `(-∞, 0) ∪ (0, +∞)` — a union of two intervals. The engine uses a single interval representation and cannot express this directly. The existing `$nonzero:` marker system covers the identifier case; compound expressions involving `nonzero` variables may lose precision.
 
-### Potential future enhancements
+### Potential precision enhancements
+
+These enhance existing analysis precision without adding new enforcement categories:
 
 - **`$nonzero:` interval encoding:** Represent `nonzero` as a flag on `NumericInterval` rather than a separate marker, enabling compound expressions involving nonzero variables to benefit from interval arithmetic.
 - **Must-alias tracking for identifier copies:** When `set A = B` is detected, copy all markers from B to A in `ApplyAssignmentNarrowing`. Already implemented for simple identifier RHS; could be extended to `abs(B)`, `max(B, literal)`, etc.
 - **Product sign analysis:** `X * Y` is nonzero when both X and Y are nonzero. Currently only proven when both intervals exclude zero; could also check `$nonzero:` markers for each factor.
+
+For the comprehensive enforcement catalog — assignment constraint checking, dead rule/guard detection, transition reachability sharpening, and cross-event invariant analysis — see **§ Comprehensive Compile-Time Enforcement** below.
+
+---
+
+## Optimality Assessment
+
+**Verdict: The layered, non-SMT interval+relational design is the correct architecture for Precept's constraint surface. No structural revision needed.**
+
+### Rationale
+
+1. **Precept's execution model eliminates abstract-interpretation overhead.** No loops, no branches, no reconverging flow (§ Execution Model Assumptions). Single-pass interval arithmetic is not just sufficient — it is *optimal*. Widening, narrowing, fixpoint iteration, and lattice joins are structurally unnecessary because there are no program points where multiple execution paths converge. (Principle #1: deterministic, inspectable model.)
+
+2. **The constraint surface is entirely interval-compatible.** Every numeric constraint (`nonnegative`, `positive`, `min N`, `max N`) maps directly to a closed/open interval. Collection constraints (`mincount`, `maxcount`) and string constraints (`minlength`, `maxlength`) map to integer count intervals over `.count` and `.length` accessors. No constraint in the DSL today requires relational or disjunctive reasoning that intervals cannot express.
+
+3. **SMT is overkill.** Z3/CVC5 would bring 50–65 MB of native dependencies, non-deterministic solving times, opaque proof witnesses, and API-surface complexity — all for a constraint surface that is decidable with interval arithmetic alone. This violates Principle #9 (tooling drives syntax — structured diagnostics, not opaque solver output) and Principle #12 (AI legibility — proof witnesses must be inspectable).
+
+4. **A fuller abstract-interpretation lattice is disproportionate.** Octagons (O(n²) per variable) or polyhedra (exponential worst case) would handle multi-variable relationships but at ~2,000+ lines of implementation for a DSL compiler serving business domain authors. The targeted relational layer (Layer 4) handles the dominant inter-variable pattern (`A - B` with `A > B`) in ~65 lines — 97% of the benefit at 3% of the cost.
+
+5. **A simpler pattern-based approach is too weak.** Pattern matching (recognize `abs()`, `max()`, etc.) misses compound expressions. The interval system proves things like `clamp(D, 1, 100)` excludes zero, `Score + Amount ∈ [1, ∞)` from constraint-derived intervals, and `if X > 0 then X else 1 ∈ (0, ∞)` via Hull — no pattern matcher can match this generality.
+
+6. **Philosophy alignment is direct.** The design serves Principle #1 (deterministic — same input → same proof), Principle #8 (sound compile-time-first — never false-positive, conservative on unknowns), Principle #9 (tooling drives syntax — structured diagnostics with interval witnesses for hover/preview), and Principle #12 (AI legibility — proof witnesses are data, not opaque solver traces).
+
+### Alternatives considered and rejected
+
+| Alternative | Why rejected |
+|---|---|
+| Constraint propagation graph | Adds node-based structure with no benefit over direct interval computation — Precept expressions are trees, not constraint networks |
+| Symbolic execution | Collapses to interval arithmetic when there are no branches — Precept's model makes symbolic execution degenerate |
+| SMT-backed verification | Disproportionate dependency cost; opaque proofs violate Principle #12; non-deterministic timing |
+| Octagon / polyhedra domains | O(n²)/exponential cost for multi-variable relations; Layer 4's targeted relational inference covers the dominant pattern |
+| Property testing / fuzzing | Complementary at test time, not a compile-time analysis technique |
+
+### Architectural smells
+
+None detected. Each layer has a single responsibility, layers compose vertically (higher layers call lower ones), and the overall architecture is a single-pass recursive descent over finite expression trees with linear sequential context. The marker-based proof state is a natural fit for the existing symbol table infrastructure.
+
+---
+
+## Comprehensive Compile-Time Enforcement
+
+The proof engine's interval infrastructure (Layers 2–5) enables enforcement beyond C93 (divisor safety) and C76 (sqrt safety). This section catalogs every construct with compile-time-checkable semantics and specifies how the proof engine reasons about each.
+
+### Governing Policy: Proven Violation Only
+
+All enforcements follow a single policy, grounded in Principles #1 and #8:
+
+| Proof outcome | Action |
+|---|---|
+| **Proven violation** (expression interval entirely outside constraint interval) | Diagnostic (error or warning per construct) |
+| **Possible violation** (partial overlap — some values safe, some not) | No diagnostic — the runtime invariant system handles runtime-data-dependent cases cleanly |
+| **Proven safe** (expression interval entirely within constraint interval) | No diagnostic |
+| **Unknown** (interval is Unknown or analysis is inconclusive) | No diagnostic (Principle #8 conservatism) |
+
+The engine NEVER fires a diagnostic on code that might be safe at runtime. The runtime invariant system exists precisely to handle the "possible violation" cases — warning about its normal operation would be noise, not signal.
+
+### Enforcement Summary Table
+
+| Construct | Enforcement | Diag | Sev | Algorithm | Phase |
+|---|---|---|---|---|---|
+| `set Field = expr` (numeric) | Expr interval provably outside field constraint interval | C94 | Error | L2–L3 interval containment | Follow-up A |
+| `to/from State -> set ...` | Same for state actions | C94 | Error | Same | Follow-up A |
+| Computed `field -> expr` | Formula interval provably violates computed field constraint | C94 | Error | Same | Follow-up A |
+| `rule expr because "..."` | Rule predicate contradicts field constraints (unsatisfiable) | C95 | Error | L2 interval intersection | Follow-up B |
+| `rule expr because "..."` | Rule predicate always true given constraints (vacuous) | C96 | Warning | L2 interval containment | Follow-up B |
+| `when guard` (row/edit/ensure) | Guard provably always false | C97 | Warning | L2–L4 proof evaluation | Follow-up C |
+| `when guard` (row/edit/ensure) | Guard provably always true | C98 | Warning | L2–L4 proof evaluation | Follow-up C |
+| Transition rows via C97 | Dead row sharpens C50/C51 | C50/C51 | Warning (existing) | Via C97 | Follow-up C |
+| State reachability via C97 | All incoming rows dead sharpens C48 | C48 | Warning (existing) | Via C97 | Follow-up D |
+| Cross-event field invariant | Field always in range across all reachable states | C99 | Info | State-graph fixed-point | Follow-up E |
+| Boolean guard refinement | Boolean field narrowing to {true}/{false} | — | — | Existing narrowing | Already shipped |
+| Choice assignment | Literal not in choice set | C68 | Error (existing) | Existing | Already shipped |
+| Divisor safety | Divisor provably zero / unproven nonzero | C92/C93 | Error | L1–L5 | PR #108 |
+| Sqrt safety | Argument provably negative / unproven non-negative | C76 | Error | L2–L3 | PR #108 |
+
+### C94: Assignment Constraint Enforcement
+
+**What:** Every `set Field = expr` where the target field has numeric constraints (`nonnegative`, `positive`, `min N`, `max N`). Covers transition row bodies, state actions, and computed field formulas.
+
+**Algorithm:**
+
+1. At each assignment site, compute the target field's **constraint interval** by combining all declared constraints:
+
+| Constraint(s) | Constraint interval |
+|---|---|
+| `nonnegative` | `[0, +∞)` |
+| `positive` | `(0, +∞)` |
+| `min N` | `[N, +∞)` |
+| `max N` | `(-∞, N]` |
+| `min N` + `max M` | `[N, M]` |
+| `positive` + `max M` | `(0, M]` |
+| Multiple constraints | Intersection of all individual intervals |
+
+2. Compute `exprInterval = TryInferInterval(expr, symbols)` using L2–L3.
+
+3. Check: `!NumericInterval.Intersects(exprInterval, constraintInterval)` → **C94 error**.
+
+**New method on `NumericInterval`:**
+
+```
+static bool Intersects(NumericInterval a, NumericInterval b):
+    if a.Upper < b.Lower then false
+    if a.Lower > b.Upper then false
+    if a.Upper == b.Lower && !(a.UpperInclusive && b.LowerInclusive) then false
+    if a.Lower == b.Upper && !(a.LowerInclusive && b.UpperInclusive) then false
+    else true
+```
+
+**New class method on `NumericInterval`:**
+
+```
+static NumericInterval FromConstraints(IReadOnlyList<FieldConstraint> constraints):
+    lower = -∞, lowerInc = false
+    upper = +∞, upperInc = false
+    for each constraint:
+        Nonnegative  → lower = max(lower, 0), lowerInc |= (lower == 0)
+        Positive     → lower = max(lower, 0), lowerInc = false when lower == 0
+        Min(V)       → lower = max(lower, V), lowerInc = true when lower == V
+        Max(V)       → upper = min(upper, V), upperInc = true when upper == V
+    return NumericInterval(lower, lowerInc, upper, upperInc)
+```
+
+**Severity: Error.** A proven violation means the runtime invariant will ALWAYS reject the operation — the assignment can never succeed. This is dead code (the transition row will always be rolled back). Principle #8: if the checker proves a contradiction, block it.
+
+**Marker format:** No new markers. Uses existing `$ival:` markers from Layer 2 for expression intervals, plus the new `FromConstraints` method for field constraint intervals.
+
+**False positive policy:** C94 fires ONLY when expression interval and constraint interval have zero overlap. `set Score = Score + 1` with `max 100` → `[1, 101]` ∩ `(-∞, 100]` = `[1, 100]` (non-empty) → no diagnostic. The runtime handles the `Score = 100` edge case.
+
+**Nullable interaction:** For nullable fields with constraints, the constraint only applies to non-null values (constraints desugar with null guards: `Field == null or Field >= N`). C94 checks only apply when the RHS expression is provably non-null (no `Null` in `StaticValueKind`). If the expression might be null, no C94 check — the null case is valid by the `nullable` declaration.
+
+**What triggers C94:**
+
+| Expression | Constraint | Interval | Constraint interval | Diagnosis |
+|---|---|---|---|---|
+| `set Score = 200` | `max 100` | `[200, 200]` | `(-∞, 100]` | C94 ✓ |
+| `set Rate = -1` | `nonnegative` | `[-1, -1]` | `[0, +∞)` | C94 ✓ |
+| `set Rate = 0` | `positive` | `[0, 0]` | `(0, +∞)` | C94 ✓ |
+| `set Count = 0` | `min 1` | `[0, 0]` | `[1, +∞)` | C94 ✓ |
+| `set Score = max(Score, 101)` | `max 100` | `[101, +∞)` | `(-∞, 100]` | C94 ✓ |
+| `set Rate = Score * -1` | `positive`, Score ∈ `[0, 100]` | `[-100, 0]` | `(0, +∞)` | C94 ✓ |
+
+**What does NOT trigger C94:**
+
+| Expression | Constraint | Interval | Constraint interval | Why safe |
+|---|---|---|---|---|
+| `set Score = Score + 1` | `max 100` | `[1, 101]` | `(-∞, 100]` | Overlap `[1, 100]` |
+| `set Score = X` | `max 100`, X Unknown | `(-∞, +∞)` | `(-∞, 100]` | Unknown always overlaps |
+| `set Score = Go.Amount` | `max 100`, Amount `min 1` | `[1, +∞)` | `(-∞, 100]` | Overlap `[1, 100]` |
+
+**Diagnostic message:** `"Assignment to '{field}' provably violates the '{constraint}' constraint. Expression range [{lo}, {hi}] is entirely outside the required range [{cLo}, {cHi}]."`
+
+**Test obligations:**
+
+| Test | Verifies |
+|---|---|
+| `Check_C94_SetLiteralExceedsMax_Error` | `set Score = 200` with `max 100` |
+| `Check_C94_SetNegativeWithNonneg_Error` | `set Rate = -1` with `nonnegative` |
+| `Check_C94_SetZeroWithPositive_Error` | `set Rate = 0` with `positive` |
+| `Check_C94_SetBelowMin_Error` | `set Count = 0` with `min 1` |
+| `Check_C94_SetCompoundExceedsMax_Error` | `set Score = max(Score, 101)` with `max 100` |
+| `Check_C94_SetPartialOverlap_NoDiagnostic` | `set Score = Score + 1` with `max 100` → clean |
+| `Check_C94_SetUnknown_NoDiagnostic` | `set Score = X + Y` (unknowns) → clean |
+| `Check_C94_StateAction_Error` | `to Done -> set Rate = -1` with `positive` |
+| `Check_C94_ComputedField_Error` | `field X as number -> -1 nonnegative` |
+| `Check_C94_NullableField_NullRHS_NoDiagnostic` | `set NullableRate = null` with `positive` → clean |
+| `Check_C94_EventArgRange_Error` | `set Score = Go.Amount * 1000` with Score `max 100`, Amount `min 1` |
+| `Check_C94_CombinedMinMax_Error` | `set Score = 200` with `min 0 max 100` |
+
+### C95: Contradictory Rule
+
+**What:** A non-synthetic rule whose predicate is provably unsatisfiable given the field's declared constraints.
+
+**Algorithm:**
+
+1. For each rule, check if the rule's `isSynthetic` flag is false and the expression is a simple single-field comparison (`Field <op> Literal`).
+2. Extract the **satisfying interval** — the range of field values that make the predicate true:
+
+| Predicate | Satisfying interval |
+|---|---|
+| `Field > N` | `(N, +∞)` |
+| `Field >= N` | `[N, +∞)` |
+| `Field < N` | `(-∞, N)` |
+| `Field <= N` | `(-∞, N]` |
+| `Field == N` | `[N, N]` |
+| `Field != N` | `(-∞, N) ∪ (N, +∞)` — not representable as single interval; skip |
+
+3. Compute the field's constraint interval from declared constraints only (not from other rules — avoids circularity).
+4. If `!Intersects(satisfyingInterval, constraintInterval)` → **C95 error**.
+
+**Severity: Error.** A contradictory rule means no valid state can satisfy all rules simultaneously. Every mutation will be rejected. The precept is structurally broken.
+
+**Example:** `field Score as number min 10` + `rule Score < 5 because "..."`. Constraint `[10, +∞)`, satisfying `(-∞, 5)`, no intersection → C95.
+
+**Scope limitation:** Only simple single-field comparisons (`Field <op> Literal`). Cross-field rules (`rule A > B`) and complex expressions (`rule X + Y > 0`) are unanalyzed — no diagnostic. The `!= N` case is also skipped because the satisfying set is disjunctive and not representable as a single interval.
+
+**Diagnostic message:** `"Rule '{expression}' contradicts the '{constraint}' constraint on field '{field}'. No valid value satisfies both — every operation will be rejected."`
+
+**Test obligations:**
+
+| Test | Verifies |
+|---|---|
+| `Check_C95_MinVsLessThan_Error` | `min 10` + `rule X < 5` |
+| `Check_C95_PositiveVsLteZero_Error` | `positive` + `rule X <= 0` |
+| `Check_C95_MaxVsGreaterThan_Error` | `max 100` + `rule X > 100` |
+| `Check_C95_MinMaxVsOutOfRange_Error` | `min 0 max 100` + `rule X > 200` |
+| `Check_C95_CrossFieldRule_NoDiagnostic` | `rule A > B` → no diagnostic (cross-field) |
+| `Check_C95_SyntheticRule_Excluded` | Synthetic rule from constraint → no C95 |
+
+### C96: Vacuous Rule
+
+**What:** A non-synthetic rule whose predicate is provably always true given the field's declared constraints.
+
+**Algorithm:**
+
+1. Same extraction as C95 — simple single-field comparison, satisfying interval, constraint interval.
+2. Check containment: if `constraintInterval ⊆ satisfyingInterval` → **C96 warning**.
+
+**Containment check:**
+
+```
+Contains(outer, inner):
+    if inner.Lower < outer.Lower then false
+    if inner.Upper > outer.Upper then false
+    if inner.Lower == outer.Lower && inner.LowerInclusive && !outer.LowerInclusive then false
+    if inner.Upper == outer.Upper && inner.UpperInclusive && !outer.UpperInclusive then false
+    else true
+```
+
+`Contains(satisfyingInterval, constraintInterval)` → C96.
+
+**Severity: Warning.** The rule isn't wrong — it's unnecessary. The constraint already guarantees the condition. May indicate a misunderstanding of the constraint system, or may be kept intentionally for documentation. Principle #8 conservatism: warn but don't block.
+
+**Example:** `field Score as number min 0 max 100` + `rule Score >= 0 because "..."`. Constraint `[0, 100]`, satisfying `[0, +∞)`, `[0, 100] ⊆ [0, +∞)` → C96.
+
+**Note:** Synthetic rules (generated by constraint desugaring) are excluded from C96 analysis. A `nonnegative` constraint generating `rule X >= 0` is not redundant with itself.
+
+**Diagnostic message:** `"Rule '{expression}' is always satisfied by the '{constraint}' constraint on field '{field}'. Consider removing the redundant rule."`
+
+**Test obligations:**
+
+| Test | Verifies |
+|---|---|
+| `Check_C96_NonnegVsGte0_Warning` | `nonnegative` + `rule X >= 0` |
+| `Check_C96_MinVsGteLower_Warning` | `min 5` + `rule X >= 0` |
+| `Check_C96_MaxVsLteHigher_Warning` | `max 100` + `rule X <= 200` |
+| `Check_C96_SyntheticRule_Excluded` | Synthetic rule from constraint → no C96 |
+| `Check_C96_NotVacuous_NoDiagnostic` | `min 0 max 100` + `rule X >= 50` → no C96 (constraint not ⊆ satisfying) |
+
+### C97: Dead Guard
+
+**What:** A `when` guard on a transition row, edit declaration, or ensure whose condition is provably always false given the proof state at the point of evaluation.
+
+**Algorithm:**
+
+1. At each `when` guard, extract the guard's satisfying interval for each field it references (same technique as C95 — simple single-field comparison extraction).
+2. Look up the field's constraint interval from the current proof state (base proof + rules + state ensures, as narrowed by `ApplyNarrowing`).
+3. If `!Intersects(guardSatisfyingInterval, fieldConstraintInterval)` for any field → **C97 warning**.
+
+**Extended to relational guards:** When the proof state contains `$gt:A:B` (from a rule `A > B`) and the guard is `when A <= B`, the guard contradicts the relational fact → C97. This uses Layer 4 markers.
+
+**Severity: Warning.** Dead guards create unreachable code — similar to existing C48 (unreachable state), which is also a warning. The code doesn't cause runtime failure; it's just unused. Principle #8: warn on proven dead code, don't error on it unless it prevents some operation from ever succeeding.
+
+**Example:** `field Score as number max 100` + `when Score > 100 -> ...`. Guard satisfying `(100, +∞)`, constraint `(-∞, 100]`, no intersection → C97.
+
+**Diagnostic message:** `"Guard 'when {expr}' is provably always false — this row/declaration is unreachable. Field '{field}' is constrained to [{lo}, {hi}] but the guard requires [{gLo}, {gHi}]."`
+
+**Test obligations:**
+
+| Test | Verifies |
+|---|---|
+| `Check_C97_GuardExceedsMax_Warning` | `when Score > 100` with `max 100` |
+| `Check_C97_GuardBelowMin_Warning` | `when Count < 0` with `nonnegative` |
+| `Check_C97_GuardContradictRule_Warning` | `rule A > B` + `when A <= B` |
+| `Check_C97_ComplexGuard_NoDiagnostic` | `when A + B > 0` → no diagnostic (complex) |
+| `Check_C97_EditGuardDead_Warning` | `in State when X > 100 edit Field` with `max 100` |
+| `Check_C97_EnsureGuardDead_Warning` | `in State ensure X > 0 when X < 0` with `nonnegative` |
+
+### C98: Vacuous Guard
+
+**What:** A `when` guard whose condition is provably always true given the proof state.
+
+**Algorithm:**
+
+1. Same extraction as C97 — guard satisfying interval, field constraint interval.
+2. Check: `Contains(guardSatisfyingInterval, fieldConstraintInterval)` → **C98 warning**.
+
+**Severity: Warning.** The guard adds no information — removing `when` would not change behavior. Not a bug, but may indicate unnecessary complexity.
+
+**Example:** `field Rate as number positive` + `when Rate > 0 -> ...`. Guard satisfying `(0, +∞)`, constraint `(0, +∞)`, constraint ⊆ satisfying → C98.
+
+**Diagnostic message:** `"Guard 'when {expr}' is provably always true — the condition has no effect. Field '{field}' already satisfies this via its '{constraint}' constraint."`
+
+**Test obligations:**
+
+| Test | Verifies |
+|---|---|
+| `Check_C98_PositiveVsGt0_Warning` | `when Rate > 0` with `positive` |
+| `Check_C98_NonnegVsGte0_Warning` | `when Score >= 0` with `nonnegative` |
+| `Check_C98_MinVsGteLower_Warning` | `when Count >= 1` with `min 1` |
+| `Check_C98_NotVacuous_NoDiagnostic` | `when Score > 50` with `min 0 max 100` → no C98 |
+
+### Transition Reachability Sharpening
+
+The proof engine sharpens three existing diagnostics by combining dead guard detection (C97) with existing state-graph analysis:
+
+**C50 sharpening (dead-end state):** If all transition rows leaving a state have provably-dead guards (all C97), the state has no viable exits. C50 fires even though rows syntactically exist — they are all unreachable.
+
+**C51 sharpening (always-rejecting):** If all non-reject rows for a `(State, Event)` pair have dead guards, only reject rows remain viable. C51 fires.
+
+**C48 sharpening (unreachable state):** If all transition rows targeting a state have dead guards (on the source rows), no path can reach it. C48 fires even though transition rows exist.
+
+These are NOT new diagnostics — they are sharper triggers for existing ones, using interval analysis instead of purely syntactic analysis.
+
+**Test obligations:**
+
+| Test | Verifies |
+|---|---|
+| `Check_C50_Sharpened_AllGuardsDead_Warning` | State with rows but all guards are C97 |
+| `Check_C51_Sharpened_NonRejectRowsDead_Warning` | Only dead-guard non-reject rows |
+| `Check_C48_Sharpened_IncomingRowsDead_Warning` | All incoming transitions have dead guards |
+
+### C99: Cross-Event Field Invariant Analysis (Opt-In)
+
+**What:** Proves that a field maintains a constraint across ALL reachable states and transitions, enabling downstream code to rely on the invariant without per-expression proof.
+
+**Example:** `field Score as number min 0 max 100` — if no transition row assigns a value outside `[0, 100]` (all assignments provably safe via C94 analysis), then Score's interval is `[0, 100]` in every reachable state. The proof engine can inject this as a tighter interval for downstream checks.
+
+**Algorithm:**
+
+1. Build the state graph (states as nodes, transition rows as edges).
+2. For each field with numeric constraints, initialize the field's interval to the constraint interval.
+3. For each transition row, compute the post-assignment interval for the field using `TryInferInterval` on the RHS expression (if assigned) or carry the incoming interval (if not assigned).
+4. At each state, compute the join (Hull) of all incoming edge intervals.
+5. Iterate until fixed point (field intervals stop changing).
+6. If the fixed-point interval for a field at a state is tighter than `Unknown`, inject it as a proof marker for that state's context.
+
+**Complexity:** O(|states| × |fields| × |transitions|) per iteration. Terminates because field constraint intervals provide finite bounds — intervals cannot grow beyond the constraint, and Hull is monotone (only widens). The number of iterations is bounded by the number of distinct interval values, which is finite given fixed constraint bounds.
+
+**Gating:** This analysis is **opt-in only**. It does not run by default. It is the only enforcement in this design that requires fixed-point iteration, breaking the single-pass guarantee. For small precepts (5–10 states), it is fast. For large precepts with complex state graphs, it could add noticeable compile time.
+
+**Severity: Info.** Informational diagnostic — tells the author a proven invariant holds. Does not block compilation.
+
+**Diagnostic message:** `"Field '{field}' maintains the invariant [{lo}, {hi}] across all reachable states."`
+
+**Test obligations:**
+
+| Test | Verifies |
+|---|---|
+| `Check_C99_FieldInvariant_AllPathsSafe_Info` | Score always in [0, 100] across all transitions |
+| `Check_C99_FieldInvariant_OnePathViolates_NoC99` | One transition can violate → no C99 |
+| `Check_C99_OptIn_DefaultOff` | Analysis doesn't run by default |
+
+### Collection, String, Boolean, and Choice Reasoning
+
+**Collection count intervals:** `mincount N` and `maxcount N` define integer intervals for `.count`. After `add`, count ∈ `[prev.count, prev.count + 1]` (sets may not increase for duplicates); after `clear`, count = 0; after `enqueue`/`push`, count = prev.count + 1; after `dequeue`/`pop`, count = prev.count - 1.
+
+**Design decision: NOT enforced.** Collection mutations are data-dependent (add a value from an event arg). Count evolution depends on runtime membership, which the proof engine cannot track without element-level set analysis. The runtime invariant system enforces `mincount`/`maxcount` after each mutation. The cost of element-membership tracking is disproportionate.
+
+**String length intervals:** `minlength N` and `maxlength N` define integer intervals for `.length`. String functions with bounded output exist (`left(s, N)` → length ≤ N), but the dominant pattern is literal assignment or event-arg assignment where length depends on runtime input.
+
+**Design decision: NOT enforced.** String operations in Precept are limited, and the dominant patterns involve runtime-dependent string values. Literal string assignments are already checked at parse time (C59 for defaults). No new enforcement adds meaningful value.
+
+**Boolean reasoning:** Already tracked through the narrowing system as `{true, false}` / `{true}` / `{false}`. Guards referencing boolean fields refine correctly: `when IsPremium` → `IsPremium = true`. No new proof engine work needed.
+
+**Choice/enum reasoning:** C68 already checks literal assignment to choice fields at compile time. Choices are discrete sets, not intervals — the proof engine's interval infrastructure does not add value. No new enforcement needed.
+
+---
+
+## Enforcement Soundness Guarantees
+
+The proof engine's no-false-positive guarantee extends to all new enforcements:
+
+### What the engine proves (complete list)
+
+**Existing (PR #108):**
+- **C92:** Divisor is literal zero — proven contradiction.
+- **C93:** Divisor has no compile-time nonzero proof — unproven identity/compound expression.
+- **C76:** Sqrt argument has no compile-time non-negative proof.
+- **Sequential flow:** Post-mutation proof state correctly reflects assignment effects.
+- **Relational facts:** `A - B` provably nonzero when strict inequality `A > B` is proven.
+- **Conditional results:** Provably nonzero when Hull of both branch intervals excludes zero.
+
+**New (follow-up):**
+- **C94:** Assignment expression interval provably outside field constraint interval. The `Intersects` predicate is sound — it returns false only when there is provably zero overlap between the two intervals.
+- **C95:** Rule predicate satisfying interval provably disjoint from field constraint interval. Uses the same `Intersects` predicate.
+- **C96:** Field constraint interval provably contained within rule satisfying interval. The `Contains` predicate is sound — it returns true only when every value in the inner interval is also in the outer interval.
+- **C97/C98:** Guard satisfying interval provably disjoint from / contains the field constraint interval. Same predicates as C95/C96 applied to guard expressions.
+- **C99:** Cross-event field interval provably bounded after fixed-point convergence. Sound because Hull is an over-approximation (only widens) and iteration terminates at a fixed point.
+
+### What the engine conservatively rejects (updated)
+
+All items from § Soundness Guarantees above remain unchanged, plus:
+
+- **Partial-overlap constraint violations.** `set Score = Score + Amount` where the result interval partially exceeds `max 100` is not flagged. The runtime handles it.
+- **Cross-field rule contradictions.** `rule A > B` with constrained A and B is not analyzed for satisfiability.
+- **Complex rule/guard expressions.** `rule X + Y > 0` or `when A * B > 5` are not analyzed — only simple single-field comparisons.
+- **`!= N` predicates in rules.** The satisfying set `(-∞, N) ∪ (N, +∞)` is disjunctive and not representable as a single interval. Skipped.
+
+---
+
+## New Design Decisions
+
+### 5. Proven-Violation-Only Policy for Constraint Enforcement
+
+**Decision:** C94 fires only when expression interval and constraint interval have NO overlap. "Possible violation" (partial overlap) produces no diagnostic.
+
+**Alternative rejected:** Warning on possible violations (expression range extends beyond constraint).
+
+**Rationale:** Precept's runtime invariant system is designed to catch constraint violations at execution time. Flagging every assignment that MIGHT produce an out-of-range value would flood authors with warnings on correct code. An assignment like `set Score = Score + Amount` with `max 100` INTENTIONALLY relies on the runtime constraint to reject the `Score = 100, Amount > 0` case. Warning about the intended design of the constraint system would be noise.
+
+**Precedent:** Rust's const-evaluation in match exhaustiveness only flags provably exhaustive/unreachable patterns, not "might be" patterns. TypeScript's narrowing errors on provable contradictions, not possible ones.
+
+**Tradeoff accepted:** `set Score = Score + 100` (which exceeds max when Score > 0) is not flagged because `[100, +∞)` ∩ `(-∞, 100]` = `{100}` (non-empty, single point). The runtime catches the actual violation. The engine only catches the case where NO value in the expression range could satisfy the constraint.
+
+### 6. Simple Single-Field Scope for Dead Rule/Guard Analysis
+
+**Decision:** C95/C96/C97/C98 only analyze simple single-field comparisons (`Field <op> Literal`). Cross-field and complex expressions are unanalyzed.
+
+**Alternative rejected:** Full constraint satisfaction for arbitrary boolean expressions.
+
+**Rationale:** General constraint satisfaction is disproportionate to the benefit. Simple single-field comparisons cover the dominant patterns (field constraints vs rules/guards that reference the same field with a literal bound). Cross-field analysis would require relational intervals or an SMT solver — both violate the design's non-SMT, single-pass architecture. (Principle #8: the checker doesn't guess.)
+
+**Tradeoff accepted:** `rule A + B < 5` with `A min 3` and `B min 3` is not flagged even though it's contradictory (`A + B >= 6 > 5`). The analysis doesn't compose arithmetic intervals across rule predicates.
+
+### 7. Cross-Event Invariant Analysis is Opt-In
+
+**Decision:** C99 requires explicit opt-in. Does not run by default.
+
+**Alternative rejected:** Always-on cross-event analysis.
+
+**Rationale:** Cross-event analysis is the only enforcement requiring fixed-point iteration, breaking the single-pass guarantee. Performance impact is proportional to state-graph complexity. The fast-by-default experience is a product commitment — opt-in preserves it.
+
+**Tradeoff accepted:** Authors don't get cross-event invariant information unless they explicitly enable it. Most won't need it.
+
+### 8. Error vs Warning Severity Split
+
+**Decision:** Proven violations that make code structurally dead → Error. Proven redundancies or unnecessary constructs → Warning.
+
+| Diagnostic | Condition | Severity | Rationale |
+|---|---|---|---|
+| C94 | Assignment always violates constraint | Error | Runtime will always reject — dead code |
+| C95 | Rule always unsatisfiable | Error | Global integrity failure — nothing works |
+| C96 | Rule always true | Warning | Not harmful, just unnecessary |
+| C97 | Guard always false | Warning | Unreachable code, not harmful |
+| C98 | Guard always true | Warning | Unnecessary condition, not harmful |
+| C99 | Cross-event invariant holds | Info | Informational, not a problem |
+
+**Rationale:** Errors block compilation (Principle #8: prevention). Warnings inform the author. The line is drawn at "will this code ever succeed?" — if the answer is provably no, it's an error. If it's "this code is redundant but not broken," it's a warning.
+
+### 9. No New DSL Constructs Required
+
+**Decision:** All enforcements apply to constructs that EXIST in the DSL today. No new keywords, modifiers, or syntax forms are needed.
+
+**Observation:** The constraint surface (`nonnegative`, `positive`, `min N`, `max N`, `notempty`, `minlength`, `maxlength`, `mincount`, `maxcount`, `maxplaces`, `ordered`) is comprehensive for the current type system. Two gaps noted:
+
+- **`nonzero` modifier:** Would enable `$nonzero:` as a first-class constraint, improving interval precision for divisor safety. Already filed as issue #111. Not required for any enforcement in this design.
+- **`length` constraint on strings (integer bound on `.length`):** Would enable C94 for string assignments. Does not exist today. PROPOSAL NOTE: if string-length enforcement is wanted, a `length` constraint keyword would be needed. This is a separate language proposal, not part of this design.
+
+---
+
+## Phasing
+
+### PR #108 — Current Scope (Unchanged)
+
+PR #108 ships the proof engine infrastructure: Layers 1–5, C93 compound-expression enforcement, C76 interval-based sqrt safety, and the `NumericInterval` foundation. Slices 11–15 as designed in `temp/proof-stack-implementation-plan.md`.
+
+**No new enforcement diagnostics land on PR #108.**
+
+**Rationale:** PR #108 is already +340 new lines, +56 tests. The proof stack infrastructure must be correct and well-tested before building enforcement on top of it. Shipping infrastructure and enforcement separately enables clean bisection if regressions occur, and each follow-up issue has a focused, reviewable scope.
+
+### Follow-up A: Assignment Constraint Enforcement (C94)
+
+**Title:** Compile-time assignment constraint enforcement via interval analysis
+**Scope:** C94 diagnostic, `NumericInterval.Intersects`, `NumericInterval.FromConstraints`, constraint interval checks at all assignment sites (transition rows, state actions, computed fields), ~12 tests.
+**Size:** ~80 new lines + ~15 changed + 12 tests.
+**Depends on:** PR #108 (interval infrastructure).
+**Rationale:** Natural first consumer of the interval infrastructure. High value — catches provably-dead assignments that currently pass silently to runtime rejection.
+
+### Follow-up B: Dead Rule Detection (C95, C96)
+
+**Title:** Compile-time dead rule detection — contradictory and vacuous rules
+**Scope:** C95/C96 diagnostics, satisfying interval extraction from rule predicates, comparison against field constraint intervals, synthetic-rule exclusion, ~8 tests.
+**Size:** ~60 new lines + ~10 changed + 8 tests.
+**Depends on:** Follow-up A (constraint interval extraction pattern).
+**Rationale:** Catches structural precept errors (C95) and unnecessary rules (C96). Low implementation cost — reuses interval comparison from C94.
+
+### Follow-up C: Dead Guard Detection (C97, C98) + Transition Sharpening
+
+**Title:** Compile-time dead/vacuous guard detection and transition reachability sharpening
+**Scope:** C97/C98 diagnostics, guard interval analysis, sharpened C48/C50/C51 triggers, ~12 tests.
+**Size:** ~80 new lines + ~20 changed + 12 tests.
+**Depends on:** Follow-up A and B (interval extraction patterns).
+**Rationale:** Extends dead-code detection to transition routing. High value for complex precepts where guard interactions with constraints create unreachable rows.
+
+### Follow-up D: State Reachability Sharpening
+
+**Title:** Proof-engine-aware state reachability analysis
+**Scope:** Integrate C97 results into existing C48 analysis, ~3 tests.
+**Size:** ~20 new lines + ~10 changed + 3 tests.
+**Depends on:** Follow-up C (C97 infrastructure).
+**Rationale:** Small, focused extension. Leverages C97 to sharpen the existing state-graph analysis.
+
+### Follow-up E: Cross-Event Field Invariant Analysis (C99)
+
+**Title:** Opt-in cross-event field invariant analysis via state-graph fixed-point
+**Scope:** C99 diagnostic, state-graph iteration, opt-in gating, ~6 tests.
+**Size:** ~150 new lines + ~10 changed + 6 tests.
+**Depends on:** PR #108 (interval infrastructure). Independent of A–D.
+**Rationale:** The only enforcement requiring fixed-point iteration. Separate research and design review recommended before implementation. Highest cost, lowest urgency.
