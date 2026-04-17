@@ -49,7 +49,9 @@ The proof engine is organized as a five-layer stack. Each layer builds on the on
 
 The updated proof state is threaded through the assignment `foreach` loop in both `ValidateTransitionRows()` and `ValidateStateActions()`, so each subsequent assignment sees post-mutation state.
 
-**Integration point:** `PreceptTypeChecker.cs` — `ValidateTransitionRows()` (line ~305) and `ValidateStateActions()` (line ~410). After each `ValidateExpression` + C68 check, call `ApplyAssignmentNarrowing` and update the symbols dictionary.
+**Integration point:** `PreceptTypeChecker.cs` — `ValidateTransitionRows()` (line ~195) and `ValidateStateActions()` (line ~354). After each `ValidateExpression` + C68 check, call `ApplyAssignmentNarrowing` and update the symbols dictionary.
+
+> **Note:** Line numbers are approximate and will shift during implementation.
 
 ### Layer 2: Interval Arithmetic
 
@@ -81,14 +83,30 @@ internal readonly record struct NumericInterval(
 |---|---|
 | `Add([a,b], [c,d])` | `[a+c, b+d]` |
 | `Subtract([a,b], [c,d])` | `[a-d, b-c]` |
-| `Multiply([a,b], [c,d])` | Four-corner: `[min(ac,ad,bc,bd), max(ac,ad,bc,bd)]` |
+| `Multiply([a,b], [c,d])` | Sign-case decomposition (see below) |
 | `Divide([a,b], [c,d])` | When `[c,d]` excludes zero: standard interval division. Otherwise: `Unknown`. |
 | `Negate([a,b])` | `[-b, -a]` with flipped inclusivity |
 | `Abs([a,b])` | Both nonneg → identity. Both nonpositive → negate. Mixed → `[0, max(\|a\|, \|b\|)]` |
 | `Min([a,b], [c,d])` | `[min(a,c), min(b,d)]` |
 | `Max([a,b], [c,d])` | `[max(a,c), max(b,d)]` |
 | `Clamp(x, lo, hi)` | `[max(x.Lower, lo.Lower), min(x.Upper, hi.Upper)]` |
-| `Hull([a,b], [c,d])` | `[min(a,c), max(b,d)]` — join for conditional expression synthesis |
+| `Hull([a,b], [c,d])` | `[min(a,c), max(b,d)]` — join for conditional expression synthesis. **Inclusivity for equal bounds:** when both lower bounds are equal, `LowerInclusive = a.LowerInclusive \|\| b.LowerInclusive`; likewise when both upper bounds are equal, `UpperInclusive = a.UpperInclusive \|\| b.UpperInclusive`. |
+
+**Multiply sign-case decomposition:** Naive four-corner multiplication (`min/max` of `{a*c, a*d, b*c, b*d}`) produces `NaN` when an endpoint is zero and the other is `±∞` (because `0 × ∞` is undefined in IEEE 754). The implementation decomposes by sign combination to avoid `0 × ∞`:
+
+| Case | Condition | Result |
+|---|---|---|
+| Both positive | `a ≥ 0 && c ≥ 0` | `[a*c, b*d]` |
+| Both negative | `b ≤ 0 && d ≤ 0` | `[b*d, a*c]` |
+| Left positive, right negative | `a ≥ 0 && d ≤ 0` | `[b*c, a*d]` |
+| Left negative, right positive | `b ≤ 0 && c ≥ 0` | `[a*d, b*c]` |
+| Left positive, right mixed | `a ≥ 0 && c < 0 && d > 0` | `[b*c, b*d]` |
+| Left negative, right mixed | `b ≤ 0 && c < 0 && d > 0` | `[a*d, a*c]` |
+| Left mixed, right positive | `a < 0 && b > 0 && c ≥ 0` | `[a*d, b*d]` |
+| Left mixed, right negative | `a < 0 && b > 0 && d ≤ 0` | `[b*c, a*c]` |
+| Both mixed | `a < 0 && b > 0 && c < 0 && d > 0` | `[min(a*d, b*c), max(a*c, b*d)]` |
+
+Inclusive bounds follow: `LowerInclusive = true` when the contributing factors' relevant bounds are both inclusive. The "both mixed" case is the only one that still uses `min/max` of four products, but all four products involve finite nonzero factors (no `0 × ∞`).
 
 **Why standard interval arithmetic suffices:** Precept expressions form finite trees with no cycles. Every transfer rule produces a result interval in O(1). The recursive walk visits each node once. There is no need for lattice widening because there is no iteration that could cause unbounded interval growth. The `Unknown` interval serves as top — any operation involving `Unknown` produces `Unknown` unless the operation itself bounds the result (e.g., `abs(Unknown)` produces `[0, +∞)`).
 
@@ -113,7 +131,9 @@ internal readonly record struct NumericInterval(
 | `max V` | `(-∞, V]` |
 | `min V1` + `max V2` | `[V1, V2]` |
 
-**Storage format decision:** Interval markers use string-encoded keys (`$ival:key:lower:lowerInc:upper:upperInc`) in the existing symbol table rather than a parallel `Dictionary<string, NumericInterval>`. This avoids threading a second dictionary through the entire narrowing pipeline and keeps the API surface unchanged. The tradeoff is parse overhead on extraction, which is negligible — extraction happens once per identifier per expression tree visit.
+**Min+max combination algorithm:** When `Check()` processes field constraints, it must detect and combine `min` and `max` constraints on the same field into a single `$ival:` marker rather than injecting two separate markers. Algorithm sketch: iterate over each field’s `FieldConstraint` records. Collect `min V` and `max V` values for each field. If both exist, inject a single `$ival:key:V1:true:V2:true` marker (the combined `[V1, V2]` interval). If only `min V` exists, inject `$ival:key:V:true:Infinity:false`. If only `max V` exists, inject `$ival:key:-Infinity:false:V:true`. The `nonnegative` and `positive` constraints are handled by their existing `$nonneg:` and `$positive:` markers, which `ExtractIntervalFromMarkers` already reads; they do NOT need a duplicate `$ival:` marker.
+
+**Storage format decision:** Interval markers use string-encoded keys (`$ival:key:lower:lowerInc:upper:upperInc`) in the existing symbol table rather than a parallel `Dictionary<string, NumericInterval>`. This avoids threading a second dictionary through the entire narrowing pipeline and keeps the API surface unchanged. The tradeoff is parse overhead on extraction, which is negligible — extraction happens once per identifier per expression tree visit. **All numeric values in `$ival:` markers MUST be serialized and parsed using `CultureInfo.InvariantCulture`** to prevent locale-dependent decimal separator issues (e.g., `5.0` vs `5,0`).
 
 ### Layer 3: Interval Inference
 
@@ -137,7 +157,9 @@ internal readonly record struct NumericInterval(
 | `max(a, b)` | `NumericInterval.Max(recurse(a), recurse(b))` |
 | `clamp(x, lo, hi)` | `NumericInterval.Clamp(recurse(x), recurse(lo), recurse(hi))` |
 | `sqrt(x)` | If `x.IsNonnegative`: `[√Lower, √Upper]`; else `Unknown` |
-| `round(x, _)` / `ceil(x)` / `floor(x)` | Same interval as `x` (rounding preserves sign and zero-exclusion) |
+| `floor(x)` | `[floor(x.Lower), floor(x.Upper)]` with closed bounds |
+| `ceil(x)` | `[ceil(x.Lower), ceil(x.Upper)]` with closed bounds |
+| `round(x, _)` | Conservative: `[floor(x.Lower), ceil(x.Upper)]` with closed bounds |
 | Conditional `if/then/else` | See Layer 5 |
 | Other | `Unknown` |
 
@@ -170,7 +192,7 @@ This subsumes the `abs()` special case (because `TryInferInterval` handles `abs(
 
 **Marker format:** `$gt:{A}:{B}` and `$gte:{A}:{B}` in the symbol table, proving `A > B` and `A >= B` respectively.
 
-**Injection point:** `TryApplyNumericComparisonNarrowing()` (line ~2340). The existing method handles `identifier <op> literal`. A new branch handles `identifier <op> identifier`:
+**Injection point:** `TryApplyNumericComparisonNarrowing()` (line ~2308). The existing method handles `identifier <op> literal`. A new branch handles `identifier <op> identifier`:
 
 | Guard/rule pattern | Marker injected |
 |---|---|
@@ -250,12 +272,14 @@ End-to-end flow for a compound divisor expression reaching `TryInferBinaryKind`:
 
 | Integration point | File | Location | Change |
 |---|---|---|---|
-| Sequential flow wiring | `PreceptTypeChecker.cs` | `ValidateTransitionRows()` ~line 305, `ValidateStateActions()` ~line 410 | Thread `ApplyAssignmentNarrowing` through assignment loops |
-| C93 compound branch | `PreceptTypeChecker.cs` | `TryInferBinaryKind()` ~line 2110 | Replace fallthrough comment with `TryInferInterval` + `TryInferRelationalNonzero` |
-| C76 sqrt check | `PreceptTypeChecker.cs` | `TryInferFunctionCallKind()` ~line 1893 | Replace hard-coded pattern match with `TryInferInterval(...).IsNonnegative` |
-| Interval markers | `PreceptTypeChecker.cs` | `Check()` ~line 108 | Inject `$ival:` markers from field `min`/`max` constraints |
-| Relational markers | `PreceptTypeChecker.cs` | `TryApplyNumericComparisonNarrowing()` ~line 2340 | New `identifier <op> identifier` branch |
+| Sequential flow wiring | `PreceptTypeChecker.cs` | `ValidateTransitionRows()` ~line 195, `ValidateStateActions()` ~line 354 | Thread `ApplyAssignmentNarrowing` through assignment loops |
+| C93 compound branch | `PreceptTypeChecker.cs` | `TryInferBinaryKind()` ~line 1921 | Replace fallthrough comment with `TryInferInterval` + `TryInferRelationalNonzero` |
+| C76 sqrt check | `PreceptTypeChecker.cs` | `TryInferFunctionCallKind()` ~line 1722 | Replace hard-coded pattern match with `TryInferInterval(...).IsNonnegative` |
+| Interval markers | `PreceptTypeChecker.cs` | `Check()` ~line 89 | Inject `$ival:` markers from field `min`/`max` constraints |
+| Relational markers | `PreceptTypeChecker.cs` | `TryApplyNumericComparisonNarrowing()` ~line 2308 | New `identifier <op> identifier` branch |
 | Interval struct | `NumericInterval.cs` | New file in `src/Precept/Dsl/` | `NumericInterval` record struct + transfer rules |
+
+> **Note:** Line numbers are approximate references to the current codebase and will shift during implementation.
 
 ## Soundness Guarantees
 
@@ -321,6 +345,14 @@ A DSL compiler serves domain authors, not PL researchers. The cost of a false po
 **Rationale:** Intervals are a non-relational abstract domain by definition — they track bounds per variable, not relationships between variables. Encoding `A > B` as a constraint on `A - B` would require tracking synthetic expressions in the symbol table, which is architecturally invasive. The separate relational layer is surgically targeted: it handles the specific pattern (`A - B` in divisor position with a known `A > B` fact) that intervals cannot and does so in ~40 lines. The scope is deliberately narrow — only direct `identifier <op> identifier` comparisons, not arbitrary relational constraints.
 
 **Tradeoff accepted:** The relational layer only handles subtraction of two identifiers. `A / (A - B - C)` with `rule A > B + C` is not recognized. This covers the dominant business pattern (pairwise comparison) and avoids the complexity of general relational reasoning.
+
+## Numeric Precision and IEEE 754
+
+The proof engine operates on `double` (IEEE 754 binary64) internally. This introduces three corner cases that are deliberately handled for soundness:
+
+- **Overflow saturates to ±∞.** When an arithmetic operation produces a result beyond `double.MaxValue`, IEEE 754 rounds to `+∞` or `-∞`. This is sound — an interval containing `+∞` or `-∞` is a valid over-approximation. No false "safe" claims result from overflow.
+- **NaN inputs produce Unknown-equivalent behavior.** If a `NaN` value enters the interval system (e.g., from a malformed literal or an impossible operation), the affected interval is treated as `Unknown`. The `ExcludesZero` and `IsNonnegative` predicates return `false` for any interval containing `NaN`, which is conservative — the engine rejects rather than falsely approves.
+- **Decimal→double cast is a slight widening.** Precept field values use `decimal` at runtime, but interval arithmetic uses `double`. The cast from `decimal` to `double` may widen the value slightly (e.g., `0.1m` → `0.1d` ≈ `0.100000000000000005...`). This is soundness-preserving — a slightly wider interval never causes a false "safe" claim. It may very rarely cause a false "unsafe" claim for values extremely close to zero, which is acceptable given the engine's conservative design.
 
 ## Limitations and Future Work
 

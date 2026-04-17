@@ -13,8 +13,22 @@
 - Event arg constraint keyword → C93 suppression must be tested separately from event arg ensure → C93 suppression. The mechanism overlaps but the AC names them as distinct.
 - `from any` expansion tests must cover each proof-scoped diagnostic independently. A null-narrowing `from any` test does NOT satisfy the divisor `from any` AC.
 - Theory-based tests with `messageFragment` inline data are the strongest pattern for context-aware diagnostic messages — each row self-documents what the message should say.
+- Principle #8 stance from the testing seat: compile-clean should not imply safety the checker did not actually prove. Runtime failure tests are a backstop, not the guarantee, but tighter philosophy must preserve already-proven compound patterns rather than flattening the language into trivial-only proofs.
+
+- Compound "assume satisfiable" heuristic has a latent soundness gap: `D - D` is always zero but no C93 fires. Any future compound analysis must address this test (`Check_DivisorCompound_Subtraction_NoWarning`).
+- The sample corpus has ZERO non-literal field-based divisors that lack proof — every division by a field or event arg is already constrained. Future proof techniques have no corpus gap to close for existing samples; their value is in enabling NEW patterns (inline if/then/else division, function-wrapped divisors, relational cross-field proofs).
+- if/then/else in Precept is ternary expression only — narrowing applies to typing within branches, not control-flow reachability. This simplifies branch analysis compared to general PL.
+- Function proofs (abs, max, min, clamp, round, sqrt) have the highest ratio of new provable patterns to implementation complexity. `max(D, 1)` as safe divisor is the single most impactful pattern.
+- Interval arithmetic's biggest win in the current corpus is computed field constraint verification (e.g., proving `LineTotal nonnegative` from upstream field ranges).
 
 ## Recent Updates
+
+### 2026-04-17 — Proof Technique Test Inventory (pre-implementation research)
+- Read all 25 sample files, cataloged every arithmetic expression: 5 divisions, 2 modulos, 22+ additions/subtractions, 11+ multiplications, 8 function calls, 5 if/then/else ternaries, 12+ relational guard expressions.
+- All sample divisions are already safe: either literal divisors or event-arg-proven. No new technique closes a gap in the existing corpus.
+- Identified `Check_DivisorCompound_Subtraction_NoWarning` (`D - D`) as a latent soundness gap that any compound analysis would expose.
+- Produced 40+ concrete test cases across 5 techniques with positive/negative/edge categories in actual Precept syntax.
+- Output: `temp/soup-nazi-proof-test-inventory.md`
 
 ### 2026-04-17 — PR #108 Test Review (Issue #106 divisor safety)
 - Reviewed full PR: 34 behavioral ACs mapped to tests. 32/34 covered, 2 blockers.

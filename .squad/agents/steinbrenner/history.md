@@ -9,6 +9,9 @@
 - Prevention-first languages cannot casually overload enforcement-shaped keywords for passive constructs.
 - Proposal issues land best with one durable structure and clearly labeled hypothetical syntax.
 - Roadmap labels and workflow metadata are most useful when taxonomy, ownership, and exceptions stay separate.
+- Principle 8 PM stance (2026-04-17): in a prevention-first product, compiler uncertainty cannot be silently treated as safety. `Compiles clean` must mean no unresolved proof gaps on guarantee-bearing surfaces; if proof runs out, surface it explicitly or require a loud escape hatch rather than assuming satisfiable.
+- Strict prevention-first products can train authors to adapt to a bounded checker, but only when the proof boundary is legible, diagnostics teach the accepted reformulations, and any escape hatch is loud enough that "verified" still means something.
+- Real entity-governance arithmetic is dominated by thresholds, ranges, ratios, bracket tables, bounded counts, and capped totals; the PM bar should optimize the proof engine for those patterns and treat actuarial, optimization, and tax-engine computation as upstream values for Precept to govern, not re-compute.
 
 ## Recent Updates
 

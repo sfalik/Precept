@@ -12,8 +12,32 @@
 - DSL `ensure` statements always require a `because` clause — tests that omit it get parse failures, not type-check failures.
 - When narrowing injects `$positive:` it always co-injects `$nonneg:`, so `$positive:` alone is never the only marker present. Adding `$positive:` as a C76 fallback is defensive but aligns with the C92/C93 pattern.
 - The dotted-key translation for event args happens in `BuildEventEnsureNarrowings` — bare markers like `$nonneg:Val` become `$nonneg:Submit.Val`. The C76 check constructs dotted keys via `TryGetIdentifierKey`, so both ends line up.
+- Transition-row `set` chains are checked against one guard-narrowed snapshot per row. Earlier assignments do not feed later assignments today, which is the root cause of the intra-row divisor/null false negatives.
+- State actions share the same stale-snapshot limitation as transition rows. A sequential action-flow fix should update both sites to avoid divergent compile-time semantics.
+- The compiler-side fix is local to `PreceptTypeChecker`, but editor/type-context precision is coarser: `transition-actions` currently records one scope snapshot per row, not per assignment.
+- Principle #8 should be described as capability-scoped strictness, not a blanket "assume satisfiable" default: the checker already rejects missing proof in some safety domains (nullability, `sqrt`, divisor safety) while remaining conservative in others (sequential flow, collection emptiness, arithmetic transfer).
+- A bounded proof engine without SMT is a natural extension of the current checker: `ApplyNarrowing`, rule/state/event ensure snapshots, and C76/C93 already form a small abstract-interpretation pipeline.
+- The sample corpus puts pressure on identifier/literal arithmetic and null-guarded `.length`, not on hard algebra. Sign/nonzero propagation plus sequential `set` flow is a better first investment than intervals or solver work.
+- The honest no-SMT ceiling is a bounded abstract interpreter, not general algebra: sequential flow plus sign analysis buys the most; intervals help next; relational reasoning is the expensive last mile; nonlinear formulas like amortization denominators still need helper values or a solver.
+- CORRECTION: Previous feasibility analysis imported general PL static analysis complexity (loop joins, widening, fixpoints, CFG reconvergence) that does not exist in Precept. Precept has no loops, no control-flow branches, no reconverging flow. `when` guards select rows independently; `if/then/else` is an inline ternary. The "join" for conditionals is a single bitwise AND of sign facts, not a lattice merge. This dramatically simplifies all proof techniques.
+- The full non-SMT proof stack (sequential flow + interval arithmetic + relational patterns) is ~500 new lines of type checker code. The previous estimate of "high complexity" for intervals and "very high" for relational reasoning was inflated by 3-5x because it included complexity that doesn't apply to Precept's execution model.
+- Interval arithmetic subsumes sign analysis. Building both is redundant — intervals give you signs for free (Positive = `(0, ∞)`, Nonneg = `[0, ∞)`). The optimal build is A (sequential flow) → C (intervals) → D (relational patterns), skipping B (signs) as a separate step.
+- Relational inference in Precept is pattern matching, not symbolic algebra. `A - B` in divisor position + `$gt:A:B` marker = safe. No normalization, no canonicalization, no solver. ~65 lines total.
 
 ## Recent Updates
+
+### 2026-04-17 — Stateless event handlers (`on EventName`) feasibility evaluation
+- Verdict: **feasible**. All 7 implementation layers have clear insertion points. Total size: M.
+- Parser: new `StatelessTransitionRowParser` combinator after `EventEnsureDecl.Try()`. No ambiguity — `ensure` token disambiguates.
+- Model: `PreceptTransitionRow.FromState` must become `string?`. ~5 callsite null-guards. Stateless rows store `null`.
+- Type checker: null-safe group key in `ValidateTransitionRows`. One new diagnostic: `transition <State>` not valid in stateless `on` block.
+- Analysis: C49 must become conditional — suppress for events that have a stateless row handler.
+- Engine: `Fire()` and `Inspect()` hard-wall on `IsStateless` must be replaced with branching paths. `_transitionRowMap` key type → `(string?, string)`. `ResolveTransition` signature → `string?`.
+- Philosophy flag: `docs/philosophy.md` frames Precept as a "state machine/lifecycle" engine. Stateless event handlers expand that identity. Frank's call — not a technical blocker.
+- Design decision needed: explicit `-> no transition` required (Option A) vs. implicit default. Recommend starting with explicit for parser consistency.
+- Key files: `PreceptParser.cs` (Statement union, new combinator), `PreceptModel.cs` (FromState nullable), `PreceptTypeChecker.cs` (ValidateTransitionRows null-guarding), `PreceptRuntime.cs` (Fire/Inspect branching), `PreceptAnalysis.cs` (C49 conditional).
+
+
 
 ### 2026-04-17 — Issue #106 Slice 6: sqrt C76 rework with unified narrowing + dotted key fix
 - Verified the C76 `$nonneg:` proof lookup already handled dotted event-arg keys (inline ternary, not broken as initially suspected).
