@@ -1133,10 +1133,10 @@ The compiler checks the right operand of `/` and `%` for a compile-time nonzero 
 | Condition | Diagnostic | Severity | Message |
 |---|---|---|---|
 | Divisor is literal `0` or `0.0` | C92 | Error | `Division by zero: the divisor is literal 0.` |
-| Divisor is an identifier with no nonzero proof | C93 | Warning | `Divisor '{name}' has no compile-time nonzero proof. Consider adding a 'positive' constraint, 'rule {name} != 0', or 'when {name} != 0' guard.` |
-| Divisor is nonnegative but not nonzero | C93 | Warning | `Divisor '{name}' is nonnegative but not nonzero — 'nonnegative' allows zero. Consider 'positive' instead.` |
+| Divisor is an identifier with no nonzero proof | C93 | Error | `Divisor '{name}' has no compile-time nonzero proof. Consider adding a 'positive' constraint, 'rule {name} != 0', or 'when {name} != 0' guard.` |
+| Divisor is nonnegative but not nonzero | C93 | Error | `Divisor '{name}' is nonnegative but not nonzero — 'nonnegative' allows zero. Consider 'positive' instead.` |
 
-C92 is an **error** because the compiler can prove a contradiction — dividing by literal zero is always wrong. C93 is a **warning** because the compiler cannot prove the divisor is zero, only that it lacks a proof of nonzero. Compound expressions (binary operations, function calls) are assumed satisfiable and produce no warning — the inspector catches those at simulation time.
+C92 is an **error** because the compiler can prove a contradiction — dividing by literal zero is always wrong. C93 is also an **error** because an unproven divisor risks runtime division by zero, which produces IEEE 754 Infinity or NaN — values that silently corrupt field state and cannot be serialized. The runtime guards against this at evaluation time, but the compile-time error ensures authors fix the proof gap before deployment. Compound expressions (binary operations, function calls) are assumed satisfiable and produce no diagnostic — the inspector catches those at simulation time.
 
 **Proof sources that suppress C93:**
 
@@ -1389,8 +1389,8 @@ All diagnostics follow a three-tier severity model:
 
 | Severity | Meaning | Examples |
 |---|---|---|
-| **Error** | Provably wrong — the checker can prove a contradiction from types, null-flow, or structural rules. Blocks compilation. | Type mismatches (C39–C41), null-flow violations (C42), unknown identifiers (C38), non-boolean rule positions (C46), identical-guard duplicates (C47), unreachable rows, missing outcomes, literal zero divisor (C92) |
-| **Warning** | Probably wrong — structural quality issue that is almost certainly a mistake but could be intentional. Does not block compilation. | Reject-only (state, event) pairs (C51), events that never succeed (C52), unreachable states (C48), orphaned events (C49), unproven divisor (C93) |
+| **Error** | Provably wrong — the checker can prove a contradiction from types, null-flow, or structural rules. Blocks compilation. | Type mismatches (C39–C41), null-flow violations (C42), unknown identifiers (C38), non-boolean rule positions (C46), identical-guard duplicates (C47), unreachable rows, missing outcomes, literal zero divisor (C92), unproven divisor (C93) |
+| **Warning** | Probably wrong — structural quality issue that is almost certainly a mistake but could be intentional. Does not block compilation. | Reject-only (state, event) pairs (C51), events that never succeed (C52), unreachable states (C48), orphaned events (C49) |
 | **Hint** | Informational — observation that may or may not indicate a problem. | Dead-end states (C50), empty precept (C53) |
 
 The rule: if the checker can **prove** it, it’s an **error**. If the analyzer can **observe** a structural concern, it’s a **warning** or **hint**. The checker never guesses — uncertain cases are left to the inspector.

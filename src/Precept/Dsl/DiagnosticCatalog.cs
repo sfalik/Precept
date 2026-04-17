@@ -712,6 +712,5 @@ public static class DiagnosticCatalog
     public static readonly LanguageConstraint C93 = Register(
         "C93", "compile",
         "Divisor has no compile-time nonzero proof.",
-        "{message}",
-        ConstraintSeverity.Warning);
+        "{message}");
 }

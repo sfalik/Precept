@@ -2063,8 +2063,8 @@ internal static class PreceptTypeChecker
                 // SYNC:CONSTRAINT:C92 — literal zero divisor
                 // SYNC:CONSTRAINT:C93 — unproven divisor safety
                 // Principle #8 ("never guess"): C92 is error (literal zero — provably wrong).
-                // C93 is warning (unproven divisor — might be wrong, but don't block).
-                // Two-tier severity: errors for deterministic proof of failure, warnings for heuristic risk.
+                // C93 is error (unproven divisor — risks IEEE 754 Infinity/NaN at runtime).
+                // Two-tier: C92 = proven contradiction, C93 = unproven nonzero gap.
                 if (binary.Operator is "/" or "%")
                 {
                     if (TryGetNumericLiteral(binary.Right, out var divisorValue))

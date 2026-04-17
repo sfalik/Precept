@@ -1678,4 +1678,24 @@ public class PreceptTypeCheckerTests
 
         result.Diagnostics.Where(d => d.Constraint.Id == "C93").Should().BeEmpty();
     }
+
+    // L. Severity
+
+    [Fact]
+    public void Check_C93_IsError_NotWarning()
+    {
+        const string dsl = """
+            precept M
+            field Y as number default 10
+            field D as number default 0
+            state A initial
+            event Go
+            from A on Go -> set Y = Y / D -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        var c93 = result.Diagnostics.Single(d => d.Constraint.Id == "C93");
+        c93.Constraint.Severity.Should().Be(ConstraintSeverity.Error);
+    }
 }

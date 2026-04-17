@@ -217,7 +217,13 @@ internal static class PreceptExpressionRuntimeEvaluator
                 }
 
                 if (TryToNumber(leftOperand, out var leftNumberForDiv) && TryToNumber(rightOperand, out var rightNumberForDiv))
-                    return EvaluationResult.Ok(leftNumberForDiv / rightNumberForDiv);
+                {
+                    if (rightNumberForDiv == 0.0) return EvaluationResult.Fail("division by zero.");
+                    var divResult = leftNumberForDiv / rightNumberForDiv;
+                    if (double.IsNaN(divResult) || double.IsInfinity(divResult))
+                        return EvaluationResult.Fail("division produced NaN or Infinity.");
+                    return EvaluationResult.Ok(divResult);
+                }
 
                 return EvaluationResult.Fail("operator '/' requires numeric operands.");
 
@@ -229,7 +235,13 @@ internal static class PreceptExpressionRuntimeEvaluator
                 }
 
                 if (TryToNumber(leftOperand, out var leftNumberForMod) && TryToNumber(rightOperand, out var rightNumberForMod))
-                    return EvaluationResult.Ok(leftNumberForMod % rightNumberForMod);
+                {
+                    if (rightNumberForMod == 0.0) return EvaluationResult.Fail("modulo by zero.");
+                    var modResult = leftNumberForMod % rightNumberForMod;
+                    if (double.IsNaN(modResult) || double.IsInfinity(modResult))
+                        return EvaluationResult.Fail("modulo produced NaN or Infinity.");
+                    return EvaluationResult.Ok(modResult);
+                }
 
                 return EvaluationResult.Fail("operator '%' requires numeric operands.");
 
