@@ -87,10 +87,9 @@ field InterestRate as number default 4.25
 
 rule ClaimAmount >= 0 because "Claim amounts cannot be negative"
 
-rule if AttemptCount > 5
-  reject "Too many attempts"
+on Submit ensure Submit.Amount <= 100000 because "Amount cannot exceed $100,000"
 
-set Score = BaseScore + 10
+from Open on Submit -> set Score = BaseScore + 10 -> no transition
 ```
 
 ### Boolean literals
@@ -101,8 +100,7 @@ set Score = BaseScore + 10
 field IsVerified as boolean default false
 field FraudFlag as boolean default false
 
-rule if IsVerified == true
-  set ApprovalReady = true
+from Open on Approve -> set ApprovalReady = if IsVerified == true then true else false -> no transition
 ```
 
 Booleans are the only literal type that is also a keyword — `true` and `false` are reserved words in the language.
@@ -112,10 +110,9 @@ Booleans are the only literal type that is also a keyword — `true` and `false`
 `null` is a language keyword representing the absence of a value. The tokenizer maps it to a `Null` token. The parser's `NullAtom` combinator produces `PreceptLiteralExpression(null)`.
 
 ```precept
-field OverrideReason as string default null
+field OverrideReason as string nullable
 
-rule if Approver == null
-  reject "Approver is required"
+on Approve ensure Approver != null because "Approver is required"
 ```
 
 `null` is valid as a default value for any field type. In expressions, `null` participates in equality comparisons (`== null`, `!= null`) and is coerced to empty string `""` in string interpolation contexts.
