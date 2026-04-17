@@ -109,6 +109,33 @@ internal static class PreceptTypeChecker
             }
         }
 
+        // Slice 12: inject $ival: markers from explicit min/max constraints.
+        // nonnegative/positive are already covered by $nonneg:/$positive: markers injected above.
+        {
+            var markerDict = new Dictionary<string, StaticValueKind>(dataFieldKinds, StringComparer.Ordinal);
+            foreach (var field in model.Fields)
+            {
+                if (field.Constraints is not { Count: > 0 }) continue;
+                if (field.Type is not (PreceptScalarType.Number or PreceptScalarType.Integer or PreceptScalarType.Decimal)) continue;
+
+                double? minVal = null;
+                double? maxVal = null;
+                foreach (var c in field.Constraints)
+                {
+                    if (c is FieldConstraint.Min m) minVal = m.Value;
+                    else if (c is FieldConstraint.Max mx) maxVal = mx.Value;
+                }
+
+                if (minVal is null && maxVal is null) continue;
+
+                var lower = minVal ?? double.NegativeInfinity;
+                var upper = maxVal ?? double.PositiveInfinity;
+                var ival = new NumericInterval(lower, minVal.HasValue, upper, maxVal.HasValue);
+                markerDict[ival.ToMarkerKey(field.Name)] = StaticValueKind.Boolean;
+            }
+            dataFieldKinds = markerDict;
+        }
+
         var eventArgKinds = model.Events.ToDictionary(
             evt => evt.Name,
             evt => evt.Args.ToDictionary(
@@ -2220,6 +2247,39 @@ internal static class PreceptTypeChecker
     }
 
     /// <summary>
+    /// Extracts the tightest <see cref="NumericInterval"/> for <paramref name="key"/> from the proof
+    /// marker symbol table. Used by <c>TryInferInterval</c> (Layer 3) to initialize leaf intervals.
+    /// Priority: explicit <c>$ival:</c> marker (from min/max constraints or assignment narrowing)
+    /// → <c>$positive:</c> → <c>$nonneg:+$nonzero:</c> → <c>$nonneg:</c> → <see cref="NumericInterval.Unknown"/>.
+    /// </summary>
+    private static NumericInterval ExtractIntervalFromMarkers(
+        string key,
+        IReadOnlyDictionary<string, StaticValueKind> symbols)
+    {
+        // Explicit interval marker takes priority (most specific).
+        var ivalPrefix = $"$ival:{key}:";
+        foreach (var mk in symbols.Keys)
+        {
+            if (mk.StartsWith(ivalPrefix, StringComparison.Ordinal) &&
+                NumericInterval.TryParseMarkerKey(mk, out var ival))
+            {
+                return ival;
+            }
+        }
+
+        // Fall back to sign markers.
+        var isPositive = symbols.ContainsKey($"$positive:{key}");
+        var isNonneg = symbols.ContainsKey($"$nonneg:{key}");
+        var isNonzero = symbols.ContainsKey($"$nonzero:{key}");
+
+        if (isPositive) return NumericInterval.Positive;
+        if (isNonneg && isNonzero) return NumericInterval.Positive; // nonneg + nonzero = strictly positive
+        if (isNonneg) return NumericInterval.Nonneg;
+        // $nonzero: alone cannot be represented as a single interval — return Unknown.
+        return NumericInterval.Unknown;
+    }
+
+    /// <summary>
     /// Updates proof markers in <paramref name="symbols"/> after a <c>set <paramref name="targetField"/> = <paramref name="rhs"/></c>
     /// assignment. Called within assignment loops to thread post-mutation proof state into subsequent
     /// assignments in the same row or state action (Layer 1: Sequential Assignment Flow).
@@ -2235,6 +2295,11 @@ internal static class PreceptTypeChecker
         markers.Remove($"$positive:{targetField}");
         markers.Remove($"$nonneg:{targetField}");
         markers.Remove($"$nonzero:{targetField}");
+
+        // Kill any $ival: markers for the target field (encoded as prefix $ival:{field}:).
+        var ivalPrefix = $"$ival:{targetField}:";
+        foreach (var k in symbols.Keys.Where(k => k.StartsWith(ivalPrefix, StringComparison.Ordinal)).ToList())
+            markers.Remove(k);
 
         rhs = StripParentheses(rhs);
 
@@ -2264,6 +2329,10 @@ internal static class PreceptTypeChecker
                 {
                     markers[$"$nonzero:{targetField}"] = StaticValueKind.Boolean;
                 }
+
+                // Also inject a point interval for precise interval arithmetic in subsequent expressions.
+                var pointIval = new NumericInterval(numVal, true, numVal, true);
+                markers[pointIval.ToMarkerKey(targetField)] = StaticValueKind.Boolean;
             }
         }
         else if (TryGetIdentifierKey(rhs, out var sourceKey))
@@ -2275,6 +2344,15 @@ internal static class PreceptTypeChecker
                 markers[$"$nonneg:{targetField}"] = StaticValueKind.Boolean;
             if (symbols.ContainsKey($"$nonzero:{sourceKey}"))
                 markers[$"$nonzero:{targetField}"] = StaticValueKind.Boolean;
+
+            // Also copy $ival: markers from source to target.
+            var srcIvalPrefix = $"$ival:{sourceKey}:";
+            foreach (var srcKey in symbols.Keys.Where(k => k.StartsWith(srcIvalPrefix, StringComparison.Ordinal)))
+            {
+                // Re-encode with the target field name.
+                if (NumericInterval.TryParseMarkerKey(srcKey, out var srcIval))
+                    markers[srcIval.ToMarkerKey(targetField)] = StaticValueKind.Boolean;
+            }
         }
         // Compound RHS: markers already killed above — conservative, no new proof.
 
