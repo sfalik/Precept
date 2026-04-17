@@ -942,4 +942,127 @@ public class PreceptTypeCheckerTests
 
         result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C76");
     }
+
+    // ─── Issue #106 Slice 2: Or-pattern null-guard decomposition ────
+
+    [Fact]
+    public void Check_OrPattern_NullOrPositive_SqrtNoC76()
+    {
+        const string dsl = """
+            precept M
+            field Rate as number nullable default null
+            state A initial
+            event Go
+            from A on Go when Rate == null or Rate > 0 -> set Rate = sqrt(Rate) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C76").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_OrPattern_PositiveOrNull_SqrtNoC76()
+    {
+        // Reversed ordering: numeric branch first, null-check second
+        const string dsl = """
+            precept M
+            field Rate as number nullable default null
+            state A initial
+            event Go
+            from A on Go when Rate > 0 or Rate == null -> set Rate = sqrt(Rate) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C76").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_OrPattern_NullLiteralOnLeft_SqrtNoC76()
+    {
+        // null == Field instead of Field == null
+        const string dsl = """
+            precept M
+            field Rate as number nullable default null
+            state A initial
+            event Go
+            from A on Go when null == Rate or Rate > 0 -> set Rate = sqrt(Rate) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C76").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_OrPattern_NullableNonnegativeConstraint_SqrtNoC76()
+    {
+        // nonnegative constraint on nullable field desugars to Rate == null or Rate >= 0
+        const string dsl = """
+            precept M
+            field Rate as number nullable nonnegative default null
+            state A initial
+            event Go
+            from A on Go when Rate != null -> set Rate = sqrt(Rate) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C76").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_OrPattern_BothNullChecks_NoNumericProof()
+    {
+        // Both branches are null checks — no numeric proof to extract.
+        // C77 fires (nullable argument) because the or-pattern doesn't narrow away null.
+        const string dsl = """
+            precept M
+            field Rate as number nullable default null
+            state A initial
+            event Go
+            from A on Go when Rate == null or Rate == null -> set Rate = sqrt(Rate) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C76" || d.Constraint.Id == "C77");
+    }
+
+    [Fact]
+    public void Check_OrPattern_CompoundAnd_SqrtNoC76()
+    {
+        // Compound: Field == null or (Field >= 0 and Field < 100)
+        const string dsl = """
+            precept M
+            field Rate as number nullable default null
+            state A initial
+            event Go
+            from A on Go when Rate == null or (Rate >= 0 and Rate < 100) -> set Rate = sqrt(Rate) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C76").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_OrPattern_CrossField_SqrtStillC76()
+    {
+        // Different fields in null-check vs numeric branch — no proof extracted.
+        // C77 fires (nullable argument) because there's no null-guard for B.
+        const string dsl = """
+            precept M
+            field A as number nullable default null
+            field B as number nullable default null
+            state S initial
+            event Go
+            from S on Go when A == null or B >= 0 -> set B = sqrt(B) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C76" || d.Constraint.Id == "C77");
+    }
 }

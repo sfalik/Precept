@@ -2117,7 +2117,14 @@ internal static class PreceptTypeChecker
         if (binary.Operator == "or")
         {
             if (assumeTrue)
+            {
+                // SOUNDNESS: This proof is sound ONLY because C42 independently prevents null fields
+                // from reaching arithmetic. If C42 is ever relaxed for nullable arithmetic, this
+                // decomposition becomes unsound.
+                if (TryDecomposeNullOrPattern(binary, symbols, out var decomposed))
+                    return decomposed;
                 return symbols;
+            }
 
             var leftNarrowed = ApplyNarrowing(binary.Left, symbols, assumeTrue: false);
             return ApplyNarrowing(binary.Right, leftNarrowed, assumeTrue: false);
@@ -2258,6 +2265,119 @@ internal static class PreceptTypeChecker
 
         result = markers;
         return true;
+    }
+
+    /// <summary>
+    /// Recognizes <c>Field == null or Field > 0</c> (or reversed ordering) produced by MaybeNullGuard
+    /// for nullable fields with numeric constraints, and extracts the numeric proof from the non-null branch.
+    /// </summary>
+    private static bool TryDecomposeNullOrPattern(
+        PreceptBinaryExpression binary,
+        IReadOnlyDictionary<string, StaticValueKind> symbols,
+        out IReadOnlyDictionary<string, StaticValueKind> result)
+    {
+        result = symbols;
+
+        if (binary.Operator != "or")
+            return false;
+
+        // Try both orderings: left=null-check + right=numeric, or left=numeric + right=null-check
+        var left = StripParentheses(binary.Left);
+        var right = StripParentheses(binary.Right);
+
+        if (TryDecomposeOrdered(left, right, symbols, out result))
+            return true;
+        if (TryDecomposeOrdered(right, left, symbols, out result))
+            return true;
+
+        return false;
+
+        static bool TryDecomposeOrdered(
+            PreceptExpression nullCandidate,
+            PreceptExpression numericCandidate,
+            IReadOnlyDictionary<string, StaticValueKind> syms,
+            out IReadOnlyDictionary<string, StaticValueKind> res)
+        {
+            res = syms;
+
+            // Null-check branch: Field == null or null == Field
+            if (nullCandidate is not PreceptBinaryExpression { Operator: "==" } nullBinary)
+                return false;
+
+            bool leftIsNull = IsNullLiteral(nullBinary.Left);
+            bool rightIsNull = IsNullLiteral(nullBinary.Right);
+            if (!leftIsNull && !rightIsNull)
+                return false;
+
+            // Both sides are null → no numeric proof to extract
+            if (leftIsNull && rightIsNull)
+                return false;
+
+            var nullSideIdExpr = leftIsNull ? nullBinary.Right : nullBinary.Left;
+            if (!TryGetIdentifierKey(nullSideIdExpr, out var nullFieldKey))
+                return false;
+
+            // Numeric branch — could be a direct comparison or a compound 'and'
+            var stripped = StripParentheses(numericCandidate);
+
+            if (stripped is PreceptBinaryExpression { Operator: "and" } andBinary)
+            {
+                // Compound: Field == null or (Field >= 0 and Field < 100)
+                // Recurse into each 'and' operand to accumulate markers
+                var accumulated = new Dictionary<string, StaticValueKind>(syms, StringComparer.Ordinal);
+                bool anyInjected = false;
+
+                foreach (var operand in new[] { andBinary.Left, andBinary.Right })
+                {
+                    // Verify same-field identity
+                    if (!TryGetNumericBranchFieldKey(operand, out var andKey) || andKey != nullFieldKey)
+                        continue;
+
+                    var narrowed = ApplyNarrowing(operand, accumulated, assumeTrue: true);
+                    if (!ReferenceEquals(narrowed, accumulated))
+                    {
+                        accumulated = new Dictionary<string, StaticValueKind>(narrowed, StringComparer.Ordinal);
+                        anyInjected = true;
+                    }
+                }
+
+                if (!anyInjected)
+                    return false;
+
+                res = accumulated;
+                return true;
+            }
+
+            // Direct comparison: Field == null or Field > 0
+            if (!TryGetNumericBranchFieldKey(stripped, out var numericFieldKey))
+                return false;
+
+            // Same-field identity check: prevent unsound cross-field decomposition
+            if (numericFieldKey != nullFieldKey)
+                return false;
+
+            var result = ApplyNarrowing(stripped, syms, assumeTrue: true);
+            if (ReferenceEquals(result, syms))
+                return false;
+
+            res = result;
+            return true;
+        }
+
+        static bool TryGetNumericBranchFieldKey(PreceptExpression expr, out string key)
+        {
+            key = string.Empty;
+            var stripped = StripParentheses(expr);
+            if (stripped is not PreceptBinaryExpression cmp)
+                return false;
+
+            if (TryGetIdentifierKey(cmp.Left, out key))
+                return true;
+            if (TryGetIdentifierKey(cmp.Right, out key))
+                return true;
+
+            return false;
+        }
     }
 
     private static string FlipComparisonOperator(string op) => op switch
