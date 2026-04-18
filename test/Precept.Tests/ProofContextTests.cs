@@ -549,4 +549,44 @@ public class ProofContextTests
         interval.ExcludesZero.Should().BeTrue("GCD normalization should make 2A-2B → A-B at storage, matching the lookup");
         interval.IsPositive.Should().BeTrue();
     }
+
+    // ── Frank B1: W1/W2 tier-specific regression pins ─────────────────────────
+
+    [Fact]
+    public void IntervalOf_ConstantOffsetScan_GteZeroOffset_LowerIsInclusive()
+    {
+        // W1 regression pin: ConstantOffsetScan with c=1 and >= must return inclusive lower bound.
+        // Stores A >= B + 1, queries A - B. Offset c = 0 - (-1) = 1 >= 0 → fires ConstantOffsetScan.
+        // Before W1 fix, c == 0 case with >= would produce (0, +inf) instead of [0, +inf).
+        // This test forces tier-4 path (not tier-1 direct match).
+        var ctx = new ProofContext(new Dictionary<string, StaticValueKind>())
+            .WithRule(
+                PreceptParser.ParseExpression("A"),
+                RelationKind.GreaterThanOrEqual,
+                PreceptParser.ParseExpression("B + 1"));
+
+        var interval = ctx.IntervalOf(PreceptParser.ParseExpression("A - B"));
+
+        interval.Lower.Should().Be(1.0);
+        interval.LowerInclusive.Should().BeTrue("W1 fix: >= with non-negative offset must be inclusive");
+        interval.IsPositive.Should().BeTrue("A >= B+1 means A-B >= 1, which is positive");
+    }
+
+    [Fact]
+    public void IntervalOf_StorageSideGcd_ScaledRule_2AGreaterThan2B_ProvesAMinusB()
+    {
+        // W2 regression pin: WithRule must GCD-normalize at storage time.
+        // Stores rule 2*A > 2*B. Without W2 fix, stored key is {A:2, B:-2}.
+        // With W2 fix, stored key is GCD-normalized to {A:1, B:-1}.
+        // Query: IntervalOf(A - B) → LinearForm {A:1, B:-1} → direct match.
+        var ctx = new ProofContext(new Dictionary<string, StaticValueKind>())
+            .WithRule(
+                PreceptParser.ParseExpression("2 * A"),
+                RelationKind.GreaterThan,
+                PreceptParser.ParseExpression("2 * B"));
+
+        var interval = ctx.IntervalOf(PreceptParser.ParseExpression("A - B"));
+
+        interval.IsPositive.Should().BeTrue("2A > 2B normalizes to A > B at storage time");
+    }
 }
