@@ -107,9 +107,9 @@ The proof engine is organized as three composing types — `ProofContext`, `Line
 
 ### Rational Type
 
-`readonly record struct Rational(long Numerator, long Denominator) : INumber<Rational>`
+`readonly record struct Rational(long Numerator, long Denominator) : INumber<Rational>, ISignedNumber<Rational>`
 
-The `Rational` type provides exact arithmetic for `LinearForm` coefficients. It is a .NET 10 native type (~100 LOC, zero external dependencies).
+The `Rational` type provides exact arithmetic for `LinearForm` coefficients. It is a .NET 10 native type (~230 LOC, zero external dependencies). `ISignedNumber<Rational>` provides `NegativeOne`, used in unary-minus normalization and display logic.
 
 **Why not `double`.** `double` coefficients risk FP-induced false positives in normalization: `(A/10)*3` and `3*A/10` may produce different bit patterns, causing them to hash to different `LinearForm` keys even though they represent the same expression. Any such divergence is a fabricated false "no match" in the relational store — sound (no false proof), but erodes proving power unpredictably.
 
@@ -117,21 +117,21 @@ The `Rational` type provides exact arithmetic for `LinearForm` coefficients. It 
 
 **Construction.** GCD normalization at construction ensures canonical form for dictionary key equality (`3/6` and `1/2` produce the same `Rational`). Zero denominator throws at construction.
 
-**Arithmetic safety.** Uses `checked` long arithmetic. `TryNormalize` catches `OverflowException` and returns `null` — the caller falls back to interval arithmetic, which is always sound. Cross-GCD pre-reduction before multiplication (`gcd(a.Num, b.Den)`, `gcd(b.Num, a.Den)`, reduce, then multiply) prevents overflow in common cases.
+**Arithmetic safety.** Uses `checked` long arithmetic. `TryNormalize` catches `OverflowException` and returns `null` — the caller falls back to interval arithmetic, which is always sound. Cross-GCD pre-reduction before multiplication (`gcd(a.Num, b.Den)`, `gcd(b.Num, a.Den)`, reduce, then multiply) prevents overflow in common cases. `CompareTo` uses `Int128`-based cross-multiplication to avoid overflow when comparing fractions with large numerators.
 
 **Decimal literal conversion.** `Rational.FromDecimalLiteral("0.1")` → `Rational(1, 10)`. Round-trip: `(double)Rational(1, 10)` = `0.1d`. Exact by construction.
 
 ### LinearForm Normalization
 
-`LinearForm` is the canonical form for sums of field references with `Rational` coefficients. It is a parallel form to the AST — the parser AST is never mutated.
+`LinearForm` is the canonical form for sums of field references with `Rational` coefficients. It is a `sealed class` (not a record) with content-based `IEquatable<LinearForm>` — `ImmutableSortedDictionary` has reference equality, so record-generated equality would be incorrect. It is a parallel form to the AST — the parser AST is never mutated.
 
 **Grammar.** A `LinearForm` is:
 ```
-Terms: ImmutableSortedDictionary<FieldKey, Rational>   (field → coefficient)
-Constant: Rational                                      (additive constant)
+Terms: ImmutableSortedDictionary<string, Rational>   (field name, possibly dotted → coefficient)
+Constant: Rational                                    (additive constant)
 ```
 
-Zero-coefficient terms are dropped at construction. `A - A` produces empty terms and constant `0`. The `FieldKey` sort order is deterministic (string-ordered field names), ensuring canonical form for dictionary key equality.
+Zero-coefficient terms are dropped at construction. `A - A` produces empty terms and constant `0`. The string sort order is deterministic, ensuring canonical form for dictionary key equality and `GetHashCode` consistency.
 
 **`TryNormalize(PreceptExpression expr) → LinearForm?`** Recursive depth-bounded normalization:
 
