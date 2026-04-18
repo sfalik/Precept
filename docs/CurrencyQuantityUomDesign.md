@@ -125,6 +125,66 @@ from Active on CalculateFee
 
 The author declares `date` fields — stating "I care about calendar distance." Subtraction yields `period`, which cancels the `days` denominator. Calendar days are the correct unit because the business contract says "10 business days," not "864,000 seconds."
 
+**Currency conversion — governed exchange rates:**
+
+```precept
+field InvoiceTotal as money in 'EUR'
+field FxRate as exchangerate in 'USD/EUR'
+field SettlementAmount as money in 'USD'
+
+from Approved on Settle
+  set SettlementAmount = FxRate * InvoiceTotal   # (USD/EUR) × EUR → USD  ✓
+```
+
+The compiler verifies the currency pair: the exchange rate's denominator (`EUR`) matches the source money, and the numerator (`USD`) matches the target. `FxRate * PaymentGbp` where PaymentGbp is `money in 'GBP'` is a compile-time error — EUR ≠ GBP. Without typed exchange rates, currency conversion is bare multiplication with no structural guarantee that the pair is correct.
+
+**Inventory — ordering, stocking, and pricing in different UOMs:**
+
+```precept
+# Unit definitions — stored as data, referenced via interpolation
+field OrderingUom as unitofmeasure default 'case'
+field StockingUom as unitofmeasure default 'each'
+field PricingUom as unitofmeasure default 'kg'
+
+# Conversion factors — typed compound units via interpolation
+field StockPerOrder as quantity in '{StockingUom}/{OrderingUom}' default '24 each/case'
+field PricingPerStock as quantity in '{PricingUom}/{StockingUom}' default '0.5 kg/each'
+
+# Supplier pricing — in pricing UOM
+field SupplierPrice as price in 'USD/{PricingUom}'
+
+# Customer pricing — in stocking UOM
+field SellingPrice as price in 'USD/{StockingUom}'
+
+# Inventory tracked in stocking UOM
+field OnHand as quantity in '{StockingUom}'
+field ReorderPoint as quantity in '{StockingUom}'
+
+# Ordering
+field CasesOrdered as quantity in '{OrderingUom}'
+field OrderCost as money in 'USD'
+
+# Sales
+field QtySold as quantity in '{StockingUom}'
+field Revenue as money in 'USD'
+
+from InStock on ReceiveOrder
+  # Convert cases → eaches for stocking
+  set OnHand = OnHand + (CasesOrdered * StockPerOrder)              # each + (case × each/case → each)  ✓
+  # Convert cases → kg for pricing: case × each/case × kg/each → kg
+  set OrderCost = SupplierPrice * (CasesOrdered * StockPerOrder * PricingPerStock)
+                                                                     # (USD/kg) × kg → USD  ✓
+
+from InStock on Sell
+  when QtySold <= OnHand
+    set OnHand = OnHand - QtySold                                    # each - each → each  ✓
+    set Revenue = Revenue + (SellingPrice * QtySold)                  # USD + (USD/each × each → USD)  ✓
+  when OnHand < ReorderPoint
+    transition Reorder
+```
+
+Three UOMs, three purposes: ordering (`case`), stocking (`each`), pricing (`kg`). The unit names appear once as data defaults; every field references them through interpolation. The conversion chain for `OrderCost` is: `case × each/case × kg/each → kg`, then `USD/kg × kg → USD`. Each step cancels one unit — the compiler verifies the full chain. `OnHand + CasesOrdered` without conversion is a compile-time error: `each ≠ case`. Division provides the inverse: `OnHand / StockPerOrder` yields `case` without defining a second factor.
+
 ### What happens if we don't build this
 
 Without business-domain types:
@@ -176,6 +236,8 @@ A field declaration may carry **at most one** of `in` or `of`. Declaring both is
 
 `in` is a **uniform assignment constraint** across all types (D14). `money in 'USD'` rejects EUR at compile time. `quantity in 'kg'` rejects `'5 lbs'` at compile time. `period in 'months'` rejects a period with days components at compile time. The same word means the same thing everywhere.
 
+**Not available on identity types:** `currency`, `unitofmeasure`, and `dimension` do not support `in`. These types ARE the identity — their value is the currency code, unit name, or dimension name itself. `currency in 'USD'` would mean "a currency that is USD," which is a constant, not a constraint. Use `rule` or `when` guards for equality checks on identity types.
+
 ### `of` — category constraint
 
 `of` constrains a field to accept **any member of a named category** rather than a single specific value:
@@ -185,7 +247,7 @@ A field declaration may carry **at most one** of `in` or `of`. Declaring both is
 | `quantity` | UCUM dimension category | `field Distance as quantity of 'length'` |
 | `period` | Component category | `field GracePeriod as period of 'date'` |
 
-`of` is available on `quantity` and `period`. It is **not** available on `money`, `currency`, `price`, or `exchangerate`.
+`of` is available on `quantity` and `period`. It is **not** available on `money`, `currency`, `price`, `exchangerate`, `unitofmeasure`, or `dimension`. The identity types (`currency`, `unitofmeasure`, `dimension`) do not carry a separate category slot — they ARE the identity. Use `when` guards for category checks (e.g., `when UOM.dimension == 'mass'`).
 
 #### UCUM dimension categories
 
@@ -196,9 +258,8 @@ A field declaration may carry **at most one** of `in` or `of`. Declaring both is
 | `volume` | L³ | L, mL, gal, fl_oz |
 | `area` | L² | m2, ft2, acre, ha |
 | `temperature` | Θ | Cel, [degF], K |
-| `count` | dimensionless | each, dozen |
 
-Time units (`s`, `min`, `h`, `d`) are excluded from the `quantity` category system because they belong to NodaTime's temporal types.
+Time units (`s`, `min`, `h`, `d`) are excluded from the `quantity` category system because they belong to NodaTime's temporal types. Counting units (`each`, `case`, `pack`, `dozen`) are **opaque** — each is its own unit with no shared dimension and no auto-conversion. Conversion between counting units requires explicit multiplication by a typed conversion factor (e.g., `quantity in 'each/case'`).
 
 #### Period component categories
 
@@ -362,9 +423,12 @@ field Measurement as quantity             # open — unit comes from event data
 | `quantity * number` | `quantity` | Scaling. |
 | `number * quantity` | `quantity` | Commutative. |
 | `quantity / number` | `quantity` | Division by scalar. Divisor safety applies. |
-| `quantity / quantity` | `number` | Same dimension required; produces dimensionless ratio. |
+| `quantity / quantity` (same dimension) | `number` | Same dimension required; produces dimensionless ratio. `'10 kg' / '5 kg'` → `2`. |
+| `quantity / quantity` (different dimensions) | `quantity` (compound) | Produces compound unit: `'12 kg' / '24 each'` → `'0.5 kg/each'` (Level B). |
 | `quantity / period` | `quantity` (compound) | Produces time-denominator rate: `'5 kg' / '1 hour'` → `'5 kg/hour'` (Level B, D15). |
 | `quantity / duration` | `quantity` (compound) | Same, but `hours`/`minutes`/`seconds` denominators only (D15). |
+| `quantity (compound) * quantity` | `quantity` | Dimensional cancellation: `'0.5 kg/each' * '24 each'` → `'12 kg'` (Level B). |
+| `quantity * quantity (compound)` | `quantity` | Commutative. |
 | `quantity (compound) * period` | `quantity` | Dimensional cancellation: `'5 kg/hour' * '2 hours'` → `'10 kg'` (D15). |
 | `period * quantity (compound)` | `quantity` | Commutative. |
 | `quantity (compound) * duration` | `quantity` | Cancellation for `hours`/`minutes`/`seconds` denominators (D15). |
@@ -376,7 +440,7 @@ field Measurement as quantity             # open — unit comes from event data
 |---|---|
 | `quantity + quantity` (different dimensions) | **Compile error.** You can't add kilograms to meters — they measure different things. |
 | `quantity + number` | A bare number has no unit. Use `Weight + '2 kg'` to add 2 kilograms. |
-| `quantity * quantity` | Direct quantity multiplication has no defined result type in v1. Use `quantity * number` for scaling. |
+| `quantity * quantity` (both simple) | Multiplying two simple quantities (e.g., `kg * kg`) produces a multi-term compound (`kg²`) — Level C, out of scope. Multiplication is allowed when one operand is a compound and the other cancels its denominator. |
 
 **Accessors:**
 
@@ -667,27 +731,77 @@ These are the two ratio patterns that dominate business domains. They get dedica
 | Currency / non-currency unit | `price` | `'4.17 USD/kg'`, `'75 USD/hours'` | Most common business ratio; enables `price * quantity → money` cancellation |
 | Currency / currency | `exchangerate` | `'1.08 USD/EUR'` | Enables governed currency conversion; D11 requires it |
 
-**Level B — Time-denominator compound quantities (v1 scope)**
+**Level B — Single-ratio compound quantities (v1 scope)**
 
-Quantities divided by time units produce rates that are common in business domains — flow rates, throughput, velocity, labor rates. These don't need a new named type because they can be modeled as `quantity` with a compound UCUM unit:
+Quantities divided by a single denominator unit produce ratios that are ubiquitous in business domains — rates, conversion factors, throughput, density. These don't need a new named type because they can be modeled as `quantity` with a compound unit:
 
 ```precept
+# Time-denominator rates
 field FlowRate as quantity in 'kg/hour'
 field Throughput as quantity in 'each/day'
-field MilesPerDay as quantity in 'miles/day'
+
+# Entity-scoped conversion factors
+field EachPerCase as quantity in 'each/case' default '24 each/case'
+field KgPerEach as quantity in 'kg/each' default '0.5 kg/each'
+
+# Standard unit ratios
+field Yield as quantity in 'kg/L'
 ```
 
-The `/` inside the unit string is UCUM compound unit syntax — the same mechanism that backs `price` and `exchangerate`. The type checker validates compound unit expressions and supports dimensional cancellation:
+The `/` inside the unit string is UCUM compound unit syntax — the same mechanism that backs `price` and `exchangerate`. The type checker validates compound unit expressions and supports dimensional cancellation.
+
+**Time-denominator cancellation** — where the denominator is a NodaTime time unit:
 
 | Expression | Result | Cancellation |
 |---|---|---|
 | `quantity in 'kg/hour' * period in 'hours'` | `quantity in 'kg'` | (kg/hour) × hour → kg |
 | `quantity in 'kg/hour' * duration` | `quantity in 'kg'` | (kg/hour) × duration → kg (fixed-length denominator) |
 | `quantity in 'kg' / period in 'hours'` | `quantity in 'kg/hour'` | kg ÷ hour → kg/hour |
-| `quantity in 'kg' / duration` | `quantity in 'kg/hour'` | kg ÷ duration → kg/hour (fixed-length denominator) |
 | `quantity in 'miles' / period in 'days'` | `quantity in 'miles/day'` | miles ÷ day → miles/day |
 
-Time-denominator compounds are in v1 scope because they rely on the same registry infrastructure (UCUM units + NodaTime time units) and the same UCUM `/` grammar that `price` and `exchangerate` already use. The time unit in the denominator comes from NodaTime's vocabulary — the same units used in `period in 'hours'` (see D15).
+Time denominators use NodaTime vocabulary (`hours`, `days`, not `h`, `d`) and cancel against both `period` and `duration` per the fixed-length boundary (D15).
+
+**Non-time-denominator cancellation** — where the denominator is any other unit:
+
+| Expression | Result | Cancellation |
+|---|---|---|
+| `quantity in 'each/case' * quantity in 'case'` | `quantity in 'each'` | (each/case) × case → each |
+| `quantity in 'each' / quantity in 'each/case'` | `quantity in 'case'` | each ÷ each/case → case (division inverts) |
+| `quantity in 'kg/each' * quantity in 'each'` | `quantity in 'kg'` | (kg/each) × each → kg |
+| `quantity in 'kg/L' * quantity in 'L'` | `quantity in 'kg'` | (kg/L) × L → kg |
+
+Non-time denominators cancel against `quantity` operands. Division provides the inverse direction: `each ÷ each/case → case`. No second conversion factor, no repeating-decimal precision problem, no auto-inversion. Standard dimensional algebra.
+
+**Deriving compound quantities from arithmetic:**
+
+Compound quantities don't have to be declared with literal defaults — they can be derived from dividing two quantities with different units:
+
+```precept
+field TotalWeight as quantity in 'kg'
+field ItemCount as quantity in 'each'
+field WeightPerItem as quantity in 'kg/each'
+
+from Active on Weigh
+  set WeightPerItem = TotalWeight / ItemCount    # kg ÷ each → kg/each  ✓
+```
+
+The compiler infers the compound unit from the operands: `kg / each → kg/each`. The result is a compound `quantity` that participates in all Level B cancellation — `WeightPerItem * SomeCount` would produce `kg`. This also works for time-denominator derivation: `quantity in 'miles' / period in 'days'` → `quantity in 'miles/day'`.
+
+**Chained conversion** — multiple ratios composed in sequence:
+
+```precept
+field EachPerCase as quantity in 'each/case' default '24 each/case'
+field KgPerEach as quantity in 'kg/each' default '0.5 kg/each'
+field SupplierPrice as price in 'USD/kg'
+field CasesOrdered as quantity in 'case'
+
+# case × each/case × kg/each → kg, then USD/kg × kg → USD
+set OrderCost = SupplierPrice * (CasesOrdered * EachPerCase * KgPerEach)
+```
+
+Each step cancels one unit. The compiler verifies the entire chain — if a step is missing, the units don't cancel and it's a compile error.
+
+Level B covers all single-ratio compounds (`X/Y` where X and Y are single units). This includes time-denominator rates, entity-scoped conversion factors, and standard unit ratios. The compound unit grammar, cancellation algebra, and type checker are identical across all denominator types — the time-denominator boundary (D15) is the only special case.
 
 **Registry bridge: NodaTime vocabulary in denominators**
 
@@ -730,18 +844,19 @@ The alternative would be: no `price` or `exchangerate` types — just `quantity 
 2. **Different operator behavior.** `price * quantity → money` is dimensional cancellation that produces a *different type*, not another quantity. Generic compound quantities don't have this cross-type algebra.
 3. **Currency-specific rules.** `price` and `exchangerate` participate in D11 (cross-currency safety). Generic compound quantities don't need currency-pair checking.
 
-Level B time-denominator compounds don't need named types because they stay within the `quantity` type family — their arithmetic produces quantities, not money or exchange rates.
+Level B single-ratio compounds don't need named types because they stay within the `quantity` type family — their arithmetic produces quantities, not money or exchange rates.
 
-**Level C — General compound unit algebra (out of v1 scope)**
+**Level C — Multi-term compound unit algebra (out of scope)**
 
-Arbitrary compound quantity-over-quantity ratios — density (`kg/L`), acceleration (`m/s2`), force (`kg.m/s2`) — require full UCUM compound unit parsing, normalization, and dimensional analysis. These are valid UCUM expressions but require a significantly more complex type checker:
+Multi-term compound units — acceleration (`m/s2`), force (`kg.m/s2`), pressure (`kg/m.s2`) — require capabilities beyond single-ratio parsing:
 
-- Parsing nested unit expressions with `.`, `/`, exponents, and parentheses
-- Normalizing to canonical form for equality testing
-- Tracking dimension vectors through multi-step arithmetic
-- Handling exponents and compound dimensions (L² for area, L³ for volume)
+- Multi-term numerators: `kg.m` (mass × length)
+- Exponents: `s2`, `m2`, `m3`
+- Parenthesized sub-expressions: `(kg.m)/s2`
+- Dimension vector tracking: [M¹ L¹ T⁻²] through arithmetic chains
+- Canonical normalization: `N` = `kg.m/s2` equivalence
 
-Level C is explicitly deferred. Authors who need compound physical units can model them as `number` fields with naming conventions until Level C ships.
+These are physics and engineering constructs. Precept governs business entities — money, counts, weights, time, and the single-ratio relationships between them. Level B's `X/Y` grammar covers the business domain. Level C is permanently out of scope, not deferred.
 
 ---
 
@@ -948,9 +1063,13 @@ Each content shape must be distinguishable from all existing inhabitants:
 
 The temporal proposal's integer requirement (Decision #28: `'0.5 days'` is a compile error) applies only to temporal unit names. Non-temporal quantities accept non-integer magnitudes because their backing types accept them: `'2.5 kg'` is valid, `'100.50 USD'` is valid.
 
-### Interpolation — any component, any type
+### Interpolation — any component, any position
 
-`{expr}` interpolation can substitute any positional component of a typed constant:
+`{expr}` interpolation can substitute any positional component of a typed constant or any declaration-site constraint. This section is the canonical reference for all interpolation in the business-domain types.
+
+#### Expression-position interpolation (typed constants)
+
+`{expr}` substitutes magnitude, unit, or currency components inside typed constant expressions:
 
 | Type | Static | Magnitude interpolated | Unit interpolated | Both interpolated |
 |---|---|---|---|---|
@@ -968,6 +1087,142 @@ set Cost = '{LineTotal} {InvoiceCurrency}'    # ✗ no proof InvoiceCurrency == 
 when InvoiceCurrency == 'USD'
   set Cost = '{LineTotal} {InvoiceCurrency}'  # ✓ guard narrows currency
 ```
+
+#### Declaration-position interpolation (`in` and `of`)
+
+`{FieldRef}` substitutes field values inside `in '...'` and `of '...'` constraints. This enables data-driven unit and category configuration:
+
+**`in` interpolation:**
+
+| Type | Static | Interpolated | Example |
+|---|---|---|---|
+| `money` | `in 'USD'` | `in '{BaseCurrency}'` | `field Revenue as money in '{BaseCurrency}'` |
+| `quantity` | `in 'kg'` | `in '{StockingUom}'` | `field OnHand as quantity in '{StockingUom}'` |
+| `quantity` (compound) | `in 'each/case'` | `in '{StockingUom}/{OrderingUom}'` | `field StockPerOrder as quantity in '{StockingUom}/{OrderingUom}'` |
+| `price` | `in 'USD/kg'` | `in '{BaseCurrency}/{PricingUom}'` | `field UnitPrice as price in '{BaseCurrency}/{PricingUom}'` |
+| `exchangerate` | `in 'USD/EUR'` | `in '{BaseCurrency}/{ForeignCurrency}'` | `field FxRate as exchangerate in '{BaseCurrency}/{ForeignCurrency}'` |
+| `period` | `in 'months'` | `in '{BillingBasis}'` | `field BillingCycle as period in '{BillingBasis}'` |
+
+**`of` interpolation:**
+
+| Type | Static | Interpolated | Example |
+|---|---|---|---|
+| `quantity` | `of 'mass'` | `of '{AllowedDimension}'` | `field Reading as quantity of '{AllowedDimension}'` |
+| `period` | `of 'date'` | `of '{ComponentCategory}'` | `field Grace as period of '{ComponentCategory}'` |
+
+**Compound unit interpolation** — any component in a compound `in` constraint can be interpolated independently:
+
+```precept
+field OrderingUom as unitofmeasure default 'case'
+field StockingUom as unitofmeasure default 'each'
+field PricingUom as unitofmeasure default 'kg'
+field BaseCurrency as currency default 'USD'
+
+# Single-component interpolation
+field OnHand as quantity in '{StockingUom}'                          # 'each'
+
+# Multi-component interpolation in compound units
+field StockPerOrder as quantity in '{StockingUom}/{OrderingUom}'     # 'each/case'
+field PricingPerStock as quantity in '{PricingUom}/{StockingUom}'    # 'kg/each'
+field UnitPrice as price in '{BaseCurrency}/{PricingUom}'           # 'USD/kg'
+field FxRate as exchangerate in '{BaseCurrency}/{ForeignCurrency}'  # 'USD/EUR'
+```
+
+#### Resolution semantics
+
+`in` and `of` interpolation resolves in two tiers:
+
+| Source | When resolved | Constraint status | Arithmetic verified at |
+|---|---|---|---|
+| Field with `default` value (not set by events) | Compile time | Static — fully known | Compile time |
+| Field set by events (no default, or overwritten) | Runtime | Dynamic — requires narrowing | Compile time via guards, runtime at fire/update boundary |
+
+**Tier 1 — Static resolution (default values):**
+
+When the referenced field has a `default` and is never `set` by any event handler, the compiler resolves the interpolation at compile time. The constraint becomes fully static — arithmetic is verified as if `in 'each'` were written directly.
+
+```precept
+field StockingUom as unitofmeasure default 'each'   # never set by events
+field OnHand as quantity in '{StockingUom}'          # resolves to in 'each' at compile time
+```
+
+**Tier 2 — Dynamic resolution (event-set values):**
+
+When the referenced field can be changed by events, the `in` constraint is dynamic. The compiler requires discrete equality narrowing before allowing arithmetic with other constrained fields:
+
+```precept
+field ActiveCurrency as currency                     # set by events — no static value
+field Revenue as money in '{ActiveCurrency}'
+
+# Without narrowing — compile error
+set Revenue = Revenue + Payment                      # ✗ ActiveCurrency is unknown
+
+# With narrowing — valid
+when ActiveCurrency == 'USD' and Payment.currency == 'USD'
+  set Revenue = Revenue + Payment                    # ✓ both proven USD
+```
+
+**Tier interaction — static and dynamic fields in the same compound:**
+
+```precept
+field BaseCurrency as currency default 'USD'         # static — never set by events
+field PricingUom as unitofmeasure                    # dynamic — set by events
+
+field UnitPrice as price in '{BaseCurrency}/{PricingUom}'
+# BaseCurrency resolves to 'USD' at compile time
+# PricingUom requires narrowing for the denominator
+```
+
+The compiler resolves what it can statically and requires narrowing for the remainder. Each interpolated component is resolved independently.
+
+---
+
+## Field Constraints
+
+The seven business-domain types reuse the existing field-constraint vocabulary from `PreceptLanguageDesign.md`. No new constraint keywords are introduced. The constraint system's desugaring, compile-time diagnostics (C57/C58/C59), and proof-engine integration (C94–C98 via `NumericInterval.FromConstraints()`) apply uniformly.
+
+### Magnitude types
+
+`money`, `quantity`, `price`, and `exchangerate` are `decimal`-backed magnitude types. All numeric constraints apply:
+
+| Constraint | Desugars to | Proof engine | Example |
+|---|---|---|---|
+| `nonnegative` | `Field >= 0` | `[0, +∞)` | `field Balance as money in 'USD' nonnegative` |
+| `positive` | `Field > 0` | `(0, +∞)` | `field Rate as exchangerate in 'USD/EUR' positive` |
+| `nonzero` (#111) | `Field != 0` | excludes zero | `field Divisor as quantity in 'each' nonzero` |
+| `min N` | `Field >= N` | `[N, +∞)` | `field OrderQty as quantity in 'each' min 1` |
+| `max N` | `Field <= N` | `(-∞, N]` | `field Score as quantity max 100` |
+| `maxplaces N` | Runtime enforcement | — | `field Amount as money in 'USD' maxplaces 2` |
+
+**`maxplaces` and ISO 4217:** `maxplaces` is available on all four magnitude types. For `money`, the author may choose to align with ISO 4217 minor units (e.g., `maxplaces 2` for USD, `maxplaces 0` for JPY), but there is no auto-default — the author must declare it explicitly. This avoids surprising behavior for domains that intentionally use higher precision (e.g., forex uses 4–6 decimal places for USD).
+
+**Nullable interaction:** Same as existing types — when a nullable magnitude field carries a constraint, the desugared expression gains a null guard: `Field == null or Field >= N`.
+
+### Identity types
+
+`currency`, `unitofmeasure`, and `dimension` are identity types — their value IS the code/name, not a numeric magnitude. No numeric constraints apply:
+
+| Constraint | `currency` | `unitofmeasure` | `dimension` |
+|---|---|---|---|
+| `nonnegative` / `positive` / `nonzero` | ✗ (C57) | ✗ (C57) | ✗ (C57) |
+| `min` / `max` | ✗ (C57) | ✗ (C57) | ✗ (C57) |
+| `maxplaces` | ✗ (C57) | ✗ (C57) | ✗ (C57) |
+| `notempty` | ✗ (C57) | ✗ (C57) | ✗ (C57) |
+
+For equality restrictions on identity types, use `rule` expressions or `when` guards: `rule Currency == 'USD'`, `when UOM.dimension == 'mass'`.
+
+### Constraint + `in`/`of` interaction
+
+`in` and `of` are unit/dimension qualifiers, not numeric constraints. They compose freely with numeric constraints:
+
+```precept
+field Balance as money in 'USD' nonnegative maxplaces 2
+field Weight as quantity in 'kg' min 0 max 1000
+field Distance as quantity of 'length' positive
+field UnitPrice as price in 'USD/each' positive maxplaces 4
+```
+
+The `in`/`of` qualifier constrains the unit slot. The numeric constraints constrain the magnitude. Both are enforced independently — `in 'USD'` rejects EUR, `nonnegative` rejects negative amounts. The proof engine reasons about the numeric constraints via interval analysis; `in`/`of` enforcement operates through discrete equality narrowing and compile-time/runtime validation.
 
 ---
 
@@ -1057,13 +1312,13 @@ When operations combine typed values, the result type is determined by the dimen
 - **Precedent:** NodaTime uses IANA TZDB. ISO 4217 for currencies. UCUM for units (HL7/FHIR, scientific computing).
 - **Tradeoff accepted:** Precept uses a practical subset, not the full UCUM specification.
 
-### D6. Entity-scoped units — no custom syntax needed
+### D6. Entity-scoped conversion factors are typed compound quantities, not bare integers
 
-- **What:** Entity-scoped unit conversions (e.g., "1 case = 24 each") use plain `integer` or `decimal` fields as conversion factors. No dedicated `units { }` block syntax.
-- **Why:** The conversion factor is data, not language structure. `field UnitsPerCase as integer default 24` + `set TotalUnits = Cases * UnitsPerCase` works with existing arithmetic. Within a single precept there is only one definition of "case."
-- **Alternatives rejected:** (A) Dedicated `units { }` block — complex language feature for what amounts to multiplication. (B) `conversionfactor in 'each/case'` — requires Level C compound unit algebra.
-- **Precedent:** SAP MM, Oracle ERP Cloud, Dynamics 365 all model UOM conversions as data, not type-system constructs.
-- **Tradeoff accepted:** No compile-time enforcement that `Cases * UnitsPerCase` produces the correct target unit.
+- **What:** Entity-scoped unit conversions (e.g., "24 each per case") are modeled as `quantity` fields with compound units: `field EachPerCase as quantity in 'each/case' default '24 each/case'`. No dedicated `units { }` block syntax.
+- **Why:** Compound unit syntax (`X/Y`) already exists for Level B. Using it for conversion factors gives compile-time dimensional cancellation verification — `case × each/case → each` is checked, not just hoped. The author chains conversions explicitly; the compiler verifies each cancellation step. Division provides the inverse direction: `each ÷ each/case → case`.
+- **Alternatives rejected:** (A) Dedicated `units { }` block — complex language feature for what amounts to multiplication. (B) Bare `integer` conversion factor — no compile-time unit verification (the original D6 design). (C) Auto-conversion registry — requires the compiler to discover and compose conversion paths, which is Level C territory.
+- **Precedent:** SAP MM, Oracle ERP Cloud, Dynamics 365 all model UOM conversions as data. Precept improves on this by making the conversion factor carry its unit ratio, so the compiler can verify dimensional correctness.
+- **Tradeoff accepted:** Counting units (`each`, `case`, `pack`) are opaque to each other — no shared dimension, no auto-conversion. The author must multiply or divide explicitly. This is deliberate: unlike `kg ↔ lbs` (fixed universal constant), entity-scoped conversion factors vary per entity.
 
 ### D7. `of` for category constraint — unified across `quantity` and `period`
 
@@ -1192,10 +1447,11 @@ This proposal extends mechanisms established by the temporal proposal (Issue #10
 
 ## Explicit Exclusions / Out of Scope
 
-- **Physical/scientific compound unit algebra (Level C)** — `quantity in 'kg.m/s2'` requires full UCUM parsing, normalization, and dimensional analysis. Deferred.
+- **Multi-term compound unit algebra (Level C)** — `quantity in 'kg.m/s2'` requires multi-term numerators, exponents, dimension vectors, and canonical normalization. These are physics constructs, not business constructs. Permanently out of scope.
+- **Auto-conversion between counting units** — `each + case` is a compile error. Conversion requires explicit multiplication by a typed conversion factor (`each/case`). No auto-conversion registry, no conversion chain solver.
+- **Entity-scoped unit declaration blocks** — No `units { case, pack, pallet }` syntax. Counting units are recognized from field declarations (`in 'case'`); conversion factors are typed `quantity` fields (`in 'each/case'`). No separate declaration form needed.
 - **Percentage type** — Whether `percent` is a type or syntactic sugar for `number / 100` is a separate investigation.
 - **Sub-cent precision or financial accounting standards** — Precept governs field rules, not accounting compliance.
-- **Entity-scoped unit declarations** — Closed by D6: conversion factors are plain fields.
 - **`zoneddatetime` as a compound-type participant** — `zoneddatetime` is a navigation waypoint, not a declared field type. Compound type cancellation uses `instant` (→ `duration`) or `date`/`datetime` (→ `period`).
 
 ---
@@ -1250,4 +1506,4 @@ This proposal extends mechanisms established by the temporal proposal (Issue #10
 
 ## Scope Boundary
 
-This document covers the design of the seven new business-domain types, the period basis extension, the `in`/`of` qualification system, compound types with dimensional cancellation (Levels A and B), and discrete equality narrowing. Level A (named `price`/`exchangerate`) and Level B (time-denominator `quantity` compounds) are in v1 scope. Level C (general compound unit algebra) is explicitly deferred.
+This document covers the design of the seven new business-domain types, the period basis extension, the `in`/`of` qualification system, compound types with dimensional cancellation (Levels A and B), and discrete equality narrowing. Level A (named `price`/`exchangerate`) and Level B (single-ratio `quantity` compounds — including time-denominator rates, entity-scoped conversion factors, and standard unit ratios) are in v1 scope. Level C (multi-term compound unit algebra) is permanently out of scope.
