@@ -73,6 +73,7 @@ internal sealed class ProofContext
         _fieldIntervals = new Dictionary<string, NumericInterval>(StringComparer.Ordinal);
         _flags = new Dictionary<string, NumericFlags>(StringComparer.Ordinal);
         _exprFacts = new Dictionary<LinearForm, NumericInterval>();
+        HydrateTypedStoresFromMarkers();
     }
 
     /// <summary>Constructs a context from the legacy dictionary plus a typed relational fact store.</summary>
@@ -84,6 +85,7 @@ internal sealed class ProofContext
         _fieldIntervals = new Dictionary<string, NumericInterval>(StringComparer.Ordinal);
         _flags = new Dictionary<string, NumericFlags>(StringComparer.Ordinal);
         _exprFacts = new Dictionary<LinearForm, NumericInterval>();
+        HydrateTypedStoresFromMarkers();
     }
 
     /// <summary>Constructs a context with all typed stores supplied explicitly.</summary>
@@ -98,6 +100,53 @@ internal sealed class ProofContext
         _fieldIntervals = fieldIntervals;
         _flags = flags;
         _exprFacts = exprFacts;
+        HydrateTypedStoresFromMarkers();
+    }
+
+    /// <summary>
+    /// Populates <see cref="_fieldIntervals"/> and <see cref="_flags"/> from legacy
+    /// string markers in <see cref="_symbols"/>. Called by the simpler constructors
+    /// so that <see cref="ExtractIntervalFromMarkers"/> (which now reads typed stores)
+    /// works correctly for ProofContexts built from raw marker dictionaries.
+    /// Temporary bridge — will be removed in step 7d along with string markers.
+    /// </summary>
+    private void HydrateTypedStoresFromMarkers()
+    {
+        foreach (var key in _symbols.Keys)
+        {
+            if (key.StartsWith("$ival:", StringComparison.Ordinal) &&
+                NumericInterval.TryParseMarkerKey(key, out var ival))
+            {
+                // "$ival:{fieldKey}:{lower}:{lowerInc}:{upper}:{upperInc}"
+                var parts = key.Split(':');
+                if (parts.Length >= 2)
+                {
+                    var fieldKey = parts[1];
+                    _fieldIntervals[fieldKey] = ival;
+                }
+            }
+            else if (key.StartsWith("$positive:", StringComparison.Ordinal))
+            {
+                var fieldKey = key.Substring("$positive:".Length);
+                _flags[fieldKey] = _flags.TryGetValue(fieldKey, out var f)
+                    ? f | NumericFlags.Positive
+                    : NumericFlags.Positive;
+            }
+            else if (key.StartsWith("$nonneg:", StringComparison.Ordinal))
+            {
+                var fieldKey = key.Substring("$nonneg:".Length);
+                _flags[fieldKey] = _flags.TryGetValue(fieldKey, out var f)
+                    ? f | NumericFlags.Nonnegative
+                    : NumericFlags.Nonnegative;
+            }
+            else if (key.StartsWith("$nonzero:", StringComparison.Ordinal))
+            {
+                var fieldKey = key.Substring("$nonzero:".Length);
+                _flags[fieldKey] = _flags.TryGetValue(fieldKey, out var f)
+                    ? f | NumericFlags.Nonzero
+                    : NumericFlags.Nonzero;
+            }
+        }
     }
 
     /// <summary>
@@ -151,6 +200,10 @@ internal sealed class ProofContext
                 double constVal = (double)form.Constant.Numerator / form.Constant.Denominator;
                 return new NumericInterval(constVal, true, constVal, true);
             }
+
+            // Typed expression facts (from assignment-derived proofs).
+            if (_exprFacts.TryGetValue(form, out var exprFact))
+                arithmetic = NumericInterval.Intersect(arithmetic, exprFact);
 
             var relational = LookupRelationalInterval(form);
             arithmetic = NumericInterval.Intersect(arithmetic, relational);

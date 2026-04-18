@@ -2162,10 +2162,11 @@ internal static class PreceptTypeChecker
                     }
                     else if (TryGetIdentifierKey(binary.Right, out var key))
                     {
-                        if (!symbols.ContainsKey($"$nonzero:{key}") && !symbols.ContainsKey($"$positive:{key}"))
+                        var keyFlags = context.Flags.TryGetValue(key, out var f) ? f : NumericFlags.None;
+                        if ((keyFlags & (NumericFlags.Nonzero | NumericFlags.Positive)) == 0)
                         {
                             var name = key;
-                            if (symbols.ContainsKey($"$nonneg:{key}"))
+                            if ((keyFlags & NumericFlags.Nonnegative) != 0)
                             {
                                 // Context-aware: field is nonnegative but not nonzero
                                 diagnostic = new PreceptValidationDiagnostic(
@@ -2311,35 +2312,29 @@ internal static class PreceptTypeChecker
     }
 
     /// <summary>
-    /// Extracts the tightest <see cref="NumericInterval"/> for <paramref name="key"/> from the proof
-    /// marker symbol table. Used by <c>TryInferInterval</c> (Layer 3) to initialize leaf intervals.
-    /// Priority: explicit <c>$ival:</c> marker (from min/max constraints or assignment narrowing)
-    /// → <c>$positive:</c> → <c>$nonneg:+$nonzero:</c> → <c>$nonneg:</c> → <see cref="NumericInterval.Unknown"/>.
+    /// Extracts the tightest <see cref="NumericInterval"/> for <paramref name="key"/> from the
+    /// typed proof stores. Used by <c>TryInferInterval</c> (Layer 3) to initialize leaf intervals.
+    /// Priority: typed interval store → flag-based interval (Positive → Nonneg+Nonzero → Nonneg) → Unknown.
     /// </summary>
     private static NumericInterval ExtractIntervalFromMarkers(
         string key,
         ProofContext context)
     {
-        // Explicit interval marker takes priority (most specific).
-        var ivalPrefix = $"$ival:{key}:";
-        foreach (var mk in context.Symbols.Keys)
+        // 1. Typed interval store takes priority (most specific).
+        if (context.FieldIntervals.TryGetValue(key, out var ival))
+            return ival;
+
+        // 2. Flag-based interval.
+        if (context.Flags.TryGetValue(key, out var flags))
         {
-            if (mk.StartsWith(ivalPrefix, StringComparison.Ordinal) &&
-                NumericInterval.TryParseMarkerKey(mk, out var ival))
-            {
-                return ival;
-            }
+            if ((flags & NumericFlags.Positive) != 0)
+                return NumericInterval.Positive;
+            if ((flags & NumericFlags.Nonnegative) != 0 && (flags & NumericFlags.Nonzero) != 0)
+                return NumericInterval.Positive; // nonneg + nonzero = strictly positive
+            if ((flags & NumericFlags.Nonnegative) != 0)
+                return NumericInterval.Nonneg;
         }
 
-        // Fall back to sign markers.
-        var isPositive = context.Symbols.ContainsKey($"$positive:{key}");
-        var isNonneg = context.Symbols.ContainsKey($"$nonneg:{key}");
-        var isNonzero = context.Symbols.ContainsKey($"$nonzero:{key}");
-
-        if (isPositive) return NumericInterval.Positive;
-        if (isNonneg && isNonzero) return NumericInterval.Positive; // nonneg + nonzero = strictly positive
-        if (isNonneg) return NumericInterval.Nonneg;
-        // $nonzero: alone cannot be represented as a single interval — return Unknown.
         return NumericInterval.Unknown;
     }
 
