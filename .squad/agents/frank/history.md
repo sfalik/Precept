@@ -40,6 +40,27 @@
 
 ## Recent Updates
 
+### 2026-04-17 — Applied review feedback to unified proof plan
+- Applied all accepted George + Soup Nazi review findings to `temp/unified-proof-plan.md` per Shane's resolved overrides.
+- B1: Added `checked` long arithmetic and cross-GCD pre-reduction to Rational spec (§0 constraint #1, §4 Rational.cs entry).
+- B2: Added `ProofEngineUnsupportedPatternTests.cs` (4 tests) to §4 test table and §5 commit 3.
+- Q2: Added §8 rows 21-22 (negated operand rule, compound-expression rule); updated coverage delta to 12 new-proves. Added §8a rows 18 (scalar-multiple, now "works") and 19 (pow/truncate opacity).
+- NB2: Added parens depth-budget note to §4 LinearForm.cs entry.
+- NB3 (Shane override): Added scalar-multiple GCD normalization to §2 Gap 1, §4 ProofContext.cs (~350→~360 LOC), §4 CompoundDivisorTests (15→17).
+- NB5-NB9: Updated all test counts — LinearFormTests 35→40, RationalTests 20→23, ProofContextTests 30→33, TransitiveClosureTests 14→17, SoundnessInvariantTests 10→15.
+- Cascaded all count changes through §5 commit ordering (1427→1437→1493→1511→1528→1555).
+- Final totals: 191 new tests, ~1555 total. No architectural spine changes.
+
+### 2026-04-17 — Unified proof plan updated with research findings and Rational decision
+- Updated `temp/unified-proof-plan.md` with all post-endorsement research and decisions.
+- Added §0 "Research findings" subsection: academic grounding (zone abstract domain / Cousot & Cousot 1977, Miné zone/octagon domains, QF_LRA under-approximation), reference implementations (CodeContracts/Clousot Pentagons domain, Boogie IntervalDomain.cs, Crab/IKOS/Apron), library survey conclusion (no reusable .NET library exists).
+- Updated §3 soundness assertion #1: replaced BigInteger-backed Rational spec with `readonly record struct Rational(long Numerator, long Denominator)` implementing `INumber<Rational>`, .NET 10 native, ~100 LOC, `long/long`. Included full decision chain as rationale.
+- Added §3 "Grounding audit" subsection: verified all six marker conventions, narrowing method shapes, kill loop, and scope model against codebase.
+- Updated §4 manifest entries for Rational.cs (~150→~100 LOC) and RationalTests.cs (expanded test spec).
+- Updated §7 Division in LinearForm exclusion to specify `long/long` Rational coefficients.
+- Added §9 "Post-endorsement update" note: architectural spine unchanged, endorsements remain valid.
+- No architectural decisions changed. All edits are refinements and external validation.
+
 ### 2026-04-13 — Issue #88 docs sync completed for PR #90
 - Reconciled the editability/documentation story across `docs/PreceptLanguageDesign.md`, `docs/EditableFieldsDesign.md`, `docs/RuntimeApiDesign.md`, and `docs/McpServerDesign.md`.
 - Validation recorded on branch `squad/88-docs-reconcile-editability`: `git diff --check` and `dotnet test --no-restore`.

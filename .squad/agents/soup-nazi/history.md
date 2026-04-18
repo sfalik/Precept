@@ -41,6 +41,16 @@
 ### 2026-04-11 — Guarded declaration validation sweep
 - Built and verified multi-layer tests for guarded invariants, state asserts, event asserts, and guarded edit blocks, including runtime and MCP coverage.
 
+### 2026-04-17 — Unified proof plan full test review (pre-implementation)
+- Reviewed `temp/unified-proof-plan.md` §4-§8a against existing test codebase. Plan has ~166 new tests across 9 files.
+- Coverage matrix (§8): All 20 input patterns mapped to planned test files. Every "✅ proves" and "💀 correctly rejected" has at least one test. No coverage gaps in the matrix proper.
+- §8a unsupported patterns: Found that 4 of 17 rows need explicit "correctly rejected" tests that are NOT listed in any planned test file: row 1 (non-linear `A*B-C`), row 4 (function opacity `abs(X)-B`), row 14 (inequality-without-ordering `A!=B`), row 16 (modulo `A%B`). Filed as NON-BLOCKING finding — these are easy to add.
+- Edge cases missing per file: LinearFormTests needs constant-only normalization, single-term form, `long.MaxValue` GCD stress, and construction-order equality. RationalTests needs `long.MinValue` negation overflow, multiplication overflow, division by zero. ProofContextTests needs deeply nested `Child()`, unknown field `WithAssignment`, opaque expression `IntervalOf`. TransitiveClosureTests needs disconnected graph, self-loop, mixed-scope chains.
+- Regression risk: Highest risk files are PreceptTypeCheckerTests.cs (C-Nano section specifically), ConditionalExpressionTests.cs, CatalogDriftTests.cs (C92/C93 entries), DiagnosticSpanPrecisionTests.cs (C93 column tests). The ProofContext signature refactor (commit 2) touches every narrowing method — mechanical but high blast radius.
+- Soundness invariant tests: -3..+3 range is acceptable first pass but narrow. Missing: decimal values (0.001, 0.1), larger magnitudes (100, 1000), explicit saturation tests.
+- Workaround flagging feasibility: Assessed all 5 unsupported categories. Detection is feasible for all — `LinearForm.TryNormalize` failure reason + expression shape inspection + rule set scanning. Suggestion generation requires ~100-200 new LOC. Recommendation: follow-up PR, not this one — it improves diagnostic quality but doesn't change proof power.
+- Verdict: APPROVED-WITH-CAVEATS (1 blocker, 6 non-blocking findings).
+
 ### 2026-04-17 — Slice 8: C92/C93 catalog drift + sample audit (#106)
 - Verified C92 (literal zero divisor) and C93 (unproven divisor) drift test entries already present and correct in both `ConstraintTriggers` and `LineAccuracyData`.
 - Audited 5 sample files: loan-application, invoice-line-item, insurance-claim, travel-reimbursement, clinic-appointment-scheduling — all compile clean, zero C92/C93 diagnostics.

@@ -74,6 +74,17 @@
 - All 1229 existing tests pass with the new code. 6 new tests added.
 - Key file paths: `src/Precept/Dsl/PreceptTypeChecker.cs` (~L2130–2280 for new methods), `test/Precept.Tests/PreceptTypeCheckerTests.cs` (bottom of file for new tests).
 
+### 2026-04-17 — Unified proof plan full design review
+- **Verdict: APPROVED-WITH-CAVEATS** on `temp/unified-proof-plan.md`.
+- §8a completeness: found 2 missing patterns — (1) scalar-distributed differences `k*A - k*B` not provable from `rule A > B` (workaround: factor as `k*(A-B)`), (2) `pow`/`truncate` function opacity not listed alongside `abs`/`min`/`sqrt` in the unsupported table.
+- Found 2 patterns missing from §8 coverage matrix that the plan DOES prove but doesn't claim: `rule A > -B` proving `Y/(A+B)` and `rule A+B > C` proving `Y/(A+B-C)`. Both validate via LinearForm normalization.
+- Rational `long/long` overflow: reachable within depth-8 bound via 3 multiplications of large constants (e.g., `A * 10^9 * 10^9 * 10`). **[CAVEAT]** Plan must specify `checked` arithmetic in `Rational.Multiply` with null-fallback in `TryNormalize` on `OverflowException`. Also recommend cross-GCD pre-reduction before multiplication to prevent overflow in common cases.
+- `INumber<Rational>`: over-engineering for current usage (~50+ interface members vs ~20 actually needed). Non-blocking — recommend implementing operators directly, add interface later if generic math needed.
+- `ProofContext.Dump()` unspecced: confirmed low priority, agree.
+- LinearForm depth bound (8): verified parens do NOT blow the budget in practice (7-level paren nesting compiles clean today). Plan should clarify that `PreceptParenthesizedExpression` unwrapping does not decrement depth counter.
+- CodeContracts Pentagons: confirms architectural validity. Our lazy composition (query-time reduced product) is sufficient for divisor-safety — no backward propagation from relational → interval needed. No patterns to adopt.
+- Confidence on §8a completeness: MEDIUM-HIGH. Systematically checked all 11 expression forms, all rule/guard/ensure contexts, cross-namespace patterns, negation, scaling, depth stress. The 2 missing patterns are low-frequency with simple workarounds.
+
 ### 2026-04-12 — Issue #17 computed fields feasibility
 - Confirmed computed fields are feasible with additive parser/model/runtime work and a single recomputation helper inserted before constraint evaluation.
 
