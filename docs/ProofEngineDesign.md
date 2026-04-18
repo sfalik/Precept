@@ -2,10 +2,11 @@
 
 Date: 2026-04-18
 
-Status: **In progress** — Architecture endorsed. Unified engine PR (replaces PR #108 five-layer stack + C-Nano patch `6fbb315`).
+Status: **Implemented** — Unified proof engine shipped in PR #108 (feature/issue-106-divisor-safety). All five gaps closed, 1853 tests passing.
 
 ### Implementation Notes
 
+- **All five gaps closed.** The unified engine closes every gap documented in the Overview: Gap 1 via `LinearForm` normalization of divisor sub-expressions + constant-offset scan; Gap 2 via `LinearForm` normalization of rule LHS/RHS at injection time (`WithRule`); Gap 3 via `WithAssignment` calling `IntervalOf(rhs)` for compound expressions; Gap 4 via `RelationalGraph` bounded BFS transitive closure; Gap 5 via `EventProofContext` structural isolation (`EventProofContext.Mutations` never promoted to global context on flush).
 - **C-Nano subsumed.** The C-Nano `InferSubtractionInterval` special case (`6fbb315`) is deleted in the unified PR. Every C-Nano test scenario passes via `ProofContext.IntervalOf` + `LinearForm` — the unified path is strictly more powerful and C-Nano is no longer a separate code path.
 - **`TryInferRelationalNonzero` deleted.** The bespoke relational pattern-matcher is subsumed by `ProofContext.KnowsNonzero`, which calls `IntervalOf`.
 - **`InferSubtractionInterval` deleted.** The bespoke subtraction shape-matcher is subsumed by `IntervalOf`'s general relational lookup path.
@@ -23,11 +24,11 @@ The Precept type checker enforces divisor safety (C93) and sqrt safety (C76) at 
 
 Compound expressions fell through with no diagnostic under Principle #8 conservatism — the compiler assumed compound expressions were satisfiable. This created five documented gaps:
 
-1. **Compound subtraction operands:** `(A+1)-B`, `A-(B+C)`, `Total-Tax-Fee` — separate operands prevented relational lookup.
-2. **Sum-on-RHS rules:** `rule Total > Tax + Fee` — the rule injection only handled `id op id`, not `id op compound`.
-3. **Computed-field intermediaries:** `set Net = Gross-Tax; check Amount/Net` — conservative RHS handling killed all markers on `Net`.
-4. **Transitive closure:** `rule A>B`, `rule B>C` — `A-C` divisors had no path to a proof without a direct `A>C` rule.
-5. **Cross-event marker scope:** derived facts from one event's transition row silently (incorrectly) influenced sibling events.
+1. **Compound subtraction operands:** `(A+1)-B`, `A-(B+C)`, `Total-Tax-Fee` — separate operands prevented relational lookup. **Closed** by `LinearForm.TryNormalize` reducing the full divisor to a canonical form; constant-offset scan then matches the stored relational fact with a positive offset.
+2. **Sum-on-RHS rules:** `rule Total > Tax + Fee` — the rule injection only handled `id op id`, not `id op compound`. **Closed** by `WithRule` calling `TryNormalize` on both sides, storing the relational fact keyed by `LinearForm(lhs) − LinearForm(rhs)` — compound expressions on either side are first-class.
+3. **Computed-field intermediaries:** `set Net = Gross-Tax; check Amount/Net` — conservative RHS handling killed all markers on `Net`. **Closed** by `WithAssignment` calling `IntervalOf(rhs)` for compound expressions and storing the result in `_fieldIntervals[target]`; forward-inferred interval for `Net` is available to subsequent divisor checks in the same row.
+4. **Transitive closure:** `rule A>B`, `rule B>C` — `A-C` divisors had no path to a proof without a direct `A>C` rule. **Closed** by `RelationalGraph` performing bounded BFS over `_relationalFacts` (depth 4, 64 facts, 256 nodes) with an exact strict/non-strict composition matrix.
+5. **Cross-event marker scope:** derived facts from one event's transition row silently (incorrectly) influenced sibling events. **Closed** structurally — `EventProofContext.Mutations` are never promoted to the parent `GlobalProofContext`; each event builds a fresh `EventProofContext` from the same global parent.
 
 The unified proof engine closes all five gaps with a single coherent architecture: `ProofContext` as the typed proof state container, `LinearForm` as the canonical normalizer keying the relational fact store, `RelationalGraph` as the bounded transitive closure engine, and a `GlobalProofContext` / `EventProofContext` scope split that makes cross-event isolation structural rather than conventional.
 
@@ -152,6 +153,25 @@ Zero-coefficient terms are dropped at construction. `A - A` produces empty terms
 **Scalar-multiple normalization.** Before any relational lookup, `IntervalOf` GCD-normalizes the queried `LinearForm`: all coefficients are divided by their GCD. This means `+3·A + (-3)·B` reduces to `+1·A + (-1)·B` before matching against stored facts. `Y / (k*A - k*B)` with `rule A > B` therefore proves directly without requiring the author to factor the constant.
 
 **Soundness rationale.** `Rational` coefficients ensure that two expressions that evaluate to the same linear function under any variable assignment produce the same `LinearForm` key. FP cancellation cannot fabricate a match or miss a match. The depth bound and `null`-on-overflow semantics mean `TryNormalize` either returns a provably correct form or declines — it never returns an incorrect form.
+
+### Relational Fact Store and 6-Tier Lookup
+
+`ProofContext._relationalFacts: Dictionary<LinearForm, RelationalFact>` stores ordering relationships between expressions. Each fact is keyed by `LinearForm(LHS) − LinearForm(RHS)` and carries a `RelationKind` (`>` strict or `>=` non-strict) and a scope (global from `rule`, or event-local from `when` guards).
+
+**Fact injection.** `WithRule(lhs, rel, rhs)` normalizes both sides and stores `RelationalFact` keyed by `LinearForm(lhs) - LinearForm(rhs)` — compound expressions on either side are first-class (closes Gap 2). `WithGuard(condition, branch)` extracts comparisons and stores event-local narrowing facts.
+
+**`LookupRelationalInterval(form)`** runs 6 tiers in order; first non-Unknown result wins:
+
+| Tier | Description | Example |
+|---|---|---|
+| 1. Direct | Exact key match in `_relationalFacts` | `A−B` matches stored `A−B > 0` → `(0,+∞)` |
+| 2. GCD-normalized | Divide all coefficients by their GCD; retry | `3A−3B` → `A−B`; matches stored `A−B > 0` → `(0,+∞)` |
+| 3. Negated | Negate the form + GCD-normalize; if found, negate the returned interval | Query `B−A`; stored `A−B > 0`; returns `(-∞, 0)` — proves the expression is negative |
+| 4. Constant-offset scan | Scan facts sharing variable terms but differing only in constant; `c > 0` + `>` ⇒ `(c,+∞)` | `A−B+1` vs stored `A−B > 0`; offset `c=1` → `(1,+∞)` (closes Gap 1) |
+| 5. Transitive closure | `RelationalGraph.Query(form)` — bounded BFS, depth ≤ 4, facts ≤ 64, nodes ≤ 256 | `A−C` with `A>B`, `B>C` → 2-hop chain derives `A>C` (closes Gap 4) |
+| 6. Legacy string-marker | `LookupLegacyRelationalInterval` — backward-compat fallback for simple `identifier − identifier` forms via pre-unified string-marker conventions | Old `$gt:A:B` marker paths still recognized |
+
+Tiers 1–5 cover all LinearForm-normalized expressions. Tier 6 is a backward-compat layer that is never reached for expressions whose operands normalize successfully.
 
 ### Transitive Closure — RelationalGraph
 
@@ -308,10 +328,9 @@ field X as number positive
 
 1. **Computes the interval-arithmetic result** via `NumericInterval` transfer rules (for all operators and functions).
 2. **Attempts `LinearForm.TryNormalize(expr)`** (bounded depth 8).
-3. **If normalization succeeds:** looks up the normalized form in `_relationalFacts`. On a direct key match, intersects the relational-derived interval (`(0,+∞)` for `>`, `[0,+∞)` for `>=`) with the arithmetic result. **Constant-offset scan (runs when no direct key match exists):** scans relational facts whose key differs from the normalized form only in the constant term — if the query form = key + c where c > 0 and the fact is `>`, infer `(c, +∞)`; if c ≥ 0 and the fact is `>=`, infer `[c, +∞)`. Example: `(A+1)-B` with `rule A > B` — stored key `+1·A + (-1)·B + 0`, query form `+1·A + (-1)·B + 1`, difference c = +1 > 0, fact is `>`, inferred interval `(1, +∞)`. **The GCD-normalized scalar-multiple check runs first, then the constant-offset scan.**
-4. **If no direct or constant-offset match:** GCD-normalizes the form and queries `RelationalGraph` for a transitive chain. If a chain is found, intersects the derived interval with the arithmetic result.
-5. **Checks `_exprFacts`** for any stored equality or interval fact matching the normalized form. If found, intersects.
-6. **Returns the intersection** of all information gathered. Each intersection can only narrow (tighten) the interval — never widen it — so the result is always sound.
+3. **If normalization succeeds:** calls `LookupRelationalInterval(normalizedForm)` — the 6-tier relational lookup described in § Relational Fact Store. Intersects the returned interval with the arithmetic result.
+4. **Checks `_exprFacts`** for any stored equality or interval fact matching the normalized form. If found, intersects.
+5. **Returns the intersection** of all information gathered. Each intersection can only narrow (tighten) the interval — never widen it — so the result is always sound.
 
 For identifiers, `IntervalOf` reads `_fieldIntervals[key]` directly (no normalization needed). For compound expressions, the normalization + relational lookup gives the relational inference; the arithmetic walk gives the interval arithmetic; the intersection gives the tightest provable bound.
 
@@ -342,8 +361,7 @@ End-to-end flow for a divisor expression reaching the C93 check:
    b. Is divisor a single identifier? → IntervalOf(id).ExcludesZero
    c. Is divisor a compound expression? → IntervalOf(expr):
       - Interval arithmetic walk over sub-expressions
-      - TryNormalize → relational lookup in _relationalFacts
-      - GCD-normalize → RelationalGraph BFS if no direct match
+      - TryNormalize → LookupRelationalInterval (6 tiers, see § Relational Fact Store)
       - _exprFacts equality lookup + intersect
       - Result: NumericInterval for entire divisor
 
