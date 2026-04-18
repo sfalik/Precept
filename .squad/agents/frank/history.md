@@ -16,6 +16,32 @@
 
 ## Recent Updates
 
+### 2026-04-18 — Instant vs LocalDateTime for shift times: type system analysis
+- Shane asked the critical question: should `ShiftStart`/`ShiftEnd` be `instant` or `localdatetime` in the shift-pay example?
+- **Decision: `instant` is correct for pay/billing scenarios.** Four pillars: (1) data provenance — clock-in/out events are UTC timestamps from timekeeping systems, (2) legal correctness — FLSA requires payment for actual hours worked, and `localdatetime` subtraction underpays by 1 hour on fall-back DST nights (Soup Nazi's Scenario 3), (3) NodaTime alignment directive — `Instant` subtraction yields `Duration` because Skeet designed it for "how long did this actually take" questions, (4) type algebra composability — `instant - instant → duration → price * duration → money` composes cleanly with the D15 amendment.
+- **Rejected `localdatetime`** — produces `period` with three failure modes: DST wage theft, integer division trap on multi-component extraction (`period.minutes / 60` = 0 in integer arithmetic), and multi-component cancellation complexity.
+- **Rejected `zoneddatetime`** — correct in principle but deferred as a field type in temporal design; `zoneddatetime - zoneddatetime` is undefined because the semantics are ambiguous (duration vs period?). Separate `instant` + `timezone` fields give both pieces of information.
+- **Key finding for D15 amendment:** The instant path is the canonical motivating case. The amendment (duration cancels `hours`/`minutes`/`seconds` denominators) is both necessary and sufficient. The fixed-length boundary (hours OK, days not) is NodaTime-faithful.
+- **Three actions recommended:** (1) Amend D15 for duration cancellation on fixed-length units, (2) use `instant` in the shift-pay example, (3) document both paths (calendar vs timeline) with clear "when to use which" guidance.
+- **D28 confirmed irrelevant** to this scenario — duration comes from subtraction, not from a typed constant literal.
+- **Open question for Shane:** Should both `period` and `duration` cancellation coexist silently (recommended — field type IS the author's intent declaration), or should divergence trigger a diagnostic?
+- Analysis written to `.squad/decisions/inbox/frank-instant-vs-local.md`.
+
+### 2026-04-18 — Real-world use-case catalog: period vs duration in compound-type arithmetic
+- Built 8 concrete business scenarios (shift pay, SLA enforcement, lease payments, proration, manufacturing throughput, hourly rental, downtime cost, daily-rate consulting) exploring where `period` and `duration` interact with `price` and `quantity` compound types.
+- Key finding: D15 amendment (duration cancellation) and D28 (integer-only) are **independent decisions**. The strongest duration-cancellation use cases (shift pay, downtime cost, throughput) come from `instant - instant` and don't require any D28 change.
+- Identified the `decimal` vs `double` precision boundary at `duration.totalHours` and assessed 4 mitigation approaches. Recommended Approach A: compute extraction in `decimal` space from duration's `long` nanosecond backing, bypassing NodaTime's `double` accessor.
+- Identified user-entered fractional time (Scenario 6: "book for 2.5 hours") as the genuine gap that D28 constrains — but this is a literal/construction surface problem, not a cancellation problem.
+- Confirmed calendar-relative domains (leases, subscriptions) are perfectly served by `period` with integer components — D28 works as designed for these.
+- Analysis written to `.squad/decisions/inbox/frank-duration-use-cases.md`.
+
+### 2026-04-18 — Deep analysis: `period` vs `duration` as compound-type cancellation partners
+- Analyzed D15 (time-unit denominators cancel against `period`) and found a real gap: `period` has integer-only components (Decision #28), so fractional time (3.5 hours worked) cannot be represented. `duration` can represent fractional time but D15 excludes it from cancellation.
+- Key finding: `instant - instant → duration`, so the natural expression `HourlyRate * (ShiftEnd - ShiftStart)` is impossible under D15 because the subtraction produces `duration`, not `period`.
+- Recommendation: amend D15 to allow `duration` as a cancellation partner for fixed-length time denominators (`hours`, `minutes`, `seconds`). Restrict `days`/`weeks`/`months`/`years` denominators to `period`-only because duration's fixed-nanosecond model diverges from calendar-relative business meaning.
+- Duration participates in cancellation (multiplication) only, not derivation (division) — `money / duration` is ambiguous (what unit for the denominator?), while `price in 'USD/hours' * duration` is unambiguous (denominator tells the compiler to extract `.totalHours`).
+- Decision recommendation written to `.squad/decisions/inbox/frank-period-vs-duration.md`.
+
 ### 2026-04-13 — Issue #88 docs sync completed for PR #90
 - Reconciled the editability/documentation story across `docs/PreceptLanguageDesign.md`, `docs/EditableFieldsDesign.md`, `docs/RuntimeApiDesign.md`, and `docs/McpServerDesign.md`.
 - Validation recorded on branch `squad/88-docs-reconcile-editability`: `git diff --check` and `dotnet test --no-restore`.

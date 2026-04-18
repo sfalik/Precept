@@ -7,6 +7,13 @@
 ## Learnings
 
 - Runtime/design gaps should be separated cleanly from philosophy decisions; product-identity calls belong to Shane.
+- `Duration` is NOT a single `long` — it's `int days` + `long nanoOfDay`. Two-field struct. Only the `FromHours(double)` factory touches floating-point; `FromHours(int)` is exact integer arithmetic throughout.
+- `Duration.FromHours(3) + Duration.FromMinutes(30)` is bitwise identical to `Duration.FromHours(3.5)`. D28 integer-only compound form has zero precision penalty for this case.
+- `Duration.TotalHours` returns `double`: `days * 24.0 + nanoOfDay / (double)NanosecondsPerHour`. Precision loss for sub-hour durations with non-binary-representable fractions (1/3 h, 1/6 h, etc.).
+- `period.minutes / 60` in Precept's current integer evaluator is integer division — `30 / 60 = 0`. Silent data loss trap for mixed-unit period × price arithmetic.
+- Decimal-exact extraction path exists: `(decimal)duration.ToInt64Nanoseconds() / 3_600_000_000_000m`. The `long → decimal` cast is always exact; keeps arithmetic in decimal domain.
+- `(decimal)long` is always exact — `decimal` has 29 significant digits, `long.MaxValue` has 19 digits.
+- Issue #115 (`TryToNumber` does `(double)dec`) is the root amplifier: any `decimal price × duration` path today loses decimal precision at the `TryToNumber` boundary regardless of how clean the duration extraction was.
 - Recompute-style features succeed when insertion points are explicit across Fire, Update, and Inspect.
 - Documentation must describe implemented pipeline stages exactly, especially around editability, hooks, and validation order.
 - DSL `ensure` statements always require a `because` clause — tests that omit it get parse failures, not type-check failures.
@@ -14,6 +21,14 @@
 - The dotted-key translation for event args happens in `BuildEventEnsureNarrowings` — bare markers like `$nonneg:Val` become `$nonneg:Submit.Val`. The C76 check constructs dotted keys via `TryGetIdentifierKey`, so both ends line up.
 
 ## Recent Updates
+
+### 2026-04-18 — NodaTime Duration/Period Precision Chain (D28 pre-analysis)
+- Verified `Duration` internals from NodaTime source: `int days` + `long nanoOfDay`, not a single long or double.
+- `FromHours(3) + FromMinutes(30)` == `FromHours(3.5)` bitwise — D28-compliant compound form is zero-precision-cost.
+- Mapped all crossing points between NodaTime's integer-nanosecond storage and Precept's decimal-backed business types (D12).
+- Confirmed decimal-safe extraction path via `(decimal)ToInt64Nanoseconds() / 3_600_000_000_000m`.
+- Flagged integer division trap: `period.minutes / 60` in current evaluator truncates (`30/60 = 0`); any period-based price multiplication must use decimal extraction to avoid silent data loss.
+- Full precision chain written to `.squad/decisions/inbox/george-duration-precision.md`.
 
 ### 2026-04-17 — Issue #106 Slice 6: sqrt C76 rework with unified narrowing + dotted key fix
 - Verified the C76 `$nonneg:` proof lookup already handled dotted event-arg keys (inline ternary, not broken as initially suspected).

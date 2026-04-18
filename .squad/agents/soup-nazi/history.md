@@ -35,3 +35,12 @@
 - Audited 5 sample files: loan-application, invoice-line-item, insurance-claim, travel-reimbursement, clinic-appointment-scheduling — all compile clean, zero C92/C93 diagnostics.
 - Critical validation: `travel-reimbursement.precept` with `Submit.Lodging / Submit.Days` (non-literal divisor) produces no C93 warning, confirming `BuildEventEnsureNarrowings` (Slice 4) is working correctly.
 - No code changes needed. All 1290 tests pass.
+
+### 2026-04-18 — Edge case analysis: period vs duration in compound-type arithmetic
+- Completed 10-scenario stress-test of D15 (period-only cancellation) vs Frank's proposal (duration also cancels).
+- Findings written to `.squad/decisions/inbox/soup-nazi-duration-edge-cases.md`.
+- 6 of 10 scenarios are 🔴 correctness breaks. 4 of the 6 are not edge cases — they are mainstream business patterns (fractional-hour payroll, instant-subtraction billing, DST fall-back wages, partial-day daily-rate pricing).
+- The DST fall-back scenario (Scenario 3) is the most severe: the period path silently underpays overnight workers by one hour on fall-back night — a potential FLSA violation. The period path is wrong there, not just inconvenient.
+- Issue #115 (decimal→double bug) is a live dependency: any duration-cancellation implementation that routes through `duration.totalHours` (number/double) will inject double precision artifacts into decimal-backed money results on day one.
+- The "both paths exist" confusion (Scenario 9) is the subtlest risk: both period and duration can produce the same money value 363 days/year and silently diverge on 2 DST nights with no compiler warning.
+- Fixed-length asymmetry (Scenario 10): hours cancel, weeks don't, for non-obvious NodaTime reasons. This will confuse domain authors writing rental contracts.

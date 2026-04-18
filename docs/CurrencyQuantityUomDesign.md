@@ -1,0 +1,1253 @@
+# Currency, Quantity, Unit-of-Measure, and Price Design
+
+> **This is the canonical design document for Precept's business-domain numeric types.** It is maintained alongside the implementation. For the investigation issue, see [Issue #95](https://github.com/sfalik/Precept/issues/95).
+
+**Author:** Shane (Owner)
+**Date:** 2026-04-18 (v2 — restructured to match temporal design doc format; D15 amended for dual cancellation)
+**Status:** Design — canonical reference
+**Depends on:** [Temporal Type System Design](TemporalTypeSystemDesign.md) (Issue #107) — establishes `period`, `duration`, `timezone`, the typed constant delimiter, and the `in` syntax pattern this proposal extends.
+**Prerequisite bug:** [Issue #115](https://github.com/sfalik/Precept/issues/115) — `decimal` arithmetic silently loses precision through `double` conversion. Must be fixed before `money` or `decimal`-backed `quantity` implementation.
+
+**Related artifacts:**
+- **Research document:** [`research/language/expressiveness/currency-quantity-uom-research.md`](../research/language/expressiveness/currency-quantity-uom-research.md)
+- **Type system follow-ons:** [`research/language/expressiveness/type-system-follow-ons.md`](../research/language/expressiveness/type-system-follow-ons.md)
+- **Type system survey:** [`research/language/references/type-system-survey.md`](../research/language/references/type-system-survey.md)
+- **Temporal expansion-joint section:** [TemporalTypeSystemDesign.md § Forward Design](TemporalTypeSystemDesign.md#why-this-matters-now)
+
+---
+
+## Summary
+
+Add seven business-domain types to the Precept DSL — `money`, `currency`, `quantity`, `unitofmeasure`, `dimension`, `price`, and `exchangerate` — plus extend the temporal `period` type with unit-basis selection via the `in` syntax. Together these types give domain authors the vocabulary to express monetary constraints, unit-of-measure governance, pricing rules, and currency conversion — all within the governing contract.
+
+The types enter through the same literal mechanisms established by the temporal proposal:
+- **Door 2 typed constants:** `'100 USD'`, `'5 kg'`, `'24.50 USD/kg'`
+- **Declaration-site unit qualification:** `field Cost as money in 'USD'`
+- **Declaration-site dimension constraint:** `field Distance as quantity of 'length'`
+
+Two mutually exclusive preposition keywords govern field unit context:
+- **`in`** — pins to a **specific unit**: `field Weight as quantity in 'kg'`
+- **`of`** — constrains to a **dimension category**: `field Distance as quantity of 'length'`
+
+A field declaration may use `in` or `of`, but never both.
+
+**Compound types and dimensional cancellation** — two levels in v1 scope:
+- **Level A (named types):** `price` (currency/unit) and `exchangerate` (currency/currency) get dedicated type names with full operator tables.
+- **Level B (time-denominator compounds):** `quantity in 'kg/hour'` uses UCUM `/` syntax with NodaTime time-unit denominators. Cancellation operates against both `period` and `duration`, with a fixed-length boundary (D15).
+
+**What changed in v2:** D15 amended to support dual cancellation — both `period` and `duration` cancel time-unit denominators, with a fixed-length boundary: `duration` cancels `hours`/`minutes`/`seconds` (always the same length); `days` and above remain `period`-only (variable length due to DST/calendar rules). The field type declaration (`instant` vs `date`/`datetime`) is the author's statement of business intent — the compound type algebra follows from that choice.
+
+### The NodaTime alignment directive — extended
+
+Shane's directive (2026-04-14): *"No obscurity, expose NodaTime. Someone way smarter than us designed NodaTime. Don't try to re-invent the wheel."*
+
+This directive extends to the broader type system:
+1. When NodaTime provides the backing model (period, duration), Precept exposes NodaTime's behavior exactly.
+2. When an external standard provides the vocabulary (ISO 4217 for currencies, UCUM for physical units), Precept adopts it rather than inventing a proprietary registry.
+3. When the algebra produces a result with a clear domain identity, Precept names it (money, price, exchangerate) rather than collapsing everything into a generic numeric.
+
+Precept's design principles ground this directly:
+
+| Precept applies it to... | External standard applies it to... | The shared principle |
+|---|---|---|
+| `money` over `decimal` + `choice` | NodaTime's `Period` over `int monthCount` | Be explicit that this value has dimensional identity |
+| `quantity in 'kg'` over `number` | F# units of measure over bare numerics | Be explicit about what unit this value is measured in |
+| `price` over generic compound | UCUM's algebraic unit grammar | Be explicit about the ratio structure |
+| `exchangerate` over `number` | ISO 4217's currency pair model | Be explicit that this is a currency conversion factor |
+| `of 'mass'` over no constraint | UCUM dimension categories | Be explicit about which dimension family is valid |
+| `in 'USD'` as hard constraint | NodaTime's type separation (no implicit conversion) | Prevention, not detection — mismatched units cannot be combined |
+
+The governing question for every decision: **"If a domain author has this kind of data, does giving it a named type help them be explicit about what it means?"**
+
+---
+
+## Motivation
+
+### The business-domain gap
+
+Precept's type system today consists of primitives (`string`, `number`, `integer`, `decimal`, `boolean`) plus temporal types (`date`, `time`, `instant`, `duration`, `period`, `timezone`, `zoneddatetime`, `datetime`). Domain authors modeling business entities must encode monetary amounts as `decimal`, quantities as `number`, and prices as naked division results — losing dimensional identity and the compiler's ability to catch unit mismatches.
+
+### Before and After
+
+**Before — scattered primitives, no dimensional safety:**
+
+```precept
+field UnitPrice as decimal
+field OrderQty as integer
+field TotalCost as decimal
+field PaymentCurrency as string
+
+from Pending on PriceOrder
+  set TotalCost = UnitPrice * OrderQty   # no unit verification — USD * each? EUR * kg?
+```
+
+The compiler cannot verify that `UnitPrice` is in the same currency as `TotalCost`, that `OrderQty` is in the correct unit for the price's denominator, or that the multiplication produces a meaningful result. The author is on their own.
+
+**After — typed values, compiler-verified dimensional safety:**
+
+```precept
+field UnitPrice as price in 'USD/each'
+field OrderQty as quantity in 'each'
+field TotalCost as money in 'USD'
+field PaymentCurrency as currency
+
+from Pending on PriceOrder
+  set TotalCost = UnitPrice * OrderQty   # (USD/each) × each → USD  ✓
+```
+
+The compiler verifies that `each` cancels, that the result is `money in 'USD'`, and that it's compatible with `TotalCost`'s declaration. `UnitPrice * Weight` where Weight is `quantity in 'kg'` is a compile-time error — the price's denominator is `each`, not `kg`.
+
+**Elapsed-time payroll — the `instant → duration` path:**
+
+```precept
+field ShiftStart as instant
+field ShiftEnd as instant
+field HourlyRate as price in 'USD/hours'
+field Pay as money in 'USD'
+
+from Active on CalculatePay
+  set Pay = HourlyRate * (ShiftEnd - ShiftStart)   # (USD/hours) × duration → USD  ✓
+```
+
+The author declares `instant` fields — stating "I care about actual elapsed time on the timeline." Subtraction yields `duration`, which cancels the `hours` denominator. This is FLSA-correct through DST transitions: `instant - instant` measures real elapsed time, not wall-clock distance.
+
+**Calendar-time billing — the `date → period` path:**
+
+```precept
+field ProjectStart as date
+field ProjectEnd as date
+field DailyRate as price in 'USD/days'
+field TotalFee as money in 'USD'
+
+from Active on CalculateFee
+  set TotalFee = DailyRate * (ProjectEnd - ProjectStart)   # (USD/days) × period → USD  ✓
+```
+
+The author declares `date` fields — stating "I care about calendar distance." Subtraction yields `period`, which cancels the `days` denominator. Calendar days are the correct unit because the business contract says "10 business days," not "864,000 seconds."
+
+### What happens if we don't build this
+
+Without business-domain types:
+- Authors encode currencies as strings, amounts as decimals, units as naming conventions. The compiler cannot prevent `CostUsd + CostEur` — the author must catch this manually.
+- Pricing logic lives in arithmetic expressions that look correct but have no dimensional verification. `UnitPrice * Quantity` compiles whether the units match or not.
+- Exchange rate application is a bare multiplication with no structural guarantee that the currency pair is correct.
+- AI consumers cannot reliably generate correct business-rule precepts because the type system provides no vocabulary for monetary or quantity constraints.
+
+---
+
+## Backing Standards
+
+### ISO 4217 — Currency codes
+
+ISO 4217 defines ~180 active 3-letter currency codes (USD, EUR, JPY, GBP, etc.) with associated metadata including the number of minor units (decimal places). Precept embeds ISO 4217 as a static lookup table — no external library dependency (D13). Currency codes are validated at compile time for literals and at the fire/update boundary for runtime values.
+
+### UCUM — Units of measure
+
+The Unified Code for Units of Measure (UCUM) provides a formal grammar for unit expressions including compound units with multiplication (`.`), division (`/`), exponents, and parentheses. It supports equality testing (canonical reduction) and commensurability testing (same dimension). Precept uses a UCUM subset covering common business units — no external library dependency (D13).
+
+Time units are excluded from UCUM's domain in Precept — they belong to NodaTime's temporal types (dead end #6 in the research doc). NodaTime's vocabulary (`hours`, `minutes`, `days`) replaces UCUM's (`h`, `min`, `d`) everywhere, including inside compound type denominators.
+
+### `decimal` backing — no `double` in the business chain
+
+All seven types use `decimal` as their magnitude backing (D12). The result-type algebra demands homogeneous backing — `price * quantity → money`, `money / quantity → price`, `money / price → quantity`. If any one type uses `double`, every cross-type operation hits a `decimal ÷ double` boundary that silently injects `double`-precision artifacts into the `decimal` result. `0.1 + 0.2 ≠ 0.3` in IEEE 754 — this is unacceptable for business arithmetic.
+
+---
+
+## The `in` and `of` Qualification System
+
+Two mutually exclusive preposition keywords qualify a field's unit context:
+
+```
+field <Name> as <type> in '<specific-unit>'       # pins to an exact unit
+field <Name> as <type> of '<dimension-category>'   # admits any unit in that dimension
+```
+
+A field declaration may carry **at most one** of `in` or `of`. Declaring both is a compile error.
+
+### `in` — specific unit
+
+| Type | `in` meaning | Example |
+|------|-------------|--------|
+| `money` | Currency code (ISO 4217) | `field Cost as money in 'USD'` |
+| `quantity` | Unit of measure | `field Weight as quantity in 'kg'` |
+| `price` | Currency / unit ratio | `field UnitPrice as price in 'USD/kg'` |
+| `exchangerate` | Currency / currency ratio | `field FxRate as exchangerate in 'USD/EUR'` |
+| `period` | NodaTime `PeriodUnits` basis | `field LeadTime as period in 'days'` |
+
+`in` is a **uniform assignment constraint** across all types (D14). `money in 'USD'` rejects EUR at compile time. `quantity in 'kg'` rejects `'5 lbs'` at compile time. `period in 'months'` rejects a period with days components at compile time. The same word means the same thing everywhere.
+
+### `of` — category constraint
+
+`of` constrains a field to accept **any member of a named category** rather than a single specific value:
+
+| Type | `of` meaning | Example |
+|------|-------------|--------|
+| `quantity` | UCUM dimension category | `field Distance as quantity of 'length'` |
+| `period` | Component category | `field GracePeriod as period of 'date'` |
+
+`of` is available on `quantity` and `period`. It is **not** available on `money`, `currency`, `price`, or `exchangerate`.
+
+#### UCUM dimension categories
+
+| Category name | Base dimension | Example units admitted |
+|---|---|---|
+| `length` | L | m, km, ft, mi, in, cm, mm |
+| `mass` | M | kg, g, lb, oz, t |
+| `volume` | L³ | L, mL, gal, fl_oz |
+| `area` | L² | m2, ft2, acre, ha |
+| `temperature` | Θ | Cel, [degF], K |
+| `count` | dimensionless | each, dozen |
+
+Time units (`s`, `min`, `h`, `d`) are excluded from the `quantity` category system because they belong to NodaTime's temporal types.
+
+#### Period component categories
+
+`period of 'date'` and `period of 'time'` replace the temporal design's `dateonly` and `timeonly` constraint suffixes with the same general `of` mechanism. The proof semantics are identical — the compiler uses the category to verify that `time ± period` and `date ± period` are safe.
+
+| Category | Admitted components | Replaces | NodaTime safety guarantee |
+|---|---|---|---|
+| `'date'` | years, months, weeks, days | `dateonly` | `LocalDate.Plus(Period)` throws on time components |
+| `'time'` | hours, minutes, seconds | `timeonly` | `LocalTime.Plus(Period)` throws on date components |
+
+### Admission vs arithmetic
+
+`of` governs **admission** — which values can be assigned to the field — and also enables **commensurable arithmetic** between values of the same dimension with automatic unit conversion.
+
+**Unit conversion resolution** (D8):
+
+1. **Target-directed:** When the result flows into a field with a known `in` unit, both operands convert to the target unit.
+2. **Left-operand wins:** When there is no target context, the right operand converts to the left operand's unit.
+
+Both rules require **commensurable** operands (same UCUM dimension). `'5 kg' + '3 ft'` is a compile-time type error — mass ≠ length. Conversion only happens within the same dimension, using UCUM standard conversion factors.
+
+**Note:** This applies to `quantity` arithmetic only. Cross-currency `money` arithmetic is always a type error — currency conversion requires an explicit `exchangerate` multiplication (D11). Exchange rates are volatile external data, not fixed constants.
+
+---
+
+## Proposed Types
+
+### `money`
+
+**What it makes explicit:** This is a monetary amount in a single currency — not a bare decimal, not a decimal+string pair. The currency is part of the value's identity. Arithmetic respects dimensional rules: you can't add USD to EUR.
+
+**Backing type:** `decimal` magnitude + ISO 4217 currency code
+
+**Declaration:**
+
+```precept
+field TotalCost as money in 'USD'
+field Payment as money                    # open — currency comes from event data
+field Budget as money in 'EUR' nullable
+```
+
+**Typed constant literal:** `'100 USD'` — content shape `<number> <3-uppercase-letters>` where the letters match an ISO 4217 code → `money`. The 3-uppercase-letter pattern is the distinguishing shape signal. See Literal Forms below.
+
+**Interpolation:** `'{Amount} USD'`, `'100 {Curr}'`, `'{Amount} {Curr}'` — any component can be interpolated. Dynamic components require guard narrowing when assigned to an `in`-constrained field (D9).
+
+**Operators:**
+
+| Expression | Produces | Rationale |
+|---|---|---|
+| `money + money` | `money` | Same currency required; cross-currency is a compile error (D11). |
+| `money - money` | `money` | Same currency required. |
+| `money * number` | `money` | Scaling. |
+| `number * money` | `money` | Commutative. |
+| `money / number` | `money` | Division by scalar. Divisor safety applies. |
+| `money / money` | `number` | Same currency; produces dimensionless ratio. |
+| `money / money` (different currencies) | `exchangerate` | Currency / currency → exchange rate derivation. |
+| `money / quantity` | `price` | Currency / non-currency → price derivation. |
+| `money / period` | `price` | Time-based price derivation: `'1000 USD' / '8 hours'` → `price in 'USD/hours'` (D15). |
+| `money / duration` | `price` | Duration-based price derivation for `hours`/`minutes`/`seconds` denominators (D15). |
+| `==`, `!=`, `<`, `>`, `<=`, `>=` | `boolean` | Same currency required. Orderable within currency. |
+
+| **Not supported** | **Why** |
+|---|---|
+| `money + money` (different currencies) | **Compile error.** You can't add USD to EUR — exchange rates are volatile. Convert first: `AmountEur * FxRate`. See D11. |
+| `money * money` | You can't multiply two monetary amounts. Did you mean `Amount * 2` to double it, or `Amount / Quantity` to derive a price? |
+| `money + number` | A bare number has no currency. Use `Amount + '50 USD'` to add $50. |
+| `money / 0` | **Compile error (C92).** Division by zero is provably always wrong. |
+
+**Accessors:**
+
+| Accessor | Returns | Description |
+|---|---|---|
+| `.currency` | `currency` | ISO 4217 code (`'USD'`, `'EUR'`) |
+| `.amount` | `decimal` | Magnitude (the numeric part) |
+
+**Constraints:** `in '<currency>'`, `nullable`, `default '...'`, `nonnegative`. The `maxplaces` constraint overrides the ISO 4217 default when needed.
+
+**Default precision (D10):** `money in 'USD'` defaults to 2 decimal places. `money in 'JPY'` defaults to 0. `money in 'BHD'` defaults to 3. ISO 4217 minor units determine the natural precision. The default rounding mode is half-even (banker's rounding).
+
+**Serialization:** `{ "amount": 100.00, "currency": "USD" }`
+
+**Teachable error messages:**
+
+| Invalid code | Error message |
+|---|---|
+| `CostUsd + CostEur` | You can't add USD and EUR — exchange rates change. Convert one currency first using an exchange rate: `CostEur * FxUsdEur`. |
+| `field Cost as money in "USD"` | Unit constraints use single quotes, not double quotes. Use `in 'USD'`. |
+| `Cost + 50` | A bare number has no currency. Use `Cost + '50 USD'` to add a monetary amount. |
+| `Cost * Revenue` | You can't multiply two monetary amounts together. Did you mean `Cost * 2` to double it? |
+| `set TotalUsd = Payment` (open → constrained, no guard) | `Payment` has no proven currency. Use `when Payment.currency == 'USD'` to narrow it, or declare `Payment as money in 'USD'`. |
+
+---
+
+### `currency`
+
+**What it makes explicit:** This is an ISO 4217 currency code — not a string that happens to look like a currency. It identifies a currency but carries no magnitude.
+
+**Backing type:** `string` (validated against ISO 4217 at compile time for literals, at fire/update boundary for runtime values)
+
+**Declaration:**
+
+```precept
+field BaseCurrency as currency default 'USD'
+field InvoiceCurrency as currency nullable
+```
+
+**Typed constant literal:** `'USD'` — content shape `<3-uppercase-letters>` matching an ISO 4217 code → `currency`. Distinguishable from timezone identifiers (which contain `/`), dates (which contain `-`), and unit names (which are lowercase/mixed).
+
+**Operators:** None. `currency` is a reference type — it identifies a currency, not a numeric value. It participates in comparisons and guard narrowing but not arithmetic.
+
+| `==`, `!=` | `boolean` | Equality comparison. |
+
+| **Not supported** | **Why** |
+|---|---|
+| `currency + currency` | Currency codes are identifiers, not numbers. Use `money` for monetary amounts. |
+| `currency < currency` | Currency codes have no natural ordering. |
+
+**Accessors:** None.
+
+**Constraints:** `nullable`, `default '...'`.
+
+**Serialization:** `"USD"` (string)
+
+**Teachable error messages:**
+
+| Invalid code | Error message |
+|---|---|
+| `field X as currency default 'usd'` | Currency codes must be uppercase (ISO 4217). Use `'USD'`. |
+| `field X as currency default 'USDX'` | `'USDX'` is not a recognized ISO 4217 currency code. |
+
+---
+
+### `quantity`
+
+**What it makes explicit:** This is a numeric value with a unit of measure — not a bare number. The unit is part of the value's identity. `'5 kg'` and `'5 lbs'` are different quantities, even though both have magnitude 5.
+
+**Backing type:** `decimal` magnitude + unit identifier (UCUM or entity-scoped)
+
+**Declaration:**
+
+```precept
+field Weight as quantity in 'kg'          # specific unit
+field ItemCount as quantity in 'each'     # specific unit
+field Distance as quantity of 'length'    # any length unit
+field Payload as quantity of 'mass'       # any mass unit
+field Measurement as quantity             # open — unit comes from event data
+```
+
+`in` and `of` are mutually exclusive — a field uses one or the other, never both.
+
+**Typed constant literal:** `'5 kg'` — content shape `<number> <unit-name>` where the unit name is not an ISO 4217 code and not a temporal unit name → `quantity`. Temporal unit names (`days`, `hours`, etc.) are a known closed set and resolve to `period`/`duration` instead.
+
+**Interpolation:** `'{Weight} kg'`, `'5 {Unit}'`, `'{Weight} {Unit}'`
+
+**Operators:**
+
+| Expression | Produces | Rationale |
+|---|---|---|
+| `quantity + quantity` | `quantity` | Same dimension required; auto-converts if commensurable (D8). |
+| `quantity - quantity` | `quantity` | Same dimension required; auto-converts if commensurable. |
+| `quantity * number` | `quantity` | Scaling. |
+| `number * quantity` | `quantity` | Commutative. |
+| `quantity / number` | `quantity` | Division by scalar. Divisor safety applies. |
+| `quantity / quantity` | `number` | Same dimension required; produces dimensionless ratio. |
+| `quantity / period` | `quantity` (compound) | Produces time-denominator rate: `'5 kg' / '1 hour'` → `'5 kg/hour'` (Level B, D15). |
+| `quantity / duration` | `quantity` (compound) | Same, but `hours`/`minutes`/`seconds` denominators only (D15). |
+| `quantity (compound) * period` | `quantity` | Dimensional cancellation: `'5 kg/hour' * '2 hours'` → `'10 kg'` (D15). |
+| `period * quantity (compound)` | `quantity` | Commutative. |
+| `quantity (compound) * duration` | `quantity` | Cancellation for `hours`/`minutes`/`seconds` denominators (D15). |
+| `duration * quantity (compound)` | `quantity` | Commutative. |
+| `money / quantity` | `price` | Currency / non-currency → price derivation. |
+| `==`, `!=`, `<`, `>`, `<=`, `>=` | `boolean` | Same dimension required; auto-converts for comparison. Orderable. |
+
+| **Not supported** | **Why** |
+|---|---|
+| `quantity + quantity` (different dimensions) | **Compile error.** You can't add kilograms to meters — they measure different things. |
+| `quantity + number` | A bare number has no unit. Use `Weight + '2 kg'` to add 2 kilograms. |
+| `quantity * quantity` | Direct quantity multiplication has no defined result type in v1. Use `quantity * number` for scaling. |
+
+**Accessors:**
+
+| Accessor | Returns | Description |
+|---|---|---|
+| `.unit` | `unitofmeasure` | The specific UCUM unit (`'kg'`, `'each'`) |
+| `.dimension` | `dimension` | The UCUM dimension category (`'mass'`, `'length'`) |
+| `.amount` | `decimal` | Magnitude (the numeric part) |
+
+**Constraints:** `in '<unit>'`, `of '<dimension>'`, `nullable`, `default '...'`, `nonnegative`.
+
+**Serialization:** `{ "amount": 5, "unit": "kg" }`
+
+**Teachable error messages:**
+
+| Invalid code | Error message |
+|---|---|
+| `WeightKg + DistanceMi` | You can't add `quantity in 'kg'` (mass) to `quantity in 'mi'` (length) — they measure different things. |
+| `field X as quantity in 'kg' of 'mass'` | A field can use `in` or `of`, but not both. `in 'kg'` already pins to kilograms (which is mass). |
+| `Weight + 5` | A bare number has no unit. Use `Weight + '5 kg'` to add 5 kilograms. |
+| `set TargetKg = Measurement` (open → constrained, no guard) | `Measurement` has no proven unit. Use `when Measurement.unit == 'kg'` or `when Measurement.dimension == 'mass'` to narrow it. |
+
+---
+
+### `unitofmeasure`
+
+**What it makes explicit:** This is a unit identifier — not a string that happens to name a unit. It identifies a unit but carries no magnitude.
+
+**Backing type:** `string` (validated against UCUM registry or entity-scoped units)
+
+**Declaration:**
+
+```precept
+field AllowedUnit as unitofmeasure default 'kg'
+field SelectedUnit as unitofmeasure nullable
+```
+
+**Typed constant literal:** `'kg'` — a bare lowercase/mixed-case unit name not matching any other type family's content shape → `unitofmeasure` when the target field is declared as `unitofmeasure`. Disambiguation from `dimension` uses registry disjointness — unit names and dimension names never overlap.
+
+**Operators:** None. `unitofmeasure` is a reference type.
+
+| `==`, `!=` | `boolean` | Equality comparison. |
+
+| **Not supported** | **Why** |
+|---|---|
+| `unitofmeasure < unitofmeasure` | Unit names have no natural ordering. |
+
+**Accessors:**
+
+| Accessor | Returns | Description |
+|---|---|---|
+| `.dimension` | `dimension` | UCUM dimension category for this unit |
+
+**Registry scopes:**
+
+| Scope | Source of truth | Examples | Validation timing |
+|---|---|---|---|
+| **Language-level** | NodaTime | `days`, `hours`, `months` | Compile-time — closed set |
+| **Standard registry** | ISO 4217, UCUM subset | `USD`, `EUR`, `kg`, `lbs` | Compile-time — large but closed set |
+| **Entity-scoped** | `units` block in precept definition | `each`, `case`, `six-pack` | Compile-time within the precept |
+
+**Constraints:** `nullable`, `default '...'`.
+
+**Serialization:** `"kg"` (string)
+
+---
+
+### `dimension`
+
+**What it makes explicit:** This is a UCUM dimension category identifier — not a string. It identifies a dimension category (e.g., mass, length, volume) but carries no magnitude or specific unit.
+
+**Backing type:** `string` (validated against UCUM dimension registry)
+
+**Declaration:**
+
+```precept
+field MeasuredDimension as dimension default 'mass'
+field AllowedDimension as dimension nullable
+```
+
+**Typed constant literal:** `'mass'` — a bare name matching the UCUM dimension registry → `dimension` when the target field is declared as `dimension`. Distinguishable from unit names because the UCUM unit registry and dimension registry are disjoint sets.
+
+**Operators:** None. `dimension` is a reference type.
+
+| `==`, `!=` | `boolean` | Equality comparison. |
+
+**Accessors:** None.
+
+**Constraints:** `nullable`, `default '...'`.
+
+**Serialization:** `"mass"` (string)
+
+**Relationship to `quantity` and `unitofmeasure`:**
+
+The `.dimension` accessor on `quantity` and `unitofmeasure` fields returns a `dimension` value. This enables type-safe cross-field consistency checks:
+
+```precept
+field AllowedDimension as dimension
+field Reading as quantity
+
+from Active on RecordReading
+  when Reading.dimension == AllowedDimension
+    set LastReading = Reading
+```
+
+The `of` keyword in `quantity of 'mass'` uses the same dimension registry — `of` is a static compile-time constraint, while the `dimension` type holds the same category as runtime data.
+
+---
+
+### `price`
+
+**What it makes explicit:** This is a currency-per-unit ratio — not a bare decimal. It carries both a currency numerator and a unit denominator. The key operation: `price * quantity → money` (dimensional cancellation).
+
+**Backing type:** `decimal` magnitude + `string` numerator currency + `string` denominator unit
+
+**Declaration:**
+
+```precept
+field UnitPrice as price in 'USD/each'
+field HourlyRate as price in 'USD/hours'
+field PricePerKg as price in 'EUR/kg'
+field DynamicRate as price                # open — currency/unit from event data
+```
+
+**Typed constant literal:** `'4.17 USD/each'` — content shape `<number> <3-uppercase-letters>/<unit-name>` → `price`. The `/` between a currency and a non-currency unit is the distinguishing shape signal.
+
+**Interpolation:** `'{Rate} USD/each'`, `'4.17 {Curr}/{Unit}'`, `'{Rate} {Curr}/{Unit}'`
+
+**Operators:**
+
+| Expression | Produces | Rationale |
+|---|---|---|
+| `price * quantity` | `money` | Dimensional cancellation: (currency/unit) × unit → currency. |
+| `quantity * price` | `money` | Commutative. |
+| `price * period` | `money` | Time-denominator cancellation: (currency/time) × time → currency (D15). |
+| `period * price` | `money` | Commutative. |
+| `price * duration` | `money` | Duration cancellation for `hours`/`minutes`/`seconds` denominators (D15). |
+| `duration * price` | `money` | Commutative. |
+| `price * number` | `price` | Scaling. |
+| `number * price` | `price` | Commutative. |
+| `price + price` | `price` | Same currency and unit required. |
+| `price - price` | `price` | Same currency and unit required. |
+| `money / quantity` | `price` | Derivation. |
+| `money / period` | `price` | Time-based derivation: currency ÷ time → currency/time (D15). |
+| `money / duration` | `price` | Duration-based derivation for `hours`/`minutes`/`seconds` denominators (D15). |
+| `==`, `!=`, `<`, `>`, `<=`, `>=` | `boolean` | Same currency and unit required. Orderable. |
+
+| **Not supported** | **Why** |
+|---|---|
+| `price * price` | You can't multiply two prices together. Use `price * quantity → money` for dimensional cancellation. |
+| `price + price` (different currency or unit) | **Compile error.** `'USD/each'` and `'EUR/each'` have different currencies. `'USD/each'` and `'USD/kg'` have different denominators. |
+| `price + number` | A bare number has no currency or unit. Use `Rate + '1 USD/each'` to add to a price. |
+
+**Accessors:**
+
+| Accessor | Returns | Description |
+|---|---|---|
+| `.currency` | `currency` | Numerator currency (`'USD'`) |
+| `.unit` | `unitofmeasure` | Denominator unit (`'each'`, `'kg'`, `'hours'`) |
+| `.amount` | `decimal` | Magnitude (the numeric part) |
+
+**Constraints:** `in '<currency>/<unit>'`, `nullable`, `default '...'`.
+
+**Serialization:** `{ "amount": 4.17, "currency": "USD", "unit": "each" }`
+
+**Dimensional cancellation — the two paths:**
+
+The key value of `price` as a distinct type is that `price * quantity → money` is type-safe dimensional cancellation. The compiler verifies that the quantity's unit matches the price's denominator unit.
+
+When the denominator is a time unit (D15), both `period` and `duration` can cancel — which one depends on the author's field type choice and the fixed-length boundary:
+
+**Calendar-time path** — the author declares `period` fields explicitly:
+
+```precept
+field HourlyRate as price in 'USD/hours'
+field HoursWorked as period in 'hours'
+field Pay as money in 'USD'
+
+from Active on CalculatePay
+  set Pay = HourlyRate * HoursWorked    # (USD/hours) × hours → USD  ✓
+```
+
+**Elapsed-time path** — the author uses `instant` fields, and subtraction yields `duration`:
+
+```precept
+field ShiftStart as instant
+field ShiftEnd as instant
+field HourlyRate as price in 'USD/hours'
+field Pay as money in 'USD'
+
+from Active on CalculatePay
+  set Pay = HourlyRate * (ShiftEnd - ShiftStart)   # (USD/hours) × duration → USD  ✓
+```
+
+The field type declaration is the author's statement of business intent. `instant` means "I care about actual elapsed time" (FLSA-correct for payroll, DST-safe). `date`/`datetime` + `period` means "I care about calendar distance" (correct for lease billing, subscription terms). The compiler follows the author's declared intent — no warning, no preference between paths.
+
+**Teachable error messages:**
+
+| Invalid code | Error message |
+|---|---|
+| `PricePerKg * DistanceMi` | `price in 'USD/kg'` × `quantity in 'mi'` — the denominator unit (`kg`) doesn't match the quantity's unit (`mi`). Use a quantity measured in `kg`. |
+| `PricePerDay * SomeDuration` | `price in 'USD/days'` × `duration` — durations can only cancel `hours`, `minutes`, or `seconds` denominators. `days` varies in length (23–25 hours near DST). Use `date`/`datetime` subtraction to get a `period` instead. |
+| `set Pay = HourlyRate * Gap` (open period, no guard) | `Gap` has no proven basis. Use `when Gap.basis == 'hours'` or declare `Gap as period in 'hours'`. |
+
+---
+
+### `exchangerate`
+
+**What it makes explicit:** This is a currency-per-currency ratio — not a bare number. It enables explicit, governed currency conversion. The compiler verifies that currency pairs match during conversion.
+
+**Backing type:** `decimal` magnitude + `string` numerator currency + `string` denominator currency
+
+**Declaration:**
+
+```precept
+field FxRate as exchangerate in 'USD/EUR'
+field SpotRate as exchangerate nullable
+```
+
+**Typed constant literal:** `'1.08 USD/EUR'` — content shape `<number> <3-uppercase-letters>/<3-uppercase-letters>` where both match ISO 4217 → `exchangerate`. The `/` between two currency codes is the distinguishing shape signal.
+
+**Interpolation:** `'{Rate} USD/EUR'`, `'1.08 {From}/{To}'`, `'{Rate} {From}/{To}'`
+
+**Operators:**
+
+| Expression | Produces | Rationale |
+|---|---|---|
+| `exchangerate * money` | `money` | Converts currency: (USD/EUR) × EUR → USD. |
+| `money * exchangerate` | `money` | Commutative. |
+| `money / money` (different currencies) | `exchangerate` | Derivation. |
+| `exchangerate * number` | `exchangerate` | Scaling. |
+| `number * exchangerate` | `exchangerate` | Commutative. |
+| `==`, `!=` | `boolean` | Same currency pair required. |
+
+| **Not supported** | **Why** |
+|---|---|
+| `exchangerate + exchangerate` | Exchange rates are ratios, not additive quantities. |
+| `exchangerate < exchangerate` | Exchange rates have no meaningful ordering outside their time context. |
+
+**Accessors:**
+
+| Accessor | Returns | Description |
+|---|---|---|
+| `.numerator` | `currency` | Numerator currency (`'USD'` in `'USD/EUR'`) |
+| `.denominator` | `currency` | Denominator currency (`'EUR'` in `'USD/EUR'`) |
+| `.amount` | `decimal` | Magnitude (the numeric part) |
+
+**Constraints:** `in '<currency>/<currency>'`, `nullable`, `default '...'`.
+
+**Serialization:** `{ "amount": 1.08, "numerator": "USD", "denominator": "EUR" }`
+
+**Currency conversion example:**
+
+```precept
+field AmountEur as money in 'EUR'
+field FxRate as exchangerate in 'USD/EUR'
+field AmountUsd as money in 'USD'
+
+from Active on Convert
+  set AmountUsd = FxRate * AmountEur    # (USD/EUR) × EUR → USD  ✓
+```
+
+The compiler verifies that the exchange rate's denominator currency matches the source money's currency, and that the result matches the exchange rate's numerator currency.
+
+**Teachable error messages:**
+
+| Invalid code | Error message |
+|---|---|
+| `FxUsdEur * AmountGbp` | `exchangerate in 'USD/EUR'` × `money in 'GBP'` — the denominator currency (`EUR`) doesn't match the money's currency (`GBP`). |
+| `FxUsdEur + FxGbpEur` | You can't add exchange rates together. Exchange rates are conversion factors, not additive quantities. |
+
+---
+
+## Compound Types and Dimensional Cancellation
+
+### The `/` ratio model
+
+When two unit-bearing values are divided, the result carries a compound unit — a ratio of the numerator's unit over the denominator's unit. This is UCUM's standard algebraic unit composition: `kg/hour`, `USD/kg`, `USD/EUR`, `miles/day`.
+
+Precept recognizes two levels of compound types in v1:
+
+**Level A — Named compound types (full type-system support)**
+
+These are the two ratio patterns that dominate business domains. They get dedicated type names, operator tables, and `in` constraint support:
+
+| Pattern | Named type | Example | Why named |
+|---|---|---|---|
+| Currency / non-currency unit | `price` | `'4.17 USD/kg'`, `'75 USD/hours'` | Most common business ratio; enables `price * quantity → money` cancellation |
+| Currency / currency | `exchangerate` | `'1.08 USD/EUR'` | Enables governed currency conversion; D11 requires it |
+
+**Level B — Time-denominator compound quantities (v1 scope)**
+
+Quantities divided by time units produce rates that are common in business domains — flow rates, throughput, velocity, labor rates. These don't need a new named type because they can be modeled as `quantity` with a compound UCUM unit:
+
+```precept
+field FlowRate as quantity in 'kg/hour'
+field Throughput as quantity in 'each/day'
+field MilesPerDay as quantity in 'miles/day'
+```
+
+The `/` inside the unit string is UCUM compound unit syntax — the same mechanism that backs `price` and `exchangerate`. The type checker validates compound unit expressions and supports dimensional cancellation:
+
+| Expression | Result | Cancellation |
+|---|---|---|
+| `quantity in 'kg/hour' * period in 'hours'` | `quantity in 'kg'` | (kg/hour) × hour → kg |
+| `quantity in 'kg/hour' * duration` | `quantity in 'kg'` | (kg/hour) × duration → kg (fixed-length denominator) |
+| `quantity in 'kg' / period in 'hours'` | `quantity in 'kg/hour'` | kg ÷ hour → kg/hour |
+| `quantity in 'kg' / duration` | `quantity in 'kg/hour'` | kg ÷ duration → kg/hour (fixed-length denominator) |
+| `quantity in 'miles' / period in 'days'` | `quantity in 'miles/day'` | miles ÷ day → miles/day |
+
+Time-denominator compounds are in v1 scope because they rely on the same registry infrastructure (UCUM units + NodaTime time units) and the same UCUM `/` grammar that `price` and `exchangerate` already use. The time unit in the denominator comes from NodaTime's vocabulary — the same units used in `period in 'hours'` (see D15).
+
+**Registry bridge: NodaTime vocabulary in denominators**
+
+UCUM defines time units as `h`, `min`, `d`, `s`. NodaTime uses `hours`, `minutes`, `days`, `seconds`. Precept's DSL surface uses NodaTime's vocabulary for all time references — including inside compound unit denominators. This means `'kg/hour'` (not `'kg/h'`), `'USD/hours'` (not `'USD/h'`), `'each/day'` (not `'each/d'`).
+
+This is not arbitrary. The cancellation partner for a time denominator is always a `period` or `duration`, never a `quantity` (dead end #6). Using the same vocabulary in both the denominator and the `period` declaration means the compiler matches them directly — `in 'USD/hours'` cancels against `period in 'hours'` without a cross-registry translation table.
+
+### The fixed-length boundary (D15)
+
+Both `period` and `duration` can cancel time-unit denominators, but with a constraint: `duration` only cancels **fixed-length** denominators — units whose real-world length never varies:
+
+| Denominator unit | Fixed-length? | `duration` cancels? | `period` cancels? |
+|---|---|---|---|
+| `seconds` | Yes (always 1 second) | ✓ | ✓ |
+| `minutes` | Yes (always 60 seconds) | ✓ | ✓ |
+| `hours` | Yes (always 3600 seconds) | ✓ | ✓ |
+| `days` | No (23 or 25 hours near DST) | ✗ | ✓ |
+| `weeks` | No (contains variable-length days) | ✗ | ✓ |
+| `months` | No (28–31 days) | ✗ | ✓ |
+| `years` | No (365 or 366 days) | ✗ | ✓ |
+
+This boundary reflects NodaTime's own type separation — `Duration` measures fixed elapsed time (nanoseconds on the timeline), while `Period` measures calendar distance (variable-length units).
+
+**Author intent — which cancellation path to use:**
+
+| Business question | Field type | Subtraction yields | Cancellation partner | Example |
+|---|---|---|---|---|
+| "How many actual hours/minutes elapsed?" | `instant` | `duration` | `duration` cancels `hours`/`minutes`/`seconds` | Payroll, parking, SLA penalties |
+| "How many calendar days/months passed?" | `date` / `datetime` | `period` | `period` cancels all time denominators | Lease billing, subscription terms, consulting |
+
+The type choice *is* the declaration of business intent. The compound type algebra follows from it.
+
+**Implementation note (precision):** When `duration` cancels a time denominator, the runtime extracts the scalar value via `(decimal)duration.ToInt64Nanoseconds() / <nanoseconds-per-unit>m` — NOT via `Duration.TotalHours` (which returns `double` and crosses the decimal boundary). The `long → decimal` cast is always exact (decimal has 29 significant digits; `long.MaxValue` has 19).
+
+### Why `price` and `exchangerate` are named types, not generic `quantity` with compound units
+
+The alternative would be: no `price` or `exchangerate` types — just `quantity in 'USD/kg'` and `quantity in 'USD/EUR'`. This was rejected (D2) because:
+
+1. **Semantic clarity.** `price` and `exchangerate` communicate business intent. `quantity in 'USD/EUR'` does not — it looks like a physics measurement.
+2. **Different operator behavior.** `price * quantity → money` is dimensional cancellation that produces a *different type*, not another quantity. Generic compound quantities don't have this cross-type algebra.
+3. **Currency-specific rules.** `price` and `exchangerate` participate in D11 (cross-currency safety). Generic compound quantities don't need currency-pair checking.
+
+Level B time-denominator compounds don't need named types because they stay within the `quantity` type family — their arithmetic produces quantities, not money or exchange rates.
+
+**Level C — General compound unit algebra (out of v1 scope)**
+
+Arbitrary compound quantity-over-quantity ratios — density (`kg/L`), acceleration (`m/s2`), force (`kg.m/s2`) — require full UCUM compound unit parsing, normalization, and dimensional analysis. These are valid UCUM expressions but require a significantly more complex type checker:
+
+- Parsing nested unit expressions with `.`, `/`, exponents, and parentheses
+- Normalizing to canonical form for equality testing
+- Tracking dimension vectors through multi-step arithmetic
+- Handling exponents and compound dimensions (L² for area, L³ for volume)
+
+Level C is explicitly deferred. Authors who need compound physical units can model them as `number` fields with naming conventions until Level C ships.
+
+---
+
+## Discrete Equality Narrowing
+
+Open fields (declared without `in` or `of`) participate in the full type system — but arithmetic involving them requires compile-time proof of compatibility. This proof comes from **discrete equality narrowing**: guard expressions that constrain an open field's unit/currency/dimension to a specific value within a guarded scope.
+
+### The contract
+
+| Field declaration | Arithmetic status | How to use in arithmetic |
+|---|---|---|
+| `field X as money in 'USD'` | Statically known. Arithmetic checked at compile time. | Direct — no guard needed. |
+| `field X as money` | Open. Arithmetic is a **compile error** without a guard. | `when X.currency == 'USD'` narrows X to `money in 'USD'` in scope. |
+| `field X as quantity of 'mass'` | Dimension known. Same-dimension arithmetic allowed. | Direct for dimension-compatible operations. Unit-specific ops need `when X.unit == 'kg'`. |
+| `field X as quantity` | Fully open. | `when X.dimension == 'length'` for dimension, `when X.unit == 'kg'` for unit. |
+
+This is the same contract as nullable narrowing: `field X as number?` is open (nullable). Using `X` in arithmetic is a compile error unless `when X != null` narrows it. Discrete equality narrowing extends this principle to unit, currency, dimension, basis, and component accessors.
+
+### Mechanism
+
+Discrete equality narrowing plugs into the existing guard-narrowing pipeline from the null-flow narrowing and proof-engine (#106) work:
+
+1. **Guard decomposition** — `when X.currency == 'USD'` is decomposed into an equality assertion on the accessor.
+2. **Marker injection** — A `$eq:X.currency:USD` marker is injected into the symbol table for the guarded scope.
+3. **Cross-branch accumulation** — Already works. `else` branches see the negation; subsequent `when` branches see accumulated narrowing.
+4. **Sequential assignment flow** — `set X = Y` where Y is narrowed copies the markers (already handled by `ApplyAssignmentNarrowing`).
+5. **Compatibility check** — The type checker consumes `$eq:` markers alongside static `in`/`of` constraints when checking arithmetic operands.
+
+### Accessors per type
+
+| Type | Accessors available | Notes |
+|------|-------------------|-------|
+| `money` | `.currency` | ISO 4217 code |
+| `quantity` | `.unit`, `.dimension` | `.unit` = specific UCUM unit, `.dimension` = UCUM dimension category (returns `dimension` type) |
+| `period` | `.basis`, `.component` | `.basis` = NodaTime PeriodUnits, `.component` = `'date'` or `'time'` |
+| `price` | `.currency`, `.unit` | Numerator currency, denominator unit |
+| `exchangerate` | `.numerator`, `.denominator` | Both are currency codes |
+| `unitofmeasure` | `.dimension` | UCUM dimension category (returns `dimension` type) |
+
+### Example — open money with guard narrowing
+
+```precept
+field Payment as money                 # open — currency unknown at declaration
+field AccountBalance as money in 'USD'
+
+from Pending on ApplyPayment
+  when Payment.currency == 'USD'
+    set AccountBalance = AccountBalance + Payment   # valid — both proven USD
+  else
+    reject "Only USD payments accepted"
+```
+
+### Example — open quantity with dimension narrowing
+
+```precept
+field Measurement as quantity              # open — unit and dimension unknown
+field TargetKg as quantity in 'kg'
+
+from Pending on Record
+  when Measurement.dimension == 'mass'     # narrows to mass dimension
+    set TargetKg = Measurement             # valid — commensurable (same dimension), auto-converts to kg
+  else
+    reject "Expected a mass measurement"
+```
+
+### Example — open period with component narrowing
+
+```precept
+field Interval as period                   # open — any components
+field DueDate as date
+
+from Active on Extend
+  when Interval.component == 'date'        # narrows to date-component period
+    set DueDate = DueDate + Interval       # valid — proven date-safe for LocalDate.Plus
+  else
+    reject "Extension interval must use date components"
+```
+
+### Relationship to the proof engine (#106)
+
+The proof engine introduced by #106 handles **numeric interval reasoning** — `$ival:`, `$positive:`, `$nonzero:` markers for divisor safety and sqrt safety. Discrete equality narrowing handles **string equality reasoning** — `$eq:` markers for unit/currency/dimension compatibility.
+
+Both systems share the same infrastructure:
+- String-encoded markers in `IReadOnlyDictionary<string, StaticValueKind>`
+- Guard decomposition via `ApplyNarrowing`
+- Cross-branch accumulation
+- Sequential assignment flow via `ApplyAssignmentNarrowing`
+
+The proof engine does not need modification. Discrete equality narrowing is a parallel layer that reuses the pipeline but operates on a different domain (discrete values vs. numeric intervals).
+
+---
+
+## Period Extensions
+
+This proposal extends the temporal `period` type with two mechanisms: unit-basis selection via `in`, and component-category constraint via `of`.
+
+### Period basis — Noda-faithful semantics
+
+For `period`, the `in` syntax is a **unit-selection instruction**, not an exactness constraint (D3). It maps directly to `NodaTime.PeriodUnits` flags and selects which overload of `Period.Between` is used when computing differences.
+
+**Atomic mapping:**
+
+| Precept basis atom | NodaTime `PeriodUnits` |
+|---|---|
+| `'years'` | `Years` |
+| `'months'` | `Months` |
+| `'weeks'` | `Weeks` |
+| `'days'` | `Days` |
+| `'hours'` | `Hours` |
+| `'minutes'` | `Minutes` |
+| `'seconds'` | `Seconds` |
+
+**Composite basis** uses `&` as separator (D4):
+
+| Precept basis | NodaTime flags |
+|---|---|
+| `'years&months'` | `Years \| Months` |
+| `'years&months&days'` | `Years \| Months \| Days` |
+| `'hours&minutes'` | `Hours \| Minutes` |
+| `'hours&minutes&seconds'` | `Hours \| Minutes \| Seconds` |
+| `'days&hours&minutes'` | `Days \| Hours \| Minutes` |
+
+`&` means "and" (basis composition). `/` is reserved exclusively for ratio expressions.
+
+### Legal basis by source operation
+
+NodaTime enforces which period units are valid for each local-type subtraction. The compiler validates that the declared basis is compatible with the source operation.
+
+| Operation | Legal basis components |
+|---|---|
+| `date - date` | Years, Months, Weeks, Days |
+| `time - time` | Hours, Minutes, Seconds |
+| `datetime - datetime` | All of the above |
+
+**Invalid combinations (compile-time errors):**
+
+| Surface | Reason |
+|---|---|
+| `time - time` as `period in 'days'` | `LocalTime.Between` rejects date units |
+| `date - date` as `period in 'hours'` | `LocalDate.Between` rejects time units |
+
+### Default NodaTime basis (no `in` specified)
+
+| Operation | Default basis |
+|---|---|
+| `date - date` | Years, Months, Days |
+| `time - time` | All time units |
+| `datetime - datetime` | Years, Months, Days + all time units |
+
+### Lowering rules
+
+| Precept expression | NodaTime lowering |
+|---|---|
+| `date - date` as `period in 'months'` | `Period.Between(start, end, PeriodUnits.Months)` |
+| `date - date` as `period in 'weeks&days'` | `Period.Between(start, end, PeriodUnits.Weeks \| PeriodUnits.Days)` |
+| `time - time` as `period in 'hours&minutes'` | `Period.Between(start, end, PeriodUnits.Hours \| PeriodUnits.Minutes)` |
+| `datetime - datetime` as `period in 'days&hours&minutes'` | `Period.Between(start, end, PeriodUnits.Days \| PeriodUnits.Hours \| PeriodUnits.Minutes)` |
+
+The result is whatever NodaTime returns for the requested basis. Precept does not add additional exactness rejection or round-trip validation beyond what NodaTime itself provides.
+
+### Adding an existing period
+
+When a `period` is an operand to addition (e.g., `DueDate + Grace`), NodaTime applies whatever units are already in the period. There is no alternate "add using these output units" overload. The compiler validates that the period's structural content is compatible with the target type.
+
+### Period operations that produce a `period` (from temporal design)
+
+| Operation | Result | Default basis |
+|---|---|---|
+| `date - date` | `period` | Years, Months, Days |
+| `time - time` | `period` | All time units |
+| `datetime - datetime` | `period` | All units |
+| `period ± period` | `period` | Union of both periods' units |
+| `-period` | `period` | Same units, negated |
+
+With `in`, each of these can be narrowed to a specific basis by lowering to the explicit `Period.Between(..., PeriodUnits)` overload.
+
+---
+
+## Literal Forms
+
+All new types enter through the existing two-door literal model established by the temporal proposal.
+
+### Door 2 — Typed constant (`'...'`) with interpolation
+
+| Content shape | Type family | Examples |
+|---|---|---|
+| `<number> <ISO-4217-code>` | `money` | `'100 USD'`, `'50.25 EUR'` |
+| `<number> <unit-name>` | `quantity` | `'5 kg'`, `'24 each'` |
+| `<number> <currency>/<unit>` | `price` | `'4.17 USD/each'` |
+| `<number> <currency>/<currency>` | `exchangerate` | `'1.08 USD/EUR'` |
+| `<ISO-4217-code>` (3-letter, no number) | `currency` | `'USD'`, `'EUR'` |
+| `<unit-name>` (no number) | `unitofmeasure` | `'kg'`, `'each'` |
+| `<dimension-name>` (no number, UCUM dimension registry) | `dimension` | `'mass'`, `'length'` |
+
+### Type-family admission rule
+
+Each content shape must be distinguishable from all existing inhabitants:
+- ISO 4217 codes are 3 uppercase letters — distinguishable from IANA timezone identifiers (which contain `/`), ISO 8601 dates (which contain `-`), and unit names (which are lowercase or mixed).
+- Quantity literals (`<number> <unit>`) are distinguishable from temporal quantities because temporal unit names (`days`, `hours`, etc.) are a known closed set; non-temporal unit names come from ISO 4217 or UCUM registries.
+- Price/rate literals contain `/` between unit components — distinguishable from temporal and plain quantity forms.
+- `unitofmeasure` vs `dimension` bare strings: disambiguated by the target field's declared type. The UCUM unit registry and dimension registry are disjoint sets — unit names (`kg`, `m`, `lbs`) never overlap with dimension names (`mass`, `length`, `volume`), so context-free disambiguation is also possible.
+
+### Integer requirement — scoped to temporal only
+
+The temporal proposal's integer requirement (Decision #28: `'0.5 days'` is a compile error) applies only to temporal unit names. Non-temporal quantities accept non-integer magnitudes because their backing types accept them: `'2.5 kg'` is valid, `'100.50 USD'` is valid.
+
+### Interpolation — any component, any type
+
+`{expr}` interpolation can substitute any positional component of a typed constant:
+
+| Type | Static | Magnitude interpolated | Unit interpolated | Both interpolated |
+|---|---|---|---|---|
+| `money` | `'100 USD'` | `'{Amount} USD'` | `'100 {Curr}'` | `'{Amount} {Curr}'` |
+| `quantity` | `'5 kg'` | `'{Weight} kg'` | `'5 {Unit}'` | `'{Weight} {Unit}'` |
+| `price` | `'4.17 USD/each'` | `'{Rate} USD/each'` | `'4.17 {Curr}/{Unit}'` | `'{Rate} {Curr}/{Unit}'` |
+| `exchangerate` | `'1.08 USD/EUR'` | `'{Rate} USD/EUR'` | `'1.08 {From}/{To}'` | `'{Rate} {From}/{To}'` |
+
+When a dynamic component flows into a field with an `in` constraint, the narrowing contract (D9, D14) applies: the compiler requires compile-time proof that the interpolated value matches the constraint.
+
+```precept
+field Cost as money in 'USD'
+set Cost = '{LineTotal} {InvoiceCurrency}'    # ✗ no proof InvoiceCurrency == 'USD'
+
+when InvoiceCurrency == 'USD'
+  set Cost = '{LineTotal} {InvoiceCurrency}'  # ✓ guard narrows currency
+```
+
+---
+
+## Semantic Rules
+
+### Result-type algebra
+
+When operations combine typed values, the result type is determined by the dimensional identity of the operands:
+
+| Operand dimensions | Result type | Example |
+|---|---|---|
+| Dimensionless | `number` | `5 * 3` |
+| Pure currency | `money` | `'100 USD' + '50 USD'` |
+| Pure time | `period` | `DueDate - StartDate` |
+| General unit-bearing | `quantity` | `'5 kg' + '3 kg'` |
+| Currency / non-currency | `price` | `'100 USD' / '5 kg'` |
+| Currency / currency | `exchangerate` | `'1.08 USD' / '1 EUR'` |
+| Currency / time | `price` | `'100 USD' / '2 hours'` → `'50 USD/hours'` |
+| Unit-bearing / time | `quantity` (compound unit) | `'5 kg' / '1 hour'` → `'5 kg/hour'` |
+| Compound unit-time × time | `quantity` (cancellation) | `'5 kg/hour' * '2 hours'` → `'10 kg'` |
+| Price(time-denom) × time | `money` (cancellation) | `'50 USD/hours' * '3 hours'` → `'150 USD'` |
+| Price(time-denom) × duration | `money` (cancellation) | `HourlyRate * (ShiftEnd - ShiftStart)` where instants |
+
+### Comparison rules
+
+| Type | Equality (`==`, `!=`) | Ordering (`<`, `>`, `<=`, `>=`) | Constraint |
+|---|---|---|---|
+| `money` | ✓ | ✓ | Same currency required |
+| `currency` | ✓ | ✗ | — |
+| `quantity` | ✓ | ✓ | Same dimension required; auto-converts |
+| `unitofmeasure` | ✓ | ✗ | — |
+| `dimension` | ✓ | ✗ | — |
+| `price` | ✓ | ✓ | Same currency and unit required |
+| `exchangerate` | ✓ | ✗ | Same currency pair required |
+
+### Cross-type arithmetic: what's NOT allowed (and why)
+
+| Expression | Why not |
+|---|---|
+| `money + quantity` | Currencies and physical units are incompatible dimensions. |
+| `money + number` | A bare number has no currency — the result's currency would be ambiguous. |
+| `quantity + number` | A bare number has no unit — the result's unit would be ambiguous. |
+| `price * price` | Multiplying two ratios produces a unit²/unit² — no business meaning. |
+| `money * money` | Multiplying two currencies produces currency² — no business meaning. |
+| `exchangerate + exchangerate` | Exchange rates are ratios, not additive quantities. |
+
+---
+
+## Locked Design Decisions
+
+### D1. `money` as a distinct type — not `decimal` + `choice`
+
+- **What:** `money` is a first-class type that carries both magnitude and currency, not a pair of `decimal` + `choice("USD","EUR","GBP")` fields.
+- **Why:** Once Precept has `quantity`, `price`, and dimensional cancellation, money must participate in the same algebra. A `decimal` field cannot be the numerator in `price = money / quantity` because it has no currency identity.
+- **Alternatives rejected:** (A) `decimal` + `choice` — no algebra participation. (B) Parameterized `money("USD")` — too complex; `in 'USD'` achieves the same effect.
+- **Precedent:** F# units of measure, UCUM, temporal `in` syntax.
+- **Tradeoff accepted:** Reverses the earlier "money is not on the roadmap" conclusion from type-system-follow-ons.md. That conclusion was made before the unit algebra design existed.
+
+### D2. Result-type refinement — algebra produces named types, not generic `quantity`
+
+- **What:** When arithmetic produces a value with a recognizable dimensional identity, the result gets a named type: `money` for pure currency, `price` for currency/non-currency, `exchangerate` for currency/currency.
+- **Why:** Collapsing all results into `quantity` loses the compiler's ability to enforce domain rules.
+- **Alternatives rejected:** (A) Everything is `quantity` — loses dimensional identity. (B) Only `money` and `quantity` — misses the price/rate distinction.
+- **Precedent:** Dimensional analysis in physics; F# units of measure.
+- **Tradeoff accepted:** More types to learn. The benefit is precise operator semantics and compile-time dimensional error catching.
+
+### D3. `in` on `period` is unit-selection, not exactness constraint — Noda-faithful
+
+- **What:** `period in 'months'` means "use the months-only NodaTime `PeriodUnits` overload." It does **not** mean "this value must be exactly representable in whole months."
+- **Why:** Custom round-trip rejection logic would be Precept inventing behavior beyond NodaTime. Violates the "expose NodaTime, don't reinvent" directive.
+- **Alternatives rejected:** (A) Exactness constraint — requires custom validation beyond NodaTime. (B) No `in` on period — loses decomposition basis control.
+- **Precedent:** NodaTime's `Period.Between(start, end, PeriodUnits)` overload.
+- **Tradeoff accepted:** `period in 'months'` on a non-month-boundary date difference will silently truncate toward start, per NodaTime behavior.
+
+### D4. `&` for period basis composition, `/` exclusively for ratios
+
+- **What:** `period in 'hours&minutes'` means Hours AND Minutes. `price in 'USD/kg'` means USD PER kg. `/` has one meaning everywhere: division/ratio.
+- **Why:** `&` eliminates the overloaded `/` problem. Every `/` inside a quoted expression means "per."
+- **Alternatives rejected:** (A) `/` for both — context-dependent disambiguation needed. (B) `+` for basis composition — confusing because `+` already means addition.
+- **Tradeoff accepted:** None significant.
+
+### D5. UCUM as the standard registry for physical units
+
+- **What:** Physical unit names inside `'...'` are validated against a UCUM subset.
+- **Why:** UCUM provides formal grammar for unit expressions with compound support, equality testing, and commensurability testing.
+- **Alternatives rejected:** (A) Custom registry — reinventing the wheel. (B) QUDT — too heavy. (C) UN/CEFACT Rec 20 — no algebraic grammar.
+- **Precedent:** NodaTime uses IANA TZDB. ISO 4217 for currencies. UCUM for units (HL7/FHIR, scientific computing).
+- **Tradeoff accepted:** Precept uses a practical subset, not the full UCUM specification.
+
+### D6. Entity-scoped units — no custom syntax needed
+
+- **What:** Entity-scoped unit conversions (e.g., "1 case = 24 each") use plain `integer` or `decimal` fields as conversion factors. No dedicated `units { }` block syntax.
+- **Why:** The conversion factor is data, not language structure. `field UnitsPerCase as integer default 24` + `set TotalUnits = Cases * UnitsPerCase` works with existing arithmetic. Within a single precept there is only one definition of "case."
+- **Alternatives rejected:** (A) Dedicated `units { }` block — complex language feature for what amounts to multiplication. (B) `conversionfactor in 'each/case'` — requires Level C compound unit algebra.
+- **Precedent:** SAP MM, Oracle ERP Cloud, Dynamics 365 all model UOM conversions as data, not type-system constructs.
+- **Tradeoff accepted:** No compile-time enforcement that `Cases * UnitsPerCase` produces the correct target unit.
+
+### D7. `of` for category constraint — unified across `quantity` and `period`
+
+- **What:** `of '<category>'` constrains a field to any member of a named category. For `quantity`, the category is a UCUM dimension. For `period`, the category is a component class (`'date'`, `'time'`).
+- **Why:** Two constraints serve different authoring needs. `in 'kg'` = "always kilograms." `of 'mass'` = "any mass unit." Extending `of` to `period` eliminates the special-case `dateonly`/`timeonly` suffixes.
+- **Alternatives rejected:** (A) Same `in` keyword, content-disambiguated — implicit intent. (B) `'length:*'` mini-grammar — no UCUM precedent. (C) Keep `dateonly`/`timeonly` as separate suffixes.
+- **Precedent:** English preposition distinction: "measured in kilograms" vs "a measure of length."
+- **Tradeoff accepted:** Two keywords instead of one. Zero ambiguity.
+
+### D8. Commensurable arithmetic with deterministic unit resolution
+
+- **What:** Arithmetic between `quantity` values of the same UCUM dimension is allowed even when units differ. Resolution: (1) target-directed, (2) left-operand wins.
+- **Why:** If commensurable values can't combine, `of` is validation-only. Both rules are fully deterministic.
+- **Alternatives rejected:** (A) Strict same-unit only — makes `of` useless for arithmetic. (B) Always SI base unit — unintuitive. (C) Require explicit conversion always — verbose.
+- **Precedent:** UnitsNet supports cross-unit arithmetic with target-directed conversion.
+- **Tradeoff accepted:** UCUM conversion factors become a runtime dependency. Physical unit conversions are fixed constants — safe for auto-conversion.
+
+### D9. Open fields require discrete equality narrowing for arithmetic
+
+- **What:** A field declared without `in` or `of` is valid, but arithmetic with constrained fields is a compile error without a guard narrowing the open field. Applies uniformly to all `in`/`of`-constrained types.
+- **Why:** Per philosophy: "Prevention, not detection. Invalid entity configurations cannot exist." An open `money` field has no statically known currency. Adding it to `money in 'USD'` without proof would require runtime validation.
+- **Mechanism:** `when Amount.currency == 'USD'` injects `$eq:Amount.currency:USD` markers. Reuses existing guard-narrowing pipeline from null-flow and proof engine (#106).
+- **Uniform pattern:**
+  | Type | Accessor | Guard pattern | Marker |
+  |------|----------|---------------|--------|
+  | `money` | `.currency` | `when X.currency == 'USD'` | `$eq:X.currency:USD` |
+  | `quantity` | `.unit` | `when X.unit == 'kg'` | `$eq:X.unit:kg` |
+  | `quantity` | `.dimension` | `when X.dimension == 'length'` | `$eq:X.dimension:length` |
+  | `period` | `.basis` | `when X.basis == 'hours&minutes'` | `$eq:X.basis:hours&minutes` |
+  | `period` | `.component` | `when X.component == 'date'` | `$eq:X.component:date` |
+  | `price` | `.currency`, `.unit` | `when X.currency == 'USD'` | `$eq:X.currency:USD` |
+  | `exchangerate` | `.numerator`, `.denominator` | `when X.numerator == 'USD'` | `$eq:X.numerator:USD` |
+- **Alternatives rejected:** (A) Require `in`/`of` on every field — eliminates open-field use cases. (B) Allow open fields but block all arithmetic. (C) Runtime validation — violates philosophy.
+- **Precedent:** Same contract as nullable narrowing. Same friction, same reason.
+- **Tradeoff accepted:** Authors who use open fields must write guards.
+
+### D10. ISO 4217 default precision and half-even rounding for `money`
+
+- **What:** `money in 'USD'` defaults to 2 decimal places (ISO 4217 minor units). `money in 'JPY'` defaults to 0. `money in 'BHD'` defaults to 3. `maxplaces` overrides. Default rounding mode: half-even.
+- **Why:** ISO 4217 defines the natural precision. Half-even eliminates systematic bias.
+- **Alternatives rejected:** (A) No auto-rounding. (B) `maxplaces` required on every field. (C) Half-up rounding — upward bias.
+- **Precedent:** NMoneys, Java `Currency.getDefaultFractionDigits()`, Python `decimal`.
+- **Tradeoff accepted:** Non-standard precision requires explicit `maxplaces`.
+
+### D11. Cross-currency `money` arithmetic requires explicit `exchangerate`
+
+- **What:** `money in 'USD' + money in 'EUR'` is a compile-time type error. Convert via `exchangerate` multiplication.
+- **Why:** Physical unit conversions are fixed constants. Currency exchange rates are volatile external data. Auto-conversion would require ambient external state.
+- **Alternatives rejected:** (A) Auto-convert using exchange rate field — implicit coupling. (B) Mixed-currency arithmetic with runtime error — violates prevention guarantee.
+- **Tradeoff accepted:** Currency conversion is more verbose than quantity conversion. This reflects real-world complexity.
+
+### D12. `decimal` backing for all seven types
+
+- **What:** All seven types use `decimal` as magnitude backing, not `double`.
+- **Why:** The result-type algebra demands homogeneous backing. `price * quantity → money` — if any type uses `double`, cross-type operations hit `decimal ÷ double` boundaries with `double`-precision artifacts. `0.1 + 0.2 ≠ 0.3` is unacceptable for business arithmetic.
+- **Alternatives rejected:** (A) `double` for `quantity` — breaks algebra. (B) `double` for all — loses base-10 precision. (C) Mixed backing with promotion — explodes complexity.
+- **Precedent:** NMoneys, .NET `System.Currency` proposals, all C# financial libraries use `decimal`.
+- **Tradeoff accepted:** UCUM conversion factors become `decimal` constants. Common factors have exact decimal representations. Exotic irrational conversions (π-related) would lose precision — but those are Level C, out of scope.
+
+### D13. Self-contained registries — no external library dependency for currency or units
+
+- **What:** Precept embeds ISO 4217 as a static currency table and a UCUM subset as a static unit registry. No NMoneys, no UnitsNet.
+- **Why:** What Precept needs is data, not logic. ISO 4217 is ~180 rows. UCUM validation is a grammar + registry. Neither requires the complexity that justified NodaTime.
+- **Alternatives rejected:** (A) NMoneys — adds dependency for a 180-row lookup; `double`-era APIs. (B) UnitsNet — uses `double` (incompatible with D12). (C) Full UCUM parser — overkill for v1.
+- **Precedent:** NodaTime itself embeds TZDB data as a static resource. Same principle: own the data, not the library.
+- **Tradeoff accepted:** Precept owns registry updates. ISO 4217 changes ~1-2 times/year. UCUM core units are stable.
+
+### D14. `in` is a uniform assignment constraint across all types
+
+- **What:** `in` constrains assignment, not just decomposition. `period in 'months'` means only months-component periods can be assigned — same as `money in 'USD'` rejecting EUR.
+- **Why:** `in` must mean the same thing everywhere. Making it a "hint" for period but a "constraint" for money would be an inconsistency.
+- **Alternatives rejected:** (A) `in` governs decomposition only for period — inconsistent with money/quantity. (B) Silently truncate incompatible components — lossy, violates NodaTime faithfulness. (C) Warn but allow — detection, not prevention.
+- **Tradeoff accepted:** Authors must explicitly extract components or use intermediate fields when assigning mixed-component periods to single-component fields.
+
+### D15. Time-unit denominators use NodaTime vocabulary and cancel against `period` or `duration`
+
+- **What:** Time-unit denominators use NodaTime vocabulary (`hours`, `minutes`, `days`), not UCUM (`h`, `min`, `d`). Both `period` and `duration` cancel, with a fixed-length boundary:
+
+  | Denominator unit | Fixed-length? | `duration` cancels? | `period` cancels? |
+  |---|---|---|---|
+  | `seconds` | Yes | ✓ | ✓ |
+  | `minutes` | Yes | ✓ | ✓ |
+  | `hours` | Yes | ✓ | ✓ |
+  | `days` | No (23–25h near DST) | ✗ | ✓ |
+  | `weeks` | No | ✗ | ✓ |
+  | `months` | No (28–31d) | ✗ | ✓ |
+  | `years` | No (365–366d) | ✗ | ✓ |
+
+- **Why:** The field type declaration is the author's statement of business intent. `instant` fields produce `duration` ("how many actual hours elapsed?"); `date`/`datetime` fields produce `period` ("how many calendar days?"). Both are valid cancellation partners. The fixed-length boundary reflects NodaTime's own type separation.
+- **Operators enabled:**
+  - Period path: `price × period → money`, `money ÷ period → price`, `quantity(compound) × period → quantity`, `quantity ÷ period → quantity(compound)` — cancels any time denominator.
+  - Duration path: `price × duration → money`, `money ÷ duration → price`, `quantity(compound) × duration → quantity`, `quantity ÷ duration → quantity(compound)` — cancels `hours`/`minutes`/`seconds` only.
+- **Alternatives rejected:** (A) UCUM time units — requires translation table. (B) Time spans as `quantity` — dead end #6. (C) No cancellation — makes `HourlyRate * HoursWorked` impossible. (D) `period`-only — blocks `instant - instant → duration` from compound arithmetic. (E) Compiler warning on dual paths — second-guessing the author's deliberate type choice.
+- **Precedent:** NodaTime separates `Duration` (fixed elapsed) from `Period` (calendar distance). The temporal proposal preserves this. The boundary is faithful to NodaTime's model.
+- **Tradeoff accepted:** UCUM time units not valid in denominators. Minor vocabulary restriction for zero-translation cancellation.
+- **Implementation note:** Duration scalar extraction via `(decimal)duration.ToInt64Nanoseconds() / <nanoseconds-per-unit>m` — NOT `Duration.TotalHours` (`double`). `long → decimal` is always exact.
+
+---
+
+## Relationship to Temporal Type System
+
+This proposal extends mechanisms established by the temporal proposal (Issue #107):
+
+| Temporal mechanism | Extension in this proposal |
+|---|---|
+| Door 2 typed constants (`'...'`) | Currency amounts (`'100 USD'`), quantities (`'5 kg'`), prices (`'4.17 USD/each'`) |
+| `{expr}` interpolation inside `'...'` | `'{BaseAmount} USD'`, `'{OrderSize} cases'` |
+| Context-dependent type resolution | Period basis selection, unit validation scope chain |
+| `period` and `duration` as separate types | `period in 'days'` maps to `PeriodUnits.Days`; both cancel time denominators with fixed-length boundary |
+| `period dateonly` / `period timeonly` | `period of 'date'` / `period of 'time'` — unified under `of` category constraint |
+| `.inZone(tz)` dot-accessor mediation | Future: `.convert(unit)` for entity-scoped UOM conversion |
+| `instant - instant → duration` | Duration participates in compound type cancellation (D15) |
+
+---
+
+## Dependencies and Related Issues
+
+| Dependency | Why |
+|---|---|
+| [Issue #107](https://github.com/sfalik/Precept/issues/107) — Temporal type system | Establishes `period`, `duration`, typed constant delimiter, `in` syntax, and the NodaTime alignment directive this proposal extends. |
+| [Issue #115](https://github.com/sfalik/Precept/issues/115) — `decimal` precision bug | `TryToNumber` converts through `double`, losing precision. Must be fixed before `money` or `decimal`-backed `quantity` ships. |
+| [Issue #106](https://github.com/sfalik/Precept/issues/106) — Proof engine | Provides the narrowing infrastructure (guard decomposition, marker injection, cross-branch accumulation) that discrete equality narrowing reuses. |
+| [Issue #111](https://github.com/sfalik/Precept/issues/111) — `nonzero` constraint | Needed for `money / number` and `price / number` divisor safety. |
+
+---
+
+## Explicit Exclusions / Out of Scope
+
+- **Physical/scientific compound unit algebra (Level C)** — `quantity in 'kg.m/s2'` requires full UCUM parsing, normalization, and dimensional analysis. Deferred.
+- **Percentage type** — Whether `percent` is a type or syntactic sugar for `number / 100` is a separate investigation.
+- **Sub-cent precision or financial accounting standards** — Precept governs field rules, not accounting compliance.
+- **Entity-scoped unit declarations** — Closed by D6: conversion factors are plain fields.
+- **`zoneddatetime` as a compound-type participant** — `zoneddatetime` is a navigation waypoint, not a declared field type. Compound type cancellation uses `instant` (→ `duration`) or `date`/`datetime` (→ `period`).
+
+---
+
+## Implementation Scope
+
+### Parser changes
+
+- Recognize `in '<unit-expression>'` and `of '<dimension-category>'` after type keywords in field declarations.
+- Enforce mutual exclusivity: `in` and `of` on the same field declaration is a parse error.
+- Parse unit expressions inside `'...'` — distinguish period basis (atoms separated by `&`), currency codes (3 uppercase letters), UCUM unit names, and compound price/rate expressions (containing `/` between a currency and a unit).
+- Parse category names inside `of '...'` — validate against the known UCUM dimension vocabulary for `quantity`, and the fixed set `'date'`/`'time'` for `period`.
+
+### Type checker changes
+
+- New types: `money`, `currency`, `quantity`, `unitofmeasure`, `dimension`, `price`, `exchangerate`.
+- Unit compatibility enforcement: same-currency for money arithmetic, same-unit for quantity arithmetic, dimensional cancellation for price × quantity.
+- Dimension category validation: for `quantity of` fields, verify that assigned values' units are commensurable with the declared dimension.
+- Period component category validation: for `period of 'date'`/`period of 'time'`, enforce the same proof semantics as the temporal design's `dateonly`/`timeonly`.
+- Period basis validation: verify that declared basis components are legal for the source operation type.
+- Mutual exclusivity: reject any field declaration that has both `in` and `of`.
+- **Discrete equality narrowing:** New `TryApplyEqualityNarrowing` method (~30 lines) pattern-matches `when Field.accessor == 'literal'` guards, injecting `$eq:Field.accessor:value` markers. Reuses existing guard decomposition, cross-branch accumulation, and `ApplyAssignmentNarrowing` infrastructure.
+- **Money precision:** ISO 4217 minor-units lookup during constraint resolution. Default `maxplaces` derived from currency code. Half-even rounding on all money arithmetic results.
+- **Duration cancellation (D15):** When a duration operand appears against a compound type with a time-unit denominator, verify the denominator is `hours`, `minutes`, or `seconds`. Emit a compile error for `days`/`weeks`/`months`/`years` denominators with duration operands, with a teachable message explaining the fixed-length boundary.
+
+### Runtime engine changes
+
+- `money`: `decimal` magnitude + `string` currency code.
+- `quantity`: `decimal` magnitude + `string` unit identifier.
+- `price`: `decimal` magnitude + `string` numerator currency + `string` denominator unit.
+- `exchangerate`: `decimal` magnitude + `string` numerator currency + `string` denominator currency.
+- Commensurable quantity arithmetic: UCUM conversion factors for standard units; convert operands to target or left-operand unit before computing.
+- Period basis lowering: when computing `date - date` for a basis-constrained period field, call the explicit `Period.Between(..., PeriodUnits)` overload.
+- **Duration scalar extraction:** `(decimal)duration.ToInt64Nanoseconds() / <nanoseconds-per-unit>m` for time-denominator cancellation. Nanoseconds-per-unit constants: seconds = `1_000_000_000m`, minutes = `60_000_000_000m`, hours = `3_600_000_000_000m`.
+
+### Language server changes
+
+- Completions: ISO 4217 codes after `money in '`, UCUM unit names after `quantity in '`, UCUM dimension names after `quantity of '` and `dimension` field assignment, `date`/`time` after `period of '`, period unit atoms after `period in '`.
+- Diagnostics: cross-currency arithmetic errors, unit mismatch errors, invalid period basis for source type, `in`/`of` mutual exclusivity violation, dimension mismatch on `of` fields, duration-vs-variable-length-denominator errors.
+
+### TextMate grammar changes
+
+- New type keywords: `money`, `currency`, `quantity`, `unitofmeasure`, `dimension`, `price`, `exchangerate`.
+- New keyword: `of` (field qualifier, same category as `in`).
+
+### MCP tool changes
+
+- `precept_language`: add all seven types, `in` and `of` syntax, operator tables, D15 cancellation rules.
+- `precept_compile`: return unit information in field metadata (currency, unit, dimension, compound status).
+
+---
+
+## Scope Boundary
+
+This document covers the design of the seven new business-domain types, the period basis extension, the `in`/`of` qualification system, compound types with dimensional cancellation (Levels A and B), and discrete equality narrowing. Level A (named `price`/`exchangerate`) and Level B (time-denominator `quantity` compounds) are in v1 scope. Level C (general compound unit algebra) is explicitly deferred.
