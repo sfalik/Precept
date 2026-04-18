@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 
 namespace Precept;
@@ -31,7 +32,7 @@ internal sealed record RelationalFact(RelationKind Kind)
 
 /// <summary>Bitwise numeric sign/zero flags for proof stores.</summary>
 [Flags]
-internal enum NumericFlags
+public enum NumericFlags
 {
     None        = 0,
     Positive    = 1,   // > 0
@@ -376,6 +377,89 @@ internal sealed class GlobalProofContext
         foreach (var pair in _symbols) copy[pair.Key] = pair.Value;
         return copy;
     }
+
+    // ── Debug snapshot ────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Returns a structured debug snapshot of all proof stores for introspection.
+    /// This is NOT the MCP-facing DTO — it's for debug/test use only.
+    /// </summary>
+    public ProofDump Dump()
+    {
+        var fields = new Dictionary<string, ProofDump.FieldEntry>(StringComparer.Ordinal);
+        foreach (var (name, interval) in _fieldIntervals)
+        {
+            _flags.TryGetValue(name, out var flagVal);
+            fields[name] = new ProofDump.FieldEntry(
+                FormatInterval(interval),
+                FormatDisplay(interval),
+                flagVal);
+        }
+        // Include fields that have flags but no interval entry
+        foreach (var (name, flagVal) in _flags)
+        {
+            if (!fields.ContainsKey(name))
+                fields[name] = new ProofDump.FieldEntry(null, null, flagVal);
+        }
+
+        var relational = new List<ProofDump.RelationalEntry>();
+        foreach (var (form, fact) in _relationalFacts)
+            relational.Add(new ProofDump.RelationalEntry(form.ToString(), fact.Kind.ToString()));
+
+        var exprFacts = new List<ProofDump.ExprFactEntry>();
+        foreach (var (form, interval) in _exprFacts)
+            exprFacts.Add(new ProofDump.ExprFactEntry(form.ToString(), FormatInterval(interval)));
+
+        return new ProofDump(fields, relational, exprFacts);
+    }
+
+    public static string FormatInterval(NumericInterval interval)
+    {
+        if (interval.IsUnknown) return "(-∞, +∞)";
+        var lb = interval.LowerInclusive ? "[" : "(";
+        var ub = interval.UpperInclusive ? "]" : ")";
+        var lo = double.IsNegativeInfinity(interval.Lower) ? "-∞" : interval.Lower.ToString(CultureInfo.InvariantCulture);
+        var hi = double.IsPositiveInfinity(interval.Upper) ? "+∞" : interval.Upper.ToString(CultureInfo.InvariantCulture);
+        return $"{lb}{lo}, {hi}{ub}";
+    }
+
+    public static string FormatDisplay(NumericInterval interval)
+    {
+        if (interval.IsUnknown) return "unknown";
+
+        bool loInf = double.IsNegativeInfinity(interval.Lower);
+        bool hiInf = double.IsPositiveInfinity(interval.Upper);
+
+        // (0, +∞) → "always greater than 0"
+        if (interval.Lower == 0 && !interval.LowerInclusive && hiInf)
+            return "always greater than 0";
+
+        // [0, +∞) → "0 or greater"
+        if (interval.Lower == 0 && interval.LowerInclusive && hiInf)
+            return "0 or greater";
+
+        // (-∞, X] or (-∞, X) → "at most X" or "less than X"
+        if (loInf && !hiInf)
+            return interval.UpperInclusive
+                ? $"{interval.Upper.ToString(CultureInfo.InvariantCulture)} or less"
+                : $"less than {interval.Upper.ToString(CultureInfo.InvariantCulture)}";
+
+        // [X, +∞) or (X, +∞) → "X or greater" or "greater than X"
+        if (!loInf && hiInf)
+            return interval.LowerInclusive
+                ? $"{interval.Lower.ToString(CultureInfo.InvariantCulture)} or greater"
+                : $"always greater than {interval.Lower.ToString(CultureInfo.InvariantCulture)}";
+
+        // [X, X] → "exactly X"
+        if (interval.Lower == interval.Upper && interval.LowerInclusive && interval.UpperInclusive)
+            return $"exactly {interval.Lower.ToString(CultureInfo.InvariantCulture)}";
+
+        // [X, Y] → "X to Y (inclusive)"
+        if (interval.LowerInclusive && interval.UpperInclusive)
+            return $"{interval.Lower.ToString(CultureInfo.InvariantCulture)} to {interval.Upper.ToString(CultureInfo.InvariantCulture)} (inclusive)";
+
+        return $"{FormatInterval(interval)}";
+    }
 }
 
 /// <summary>Sign classification returned by <see cref="GlobalProofContext.SignOf"/>.</summary>
@@ -415,4 +499,15 @@ internal sealed class ProofAttribution
         }
         return new ProofAttribution(merged);
     }
+}
+
+/// <summary>Structured debug snapshot of all proof stores in a <see cref="GlobalProofContext"/>.</summary>
+public sealed record ProofDump(
+    IReadOnlyDictionary<string, ProofDump.FieldEntry> Fields,
+    IReadOnlyList<ProofDump.RelationalEntry> RelationalFacts,
+    IReadOnlyList<ProofDump.ExprFactEntry> ExpressionFacts)
+{
+    public sealed record FieldEntry(string? Interval, string? Display, NumericFlags Flags);
+    public sealed record RelationalEntry(string Form, string Kind);
+    public sealed record ExprFactEntry(string Form, string Interval);
 }

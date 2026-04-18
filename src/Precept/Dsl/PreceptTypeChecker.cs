@@ -71,7 +71,8 @@ internal sealed class PreceptTypeContext(
 internal sealed record TypeCheckResult(
     IReadOnlyList<PreceptValidationDiagnostic> Diagnostics,
     PreceptTypeContext TypeContext,
-    IReadOnlyList<string>? ComputedFieldOrder = null)
+    IReadOnlyList<string>? ComputedFieldOrder = null,
+    GlobalProofContext? ProofContext = null)
 {
     public bool HasErrors => Diagnostics.Any(static diagnostic => diagnostic.Constraint.Severity == ConstraintSeverity.Error);
 }
@@ -79,7 +80,8 @@ internal sealed record TypeCheckResult(
 internal sealed record ValidationResult(
     IReadOnlyList<PreceptValidationDiagnostic> Diagnostics,
     PreceptTypeContext TypeContext,
-    PreceptDefinition? ValidatedModel = null)
+    PreceptDefinition? ValidatedModel = null,
+    GlobalProofContext? ProofContext = null)
 {
     public bool HasErrors => Diagnostics.Any(static diagnostic => diagnostic.Constraint.Severity == ConstraintSeverity.Error);
 }
@@ -167,7 +169,7 @@ internal static class PreceptTypeChecker
 
         var computedFieldOrder = ValidateComputedFields(model, dataFieldKinds, eventArgKinds, collectionFieldMap, diagnostics, expressions, scopes);
 
-        return new TypeCheckResult(diagnostics, new PreceptTypeContext(expressions, scopes), computedFieldOrder);
+        return new TypeCheckResult(diagnostics, new PreceptTypeContext(expressions, scopes), computedFieldOrder, dataFieldKinds);
     }
 
     internal static StaticValueKind MapFieldContractKind(PreceptField field)

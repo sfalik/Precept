@@ -90,7 +90,32 @@ public static class CompileTool
             stateEnsures,
             eventEnsures,
             editBlocks,
-            diagnostics);
+            diagnostics,
+            BuildProofSnapshot(result));
+    }
+
+    private static ProofSnapshot? BuildProofSnapshot(CompileFromTextResult result)
+    {
+        var proofDump = result.ProofDump;
+        if (proofDump is null)
+            return null;
+
+        var fieldEntries = new Dictionary<string, ProofFieldInfo>(StringComparer.Ordinal);
+        foreach (var (name, entry) in proofDump.Fields)
+        {
+            if (entry.Interval is null || entry.Display is null || entry.Display == "unknown")
+                continue;
+            fieldEntries[name] = new ProofFieldInfo(
+                entry.Interval,
+                entry.Display,
+                Array.Empty<string>(),
+                "global");
+        }
+
+        if (fieldEntries.Count == 0)
+            return null;
+
+        return new ProofSnapshot(fieldEntries, null);
     }
 
     private static List<string> GetStateRules(PreceptDefinition model, string stateName)
@@ -155,7 +180,8 @@ public sealed record CompileResult(
     IReadOnlyList<StateEnsureDto>? StateEnsures,
     IReadOnlyList<EventEnsureDto>? EventEnsures,
     IReadOnlyList<EditBlockDto>? EditBlocks,
-    IReadOnlyList<DiagnosticDto> Diagnostics)
+    IReadOnlyList<DiagnosticDto> Diagnostics,
+    ProofSnapshot? Proof = null)
 {
     public static CompileResult DiagnosticsOnly(IReadOnlyList<DiagnosticDto> diagnostics) =>
         new(false, false, null, null, 0, 0, null, null, null, null, null, null, null, null, null, diagnostics);
@@ -182,3 +208,21 @@ public sealed record RuleDto(string Expression, string? When, string Reason, int
 public sealed record StateEnsureDto(string Anchor, string State, string Expression, string? When, string Reason, int Line);
 public sealed record EventEnsureDto(string Event, string Expression, string? When, string Reason, int Line);
 public sealed record EditBlockDto(string? State, string? When, IReadOnlyList<string> Fields, int Line);
+
+// ── Proof snapshot DTOs (AI-consumption, no compiler internals) ──
+
+public sealed record ProofSnapshot(
+    IReadOnlyDictionary<string, ProofFieldInfo>? Fields,
+    IReadOnlyList<ProofExpressionInfo>? Expressions);
+
+public sealed record ProofFieldInfo(
+    string Interval,
+    string Display,
+    IReadOnlyList<string> Sources,
+    string Scope);
+
+public sealed record ProofExpressionInfo(
+    string Expression,
+    string Interval,
+    string Display,
+    IReadOnlyList<string> Sources);

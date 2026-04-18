@@ -17,7 +17,10 @@ public static class LanguageTool
             .Select(c => new ConstructDto(c.Form, c.Context, c.Description, c.Example))
             .ToList();
         var constraints = DiagnosticCatalog.Constraints
-            .Select(c => new ConstraintDto(c.Id, c.Phase, c.Rule))
+            .Select(c => new ConstraintDto(c.Id, c.Phase, c.Rule,
+                GetAssessmentModel(c.Id),
+                GetRemediation(c.Id),
+                GetProofDependency(c.Id)))
             .ToList();
         var functions = BuildFunctionCatalog();
 
@@ -155,6 +158,47 @@ public static class LanguageTool
         _ => (0, "binary")
     };
 
+    // ── Proof-enrichment helpers for ConstraintDto ────────────────────────────
+
+    private static string? GetAssessmentModel(string id) => id switch
+    {
+        "C76" => "obligation",
+        "C92" => "contradiction",
+        "C93" => "obligation",
+        "C94" => "contradiction",
+        "C95" => "contradiction",
+        "C96" => "satisfied",
+        "C97" => "contradiction",
+        "C98" => "satisfied",
+        _ => null
+    };
+
+    private static string? GetRemediation(string id) => id switch
+    {
+        "C76" => "add-constraint",
+        "C92" => "fix-expression",
+        "C93" => "add-constraint",
+        "C94" => "fix-value",
+        "C95" => "fix-rule",
+        "C96" => "remove-rule",
+        "C97" => "fix-guard",
+        "C98" => "remove-guard",
+        _ => null
+    };
+
+    private static string? GetProofDependency(string id) => id switch
+    {
+        "C76" => "flag",
+        "C92" => "interval",
+        "C93" => "interval",
+        "C94" => "interval",
+        "C95" => "interval",
+        "C96" => "interval",
+        "C97" => "interval",
+        "C98" => "interval",
+        _ => null
+    };
+
     private static readonly IReadOnlyList<ExpressionScopeDto> ExpressionScopes =
     [
         new("rule expression", "All data fields, collection accessors"),
@@ -209,7 +253,11 @@ public sealed record VocabularyDto(
 
 public sealed record OperatorDto(string Symbol, int Precedence, string Arity, string Description);
 public sealed record ConstructDto(string Form, string Context, string Description, string Example);
-public sealed record ConstraintDto(string Id, string Phase, string Rule);
+public sealed record ConstraintDto(
+    string Id, string Phase, string Rule,
+    string? AssessmentModel = null,
+    string? Remediation = null,
+    string? ProofDependency = null);
 public sealed record ExpressionScopeDto(string Position, string Allowed);
 public sealed record FunctionDto(string Name, string Description, IReadOnlyList<FunctionSignatureDto> Signatures);
 public sealed record FunctionSignatureDto(IReadOnlyList<FunctionParamDto> Parameters, string ReturnType, bool IsVariadic);

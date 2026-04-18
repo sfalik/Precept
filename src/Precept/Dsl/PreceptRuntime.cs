@@ -2107,7 +2107,8 @@ public sealed record PreceptDiagnostic(
 public sealed record CompileFromTextResult(
     PreceptDefinition? Model,
     PreceptEngine? Engine,
-    IReadOnlyList<PreceptDiagnostic> Diagnostics)
+    IReadOnlyList<PreceptDiagnostic> Diagnostics,
+    ProofDump? ProofDump = null)
 {
     public bool HasErrors => Diagnostics.Any(static diagnostic => diagnostic.Severity == ConstraintSeverity.Error);
 }
@@ -2170,7 +2171,7 @@ public static class PreceptCompiler
             diagnostics.AddRange(PreceptAnalysis.Analyze(model, deadGuardLines).Diagnostics);
         }
 
-        return new ValidationResult(diagnostics, typeCheck.TypeContext, model);
+        return new ValidationResult(diagnostics, typeCheck.TypeContext, model, typeCheck.ProofContext);
     }
 
     public static CompileFromTextResult CompileFromText(string text)
@@ -2182,10 +2183,11 @@ public static class PreceptCompiler
         var validation = Validate(model);
         var validatedModel = validation.ValidatedModel ?? model;
         var diagnostics = validation.Diagnostics.Select(ToDiagnostic).ToArray();
+        var proofDump = validation.ProofContext?.Dump();
         if (validation.HasErrors)
-            return new CompileFromTextResult(validatedModel, null, diagnostics);
+            return new CompileFromTextResult(validatedModel, null, diagnostics, proofDump);
 
-        return new CompileFromTextResult(validatedModel, new PreceptEngine(validatedModel), diagnostics);
+        return new CompileFromTextResult(validatedModel, new PreceptEngine(validatedModel), diagnostics, proofDump);
     }
 
     public static PreceptEngine Compile(PreceptDefinition model)
