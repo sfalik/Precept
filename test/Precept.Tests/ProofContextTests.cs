@@ -5,7 +5,7 @@ using Xunit;
 namespace Precept.Tests;
 
 /// <summary>
-/// Wrapper-contract tests for <see cref="ProofContext"/>.
+/// Wrapper-contract tests for <see cref="GlobalProofContext"/>.
 /// Verifies that ProofContext correctly delegates to the underlying proof infrastructure
 /// for all query methods and preserves copy-on-write semantics for mutation methods.
 /// </summary>
@@ -21,7 +21,7 @@ public class ProofContextTests
             ["Price"] = StaticValueKind.Number,
             ["Amount"] = StaticValueKind.Number,
         };
-        var ctx = new ProofContext(dict);
+        var ctx = new GlobalProofContext(dict);
 
         ctx.Symbols.Should().BeEquivalentTo(dict);
     }
@@ -31,7 +31,7 @@ public class ProofContextTests
     [Fact]
     public void IntervalOf_FieldWithPositiveFlag_ReturnsPositiveInterval()
     {
-        var ctx = new ProofContext(
+        var ctx = new GlobalProofContext(
             new Dictionary<string, StaticValueKind>(),
             new Dictionary<LinearForm, RelationalFact>(),
             new Dictionary<string, NumericInterval>(System.StringComparer.Ordinal),
@@ -50,7 +50,7 @@ public class ProofContextTests
     [Fact]
     public void IntervalOf_LiteralExpression_ReturnsSingleton()
     {
-        var ctx = new ProofContext(new Dictionary<string, StaticValueKind>());
+        var ctx = new GlobalProofContext(new Dictionary<string, StaticValueKind>());
         var expr = PreceptParser.ParseExpression("42");
 
         var interval = ctx.IntervalOf(expr);
@@ -67,7 +67,7 @@ public class ProofContextTests
     public void KnowsNonzero_FieldWithGtRule_ReturnsTrue()
     {
         // A > B via WithRule → A - B > 0 (strictly positive, hence nonzero)
-        var ctx = new ProofContext(new Dictionary<string, StaticValueKind>())
+        var ctx = new GlobalProofContext(new Dictionary<string, StaticValueKind>())
             .WithRule(
                 PreceptParser.ParseExpression("A"),
                 RelationKind.GreaterThan,
@@ -80,7 +80,7 @@ public class ProofContextTests
     [Fact]
     public void KnowsNonzero_UnknownField_ReturnsFalse()
     {
-        var ctx = new ProofContext(new Dictionary<string, StaticValueKind>());
+        var ctx = new GlobalProofContext(new Dictionary<string, StaticValueKind>());
         var expr = PreceptParser.ParseExpression("X");
 
         ctx.KnowsNonzero(expr).Should().BeFalse();
@@ -91,7 +91,7 @@ public class ProofContextTests
     [Fact]
     public void KnowsNonnegative_FieldWithNonnegFlag_ReturnsTrue()
     {
-        var ctx = new ProofContext(
+        var ctx = new GlobalProofContext(
             new Dictionary<string, StaticValueKind>(),
             new Dictionary<LinearForm, RelationalFact>(),
             new Dictionary<string, NumericInterval>(System.StringComparer.Ordinal),
@@ -108,7 +108,7 @@ public class ProofContextTests
     [Fact]
     public void KnowsNonnegative_UnconstrainedField_ReturnsFalse()
     {
-        var ctx = new ProofContext(new Dictionary<string, StaticValueKind>());
+        var ctx = new GlobalProofContext(new Dictionary<string, StaticValueKind>());
         var expr = PreceptParser.ParseExpression("X");
 
         ctx.KnowsNonnegative(expr).Should().BeFalse();
@@ -119,7 +119,7 @@ public class ProofContextTests
     [Fact]
     public void SignOf_PositiveField_ReturnsPositive()
     {
-        var ctx = new ProofContext(
+        var ctx = new GlobalProofContext(
             new Dictionary<string, StaticValueKind>(),
             new Dictionary<LinearForm, RelationalFact>(),
             new Dictionary<string, NumericInterval>(System.StringComparer.Ordinal),
@@ -136,7 +136,7 @@ public class ProofContextTests
     [Fact]
     public void SignOf_UnknownField_ReturnsUnknown()
     {
-        var ctx = new ProofContext(new Dictionary<string, StaticValueKind>());
+        var ctx = new GlobalProofContext(new Dictionary<string, StaticValueKind>());
         var expr = PreceptParser.ParseExpression("X");
 
         ctx.SignOf(expr).Should().Be(ProofSign.Unknown);
@@ -149,7 +149,7 @@ public class ProofContextTests
     {
         // Narrowing "Price > 0" (assumeTrue) should produce a new context with
         // Positive flag for Price — the original empty context must remain unchanged.
-        var original = new ProofContext(new Dictionary<string, StaticValueKind>());
+        var original = new GlobalProofContext(new Dictionary<string, StaticValueKind>());
         var condition = PreceptParser.ParseExpression("Price > 0");
 
         var narrowed = original.WithNarrowing(condition, assumeTrue: true);
@@ -173,7 +173,7 @@ public class ProofContextTests
         // C-Nano primary case: rule A > B → A - B > 0 (strictly positive, excludes zero).
         // WithRule stores a RelationalFact keyed by LinearForm(A) - LinearForm(B).
         // IntervalOf(A - B) looks up that key and intersects with (0,+∞).
-        var ctx = new ProofContext(new Dictionary<string, StaticValueKind>())
+        var ctx = new GlobalProofContext(new Dictionary<string, StaticValueKind>())
             .WithRule(
                 PreceptParser.ParseExpression("A"),
                 RelationKind.GreaterThan,
@@ -189,7 +189,7 @@ public class ProofContextTests
     {
         // Reversed subtraction: A > B → B - A < 0 (excludes zero).
         // The engine must handle the negated LinearForm (key = -1·A + 1·B).
-        var ctx = new ProofContext(new Dictionary<string, StaticValueKind>())
+        var ctx = new GlobalProofContext(new Dictionary<string, StaticValueKind>())
             .WithRule(
                 PreceptParser.ParseExpression("A"),
                 RelationKind.GreaterThan,
@@ -206,7 +206,7 @@ public class ProofContextTests
     {
         // C-Nano primary use case verbatim: WithRule(A > B) → KnowsNonzero(A - B) == true.
         // This is the exact scenario the C-Nano patch addressed; the unified engine must pass it.
-        var ctx = new ProofContext(new Dictionary<string, StaticValueKind>())
+        var ctx = new GlobalProofContext(new Dictionary<string, StaticValueKind>())
             .WithRule(
                 PreceptParser.ParseExpression("A"),
                 RelationKind.GreaterThan,
@@ -220,7 +220,7 @@ public class ProofContextTests
     {
         // A >= B → A - B >= 0 (nonneg). The interval should start at 0 (inclusive) but
         // NOT be strictly positive — zero is included when A == B.
-        var ctx = new ProofContext(new Dictionary<string, StaticValueKind>())
+        var ctx = new GlobalProofContext(new Dictionary<string, StaticValueKind>())
             .WithRule(
                 PreceptParser.ParseExpression("A"),
                 RelationKind.GreaterThanOrEqual,
@@ -237,7 +237,7 @@ public class ProofContextTests
     {
         // Soundness boundary: A >= B proves nonneg but NOT nonzero.
         // A == B is a valid concrete value, so the engine MUST NOT claim nonzero.
-        var ctx = new ProofContext(new Dictionary<string, StaticValueKind>())
+        var ctx = new GlobalProofContext(new Dictionary<string, StaticValueKind>())
             .WithRule(
                 PreceptParser.ParseExpression("A"),
                 RelationKind.GreaterThanOrEqual,
@@ -258,7 +258,7 @@ public class ProofContextTests
         // A > B → A - B > 0. (A+1) - B = (A - B) + 1 ≥ 1 > 0.
         // LinearForm((A+1)-B) = +1·A + (-1)·B + 1. Stored key = +1·A + (-1)·B.
         // Constant difference = +1, so the divisor is ≥ 1 > 0.
-        var ctx = new ProofContext(new Dictionary<string, StaticValueKind>())
+        var ctx = new GlobalProofContext(new Dictionary<string, StaticValueKind>())
             .WithRule(
                 PreceptParser.ParseExpression("A"),
                 RelationKind.GreaterThan,
@@ -276,7 +276,7 @@ public class ProofContextTests
         // LinearForm(Total - Tax - Fee) = +1·Total + (-1)·Tax + (-1)·Fee.
         // WithRule(Total, GT, Tax+Fee) stores key = LinearForm(Total) - LinearForm(Tax+Fee)
         //   = +1·Total + (-1)·Tax + (-1)·Fee — exact match, no constant difference.
-        var ctx = new ProofContext(new Dictionary<string, StaticValueKind>())
+        var ctx = new GlobalProofContext(new Dictionary<string, StaticValueKind>())
             .WithRule(
                 PreceptParser.ParseExpression("Total"),
                 RelationKind.GreaterThan,
@@ -298,7 +298,7 @@ public class ProofContextTests
         // Gap 2: rule Total > Tax + Fee stored directly via WithRule.
         // KnowsNonzero bridges Gap 1+2: divisor Total - Tax - Fee normalizes
         // to the same LinearForm key as LHS - RHS of the rule.
-        var ctx = new ProofContext(new Dictionary<string, StaticValueKind>())
+        var ctx = new GlobalProofContext(new Dictionary<string, StaticValueKind>())
             .WithRule(
                 PreceptParser.ParseExpression("Total"),
                 RelationKind.GreaterThan,
@@ -319,7 +319,7 @@ public class ProofContextTests
         // LinearForm: {A: 3, B: -3}. GCD = 3. GCD-normalized: {A: 1, B: -1}.
         // Stored key (from WithRule A > B): {A: 1, B: -1}. Direct match after normalization.
         // Scale factor = 3 (positive) → sign preserved → interval is (0,+∞).
-        var ctx = new ProofContext(new Dictionary<string, StaticValueKind>())
+        var ctx = new GlobalProofContext(new Dictionary<string, StaticValueKind>())
             .WithRule(
                 PreceptParser.ParseExpression("A"),
                 RelationKind.GreaterThan,
@@ -337,7 +337,7 @@ public class ProofContextTests
     {
         // WithGuard(A > B, branch=true) should narrow context so IntervalOf(A - B) is positive.
         // Depends on George renaming WithNarrowing → WithGuard (or adding WithGuard as an alias).
-        var empty = new ProofContext(new Dictionary<string, StaticValueKind>());
+        var empty = new GlobalProofContext(new Dictionary<string, StaticValueKind>());
         var condition = PreceptParser.ParseExpression("A > B");
 
         var narrowed = empty.WithGuard(condition, branch: true);
@@ -350,7 +350,7 @@ public class ProofContextTests
     public void WithRule_StoresRelationalFact()
     {
         // WithRule must store a relational fact that IntervalOf can look up via LinearForm.
-        var ctx = new ProofContext(new Dictionary<string, StaticValueKind>())
+        var ctx = new GlobalProofContext(new Dictionary<string, StaticValueKind>())
             .WithRule(
                 PreceptParser.ParseExpression("Price"),
                 RelationKind.GreaterThan,
@@ -365,7 +365,7 @@ public class ProofContextTests
     public void WithRule_ReturnsNewContext_DoesNotMutateOriginal()
     {
         // WithRule must be copy-on-write — the original context must remain unchanged.
-        var original = new ProofContext(new Dictionary<string, StaticValueKind>());
+        var original = new GlobalProofContext(new Dictionary<string, StaticValueKind>());
 
         var narrowed = original.WithRule(
             PreceptParser.ParseExpression("A"),
@@ -383,7 +383,7 @@ public class ProofContextTests
     public void KnowsNonnegative_WithGteRule_AMinusB_ReturnsTrue()
     {
         // A >= B → A - B >= 0 → KnowsNonnegative returns true.
-        var ctx = new ProofContext(new Dictionary<string, StaticValueKind>())
+        var ctx = new GlobalProofContext(new Dictionary<string, StaticValueKind>())
             .WithRule(
                 PreceptParser.ParseExpression("A"),
                 RelationKind.GreaterThanOrEqual,
@@ -396,7 +396,7 @@ public class ProofContextTests
     public void SignOf_WithGtRule_AMinusB_ReturnsPositive()
     {
         // A > B → SignOf(A - B) = Positive (the strongest classification).
-        var ctx = new ProofContext(new Dictionary<string, StaticValueKind>())
+        var ctx = new GlobalProofContext(new Dictionary<string, StaticValueKind>())
             .WithRule(
                 PreceptParser.ParseExpression("A"),
                 RelationKind.GreaterThan,
@@ -411,7 +411,7 @@ public class ProofContextTests
         // Gap 1+2 combined: A - (B + C) with rule A > B + C.
         // WithRule(A, GT, B+C): key = LinearForm(A) - LinearForm(B+C) = +1·A + (-1)·B + (-1)·C.
         // Divisor A - (B + C) normalizes to the same key → direct match.
-        var ctx = new ProofContext(new Dictionary<string, StaticValueKind>())
+        var ctx = new GlobalProofContext(new Dictionary<string, StaticValueKind>())
             .WithRule(
                 PreceptParser.ParseExpression("A"),
                 RelationKind.GreaterThan,
@@ -425,7 +425,7 @@ public class ProofContextTests
     {
         // A - A normalizes to LinearForm with empty terms and constant 0.
         // The engine should return the singleton interval [0, 0].
-        var ctx = new ProofContext(new Dictionary<string, StaticValueKind>());
+        var ctx = new GlobalProofContext(new Dictionary<string, StaticValueKind>());
 
         var interval = ctx.IntervalOf(PreceptParser.ParseExpression("A - A"));
 
@@ -437,7 +437,7 @@ public class ProofContextTests
     public void KnowsNonzero_LiteralPositive_ReturnsTrue()
     {
         // Literal 5 → interval [5, 5]. Lower = 5 > 0 → ExcludesZero = true.
-        var ctx = new ProofContext(new Dictionary<string, StaticValueKind>());
+        var ctx = new GlobalProofContext(new Dictionary<string, StaticValueKind>());
 
         ctx.KnowsNonzero(PreceptParser.ParseExpression("5")).Should().BeTrue();
     }
@@ -446,7 +446,7 @@ public class ProofContextTests
     public void IntervalOf_ConstantPositive_IsPositive()
     {
         // Literal 42 → singleton interval [42, 42] → IsPositive = true.
-        var ctx = new ProofContext(new Dictionary<string, StaticValueKind>());
+        var ctx = new GlobalProofContext(new Dictionary<string, StaticValueKind>());
 
         var interval = ctx.IntervalOf(PreceptParser.ParseExpression("42"));
 
@@ -459,7 +459,7 @@ public class ProofContextTests
         // abs(X) is not normalizable to a LinearForm.
         // WithRule must fail gracefully (store nothing) rather than throw.
         // Querying IntervalOf(abs(X) - B) should return a non-positive result — not throw.
-        var ctx = new ProofContext(new Dictionary<string, StaticValueKind>());
+        var ctx = new GlobalProofContext(new Dictionary<string, StaticValueKind>());
 
         var act = () => ctx.WithRule(
             PreceptParser.ParseExpression("abs(X)"),
@@ -481,7 +481,7 @@ public class ProofContextTests
         // GCD of coefficient absolute values = Rational(1,2).
         // GCD-normalized: {A: 1, B: -1}. Matches stored key from rule A > B.
         // Scale factor = 1/2 (positive) → sign preserved → interval is (0,+∞).
-        var ctx = new ProofContext(new Dictionary<string, StaticValueKind>())
+        var ctx = new GlobalProofContext(new Dictionary<string, StaticValueKind>())
             .WithRule(
                 PreceptParser.ParseExpression("A"),
                 RelationKind.GreaterThan,
@@ -494,7 +494,7 @@ public class ProofContextTests
     public void WithGuard_GteCondition_NarrowsToNonneg()
     {
         // WithGuard(A >= B, branch=true) narrows context so IntervalOf(A - B) is nonneg.
-        var empty = new ProofContext(new Dictionary<string, StaticValueKind>());
+        var empty = new GlobalProofContext(new Dictionary<string, StaticValueKind>());
         var condition = PreceptParser.ParseExpression("A >= B");
 
         var narrowed = empty.WithGuard(condition, branch: true);
@@ -507,7 +507,7 @@ public class ProofContextTests
     {
         // Gap 1: (A+1) - B with rule A > B should be provably nonzero.
         // A > B → A - B > 0 → (A - B) + 1 ≥ 1 > 0 → ExcludesZero = true.
-        var ctx = new ProofContext(new Dictionary<string, StaticValueKind>())
+        var ctx = new GlobalProofContext(new Dictionary<string, StaticValueKind>())
             .WithRule(
                 PreceptParser.ParseExpression("A"),
                 RelationKind.GreaterThan,
@@ -520,7 +520,7 @@ public class ProofContextTests
     public void SignOf_WithGteRule_AMinusB_ReturnsNonneg()
     {
         // A >= B → SignOf(A - B) = Nonneg (not Positive, since A == B is possible).
-        var ctx = new ProofContext(new Dictionary<string, StaticValueKind>())
+        var ctx = new GlobalProofContext(new Dictionary<string, StaticValueKind>())
             .WithRule(
                 PreceptParser.ParseExpression("A"),
                 RelationKind.GreaterThanOrEqual,
@@ -537,7 +537,7 @@ public class ProofContextTests
         // W1 regression: rule A >= B → IntervalOf(A - B) = [0, +∞).
         // ConstantOffsetScan with c=0 must return LowerInclusive = true.
         // Before the fix, it returned (0, +∞) — LowerInclusive = false.
-        var ctx = new ProofContext(new Dictionary<string, StaticValueKind>())
+        var ctx = new GlobalProofContext(new Dictionary<string, StaticValueKind>())
             .WithRule(
                 PreceptParser.ParseExpression("A"),
                 RelationKind.GreaterThanOrEqual,
@@ -555,7 +555,7 @@ public class ProofContextTests
         // W2 regression: rule 2*A > 2*B stores key 2A-2B. Without GCD normalization
         // at storage, looking up A-B (which IS GCD-normalized at lookup) would miss.
         // With GCD normalization at storage, 2A-2B → A-B, and IntervalOf(A - B) = (0, +∞).
-        var ctx = new ProofContext(new Dictionary<string, StaticValueKind>())
+        var ctx = new GlobalProofContext(new Dictionary<string, StaticValueKind>())
             .WithRule(
                 PreceptParser.ParseExpression("2 * A"),
                 RelationKind.GreaterThan,
@@ -576,7 +576,7 @@ public class ProofContextTests
         // Stores A >= B + 1, queries A - B. Offset c = 0 - (-1) = 1 >= 0 → fires ConstantOffsetScan.
         // Before W1 fix, c == 0 case with >= would produce (0, +inf) instead of [0, +inf).
         // This test forces tier-4 path (not tier-1 direct match).
-        var ctx = new ProofContext(new Dictionary<string, StaticValueKind>())
+        var ctx = new GlobalProofContext(new Dictionary<string, StaticValueKind>())
             .WithRule(
                 PreceptParser.ParseExpression("A"),
                 RelationKind.GreaterThanOrEqual,
@@ -596,7 +596,7 @@ public class ProofContextTests
         // Stores rule 2*A > 2*B. Without W2 fix, stored key is {A:2, B:-2}.
         // With W2 fix, stored key is GCD-normalized to {A:1, B:-1}.
         // Query: IntervalOf(A - B) → LinearForm {A:1, B:-1} → direct match.
-        var ctx = new ProofContext(new Dictionary<string, StaticValueKind>())
+        var ctx = new GlobalProofContext(new Dictionary<string, StaticValueKind>())
             .WithRule(
                 PreceptParser.ParseExpression("2 * A"),
                 RelationKind.GreaterThan,
@@ -605,5 +605,64 @@ public class ProofContextTests
         var interval = ctx.IntervalOf(PreceptParser.ParseExpression("A - B"));
 
         interval.IsPositive.Should().BeTrue("2A > 2B normalizes to A > B at storage time");
+    }
+
+    // ── Scope isolation (Child) ───────────────────────────────────────────────
+
+    [Fact]
+    public void Child_DoesNotLeakToParent()
+    {
+        // Mutating a child context must not affect the parent.
+        var parent = new GlobalProofContext(new Dictionary<string, StaticValueKind>())
+            .WithRule(
+                PreceptParser.ParseExpression("A"),
+                RelationKind.GreaterThan,
+                PreceptParser.ParseExpression("B"));
+
+        var child = parent.Child();
+
+        // Mutate the child by adding a new rule.
+        var mutated = child.WithRule(
+            PreceptParser.ParseExpression("X"),
+            RelationKind.GreaterThan,
+            PreceptParser.ParseExpression("Y"));
+
+        // Parent must still know A > B but NOT X > Y.
+        parent.KnowsNonzero(PreceptParser.ParseExpression("A - B")).Should().BeTrue();
+        parent.KnowsNonzero(PreceptParser.ParseExpression("X - Y")).Should().BeFalse();
+
+        // Mutated child knows both.
+        mutated.KnowsNonzero(PreceptParser.ParseExpression("A - B")).Should().BeTrue();
+        mutated.KnowsNonzero(PreceptParser.ParseExpression("X - Y")).Should().BeTrue();
+    }
+
+    [Fact]
+    public void Child_SiblingIsolation()
+    {
+        // Two children from the same parent must not see each other's mutations.
+        var parent = new GlobalProofContext(new Dictionary<string, StaticValueKind>());
+
+        var childA = parent.Child()
+            .WithRule(
+                PreceptParser.ParseExpression("P"),
+                RelationKind.GreaterThan,
+                PreceptParser.ParseExpression("Q"));
+
+        var childB = parent.Child()
+            .WithRule(
+                PreceptParser.ParseExpression("X"),
+                RelationKind.GreaterThan,
+                PreceptParser.ParseExpression("Y"));
+
+        // Each child sees only its own rule.
+        childA.KnowsNonzero(PreceptParser.ParseExpression("P - Q")).Should().BeTrue();
+        childA.KnowsNonzero(PreceptParser.ParseExpression("X - Y")).Should().BeFalse();
+
+        childB.KnowsNonzero(PreceptParser.ParseExpression("X - Y")).Should().BeTrue();
+        childB.KnowsNonzero(PreceptParser.ParseExpression("P - Q")).Should().BeFalse();
+
+        // Parent sees neither.
+        parent.KnowsNonzero(PreceptParser.ParseExpression("P - Q")).Should().BeFalse();
+        parent.KnowsNonzero(PreceptParser.ParseExpression("X - Y")).Should().BeFalse();
     }
 }

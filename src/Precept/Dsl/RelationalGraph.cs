@@ -4,7 +4,7 @@ namespace Precept;
 
 /// <summary>
 /// Bounded transitive-closure engine over relational facts stored in
-/// <see cref="ProofContext"/>. Performs a BFS over the fact graph with hard caps
+/// <see cref="GlobalProofContext"/>. Performs a BFS over the fact graph with hard caps
 /// (max 64 facts, depth 4, 256 visited nodes) and the strict/non-strict combination
 /// matrix: &gt;·&gt;⇒&gt;, &gt;·&gt;=⇒&gt;, &gt;=·&gt;⇒&gt;, &gt;=·&gt;=⇒&gt;=.
 /// </summary>

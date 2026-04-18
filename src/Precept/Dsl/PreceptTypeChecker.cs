@@ -92,7 +92,7 @@ internal static class PreceptTypeChecker
         var expressions = new List<PreceptTypeExpressionInfo>();
         var scopes = new List<PreceptTypeScopeInfo>();
 
-        ProofContext dataFieldKinds = new ProofContext(model.Fields.ToDictionary(
+        GlobalProofContext dataFieldKinds = new GlobalProofContext(model.Fields.ToDictionary(
             field => field.Name,
             MapFieldContractKind,
             StringComparer.Ordinal));
@@ -134,7 +134,7 @@ internal static class PreceptTypeChecker
                 var ival = new NumericInterval(lower, minVal.HasValue, upper, maxVal.HasValue);
                 fieldIntervals[field.Name] = ival;
             }
-            dataFieldKinds = new ProofContext(markerDict, new Dictionary<LinearForm, RelationalFact>(dataFieldKinds.RelationalFacts), fieldIntervals, CopyFlags(dataFieldKinds), CopyExprFacts(dataFieldKinds));
+            dataFieldKinds = new GlobalProofContext(markerDict, new Dictionary<LinearForm, RelationalFact>(dataFieldKinds.RelationalFacts), fieldIntervals, CopyFlags(dataFieldKinds), CopyExprFacts(dataFieldKinds));
         }
 
         var eventArgKinds = model.Events.ToDictionary(
@@ -222,11 +222,11 @@ internal static class PreceptTypeChecker
 
     private static void ValidateTransitionRows(
         PreceptDefinition model,
-        ProofContext dataFieldKinds,
+        GlobalProofContext dataFieldKinds,
         IReadOnlyDictionary<string, Dictionary<string, StaticValueKind>> eventArgKinds,
         IReadOnlyDictionary<string, PreceptCollectionField> collectionFieldMap,
-        IReadOnlyDictionary<string, ProofContext> stateEnsureNarrowings,
-        IReadOnlyDictionary<string, ProofContext> eventEnsureNarrowings,
+        IReadOnlyDictionary<string, GlobalProofContext> stateEnsureNarrowings,
+        IReadOnlyDictionary<string, GlobalProofContext> eventEnsureNarrowings,
         List<PreceptValidationDiagnostic> diagnostics,
         List<PreceptTypeExpressionInfo> expressions,
         List<PreceptTypeScopeInfo> scopes)
@@ -268,38 +268,7 @@ internal static class PreceptTypeChecker
                     stateGroup.Key,
                     eventName));
 
-                var branchRelational = new Dictionary<LinearForm, RelationalFact>(dataFieldKinds.RelationalFacts);
-                var branchFieldIntervals = CopyFieldIntervals(dataFieldKinds);
-                var branchFlags = CopyFlags(dataFieldKinds);
-                var branchExprFacts = CopyExprFacts(dataFieldKinds);
-
-                // Merge state ensure narrowing typed stores
-                if (stateNarrowing is not null)
-                {
-                    foreach (var pair in stateNarrowing.FieldIntervals)
-                        branchFieldIntervals[pair.Key] = pair.Value;
-                    foreach (var pair in stateNarrowing.Flags)
-                        branchFlags[pair.Key] = pair.Value;
-                    foreach (var pair in stateNarrowing.RelationalFacts)
-                        branchRelational[pair.Key] = pair.Value;
-                    foreach (var pair in stateNarrowing.ExprFacts)
-                        branchExprFacts[pair.Key] = pair.Value;
-                }
-
-                // Merge event ensure narrowing typed stores
-                if (eventNarrowing is not null)
-                {
-                    foreach (var pair in eventNarrowing.FieldIntervals)
-                        branchFieldIntervals[pair.Key] = pair.Value;
-                    foreach (var pair in eventNarrowing.Flags)
-                        branchFlags[pair.Key] = pair.Value;
-                    foreach (var pair in eventNarrowing.RelationalFacts)
-                        branchRelational[pair.Key] = pair.Value;
-                    foreach (var pair in eventNarrowing.ExprFacts)
-                        branchExprFacts[pair.Key] = pair.Value;
-                }
-
-                ProofContext branchContext = new ProofContext(baseSymbols, branchRelational, branchFieldIntervals, branchFlags, branchExprFacts);
+                GlobalProofContext branchContext = dataFieldKinds.ChildMerging(baseSymbols, stateNarrowing, eventNarrowing);
 
                 // C47: detect identical guard text for the same (state, event) group
                 var seenGuards = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -307,7 +276,7 @@ internal static class PreceptTypeChecker
                 foreach (var item in stateGroup.OrderBy(x => x.Row.SourceLine))
                 {
                     var row = item.Row;
-                    ProofContext setContext = branchContext;
+                    GlobalProofContext setContext = branchContext;
 
                     // C47: duplicate guard detection for this (state, event) group
                     if (row.WhenGuard is not null && !string.IsNullOrWhiteSpace(row.WhenText))
@@ -416,9 +385,9 @@ internal static class PreceptTypeChecker
 
     private static void ValidateStateActions(
         PreceptDefinition model,
-        ProofContext dataFieldKinds,
+        GlobalProofContext dataFieldKinds,
         IReadOnlyDictionary<string, PreceptCollectionField> collectionFieldMap,
-        IReadOnlyDictionary<string, ProofContext> stateEnsureNarrowings,
+        IReadOnlyDictionary<string, GlobalProofContext> stateEnsureNarrowings,
         List<PreceptValidationDiagnostic> diagnostics,
         List<PreceptTypeExpressionInfo> expressions,
         List<PreceptTypeScopeInfo> scopes)
@@ -465,7 +434,7 @@ internal static class PreceptTypeChecker
                 action.State));
 
             // Layer 1: thread post-assignment proof state into subsequent assignments.
-            ProofContext assignmentContext = new ProofContext(baseSymbols, new Dictionary<LinearForm, RelationalFact>(dataFieldKinds.RelationalFacts), CopyFieldIntervals(dataFieldKinds), CopyFlags(dataFieldKinds), CopyExprFacts(dataFieldKinds));
+            GlobalProofContext assignmentContext = new GlobalProofContext(baseSymbols, new Dictionary<LinearForm, RelationalFact>(dataFieldKinds.RelationalFacts), CopyFieldIntervals(dataFieldKinds), CopyFlags(dataFieldKinds), CopyExprFacts(dataFieldKinds));
 
             foreach (var assignment in action.SetAssignments)
             {
@@ -856,7 +825,7 @@ internal static class PreceptTypeChecker
     /// </summary>
     private static IReadOnlyList<string>? ValidateComputedFields(
         PreceptDefinition model,
-        ProofContext dataFieldKinds,
+        GlobalProofContext dataFieldKinds,
         IReadOnlyDictionary<string, Dictionary<string, StaticValueKind>> eventArgKinds,
         IReadOnlyDictionary<string, PreceptCollectionField> collectionFieldMap,
         List<PreceptValidationDiagnostic> diagnostics,
@@ -916,7 +885,7 @@ internal static class PreceptTypeChecker
                 field.DerivedExpression!,
                 field.DerivedExpressionText!,
                 field.SourceLine,
-                new ProofContext(dataSymbols),
+                new GlobalProofContext(dataSymbols),
                 expectedKind,
                 $"computed field '{field.Name}'",
                 diagnostics,
@@ -1163,7 +1132,7 @@ internal static class PreceptTypeChecker
 
     private static void ValidateRules(
         PreceptDefinition model,
-        ProofContext dataFieldKinds,
+        GlobalProofContext dataFieldKinds,
         IReadOnlyDictionary<string, Dictionary<string, StaticValueKind>> eventArgKinds,
         List<PreceptValidationDiagnostic> diagnostics,
         List<PreceptTypeExpressionInfo> expressions,
@@ -1201,7 +1170,7 @@ internal static class PreceptTypeChecker
                     rule.Expression,
                     rule.ExpressionText,
                     rule.SourceLine,
-                    new ProofContext(
+                    new GlobalProofContext(
                         dataSymbols,
                         new Dictionary<LinearForm, RelationalFact>(dataFieldKinds.RelationalFacts),
                         CopyFieldIntervals(dataFieldKinds),
@@ -1219,7 +1188,7 @@ internal static class PreceptTypeChecker
                         rule.WhenGuard,
                         rule.WhenText!,
                         rule.SourceLine,
-                        new ProofContext(
+                        new GlobalProofContext(
                             dataSymbols,
                             new Dictionary<LinearForm, RelationalFact>(dataFieldKinds.RelationalFacts),
                             CopyFieldIntervals(dataFieldKinds),
@@ -1245,7 +1214,7 @@ internal static class PreceptTypeChecker
                     stateEnsure.Expression,
                     stateEnsure.ExpressionText,
                     stateEnsure.SourceLine,
-                    new ProofContext(
+                    new GlobalProofContext(
                         dataSymbols,
                         new Dictionary<LinearForm, RelationalFact>(dataFieldKinds.RelationalFacts),
                         CopyFieldIntervals(dataFieldKinds),
@@ -1264,7 +1233,7 @@ internal static class PreceptTypeChecker
                         stateEnsure.WhenGuard,
                         stateEnsure.WhenText!,
                         stateEnsure.SourceLine,
-                        new ProofContext(
+                        new GlobalProofContext(
                             dataSymbols,
                             new Dictionary<LinearForm, RelationalFact>(dataFieldKinds.RelationalFacts),
                             CopyFieldIntervals(dataFieldKinds),
@@ -1298,7 +1267,7 @@ internal static class PreceptTypeChecker
                     eventEnsure.Expression,
                     eventEnsure.ExpressionText,
                     eventEnsure.SourceLine,
-                    new ProofContext(
+                    new GlobalProofContext(
                         symbols,
                         new Dictionary<LinearForm, RelationalFact>(dataFieldKinds.RelationalFacts),
                         CopyFieldIntervals(dataFieldKinds),
@@ -1317,7 +1286,7 @@ internal static class PreceptTypeChecker
                         eventEnsure.WhenGuard,
                         eventEnsure.WhenText!,
                         eventEnsure.SourceLine,
-                        new ProofContext(
+                        new GlobalProofContext(
                             symbols,
                             new Dictionary<LinearForm, RelationalFact>(dataFieldKinds.RelationalFacts),
                             CopyFieldIntervals(dataFieldKinds),
@@ -1346,7 +1315,7 @@ internal static class PreceptTypeChecker
                         editBlock.WhenGuard,
                         editBlock.WhenText!,
                         editBlock.SourceLine,
-                        new ProofContext(
+                        new GlobalProofContext(
                             dataSymbols,
                             new Dictionary<LinearForm, RelationalFact>(dataFieldKinds.RelationalFacts),
                             CopyFieldIntervals(dataFieldKinds),
@@ -1445,11 +1414,11 @@ internal static class PreceptTypeChecker
         return [row.FromState];
     }
 
-    private static IReadOnlyDictionary<string, ProofContext> BuildStateEnsureNarrowings(
+    private static IReadOnlyDictionary<string, GlobalProofContext> BuildStateEnsureNarrowings(
         PreceptDefinition model,
-        ProofContext dataFieldKinds)
+        GlobalProofContext dataFieldKinds)
     {
-        var result = new Dictionary<string, ProofContext>(StringComparer.Ordinal);
+        var result = new Dictionary<string, GlobalProofContext>(StringComparer.Ordinal);
         if (model.StateEnsures is null || model.StateEnsures.Count == 0)
             return result;
 
@@ -1457,7 +1426,7 @@ internal static class PreceptTypeChecker
             .Where(static stateEnsure => stateEnsure.Anchor == EnsureAnchor.In && stateEnsure.WhenGuard is null)
             .GroupBy(static stateEnsure => stateEnsure.State, StringComparer.Ordinal))
         {
-            ProofContext narrowed = new ProofContext(
+            GlobalProofContext narrowed = new GlobalProofContext(
                 new Dictionary<string, StaticValueKind>(dataFieldKinds.Symbols, StringComparer.Ordinal),
                 new Dictionary<LinearForm, RelationalFact>(),
                 CopyFieldIntervals(dataFieldKinds),
@@ -1473,11 +1442,11 @@ internal static class PreceptTypeChecker
         return result;
     }
 
-    private static IReadOnlyDictionary<string, ProofContext> BuildEventEnsureNarrowings(
+    private static IReadOnlyDictionary<string, GlobalProofContext> BuildEventEnsureNarrowings(
         PreceptDefinition model,
         IReadOnlyDictionary<string, Dictionary<string, StaticValueKind>> eventArgKinds)
     {
-        var result = new Dictionary<string, ProofContext>(StringComparer.Ordinal);
+        var result = new Dictionary<string, GlobalProofContext>(StringComparer.Ordinal);
         if (model.EventEnsures is null || model.EventEnsures.Count == 0)
             return result;
 
@@ -1490,7 +1459,7 @@ internal static class PreceptTypeChecker
                 continue;
 
             // Build bare-name symbol table for the event's args
-            ProofContext bareContext = new ProofContext(new Dictionary<string, StaticValueKind>(args, StringComparer.Ordinal));
+            GlobalProofContext bareContext = new GlobalProofContext(new Dictionary<string, StaticValueKind>(args, StringComparer.Ordinal));
 
             foreach (var eventEnsure in group)
                 bareContext = ApplyNarrowing(eventEnsure.Expression, bareContext, assumeTrue: true);
@@ -1518,7 +1487,7 @@ internal static class PreceptTypeChecker
             foreach (var pair in bareContext.ExprFacts)
                 dottedExprFacts[pair.Key.Rekey(eventName)] = pair.Value;
 
-            result[eventName] = new ProofContext(dottedSymbols, dottedRelational, dottedFieldIntervals, dottedFlags, dottedExprFacts);
+            result[eventName] = new GlobalProofContext(dottedSymbols, dottedRelational, dottedFieldIntervals, dottedFlags, dottedExprFacts);
         }
 
         return result;
@@ -1575,7 +1544,7 @@ internal static class PreceptTypeChecker
         PreceptExpression expression,
         string expressionText,
         int sourceLine,
-        ProofContext context,
+        GlobalProofContext context,
         StaticValueKind expectedKind,
         string expectedLabel,
         List<PreceptValidationDiagnostic> diagnostics,
@@ -1657,7 +1626,7 @@ internal static class PreceptTypeChecker
 
     private static bool TryInferKind(
         PreceptExpression expression,
-        ProofContext context,
+        GlobalProofContext context,
         out StaticValueKind kind,
         out PreceptValidationDiagnostic? diagnostic)
     {
@@ -1847,7 +1816,7 @@ internal static class PreceptTypeChecker
 
     private static bool TryInferFunctionCallKind(
         PreceptFunctionCallExpression fn,
-        ProofContext context,
+        GlobalProofContext context,
         out StaticValueKind kind,
         out PreceptValidationDiagnostic? diagnostic)
     {
@@ -2052,7 +2021,7 @@ internal static class PreceptTypeChecker
 
     private static bool TryInferBinaryKind(
         PreceptBinaryExpression binary,
-        ProofContext context,
+        GlobalProofContext context,
         out StaticValueKind kind,
         out PreceptValidationDiagnostic? diagnostic)
     {
@@ -2374,7 +2343,7 @@ internal static class PreceptTypeChecker
     /// </summary>
     private static NumericInterval ExtractIntervalFromMarkers(
         string key,
-        ProofContext context)
+        GlobalProofContext context)
     {
         // 1. Typed interval store takes priority (most specific).
         if (context.FieldIntervals.TryGetValue(key, out var ival))
@@ -2402,7 +2371,7 @@ internal static class PreceptTypeChecker
     /// </summary>
     internal static NumericInterval TryInferInterval(
         PreceptExpression expression,
-        ProofContext context)
+        GlobalProofContext context)
     {
         switch (expression)
         {
@@ -2533,10 +2502,10 @@ internal static class PreceptTypeChecker
     /// assignment. Called within assignment loops to thread post-mutation proof state into subsequent
     /// assignments in the same row or state action (Layer 1: Sequential Assignment Flow).
     /// </summary>
-    internal static ProofContext ApplyAssignmentNarrowing(
+    internal static GlobalProofContext ApplyAssignmentNarrowing(
         string targetField,
         PreceptExpression rhs,
-        ProofContext context)
+        GlobalProofContext context)
     {
         var markers = new Dictionary<string, StaticValueKind>(context.Symbols, StringComparer.Ordinal);
         var fieldIntervals = CopyFieldIntervals(context);
@@ -2641,12 +2610,12 @@ internal static class PreceptTypeChecker
                 relFacts[lf] = fact;
         }
 
-        return new ProofContext(markers, relFacts, fieldIntervals, flags, exprFacts);
+        return new GlobalProofContext(markers, relFacts, fieldIntervals, flags, exprFacts);
     }
 
-    internal static ProofContext ApplyNarrowing(
+    internal static GlobalProofContext ApplyNarrowing(
         PreceptExpression expression,
-        ProofContext context,
+        GlobalProofContext context,
         bool assumeTrue)
     {
         expression = StripParentheses(expression);
@@ -2694,9 +2663,9 @@ internal static class PreceptTypeChecker
 
     private static bool TryApplyNullComparisonNarrowing(
         PreceptBinaryExpression binary,
-        ProofContext context,
+        GlobalProofContext context,
         bool assumeTrue,
-        out ProofContext narrowed)
+        out GlobalProofContext narrowed)
     {
         narrowed = context;
 
@@ -2731,7 +2700,7 @@ internal static class PreceptTypeChecker
             ? StaticValueKind.Null
             : (existingKind & ~StaticValueKind.Null);
 
-        narrowed = new ProofContext(
+        narrowed = new GlobalProofContext(
             new Dictionary<string, StaticValueKind>(context.Symbols, StringComparer.Ordinal)
             {
                 [key] = updatedKind
@@ -2745,9 +2714,9 @@ internal static class PreceptTypeChecker
 
     private static bool TryApplyNumericComparisonNarrowing(
         PreceptBinaryExpression binary,
-        ProofContext context,
+        GlobalProofContext context,
         bool assumeTrue,
-        out ProofContext result)
+        out GlobalProofContext result)
     {
         result = context;
 
@@ -2799,7 +2768,7 @@ internal static class PreceptTypeChecker
                 default:
                     return false;
             }
-            result = new ProofContext(relMarkers, relFacts, CopyFieldIntervals(context), CopyFlags(context), CopyExprFacts(context));
+            result = new GlobalProofContext(relMarkers, relFacts, CopyFieldIntervals(context), CopyFlags(context), CopyExprFacts(context));
             return true;
         }
         else if (binary.Operator is ">" or ">=" or "<" or "<=")
@@ -2815,21 +2784,21 @@ internal static class PreceptTypeChecker
             switch (binary.Operator)
             {
                 case ">":
-                    relFacts[ProofContext.GcdNormalize(leftForm.Subtract(rightForm))] = new RelationalFact(RelationKind.GreaterThan);
+                    relFacts[GlobalProofContext.GcdNormalize(leftForm.Subtract(rightForm))] = new RelationalFact(RelationKind.GreaterThan);
                     break;
                 case ">=":
-                    relFacts[ProofContext.GcdNormalize(leftForm.Subtract(rightForm))] = new RelationalFact(RelationKind.GreaterThanOrEqual);
+                    relFacts[GlobalProofContext.GcdNormalize(leftForm.Subtract(rightForm))] = new RelationalFact(RelationKind.GreaterThanOrEqual);
                     break;
                 case "<":
-                    relFacts[ProofContext.GcdNormalize(rightForm.Subtract(leftForm))] = new RelationalFact(RelationKind.GreaterThan);
+                    relFacts[GlobalProofContext.GcdNormalize(rightForm.Subtract(leftForm))] = new RelationalFact(RelationKind.GreaterThan);
                     break;
                 case "<=":
-                    relFacts[ProofContext.GcdNormalize(rightForm.Subtract(leftForm))] = new RelationalFact(RelationKind.GreaterThanOrEqual);
+                    relFacts[GlobalProofContext.GcdNormalize(rightForm.Subtract(leftForm))] = new RelationalFact(RelationKind.GreaterThanOrEqual);
                     break;
                 default:
                     return false;
             }
-            result = new ProofContext(new Dictionary<string, StaticValueKind>(context.Symbols, StringComparer.Ordinal), relFacts, CopyFieldIntervals(context), CopyFlags(context), CopyExprFacts(context));
+            result = new GlobalProofContext(new Dictionary<string, StaticValueKind>(context.Symbols, StringComparer.Ordinal), relFacts, CopyFieldIntervals(context), CopyFlags(context), CopyExprFacts(context));
             return true;
         }
         else
@@ -2871,7 +2840,7 @@ internal static class PreceptTypeChecker
         if (!injected)
             return false;
 
-        result = new ProofContext(markers, CopyRelationalFacts(context), CopyFieldIntervals(context), flags, CopyExprFacts(context));
+        result = new GlobalProofContext(markers, CopyRelationalFacts(context), CopyFieldIntervals(context), flags, CopyExprFacts(context));
         return true;
     }
 
@@ -2879,7 +2848,7 @@ internal static class PreceptTypeChecker
     /// Returns a mutable copy of <paramref name="context"/>'s typed relational fact store.
     /// Used by <see cref="TryApplyNumericComparisonNarrowing"/> to produce copy-on-write updates.
     /// </summary>
-    private static Dictionary<LinearForm, RelationalFact> CopyRelationalFacts(ProofContext context)
+    private static Dictionary<LinearForm, RelationalFact> CopyRelationalFacts(GlobalProofContext context)
     {
         var copy = new Dictionary<LinearForm, RelationalFact>();
         foreach (var kvp in context.RelationalFacts)
@@ -2889,9 +2858,9 @@ internal static class PreceptTypeChecker
 
     /// <summary>
     /// Returns a mutable copy of <paramref name="context"/>'s typed field interval store.
-    /// Used for copy-on-write propagation when constructing derived <see cref="ProofContext"/> instances.
+    /// Used for copy-on-write propagation when constructing derived <see cref="GlobalProofContext"/> instances.
     /// </summary>
-    private static Dictionary<string, NumericInterval> CopyFieldIntervals(ProofContext context)
+    private static Dictionary<string, NumericInterval> CopyFieldIntervals(GlobalProofContext context)
     {
         var copy = new Dictionary<string, NumericInterval>(StringComparer.Ordinal);
         foreach (var kvp in context.FieldIntervals)
@@ -2902,7 +2871,7 @@ internal static class PreceptTypeChecker
     /// <summary>
     /// Returns a mutable copy of <paramref name="context"/>'s typed numeric flags store.
     /// </summary>
-    private static Dictionary<string, NumericFlags> CopyFlags(ProofContext context)
+    private static Dictionary<string, NumericFlags> CopyFlags(GlobalProofContext context)
     {
         var copy = new Dictionary<string, NumericFlags>(StringComparer.Ordinal);
         foreach (var kvp in context.Flags)
@@ -2913,7 +2882,7 @@ internal static class PreceptTypeChecker
     /// <summary>
     /// Returns a mutable copy of <paramref name="context"/>'s typed expression-level interval store.
     /// </summary>
-    private static Dictionary<LinearForm, NumericInterval> CopyExprFacts(ProofContext context)
+    private static Dictionary<LinearForm, NumericInterval> CopyExprFacts(GlobalProofContext context)
     {
         var copy = new Dictionary<LinearForm, NumericInterval>();
         foreach (var kvp in context.ExprFacts)
@@ -2936,7 +2905,7 @@ internal static class PreceptTypeChecker
         var lf = LinearForm.TryNormalize(lhs);
         var rf = LinearForm.TryNormalize(rhs);
         if (lf is not null && rf is not null)
-            relFacts[ProofContext.GcdNormalize(lf.Subtract(rf))] = new RelationalFact(kind);
+            relFacts[GlobalProofContext.GcdNormalize(lf.Subtract(rf))] = new RelationalFact(kind);
     }
 
     /// <summary>
@@ -2945,8 +2914,8 @@ internal static class PreceptTypeChecker
     /// </summary>
     private static bool TryDecomposeNullOrPattern(
         PreceptBinaryExpression binary,
-        ProofContext context,
-        out ProofContext result)
+        GlobalProofContext context,
+        out GlobalProofContext result)
     {
         result = context;
 
@@ -2967,8 +2936,8 @@ internal static class PreceptTypeChecker
         static bool TryDecomposeOrdered(
             PreceptExpression nullCandidate,
             PreceptExpression numericCandidate,
-            ProofContext syms,
-            out ProofContext res)
+            GlobalProofContext syms,
+            out GlobalProofContext res)
         {
             res = syms;
 
@@ -2996,7 +2965,7 @@ internal static class PreceptTypeChecker
             {
                 // Compound: Field == null or (Field >= 0 and Field < 100)
                 // Recurse into each 'and' operand to accumulate markers
-                ProofContext accumulated = syms;
+                GlobalProofContext accumulated = syms;
                 bool anyInjected = false;
 
                 foreach (var operand in new[] { andBinary.Left, andBinary.Right })
@@ -3080,7 +3049,7 @@ internal static class PreceptTypeChecker
 
     private static void ValidateCollectionMutations(
         IReadOnlyList<PreceptCollectionMutation>? mutations,
-        ProofContext context,
+        GlobalProofContext context,
         IReadOnlyDictionary<string, StaticValueKind> dataFieldKinds,
         IReadOnlyDictionary<string, PreceptCollectionField> collectionFieldMap,
         List<PreceptValidationDiagnostic> diagnostics,

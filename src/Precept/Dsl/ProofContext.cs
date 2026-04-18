@@ -6,7 +6,7 @@ namespace Precept;
 
 // ── Relational fact types ─────────────────────────────────────────────────────
 
-/// <summary>Strict vs. non-strict ordering for relational facts stored in <see cref="ProofContext"/>.</summary>
+/// <summary>Strict vs. non-strict ordering for relational facts stored in <see cref="GlobalProofContext"/>.</summary>
 internal enum RelationKind { GreaterThan, GreaterThanOrEqual }
 
 /// <summary>
@@ -47,7 +47,7 @@ internal enum NumericFlags
 /// and expression-level interval facts. Also retains a string-marker dictionary
 /// (<see cref="Symbols"/>) used by non-proof paths (field presence, type resolution).
 /// </summary>
-internal sealed class ProofContext
+internal sealed class GlobalProofContext
 {
     private readonly IReadOnlyDictionary<string, StaticValueKind> _symbols;
     private readonly Dictionary<LinearForm, RelationalFact> _relationalFacts;
@@ -56,7 +56,7 @@ internal sealed class ProofContext
     private readonly Dictionary<LinearForm, NumericInterval> _exprFacts;
 
     /// <summary>Constructs a context from a string-marker dictionary only.</summary>
-    public ProofContext(IReadOnlyDictionary<string, StaticValueKind> symbols)
+    public GlobalProofContext(IReadOnlyDictionary<string, StaticValueKind> symbols)
     {
         _symbols = symbols;
         _relationalFacts = new Dictionary<LinearForm, RelationalFact>();
@@ -66,7 +66,7 @@ internal sealed class ProofContext
     }
 
     /// <summary>Constructs a context from a dictionary plus a typed relational fact store.</summary>
-    public ProofContext(IReadOnlyDictionary<string, StaticValueKind> symbols,
+    public GlobalProofContext(IReadOnlyDictionary<string, StaticValueKind> symbols,
                         Dictionary<LinearForm, RelationalFact> relationalFacts)
     {
         _symbols = symbols;
@@ -77,7 +77,7 @@ internal sealed class ProofContext
     }
 
     /// <summary>Constructs a context with all typed stores supplied explicitly.</summary>
-    public ProofContext(IReadOnlyDictionary<string, StaticValueKind> symbols,
+    public GlobalProofContext(IReadOnlyDictionary<string, StaticValueKind> symbols,
                         Dictionary<LinearForm, RelationalFact> relationalFacts,
                         Dictionary<string, NumericInterval> fieldIntervals,
                         Dictionary<string, NumericFlags> flags,
@@ -92,7 +92,7 @@ internal sealed class ProofContext
 
     /// <summary>
     /// The raw string-marker dictionary. Used by <see cref="PreceptTypeChecker"/> methods
-    /// that have not yet been migrated to operate on <see cref="ProofContext"/> directly.
+    /// that have not yet been migrated to operate on <see cref="GlobalProofContext"/> directly.
     /// </summary>
     internal IReadOnlyDictionary<string, StaticValueKind> Symbols => _symbols;
 
@@ -175,26 +175,26 @@ internal sealed class ProofContext
     // ── Copy-on-write mutation methods ────────────────────────────────────────
 
     /// <summary>
-    /// Returns a new <see cref="ProofContext"/> that incorporates the narrowing
+    /// Returns a new <see cref="GlobalProofContext"/> that incorporates the narrowing
     /// implied by <paramref name="condition"/> being <paramref name="assumeTrue"/>.
     /// </summary>
-    public ProofContext WithNarrowing(PreceptExpression condition, bool assumeTrue) =>
+    public GlobalProofContext WithNarrowing(PreceptExpression condition, bool assumeTrue) =>
         PreceptTypeChecker.ApplyNarrowing(condition, this, assumeTrue);
 
     /// <summary>
-    /// Alias for <see cref="WithNarrowing"/>. Returns a new <see cref="ProofContext"/>
+    /// Alias for <see cref="WithNarrowing"/>. Returns a new <see cref="GlobalProofContext"/>
     /// narrowed by <paramref name="condition"/> being <paramref name="branch"/>.
     /// </summary>
-    public ProofContext WithGuard(PreceptExpression condition, bool branch) =>
+    public GlobalProofContext WithGuard(PreceptExpression condition, bool branch) =>
         WithNarrowing(condition, branch);
 
     /// <summary>
-    /// Returns a new <see cref="ProofContext"/> with a typed relational fact stored directly:
+    /// Returns a new <see cref="GlobalProofContext"/> with a typed relational fact stored directly:
     /// <c><paramref name="lhs"/> <paramref name="kind"/> <paramref name="rhs"/></c>.
     /// Both sides must normalize to a <see cref="LinearForm"/>; when either is non-normalizable
     /// the method returns <c>this</c> unchanged.
     /// </summary>
-    public ProofContext WithRule(PreceptExpression lhs, RelationKind kind, PreceptExpression rhs)
+    public GlobalProofContext WithRule(PreceptExpression lhs, RelationKind kind, PreceptExpression rhs)
     {
         var lf = LinearForm.TryNormalize(lhs);
         var rf = LinearForm.TryNormalize(rhs);
@@ -205,14 +205,14 @@ internal sealed class ProofContext
         {
             [GcdNormalize(lf.Subtract(rf))] = new RelationalFact(kind)
         };
-        return new ProofContext(_symbols, relFacts, _fieldIntervals, _flags, _exprFacts);
+        return new GlobalProofContext(_symbols, relFacts, _fieldIntervals, _flags, _exprFacts);
     }
 
     /// <summary>
-    /// Returns a new <see cref="ProofContext"/> that incorporates proof knowledge
+    /// Returns a new <see cref="GlobalProofContext"/> that incorporates proof knowledge
     /// derived from <c>set <paramref name="targetField"/> = <paramref name="rhs"/></c>.
     /// </summary>
-    public ProofContext WithAssignment(string targetField, PreceptExpression rhs) =>
+    public GlobalProofContext WithAssignment(string targetField, PreceptExpression rhs) =>
         PreceptTypeChecker.ApplyAssignmentNarrowing(targetField, rhs, this);
 
     // ── Relational tightening ─────────────────────────────────────────────────
@@ -326,9 +326,54 @@ internal sealed class ProofContext
         }
         return true;
     }
+
+    // ── Scope isolation ───────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Creates an isolated child context with deep copies of all mutable stores.
+    /// Mutations to the child do not affect this context or any sibling children.
+    /// </summary>
+    public GlobalProofContext Child() =>
+        new(CopySymbols(),
+            new Dictionary<LinearForm, RelationalFact>(_relationalFacts),
+            new Dictionary<string, NumericInterval>(_fieldIntervals, StringComparer.Ordinal),
+            new Dictionary<string, NumericFlags>(_flags, StringComparer.Ordinal),
+            new Dictionary<LinearForm, NumericInterval>(_exprFacts));
+
+    /// <summary>
+    /// Creates an isolated child with replaced <paramref name="symbols"/> and the specified
+    /// <paramref name="narrowings"/> merged over this context's typed stores (last writer wins).
+    /// </summary>
+    internal GlobalProofContext ChildMerging(
+        IReadOnlyDictionary<string, StaticValueKind> symbols,
+        params ReadOnlySpan<GlobalProofContext?> narrowings)
+    {
+        var relFacts = new Dictionary<LinearForm, RelationalFact>(_relationalFacts);
+        var intervals = new Dictionary<string, NumericInterval>(_fieldIntervals, StringComparer.Ordinal);
+        var flags = new Dictionary<string, NumericFlags>(_flags, StringComparer.Ordinal);
+        var exprFacts = new Dictionary<LinearForm, NumericInterval>(_exprFacts);
+
+        foreach (var n in narrowings)
+        {
+            if (n is null) continue;
+            foreach (var p in n.RelationalFacts) relFacts[p.Key] = p.Value;
+            foreach (var p in n.FieldIntervals) intervals[p.Key] = p.Value;
+            foreach (var p in n.Flags) flags[p.Key] = p.Value;
+            foreach (var p in n.ExprFacts) exprFacts[p.Key] = p.Value;
+        }
+
+        return new GlobalProofContext(symbols, relFacts, intervals, flags, exprFacts);
+    }
+
+    private Dictionary<string, StaticValueKind> CopySymbols()
+    {
+        var copy = new Dictionary<string, StaticValueKind>(StringComparer.Ordinal);
+        foreach (var pair in _symbols) copy[pair.Key] = pair.Value;
+        return copy;
+    }
 }
 
-/// <summary>Sign classification returned by <see cref="ProofContext.SignOf"/>.</summary>
+/// <summary>Sign classification returned by <see cref="GlobalProofContext.SignOf"/>.</summary>
 internal enum ProofSign
 {
     Unknown,
