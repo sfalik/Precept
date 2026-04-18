@@ -417,6 +417,43 @@ public class ProofEngineCompoundDivisorTests
         result.Diagnostics.Where(d => d.Constraint.Id == "C93").Should().BeEmpty();
     }
 
+    [Fact]
+    public void Check_TruncateDivisor_WithMinConstraint_NoC93()
+    {
+        // truncate(X) where X >= 1 → truncate([1, +∞)) = [1, +∞) → always positive → no C93.
+        const string dsl = """
+            precept Test
+            field X as number default 5 min 1
+            field Y as number default 1
+            state Open initial
+            event Go
+            from Open on Go -> set Y = 100 / truncate(X) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C93").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_PowEvenExponentDivisor_WithNonzeroRule_NoC93()
+    {
+        // pow(X, 2) where X != 0 → result is positive (even exponent, nonzero base) → no C93.
+        const string dsl = """
+            precept Test
+            field X as number default 3
+            field Y as number default 1
+            rule X != 0 because "X is nonzero"
+            state Open initial
+            event Go
+            from Open on Go -> set Y = 100 / pow(X, 2) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C93").Should().BeEmpty();
+    }
+
     // ── Private helpers ───────────────────────────────────────────────────────
 
     private static TypeCheckResult Check(string dsl) =>

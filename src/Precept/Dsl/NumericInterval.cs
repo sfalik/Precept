@@ -227,35 +227,4 @@ internal readonly record struct NumericInterval(
 
         return new(lower, lowerInc, upper, upperInc);
     }
-
-    // ── Interval marker serialization ────────────────────────────────────────
-
-    /// <summary>
-    /// Serializes this interval into the <c>$ival:{key}:{lower}:{lowerInc}:{upper}:{upperInc}</c>
-    /// marker key format used by the symbol table. All numeric values use InvariantCulture.
-    /// </summary>
-    public string ToMarkerKey(string fieldKey) =>
-        string.Create(CultureInfo.InvariantCulture,
-            $"$ival:{fieldKey}:{Lower}:{(LowerInclusive ? "true" : "false")}:{Upper}:{(UpperInclusive ? "true" : "false")}");
-
-    /// <summary>
-    /// Parses an interval from a marker key produced by <see cref="ToMarkerKey"/>.
-    /// Returns <see cref="Unknown"/> if the key is malformed.
-    /// </summary>
-    public static bool TryParseMarkerKey(string markerKey, out NumericInterval result)
-    {
-        result = Unknown;
-        // format: $ival:{key}:{lower}:{lowerInc}:{upper}:{upperInc}
-        var parts = markerKey.Split(':');
-        if (parts.Length < 6) return false;
-        // parts[0] = "$ival", parts[1] = field key (may be dotted), parts[2] = lower,
-        // parts[3] = lowerInc, parts[4] = upper, parts[5] = upperInc
-        // Parse from the end to handle dotted field keys with embedded dots
-        if (!double.TryParse(parts[parts.Length - 4], NumberStyles.Float, CultureInfo.InvariantCulture, out var lower)) return false;
-        if (!double.TryParse(parts[parts.Length - 2], NumberStyles.Float, CultureInfo.InvariantCulture, out var upper)) return false;
-        var lowerInc = parts[parts.Length - 3] == "true";
-        var upperInc = parts[parts.Length - 1] == "true";
-        result = new(lower, lowerInc, upper, upperInc);
-        return true;
-    }
 }

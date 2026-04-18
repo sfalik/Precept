@@ -89,6 +89,18 @@ internal sealed class LinearForm : IEquatable<LinearForm>
         return new(builder.ToImmutable(), Constant * scalar);
     }
 
+    /// <summary>
+    /// Returns a new <see cref="LinearForm"/> with every term key prefixed:
+    /// <c>prefix + "." + originalKey</c>.  The constant is preserved.
+    /// </summary>
+    public LinearForm Rekey(string prefix)
+    {
+        var builder = ImmutableSortedDictionary<string, Rational>.Empty.ToBuilder();
+        foreach (var (key, coeff) in Terms)
+            builder[prefix + "." + key] = coeff;
+        return new(builder.ToImmutable(), Constant);
+    }
+
     // ── TryNormalize ──────────────────────────────────────────────────────────
 
     /// <summary>

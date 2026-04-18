@@ -18,8 +18,8 @@ public class ProofContextTests
     {
         var dict = new Dictionary<string, StaticValueKind>
         {
-            ["$positive:Price"] = StaticValueKind.Boolean,
-            ["$nonneg:Amount"]  = StaticValueKind.Boolean,
+            ["Price"] = StaticValueKind.Number,
+            ["Amount"] = StaticValueKind.Number,
         };
         var ctx = new ProofContext(dict);
 
@@ -29,12 +29,17 @@ public class ProofContextTests
     // ── IntervalOf ───────────────────────────────────────────────────────────
 
     [Fact]
-    public void IntervalOf_FieldWithPositiveMarker_ReturnsPositiveInterval()
+    public void IntervalOf_FieldWithPositiveFlag_ReturnsPositiveInterval()
     {
-        var ctx = new ProofContext(new Dictionary<string, StaticValueKind>
-        {
-            ["$positive:Price"] = StaticValueKind.Boolean,
-        });
+        var ctx = new ProofContext(
+            new Dictionary<string, StaticValueKind>(),
+            new Dictionary<LinearForm, RelationalFact>(),
+            new Dictionary<string, NumericInterval>(System.StringComparer.Ordinal),
+            new Dictionary<string, NumericFlags>(System.StringComparer.Ordinal)
+            {
+                ["Price"] = NumericFlags.Positive | NumericFlags.Nonnegative | NumericFlags.Nonzero,
+            },
+            new Dictionary<LinearForm, NumericInterval>());
         var expr = PreceptParser.ParseExpression("Price");
 
         var interval = ctx.IntervalOf(expr);
@@ -59,13 +64,14 @@ public class ProofContextTests
     // ── KnowsNonzero ─────────────────────────────────────────────────────────
 
     [Fact]
-    public void KnowsNonzero_FieldWithGtMarker_ReturnsTrue()
+    public void KnowsNonzero_FieldWithGtRule_ReturnsTrue()
     {
-        // $gt:A:B → A > B → A - B > 0 (strictly positive, hence nonzero)
-        var ctx = new ProofContext(new Dictionary<string, StaticValueKind>
-        {
-            ["$gt:A:B"] = StaticValueKind.Boolean,
-        });
+        // A > B via WithRule → A - B > 0 (strictly positive, hence nonzero)
+        var ctx = new ProofContext(new Dictionary<string, StaticValueKind>())
+            .WithRule(
+                PreceptParser.ParseExpression("A"),
+                RelationKind.GreaterThan,
+                PreceptParser.ParseExpression("B"));
         var expr = PreceptParser.ParseExpression("A - B");
 
         ctx.KnowsNonzero(expr).Should().BeTrue();
@@ -83,12 +89,17 @@ public class ProofContextTests
     // ── KnowsNonnegative ─────────────────────────────────────────────────────
 
     [Fact]
-    public void KnowsNonnegative_FieldWithNonnegMarker_ReturnsTrue()
+    public void KnowsNonnegative_FieldWithNonnegFlag_ReturnsTrue()
     {
-        var ctx = new ProofContext(new Dictionary<string, StaticValueKind>
-        {
-            ["$nonneg:Amount"] = StaticValueKind.Boolean,
-        });
+        var ctx = new ProofContext(
+            new Dictionary<string, StaticValueKind>(),
+            new Dictionary<LinearForm, RelationalFact>(),
+            new Dictionary<string, NumericInterval>(System.StringComparer.Ordinal),
+            new Dictionary<string, NumericFlags>(System.StringComparer.Ordinal)
+            {
+                ["Amount"] = NumericFlags.Nonnegative,
+            },
+            new Dictionary<LinearForm, NumericInterval>());
         var expr = PreceptParser.ParseExpression("Amount");
 
         ctx.KnowsNonnegative(expr).Should().BeTrue();
@@ -108,10 +119,15 @@ public class ProofContextTests
     [Fact]
     public void SignOf_PositiveField_ReturnsPositive()
     {
-        var ctx = new ProofContext(new Dictionary<string, StaticValueKind>
-        {
-            ["$positive:Rate"] = StaticValueKind.Boolean,
-        });
+        var ctx = new ProofContext(
+            new Dictionary<string, StaticValueKind>(),
+            new Dictionary<LinearForm, RelationalFact>(),
+            new Dictionary<string, NumericInterval>(System.StringComparer.Ordinal),
+            new Dictionary<string, NumericFlags>(System.StringComparer.Ordinal)
+            {
+                ["Rate"] = NumericFlags.Positive | NumericFlags.Nonnegative | NumericFlags.Nonzero,
+            },
+            new Dictionary<LinearForm, NumericInterval>());
         var expr = PreceptParser.ParseExpression("Rate");
 
         ctx.SignOf(expr).Should().Be(ProofSign.Positive);
@@ -131,16 +147,17 @@ public class ProofContextTests
     [Fact]
     public void WithNarrowing_ReturnsNewContext_DoesNotMutateOriginal()
     {
-        // Narrowing "Price > 0" (assumeTrue) injects $positive:Price, $nonneg:Price, $nonzero:Price
-        // into a copy — the original empty context must remain unchanged.
+        // Narrowing "Price > 0" (assumeTrue) should produce a new context with
+        // Positive flag for Price — the original empty context must remain unchanged.
         var original = new ProofContext(new Dictionary<string, StaticValueKind>());
         var condition = PreceptParser.ParseExpression("Price > 0");
 
         var narrowed = original.WithNarrowing(condition, assumeTrue: true);
 
         narrowed.Should().NotBeSameAs(original);
-        narrowed.Symbols.Should().ContainKey("$positive:Price");
-        original.Symbols.Should().BeEmpty();
+        narrowed.Flags.Should().ContainKey("Price");
+        ((narrowed.Flags["Price"] & NumericFlags.Positive) != 0).Should().BeTrue();
+        original.Flags.Should().BeEmpty();
     }
 
     // ── Commit 3: C-Nano regression cases (via unified LinearForm path) ──────

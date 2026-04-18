@@ -109,8 +109,8 @@ internal static class PreceptTypeChecker
             }
         }
 
-        // Slice 12: inject $ival: markers from explicit min/max constraints.
-        // nonnegative/positive are already covered by $nonneg:/$positive: markers injected above.
+        // Slice 12: inject interval data from explicit min/max constraints.
+        // nonnegative/positive flags are already covered by _flags injected above.
         {
             var markerDict = new Dictionary<string, StaticValueKind>(dataFieldKinds.Symbols, StringComparer.Ordinal);
             var fieldIntervals = CopyFieldIntervals(dataFieldKinds);
@@ -132,7 +132,6 @@ internal static class PreceptTypeChecker
                 var lower = minVal ?? double.NegativeInfinity;
                 var upper = maxVal ?? double.PositiveInfinity;
                 var ival = new NumericInterval(lower, minVal.HasValue, upper, maxVal.HasValue);
-                markerDict[ival.ToMarkerKey(field.Name)] = StaticValueKind.Boolean;
                 fieldIntervals[field.Name] = ival;
             }
             dataFieldKinds = new ProofContext(markerDict, new Dictionary<LinearForm, RelationalFact>(dataFieldKinds.RelationalFacts), fieldIntervals, CopyFlags(dataFieldKinds), CopyExprFacts(dataFieldKinds));
@@ -269,7 +268,38 @@ internal static class PreceptTypeChecker
                     stateGroup.Key,
                     eventName));
 
-                ProofContext branchContext = new ProofContext(baseSymbols, new Dictionary<LinearForm, RelationalFact>(dataFieldKinds.RelationalFacts), CopyFieldIntervals(dataFieldKinds), CopyFlags(dataFieldKinds), CopyExprFacts(dataFieldKinds));
+                var branchRelational = new Dictionary<LinearForm, RelationalFact>(dataFieldKinds.RelationalFacts);
+                var branchFieldIntervals = CopyFieldIntervals(dataFieldKinds);
+                var branchFlags = CopyFlags(dataFieldKinds);
+                var branchExprFacts = CopyExprFacts(dataFieldKinds);
+
+                // Merge state ensure narrowing typed stores
+                if (stateNarrowing is not null)
+                {
+                    foreach (var pair in stateNarrowing.FieldIntervals)
+                        branchFieldIntervals[pair.Key] = pair.Value;
+                    foreach (var pair in stateNarrowing.Flags)
+                        branchFlags[pair.Key] = pair.Value;
+                    foreach (var pair in stateNarrowing.RelationalFacts)
+                        branchRelational[pair.Key] = pair.Value;
+                    foreach (var pair in stateNarrowing.ExprFacts)
+                        branchExprFacts[pair.Key] = pair.Value;
+                }
+
+                // Merge event ensure narrowing typed stores
+                if (eventNarrowing is not null)
+                {
+                    foreach (var pair in eventNarrowing.FieldIntervals)
+                        branchFieldIntervals[pair.Key] = pair.Value;
+                    foreach (var pair in eventNarrowing.Flags)
+                        branchFlags[pair.Key] = pair.Value;
+                    foreach (var pair in eventNarrowing.RelationalFacts)
+                        branchRelational[pair.Key] = pair.Value;
+                    foreach (var pair in eventNarrowing.ExprFacts)
+                        branchExprFacts[pair.Key] = pair.Value;
+                }
+
+                ProofContext branchContext = new ProofContext(baseSymbols, branchRelational, branchFieldIntervals, branchFlags, branchExprFacts);
 
                 // C47: detect identical guard text for the same (state, event) group
                 var seenGuards = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -1171,7 +1201,12 @@ internal static class PreceptTypeChecker
                     rule.Expression,
                     rule.ExpressionText,
                     rule.SourceLine,
-                    new ProofContext(dataSymbols),
+                    new ProofContext(
+                        dataSymbols,
+                        new Dictionary<LinearForm, RelationalFact>(dataFieldKinds.RelationalFacts),
+                        CopyFieldIntervals(dataFieldKinds),
+                        CopyFlags(dataFieldKinds),
+                        CopyExprFacts(dataFieldKinds)),
                     StaticValueKind.Boolean,
                     "rule",
                     diagnostics,
@@ -1184,7 +1219,12 @@ internal static class PreceptTypeChecker
                         rule.WhenGuard,
                         rule.WhenText!,
                         rule.SourceLine,
-                        new ProofContext(dataSymbols),
+                        new ProofContext(
+                            dataSymbols,
+                            new Dictionary<LinearForm, RelationalFact>(dataFieldKinds.RelationalFacts),
+                            CopyFieldIntervals(dataFieldKinds),
+                            CopyFlags(dataFieldKinds),
+                            CopyExprFacts(dataFieldKinds)),
                         StaticValueKind.Boolean,
                         "rule when guard",
                         diagnostics,
@@ -1205,7 +1245,12 @@ internal static class PreceptTypeChecker
                     stateEnsure.Expression,
                     stateEnsure.ExpressionText,
                     stateEnsure.SourceLine,
-                    new ProofContext(dataSymbols),
+                    new ProofContext(
+                        dataSymbols,
+                        new Dictionary<LinearForm, RelationalFact>(dataFieldKinds.RelationalFacts),
+                        CopyFieldIntervals(dataFieldKinds),
+                        CopyFlags(dataFieldKinds),
+                        CopyExprFacts(dataFieldKinds)),
                     StaticValueKind.Boolean,
                     $"state ensure on '{stateEnsure.State}'",
                     diagnostics,
@@ -1219,7 +1264,12 @@ internal static class PreceptTypeChecker
                         stateEnsure.WhenGuard,
                         stateEnsure.WhenText!,
                         stateEnsure.SourceLine,
-                        new ProofContext(dataSymbols),
+                        new ProofContext(
+                            dataSymbols,
+                            new Dictionary<LinearForm, RelationalFact>(dataFieldKinds.RelationalFacts),
+                            CopyFieldIntervals(dataFieldKinds),
+                            CopyFlags(dataFieldKinds),
+                            CopyExprFacts(dataFieldKinds)),
                         StaticValueKind.Boolean,
                         "state ensure when guard",
                         diagnostics,
@@ -1248,7 +1298,12 @@ internal static class PreceptTypeChecker
                     eventEnsure.Expression,
                     eventEnsure.ExpressionText,
                     eventEnsure.SourceLine,
-                    new ProofContext(symbols),
+                    new ProofContext(
+                        symbols,
+                        new Dictionary<LinearForm, RelationalFact>(dataFieldKinds.RelationalFacts),
+                        CopyFieldIntervals(dataFieldKinds),
+                        CopyFlags(dataFieldKinds),
+                        CopyExprFacts(dataFieldKinds)),
                     StaticValueKind.Boolean,
                     $"event ensure on '{eventEnsure.EventName}'",
                     diagnostics,
@@ -1262,7 +1317,12 @@ internal static class PreceptTypeChecker
                         eventEnsure.WhenGuard,
                         eventEnsure.WhenText!,
                         eventEnsure.SourceLine,
-                        new ProofContext(symbols),
+                        new ProofContext(
+                            symbols,
+                            new Dictionary<LinearForm, RelationalFact>(dataFieldKinds.RelationalFacts),
+                            CopyFieldIntervals(dataFieldKinds),
+                            CopyFlags(dataFieldKinds),
+                            CopyExprFacts(dataFieldKinds)),
                         StaticValueKind.Boolean,
                         "event ensure when guard",
                         diagnostics,
@@ -1286,7 +1346,12 @@ internal static class PreceptTypeChecker
                         editBlock.WhenGuard,
                         editBlock.WhenText!,
                         editBlock.SourceLine,
-                        new ProofContext(dataSymbols),
+                        new ProofContext(
+                            dataSymbols,
+                            new Dictionary<LinearForm, RelationalFact>(dataFieldKinds.RelationalFacts),
+                            CopyFieldIntervals(dataFieldKinds),
+                            CopyFlags(dataFieldKinds),
+                            CopyExprFacts(dataFieldKinds)),
                         StaticValueKind.Boolean,
                         "edit when guard",
                         diagnostics,
@@ -1430,39 +1495,30 @@ internal static class PreceptTypeChecker
             foreach (var eventEnsure in group)
                 bareContext = ApplyNarrowing(eventEnsure.Expression, bareContext, assumeTrue: true);
 
-            // Translate proof markers from bare form to dotted form for transition-row scope.
+            // Translate typed stores from bare arg names to dotted form for transition-row scope.
             // Event ensures use bare arg names (e.g. "Days"), but transition rows use dotted names
-            // (e.g. "Submit.Days"). Markers like "$positive:Days" become "$positive:Submit.Days".
-            // Relational markers like "$gt:A:B" become "$gt:Submit.A:Submit.B" (both fields dotted).
-            var dottedMarkers = new Dictionary<string, StaticValueKind>(StringComparer.Ordinal);
+            // (e.g. "Submit.Days").
+            var dottedSymbols = new Dictionary<string, StaticValueKind>(StringComparer.Ordinal);
             foreach (var pair in bareContext.Symbols)
-            {
-                if (pair.Key.Length == 0 || pair.Key[0] != '$')
-                    continue;
+                dottedSymbols[eventName + "." + pair.Key] = pair.Value;
 
-                var colonIndex = pair.Key.IndexOf(':');
-                if (colonIndex < 0)
-                    continue;
+            var dottedFieldIntervals = new Dictionary<string, NumericInterval>(StringComparer.Ordinal);
+            foreach (var pair in bareContext.FieldIntervals)
+                dottedFieldIntervals[eventName + "." + pair.Key] = pair.Value;
 
-                var prefix = pair.Key.AsSpan(0, colonIndex + 1);  // e.g. "$positive:" or "$gt:"
-                var rest = pair.Key.AsSpan(colonIndex + 1);        // e.g. "Days" or "A:B"
+            var dottedFlags = new Dictionary<string, NumericFlags>(StringComparer.Ordinal);
+            foreach (var pair in bareContext.Flags)
+                dottedFlags[eventName + "." + pair.Key] = pair.Value;
 
-                // Multi-field markers (e.g. "$gt:A:B") — dot each field independently.
-                var secondColon = rest.IndexOf(':');
-                if (secondColon >= 0)
-                {
-                    var field1 = rest.Slice(0, secondColon);
-                    var field2 = rest.Slice(secondColon + 1);
-                    dottedMarkers[$"{prefix}{eventName}.{field1}:{eventName}.{field2}"] = pair.Value;
-                }
-                else
-                {
-                    dottedMarkers[$"{prefix}{eventName}.{rest}"] = pair.Value;
-                }
-            }
+            var dottedRelational = new Dictionary<LinearForm, RelationalFact>();
+            foreach (var pair in bareContext.RelationalFacts)
+                dottedRelational[pair.Key.Rekey(eventName)] = pair.Value;
 
-            if (dottedMarkers.Count > 0)
-                result[eventName] = new ProofContext(dottedMarkers);
+            var dottedExprFacts = new Dictionary<LinearForm, NumericInterval>();
+            foreach (var pair in bareContext.ExprFacts)
+                dottedExprFacts[pair.Key.Rekey(eventName)] = pair.Value;
+
+            result[eventName] = new ProofContext(dottedSymbols, dottedRelational, dottedFieldIntervals, dottedFlags, dottedExprFacts);
         }
 
         return result;
@@ -2420,6 +2476,38 @@ internal static class PreceptTypeChecker
                         return new NumericInterval(Math.Ceiling(a0.Lower), true, Math.Ceiling(a0.Upper), true);
                     case "round":
                         return new NumericInterval(Math.Floor(a0.Lower), true, Math.Ceiling(a0.Upper), true);
+                    case "truncate":
+                        if (a0.IsUnknown) return NumericInterval.Unknown;
+                        var tLo = a0.Lower >= 0 ? Math.Floor(a0.Lower) : Math.Ceiling(a0.Lower);
+                        var tHi = a0.Upper >= 0 ? Math.Floor(a0.Upper) : Math.Ceiling(a0.Upper);
+                        return new NumericInterval(Math.Min(tLo, tHi), true, Math.Max(tLo, tHi), true);
+                    case "pow" when fn.Arguments.Length == 2:
+                        var exp = TryInferInterval(fn.Arguments[1], context);
+                        // Only handle constant integer exponents.
+                        if (exp.Lower != exp.Upper || exp.Lower != Math.Floor(exp.Lower))
+                            return NumericInterval.Unknown;
+                        int n = (int)exp.Lower;
+                        if (n % 2 == 0)
+                        {
+                            // Even exponent: result is nonneg.
+                            if (a0.IsNonnegative)
+                                return new NumericInterval(Math.Pow(a0.Lower, n), true, Math.Pow(a0.Upper, n), true);
+                            if (a0.Upper <= 0)
+                                return new NumericInterval(Math.Pow(a0.Upper, n), true, Math.Pow(a0.Lower, n), true);
+                            // Mixed sign: [0, max(lo^n, hi^n)]
+                            var maxPow = Math.Max(Math.Pow(a0.Lower, n), Math.Pow(a0.Upper, n));
+                            bool baseNonzero = fn.Arguments[0] is PreceptIdentifierExpression baseId
+                                && context.Flags.TryGetValue(
+                                    baseId.Member is not null ? $"{baseId.Name}.{baseId.Member}" : baseId.Name,
+                                    out var baseFlags)
+                                && (baseFlags & (NumericFlags.Nonzero | NumericFlags.Positive)) != 0;
+                            return new NumericInterval(0, !baseNonzero, maxPow, true);
+                        }
+                        else
+                        {
+                            // Odd exponent: preserves monotonicity.
+                            return new NumericInterval(Math.Pow(a0.Lower, n), true, Math.Pow(a0.Upper, n), true);
+                        }
                     default:
                         return NumericInterval.Unknown;
                 }
@@ -2455,16 +2543,9 @@ internal static class PreceptTypeChecker
         var flags = CopyFlags(context);
         var exprFacts = CopyExprFacts(context);
 
-        // Always kill existing numeric proof markers for the target field first.
-        markers.Remove($"$positive:{targetField}");
-        markers.Remove($"$nonneg:{targetField}");
-        markers.Remove($"$nonzero:{targetField}");
+        // Always kill existing numeric proof state for the target field first.
         flags.Remove(targetField);
 
-        // Kill any $ival: markers for the target field (encoded as prefix $ival:{field}:).
-        var ivalPrefix = $"$ival:{targetField}:";
-        foreach (var k in context.Symbols.Keys.Where(k => k.StartsWith(ivalPrefix, StringComparison.Ordinal)).ToList())
-            markers.Remove(k);
         fieldIntervals.Remove(targetField);
 
         // Kill exprFacts entries where the LinearForm mentions the reassigned field.
@@ -2476,18 +2557,6 @@ internal static class PreceptTypeChecker
         }
         foreach (var k in exprKeysToKill)
             exprFacts.Remove(k);
-
-        // Kill relational markers ($gt:, $gte:) where the target field appears as either operand.
-        // A reassignment invalidates ordering proofs that involved the old field value.
-        foreach (var relPrefix in new[] { "$gt:", "$gte:" })
-        {
-            var asLeft  = $"{relPrefix}{targetField}:";
-            var asRight = $":{targetField}";
-            foreach (var k in context.Symbols.Keys.Where(k =>
-                k.StartsWith(asLeft, StringComparison.Ordinal) ||
-                (k.StartsWith(relPrefix, StringComparison.Ordinal) && k.EndsWith(asRight, StringComparison.Ordinal))).ToList())
-                markers.Remove(k);
-        }
 
         rhs = StripParentheses(rhs);
 
@@ -2505,75 +2574,51 @@ internal static class PreceptTypeChecker
             {
                 if (numVal > 0)
                 {
-                    markers[$"$positive:{targetField}"] = StaticValueKind.Boolean;
-                    markers[$"$nonneg:{targetField}"] = StaticValueKind.Boolean;
-                    markers[$"$nonzero:{targetField}"] = StaticValueKind.Boolean;
                     flags[targetField] = NumericFlags.Positive | NumericFlags.Nonnegative | NumericFlags.Nonzero;
                 }
                 else if (numVal == 0.0)
                 {
-                    markers[$"$nonneg:{targetField}"] = StaticValueKind.Boolean;
                     flags[targetField] = NumericFlags.Nonnegative;
                 }
                 else // negative literal — nonzero but not positive/nonneg
                 {
-                    markers[$"$nonzero:{targetField}"] = StaticValueKind.Boolean;
                     flags[targetField] = NumericFlags.Nonzero;
                 }
 
                 // Also inject a point interval for precise interval arithmetic in subsequent expressions.
                 var pointIval = new NumericInterval(numVal, true, numVal, true);
-                markers[pointIval.ToMarkerKey(targetField)] = StaticValueKind.Boolean;
                 fieldIntervals[targetField] = pointIval;
             }
         }
         else if (TryGetIdentifierKey(rhs, out var sourceKey))
         {
-            // Copy numeric proof markers from source identifier to target field.
-            if (context.Symbols.ContainsKey($"$positive:{sourceKey}"))
-                markers[$"$positive:{targetField}"] = StaticValueKind.Boolean;
-            if (context.Symbols.ContainsKey($"$nonneg:{sourceKey}"))
-                markers[$"$nonneg:{targetField}"] = StaticValueKind.Boolean;
-            if (context.Symbols.ContainsKey($"$nonzero:{sourceKey}"))
-                markers[$"$nonzero:{targetField}"] = StaticValueKind.Boolean;
+            // Copy numeric proof state from source identifier to target field.
             if (context.Flags.TryGetValue(sourceKey, out var srcFlags))
                 flags[targetField] = srcFlags;
 
-            // Also copy $ival: markers from source to target.
-            var srcIvalPrefix = $"$ival:{sourceKey}:";
-            foreach (var srcKey in context.Symbols.Keys.Where(k => k.StartsWith(srcIvalPrefix, StringComparison.Ordinal)))
+            // Copy interval from source to target via typed store.
+            if (context.FieldIntervals.TryGetValue(sourceKey, out var srcIval))
             {
-                // Re-encode with the target field name.
-                if (NumericInterval.TryParseMarkerKey(srcKey, out var srcIval))
-                {
-                    markers[srcIval.ToMarkerKey(targetField)] = StaticValueKind.Boolean;
-                    fieldIntervals[targetField] = srcIval;
-                }
+                fieldIntervals[targetField] = srcIval;
             }
         }
         else
         {
-            // Compound RHS: derive interval from proof engine and inject sign/ival markers.
+            // Compound RHS: derive interval from proof engine and inject sign markers.
             var rhsInterval = context.IntervalOf(rhs);
             if (!rhsInterval.IsUnknown)
             {
-                markers[rhsInterval.ToMarkerKey(targetField)] = StaticValueKind.Boolean;
                 fieldIntervals[targetField] = rhsInterval;
                 if (rhsInterval.IsPositive)
                 {
-                    markers[$"$positive:{targetField}"] = StaticValueKind.Boolean;
-                    markers[$"$nonneg:{targetField}"]   = StaticValueKind.Boolean;
-                    markers[$"$nonzero:{targetField}"]  = StaticValueKind.Boolean;
                     flags[targetField] = NumericFlags.Positive | NumericFlags.Nonnegative | NumericFlags.Nonzero;
                 }
                 else if (rhsInterval.IsNonnegative)
                 {
-                    markers[$"$nonneg:{targetField}"]  = StaticValueKind.Boolean;
                     flags[targetField] = NumericFlags.Nonnegative;
                 }
                 else if (rhsInterval.ExcludesZero)
                 {
-                    markers[$"$nonzero:{targetField}"] = StaticValueKind.Boolean;
                     flags[targetField] = NumericFlags.Nonzero;
                 }
 
@@ -2740,19 +2785,15 @@ internal static class PreceptTypeChecker
             switch (binary.Operator)
             {
                 case ">":
-                    relMarkers[$"$gt:{leftKey}:{rightKey}"] = StaticValueKind.Boolean;
                     TryStoreLinearFact(binary.Left, binary.Right, RelationKind.GreaterThan, relFacts);
                     break;
                 case ">=":
-                    relMarkers[$"$gte:{leftKey}:{rightKey}"] = StaticValueKind.Boolean;
                     TryStoreLinearFact(binary.Left, binary.Right, RelationKind.GreaterThanOrEqual, relFacts);
                     break;
                 case "<":  // B < A → A > B (canonicalized)
-                    relMarkers[$"$gt:{rightKey}:{leftKey}"] = StaticValueKind.Boolean;
                     TryStoreLinearFact(binary.Right, binary.Left, RelationKind.GreaterThan, relFacts);
                     break;
                 case "<=": // B <= A → A >= B (canonicalized)
-                    relMarkers[$"$gte:{rightKey}:{leftKey}"] = StaticValueKind.Boolean;
                     TryStoreLinearFact(binary.Right, binary.Left, RelationKind.GreaterThanOrEqual, relFacts);
                     break;
                 default:
@@ -2803,43 +2844,34 @@ internal static class PreceptTypeChecker
 
         if (op == ">" && lit >= 0)
         {
-            markers[$"$positive:{key}"] = StaticValueKind.Boolean;
-            markers[$"$nonneg:{key}"] = StaticValueKind.Boolean;
-            markers[$"$nonzero:{key}"] = StaticValueKind.Boolean;
-            flags[key] = NumericFlags.Positive | NumericFlags.Nonnegative | NumericFlags.Nonzero;
+            flags[key] = flags.GetValueOrDefault(key) | NumericFlags.Positive | NumericFlags.Nonnegative | NumericFlags.Nonzero;
             injected = true;
         }
         else if (op == ">=" && lit > 0)
         {
-            markers[$"$positive:{key}"] = StaticValueKind.Boolean;
-            markers[$"$nonneg:{key}"] = StaticValueKind.Boolean;
-            markers[$"$nonzero:{key}"] = StaticValueKind.Boolean;
-            flags[key] = NumericFlags.Positive | NumericFlags.Nonnegative | NumericFlags.Nonzero;
+            flags[key] = flags.GetValueOrDefault(key) | NumericFlags.Positive | NumericFlags.Nonnegative | NumericFlags.Nonzero;
             injected = true;
         }
         else if (op == ">=" && lit == 0)
         {
-            markers[$"$nonneg:{key}"] = StaticValueKind.Boolean;
-            flags[key] = NumericFlags.Nonnegative;
+            flags[key] = flags.GetValueOrDefault(key) | NumericFlags.Nonnegative;
             injected = true;
         }
         else if (op == "!=" && lit == 0)
         {
-            markers[$"$nonzero:{key}"] = StaticValueKind.Boolean;
-            flags[key] = NumericFlags.Nonzero;
+            flags[key] = flags.GetValueOrDefault(key) | NumericFlags.Nonzero;
             injected = true;
         }
         else if (op == "<" && lit <= 0)
         {
-            markers[$"$nonzero:{key}"] = StaticValueKind.Boolean;
-            flags[key] = NumericFlags.Nonzero;
+            flags[key] = flags.GetValueOrDefault(key) | NumericFlags.Nonzero;
             injected = true;
         }
 
         if (!injected)
             return false;
 
-        result = new ProofContext(markers, new Dictionary<LinearForm, RelationalFact>(), CopyFieldIntervals(context), flags, CopyExprFacts(context));
+        result = new ProofContext(markers, CopyRelationalFacts(context), CopyFieldIntervals(context), flags, CopyExprFacts(context));
         return true;
     }
 

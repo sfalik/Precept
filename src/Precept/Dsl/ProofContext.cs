@@ -43,20 +43,10 @@ internal enum NumericFlags
 
 /// <summary>
 /// Typed proof state container for the Precept proof engine.
-/// Holds a string-marker dictionary (legacy path) and a typed
-/// <see cref="LinearForm"/>-keyed relational fact store (new path).
+/// Holds typed stores for field intervals, numeric flags, relational facts,
+/// and expression-level interval facts. Also retains a string-marker dictionary
+/// (<see cref="Symbols"/>) used by non-proof paths (field presence, type resolution).
 /// </summary>
-/// <remarks>
-/// The six string-marker conventions stored in <see cref="Symbols"/>:
-/// <list type="bullet">
-///   <item><c>$positive:{key}</c> — key &gt; 0</item>
-///   <item><c>$nonneg:{key}</c> — key &gt;= 0</item>
-///   <item><c>$nonzero:{key}</c> — key != 0</item>
-///   <item><c>$ival:{key}:{lower}:{lowerInc}:{upper}:{upperInc}</c> — interval</item>
-///   <item><c>$gt:{a}:{b}</c> — a &gt; b (strict)</item>
-///   <item><c>$gte:{a}:{b}</c> — a &gt;= b (non-strict)</item>
-/// </list>
-/// </remarks>
 internal sealed class ProofContext
 {
     private readonly IReadOnlyDictionary<string, StaticValueKind> _symbols;
@@ -65,7 +55,7 @@ internal sealed class ProofContext
     private readonly Dictionary<string, NumericFlags> _flags;
     private readonly Dictionary<LinearForm, NumericInterval> _exprFacts;
 
-    /// <summary>Constructs a context from the legacy string-marker dictionary only.</summary>
+    /// <summary>Constructs a context from a string-marker dictionary only.</summary>
     public ProofContext(IReadOnlyDictionary<string, StaticValueKind> symbols)
     {
         _symbols = symbols;
@@ -73,10 +63,9 @@ internal sealed class ProofContext
         _fieldIntervals = new Dictionary<string, NumericInterval>(StringComparer.Ordinal);
         _flags = new Dictionary<string, NumericFlags>(StringComparer.Ordinal);
         _exprFacts = new Dictionary<LinearForm, NumericInterval>();
-        HydrateTypedStoresFromMarkers();
     }
 
-    /// <summary>Constructs a context from the legacy dictionary plus a typed relational fact store.</summary>
+    /// <summary>Constructs a context from a dictionary plus a typed relational fact store.</summary>
     public ProofContext(IReadOnlyDictionary<string, StaticValueKind> symbols,
                         Dictionary<LinearForm, RelationalFact> relationalFacts)
     {
@@ -85,7 +74,6 @@ internal sealed class ProofContext
         _fieldIntervals = new Dictionary<string, NumericInterval>(StringComparer.Ordinal);
         _flags = new Dictionary<string, NumericFlags>(StringComparer.Ordinal);
         _exprFacts = new Dictionary<LinearForm, NumericInterval>();
-        HydrateTypedStoresFromMarkers();
     }
 
     /// <summary>Constructs a context with all typed stores supplied explicitly.</summary>
@@ -100,53 +88,6 @@ internal sealed class ProofContext
         _fieldIntervals = fieldIntervals;
         _flags = flags;
         _exprFacts = exprFacts;
-        HydrateTypedStoresFromMarkers();
-    }
-
-    /// <summary>
-    /// Populates <see cref="_fieldIntervals"/> and <see cref="_flags"/> from legacy
-    /// string markers in <see cref="_symbols"/>. Called by the simpler constructors
-    /// so that <see cref="ExtractIntervalFromMarkers"/> (which now reads typed stores)
-    /// works correctly for ProofContexts built from raw marker dictionaries.
-    /// Temporary bridge — will be removed in step 7d along with string markers.
-    /// </summary>
-    private void HydrateTypedStoresFromMarkers()
-    {
-        foreach (var key in _symbols.Keys)
-        {
-            if (key.StartsWith("$ival:", StringComparison.Ordinal) &&
-                NumericInterval.TryParseMarkerKey(key, out var ival))
-            {
-                // "$ival:{fieldKey}:{lower}:{lowerInc}:{upper}:{upperInc}"
-                var parts = key.Split(':');
-                if (parts.Length >= 2)
-                {
-                    var fieldKey = parts[1];
-                    _fieldIntervals[fieldKey] = ival;
-                }
-            }
-            else if (key.StartsWith("$positive:", StringComparison.Ordinal))
-            {
-                var fieldKey = key.Substring("$positive:".Length);
-                _flags[fieldKey] = _flags.TryGetValue(fieldKey, out var f)
-                    ? f | NumericFlags.Positive
-                    : NumericFlags.Positive;
-            }
-            else if (key.StartsWith("$nonneg:", StringComparison.Ordinal))
-            {
-                var fieldKey = key.Substring("$nonneg:".Length);
-                _flags[fieldKey] = _flags.TryGetValue(fieldKey, out var f)
-                    ? f | NumericFlags.Nonnegative
-                    : NumericFlags.Nonnegative;
-            }
-            else if (key.StartsWith("$nonzero:", StringComparison.Ordinal))
-            {
-                var fieldKey = key.Substring("$nonzero:".Length);
-                _flags[fieldKey] = _flags.TryGetValue(fieldKey, out var f)
-                    ? f | NumericFlags.Nonzero
-                    : NumericFlags.Nonzero;
-            }
-        }
     }
 
     /// <summary>
@@ -303,8 +244,7 @@ internal sealed class ProofContext
         var transitiveResult = new RelationalGraph(_relationalFacts).Query(form);
         if (!transitiveResult.IsUnknown) return transitiveResult;
 
-        // 6. Legacy string-marker fallback for simple A − B identifier differences.
-        return LookupLegacyRelationalInterval(form);
+        return NumericInterval.Unknown;
     }
 
     /// <summary>
@@ -385,41 +325,6 @@ internal sealed class ProofContext
                 return false;
         }
         return true;
-    }
-
-    /// <summary>
-    /// Fallback relational interval lookup using legacy <c>$gt:</c>/<c>$gte:</c> string markers.
-    /// Only applies to exactly two-term forms <c>{A → 1, B → −1}</c> with constant 0 (i.e., A − B).
-    /// </summary>
-    private NumericInterval LookupLegacyRelationalInterval(LinearForm form)
-    {
-        if (form.Terms.Count != 2 || !Rational.IsZero(form.Constant))
-            return NumericInterval.Unknown;
-
-        string? posKey = null, negKey = null;
-        foreach (var (key, coeff) in form.Terms)
-        {
-            if (coeff == Rational.One)         posKey = key;
-            else if (coeff == Rational.NegativeOne) negKey = key;
-            else return NumericInterval.Unknown;
-        }
-
-        if (posKey is null || negKey is null) return NumericInterval.Unknown;
-
-        // $gt:A:B → A > B → A − B ∈ (0, +∞)
-        if (_symbols.ContainsKey($"$gt:{posKey}:{negKey}"))
-            return NumericInterval.Positive;
-        // $gt:B:A → B > A → A − B ∈ (−∞, 0) — still ExcludesZero
-        if (_symbols.ContainsKey($"$gt:{negKey}:{posKey}"))
-            return new NumericInterval(double.NegativeInfinity, false, 0, false);
-        // $gte:A:B → A >= B → A − B ∈ [0, +∞)
-        if (_symbols.ContainsKey($"$gte:{posKey}:{negKey}"))
-            return NumericInterval.Nonneg;
-        // $gte:B:A → B >= A → A − B ∈ (−∞, 0]
-        if (_symbols.ContainsKey($"$gte:{negKey}:{posKey}"))
-            return new NumericInterval(double.NegativeInfinity, false, 0, true);
-
-        return NumericInterval.Unknown;
     }
 }
 
