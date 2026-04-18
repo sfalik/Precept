@@ -2392,4 +2392,109 @@ public class PreceptTypeCheckerTests
 
         result.Diagnostics.Where(d => d.Constraint.Id == "C93").Should().BeEmpty();
     }
+
+    // ── Slice 16: C-Nano — relational-aware interval subtraction + invalidation ────────────
+
+    [Fact]
+    public void Check_DivisorCNano_ConditionalAMinusB_RuleGt_NoC93()
+    {
+        // Composition: L3 relational marker + L5 conditional synthesis.
+        // Then-branch: A-B ∈ (0,+∞) via $gt:A:B; else-branch: [1,1]. Hull (0,+∞) excludes zero.
+        const string dsl = """
+            precept M
+            field Y as number default 10
+            field A as number default 5
+            field B as number default 3
+            state S initial
+            event Go
+            rule A > B because "A exceeds B"
+            from S on Go -> set Y = Y / (if A > B then A - B else 1) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C93").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_DivisorCNano_AMinusBPlusOne_RuleGt_NoC93()
+    {
+        // A-B ∈ (0,+∞) via $gt:A:B; add 1 → (1,+∞) excludes zero.
+        const string dsl = """
+            precept M
+            field Y as number default 10
+            field A as number default 5
+            field B as number default 3
+            state S initial
+            event Go
+            rule A > B because "A exceeds B"
+            from S on Go -> set Y = Y / ((A - B) + 1) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C93").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_DivisorCNano_AMinusBTimesC_RuleGtCPositive_NoC93()
+    {
+        // A-B ∈ (0,+∞) via $gt:A:B; C ∈ (0,+∞) positive; product ∈ (0,+∞) excludes zero.
+        const string dsl = """
+            precept M
+            field Y as number default 10
+            field A as number default 5
+            field B as number default 3
+            field C as number default 2 positive
+            state S initial
+            event Go
+            rule A > B because "A exceeds B"
+            from S on Go -> set Y = Y / ((A - B) * C) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C93").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_SqrtCNano_AMinusB_RuleGte_NoC76()
+    {
+        // A-B ∈ [0,+∞) via $gte:A:B; nonnegative → sqrt safe (C76 suppressed).
+        const string dsl = """
+            precept M
+            field Y as number default 10
+            field A as number default 5
+            field B as number default 3
+            state S initial
+            event Go
+            rule A >= B because "A at least B"
+            from S on Go -> set Y = sqrt(A - B) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C76").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_DivisorCNano_ReassignmentInvalidatesRelational_C93()
+    {
+        // After set A = 0, the relational marker $gt:A:B must be killed by ApplyAssignmentNarrowing.
+        // Without invalidation, the stale $gt:A:B would incorrectly suppress C93 for A - B.
+        const string dsl = """
+            precept M
+            field Y as number default 10
+            field A as number default 5
+            field B as number default 3
+            state S initial
+            event Go
+            rule A > B because "A exceeds B"
+            from S on Go -> set A = 0 -> set Y = Y / (A - B) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C93");
+    }
 }

@@ -178,6 +178,33 @@ internal readonly record struct NumericInterval(
     }
 
     /// <summary>
+    /// Returns the intersection of <paramref name="a"/> and <paramref name="b"/>: the tightest interval
+    /// contained in both. Picks the higher lower-bound and the lower upper-bound. If the result would
+    /// be empty (lower exceeds upper), returns <see cref="Unknown"/> as a safe over-approximation.
+    /// </summary>
+    public static NumericInterval Intersect(NumericInterval a, NumericInterval b)
+    {
+        // Tighten lower bound to the larger of the two
+        double lo; bool loInc;
+        if (b.Lower > a.Lower || (b.Lower == a.Lower && !b.LowerInclusive && a.LowerInclusive))
+            (lo, loInc) = (b.Lower, b.LowerInclusive);
+        else
+            (lo, loInc) = (a.Lower, a.LowerInclusive);
+
+        // Tighten upper bound to the smaller of the two
+        double hi; bool hiInc;
+        if (b.Upper < a.Upper || (b.Upper == a.Upper && !b.UpperInclusive && a.UpperInclusive))
+            (hi, hiInc) = (b.Upper, b.UpperInclusive);
+        else
+            (hi, hiInc) = (a.Upper, a.UpperInclusive);
+
+        // Empty interval — sound fallback
+        if (lo > hi) return Unknown;
+
+        return new NumericInterval(lo, loInc, hi, hiInc);
+    }
+
+    /// <summary>
     /// Hull (join for conditional expression synthesis): smallest interval enclosing both.
     /// When both lower bounds are equal, <c>LowerInclusive = a.LowerInclusive || b.LowerInclusive</c>
     /// (and likewise for upper).

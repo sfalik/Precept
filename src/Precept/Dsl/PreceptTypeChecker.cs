@@ -2340,7 +2340,7 @@ internal static class PreceptTypeChecker
                 return binary.Operator switch
                 {
                     "+" => NumericInterval.Add(left, right),
-                    "-" => NumericInterval.Subtract(left, right),
+                    "-" => InferSubtractionInterval(binary, left, right, symbols),
                     "*" => NumericInterval.Multiply(left, right),
                     "/" => NumericInterval.Divide(left, right),
                     "%" => right.ExcludesZero
@@ -2429,6 +2429,45 @@ internal static class PreceptTypeChecker
     }
 
     /// <summary>
+    /// Computes the interval for <c>binary.Left - binary.Right</c>, optionally tightened by
+    /// relational markers when both operands are identifiers.
+    /// <list type="bullet">
+    ///   <item><c>$gt:L:R</c> → A &gt; B → difference ∈ (0, +∞) : strictly positive</item>
+    ///   <item><c>$gte:L:R</c> → A ≥ B → difference ∈ [0, +∞) : non-negative (includes 0)</item>
+    ///   <item><c>$gt:R:L</c> → B &gt; A → difference ∈ (-∞, 0) : strictly negative</item>
+    ///   <item><c>$gte:R:L</c> → B ≥ A → difference ∈ (-∞, 0] : non-positive</item>
+    /// </list>
+    /// The relational bound is intersected with the arithmetic result for maximum precision.
+    /// </summary>
+    private static NumericInterval InferSubtractionInterval(
+        PreceptBinaryExpression binary,
+        NumericInterval left,
+        NumericInterval right,
+        IReadOnlyDictionary<string, StaticValueKind> symbols)
+    {
+        var arithmetic = NumericInterval.Subtract(left, right);
+
+        if (!TryGetIdentifierKey(binary.Left,  out var leftKey) ||
+            !TryGetIdentifierKey(binary.Right, out var rightKey))
+            return arithmetic;
+
+        // L > R  →  L - R ∈ (0, +∞) : strictly positive
+        if (symbols.ContainsKey($"$gt:{leftKey}:{rightKey}"))
+            return NumericInterval.Intersect(arithmetic, NumericInterval.Positive);
+        // L ≥ R  →  L - R ∈ [0, +∞) : non-negative (allows zero — does NOT prove nonzero for C93)
+        if (symbols.ContainsKey($"$gte:{leftKey}:{rightKey}"))
+            return NumericInterval.Intersect(arithmetic, NumericInterval.Nonneg);
+        // R > L  →  L - R ∈ (-∞, 0) : strictly negative
+        if (symbols.ContainsKey($"$gt:{rightKey}:{leftKey}"))
+            return NumericInterval.Intersect(arithmetic, new NumericInterval(double.NegativeInfinity, false, 0, false));
+        // R ≥ L  →  L - R ∈ (-∞, 0] : non-positive
+        if (symbols.ContainsKey($"$gte:{rightKey}:{leftKey}"))
+            return NumericInterval.Intersect(arithmetic, new NumericInterval(double.NegativeInfinity, false, 0, true));
+
+        return arithmetic;
+    }
+
+    /// <summary>
     /// Updates proof markers in <paramref name="symbols"/> after a <c>set <paramref name="targetField"/> = <paramref name="rhs"/></c>
     /// assignment. Called within assignment loops to thread post-mutation proof state into subsequent
     /// assignments in the same row or state action (Layer 1: Sequential Assignment Flow).
@@ -2449,6 +2488,18 @@ internal static class PreceptTypeChecker
         var ivalPrefix = $"$ival:{targetField}:";
         foreach (var k in symbols.Keys.Where(k => k.StartsWith(ivalPrefix, StringComparison.Ordinal)).ToList())
             markers.Remove(k);
+
+        // Kill relational markers ($gt:, $gte:) where the target field appears as either operand.
+        // A reassignment invalidates ordering proofs that involved the old field value.
+        foreach (var relPrefix in new[] { "$gt:", "$gte:" })
+        {
+            var asLeft  = $"{relPrefix}{targetField}:";
+            var asRight = $":{targetField}";
+            foreach (var k in symbols.Keys.Where(k =>
+                k.StartsWith(asLeft, StringComparison.Ordinal) ||
+                (k.StartsWith(relPrefix, StringComparison.Ordinal) && k.EndsWith(asRight, StringComparison.Ordinal))).ToList())
+                markers.Remove(k);
+        }
 
         rhs = StripParentheses(rhs);
 
