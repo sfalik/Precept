@@ -2525,9 +2525,35 @@ internal static class PreceptTypeChecker
                     markers[srcIval.ToMarkerKey(targetField)] = StaticValueKind.Boolean;
             }
         }
-        // Compound RHS: markers already killed above — conservative, no new proof.
+        else
+        {
+            // Compound RHS: derive interval from proof engine and inject sign/ival markers.
+            var rhsInterval = context.IntervalOf(rhs);
+            if (!rhsInterval.IsUnknown)
+            {
+                markers[rhsInterval.ToMarkerKey(targetField)] = StaticValueKind.Boolean;
+                if (rhsInterval.IsPositive)
+                {
+                    markers[$"$positive:{targetField}"] = StaticValueKind.Boolean;
+                    markers[$"$nonneg:{targetField}"]   = StaticValueKind.Boolean;
+                    markers[$"$nonzero:{targetField}"]  = StaticValueKind.Boolean;
+                }
+                else if (rhsInterval.IsNonnegative)
+                    markers[$"$nonneg:{targetField}"]  = StaticValueKind.Boolean;
+                else if (rhsInterval.ExcludesZero)
+                    markers[$"$nonzero:{targetField}"] = StaticValueKind.Boolean;
+            }
+        }
 
-        return new ProofContext(markers);
+        // Preserve relational facts, killing any that mention the reassigned field.
+        var relFacts = new Dictionary<LinearForm, RelationalFact>();
+        foreach (var (lf, fact) in context.RelationalFacts)
+        {
+            if (!lf.Terms.ContainsKey(targetField))
+                relFacts[lf] = fact;
+        }
+
+        return new ProofContext(markers, relFacts);
     }
 
     internal static ProofContext ApplyNarrowing(
