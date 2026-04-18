@@ -1,31 +1,61 @@
 # Proof Engine Design
 
-Date: 2026-04-17
+Date: 2026-04-18
 
-Status: **Shipped** — PR #108, Slices 11–15 (commits `8fd9746`–`adbedfa`).
+Status: **In progress** — Architecture endorsed. Unified engine PR (replaces PR #108 five-layer stack + C-Nano patch `6fbb315`).
 
-### Implementation Notes (post-ship)
+### Implementation Notes
 
-Fixes discovered during test authoring that refine the design:
-
-- **`TryInferRelationalNonzero` must `StripParentheses`** before pattern-matching. Parenthesized divisors like `(A - B)` wrap the binary expression in `PreceptParenthesizedExpression`, which the `is not PreceptBinaryExpression` check rejected.
-- **`NumericInterval.Multiply` zero-interval fast path.** `(0,∞) × [0,0]` produces `NaN` via IEEE 754 `∞*0`. Added early return for `[0,0]` inputs.
-- **Modulo interval tightened for non-negative dividend.** When dividend is nonnegative and divisor is positive, result ∈ `[0, |B|)` (not `(-|B|, |B|)`). Enables `D % C + 1` to prove nonzero.
-- **`BuildEventEnsureNarrowings` multi-field relational markers.** Relational markers like `$gt:A:B` have two field names separated by `:`. The bare→dotted translation must dot both fields independently: `$gt:A:B` → `$gt:Go.A:Go.B`.
+- **C-Nano subsumed.** The C-Nano `InferSubtractionInterval` special case (`6fbb315`) is deleted in the unified PR. Every C-Nano test scenario passes via `ProofContext.IntervalOf` + `LinearForm` — the unified path is strictly more powerful and C-Nano is no longer a separate code path.
+- **`TryInferRelationalNonzero` deleted.** The bespoke relational pattern-matcher is subsumed by `ProofContext.KnowsNonzero`, which calls `IntervalOf`.
+- **`InferSubtractionInterval` deleted.** The bespoke subtraction shape-matcher is subsumed by `IntervalOf`'s general relational lookup path.
+- **`BuildEventEnsureNarrowings` rewritten.** The bare→dotted string surgery is replaced with a structural transform on typed `RelationalFact` records, eliminating the multi-field marker bug class (`$gt:A:B` → `$gt:Go.A:Go.B`) by construction.
+- **PR #108 implementation notes preserved for archaeology:**
+  - `TryInferRelationalNonzero` required `StripParentheses` — parenthesized divisors like `(A - B)` wrapped in `PreceptParenthesizedExpression` failed the `is not PreceptBinaryExpression` check. Irrelevant after deletion, but the `StripParentheses` call remains in other consumers.
+  - `NumericInterval.Multiply` zero-interval fast path: `(0,∞) × [0,0]` produces `NaN` via IEEE 754 `∞*0`. Added early return for `[0,0]` inputs (still present).
+  - Modulo interval tightened: non-negative dividend + positive divisor → result ∈ `[0, |B|)`.
 
 ---
 
 ## Overview
 
-The Precept type checker enforces divisor safety (C93) and sqrt safety (C76) at compile time. The original implementation (Slices 1–10) handles the common case: single-identifier divisors where proof markers like `$positive:`, `$nonzero:`, and `$nonneg:` are injected from field constraints, guards, rules, and ensures. An unproven identifier in divisor position emits C93.
+The Precept type checker enforces divisor safety (C93) and sqrt safety (C76) at compile time. The original implementation (PR #108, Slices 1–10) handled the common case: single-identifier divisors where proof markers were injected from field constraints, guards, rules, and ensures.
 
-Compound expressions — `Amount / (Rate * Factor)`, `Score / abs(Adjustment)`, `Surplus / (Produced - Defective)` — fell through with no diagnostic under Principle #8 conservatism: the compiler assumed compound expressions were satisfiable and deferred checking to the inspector at simulation time. This created a silent gap where provably-zero divisors (like `D - D`) passed compilation.
+Compound expressions fell through with no diagnostic under Principle #8 conservatism — the compiler assumed compound expressions were satisfiable. This created five documented gaps:
 
-The proof engine (Slices 11–15) closes this gap. It is a non-SMT static analysis subsystem that tracks numeric bounds through expression trees using interval arithmetic, sequential assignment flow, relational inference, and conditional expression synthesis. The engine is:
+1. **Compound subtraction operands:** `(A+1)-B`, `A-(B+C)`, `Total-Tax-Fee` — separate operands prevented relational lookup.
+2. **Sum-on-RHS rules:** `rule Total > Tax + Fee` — the rule injection only handled `id op id`, not `id op compound`.
+3. **Computed-field intermediaries:** `set Net = Gross-Tax; check Amount/Net` — conservative RHS handling killed all markers on `Net`.
+4. **Transitive closure:** `rule A>B`, `rule B>C` — `A-C` divisors had no path to a proof without a direct `A>C` rule.
+5. **Cross-event marker scope:** derived facts from one event's transition row silently (incorrectly) influenced sibling events.
+
+The unified proof engine closes all five gaps with a single coherent architecture: `ProofContext` as the typed proof state container, `LinearForm` as the canonical normalizer keying the relational fact store, `RelationalGraph` as the bounded transitive closure engine, and a `GlobalProofContext` / `EventProofContext` scope split that makes cross-event isolation structural rather than conventional.
+
+The engine is:
 
 - **Sound:** It never claims an expression is safe when it is not.
 - **Incomplete:** It may reject expressions it cannot prove safe. This is the correct tradeoff for a DSL compiler — false negatives (missed proofs) cause author friction; false positives (wrong "safe" claims) cause runtime crashes.
 - **Single-pass:** No fixpoint iteration, no widening, no solver. This is possible because of Precept's flat execution model.
+
+---
+
+## Research Foundations
+
+The ProofContext + LinearForm + RelationalGraph architecture sits on well-established formal ground.
+
+**Academic grounding.** This design is a simplified **Zone abstract domain** in the Cousot & Cousot (1977) abstract interpretation framework. Specifically: an interval domain combined with a bounded relational graph in a reduced product — nearly identical to Miné's zone/octagon domains (2001/2006). The bounded BFS transitive closure is a simplified **difference-bound matrix (DBM)** without the full Floyd-Warshall closure. Barrett & Tinelli (2018) SMT surveys confirm that **QF_LRA** (quantifier-free linear real arithmetic) is the closest formal fragment; this approach is a sound under-approximation of that fragment.
+
+**Reference implementations.** Three reference implementations inform the build:
+
+- **CodeContracts / Clousot** (MIT, archived, github.com/microsoft/CodeContracts) — contains a "Pentagons" domain that is the architectural blueprint: interval domain + lightweight relational domain (upper bounds) in a reduced product. This is exactly the architecture chosen here.
+- **Boogie IntervalDomain.cs** (MIT, active, github.com/boogie-org/boogie) — 1,730 lines of production C# interval domain code. Uses `BigInteger?` for bounds. Best living C# reference for interval domain implementation.
+- **Crab / IKOS / Apron** — C++ algorithm references for zone domain and DBM closure.
+
+**SMT/Z3 evaluation.** Z3/CVC5 was unanimously rejected during design review for PR #108. The reasons: 50–65 MB of native dependencies, non-deterministic solving times, opaque proof witnesses that violate Principle #12 (AI legibility), and API-surface complexity — all for a constraint surface that is decidable with interval arithmetic alone. Reaffirmed at unified engine design review.
+
+**Library survey conclusion.** No reusable .NET library exists for interval arithmetic, LinearForm normalization, or DBM/zone domains. The three new types (`Rational`, `LinearForm`, `RelationalGraph`) are built from scratch, informed by the references above.
+
+---
 
 ## Execution Model Assumptions
 
@@ -39,30 +69,135 @@ The proof engine's tractability rests on three structural properties of Precept'
 
 These properties mean the proof engine is a **recursive descent over finite expression trees with linear sequential context**, not an abstract interpretation framework. Standard interval arithmetic transfer rules are directly applicable without the lattice infrastructure (widen, narrow, join, meet) that general-purpose analyzers require.
 
+---
+
 ## Architecture
 
-The proof engine is organized as a five-layer stack. Each layer builds on the ones below it.
+The proof engine is organized as three composing types — `ProofContext`, `LinearForm`, and `RelationalGraph` — with a single composing query `ProofContext.IntervalOf(expr)` as the integration point. All five consultation sites in the type checker that previously called separate methods (`TryInferInterval`, `TryInferRelationalNonzero`, `ExtractIntervalFromMarkers`, `InferSubtractionInterval`, the C-Nano special case) now call `IntervalOf`. The internal dispatch handles interval arithmetic, relational lookup, forward-inferred facts, and transitive closure in one place.
 
-### Layer 1: Sequential Assignment Flow
+### ProofContext
 
-**Problem solved:** Within a single transition row or state action, multiple `set` assignments execute left-to-right. Before Layer 1, all assignments in a row were validated against the same proof snapshot derived from the guard. A `set Rate = 0` did not kill the `$positive:Rate` marker for a subsequent `set X = Amount / Rate` in the same row.
+`ProofContext` is the typed proof state container. It replaces the flat `IReadOnlyDictionary<string, StaticValueKind>` + six string-encoded marker conventions with structured, typed storage.
 
-**Mechanism:** `ApplyAssignmentNarrowing(targetField, rhs, symbols)` updates the proof state after each assignment by pattern-matching the right-hand side:
+**Fact stores:**
 
-| RHS pattern | Marker effect |
+| Store | Key | Value | Scope |
+|---|---|---|---|
+| `_fieldIntervals` | `FieldKey` | `NumericInterval` | Field-constraint → global; guard/ensure/assignment-derived → event-local |
+| `_relationalFacts` | `LinearForm` (LHS - RHS) | `RelationalFact` (`>` or `>=`, scope) | Rule-derived → global; guard-derived → event-local |
+| `_exprFacts` | `LinearForm` | `NumericInterval` | Always event-local |
+| `_flags` | `FieldKey` | `NumericFlags` | Same as source fact |
+
+**Primary query methods:**
+
+- `IntervalOf(PreceptExpression expr)` — composing query. Returns a `NumericInterval`. Calls interval arithmetic, relational lookup, and transitive closure in one pass. This is the single integration point for all C93, C76, C94, C97, and C98 checks.
+- `SignOf(PreceptExpression expr)` — returns `Positive / Nonneg / Nonzero / Unknown` derived from `IntervalOf`.
+- `KnowsNonzero(PreceptExpression expr)` — `IntervalOf(...).ExcludesZero`.
+- `KnowsNonnegative(PreceptExpression expr)` — `IntervalOf(...).IsNonnegative`.
+
+**Mutation methods:**
+
+- `WithAssignment(FieldKey target, PreceptExpression rhs)` — closes Gap 3. Calls `IntervalOf(rhs)` and stores the result as `_fieldIntervals[target]`. When `rhs` is normalizable, also stores an equality fact in `_exprFacts` (`LinearForm(target) - LinearForm(rhs) ∈ [0,0]`). Includes the reassignment kill loop: when `target` is assigned, every `_relationalFacts` entry whose `LinearForm` contains `target`, every `_exprFacts` entry whose `LinearForm` contains `target`, and every `_flags` entry on `target` is cleared atomically before the new fact is stored.
+- `WithGuard(PreceptExpression condition, bool branch)` — calls `TryApplyNumericComparisonNarrowing` to inject interval and relational narrowings from a guard condition.
+- `WithRule(PreceptExpression lhs, RelationKind rel, PreceptExpression rhs)` — stores a `RelationalFact` keyed by `LinearForm(lhs) - LinearForm(rhs)` when both sides are normalizable. Closes Gap 2 at injection time.
+- `Child()` — returns an `EventProofContext` parented to this context (see § Proof State Lifecycle and Scope).
+- `Dump()` — structured snapshot of all fact stores, consumed by hover, MCP `precept_compile` output, and debug display.
+
+**Sequential flow (Gap 1 close).** `WithAssignment` is called after each `set` assignment in `ValidateTransitionRows()` and `ValidateStateActions()`, threading the updated proof state through the row. Each subsequent assignment sees post-mutation state — `set Rate = 0` kills `$positive:Rate` before a subsequent `set X = Amount / Rate` in the same row sees the Rate interval.
+
+### Rational Type
+
+`readonly record struct Rational(long Numerator, long Denominator) : INumber<Rational>`
+
+The `Rational` type provides exact arithmetic for `LinearForm` coefficients. It is a .NET 10 native type (~100 LOC, zero external dependencies).
+
+**Why not `double`.** `double` coefficients risk FP-induced false positives in normalization: `(A/10)*3` and `3*A/10` may produce different bit patterns, causing them to hash to different `LinearForm` keys even though they represent the same expression. Any such divergence is a fabricated false "no match" in the relational store — sound (no false proof), but erodes proving power unpredictably.
+
+**Why not `BigInteger` or NuGet.** `BigInteger`-backed rational (~150 LOC) was considered. tompazourek/Rationals (MIT, 1M+ downloads) targets .NET Standard 1.3 / .NET 6 — works on .NET 10 but not native, no `INumber<T>` generic math. c-ohle/RationalNumerics: 52 stars, single contributor, stale — overkill for the use case. **All coefficients originate from source literals (parser-bounded)**, so `long/long` representation is sufficient. Parser produces `long` for integers and `double` for decimals; `double`→`Rational` conversion is exact for finite decimals via `decimal` intermediary.
+
+**Construction.** GCD normalization at construction ensures canonical form for dictionary key equality (`3/6` and `1/2` produce the same `Rational`). Zero denominator throws at construction.
+
+**Arithmetic safety.** Uses `checked` long arithmetic. `TryNormalize` catches `OverflowException` and returns `null` — the caller falls back to interval arithmetic, which is always sound. Cross-GCD pre-reduction before multiplication (`gcd(a.Num, b.Den)`, `gcd(b.Num, a.Den)`, reduce, then multiply) prevents overflow in common cases.
+
+**Decimal literal conversion.** `Rational.FromDecimalLiteral("0.1")` → `Rational(1, 10)`. Round-trip: `(double)Rational(1, 10)` = `0.1d`. Exact by construction.
+
+### LinearForm Normalization
+
+`LinearForm` is the canonical form for sums of field references with `Rational` coefficients. It is a parallel form to the AST — the parser AST is never mutated.
+
+**Grammar.** A `LinearForm` is:
+```
+Terms: ImmutableSortedDictionary<FieldKey, Rational>   (field → coefficient)
+Constant: Rational                                      (additive constant)
+```
+
+Zero-coefficient terms are dropped at construction. `A - A` produces empty terms and constant `0`. The `FieldKey` sort order is deterministic (string-ordered field names), ensuring canonical form for dictionary key equality.
+
+**`TryNormalize(PreceptExpression expr) → LinearForm?`** Recursive depth-bounded normalization:
+
+| Expression node | Normalization |
 |---|---|
-| Numeric literal (sign known) | Inject/kill `$positive:`, `$nonneg:`, `$nonzero:` based on value |
-| `null` literal | Kill all numeric markers; reintroduce `Null` flag |
-| Identifier (markers known) | Copy source markers to target |
-| Compound expression | Kill all markers on target (conservative) |
+| Integer / decimal literal | `LinearForm` with empty terms, constant = literal value |
+| Field reference | Single-term `LinearForm`: `{field → 1}`, constant = 0 |
+| Parenthesized | Recurse (does not consume depth budget) |
+| Unary `-` | `LinearForm.Negate(recurse(operand))` |
+| Binary `+` | `LinearForm.Add(left, right)` |
+| Binary `-` | `LinearForm.Subtract(left, right)` |
+| `field * constant` or `constant * field` | `LinearForm.ScaleByConstant(field, constant)` |
+| `field / constant` | `LinearForm.ScaleByConstant(field, Rational(1, constant))` |
+| Function calls, `*` of two non-constants, etc. | `null` (non-normalizable) |
 
-The updated proof state is threaded through the assignment `foreach` loop in both `ValidateTransitionRows()` and `ValidateStateActions()`, so each subsequent assignment sees post-mutation state.
+**Depth bound.** `TryNormalize` tracks a recursion depth counter initialized to `8`. Binary `+`, `-`, unary `-`, and function calls each decrement the counter. Parenthesized expression unwrapping does not consume depth budget — only operations do. On counter reaching zero, returns `null`. This guarantees termination and bounds per-expression work.
 
-**Integration point:** `PreceptTypeChecker.cs` — `ValidateTransitionRows()` (line ~195) and `ValidateStateActions()` (line ~354). After each `ValidateExpression` + C68 check, call `ApplyAssignmentNarrowing` and update the symbols dictionary.
+**Scalar-multiple normalization.** Before any relational lookup, `IntervalOf` GCD-normalizes the queried `LinearForm`: all coefficients are divided by their GCD. This means `+3·A + (-3)·B` reduces to `+1·A + (-1)·B` before matching against stored facts. `Y / (k*A - k*B)` with `rule A > B` therefore proves directly without requiring the author to factor the constant.
 
-> **Note:** Line numbers are approximate and will shift during implementation.
+**Soundness rationale.** `Rational` coefficients ensure that two expressions that evaluate to the same linear function under any variable assignment produce the same `LinearForm` key. FP cancellation cannot fabricate a match or miss a match. The depth bound and `null`-on-overflow semantics mean `TryNormalize` either returns a provably correct form or declines — it never returns an incorrect form.
 
-### Layer 2: Interval Arithmetic
+### Transitive Closure — RelationalGraph
+
+`RelationalGraph` performs bounded BFS over the `_relationalFacts` store to derive facts not directly stored.
+
+**Algorithm.** Lazy BFS over the relational graph: nodes are `LinearForm`s appearing as either LHS or RHS of any stored relational fact; edges are `>`/`>=` facts. On a query for `IntervalOf(expr)` where no direct fact matches the normalized form, `RelationalGraph.Query(form)` walks outward from the normalized form looking for a chain of facts that implies the target.
+
+**Strict/non-strict matrix.** Encoded as a static table:
+
+| Composition | Result |
+|---|---|
+| `>` · `>` | `>` |
+| `>=` · `>` | `>` |
+| `>` · `>=` | `>` |
+| `>=` · `>=` | `>=` (does NOT yield `>`) |
+
+`>=` · `>=` correctly does NOT prove nonzero (example: `A >= B`, `B >= A` allows `A = B`).
+
+**Hard caps.** Maximum 64 facts per scope, maximum depth 4, maximum 256 visited nodes per query. On any cap hit, the query returns no derived fact — the caller continues with whatever interval arithmetic already produced. Cap hit is a sound false negative, never a false positive.
+
+**Self-contradiction handling.** Cycle detection during BFS: if the traversal derives `A > A` (or any form whose interval would be empty under the derivation), the derived fact is silently dropped and traversal continues. Self-contradictions surface in the inspector and runtime; the type checker is not the place to enforce rule consistency.
+
+**Optional debug mode.** `--proof-saturate` flag materializes all transitive facts up front (eager mode) for test inspection. Production mode is always lazy.
+
+### Proof State Lifecycle and Scope
+
+**GlobalProofContext (per Check).** Built once per `Check()` invocation. Contains:
+
+- Field constraint intervals (from `nonnegative`, `positive`, `min N`, `max N`).
+- Global relational facts from `rule` declarations (always present, all events see them).
+- `Choices` and field-declared flags.
+- Derived flags from global rules.
+
+**EventProofContext (per event/state, child of global).** Constructed per event/state as `globalCtx.Child()`. Contains:
+
+- Event-arg intervals.
+- Guard-narrowed intervals and relational facts.
+- Ensure-derived narrowings.
+- Sequential assignment effects (`WithAssignment` results).
+- All derived facts from Gap 3 (`_exprFacts` and computed-field intervals from `WithAssignment`).
+
+**Cross-event isolation.** `EventProofContext.Mutations` are never promoted on context flush. Derived facts from event E1's transition row cannot influence event E2's `EventProofContext` — E2's context is built fresh from the same `GlobalProofContext` parent. Cross-event fact carryover requires explicit `ensure` clauses, which already produce facts via `BuildEventEnsureNarrowings`.
+
+**`BuildEventEnsureNarrowings` rewrite.** The bare→dotted field-name translation is now a structural transform on typed `RelationalFact` records: `facts.Select(f => f.Rekey(bare → dotted))`. The string-surgery bug class from PR #108 (`$gt:A:B` → `$gt:Go.A:Go.B` having to split on `:` and dot both parts) is eliminated by construction — the key is a `LinearForm` with typed `FieldKey` terms, and dotting is a map over terms.
+
+### NumericInterval
 
 **Core abstraction:** `NumericInterval` — a closed/open interval over `double` representing the range of values an expression can produce.
 
@@ -99,7 +234,7 @@ internal readonly record struct NumericInterval(
 | `Min([a,b], [c,d])` | `[min(a,c), min(b,d)]` |
 | `Max([a,b], [c,d])` | `[max(a,c), max(b,d)]` |
 | `Clamp(x, lo, hi)` | `[max(x.Lower, lo.Lower), min(x.Upper, hi.Upper)]` |
-| `Hull([a,b], [c,d])` | `[min(a,c), max(b,d)]` — join for conditional expression synthesis. **Inclusivity for equal bounds:** when both lower bounds are equal, `LowerInclusive = a.LowerInclusive \|\| b.LowerInclusive`; likewise when both upper bounds are equal, `UpperInclusive = a.UpperInclusive \|\| b.UpperInclusive`. |
+| `Hull([a,b], [c,d])` | `[min(a,c), max(b,d)]` — join for conditional expression synthesis. **Inclusivity for equal bounds:** when both lower bounds are equal, `LowerInclusive = a.LowerInclusive \|\| b.LowerInclusive`; likewise when both upper bounds are equal, `UpperInclusive = a.UpperInclusive \|\| b.UpperInclusive`. *(Covered by existing `NumericIntervalTests.cs` Hull tests — no new test obligation.)* |
 
 **Multiply sign-case decomposition:** Naive four-corner multiplication (`min/max` of `{a*c, a*d, b*c, b*d}`) produces `NaN` when an endpoint is zero and the other is `±∞` (because `0 × ∞` is undefined in IEEE 754). The implementation decomposes by sign combination to avoid `0 × ∞`:
 
@@ -119,20 +254,20 @@ Inclusive bounds follow: `LowerInclusive = true` when the contributing factors' 
 
 **Why standard interval arithmetic suffices:** Precept expressions form finite trees with no cycles. Every transfer rule produces a result interval in O(1). The recursive walk visits each node once. There is no need for lattice widening because there is no iteration that could cause unbounded interval growth. The `Unknown` interval serves as top — any operation involving `Unknown` produces `Unknown` unless the operation itself bounds the result (e.g., `abs(Unknown)` produces `[0, +∞)`).
 
-**Interval extraction from proof markers:** `ExtractIntervalFromMarkers(key, symbols)` reads the existing string-encoded markers for an identifier and returns the tightest interval:
+**Interval extraction from proof state:** `ProofContext.IntervalOf(identifier)` reads `_fieldIntervals[key]` for the field key, then applies flag projection:
 
-| Markers present | Interval |
+| Flags / stored interval | Interval returned |
 |---|---|
-| `$positive:` | `(0, +∞)` |
-| `$nonneg:` | `[0, +∞)` |
-| `$nonneg:` + `$nonzero:` | `(0, +∞)` |
-| `$nonzero:` alone | `Unknown` (nonzero spans both positive and negative) |
-| `$ival:key:lower:lowerInc:upper:upperInc` | Decoded interval from field constraints (`min N`, `max N`) |
+| `Positive` flag | `(0, +∞)` |
+| `Nonneg` flag | `[0, +∞)` |
+| `Nonneg` + `Nonzero` flags | `(0, +∞)` |
+| `Nonzero` flag alone | `Unknown` (nonzero spans both positive and negative) |
+| Stored interval | Decoded interval from field constraints (`min N`, `max N`) |
 | None | `Unknown` |
 
-**Interval marker injection from field constraints:** At initial narrowing time (during `Check()`), field constraints are encoded as interval markers:
+**Interval injection from field constraints:** At `GlobalProofContext` build time (during `Check()`), field constraints are encoded as intervals in `_fieldIntervals`:
 
-| Constraint | Marker interval |
+| Constraint | Stored interval |
 |---|---|
 | `nonnegative` | `[0, +∞)` |
 | `positive` | `(0, +∞)` |
@@ -140,248 +275,294 @@ Inclusive bounds follow: `LowerInclusive = true` when the contributing factors' 
 | `max V` | `(-∞, V]` |
 | `min V1` + `max V2` | `[V1, V2]` |
 
-**Min+max combination algorithm:** When `Check()` processes field constraints, it must detect and combine `min` and `max` constraints on the same field into a single `$ival:` marker rather than injecting two separate markers. Algorithm sketch: iterate over each field’s `FieldConstraint` records. Collect `min V` and `max V` values for each field. If both exist, inject a single `$ival:key:V1:true:V2:true` marker (the combined `[V1, V2]` interval). If only `min V` exists, inject `$ival:key:V:true:Infinity:false`. If only `max V` exists, inject `$ival:key:-Infinity:false:V:true`. The `nonnegative` and `positive` constraints are handled by their existing `$nonneg:` and `$positive:` markers, which `ExtractIntervalFromMarkers` already reads; they do NOT need a duplicate `$ival:` marker.
+**Min+max combination:** When `Check()` processes field constraints, `min` and `max` constraints on the same field are combined into a single stored interval. If only `min V` exists: `[V, +∞)`. If only `max V` exists: `(-∞, V]`. Both: `[V1, V2]`. The `nonnegative` and `positive` constraints are handled by their flag entries; they do NOT need a duplicate interval entry.
 
-**Storage format decision:** Interval markers use string-encoded keys (`$ival:key:lower:lowerInc:upper:upperInc`) in the existing symbol table rather than a parallel `Dictionary<string, NumericInterval>`. This avoids threading a second dictionary through the entire narrowing pipeline and keeps the API surface unchanged. The tradeoff is parse overhead on extraction, which is negligible — extraction happens once per identifier per expression tree visit. **All numeric values in `$ival:` markers MUST be serialized and parsed using `CultureInfo.InvariantCulture`** to prevent locale-dependent decimal separator issues (e.g., `5.0` vs `5,0`).
+**Note on storage.** Previous implementation used string-encoded `$ival:key:lower:lowerInc:upper:upperInc` markers in the symbol table. This is superseded by typed `_fieldIntervals` storage in `ProofContext`. See Design Decision #1 (Superseded).
 
-### Layer 3: Interval Inference
+### Conditional Expression Proof Synthesis
 
-**Core method:** `TryInferInterval(expression, symbols)` — a recursive walk over the expression tree that returns a `NumericInterval`.
+**Problem solved:** `if Rate > 0 then Amount / Rate else 0` — the then-branch is safe (narrowing proves `Rate > 0`). The result of the whole conditional expression needs an interval so it can be used as a sub-expression in a larger divisor.
 
-**Dispatch table:**
+**Mechanism.** The `PreceptConditionalExpression` case in `IntervalOf` computes:
 
-| Expression node | Interval computation |
-|---|---|
-| Numeric literal | Point interval `[v, v]` |
-| Identifier | `ExtractIntervalFromMarkers(key, symbols)` |
-| Parenthesized | Recurse into inner expression |
-| Unary `-` | `NumericInterval.Negate(recurse(operand))` |
-| Binary `+` | `NumericInterval.Add(left, right)` |
-| Binary `-` | `NumericInterval.Subtract(left, right)` |
-| Binary `*` | `NumericInterval.Multiply(left, right)` |
-| Binary `/` | `NumericInterval.Divide(left, right)` |
-| Binary `%` | Conservative: if divisor excludes zero, bounded by divisor magnitude; else `Unknown` |
-| `abs(x)` | `NumericInterval.Abs(recurse(x))` |
-| `min(a, b)` | `NumericInterval.Min(recurse(a), recurse(b))` |
-| `max(a, b)` | `NumericInterval.Max(recurse(a), recurse(b))` |
-| `clamp(x, lo, hi)` | `NumericInterval.Clamp(recurse(x), recurse(lo), recurse(hi))` |
-| `sqrt(x)` | If `x.IsNonnegative`: `[√Lower, √Upper]`; else `Unknown` |
-| `floor(x)` | `[floor(x.Lower), floor(x.Upper)]` with closed bounds |
-| `ceil(x)` | `[ceil(x.Lower), ceil(x.Upper)]` with closed bounds |
-| `round(x, _)` | Conservative: `[floor(x.Lower), ceil(x.Upper)]` with closed bounds |
-| Conditional `if/then/else` | See Layer 5 |
-| Other | `Unknown` |
-
-**C93 integration in `TryInferBinaryKind()`:** The current compound-expression fallthrough (`// Compound expressions — no diagnostic`) is replaced with:
-
-```csharp
-var divisorInterval = TryInferInterval(binary.Right, symbols);
-if (!divisorInterval.ExcludesZero)
-{
-    // Also check relational inference (Layer 4) before emitting
-    if (!TryInferRelationalNonzero(binary.Right, symbols))
-    {
-        // Emit C93 with interval-aware message
-    }
-}
-```
-
-**C76 integration in `TryInferFunctionCallKind()`:** The hard-coded `abs()` and identifier pattern match for sqrt safety is replaced with:
-
-```csharp
-var argInterval = TryInferInterval(arg, symbols);
-bool isNonNeg = argInterval.IsNonnegative;
-```
-
-This subsumes the `abs()` special case (because `TryInferInterval` handles `abs()` via `NumericInterval.Abs`) and the identifier marker lookup (because `ExtractIntervalFromMarkers` is called for identifiers).
-
-### Layer 4: Relational Inference
-
-**Problem solved:** `A / (A - B)` where `rule A > B` is a common business pattern (remaining balance, net quantity, surplus). Interval arithmetic cannot prove `A - B` excludes zero when A and B have overlapping independent bounds — their relationship is lost in the interval abstraction. This requires a relational fact.
-
-**Marker format:** `$gt:{A}:{B}` and `$gte:{A}:{B}` in the symbol table, proving `A > B` and `A >= B` respectively.
-
-**Injection point:** `TryApplyNumericComparisonNarrowing()` (line ~2308). The existing method handles `identifier <op> literal`. A new branch handles `identifier <op> identifier`:
-
-| Guard/rule pattern | Marker injected |
-|---|---|
-| `A > B` | `$gt:{A}:{B}` |
-| `A >= B` | `$gte:{A}:{B}` |
-| `B < A` | `$gt:{A}:{B}` (canonicalized) |
-| `B <= A` | `$gte:{A}:{B}` (canonicalized) |
-
-**Proof method:** `TryInferRelationalNonzero(divisor, symbols)` pattern-matches the divisor for `A - B` (subtraction of two identifiers) and checks:
-
-- `$gt:{A}:{B}` → `A > B` → `A - B > 0` → nonzero ✓
-- `$gt:{B}:{A}` → `B > A` → `A - B < 0` → nonzero ✓
-- `$gte:{A}:{B}` → `A >= B` → `A - B >= 0` → NOT provably nonzero (allows equality)
-
-The method returns `true` only when strict inequality is proven.
-
-**Why relational inference is a separate layer:** Interval arithmetic operates on individual variable bounds. Relational facts capture inter-variable constraints (`A > B`) that intervals cannot represent — the relationship between two variables is lost when each is independently bounded. This is a fundamental limitation of non-relational abstract domains (intervals are the canonical non-relational domain). Rather than upgrading to a relational domain (octagons, polyhedra) — which would be massive overkill for a DSL compiler — we harvest a targeted class of relational facts (direct comparisons between identifiers) and check them as a separate fallback after interval analysis.
-
-### Layer 5: Conditional Expression Proof Synthesis
-
-**Problem solved:** `if Rate > 0 then Amount / Rate else 0` — the then-branch is already safe (existing narrowing proves `Rate > 0`). But the *result* of the whole conditional expression has no interval. If used as a divisor elsewhere, the lack of a result interval is a proof gap.
-
-**Mechanism:** The `PreceptConditionalExpression` case in `TryInferInterval` computes:
-
-1. `thenInterval = TryInferInterval(thenBranch, ApplyNarrowing(condition, symbols, true))`
-2. `elseInterval = TryInferInterval(elseBranch, symbols)`
+1. `thenInterval = IntervalOf(thenBranch, childCtx.WithGuard(condition, true))`
+2. `elseInterval = IntervalOf(elseBranch, childCtx.WithGuard(condition, false))`
 3. `result = NumericInterval.Hull(thenInterval, elseInterval)`
 
-**Why Hull is correct:** In Precept's execution model, exactly one branch of a conditional expression is evaluated at runtime. The result is either `thenInterval` or `elseInterval` — the proof engine must be sound for either case. Hull (the smallest interval containing both) is the correct over-approximation because there is no control-flow join where a more precise analysis could apply. There is no path-sensitivity to exploit — the conditional expression is a single value-producing node, not a branching construct.
+**Why Hull is correct:** In Precept's execution model, exactly one branch of a conditional expression is evaluated at runtime. The result is either `thenInterval` or `elseInterval`. Hull (the smallest interval containing both) is the correct over-approximation. There is no post-conditional code path where path-sensitivity could tighten the result — the conditional is a single value-producing node, not a branching construct.
 
 **Example:**
-
 ```precept
 field X as number positive
 # if X > 5 then X else 1
-# thenInterval: [5, +∞) (narrowed from X > 5)
+# thenInterval: [5, +∞)   (from guard narrowing X > 5)
 # elseInterval: [1, 1]
-# Hull: [1, +∞) — ExcludesZero = true
+# Hull: [1, +∞)  — ExcludesZero = true
 ```
+
+---
+
+## IntervalOf Query Path
+
+`ProofContext.IntervalOf(expr)` is the composing query at the center of the unified architecture. At each node, it:
+
+1. **Computes the interval-arithmetic result** via `NumericInterval` transfer rules (for all operators and functions).
+2. **Attempts `LinearForm.TryNormalize(expr)`** (bounded depth 8).
+3. **If normalization succeeds:** looks up the normalized form in `_relationalFacts`. On a direct key match, intersects the relational-derived interval (`(0,+∞)` for `>`, `[0,+∞)` for `>=`) with the arithmetic result. **Constant-offset scan (runs when no direct key match exists):** scans relational facts whose key differs from the normalized form only in the constant term — if the query form = key + c where c > 0 and the fact is `>`, infer `(c, +∞)`; if c ≥ 0 and the fact is `>=`, infer `[c, +∞)`. Example: `(A+1)-B` with `rule A > B` — stored key `+1·A + (-1)·B + 0`, query form `+1·A + (-1)·B + 1`, difference c = +1 > 0, fact is `>`, inferred interval `(1, +∞)`. **The GCD-normalized scalar-multiple check runs first, then the constant-offset scan.**
+4. **If no direct or constant-offset match:** GCD-normalizes the form and queries `RelationalGraph` for a transitive chain. If a chain is found, intersects the derived interval with the arithmetic result.
+5. **Checks `_exprFacts`** for any stored equality or interval fact matching the normalized form. If found, intersects.
+6. **Returns the intersection** of all information gathered. Each intersection can only narrow (tighten) the interval — never widen it — so the result is always sound.
+
+For identifiers, `IntervalOf` reads `_fieldIntervals[key]` directly (no normalization needed). For compound expressions, the normalization + relational lookup gives the relational inference; the arithmetic walk gives the interval arithmetic; the intersection gives the tightest provable bound.
+
+---
 
 ## Proof Flow
 
-End-to-end flow for a compound divisor expression reaching `TryInferBinaryKind`:
+End-to-end flow for a divisor expression reaching the C93 check:
 
 ```
-1. Field constraints (positive, min N, etc.)
-   └─→ Inject $positive:, $nonneg:, $nonzero:, $ival: markers into base symbols
+1. GlobalProofContext built once per Check():
+   └─→ Field constraint intervals stored in _fieldIntervals
+   └─→ Rule relational facts stored in _relationalFacts (keyed by LinearForm)
+   └─→ Field flags (positive, nonneg, nonzero) stored in _flags
 
-2. Guard narrowing (when Field > 0, when Field != 0)
-   └─→ Inject markers via ApplyNarrowing + TryApplyNumericComparisonNarrowing
+2. EventProofContext built per event/state as globalCtx.Child():
+   └─→ Guard narrowing: WithGuard() adds event-local intervals + relational facts
+   └─→ Ensure narrowing: BuildEventEnsureNarrowings (typed RelationalFact map)
 
-3. Rule/ensure narrowing (rule A > B, ensure X > 0)
-   └─→ Inject markers including relational $gt:/$gte: markers
+3. Sequential assignment walk in ValidateTransitionRows() / ValidateStateActions():
+   └─→ After each assignment: WithAssignment(target, rhs)
+       ├─→ IntervalOf(rhs) → stores interval in _fieldIntervals[target]
+       ├─→ TryNormalize(rhs) succeeds → stores equality fact in _exprFacts
+       └─→ Reassignment kill loop: clear prior facts mentioning target field
 
-4. Sequential assignment flow (set Rate = 0 → set X = A / Rate)
-   └─→ ApplyAssignmentNarrowing updates/kills markers between assignments
-
-5. Divisor expression reaches TryInferBinaryKind C93 check:
-   a. Is divisor a literal zero? → C92
-   b. Is divisor a single identifier? → Check $nonzero:/$positive: markers
-   c. Is divisor a compound expression? → TryInferInterval:
-      - Recursive walk builds interval from sub-expressions
-      - Each identifier extracts interval from markers
-      - Each operation applies standard transfer rule
+4. Divisor expression reaches C93 check:
+   a. Is divisor literal zero? → C92
+   b. Is divisor a single identifier? → IntervalOf(id).ExcludesZero
+   c. Is divisor a compound expression? → IntervalOf(expr):
+      - Interval arithmetic walk over sub-expressions
+      - TryNormalize → relational lookup in _relationalFacts
+      - GCD-normalize → RelationalGraph BFS if no direct match
+      - _exprFacts equality lookup + intersect
       - Result: NumericInterval for entire divisor
 
-6. ExcludesZero check on result interval:
+5. ExcludesZero check on result interval:
    - true  → No diagnostic (divisor provably nonzero)
-   - false → Fall through to relational check
-
-7. TryInferRelationalNonzero (Layer 4 fallback):
-   - Divisor is A - B with $gt:{A}:{B}? → No diagnostic
-   - Otherwise → Emit C93 with interval-aware message
+   - false → Emit C93 with interval-aware message
 ```
+
+---
 
 ## Integration Points
 
-| Integration point | File | Location | Change |
+| Integration point | File | Location | Role |
 |---|---|---|---|
-| Sequential flow wiring | `PreceptTypeChecker.cs` | `ValidateTransitionRows()` ~line 195, `ValidateStateActions()` ~line 354 | Thread `ApplyAssignmentNarrowing` through assignment loops |
-| C93 compound branch | `PreceptTypeChecker.cs` | `TryInferBinaryKind()` ~line 1921 | Replace fallthrough comment with `TryInferInterval` + `TryInferRelationalNonzero` |
-| C76 sqrt check | `PreceptTypeChecker.cs` | `TryInferFunctionCallKind()` ~line 1722 | Replace hard-coded pattern match with `TryInferInterval(...).IsNonnegative` |
-| Interval markers | `PreceptTypeChecker.cs` | `Check()` ~line 89 | Inject `$ival:` markers from field `min`/`max` constraints |
-| Relational markers | `PreceptTypeChecker.cs` | `TryApplyNumericComparisonNarrowing()` ~line 2308 | New `identifier <op> identifier` branch |
-| Interval struct | `NumericInterval.cs` | New file in `src/Precept/Dsl/` | `NumericInterval` record struct + transfer rules |
+| GlobalProofContext construction | `PreceptTypeChecker.cs` | `Check()` ~line 89 | Build global fact stores from field constraints and rules |
+| EventProofContext construction | `PreceptTypeChecker.cs` | `ValidateTransitionRows()` ~line 195, `ValidateStateActions()` ~line 354 | `globalCtx.Child()` per event/state |
+| Sequential flow wiring | `PreceptTypeChecker.cs` | `ValidateTransitionRows()`, `ValidateStateActions()` | Call `WithAssignment` after each assignment |
+| C93 compound branch | `PreceptTypeChecker.cs` | `TryInferBinaryKind()` ~line 1921 | `ctx.KnowsNonzero(divisor)` |
+| C76 sqrt check | `PreceptTypeChecker.cs` | `TryInferFunctionCallKind()` ~line 1722 | `ctx.KnowsNonnegative(arg)` |
+| Relational fact injection | `PreceptTypeChecker.cs` | `TryApplyNumericComparisonNarrowing()` | `ctx.WithRule(lhs, rel, rhs)` |
+| Ensure narrowing rewrite | `PreceptTypeChecker.cs` | `BuildEventEnsureNarrowings()` | Typed `RelationalFact` map over dotted keys |
+| NumericInterval struct | `NumericInterval.cs` | `src/Precept/Dsl/` | Unchanged; gains `IntersectMany` helper |
+| ProofContext | `ProofContext.cs` | `src/Precept/Dsl/` | New: central proof state container |
+| LinearForm | `LinearForm.cs` | `src/Precept/Dsl/` | New: canonical normalizer |
+| Rational | `Rational.cs` | `src/Precept/Dsl/` | New: exact arithmetic for coefficients |
+| RelationalGraph | `RelationalGraph.cs` | `src/Precept/Dsl/` | New: bounded transitive closure |
+| MCP proof snapshot | `CompileTool.cs` | `tools/Precept.Mcp/Tools/` | `ProofContext.Dump()` under `proof` key |
+| Hover integration | `PreceptHover.cs` | `tools/Precept.LanguageServer/` | `ctx.IntervalOf(expr)` in hover content |
 
-> **Note:** Line numbers are approximate references to the current codebase and will shift during implementation.
+> **Note:** Line numbers are approximate and will shift during implementation.
+
+---
 
 ## Soundness Guarantees
 
+### Fact category invariants
+
+**`interval` (`NumericInterval` on a field key)**
+- *Derivation:* From field constraint declarations, event-arg constraints, guard narrowing, ensure narrowing, and `WithAssignment` calling `IntervalOf(rhs)`.
+- *Scope:* Field-constraint intervals → global. Event-arg, guard, ensure, assignment-derived → event-local.
+- *Invalidation:* On reassignment to the same field key.
+- *Soundness:* All arithmetic via `NumericInterval` (saturation handled). FP edge case: `A > B` does NOT imply `A - 1 > B` in IEEE 754 — but this is never derived symbolically; it is always computed via `NumericInterval.Subtract(IntervalOf(A), Singleton(1))`, which produces `(B + ε, +∞) - [1,1] = (B - 1 + ε, +∞)`, correctly NOT proving `> B`. Saturation: `B + C` near `MaxValue` produces `[..., +∞)`, which is sound.
+
+**`$positive` / `$nonneg` / `$nonzero` flags**
+- *Derivation:* From interval projection (interval ⊆ (0,+∞) ⇒ Positive flag). From relational facts. From explicit declarations.
+- *Scope:* Same as the source.
+- *Invalidation:* When the underlying interval or relational fact is invalidated.
+- *Soundness:* Pure intersection/projection over `NumericInterval`. Cannot fabricate.
+
+**`$gt` / `$gte` relational facts (keyed by LinearForm)**
+- *Derivation:* From `rule` comparisons `LHS op RHS` where both sides normalize. From `when` guard comparisons. From transitive closure (depth-bounded BFS).
+- *Scope:* Rule-derived → global. Guard-derived → event-local. Transitive-derived → scope of weakest source (if any source is event-local, the derived fact is event-local).
+- *Invalidation:* Direct facts: when a field appearing in either side of the LinearForm is reassigned. Transitive-derived: lazy — re-derived on next query, never cached across mutations.
+- *Soundness:* LinearForm uses exact `Rational` (`long/long`) coefficients — no FP cancellation can fabricate a relational fact. Strict/non-strict matrix is explicit. Self-contradictions dropped silently. Transitive closure depth-bounded — termination guaranteed.
+
+**`_exprFacts` (derived facts about compound expressions)**
+- *Derivation:* Equality facts from `WithAssignment` (`LinearForm(target) - LinearForm(rhs) ∈ [0,0]`) when `rhs` is normalizable. Interval facts about non-trivial LinearForms from rule narrowing.
+- *Scope:* **Always event-local.** Computed-field state never crosses event boundaries.
+- *Invalidation:* When any field appearing in the LinearForm is reassigned, the entire entry is dropped (kill loop scans `LinearForm.Terms`).
+- *Soundness:* LinearForm equality is used ONLY to substitute one normalized form for another in queries — never to perform symbolic arithmetic. The substitution preserves soundness because `NumericInterval` of either form bounds the same set of concrete runtime values.
+
+**Transitive-derived relational facts**
+- *Derivation:* Bounded BFS over `_relationalFacts` graph with explicit strict/non-strict matrix.
+- *Scope:* Inherited from source facts (most-restrictive wins).
+- *Invalidation:* Lazy — never cached across mutations.
+- *Soundness:* Transitivity of `>` and `>=` is exact under IEEE 754 (no arithmetic involved, only fact composition). The strict/non-strict matrix is the only correctness hazard — it is encoded as a small static table reviewed exhaustively in tests.
+
 ### What the engine proves
 
-- **Identifier divisors:** Provably nonzero via `$positive:`, `$nonzero:`, or (`$nonneg:` + `$nonzero:`) markers. No change from Slices 1–10.
-- **Compound divisors:** Provably nonzero via interval arithmetic — the result interval's `ExcludesZero` predicate.
-- **Relational divisors:** `A - B` provably nonzero when strict inequality `A > B` or `B > A` is proven from guards, rules, or ensures.
-- **Conditional expression results:** Provably nonzero when the hull of both branch intervals excludes zero.
-- **Sqrt arguments:** Provably non-negative via interval arithmetic — the argument interval's `IsNonnegative` predicate.
-- **Sequential flow:** Post-mutation proof state correctly reflects assignment effects. A `set Rate = 0` kills the nonzero proof for subsequent uses of `Rate` in the same row.
+- **Identifier divisors:** Provably nonzero via `Positive`, `Nonzero`, or (`Nonneg` + `Nonzero`) flags. Unchanged from PR #108.
+- **Compound divisors:** Provably nonzero via `IntervalOf(expr).ExcludesZero`.
+- **Relational divisors:** `A - B` and general `LinearForm`-shaped expressions provably nonzero when a matching strict relational fact exists in `_relationalFacts`, directly or via transitive closure.
+- **Computed-field intermediaries:** `set Net = Gross-Tax` followed by `Amount/Net` proves when `IntervalOf(Gross-Tax)` excludes zero — the computed-field interval is stored by `WithAssignment` and available for subsequent divisor checks in the same row.
+- **Conditional expression results:** Provably nonzero when Hull of both branch intervals excludes zero.
+- **Sqrt arguments:** Provably non-negative via `IntervalOf(arg).IsNonnegative`.
+- **Sequential flow:** Post-mutation proof state correctly reflects assignment effects. `set Rate = 0` kills the Positive fact for subsequent uses of `Rate` in the same row.
 
 ### What the engine conservatively rejects
 
 These patterns emit C93 even though a human could verify them safe:
 
-- **Inter-event reasoning:** `on SetRate ensure Rate > 0` does not prove `Rate > 0` in a different event's transition row. Each event's proof context is independent.
-- **Aliased fields:** `set Backup = Rate` followed by `X / Backup` — compound RHS kills markers (Layer 1 conservatism). The engine does not track that `Backup` holds the value of `Rate`.
-- **Deeply nested conditionals:** The engine handles one level of `if/then/else` via Hull. Nested conditionals compose correctly (Hull of Hull) but the resulting interval may be very wide, leading to inconclusive proofs.
-- **Non-linear relational patterns:** `rule A * B > 0` does not produce a relational marker. Only direct `identifier <op> identifier` comparisons are harvested.
-- **Modulo with variable divisor:** `A % B` where B's magnitude is not bounded by known constraints produces `Unknown`, even if the author knows B is bounded.
+- **Cross-event derived facts:** Computed-field intervals derived in event E1 do not carry to event E2. Cross-event carryover requires explicit `ensure` clauses. (This is the soundness load-bearing wall — it never moves.)
+- **Non-linear relational patterns:** `rule A * B > 0` does not produce a relational fact. Only expressions normalizable to LinearForm are stored.
+- **Function-call opacity:** `abs(X)`, `min(A,B)`, and other built-in function calls are opaque to LinearForm. Function results contribute via `NumericInterval` only.
+- **Inequality without ordering:** `rule A != B` does not enter the relational store. Only `>` and `>=` comparisons produce relational facts.
+- **Transitive chains beyond depth 4.** The BFS depth cap produces conservative false negatives, never false positives.
+- **Deeply nested conditionals:** Hull composes correctly (Hull of Hull) but the resulting interval may be very wide.
 
 ### The right tradeoff
 
-A DSL compiler serves domain authors, not PL researchers. The cost of a false positive (claiming safe when it isn't) is a runtime crash — catastrophic in a business rules engine. The cost of a false negative (rejecting a safe expression) is author friction — the author adds a constraint or restructures the expression. The engine is calibrated for zero false positives at the cost of some false negatives. Authors who hit a false negative have clear remediation: add a field constraint (`positive`, `min 1`), a rule (`rule X != 0`), or restructure into a guarded expression (`when X != 0 -> ...`).
+A DSL compiler serves domain authors, not PL researchers. The cost of a false positive (claiming safe when it isn't) is a runtime crash — catastrophic in a business rules engine. The cost of a false negative (rejecting a safe expression) is author friction — the author adds a constraint or restructures the expression. The engine is calibrated for zero false positives at the cost of some false negatives. Authors who hit a false negative have clear remediation paths — see § Unsupported Patterns.
 
-## Design Decisions
+---
 
-### 1. String-Encoded Interval Markers
+## Coverage Matrix
 
-**Decision:** Interval data from field constraints (`min N`, `max N`) is stored as string-encoded markers (`$ival:key:lower:lowerInc:upper:upperInc`) in the existing `IReadOnlyDictionary<string, StaticValueKind>` symbol table.
+22 input patterns. For each: behavior before the unified PR (baseline = PR #108 + C-Nano `6fbb315`) → behavior after.
 
-**Alternative rejected:** Parallel `Dictionary<string, NumericInterval>` threaded alongside the symbol table through all narrowing methods.
+Legend: ✅ proves (no diagnostic) · ❌ false negative (C93 emitted but expression is provably safe) · 💀 correctly rejected (C93 emitted, expression is unsafe) · ⚠️ false positive (no diagnostic but expression is unsafe — must never happen).
 
-**Rationale:** The symbol table is already threaded through every narrowing and validation method. Adding a second dictionary would require changing the signature of ~15 methods and every call site. String-encoded markers keep the API surface unchanged. The parse overhead on extraction (one `string.Split` per identifier per expression visit) is negligible compared to the expression validation work already being done.
+| # | Pattern | Before | After | Gap closed |
+|---|---------|--------|-------|------------|
+| 1 | `Y / (A - B)` with `rule A > B` | ✅ (C-Nano) | ✅ | regression anchor |
+| 2 | `Y / ((A + 1) - B)` with `rule A > B` | ❌ | ✅ | 1 |
+| 3 | `Y / (A - (B + C))` with `rule A > B + C` | ❌ | ✅ | 1 + 2 |
+| 4 | `Y / (Total - Tax - Fee)` with `rule Total > Tax + Fee` | ❌ | ✅ | 1 + 2 |
+| 5 | `Y / (A - B - C)` with `rule A > B`, `rule A > C`, `rule A - B > C` | ❌ | ✅ | 1 + 2 |
+| 6 | `set Net = Gross - Tax; check Amount / Net` with `rule Gross > Tax` | ❌ | ✅ | 3 |
+| 7 | `set A = X + Y; set B = A - 1; check Z / B` with `rule X + Y > 1` | ❌ | ✅ | 3 + 2 |
+| 8 | `set Net = Gross - Tax; set Net = 0; check Amount / Net` (reassignment) | 💀 | 💀 | regression: kill loop |
+| 9 | `Y / (A - C)` with `rule A > B`, `rule B > C` (transitive 2-step) | ❌ | ✅ | 4 |
+| 10 | `Y / (A - D)` with `rule A > B`, `rule B > C`, `rule C > D` (3-step) | ❌ | ✅ | 4 |
+| 11 | `Y / (A - C)` with `rule A >= B`, `rule B > C` (mixed strict, derives `>`) | ❌ | ✅ | 4 |
+| 12 | `Y / (A - C)` with `rule A >= B`, `rule B >= C` (both weak, derives `>=` only) | 💀 | 💀 | regression + soundness anchor |
+| 13 | `Y / (A - B)` with `rule A > B`, `rule B > A` (self-contradiction) | 💀 | 💀 | regression: silent drop |
+| 14 | Event E1: `set Net = Gross - Tax`. Event E2: `check Amount / Net`. No field-declared positivity. | 💀 | 💀 | regression: cross-event isolation |
+| 15 | Event E1: derived `Net > 0`. Event E2 (sibling): `check Amount / Net`. | 💀 | 💀 | regression: sibling isolation |
+| 16 | `Y / D` where `D` is a field with declared `> 0` constraint | ✅ | ✅ | regression anchor |
+| 17 | `Y / abs(X)` where `X` is `nonzero` | ✅ | ✅ | regression anchor |
+| 18 | `Y / (Rate * Factor)` where both are `positive` | ✅ | ✅ | regression anchor |
+| 19 | `Y / (D - D)` (provably zero) | 💀 | 💀 | regression anchor |
+| 20 | `Y / (if A > B then A - B else 1)` with `rule A > B` | ❌ | ✅ | falls out of gap 1 (conditional branch uses composing IntervalOf) |
+| 21 | `Y / (A + B)` with `rule A > -B` | ❌ | ✅ | falls out of gap 2 (LinearForm normalization of negated operand rule) |
+| 22 | `Y / (A + B - C)` with `rule A + B > C` | ❌ | ✅ | falls out of gap 2 (compound-expression rule) |
 
-**Tradeoff accepted:** String encoding is less type-safe than a dedicated dictionary. A malformed marker string would silently produce `Unknown` rather than a compile error. This is acceptable because marker injection and extraction are co-located in the same file and covered by unit tests.
+**Coverage delta:** 12 patterns now prove that did not before (#2, #3, #4, #5, #6, #7, #9, #10, #11, #20, #21, #22). 0 false positives introduced. 0 regressions.
 
-### 2. Subsuming Sign Analysis into Intervals
+---
 
-**Decision:** There is no separate "sign analysis" layer. Sign information is a special case of interval bounds — `Positive` is `(0, +∞)`, `Nonneg` is `[0, +∞)`, `Nonzero` is the complement of `{0}` (not directly representable as a single interval, but handled via the existing marker check as a fallback).
+## Unsupported Patterns
 
-**Alternative rejected:** Dedicated sign domain (Positive / Negative / Nonneg / Nonpositive / Zero / Nonzero / Unknown) with its own transfer rules, running as a parallel analysis alongside intervals.
+Each pattern below is expressible in the DSL but the proof engine cannot prove it safe. Author workarounds are validated against the DSL language reference.
 
-**Rationale:** A sign domain duplicates information already captured by interval bounds. Every sign transfer rule is a special case of the corresponding interval transfer rule. Maintaining two parallel analyses adds ~100 lines of code with no additional proving power — intervals subsume everything sign analysis can do, plus they handle bounded ranges (`min 5`, `clamp(x, 1, 100)`) that sign analysis cannot.
+**DSL facts that shaped this table:**
+- `rule` supports compound expressions on both sides (`rule A * 2 <= B because "..."`).
+- `on Event ensure` is event-arg-only — cannot reference fields (PRECEPT016).
+- `in State ensure` is the cross-event field workaround — validated to suppress C93 in receiving-state events.
+- `to State ensure` does NOT suppress C93 in the receiving event — use `in`, not `to`.
+- `when A > B` guard suppresses C93 for `A - B` divisors; `when A != B` and `when A - B > 0` do NOT.
+- `rule D != 0` / `field D as number positive` suppress C93 on bare `D` but not after `set D = expr` — after the unified plan, the global `positive` constraint in `GlobalProofContext` survives assignment (the event-local kill loop does not touch global facts).
 
-**Tradeoff accepted:** `Nonzero` (the union `(-∞, 0) ∪ (0, +∞)`) is not representable as a single interval. The engine falls back to the existing `$nonzero:` marker check for this case. This is not a regression — Slices 1–10 already handle `$nonzero:` markers for identifier divisors.
+| # | Unsupported pattern | Why the proof fails | Author workaround |
+|---|---|---|---|
+| 1 | `Y / (A * B - C)` with `rule A * B > C` | LHS `A * B` is non-linear — does not normalize to LinearForm | Introduce intermediate: `set Product = A * B` with `rule Product > C because "..."`. Global rule `Product > C` survives; gap 3 forward-infers the interval. |
+| 2 | `Y / (A * 2 - B)` with `rule A * 2 > B` | Scalar multiplication `A * 2` IS linear — coefficient `2` is a constant that LinearForm handles | *(works — no workaround needed. Scalar-constant multiplication normalizes correctly.)* |
+| 3 | `Y / (A / 2 - B)` with `rule A > 2 * B` | Division by constant produces rational coefficient `1/2` — LinearForm handles this | *(works — no workaround needed. Division by constant normalizes via Rational(1,2).)* |
+| 4 | `Y / (abs(X) - B)` with `rule abs(X) > B` | Function calls are opaque to LinearForm — `abs(X)` does not normalize | Introduce intermediate: `set AbsX = abs(X)` with `rule AbsX > B because "..."`. |
+| 5 | `Y / (min(A, B) - C)` with `rule min(A, B) > C` | Same — function results do not normalize | Same pattern: `set MinAB = min(A, B)` with `rule MinAB > C because "..."`. |
+| 6 | `Y / sqrt(A - B)` with `rule A > B` | sqrt argument check uses `KnowsNonnegative`; sqrt result inherits strict positivity when argument is strictly positive | *(works — validated. `rule A > B` proves `A - B > 0`, sqrt of strictly positive is strictly positive. No C93.)* |
+| 7 | `Y / D` where `D = if cond then A else B` and branches are nonzero for different reasons | Conditional hull requires both branches to produce a common provable flag | Ensure both branches share the same provable property: `rule A > 0 because "..."` and `rule B > 0 because "..."` — both branches positive, hull preserves positivity. |
+| 8 | `Y / (A - C)` with `rule A >= B` and `rule B >= C` (both weak) | Strict/non-strict matrix: `>= · >= ⇒ >=` only. `A = B = C` satisfies both rules AND makes divisor zero. **Correctly rejected.** | Strengthen at least one rule to strict: `rule A > B` or `rule B > C`. Transitive closure then derives `A > C`. |
+| 9 | `set Net = Gross - Tax` in event E1; `Y / Net` in event E2 | Computed-field facts are event-local — the soundness wall prevents cross-event leakage | Three workarounds: (a) `field Net as number positive` — global constraint. (b) `in Step2 ensure Net > 0 because "..."` — suppresses C93 in events from Step2. (c) Repeat `set Net = Gross - Tax` in E2's chain so gap 3 forward-infers within that event. |
+| 10 | `Y / D` where `D` is assigned from a function call: `set D = compute(X)` where function is known positive | No function-summary analysis — opaque to LinearForm and NumericInterval | `field D as number positive` — global constraint survives assignment. Runtime rejects any assignment that violates the constraint. |
+| 11 | Transitive chain longer than 4 hops | Depth cap = 4 on BFS (sound false negative) | Add a shortcut rule: `rule A > F because "..."`. Direct `rule` always works. |
+| 12 | Relational graph with > 64 facts in scope | Fact-count cap = 64 (sound bounded saturation) | Unlikely in realistic precepts. Move some rules to state-scoped `in State ensure` to reduce global fact count. |
+| 13 | `Y / (A + B)` where both are `nonneg` but at least one might be zero | Sum of non-negatives is non-negative, not positive | Strengthen one summand: `field A as number positive`. Or add `rule A + B > 0 because "..."` directly. |
+| 14 | `Y / (A - B)` where the only fact is `rule A != B` | `!=` does not enter the relational store — only `>` and `>=` | Split into guarded branches: `when A > B -> set Y = Y / (A - B)` and `when B > A -> set Y = Y / (B - A)`. Or add `rule A > B because "..."` if ordering is known. |
+| 15 | `Y / (A - B)` where `A` is an event arg and `B` is a state field with cross-namespace rule | Cross-namespace relational facts work when the rule references dotted forms | *(works — no workaround needed. The bare→dotted rewriter handles the event-arg side structurally.)* |
+| 16 | `Y / (A % B)` where `A` and `B` are positive | `A % B` can be zero even when both operands are positive (`6 % 3 = 0`). **Correctly rejected.** | `(A % B) + 1` is provably positive via interval arithmetic `[0, ∞) + 1 = [1, ∞)`. Validated. |
+| 17 | `rule A > B`, `rule B > A` (self-contradiction) then `Y / (A - B)` | Cycle detected, derived fact silently dropped, C93 emitted | Fix the rules — they are inconsistent. No valid concrete state can satisfy both. |
+| 18 | `Y / (k*A - k*B)` with `rule A > B` and constant `k > 0` | Scalar multiple of a stored relational fact | *(works — no workaround needed. Scalar-multiple GCD normalization reduces `+k·A + (-k)·B` to `+1·A + (-1)·B` before relational lookup.)* |
+| 19 | `Y / (pow(A - B, 2))` or `Y / truncate(X)` with relevant rules | `pow` and `truncate` are built-in functions opaque to LinearForm | Promote to intermediate: `set Sq = pow(A - B, 2)` with `field Sq as number positive`, then divide by `Sq`. |
 
-### 3. Hull for Conditional Expressions
+**Unsupported categories summary:**
+1. **Non-linear expressions** (rows 1, 4, 5) → hoist into intermediate fields with global `rule` constraints.
+2. **Function call opacity** (rows 4, 5, 10) → promote function results to named fields with `positive` constraint or `rule`.
+3. **Cross-event derived facts** (row 9) → declare `field` constraint, use `in State ensure`, or re-derive in the consuming event.
+4. **Correctly rejected patterns** (rows 8, 16, 17) → true unsafeties or contradictions. Fix the logic or rules.
+5. **Bound limits** (rows 11, 12) → add shortcut rules or scope rules tighter.
+6. **Inequality without ordering** (row 14) → split into ordered guard branches or add ordering rule.
 
-**Decision:** The result interval of `if/then/else` is the hull (smallest enclosing interval) of the then-branch and else-branch intervals.
+---
 
-**Alternative considered:** Path-sensitive analysis that tracks which branch was taken and narrows accordingly.
+## Risk Register
 
-**Rationale:** Precept's conditional expressions are value-producing nodes, not control-flow constructs. There is no post-conditional code path where the branch choice matters — the result is a single value used in the enclosing expression. Hull is sound (it contains both possible results) and optimal for this use case (no precision is lost because there is no subsequent narrowing opportunity). Path-sensitive analysis would add complexity with no benefit.
+| Risk | Severity | Mitigation |
+|------|----------|------------|
+| LinearForm `Rational` arithmetic bug → false-positive proof | **High soundness** | Property tests (associativity/commutativity/distributivity over scalar). `ProofEngineSoundnessInvariantTests` enumerates concrete value set `{-100, -1, -0.5, 0, 0.5, 1, 100}` for free variables and asserts `IntervalOf` result contains every realized value. Includes saturation boundary test with `long.MaxValue`-scale coefficients. Debug-build assertion. |
+| FP edge case: `A > B` does NOT imply `A - 1 > B` exploited via symbolic shortcut | **High soundness** | Hard rule in `ProofContext`: all numeric narrowing flows through `NumericInterval` arithmetic. LinearForm equality is used ONLY for fact-key matching, never for symbolic value computation. Property tests cover saturation near MaxValue. |
+| Cross-event leakage of derived facts | **High soundness** | Structural: `EventProofContext.Mutations` not promoted on context flush. `BuildEventEnsureNarrowings` consumes only declared `ensure` clauses. Explicit cross-event isolation tests in `ProofEngineComputedFieldTests` and `ProofContextScopeTests`. |
+| Reassignment fails to invalidate derived facts → stale proof | **High soundness** | C-Nano kill loop ported verbatim into `WithAssignment`, generalized to scan `LinearForm.Terms`. `ProofContextTests.cs` covers (a) relational-fact invalidation (every prior C-Nano scenario mirrored verbatim) and (b) equality-fact invalidation (new in this PR: `WithAssignment` + `_exprFacts` kill loop scanning `LinearForm.Terms`). |
+| Transitive closure exhausts on adversarial precepts | **Medium perf** | Hard caps: 64 facts, depth 4, 256 visited nodes. Cap hit returns Unknown (sound false negative). Stress cases tested. |
+| Strict/non-strict combination matrix bug → fabricates `>` from two `>=` | **Medium soundness** | Encoded as a small static table in `RelationalGraph.cs`. Exhaustive tests cover all four combinations. |
+| Self-contradiction in relational graph throws or fabricates | **Medium correctness** | Cycle detection in BFS; silent drop on contradiction. Test asserts no throw and no fabrication. |
+| LinearForm normalization runs at every `IntervalOf` call → perf regression | **Low perf** | Depth bound (8). Cached on AST node (one allocation per expression, reused across queries). Short-circuit on provably non-normalizable shapes. Budget: no >5% compile-time regression across all 24 sample files. |
+| Inspectability regression — proof state harder to dump | **Low UX** | `ProofContext.Dump()` produces a structured snapshot consumed by hover, MCP `precept_compile`, and debugger display. Strictly an improvement over scattered marker strings. |
+| `BuildEventEnsureNarrowings` migration breaks bare→dotted rewriter | **Medium correctness** | Typed `RelationalFact` records make dotting a structural transform. The PR #108 multi-field bug class is eliminated by construction. Regression tests in `ProofContextScopeTests`. |
+| AST consumers (hover, semantic tokens, MCP DTOs, `ReconstituteExpr`) break | **Low** | LinearForm is parallel to the AST, never replaces it. Diagnostic source spans remain bound to original `PreceptExpression`. AST consumers see no change. |
 
-### 4. Relational Markers as a Separate Layer
-
-**Decision:** `$gt:{A}:{B}` and `$gte:{A}:{B}` markers are harvested from guards/rules/ensures and checked in `TryInferRelationalNonzero` as a fallback after interval analysis fails.
-
-**Alternative considered:** Encoding relational information into the interval domain itself (e.g., constraining `A - B` to a positive interval when `A > B` is known).
-
-**Rationale:** Intervals are a non-relational abstract domain by definition — they track bounds per variable, not relationships between variables. Encoding `A > B` as a constraint on `A - B` would require tracking synthetic expressions in the symbol table, which is architecturally invasive. The separate relational layer is surgically targeted: it handles the specific pattern (`A - B` in divisor position with a known `A > B` fact) that intervals cannot and does so in ~40 lines. The scope is deliberately narrow — only direct `identifier <op> identifier` comparisons, not arbitrary relational constraints.
-
-**Tradeoff accepted:** The relational layer only handles subtraction of two identifiers. `A / (A - B - C)` with `rule A > B + C` is not recognized. This covers the dominant business pattern (pairwise comparison) and avoids the complexity of general relational reasoning.
+---
 
 ## Numeric Precision and IEEE 754
 
-The proof engine operates on `double` (IEEE 754 binary64) internally. This introduces three corner cases that are deliberately handled for soundness:
+The proof engine operates on `double` (IEEE 754 binary64) for `NumericInterval` bounds. This introduces three corner cases that are deliberately handled for soundness:
 
 - **Overflow saturates to ±∞.** When an arithmetic operation produces a result beyond `double.MaxValue`, IEEE 754 rounds to `+∞` or `-∞`. This is sound — an interval containing `+∞` or `-∞` is a valid over-approximation. No false "safe" claims result from overflow.
 - **NaN inputs produce Unknown-equivalent behavior.** If a `NaN` value enters the interval system (e.g., from a malformed literal or an impossible operation), the affected interval is treated as `Unknown`. The `ExcludesZero` and `IsNonnegative` predicates return `false` for any interval containing `NaN`, which is conservative — the engine rejects rather than falsely approves.
 - **Decimal→double cast is a slight widening.** Precept field values use `decimal` at runtime, but interval arithmetic uses `double`. The cast from `decimal` to `double` may widen the value slightly (e.g., `0.1m` → `0.1d` ≈ `0.100000000000000005...`). This is soundness-preserving — a slightly wider interval never causes a false "safe" claim. It may very rarely cause a false "unsafe" claim for values extremely close to zero, which is acceptable given the engine's conservative design.
 
+**`LinearForm` / `Rational` are immune to these issues.** `Rational` uses `long/long` with GCD normalization and `checked` arithmetic. Overflow in `TryNormalize` returns `null` and falls back to interval arithmetic (sound). LinearForm equality for fact-key matching never involves floating-point computation.
+
+---
+
 ## Limitations and Future Work
 
 ### Deliberate exclusions
 
-- **Inter-event proof propagation:** Each event's transition rows are validated with their own proof context. A `positive` constraint or rule applies everywhere, but guard narrowing in one event does not carry to another. This is correct — events are independent entry points.
-
-- **Alias tracking through assignments:** `set Backup = Rate` does not propagate Rate's markers to Backup when the RHS is a compound expression (Layer 1 conservatism). Identifier-to-identifier copies DO propagate markers. Full alias tracking would require must-alias analysis, which is disproportionate for a DSL compiler.
-
-- **Non-linear arithmetic:** Multiplication of two unbounded variables produces `Unknown` bounds (the four-corner rule with `±∞` extremes). This is correct but coarse. Proving `X * X > 0` from `X != 0` would require squaring analysis — a special case not yet implemented.
-
-- **Disjunctive intervals:** `Nonzero` is `(-∞, 0) ∪ (0, +∞)` — a union of two intervals. The engine uses a single interval representation and cannot express this directly. The existing `$nonzero:` marker system covers the identifier case; compound expressions involving `nonzero` variables may lose precision.
+- **Cross-event derived fact carryover.** Always unsound for derived facts — event semantics demand fresh state. Cross-event facts MUST come from declared `ensure` clauses via the existing path. This is the soundness load-bearing wall; it never moves.
+- **Alias tracking through computed assignments.** `set Backup = Rate` propagates whatever `IntervalOf(Rate)` reveals. Full alias tracking through arbitrary expressions would require must-alias analysis disproportionate to the divisor-safety theme.
+- **Non-linear arithmetic.** `A * B` is not linear; representing it requires polynomial normalization (Gröbner-style). Falls back to existing `NumericInterval` arithmetic, which handles `nonzero × nonzero = nonzero` patterns through the flag pipeline.
+- **Function calls in LinearForm.** `abs(X)`, `min(A,B)`, etc. produce non-linear shapes. Function results contribute via `NumericInterval` only.
+- **SMT, octagons, polyhedra, fixpoint over expression trees.** All rejected. Reaffirmed at unified engine design review.
 
 ### Potential precision enhancements
 
 These enhance existing analysis precision without adding new enforcement categories:
 
-- **`$nonzero:` interval encoding:** Represent `nonzero` as a flag on `NumericInterval` rather than a separate marker, enabling compound expressions involving nonzero variables to benefit from interval arithmetic.
-- **Must-alias tracking for identifier copies:** When `set A = B` is detected, copy all markers from B to A in `ApplyAssignmentNarrowing`. Already implemented for simple identifier RHS; could be extended to `abs(B)`, `max(B, literal)`, etc.
-- **Product sign analysis:** `X * Y` is nonzero when both X and Y are nonzero. Currently only proven when both intervals exclude zero; could also check `$nonzero:` markers for each factor.
+- **`nonzero` modifier as first-class constraint:** Would enable `Nonzero` as a flag that survives compound expressions better. Already filed as issue #111.
+- **Product sign analysis:** `X * Y` is nonzero when both X and Y are nonzero. Currently only proven when both intervals exclude zero; could also check `Nonzero` flags for each factor.
 
 For the comprehensive enforcement catalog — assignment constraint checking, dead rule/guard detection, transition reachability sharpening, and cross-event invariant analysis — see **§ Comprehensive Compile-Time Enforcement** below.
 
@@ -389,19 +570,19 @@ For the comprehensive enforcement catalog — assignment constraint checking, de
 
 ## Optimality Assessment
 
-**Verdict: The layered, non-SMT interval+relational design is the correct architecture for Precept's constraint surface. No structural revision needed.**
+**Verdict: The unified ProofContext + LinearForm + RelationalGraph architecture is the correct architecture for Precept's constraint surface. No structural revision needed.**
 
 ### Rationale
 
-1. **Precept's execution model eliminates abstract-interpretation overhead.** No loops, no branches, no reconverging flow (§ Execution Model Assumptions). Single-pass interval arithmetic is not just sufficient — it is *optimal*. Widening, narrowing, fixpoint iteration, and lattice joins are structurally unnecessary because there are no program points where multiple execution paths converge. (Principle #1: deterministic, inspectable model.)
+1. **Precept's execution model eliminates abstract-interpretation overhead.** No loops, no branches, no reconverging flow (§ Execution Model Assumptions). Single-pass interval arithmetic is not just sufficient — it is *optimal*. Widening, narrowing, fixpoint iteration, and lattice joins are structurally unnecessary.
 
-2. **The constraint surface is entirely interval-compatible.** Every numeric constraint (`nonnegative`, `positive`, `min N`, `max N`) maps directly to a closed/open interval. Collection constraints (`mincount`, `maxcount`) and string constraints (`minlength`, `maxlength`) map to integer count intervals over `.count` and `.length` accessors. No constraint in the DSL today requires relational or disjunctive reasoning that intervals cannot express.
+2. **The constraint surface is entirely interval-compatible.** Every numeric constraint (`nonnegative`, `positive`, `min N`, `max N`) maps directly to a closed/open interval. Collection constraints (`mincount`, `maxcount`) and string constraints (`minlength`, `maxlength`) map to integer count intervals. No constraint in the DSL today requires relational or disjunctive reasoning that intervals cannot express.
 
 3. **SMT is overkill.** Z3/CVC5 would bring 50–65 MB of native dependencies, non-deterministic solving times, opaque proof witnesses, and API-surface complexity — all for a constraint surface that is decidable with interval arithmetic alone. This violates Principle #9 (tooling drives syntax — structured diagnostics, not opaque solver output) and Principle #12 (AI legibility — proof witnesses must be inspectable).
 
-4. **A fuller abstract-interpretation lattice is disproportionate.** Octagons (O(n²) per variable) or polyhedra (exponential worst case) would handle multi-variable relationships but at ~2,000+ lines of implementation for a DSL compiler serving business domain authors. The targeted relational layer (Layer 4) handles the dominant inter-variable pattern (`A - B` with `A > B`) in ~65 lines — 97% of the benefit at 3% of the cost.
+4. **A fuller abstract-interpretation lattice is disproportionate.** Octagons (O(n²) per variable) or polyhedra (exponential worst case) would handle multi-variable relationships but at ~2,000+ lines of implementation for a DSL compiler serving business domain authors. The targeted relational layer (`_relationalFacts` keyed by LinearForm + bounded RelationalGraph BFS) handles the dominant inter-variable pattern in ~360 lines — 97% of the benefit at 3% of the cost. The architecture is the CodeContracts "Pentagons" blueprint — interval domain + lightweight relational domain — the proven point on the cost/power curve for this problem class.
 
-5. **A simpler pattern-based approach is too weak.** Pattern matching (recognize `abs()`, `max()`, etc.) misses compound expressions. The interval system proves things like `clamp(D, 1, 100)` excludes zero, `Score + Amount ∈ [1, ∞)` from constraint-derived intervals, and `if X > 0 then X else 1 ∈ (0, ∞)` via Hull — no pattern matcher can match this generality.
+5. **A simpler pattern-based approach is too weak.** Pattern matching misses compound expressions. The unified engine proves things like `clamp(D, 1, 100)` excludes zero, `Score + Amount ∈ [1, ∞)` from constraint-derived intervals, and `if X > 0 then X else 1 ∈ (0, ∞)` via Hull — no pattern matcher can match this generality. Moreover, each new proof shape under the old approach required its own bespoke method (C-Nano illustrated this explicitly). LinearForm closes three gaps simultaneously because it is the typed, exact vocabulary that ad-hoc string markers were approximating.
 
 6. **Philosophy alignment is direct.** The design serves Principle #1 (deterministic — same input → same proof), Principle #8 (sound compile-time-first — never false-positive, conservative on unknowns), Principle #9 (tooling drives syntax — structured diagnostics with interval witnesses for hover/preview), and Principle #12 (AI legibility — proof witnesses are data, not opaque solver traces).
 
@@ -409,21 +590,113 @@ For the comprehensive enforcement catalog — assignment constraint checking, de
 
 | Alternative | Why rejected |
 |---|---|
-| Constraint propagation graph | Adds node-based structure with no benefit over direct interval computation — Precept expressions are trees, not constraint networks |
-| Symbolic execution | Collapses to interval arithmetic when there are no branches — Precept's model makes symbolic execution degenerate |
-| SMT-backed verification | Disproportionate dependency cost; opaque proofs violate Principle #12; non-deterministic timing |
-| Octagon / polyhedra domains | O(n²)/exponential cost for multi-variable relations; Layer 4's targeted relational inference covers the dominant pattern |
-| Property testing / fuzzing | Complementary at test time, not a compile-time analysis technique |
+| Extended marker conventions with bounded helpers (C-Nano trajectory) | Cannot close gaps 1+2 together without inventing a parallel canonical-expression vocabulary as marker keys. LinearForm *is* that vocabulary, typed and exact instead of string-encoded and ad hoc. |
+| AST normalization in the parser | Breaks `ReconstituteExpr`, source spans, semantic tokens, hover, and MCP DTOs. LinearForm as a parallel form avoids this. |
+| Constraint propagation graph | Adds node-based structure with no benefit over direct interval computation — Precept expressions are trees, not constraint networks. |
+| Symbolic execution | Collapses to interval arithmetic when there are no branches — Precept's model makes symbolic execution degenerate. |
+| SMT-backed verification | Disproportionate dependency cost; opaque proofs violate Principle #12; non-deterministic timing. |
+| Octagon / polyhedra domains | O(n²)/exponential cost for multi-variable relations; the targeted relational inference covers the dominant pattern. |
 
-### Architectural smells
+---
 
-None detected. Each layer has a single responsibility, layers compose vertically (higher layers call lower ones), and the overall architecture is a single-pass recursive descent over finite expression trees with linear sequential context. The marker-based proof state is a natural fit for the existing symbol table infrastructure.
+## Design Decisions
+
+### 1. String-Encoded Interval Markers — SUPERSEDED
+
+**Decision (original, PR #108):** Interval data from field constraints was stored as string-encoded markers (`$ival:key:lower:lowerInc:upper:upperInc`) in the existing `IReadOnlyDictionary<string, StaticValueKind>` symbol table.
+
+**Status: SUPERSEDED** by the unified engine's typed `ProofContext._fieldIntervals` (`Dictionary<FieldKey, NumericInterval>`).
+
+**Why superseded.** The string-marker approach was correctly motivated at PR #108 time (avoided threading a second dictionary through ~15 methods). The unified engine's `ProofContext` parameter threading replaces the symbol table entirely, making typed storage the natural choice. The string-encoding and `CultureInfo.InvariantCulture` parsing overhead are eliminated. The bug surface (malformed marker strings silently producing `Unknown`) is eliminated by construction.
+
+**New decision (unified engine).** `ProofContext` is the single proof state parameter threaded through all narrowing and validation methods. Interval data is stored in `_fieldIntervals: Dictionary<FieldKey, NumericInterval>`. Relational facts are stored in `_relationalFacts: Dictionary<LinearForm, RelationalFact>`. All string-marker conventions (`$positive:`, `$nonneg:`, `$nonzero:`, `$ival:`, `$gt:`, `$gte:`) are replaced by typed storage.
+
+**Tradeoff.** Refactoring `PreceptTypeChecker.cs` to replace ~15 method signatures is the price of the unified model. The risk is mitigated by Commit 2 of the implementation plan being a purely mechanical signature refactor (no behavior change) with full test coverage before behavior changes land.
+
+### 2. Subsuming Sign Analysis into Intervals
+
+**Decision:** There is no separate "sign analysis" layer. Sign information is a special case of interval bounds — `Positive` is `(0, +∞)`, `Nonneg` is `[0, +∞)`, `Nonzero` is the complement of `{0}` (handled via flag fallback).
+
+**Alternative rejected:** Dedicated sign domain (Positive / Negative / Nonneg / Nonpositive / Zero / Nonzero / Unknown) with its own transfer rules, running as a parallel analysis alongside intervals.
+
+**Rationale:** A sign domain duplicates information already captured by interval bounds. Every sign transfer rule is a special case of the corresponding interval transfer rule. Maintaining two parallel analyses adds ~100 lines of code with no additional proving power — intervals subsume everything sign analysis can do, plus they handle bounded ranges (`min 5`, `clamp(x, 1, 100)`) that sign analysis cannot.
+
+**Tradeoff accepted:** `Nonzero` (the union `(-∞, 0) ∪ (0, +∞)`) is not representable as a single interval. The engine falls back to the `Nonzero` flag for this case. This is not a regression — PR #108 already handled `Nonzero`-flagged identifier divisors.
+
+### 3. Hull for Conditional Expressions
+
+**Decision:** The result interval of `if/then/else` is the hull (smallest enclosing interval) of the then-branch and else-branch intervals, with each branch evaluated under the narrowed proof context from the guard.
+
+**Alternative considered:** Path-sensitive analysis that tracks which branch was taken and narrows accordingly.
+
+**Rationale:** Precept's conditional expressions are value-producing nodes, not control-flow constructs. There is no post-conditional code path where the branch choice matters — the result is a single value used in the enclosing expression. Hull is sound (it contains both possible results) and optimal for this use case. Path-sensitive analysis would add complexity with no benefit.
+
+### 4. Relational Markers as a Separate Layer — SUPERSEDED
+
+**Decision (original, PR #108):** `$gt:{A}:{B}` and `$gte:{A}:{B}` markers were harvested from guards/rules/ensures and checked in `TryInferRelationalNonzero` as a fallback after interval analysis.
+
+**Status: SUPERSEDED** by unified `LinearForm`-keyed relational facts in `ProofContext._relationalFacts`.
+
+**Why superseded.** The old approach only handled `id OP id` patterns — `A - B` where both sides were bare identifiers. Any compound expression on either side fell through. The new approach stores relational facts keyed by the `LinearForm` of `LHS - RHS`, handling any normalizable expression on either side. `TryInferRelationalNonzero` is deleted.
+
+**New decision (unified engine).** Relational facts are stored as `RelationalFact` records in `_relationalFacts: Dictionary<LinearForm, RelationalFact>`. The fact key is `LinearForm(lhs) - LinearForm(rhs)`. `WithRule(lhs, rel, rhs)` calls `TryNormalize` on both sides; if either is non-normalizable, the fact is dropped (sound — false negative, not false positive). `IntervalOf` queries the store by normalizing the divisor expression and looking for a key that matches (or matches after scalar-multiple GCD reduction). This single query handles direct matches, compound operands, and — via `RelationalGraph` — transitive chains.
+
+### 5. Proven-Violation-Only Policy for Constraint Enforcement
+
+**Decision:** C94 fires only when expression interval and constraint interval have NO overlap. "Possible violation" (partial overlap) produces no diagnostic.
+
+**Alternative rejected:** Warning on possible violations (expression range extends beyond constraint).
+
+**Rationale:** Precept's runtime invariant system is designed to catch constraint violations at execution time. Flagging every assignment that MIGHT produce an out-of-range value would flood authors with warnings on correct code. An assignment like `set Score = Score + Amount` with `max 100` INTENTIONALLY relies on the runtime constraint to reject the `Score = 100, Amount > 0` case.
+
+**Precedent:** Rust's const-evaluation in match exhaustiveness only flags provably exhaustive/unreachable patterns, not "might be" patterns. TypeScript's narrowing errors on provable contradictions, not possible ones.
+
+**Tradeoff accepted:** `set Score = Score + 100` (which exceeds max when Score > 0) is not flagged because `[100, +∞)` ∩ `(-∞, 100]` = `{100}` (non-empty). The runtime catches the actual violation. The engine only catches the case where NO value in the expression range could satisfy the constraint.
+
+### 6. Simple Single-Field Scope for Dead Rule/Guard Analysis
+
+**Decision:** C95/C96/C97/C98 only analyze simple single-field comparisons (`Field <op> Literal`). Cross-field and complex expressions are unanalyzed.
+
+**Alternative rejected:** Full constraint satisfaction for arbitrary boolean expressions.
+
+**Rationale:** General constraint satisfaction is disproportionate to the benefit. Simple single-field comparisons cover the dominant patterns. Cross-field analysis would require relational intervals or an SMT solver — both violate the non-SMT, single-pass architecture.
+
+**Tradeoff accepted:** `rule A + B < 5` with `A min 3` and `B min 3` is not flagged even though it's contradictory.
+
+### 7. Cross-Event Invariant Analysis is Opt-In
+
+**Decision:** C99 requires explicit opt-in. Does not run by default.
+
+**Alternative rejected:** Always-on cross-event analysis.
+
+**Rationale:** Cross-event analysis is the only enforcement requiring fixed-point iteration, breaking the single-pass guarantee. The fast-by-default experience is a product commitment — opt-in preserves it.
+
+### 8. Error vs Warning Severity Split
+
+**Decision:** Proven violations that make code structurally dead → Error. Proven redundancies or unnecessary constructs → Warning.
+
+| Diagnostic | Condition | Severity | Rationale |
+|---|---|---|---|
+| C94 | Assignment always violates constraint | Error | Runtime will always reject — dead code |
+| C95 | Rule always unsatisfiable | Error | Global integrity failure — nothing works |
+| C96 | Rule always true | Warning | Not harmful, just unnecessary |
+| C97 | Guard always false | Warning | Unreachable code, not harmful |
+| C98 | Guard always true | Warning | Unnecessary condition, not harmful |
+| C99 | Cross-event invariant holds | Info | Informational, not a problem |
+
+### 9. No New DSL Constructs Required
+
+**Decision:** All enforcements apply to constructs that exist in the DSL today. No new keywords, modifiers, or syntax forms are needed.
+
+**Observation:** Two gaps noted:
+- **`nonzero` modifier:** Would enable `Nonzero` as a first-class constraint, improving interval precision for divisor safety. Already filed as issue #111. Not required for any enforcement in this design.
+- **`length` constraint on strings:** Would enable C94 for string assignments. Separate language proposal, not part of this design.
 
 ---
 
 ## Comprehensive Compile-Time Enforcement
 
-The proof engine's interval infrastructure (Layers 2–5) enables enforcement beyond C93 (divisor safety) and C76 (sqrt safety). This section catalogs every construct with compile-time-checkable semantics and specifies how the proof engine reasons about each.
+The proof engine's interval infrastructure enables enforcement beyond C93 (divisor safety) and C76 (sqrt safety). This section catalogs every construct with compile-time-checkable semantics and specifies how the proof engine reasons about each.
 
 ### Governing Policy: Proven Violation Only
 
@@ -442,20 +715,20 @@ The engine NEVER fires a diagnostic on code that might be safe at runtime. The r
 
 | Construct | Enforcement | Diag | Sev | Algorithm | Phase |
 |---|---|---|---|---|---|
-| `set Field = expr` (numeric) | Expr interval provably outside field constraint interval | C94 | Error | L2–L3 interval containment | Follow-up A |
+| `set Field = expr` (numeric) | Expr interval provably outside field constraint interval | C94 | Error | IntervalOf + containment | Follow-up A |
 | `to/from State -> set ...` | Same for state actions | C94 | Error | Same | Follow-up A |
 | Computed `field -> expr` | Formula interval provably violates computed field constraint | C94 | Error | Same | Follow-up A |
-| `rule expr because "..."` | Rule predicate contradicts field constraints (unsatisfiable) | C95 | Error | L2 interval intersection | Follow-up B |
-| `rule expr because "..."` | Rule predicate always true given constraints (vacuous) | C96 | Warning | L2 interval containment | Follow-up B |
-| `when guard` (row/edit/ensure) | Guard provably always false | C97 | Warning | L2–L4 proof evaluation | Follow-up C |
-| `when guard` (row/edit/ensure) | Guard provably always true | C98 | Warning | L2–L4 proof evaluation | Follow-up C |
+| `rule expr because "..."` | Rule predicate contradicts field constraints (unsatisfiable) | C95 | Error | Interval intersection | Follow-up B |
+| `rule expr because "..."` | Rule predicate always true given constraints (vacuous) | C96 | Warning | Interval containment | Follow-up B |
+| `when guard` (row/edit/ensure) | Guard provably always false | C97 | Warning | IntervalOf proof evaluation | Follow-up C |
+| `when guard` (row/edit/ensure) | Guard provably always true | C98 | Warning | IntervalOf proof evaluation | Follow-up C |
 | Transition rows via C97 | Dead row sharpens C50/C51 | C50/C51 | Warning (existing) | Via C97 | Follow-up C |
 | State reachability via C97 | All incoming rows dead sharpens C48 | C48 | Warning (existing) | Via C97 | Follow-up D |
 | Cross-event field invariant | Field always in range across all reachable states | C99 | Info | State-graph fixed-point | Follow-up E |
 | Boolean guard refinement | Boolean field narrowing to {true}/{false} | — | — | Existing narrowing | Already shipped |
 | Choice assignment | Literal not in choice set | C68 | Error (existing) | Existing | Already shipped |
-| Divisor safety | Divisor provably zero / unproven nonzero | C92/C93 | Error | L1–L5 | PR #108 |
-| Sqrt safety | Argument provably negative / unproven non-negative | C76 | Error | L2–L3 | PR #108 |
+| Divisor safety | Divisor provably zero / unproven nonzero | C92/C93 | Error | Unified engine | Unified PR |
+| Sqrt safety | Argument provably negative / unproven non-negative | C76 | Error | Unified engine | Unified PR |
 
 ### C94: Assignment Constraint Enforcement
 
@@ -475,8 +748,7 @@ The engine NEVER fires a diagnostic on code that might be safe at runtime. The r
 | `positive` + `max M` | `(0, M]` |
 | Multiple constraints | Intersection of all individual intervals |
 
-2. Compute `exprInterval = TryInferInterval(expr, symbols)` using L2–L3.
-
+2. Compute `exprInterval = ctx.IntervalOf(expr)` using the unified engine.
 3. Check: `!NumericInterval.Intersects(exprInterval, constraintInterval)` → **C94 error**.
 
 **New method on `NumericInterval`:**
@@ -506,11 +778,7 @@ static NumericInterval FromConstraints(IReadOnlyList<FieldConstraint> constraint
 
 **Severity: Error.** A proven violation means the runtime invariant will ALWAYS reject the operation — the assignment can never succeed. This is dead code (the transition row will always be rolled back). Principle #8: if the checker proves a contradiction, block it.
 
-**Marker format:** No new markers. Uses existing `$ival:` markers from Layer 2 for expression intervals, plus the new `FromConstraints` method for field constraint intervals.
-
-**False positive policy:** C94 fires ONLY when expression interval and constraint interval have zero overlap. `set Score = Score + 1` with `max 100` → `[1, 101]` ∩ `(-∞, 100]` = `[1, 100]` (non-empty) → no diagnostic. The runtime handles the `Score = 100` edge case.
-
-**Nullable interaction:** For nullable fields with constraints, the constraint only applies to non-null values (constraints desugar with null guards: `Field == null or Field >= N`). C94 checks only apply when the RHS expression is provably non-null (no `Null` in `StaticValueKind`). If the expression might be null, no C94 check — the null case is valid by the `nullable` declaration.
+**Nullable interaction:** C94 checks only apply when the RHS expression is provably non-null (no `Null` in `StaticValueKind`). If the expression might be null, no C94 check — the null case is valid by the `nullable` declaration.
 
 **What triggers C94:**
 
@@ -575,7 +843,7 @@ static NumericInterval FromConstraints(IReadOnlyList<FieldConstraint> constraint
 
 **Example:** `field Score as number min 10` + `rule Score < 5 because "..."`. Constraint `[10, +∞)`, satisfying `(-∞, 5)`, no intersection → C95.
 
-**Scope limitation:** Only simple single-field comparisons (`Field <op> Literal`). Cross-field rules (`rule A > B`) and complex expressions (`rule X + Y > 0`) are unanalyzed — no diagnostic. The `!= N` case is also skipped because the satisfying set is disjunctive and not representable as a single interval.
+**Scope limitation:** Only simple single-field comparisons. Cross-field rules (`rule A > B`) and complex expressions (`rule X + Y > 0`) are unanalyzed.
 
 **Diagnostic message:** `"Rule '{expression}' contradicts the '{constraint}' constraint on field '{field}'. No valid value satisfies both — every operation will be rejected."`
 
@@ -594,10 +862,7 @@ static NumericInterval FromConstraints(IReadOnlyList<FieldConstraint> constraint
 
 **What:** A non-synthetic rule whose predicate is provably always true given the field's declared constraints.
 
-**Algorithm:**
-
-1. Same extraction as C95 — simple single-field comparison, satisfying interval, constraint interval.
-2. Check containment: if `constraintInterval ⊆ satisfyingInterval` → **C96 warning**.
+**Algorithm:** Same extraction as C95. Check containment: if `constraintInterval ⊆ satisfyingInterval` → **C96 warning**.
 
 **Containment check:**
 
@@ -612,11 +877,11 @@ Contains(outer, inner):
 
 `Contains(satisfyingInterval, constraintInterval)` → C96.
 
-**Severity: Warning.** The rule isn't wrong — it's unnecessary. The constraint already guarantees the condition. May indicate a misunderstanding of the constraint system, or may be kept intentionally for documentation. Principle #8 conservatism: warn but don't block.
+**Severity: Warning.** The rule isn't wrong — it's unnecessary. Principle #8 conservatism: warn but don't block.
 
 **Example:** `field Score as number min 0 max 100` + `rule Score >= 0 because "..."`. Constraint `[0, 100]`, satisfying `[0, +∞)`, `[0, 100] ⊆ [0, +∞)` → C96.
 
-**Note:** Synthetic rules (generated by constraint desugaring) are excluded from C96 analysis. A `nonnegative` constraint generating `rule X >= 0` is not redundant with itself.
+**Note:** Synthetic rules (generated by constraint desugaring) are excluded from C96 analysis.
 
 **Diagnostic message:** `"Rule '{expression}' is always satisfied by the '{constraint}' constraint on field '{field}'. Consider removing the redundant rule."`
 
@@ -628,21 +893,17 @@ Contains(outer, inner):
 | `Check_C96_MinVsGteLower_Warning` | `min 5` + `rule X >= 0` |
 | `Check_C96_MaxVsLteHigher_Warning` | `max 100` + `rule X <= 200` |
 | `Check_C96_SyntheticRule_Excluded` | Synthetic rule from constraint → no C96 |
-| `Check_C96_NotVacuous_NoDiagnostic` | `min 0 max 100` + `rule X >= 50` → no C96 (constraint not ⊆ satisfying) |
+| `Check_C96_NotVacuous_NoDiagnostic` | `min 0 max 100` + `rule X >= 50` → no C96 |
 
 ### C97: Dead Guard
 
 **What:** A `when` guard on a transition row, edit declaration, or ensure whose condition is provably always false given the proof state at the point of evaluation.
 
-**Algorithm:**
+**Algorithm:** At each `when` guard, extract the guard's satisfying interval for each field it references (simple single-field comparison extraction). Look up the field's constraint interval from the current proof state. If `!Intersects(guardSatisfyingInterval, fieldConstraintInterval)` for any field → **C97 warning**.
 
-1. At each `when` guard, extract the guard's satisfying interval for each field it references (same technique as C95 — simple single-field comparison extraction).
-2. Look up the field's constraint interval from the current proof state (base proof + rules + state ensures, as narrowed by `ApplyNarrowing`).
-3. If `!Intersects(guardSatisfyingInterval, fieldConstraintInterval)` for any field → **C97 warning**.
+**Extended to relational guards:** When the proof state contains a relational fact `A > B` and the guard is `when A <= B`, the guard contradicts the relational fact → C97.
 
-**Extended to relational guards:** When the proof state contains `$gt:A:B` (from a rule `A > B`) and the guard is `when A <= B`, the guard contradicts the relational fact → C97. This uses Layer 4 markers.
-
-**Severity: Warning.** Dead guards create unreachable code — similar to existing C48 (unreachable state), which is also a warning. The code doesn't cause runtime failure; it's just unused. Principle #8: warn on proven dead code, don't error on it unless it prevents some operation from ever succeeding.
+**Severity: Warning.** Dead guards create unreachable code — similar to existing C48 (unreachable state), also a warning.
 
 **Example:** `field Score as number max 100` + `when Score > 100 -> ...`. Guard satisfying `(100, +∞)`, constraint `(-∞, 100]`, no intersection → C97.
 
@@ -663,12 +924,9 @@ Contains(outer, inner):
 
 **What:** A `when` guard whose condition is provably always true given the proof state.
 
-**Algorithm:**
+**Algorithm:** Same extraction as C97. Check: `Contains(guardSatisfyingInterval, fieldConstraintInterval)` → **C98 warning**.
 
-1. Same extraction as C97 — guard satisfying interval, field constraint interval.
-2. Check: `Contains(guardSatisfyingInterval, fieldConstraintInterval)` → **C98 warning**.
-
-**Severity: Warning.** The guard adds no information — removing `when` would not change behavior. Not a bug, but may indicate unnecessary complexity.
+**Severity: Warning.** The guard adds no information — removing `when` would not change behavior.
 
 **Example:** `field Rate as number positive` + `when Rate > 0 -> ...`. Guard satisfying `(0, +∞)`, constraint `(0, +∞)`, constraint ⊆ satisfying → C98.
 
@@ -687,11 +945,11 @@ Contains(outer, inner):
 
 The proof engine sharpens three existing diagnostics by combining dead guard detection (C97) with existing state-graph analysis:
 
-**C50 sharpening (dead-end state):** If all transition rows leaving a state have provably-dead guards (all C97), the state has no viable exits. C50 fires even though rows syntactically exist — they are all unreachable.
+**C50 sharpening (dead-end state):** If all transition rows leaving a state have provably-dead guards (all C97), the state has no viable exits. C50 fires even though rows syntactically exist.
 
 **C51 sharpening (always-rejecting):** If all non-reject rows for a `(State, Event)` pair have dead guards, only reject rows remain viable. C51 fires.
 
-**C48 sharpening (unreachable state):** If all transition rows targeting a state have dead guards (on the source rows), no path can reach it. C48 fires even though transition rows exist.
+**C48 sharpening (unreachable state):** If all transition rows targeting a state have dead guards, no path can reach it. C48 fires even though transition rows exist.
 
 These are NOT new diagnostics — they are sharper triggers for existing ones, using interval analysis instead of purely syntactic analysis.
 
@@ -707,20 +965,18 @@ These are NOT new diagnostics — they are sharper triggers for existing ones, u
 
 **What:** Proves that a field maintains a constraint across ALL reachable states and transitions, enabling downstream code to rely on the invariant without per-expression proof.
 
-**Example:** `field Score as number min 0 max 100` — if no transition row assigns a value outside `[0, 100]` (all assignments provably safe via C94 analysis), then Score's interval is `[0, 100]` in every reachable state. The proof engine can inject this as a tighter interval for downstream checks.
-
 **Algorithm:**
 
 1. Build the state graph (states as nodes, transition rows as edges).
 2. For each field with numeric constraints, initialize the field's interval to the constraint interval.
-3. For each transition row, compute the post-assignment interval for the field using `TryInferInterval` on the RHS expression (if assigned) or carry the incoming interval (if not assigned).
+3. For each transition row, compute the post-assignment interval for the field using `ctx.IntervalOf(rhs)` (if assigned) or carry the incoming interval (if not assigned).
 4. At each state, compute the join (Hull) of all incoming edge intervals.
 5. Iterate until fixed point (field intervals stop changing).
 6. If the fixed-point interval for a field at a state is tighter than `Unknown`, inject it as a proof marker for that state's context.
 
-**Complexity:** O(|states| × |fields| × |transitions|) per iteration. Terminates because field constraint intervals provide finite bounds — intervals cannot grow beyond the constraint, and Hull is monotone (only widens). The number of iterations is bounded by the number of distinct interval values, which is finite given fixed constraint bounds.
+**Complexity:** O(|states| × |fields| × |transitions|) per iteration. Terminates because field constraint intervals provide finite bounds — intervals cannot grow beyond the constraint, and Hull is monotone. The number of iterations is bounded by the number of distinct interval values, which is finite given fixed constraint bounds.
 
-**Gating:** This analysis is **opt-in only**. It does not run by default. It is the only enforcement in this design that requires fixed-point iteration, breaking the single-pass guarantee. For small precepts (5–10 states), it is fast. For large precepts with complex state graphs, it could add noticeable compile time.
+**Gating:** **Opt-in only.** This is the only enforcement in this design that requires fixed-point iteration, breaking the single-pass guarantee.
 
 **Severity: Info.** Informational diagnostic — tells the author a proven invariant holds. Does not block compilation.
 
@@ -736,17 +992,15 @@ These are NOT new diagnostics — they are sharper triggers for existing ones, u
 
 ### Collection, String, Boolean, and Choice Reasoning
 
-**Collection count intervals:** `mincount N` and `maxcount N` define integer intervals for `.count`. After `add`, count ∈ `[prev.count, prev.count + 1]` (sets may not increase for duplicates); after `clear`, count = 0; after `enqueue`/`push`, count = prev.count + 1; after `dequeue`/`pop`, count = prev.count - 1.
+**Collection count intervals:** `mincount N` and `maxcount N` define integer intervals for `.count`. After `add`, count ∈ `[prev.count, prev.count + 1]`; after `clear`, count = 0; after `enqueue`/`push`, count = prev.count + 1; after `dequeue`/`pop`, count = prev.count - 1.
 
-**Design decision: NOT enforced.** Collection mutations are data-dependent (add a value from an event arg). Count evolution depends on runtime membership, which the proof engine cannot track without element-level set analysis. The runtime invariant system enforces `mincount`/`maxcount` after each mutation. The cost of element-membership tracking is disproportionate.
+**Design decision: NOT enforced.** Collection mutations are data-dependent. Count evolution depends on runtime membership, which the proof engine cannot track without element-level set analysis. The runtime invariant system enforces `mincount`/`maxcount` after each mutation.
 
-**String length intervals:** `minlength N` and `maxlength N` define integer intervals for `.length`. String functions with bounded output exist (`left(s, N)` → length ≤ N), but the dominant pattern is literal assignment or event-arg assignment where length depends on runtime input.
+**String length intervals:** **NOT enforced.** String operations in Precept are limited, and the dominant patterns involve runtime-dependent string values.
 
-**Design decision: NOT enforced.** String operations in Precept are limited, and the dominant patterns involve runtime-dependent string values. Literal string assignments are already checked at parse time (C59 for defaults). No new enforcement adds meaningful value.
+**Boolean reasoning:** Already tracked through the narrowing system as `{true, false}` / `{true}` / `{false}`. No new proof engine work needed.
 
-**Boolean reasoning:** Already tracked through the narrowing system as `{true, false}` / `{true}` / `{false}`. Guards referencing boolean fields refine correctly: `when IsPremium` → `IsPremium = true`. No new proof engine work needed.
-
-**Choice/enum reasoning:** C68 already checks literal assignment to choice fields at compile time. Choices are discrete sets, not intervals — the proof engine's interval infrastructure does not add value. No new enforcement needed.
+**Choice/enum reasoning:** C68 already checks literal assignment to choice fields at compile time. No new enforcement needed.
 
 ---
 
@@ -756,24 +1010,23 @@ The proof engine's no-false-positive guarantee extends to all new enforcements:
 
 ### What the engine proves (complete list)
 
-**Existing (PR #108):**
+**Unified PR:**
 - **C92:** Divisor is literal zero — proven contradiction.
-- **C93:** Divisor has no compile-time nonzero proof — unproven identity/compound expression.
+- **C93:** Divisor has no compile-time nonzero proof — unproven compound expression.
 - **C76:** Sqrt argument has no compile-time non-negative proof.
 - **Sequential flow:** Post-mutation proof state correctly reflects assignment effects.
-- **Relational facts:** `A - B` provably nonzero when strict inequality `A > B` is proven.
+- **Relational facts:** LinearForm-shaped expressions provably nonzero when a matching strict relational fact exists (directly or transitively).
+- **Computed-field intermediaries:** Intervals derived from `WithAssignment` are available to subsequent divisor checks in the same row.
 - **Conditional results:** Provably nonzero when Hull of both branch intervals excludes zero.
 
-**New (follow-up):**
-- **C94:** Assignment expression interval provably outside field constraint interval. The `Intersects` predicate is sound — it returns false only when there is provably zero overlap between the two intervals.
-- **C95:** Rule predicate satisfying interval provably disjoint from field constraint interval. Uses the same `Intersects` predicate.
-- **C96:** Field constraint interval provably contained within rule satisfying interval. The `Contains` predicate is sound — it returns true only when every value in the inner interval is also in the outer interval.
-- **C97/C98:** Guard satisfying interval provably disjoint from / contains the field constraint interval. Same predicates as C95/C96 applied to guard expressions.
-- **C99:** Cross-event field interval provably bounded after fixed-point convergence. Sound because Hull is an over-approximation (only widens) and iteration terminates at a fixed point.
+**Follow-up:**
+- **C94:** Assignment expression interval provably outside field constraint interval. The `Intersects` predicate is sound — it returns false only when there is provably zero overlap.
+- **C95:** Rule predicate satisfying interval provably disjoint from field constraint interval.
+- **C96:** Field constraint interval provably contained within rule satisfying interval.
+- **C97/C98:** Guard satisfying interval provably disjoint from / contains the field constraint interval.
+- **C99:** Cross-event field interval provably bounded after fixed-point convergence. Sound because Hull is an over-approximation and iteration terminates at a fixed point.
 
 ### What the engine conservatively rejects (updated)
-
-All items from § Soundness Guarantees above remain unchanged, plus:
 
 - **Partial-overlap constraint violations.** `set Score = Score + Amount` where the result interval partially exceeds `max 100` is not flagged. The runtime handles it.
 - **Cross-field rule contradictions.** `rule A > B` with constrained A and B is not analyzed for satisfiability.
@@ -784,97 +1037,47 @@ All items from § Soundness Guarantees above remain unchanged, plus:
 
 ## New Design Decisions
 
-### 5. Proven-Violation-Only Policy for Constraint Enforcement
-
-**Decision:** C94 fires only when expression interval and constraint interval have NO overlap. "Possible violation" (partial overlap) produces no diagnostic.
-
-**Alternative rejected:** Warning on possible violations (expression range extends beyond constraint).
-
-**Rationale:** Precept's runtime invariant system is designed to catch constraint violations at execution time. Flagging every assignment that MIGHT produce an out-of-range value would flood authors with warnings on correct code. An assignment like `set Score = Score + Amount` with `max 100` INTENTIONALLY relies on the runtime constraint to reject the `Score = 100, Amount > 0` case. Warning about the intended design of the constraint system would be noise.
-
-**Precedent:** Rust's const-evaluation in match exhaustiveness only flags provably exhaustive/unreachable patterns, not "might be" patterns. TypeScript's narrowing errors on provable contradictions, not possible ones.
-
-**Tradeoff accepted:** `set Score = Score + 100` (which exceeds max when Score > 0) is not flagged because `[100, +∞)` ∩ `(-∞, 100]` = `{100}` (non-empty, single point). The runtime catches the actual violation. The engine only catches the case where NO value in the expression range could satisfy the constraint.
-
-### 6. Simple Single-Field Scope for Dead Rule/Guard Analysis
-
-**Decision:** C95/C96/C97/C98 only analyze simple single-field comparisons (`Field <op> Literal`). Cross-field and complex expressions are unanalyzed.
-
-**Alternative rejected:** Full constraint satisfaction for arbitrary boolean expressions.
-
-**Rationale:** General constraint satisfaction is disproportionate to the benefit. Simple single-field comparisons cover the dominant patterns (field constraints vs rules/guards that reference the same field with a literal bound). Cross-field analysis would require relational intervals or an SMT solver — both violate the design's non-SMT, single-pass architecture. (Principle #8: the checker doesn't guess.)
-
-**Tradeoff accepted:** `rule A + B < 5` with `A min 3` and `B min 3` is not flagged even though it's contradictory (`A + B >= 6 > 5`). The analysis doesn't compose arithmetic intervals across rule predicates.
-
-### 7. Cross-Event Invariant Analysis is Opt-In
-
-**Decision:** C99 requires explicit opt-in. Does not run by default.
-
-**Alternative rejected:** Always-on cross-event analysis.
-
-**Rationale:** Cross-event analysis is the only enforcement requiring fixed-point iteration, breaking the single-pass guarantee. Performance impact is proportional to state-graph complexity. The fast-by-default experience is a product commitment — opt-in preserves it.
-
-**Tradeoff accepted:** Authors don't get cross-event invariant information unless they explicitly enable it. Most won't need it.
-
-### 8. Error vs Warning Severity Split
-
-**Decision:** Proven violations that make code structurally dead → Error. Proven redundancies or unnecessary constructs → Warning.
-
-| Diagnostic | Condition | Severity | Rationale |
-|---|---|---|---|
-| C94 | Assignment always violates constraint | Error | Runtime will always reject — dead code |
-| C95 | Rule always unsatisfiable | Error | Global integrity failure — nothing works |
-| C96 | Rule always true | Warning | Not harmful, just unnecessary |
-| C97 | Guard always false | Warning | Unreachable code, not harmful |
-| C98 | Guard always true | Warning | Unnecessary condition, not harmful |
-| C99 | Cross-event invariant holds | Info | Informational, not a problem |
-
-**Rationale:** Errors block compilation (Principle #8: prevention). Warnings inform the author. The line is drawn at "will this code ever succeed?" — if the answer is provably no, it's an error. If it's "this code is redundant but not broken," it's a warning.
-
-### 9. No New DSL Constructs Required
-
-**Decision:** All enforcements apply to constructs that EXIST in the DSL today. No new keywords, modifiers, or syntax forms are needed.
-
-**Observation:** The constraint surface (`nonnegative`, `positive`, `min N`, `max N`, `notempty`, `minlength`, `maxlength`, `mincount`, `maxcount`, `maxplaces`, `ordered`) is comprehensive for the current type system. Two gaps noted:
-
-- **`nonzero` modifier:** Would enable `$nonzero:` as a first-class constraint, improving interval precision for divisor safety. Already filed as issue #111. Not required for any enforcement in this design.
-- **`length` constraint on strings (integer bound on `.length`):** Would enable C94 for string assignments. Does not exist today. PROPOSAL NOTE: if string-length enforcement is wanted, a `length` constraint keyword would be needed. This is a separate language proposal, not part of this design.
+See §§ 5–9 in the **Design Decisions** section above.
 
 ---
 
 ## Phasing
 
-### PR #108 — Current Scope (Unchanged)
+### Unified PR — Current Scope
 
-PR #108 ships the proof engine infrastructure: Layers 1–5, C93 compound-expression enforcement, C76 interval-based sqrt safety, and the `NumericInterval` foundation. Slices 11–15 as designed in `temp/proof-stack-implementation-plan.md`.
+The unified PR ships the complete proof engine: `ProofContext`, `LinearForm`, `Rational`, `RelationalGraph`, the `GlobalProofContext`/`EventProofContext` scope split, and the unified `IntervalOf` query path. It closes all five gaps (compound subtraction, sum-on-RHS, computed-field intermediaries, transitive closure, cross-event scope) and replaces the old five-layer stack architecture and the C-Nano patch.
 
-**No new enforcement diagnostics land on PR #108.**
+The PR is organized as six internal commits for reviewability, but ships as a single unit when all six are complete:
 
-**Rationale:** PR #108 is already +340 new lines, +56 tests. The proof stack infrastructure must be correct and well-tested before building enforcement on top of it. Shipping infrastructure and enforcement separately enables clean bisection if regressions occur, and each follow-up issue has a focused, reviewable scope.
+- **Commit 1** — `Rational` + `LinearForm` (no integration, ~100+250 LOC).
+- **Commit 2** — `ProofContext` introduced as a refactor (no behavior change, type-checker signature migration).
+- **Commit 3** — `IntervalOf` composes interval + relational facts via LinearForm (gaps 1 + 2); `InferSubtractionInterval` and `TryInferRelationalNonzero` deleted.
+- **Commit 4** — Forward inference at assignment + equality facts (gap 3); kill loop ported.
+- **Commit 5** — `RelationalGraph` transitive closure (gap 4); `--proof-saturate` debug flag.
+- **Commit 6** — `GlobalProofContext`/`EventProofContext` scope split (gap 5); `BuildEventEnsureNarrowings` typed rewrite; soundness invariant tests; docs; MCP `proof` key; hover integration; new sample files.
+
+**No new enforcement diagnostics land in the unified PR.** C94–C99 remain follow-up issues built on the unified engine infrastructure.
 
 ### Follow-up A: Assignment Constraint Enforcement (C94)
 
 **Title:** Compile-time assignment constraint enforcement via interval analysis
-**Scope:** C94 diagnostic, `NumericInterval.Intersects`, `NumericInterval.FromConstraints`, constraint interval checks at all assignment sites (transition rows, state actions, computed fields), ~12 tests.
+**Scope:** C94 diagnostic, `NumericInterval.Intersects`, `NumericInterval.FromConstraints`, constraint interval checks at all assignment sites, ~12 tests.
 **Size:** ~80 new lines + ~15 changed + 12 tests.
-**Depends on:** PR #108 (interval infrastructure).
-**Rationale:** Natural first consumer of the interval infrastructure. High value — catches provably-dead assignments that currently pass silently to runtime rejection.
+**Depends on:** Unified PR (interval infrastructure + `ProofContext`).
 
 ### Follow-up B: Dead Rule Detection (C95, C96)
 
 **Title:** Compile-time dead rule detection — contradictory and vacuous rules
-**Scope:** C95/C96 diagnostics, satisfying interval extraction from rule predicates, comparison against field constraint intervals, synthetic-rule exclusion, ~8 tests.
+**Scope:** C95/C96 diagnostics, satisfying interval extraction from rule predicates, ~8 tests.
 **Size:** ~60 new lines + ~10 changed + 8 tests.
 **Depends on:** Follow-up A (constraint interval extraction pattern).
-**Rationale:** Catches structural precept errors (C95) and unnecessary rules (C96). Low implementation cost — reuses interval comparison from C94.
 
 ### Follow-up C: Dead Guard Detection (C97, C98) + Transition Sharpening
 
 **Title:** Compile-time dead/vacuous guard detection and transition reachability sharpening
 **Scope:** C97/C98 diagnostics, guard interval analysis, sharpened C48/C50/C51 triggers, ~12 tests.
 **Size:** ~80 new lines + ~20 changed + 12 tests.
-**Depends on:** Follow-up A and B (interval extraction patterns).
-**Rationale:** Extends dead-code detection to transition routing. High value for complex precepts where guard interactions with constraints create unreachable rows.
+**Depends on:** Follow-ups A and B.
 
 ### Follow-up D: State Reachability Sharpening
 
@@ -882,12 +1085,37 @@ PR #108 ships the proof engine infrastructure: Layers 1–5, C93 compound-expres
 **Scope:** Integrate C97 results into existing C48 analysis, ~3 tests.
 **Size:** ~20 new lines + ~10 changed + 3 tests.
 **Depends on:** Follow-up C (C97 infrastructure).
-**Rationale:** Small, focused extension. Leverages C97 to sharpen the existing state-graph analysis.
 
 ### Follow-up E: Cross-Event Field Invariant Analysis (C99)
 
 **Title:** Opt-in cross-event field invariant analysis via state-graph fixed-point
 **Scope:** C99 diagnostic, state-graph iteration, opt-in gating, ~6 tests.
 **Size:** ~150 new lines + ~10 changed + 6 tests.
-**Depends on:** PR #108 (interval infrastructure). Independent of A–D.
-**Rationale:** The only enforcement requiring fixed-point iteration. Separate research and design review recommended before implementation. Highest cost, lowest urgency.
+**Depends on:** Unified PR (interval infrastructure). Independent of A–D.
+**Note:** Only enforcement requiring fixed-point iteration. Separate design review recommended before implementation.
+
+---
+
+## Test Obligations
+
+**Baseline (branch at design review):** 1469 tests. (The plan's original 1364 baseline predated the DiagnosticSpanPrecisionTests (28 tests) and C-Nano commits that landed before the unified engine PR.)
+
+**Post-PR target:** ~1660 tests (1469 + 191 new).
+
+| File | New tests | Coverage summary |
+|------|-----------|-----------------|
+| `LinearFormTests.cs` | 40 | Normalization of `+`, `-`, unary `-`, parens, literals, identifiers; commutative equality; decimal literal handling via `Rational`; depth-bound termination at 8; non-normalizable → null; algebra (Add/Subtract/Negate); property tests for associativity/commutativity/distributivity over scalar; constant-only form; single-term form; zero-coefficient cancellation (`A - A` → empty terms, constant 0); `long.MaxValue` GCD stress. |
+| `RationalTests.cs` | 23 | Construction; GCD normalization; `INumber<Rational>` compliance; arithmetic; equality and GetHashCode consistency; zero denominator throws; decimal literal round-trip; `long.MinValue` negation overflow; multiplication overflow; division by zero throws. |
+| `ProofContextTests.cs` | 33 | Query API contracts (`IntervalOf`, `SignOf`, `KnowsNonzero`, `KnowsNonnegative`); copy-on-write semantics; `Child()` parenting; `Dump()` shape; **reassignment kill loop — covers (a) relational-fact invalidation (every C-Nano scenario mirrored verbatim) AND (b) equality-fact invalidation (new in this PR: `WithAssignment` + `_exprFacts` kill loop scanning `LinearForm.Terms`)**; `IntervalOf` on fully opaque expression → Unknown (never throws). |
+| `ProofEngineCompoundDivisorTests.cs` | 17 | Gap 1: `(A+1)-B` with `rule A>B`; `A-(B+C)` with `rule A>B+C`; `Total-Tax-Fee` with `rule Total>Tax+Fee`; mixed compound shapes; regression: bare `A-B` (ex-C-Nano); scalar-multiple: `Y / (3*A - 3*B)` with `rule A > B` proves; negative-k does NOT prove. **Includes `Check_ConditionalHullIncludesZero_C93`: `Y / (if A > B then A - B else 0)` — hull is `[0, +∞)` → C93 fires correctly.** |
+| `ProofEngineSumOnRhsTests.cs` | 12 | Gap 2: `rule Total > Tax + Fee` proves `Amount/(Total-Tax-Fee)`; `rule A >= B + C`; mixed-sign summands; function-call summands fall back gracefully (no crash, conservative). |
+| `ProofEngineComputedFieldTests.cs` | 18 | Gap 3: `set Net = Gross-Tax; check Amount/Net` with `rule Gross>Tax`; multi-step chains (`set A = X+Y; set B = A-1; check Z/B`); reassignment invalidates derived equality fact; non-normalizable RHS falls back conservatively; cross-event isolation soundness anchor. |
+| `ProofEngineTransitiveClosureTests.cs` | 17 | Gap 4: 2-step / 3-step / 4-step chains; strict/non-strict matrix exhaustive (all four combinations); cycle/self-contradiction silently dropped; depth cap honored; fact-count cap honored; disconnected graph. |
+| `ProofContextScopeTests.cs` | 12 | Gap 5: global facts visible in event scope; event facts NOT visible in sibling event; ensure-derived facts cross via `BuildEventEnsureNarrowings`; rule narrowings remain global; bare→dotted rewriter regression. **Explicitly covers all three ensure variants: `on Event ensure` (arg-only — cannot reference fields); `in State ensure` (suppresses C93 in receiving-state events); `to State ensure` (does NOT suppress C93 in the receiving event — use `in`, not `to`).** |
+| `ProofEngineSoundnessInvariantTests.cs` | 15 | Concrete value enumeration over `{-100, -1, -0.5, 0, 0.5, 1, 100}` for free variables; saturation boundary test with `long.MaxValue`-scale coefficients; FP edge cases. |
+| `ProofEngineUnsupportedPatternTests.cs` | 4 | Soundness anchors: C93 correctly fires on non-linear divisors, function-opaque divisors, inequality-without-ordering, and modulo. |
+| **Total new** | **191** | |
+
+**Hull equal-bound inclusivity** (`LowerInclusive = a.LowerInclusive || b.LowerInclusive` when bounds are equal) is existing behavior covered by `NumericIntervalTests.cs` Hull tests. No new test obligation for this PR.
+
+**Performance regression** (≤5% compile-time budget across all 24 sample files): pre-merge manual check — benchmark all 24 `samples/*.precept` files before/after using the language server timing output. Candidate for CI automation, not in scope for this PR.

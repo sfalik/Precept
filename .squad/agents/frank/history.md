@@ -40,6 +40,24 @@
 
 ## Recent Updates
 
+### 2026-04-18 — Rewrote ProofEngineDesign.md for unified architecture
+
+Rewrote `docs/ProofEngineDesign.md` (893 → 1095 lines) to reflect the unified ProofContext + LinearForm + RelationalGraph architecture from `temp/unified-proof-plan.md`.
+
+Key structural decisions:
+
+1. **Architecture framing replaced.** The "five-layer stack" is gone. The doc now describes three composing types (`ProofContext`, `LinearForm`, `RelationalGraph`) and one composing query (`IntervalOf`) as the architecture spine. Layer 1 → `WithAssignment`, Layer 2 → `NumericInterval` (unchanged), Layer 3 → `IntervalOf` dispatch, Layer 4 → LinearForm-keyed `_relationalFacts` + `RelationalGraph`, Layer 5 → `IntervalOf` conditional case.
+
+2. **New sections added:** Research Foundations (zone domain / Cousot & Cousot / CodeContracts Pentagons / Boogie), Rational Type, LinearForm Normalization, Transitive Closure, Proof State Lifecycle and Scope, Coverage Matrix (22 patterns), Unsupported Patterns (19 rows), Risk Register, IntervalOf Query Path.
+
+3. **Design Decisions #1 and #4 marked SUPERSEDED.** #1 (string-encoded interval markers) superseded by typed `ProofContext._fieldIntervals`. #4 (relational markers as a separate layer) superseded by LinearForm-keyed `_relationalFacts`. New decisions noted inline in each.
+
+4. **Phasing updated.** Replaced "PR #108, Slices 11–15" framing with the unified PR six-commit structure. Follow-up A–E sections updated to reference `ProofContext` and `IntervalOf` instead of string markers.
+
+5. **Doc is self-contained.** A reader can understand the full architecture without reading `temp/unified-proof-plan.md`. Implementation artifacts (commit ordering, test counts, file inventory) deliberately omitted — those belong in the PR body. The five gaps are described as problems the architecture solves, with the mechanism for each.
+
+6. **NumericInterval details, IEEE 754 handling, and C94–C99 enforcement specs preserved intact** — these are correct and unchanged; only their framing was updated (e.g., `ctx.IntervalOf(expr)` instead of `TryInferInterval` call sites).
+
 ### 2026-04-17 — Applied review feedback to unified proof plan
 - Applied all accepted George + Soup Nazi review findings to `temp/unified-proof-plan.md` per Shane's resolved overrides.
 - B1: Added `checked` long arithmetic and cross-GCD pre-reduction to Rational spec (§0 constraint #1, §4 Rational.cs entry).
@@ -60,6 +78,16 @@
 - Updated §7 Division in LinearForm exclusion to specify `long/long` Rational coefficients.
 - Added §9 "Post-endorsement update" note: architectural spine unchanged, endorsements remain valid.
 - No architectural decisions changed. All edits are refinements and external validation.
+
+### 2026-04-18 — PR #108 body updated: replaced stale Slices 11–16 with unified proof plan
+- Replaced Slices 11–16 (old per-slice narrowing approach) in PR #108 body with the 6-commit unified ProofContext + LinearForm architecture from `temp/unified-proof-plan.md`.
+- Preserved Slices 1–10 content exactly (all checked — shipped). New Commits 1–6 all unchecked.
+- Updated Summary: reflects Slices 1–10 as shipped plus the unified proof engine delivering ProofContext + LinearForm + Rational + RelationalGraph, closing all 5 proof gaps.
+- Updated Why: added the linear-form decision rationale and explicit SMT/Z3 rejection.
+- Updated Implementation Plan: 6 commits with method-level specificity, exact file paths, per-commit test counts (1469 baseline → 1532 → 1542 → 1598 → 1616 → 1633 → 1660), regression anchors, dependency graph, and tests-that-MUST-FLIP table.
+- Added Coverage Matrix (22 patterns, 12 new provers, 0 regressions), Unsupported Patterns (§8a) summary, and Risk Register (§6) table per task requirements.
+- Updated File Inventory (18 new files), Tooling/MCP sync assessment, and Validation (1469 current → ~1660 target, 191 new tests).
+- Key decision: used 1660 as the actual target (1469 + 191) rather than the plan document's 1555 (which used a stale 1364 baseline). The additional 105 tests came from post-Slices-1-10 commits (e.g., span precision work).
 
 ### 2026-04-13 — Issue #88 docs sync completed for PR #90
 - Reconciled the editability/documentation story across `docs/PreceptLanguageDesign.md`, `docs/EditableFieldsDesign.md`, `docs/RuntimeApiDesign.md`, and `docs/McpServerDesign.md`.
