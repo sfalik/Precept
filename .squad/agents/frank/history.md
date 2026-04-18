@@ -237,6 +237,14 @@ Key structural decisions:
 - Shane flagged that issue #118's decomposition was built from the current file state, not the post-PR-#108 target state described in `docs/ProofEngineDesign.md`. Revised the entire issue body.
 - Key corrections: (1) Added architectural boundary section clarifying what lives on `ProofContext.cs` (IntervalOf, KnowsNonzero, WithAssignment, WithRule, WithGuard, Child, Dump, LookupRelationalInterval, GcdNormalize) vs `PreceptTypeChecker.cs` — the design doc's Integration Points table is the authoritative source. (2) ProofChecks group grew from ~380 to ~500-550 lines to account for the shared assessment model (Commit 11) and C94-C98 enforcement methods (Commit 12) that will exist in the file before this refactoring runs. (3) Updated line estimates from ~3200 to ~3500-3600 for the post-PR-#108 file. (4) Fixed future-proofing: #111 is now scoped to the `nonzero` modifier, not C94-C99 (those land in PR #108). (5) Added C95/C96 integration note for ValidateRules in the main file. (6) Updated Narrowing group for typed RelationalFact rekeying (Commit 9).
 - Lesson: decomposition issues for files under active development MUST target the to-be state from the canonical design doc, not the as-is state that will change before the refactoring runs.
+### 2026-04-15 — Issue #100 precept name token scope fix (PR #101)
+- Fixed `machineDeclaration` capture 4 scope from `entity.name.precept.message.precept` → `entity.name.type.precept.precept` in the TextMate grammar.
+- Removed the old scope from the `preceptMessage` semanticTokenScopes mapping in package.json.
+- Added explicit Structure Indigo (`#6366F1`) textMateRule for `entity.name.type.precept.precept`.
+- No runtime, language server, MCP, or doc changes required — purely a tooling scope correction.
+- All 1,476 tests pass. PR #101 marked ready for review.
+
+
 
 ### 2026-04-13 — Issue #88 docs sync completed for PR #90
 - Reconciled the editability/documentation story across `docs/PreceptLanguageDesign.md`, `docs/EditableFieldsDesign.md`, `docs/RuntimeApiDesign.md`, and `docs/McpServerDesign.md`.
