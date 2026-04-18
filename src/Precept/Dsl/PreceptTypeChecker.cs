@@ -92,10 +92,10 @@ internal static class PreceptTypeChecker
         var expressions = new List<PreceptTypeExpressionInfo>();
         var scopes = new List<PreceptTypeScopeInfo>();
 
-        IReadOnlyDictionary<string, StaticValueKind> dataFieldKinds = model.Fields.ToDictionary(
+        ProofContext dataFieldKinds = new ProofContext(model.Fields.ToDictionary(
             field => field.Name,
             MapFieldContractKind,
-            StringComparer.Ordinal);
+            StringComparer.Ordinal));
 
         // Replace bespoke constraint-inspection loop with unified narrowing from rules.
         // Constraints desugar to synthetic rules at parse time (e.g., `positive` → `rule Field > 0`).
@@ -112,7 +112,7 @@ internal static class PreceptTypeChecker
         // Slice 12: inject $ival: markers from explicit min/max constraints.
         // nonnegative/positive are already covered by $nonneg:/$positive: markers injected above.
         {
-            var markerDict = new Dictionary<string, StaticValueKind>(dataFieldKinds, StringComparer.Ordinal);
+            var markerDict = new Dictionary<string, StaticValueKind>(dataFieldKinds.Symbols, StringComparer.Ordinal);
             foreach (var field in model.Fields)
             {
                 if (field.Constraints is not { Count: > 0 }) continue;
@@ -133,7 +133,7 @@ internal static class PreceptTypeChecker
                 var ival = new NumericInterval(lower, minVal.HasValue, upper, maxVal.HasValue);
                 markerDict[ival.ToMarkerKey(field.Name)] = StaticValueKind.Boolean;
             }
-            dataFieldKinds = markerDict;
+            dataFieldKinds = new ProofContext(markerDict);
         }
 
         var eventArgKinds = model.Events.ToDictionary(
@@ -221,11 +221,11 @@ internal static class PreceptTypeChecker
 
     private static void ValidateTransitionRows(
         PreceptDefinition model,
-        IReadOnlyDictionary<string, StaticValueKind> dataFieldKinds,
+        ProofContext dataFieldKinds,
         IReadOnlyDictionary<string, Dictionary<string, StaticValueKind>> eventArgKinds,
         IReadOnlyDictionary<string, PreceptCollectionField> collectionFieldMap,
-        IReadOnlyDictionary<string, IReadOnlyDictionary<string, StaticValueKind>> stateEnsureNarrowings,
-        IReadOnlyDictionary<string, IReadOnlyDictionary<string, StaticValueKind>> eventEnsureNarrowings,
+        IReadOnlyDictionary<string, ProofContext> stateEnsureNarrowings,
+        IReadOnlyDictionary<string, ProofContext> eventEnsureNarrowings,
         List<PreceptValidationDiagnostic> diagnostics,
         List<PreceptTypeExpressionInfo> expressions,
         List<PreceptTypeScopeInfo> scopes)
@@ -247,16 +247,16 @@ internal static class PreceptTypeChecker
             foreach (var stateGroup in groupedRows)
             {
                 var baseSymbols = BuildSymbolKinds(
-                    dataFieldKinds,
+                    dataFieldKinds.Symbols,
                     eventArgKinds,
                     eventName,
                     model.CollectionFields,
-                    stateEnsureNarrowings.TryGetValue(stateGroup.Key, out var stateNarrowing) ? stateNarrowing : null);
+                    stateEnsureNarrowings.TryGetValue(stateGroup.Key, out var stateNarrowing) ? stateNarrowing.Symbols : null);
 
                 // Merge event ensure narrowings (dotted-form proof markers) into transition-row scope
                 if (eventEnsureNarrowings.TryGetValue(eventName, out var eventNarrowing))
                 {
-                    foreach (var pair in eventNarrowing)
+                    foreach (var pair in eventNarrowing.Symbols)
                         baseSymbols[pair.Key] = pair.Value;
                 }
 
@@ -267,7 +267,7 @@ internal static class PreceptTypeChecker
                     stateGroup.Key,
                     eventName));
 
-                IReadOnlyDictionary<string, StaticValueKind> branchSymbols = baseSymbols;
+                IReadOnlyDictionary<string, StaticValueKind> branchContext = baseSymbols;
 
                 // C47: detect identical guard text for the same (state, event) group
                 var seenGuards = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -275,7 +275,7 @@ internal static class PreceptTypeChecker
                 foreach (var item in stateGroup.OrderBy(x => x.Row.SourceLine))
                 {
                     var row = item.Row;
-                    IReadOnlyDictionary<string, StaticValueKind> setSymbols = branchSymbols;
+                    IReadOnlyDictionary<string, StaticValueKind> setContext = branchContext;
 
                     // C47: duplicate guard detection for this (state, event) group
                     if (row.WhenGuard is not null && !string.IsNullOrWhiteSpace(row.WhenText))
@@ -305,14 +305,14 @@ internal static class PreceptTypeChecker
                         scopes.Add(new PreceptTypeScopeInfo(
                             row.SourceLine,
                             "when",
-                            new Dictionary<string, StaticValueKind>(branchSymbols, StringComparer.Ordinal),
+                            new Dictionary<string, StaticValueKind>(branchContext, StringComparer.Ordinal),
                             item.State,
                             eventName));
                         ValidateExpression(
                             row.WhenGuard,
                             row.WhenText!,
                             row.SourceLine,
-                            branchSymbols,
+                            branchContext,
                             StaticValueKind.Boolean,
                             "when predicate",
                             diagnostics,
@@ -320,27 +320,27 @@ internal static class PreceptTypeChecker
                             stateContext: item.State,
                             isBooleanRulePosition: true);
 
-                        setSymbols = ApplyNarrowing(row.WhenGuard, branchSymbols, assumeTrue: true);
-                        branchSymbols = ApplyNarrowing(row.WhenGuard, branchSymbols, assumeTrue: false);
+                        setContext = ApplyNarrowing(row.WhenGuard, new ProofContext(branchContext), assumeTrue: true).Symbols;
+                        branchContext = ApplyNarrowing(row.WhenGuard, new ProofContext(branchContext), assumeTrue: false).Symbols;
                     }
 
                     scopes.Add(new PreceptTypeScopeInfo(
                         row.SourceLine,
                         "transition-actions",
-                        new Dictionary<string, StaticValueKind>(setSymbols, StringComparer.Ordinal),
+                        new Dictionary<string, StaticValueKind>(setContext, StringComparer.Ordinal),
                         item.State,
                         eventName));
 
                     foreach (var assignment in row.SetAssignments)
                     {
-                        if (!dataFieldKinds.TryGetValue(assignment.Key, out var targetKind))
+                        if (!dataFieldKinds.Symbols.TryGetValue(assignment.Key, out var targetKind))
                             continue;
 
                         ValidateExpression(
                             assignment.Expression,
                             assignment.ExpressionText,
                             assignment.SourceLine > 0 ? assignment.SourceLine : row.SourceLine,
-                            setSymbols,
+                            setContext,
                             targetKind,
                             $"set target '{assignment.Key}'",
                             diagnostics,
@@ -364,13 +364,13 @@ internal static class PreceptTypeChecker
                         }
 
                         // Layer 1: thread post-assignment proof state into subsequent assignments.
-                        setSymbols = ApplyAssignmentNarrowing(assignment.Key, assignment.Expression, setSymbols);
+                        setContext = ApplyAssignmentNarrowing(assignment.Key, assignment.Expression, new ProofContext(setContext)).Symbols;
                     }
 
                     ValidateCollectionMutations(
                         row.CollectionMutations,
-                        setSymbols,
-                        dataFieldKinds,
+                        setContext,
+                        dataFieldKinds.Symbols,
                         collectionFieldMap,
                         diagnostics,
                         expressions,
@@ -384,9 +384,9 @@ internal static class PreceptTypeChecker
 
     private static void ValidateStateActions(
         PreceptDefinition model,
-        IReadOnlyDictionary<string, StaticValueKind> dataFieldKinds,
+        ProofContext dataFieldKinds,
         IReadOnlyDictionary<string, PreceptCollectionField> collectionFieldMap,
-        IReadOnlyDictionary<string, IReadOnlyDictionary<string, StaticValueKind>> stateEnsureNarrowings,
+        IReadOnlyDictionary<string, ProofContext> stateEnsureNarrowings,
         List<PreceptValidationDiagnostic> diagnostics,
         List<PreceptTypeExpressionInfo> expressions,
         List<PreceptTypeScopeInfo> scopes)
@@ -402,7 +402,7 @@ internal static class PreceptTypeChecker
         {
             // Build data-only symbols with collection accessors, narrowed by state ensures
             var baseSymbols = new Dictionary<string, StaticValueKind>(
-                stateEnsureNarrowings.TryGetValue(action.State, out var narrowed) ? narrowed : dataFieldKinds,
+                stateEnsureNarrowings.TryGetValue(action.State, out var narrowed) ? narrowed.Symbols : dataFieldKinds.Symbols,
                 StringComparer.Ordinal);
 
             foreach (var col in model.CollectionFields)
@@ -433,18 +433,18 @@ internal static class PreceptTypeChecker
                 action.State));
 
             // Layer 1: thread post-assignment proof state into subsequent assignments.
-            IReadOnlyDictionary<string, StaticValueKind> assignmentSymbols = baseSymbols;
+            IReadOnlyDictionary<string, StaticValueKind> assignmentContext = baseSymbols;
 
             foreach (var assignment in action.SetAssignments)
             {
-                if (!dataFieldKinds.TryGetValue(assignment.Key, out var targetKind))
+                if (!dataFieldKinds.Symbols.TryGetValue(assignment.Key, out var targetKind))
                     continue;
 
                 ValidateExpression(
                     assignment.Expression,
                     assignment.ExpressionText,
                     assignment.SourceLine > 0 ? assignment.SourceLine : action.SourceLine,
-                    assignmentSymbols,
+                    assignmentContext,
                     targetKind,
                     $"set target '{assignment.Key}'",
                     diagnostics,
@@ -467,13 +467,13 @@ internal static class PreceptTypeChecker
                         StateContext: action.State));
                 }
 
-                assignmentSymbols = ApplyAssignmentNarrowing(assignment.Key, assignment.Expression, assignmentSymbols);
+                assignmentContext = ApplyAssignmentNarrowing(assignment.Key, assignment.Expression, new ProofContext(assignmentContext)).Symbols;
             }
 
             ValidateCollectionMutations(
                 action.CollectionMutations,
-                assignmentSymbols,
-                dataFieldKinds,
+                assignmentContext,
+                dataFieldKinds.Symbols,
                 collectionFieldMap,
                 diagnostics,
                 expressions,
@@ -824,7 +824,7 @@ internal static class PreceptTypeChecker
     /// </summary>
     private static IReadOnlyList<string>? ValidateComputedFields(
         PreceptDefinition model,
-        IReadOnlyDictionary<string, StaticValueKind> dataFieldKinds,
+        ProofContext dataFieldKinds,
         IReadOnlyDictionary<string, Dictionary<string, StaticValueKind>> eventArgKinds,
         IReadOnlyDictionary<string, PreceptCollectionField> collectionFieldMap,
         List<PreceptValidationDiagnostic> diagnostics,
@@ -853,7 +853,7 @@ internal static class PreceptTypeChecker
         var unsafeAccessors = new HashSet<string>(StringComparer.Ordinal) { "peek", "min", "max" };
 
         // Build full data-symbols scope for expression type checking (same as ValidateRules)
-        var dataSymbols = new Dictionary<string, StaticValueKind>(dataFieldKinds, StringComparer.Ordinal);
+        var dataSymbols = new Dictionary<string, StaticValueKind>(dataFieldKinds.Symbols, StringComparer.Ordinal);
         foreach (var col in model.CollectionFields)
         {
             dataSymbols[$"{col.Name}.count"] = StaticValueKind.Number;
@@ -1131,13 +1131,13 @@ internal static class PreceptTypeChecker
 
     private static void ValidateRules(
         PreceptDefinition model,
-        IReadOnlyDictionary<string, StaticValueKind> dataFieldKinds,
+        ProofContext dataFieldKinds,
         IReadOnlyDictionary<string, Dictionary<string, StaticValueKind>> eventArgKinds,
         List<PreceptValidationDiagnostic> diagnostics,
         List<PreceptTypeExpressionInfo> expressions,
         List<PreceptTypeScopeInfo> scopes)
     {
-        var dataSymbols = new Dictionary<string, StaticValueKind>(dataFieldKinds, StringComparer.Ordinal);
+        var dataSymbols = new Dictionary<string, StaticValueKind>(dataFieldKinds.Symbols, StringComparer.Ordinal);
         foreach (var col in model.CollectionFields)
         {
             dataSymbols[$"{col.Name}.count"] = StaticValueKind.Number;
@@ -1378,11 +1378,11 @@ internal static class PreceptTypeChecker
         return [row.FromState];
     }
 
-    private static IReadOnlyDictionary<string, IReadOnlyDictionary<string, StaticValueKind>> BuildStateEnsureNarrowings(
+    private static IReadOnlyDictionary<string, ProofContext> BuildStateEnsureNarrowings(
         PreceptDefinition model,
-        IReadOnlyDictionary<string, StaticValueKind> dataFieldKinds)
+        ProofContext dataFieldKinds)
     {
-        var result = new Dictionary<string, IReadOnlyDictionary<string, StaticValueKind>>(StringComparer.Ordinal);
+        var result = new Dictionary<string, ProofContext>(StringComparer.Ordinal);
         if (model.StateEnsures is null || model.StateEnsures.Count == 0)
             return result;
 
@@ -1390,7 +1390,7 @@ internal static class PreceptTypeChecker
             .Where(static stateEnsure => stateEnsure.Anchor == EnsureAnchor.In && stateEnsure.WhenGuard is null)
             .GroupBy(static stateEnsure => stateEnsure.State, StringComparer.Ordinal))
         {
-            IReadOnlyDictionary<string, StaticValueKind> narrowed = new Dictionary<string, StaticValueKind>(dataFieldKinds, StringComparer.Ordinal);
+            ProofContext narrowed = new ProofContext(new Dictionary<string, StaticValueKind>(dataFieldKinds.Symbols, StringComparer.Ordinal));
 
             foreach (var stateEnsure in group)
                 narrowed = ApplyNarrowing(stateEnsure.Expression, narrowed, assumeTrue: true);
@@ -1401,11 +1401,11 @@ internal static class PreceptTypeChecker
         return result;
     }
 
-    private static IReadOnlyDictionary<string, IReadOnlyDictionary<string, StaticValueKind>> BuildEventEnsureNarrowings(
+    private static IReadOnlyDictionary<string, ProofContext> BuildEventEnsureNarrowings(
         PreceptDefinition model,
         IReadOnlyDictionary<string, Dictionary<string, StaticValueKind>> eventArgKinds)
     {
-        var result = new Dictionary<string, IReadOnlyDictionary<string, StaticValueKind>>(StringComparer.Ordinal);
+        var result = new Dictionary<string, ProofContext>(StringComparer.Ordinal);
         if (model.EventEnsures is null || model.EventEnsures.Count == 0)
             return result;
 
@@ -1418,18 +1418,17 @@ internal static class PreceptTypeChecker
                 continue;
 
             // Build bare-name symbol table for the event's args
-            IReadOnlyDictionary<string, StaticValueKind> bareSymbols =
-                new Dictionary<string, StaticValueKind>(args, StringComparer.Ordinal);
+            ProofContext bareContext = new ProofContext(new Dictionary<string, StaticValueKind>(args, StringComparer.Ordinal));
 
             foreach (var eventEnsure in group)
-                bareSymbols = ApplyNarrowing(eventEnsure.Expression, bareSymbols, assumeTrue: true);
+                bareContext = ApplyNarrowing(eventEnsure.Expression, bareContext, assumeTrue: true);
 
             // Translate proof markers from bare form to dotted form for transition-row scope.
             // Event ensures use bare arg names (e.g. "Days"), but transition rows use dotted names
             // (e.g. "Submit.Days"). Markers like "$positive:Days" become "$positive:Submit.Days".
             // Relational markers like "$gt:A:B" become "$gt:Submit.A:Submit.B" (both fields dotted).
             var dottedMarkers = new Dictionary<string, StaticValueKind>(StringComparer.Ordinal);
-            foreach (var pair in bareSymbols)
+            foreach (var pair in bareContext.Symbols)
             {
                 if (pair.Key.Length == 0 || pair.Key[0] != '$')
                     continue;
@@ -1456,7 +1455,7 @@ internal static class PreceptTypeChecker
             }
 
             if (dottedMarkers.Count > 0)
-                result[eventName] = dottedMarkers;
+                result[eventName] = new ProofContext(dottedMarkers);
         }
 
         return result;
@@ -1731,7 +1730,7 @@ internal static class PreceptTypeChecker
                 }
 
                 // Null-narrow symbols for then-branch (condition assumed true)
-                var thenSymbols = ApplyNarrowing(cond.Condition, symbols, assumeTrue: true);
+                var thenSymbols = ApplyNarrowing(cond.Condition, new ProofContext(symbols), assumeTrue: true).Symbols;
                 if (!TryInferKind(cond.ThenBranch, thenSymbols, out var thenKind, out diagnostic))
                     return false;
 
@@ -1964,7 +1963,7 @@ internal static class PreceptTypeChecker
                     PreceptLiteralExpression { Value: long lval } => lval >= 0,
                     PreceptLiteralExpression { Value: double dval } => dval >= 0,
                     PreceptLiteralExpression { Value: decimal mval } => mval >= 0,
-                    _ => TryInferInterval(arg, symbols).IsNonnegative,
+                    _ => TryInferInterval(arg, new ProofContext(symbols)).IsNonnegative,
                 };
 
                 if (!isNonNeg)
@@ -2008,7 +2007,7 @@ internal static class PreceptTypeChecker
                     return false;
                 }
 
-                var rightSymbols = ApplyNarrowing(binary.Left, symbols, assumeTrue: true);
+                var rightSymbols = ApplyNarrowing(binary.Left, new ProofContext(symbols), assumeTrue: true).Symbols;
                 if (!TryInferKind(binary.Right, rightSymbols, out var rightKind, out diagnostic))
                     return false;
 
@@ -2033,7 +2032,7 @@ internal static class PreceptTypeChecker
                     return false;
                 }
 
-                var rightSymbols = ApplyNarrowing(binary.Left, symbols, assumeTrue: false);
+                var rightSymbols = ApplyNarrowing(binary.Left, new ProofContext(symbols), assumeTrue: false).Symbols;
                 if (!TryInferKind(binary.Right, rightSymbols, out var rightKind, out diagnostic))
                     return false;
 
@@ -2179,8 +2178,8 @@ internal static class PreceptTypeChecker
                     else
                     {
                         // Layer 3: interval arithmetic + Layer 4: relational inference
-                        var divisorInterval = TryInferInterval(binary.Right, symbols);
-                        if (!divisorInterval.ExcludesZero && !TryInferRelationalNonzero(binary.Right, symbols))
+                        var divisorInterval = TryInferInterval(binary.Right, new ProofContext(symbols));
+                        if (!divisorInterval.ExcludesZero && !TryInferRelationalNonzero(binary.Right, new ProofContext(symbols)))
                         {
                             var description = divisorInterval.IsUnknown
                                 ? "Divisor expression has no compile-time nonzero proof."
@@ -2309,11 +2308,11 @@ internal static class PreceptTypeChecker
     /// </summary>
     private static NumericInterval ExtractIntervalFromMarkers(
         string key,
-        IReadOnlyDictionary<string, StaticValueKind> symbols)
+        ProofContext context)
     {
         // Explicit interval marker takes priority (most specific).
         var ivalPrefix = $"$ival:{key}:";
-        foreach (var mk in symbols.Keys)
+        foreach (var mk in context.Symbols.Keys)
         {
             if (mk.StartsWith(ivalPrefix, StringComparison.Ordinal) &&
                 NumericInterval.TryParseMarkerKey(mk, out var ival))
@@ -2323,9 +2322,9 @@ internal static class PreceptTypeChecker
         }
 
         // Fall back to sign markers.
-        var isPositive = symbols.ContainsKey($"$positive:{key}");
-        var isNonneg = symbols.ContainsKey($"$nonneg:{key}");
-        var isNonzero = symbols.ContainsKey($"$nonzero:{key}");
+        var isPositive = context.Symbols.ContainsKey($"$positive:{key}");
+        var isNonneg = context.Symbols.ContainsKey($"$nonneg:{key}");
+        var isNonzero = context.Symbols.ContainsKey($"$nonzero:{key}");
 
         if (isPositive) return NumericInterval.Positive;
         if (isNonneg && isNonzero) return NumericInterval.Positive; // nonneg + nonzero = strictly positive
@@ -2340,9 +2339,9 @@ internal static class PreceptTypeChecker
     /// Each identifier leaf is initialized via <see cref="ExtractIntervalFromMarkers"/>.
     /// Returns <see cref="NumericInterval.Unknown"/> for any expression whose bounds cannot be determined.
     /// </summary>
-    private static NumericInterval TryInferInterval(
+    internal static NumericInterval TryInferInterval(
         PreceptExpression expression,
-        IReadOnlyDictionary<string, StaticValueKind> symbols)
+        ProofContext context)
     {
         switch (expression)
         {
@@ -2355,23 +2354,23 @@ internal static class PreceptTypeChecker
 
             case PreceptIdentifierExpression idExpr:
                 if (TryGetIdentifierKey(idExpr, out var idKey))
-                    return ExtractIntervalFromMarkers(idKey, symbols);
+                    return ExtractIntervalFromMarkers(idKey, context);
                 return NumericInterval.Unknown;
 
             case PreceptParenthesizedExpression paren:
-                return TryInferInterval(paren.Inner, symbols);
+                return TryInferInterval(paren.Inner, context);
 
             case PreceptUnaryExpression { Operator: "-" } unary:
-                return NumericInterval.Negate(TryInferInterval(unary.Operand, symbols));
+                return NumericInterval.Negate(TryInferInterval(unary.Operand, context));
 
             case PreceptBinaryExpression binary:
             {
-                var left  = TryInferInterval(binary.Left,  symbols);
-                var right = TryInferInterval(binary.Right, symbols);
+                var left  = TryInferInterval(binary.Left,  context);
+                var right = TryInferInterval(binary.Right, context);
                 return binary.Operator switch
                 {
                     "+" => NumericInterval.Add(left, right),
-                    "-" => InferSubtractionInterval(binary, left, right, symbols),
+                    "-" => InferSubtractionInterval(binary, left, right, context),
                     "*" => NumericInterval.Multiply(left, right),
                     "/" => NumericInterval.Divide(left, right),
                     "%" => right.ExcludesZero
@@ -2385,19 +2384,19 @@ internal static class PreceptTypeChecker
 
             case PreceptFunctionCallExpression fn when fn.Arguments.Length >= 1:
             {
-                var a0 = TryInferInterval(fn.Arguments[0], symbols);
+                var a0 = TryInferInterval(fn.Arguments[0], context);
                 switch (fn.Name)
                 {
                     case "abs":
                         return NumericInterval.Abs(a0);
                     case "min" when fn.Arguments.Length == 2:
-                        return NumericInterval.Min(a0, TryInferInterval(fn.Arguments[1], symbols));
+                        return NumericInterval.Min(a0, TryInferInterval(fn.Arguments[1], context));
                     case "max" when fn.Arguments.Length == 2:
-                        return NumericInterval.Max(a0, TryInferInterval(fn.Arguments[1], symbols));
+                        return NumericInterval.Max(a0, TryInferInterval(fn.Arguments[1], context));
                     case "clamp" when fn.Arguments.Length == 3:
                         return NumericInterval.Clamp(a0,
-                            TryInferInterval(fn.Arguments[1], symbols),
-                            TryInferInterval(fn.Arguments[2], symbols));
+                            TryInferInterval(fn.Arguments[1], context),
+                            TryInferInterval(fn.Arguments[2], context));
                     case "sqrt":
                         if (a0.IsNonnegative)
                         {
@@ -2421,9 +2420,9 @@ internal static class PreceptTypeChecker
 
             case PreceptConditionalExpression cond:
             {
-                var thenSymbols = ApplyNarrowing(cond.Condition, symbols, assumeTrue: true);
-                var thenInterval = TryInferInterval(cond.ThenBranch, thenSymbols);
-                var elseInterval = TryInferInterval(cond.ElseBranch, symbols);
+                var thenContext = ApplyNarrowing(cond.Condition, context, assumeTrue: true);
+                var thenInterval = TryInferInterval(cond.ThenBranch, thenContext);
+                var elseInterval = TryInferInterval(cond.ElseBranch, context);
                 return NumericInterval.Hull(thenInterval, elseInterval);
             }
 
@@ -2438,9 +2437,9 @@ internal static class PreceptTypeChecker
     /// only when strict inequality guarantees the difference is nonzero.
     /// <c>$gte:</c> allows equality (difference = 0) and does NOT satisfy this predicate.
     /// </summary>
-    private static bool TryInferRelationalNonzero(
+    internal static bool TryInferRelationalNonzero(
         PreceptExpression divisor,
-        IReadOnlyDictionary<string, StaticValueKind> symbols)
+        ProofContext context)
     {
         divisor = StripParentheses(divisor);
 
@@ -2452,9 +2451,9 @@ internal static class PreceptTypeChecker
         if (!TryGetIdentifierKey(sub.Right, out var b)) return false;
 
         // $gt:{a}:{b}  →  a > b  →  a - b > 0  ✓
-        if (symbols.ContainsKey($"$gt:{a}:{b}")) return true;
+        if (context.Symbols.ContainsKey($"$gt:{a}:{b}")) return true;
         // $gt:{b}:{a}  →  b > a  →  a - b < 0  ✓ (still nonzero)
-        if (symbols.ContainsKey($"$gt:{b}:{a}")) return true;
+        if (context.Symbols.ContainsKey($"$gt:{b}:{a}")) return true;
         // $gte does NOT prove nonzero (a == b is possible)
         return false;
     }
@@ -2474,7 +2473,7 @@ internal static class PreceptTypeChecker
         PreceptBinaryExpression binary,
         NumericInterval left,
         NumericInterval right,
-        IReadOnlyDictionary<string, StaticValueKind> symbols)
+        ProofContext context)
     {
         var arithmetic = NumericInterval.Subtract(left, right);
 
@@ -2483,16 +2482,16 @@ internal static class PreceptTypeChecker
             return arithmetic;
 
         // L > R  →  L - R ∈ (0, +∞) : strictly positive
-        if (symbols.ContainsKey($"$gt:{leftKey}:{rightKey}"))
+        if (context.Symbols.ContainsKey($"$gt:{leftKey}:{rightKey}"))
             return NumericInterval.Intersect(arithmetic, NumericInterval.Positive);
         // L ≥ R  →  L - R ∈ [0, +∞) : non-negative (allows zero — does NOT prove nonzero for C93)
-        if (symbols.ContainsKey($"$gte:{leftKey}:{rightKey}"))
+        if (context.Symbols.ContainsKey($"$gte:{leftKey}:{rightKey}"))
             return NumericInterval.Intersect(arithmetic, NumericInterval.Nonneg);
         // R > L  →  L - R ∈ (-∞, 0) : strictly negative
-        if (symbols.ContainsKey($"$gt:{rightKey}:{leftKey}"))
+        if (context.Symbols.ContainsKey($"$gt:{rightKey}:{leftKey}"))
             return NumericInterval.Intersect(arithmetic, new NumericInterval(double.NegativeInfinity, false, 0, false));
         // R ≥ L  →  L - R ∈ (-∞, 0] : non-positive
-        if (symbols.ContainsKey($"$gte:{rightKey}:{leftKey}"))
+        if (context.Symbols.ContainsKey($"$gte:{rightKey}:{leftKey}"))
             return NumericInterval.Intersect(arithmetic, new NumericInterval(double.NegativeInfinity, false, 0, true));
 
         return arithmetic;
@@ -2503,12 +2502,12 @@ internal static class PreceptTypeChecker
     /// assignment. Called within assignment loops to thread post-mutation proof state into subsequent
     /// assignments in the same row or state action (Layer 1: Sequential Assignment Flow).
     /// </summary>
-    private static IReadOnlyDictionary<string, StaticValueKind> ApplyAssignmentNarrowing(
+    internal static ProofContext ApplyAssignmentNarrowing(
         string targetField,
         PreceptExpression rhs,
-        IReadOnlyDictionary<string, StaticValueKind> symbols)
+        ProofContext context)
     {
-        var markers = new Dictionary<string, StaticValueKind>(symbols, StringComparer.Ordinal);
+        var markers = new Dictionary<string, StaticValueKind>(context.Symbols, StringComparer.Ordinal);
 
         // Always kill existing numeric proof markers for the target field first.
         markers.Remove($"$positive:{targetField}");
@@ -2517,7 +2516,7 @@ internal static class PreceptTypeChecker
 
         // Kill any $ival: markers for the target field (encoded as prefix $ival:{field}:).
         var ivalPrefix = $"$ival:{targetField}:";
-        foreach (var k in symbols.Keys.Where(k => k.StartsWith(ivalPrefix, StringComparison.Ordinal)).ToList())
+        foreach (var k in context.Symbols.Keys.Where(k => k.StartsWith(ivalPrefix, StringComparison.Ordinal)).ToList())
             markers.Remove(k);
 
         // Kill relational markers ($gt:, $gte:) where the target field appears as either operand.
@@ -2526,7 +2525,7 @@ internal static class PreceptTypeChecker
         {
             var asLeft  = $"{relPrefix}{targetField}:";
             var asRight = $":{targetField}";
-            foreach (var k in symbols.Keys.Where(k =>
+            foreach (var k in context.Symbols.Keys.Where(k =>
                 k.StartsWith(asLeft, StringComparison.Ordinal) ||
                 (k.StartsWith(relPrefix, StringComparison.Ordinal) && k.EndsWith(asRight, StringComparison.Ordinal))).ToList())
                 markers.Remove(k);
@@ -2569,16 +2568,16 @@ internal static class PreceptTypeChecker
         else if (TryGetIdentifierKey(rhs, out var sourceKey))
         {
             // Copy numeric proof markers from source identifier to target field.
-            if (symbols.ContainsKey($"$positive:{sourceKey}"))
+            if (context.Symbols.ContainsKey($"$positive:{sourceKey}"))
                 markers[$"$positive:{targetField}"] = StaticValueKind.Boolean;
-            if (symbols.ContainsKey($"$nonneg:{sourceKey}"))
+            if (context.Symbols.ContainsKey($"$nonneg:{sourceKey}"))
                 markers[$"$nonneg:{targetField}"] = StaticValueKind.Boolean;
-            if (symbols.ContainsKey($"$nonzero:{sourceKey}"))
+            if (context.Symbols.ContainsKey($"$nonzero:{sourceKey}"))
                 markers[$"$nonzero:{targetField}"] = StaticValueKind.Boolean;
 
             // Also copy $ival: markers from source to target.
             var srcIvalPrefix = $"$ival:{sourceKey}:";
-            foreach (var srcKey in symbols.Keys.Where(k => k.StartsWith(srcIvalPrefix, StringComparison.Ordinal)))
+            foreach (var srcKey in context.Symbols.Keys.Where(k => k.StartsWith(srcIvalPrefix, StringComparison.Ordinal)))
             {
                 // Re-encode with the target field name.
                 if (NumericInterval.TryParseMarkerKey(srcKey, out var srcIval))
@@ -2587,28 +2586,28 @@ internal static class PreceptTypeChecker
         }
         // Compound RHS: markers already killed above — conservative, no new proof.
 
-        return markers;
+        return new ProofContext(markers);
     }
 
-    private static IReadOnlyDictionary<string, StaticValueKind> ApplyNarrowing(
+    internal static ProofContext ApplyNarrowing(
         PreceptExpression expression,
-        IReadOnlyDictionary<string, StaticValueKind> symbols,
+        ProofContext context,
         bool assumeTrue)
     {
         expression = StripParentheses(expression);
 
         if (expression is PreceptUnaryExpression { Operator: "not" } unary)
-            return ApplyNarrowing(unary.Operand, symbols, !assumeTrue);
+            return ApplyNarrowing(unary.Operand, context, !assumeTrue);
 
         if (expression is not PreceptBinaryExpression binary)
-            return symbols;
+            return context;
 
         if (binary.Operator == "and")
         {
             if (!assumeTrue)
-                return symbols;
+                return context;
 
-            var leftNarrowed = ApplyNarrowing(binary.Left, symbols, assumeTrue: true);
+            var leftNarrowed = ApplyNarrowing(binary.Left, context, assumeTrue: true);
             return ApplyNarrowing(binary.Right, leftNarrowed, assumeTrue: true);
         }
 
@@ -2619,32 +2618,32 @@ internal static class PreceptTypeChecker
                 // SOUNDNESS: This proof is sound ONLY because C42 independently prevents null fields
                 // from reaching arithmetic. If C42 is ever relaxed for nullable arithmetic, this
                 // decomposition becomes unsound.
-                if (TryDecomposeNullOrPattern(binary, symbols, out var decomposed))
+                if (TryDecomposeNullOrPattern(binary, context, out var decomposed))
                     return decomposed;
-                return symbols;
+                return context;
             }
 
-            var leftNarrowed = ApplyNarrowing(binary.Left, symbols, assumeTrue: false);
+            var leftNarrowed = ApplyNarrowing(binary.Left, context, assumeTrue: false);
             return ApplyNarrowing(binary.Right, leftNarrowed, assumeTrue: false);
         }
 
         if (binary.Operator is "==" or "!=" &&
-            TryApplyNullComparisonNarrowing(binary, symbols, assumeTrue, out var nullNarrowed))
+            TryApplyNullComparisonNarrowing(binary, context, assumeTrue, out var nullNarrowed))
             return nullNarrowed;
 
-        if (TryApplyNumericComparisonNarrowing(binary, symbols, assumeTrue, out var numericNarrowed))
+        if (TryApplyNumericComparisonNarrowing(binary, context, assumeTrue, out var numericNarrowed))
             return numericNarrowed;
 
-        return symbols;
+        return context;
     }
 
     private static bool TryApplyNullComparisonNarrowing(
         PreceptBinaryExpression binary,
-        IReadOnlyDictionary<string, StaticValueKind> symbols,
+        ProofContext context,
         bool assumeTrue,
-        out IReadOnlyDictionary<string, StaticValueKind> narrowed)
+        out ProofContext narrowed)
     {
-        narrowed = symbols;
+        narrowed = context;
 
         var leftIsNull = IsNullLiteral(binary.Left);
         var rightIsNull = IsNullLiteral(binary.Right);
@@ -2663,7 +2662,7 @@ internal static class PreceptTypeChecker
                 return false;
         }
 
-        if (!symbols.TryGetValue(key, out var existingKind))
+        if (!context.Symbols.TryGetValue(key, out var existingKind))
             return false;
 
         var expectsNull = binary.Operator switch
@@ -2677,20 +2676,20 @@ internal static class PreceptTypeChecker
             ? StaticValueKind.Null
             : (existingKind & ~StaticValueKind.Null);
 
-        narrowed = new Dictionary<string, StaticValueKind>(symbols, StringComparer.Ordinal)
+        narrowed = new ProofContext(new Dictionary<string, StaticValueKind>(context.Symbols, StringComparer.Ordinal)
         {
             [key] = updatedKind
-        };
+        });
         return true;
     }
 
     private static bool TryApplyNumericComparisonNarrowing(
         PreceptBinaryExpression binary,
-        IReadOnlyDictionary<string, StaticValueKind> symbols,
+        ProofContext context,
         bool assumeTrue,
-        out IReadOnlyDictionary<string, StaticValueKind> result)
+        out ProofContext result)
     {
-        result = symbols;
+        result = context;
 
         if (!assumeTrue)
             return false;
@@ -2721,7 +2720,7 @@ internal static class PreceptTypeChecker
         }
         else if (leftIsId && rightIsId)
         {
-            var relMarkers = new Dictionary<string, StaticValueKind>(symbols, StringComparer.Ordinal);
+            var relMarkers = new Dictionary<string, StaticValueKind>(context.Symbols, StringComparer.Ordinal);
             switch (binary.Operator)
             {
                 case ">":
@@ -2739,7 +2738,7 @@ internal static class PreceptTypeChecker
                 default:
                     return false;
             }
-            result = relMarkers;
+            result = new ProofContext(relMarkers);
             return true;
         }
         else
@@ -2748,7 +2747,7 @@ internal static class PreceptTypeChecker
         }
 
         // Canonicalized: key <op> lit
-        var markers = new Dictionary<string, StaticValueKind>(symbols, StringComparer.Ordinal);
+        var markers = new Dictionary<string, StaticValueKind>(context.Symbols, StringComparer.Ordinal);
         bool injected = false;
 
         if (op == ">" && lit >= 0)
@@ -2784,20 +2783,20 @@ internal static class PreceptTypeChecker
         if (!injected)
             return false;
 
-        result = markers;
+        result = new ProofContext(markers);
         return true;
     }
 
     /// <summary>
-    /// Recognizes <c>Field == null or Field > 0</c> (or reversed ordering) produced by MaybeNullGuard
+    /// Recognizes <c>Field == null or Field &gt; 0</c> (or reversed ordering) produced by MaybeNullGuard
     /// for nullable fields with numeric constraints, and extracts the numeric proof from the non-null branch.
     /// </summary>
     private static bool TryDecomposeNullOrPattern(
         PreceptBinaryExpression binary,
-        IReadOnlyDictionary<string, StaticValueKind> symbols,
-        out IReadOnlyDictionary<string, StaticValueKind> result)
+        ProofContext context,
+        out ProofContext result)
     {
-        result = symbols;
+        result = context;
 
         if (binary.Operator != "or")
             return false;
@@ -2806,9 +2805,9 @@ internal static class PreceptTypeChecker
         var left = StripParentheses(binary.Left);
         var right = StripParentheses(binary.Right);
 
-        if (TryDecomposeOrdered(left, right, symbols, out result))
+        if (TryDecomposeOrdered(left, right, context, out result))
             return true;
-        if (TryDecomposeOrdered(right, left, symbols, out result))
+        if (TryDecomposeOrdered(right, left, context, out result))
             return true;
 
         return false;
@@ -2816,8 +2815,8 @@ internal static class PreceptTypeChecker
         static bool TryDecomposeOrdered(
             PreceptExpression nullCandidate,
             PreceptExpression numericCandidate,
-            IReadOnlyDictionary<string, StaticValueKind> syms,
-            out IReadOnlyDictionary<string, StaticValueKind> res)
+            ProofContext syms,
+            out ProofContext res)
         {
             res = syms;
 
@@ -2845,7 +2844,7 @@ internal static class PreceptTypeChecker
             {
                 // Compound: Field == null or (Field >= 0 and Field < 100)
                 // Recurse into each 'and' operand to accumulate markers
-                var accumulated = new Dictionary<string, StaticValueKind>(syms, StringComparer.Ordinal);
+                ProofContext accumulated = syms;
                 bool anyInjected = false;
 
                 foreach (var operand in new[] { andBinary.Left, andBinary.Right })
@@ -2857,7 +2856,7 @@ internal static class PreceptTypeChecker
                     var narrowed = ApplyNarrowing(operand, accumulated, assumeTrue: true);
                     if (!ReferenceEquals(narrowed, accumulated))
                     {
-                        accumulated = new Dictionary<string, StaticValueKind>(narrowed, StringComparer.Ordinal);
+                        accumulated = narrowed;
                         anyInjected = true;
                     }
                 }
