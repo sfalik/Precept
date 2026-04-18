@@ -201,7 +201,11 @@ internal sealed class ProofContext
         var offsetResult = ConstantOffsetScan(scanForm);
         if (!offsetResult.IsUnknown) return offsetResult;
 
-        // 5. Legacy string-marker fallback for simple A − B identifier differences.
+        // 5. Transitive closure: BFS over the relational fact graph (depth ≤ 4, nodes ≤ 256).
+        var transitiveResult = new RelationalGraph(_relationalFacts).Query(form);
+        if (!transitiveResult.IsUnknown) return transitiveResult;
+
+        // 6. Legacy string-marker fallback for simple A − B identifier differences.
         return LookupLegacyRelationalInterval(form);
     }
 
