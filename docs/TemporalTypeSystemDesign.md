@@ -281,8 +281,8 @@ field ContractEnd as date default '2099-12-31'
 
 | Expression | Produces | Rationale |
 |---|---|---|
-| `date ± period dateonly` | `date` | Calendar arithmetic. `LocalDate.Plus/Minus(Period)`. Handles truncation. Period must be provably date-only — NodaTime throws on time components; see Decision #26. |
-| `date ± period` (unconstrained) | **compile error** | An unconstrained period might contain time parts like hours. Use `period dateonly` or add specific units like `'30 days'`. |
+| `date ± period of 'date'` | `date` | Calendar arithmetic. `LocalDate.Plus/Minus(Period)`. Handles truncation. Period must be provably date-only — NodaTime throws on time components; see Decision #26. |
+| `date ± period` (unconstrained) | **compile error** | An unconstrained period might contain time parts like hours. Use `period of 'date'` or add specific units like `'30 days'`. |
 | `date ± '30 days'` | `date` | Typed constant quantity — `'30 days'` resolves to `period` in date context. |
 | `date ± '{GraceDays} days'` | `date` | Interpolated typed constant — variable expression resolves to `period` in date context. |
 | `date ± '3 months'` | `date` | Truncates at month end (Jan 31 ± 1 month = Feb 28). |
@@ -344,8 +344,8 @@ field CheckInTime as time nullable
 
 | Expression | Produces | Rationale |
 |---|---|---|
-| `time ± period timeonly` | `time` | `LocalTime.Plus/Minus(Period)`. Period must be provably time-only — NodaTime throws on date components; see Decision #26. |
-| `time ± period` (unconstrained) | **compile error** | An unconstrained period might contain date parts like months. Use `period timeonly` or add specific units like `'3 hours'`. |
+| `time ± period of 'time'` | `time` | `LocalTime.Plus/Minus(Period)`. Period must be provably time-only — NodaTime throws on date components; see Decision #26. |
+| `time ± period` (unconstrained) | **compile error** | An unconstrained period might contain date parts like months. Use `period of 'time'` or add specific units like `'3 hours'`. |
 | `time ± duration` | `time` | Sub-day bridging. Wraps at midnight. Runtime: nanosecond arithmetic on `LocalTime` (see Decision #16). For sub-day units, `duration` and `period` represent identical physical quantities — the type checker bridges this. |
 | `time ± '3 hours'` | `time` | Typed constant quantity — resolves via sub-day bridging. Wraps at midnight. |
 | `time ± '30 minutes'` | `time` | Same bridging. Wraps at midnight. |
@@ -354,7 +354,7 @@ field CheckInTime as time nullable
 | `time - time` | `period` | Time-component period between two times. `Period.Between(t1, t2)` returns period with `.hours`, `.minutes`, `.seconds` components. NodaTime faithful. |
 | `==`, `!=`, `<`, `>`, `<=`, `>=` | `boolean` | NodaTime default behavior. Thin wrapper — no custom logic. |
 
-**Note:** `time ± period` requires the period to be provably time-only (Decision #26). NodaTime's `LocalTime.Plus(Period)` **throws `ArgumentException`** on periods with non-zero date components — it does NOT silently ignore them. The `timeonly` constraint or literal time-unit analysis provides the compile-time proof. `time + '5 days'` is a compile error. `time + '3 hours'` is valid (literal analysis proves time-only).
+**Note:** `time ± period` requires the period to be provably time-only (Decision #26). NodaTime's `LocalTime.Plus(Period)` **throws `ArgumentException`** on periods with non-zero date components — it does NOT silently ignore them. The `of 'time'` constraint or literal time-unit analysis provides the compile-time proof. `time + '5 days'` is a compile error. `time + '3 hours'` is valid (literal analysis proves time-only).
 
 | **Not supported** | **Why** |
 |---|---|
@@ -362,7 +362,7 @@ field CheckInTime as time nullable
 | `time ± integer` | What unit? Use `'{n} hours'` or `'{n} minutes'`. |
 | `time ± '1 day'` / `time ± 'N days'` | Days can't be added to a time — times only support hours, minutes, and seconds. |
 | `time ± 'N months'` / `time ± 'N years'` | Same — months and years don't apply to a time. |
-| `time ± SomePeriodField` (unconstrained) | This period field may include date parts. Declare it as `period timeonly` to use it with times, or use a `duration` field instead. |
+| `time ± SomePeriodField` (unconstrained) | This period field may include date parts. Declare it as `period of 'time'` to use it with times, or use a `duration` field instead. |
 
 **Accessors:**
 
@@ -383,7 +383,7 @@ field CheckInTime as time nullable
 | `'25:00:00'` | Invalid time: hours must be 0–23. |
 | `AppointmentTime + 30` | A bare number doesn't specify a unit. Use `StartTime + '30 minutes'` or `StartTime + '1 hour'`. |
 | `AppointmentTime + '1 day'` | Days can't be added to a time — times only support hours, minutes, and seconds. |
-| `AppointmentTime + SomePeriodField` | This period field may include date parts. Declare it as `period timeonly` to use it with times, or use a `duration` field instead. |
+| `AppointmentTime + SomePeriodField` | This period field may include date parts. Declare it as `period of 'time'` to use it with times, or use a `duration` field instead. |
 
 ---
 
@@ -641,7 +641,21 @@ field ExtendedWarranty as period default '2 years + 6 months'
 
 10 period fields across 7 samples (`GracePeriodDays`, `TermLengthMonths`, `WarrantyMonths`, etc.) are currently `integer` surrogates. See Locked Decision #12.
 
-**Constraints:** `nullable`, `default '30 days'` / `default '12 months'` / `default '2 years'` / `default '2 weeks'`, or combined: `default '2 years + 6 months'`. `timeonly` (hours/minutes/seconds only), `dateonly` (years/months/weeks/days only) — see Decision #26.
+**Constraints:** `nullable`, `default '30 days'` / `default '12 months'` / `default '2 years'` / `default '2 weeks'`, or combined: `default '2 years + 6 months'`. `of 'time'` (hours/minutes/seconds only), `of 'date'` (years/months/weeks/days only) — see Decision #26. `in 'days'` / `in 'months'` / `in 'hours'` etc. pins to a specific NodaTime `PeriodUnits` basis — see the currency/quantity design doc for the full `in`/`of` qualification system.
+
+**The `in` and `of` qualification system for `period`:**
+
+`period` participates in the same `in`/`of` qualification system as the business-domain types. A field carries at most one of `in` or `of`. Declaring both is a compile error.
+
+| Qualifier | Meaning | Example |
+|---|---|---|
+| `in 'days'` | Pins to a specific NodaTime `PeriodUnits` basis | `field GracePeriod as period in 'days'` |
+| `in 'months'` | Same — months basis | `field LoanTerm as period in 'months'` |
+| `of 'date'` | Category constraint — years/months/weeks/days only | `field CalendarOffset as period of 'date'` |
+| `of 'time'` | Category constraint — hours/minutes/seconds only | `field ShiftLength as period of 'time'` |
+| (none) | Unconstrained — any components | `field AnyPeriod as period` |
+
+`in` is more restrictive than `of`: `period in 'days'` only admits values with a single days component. `period of 'date'` admits any combination of date components (years + months + days). `of` is the proof mechanism for `date ± period` and `time ± period` safety (Decision #26). `in` is for fields where the business domain demands a specific unit basis (e.g., "grace periods are always in days").
 
 **Serialization:** ISO 8601 period string: `"P1Y2M3D"`, `"PT5H30M"`, `"P1MT2H"`. Via `PeriodPattern.Roundtrip`.
 
@@ -1070,12 +1084,12 @@ This is what makes temporal types the gateway: they don't just add temporal capa
 
 | Left | Op | Right | Result | Notes |
 |---|---|---|---|---|
-| `date` | `±` | `period dateonly` | `date` | Calendar arithmetic. Truncation at month end. Period must be provably date-only (Decision #26) — NodaTime throws on time components. `date ± period` (unconstrained) is a compile error. |
+| `date` | `±` | `period of 'date'` | `date` | Calendar arithmetic. Truncation at month end. Period must be provably date-only (Decision #26) — NodaTime throws on time components. `date ± period` (unconstrained) is a compile error. |
 | `date` | `-` | `date` | `period` | Calendar distance. `Period.Between`. |
 | `period` | `±` | `period` | `period` | Combined / difference. |
 | `datetime` | `±` | `period` | `datetime` | Calendar arithmetic. No constraint — `LocalDateTime.Plus/Minus(Period)` accepts all components. |
 | `datetime` | `-` | `datetime` | `period` | Calendar distance. |
-| `time` | `±` | `period timeonly` | `time` | `LocalTime.Plus/Minus(Period)`. Period must be provably time-only (Decision #26) — NodaTime throws on date components. `time ± period` (unconstrained) is a compile error. |
+| `time` | `±` | `period of 'time'` | `time` | `LocalTime.Plus/Minus(Period)`. Period must be provably time-only (Decision #26) — NodaTime throws on date components. `time ± period` (unconstrained) is a compile error. |
 
 **Timeline domain (uses `duration`):**
 
@@ -1259,7 +1273,7 @@ All temporal types support `nullable`. All follow existing null propagation rule
 - **Why:** NodaTime's `Period` includes both date components (years, months, weeks, days) and time components (hours, minutes, seconds). The v2 date-only restriction contradicted the "expose NodaTime faithfully" directive in three ways: (1) `LocalTime.Plus(Period)` is NodaTime's native API for time arithmetic, but date-only `period` couldn't carry time results; (2) `Period.Between(LocalTime, LocalTime)` returns time-component Periods with no home in a date-only type; (3) timeline constructors returning `duration` plus `LocalTime` not accepting `Duration` left no clean implementation path for `time + '3 hours'`. `Period.FromHours()`, `.FromMinutes()`, `.FromSeconds()` all exist in NodaTime.
 - **Alternatives rejected:** Date-only `period` (v2 position) — created the three structural contradictions above. Re-invents a boundary NodaTime chose not to draw.
 - **Precedent:** NodaTime `Period` — full date+time components. `Period.HasDateComponent` / `Period.HasTimeComponent` for introspection.
-- **Tradeoff:** `date + period` where the period has time components: NodaTime's `LocalDate.Plus(Period)` throws `ArgumentException` on non-zero time components (`Preconditions.CheckArgument(!period.HasTimeComponent, ...)`). Precept's `dateonly` constraint catches this at compile time rather than letting it reach the runtime exception. This is stricter-earlier, not a divergence.
+- **Tradeoff:** `date + period` where the period has time components: NodaTime's `LocalDate.Plus(Period)` throws `ArgumentException` on non-zero time components (`Preconditions.CheckArgument(!period.HasTimeComponent, ...)`). Precept's `of 'date'` constraint catches this at compile time rather than letting it reach the runtime exception. This is stricter-earlier, not a divergence.
 
 ### 14. No ordering on `period` — `==` and `!=` only
 
@@ -1401,14 +1415,15 @@ All temporal types support `nullable`. All follow existing null propagation rule
 - **Precedent:** NodaTime `LocalDate + LocalTime → LocalDateTime`. Kotlin `LocalDate.atTime(LocalTime)` — similar composition, different syntax.
 - **Tradeoff:** None significant. The operation is natural, NodaTime-native, and already expected by the motivation example.
 
-### 26. Period component constraints — `timeonly` and `dateonly` (locked v4)
+### 26. Period component constraints — `of 'date'` and `of 'time'` (locked v4, updated v6)
 
-- **Why:** NodaTime's `LocalTime.Plus(Period)` throws `ArgumentException` on periods with non-zero date components. `LocalDate.Plus(Period)` throws on non-zero time components. The type `period` alone carries no information about which component categories a value contains. Without a proof mechanism, `time ± period` and `date ± period` create a soundness gap — the expression may throw at runtime depending on field data, violating Precept's deterministic execution guarantee (Principle #1) and sound static analysis (Principle #8). The `timeonly` and `dateonly` constraint suffixes provide the proof mechanism: (1) For literal postfix expressions (`3 hours`, `30 days`), the compiler infers component category from the unit keyword — no annotation needed. (2) For `time - time` and `date - date`, the result is always same-category — no annotation needed. (3) For `period` field references and event args, the author declares `period timeonly` or `period dateonly` and the compiler enforces it at every assignment site. (4) For event args (external input), the runtime validates at the API boundary in `TryValidateEventArguments` — input validation, not mid-evaluation exception. This closes the gap completely: every `time ± period` or `date ± period` expression either has compile-time proof or is rejected at compile time.
-- **Syntax:** `timeonly` and `dateonly` as single-word constraint suffixes, matching the existing convention (`nonnegative`, `notempty`, `minlength`). Three forms: `period timeonly` (hours/minutes/seconds only), `period dateonly` (years/months/weeks/days only), `period` (unconstrained — any components, but `time ± period` and `date ± period` are compile errors). Applicable to field declarations and event arg declarations.
-- **Semantic rules:** `time ± period timeonly` → OK. `time ± period` (unconstrained) → compile error. `date ± period dateonly` → OK. `date ± period` (unconstrained) → compile error. `datetime ± period` (any) → always OK (`LocalDateTime.Plus/Minus(Period)` accepts all components). Component categories are closed under arithmetic: `timeonly + timeonly = timeonly`, `dateonly + dateonly = dateonly`, `timeonly + dateonly = mixed (unconstrained)`.
-- **Alternatives rejected:** (1) Ban `time ± period` entirely — overly restrictive, prevents `time + GracePeriod` when GracePeriod is known time-only. (2) Runtime strip of date components — silently changes behavior, diverges from NodaTime, violates "expose NodaTime faithfully" directive. (3) Runtime rejection mid-evaluation — violates Principle #1 (deterministic model). (4) Period subtypes `period<time>` / `period<date>` — angle brackets aren't in the grammar; parameterized types add language complexity disproportionate to the problem. (5) Hyphenated `time-only` / `date-only` — breaks the existing constraint keyword convention (all single lowercase compounds).
-- **Precedent:** NodaTime `PeriodUnits.DateOnly` / `PeriodUnits.TimeOnly` masks. `Period.HasDateComponent` / `Period.HasTimeComponent` introspection (used for runtime boundary validation).
+- **Why:** NodaTime's `LocalTime.Plus(Period)` throws `ArgumentException` on periods with non-zero date components. `LocalDate.Plus(Period)` throws on non-zero time components. The type `period` alone carries no information about which component categories a value contains. Without a proof mechanism, `time ± period` and `date ± period` create a soundness gap — the expression may throw at runtime depending on field data, violating Precept's deterministic execution guarantee (Principle #1) and sound static analysis (Principle #8). The `of` qualifier provides the proof mechanism: (1) For literal postfix expressions (`3 hours`, `30 days`), the compiler infers component category from the unit keyword — no annotation needed. (2) For `time - time` and `date - date`, the result is always same-category — no annotation needed. (3) For `period` field references and event args, the author declares `period of 'time'` or `period of 'date'` and the compiler enforces it at every assignment site. (4) For event args (external input), the runtime validates at the API boundary in `TryValidateEventArguments` — input validation, not mid-evaluation exception. This closes the gap completely: every `time ± period` or `date ± period` expression either has compile-time proof or is rejected at compile time.
+- **Syntax:** `of 'date'` and `of 'time'` as category qualifiers using the same `of` mechanism as `quantity of 'mass'` (see the currency/quantity design doc for the full `in`/`of` qualification system). Three forms: `period of 'time'` (hours/minutes/seconds only), `period of 'date'` (years/months/weeks/days only), `period` (unconstrained — any components, but `time ± period` and `date ± period` are compile errors). Applicable to field declarations and event arg declarations.
+- **Semantic rules:** `time ± period of 'time'` → OK. `time ± period` (unconstrained) → compile error. `date ± period of 'date'` → OK. `date ± period` (unconstrained) → compile error. `datetime ± period` (any) → always OK (`LocalDateTime.Plus/Minus(Period)` accepts all components). Component categories are closed under arithmetic: `of 'time' + of 'time' = of 'time'`, `of 'date' + of 'date' = of 'date'`, `of 'time' + of 'date' = mixed (unconstrained)`.
+- **Alternatives rejected:** (1) Ban `time ± period` entirely — overly restrictive, prevents `time + GracePeriod` when GracePeriod is known time-only. (2) Runtime strip of date components — silently changes behavior, diverges from NodaTime, violates "expose NodaTime faithfully" directive. (3) Runtime rejection mid-evaluation — violates Principle #1 (deterministic model). (4) Period subtypes `period<time>` / `period<date>` — angle brackets aren't in the grammar; parameterized types add language complexity disproportionate to the problem. (5) Single-word constraint suffixes `timeonly` / `dateonly` — replaced by `of 'time'` / `of 'date'` for consistency with the unified `in`/`of` qualification system across all types.
+- **Precedent:** NodaTime `PeriodUnits.DateOnly` / `PeriodUnits.TimeOnly` masks. `Period.HasDateComponent` / `Period.HasTimeComponent` introspection (used for runtime boundary validation). The `of` keyword mirrors `quantity of 'mass'` — category constraint on a type.
 - **Tradeoff:** Authors must annotate period fields and args when used with `time` or `date` arithmetic. The annotation is the proof — without it, the compiler cannot guarantee safety. This is consistent with Precept's philosophy: explicit over implicit.
+- **v6 update:** Syntax changed from `period timeonly` / `period dateonly` (single-word constraint suffixes) to `period of 'time'` / `period of 'date'` (category qualifiers). This aligns period's component constraint mechanism with the unified `in`/`of` qualification system designed for the business-domain types. `of` means "constrains to a category" everywhere: `quantity of 'mass'`, `period of 'date'`, `period of 'time'`. The semantics, proof mechanism, and NodaTime backing are unchanged — only the surface syntax changed.
 
 ### 27. No `datetime + duration` — context-dependent resolution to `period` instead (locked v4)
 
@@ -1551,7 +1566,7 @@ Temporal types are valid as collection inner types where the collection's struct
 - **Period/duration split enforcement:** `date + period ✓`, `date + duration ✗`, `instant + duration ✓`, `instant + period ✗`. Standard type-checking — no custom dispatch.
 - **Postfix unit type resolution:** Resolve quantity typed constants (`'<value> <unit>'`) to `period` or `duration` based on expression context. `date +` / `datetime +` context → `period`. `instant +` / `zoneddatetime +` context → `duration`. `months`/`years` → always `period`. Field default context → match declared field type. No context → compile error.
 - **Typed constant type inference:** Determine specific type from content shape via the type-family admission rule. Current inhabitants: `YYYY-MM-DD` without `T` = date, `HH:MM:SS` without `-` = time, `...T...` without `Z` or `[` = datetime, `...T...Z` = instant, `...T...[zone]` = zoneddatetime, IANA pattern = timezone, `<value> <unit>` = quantity (family `{period, duration}`). Framework is extensible to future inhabitants whose shapes produce disjoint families.
-- **Cross-domain unit rejection:** `date + '3 hours'` → compile error (date requires `period dateonly`; hours are time components). `time + '5 days'` → compile error (time requires `period timeonly`; days are date components). Follows Decision #26.
+- **Cross-domain unit rejection:** `date + '3 hours'` → compile error (date requires `period of 'date'`; hours are time components). `time + '5 days'` → compile error (time requires `period of 'time'`; days are date components). Follows Decision #26.
 - Full cross-type interaction matrix.
 - `period` ordering rejection (`<`, `>`, `<=`, `>=`).
 - `period` scaling rejection (`* integer`).
