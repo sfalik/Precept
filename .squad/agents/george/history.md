@@ -26,6 +26,40 @@
 
 ## Recent Updates
 
+### 2026-04-18 — Proof engine design-to-code accuracy review (PR #108)
+
+Full review written to `.squad/decisions/inbox/george-proof-engine-review.md`.
+
+Key findings:
+
+**Architecture:** The five gaps (1–5) are genuinely closed in Commits 1–6. The core proof engine (`LinearForm`, `RelationalGraph`, 5-tier lookup, kill loop) is correct. The prevention guarantee holds for compound divisor patterns. The engine is sound — no false positives. `TryInferRelationalNonzero` and `InferSubtractionInterval` are correctly deleted.
+
+**Discrepancies (13 total):**
+- D1: Design doc status header says "Implemented" — FALSE. Commits 7–15 not started.
+- D2: String markers (`$ival:`, `$positive:`, `$nonneg:`, `$nonzero:`, `$gt:`, `$gte:`) NOT eliminated. Still active in `PreceptTypeChecker.cs`, `ApplyAssignmentNarrowing`, `ExtractIntervalFromMarkers`, `LookupLegacyRelationalInterval`, `NumericInterval.ToMarkerKey/TryParseMarkerKey`.
+- D3: `_fieldIntervals`, `_flags`, `_exprFacts` typed stores do not exist. Only `_relationalFacts` is typed.
+- D4: No `GlobalProofContext`/`EventProofContext` class split. Single `ProofContext` only.
+- D5: `BuildEventEnsureNarrowings` still uses string surgery — compound relational ensure narrowings are LOST (not translated to dotted form).
+- D6: No `ProofAssessment` model. C92 fires only on literal 0 (not truth-based). Identifier divisor path reads markers directly, bypasses `IntervalOf`.
+- D7: No `Dump()` method on `ProofContext`.
+- D8: No `NumericInterval.ToNaturalLanguage()`.
+- D9: `LookupLegacyRelationalInterval` (Tier 6) still present.
+- D10: C94–C98 do not exist. Zero matches in `src/Precept/`.
+- D11: W2 — `WithRule` doesn't GCD-normalize. Functionally recovered by tier-5 `RelationalGraph`.
+- D12: W1 — `ConstantOffsetScan` `>=` + offset 0 wrong inclusivity. Unreachable, trivial fix.
+- D13 (undocumented): Identifier divisor path in `TryInferBinaryKind` checks markers directly — `field D as number min 1` has `$ival:D:1:...` (ExcludesZero=true) but gets C93 because no `$positive:D` or `$nonzero:D` marker. False positive. Must be fixed in Commit 7 by unifying to `IntervalOf`/`KnowsNonzero` for all expression shapes.
+
+**Key implementation risks:**
+- Commit 7 (typed stores) must atomically unify the identifier divisor path — otherwise `min N` fields get false C93 errors.
+- `TryApplyNumericComparisonNarrowing` writes BOTH markers AND LinearForm facts for `id op id` — both must be cleaned up in Commit 7.
+- `BuildEventEnsureNarrowings` also loses `_relationalFacts` from compound ensures — Commit 9 must fix this.
+- Commit 11 (C92 truth-based) breaks code action message parsing in `PreceptCodeActionHandler.cs` — structured metadata required in same commit.
+- Commit 14 (hover) needs proof source attribution threading through `IntervalOf` — this is non-trivial new API surface.
+
+**Philosophy verdict:** Engine is sound. Prevention guarantee holds for all compound patterns. No false-positive proof paths. Conservative false negatives (C93 on min-constrained identifiers, D13) are the only failure mode — annoying but never unsafe.
+
+**Action required:** (a) Update design doc status header to reflect in-progress state. (b) Deliver Commits 7–15 in this PR per Shane's "no more shortcuts" directive.
+
 ### 2026-04-17 — Stateless event handlers (`on EventName`) feasibility evaluation
 - Verdict: **feasible**. All 7 implementation layers have clear insertion points. Total size: M.
 - Parser: new `StatelessTransitionRowParser` combinator after `EventEnsureDecl.Try()`. No ambiguity — `ensure` token disambiguates.

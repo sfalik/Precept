@@ -12,6 +12,7 @@
 - C93 code actions: extracting structured info (divisor name, field vs event-arg) from diagnostic messages via regex is reliable when the message format is stable. The `Divisor '{name}'` pattern carries enough to distinguish field refs from dotted event-arg refs and drive all three fix variants.
 - For `when` guard insertion, splitting the transition row at the first `->` and checking for ` when ` in the prefix is the simplest reliable approach — no need to re-parse the row.
 - Tooling trust collapses faster from false-positive-heavy proof diagnostics than from selective under-approximation; if Principle #8 tightens, proof-gap diagnostics need distinct wording and actionable fixes instead of generic red squiggles.
+- Proof diagnostics already have a working Problems-panel publication path through `PreceptAnalyzer` and `PreceptTextDocumentSyncHandler`; the real tooling risk is missing structured proof metadata, because hover and quick fixes both become brittle as soon as diagnostic prose shifts to truth-based/natural-language rendering.
 
 ## Recent Updates
 

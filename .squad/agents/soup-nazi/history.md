@@ -20,6 +20,7 @@
 - if/then/else in Precept is ternary expression only — narrowing applies to typing within branches, not control-flow reachability. This simplifies branch analysis compared to general PL.
 - Function proofs (abs, max, min, clamp, round, sqrt) have the highest ratio of new provable patterns to implementation complexity. `max(D, 1)` as safe divisor is the single most impactful pattern.
 - Interval arithmetic's biggest win in the current corpus is computed field constraint verification (e.g., proving `LineTotal nonnegative` from upstream field ranges).
+- A large proof-test count can still hide guarantee holes. For PR #108, the critical misses are concentrated at the design-expansion edges: truth-based `C92` vs unresolved `C93`, the entire `C94`-`C98` family, the 64-fact / 256-node graph caps, and proof surfacing in hover/MCP.
 
 ## Recent Updates
 

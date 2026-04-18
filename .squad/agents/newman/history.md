@@ -9,6 +9,8 @@
 - MCP contract changes should be additive when possible and preserve existing consumer shapes.
 - Catalog-driven vocabulary is the preferred path for exposing DSL keywords/types; non-token constructs need explicit catalog registration.
 - Label/automation removals should be staged through sync workflows and disabled notices, not silent deletion.
+- Proof-engine MCP integration is only agent-complete when `precept_compile` exposes a documented proof schema with structured assessments; a raw `Dump()` reference is not a sufficient contract.
+- `precept_language` already has the right catalog-driven insertion point for proof diagnostics, but `id`/`phase`/`rule` alone is too thin for contradiction-vs-unresolved proof semantics.
 
 ## Recent Updates
 
