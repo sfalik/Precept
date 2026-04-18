@@ -126,7 +126,14 @@ public enum PreceptScalarType
     Choice,    // #25 (scaffold)
 }
 
-public abstract record PreceptExpression;
+/// <summary>Source position span for an expression node (1-based columns from tokenizer).</summary>
+public sealed record SourceSpan(int StartColumn = 0, int EndColumn = 0);
+
+public abstract record PreceptExpression
+{
+    /// <summary>Source position of this expression in the original text (null when constructed without position info).</summary>
+    public SourceSpan? Position { get; init; }
+}
 
 public sealed record PreceptLiteralExpression(object? Value) : PreceptExpression;
 

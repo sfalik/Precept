@@ -251,26 +251,31 @@ public static class PreceptParser
     // Expression Combinators
     // ═══════════════════════════════════════════════════════════════════
 
+    /// <summary>Creates a <see cref="SourceSpan"/> from a single Superpower token.</summary>
+    /// <remarks>Superpower columns are 1-based; SourceSpan/LSP are 0-based, so subtract 1.</remarks>
+    private static SourceSpan SpanOf(Token<PreceptToken> token)
+        => new(token.Span.Position.Column - 1, token.Span.Position.Column - 1 + token.Span.Length);
+
     // Level 5: Atoms
     private static readonly TokenListParser<PreceptToken, PreceptExpression> NumberAtom =
         Token.EqualTo(PreceptToken.NumberLiteral)
-            .Select(t => (PreceptExpression)new PreceptLiteralExpression(t.ToNumericLiteralValue()));
+            .Select(t => (PreceptExpression)new PreceptLiteralExpression(t.ToNumericLiteralValue()) { Position = SpanOf(t) });
 
     private static readonly TokenListParser<PreceptToken, PreceptExpression> StringAtom =
         Token.EqualTo(PreceptToken.StringLiteral)
-            .Select(t => (PreceptExpression)new PreceptLiteralExpression(t.ToStringLiteralValue()));
+            .Select(t => (PreceptExpression)new PreceptLiteralExpression(t.ToStringLiteralValue()) { Position = SpanOf(t) });
 
     private static readonly TokenListParser<PreceptToken, PreceptExpression> TrueAtom =
         Token.EqualTo(PreceptToken.True)
-            .Value((PreceptExpression)new PreceptLiteralExpression(true));
+            .Select(t => (PreceptExpression)new PreceptLiteralExpression(true) { Position = SpanOf(t) });
 
     private static readonly TokenListParser<PreceptToken, PreceptExpression> FalseAtom =
         Token.EqualTo(PreceptToken.False)
-            .Value((PreceptExpression)new PreceptLiteralExpression(false));
+            .Select(t => (PreceptExpression)new PreceptLiteralExpression(false) { Position = SpanOf(t) });
 
     private static readonly TokenListParser<PreceptToken, PreceptExpression> NullAtom =
         Token.EqualTo(PreceptToken.Null)
-            .Value((PreceptExpression)new PreceptLiteralExpression(null));
+            .Select(t => (PreceptExpression)new PreceptLiteralExpression(null) { Position = SpanOf(t) });
 
     #pragma warning disable CS8603, CS8620
 
@@ -289,13 +294,15 @@ public static class PreceptParser
                     .Then(member =>
                         Token.EqualTo(PreceptToken.Dot)
                             .IgnoreThen(Token.EqualTo(PreceptToken.Identifier))
-                            .Select(subMember => (PreceptExpression)new PreceptIdentifierExpression(id.ToText(), member.ToText(), subMember.ToText()))
+                            .Select(subMember => (PreceptExpression)new PreceptIdentifierExpression(id.ToText(), member.ToText(), subMember.ToText())
+                                { Position = new SourceSpan(id.Span.Position.Column - 1, subMember.Span.Position.Column - 1 + subMember.Span.Length) })
                         .Try()
                         .Or(Superpower.Parse.Return<PreceptToken, PreceptExpression>(
-                            new PreceptIdentifierExpression(id.ToText(), member.ToText()))))
+                            new PreceptIdentifierExpression(id.ToText(), member.ToText())
+                                { Position = new SourceSpan(id.Span.Position.Column - 1, member.Span.Position.Column - 1 + member.Span.Length) })))
                 .Try()
                 .Or(Superpower.Parse.Return<PreceptToken, PreceptExpression>(
-                    new PreceptIdentifierExpression(id.ToText()))));
+                    new PreceptIdentifierExpression(id.ToText()) { Position = SpanOf(id) })));
 
     private static TokenListParser<PreceptToken, PreceptExpression> BoolExprRef()
         => BoolExpr;
@@ -311,20 +318,22 @@ public static class PreceptParser
         .Or(Superpower.Parse.Return<PreceptToken, string?>(null));
 
     private static readonly TokenListParser<PreceptToken, PreceptExpression> ParenExpr =
-        from _lp in Token.EqualTo(PreceptToken.LeftParen)
+        from lp in Token.EqualTo(PreceptToken.LeftParen)
         from inner in Superpower.Parse.Ref(BoolExprRef)
-        from _rp in Token.EqualTo(PreceptToken.RightParen)
-        select (PreceptExpression)new PreceptParenthesizedExpression(inner);
+        from rp in Token.EqualTo(PreceptToken.RightParen)
+        select (PreceptExpression)new PreceptParenthesizedExpression(inner)
+            { Position = new SourceSpan(lp.Span.Position.Column - 1, rp.Span.Position.Column - 1 + rp.Span.Length) };
 
     // Conditional expression: if <condition> then <value> else <value>
     private static readonly TokenListParser<PreceptToken, PreceptExpression> ConditionalExpr =
-        (from _if in Token.EqualTo(PreceptToken.If)
+        (from ifToken in Token.EqualTo(PreceptToken.If)
          from condition in Superpower.Parse.Ref(BoolExprRef)
          from _then in Token.EqualTo(PreceptToken.Then)
          from thenBranch in Superpower.Parse.Ref(BoolExprRef)
          from _else in Token.EqualTo(PreceptToken.Else)
          from elseBranch in Superpower.Parse.Ref(BoolExprRef)
-         select (PreceptExpression)new PreceptConditionalExpression(condition, thenBranch, elseBranch))
+         select (PreceptExpression)new PreceptConditionalExpression(condition, thenBranch, elseBranch)
+             { Position = new SourceSpan(ifToken.Span.Position.Column - 1, elseBranch.Position?.EndColumn ?? 0) })
         .Register(new ConstructInfo(
             "conditional-expression",
             "if <condition> then <value> else <value>",
@@ -341,8 +350,14 @@ public static class PreceptParser
             .Try().Or(Token.EqualTo(PreceptToken.Min).Value("min"))
             .Try().Or(Token.EqualTo(PreceptToken.Max).Value("max"));
 
+    // Token-preserving version for position tracking in FunctionCallAtom.
+    private static readonly TokenListParser<PreceptToken, Token<PreceptToken>> AnyFunctionNameToken =
+        Token.EqualTo(PreceptToken.Identifier).Where(t => FunctionRegistry.IsFunction(t.ToStringValue()))
+            .Try().Or(Token.EqualTo(PreceptToken.Min))
+            .Try().Or(Token.EqualTo(PreceptToken.Max));
+
     private static readonly TokenListParser<PreceptToken, PreceptExpression> FunctionCallAtom =
-        (from name in AnyFunctionName
+        (from nameToken in AnyFunctionNameToken
          from _lp in Token.EqualTo(PreceptToken.LeftParen)
          from firstArg in Superpower.Parse.Ref(BoolExprRef)
          from restArgs in (
@@ -350,10 +365,11 @@ public static class PreceptParser
              from arg in Superpower.Parse.Ref(BoolExprRef)
              select arg
          ).Many()
-         from _rp in Token.EqualTo(PreceptToken.RightParen)
+         from rp in Token.EqualTo(PreceptToken.RightParen)
          select (PreceptExpression)new PreceptFunctionCallExpression(
-             name,
-             new[] { firstArg }.Concat(restArgs).ToArray()))
+             nameToken.ToText(),
+             new[] { firstArg }.Concat(restArgs).ToArray())
+             { Position = new SourceSpan(nameToken.Span.Position.Column - 1, rp.Span.Position.Column - 1 + rp.Span.Length) })
         .Try()
         .Register(new ConstructInfo(
             "function-call",
@@ -376,13 +392,15 @@ public static class PreceptParser
     // Level 4: Unary (! and unary -)
     private static readonly TokenListParser<PreceptToken, PreceptExpression> Unary =
         Token.EqualTo(PreceptToken.Not)
-            .IgnoreThen(Superpower.Parse.Ref(UnaryRef))
-            .Select(expr => (PreceptExpression)new PreceptUnaryExpression("not", expr))
+            .Then(notTok => Superpower.Parse.Ref(UnaryRef)
+                .Select(expr => (PreceptExpression)new PreceptUnaryExpression("not", expr)
+                    { Position = new SourceSpan(notTok.Span.Position.Column - 1, expr.Position?.EndColumn ?? 0) }))
         .Try()
         .Or(
             Token.EqualTo(PreceptToken.Minus)
-                .IgnoreThen(Superpower.Parse.Ref(UnaryRef))
-                .Select(expr => (PreceptExpression)new PreceptUnaryExpression("-", expr))
+                .Then(minTok => Superpower.Parse.Ref(UnaryRef)
+                    .Select(expr => (PreceptExpression)new PreceptUnaryExpression("-", expr)
+                        { Position = new SourceSpan(minTok.Span.Position.Column - 1, expr.Position?.EndColumn ?? 0) }))
             .Try()
             .Or(Atom));
 
@@ -393,7 +411,8 @@ public static class PreceptParser
                 .Or(Token.EqualTo(PreceptToken.Slash).Value("/"))
                 .Or(Token.EqualTo(PreceptToken.Percent).Value("%")),
             Unary,
-            (op, left, right) => (PreceptExpression)new PreceptBinaryExpression(op, left, right));
+            (op, left, right) => (PreceptExpression)new PreceptBinaryExpression(op, left, right)
+                { Position = new SourceSpan(left.Position?.StartColumn ?? 0, right.Position?.EndColumn ?? 0) });
 
     // Level 3: Additive (+ -)
     private static readonly TokenListParser<PreceptToken, PreceptExpression> Term =
@@ -401,7 +420,8 @@ public static class PreceptParser
             Token.EqualTo(PreceptToken.Plus).Value("+")
                 .Or(Token.EqualTo(PreceptToken.Minus).Value("-")),
             Factor,
-            (op, left, right) => (PreceptExpression)new PreceptBinaryExpression(op, left, right));
+            (op, left, right) => (PreceptExpression)new PreceptBinaryExpression(op, left, right)
+                { Position = new SourceSpan(left.Position?.StartColumn ?? 0, right.Position?.EndColumn ?? 0) });
 
     // Level 2: Comparison (==, !=, >, >=, <, <=, contains)
     private static readonly TokenListParser<PreceptToken, PreceptExpression> Comparison =
@@ -414,21 +434,24 @@ public static class PreceptParser
                 .Try().Or(Token.EqualTo(PreceptToken.LessThan).Value("<"))
                 .Or(Token.EqualTo(PreceptToken.Contains).Value("contains")),
             Term,
-            (op, left, right) => (PreceptExpression)new PreceptBinaryExpression(op, left, right));
+            (op, left, right) => (PreceptExpression)new PreceptBinaryExpression(op, left, right)
+                { Position = new SourceSpan(left.Position?.StartColumn ?? 0, right.Position?.EndColumn ?? 0) });
 
     // Level 1.5: Logical AND (and)
     private static readonly TokenListParser<PreceptToken, PreceptExpression> AndExpr =
         Superpower.Parse.Chain(
             Token.EqualTo(PreceptToken.And).Value("and"),
             Comparison,
-            (op, left, right) => (PreceptExpression)new PreceptBinaryExpression(op, left, right));
+            (op, left, right) => (PreceptExpression)new PreceptBinaryExpression(op, left, right)
+                { Position = new SourceSpan(left.Position?.StartColumn ?? 0, right.Position?.EndColumn ?? 0) });
 
     // Level 1: Logical OR (or)
     private static readonly TokenListParser<PreceptToken, PreceptExpression> OrExpr =
         Superpower.Parse.Chain(
             Token.EqualTo(PreceptToken.Or).Value("or"),
             AndExpr,
-            (op, left, right) => (PreceptExpression)new PreceptBinaryExpression(op, left, right));
+            (op, left, right) => (PreceptExpression)new PreceptBinaryExpression(op, left, right)
+                { Position = new SourceSpan(left.Position?.StartColumn ?? 0, right.Position?.EndColumn ?? 0) });
 
     /// <summary>Full boolean expression parser.</summary>
     internal static readonly TokenListParser<PreceptToken, PreceptExpression> BoolExpr = OrExpr;

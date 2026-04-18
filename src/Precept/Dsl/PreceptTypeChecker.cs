@@ -359,6 +359,7 @@ internal static class PreceptTypeChecker
                                     ("values", string.Join(", ", choiceVals.Select(v => $"\"{v}\""))),
                                     ("name", assignment.Key)),
                                 assignment.SourceLine > 0 ? assignment.SourceLine : row.SourceLine,
+                                Column: assignment.Expression.Position?.StartColumn ?? 0,
                                 StateContext: item.State));
                         }
 
@@ -462,6 +463,7 @@ internal static class PreceptTypeChecker
                             ("values", string.Join(", ", choiceVals.Select(v => $"\"{v}\""))),
                             ("name", assignment.Key)),
                         assignment.SourceLine > 0 ? assignment.SourceLine : action.SourceLine,
+                        Column: assignment.Expression.Position?.StartColumn ?? 0,
                         StateContext: action.State));
                 }
 
@@ -1317,7 +1319,8 @@ internal static class PreceptTypeChecker
                     diagnostics.Add(new PreceptValidationDiagnostic(
                         DiagnosticCatalog.C69,
                         DiagnosticCatalog.C69.FormatMessage(("name", fullName)),
-                        sourceLine));
+                        sourceLine,
+                        Column: id.Position?.StartColumn ?? 0));
                 }
                 break;
 
@@ -1524,6 +1527,7 @@ internal static class PreceptTypeChecker
             diagnostics.Add(diagnostic! with
             {
                 Line = sourceLine > 0 ? sourceLine : diagnostic.Line,
+                Column = diagnostic.Column != 0 ? diagnostic.Column : expression.Position?.StartColumn ?? 0,
                 StateContext = stateContext
             });
             return;
@@ -1535,6 +1539,7 @@ internal static class PreceptTypeChecker
             diagnostics.Add(diagnostic with
             {
                 Line = sourceLine > 0 ? sourceLine : diagnostic.Line,
+                Column = diagnostic.Column != 0 ? diagnostic.Column : expression.Position?.StartColumn ?? 0,
                 StateContext = stateContext
             });
         }
@@ -1584,6 +1589,7 @@ internal static class PreceptTypeChecker
             constraint,
             message,
             sourceLine,
+            Column: expression.Position?.StartColumn ?? 0,
             StateContext: stateContext));
     }
 
@@ -1612,7 +1618,8 @@ internal static class PreceptTypeChecker
                     diagnostic = new PreceptValidationDiagnostic(
                         DiagnosticCatalog.C38,
                         $"unknown identifier '{key}'.",
-                        0);
+                        0,
+                        Column: identifier.Position?.StartColumn ?? 0);
                     return false;
                 }
 
@@ -1625,7 +1632,8 @@ internal static class PreceptTypeChecker
                     diagnostic = new PreceptValidationDiagnostic(
                         DiagnosticCatalog.C56,
                         DiagnosticCatalog.C56.FormatMessage(("field", identifier.Name)),
-                        0);
+                        0,
+                        Column: identifier.Position?.StartColumn ?? 0);
                     return false;
                 }
 
@@ -1639,7 +1647,8 @@ internal static class PreceptTypeChecker
                         diagnostic = new PreceptValidationDiagnostic(
                             DiagnosticCatalog.C56,
                             DiagnosticCatalog.C56.FormatMessage(("field", argKey)),
-                            0);
+                            0,
+                            Column: identifier.Position?.StartColumn ?? 0);
                         return false;
                     }
                 }
@@ -1662,7 +1671,8 @@ internal static class PreceptTypeChecker
                         diagnostic = new PreceptValidationDiagnostic(
                             DiagnosticCatalog.C40,
                             "operator 'not' requires boolean operand.",
-                            0);
+                            0,
+                            Column: unary.Operand.Position?.StartColumn ?? 0);
                         return false;
                     }
 
@@ -1678,7 +1688,8 @@ internal static class PreceptTypeChecker
                         diagnostic = new PreceptValidationDiagnostic(
                             DiagnosticCatalog.C40,
                             "unary '-' requires numeric operand.",
-                            0);
+                            0,
+                            Column: unary.Operand.Position?.StartColumn ?? 0);
                         return false;
                     }
 
@@ -1689,7 +1700,8 @@ internal static class PreceptTypeChecker
                 diagnostic = new PreceptValidationDiagnostic(
                     DiagnosticCatalog.C40,
                     $"unsupported unary operator '{unary.Operator}'.",
-                    0);
+                    0,
+                    Column: unary.Position?.StartColumn ?? 0);
                 return false;
             }
 
@@ -1713,7 +1725,8 @@ internal static class PreceptTypeChecker
                     diagnostic = new PreceptValidationDiagnostic(
                         DiagnosticCatalog.C78,
                         DiagnosticCatalog.C78.FormatMessage(("actual", FormatKinds(condKind))),
-                        0);
+                        0,
+                        Column: cond.Condition.Position?.StartColumn ?? 0);
                     return false;
                 }
 
@@ -1749,7 +1762,8 @@ internal static class PreceptTypeChecker
                     diagnostic = new PreceptValidationDiagnostic(
                         DiagnosticCatalog.C79,
                         BuildC79Message(thenKind, elseKind),
-                        0);
+                        0,
+                        Column: cond.ElseBranch.Position?.StartColumn ?? 0);
                     return false;
                 }
 
@@ -1762,7 +1776,8 @@ internal static class PreceptTypeChecker
                 diagnostic = new PreceptValidationDiagnostic(
                     DiagnosticCatalog.C39,
                     "unsupported expression node.",
-                    0);
+                    0,
+                    Column: expression.Position?.StartColumn ?? 0);
                 return false;
         }
     }
@@ -1782,7 +1797,8 @@ internal static class PreceptTypeChecker
             diagnostic = new PreceptValidationDiagnostic(
                 DiagnosticCatalog.C71,
                 $"Unknown function '{fn.Name}'.",
-                0);
+                0,
+                Column: fn.Position?.StartColumn ?? 0);
             return false;
         }
 
@@ -1800,7 +1816,8 @@ internal static class PreceptTypeChecker
                 diagnostic = new PreceptValidationDiagnostic(
                     DiagnosticCatalog.C77,
                     $"Function '{fn.Name}' does not accept nullable arguments. '{argName}' may be null. Add a null check.",
-                    0);
+                    0,
+                    Column: fn.Arguments[i].Position?.StartColumn ?? 0);
                 return false;
             }
         }
@@ -1858,7 +1875,8 @@ internal static class PreceptTypeChecker
                 diagnostic = new PreceptValidationDiagnostic(
                     DiagnosticCatalog.C75,
                     $"pow() exponent must be integer type, but got {KindLabel(argKinds[1])}.",
-                    0);
+                    0,
+                    Column: fn.Arguments[1].Position?.StartColumn ?? 0);
                 return false;
             }
 
@@ -1881,7 +1899,8 @@ internal static class PreceptTypeChecker
                             diagnostic = new PreceptValidationDiagnostic(
                                 DiagnosticCatalog.C73,
                                 $"{fn.Name}() no matching overload: {param.Name} argument expects {KindLabel(param.AcceptedTypes)} but got {KindLabel(argKinds[i])}.",
-                                0);
+                                0,
+                                Column: fn.Arguments[i].Position?.StartColumn ?? 0);
                             return false;
                         }
                     }
@@ -1896,7 +1915,8 @@ internal static class PreceptTypeChecker
                             diagnostic = new PreceptValidationDiagnostic(
                                 DiagnosticCatalog.C73,
                                 $"{fn.Name}() no matching overload: {param.Name} argument expects {KindLabel(param.AcceptedTypes)} but got {KindLabel(argKinds[i])}.",
-                                0);
+                                0,
+                                Column: fn.Arguments[i].Position?.StartColumn ?? 0);
                             return false;
                         }
                     }
@@ -1907,7 +1927,8 @@ internal static class PreceptTypeChecker
             diagnostic = new PreceptValidationDiagnostic(
                 DiagnosticCatalog.C72,
                 $"{fn.Name}() called with {fn.Arguments.Length} argument(s), but no matching overload found.",
-                0);
+                0,
+                Column: fn.Position?.StartColumn ?? 0);
             return false;
         }
 
@@ -1928,7 +1949,8 @@ internal static class PreceptTypeChecker
                     diagnostic = new PreceptValidationDiagnostic(
                         DiagnosticCatalog.C74,
                         "round() precision argument must be a non-negative integer literal.",
-                        0);
+                        0,
+                        Column: fn.Arguments[argIndex].Position?.StartColumn ?? 0);
                     return false;
                 }
             }
@@ -1953,7 +1975,8 @@ internal static class PreceptTypeChecker
                     diagnostic = new PreceptValidationDiagnostic(
                         DiagnosticCatalog.C76,
                         $"sqrt() requires a non-negative argument. '{argName}' may be negative. Add a 'nonnegative' constraint, 'rule {argName} >= 0', state/event 'ensure', or guard with '{argName} >= 0'.",
-                        0);
+                        0,
+                        Column: arg.Position?.StartColumn ?? 0);
                     return false;
                 }
             }
@@ -1981,7 +2004,7 @@ internal static class PreceptTypeChecker
 
                 if (!IsExactly(leftKind, StaticValueKind.Boolean))
                 {
-                    diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C41, "operator 'and' requires boolean operands.", 0);
+                    diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C41, "operator 'and' requires boolean operands.", 0, Column: binary.Left.Position?.StartColumn ?? 0);
                     return false;
                 }
 
@@ -1991,7 +2014,7 @@ internal static class PreceptTypeChecker
 
                 if (!IsExactly(rightKind, StaticValueKind.Boolean))
                 {
-                    diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C41, "operator 'and' requires boolean operands.", 0);
+                    diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C41, "operator 'and' requires boolean operands.", 0, Column: binary.Right.Position?.StartColumn ?? 0);
                     return false;
                 }
 
@@ -2006,7 +2029,7 @@ internal static class PreceptTypeChecker
 
                 if (!IsExactly(leftKind, StaticValueKind.Boolean))
                 {
-                    diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C41, "operator 'or' requires boolean operands.", 0);
+                    diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C41, "operator 'or' requires boolean operands.", 0, Column: binary.Left.Position?.StartColumn ?? 0);
                     return false;
                 }
 
@@ -2016,7 +2039,7 @@ internal static class PreceptTypeChecker
 
                 if (!IsExactly(rightKind, StaticValueKind.Boolean))
                 {
-                    diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C41, "operator 'or' requires boolean operands.", 0);
+                    diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C41, "operator 'or' requires boolean operands.", 0, Column: binary.Right.Position?.StartColumn ?? 0);
                     return false;
                 }
 
@@ -2044,7 +2067,7 @@ internal static class PreceptTypeChecker
                     return true;
                 }
 
-                diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C41, "operator '+' requires number+number or string+string.", 0);
+                diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C41, "operator '+' requires number+number or string+string.", 0, Column: binary.Position?.StartColumn ?? 0);
                 return false;
             }
 
@@ -2073,7 +2096,8 @@ internal static class PreceptTypeChecker
                         diagnostic = new PreceptValidationDiagnostic(
                             DiagnosticCatalog.C65,
                             DiagnosticCatalog.C65.FormatMessage(("operator", binary.Operator)),
-                            0);
+                            0,
+                            Column: binary.Left.Position?.StartColumn ?? 0);
                         return false;
                     }
 
@@ -2083,7 +2107,8 @@ internal static class PreceptTypeChecker
                         diagnostic = new PreceptValidationDiagnostic(
                             DiagnosticCatalog.C67,
                             DiagnosticCatalog.C67.FormatMessage(("operator", binary.Operator)),
-                            0);
+                            0,
+                            Column: binary.Position?.StartColumn ?? 0);
                         return false;
                     }
 
@@ -2101,7 +2126,8 @@ internal static class PreceptTypeChecker
                     diagnostic = new PreceptValidationDiagnostic(
                         DiagnosticCatalog.C41,
                         $"operator '{binary.Operator}' requires numeric operands.",
-                        0);
+                        0,
+                        Column: binary.Position?.StartColumn ?? 0);
                     return false;
                 }
 
@@ -2119,7 +2145,8 @@ internal static class PreceptTypeChecker
                             diagnostic = new PreceptValidationDiagnostic(
                                 DiagnosticCatalog.C92,
                                 "Division by zero: the divisor is literal 0.",
-                                0);
+                                0,
+                                Column: binary.Right.Position?.StartColumn ?? 0);
                             return false;
                         }
                         // Non-zero literal — safe, no diagnostic
@@ -2135,7 +2162,8 @@ internal static class PreceptTypeChecker
                                 diagnostic = new PreceptValidationDiagnostic(
                                     DiagnosticCatalog.C93,
                                     $"Divisor '{name}' is nonnegative but not nonzero — 'nonnegative' allows zero. Consider 'positive' instead.",
-                                    0);
+                                    0,
+                                    Column: binary.Right.Position?.StartColumn ?? 0);
                             }
                             else
                             {
@@ -2143,7 +2171,8 @@ internal static class PreceptTypeChecker
                                 diagnostic = new PreceptValidationDiagnostic(
                                     DiagnosticCatalog.C93,
                                     $"Divisor '{name}' has no compile-time nonzero proof. Consider adding a 'positive' constraint, 'rule {name} != 0', or 'when {name} != 0' guard.",
-                                    0);
+                                    0,
+                                    Column: binary.Right.Position?.StartColumn ?? 0);
                             }
                         }
                     }
@@ -2159,7 +2188,8 @@ internal static class PreceptTypeChecker
                             diagnostic = new PreceptValidationDiagnostic(
                                 DiagnosticCatalog.C93,
                                 $"{description} Consider restructuring into a helper field with a 'positive' constraint or 'rule != 0'.",
-                                0);
+                                0,
+                                Column: binary.Right.Position?.StartColumn ?? 0);
                         }
                     }
                 }
@@ -2188,14 +2218,14 @@ internal static class PreceptTypeChecker
                 if (leftIsNull && !HasFlag(rightEqKind, StaticValueKind.Null))
                 {
                     diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C41,
-                        $"operator '{binary.Operator}' cannot compare non-nullable {FormatKinds(rightEqKind)} with null.", 0);
+                        $"operator '{binary.Operator}' cannot compare non-nullable {FormatKinds(rightEqKind)} with null.", 0, Column: binary.Left.Position?.StartColumn ?? 0);
                     return false;
                 }
 
                 if (rightIsNull && !HasFlag(leftEqKind, StaticValueKind.Null))
                 {
                     diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C41,
-                        $"operator '{binary.Operator}' cannot compare non-nullable {FormatKinds(leftEqKind)} with null.", 0);
+                        $"operator '{binary.Operator}' cannot compare non-nullable {FormatKinds(leftEqKind)} with null.", 0, Column: binary.Right.Position?.StartColumn ?? 0);
                     return false;
                 }
 
@@ -2212,7 +2242,7 @@ internal static class PreceptTypeChecker
                 if (!isIntNumberMix && !isDecimalMix && leftEqFamily != StaticValueKind.None && rightEqFamily != StaticValueKind.None && leftEqFamily != rightEqFamily)
                 {
                     diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C41,
-                        $"operator '{binary.Operator}' requires operands of the same type, but found {FormatKinds(leftEqKind)} and {FormatKinds(rightEqKind)}.", 0);
+                        $"operator '{binary.Operator}' requires operands of the same type, but found {FormatKinds(leftEqKind)} and {FormatKinds(rightEqKind)}.", 0, Column: binary.Position?.StartColumn ?? 0);
                     return false;
                 }
 
@@ -2224,7 +2254,7 @@ internal static class PreceptTypeChecker
             {
                 if (binary.Left is not PreceptIdentifierExpression { Member: null } collectionIdentifier)
                 {
-                    diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C41, "'contains' requires a collection field on the left side.", 0);
+                    diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C41, "'contains' requires a collection field on the left side.", 0, Column: binary.Left.Position?.StartColumn ?? 0);
                     return false;
                 }
 
@@ -2234,7 +2264,7 @@ internal static class PreceptTypeChecker
                 var collectionKey = $"{collectionIdentifier.Name}.count";
                 if (!symbols.ContainsKey(collectionKey))
                 {
-                    diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C38, $"unknown identifier '{collectionIdentifier.Name}'.", 0);
+                    diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C38, $"unknown identifier '{collectionIdentifier.Name}'.", 0, Column: collectionIdentifier.Position?.StartColumn ?? 0);
                     return false;
                 }
 
@@ -2256,7 +2286,8 @@ internal static class PreceptTypeChecker
                     diagnostic = new PreceptValidationDiagnostic(
                         DiagnosticCatalog.C41,
                         $"operator 'contains' requires RHS of type {FormatKinds(innerKind)} but expression produces {FormatKinds(rightKind)}.",
-                        0);
+                        0,
+                        Column: binary.Right.Position?.StartColumn ?? 0);
                     return false;
                 }
 
@@ -2265,7 +2296,7 @@ internal static class PreceptTypeChecker
             }
 
             default:
-                diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C41, $"unsupported binary operator '{binary.Operator}'.", 0);
+                diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C41, $"unsupported binary operator '{binary.Operator}'.", 0, Column: binary.Position?.StartColumn ?? 0);
                 return false;
         }
     }
@@ -2952,6 +2983,7 @@ internal static class PreceptTypeChecker
                                 ("values", string.Join(", ", collectionField.ChoiceValues.Select(v => $"\"{v}\""))),
                                 ("name", mutation.TargetField)),
                             line,
+                            Column: mutation.Expression.Position?.StartColumn ?? 0,
                             StateContext: stateContext));
                     }
                     break;
@@ -2968,6 +3000,7 @@ internal static class PreceptTypeChecker
                         DiagnosticCatalog.C43,
                         $"'{mutation.Verb.ToString().ToLowerInvariant()} {mutation.TargetField} into {mutation.IntoField}': cannot assign {FormatKinds(innerKind)} to target '{mutation.IntoField}' of type {FormatKinds(intoKind)}.",
                         line,
+                        Column: mutation.Expression?.Position?.StartColumn ?? 0,
                         StateContext: stateContext));
                     break;
             }

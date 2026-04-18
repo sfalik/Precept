@@ -2393,7 +2393,8 @@ public static class PreceptCompiler
                     diagnostics.Add(new PreceptValidationDiagnostic(
                         DiagnosticCatalog.C32,
                         DiagnosticCatalog.C32.FormatMessage(("sourceLine", assignment.SourceLine), ("key", assignment.Key), ("expression", assignment.ExpressionText), ("reason", rule.Reason)),
-                        assignment.SourceLine));
+                        assignment.SourceLine,
+                        Column: assignment.Expression.Position?.StartColumn ?? 0));
                 }
             }
         }
