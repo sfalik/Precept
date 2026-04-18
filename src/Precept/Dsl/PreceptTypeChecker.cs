@@ -2458,6 +2458,7 @@ internal static class PreceptTypeChecker
         var markers = new Dictionary<string, StaticValueKind>(context.Symbols, StringComparer.Ordinal);
         var fieldIntervals = CopyFieldIntervals(context);
         var flags = CopyFlags(context);
+        var exprFacts = CopyExprFacts(context);
 
         // Always kill existing numeric proof markers for the target field first.
         markers.Remove($"$positive:{targetField}");
@@ -2470,6 +2471,16 @@ internal static class PreceptTypeChecker
         foreach (var k in context.Symbols.Keys.Where(k => k.StartsWith(ivalPrefix, StringComparison.Ordinal)).ToList())
             markers.Remove(k);
         fieldIntervals.Remove(targetField);
+
+        // Kill exprFacts entries where the LinearForm mentions the reassigned field.
+        var exprKeysToKill = new List<LinearForm>();
+        foreach (var lf in exprFacts.Keys)
+        {
+            if (lf.Terms.ContainsKey(targetField))
+                exprKeysToKill.Add(lf);
+        }
+        foreach (var k in exprKeysToKill)
+            exprFacts.Remove(k);
 
         // Kill relational markers ($gt:, $gte:) where the target field appears as either operand.
         // A reassignment invalidates ordering proofs that involved the old field value.
@@ -2570,6 +2581,15 @@ internal static class PreceptTypeChecker
                     markers[$"$nonzero:{targetField}"] = StaticValueKind.Boolean;
                     flags[targetField] = NumericFlags.Nonzero;
                 }
+
+                // Dual-write: store compound RHS interval in exprFacts (step 7b-iii).
+                var rhsForm = LinearForm.TryNormalize(rhs);
+                if (rhsForm is not null)
+                {
+                    exprFacts[rhsForm] = rhsInterval;
+                    var targetForm = LinearForm.FromField(targetField);
+                    exprFacts[targetForm.Subtract(rhsForm)] = new NumericInterval(0, true, 0, true);
+                }
             }
         }
 
@@ -2581,7 +2601,7 @@ internal static class PreceptTypeChecker
                 relFacts[lf] = fact;
         }
 
-        return new ProofContext(markers, relFacts, fieldIntervals, flags, CopyExprFacts(context));
+        return new ProofContext(markers, relFacts, fieldIntervals, flags, exprFacts);
     }
 
     internal static ProofContext ApplyNarrowing(
