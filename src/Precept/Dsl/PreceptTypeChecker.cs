@@ -113,6 +113,7 @@ internal static class PreceptTypeChecker
         // nonnegative/positive are already covered by $nonneg:/$positive: markers injected above.
         {
             var markerDict = new Dictionary<string, StaticValueKind>(dataFieldKinds.Symbols, StringComparer.Ordinal);
+            var fieldIntervals = CopyFieldIntervals(dataFieldKinds);
             foreach (var field in model.Fields)
             {
                 if (field.Constraints is not { Count: > 0 }) continue;
@@ -132,8 +133,9 @@ internal static class PreceptTypeChecker
                 var upper = maxVal ?? double.PositiveInfinity;
                 var ival = new NumericInterval(lower, minVal.HasValue, upper, maxVal.HasValue);
                 markerDict[ival.ToMarkerKey(field.Name)] = StaticValueKind.Boolean;
+                fieldIntervals[field.Name] = ival;
             }
-            dataFieldKinds = new ProofContext(markerDict, new Dictionary<LinearForm, RelationalFact>(dataFieldKinds.RelationalFacts));
+            dataFieldKinds = new ProofContext(markerDict, new Dictionary<LinearForm, RelationalFact>(dataFieldKinds.RelationalFacts), fieldIntervals, CopyFlags(dataFieldKinds), CopyExprFacts(dataFieldKinds));
         }
 
         var eventArgKinds = model.Events.ToDictionary(
@@ -267,7 +269,7 @@ internal static class PreceptTypeChecker
                     stateGroup.Key,
                     eventName));
 
-                ProofContext branchContext = new ProofContext(baseSymbols, new Dictionary<LinearForm, RelationalFact>(dataFieldKinds.RelationalFacts));
+                ProofContext branchContext = new ProofContext(baseSymbols, new Dictionary<LinearForm, RelationalFact>(dataFieldKinds.RelationalFacts), CopyFieldIntervals(dataFieldKinds), CopyFlags(dataFieldKinds), CopyExprFacts(dataFieldKinds));
 
                 // C47: detect identical guard text for the same (state, event) group
                 var seenGuards = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -433,7 +435,7 @@ internal static class PreceptTypeChecker
                 action.State));
 
             // Layer 1: thread post-assignment proof state into subsequent assignments.
-            ProofContext assignmentContext = new ProofContext(baseSymbols, new Dictionary<LinearForm, RelationalFact>(dataFieldKinds.RelationalFacts));
+            ProofContext assignmentContext = new ProofContext(baseSymbols, new Dictionary<LinearForm, RelationalFact>(dataFieldKinds.RelationalFacts), CopyFieldIntervals(dataFieldKinds), CopyFlags(dataFieldKinds), CopyExprFacts(dataFieldKinds));
 
             foreach (var assignment in action.SetAssignments)
             {
@@ -1390,7 +1392,12 @@ internal static class PreceptTypeChecker
             .Where(static stateEnsure => stateEnsure.Anchor == EnsureAnchor.In && stateEnsure.WhenGuard is null)
             .GroupBy(static stateEnsure => stateEnsure.State, StringComparer.Ordinal))
         {
-            ProofContext narrowed = new ProofContext(new Dictionary<string, StaticValueKind>(dataFieldKinds.Symbols, StringComparer.Ordinal));
+            ProofContext narrowed = new ProofContext(
+                new Dictionary<string, StaticValueKind>(dataFieldKinds.Symbols, StringComparer.Ordinal),
+                new Dictionary<LinearForm, RelationalFact>(),
+                CopyFieldIntervals(dataFieldKinds),
+                CopyFlags(dataFieldKinds),
+                CopyExprFacts(dataFieldKinds));
 
             foreach (var stateEnsure in group)
                 narrowed = ApplyNarrowing(stateEnsure.Expression, narrowed, assumeTrue: true);
@@ -2449,6 +2456,7 @@ internal static class PreceptTypeChecker
         ProofContext context)
     {
         var markers = new Dictionary<string, StaticValueKind>(context.Symbols, StringComparer.Ordinal);
+        var fieldIntervals = CopyFieldIntervals(context);
 
         // Always kill existing numeric proof markers for the target field first.
         markers.Remove($"$positive:{targetField}");
@@ -2459,6 +2467,7 @@ internal static class PreceptTypeChecker
         var ivalPrefix = $"$ival:{targetField}:";
         foreach (var k in context.Symbols.Keys.Where(k => k.StartsWith(ivalPrefix, StringComparison.Ordinal)).ToList())
             markers.Remove(k);
+        fieldIntervals.Remove(targetField);
 
         // Kill relational markers ($gt:, $gte:) where the target field appears as either operand.
         // A reassignment invalidates ordering proofs that involved the old field value.
@@ -2504,6 +2513,7 @@ internal static class PreceptTypeChecker
                 // Also inject a point interval for precise interval arithmetic in subsequent expressions.
                 var pointIval = new NumericInterval(numVal, true, numVal, true);
                 markers[pointIval.ToMarkerKey(targetField)] = StaticValueKind.Boolean;
+                fieldIntervals[targetField] = pointIval;
             }
         }
         else if (TryGetIdentifierKey(rhs, out var sourceKey))
@@ -2522,7 +2532,10 @@ internal static class PreceptTypeChecker
             {
                 // Re-encode with the target field name.
                 if (NumericInterval.TryParseMarkerKey(srcKey, out var srcIval))
+                {
                     markers[srcIval.ToMarkerKey(targetField)] = StaticValueKind.Boolean;
+                    fieldIntervals[targetField] = srcIval;
+                }
             }
         }
         else
@@ -2532,6 +2545,7 @@ internal static class PreceptTypeChecker
             if (!rhsInterval.IsUnknown)
             {
                 markers[rhsInterval.ToMarkerKey(targetField)] = StaticValueKind.Boolean;
+                fieldIntervals[targetField] = rhsInterval;
                 if (rhsInterval.IsPositive)
                 {
                     markers[$"$positive:{targetField}"] = StaticValueKind.Boolean;
@@ -2553,7 +2567,7 @@ internal static class PreceptTypeChecker
                 relFacts[lf] = fact;
         }
 
-        return new ProofContext(markers, relFacts);
+        return new ProofContext(markers, relFacts, fieldIntervals, CopyFlags(context), CopyExprFacts(context));
     }
 
     internal static ProofContext ApplyNarrowing(
@@ -2643,10 +2657,15 @@ internal static class PreceptTypeChecker
             ? StaticValueKind.Null
             : (existingKind & ~StaticValueKind.Null);
 
-        narrowed = new ProofContext(new Dictionary<string, StaticValueKind>(context.Symbols, StringComparer.Ordinal)
-        {
-            [key] = updatedKind
-        });
+        narrowed = new ProofContext(
+            new Dictionary<string, StaticValueKind>(context.Symbols, StringComparer.Ordinal)
+            {
+                [key] = updatedKind
+            },
+            new Dictionary<LinearForm, RelationalFact>(),
+            CopyFieldIntervals(context),
+            CopyFlags(context),
+            CopyExprFacts(context));
         return true;
     }
 
@@ -2710,7 +2729,7 @@ internal static class PreceptTypeChecker
                 default:
                     return false;
             }
-            result = new ProofContext(relMarkers, relFacts);
+            result = new ProofContext(relMarkers, relFacts, CopyFieldIntervals(context), CopyFlags(context), CopyExprFacts(context));
             return true;
         }
         else if (binary.Operator is ">" or ">=" or "<" or "<=")
@@ -2740,7 +2759,7 @@ internal static class PreceptTypeChecker
                 default:
                     return false;
             }
-            result = new ProofContext(new Dictionary<string, StaticValueKind>(context.Symbols, StringComparer.Ordinal), relFacts);
+            result = new ProofContext(new Dictionary<string, StaticValueKind>(context.Symbols, StringComparer.Ordinal), relFacts, CopyFieldIntervals(context), CopyFlags(context), CopyExprFacts(context));
             return true;
         }
         else
@@ -2785,7 +2804,7 @@ internal static class PreceptTypeChecker
         if (!injected)
             return false;
 
-        result = new ProofContext(markers);
+        result = new ProofContext(markers, new Dictionary<LinearForm, RelationalFact>(), CopyFieldIntervals(context), CopyFlags(context), CopyExprFacts(context));
         return true;
     }
 
@@ -2797,6 +2816,40 @@ internal static class PreceptTypeChecker
     {
         var copy = new Dictionary<LinearForm, RelationalFact>();
         foreach (var kvp in context.RelationalFacts)
+            copy[kvp.Key] = kvp.Value;
+        return copy;
+    }
+
+    /// <summary>
+    /// Returns a mutable copy of <paramref name="context"/>'s typed field interval store.
+    /// Used for copy-on-write propagation when constructing derived <see cref="ProofContext"/> instances.
+    /// </summary>
+    private static Dictionary<string, NumericInterval> CopyFieldIntervals(ProofContext context)
+    {
+        var copy = new Dictionary<string, NumericInterval>(StringComparer.Ordinal);
+        foreach (var kvp in context.FieldIntervals)
+            copy[kvp.Key] = kvp.Value;
+        return copy;
+    }
+
+    /// <summary>
+    /// Returns a mutable copy of <paramref name="context"/>'s typed numeric flags store.
+    /// </summary>
+    private static Dictionary<string, NumericFlags> CopyFlags(ProofContext context)
+    {
+        var copy = new Dictionary<string, NumericFlags>(StringComparer.Ordinal);
+        foreach (var kvp in context.Flags)
+            copy[kvp.Key] = kvp.Value;
+        return copy;
+    }
+
+    /// <summary>
+    /// Returns a mutable copy of <paramref name="context"/>'s typed expression-level interval store.
+    /// </summary>
+    private static Dictionary<LinearForm, NumericInterval> CopyExprFacts(ProofContext context)
+    {
+        var copy = new Dictionary<LinearForm, NumericInterval>();
+        foreach (var kvp in context.ExprFacts)
             copy[kvp.Key] = kvp.Value;
         return copy;
     }
