@@ -712,6 +712,18 @@ public class CatalogDriftTests
         ["C95"] = new("precept Test\nfield X as number default 10 min 10\nstate A initial\n" +
             "rule X < 5 because \"contradicts min\"\n", "contradicts"),
 
+        // C96: vacuous rule (always true given constraints)
+        ["C96"] = new("precept Test\nfield X as number default 5 min 1 max 100\nstate A initial\n" +
+            "rule X >= 0 because \"vacuous\"\n", "vacuous"),
+
+        // C97: dead guard (always false given constraints)
+        ["C97"] = new(H + "field X as number default 15 min 10\n" + S +
+            "event Go\nfrom A on Go when X < 0 -> no transition\nfrom A on Go -> no transition\n", "always false"),
+
+        // C98: tautological guard (always true given constraints)
+        ["C98"] = new(H + "field X as number default 15 min 10\n" + S +
+            "event Go\nfrom A on Go when X >= 0 -> no transition\n", "always true"),
+
         // ── Runtime-phase (C33–C37) ───────────────────────────────────
 
         // C33: CreateInstance with empty initial state
@@ -1567,6 +1579,15 @@ public class CatalogDriftTests
 
         // C95: contradictory rule — rule on line 4
         ["C95"] = ("precept Test\nfield X as number default 10 min 10\nstate A initial\nrule X < 5 because \"contradicts min\"\n", "compile", 4),
+
+        // C96: vacuous rule — rule on line 4
+        ["C96"] = ("precept Test\nfield X as number default 5 min 1 max 100\nstate A initial\nrule X >= 0 because \"vacuous\"\n", "compile", 4),
+
+        // C97: dead guard — transition row on line 5
+        ["C97"] = ("precept Test\nfield X as number default 15 min 10\nstate A initial\nevent Go\nfrom A on Go when X < 0 -> no transition\nfrom A on Go -> no transition\n", "compile", 5),
+
+        // C98: tautological guard — transition row on line 5
+        ["C98"] = ("precept Test\nfield X as number default 15 min 10\nstate A initial\nevent Go\nfrom A on Go when X >= 0 -> no transition\n", "compile", 5),
     };
 
     [Theory]

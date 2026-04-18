@@ -728,4 +728,28 @@ public static class DiagnosticCatalog
         "Rules are contradictory — no value can satisfy both simultaneously.",
         "{message}",
         ConstraintSeverity.Warning);
+
+    /// <summary>Rule is vacuous — provably always true given field constraints.</summary>
+    // SYNC:CONSTRAINT:C96
+    public static readonly LanguageConstraint C96 = Register(
+        "C96", "compile",
+        "Rule is vacuous — provably always true given field constraints.",
+        "{message}",
+        ConstraintSeverity.Warning);
+
+    /// <summary>Guard is dead — provably always false; this row/block can never execute.</summary>
+    // SYNC:CONSTRAINT:C97
+    public static readonly LanguageConstraint C97 = Register(
+        "C97", "compile",
+        "Guard is dead — provably always false; this row/block can never execute.",
+        "{message}",
+        ConstraintSeverity.Warning);
+
+    /// <summary>Guard is tautological — provably always true; the 'when' clause has no effect.</summary>
+    // SYNC:CONSTRAINT:C98
+    public static readonly LanguageConstraint C98 = Register(
+        "C98", "compile",
+        "Guard is tautological — provably always true; the 'when' clause has no effect.",
+        "{message}",
+        ConstraintSeverity.Warning);
 }

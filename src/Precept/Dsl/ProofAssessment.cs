@@ -24,7 +24,12 @@ internal enum ProofRequirement
     AssignmentConstraint,
     /// <summary>Rule must be satisfiable given field constraints and other rules.</summary>
     RuleSatisfiability,
-    // Planned: RuleVacuity (C96), GuardSatisfiability (C97), GuardTautology (C98)
+    /// <summary>Rule is vacuous — already guaranteed by field constraints.</summary>
+    RuleVacuity,
+    /// <summary>Guard is provably always false (dead code).</summary>
+    GuardSatisfiability,
+    /// <summary>Guard is provably always true (tautological — no effect).</summary>
+    GuardTautology,
 }
 
 /// <summary>
@@ -49,6 +54,9 @@ internal sealed record ProofAssessment(
         (ProofRequirement.NonnegativeArgument, ProofOutcome.Obligation) => DiagnosticCatalog.C76,
         (ProofRequirement.AssignmentConstraint, ProofOutcome.Contradiction) => DiagnosticCatalog.C94,
         (ProofRequirement.RuleSatisfiability, ProofOutcome.Contradiction) => DiagnosticCatalog.C95,
+        (ProofRequirement.RuleVacuity, ProofOutcome.Satisfied) => DiagnosticCatalog.C96,
+        (ProofRequirement.GuardSatisfiability, ProofOutcome.Contradiction) => DiagnosticCatalog.C97,
+        (ProofRequirement.GuardTautology, ProofOutcome.Satisfied) => DiagnosticCatalog.C98,
         _ => throw new InvalidOperationException($"Unexpected assessment: {Requirement}/{Outcome}"),
     };
 }

@@ -45,6 +45,20 @@ internal static class ProofDiagnosticRenderer
         { Requirement: ProofRequirement.RuleSatisfiability, Outcome: ProofOutcome.Contradiction } a =>
             $"Rules for '{a.SubjectDescription}' are contradictory — no value can satisfy all simultaneously.",
 
+        { Requirement: ProofRequirement.RuleVacuity, Outcome: ProofOutcome.Satisfied } a
+            when a.ConstraintInterval is not null && a.ConstraintDescription is not null =>
+            $"Rule '{a.ConstraintDescription}' is vacuous — field '{a.SubjectDescription}' constraints already guarantee this " +
+            $"(field constrained to {FormatInterval(a.ConstraintInterval.Value)}, rule requires {FormatInterval(a.StrongestFact)}).",
+
+        { Requirement: ProofRequirement.RuleVacuity, Outcome: ProofOutcome.Satisfied } a =>
+            $"Rule is vacuous — field '{a.SubjectDescription}' constraints already guarantee this.",
+
+        { Requirement: ProofRequirement.GuardSatisfiability, Outcome: ProofOutcome.Contradiction } a =>
+            $"Guard 'when {a.ConstraintDescription ?? a.SubjectDescription}' is provably always false — this row can never execute.",
+
+        { Requirement: ProofRequirement.GuardTautology, Outcome: ProofOutcome.Satisfied } a =>
+            $"Guard 'when {a.ConstraintDescription ?? a.SubjectDescription}' is provably always true — the condition has no effect.",
+
         _ => $"Proof diagnostic: {assessment.Requirement}/{assessment.Outcome} for {assessment.SubjectDescription}",
     };
 

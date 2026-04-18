@@ -97,6 +97,9 @@ public class DiagnosticSpanPrecisionTests
         "C87", // computed field in edit declaration
         "C88", // computed field assigned via set
         "C95", // contradictory rule
+        "C96", // vacuous rule
+        "C97", // dead guard
+        "C98", // tautological guard
     };
 
     // ════════════════════════════════════════════════════════════════

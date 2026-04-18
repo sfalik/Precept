@@ -79,6 +79,8 @@ Key structural decisions:
 - Updated §4 manifest entries for Rational.cs (~150→~100 LOC) and RationalTests.cs (expanded test spec).
 - Updated §7 Division in LinearForm exclusion to specify `long/long` Rational coefficients.
 - Added §9 "Post-endorsement update" note: architectural spine unchanged, endorsements remain valid.
+
+- PreceptTypeChecker.cs decomposition analysis (2026-04-18): Analyzed the full 3197-line file (53 methods) for partial-class decomposition. Key findings: (1) Shane's proposed "Diagnostics" group does not exist as a natural seam — diagnostic emissions are inline, not standalone methods. Replaced with TypeInference (~750 lines) and FieldConstraints (~330 lines). (2) IntervalInference (~157 lines) too small for its own file — merged into ProofChecks (~380 lines combined). (3) Zero visibility changes needed — C# partial classes compile as one class, so `private` members are accessible across all partial files. This eliminates the biggest risk. (4) Commit ordering is bottom-up by dependency: Helpers → FieldConstraints → Narrowing → ProofChecks → TypeInference. (5) Future-proofing validated: #111's C94–C99 land cleanly in ProofChecks, #107/#95 type additions land in TypeInference, #112 stateless events land in main orchestration file. Filed as issue #118, milestone M4. Decision in `.squad/decisions/inbox/frank-typechecker-decomposition.md`.
 - No architectural decisions changed. All edits are refinements and external validation.
 
 ### 2026-04-18 — PR #108 body updated: replaced stale Slices 11–16 with unified proof plan

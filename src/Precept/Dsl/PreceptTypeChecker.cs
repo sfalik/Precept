@@ -125,13 +125,21 @@ internal static class PreceptTypeChecker
                 {
                     if (c is FieldConstraint.Min m) minVal = m.Value;
                     else if (c is FieldConstraint.Max mx) maxVal = mx.Value;
+                    else if (c is FieldConstraint.Positive) minVal = minVal is null || minVal.Value <= 0 ? double.Epsilon : minVal;
+                    else if (c is FieldConstraint.Nonnegative) minVal ??= 0;
                 }
 
                 if (minVal is null && maxVal is null) continue;
 
                 var lower = minVal ?? double.NegativeInfinity;
                 var upper = maxVal ?? double.PositiveInfinity;
-                var ival = new NumericInterval(lower, minVal.HasValue, upper, maxVal.HasValue);
+                var lowerInclusive = minVal.HasValue && !(field.Constraints.Any(c => c is FieldConstraint.Positive) && minVal.Value == double.Epsilon);
+                if (field.Constraints.Any(c => c is FieldConstraint.Positive) && minVal.Value == double.Epsilon)
+                {
+                    lower = 0;
+                    lowerInclusive = false;
+                }
+                var ival = new NumericInterval(lower, lowerInclusive, upper, maxVal.HasValue);
                 fieldIntervals[field.Name] = ival;
             }
             dataFieldKinds = new GlobalProofContext(markerDict, new Dictionary<LinearForm, RelationalFact>(dataFieldKinds.RelationalFacts), fieldIntervals, CopyFlags(dataFieldKinds), CopyExprFacts(dataFieldKinds));
@@ -320,6 +328,10 @@ internal static class PreceptTypeChecker
                             expressions,
                             stateContext: item.State,
                             isBooleanRulePosition: true);
+
+                        // SYNC:CONSTRAINT:C97/C98: dead/tautological guard detection
+                        AssessGuard(row.WhenGuard, row.WhenText!, row.SourceLine,
+                            dataFieldKinds.FieldIntervals, diagnostics, item.State);
 
                         setContext = ApplyNarrowing(row.WhenGuard, branchContext, assumeTrue: true);
                         branchContext = ApplyNarrowing(row.WhenGuard, branchContext, assumeTrue: false);
@@ -1282,18 +1294,36 @@ internal static class PreceptTypeChecker
             foreach (var rule in model.Rules.Where(r => !r.IsSynthetic && r.WhenGuard is null))
             {
                 if (TryExtractSingleFieldComparison(rule.Expression, out var fieldName, out var ruleInterval)
-                    && fieldConstraintIntervals.TryGetValue(fieldName, out var constraintIval)
-                    && NumericInterval.AreDisjoint(ruleInterval, constraintIval))
+                    && fieldConstraintIntervals.TryGetValue(fieldName, out var constraintIval))
                 {
-                    var assessment = new ProofAssessment(
-                        ProofRequirement.RuleSatisfiability, ProofOutcome.Contradiction,
-                        fieldName, ruleInterval, ProofAttribution.None,
-                        ConstraintInterval: constraintIval,
-                        ConstraintDescription: rule.ExpressionText);
-                    diagnostics.Add(new PreceptValidationDiagnostic(
-                        DiagnosticCatalog.C95,
-                        ProofDiagnosticRenderer.Render(assessment),
-                        rule.SourceLine));
+                    // SYNC:CONSTRAINT:C95: contradictory rule detection
+                    if (NumericInterval.AreDisjoint(ruleInterval, constraintIval))
+                    {
+                        var assessment = new ProofAssessment(
+                            ProofRequirement.RuleSatisfiability, ProofOutcome.Contradiction,
+                            fieldName, ruleInterval, ProofAttribution.None,
+                            ConstraintInterval: constraintIval,
+                            ConstraintDescription: rule.ExpressionText);
+                        diagnostics.Add(new PreceptValidationDiagnostic(
+                            DiagnosticCatalog.C95,
+                            ProofDiagnosticRenderer.Render(assessment),
+                            rule.SourceLine));
+                    }
+                    // SYNC:CONSTRAINT:C96: vacuous rule detection
+                    // If the constraint interval is entirely within the rule interval,
+                    // the rule adds no new information — it's always true given constraints.
+                    else if (!constraintIval.IsUnknown && NumericInterval.Contains(ruleInterval, constraintIval))
+                    {
+                        var assessment = new ProofAssessment(
+                            ProofRequirement.RuleVacuity, ProofOutcome.Satisfied,
+                            fieldName, ruleInterval, ProofAttribution.None,
+                            ConstraintInterval: constraintIval,
+                            ConstraintDescription: rule.ExpressionText);
+                        diagnostics.Add(new PreceptValidationDiagnostic(
+                            DiagnosticCatalog.C96,
+                            ProofDiagnosticRenderer.Render(assessment),
+                            rule.SourceLine));
+                    }
                 }
             }
         }
@@ -3104,6 +3134,57 @@ internal static class PreceptTypeChecker
         return new ProofAssessment(
             ProofRequirement.NonzeroDivisor, ProofOutcome.Obligation,
             subject, interval, ProofAttribution.None);
+    }
+
+    /// <summary>
+    /// Assesses a guard expression for C97 (dead guard — always false) and
+    /// C98 (tautological guard — always true) using field constraint intervals.
+    /// Only handles simple single-field comparisons (e.g. <c>when X &lt; 0</c>).
+    /// </summary>
+    private static void AssessGuard(
+        PreceptExpression guard,
+        string guardText,
+        int sourceLine,
+        IReadOnlyDictionary<string, NumericInterval> fieldIntervals,
+        List<PreceptValidationDiagnostic> diagnostics,
+        string? stateContext)
+    {
+        if (!TryExtractSingleFieldComparison(guard, out var fieldName, out var guardTrueInterval))
+            return;
+
+        if (!fieldIntervals.TryGetValue(fieldName, out var constraintIval) || constraintIval.IsUnknown)
+            return;
+
+        // C97: guard's "true" interval is disjoint from field constraints → always false
+        if (NumericInterval.AreDisjoint(guardTrueInterval, constraintIval))
+        {
+            var assessment = new ProofAssessment(
+                ProofRequirement.GuardSatisfiability, ProofOutcome.Contradiction,
+                fieldName, guardTrueInterval, ProofAttribution.None,
+                ConstraintInterval: constraintIval,
+                ConstraintDescription: guardText.Trim());
+            diagnostics.Add(new PreceptValidationDiagnostic(
+                DiagnosticCatalog.C97,
+                ProofDiagnosticRenderer.Render(assessment),
+                sourceLine,
+                StateContext: stateContext));
+            return;
+        }
+
+        // C98: field constraints are entirely within the guard's "true" interval → always true
+        if (NumericInterval.Contains(guardTrueInterval, constraintIval))
+        {
+            var assessment = new ProofAssessment(
+                ProofRequirement.GuardTautology, ProofOutcome.Satisfied,
+                fieldName, guardTrueInterval, ProofAttribution.None,
+                ConstraintInterval: constraintIval,
+                ConstraintDescription: guardText.Trim());
+            diagnostics.Add(new PreceptValidationDiagnostic(
+                DiagnosticCatalog.C98,
+                ProofDiagnosticRenderer.Render(assessment),
+                sourceLine,
+                StateContext: stateContext));
+        }
     }
 
     /// <summary>

@@ -60,6 +60,24 @@ internal readonly record struct NumericInterval(
     public bool IsUnknown => double.IsNegativeInfinity(Lower) && double.IsPositiveInfinity(Upper);
 
     /// <summary>
+    /// Returns <c>true</c> when <paramref name="inner"/> is entirely contained within <paramref name="outer"/>.
+    /// </summary>
+    public static bool Contains(NumericInterval outer, NumericInterval inner)
+    {
+        if (inner.IsUnknown || outer.IsUnknown) return false;
+
+        // Check lower bound: outer.Lower must be ≤ inner.Lower (with inclusiveness)
+        if (outer.Lower > inner.Lower) return false;
+        if (outer.Lower == inner.Lower && !outer.LowerInclusive && inner.LowerInclusive) return false;
+
+        // Check upper bound: outer.Upper must be ≥ inner.Upper (with inclusiveness)
+        if (outer.Upper < inner.Upper) return false;
+        if (outer.Upper == inner.Upper && !outer.UpperInclusive && inner.UpperInclusive) return false;
+
+        return true;
+    }
+
+    /// <summary>
     /// Returns <c>true</c> when intervals <paramref name="a"/> and <paramref name="b"/>
     /// share no common values (are disjoint).
     /// </summary>
