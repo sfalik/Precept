@@ -272,7 +272,7 @@ internal sealed class PreceptCodeActionHandler : ICodeActionHandler
         PreceptDefinition model,
         Diagnostic diagnostic)
     {
-        var divisorName = ExtractC93DivisorName(diagnostic.Message);
+        var divisorName = ExtractC93DivisorName(diagnostic, lines);
         if (divisorName is null)
             return;
 
@@ -340,9 +340,29 @@ internal sealed class PreceptCodeActionHandler : ICodeActionHandler
         }
     }
 
-    private static string? ExtractC93DivisorName(string message)
+    private static readonly Regex IdentifierTokenRegex = new(@"^[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)?", RegexOptions.Compiled);
+
+    private static string? ExtractC93DivisorName(Diagnostic diagnostic, string[] lines)
     {
-        var match = C93DivisorNameRegex.Match(message);
+        // Span-driven: read the source text at the diagnostic start position and
+        // extract the first identifier token (possibly dotted like Event.Arg).
+        var startLine = (int)diagnostic.Range.Start.Line;
+        var startChar = (int)diagnostic.Range.Start.Character;
+
+        if (startLine >= 0 && startLine < lines.Length && startChar > 0)
+        {
+            var line = lines[startLine];
+            if (startChar < line.Length)
+            {
+                var rest = line[startChar..];
+                var tokenMatch = IdentifierTokenRegex.Match(rest);
+                if (tokenMatch.Success)
+                    return tokenMatch.Value;
+            }
+        }
+
+        // Fallback: parse from message text.
+        var match = C93DivisorNameRegex.Match(diagnostic.Message);
         return match.Success ? match.Groups[1].Value : null;
     }
 

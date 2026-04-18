@@ -1992,22 +1992,12 @@ internal static class PreceptTypeChecker
             if (param.Constraint == FunctionArgConstraint.RequiresNonNegativeProof)
             {
                 var arg = fn.Arguments[argIndex];
-                bool isNonNeg = arg switch
+                var assessment = AssessNonnegativeArgument(arg, context);
+                if (assessment is not null && assessment.Outcome != ProofOutcome.Satisfied)
                 {
-                    PreceptLiteralExpression { Value: long lval } => lval >= 0,
-                    PreceptLiteralExpression { Value: double dval } => dval >= 0,
-                    PreceptLiteralExpression { Value: decimal mval } => mval >= 0,
-                    _ => context.KnowsNonnegative(arg),
-                };
-
-                if (!isNonNeg)
-                {
-                    var argName = arg is PreceptIdentifierExpression nid
-                        ? (nid.Member is null ? nid.Name : $"{nid.Name}.{nid.Member}")
-                        : "argument";
                     diagnostic = new PreceptValidationDiagnostic(
-                        DiagnosticCatalog.C76,
-                        $"sqrt() requires a non-negative argument. '{argName}' may be negative. Add a 'nonnegative' constraint, 'rule {argName} >= 0', state/event 'ensure', or guard with '{argName} >= 0'.",
+                        assessment.DiagnosticCode,
+                        ProofDiagnosticRenderer.Render(assessment),
                         0,
                         Column: arg.Position?.StartColumn ?? 0);
                     return false;
@@ -3034,6 +3024,40 @@ internal static class PreceptTypeChecker
         PreceptIdentifierExpression id => $"{id.Name}.{id.Member}",
         _ => "expression",
     };
+
+    /// <summary>
+    /// Assesses whether a sqrt() argument is provably non-negative using the unified proof model.
+    /// Returns <c>null</c> when no diagnostic is needed (argument is provably non-negative).
+    /// </summary>
+    private static ProofAssessment? AssessNonnegativeArgument(
+        PreceptExpression arg, GlobalProofContext context)
+    {
+        var subject = DescribeExpression(arg);
+
+        // Check literals directly.
+        if (arg is PreceptLiteralExpression { Value: long lval } && lval >= 0)
+            return null;
+        if (arg is PreceptLiteralExpression { Value: double dval } && dval >= 0)
+            return null;
+        if (arg is PreceptLiteralExpression { Value: decimal mval } && mval >= 0)
+            return null;
+
+        if (context.KnowsNonnegative(arg))
+            return null;
+
+        var interval = context.IntervalOf(arg);
+
+        // Provably negative: contradiction
+        if (interval is { Upper: < 0 })
+            return new ProofAssessment(
+                ProofRequirement.NonnegativeArgument, ProofOutcome.Contradiction,
+                subject, interval, ProofAttribution.None);
+
+        // Obligation: may be negative
+        return new ProofAssessment(
+            ProofRequirement.NonnegativeArgument, ProofOutcome.Obligation,
+            subject, interval, ProofAttribution.None);
+    }
 
     private static bool TryGetNumericLiteral(PreceptExpression expr, out double value)
     {

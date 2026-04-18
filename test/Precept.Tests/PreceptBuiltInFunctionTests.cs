@@ -567,6 +567,28 @@ public class PreceptBuiltInFunctionTests
         c76[0].Message.Should().Contain("Submit.Val");
     }
 
+    [Fact]
+    public void TypeChecker_C76_SqrtNegativeLiteral_EmitsContradiction()
+    {
+        var dsl = "precept Test\nfield Result as number default 0\nstate A initial\nstate B\nevent Go\nfrom A on Go -> set Result = sqrt(-1.0) -> no transition\n";
+        var model = PreceptParser.Parse(dsl);
+        var validation = PreceptCompiler.Validate(model);
+        var c76 = validation.Diagnostics.Where(d => d.Constraint.Id == "C76").ToList();
+        c76.Should().ContainSingle();
+        c76[0].Message.Should().Contain("provably negative");
+    }
+
+    [Fact]
+    public void TypeChecker_C76_SqrtUnconstrainedField_EmitsObligation()
+    {
+        var dsl = "precept Test\nfield X as number default 0\nfield Result as number default 0\nstate A initial\nstate B\nevent Go\nfrom A on Go -> set Result = sqrt(X) -> no transition\n";
+        var model = PreceptParser.Parse(dsl);
+        var validation = PreceptCompiler.Validate(model);
+        var c76 = validation.Diagnostics.Where(d => d.Constraint.Id == "C76").ToList();
+        c76.Should().ContainSingle();
+        c76[0].Message.Should().Contain("X");
+    }
+
     // ─── Functions in rule and ensure contexts ─────────────────
 
     [Fact]
