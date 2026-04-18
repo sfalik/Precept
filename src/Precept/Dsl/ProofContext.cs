@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Precept;
 
@@ -401,12 +402,7 @@ internal sealed class ProofAttribution
         var merged = new List<string>(a.Sources);
         foreach (var s in b.Sources)
         {
-            bool found = false;
-            foreach (var m in merged)
-            {
-                if (string.Equals(m, s, StringComparison.Ordinal)) { found = true; break; }
-            }
-            if (!found)
+            if (!merged.Contains(s, StringComparer.Ordinal))
                 merged.Add(s);
         }
         return new ProofAttribution(merged);
