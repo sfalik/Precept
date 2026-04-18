@@ -49,6 +49,38 @@ The engine is:
 
 ---
 
+## Philosophy-Rooted Design Principles
+
+The following principles govern the proof engine's design, implementation, and evolution. They are grounded in Precept's core philosophy — prevention, one-file completeness, inspectability, determinism, and compile-time structural checking — and were confirmed through team design review of the unified proof engine architecture. They are not aspirational; they are constraints that every proof-engine decision must satisfy.
+
+1. **Prevention before instantiation.** The proof engine proves safety at compile time, before any entity instance exists. This is the direct realization of the philosophy's prevention commitment: invalid configurations are structurally impossible, not caught at runtime. A proof that fires only when an instance is constructed is detection; a proof that fires when the definition is compiled is prevention.
+
+2. **The flat execution model is the load-bearing insight.** Precept has no loops, no control-flow branches, and no reconverging flow. This makes interval arithmetic *optimal*, not merely sufficient — it eliminates fixpoint computation, widening operators, and lattice joins by construction. The absence of widening is a feature: in general-purpose analyzers, widening is the primary source of precision loss. The engine's tractability is not an engineering tradeoff; it is a structural consequence of the DSL's execution model.
+
+3. **Soundness over completeness.** Every code path returns a provably correct interval or `Unknown`. No path fabricates a tighter interval than the evidence justifies. False negatives (missed proofs) cause author friction — the author must supply additional constraints. False positives (wrong "safe" claims) cause runtime crashes. The engine always chooses the safe direction: widen toward `Unknown`, never narrow without proof.
+
+4. **One file, complete proof facts.** All proof facts — field constraints, rules, guards, ensures, assignments — derive from the `.precept` definition. No external oracle, no hidden configuration, no side channel. The proof engine's knowledge boundary is the file boundary. This is a direct consequence of the one-file-complete-rules philosophy commitment.
+
+5. **Deterministic proof outcomes.** Same definition produces the same proof result. No non-deterministic solvers, no timing-dependent analysis, no stochastic reasoning. This is why SMT solvers are rejected even when they could prove more: a solver that returns different results on different runs, or whose proof witness is opaque, violates both determinism and inspectability.
+
+6. **Inspectability is architectural, not optional.** The proof engine's reasoning must be visible through hover displays, MCP tools, and structured proof dumps. Inspectability ships *with* the engine, not after it — prevention without inspectability improves safety but does not cash the philosophy promise that "nothing is hidden." The author must be able to see what the engine proved, what it could not prove, and why.
+
+7. **Natural language, not compiler internals.** Users see proven ranges and source attribution ("1 to 100, inclusive — from: rule Rate >= 1, rule Rate <= 100"), not proof mechanics (`LinearForm`, `RelationalGraph`, interval notation). This is enforced by architecture: the data-flow pipeline from proof assessment to user-facing display has no path where internal type names can surface. Convention-based hiding is fragile; architectural separation is durable.
+
+8. **Truth-based diagnostic classification.** The proof engine classifies outcomes into three categories: *proved dangerous* (the compiler can demonstrate a violation), *proved safe* (the compiler can demonstrate correctness), and *unresolved* (the compiler cannot determine either). These categories map to distinct author actions: fix a proven violation, rely on proven safety, or supply additional constraints to help the compiler. Syntax-shape pattern matching is replaced by proof-outcome classification through a shared assessment model.
+
+9. **Proven violations only.** The engine reports what is definitively broken, not what might be broken. Flagging possible violations turns the compiler into a nag that trains authors to ignore warnings. Flagging only proven violations makes it a trusted guide — when it speaks, it is right. This is the difference between a compiler that helps and one that erodes trust.
+
+10. **Opaque solvers are rejected on principle.** SMT/Z3 is excluded because opaque proof witnesses violate the inspectability commitment. The constraint surface handled by the proof engine is decidable with interval arithmetic and bounded relational closure alone. When the engine cannot prove safety, it says so explicitly — the author is never confronted with an unexplainable verdict. Proof legibility extends to AI agents: proof witnesses must be structured data, not opaque solver traces.
+
+11. **Proof flows as structured data, not parsed prose.** The shared assessment model is the contract center for all consumers: diagnostics, hover, MCP tools, and AI agents. Diagnostic message text is a rendering of the structured assessment, never a contract. Tooling integrations consume the assessment model directly — message parsing is explicitly rejected as an integration mechanism. This is how inspectability becomes real in the editor and in agent tooling.
+
+12. **Design claims are locked by tests.** Every proof-engine guarantee must have corresponding test coverage. Boundary conditions — fact-store limits, traversal depths, visited-node caps — are correctness boundaries, not implementation trivia. Assessment-model coverage is distinct from scenario coverage: the model's classification logic must be tested directly, not only through scenarios that happen to pass through it. A design claim without a test is not a guarantee.
+
+13. **General integrity reasoning, not special-case patterns.** The proof engine reasons about numeric integrity across the entire definition — field constraints, rules, assignments, expressions — not as a collection of special-case checkers for specific syntactic patterns. Broadening from divisor safety to general integrity reasoning transforms the engine from a targeted checker into a general authoring aid. Every new proof capability should follow this principle: prove properties of the domain model, not properties of a syntax shape.
+
+---
+
 ## Research Foundations
 
 The ProofContext + LinearForm + RelationalGraph architecture sits on well-established formal ground.
