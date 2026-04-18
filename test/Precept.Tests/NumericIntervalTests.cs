@@ -187,4 +187,80 @@ public class NumericIntervalTests
         bounded.ExcludesZero.Should().BeTrue();
     }
 
+    // ── ToNaturalLanguage ────────────────────────────────────────────────────
+
+    [Fact]
+    public void ToNaturalLanguage_Unknown_ReturnsNull()
+    {
+        NumericInterval.Unknown.ToNaturalLanguage().Should().BeNull();
+    }
+
+    [Fact]
+    public void ToNaturalLanguage_FullRealLine_ReturnsNull()
+    {
+        var full = new NumericInterval(double.NegativeInfinity, false, double.PositiveInfinity, false);
+        full.ToNaturalLanguage().Should().BeNull();
+    }
+
+    [Fact]
+    public void ToNaturalLanguage_Positive_ReturnsAlwaysGreaterThanZero()
+    {
+        NumericInterval.Positive.ToNaturalLanguage().Should().Be("always greater than 0");
+    }
+
+    [Fact]
+    public void ToNaturalLanguage_Nonneg_ReturnsZeroOrGreater()
+    {
+        NumericInterval.Nonneg.ToNaturalLanguage().Should().Be("0 or greater");
+    }
+
+    [Fact]
+    public void ToNaturalLanguage_PointInterval_ReturnsExactly()
+    {
+        NumericInterval.Zero.ToNaturalLanguage().Should().Be("exactly 0");
+        new NumericInterval(42, true, 42, true).ToNaturalLanguage().Should().Be("exactly 42");
+    }
+
+    [Fact]
+    public void ToNaturalLanguage_BoundedInclusive_ReturnsRange()
+    {
+        var bounded = new NumericInterval(1, true, 100, true);
+        bounded.ToNaturalLanguage().Should().Be("1 to 100 (inclusive)");
+    }
+
+    [Fact]
+    public void ToNaturalLanguage_UpperBounded_ReturnsOrLess()
+    {
+        var upperBounded = new NumericInterval(double.NegativeInfinity, false, 50, true);
+        upperBounded.ToNaturalLanguage().Should().Be("50 or less");
+    }
+
+    [Fact]
+    public void ToNaturalLanguage_UpperBoundedExclusive_ReturnsLessThan()
+    {
+        var upperBounded = new NumericInterval(double.NegativeInfinity, false, 50, false);
+        upperBounded.ToNaturalLanguage().Should().Be("always less than 50");
+    }
+
+    [Fact]
+    public void ToNaturalLanguage_LowerBoundedExclusive_ReturnsGreaterThan()
+    {
+        var lowerBounded = new NumericInterval(10, false, double.PositiveInfinity, false);
+        lowerBounded.ToNaturalLanguage().Should().Be("always greater than 10");
+    }
+
+    [Fact]
+    public void ToNaturalLanguage_LowerBoundedInclusive_ReturnsOrGreater()
+    {
+        var lowerBounded = new NumericInterval(5, true, double.PositiveInfinity, false);
+        lowerBounded.ToNaturalLanguage().Should().Be("5 or greater");
+    }
+
+    [Fact]
+    public void ToNaturalLanguage_MixedBounded_ReturnsBoundedDescription()
+    {
+        var mixed = new NumericInterval(1, false, 100, true);
+        mixed.ToNaturalLanguage().Should().Be("greater than 1 to up to 100");
+    }
+
 }

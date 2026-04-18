@@ -77,6 +77,14 @@ internal static class PreceptDocumentIntellisense
         var declarations = BuildDeclarations(lines, model);
         var documentSymbols = BuildDocumentSymbols(lines, model, declarations);
 
+        // Run type checking to get proof context for hover integration
+        GlobalProofContext? proofContext = null;
+        if (model is not null)
+        {
+            var typeCheck = PreceptTypeChecker.Check(model);
+            proofContext = typeCheck.ProofContext;
+        }
+
         return new PreceptDocumentInfo(
             text,
             lines,
@@ -90,7 +98,8 @@ internal static class PreceptDocumentIntellisense
             collectionInnerTypes,
             fieldTypeKinds,
             declarations,
-            documentSymbols);
+            documentSymbols,
+            proofContext);
     }
 
     internal static PreceptResolvedSymbol? ResolveSymbol(PreceptDocumentInfo info, Position position)
@@ -149,12 +158,22 @@ internal static class PreceptDocumentIntellisense
         if (resolved is not null)
         {
             var symbol = resolved.Value.Declaration;
+            var markdown = symbol.Markdown;
+
+            // Append proof section for field symbols when proof data is available
+            if (symbol.Kind == PreceptDeclaredSymbolKind.Field && info.ProofContext is not null && info.Model is not null)
+            {
+                var proofSection = BuildFieldProofSection(symbol.Name, info.ProofContext, info.Model);
+                if (proofSection is not null)
+                    markdown = markdown + "\n\n---\n\n" + proofSection;
+            }
+
             return new Hover
             {
                 Contents = new MarkedStringsOrMarkupContent(new MarkupContent
                 {
                     Kind = MarkupKind.Markdown,
-                    Value = symbol.Markdown
+                    Value = markdown
                 }),
                 Range = resolved.Value.ReferenceRange
             };
@@ -162,6 +181,63 @@ internal static class PreceptDocumentIntellisense
 
         // Fall back to construct/keyword hover from catalogs
         return CreateKeywordHover(info, position);
+    }
+
+    /// <summary>
+    /// Builds the proof section for a field hover using natural language phrasing.
+    /// Returns null when no interesting proof data is available.
+    /// </summary>
+    private static string? BuildFieldProofSection(string fieldName, GlobalProofContext proofContext, PreceptDefinition model)
+    {
+        if (!proofContext.FieldIntervals.TryGetValue(fieldName, out var interval))
+            return null;
+
+        var natural = interval.ToNaturalLanguage();
+        if (natural is null)
+            return null;
+
+        // Build "never zero" fact from flags
+        var neverZero = proofContext.Flags.TryGetValue(fieldName, out var flags)
+            && flags.HasFlag(NumericFlags.Nonzero)
+            && !interval.ExcludesZero; // Only add if not already implied by the interval
+
+        var provenText = neverZero ? $"{natural}, never zero" : natural;
+
+        // Build attribution from field constraints
+        var field = model.Fields.FirstOrDefault(f => string.Equals(f.Name, fieldName, StringComparison.Ordinal));
+        var attribution = BuildFieldAttribution(fieldName, field);
+
+        var result = $"**Proven safe:** {provenText}";
+        if (attribution is not null)
+            result += $"\n\n*from:* {attribution}";
+
+        return result;
+    }
+
+    /// <summary>
+    /// Builds the attribution line from a field's constraints.
+    /// </summary>
+    private static string? BuildFieldAttribution(string fieldName, PreceptField? field)
+    {
+        if (field?.Constraints is null || field.Constraints.Count == 0)
+            return null;
+
+        var sources = new List<string>();
+        foreach (var constraint in field.Constraints)
+        {
+            var desc = constraint switch
+            {
+                FieldConstraint.Min min => $"`field constraint: min {min.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)}`",
+                FieldConstraint.Max max => $"`field constraint: max {max.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)}`",
+                FieldConstraint.Nonnegative => "`field constraint: nonnegative`",
+                FieldConstraint.Positive => "`field constraint: positive`",
+                _ => null
+            };
+            if (desc is not null)
+                sources.Add(desc);
+        }
+
+        return sources.Count > 0 ? string.Join(", ", sources) : null;
     }
 
     private static Hover? CreateKeywordHover(PreceptDocumentInfo info, Position position)
@@ -1106,7 +1182,8 @@ internal sealed record PreceptDocumentInfo(
     IReadOnlyDictionary<string, PreceptScalarType> CollectionInnerTypes,
     IReadOnlyDictionary<string, StaticValueKind> FieldTypeKinds,
     PreceptDeclarationIndex Declarations,
-    IReadOnlyList<DocumentSymbol> DocumentSymbols);
+    IReadOnlyList<DocumentSymbol> DocumentSymbols,
+    GlobalProofContext? ProofContext = null);
 
 internal sealed record PreceptDeclarationIndex(
     PreceptDeclaredSymbol? Precept,

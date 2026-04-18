@@ -262,4 +262,64 @@ internal readonly record struct NumericInterval(
 
         return new(lower, lowerInc, upper, upperInc);
     }
+
+    // ── Natural language formatting (Elaine UX spec) ─────────────────────────
+
+    /// <summary>
+    /// Converts this interval to natural language phrasing per Elaine's UX spec.
+    /// Returns <c>null</c> when the interval is Unknown or the full real line
+    /// (no proof = no section).
+    /// </summary>
+    public string? ToNaturalLanguage()
+    {
+        if (IsUnknown) return null;
+
+        // Full real line — nothing interesting
+        if (double.IsNegativeInfinity(Lower) && double.IsPositiveInfinity(Upper))
+            return null;
+
+        // Point interval: [X, X]
+        if (Lower == Upper && LowerInclusive && UpperInclusive)
+            return $"exactly {Lower.ToString(CultureInfo.InvariantCulture)}";
+
+        bool loInf = double.IsNegativeInfinity(Lower);
+        bool hiInf = double.IsPositiveInfinity(Upper);
+
+        // (0, +∞) — positive
+        if (Lower == 0 && !LowerInclusive && hiInf)
+            return "always greater than 0";
+
+        // [0, +∞) — nonnegative
+        if (Lower == 0 && LowerInclusive && hiInf)
+            return "0 or greater";
+
+        // (N, +∞) — greater than N
+        if (!LowerInclusive && hiInf)
+            return $"always greater than {Lower.ToString(CultureInfo.InvariantCulture)}";
+
+        // [N, +∞) — N or greater
+        if (LowerInclusive && hiInf)
+            return $"{Lower.ToString(CultureInfo.InvariantCulture)} or greater";
+
+        // (-∞, N] — N or less
+        if (loInf && UpperInclusive)
+            return $"{Upper.ToString(CultureInfo.InvariantCulture)} or less";
+
+        // (-∞, N) — less than N
+        if (loInf && !UpperInclusive)
+            return $"always less than {Upper.ToString(CultureInfo.InvariantCulture)}";
+
+        // [L, U] — bounded inclusive
+        if (LowerInclusive && UpperInclusive)
+            return $"{Lower.ToString(CultureInfo.InvariantCulture)} to {Upper.ToString(CultureInfo.InvariantCulture)} (inclusive)";
+
+        // Other bounded ranges
+        var loPart = LowerInclusive
+            ? Lower.ToString(CultureInfo.InvariantCulture)
+            : $"greater than {Lower.ToString(CultureInfo.InvariantCulture)}";
+        var hiPart = UpperInclusive
+            ? $"up to {Upper.ToString(CultureInfo.InvariantCulture)}"
+            : $"less than {Upper.ToString(CultureInfo.InvariantCulture)}";
+        return $"{loPart} to {hiPart}";
+    }
 }
