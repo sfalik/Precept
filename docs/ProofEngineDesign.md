@@ -2,50 +2,41 @@
 
 Date: 2026-04-18
 
-Status: **Target State** — Design for full local proof engine, PR #108 (feature/issue-106-divisor-safety). Implementation in progress: Commits 1–6 shipped, Commits 7–15 pending. Target: all five gaps closed, typed stores, scope split, full local proof family (C76, C92–C98), proof-diagnostic assessment model, hover integration, and MCP proof key.
+Status: **Target State** — Implementation in progress (PR #108). Core engine shipped (Commits 1–6). Typed stores, scope split, full proof-diagnostic family, assessment model, hover integration, and MCP proof key pending (Commits 7–15).
 
 > **C99 (cross-event field invariant analysis)** is out of scope for this document. It requires fixed-point iteration, breaking the single-pass guarantee, and is tracked separately as issue #117.
-
-### Implementation Notes
-
-- **All five gaps closed.** The unified engine closes every gap documented in the Overview: Gap 1 via `LinearForm` normalization of divisor sub-expressions + constant-offset scan; Gap 2 via `LinearForm` normalization of rule LHS/RHS at injection time (`WithRule`); Gap 3 via `WithAssignment` calling `IntervalOf(rhs)` for compound expressions; Gap 4 via `RelationalGraph` bounded BFS transitive closure; Gap 5 via `EventProofContext` structural isolation (`EventProofContext.Mutations` never promoted to global context on flush).
-- **C-Nano subsumed.** The C-Nano `InferSubtractionInterval` special case (`6fbb315`) is deleted in the unified PR. Every C-Nano test scenario passes via `ProofContext.IntervalOf` + `LinearForm` — the unified path is strictly more powerful and C-Nano is no longer a separate code path.
-- **`TryInferRelationalNonzero` deleted.** The bespoke relational pattern-matcher is subsumed by `ProofContext.KnowsNonzero`, which calls `IntervalOf`.
-- **`InferSubtractionInterval` deleted.** The bespoke subtraction shape-matcher is subsumed by `IntervalOf`'s general relational lookup path.
-- **All string markers eliminated.** `$ival:`, `$positive:`, `$nonneg:`, `$nonzero:`, `$gt:`, `$gte:` marker conventions replaced by typed stores (`_fieldIntervals`, `_flags`, `_exprFacts`, `_relationalFacts`). `_symbols` retained only for non-proof symbol/type duties.
-- **`BuildEventEnsureNarrowings` rewritten.** The bare→dotted string surgery replaced with structural `Rekey()` transform on typed `RelationalFact` records, eliminating the multi-field marker bug class by construction.
-- **Scope split shipped.** `GlobalProofContext` (immutable after construction) and `EventProofContext` (per-event child via `Child()`) make scope isolation a type-level guarantee.
-- **`Dump()` shipped.** Structured snapshot of all fact stores, consumed by hover, MCP `precept_compile` output, and debug display.
-- **Truth-based C92 shipped.** C92 fires on any provably-zero divisor (literal, identifier, assignment-derived, exact-zero expression), not just literal zero.
-- **Local proof family shipped.** C94 (assignment constraint enforcement), C95 (contradictory rule), C96 (vacuous rule), C97 (dead guard), C98 (vacuous guard), plus sharpened C48/C50/C51 reachability diagnostics.
-- **Shared proof-diagnostic assessment model shipped.** All proof-backed diagnostics (C76, C92, C93, C94–C98) route through a shared assessment model classifying by proof outcome (contradiction vs. unresolved obligation vs. proven safe), not by syntax shape.
-- **`BuildEventEnsureNarrowings` rewritten.** The bare→dotted string surgery is replaced with a structural transform on typed `RelationalFact` records, eliminating the multi-field marker bug class (`$gt:A:B` → `$gt:Go.A:Go.B`) by construction.
-- **PR #108 implementation notes preserved for archaeology:**
-  - `TryInferRelationalNonzero` required `StripParentheses` — parenthesized divisors like `(A - B)` wrapped in `PreceptParenthesizedExpression` failed the `is not PreceptBinaryExpression` check. Irrelevant after deletion, but the `StripParentheses` call remains in other consumers.
-  - `NumericInterval.Multiply` zero-interval fast path: `(0,∞) × [0,0]` produces `NaN` via IEEE 754 `∞*0`. Added early return for `[0,0]` inputs (still present).
-  - Modulo interval tightened: non-negative dividend + positive divisor → result ∈ `[0, |B|)`.
 
 ---
 
 ## Overview
 
-The Precept type checker enforces divisor safety (C93) and sqrt safety (C76) at compile time. The original implementation (PR #108, Slices 1–10) handled the common case: single-identifier divisors where proof markers were injected from field constraints, guards, rules, and ensures.
+The proof engine is Precept's compile-time reasoning layer. It infers numeric intervals and relational facts from the `.precept` definition — field constraints, rules, guards, ensures, and assignments — and uses them to prove or disprove properties of every numeric expression before any entity instance exists. This is the mechanism that delivers the philosophy's prevention commitment for numeric integrity.
 
-Compound expressions fell through with no diagnostic under Principle #8 conservatism — the compiler assumed compound expressions were satisfiable. This created five documented gaps:
+The engine serves three purposes:
 
-1. **Compound subtraction operands:** `(A+1)-B`, `A-(B+C)`, `Total-Tax-Fee` — separate operands prevented relational lookup. **Closed** by `LinearForm.TryNormalize` reducing the full divisor to a canonical form; constant-offset scan then matches the stored relational fact with a positive offset.
-2. **Sum-on-RHS rules:** `rule Total > Tax + Fee` — the rule injection only handled `id op id`, not `id op compound`. **Closed** by `WithRule` calling `TryNormalize` on both sides, storing the relational fact keyed by `LinearForm(lhs) − LinearForm(rhs)` — compound expressions on either side are first-class.
-3. **Computed-field intermediaries:** `set Net = Gross-Tax; check Amount/Net` — conservative RHS handling killed all markers on `Net`. **Closed** by `WithAssignment` calling `IntervalOf(rhs)` for compound expressions and storing the result in `_fieldIntervals[target]`; forward-inferred interval for `Net` is available to subsequent divisor checks in the same row.
-4. **Transitive closure:** `rule A>B`, `rule B>C` — `A-C` divisors had no path to a proof without a direct `A>C` rule. **Closed** by `RelationalGraph` performing bounded BFS over `_relationalFacts` (depth 4, 64 facts, 256 nodes) with an exact strict/non-strict composition matrix.
-5. **Cross-event marker scope:** derived facts from one event's transition row silently (incorrectly) influenced sibling events. **Closed** structurally — `EventProofContext.Mutations` are never promoted to the parent `GlobalProofContext`; each event builds a fresh `EventProofContext` from the same global parent.
+1. **Safety enforcement.** Prove that divisors are nonzero (C92/C93), sqrt operands are non-negative (C76), and assignments satisfy field constraints (C94). These are compile-time errors or warnings — the invalid configuration never reaches runtime.
+2. **Structural integrity analysis.** Detect contradictory rules (C95), vacuous rules (C96), dead guards (C97), and vacuous guards (C98). These are authoring-quality diagnostics — they surface definition problems that would silently degrade the entity's behavior.
+3. **Author-facing inspectability.** Surface proven ranges and source attribution through hover displays, diagnostic messages, and MCP proof output — in natural language, never compiler internals. The author sees what the engine proved, what it could not prove, and why.
 
-The unified proof engine closes all five gaps with a single coherent architecture: `ProofContext` as the typed proof state container, `LinearForm` as the canonical normalizer keying the relational fact store, `RelationalGraph` as the bounded transitive closure engine, and a `GlobalProofContext` / `EventProofContext` scope split that makes cross-event isolation structural rather than conventional.
+All proof-backed diagnostics route through a shared assessment model that classifies outcomes by proof result (contradiction, unresolved obligation, proven safe), not by syntax shape. This ensures consistent behavior across diagnostics, hover, and MCP output.
 
-The engine is:
+### Architecture Summary
 
-- **Sound:** It never claims an expression is safe when it is not.
-- **Incomplete:** It may reject expressions it cannot prove safe. This is the correct tradeoff for a DSL compiler — false negatives (missed proofs) cause author friction; false positives (wrong "safe" claims) cause runtime crashes.
-- **Single-pass:** No fixpoint iteration, no widening, no solver. This is possible because of Precept's flat execution model.
+The engine is organized as three composing types with a single integration query:
+
+- **`ProofContext`** — the typed proof state container. Holds field intervals, relational facts, expression facts, and sign flags in structured, typed stores. Scoped: `GlobalProofContext` (immutable, definition-wide) and `EventProofContext` (per-event child, structurally isolated).
+- **`LinearForm`** — canonical normalizer for linear expressions with `Rational` coefficients. Keys the relational fact store. Reduces compound expressions like `Total - Tax - Fee` to a single canonical form for lookup.
+- **`RelationalGraph`** — bounded BFS transitive closure over relational facts. Derives ordering relationships not directly stored (e.g., `A > C` from `rule A > B` and `rule B > C`). Hard-capped: 64 facts, depth 4, 256 visited nodes.
+
+The composing query `ProofContext.IntervalOf(expr)` is the single integration point for all proof consumers. It returns a `ProofResult` containing a `NumericInterval` (the proven range) and a `ProofAttribution` (the source rules and constraints that contributed to the proof). Every safety check, integrity analysis, and inspectability surface calls `IntervalOf`.
+
+### Properties
+
+- **Sound.** The engine never claims an expression is safe when it is not. Every code path returns a provably correct interval or conservatively widens toward `Unknown`.
+- **Incomplete.** The engine may reject expressions it cannot prove safe. This is the correct tradeoff for a DSL compiler — false negatives (missed proofs) cause author friction; false positives (wrong "safe" claims) cause runtime crashes.
+- **Single-pass.** No fixpoint computation, no widening, no solver. This is possible because of Precept's flat execution model: no loops, no control-flow branches, no reconverging flow.
+- **Deterministic.** Same definition produces the same proof outcome. No non-deterministic solvers, no timing-dependent analysis.
+- **Bounded.** All traversals and closures have hard caps. Worst-case cost is predictable and proportional to definition size, not expression complexity.
 
 ---
 
@@ -1309,3 +1300,37 @@ Hover, diagnostics, and MCP MUST produce the same proof facts for the same expre
 - All three surfaces read `ProofAttribution.Sources` → same "from:" lines
 
 **Acceptance criterion:** At least 1 sample file (created in Commit 15) must demonstrate an expression where the hover proof section, the diagnostic message, and the MCP `proof` key all display consistent interval + attribution data. This is verified by inspection during Commit 15, not by automated test.
+
+---
+
+## Implementation Notes (PR #108)
+
+Implementation history and archaeology for the unified proof engine, PR #108 (`feature/issue-106-divisor-safety`). This section preserves the evolutionary context — what was superseded, what was deleted, and what gaps were closed — for future contributors.
+
+### Superseded Approaches
+
+- **C-Nano subsumed.** The C-Nano `InferSubtractionInterval` special case (`6fbb315`) is deleted. Every C-Nano test scenario passes via `ProofContext.IntervalOf` + `LinearForm` — the unified path is strictly more powerful.
+- **`TryInferRelationalNonzero` deleted.** The bespoke relational pattern-matcher is subsumed by `ProofContext.KnowsNonzero`, which calls `IntervalOf`.
+- **`InferSubtractionInterval` deleted.** The bespoke subtraction shape-matcher is subsumed by `IntervalOf`'s general relational lookup path.
+
+### Gap Closure
+
+The original type checker handled single-identifier divisors. Compound expressions fell through with no diagnostic under Principle #8 conservatism. Five gaps were identified and closed:
+
+1. **Compound subtraction operands** (`(A+1)-B`, `Total-Tax-Fee`): closed by `LinearForm.TryNormalize` reducing the divisor to a canonical form; constant-offset scan matches the stored relational fact.
+2. **Sum-on-RHS rules** (`rule Total > Tax + Fee`): closed by `WithRule` calling `TryNormalize` on both sides, storing facts keyed by `LinearForm(lhs) − LinearForm(rhs)`.
+3. **Computed-field intermediaries** (`set Net = Gross-Tax; Amount/Net`): closed by `WithAssignment` calling `IntervalOf(rhs)` and storing the result in `_fieldIntervals[target]`.
+4. **Transitive closure** (`rule A>B`, `rule B>C` → `A-C`): closed by `RelationalGraph` bounded BFS.
+5. **Cross-event scope leakage**: closed structurally — `EventProofContext.Mutations` never promoted to `GlobalProofContext`.
+
+### Migration Notes
+
+- **All string markers eliminated.** `$ival:`, `$positive:`, `$nonneg:`, `$nonzero:`, `$gt:`, `$gte:` marker conventions replaced by typed stores. `_symbols` retained only for non-proof symbol/type duties.
+- **`BuildEventEnsureNarrowings` rewritten.** Bare→dotted string surgery replaced with structural `Rekey()` transform on typed `RelationalFact` records, eliminating the multi-field marker bug class (`$gt:A:B` → `$gt:Go.A:Go.B`) by construction.
+- **Scope split.** Single `ProofContext` class replaced by `GlobalProofContext` (immutable) / `EventProofContext` (per-event child via `Child()`), making scope isolation a type-level guarantee.
+
+### Archaeology
+
+- `TryInferRelationalNonzero` required `StripParentheses` — parenthesized divisors like `(A - B)` wrapped in `PreceptParenthesizedExpression` failed the `is not PreceptBinaryExpression` check. Irrelevant after deletion, but `StripParentheses` remains in other consumers.
+- `NumericInterval.Multiply` zero-interval fast path: `(0,∞) × [0,0]` produces `NaN` via IEEE 754 `∞*0`. Added early return for `[0,0]` inputs (still present).
+- Modulo interval tightened: non-negative dividend + positive divisor → result ∈ `[0, |B|)`.
