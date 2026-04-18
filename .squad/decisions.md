@@ -6,6 +6,49 @@
 
 ---
 
+### 2026-04-18T22:30:00Z: Currency/Quantity/UOM design review batch — implementation blocked on four contracts
+**By:** Frank, George, Newman, Soup Nazi, Uncle Leo
+**Status:** Consolidated review verdict — do not begin implementation until the blockers and design-doc conditions below are closed
+
+The Issue #95 design direction is structurally strong, but the batch converged on four cross-cutting contracts that must be resolved before implementation is safe.
+
+1. **`maxplaces` default contract is contradictory.** D10 says money/currency defaults follow ISO 4217 minor units; the constraint section says there is no auto-default. Frank flagged this as an architectural blocker, George carried it as an open question, and Soup Nazi marked it as a test blocker because stable expected behavior cannot be asserted until one rule wins.
+2. **Compound time-unit cancellation semantics are incomplete.** Frank blocked the multi-basis `period` × single-basis `price` case and the undefined `.basis` / `.component` accessor surface. Soup Nazi independently blocked duration-versus-days and chained cancellation semantics. The design must explicitly define what cancels, what never cancels, and what accessor surface the compiler may lower against.
+3. **Compound value transport contract is unresolved.** Newman reduced the MCP/AI impact to one concrete choice: string typed-constant form versus JSON object form for runtime tool input/output. George confirmed current runtime ingestion is not ready for object-shape values. Until that decision is locked, MCP/runtime work should not start.
+4. **Issue #115 is a prerequisite, not a follow-up.** George marked the decimal-to-double path as a hard runtime prerequisite, Soup Nazi treated it as a broad test blocker, and Uncle Leo elevated it to a financial-integrity concern. Money, quantity, price, and exchange-rate work should remain blocked until the decimal path is exact end to end.
+
+**Per-reviewer consolidation:**
+- Frank: BLOCKED with 4 blockers and 10 strong catches. Strongest confirmed decisions were the seven-type taxonomy, the Level A/B/C split, D11 no auto-convert across currencies, and the fixed-length intent behind D15.
+- George: FEASIBLE-WITH-CAVEATS. Parser/model/type-checker/runtime implementation is tractable after Issue #107, Issue #115, embedded registries, and the compound-value transport decision are handled.
+- Newman: MINOR UPDATE. DTO expansion is additive, but compound-type serialization must favor an explicit contract; string form is the recommended default for AI-facing tools.
+- Soup Nazi: roughly 310 tests required, with blockers on Issue #115, duration/days boundaries, and chained cancellation semantics.
+- Uncle Leo: APPROVED WITH CONDITIONS. The design doc must specify normalization/validation order for string-backed registry values and must frame Issue #115 as a trust-boundary prerequisite.
+
+---
+
+### 2026-04-18T22:30:00Z: Duration cancellation boundary guidance for Issue #95
+**By:** Frank, George, Soup Nazi
+**Status:** Advisory — informs D15 follow-up, not yet owner-locked
+
+- The canonical shift-pay example should use `instant`, not `localdatetime`, when the business question is actual elapsed work time. The `localdatetime` path underpays on DST fall-back nights and forces awkward multi-component `period` extraction.
+- `duration` can plausibly participate in compound-type cancellation only for fixed-length denominators such as `hours`, `minutes`, and `seconds`. `days` and larger calendar-relative units must stay outside duration-based cancellation.
+- The runtime extraction path must stay in decimal space via integer nanoseconds. `Duration.TotalHours` and any other double-based path are rejected for financial types.
+- Chained compound cancellation needs an explicit semantic rule and explicit tests before implementation starts. The review batch treated this as a correctness risk, not polish.
+
+---
+
+### 2026-04-18T22:30:00Z: Temporal design inbox backlog consolidated and cleared
+**By:** Shane, Frank, George, Elaine, Kramer, Newman, J. Peterman, Steinbrenner
+**Status:** Canonicalized — source-note statuses preserved; inbox cleared
+
+The remaining temporal backlog in `.squad/decisions/inbox/` was deduplicated into one canonical bundle for recordkeeping. This merge intentionally preserved the distinction between **owner directives** and **analysis/review input**.
+
+- **Owner-direction bundle:** the `copilot-directive-*` notes plus `coordinator-philosophy-openness.md` were absorbed as locked or explicitly owner-signaled direction where the source note said so. These files cover the typed-constant delimiter, postfix quantity syntax, dot-access versus function-call direction, type-surface restrictions/expansions, naming, hierarchy, and NodaTime alignment.
+- **Analysis/review bundle:** Elaine UX/readability notes, Frank temporal-design analyses, George parser/readability/sample notes, Kramer tooling impact, J. Peterman voice review, Steinbrenner low-code/product research, and the `team-temporal-v4-review` synthesis were merged as advisory design record. These notes inform future implementation and design-doc reconciliation but do not create new implementation commitments on their own.
+- **Currency split:** the 2026-04-18 currency review files were not folded into the generic temporal bundle; they were promoted into the dedicated currency entries above because they create immediate gating conditions for Issue #95.
+
+---
+
 ### 2026-04-11T17:00:00Z: Shane — Verdict modifier research decisions (5 owner answers)
 **By:** Shane (owner)
 **Status:** Captured — team collaboration completed

@@ -28,3 +28,39 @@
 ### 2026-04-05 - Consolidation safety gate recorded
 - Rejected direct merge, force-repoint, blind squash, and docs-only cherry-pick for the unrelated-history return to trunk.
 - Confirmed the health checks were green at review time (dotnet build; dotnet test --no-build, 703/703) and approved only a freeze-and-curate cutover from a frozen SHA.
+
+## Learnings
+
+### 2026-04-18 - Currency/Quantity/UOM design security review
+
+**Design-stage review patterns — what to check in a DSL type extension:**
+- Verify every new string-backed type has an explicit runtime validator spec: normalization order (trim→length→charset→allowlist), not just "validated against registry."
+- Decimal backing (D12 equivalent) is the right mandate for financial types — flag any design that allows `double` anywhere in the arithmetic pipeline.
+- Interpolation into structured strings (unit/currency expressions) is an injection surface. The fix is always "validate the leaf value BEFORE it enters the compound expression, not after."
+- "No external library dependency" for registries is a positive security property — static tables are easier to audit than dynamic lookups.
+
+**Key threat patterns for the currency/quantity domain:**
+- Decimal precision attacks: `decimal.MaxValue` and 28-digit-precision values are the adversarial boundary inputs for financial types.
+- Unit string injection: the attacker's lever is a `unitofmeasure` field set to a value containing `/` that then gets interpolated into a compound `in '...'` constraint. Closed at design time by allowlist-only validation.
+- Overflow in compound arithmetic (`price * quantity → money`): `decimal` overflow throws `OverflowException` — must be caught at the evaluation boundary, not propagated.
+- Issue #115 (`double` intermediate) is not just a precision bug — it is a trust-boundary violation for a financial integrity engine. Frame it as a security prerequisite in design docs.
+
+**Prompt injection extension to financial domain:**
+- `because` clauses and rejection messages in `money`-domain rules are high-trust signals to AI consumers ("payment rejected," "currency mismatch"). These are high-value injection surfaces that need output tagging (user-supplied vs system-generated).
+
+**Positive patterns to record and reuse:**
+- Closed entity-scoped registries (compile-time fixed set) eliminate open-ended string injection before it reaches the parser.
+- Level C (multi-term compound units) permanently excluded = entire class of parsing complexity attacks eliminated by scope boundary.
+- Mutual exclusivity (`in` XOR `of`) as a compile error = prevents guard bypass via ambiguous constraint state.
+- Cross-currency arithmetic as a compile error (D11) = prevention, not detection, applied correctly.
+
+**Verdict approach for design-stage reviews:**
+- APPROVED WITH CONDITIONS is the right call when: no Critical blockers, but gaps exist that would be expensive to discover at code review time. Require the gaps be closed in the design doc before implementation starts.
+- Two High findings (Issue #115 framing, unit injection spec gap) were design-doc gaps, not code bugs — both can and should be fixed before a single line of implementation is written.
+
+### 2026-04-18 - Currency review batch consolidation
+
+- Frank's architectural blockers and George's runtime caveats both reinforce the same security posture: design contracts must be explicit before code exists, especially for cancellation semantics and registry-backed structured values.
+- Newman narrowed the MCP decision to string-versus-object compound transport. From a security perspective, the simpler typed-string form remains the lower-risk default until object ingestion is deliberately hardened.
+- Soup Nazi's blockers line up with the security view: Issue #115 and the duration/days boundary are not edge polish; they are correctness and trust-boundary concerns.
+- Net requirement: treat validator normalization order and decimal exactness as pre-implementation design obligations, not follow-up cleanup.

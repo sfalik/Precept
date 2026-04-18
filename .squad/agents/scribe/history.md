@@ -107,6 +107,11 @@ Team cast on 2026-04-04: Frank (Lead), George (Runtime), Kramer (Tooling), Elain
 
 ## Recent Updates
 
+### 2026-04-18T22:30:00Z - Currency design review batch recorded
+- Wrote five orchestration logs plus the session log for the Frank/George/Newman/Soup Nazi/Uncle Leo currency design review pass.
+- Merged the current currency review findings into `.squad/decisions.md`, added a dedicated duration-boundary advisory entry, and collapsed the remaining temporal inbox residue into one canonical backlog record before clearing the inbox.
+- Updated affected agent histories, summarized oversized Frank/George histories into compact Core Context forms, and left the pass ready for a `.squad/`-only commit.
+
 ### 2026-04-12T19:45:41Z - Squad `@copilot` lane retirement recorded
 - Wrote orchestration logs for Newman and Frank plus a session log for the Squad operations contract change.
 - Merged 2 relevant inbox items into one canonical `decisions.md` entry, recording the lane retirement and marking the earlier direct-`@copilot` directive as superseded.

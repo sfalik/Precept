@@ -36,6 +36,18 @@
 - Critical validation: `travel-reimbursement.precept` with `Submit.Lodging / Submit.Days` (non-literal divisor) produces no C93 warning, confirming `BuildEventEnsureNarrowings` (Slice 4) is working correctly.
 - No code changes needed. All 1290 tests pass.
 
+### 2026-04-18 — CurrencyQuantityUomDesign.md test strategy review
+- Reviewed full design doc for 7 business-domain types: `money`, `currency`, `quantity`, `unitofmeasure`, `dimension`, `price`, `exchangerate`.
+- Produced structured review in `.squad/decisions/inbox/soup-nazi-currency-test-review.md`.
+- Found 6 acceptance criteria gaps (AC-GAP-1 through AC-GAP-6). Two are test blockers: AC-GAP-2 (maxplaces default contradiction) and Issue #115 (decimal precision bug).
+- Issue #115 is a hard test-blocker: ALL decimal-backed arithmetic tests (money, quantity, price, exchangerate) are unstable until it is fixed. Must be gated or explicitly documented.
+- Identified 10 regression risks (X1–X10). X1 and X10 (CatalogDrift ConstraintTriggers and LineAccuracyData) will fail the moment new diagnostic codes are assigned — drift tests need entries before any implementation PR can be green.
+- E5 (chained compound quantity cancellation) and E6 (commensurable arithmetic result unit after conversion) are the two implementation edge cases most likely to be wrong on first try.
+- Hardest single edge case: E4 (duration cancellation with `days` denominator, D15 boundary) — most likely to appear in real DSL and be silently accepted if the compiler only checks denominator unit name and not fixed-length flag.
+- Discrete equality narrowing (T9) tests must be written BEFORE null-narrowing tests are touched. Regression risk X9 (AccidentalNullNarrowingInterference) is non-trivial.
+- Total estimated new tests: ~310 (220 Precept.Tests + 60 LS.Tests + 30 Mcp.Tests).
+- Key file paths: `docs/CurrencyQuantityUomDesign.md`, `test/Precept.Tests/PreceptDecimalTypeTests.cs` (regression anchor), `test/Precept.Tests/CatalogDriftTests.cs` (drift anchor), `test/Precept.LanguageServer.Tests/PreceptAnalyzerNullNarrowingTests.cs` (X9 anchor).
+
 ### 2026-04-18 — Edge case analysis: period vs duration in compound-type arithmetic
 - Completed 10-scenario stress-test of D15 (period-only cancellation) vs Frank's proposal (duration also cancels).
 - Findings written to `.squad/decisions/inbox/soup-nazi-duration-edge-cases.md`.
@@ -44,3 +56,10 @@
 - Issue #115 (decimal→double bug) is a live dependency: any duration-cancellation implementation that routes through `duration.totalHours` (number/double) will inject double precision artifacts into decimal-backed money results on day one.
 - The "both paths exist" confusion (Scenario 9) is the subtlest risk: both period and duration can produce the same money value 363 days/year and silently diverge on 2 DST nights with no compiler warning.
 - Fixed-length asymmetry (Scenario 10): hours cancel, weeks don't, for non-obvious NodaTime reasons. This will confuse domain authors writing rental contracts.
+
+### 2026-04-18 — Currency review batch consolidation
+
+- Frank and George converged on the same structural gate: Issue #95 is feasible only after the `maxplaces` contract, accessor surface, compound serialization form, and Issue #115 are resolved.
+- The batch strengthened the testing priority order: lock the duration/days boundary and chained cancellation semantics before implementing the broad matrix.
+- Newman kept the MCP question intentionally narrow: string versus object transport for compound values. Test planning should assume one canonical form, not both.
+- Uncle Leo's High-severity conditions mean validator/normalization order and Issue #115 framing need to land in the design doc before implementation tests should be treated as durable.
