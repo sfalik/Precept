@@ -18,6 +18,24 @@
 
 ## Recent Updates
 
+### 2026-04-18 — Milestone restructuring recommendation
+- Recommended closing M1 (Governed Integrity) and M2 (Full Entity Surface) — both effectively complete. Deferred #11 does not hold M2 open.
+- Recommended retiring M3 (Expression Power) — shipped scope complete, 4 open issues redistributed to new milestones.
+- Proposed 4 new milestones: M4 Proven Safe (#106, #111, #115), M5 Real-World Types (#107, #26, #95, #15, #61), M6 Expressive Governance (#112, #65, #58, #80), M7 Language Integrity (#93, #92, #86, #117).
+- Ordering matches Shane's stated priorities: proof → types → expressiveness → integrity.
+- Key insight: #112 (stateless events) is the most independent high-value issue — it's the pressure-relief valve if proof or type work stalls.
+- Product story framing: each milestone boundary delivers a complete, pitchable capability narrative.
+
+### 2026-04-18 — Language project prioritization assessment
+- Assessed all 30 items on the Language Improvements project board, focusing on the 7 newly-added issues.
+- Shane's proposed sequence (#111 → #107/#26 → #95) is sound but gated on PR #108 closing.
+- #111 and #106 are tightly coupled — #111 literally consumes the interval infrastructure PR #108 builds. No overlap possible; strict dependency.
+- #107 (temporal) subsumes #26 (date-only). If #107 is too large, #26 is the extractable MVP.
+- #95 (currency/UOM) depends on the postfix literal grammar #107 introduces — must follow.
+- #112 (stateless events) is the most independent of the top proposals and could be pulled forward if proof work stalls.
+- Board assignments: #111 Ready, #112 Ready, #117 Backlog, #107 Backlog, #95 Backlog, #92 Backlog, #61 Backlog.
+- Key risk: Phase 2 review blockers on PR #108 (7 reviewers, all filed CHANGES_NEEDED except Frank's conditional approval) are the critical path constraint.
+
 ### 2026-04-12 — Event hooks PM analysis
 - Recommended a two-proposal split: advance stateless event hooks first and defer stateful hooks until execution-order and scope questions are resolved.
 

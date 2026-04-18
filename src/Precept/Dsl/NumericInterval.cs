@@ -59,6 +59,23 @@ internal readonly record struct NumericInterval(
     /// <summary><c>true</c> when this is the Unknown interval (full real line).</summary>
     public bool IsUnknown => double.IsNegativeInfinity(Lower) && double.IsPositiveInfinity(Upper);
 
+    /// <summary>
+    /// Returns <c>true</c> when intervals <paramref name="a"/> and <paramref name="b"/>
+    /// share no common values (are disjoint).
+    /// </summary>
+    public static bool AreDisjoint(NumericInterval a, NumericInterval b)
+    {
+        // a entirely left of b
+        if (a.Upper < b.Lower) return true;
+        if (a.Upper == b.Lower && !(a.UpperInclusive && b.LowerInclusive)) return true;
+
+        // a entirely right of b
+        if (b.Upper < a.Lower) return true;
+        if (b.Upper == a.Lower && !(b.UpperInclusive && a.LowerInclusive)) return true;
+
+        return false;
+    }
+
     // ── Transfer rules ───────────────────────────────────────────────────────
 
     /// <summary>[a,b] + [c,d] = [a+c, b+d]</summary>

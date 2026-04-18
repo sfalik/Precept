@@ -57,6 +57,7 @@ public class DiagnosticSpanPrecisionTests
         "C79", // conditional branch type mismatch
         "C92", // division by literal zero
         "C93", // divisor not provably nonzero
+        "C94", // assignment outside field constraint interval
     };
 
     /// <summary>
@@ -95,6 +96,7 @@ public class DiagnosticSpanPrecisionTests
         "C86", // circular dependency in computed fields
         "C87", // computed field in edit declaration
         "C88", // computed field assigned via set
+        "C95", // contradictory rule
     };
 
     // ════════════════════════════════════════════════════════════════
@@ -246,6 +248,9 @@ public class DiagnosticSpanPrecisionTests
     // C93: divisor not provably nonzero
     [InlineData("C93", "PRECEPT093",
         "precept Test\nfield Y as number default 10\nfield D as number default 1\nstate A initial\nevent Go\nfrom A on Go -> set Y = Y / D -> no transition\n")]
+    // C94: assignment outside field constraint interval
+    [InlineData("C94", "PRECEPT094",
+        "precept Test\nfield Score as number default 50 max 100\nstate A initial\nevent Go\nfrom A on Go -> set Score = 150 -> no transition\n")]
     public void ExpressionLevelDiagnostic_HasNonZeroColumn(string constraintId, string expectedCode, string dsl)
     {
         var result = PreceptCompiler.CompileFromText(dsl);

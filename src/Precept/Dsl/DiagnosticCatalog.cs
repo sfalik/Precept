@@ -713,4 +713,19 @@ public static class DiagnosticCatalog
         "C93", "compile",
         "Divisor has no compile-time nonzero proof.",
         "{message}");
+
+    /// <summary>Assignment expression is provably outside the target field's constraint range.</summary>
+    // SYNC:CONSTRAINT:C94
+    public static readonly LanguageConstraint C94 = Register(
+        "C94", "compile",
+        "Assignment expression is provably outside the target field's constraint range.",
+        "{message}");
+
+    /// <summary>Rules are contradictory — no value can satisfy both simultaneously.</summary>
+    // SYNC:CONSTRAINT:C95
+    public static readonly LanguageConstraint C95 = Register(
+        "C95", "compile",
+        "Rules are contradictory — no value can satisfy both simultaneously.",
+        "{message}",
+        ConstraintSeverity.Warning);
 }

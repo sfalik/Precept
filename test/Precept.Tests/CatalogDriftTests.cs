@@ -704,6 +704,14 @@ public class CatalogDriftTests
         ["C93"] = new(H + "field Y as number default 10\nfield D as number default 1\n" + S +
             "event Go\nfrom A on Go -> set Y = Y / D -> no transition\n", "no compile-time nonzero proof"),
 
+        // C94: assignment value outside field constraint interval
+        ["C94"] = new(H + "field Score as number default 50 max 100\n" + S +
+            "event Go\nfrom A on Go -> set Score = 150 -> no transition\n", "outside"),
+
+        // C95: contradictory rule (rule interval disjoint from field constraints)
+        ["C95"] = new("precept Test\nfield X as number default 10 min 10\nstate A initial\n" +
+            "rule X < 5 because \"contradicts min\"\n", "contradicts"),
+
         // ── Runtime-phase (C33–C37) ───────────────────────────────────
 
         // C33: CreateInstance with empty initial state
@@ -1553,6 +1561,12 @@ public class CatalogDriftTests
 
         // C93: unproven divisor — row on line 6
         ["C93"] = ("precept Test\nfield Y as number default 10\nfield D as number default 1\nstate A initial\nevent Go\nfrom A on Go -> set Y = Y / D -> no transition\n", "compile", 6),
+
+        // C94: assignment value outside field constraint — row on line 5
+        ["C94"] = ("precept Test\nfield Score as number default 50 max 100\nstate A initial\nevent Go\nfrom A on Go -> set Score = 150 -> no transition\n", "compile", 5),
+
+        // C95: contradictory rule — rule on line 4
+        ["C95"] = ("precept Test\nfield X as number default 10 min 10\nstate A initial\nrule X < 5 because \"contradicts min\"\n", "compile", 4),
     };
 
     [Theory]

@@ -364,6 +364,25 @@ internal static class PreceptTypeChecker
                                 StateContext: item.State));
                         }
 
+                        // SYNC:CONSTRAINT:C94: assignment provably outside field constraint range
+                        if (dataFieldKinds.FieldIntervals.TryGetValue(assignment.Key, out var constraintIval94))
+                        {
+                            var rhsIval = setContext.IntervalOf(assignment.Expression);
+                            if (!rhsIval.IsUnknown && NumericInterval.AreDisjoint(rhsIval, constraintIval94))
+                            {
+                                var assessment = new ProofAssessment(
+                                    ProofRequirement.AssignmentConstraint, ProofOutcome.Contradiction,
+                                    assignment.Key, rhsIval, ProofAttribution.None,
+                                    ConstraintInterval: constraintIval94);
+                                diagnostics.Add(new PreceptValidationDiagnostic(
+                                    DiagnosticCatalog.C94,
+                                    ProofDiagnosticRenderer.Render(assessment),
+                                    assignment.SourceLine > 0 ? assignment.SourceLine : row.SourceLine,
+                                    Column: assignment.Expression.Position?.StartColumn ?? 0,
+                                    StateContext: item.State));
+                            }
+                        }
+
                         // Layer 1: thread post-assignment proof state into subsequent assignments.
                         setContext = ApplyAssignmentNarrowing(assignment.Key, assignment.Expression, setContext);
                     }
@@ -466,6 +485,25 @@ internal static class PreceptTypeChecker
                         assignment.SourceLine > 0 ? assignment.SourceLine : action.SourceLine,
                         Column: assignment.Expression.Position?.StartColumn ?? 0,
                         StateContext: action.State));
+                }
+
+                // SYNC:CONSTRAINT:C94: assignment provably outside field constraint range
+                if (dataFieldKinds.FieldIntervals.TryGetValue(assignment.Key, out var constraintIval94))
+                {
+                    var rhsIval = assignmentContext.IntervalOf(assignment.Expression);
+                    if (!rhsIval.IsUnknown && NumericInterval.AreDisjoint(rhsIval, constraintIval94))
+                    {
+                        var assessment = new ProofAssessment(
+                            ProofRequirement.AssignmentConstraint, ProofOutcome.Contradiction,
+                            assignment.Key, rhsIval, ProofAttribution.None,
+                            ConstraintInterval: constraintIval94);
+                        diagnostics.Add(new PreceptValidationDiagnostic(
+                            DiagnosticCatalog.C94,
+                            ProofDiagnosticRenderer.Render(assessment),
+                            assignment.SourceLine > 0 ? assignment.SourceLine : action.SourceLine,
+                            Column: assignment.Expression.Position?.StartColumn ?? 0,
+                            StateContext: action.State));
+                    }
                 }
 
                 assignmentContext = ApplyAssignmentNarrowing(assignment.Key, assignment.Expression, assignmentContext);
@@ -1202,6 +1240,60 @@ internal static class PreceptTypeChecker
 
                     // SYNC:CONSTRAINT:C69
                     CheckCrossScopeGuardIdentifiers(rule.WhenGuard, dataSymbols, rule.SourceLine, diagnostics);
+                }
+            }
+        }
+
+        // SYNC:CONSTRAINT:C95: non-synthetic rule contradicts field constraints
+        if (model.Rules is not null)
+        {
+            // Build constraint-only intervals from field definitions (min/max/positive/nonnegative).
+            var fieldConstraintIntervals = new Dictionary<string, NumericInterval>(StringComparer.Ordinal);
+            foreach (var field in model.Fields)
+            {
+                if (field.Constraints is not { Count: > 0 }) continue;
+                if (field.Type is not (PreceptScalarType.Number or PreceptScalarType.Integer or PreceptScalarType.Decimal)) continue;
+
+                double? minVal = null;
+                double? maxVal = null;
+                foreach (var c in field.Constraints)
+                {
+                    if (c is FieldConstraint.Min m) minVal = m.Value;
+                    else if (c is FieldConstraint.Max mx) maxVal = mx.Value;
+                    else if (c is FieldConstraint.Positive) minVal = minVal is null || minVal.Value <= 0 ? double.Epsilon : minVal;
+                    else if (c is FieldConstraint.Nonnegative) minVal ??= 0;
+                }
+
+                if (minVal is null && maxVal is null) continue;
+
+                var lower = minVal ?? double.NegativeInfinity;
+                var upper = maxVal ?? double.PositiveInfinity;
+                // positive uses open lower bound (0, +∞); min uses closed [min, …]
+                var lowerInclusive = minVal.HasValue && !(field.Constraints.Any(c => c is FieldConstraint.Positive) && minVal.Value == double.Epsilon);
+                if (field.Constraints.Any(c => c is FieldConstraint.Positive) && minVal.Value == double.Epsilon)
+                {
+                    lower = 0;
+                    lowerInclusive = false;
+                }
+                var ival = new NumericInterval(lower, lowerInclusive, upper, maxVal.HasValue);
+                fieldConstraintIntervals[field.Name] = ival;
+            }
+
+            foreach (var rule in model.Rules.Where(r => !r.IsSynthetic && r.WhenGuard is null))
+            {
+                if (TryExtractSingleFieldComparison(rule.Expression, out var fieldName, out var ruleInterval)
+                    && fieldConstraintIntervals.TryGetValue(fieldName, out var constraintIval)
+                    && NumericInterval.AreDisjoint(ruleInterval, constraintIval))
+                {
+                    var assessment = new ProofAssessment(
+                        ProofRequirement.RuleSatisfiability, ProofOutcome.Contradiction,
+                        fieldName, ruleInterval, ProofAttribution.None,
+                        ConstraintInterval: constraintIval,
+                        ConstraintDescription: rule.ExpressionText);
+                    diagnostics.Add(new PreceptValidationDiagnostic(
+                        DiagnosticCatalog.C95,
+                        ProofDiagnosticRenderer.Render(assessment),
+                        rule.SourceLine));
                 }
             }
         }
@@ -3012,6 +3104,79 @@ internal static class PreceptTypeChecker
         return new ProofAssessment(
             ProofRequirement.NonzeroDivisor, ProofOutcome.Obligation,
             subject, interval, ProofAttribution.None);
+    }
+
+    /// <summary>
+    /// Extracts a single field-vs-literal comparison from a rule expression (e.g. <c>X &lt; 5</c>)
+    /// and returns the field name plus the numeric interval the comparison implies for that field.
+    /// Returns <c>false</c> when the expression is not a simple <c>identifier op literal</c> form.
+    /// </summary>
+    private static bool TryExtractSingleFieldComparison(
+        PreceptExpression expr,
+        out string fieldName,
+        out NumericInterval ruleInterval)
+    {
+        fieldName = default!;
+        ruleInterval = default;
+
+        if (expr is not PreceptBinaryExpression bin) return false;
+
+        // One side must be identifier, other must be numeric literal
+        string? name = null;
+        double? value = null;
+        bool identifierOnLeft = false;
+
+        if (bin.Left is PreceptIdentifierExpression id && id.Member is null
+            && bin.Right is PreceptLiteralExpression lit && TryGetNumericValue(lit.Value, out var rv))
+        {
+            name = id.Name;
+            value = rv;
+            identifierOnLeft = true;
+        }
+        else if (bin.Right is PreceptIdentifierExpression id2 && id2.Member is null
+                 && bin.Left is PreceptLiteralExpression lit2 && TryGetNumericValue(lit2.Value, out var lv))
+        {
+            name = id2.Name;
+            value = lv;
+            identifierOnLeft = false;
+        }
+
+        static bool TryGetNumericValue(object? val, out double result)
+        {
+            switch (val)
+            {
+                case double d: result = d; return true;
+                case long l: result = l; return true;
+                case int i: result = i; return true;
+                default: result = 0; return false;
+            }
+        }
+
+        if (name is null || value is null) return false;
+
+        fieldName = name;
+
+        // Convert comparison to interval the field must satisfy.
+        // identifierOnLeft: "X op value" → interval for X
+        // !identifierOnLeft: "value op X" → flip the operator for X
+        var op = bin.Operator;
+        if (!identifierOnLeft)
+        {
+            op = FlipComparisonOperator(op);
+        }
+
+        ruleInterval = op switch
+        {
+            "<" => new NumericInterval(double.NegativeInfinity, false, value.Value, false),
+            "<=" => new NumericInterval(double.NegativeInfinity, false, value.Value, true),
+            ">" => new NumericInterval(value.Value, false, double.PositiveInfinity, false),
+            ">=" => new NumericInterval(value.Value, true, double.PositiveInfinity, false),
+            "==" => new NumericInterval(value.Value, true, value.Value, true),
+            "!=" => NumericInterval.Unknown, // Can't express "not equal" as single interval
+            _ => NumericInterval.Unknown,
+        };
+
+        return !ruleInterval.IsUnknown;
     }
 
     /// <summary>

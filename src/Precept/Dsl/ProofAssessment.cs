@@ -20,8 +20,11 @@ internal enum ProofRequirement
     NonzeroDivisor,
     /// <summary>sqrt() argument must be non-negative.</summary>
     NonnegativeArgument,
-    // Planned: AssignmentConstraint (C94), RuleSatisfiability (C95),
-    // RuleVacuity (C96), GuardSatisfiability (C97), GuardTautology (C98)
+    /// <summary>Assignment must fall within the target field's constraint interval.</summary>
+    AssignmentConstraint,
+    /// <summary>Rule must be satisfiable given field constraints and other rules.</summary>
+    RuleSatisfiability,
+    // Planned: RuleVacuity (C96), GuardSatisfiability (C97), GuardTautology (C98)
 }
 
 /// <summary>
@@ -44,6 +47,8 @@ internal sealed record ProofAssessment(
         (ProofRequirement.NonzeroDivisor, ProofOutcome.Obligation) => DiagnosticCatalog.C93,
         (ProofRequirement.NonnegativeArgument, ProofOutcome.Contradiction) => DiagnosticCatalog.C76,
         (ProofRequirement.NonnegativeArgument, ProofOutcome.Obligation) => DiagnosticCatalog.C76,
+        (ProofRequirement.AssignmentConstraint, ProofOutcome.Contradiction) => DiagnosticCatalog.C94,
+        (ProofRequirement.RuleSatisfiability, ProofOutcome.Contradiction) => DiagnosticCatalog.C95,
         _ => throw new InvalidOperationException($"Unexpected assessment: {Requirement}/{Outcome}"),
     };
 }

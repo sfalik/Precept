@@ -32,6 +32,31 @@ internal static class ProofDiagnosticRenderer
         { Requirement: ProofRequirement.NonnegativeArgument, Outcome: ProofOutcome.Contradiction } a =>
             $"sqrt() argument '{a.SubjectDescription}' is provably negative.",
 
+        { Requirement: ProofRequirement.AssignmentConstraint, Outcome: ProofOutcome.Contradiction } a
+            when a.ConstraintInterval is not null =>
+            $"Assignment to '{a.SubjectDescription}' is provably outside the field's constraint range. " +
+            $"Expression produces {FormatInterval(a.StrongestFact)}, but field requires {FormatInterval(a.ConstraintInterval.Value)}.",
+
+        { Requirement: ProofRequirement.RuleSatisfiability, Outcome: ProofOutcome.Contradiction } a
+            when a.ConstraintInterval is not null && a.ConstraintDescription is not null =>
+            $"Rule '{a.ConstraintDescription}' contradicts the constraints on '{a.SubjectDescription}'. " +
+            $"Rule requires {FormatInterval(a.StrongestFact)}, but field is constrained to {FormatInterval(a.ConstraintInterval.Value)}.",
+
+        { Requirement: ProofRequirement.RuleSatisfiability, Outcome: ProofOutcome.Contradiction } a =>
+            $"Rules for '{a.SubjectDescription}' are contradictory — no value can satisfy all simultaneously.",
+
         _ => $"Proof diagnostic: {assessment.Requirement}/{assessment.Outcome} for {assessment.SubjectDescription}",
     };
+
+    /// <summary>
+    /// Formats a <see cref="NumericInterval"/> as standard mathematical notation.
+    /// </summary>
+    internal static string FormatInterval(NumericInterval ival)
+    {
+        var left = ival.LowerInclusive ? "[" : "(";
+        var right = ival.UpperInclusive ? "]" : ")";
+        var lo = double.IsNegativeInfinity(ival.Lower) ? "-∞" : ival.Lower.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var hi = double.IsPositiveInfinity(ival.Upper) ? "+∞" : ival.Upper.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        return $"{left}{lo}, {hi}{right}";
+    }
 }
