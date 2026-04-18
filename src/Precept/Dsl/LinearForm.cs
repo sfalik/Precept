@@ -11,7 +11,7 @@ namespace Precept;
 /// weighted by exact <see cref="Rational"/> coefficients plus an additive constant.
 /// </summary>
 /// <remarks>
-/// <para>Used as a dictionary key in <c>ProofContext._relationalFacts</c>.  Equality is
+/// <para>Used as a dictionary key in <c>GlobalProofContext._relationalFacts</c>.  Equality is
 /// content-based: same terms (key → coefficient) and same constant.</para>
 /// <para>Zero-coefficient terms are eliminated on construction.  The <see cref="Terms"/>
 /// dictionary is sorted by field key, ensuring deterministic iteration and hash order.</para>

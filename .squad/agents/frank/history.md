@@ -100,6 +100,15 @@ Key structural decisions:
 - Confirmed the change is narrowly scoped to retiring the Squad-owned `squad:copilot` routing lane while preserving general repo-wide Copilot tooling.
 - Required all live workflows, mirrored templates, and squad docs to agree so the lane is retired cleanly.
 
+### 2026-04-18 — Wave 2 code review: PR #108 strangler-fig migration (Steps 7b-i through 8)
+- **APPROVED** — 6 commits, 8 files, +507/−386 lines. Strangler-fig migration from string-encoded proof markers to typed stores, followed by scope split.
+- Marker elimination total: zero `$ival:`, `$positive:`, `$nonneg:`, `$nonzero:`, `$gt:`, `$gte:` in `src/Precept/Dsl/`. `ToMarkerKey`, `TryParseMarkerKey`, `LookupLegacyRelationalInterval` all deleted.
+- All Wave 1 carry-forward findings verified: G1 (GCD normalization) resolved — all storage uses `GcdNormalize`. G2 (flag implications) resolved — all 8 write sites correct. G4 (reference aliasing) partially resolved — `WithRule` still shares `_fieldIntervals`/`_flags`/`_exprFacts` by reference (safe today, fragile by design).
+- `BuildEventEnsureNarrowings` rewrite eliminates string-surgery bug class by construction — `LinearForm.Rekey()` replaces `:` split/reassemble.
+- Scope split simpler than spec (single class with `Child()`/`ChildMerging()` instead of two-class hierarchy) — correct and sufficient.
+- 4 non-blocking warnings: `WithRule` reference sharing (W1), stale `ExtractIntervalFromMarkers` name (W2), 5 stale `ProofContext` comment references (W3), `ValidateStateActions` manual construction instead of `ChildMerging` (W4).
+- Key insight: the strangler-fig sequence (dual-write → switch reads → remove old → scope split) is the model for any future migration of shared mutable state in the type checker.
+
 ### 2026-04-12 — Issue #9 design review resolutions incorporated
 - Folded the resolved design decisions back into the issue body, including null-handling, split diagnostics (C72/C73), and inspect trace expectations.
 - Design left implementation-ready after proposal/body synchronization.

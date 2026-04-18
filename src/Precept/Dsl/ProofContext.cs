@@ -39,7 +39,7 @@ internal enum NumericFlags
     Nonzero     = 4,   // != 0
 }
 
-// ── ProofContext ──────────────────────────────────────────────────────────────
+// ── GlobalProofContext ──────────────────────────────────────────────────────────────
 
 /// <summary>
 /// Typed proof state container for the Precept proof engine.
@@ -205,7 +205,12 @@ internal sealed class GlobalProofContext
         {
             [GcdNormalize(lf.Subtract(rf))] = new RelationalFact(kind)
         };
-        return new GlobalProofContext(_symbols, relFacts, _fieldIntervals, _flags, _exprFacts);
+        return new GlobalProofContext(
+            _symbols,
+            relFacts,
+            new Dictionary<string, NumericInterval>(_fieldIntervals, StringComparer.Ordinal),
+            new Dictionary<string, NumericFlags>(_flags, StringComparer.Ordinal),
+            new Dictionary<LinearForm, NumericInterval>(_exprFacts));
     }
 
     /// <summary>

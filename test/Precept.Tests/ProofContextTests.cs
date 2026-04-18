@@ -6,7 +6,7 @@ namespace Precept.Tests;
 
 /// <summary>
 /// Wrapper-contract tests for <see cref="GlobalProofContext"/>.
-/// Verifies that ProofContext correctly delegates to the underlying proof infrastructure
+/// Verifies that GlobalProofContext correctly delegates to the underlying proof infrastructure
 /// for all query methods and preserves copy-on-write semantics for mutation methods.
 /// </summary>
 public class ProofContextTests

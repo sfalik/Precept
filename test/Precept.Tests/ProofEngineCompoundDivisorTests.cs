@@ -6,7 +6,7 @@ namespace Precept.Tests;
 
 /// <summary>
 /// Full-pipeline tests for compound-divisor patterns through the unified proof engine
-/// (Commit 3: <c>ProofContext</c> + <c>LinearForm</c> relational-fact integration).
+/// (Commit 3: <c>GlobalProofContext</c> + <c>LinearForm</c> relational-fact integration).
 ///
 /// Each test compiles a complete precept via <see cref="PreceptTypeChecker.Check"/> and
 /// asserts whether C93 (unproven divisor) is suppressed or emitted.

@@ -2213,7 +2213,7 @@ internal static class PreceptTypeChecker
                     }
                     else
                     {
-                        // Layer 3: interval arithmetic + relational inference via ProofContext.KnowsNonzero.
+                        // Layer 3: interval arithmetic + relational inference via GlobalProofContext.KnowsNonzero.
                         if (!context.KnowsNonzero(binary.Right))
                         {
                             var divisorInterval = context.IntervalOf(binary.Right);
@@ -2341,7 +2341,7 @@ internal static class PreceptTypeChecker
     /// typed proof stores. Used by <c>TryInferInterval</c> (Layer 3) to initialize leaf intervals.
     /// Priority: typed interval store → flag-based interval (Positive → Nonneg+Nonzero → Nonneg) → Unknown.
     /// </summary>
-    private static NumericInterval ExtractIntervalFromMarkers(
+    private static NumericInterval ExtractFieldInterval(
         string key,
         GlobalProofContext context)
     {
@@ -2366,7 +2366,7 @@ internal static class PreceptTypeChecker
     /// <summary>
     /// Recursively infers the <see cref="NumericInterval"/> for <paramref name="expression"/>
     /// using Layer 2 transfer rules (interval arithmetic) and Layer 5 conditional hull synthesis.
-    /// Each identifier leaf is initialized via <see cref="ExtractIntervalFromMarkers"/>.
+    /// Each identifier leaf is initialized via <see cref="ExtractFieldInterval"/>.
     /// Returns <see cref="NumericInterval.Unknown"/> for any expression whose bounds cannot be determined.
     /// </summary>
     internal static NumericInterval TryInferInterval(
@@ -2384,7 +2384,7 @@ internal static class PreceptTypeChecker
 
             case PreceptIdentifierExpression idExpr:
                 if (TryGetIdentifierKey(idExpr, out var idKey))
-                    return ExtractIntervalFromMarkers(idKey, context);
+                    return ExtractFieldInterval(idKey, context);
                 return NumericInterval.Unknown;
 
             case PreceptParenthesizedExpression paren:
