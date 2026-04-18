@@ -2457,11 +2457,13 @@ internal static class PreceptTypeChecker
     {
         var markers = new Dictionary<string, StaticValueKind>(context.Symbols, StringComparer.Ordinal);
         var fieldIntervals = CopyFieldIntervals(context);
+        var flags = CopyFlags(context);
 
         // Always kill existing numeric proof markers for the target field first.
         markers.Remove($"$positive:{targetField}");
         markers.Remove($"$nonneg:{targetField}");
         markers.Remove($"$nonzero:{targetField}");
+        flags.Remove(targetField);
 
         // Kill any $ival: markers for the target field (encoded as prefix $ival:{field}:).
         var ivalPrefix = $"$ival:{targetField}:";
@@ -2500,14 +2502,17 @@ internal static class PreceptTypeChecker
                     markers[$"$positive:{targetField}"] = StaticValueKind.Boolean;
                     markers[$"$nonneg:{targetField}"] = StaticValueKind.Boolean;
                     markers[$"$nonzero:{targetField}"] = StaticValueKind.Boolean;
+                    flags[targetField] = NumericFlags.Positive | NumericFlags.Nonnegative | NumericFlags.Nonzero;
                 }
                 else if (numVal == 0.0)
                 {
                     markers[$"$nonneg:{targetField}"] = StaticValueKind.Boolean;
+                    flags[targetField] = NumericFlags.Nonnegative;
                 }
                 else // negative literal — nonzero but not positive/nonneg
                 {
                     markers[$"$nonzero:{targetField}"] = StaticValueKind.Boolean;
+                    flags[targetField] = NumericFlags.Nonzero;
                 }
 
                 // Also inject a point interval for precise interval arithmetic in subsequent expressions.
@@ -2525,6 +2530,8 @@ internal static class PreceptTypeChecker
                 markers[$"$nonneg:{targetField}"] = StaticValueKind.Boolean;
             if (context.Symbols.ContainsKey($"$nonzero:{sourceKey}"))
                 markers[$"$nonzero:{targetField}"] = StaticValueKind.Boolean;
+            if (context.Flags.TryGetValue(sourceKey, out var srcFlags))
+                flags[targetField] = srcFlags;
 
             // Also copy $ival: markers from source to target.
             var srcIvalPrefix = $"$ival:{sourceKey}:";
@@ -2551,11 +2558,18 @@ internal static class PreceptTypeChecker
                     markers[$"$positive:{targetField}"] = StaticValueKind.Boolean;
                     markers[$"$nonneg:{targetField}"]   = StaticValueKind.Boolean;
                     markers[$"$nonzero:{targetField}"]  = StaticValueKind.Boolean;
+                    flags[targetField] = NumericFlags.Positive | NumericFlags.Nonnegative | NumericFlags.Nonzero;
                 }
                 else if (rhsInterval.IsNonnegative)
+                {
                     markers[$"$nonneg:{targetField}"]  = StaticValueKind.Boolean;
+                    flags[targetField] = NumericFlags.Nonnegative;
+                }
                 else if (rhsInterval.ExcludesZero)
+                {
                     markers[$"$nonzero:{targetField}"] = StaticValueKind.Boolean;
+                    flags[targetField] = NumericFlags.Nonzero;
+                }
             }
         }
 
@@ -2567,7 +2581,7 @@ internal static class PreceptTypeChecker
                 relFacts[lf] = fact;
         }
 
-        return new ProofContext(markers, relFacts, fieldIntervals, CopyFlags(context), CopyExprFacts(context));
+        return new ProofContext(markers, relFacts, fieldIntervals, flags, CopyExprFacts(context));
     }
 
     internal static ProofContext ApplyNarrowing(
@@ -2769,6 +2783,7 @@ internal static class PreceptTypeChecker
 
         // Canonicalized: key <op> lit
         var markers = new Dictionary<string, StaticValueKind>(context.Symbols, StringComparer.Ordinal);
+        var flags = CopyFlags(context);
         bool injected = false;
 
         if (op == ">" && lit >= 0)
@@ -2776,6 +2791,7 @@ internal static class PreceptTypeChecker
             markers[$"$positive:{key}"] = StaticValueKind.Boolean;
             markers[$"$nonneg:{key}"] = StaticValueKind.Boolean;
             markers[$"$nonzero:{key}"] = StaticValueKind.Boolean;
+            flags[key] = NumericFlags.Positive | NumericFlags.Nonnegative | NumericFlags.Nonzero;
             injected = true;
         }
         else if (op == ">=" && lit > 0)
@@ -2783,28 +2799,32 @@ internal static class PreceptTypeChecker
             markers[$"$positive:{key}"] = StaticValueKind.Boolean;
             markers[$"$nonneg:{key}"] = StaticValueKind.Boolean;
             markers[$"$nonzero:{key}"] = StaticValueKind.Boolean;
+            flags[key] = NumericFlags.Positive | NumericFlags.Nonnegative | NumericFlags.Nonzero;
             injected = true;
         }
         else if (op == ">=" && lit == 0)
         {
             markers[$"$nonneg:{key}"] = StaticValueKind.Boolean;
+            flags[key] = NumericFlags.Nonnegative;
             injected = true;
         }
         else if (op == "!=" && lit == 0)
         {
             markers[$"$nonzero:{key}"] = StaticValueKind.Boolean;
+            flags[key] = NumericFlags.Nonzero;
             injected = true;
         }
         else if (op == "<" && lit <= 0)
         {
             markers[$"$nonzero:{key}"] = StaticValueKind.Boolean;
+            flags[key] = NumericFlags.Nonzero;
             injected = true;
         }
 
         if (!injected)
             return false;
 
-        result = new ProofContext(markers, new Dictionary<LinearForm, RelationalFact>(), CopyFieldIntervals(context), CopyFlags(context), CopyExprFacts(context));
+        result = new ProofContext(markers, new Dictionary<LinearForm, RelationalFact>(), CopyFieldIntervals(context), flags, CopyExprFacts(context));
         return true;
     }
 
