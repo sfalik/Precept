@@ -26,6 +26,18 @@ internal sealed record RelationalFact(RelationKind Kind)
     };
 }
 
+// ── Numeric flags ─────────────────────────────────────────────────────────────
+
+/// <summary>Bitwise numeric sign/zero flags for proof stores.</summary>
+[Flags]
+internal enum NumericFlags
+{
+    None        = 0,
+    Positive    = 1,   // > 0
+    Nonnegative = 2,   // >= 0
+    Nonzero     = 4,   // != 0
+}
+
 // ── ProofContext ──────────────────────────────────────────────────────────────
 
 /// <summary>
@@ -48,12 +60,18 @@ internal sealed class ProofContext
 {
     private readonly IReadOnlyDictionary<string, StaticValueKind> _symbols;
     private readonly Dictionary<LinearForm, RelationalFact> _relationalFacts;
+    private readonly Dictionary<string, NumericInterval> _fieldIntervals;
+    private readonly Dictionary<string, NumericFlags> _flags;
+    private readonly Dictionary<LinearForm, NumericInterval> _exprFacts;
 
     /// <summary>Constructs a context from the legacy string-marker dictionary only.</summary>
     public ProofContext(IReadOnlyDictionary<string, StaticValueKind> symbols)
     {
         _symbols = symbols;
         _relationalFacts = new Dictionary<LinearForm, RelationalFact>();
+        _fieldIntervals = new Dictionary<string, NumericInterval>(StringComparer.Ordinal);
+        _flags = new Dictionary<string, NumericFlags>(StringComparer.Ordinal);
+        _exprFacts = new Dictionary<LinearForm, NumericInterval>();
     }
 
     /// <summary>Constructs a context from the legacy dictionary plus a typed relational fact store.</summary>
@@ -62,6 +80,23 @@ internal sealed class ProofContext
     {
         _symbols = symbols;
         _relationalFacts = relationalFacts;
+        _fieldIntervals = new Dictionary<string, NumericInterval>(StringComparer.Ordinal);
+        _flags = new Dictionary<string, NumericFlags>(StringComparer.Ordinal);
+        _exprFacts = new Dictionary<LinearForm, NumericInterval>();
+    }
+
+    /// <summary>Constructs a context with all typed stores supplied explicitly.</summary>
+    public ProofContext(IReadOnlyDictionary<string, StaticValueKind> symbols,
+                        Dictionary<LinearForm, RelationalFact> relationalFacts,
+                        Dictionary<string, NumericInterval> fieldIntervals,
+                        Dictionary<string, NumericFlags> flags,
+                        Dictionary<LinearForm, NumericInterval> exprFacts)
+    {
+        _symbols = symbols;
+        _relationalFacts = relationalFacts;
+        _fieldIntervals = fieldIntervals;
+        _flags = flags;
+        _exprFacts = exprFacts;
     }
 
     /// <summary>
@@ -75,6 +110,15 @@ internal sealed class ProofContext
     /// <c>LHS - RHS</c> for each stored <c>LHS op RHS</c> fact.
     /// </summary>
     internal IReadOnlyDictionary<LinearForm, RelationalFact> RelationalFacts => _relationalFacts;
+
+    /// <summary>Typed field-level interval store.</summary>
+    internal IReadOnlyDictionary<string, NumericInterval> FieldIntervals => _fieldIntervals;
+
+    /// <summary>Typed field-level numeric sign/zero flags.</summary>
+    internal IReadOnlyDictionary<string, NumericFlags> Flags => _flags;
+
+    /// <summary>Typed expression-level interval store keyed by <see cref="LinearForm"/>.</summary>
+    internal IReadOnlyDictionary<LinearForm, NumericInterval> ExprFacts => _exprFacts;
 
     // ── Primary query methods ─────────────────────────────────────────────────
 
@@ -164,9 +208,9 @@ internal sealed class ProofContext
 
         var relFacts = new Dictionary<LinearForm, RelationalFact>(_relationalFacts)
         {
-            [lf.Subtract(rf)] = new RelationalFact(kind)
+            [GcdNormalize(lf.Subtract(rf))] = new RelationalFact(kind)
         };
-        return new ProofContext(_symbols, relFacts);
+        return new ProofContext(_symbols, relFacts, _fieldIntervals, _flags, _exprFacts);
     }
 
     /// <summary>
@@ -215,7 +259,7 @@ internal sealed class ProofContext
     /// <c>3A − 3B</c> → <c>A − B</c>; <c>½A − ½B</c> → <c>A − B</c>.
     /// Returns the same instance when the rational GCD equals 1 (no-op).
     /// </summary>
-    private static LinearForm GcdNormalize(LinearForm form)
+    internal static LinearForm GcdNormalize(LinearForm form)
     {
         if (form.Terms.IsEmpty) return form;
 
@@ -269,7 +313,7 @@ internal sealed class ProofContext
                 return new NumericInterval(cDouble, false, double.PositiveInfinity, false);
 
             if (storedFact.Kind == RelationKind.GreaterThanOrEqual && c >= Rational.Zero)
-                return new NumericInterval(cDouble, c > Rational.Zero, double.PositiveInfinity, false);
+                return new NumericInterval(cDouble, true, double.PositiveInfinity, false);
         }
         return NumericInterval.Unknown;
     }
@@ -332,4 +376,39 @@ internal enum ProofSign
     Nonneg,
     Nonzero,
     Positive,
+}
+
+/// <summary>An interval result paired with attribution indicating which proof sources contributed.</summary>
+internal readonly record struct ProofResult(NumericInterval Interval, ProofAttribution Attribution)
+{
+    public static ProofResult Unknown { get; } = new(NumericInterval.Unknown, ProofAttribution.None);
+    public bool IsUnknown => Interval.IsUnknown;
+}
+
+/// <summary>Tracks which proof sources contributed to an interval result.</summary>
+internal sealed class ProofAttribution
+{
+    public static readonly ProofAttribution None = new(Array.Empty<string>());
+
+    public IReadOnlyList<string> Sources { get; }
+
+    public ProofAttribution(IReadOnlyList<string> sources) => Sources = sources;
+
+    public static ProofAttribution Merge(ProofAttribution a, ProofAttribution b)
+    {
+        if (a.Sources.Count == 0) return b;
+        if (b.Sources.Count == 0) return a;
+        var merged = new List<string>(a.Sources);
+        foreach (var s in b.Sources)
+        {
+            bool found = false;
+            foreach (var m in merged)
+            {
+                if (string.Equals(m, s, StringComparison.Ordinal)) { found = true; break; }
+            }
+            if (!found)
+                merged.Add(s);
+        }
+        return new ProofAttribution(merged);
+    }
 }

@@ -511,4 +511,42 @@ public class ProofContextTests
 
         ctx.SignOf(PreceptParser.ParseExpression("A - B")).Should().Be(ProofSign.Nonneg);
     }
+
+    // ── Step 10: W1 inclusivity fix + W2 GCD normalization ────────────────────
+
+    [Fact]
+    public void IntervalOf_GteRule_AMinusB_LowerIsInclusive()
+    {
+        // W1 regression: rule A >= B → IntervalOf(A - B) = [0, +∞).
+        // ConstantOffsetScan with c=0 must return LowerInclusive = true.
+        // Before the fix, it returned (0, +∞) — LowerInclusive = false.
+        var ctx = new ProofContext(new Dictionary<string, StaticValueKind>())
+            .WithRule(
+                PreceptParser.ParseExpression("A"),
+                RelationKind.GreaterThanOrEqual,
+                PreceptParser.ParseExpression("B"));
+
+        var interval = ctx.IntervalOf(PreceptParser.ParseExpression("A - B"));
+
+        interval.Lower.Should().Be(0);
+        interval.LowerInclusive.Should().BeTrue("A >= B means A - B >= 0, so [0, +∞) not (0, +∞)");
+    }
+
+    [Fact]
+    public void IntervalOf_ScaledGtRule_2AMinus2B_ProvesAMinusB_Safe()
+    {
+        // W2 regression: rule 2*A > 2*B stores key 2A-2B. Without GCD normalization
+        // at storage, looking up A-B (which IS GCD-normalized at lookup) would miss.
+        // With GCD normalization at storage, 2A-2B → A-B, and IntervalOf(A - B) = (0, +∞).
+        var ctx = new ProofContext(new Dictionary<string, StaticValueKind>())
+            .WithRule(
+                PreceptParser.ParseExpression("2 * A"),
+                RelationKind.GreaterThan,
+                PreceptParser.ParseExpression("2 * B"));
+
+        var interval = ctx.IntervalOf(PreceptParser.ParseExpression("A - B"));
+
+        interval.ExcludesZero.Should().BeTrue("GCD normalization should make 2A-2B → A-B at storage, matching the lookup");
+        interval.IsPositive.Should().BeTrue();
+    }
 }

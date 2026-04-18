@@ -2726,16 +2726,16 @@ internal static class PreceptTypeChecker
             switch (binary.Operator)
             {
                 case ">":
-                    relFacts[leftForm.Subtract(rightForm)] = new RelationalFact(RelationKind.GreaterThan);
+                    relFacts[ProofContext.GcdNormalize(leftForm.Subtract(rightForm))] = new RelationalFact(RelationKind.GreaterThan);
                     break;
                 case ">=":
-                    relFacts[leftForm.Subtract(rightForm)] = new RelationalFact(RelationKind.GreaterThanOrEqual);
+                    relFacts[ProofContext.GcdNormalize(leftForm.Subtract(rightForm))] = new RelationalFact(RelationKind.GreaterThanOrEqual);
                     break;
                 case "<":
-                    relFacts[rightForm.Subtract(leftForm)] = new RelationalFact(RelationKind.GreaterThan);
+                    relFacts[ProofContext.GcdNormalize(rightForm.Subtract(leftForm))] = new RelationalFact(RelationKind.GreaterThan);
                     break;
                 case "<=":
-                    relFacts[rightForm.Subtract(leftForm)] = new RelationalFact(RelationKind.GreaterThanOrEqual);
+                    relFacts[ProofContext.GcdNormalize(rightForm.Subtract(leftForm))] = new RelationalFact(RelationKind.GreaterThanOrEqual);
                     break;
                 default:
                     return false;
@@ -2816,7 +2816,7 @@ internal static class PreceptTypeChecker
         var lf = LinearForm.TryNormalize(lhs);
         var rf = LinearForm.TryNormalize(rhs);
         if (lf is not null && rf is not null)
-            relFacts[lf.Subtract(rf)] = new RelationalFact(kind);
+            relFacts[ProofContext.GcdNormalize(lf.Subtract(rf))] = new RelationalFact(kind);
     }
 
     /// <summary>
