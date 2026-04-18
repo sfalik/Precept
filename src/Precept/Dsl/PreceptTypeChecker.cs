@@ -2553,10 +2553,11 @@ internal static class PreceptTypeChecker
             case PreceptConditionalExpression cond:
             {
                 var thenContext = ApplyNarrowing(cond.Condition, context, assumeTrue: true);
+                var elseContext = ApplyNarrowing(cond.Condition, context, assumeTrue: false);
                 // Use IntervalOf (not TryInferInterval) so relational facts stored by ApplyNarrowing
                 // are consulted when tightening branch sub-expressions (e.g. A-B given A>B).
                 var thenInterval = thenContext.IntervalOf(cond.ThenBranch);
-                var elseInterval = context.IntervalOf(cond.ElseBranch);
+                var elseInterval = elseContext.IntervalOf(cond.ElseBranch);
                 return NumericInterval.Hull(thenInterval, elseInterval);
             }
 
@@ -2789,7 +2790,22 @@ internal static class PreceptTypeChecker
         result = context;
 
         if (!assumeTrue)
-            return false;
+        {
+            // Negate the comparison: not(A > B) ≡ A <= B, etc.
+            var negatedOp = binary.Operator switch
+            {
+                ">" => "<=",
+                ">=" => "<",
+                "<" => ">=",
+                "<=" => ">",
+                "!=" => "==",
+                "==" => "!=",
+                _ => (string?)null
+            };
+            if (negatedOp is null) return false;
+            var negated = new PreceptBinaryExpression(negatedOp, binary.Left, binary.Right);
+            return TryApplyNumericComparisonNarrowing(negated, context, assumeTrue: true, out result);
+        }
 
         if (binary.Operator is not (">" or ">=" or "<" or "<=" or "!=" or "=="))
             return false;

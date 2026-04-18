@@ -305,4 +305,119 @@ public class ProofEngineConstraintTests
 
         result.Diagnostics.Where(d => d.Constraint.Id == "C98").Should().BeEmpty();
     }
+
+    // ── Conditional composition: else-branch negated guard narrowing ─────────
+
+    [Fact]
+    public void Check_ConditionalComposition_BothBranchesExcludeZero_NoC93()
+    {
+        // if A > B then A - B else 1 → then branch: A>B → A-B > 0; else branch: literal 1
+        // Hull = (0,+∞) ∪ [1,1] = (0,+∞) — excludes zero → no C93
+        const string dsl = """
+            precept Test
+            field A as number default 10 positive
+            field B as number default 5 positive
+            field Result as number default 1
+            state Open initial
+            event Go
+            from Open on Go -> set Result = Result / (if A > B then A - B else 1) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C93").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_ConditionalComposition_ElseBranchIncludesZero_EmitsC93()
+    {
+        // if A > B then A - B else 0 → else branch is literal 0
+        // Hull includes zero → C93
+        const string dsl = """
+            precept Test
+            field A as number default 10 positive
+            field B as number default 5 positive
+            field Result as number default 1
+            state Open initial
+            event Go
+            from Open on Go -> set Result = Result / (if A > B then A - B else 0) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C93");
+    }
+
+    [Fact]
+    public void Check_ConditionalComposition_ElseBranchNegatedNarrowing_NoC93()
+    {
+        // if A > B then A - B else B - A + 1
+        // else context: A <= B (negated guard) → B - A >= 0 → B - A + 1 >= 1
+        // Hull of (0,+∞) and [1,+∞) excludes zero → no C93
+        const string dsl = """
+            precept Test
+            field A as number default 10 positive
+            field B as number default 5 positive
+            field Result as number default 1
+            state Open initial
+            event Go
+            from Open on Go -> set Result = Result / (if A > B then A - B else B - A + 1) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C93").Should().BeEmpty();
+    }
+
+    // ── Reachability sharpening: C97 dead guards sharpen C48/C50/C51 ────────
+
+    [Fact]
+    public void Validate_DeadGuardRow_SharpensC51_RejectOnly()
+    {
+        // State A has two rows for Go: one rejects, one transitions but has a dead guard
+        // (when X < 0 with positive X). Without sharpening, the transition row would
+        // prevent C51. With sharpening, C51 fires because the transition is unreachable.
+        const string dsl = """
+            precept Test
+            field X as number default 10 positive
+            state A initial
+            state B
+            event Go
+            from A on Go when X < 0 -> transition B
+            from A on Go -> reject "blocked"
+            from B on Go -> no transition
+            """;
+
+        var result = Validate(dsl);
+
+        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C51");
+        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C97");
+    }
+
+    [Fact]
+    public void Validate_DeadGuardRow_SharpensC48_Unreachable()
+    {
+        // State B is only reachable via a dead-guard transition.
+        // With sharpening, B is reported as unreachable (C48).
+        const string dsl = """
+            precept Test
+            field X as number default 10 positive
+            state A initial
+            state B
+            event Go
+            from A on Go when X < 0 -> transition B
+            from A on Go -> no transition
+            """;
+
+        var result = Validate(dsl);
+
+        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C48"
+            && d.Message.Contains("B"));
+        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C97");
+    }
+
+    // ── Private helpers (Validate) ──────────────────────────────────────────
+
+    private static ValidationResult Validate(string dsl) =>
+        PreceptCompiler.Validate(PreceptParser.Parse(dsl));
 }

@@ -2162,7 +2162,13 @@ public static class PreceptCompiler
         CollectCompileTimeDiagnostics(model, diagnostics);
 
         if (!diagnostics.Any(diagnostic => diagnostic.Constraint.Id is "C27" or "C28"))
-            diagnostics.AddRange(PreceptAnalysis.Analyze(model).Diagnostics);
+        {
+            var deadGuardLines = new HashSet<int>(
+                typeCheck.Diagnostics
+                    .Where(d => d.Constraint.Id == "C97")
+                    .Select(d => d.Line));
+            diagnostics.AddRange(PreceptAnalysis.Analyze(model, deadGuardLines).Diagnostics);
+        }
 
         return new ValidationResult(diagnostics, typeCheck.TypeContext, model);
     }

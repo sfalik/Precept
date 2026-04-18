@@ -27,7 +27,7 @@ internal sealed record AnalysisResult(
 
 internal static class PreceptAnalysis
 {
-    public static AnalysisResult Analyze(PreceptDefinition definition)
+    public static AnalysisResult Analyze(PreceptDefinition definition, IReadOnlySet<int>? deadGuardLines = null)
     {
         ArgumentNullException.ThrowIfNull(definition);
 
@@ -75,6 +75,7 @@ internal static class PreceptAnalysis
         foreach (var row in transitionRows)
         {
             referencedEvents.Add(row.EventName);
+            var isDeadGuard = deadGuardLines is not null && deadGuardLines.Contains(row.SourceLine);
 
             foreach (var sourceState in ExpandSourceStates(row.FromState, allStateNames))
             {
@@ -89,7 +90,8 @@ internal static class PreceptAnalysis
 
                 rows.Add(row);
 
-                if (row.Outcome is StateTransition transition && graph.TryGetValue(sourceState, out var neighbors))
+                // Dead-guard rows should not contribute graph edges — the transition is unreachable.
+                if (!isDeadGuard && row.Outcome is StateTransition transition && graph.TryGetValue(sourceState, out var neighbors))
                     neighbors.Add(transition.TargetState);
             }
         }
@@ -146,7 +148,8 @@ internal static class PreceptAnalysis
             .Where(state => rowsByPair
                 .Where(pair => StringComparer.Ordinal.Equals(pair.Key.State, state))
                 .SelectMany(pair => pair.Value)
-                .All(static row => row.Outcome is NoTransition or Rejection))
+                .All(row => row.Outcome is NoTransition or Rejection
+                    || (deadGuardLines is not null && deadGuardLines.Contains(row.SourceLine))))
             .ToArray();
         foreach (var stateName in deadEndStates)
         {
@@ -162,12 +165,15 @@ internal static class PreceptAnalysis
             .GroupBy(static pair => pair.Key.Event, StringComparer.Ordinal)
             .ToDictionary(
                 group => group.Key,
-                group => group.SelectMany(static pair => pair.Value).Any(static row => row.Outcome is not Rejection),
+                group => group.SelectMany(static pair => pair.Value)
+                    .Any(row => row.Outcome is not Rejection
+                        && (deadGuardLines is null || !deadGuardLines.Contains(row.SourceLine))),
                 StringComparer.Ordinal);
 
         var rejectOnlyPairs = rowsByPair
             .Where(static pair => pair.Value.Count > 0)
-            .Where(static pair => pair.Value.All(static row => row.Outcome is Rejection))
+            .Where(pair => pair.Value.All(row => row.Outcome is Rejection
+                || (deadGuardLines is not null && deadGuardLines.Contains(row.SourceLine))))
             .Select(pair =>
             {
                 var firstRow = pair.Value.OrderBy(static row => row.SourceLine).First();
@@ -193,7 +199,9 @@ internal static class PreceptAnalysis
             .Where(evt => reachable.All(state =>
             {
                 var key = (state, evt.Name);
-                return !rowsByPair.TryGetValue(key, out var rows) || rows.All(static row => row.Outcome is Rejection);
+                return !rowsByPair.TryGetValue(key, out var rows)
+                    || rows.All(row => row.Outcome is Rejection
+                        || (deadGuardLines is not null && deadGuardLines.Contains(row.SourceLine)));
             }))
             .Select(static evt => evt.Name)
             .ToArray();
