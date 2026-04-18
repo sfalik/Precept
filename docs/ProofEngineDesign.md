@@ -14,7 +14,7 @@ The proof engine is Precept's compile-time reasoning layer. It infers numeric in
 
 The engine serves three purposes:
 
-1. **Safety enforcement.** Prove that divisors are nonzero (C92/C93), sqrt operands are non-negative (C76), and assignments satisfy field constraints (C94). These are compile-time errors or warnings — the invalid configuration never reaches runtime.
+1. **Safety enforcement.** Prove that divisors are nonzero (C92/C93), sqrt operands are non-negative (C76), and assignments satisfy field constraints (C94). Interval transfer rules propagate proof information through all 10 built-in numeric functions (`abs`, `min`, `max`, `clamp`, `sqrt`, `floor`, `ceil`, `round`, `truncate`, `pow`) so that proof-backed diagnostics fire correctly when these functions appear in expressions. These are compile-time errors or warnings — the invalid configuration never reaches runtime.
 2. **Structural integrity analysis.** Detect contradictory rules (C95), vacuous rules (C96), dead guards (C97), and vacuous guards (C98). These are authoring-quality diagnostics — they surface definition problems that would silently degrade the entity's behavior.
 3. **Author-facing inspectability.** Surface proven ranges and source attribution through hover displays, diagnostic messages, and MCP proof output — in natural language, never compiler internals. The author sees what the engine proved, what it could not prove, and why.
 
@@ -124,6 +124,13 @@ The proof engine is organized as three composing types — `ProofContext`, `Line
 **Primary query methods:**
 
 - `IntervalOf(PreceptExpression expr)` — composing query. Returns a `ProofResult` containing a `NumericInterval` and a `ProofAttribution` (source rules/constraints that contributed to the interval). Calls interval arithmetic, relational lookup, and transitive closure in one pass. This is the single integration point for all C92, C93, C76, C94, C97, and C98 checks.
+
+**`IntervalOf` query dispatch order.** The composing query runs two phases and intersects their results:
+
+1. **Interval arithmetic** (`TryInferInterval`). Recursive descent over the expression tree. Literal nodes produce singleton intervals. Identifier leaves are resolved by: (a) `_fieldIntervals` direct lookup, (b) `_flags` projection (`Positive` → `(0,+∞)`, `Nonneg` → `[0,+∞)`, etc.). Binary and unary nodes apply standard transfer rules. Function calls dispatch to `Abs`, `Min`, `Max`, `Clamp`, `Sqrt`, `Floor`, `Ceil`, `Round`, `Truncate`, and `Pow` (see function transfer rules below). Conditional `if/then/else` applies `Hull` over both branches with guard narrowing (see § Conditional Composition). This phase produces the **arithmetic interval**.
+2. **Relational refinement** (`LookupRelationalInterval`). Attempted only when `LinearForm.TryNormalize(expr)` succeeds. If the normalized form has empty terms (pure constant, e.g. `A - A`), returns an exact singleton directly — no relational lookup needed. Otherwise, runs the 5-tier cascade (see § Relational Fact Store and 5-Tier Lookup). `_exprFacts` are consulted during this phase for expression-level facts stored by `WithAssignment`. This phase produces the **relational interval**.
+
+The final result is `Intersect(arithmetic, relational)` — the tightest interval supported by both sources. When either phase returns `Unknown`, the intersection is the other phase's result. When both return `Unknown`, the final result is `Unknown`.
 - `SignOf(PreceptExpression expr)` — returns `Positive / Nonneg / Nonzero / Unknown` derived from `IntervalOf`.
 - `KnowsNonzero(PreceptExpression expr)` — `IntervalOf(...).Interval.ExcludesZero`.
 - `KnowsNonnegative(PreceptExpression expr)` — `IntervalOf(...).Interval.IsNonnegative`.
@@ -148,6 +155,8 @@ internal sealed class ProofAttribution
 **Design decision (D2, team review 2026-04-18): Eager tracking.** Attribution is collected during `IntervalOf` traversal, not reconstructed lazily at hover time. Every `With*` mutation records its source. `NumericInterval` arithmetic (`Add`, `Subtract`, `Intersect`, etc.) merges attributions from both operands. This adds ~1 field per method signature but gives all consumers — hover, diagnostics, MCP — access to attribution with zero additional cost.
 
 **Tradeoff accepted:** Every `IntervalOf` call pays the attribution collection cost, even when no consumer reads it. The cost is proportional to the number of contributing facts (typically 1–3), not the expression tree size. Acceptable for a DSL compiler.
+
+**Multi-source display format:** When multiple sources contribute to a single interval, the "from:" line renders them as a comma-separated list, each source as its DSL declaration text: `from: rule Rate >= 1, rule Rate <= 100`. Field constraints render as `field constraint {kind}` (e.g., `field constraint positive`). If the source list exceeds 5 entries, truncate to the first 4 and append "and N more" (e.g., `from: rule A >= 1, rule A <= 100, rule A != 50, rule A != 75, and 3 more`). This format is shared by hover, diagnostics, and MCP display.
 
 **Mutation methods:**
 
@@ -267,6 +276,8 @@ All tiers operate on typed `RelationalFact` records in `_relationalFacts`. The l
 
 **Cross-event isolation.** `EventProofContext.Mutations` are never promoted on context flush. Derived facts from event E1's transition row cannot influence event E2's `EventProofContext` — E2's context is built fresh from the same `GlobalProofContext` parent. Cross-event fact carryover requires explicit `ensure` clauses, which already produce facts via `BuildEventEnsureNarrowings`.
 
+**`BuildStateEnsureNarrowings`.** Built once per `Check()`, alongside event-ensure narrowings. Processes unconditional `in {State} ensure` clauses (`EnsureAnchor.In`, no `when` guard), grouped by state name. Each group starts from a fresh `ProofContext` seeded with the global data-field kinds and applies `ApplyNarrowing` for each ensure expression. The result is a `IReadOnlyDictionary<string, ProofContext>` — one entry per state that has at least one `in`-anchored ensure. Consumed by both `ValidateTransitionRows` (merged into the `EventProofContext` for transitions whose source state has ensures) and `ValidateStateActions` (merged into the proof context for `initial` and `on enter` actions in states with ensures). State ensures operate on data-field names directly — no bare→dotted translation is needed because state-ensure narrowings apply to the same field namespace as global rules.
+
 **`BuildEventEnsureNarrowings` rewrite.** The bare→dotted field-name translation is now a structural transform on typed `RelationalFact` records: `facts.Select(f => f.Rekey(bare → dotted))`. The string-surgery bug class from PR #108 (`$gt:A:B` → `$gt:Go.A:Go.B` having to split on `:` and dot both parts) is eliminated by construction — the key is a `LinearForm` with typed `FieldKey` terms, and dotting is a map over terms.
 
 ### NumericInterval
@@ -301,11 +312,18 @@ internal readonly record struct NumericInterval(
 | `Subtract([a,b], [c,d])` | `[a-d, b-c]` |
 | `Multiply([a,b], [c,d])` | Sign-case decomposition (see below) |
 | `Divide([a,b], [c,d])` | When `[c,d]` excludes zero: standard interval division. Otherwise: `Unknown`. |
+| `Modulo([a,b], [c,d])` | When `[c,d]` excludes zero: `(-\|d\|, \|d\|)`. **Tighter when dividend is nonneg and divisor is positive:** `[0, \|d\|)`. Otherwise: `Unknown`. |
 | `Negate([a,b])` | `[-b, -a]` with flipped inclusivity |
 | `Abs([a,b])` | Both nonneg → identity. Both nonpositive → negate. Mixed → `[0, max(\|a\|, \|b\|)]` |
 | `Min([a,b], [c,d])` | `[min(a,c), min(b,d)]` |
 | `Max([a,b], [c,d])` | `[max(a,c), max(b,d)]` |
 | `Clamp(x, lo, hi)` | `[max(x.Lower, lo.Lower), min(x.Upper, hi.Upper)]` |
+| `Sqrt([a,b])` | When nonneg: `[√a, √b]` preserving inclusivity. Otherwise: `Unknown`. |
+| `Floor([a,b])` | `[⌊a⌋, ⌊b⌋]` with both bounds inclusive. Sound but may over-approximate — integer results always land on or inside the floored bounds. |
+| `Ceil([a,b])` | `[⌈a⌉, ⌈b⌉]` with both bounds inclusive. Same conservative inclusivity as `Floor`. |
+| `Round([a,b])` | `[⌊a⌋, ⌈b⌉]` with both bounds inclusive. Widest safe approximation — `round` can go either direction. |
+| `Truncate([a,b])` | `[truncate(a), truncate(b)]` with both bounds inclusive. Truncation toward zero: positive values floor, negative values ceil. **Currently missing — falls to `Unknown`.** |
+| `Pow([a,b], [c,d])` | When exponent is a constant even integer and base is nonneg: `[a^c, b^c]`. When exponent is constant `2`: nonneg base → `[a², b²]`, nonpositive base → `[b², a²]`, mixed → `[0, max(a², b²)]`. **Currently missing — falls to `Unknown`.** |
 | `Hull([a,b], [c,d])` | `[min(a,c), max(b,d)]` — join for conditional expression synthesis. **Inclusivity for equal bounds:** when both lower bounds are equal, `LowerInclusive = a.LowerInclusive \|\| b.LowerInclusive`; likewise when both upper bounds are equal, `UpperInclusive = a.UpperInclusive \|\| b.UpperInclusive`. *(Covered by existing `NumericIntervalTests.cs` Hull tests — no new test obligation.)* |
 
 **Multiply sign-case decomposition:** Naive four-corner multiplication (`min/max` of `{a*c, a*d, b*c, b*d}`) produces `NaN` when an endpoint is zero and the other is `±∞` (because `0 × ∞` is undefined in IEEE 754). The implementation decomposes by sign combination to avoid `0 × ∞`:
@@ -867,6 +885,14 @@ The shared assessment model feeds a single proof-diagnostic renderer that:
 3. Attaches source attribution from `ProofAttribution` (eager tracking from `IntervalOf`)
 4. Emits structured metadata on every diagnostic for tooling consumers (code actions, hover, MCP)
 
+**Diagnostic surfaces (R11).** All proof-backed diagnostics originate as `PreceptDiagnostic` instances from `PreceptCompiler.CompileFromText()`. There is one pipeline, not three. The same `PreceptDiagnostic` list is consumed identically by:
+
+- **Language server** — maps each diagnostic to an LSP `Diagnostic` (squiggle, severity, message). File: `tools/Precept.LanguageServer/PreceptDiagnosticsPublisher.cs`.
+- **MCP `precept_compile`** — serializes each diagnostic to the `diagnostics[]` array in the JSON response. File: `tools/Precept.Mcp/Tools/CompileTool.cs`.
+- **CLI** (future) — will render the same list to console output.
+
+When this document says "the compiler reports C93," it means a `PreceptDiagnostic` with code `C93` is added to the compilation result. All surfaces display it — no surface has its own diagnostic generation logic.
+
 Code actions consume the structured assessment metadata — they do NOT parse diagnostic message text.
 
 ### Structured Diagnostic Metadata (D7, team review 2026-04-18)
@@ -912,6 +938,30 @@ This metadata is consumed by:
 
 **Diagnostic message format:** All proof-backed diagnostics use `ToNaturalLanguage()` instead of interval notation. Example C94 message:
 > "Assignment to 'Score' provably violates the 'max 100' constraint. Expression produces a value that is always greater than 100 — required range is 0 to 100 (inclusive)."
+
+### Hover Trigger Conditions
+
+The language server appends a proof section to hover content for the following AST node positions:
+
+1. **Field declarations** with numeric type (`field F as number`) — hover shows the field's proven interval from global proof state (field constraints + rules).
+2. **Numeric expressions** in `set` assignment RHS — hover shows the expression's `IntervalOf` result under the event proof context at that assignment point.
+3. **Numeric expressions** in `rule` declarations — hover shows the expression's proven interval.
+4. **Numeric expressions** in `when` guard conditions — hover shows the expression's proven interval (under the guard's proof context).
+
+**Suppression rules:**
+- Show nothing when `IntervalOf` returns `Unknown`.
+- Show nothing when the interval is `(-∞, +∞)` — an unbounded interval carries no useful information.
+- Show nothing for non-numeric expressions (string, boolean, choice fields).
+
+**Rule and guard declaration hover (R10):** Hovering on a `rule` or `when` declaration keyword (not the expression inside it) shows what the declaration *contributes* to the proof state, framed as effect rather than range:
+
+- **`rule` declaration hover:** "This rule proves {field} is {natural-language interval}." with `from:` self-referencing the rule. Example: hovering on `rule Rate >= 1` → "This rule proves Rate is 1 or greater." If the rule is vacuous (C96) or contradictory (C95), show the diagnostic instead.
+- **`when` guard hover:** "This guard narrows {field} to {natural-language interval} in this branch." Example: hovering on `when Score > 0` → "This guard narrows Score to always greater than 0 in this branch." If the guard is dead (C97) or vacuous (C98), show the diagnostic instead.
+- **`ensure` declaration hover:** Same pattern as `rule` — "This ensure proves {field} is {natural-language interval} in state {State}."
+
+This is distinct from expression hover (which shows the *result* of proof composition) — declaration hover shows the *input* a single declaration contributes to the proof state.
+
+**Format:** Separator `---` between existing hover content and proof section. Section label "Proven safe:". Source attribution "from:" line. See § Natural-Language Interval Formatting for the display phrasing. See PR #108 Commit 14 for the full Elaine-reviewed UX spec.
 
 ---
 
@@ -1053,6 +1103,8 @@ static NumericInterval FromConstraints(IReadOnlyList<FieldConstraint> constraint
 
 **Diagnostic message:** `"Assignment to '{field}' provably violates the '{constraint}' constraint. Expression produces a value that is {exprInterval.ToNaturalLanguage()} — required range is {constraintInterval.ToNaturalLanguage()}."`
 
+**Remediation guidance (S4):** The author must either adjust the expression to produce values within the constraint range, or widen the field constraint if the intended range was wrong. For computed fields, verify the formula against all possible input combinations.
+
 **Test obligations:**
 
 | Test | Verifies |
@@ -1099,6 +1151,8 @@ static NumericInterval FromConstraints(IReadOnlyList<FieldConstraint> constraint
 
 **Diagnostic message:** `"Rule '{expression}' contradicts the '{constraint}' constraint on field '{field}'. Field values are {constraintInterval.ToNaturalLanguage()} but the rule requires {satisfyingInterval.ToNaturalLanguage()} — no valid value satisfies both."`
 
+**Remediation guidance (S4):** The author must remove or adjust one of the conflicting declarations — either relax the field constraint or change the rule predicate so a valid range exists. A contradictory rule means no mutation can ever succeed.
+
 **Test obligations:**
 
 | Test | Verifies |
@@ -1137,6 +1191,8 @@ Contains(outer, inner):
 
 **Diagnostic message:** `"Rule '{expression}' is always satisfied — field '{field}' is already constrained to {constraintInterval.ToNaturalLanguage()}, which always satisfies this rule. Consider removing the redundant rule."`
 
+**Remediation guidance (S4):** Remove the redundant rule — the field constraint already guarantees the property. If the rule was intentional documentation, consider using a `because` message on the field constraint instead.
+
 **Test obligations:**
 
 | Test | Verifies |
@@ -1161,6 +1217,8 @@ Contains(outer, inner):
 
 **Diagnostic message:** `"Guard 'when {expr}' is provably always false — this row/declaration is unreachable. Field '{field}' is constrained to {constraintInterval.ToNaturalLanguage()} but the guard requires {guardInterval.ToNaturalLanguage()}."`
 
+**Remediation guidance (S4):** Remove the unreachable row or adjust the guard condition to match a reachable range. If the guard was protecting against a condition that constraints already prevent, the guard is unnecessary.
+
 **Test obligations:**
 
 | Test | Verifies |
@@ -1183,6 +1241,8 @@ Contains(outer, inner):
 **Example:** `field Rate as number positive` + `when Rate > 0 -> ...`. Guard satisfying `(0, +∞)`, constraint `(0, +∞)`, constraint ⊆ satisfying → C98.
 
 **Diagnostic message:** `"Guard 'when {expr}' is provably always true — the condition has no effect. Field '{field}' is already constrained to {constraintInterval.ToNaturalLanguage()}, which always satisfies this guard."`
+
+**Remediation guidance (S4):** Remove the unnecessary guard — the constraint already guarantees the condition. If the guard was intended to document intent, consider using a `because` message on the relevant constraint or rule instead.
 
 **Test obligations:**
 
@@ -1300,6 +1360,34 @@ Hover, diagnostics, and MCP MUST produce the same proof facts for the same expre
 - All three surfaces read `ProofAttribution.Sources` → same "from:" lines
 
 **Acceptance criterion:** At least 1 sample file (created in Commit 15) must demonstrate an expression where the hover proof section, the diagnostic message, and the MCP `proof` key all display consistent interval + attribution data. This is verified by inspection during Commit 15, not by automated test.
+
+### Diagnostic Samples (S5, team review 2026-04-18)
+
+The `samples/diagnostics/` folder is a living catalog of proof engine scenarios — user-facing reference files that show authors what the engine catches, what messages it produces, and how to fix the code. Each file is self-contained, demonstrates both the triggering pattern and the remediation, and uses comments to explain the proof engine's reasoning.
+
+**Maintenance rule:** When a PR adds, changes, or removes a proof-backed diagnostic, the same PR must add or update the corresponding sample in `samples/diagnostics/`. This is codified in `CONTRIBUTING.md` § Diagnostic Samples.
+
+**Initial catalog (Commit 15):**
+
+| Sample file | Diagnostics | Scenario |
+|---|---|---|
+| `divisor-safety.precept` | C92, C93 | Literal zero, identifier without proof, compound expression, three C93 message variants, remediation paths |
+| `sqrt-safety.precept` | C76 | Negative argument, unproven non-negative, remediation via `nonnegative` |
+| `assignment-constraints.precept` | C94 | Provably outside constraint interval, partial overlap (no diagnostic), remediation |
+| `contradictory-rules.precept` | C95 | Rule vs field constraint contradiction |
+| `vacuous-rules.precept` | C96 | Rule always true given constraints |
+| `dead-guards.precept` | C97 | Guard always false, reachability sharpening impact |
+| `vacuous-guards.precept` | C98 | Guard always true |
+| `conditional-composition.precept` | C92, C93 | Guard-narrowed branches, relational narrowing, Hull semantics |
+
+**Drift prevention tests:** Each diagnostic sample has a corresponding `[Theory]` test case in `DiagnosticSampleDriftTests.cs` that compiles the file via `PreceptCompiler.CompileFromText()` and asserts:
+
+1. **Expected diagnostics present** — every diagnostic code listed in the sample's `// Demonstrates:` comment header must appear in the compilation result.
+2. **No unexpected errors** — no error-severity diagnostic codes beyond those listed in the header. (Additional warnings are tolerated — the engine may add new warning-level diagnostics without breaking existing samples.)
+
+Each sample file's `// Demonstrates:` header is the contract: it declares exactly which diagnostic codes the file is designed to trigger. The test reads this header and uses it as the assertion set — no hardcoded test data that can drift from the sample content.
+
+This mirrors the existing `SampleFile_ParsesAndCompilesClean` pattern for regular samples, but inverts the assertion: regular samples must compile clean, diagnostic samples must produce their declared diagnostics.
 
 ---
 
