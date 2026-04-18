@@ -12,17 +12,17 @@ internal static class ProofDiagnosticRenderer
     public static string Render(ProofAssessment assessment) => assessment switch
     {
         { Requirement: ProofRequirement.NonzeroDivisor, Outcome: ProofOutcome.Contradiction } a =>
-            $"Division by zero: divisor {a.SubjectDescription} is provably zero.",
+            $"Division by zero: divisor '{a.SubjectDescription}' is provably zero.",
 
         { Requirement: ProofRequirement.NonzeroDivisor, Outcome: ProofOutcome.Obligation } a when a.StrongestFact.IsNonnegative =>
-            $"Divisor {a.SubjectDescription} is nonnegative but not nonzero — 'nonnegative' allows zero. Consider 'positive' instead.",
+            $"Divisor '{a.SubjectDescription}' is nonnegative but not nonzero — 'nonnegative' allows zero. Consider 'positive' instead.",
 
         { Requirement: ProofRequirement.NonzeroDivisor, Outcome: ProofOutcome.Obligation } a when !a.StrongestFact.IsUnknown =>
-            $"Divisor {a.SubjectDescription} interval [{a.StrongestFact.Lower}, {a.StrongestFact.Upper}] may include zero. " +
+            $"Divisor '{a.SubjectDescription}' interval [{a.StrongestFact.Lower}, {a.StrongestFact.Upper}] may include zero. " +
             "Consider restructuring with a 'positive' constraint or 'rule != 0'.",
 
         { Requirement: ProofRequirement.NonzeroDivisor, Outcome: ProofOutcome.Obligation } a =>
-            $"Divisor {a.SubjectDescription} has no compile-time nonzero proof. " +
+            $"Divisor '{a.SubjectDescription}' has no compile-time nonzero proof. " +
             $"Consider adding a 'positive' constraint, 'rule {a.SubjectDescription} != 0', or 'when {a.SubjectDescription} != 0' guard.",
 
         { Requirement: ProofRequirement.NonnegativeArgument, Outcome: ProofOutcome.Obligation } a =>

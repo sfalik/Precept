@@ -140,11 +140,10 @@ public class ProofEngineComputedFieldTests
     }
 
     [Fact]
-    public void Check_ComputedField_LiteralZeroRhs_C93()
+    public void Check_ComputedField_LiteralZeroRhs_C92()
     {
-        // set X = 0: literal 0 is nonneg but NOT nonzero. Stores $nonneg:X only.
-        // Y / X: identifier check finds $nonneg:X but no $positive:X or $nonzero:X
-        // → "nonneg but not nonzero" C93 fires.
+        // set X = 0: literal 0 produces interval [0,0] — provably zero.
+        // Y / X: AssessDivisorSafety finds [0,0] → Contradiction → C92.
         const string dsl = """
             precept Test
             field X as number default 1
@@ -156,8 +155,8 @@ public class ProofEngineComputedFieldTests
 
         var result = Check(dsl);
 
-        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C93",
-            "X = 0 is nonneg but not nonzero; division by zero is possible");
+        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C92",
+            "X = 0 is provably zero — contradiction, not just obligation");
     }
 
     [Fact]

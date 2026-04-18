@@ -1370,9 +1370,9 @@ public class PreceptTypeCheckerTests
     }
 
     [Fact]
-    public void Check_DivisorCompound_Subtraction_NoWarning()
+    public void Check_DivisorCompound_Subtraction_ProvablyZero_EmitsC92()
     {
-        // D - D is provably zero — interval arithmetic detects this. MUST emit C93.
+        // D - D is provably zero — LinearForm normalization yields constant 0 → [0,0] → C92 contradiction.
         const string dsl = """
             precept M
             field Y as number default 10
@@ -1384,7 +1384,7 @@ public class PreceptTypeCheckerTests
 
         var result = Check(dsl);
 
-        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C93");
+        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C92");
     }
 
     [Fact]
@@ -1623,13 +1623,13 @@ public class PreceptTypeCheckerTests
         result.Diagnostics.Should().ContainSingle(d => d.Constraint.Id == "C93");
     }
 
-    // J. Intra-row mutation false-negative (known limitation)
+    // J. Intra-row mutation: set Rate = 0 then divide by Rate
 
     [Fact]
-    public void Check_DivisorIntraRowMutation_KnownLimitation_NoC93()
+    public void Check_DivisorIntraRowMutation_SetZero_EmitsC92()
     {
-        // Slice 11 (sequential assignment flow): set Rate = 0 kills $positive:Rate, so the
-        // subsequent set X = A / Rate correctly emits C93.
+        // Slice 11 (sequential assignment flow): set Rate = 0 injects point interval [0,0].
+        // Subsequent A / Rate sees [0,0] → C92 contradiction (provably zero).
         const string dsl = """
             precept M
             field A as number default 10
@@ -1642,12 +1642,14 @@ public class PreceptTypeCheckerTests
 
         var result = Check(dsl);
 
-        result.Diagnostics.Should().ContainSingle(d => d.Constraint.Id == "C93");
+        result.Diagnostics.Should().ContainSingle(d => d.Constraint.Id == "C92");
     }
 
     [Fact]
-    public void Check_DivisorIntraRowMutation_SetZero_EmitsC93()
+    public void Check_DivisorIntraRowMutation_SetZero_EmitsC92_Duplicate()
     {
+        // Same scenario as Check_DivisorIntraRowMutation_SetZero_EmitsC92: set Rate = 0
+        // injects [0,0] → C92 contradiction.
         const string dsl = """
             precept M
             field A as number default 10
@@ -1660,7 +1662,7 @@ public class PreceptTypeCheckerTests
 
         var result = Check(dsl);
 
-        result.Diagnostics.Should().ContainSingle(d => d.Constraint.Id == "C93");
+        result.Diagnostics.Should().ContainSingle(d => d.Constraint.Id == "C92");
     }
 
     [Fact]
@@ -1720,8 +1722,10 @@ public class PreceptTypeCheckerTests
     }
 
     [Fact]
-    public void Check_DivisorIntraRowMutation_SetCompound_KillsMarkers()
+    public void Check_DivisorIntraRowMutation_SetCompound_KillsMarkers_EmitsC92()
     {
+        // set Rate = D - D: LinearForm normalization yields [0,0], stored as point interval.
+        // Subsequent A / Rate sees [0,0] → C92 contradiction (provably zero).
         const string dsl = """
             precept M
             field A as number default 10
@@ -1735,12 +1739,14 @@ public class PreceptTypeCheckerTests
 
         var result = Check(dsl);
 
-        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C93");
+        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C92");
     }
 
     [Fact]
-    public void Check_DivisorStateAction_SetZero_EmitsC93()
+    public void Check_DivisorStateAction_SetZero_EmitsC92()
     {
+        // set Rate = 0 produces interval [0,0] — provably zero.
+        // A / Rate: AssessDivisorSafety finds [0,0] → Contradiction → C92.
         const string dsl = """
             precept M
             field A as number default 10
@@ -1752,7 +1758,7 @@ public class PreceptTypeCheckerTests
 
         var result = Check(dsl);
 
-        result.Diagnostics.Should().ContainSingle(d => d.Constraint.Id == "C93");
+        result.Diagnostics.Should().ContainSingle(d => d.Constraint.Id == "C92");
     }
 
     [Fact]
@@ -1904,9 +1910,9 @@ public class PreceptTypeCheckerTests
     }
 
     [Fact]
-    public void Check_DivisorCompound_SubtractionSelf_C93()
+    public void Check_DivisorCompound_SubtractionSelf_C92()
     {
-        // D-D: interval [x,x]-[x,x] contains zero.
+        // D-D: LinearForm normalization yields constant 0 → [0,0] → C92 contradiction.
         const string dsl = """
             precept M
             field Y as number default 10
@@ -1918,7 +1924,7 @@ public class PreceptTypeCheckerTests
 
         var result = Check(dsl);
 
-        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C93");
+        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C92");
     }
 
     [Fact]
@@ -2107,10 +2113,10 @@ public class PreceptTypeCheckerTests
     }
 
     [Theory]
-    [InlineData("D - D", "D", "positive")]
-    [InlineData("D * 0", "D", "positive")]
-    [InlineData("abs(D) - abs(D)", "D", "positive")]
-    public void Check_ProvablyZeroDivisors_Theory(string divisorExpr, string fieldName, string constraint)
+    [InlineData("D - D", "D", "positive", "C92")]
+    [InlineData("D * 0", "D", "positive", "C92")]
+    [InlineData("abs(D) - abs(D)", "D", "positive", "C93")]
+    public void Check_ProvablyZeroDivisors_Theory(string divisorExpr, string fieldName, string constraint, string expectedCode)
     {
         var dsl = $"""
             precept M
@@ -2123,7 +2129,7 @@ public class PreceptTypeCheckerTests
 
         var result = Check(dsl);
 
-        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C93");
+        result.Diagnostics.Should().Contain(d => d.Constraint.Id == expectedCode);
     }
 
     // ── Slice 14: Relational inference tests ─────────────────────────────────

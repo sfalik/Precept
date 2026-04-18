@@ -2165,67 +2165,23 @@ internal static class PreceptTypeChecker
                     return false;
                 }
 
-                // SYNC:CONSTRAINT:C92 — literal zero divisor
+                // SYNC:CONSTRAINT:C92 — provably-zero divisor
                 // SYNC:CONSTRAINT:C93 — unproven divisor safety
-                // Principle #8 ("never guess"): C92 is error (literal zero — provably wrong).
+                // Principle #8 ("never guess"): C92 is error (provably zero — contradiction).
                 // C93 is error (unproven divisor — risks IEEE 754 Infinity/NaN at runtime).
-                // Two-tier: C92 = proven contradiction, C93 = unproven nonzero gap.
+                // Unified assessment: C92 = proven contradiction, C93 = unresolved obligation.
                 if (binary.Operator is "/" or "%")
                 {
-                    if (TryGetNumericLiteral(binary.Right, out var divisorValue))
+                    var assessment = AssessDivisorSafety(binary.Right, context);
+                    if (assessment is not null && assessment.Outcome != ProofOutcome.Satisfied)
                     {
-                        if (divisorValue == 0.0)
-                        {
-                            diagnostic = new PreceptValidationDiagnostic(
-                                DiagnosticCatalog.C92,
-                                "Division by zero: the divisor is literal 0.",
-                                0,
-                                Column: binary.Right.Position?.StartColumn ?? 0);
+                        diagnostic = new PreceptValidationDiagnostic(
+                            assessment.DiagnosticCode,
+                            ProofDiagnosticRenderer.Render(assessment),
+                            0,
+                            Column: binary.Right.Position?.StartColumn ?? 0);
+                        if (assessment.Outcome == ProofOutcome.Contradiction)
                             return false;
-                        }
-                        // Non-zero literal — safe, no diagnostic
-                    }
-                    else if (TryGetIdentifierKey(binary.Right, out var key))
-                    {
-                        var keyFlags = context.Flags.TryGetValue(key, out var f) ? f : NumericFlags.None;
-                        if ((keyFlags & (NumericFlags.Nonzero | NumericFlags.Positive)) == 0)
-                        {
-                            var name = key;
-                            if ((keyFlags & NumericFlags.Nonnegative) != 0)
-                            {
-                                // Context-aware: field is nonnegative but not nonzero
-                                diagnostic = new PreceptValidationDiagnostic(
-                                    DiagnosticCatalog.C93,
-                                    $"Divisor '{name}' is nonnegative but not nonzero — 'nonnegative' allows zero. Consider 'positive' instead.",
-                                    0,
-                                    Column: binary.Right.Position?.StartColumn ?? 0);
-                            }
-                            else
-                            {
-                                // Generic: no proof at all
-                                diagnostic = new PreceptValidationDiagnostic(
-                                    DiagnosticCatalog.C93,
-                                    $"Divisor '{name}' has no compile-time nonzero proof. Consider adding a 'positive' constraint, 'rule {name} != 0', or 'when {name} != 0' guard.",
-                                    0,
-                                    Column: binary.Right.Position?.StartColumn ?? 0);
-                            }
-                        }
-                    }
-                    else
-                    {
-                        // Layer 3: interval arithmetic + relational inference via GlobalProofContext.KnowsNonzero.
-                        if (!context.KnowsNonzero(binary.Right))
-                        {
-                            var divisorInterval = context.IntervalOf(binary.Right);
-                            var description = divisorInterval.IsUnknown
-                                ? "Divisor expression has no compile-time nonzero proof."
-                                : $"Divisor expression interval [{divisorInterval.Lower}, {divisorInterval.Upper}] may include zero.";
-                            diagnostic = new PreceptValidationDiagnostic(
-                                DiagnosticCatalog.C93,
-                                $"{description} Consider restructuring into a helper field with a 'positive' constraint or 'rule != 0'.",
-                                0,
-                                Column: binary.Right.Position?.StartColumn ?? 0);
-                        }
                     }
                 }
 
@@ -3028,6 +2984,55 @@ internal static class PreceptTypeChecker
         ">" => "<",
         ">=" => "<=",
         _ => op // == and != are symmetric
+    };
+
+    /// <summary>
+    /// Assesses divisor safety using the unified proof model.
+    /// Returns <c>null</c> when no diagnostic is needed (non-numeric or non-division context).
+    /// </summary>
+    private static ProofAssessment? AssessDivisorSafety(
+        PreceptExpression divisor, GlobalProofContext context)
+    {
+        var interval = context.IntervalOf(divisor);
+        var subject = DescribeExpression(divisor);
+
+        // Provably zero: contradiction → C92
+        if (interval is { Lower: 0, Upper: 0, LowerInclusive: true, UpperInclusive: true })
+            return new ProofAssessment(
+                ProofRequirement.NonzeroDivisor, ProofOutcome.Contradiction,
+                subject, interval, ProofAttribution.None);
+
+        // Provably nonzero via interval: satisfied → no diagnostic
+        if (interval.ExcludesZero)
+            return new ProofAssessment(
+                ProofRequirement.NonzeroDivisor, ProofOutcome.Satisfied,
+                subject, interval, ProofAttribution.None);
+
+        // Flag-based nonzero proof for identifiers: the Nonzero flag (from rule != 0,
+        // when != 0, etc.) cannot be expressed as a single contiguous interval, so
+        // check the flags dictionary directly for identifier expressions.
+        if (TryGetIdentifierKey(divisor, out var key) &&
+            context.Flags.TryGetValue(key, out var flags) &&
+            (flags & (NumericFlags.Nonzero | NumericFlags.Positive)) != 0)
+            return new ProofAssessment(
+                ProofRequirement.NonzeroDivisor, ProofOutcome.Satisfied,
+                subject, interval, ProofAttribution.None);
+
+        // Obligation: zero still possible or unknown → C93
+        return new ProofAssessment(
+            ProofRequirement.NonzeroDivisor, ProofOutcome.Obligation,
+            subject, interval, ProofAttribution.None);
+    }
+
+    /// <summary>
+    /// Returns a human-readable description of an expression for use in diagnostic messages.
+    /// </summary>
+    private static string DescribeExpression(PreceptExpression expr) => expr switch
+    {
+        PreceptLiteralExpression lit => lit.Value?.ToString() ?? "null",
+        PreceptIdentifierExpression id when id.Member is null => id.Name,
+        PreceptIdentifierExpression id => $"{id.Name}.{id.Member}",
+        _ => "expression",
     };
 
     private static bool TryGetNumericLiteral(PreceptExpression expr, out double value)

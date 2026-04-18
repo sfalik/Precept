@@ -377,10 +377,10 @@ public class ProofEngineCompoundDivisorTests
     }
 
     [Fact]
-    public void Check_CompoundDivisor_DDivisorIsAlwaysZero_EmitsC93()
+    public void Check_CompoundDivisor_DDivisorIsAlwaysZero_EmitsC92()
     {
-        // D - D is provably zero: interval arithmetic yields [0,0], which includes zero.
-        // C93 must fire. This tests that the engine does NOT suppress C93 for zero divisors.
+        // D - D is provably zero: interval arithmetic yields [0,0].
+        // AssessDivisorSafety finds [0,0] → Contradiction → C92.
         const string dsl = """
             precept Test
             field D as number default 3 positive
@@ -392,7 +392,7 @@ public class ProofEngineCompoundDivisorTests
 
         var result = Check(dsl);
 
-        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C93");
+        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C92");
     }
 
     [Fact]
