@@ -1509,6 +1509,7 @@ Single quotes win on all three criteria that matter for a DSL: refactoring safet
 | #13 (field-level constraints) | `nullable`, `default`, `nonnegative` architecture. |
 | #106 (division-by-zero unified narrowing) | **Hard dependency for `duration` division.** NodaTime throws `DivideByZeroException` (not IEEE 754 `Infinity`) for `duration / 0` and `duration / Duration.Zero`. The compile-time literal check (C92) and unproven-divisor error (C93) from #106 must ship before or alongside temporal types. Without #106, three division-by-zero paths remain unguarded. |
 | #111 (`nonzero` modifier + C94–C99) | **Hard dependency for `duration / duration` divisor safety.** `nonzero` on duration fields provides the first-class proof source for C93 suppression when a duration is the divisor. Without #111, authors must use verbose `rule ShiftLength != '0 hours'` or `when ShiftLength != '0 hours'` guards. C94 assignment constraint enforcement may extend to temporal types in the future (requires `NumericInterval` for duration/period — deferred). |
+| #118 (type checker decomposition) | Should land before this proposal. #107 adds ~360–540 lines to `TryInferBinaryKind` (temporal operator tables, typed-constant inference, dot-accessor chains including `.inZone(tz)`). #118 plans a `PreceptTypeChecker.DomainTypeInference.cs` 7th partial file as the split point — `TryInferBinaryKind` gains early type-family dispatch ("if either operand is temporal, delegate to `TryInferTemporalBinaryKind`"). Temporal constraint rejection lands in `FieldConstraints.cs`. Temporal desugar (`nonnegative`/`nonzero` on duration) lands in `Narrowing.cs`. |
 
 ---
 
@@ -1561,6 +1562,8 @@ Temporal types are valid as collection inner types where the collection's struct
 - Parse accessors: `.year`, `.month`, `.day`, `.dayOfWeek`, `.hour`, `.minute`, `.second`, `.date`, `.time`, `.datetime`, `.totalHours`, `.totalMinutes`, `.totalSeconds`, `.instant`, `.timezone`, `.years`, `.months`, `.weeks`, `.days`, `.hours`, `.minutes`, `.seconds`, `.hasDateComponent`, `.hasTimeComponent`.
 
 ### Type Checker
+
+> **File placement (#118):** After the type checker decomposition (#118), new temporal type-inference logic (operator tables, typed-constant inference, dot-accessor resolution including `.inZone(tz)`) lands in `PreceptTypeChecker.DomainTypeInference.cs` via type-family dispatch from `TryInferBinaryKind`. Temporal constraint rejection (no `nonnegative` on `date`, etc.) lands in `FieldConstraints.cs`. Duration desugar for `nonnegative`/`nonzero` comparisons against `Duration.Zero` lands in `Narrowing.cs`. See #118's future-proofing analysis for the full per-file growth estimates.
 
 - 8 new type entries.
 - **Period/duration split enforcement:** `date + period ✓`, `date + duration ✗`, `instant + duration ✓`, `instant + period ✗`. Standard type-checking — no custom dispatch.
