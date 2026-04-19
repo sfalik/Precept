@@ -23,13 +23,11 @@ flowchart TD
     src(["📄 .precept"])
 
     subgraph CT["Compile-Time"]
-        direction LR
         P["🔤 Parser"] -->|definition model| TC["🔍 Type Checker"]
         TC <-->|interval queries /\nnarrowing facts| PE["📐 Proof Engine"]
     end
 
     subgraph RT["Run-Time"]
-        direction LR
         ENG["⚙️ Engine  ·  PreceptEngine"]
         I1(["CreateInstance\n→ PreceptInstance"])
         I2(["Inspect\n→ simulate, no commit"])
