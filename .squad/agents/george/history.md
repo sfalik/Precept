@@ -26,6 +26,21 @@
 
 ## Recent Updates
 
+### 2026-04-19 — Diagnostic triage: `assignment-constraints.precept` and `sqrt-safety.precept`
+
+Two `DiagnosticSampleDriftTests` failures were reported at Slice 6 verification time. Independent triage conclusively shows neither is refactor-attributable.
+
+Key findings:
+- Current HEAD (a83956d) passes 1752/1752 — zero drift test failures.
+- MCP compile verification confirms both samples produce exact EXPECT-annotated diagnostics (code, severity, line, column, end column, message all match).
+- Automated bisect across all 6 slice commits shows 8/8 passing at every checkpoint.
+- C94 emission code (both blocks) lives in the **main** `PreceptTypeChecker.cs` and was never moved by any slice — it cannot be refactor-attributable.
+- C76 emission (`AssessNonnegativeArgument`) was extracted byte-for-byte to ProofChecks.cs (Slice 4); its call site extracted byte-for-byte to TypeInference.cs (Slice 5).
+- The Slice 6 history entry claiming "1742/1744 passed, same 2 pre-existing failures confirmed by stash cycle" is contradicted by current evidence. Most likely cause: stale test discovery cache or out-of-sync build artifact at the time of that run.
+- Post-turn edits to PreceptTypeChecker.cs were limited to a 5-line header comment (commit 49e9090, 0 deletions) — incapable of introducing or fixing logical behavior.
+
+Lesson: "stash/test-without-change/stash-pop cycle" for confirming pre-existing failures is unreliable if the failing tests live in committed files that the stash does not touch. An independent git-archive test at the introducing commit (`b686893`) is the correct isolation method.
+
 ### 2026-04-19 — Issue #118 Slice 1 validation (PR #123)
 
 Slice 1 (extract Helpers partial class) was already committed at `032b897` when assigned. Performed independent validation.
