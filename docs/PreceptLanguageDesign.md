@@ -1164,7 +1164,7 @@ The proof engine uses interval arithmetic and relational inference to detect str
 | Condition | Diagnostic | Severity | Message |
 |---|---|---|---|
 | Assignment provably outside target field's constraint range | C94 | Error | `Assignment expression is provably outside the target field's constraint range.` |
-| Rules are contradictory — no value can satisfy both simultaneously | C95 | Warning | `Rules are contradictory — no value can satisfy both simultaneously.` |
+| Rules are contradictory — no value can satisfy both simultaneously | C95 | Error | `Rules are contradictory — no value can satisfy both simultaneously.` |
 | Rule is vacuous — provably always true given field constraints | C96 | Warning | `Rule is vacuous — provably always true given field constraints.` |
 | Guard is dead — provably always false; row/block can never execute | C97 | Warning | `Guard is dead — provably always false; this row/block can never execute.` |
 | Guard is tautological — provably always true; the `when` clause has no effect | C98 | Warning | `Guard is tautological — provably always true; the 'when' clause has no effect.` |
