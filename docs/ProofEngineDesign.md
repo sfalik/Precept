@@ -814,7 +814,7 @@ For the comprehensive enforcement catalog — assignment constraint checking, de
 | Diagnostic | Condition | Severity | Rationale |
 |---|---|---|---|
 | C94 | Assignment always violates constraint | Error | Runtime will always reject — dead code |
-| C95 | Rule always unsatisfiable | Warning | Structural contradiction — author attention needed |
+| C95 | Rule always unsatisfiable | Error | Global integrity failure — nothing works |
 | C96 | Rule always true | Warning | Not harmful, just unnecessary |
 | C97 | Guard always false | Warning | Unreachable code, not harmful |
 | C98 | Guard always true | Warning | Unnecessary condition, not harmful |
@@ -856,7 +856,7 @@ Each proof-backed check produces a `ProofAssessment` with:
 | `Nonnegative` | `Unresolved` (non-negative not proven) | **C76** | Error |
 | `Nonnegative` | `Proven` (interval is non-negative) | — | — |
 | `InConstraintRange` | `Contradiction` (no overlap) | **C94** | Error |
-| `Satisfiable` | `Contradiction` (no overlap) | **C95** | Warning |
+| `Satisfiable` | `Contradiction` (no overlap) | **C95** | Error |
 | `NotVacuous` | `Contradiction` (constraint ⊆ satisfying) | **C96** | Warning |
 | `Reachable` | `Contradiction` (no overlap) | **C97** | Warning |
 | `NotTautological` | `Contradiction` (constraint ⊆ satisfying) | **C98** | Warning |
@@ -1021,7 +1021,7 @@ The engine NEVER fires a diagnostic on code that might be safe at runtime. The r
 | `set Field = expr` (numeric) | Expr interval provably outside field constraint interval | C94 | Error | IntervalOf + containment |
 | `to/from State -> set ...` | Same for state actions | C94 | Error | Same |
 | Computed `field -> expr` | Formula interval provably violates computed field constraint | C94 | Error | Same |
-| `rule expr because "..."` | Rule predicate contradicts field constraints (unsatisfiable) | C95 | Warning | Interval intersection |
+| `rule expr because "..."` | Rule predicate contradicts field constraints (unsatisfiable) | C95 | Error | Interval intersection |
 | `rule expr because "..."` | Rule predicate always true given constraints (vacuous) | C96 | Warning | Interval containment |
 | `when guard` (row/edit/ensure) | Guard provably always false | C97 | Warning | IntervalOf proof evaluation |
 | `when guard` (row/edit/ensure) | Guard provably always true | C98 | Warning | IntervalOf proof evaluation |
@@ -1141,9 +1141,9 @@ static NumericInterval FromConstraints(IReadOnlyList<FieldConstraint> constraint
 | `Field != N` | `(-∞, N) ∪ (N, +∞)` — not representable as single interval; skip |
 
 3. Compute the field's constraint interval from declared constraints only (not from other rules — avoids circularity).
-4. If `!Intersects(satisfyingInterval, constraintInterval)` → **C95 warning**.
+4. If `!Intersects(satisfyingInterval, constraintInterval)` → **C95 error**.
 
-**Severity: Warning.** A contradictory rule means no valid state can satisfy all rules simultaneously. Every mutation will be rejected at runtime. Flagged as a warning (not error) because the contradiction is between authored declarations, not a syntax or type error — the author may be mid-edit or intentionally testing constraint behavior.
+**Severity: Error.** A contradictory rule means no valid state can satisfy all rules simultaneously. Every mutation will be rejected. The precept is structurally broken.
 
 **Example:** `field Score as number min 10` + `rule Score < 5 because "..."`. Constraint `[10, +∞)`, satisfying `(-∞, 5)`, no intersection → C95.
 

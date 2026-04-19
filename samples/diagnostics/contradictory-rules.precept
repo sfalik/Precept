@@ -9,7 +9,8 @@
 #   rule Threshold < 5           → rule requires interval (-∞, 5)
 #   These intervals are disjoint — no value satisfies both.
 #
-# C95 is a WARNING: it flags the logical contradiction so you can fix the rule or the field.
+# C95 is an ERROR: it flags the logical contradiction — the precept is structurally broken
+# because no value can satisfy all rules simultaneously.
 #
 # C29 is an ERROR: it enforces that rules must hold for default field values at compile time.
 # Because no value can satisfy both the constraint and the rule, the default value (10)
@@ -35,6 +36,6 @@ state Review initial
 
 # C95 + C29: Threshold < 5 requires (-∞, 5), but field is constrained to [10, 20].
 # The default value 10 satisfies the field constraint but violates the rule.
-# EXPECT: C95 | severity=warning | contains=contradicts the constraints on
+# EXPECT: C95 | severity=error | contains=contradicts the constraints on
 # EXPECT: C29 | severity=error | contains=is violated by default field values
 rule Threshold < 5 because "Threshold must stay below 5"

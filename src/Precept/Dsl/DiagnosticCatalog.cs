@@ -726,8 +726,7 @@ public static class DiagnosticCatalog
     public static readonly LanguageConstraint C95 = Register(
         "C95", "compile",
         "Rules are contradictory — no value can satisfy both simultaneously.",
-        "{message}",
-        ConstraintSeverity.Warning);
+        "{message}");
 
     /// <summary>Rule is vacuous — provably always true given field constraints.</summary>
     // SYNC:CONSTRAINT:C96
