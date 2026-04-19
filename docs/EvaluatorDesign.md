@@ -14,15 +14,31 @@ Research grounding: [research/language/evaluator-architecture-survey.md](../rese
 
 The expression evaluator is Precept's runtime computation layer. It evaluates every DSL expression — guards, rules, ensures, set assignments, computed fields, and conditional branches — against a live entity instance, producing the values that the runtime engine uses to decide whether a transition commits or rejects.
 
-The evaluator operates over three numeric type families:
+The evaluator operates over five type families:
 
 | Family | C# backing type | Semantics | DSL keyword |
 |--------|-----------------|-----------|-------------|
 | **Integer** | `long` | Discrete, countable, exact over the integers | `integer` |
 | **Decimal** | `decimal` | Exact base-10, closed over exact arithmetic | `decimal` |
 | **Number** | `double` | Approximate IEEE 754 binary64, for inherently inexact operations | `number` |
+| **String** | `string` | Immutable text, ordinal comparison | `string` |
+| **Boolean** | `bool` | Logical truth value | `boolean` |
 
-**The semantic fidelity guarantee:** Every value produced by the evaluator preserves the type identity declared or inferred for it in the DSL. A `decimal` field's value is always a C# `decimal`; it is never silently widened to `double` for comparison, storage, or arithmetic. An integer-shaped surface (`.count`, `.length`) always produces a `long`. The evaluator does not present approximation as exactness — the boundary between exact and approximate lanes is visible, explicit, and enforced at every evaluation point.
+A sixth "type" — **Choice** — is backed by `string` at runtime but carries additional semantics: its value is constrained to a declared member set, and the `ordered` constraint enables declaration-position ordinal comparison.
+
+The evaluator supports the following expression forms:
+
+| Form | Examples |
+|------|----------|
+| **Arithmetic** | `+`, `-`, `*`, `/`, `%` on numeric operands; `+` on strings (concatenation) |
+| **Comparison** | `==`, `!=`, `>`, `>=`, `<`, `<=` — dispatch varies by operand type family |
+| **Logical** | `and`, `or` (short-circuit), `not` (unary) |
+| **Conditional** | `if Condition then ThenBranch else ElseBranch` |
+| **Contains** | `Collection contains Expr` — collection membership test |
+| **Function call** | `abs`, `floor`, `ceil`, `round`, `truncate`, `min`, `max`, `clamp`, `pow`, `sqrt`, `toLower`, `toUpper`, `trim`, `startsWith`, `endsWith`, `left`, `right`, `mid` |
+| **Accessor** | `.count`, `.length`, `.min`, `.max`, `.peek` |
+
+**The semantic fidelity guarantee:** Every value produced by the evaluator preserves the type identity declared or inferred for it in the DSL. A `decimal` field's value is always a C# `decimal`; it is never silently widened to `double` for comparison, storage, or arithmetic. An integer-shaped surface (`.count`, `.length`) always produces a `long`. A `string` function always returns `string` (or `boolean` for predicates). The evaluator does not present approximation as exactness — the boundary between exact and approximate lanes is visible, explicit, and enforced at every evaluation point.
 
 This guarantee is grounded in Precept's philosophy: *"Precept does not present approximation as exactness. If a value or operation is inherently approximate, that fact must be explicit in the contract."*
 
@@ -429,6 +445,225 @@ Collections preserve element type identity through storage, retrieval, compariso
 **CollectionComparer contract:** `CollectionComparer` dispatches comparison by element type. `decimal` elements are compared via `decimal.CompareTo`, never via `double` intermediary. This ensures that `set<decimal>` ordering is exact base-10 — `{0.1m, 0.2m, 0.3m}` sorts correctly without IEEE 754 artifacts.
 
 **`.contains` semantics:** Element lookup uses the same `CollectionComparer`, ensuring that `mySet contains 0.1` (where `mySet` is `set<decimal>`) compares `decimal 0.1m` against `decimal` elements, not `double 0.1` against `double` elements.
+
+---
+
+## String Evaluation Contract
+
+### Backing Type
+
+**`string`** — immutable, UTF-16, ordinal semantics. The evaluator treats string values as opaque character sequences. No locale-aware collation is applied at any evaluation point.
+
+### String Concatenation
+
+The `+` operator is overloaded for strings. When both operands are `string`, `+` produces a new `string` via standard .NET concatenation. Mixed-type concatenation (string + number, string + boolean) is a type error — the evaluator does not implicitly coerce non-string operands to string.
+
+### String Equality
+
+`==` and `!=` on string operands use `Object.Equals`, which for strings performs ordinal (byte-by-byte) comparison. This is case-sensitive: `"Draft" != "draft"`.
+
+String is NOT relationally comparable — `>`, `>=`, `<`, `<=` on string operands are type errors (they fall through to the numeric dispatch path, which fails). Only equality operators are defined for plain strings. Relational comparison on string-backed values is available only for `choice` fields with the `ordered` constraint (see § Choice Evaluation Contract).
+
+### `.length` Accessor
+
+`Field.length` returns the UTF-16 code unit count of the string value. This matches .NET's `string.Length` and is O(1). Characters outside the Basic Multilingual Plane (e.g., emoji) count as 2 code units: `"💀".length == 2`.
+
+The `.length` accessor is also available on event argument dotted forms: `EventName.ArgName.length`.
+
+**Target type:** `long` (integer lane, per DD3). Integer-typed `.length` ensures that downstream expressions like `Name.length >= 2` compare via `long`, and that `left(str, Name.length)` passes an integer argument as required.
+
+**Current violation:** `.length` returns `(double)str.Length` — a `double`-typed value. This places string length in the `number` lane instead of the `integer` lane. The same violation applies to the three-level dotted form (`EventName.ArgName.length`). See Current State Analysis, Critical Finding 8.
+
+### Null Handling
+
+`.length` on a `null` value produces an evaluation error (`"Field.length failed: field is null."`), not a silent `0`. The type checker enforces a null guard for nullable string fields — authors must narrow to non-null before accessing `.length`.
+
+If a string function receives a non-string argument where a string is expected, the evaluator produces an evaluation error (e.g., `"toLower() requires a string argument."`). `null` is not coerced to empty string.
+
+### String Functions
+
+| Function | Signature | Return type | Semantics | Culture/comparison |
+|----------|-----------|-------------|-----------|-------------------|
+| `toLower(string)` | `string → string` | `string` | Lowercase conversion | Invariant culture (`ToLowerInvariant`) |
+| `toUpper(string)` | `string → string` | `string` | Uppercase conversion | Invariant culture (`ToUpperInvariant`) |
+| `trim(string)` | `string → string` | `string` | Remove leading/trailing whitespace | Unicode whitespace (`String.Trim`) |
+| `startsWith(string, string)` | `string, string → boolean` | `bool` | Prefix test | Ordinal comparison (`StringComparison.Ordinal`) |
+| `endsWith(string, string)` | `string, string → boolean` | `bool` | Suffix test | Ordinal comparison (`StringComparison.Ordinal`) |
+| `left(string, integer)` | `string, long → string` | `string` | First N code units | Count clamped to `[0, string.Length]` |
+| `right(string, integer)` | `string, long → string` | `string` | Last N code units | Count clamped to `[0, string.Length]` |
+| `mid(string, integer, integer)` | `string, long, long → string` | `string` | Substring from 1-based start, length N | Start and length clamped; out-of-range start returns `""` |
+
+**Culture determinism:** `toLower` and `toUpper` use invariant culture to ensure deterministic results across platforms. No locale-sensitive casing is performed. `startsWith` and `endsWith` use ordinal comparison — no Unicode normalization, no locale-dependent collation.
+
+**`mid` indexing:** The `start` parameter is **1-based** (first character is position 1). Internally, the evaluator subtracts 1 to convert to the 0-based .NET index.
+
+### String Slicing Parameter Type Contract
+
+`left`, `right`, and `mid` count/start/length parameters require `integer` (per DD3). Authors with `number`-typed values must explicitly convert via `floor()`, `ceil()`, or `truncate()` before passing them as slicing parameters.
+
+**Current violation:** `left()`, `right()`, and `mid()` accept any numeric type via `TryToNumber`, then silently truncate to `int` via `(int)countNum`. A call `left(Name, 3.7)` silently becomes `left(Name, 3)` — the fractional part is discarded without warning. See Current State Analysis, Critical Finding 10.
+
+### `contains` on Strings
+
+The `contains` operator is NOT supported for substring testing on strings. `contains` is defined only for collection membership (see § Contains Operator). Substring testing uses `startsWith` and `endsWith`. This is a deliberate surface constraint — a `contains` function for substring search may be added in a future language revision but is not part of the current contract.
+
+---
+
+## Boolean Evaluation Contract
+
+### Backing Type
+
+**`bool`** — C# `System.Boolean`. Boolean values are `true` or `false`. There is no truthy/falsy coercion — the evaluator does not treat `0`, `""`, or `null` as boolean.
+
+### Logical Operators
+
+| Operator | Form | Semantics |
+|----------|------|-----------|
+| `and` | `Expr and Expr` | Short-circuit conjunction. Evaluates the left operand first; if `false`, returns `false` without evaluating the right operand. Both operands must be `bool` — non-boolean produces an evaluation error. |
+| `or` | `Expr or Expr` | Short-circuit disjunction. Evaluates the left operand first; if `true`, returns `true` without evaluating the right operand. Both operands must be `bool`. |
+| `not` | `not Expr` | Unary negation. The operand must be `bool`. Returns the logical complement. |
+
+**Short-circuit guarantee:** `and` and `or` are evaluated lazily. The right operand is evaluated only if the left operand does not determine the result. This is semantically significant — a right-side expression that would produce an evaluation error is never reached if the left side short-circuits. This enables guard patterns like `Name != null and Name.length >= 2`.
+
+### Equality
+
+`==` and `!=` on boolean operands use `Object.Equals`. `true == true` is `true`; `true == false` is `false`.
+
+### Relational Operators
+
+Boolean is NOT comparable. `>`, `>=`, `<`, `<=` on boolean operands are type errors. The evaluator's comparison dispatch first checks for `long`, then attempts `TryToNumber` (which does not accept `bool`), then checks for ordered choice — boolean matches none of these, producing an evaluation error.
+
+### Where Booleans Appear
+
+Boolean values are the result type for:
+- Guard conditions (`when` clauses in transition rows)
+- `if` conditions in conditional expressions
+- `rule` and `ensure` constraint expressions
+- Comparison operators (`==`, `!=`, `>`, `>=`, `<`, `<=`) — all return `bool`
+- Logical operators (`and`, `or`, `not`) — all return `bool`
+- `contains` operator — returns `bool`
+- `startsWith` and `endsWith` functions — return `bool`
+
+Boolean values are NOT valid operands for:
+- Arithmetic operators (`+`, `-`, `*`, `/`, `%`) — type error
+- String concatenation — type error (no implicit `ToString`)
+- Numeric functions (`abs`, `floor`, `round`, etc.) — type error
+
+---
+
+## Choice Evaluation Contract
+
+### Backing Type
+
+**`string`** — choice values are stored as `string` at runtime. The `choice("A", "B", "C")` declaration constrains the value to a member of the declared set, but the underlying representation is a plain string. This means choice fields participate in string-typed storage, serialization, and collection membership — but they carry additional semantics that the evaluator enforces.
+
+### Equality
+
+`==` and `!=` on choice values use `Object.Equals`, which for the `string` backing type performs ordinal (case-sensitive) comparison. `"Draft" != "draft"`.
+
+Choice equality does not require the `ordered` constraint — all choice fields support `==` and `!=` regardless of ordering.
+
+### Ordered Choice Comparison
+
+Relational operators (`>`, `>=`, `<`, `<=`) are valid on choice fields **only** when the field carries the `ordered` constraint. Comparison uses declaration-position ordinal index from the field's `ChoiceValues` list.
+
+**Mechanism:** When the evaluator encounters a relational operator and both operands are `string`, it calls `TryGetChoiceOrdinals` to attempt ordered choice resolution:
+
+1. The left-side expression must be a `PreceptIdentifierExpression` (a simple identifier, not a dotted form).
+2. The identifier must resolve to a `PreceptField` in the `fieldContracts` dictionary.
+3. The field must have `Type == PreceptScalarType.Choice` and `IsOrdered == true`.
+4. The field must have a non-empty `ChoiceValues` list.
+5. Both the left and right operand values (as strings) are looked up in the `ChoiceValues` list by ordinal (`StringComparison.Ordinal`) to find their position indices.
+6. The position indices are compared using the requested relational operator.
+
+**Example:** Given `field Priority as choice("low", "medium", "high") ordered`, the ordinal positions are: `"low"` → 0, `"medium"` → 1, `"high"` → 2. The expression `Priority > "low"` evaluates to `true` when `Priority` is `"medium"` or `"high"`.
+
+### Error Cases
+
+- **Value not in ordered set:** If either operand's string value is not found in the `ChoiceValues` list, the evaluator produces an evaluation error: `"'value' is not a member of the ordered choice set."` This is a hard error, not a silent `false`.
+- **Unordered choice with relational operator:** If the field lacks the `ordered` constraint, `TryGetChoiceOrdinals` returns `false`, and the evaluator falls through to the numeric comparison path, which fails with `"operator '>' requires numeric operands."` The type checker prevents this at compile time, but the evaluator enforces it as a safety net.
+- **Cross-field ordered comparison:** Ordinal rank is field-local. Comparing two different ordered choice fields is meaningless because their orderings are independent.
+
+### Arithmetic on Choice
+
+Choice values are NOT numeric. Arithmetic operators (`+`, `-`, `*`, `/`, `%`) on choice values are type errors — the string backing does not participate in numeric dispatch, and string `+` requires both operands to be `string` (which choice values satisfy syntactically, but the type checker rejects arithmetic on choice-typed fields at compile time).
+
+### Choice in Collections
+
+Choice values in `set<choice(...)>` collections are stored as `string` and compared via ordinal string comparison (not declaration-position ordering). The `ordered` constraint affects only relational operator evaluation, not collection sort order.
+
+---
+
+## Conditional Expression Evaluation
+
+### Evaluation Model
+
+Conditional expressions follow the form:
+
+```
+if Condition then ThenBranch else ElseBranch
+```
+
+The evaluator processes a conditional expression in three steps:
+
+1. **Evaluate the condition.** The `Condition` sub-expression is evaluated. If evaluation fails, the error propagates immediately.
+2. **Type-check the condition result.** The result must be `bool`. If the condition evaluates to a non-boolean value, the evaluator produces an evaluation error: `"conditional expression condition must be a boolean."` There is no truthy/falsy coercion.
+3. **Evaluate the selected branch.** If the condition is `true`, only `ThenBranch` is evaluated. If `false`, only `ElseBranch` is evaluated. The unselected branch is never evaluated — this is a short-circuit guarantee, not an optimization.
+
+### Return Type
+
+The return type of a conditional expression is the type of the selected branch. The `ThenBranch` and `ElseBranch` may have different types — the type checker validates compatibility at compile time (both branches must be assignable to the target context's type), but the evaluator returns whichever branch's result is produced at runtime without further coercion.
+
+### Nesting
+
+Conditional expressions nest arbitrarily. The `ThenBranch` or `ElseBranch` may itself be a conditional expression:
+
+```
+if Score >= 90 then "high" else if Score >= 50 then "medium" else "low"
+```
+
+Each nested conditional follows the same three-step evaluation model. Nesting depth is limited only by the expression AST — there is no artificial depth limit.
+
+### Short-Circuit Significance
+
+The short-circuit guarantee is semantically meaningful, not just a performance concern. An expression like:
+
+```
+if Count > 0 then Total / Count else 0
+```
+
+relies on the `else` branch NOT evaluating `Total / Count` when `Count` is 0. The evaluator guarantees this — a division-by-zero error is never produced when the condition directs evaluation to the safe branch.
+
+### Field Contracts Propagation
+
+The `fieldContracts` dictionary is propagated through conditional expression evaluation. Both branches have access to field contracts for ordered choice resolution and other contract-dependent evaluation (see § Choice Evaluation Contract).
+
+---
+
+## Contains Operator
+
+### Collection `contains`
+
+The `contains` operator tests collection membership. Its evaluation follows a strict structural contract:
+
+1. **Left side must be a collection identifier.** The left operand must be a `PreceptIdentifierExpression` with no member accessor (no dotted form). If the left side is not a simple identifier, the evaluator produces an error: `"'contains' requires a collection field on the left side."`
+2. **Left side must resolve to a `CollectionValue`.** The identifier is looked up in the context via the `__collection__` key prefix. If no collection is found, the evaluator produces an error: `"'<name>' is not a collection field."`
+3. **Right side is any expression.** The right operand is evaluated as a normal expression. If evaluation fails, the error propagates.
+4. **Membership test.** The evaluated right-side value is tested against the collection via `CollectionValue.Contains()`, which delegates to `CollectionComparer` for type-aware comparison.
+
+**Return type:** `bool` — `true` if the collection contains the value, `false` otherwise.
+
+### Comparison Semantics
+
+`CollectionValue.Contains()` normalizes the test value through `NormalizeValue` and compares using `CollectionComparer`, which dispatches by element type. For element comparison semantics per collection inner type, see § Collection Storage Contract.
+
+**Current violation:** `NormalizeValue` converts all numerics to `double` via `Convert.ToDouble`. This means `set<decimal> contains 0.1` compares `double 0.1` against `double`-stored elements, not `decimal 0.1m` against `decimal` elements. See Current State Analysis, Critical Finding 7.
+
+### String `contains` (NOT Supported)
+
+The `contains` operator is defined **only** for collection membership. It is NOT available as a substring test on string values. An expression like `Name contains "smith"` where `Name` is a `string` field will fail: the evaluator checks for a collection on the left side, finds none, and produces an error.
+
+Substring testing is supported via `startsWith(str, prefix)` and `endsWith(str, suffix)`. A dedicated substring `contains` function is not part of the current language surface.
 
 ---
 
