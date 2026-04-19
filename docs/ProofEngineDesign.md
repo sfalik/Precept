@@ -322,8 +322,8 @@ internal readonly record struct NumericInterval(
 | `Floor([a,b])` | `[⌊a⌋, ⌊b⌋]` with both bounds inclusive. Sound but may over-approximate — integer results always land on or inside the floored bounds. |
 | `Ceil([a,b])` | `[⌈a⌉, ⌈b⌉]` with both bounds inclusive. Same conservative inclusivity as `Floor`. |
 | `Round([a,b])` | `[⌊a⌋, ⌈b⌉]` with both bounds inclusive. Widest safe approximation — `round` can go either direction. |
-| `Truncate([a,b])` | `[truncate(a), truncate(b)]` with both bounds inclusive. Truncation toward zero: positive values floor, negative values ceil. **Currently missing — falls to `Unknown`.** |
-| `Pow([a,b], [c,d])` | When exponent is a constant even integer and base is nonneg: `[a^c, b^c]`. When exponent is constant `2`: nonneg base → `[a², b²]`, nonpositive base → `[b², a²]`, mixed → `[0, max(a², b²)]`. **Currently missing — falls to `Unknown`.** |
+| `Truncate([a,b])` | Truncation toward zero: positive values floor, negative values ceil. `tLo = a >= 0 ? floor(a) : ceil(a)`, `tHi = b >= 0 ? floor(b) : ceil(b)`, result `[min(tLo,tHi), max(tLo,tHi)]` with both bounds inclusive. Returns `Unknown` when `IsUnknown`. |
+| `Pow([a,b], [c,d])` | When exponent is a constant integer: even exponent on nonneg base → `[a^n, b^n]`; even exponent on nonpositive base → `[b^n, a^n]`; even exponent on mixed base → `[0, max(a^n, b^n)]` (lower inclusive when base can be zero and base lacks the Nonzero/Positive flag). Non-integer or non-constant exponent → `Unknown`. |
 | `Hull([a,b], [c,d])` | `[min(a,c), max(b,d)]` — join for conditional expression synthesis. **Inclusivity for equal bounds:** when both lower bounds are equal, `LowerInclusive = a.LowerInclusive \|\| b.LowerInclusive`; likewise when both upper bounds are equal, `UpperInclusive = a.UpperInclusive \|\| b.UpperInclusive`. *(Covered by existing `NumericIntervalTests.cs` Hull tests — no new test obligation.)* |
 
 **Multiply sign-case decomposition:** Naive four-corner multiplication (`min/max` of `{a*c, a*d, b*c, b*d}`) produces `NaN` when an endpoint is zero and the other is `±∞` (because `0 × ∞` is undefined in IEEE 754). The implementation decomposes by sign combination to avoid `0 × ∞`:
@@ -649,7 +649,7 @@ Each pattern below is expressible in the DSL but the proof engine cannot prove i
 | 16 | `Y / (A % B)` where `A` and `B` are positive | `A % B` can be zero even when both operands are positive (`6 % 3 = 0`). **Correctly rejected.** | `(A % B) + 1` is provably positive via interval arithmetic `[0, ∞) + 1 = [1, ∞)`. Validated. |
 | 17 | `rule A > B`, `rule B > A` (self-contradiction) then `Y / (A - B)` | Cycle detected, derived fact silently dropped, C93 emitted | Fix the rules — they are inconsistent. No valid concrete state can satisfy both. |
 | 18 | `Y / (k*A - k*B)` with `rule A > B` and constant `k > 0` | Scalar multiple of a stored relational fact | *(works — no workaround needed. Scalar-multiple GCD normalization reduces `+k·A + (-k)·B` to `+1·A + (-1)·B` before relational lookup.)* |
-| 19 | `Y / (pow(A - B, 2))` or `Y / truncate(X)` with relevant rules | `pow` and `truncate` are built-in functions opaque to LinearForm | Promote to intermediate: `set Sq = pow(A - B, 2)` with `field Sq as number positive`, then divide by `Sq`. |
+| 19 | `Y / (pow(A - B, 2))` where `A > B` | `pow` and `truncate` contribute via `NumericInterval` interval arithmetic (not LinearForm normalization), so the interval result propagates directly. `pow(A-B, 2)` where `A-B ∈ (0,+∞)` yields `(0,+∞)` — no C93. `truncate(X)` where `X has min 1` yields `[1,+∞)` — no C93. The limitation applies only when the *argument* is itself not provable, not to the function call per se. | Ensure the argument interval excludes zero before the function call. No workaround needed when the argument is provably positive. |
 
 **Unsupported categories summary:**
 1. **Non-linear expressions** (rows 1, 4, 5) → hoist into intermediate fields with global `rule` constraints.

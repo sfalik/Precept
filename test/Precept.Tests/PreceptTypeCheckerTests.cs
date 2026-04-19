@@ -191,7 +191,9 @@ public class PreceptTypeCheckerTests
             """;
         var result = Check(dsl);
         // Should warn for state A (no ensure) but not state B
-        result.Diagnostics.Where(d => d.Constraint.Id == "C93").Should().ContainSingle();
+        var c93 = result.Diagnostics.Where(d => d.Constraint.Id == "C93").Should().ContainSingle().Subject;
+        c93.StateContext.Should().Be("A",
+            "state A has no divisor proof — C93 must be attributed to the state where the divisor is unproven, not the state with the ensure");
     }
 
     [Fact]
