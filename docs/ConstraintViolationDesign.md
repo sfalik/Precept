@@ -196,21 +196,21 @@ for each violation:
 
 ### Compile-time subject extraction
 
-At compile time, walk each constraint's expression AST to record two layers of subject data: the direct subjects named by the expression itself, and the expanded subjects produced by walking any referenced computed fields through the computed-field dependency graph.
+At compile time, walk each constraint's expression AST to extract referenced identifiers.
 
 ```csharp
 public sealed record ExpressionSubjects(
-    IReadOnlyList<string> DirectFieldReferences,
-    IReadOnlyList<string> ExpandedFieldReferences,
+    IReadOnlyList<string> FieldReferences,
     IReadOnlyList<(string Event, string Arg)> ArgReferences);
 ```
 
-- `PreceptIdentifierExpression` with no dot in field scope → direct field reference.
+- `PreceptIdentifierExpression` with no dot in field scope → field reference.
 - `PreceptIdentifierExpression` with no dot in event-ensure scope → event arg reference for that event.
 - `PreceptIdentifierExpression` with dot (`Event.Arg`) → explicit event arg reference.
-- Any directly referenced computed field contributes itself to the direct subject set and contributes its full transitive stored-field dependency closure to the expanded field set.
 
-This is computed once in `PreceptCompiler` and stored alongside each rule, state ensure, event ensure, and transition row's `WhenGuard`. At inspect time, the runtime looks up the precomputed subjects and returns a de-duplicated union of direct and expanded subjects in stable dependency order, then appends the scope target — no expression re-parsing needed.
+This is computed once in `PreceptCompiler` and stored alongside each rule, state ensure, event ensure, and transition row's `WhenGuard`. At inspect time, the runtime looks up the precomputed subjects and appends the scope target — no expression re-parsing needed.
+
+> **Future:** Transitive expansion of computed-field references into their underlying stored-field dependencies is described in Design Principles §1 but not yet implemented. When implemented, `ExpressionSubjects` will gain a separate `ExpandedFieldReferences` property.
 
 ### Outcome enums
 
@@ -219,15 +219,15 @@ Two separate enums for the two operation paths, with `IsSuccess` on result types
 ```csharp
 public enum TransitionOutcome
 {
-    // Success
-    Transition,              // state A → state B
-    NoTransition,            // event processed, no state change
-
     // Failure
+    Undefined,               // no rows exist for this event/state
+    Unmatched,               // rows exist but no guard matched
     Rejected,                // author's explicit reject
     ConstraintFailure,       // constraints failed post-mutation
-    Unmatched,               // rows exist but no guard matched
-    Undefined                // no rows exist for this event/state
+
+    // Success
+    Transition,              // state A → state B
+    NoTransition             // event processed, no state change
 }
 
 public enum UpdateOutcome
@@ -236,8 +236,8 @@ public enum UpdateOutcome
     Update,                  // field edit succeeded
 
     // Failure
-    ConstraintFailure,       // constraints failed post-edit
     UneditableField,         // field not editable in current state
+    ConstraintFailure,       // constraints failed post-edit
     InvalidInput             // wrong type, unknown field, etc.
 }
 ```
@@ -249,7 +249,7 @@ All result types carry `IReadOnlyList<ConstraintViolation> Violations` (replacin
 ```csharp
 public sealed record FireResult(
     TransitionOutcome Outcome,
-    string PreviousState,
+    string? PreviousState,
     string EventName,
     string? NewState,
     IReadOnlyList<ConstraintViolation> Violations,
@@ -261,7 +261,7 @@ public sealed record FireResult(
 
 public sealed record EventInspectionResult(
     TransitionOutcome Outcome,
-    string CurrentState,
+    string? CurrentState,
     string EventName,
     string? TargetState,
     IReadOnlyList<string> RequiredEventArgumentKeys,
@@ -272,7 +272,7 @@ public sealed record EventInspectionResult(
 }
 
 public sealed record InspectionResult(
-    string CurrentState,
+    string? CurrentState,
     IReadOnlyDictionary<string, object?> InstanceData,
     IReadOnlyList<EventInspectionResult> Events,
     IReadOnlyList<PreceptEditableFieldInfo>? EditableFields = null);
@@ -290,15 +290,15 @@ public sealed record UpdateResult(
 
 ### Naming conventions
 
-**Prefix rule (middle-ground):** Keep `Precept` on types whose bare name is too generic for C# (`PreceptField`, `PreceptState`, `PreceptEvent`, `PreceptInstance`, `PreceptDefinition`, `PreceptRuntime`, `PreceptEngine`, `PreceptCompiler`, `PreceptRule`, `PreceptTransitionRow`, `PreceptEditableFieldInfo`). Drop it on domain-specific types (`FireResult`, `EventInspectionResult`, `ConstraintViolation`, `TransitionOutcome`, `EnsureAnchor`, etc.).
+**Prefix rule (middle-ground):** Keep `Precept` on types whose bare name is too generic for C# (`PreceptField`, `PreceptState`, `PreceptEvent`, `PreceptInstance`, `PreceptDefinition`, `PreceptEngine`, `PreceptCompiler`, `PreceptRule`, `PreceptTransitionRow`, `PreceptEditableFieldInfo`). Drop it on domain-specific types (`FireResult`, `EventInspectionResult`, `ConstraintViolation`, `TransitionOutcome`, `EnsureAnchor`, etc.).
 
 **Model type renames:**
 - `PreceptStateAssert` → `StateEnsure` *(done)*
 - `PreceptEventAssert` → `EventEnsure` *(done)*
 - `PreceptAssertPreposition` → `EnsureAnchor` (members: `In`, `To`, `From`) *(done)*
-- `PreceptRejection` → `Rejection`
-- `PreceptStateTransition` → `StateTransition`
-- `PreceptNoTransition` → `NoTransition`
+- `PreceptRejection` → `Rejection` *(done)*
+- `PreceptStateTransition` → `StateTransition` *(done)*
+- `PreceptNoTransition` → `NoTransition` *(done)*
 
 **Compile-time vs runtime vocabulary:**
 - "Constraints" = runtime data rules (rules, ensures, rejections) that produce `ConstraintViolation`
@@ -627,7 +627,7 @@ Three approaches were evaluated:
 2. **Prefix nothing** — clean but risks collision with common C# types (`Field`, `State`, `Event`, `Instance`)
 3. **Middle-ground** — keep `Precept` on types whose bare names are too generic for C#; drop it on domain-specific types
 
-The middle-ground was chosen. Types that keep `Precept`: `PreceptField`, `PreceptState`, `PreceptEvent`, `PreceptInstance`, `PreceptDefinition`, `PreceptRuntime`, `PreceptEngine`, `PreceptCompiler`, `PreceptRule`, `PreceptTransitionRow`, `PreceptEditableFieldInfo`. Types that drop it: `FireResult`, `EventInspectionResult`, `ConstraintViolation`, `TransitionOutcome`, `EnsureAnchor`, `StateEnsure`, `EventEnsure`, `Rejection`, `StateTransition`, `NoTransition`, `ValidationResult`, etc.
+The middle-ground was chosen. Types that keep `Precept`: `PreceptField`, `PreceptState`, `PreceptEvent`, `PreceptInstance`, `PreceptDefinition`, `PreceptEngine`, `PreceptCompiler`, `PreceptRule`, `PreceptTransitionRow`, `PreceptEditableFieldInfo`. Types that drop it: `FireResult`, `EventInspectionResult`, `ConstraintViolation`, `TransitionOutcome`, `EnsureAnchor`, `StateEnsure`, `EventEnsure`, `Rejection`, `StateTransition`, `NoTransition`, `ValidationResult`, etc.
 
 ---
 
@@ -650,7 +650,7 @@ Compile-phase and parse-phase diagnostics (DSL validity checks) use a separate v
 | C75 / PRECEPT075 | compile | Error | `pow()` exponent must be integer type. The second argument to `pow(base, exponent)` must resolve to `integer`, not `number` or `decimal`. This ensures totality — integer exponentiation always produces a finite result. |
 | C76 / PRECEPT076 | compile | Error | `sqrt()` requires a non-negative argument. The argument may be negative at runtime. Proof sources: `nonnegative` or `positive` constraint, `rule Field >= 0`, state/event `ensure`, or `when` guard with `>= 0`. Also accepted: literal values ≥ 0 and `abs()` results. |
 | C77 / PRECEPT077 | compile | Error | Function does not accept nullable arguments. The argument may be null at runtime. Add a null check (e.g., `field != null and ...`) before calling the function. Same pattern as C56 for string `.length`. |
-| C78 / PRECEPT078 | compile | Error | Conditional expression condition must be a boolean expression. The `if` clause evaluates to a non-boolean type. |
+| C78 / PRECEPT078 | compile | Error | Conditional expression condition must be a non-nullable boolean. The `if` clause evaluates to a non-boolean type. |
 | C79 / PRECEPT079 | compile | Error | Conditional expression branches must produce the same scalar type. The `then` and `else` branches return different types. |
 | C80 / PRECEPT080 | parse | Error | A field cannot have both a default value and a derived expression. Use `default` for user-set fields or `->` for computed fields, not both. |
 | C81 / PRECEPT081 | parse | Error | A nullable field cannot have a derived expression. Computed fields always produce a value and cannot be nullable. |
@@ -664,7 +664,7 @@ Compile-phase and parse-phase diagnostics (DSL validity checks) use a separate v
 | C92 / PRECEPT092 | compile | Error | Division by zero — proved dangerous. The proof engine evaluates `IntervalOf(divisor)` and determines the divisor is provably always zero (e.g., literal `0`, or a field/expression whose interval collapses to `[0, 0]`). This is an unconditional error — the author must fix the expression. |
 | C93 / PRECEPT093 | compile | Error | Divisor safety unresolved — the proof engine cannot prove the divisor is nonzero. `IntervalOf(divisor)` returns an interval that does not exclude zero, or `Unknown`. Three context-aware message variants: (1) field is `nonnegative` but not `nonzero` — explains that `nonnegative` allows zero and suggests `positive` instead; (2) simple identifier with no proof — suggests adding a `positive` constraint, `rule Field != 0`, or `when Field != 0` guard; (3) compound expression — reports the proven interval if available. The author must supply additional constraints to help the compiler prove nonzero. See [ProofEngineDesign.md](ProofEngineDesign.md) § IntervalOf query dispatch order and § Assessment Model. |
 | C94 / PRECEPT094 | compile | Error | Assignment violates field constraint — proved dangerous. The proof engine evaluates `IntervalOf(rhs)` for a `set` assignment and determines the result interval has NO overlap with the target field's constraint interval (e.g., `set Score = Score + 200` where `Score max 100` produces an interval entirely above 100). Fires only on proven contradiction — partial overlap produces no diagnostic (the runtime catches actual violations). See [ProofEngineDesign.md](ProofEngineDesign.md) § Comprehensive Enforcement. |
-| C95 / PRECEPT095 | compile | Error | Contradictory rule — proved dangerous. The proof engine determines a `rule` declaration is always unsatisfiable given other rules and field constraints (e.g., `rule Rate > 100` with `Rate max 50`). This is a global integrity failure. Analyzes simple single-field comparisons (`Field <op> Literal`). See [ProofEngineDesign.md](ProofEngineDesign.md) § Comprehensive Enforcement. |
+| C95 / PRECEPT095 | compile | Warning | Contradictory rule — proved unsatisfiable. The proof engine determines a `rule` declaration is always unsatisfiable given other rules and field constraints (e.g., `rule Rate > 100` with `Rate max 50`). Analyzes simple single-field comparisons (`Field <op> Literal`). See [ProofEngineDesign.md](ProofEngineDesign.md) § Comprehensive Enforcement. |
 | C96 / PRECEPT096 | compile | Warning | Vacuous rule — proved redundant. The proof engine determines a `rule` declaration is always true given field constraints (e.g., `rule Rate >= 0` when `Rate` is `nonnegative`). Not harmful, but indicates unnecessary code. Analyzes simple single-field comparisons. See [ProofEngineDesign.md](ProofEngineDesign.md) § Comprehensive Enforcement. |
 | C97 / PRECEPT097 | compile | Warning | Dead guard — proved unreachable. The proof engine determines a `when` guard condition is always false given the proof state at that point (e.g., `when Rate < 0` when `Rate` is `positive`). The guarded transition row is unreachable. Analyzes simple single-field comparisons. See [ProofEngineDesign.md](ProofEngineDesign.md) § Comprehensive Enforcement. |
 | C98 / PRECEPT098 | compile | Warning | Vacuous guard — proved unnecessary. The proof engine determines a `when` guard condition is always true given the proof state (e.g., `when Rate > 0` when `Rate` is `positive`). The guard adds no filtering. Analyzes simple single-field comparisons. See [ProofEngineDesign.md](ProofEngineDesign.md) § Comprehensive Enforcement. |

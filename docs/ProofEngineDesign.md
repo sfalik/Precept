@@ -2,7 +2,7 @@
 
 Date: 2026-04-18
 
-Status: **Target State** — Implementation in progress (PR #108). Core engine shipped (Commits 1–6). Typed stores, scope split, full proof-diagnostic family, assessment model, hover integration, and MCP proof key pending (Commits 7–15).
+Status: **Implemented** — Core engine and all four implementation waves shipped in PR #108. Coefficient guard soundness fix, ProofResult with real ProofAttribution, natural-language interval formatting, hover expansion (field declarations and rule/when keywords), assessment-driven code action structured metadata, MCP structured proof output, and 22 MCP proof tests all landed. Deferred items: full expression-level hover for compound sub-expressions, per-event proof scoping (Events DTO field always null — schema ready), and ensure keyword hover.
 
 > **C99 (cross-event field invariant analysis)** is out of scope for this document. It requires fixed-point iteration, breaking the single-pass guarantee, and is tracked separately as issue #117.
 
@@ -814,7 +814,7 @@ For the comprehensive enforcement catalog — assignment constraint checking, de
 | Diagnostic | Condition | Severity | Rationale |
 |---|---|---|---|
 | C94 | Assignment always violates constraint | Error | Runtime will always reject — dead code |
-| C95 | Rule always unsatisfiable | Error | Global integrity failure — nothing works |
+| C95 | Rule always unsatisfiable | Warning | Structural contradiction — author attention needed |
 | C96 | Rule always true | Warning | Not harmful, just unnecessary |
 | C97 | Guard always false | Warning | Unreachable code, not harmful |
 | C98 | Guard always true | Warning | Unnecessary condition, not harmful |
@@ -856,7 +856,7 @@ Each proof-backed check produces a `ProofAssessment` with:
 | `Nonnegative` | `Unresolved` (non-negative not proven) | **C76** | Error |
 | `Nonnegative` | `Proven` (interval is non-negative) | — | — |
 | `InConstraintRange` | `Contradiction` (no overlap) | **C94** | Error |
-| `Satisfiable` | `Contradiction` (no overlap) | **C95** | Error |
+| `Satisfiable` | `Contradiction` (no overlap) | **C95** | Warning |
 | `NotVacuous` | `Contradiction` (constraint ⊆ satisfying) | **C96** | Warning |
 | `Reachable` | `Contradiction` (no overlap) | **C97** | Warning |
 | `NotTautological` | `Contradiction` (constraint ⊆ satisfying) | **C98** | Warning |
@@ -1021,7 +1021,7 @@ The engine NEVER fires a diagnostic on code that might be safe at runtime. The r
 | `set Field = expr` (numeric) | Expr interval provably outside field constraint interval | C94 | Error | IntervalOf + containment |
 | `to/from State -> set ...` | Same for state actions | C94 | Error | Same |
 | Computed `field -> expr` | Formula interval provably violates computed field constraint | C94 | Error | Same |
-| `rule expr because "..."` | Rule predicate contradicts field constraints (unsatisfiable) | C95 | Error | Interval intersection |
+| `rule expr because "..."` | Rule predicate contradicts field constraints (unsatisfiable) | C95 | Warning | Interval intersection |
 | `rule expr because "..."` | Rule predicate always true given constraints (vacuous) | C96 | Warning | Interval containment |
 | `when guard` (row/edit/ensure) | Guard provably always false | C97 | Warning | IntervalOf proof evaluation |
 | `when guard` (row/edit/ensure) | Guard provably always true | C98 | Warning | IntervalOf proof evaluation |
@@ -1141,9 +1141,9 @@ static NumericInterval FromConstraints(IReadOnlyList<FieldConstraint> constraint
 | `Field != N` | `(-∞, N) ∪ (N, +∞)` — not representable as single interval; skip |
 
 3. Compute the field's constraint interval from declared constraints only (not from other rules — avoids circularity).
-4. If `!Intersects(satisfyingInterval, constraintInterval)` → **C95 error**.
+4. If `!Intersects(satisfyingInterval, constraintInterval)` → **C95 warning**.
 
-**Severity: Error.** A contradictory rule means no valid state can satisfy all rules simultaneously. Every mutation will be rejected. The precept is structurally broken.
+**Severity: Warning.** A contradictory rule means no valid state can satisfy all rules simultaneously. Every mutation will be rejected at runtime. Flagged as a warning (not error) because the contradiction is between authored declarations, not a syntax or type error — the author may be mid-edit or intentionally testing constraint behavior.
 
 **Example:** `field Score as number min 10` + `rule Score < 5 because "..."`. Constraint `[10, +∞)`, satisfying `(-∞, 5)`, no intersection → C95.
 
@@ -1157,12 +1157,10 @@ static NumericInterval FromConstraints(IReadOnlyList<FieldConstraint> constraint
 
 | Test | Verifies |
 |---|---|
-| `Check_C95_MinVsLessThan_Error` | `min 10` + `rule X < 5` |
-| `Check_C95_PositiveVsLteZero_Error` | `positive` + `rule X <= 0` |
-| `Check_C95_MaxVsGreaterThan_Error` | `max 100` + `rule X > 100` |
-| `Check_C95_MinMaxVsOutOfRange_Error` | `min 0 max 100` + `rule X > 200` |
-| `Check_C95_CrossFieldRule_NoDiagnostic` | `rule A > B` → no diagnostic (cross-field) |
-| `Check_C95_SyntheticRule_Excluded` | Synthetic rule from constraint → no C95 |
+| `Check_C95_ContradictoryRule_EmitsC95` | Contradictory rule emits C95 warning |
+| `Check_C95_SatisfiableRule_NoC95` | Satisfiable rule emits no diagnostic |
+| `Check_C95_RuleAtExactBoundary_NoC95` | Rule at exact boundary emits no diagnostic |
+| `Check_C95_LiteralOnLeftSide_EmitsC95` | Literal-on-left contradictory rule emits C95 |
 
 ### C96: Vacuous Rule
 
