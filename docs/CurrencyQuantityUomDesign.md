@@ -1479,6 +1479,7 @@ This proposal extends mechanisms established by the temporal proposal (Issue #10
 | [Issue #115](https://github.com/sfalik/Precept/issues/115) — `decimal` precision bug | `TryToNumber` converts through `double`, losing precision. This is a security prerequisite — `double` intermediates for financial values are a trust-boundary violation, not just a correctness bug. Will be completed before this proposal ships — no blocking dependency at implementation time. |
 | [Issue #106](https://github.com/sfalik/Precept/issues/106) — Proof engine | Provides the narrowing infrastructure (guard decomposition, marker injection, cross-branch accumulation) that discrete equality narrowing reuses. |
 | [Issue #111](https://github.com/sfalik/Precept/issues/111) — `nonzero` constraint | Needed for `money / number` and `price / number` divisor safety. |
+| [Issue #118](https://github.com/sfalik/Precept/issues/118) — Type checker decomposition | Should land before this proposal. #95 adds ~520–795 lines to `TryInferBinaryKind` (operator tables, typed-constant inference, dot-accessor resolution, dimensional cancellation). #118 plans a `PreceptTypeChecker.DomainTypeInference.cs` 7th partial file as the split point — `TryInferBinaryKind` gains early type-family dispatch ("if either operand is a business domain type, delegate to `TryInferDomainBinaryKind`"). Discrete equality narrowing (~30 lines) lands in `Narrowing.cs`. `in`/`of` validation lands in `FieldConstraints.cs`. |
 
 ---
 
@@ -1504,6 +1505,8 @@ This proposal extends mechanisms established by the temporal proposal (Issue #10
 - **Typed-constant content parsing belongs in the parser phase**, not the type checker. Content-shape recognition (detecting `<number> <3-uppercase>` vs `<number> <unit>` vs `<bare-name>`) happens during parsing so that diagnostics attach to the correct token span. The type checker consumes already-classified typed constants.
 
 ### Type checker changes
+
+> **File placement (#118):** After the type checker decomposition (#118), new type-inference logic (operator tables, typed-constant content inference, dot-accessor resolution, dimensional cancellation) lands in `PreceptTypeChecker.DomainTypeInference.cs` via type-family dispatch from `TryInferBinaryKind`. Discrete equality narrowing lands in `Narrowing.cs`. `in`/`of` constraint validation lands in `FieldConstraints.cs`. See #118's future-proofing analysis for the full per-file growth estimates.
 
 - New types: `money`, `currency`, `quantity`, `unitofmeasure`, `dimension`, `price`, `exchangerate`.
 - Unit compatibility enforcement: same-currency for money arithmetic, same-unit for quantity arithmetic, dimensional cancellation for price × quantity.
