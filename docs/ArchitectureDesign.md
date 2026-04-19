@@ -20,11 +20,12 @@ The **Run-Time phase** accepts a `PreceptEngine` and exposes an instance lifecyc
 
 ```mermaid
 flowchart TD
+    src(["📄 .precept"])
+
     subgraph CT["Compile-Time"]
         direction LR
-        src(["📄 .precept"]) --> P["🔤 Parser"] -->|definition model| TC["🔍 Type Checker"]
-        TC -->|interval queries| PE["📐 Proof Engine"]
-        PE -->|narrowing facts| TC
+        P["🔤 Parser"] -->|definition model| TC["🔍 Type Checker"]
+        TC -->|"⇌ interval queries\n+ narrowing facts"| PE["📐 Proof Engine"]
     end
 
     subgraph RT["Run-Time"]
@@ -46,11 +47,12 @@ flowchart TD
 
     OUT["📤 Outcomes\nTransition  ·  NoTransition  ·  Rejected\nConstraintFailure  ·  Unmatched  ·  Undefined\nUneditableField  ·  InvalidInput  ·  Update"]
 
+    src --> P
     TC -->|PreceptEngine| ENG
     EVAL --> OUT
 ```
 
-> **Diagram note:** The two arrows between Type Checker and Proof Engine show direction: the type checker queries the proof engine for interval facts; the proof engine returns narrowing facts back. See [Compile-Time Phase](#compile-time-phase) for detail. `CreateInstance` calls the evaluator only for computed field initialization, not for constraint evaluation. The diagram is an overview; see [EngineDesign.md](EngineDesign.md) for the full operation-level execution model.
+> **Diagram note:** The ⇌ arrow between Type Checker and Proof Engine is a mutual exchange: the type checker queries the proof engine for interval facts; the proof engine returns narrowing facts. See [Compile-Time Phase](#compile-time-phase) for detail. `CreateInstance` calls the evaluator only for computed field initialization, not for constraint evaluation. The diagram is an overview; see [EngineDesign.md](EngineDesign.md) for the full operation-level execution model.
 
 The architecture is grounded in three philosophy commitments:
 
