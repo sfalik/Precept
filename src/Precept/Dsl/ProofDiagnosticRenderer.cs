@@ -1,3 +1,6 @@
+using System;
+using System.Linq;
+
 namespace Precept;
 
 /// <summary>
@@ -8,8 +11,16 @@ internal static class ProofDiagnosticRenderer
 {
     /// <summary>
     /// Renders a human-readable diagnostic message for the given assessment.
+    /// Appends a "from:" attribution suffix when sources are available.
     /// </summary>
-    public static string Render(ProofAssessment assessment) => assessment switch
+    public static string Render(ProofAssessment assessment)
+    {
+        var message = RenderCore(assessment);
+        var attribution = FormatAttribution(assessment.Attribution);
+        return attribution is null ? message : $"{message} (from: {attribution})";
+    }
+
+    private static string RenderCore(ProofAssessment assessment) => assessment switch
     {
         { Requirement: ProofRequirement.NonzeroDivisor, Outcome: ProofOutcome.Contradiction } a =>
             $"Division by zero: divisor '{a.SubjectDescription}' is provably zero.",
@@ -61,6 +72,26 @@ internal static class ProofDiagnosticRenderer
 
         _ => $"Proof diagnostic: {assessment.Requirement}/{assessment.Outcome} for {assessment.SubjectDescription}",
     };
+
+    /// <summary>
+    /// Formats attribution sources for display. Returns null when there are no sources.
+    /// Truncates to first 4 entries + "and N more" when sources exceed 5.
+    /// </summary>
+    internal static string? FormatAttribution(ProofAttribution attribution)
+    {
+        if (attribution.Sources.Count == 0)
+            return null;
+
+        const int maxDisplay = 5;
+        const int truncateKeep = 4;
+
+        if (attribution.Sources.Count <= maxDisplay)
+            return string.Join(", ", attribution.Sources);
+
+        var displayed = string.Join(", ", attribution.Sources.Take(truncateKeep));
+        var remaining = attribution.Sources.Count - truncateKeep;
+        return $"{displayed}, and {remaining} more";
+    }
 
     /// <summary>
     /// Formats a <see cref="NumericInterval"/> as standard mathematical notation.

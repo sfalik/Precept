@@ -161,9 +161,9 @@ internal static class PreceptDocumentIntellisense
             var markdown = symbol.Markdown;
 
             // Append proof section for field symbols when proof data is available
-            if (symbol.Kind == PreceptDeclaredSymbolKind.Field && info.ProofContext is not null && info.Model is not null)
+            if (symbol.Kind == PreceptDeclaredSymbolKind.Field && info.ProofContext is not null)
             {
-                var proofSection = BuildFieldProofSection(symbol.Name, info.ProofContext, info.Model);
+                var proofSection = BuildFieldProofSection(symbol.Name, info.ProofContext);
                 if (proofSection is not null)
                     markdown = markdown + "\n\n---\n\n" + proofSection;
             }
@@ -187,11 +187,13 @@ internal static class PreceptDocumentIntellisense
     /// Builds the proof section for a field hover using natural language phrasing.
     /// Returns null when no interesting proof data is available.
     /// </summary>
-    private static string? BuildFieldProofSection(string fieldName, GlobalProofContext proofContext, PreceptDefinition model)
+    private static string? BuildFieldProofSection(string fieldName, GlobalProofContext proofContext)
     {
-        if (!proofContext.FieldIntervals.TryGetValue(fieldName, out var interval))
+        var proof = proofContext.IntervalOf(new PreceptIdentifierExpression(fieldName));
+        if (proof.IsUnknown)
             return null;
 
+        var interval = proof.Interval;
         var natural = interval.ToNaturalLanguage();
         if (natural is null)
             return null;
@@ -203,9 +205,8 @@ internal static class PreceptDocumentIntellisense
 
         var provenText = neverZero ? $"{natural}, never zero" : natural;
 
-        // Build attribution from field constraints
-        var field = model.Fields.FirstOrDefault(f => string.Equals(f.Name, fieldName, StringComparison.Ordinal));
-        var attribution = BuildFieldAttribution(fieldName, field);
+        // Format attribution from proof result
+        var attribution = FormatAttribution(proof.Attribution);
 
         var result = $"**Proven safe:** {provenText}";
         if (attribution is not null)
@@ -215,29 +216,19 @@ internal static class PreceptDocumentIntellisense
     }
 
     /// <summary>
-    /// Builds the attribution line from a field's constraints.
+    /// Formats a <see cref="ProofAttribution"/> for hover display.
+    /// Truncates to first 4 sources + "and N more" when there are more than 5.
     /// </summary>
-    private static string? BuildFieldAttribution(string fieldName, PreceptField? field)
+    private static string? FormatAttribution(ProofAttribution attribution)
     {
-        if (field?.Constraints is null || field.Constraints.Count == 0)
+        if (attribution.Sources.Count == 0)
             return null;
 
-        var sources = new List<string>();
-        foreach (var constraint in field.Constraints)
-        {
-            var desc = constraint switch
-            {
-                FieldConstraint.Min min => $"`field constraint: min {min.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)}`",
-                FieldConstraint.Max max => $"`field constraint: max {max.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)}`",
-                FieldConstraint.Nonnegative => "`field constraint: nonnegative`",
-                FieldConstraint.Positive => "`field constraint: positive`",
-                _ => null
-            };
-            if (desc is not null)
-                sources.Add(desc);
-        }
+        if (attribution.Sources.Count <= 5)
+            return string.Join(", ", attribution.Sources.Select(static s => $"`{s}`"));
 
-        return sources.Count > 0 ? string.Join(", ", sources) : null;
+        var first4 = attribution.Sources.Take(4).Select(static s => $"`{s}`");
+        return string.Join(", ", first4) + $", and {attribution.Sources.Count - 4} more";
     }
 
     private static Hover? CreateKeywordHover(PreceptDocumentInfo info, Position position)
