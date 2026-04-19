@@ -48,11 +48,11 @@ At construction, the engine precomputes the following internal structures:
 
 | Structure | Type | What it holds |
 |---|---|---|
-| `_transitionRowMap` | `Dictionary<(State, Event), List<TransitionRow>>` | All transition rows, keyed by (state, event). First-match wins at runtime. Keys are ordinal case-sensitive. |
-| `_editableFieldsByState` | `Dictionary<string, HashSet<string>>` | Statically declared editable fields per state (unguarded `edit` blocks only). Precomputed; `["all"]` expands to all non-computed scalar + collection fields. |
-| `_guardedEditBlocks` | `List<GuardedEditBlock>` | Guarded `edit` blocks (those with `when` guards). NOT precomputed — evaluated per-call. Fail-closed: guard evaluation exception → field not granted. |
+| `_transitionRowMap` | `Dictionary<(string State, string Event), List<PreceptTransitionRow>>` | All transition rows, keyed by (state, event). First-match wins at runtime. Keys are ordinal case-sensitive. |
+| `_editableFieldsByState` | `IReadOnlyDictionary<string, HashSet<string>>` | Statically declared editable fields per state (unguarded `edit` blocks only). Precomputed; `["all"]` expands to all non-computed scalar + collection fields. |
+| `_guardedEditBlocks` | `IReadOnlyList<PreceptEditBlock>` | Guarded `edit` blocks (those with `when` guards). NOT precomputed — evaluated per-call. Fail-closed: guard evaluation exception → field not granted. |
 | `_stateActionMap` | `Dictionary<(EnsureAnchor Prep, string State), List<PreceptStateAction>>` | Entry (`to`) and exit (`from`) automatic mutations per state. |
-| `_computedFieldOrder` | `List<string>?` | Topological evaluation order for computed fields. Null if no computed fields. Injected from `TypeCheckResult`. |
+| `_computedFieldOrder` | `IReadOnlyList<string>?` | Topological evaluation order for computed fields. Null if no computed fields. Injected from `TypeCheckResult`. |
 | `_computedFieldDependencies` | `IReadOnlyDictionary<string, IReadOnlyList<string>>?` | Transitive stored-field dependency map for computed fields. Used when a constraint failure must name the user-visible field, not an intermediate computed field. |
 
 The `IsStateless` property is derived at every call from `States.Count == 0` — not a flag set at construction. This means stateless detection is always consistent with the actual definition model.
