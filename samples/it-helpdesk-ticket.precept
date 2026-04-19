@@ -31,20 +31,47 @@ event Resolve with Note as string notempty
 event CloseTicket
 event Reopen with Note as string nullable default null notempty
 
-from New on RegisterAgent -> enqueue AgentQueue RegisterAgent.AgentName -> no transition
-from Assigned on RegisterAgent -> enqueue AgentQueue RegisterAgent.AgentName -> no transition
-from WaitingOnCustomer on RegisterAgent -> enqueue AgentQueue RegisterAgent.AgentName -> no transition
-from Resolved on RegisterAgent -> enqueue AgentQueue RegisterAgent.AgentName -> no transition
+from New on RegisterAgent
+    -> enqueue AgentQueue RegisterAgent.AgentName
+    -> no transition
+from Assigned on RegisterAgent
+    -> enqueue AgentQueue RegisterAgent.AgentName
+    -> no transition
+from WaitingOnCustomer on RegisterAgent
+    -> enqueue AgentQueue RegisterAgent.AgentName
+    -> no transition
+from Resolved on RegisterAgent
+    -> enqueue AgentQueue RegisterAgent.AgentName
+    -> no transition
 
-from New on Triage -> set TicketTitle = Triage.Title -> set Severity = Triage.Level -> no transition
-from New on Assign when AgentQueue.count > 0 -> set LastQueuedAgent = AgentQueue.peek -> dequeue AgentQueue -> set AssignedAgent = LastQueuedAgent -> transition Assigned
-from New on Assign -> reject "No support agent is currently available"
+from New on Triage
+    -> set TicketTitle = Triage.Title
+    -> set Severity = Triage.Level
+    -> no transition
+from New on Assign when AgentQueue.count > 0
+    -> set LastQueuedAgent = AgentQueue.peek
+    -> dequeue AgentQueue
+    -> set AssignedAgent = LastQueuedAgent
+    -> transition Assigned
+from New on Assign
+    -> reject "No support agent is currently available"
 
-from Assigned on CustomerReply -> transition WaitingOnCustomer
-from Assigned on Resolve -> set ResolutionNote = Resolve.Note -> transition Resolved
+from Assigned on CustomerReply
+    -> transition WaitingOnCustomer
+from Assigned on Resolve
+    -> set ResolutionNote = Resolve.Note
+    -> transition Resolved
 
-from WaitingOnCustomer on Assign when AgentQueue.count > 0 -> set LastQueuedAgent = AgentQueue.peek -> dequeue AgentQueue -> set AssignedAgent = LastQueuedAgent -> transition Assigned
-from WaitingOnCustomer on Assign -> reject "No support agent is currently available"
+from WaitingOnCustomer on Assign when AgentQueue.count > 0
+    -> set LastQueuedAgent = AgentQueue.peek
+    -> dequeue AgentQueue
+    -> set AssignedAgent = LastQueuedAgent
+    -> transition Assigned
+from WaitingOnCustomer on Assign
+    -> reject "No support agent is currently available"
 
-from Resolved on CloseTicket -> transition Closed
-from Resolved on Reopen -> set ReopenCount = ReopenCount + 1 -> transition New
+from Resolved on CloseTicket
+    -> transition Closed
+from Resolved on Reopen
+    -> set ReopenCount = ReopenCount + 1
+    -> transition New

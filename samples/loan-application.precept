@@ -27,7 +27,12 @@ in Funded ensure ApprovedAmount > 0 because "Funded loans must have a positive a
 
 in UnderReview when DocumentsVerified edit DecisionNote
 
-event Submit with Applicant as string notempty, Amount as number, Score as number, Income as number, Debt as number
+event Submit with
+    Applicant as string notempty,
+    Amount as number,
+    Score as number,
+    Income as number,
+    Debt as number
 on Submit ensure Amount > 0 because "Loan requests must be positive"
 on Submit ensure Score >= 0 because "Credit score cannot be negative"
 on Submit ensure Income >= 0 because "Income cannot be negative"
@@ -40,12 +45,27 @@ on Approve ensure Amount > 0 because "Approved amounts must be positive"
 event Decline with Note as string notempty
 event FundLoan
 
-from Draft on Submit -> set ApplicantName = Submit.Applicant -> set RequestedAmount = Submit.Amount -> set CreditScore = Submit.Score -> set AnnualIncome = Submit.Income -> set ExistingDebt = Submit.Debt -> transition UnderReview
+from Draft on Submit
+    -> set ApplicantName = Submit.Applicant
+    -> set RequestedAmount = Submit.Amount
+    -> set CreditScore = Submit.Score
+    -> set AnnualIncome = Submit.Income
+    -> set ExistingDebt = Submit.Debt
+    -> transition UnderReview
 
-from UnderReview on VerifyDocuments -> set DocumentsVerified = true -> no transition
+from UnderReview on VerifyDocuments
+    -> set DocumentsVerified = true
+    -> no transition
 
-from UnderReview on Approve when DocumentsVerified and CreditScore >= 680 and AnnualIncome >= ExistingDebt * 2 and RequestedAmount < AnnualIncome / 2 and Approve.Amount <= RequestedAmount -> set ApprovedAmount = min(Approve.Amount, RequestedAmount) -> set DecisionNote = if Approve.Note != null then Approve.Note else if CreditScore >= 750 then "Prime tier  — auto-approved" else "Standard tier — approved" -> transition Approved
-from UnderReview on Approve -> reject "Approval requires verified documents, strong credit, and affordable debt load"
+from UnderReview on Approve when DocumentsVerified and CreditScore >= 680 and AnnualIncome >= ExistingDebt * 2 and RequestedAmount < AnnualIncome / 2 and Approve.Amount <= RequestedAmount
+    -> set ApprovedAmount = min(Approve.Amount, RequestedAmount)
+    -> set DecisionNote = if Approve.Note != null then Approve.Note else if CreditScore >= 750 then "Prime tier  — auto-approved" else "Standard tier — approved"
+    -> transition Approved
+from UnderReview on Approve
+    -> reject "Approval requires verified documents, strong credit, and affordable debt load"
 
-from UnderReview on Decline -> set DecisionNote = Decline.Note -> transition Declined
-from Approved on FundLoan -> transition Funded
+from UnderReview on Decline
+    -> set DecisionNote = Decline.Note
+    -> transition Declined
+from Approved on FundLoan
+    -> transition Funded

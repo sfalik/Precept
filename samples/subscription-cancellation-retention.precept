@@ -17,7 +17,11 @@ state Cancelled
 
 in RetentionReview edit LastAgentNote
 
-event RequestCancellation with Name as string notempty, Plan as string notempty, Price as number, Reason as string notempty
+event RequestCancellation with
+    Name as string notempty,
+    Plan as string notempty,
+    Price as number,
+    Reason as string notempty
 on RequestCancellation ensure Price >= 0 because "The plan price cannot be negative"
 
 event MakeSaveOffer with DiscountPercent as number default 10
@@ -27,10 +31,25 @@ on MakeSaveOffer ensure DiscountPercent <= 100 because "Save offers cannot excee
 event AcceptOffer
 event DeclineOffer with Note as string nullable default null notempty
 
-from Active on RequestCancellation -> set SubscriberName = RequestCancellation.Name -> set PlanName = RequestCancellation.Plan -> set MonthlyPrice = RequestCancellation.Price -> set CancellationReason = RequestCancellation.Reason -> set SaveOfferAccepted = false -> transition RetentionReview
+from Active on RequestCancellation
+    -> set SubscriberName = RequestCancellation.Name
+    -> set PlanName = RequestCancellation.Plan
+    -> set MonthlyPrice = RequestCancellation.Price
+    -> set CancellationReason = RequestCancellation.Reason
+    -> set SaveOfferAccepted = false
+    -> transition RetentionReview
 
-from RetentionReview on MakeSaveOffer when not SaveOfferAccepted and RetentionDiscount == 0 -> set RetentionDiscount = MakeSaveOffer.DiscountPercent -> set LastAgentNote = if MonthlyPrice >= 50 then "Premium plan retention" else "Standard plan retention" -> no transition
-from RetentionReview on MakeSaveOffer -> reject "Only one outstanding save offer can exist at a time"
+from RetentionReview on MakeSaveOffer when not SaveOfferAccepted and RetentionDiscount == 0
+    -> set RetentionDiscount = MakeSaveOffer.DiscountPercent
+    -> set LastAgentNote = if MonthlyPrice >= 50 then "Premium plan retention" else "Standard plan retention"
+    -> no transition
+from RetentionReview on MakeSaveOffer
+    -> reject "Only one outstanding save offer can exist at a time"
 
-from RetentionReview on AcceptOffer -> set SaveOfferAccepted = true -> set CancellationReason = null -> transition Active
-from RetentionReview on DeclineOffer -> set LastAgentNote = DeclineOffer.Note -> transition Cancelled
+from RetentionReview on AcceptOffer
+    -> set SaveOfferAccepted = true
+    -> set CancellationReason = null
+    -> transition Active
+from RetentionReview on DeclineOffer
+    -> set LastAgentNote = DeclineOffer.Note
+    -> transition Cancelled

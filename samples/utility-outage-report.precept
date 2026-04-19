@@ -33,20 +33,49 @@ event DispatchCrew
 event MarkRestored with Note as string notempty
 event CloseIncident
 
-from Reported on FileReport -> set ReporterName = FileReport.Reporter -> set RegionName = FileReport.Region -> set EstimatedCustomers = FileReport.Customers -> no transition
-from Reported on AddBlock -> add AffectedBlocks AddBlock.BlockName -> no transition
-from Reported on RemoveBlock when AffectedBlocks contains RemoveBlock.BlockName -> remove AffectedBlocks RemoveBlock.BlockName -> no transition
-from Reported on RemoveBlock -> reject "That block is not currently on the outage map"
-from Reported on VerifyReport when AffectedBlocks.count > 0 -> set Verified = true -> transition VerifiedState
-from Reported on VerifyReport -> reject "At least one affected block must be recorded before verification"
+from Reported on FileReport
+    -> set ReporterName = FileReport.Reporter
+    -> set RegionName = FileReport.Region
+    -> set EstimatedCustomers = FileReport.Customers
+    -> no transition
+from Reported on AddBlock
+    -> add AffectedBlocks AddBlock.BlockName
+    -> no transition
+from Reported on RemoveBlock when AffectedBlocks contains RemoveBlock.BlockName
+    -> remove AffectedBlocks RemoveBlock.BlockName
+    -> no transition
+from Reported on RemoveBlock
+    -> reject "That block is not currently on the outage map"
+from Reported on VerifyReport when AffectedBlocks.count > 0
+    -> set Verified = true
+    -> transition VerifiedState
+from Reported on VerifyReport
+    -> reject "At least one affected block must be recorded before verification"
 
-from Reported on RegisterCrew -> enqueue CrewQueue RegisterCrew.CrewName -> no transition
-from VerifiedState on RegisterCrew -> enqueue CrewQueue RegisterCrew.CrewName -> no transition
-from Dispatched on RegisterCrew -> enqueue CrewQueue RegisterCrew.CrewName -> no transition
-from Restored on RegisterCrew -> enqueue CrewQueue RegisterCrew.CrewName -> no transition
+from Reported on RegisterCrew
+    -> enqueue CrewQueue RegisterCrew.CrewName
+    -> no transition
+from VerifiedState on RegisterCrew
+    -> enqueue CrewQueue RegisterCrew.CrewName
+    -> no transition
+from Dispatched on RegisterCrew
+    -> enqueue CrewQueue RegisterCrew.CrewName
+    -> no transition
+from Restored on RegisterCrew
+    -> enqueue CrewQueue RegisterCrew.CrewName
+    -> no transition
 
-from VerifiedState on DispatchCrew when CrewQueue.count > 0 -> set AssignedCrew = CrewQueue.peek -> dequeue CrewQueue -> set DispatchRound = DispatchRound + 1 -> transition Dispatched
-from VerifiedState on DispatchCrew -> reject "No crew is available for dispatch"
+from VerifiedState on DispatchCrew when CrewQueue.count > 0
+    -> set AssignedCrew = CrewQueue.peek
+    -> dequeue CrewQueue
+    -> set DispatchRound = DispatchRound + 1
+    -> transition Dispatched
+from VerifiedState on DispatchCrew
+    -> reject "No crew is available for dispatch"
 
-from Dispatched on MarkRestored -> set RestorationNote = MarkRestored.Note -> transition Restored
-from Restored on CloseIncident -> clear AffectedBlocks -> transition Closed
+from Dispatched on MarkRestored
+    -> set RestorationNote = MarkRestored.Note
+    -> transition Restored
+from Restored on CloseIncident
+    -> clear AffectedBlocks
+    -> transition Closed
