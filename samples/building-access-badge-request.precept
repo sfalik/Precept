@@ -10,7 +10,6 @@ field ReviewerNote as string nullable
 field LowestRequestedFloor as number default 0
 field HighestRequestedFloor as number default 0
 field BadgePrinted as boolean default false
-
 field RequestedFloors as set of number
 
 rule RequestedFloors.count == 0 or LowestRequestedFloor <= HighestRequestedFloor because "Requested floor bounds must stay ordered"
@@ -38,9 +37,7 @@ on RemoveFloor ensure Floor > 0 because "Floors must be positive"
 
 event Submit
 event Approve with Note as string nullable default null notempty
-
 event Reject with Reason as string notempty
-
 event PrintBadge
 
 from Draft on AddFloor -> add RequestedFloors AddFloor.Floor -> no transition

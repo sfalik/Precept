@@ -29,9 +29,7 @@ event Approve with Amount as number, Note as string nullable default null notemp
 on Approve ensure Amount > 0 because "The approved amount must be positive"
 
 event Decline with Note as string notempty
-
 event MarkReturnReceived
-
 event Cancel with Reason as string nullable default null notempty
 
 from Draft on Submit -> set OrderId = Submit.OrderNumber -> set CustomerEmail = Submit.Email -> set RequestedAmount = Submit.Amount -> set ReasonText = Submit.Reason -> transition Submitted

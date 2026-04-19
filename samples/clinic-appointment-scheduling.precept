@@ -35,9 +35,7 @@ on Reschedule ensure MinuteOfDay >= 0 because "The scheduled minute cannot be ne
 on Reschedule ensure MinuteOfDay % 15 == 0 because "Appointments must start on a 15-minute boundary"
 
 event SendReminder
-
 event CheckIn with Note as string nullable default null notempty
-
 event CompleteVisit
 event Cancel with Reason as string nullable default null notempty
 

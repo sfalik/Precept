@@ -10,7 +10,6 @@ field ReadyPatron as string nullable
 field PickupCode as string nullable
 field PickupExpiryDay as number default 0 nonnegative
 field CurrentDay as number default 0 nonnegative
-
 field HoldQueue as queue of string
 field BorrowerHistory as stack of string
 
@@ -28,15 +27,10 @@ to HoldReady -> set ReadyPatron = PromotedPatron -> set PickupCode = "READY" -> 
 from HoldReady -> set PromotedPatron = null -> set ReadyPatron = null -> set PickupCode = null
 
 event Checkout with PatronId as string notempty
-
 event ReturnBook
-
 event PlaceHold with PatronId as string notempty
-
 event ProcessNextHold
-
 event CollectHold with PatronId as string notempty
-
 event AdvanceDay with DayNumber as number
 on AdvanceDay ensure DayNumber >= 0 because "The day counter cannot be negative"
 

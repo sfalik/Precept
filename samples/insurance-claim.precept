@@ -11,7 +11,6 @@ field AdjusterName as string nullable
 field DecisionNote as string nullable maxlength 500
 field PoliceReportRequired as boolean default false
 field FraudFlag as boolean default false
-
 field MissingDocuments as set of string
 rule ApprovedAmount <= ClaimAmount because "Approved amounts cannot exceed the claim"
 rule ApprovedAmount * 2 <= ClaimAmount when FraudFlag because "Fraud-flagged claims are capped at half the claimed amount"
@@ -33,16 +32,12 @@ on Submit ensure Amount > 0 because "Claim amounts must be positive"
 on Submit ensure Amount <= 100000 when RequiresPoliceReport because "Police-report claims are capped at $100,000"
 
 event RequestDocument with Name as string notempty
-
 event ReceiveDocument with Name as string notempty
-
 event AssignAdjuster with Name as string notempty
-
 event Approve with Amount as decimal, Note as string nullable default null notempty
 on Approve ensure Amount > 0 because "Approved claim amounts must be positive"
 
 event Deny with Note as string notempty
-
 event PayClaim
 
 from Draft on Submit -> set ClaimantName = Submit.Claimant -> set ClaimAmount = Submit.Amount -> set PoliceReportRequired = Submit.RequiresPoliceReport -> transition Submitted

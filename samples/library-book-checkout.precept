@@ -41,11 +41,8 @@ event AdvanceDay with DayNumber as number
 on AdvanceDay ensure DayNumber >= 0 because "The day counter cannot be negative"
 
 event ReturnBook with Condition as string nullable default null notempty
-
 event ReportLost with Note as string nullable default null notempty
-
 event Shelve
-
 event ResolveLoss
 
 from Available on Checkout -> set BookTitle = Checkout.Title -> set BorrowerId = Checkout.PatronId -> set CheckoutDay = CurrentDay -> set DueDay = CurrentDay + Checkout.LoanDays -> set RenewalCount = 0 -> set FineAmount = 0 -> set ConditionNote = null -> set LostReported = false -> transition CheckedOut

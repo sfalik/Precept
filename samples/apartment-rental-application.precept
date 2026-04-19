@@ -22,12 +22,9 @@ in Approved ensure MonthlyIncome >= RequestedRent * 3 because "Approved applican
 in MoveInReady ensure DepositPaid and LeaseSigned because "Move-in ready applications need both a deposit and a signed lease"
 
 event Submit with Name as string notempty, Income as number nonnegative, Rent as number positive, Score as number nonnegative, Household as number default 1 positive
-
 event Approve with Note as string nullable default null notempty
-
 event PayDeposit
 event SignLease
-
 event Decline with Note as string notempty
 
 from Draft on Submit -> set ApplicantName = Submit.Name -> set MonthlyIncome = Submit.Income -> set RequestedRent = Submit.Rent -> set CreditScore = Submit.Score -> set HouseholdSize = Submit.Household -> transition Submitted

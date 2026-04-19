@@ -29,18 +29,15 @@ in Completed ensure CompletionNote != null because "Completed work orders need a
 from InProgress ensure AssignedTechnician != null because "Active work cannot finish without a technician"
 
 event Submit with Requester as string notempty, WorkLocation as string notempty, Summary as string notempty, IsUrgent as boolean default false
-
 event Assign with Technician as string notempty, Estimate as number
 on Assign ensure Estimate > 0 because "Estimated hours must be positive"
 
 event ApproveParts
 event StartWork
-
 event RecordProgress with Hours as number
 on RecordProgress ensure Hours > 0 because "Progress entries must be positive"
 
 event Complete with Note as string notempty
-
 event Cancel with Reason as string nullable default null notempty
 
 from Draft on Submit -> set RequesterName = Submit.Requester -> set Location = Submit.WorkLocation -> set IssueSummary = Submit.Summary -> set Urgent = Submit.IsUrgent -> transition Open

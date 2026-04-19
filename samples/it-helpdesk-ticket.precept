@@ -10,7 +10,6 @@ field LastQueuedAgent as string nullable
 field ResolutionNote as string nullable
 field ReopenCount as integer default 0 nonnegative
 field Priority as choice("Low","Medium","High","Critical") default "Low"
-
 field AgentQueue as queue of string
 
 state New initial
@@ -23,17 +22,13 @@ in Assigned ensure AssignedAgent != null because "Assigned tickets must name an 
 in New edit Priority
 
 event RegisterAgent with AgentName as string notempty
-
 event Triage with Title as string notempty, Level as number default 3
 on Triage ensure Level >= 1 and Level <= 5 because "Severity must stay within the supported range"
 
 event Assign
-
 event CustomerReply
 event Resolve with Note as string notempty
-
 event CloseTicket
-
 event Reopen with Note as string nullable default null notempty
 
 from New on RegisterAgent -> enqueue AgentQueue RegisterAgent.AgentName -> no transition
