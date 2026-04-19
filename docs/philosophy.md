@@ -40,6 +40,8 @@ This is not validation — it is governance. Validation checks data at a moment 
 
 **Workflow is one dimension of entity lifecycle — not the defining frame.** A workflow engine orchestrates work through a process. Precept ensures a business entity's data satisfies its declared rules, at every moment, through every operation. The state graph structures how the entity moves through its lifecycle; the entity's data and rules are what the product governs. The governing concept is **governed integrity** — lifecycle transitions, field constraints, editability rules, or any combination. The test for whether an entity belongs in Precept: does it need governed integrity?
 
+*Domain* in "domain integrity engine" carries the DDD meaning: the business subject area — the problem space to which the application is applied. It does not refer to the relational model's narrower sense of *domain* as the set of valid values for a column. Precept's guarantee is lifecycle-aware, cross-field, and compile-time verified; relational domain integrity governs only type conformance for individual column values.
+
 The full guarantee the engine provides is about **configurations** — the pair of (current lifecycle position, current field values), or for stateless entities, simply the current field values. Invalid configurations are structurally impossible. A valid entity is simply one where every constraint holds for its current configuration.
 
 ---
