@@ -1361,9 +1361,9 @@ Hover, diagnostics, and MCP MUST produce the same proof facts for the same expre
 
 ### Diagnostic Samples (S5, team review 2026-04-18)
 
-The `samples/diagnostics/` folder is a living catalog of proof engine scenarios — user-facing reference files that show authors what the engine catches, what messages it produces, and how to fix the code. Each file is self-contained, demonstrates both the triggering pattern and the remediation, and uses comments to explain the proof engine's reasoning.
+The `test/integrationtests/diagnostics/` folder is a living catalog of proof engine scenarios — user-facing reference files that show authors what the engine catches, what messages it produces, and how to fix the code. Each file is self-contained, demonstrates both the triggering pattern and the remediation, and uses comments to explain the proof engine's reasoning.
 
-**Maintenance rule:** When a PR adds, changes, or removes a proof-backed diagnostic, the same PR must add or update the corresponding sample in `samples/diagnostics/`. This is codified in `CONTRIBUTING.md` § Diagnostic Samples.
+**Maintenance rule:** When a PR adds, changes, or removes a proof-backed diagnostic, the same PR must add or update the corresponding sample in `test/integrationtests/diagnostics/`. This is codified in `CONTRIBUTING.md` § Diagnostic Samples.
 
 **Initial catalog (Commit 15):**
 

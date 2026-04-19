@@ -12,7 +12,7 @@ namespace Precept.Tests;
 /// Drift defense for the proof-engine sample catalog.
 ///
 /// Root samples (samples/*.precept): must parse and compile without errors.
-/// Diagnostic samples (samples/diagnostics/*.precept): must compile and produce
+/// Diagnostic samples (test/integrationtests/diagnostics/*.precept): must compile and produce
     /// exactly the diagnostic codes declared in their <c># Demonstrates: Cxx</c> header.
 /// A discovery test fails if any sample file lacks the header.
 ///
@@ -41,7 +41,7 @@ public class DiagnosticSampleDriftTests
     }
 
     private static string SamplesDir => Path.Combine(FindRepoRoot(), "samples");
-    private static string DiagnosticSamplesDir => Path.Combine(SamplesDir, "diagnostics");
+    private static string DiagnosticSamplesDir => Path.Combine(FindRepoRoot(), "test", "integrationtests", "diagnostics");
 
     // ════════════════════════════════════════════════════════════════════
     // Test 1: Root sample file count guard
@@ -145,7 +145,7 @@ public class DiagnosticSampleDriftTests
     public void DiagnosticSamplesDirectory_Exists()
     {
         Directory.Exists(DiagnosticSamplesDir).Should().BeTrue(
-            "samples/diagnostics/ must exist and contain the proof-engine diagnostic catalog");
+            "test/integrationtests/diagnostics/ must exist and contain the proof-engine diagnostic catalog");
     }
 
     // ════════════════════════════════════════════════════════════════════
@@ -155,7 +155,7 @@ public class DiagnosticSampleDriftTests
     public static TheoryData<string> AllDiagnosticSampleFiles()
     {
         var data = new TheoryData<string>();
-        var dir = Path.Combine(FindRepoRoot(), "samples", "diagnostics");
+        var dir = Path.Combine(FindRepoRoot(), "test", "integrationtests", "diagnostics");
         if (!Directory.Exists(dir)) return data;
         foreach (var file in Directory.GetFiles(dir, "*.precept"))
             data.Add(Path.GetFileName(file));

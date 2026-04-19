@@ -78,7 +78,7 @@ Every implementation PR must update documentation in the same pass:
 | New editability semantics | `docs/EditableFieldsDesign.md` |
 | New MCP tool behavior | `docs/McpServerDesign.md` |
 | Feature claims in README | `README.md` |
-| New or changed proof engine diagnostic (C76, C92–C98, future) | `samples/diagnostics/` — add or update a `.precept` sample that demonstrates the diagnostic scenario. See § Diagnostic Samples below. |
+| New or changed proof engine diagnostic (C76, C92–C98, future) | `test/integrationtests/diagnostics/` — add or update a `.precept` sample that demonstrates the diagnostic scenario. See § Diagnostic Samples below. |
 
 **Design docs track what EXISTS in the runtime, not what's planned.** They are updated at implementation time, never before.
 
@@ -86,9 +86,9 @@ Every implementation PR must update documentation in the same pass:
 
 #### 5. Diagnostic Samples (Same PR — Non-Negotiable)
 
-The `samples/diagnostics/` folder contains `.precept` files that demonstrate the proof engine's diagnostic scenarios. These are **user-facing reference samples** — not test fixtures. They show authors what the proof engine catches, what messages it produces, and how to fix the code.
+The `test/integrationtests/diagnostics/` folder contains `.precept` files that demonstrate the proof engine's diagnostic scenarios. These are **user-facing reference samples** — not test fixtures. They show authors what the proof engine catches, what messages it produces, and how to fix the code.
 
-**Maintenance rule:** When a PR adds, changes, or removes a proof engine diagnostic (C76, C92–C98, and any future proof-backed diagnostics), the same PR must add or update the corresponding sample in `samples/diagnostics/`. This is part of the documentation sync, not a separate phase.
+**Maintenance rule:** When a PR adds, changes, or removes a proof engine diagnostic (C76, C92–C98, and any future proof-backed diagnostics), the same PR must add or update the corresponding sample in `test/integrationtests/diagnostics/`. This is part of the documentation sync, not a separate phase.
 
 **Sample file conventions:**
 
@@ -105,9 +105,9 @@ The `samples/diagnostics/` folder contains `.precept` files that demonstrate the
 - Refinement to existing diagnostic (e.g., better C93 message) → update existing file
 - New proof composition pattern (e.g., conditional + relational) → new file if it demonstrates a distinct author scenario
 
-**Evolution:** As the proof engine grows (collection reasoning, string constraints, cross-field analysis), new samples should be added to cover those scenarios. The `samples/diagnostics/` folder is a living catalog of what the engine can prove.
+**Evolution:** As the proof engine grows (collection reasoning, string constraints, cross-field analysis), new samples should be added to cover those scenarios. The `test/integrationtests/diagnostics/` folder is a living catalog of what the engine can prove.
 
-**Drift prevention:** Every diagnostic sample is backed by a test in `test/Precept.Tests/DiagnosticSampleDriftTests.cs`. The test reads each sample's `# Demonstrates:` header, compiles the file, and asserts the declared diagnostic codes appear with no unexpected errors. A discovery test fails if any sample file lacks the header. When adding a new sample, no manual test wiring is needed — the theory test auto-discovers `samples/diagnostics/*.precept` files.
+**Drift prevention:** Every diagnostic sample is backed by a test in `test/Precept.Tests/DiagnosticSampleDriftTests.cs`. The test reads each sample's `# Demonstrates:` header, compiles the file, and asserts the declared diagnostic codes appear with no unexpected errors. A discovery test fails if any sample file lacks the header. When adding a new sample, no manual test wiring is needed — the theory test auto-discovers `test/integrationtests/diagnostics/*.precept` files.
 
 #### Proposal content at merge time
 
