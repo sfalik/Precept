@@ -1,40 +1,25 @@
-# Demonstrates: C97 — dead guard: provably always false given field constraints
+# Demonstrates: C97 — dead guards provably false from field constraints
 
-# DEAD GUARDS
-# C97 fires when a transition guard expression is provably always false given field constraints.
-# The guarded branch can never execute — it is dead code.
-#
-# C97 is a WARNING: it does not block compilation, but the dead branch is unreachable
-# and should be removed or fixed.
-#
-# Example:
-#   field Score min 0 max 100  → interval [0, 100]
-#   when Score > 150           → requires Score > 150, but Score is at most 100
-#   Dead: no reachable execution can satisfy this guard. C97 fires.
-#
-# REMEDIATION:
-#   Option A — fix the guard to use a reachable threshold:
-#     from Review on Submit when Score > 80 -> transition Approved
-#
-#   Option B — remove the dead guard row entirely if the logic was wrong.
-#
-#   Option C — widen the field constraint if Score can legitimately exceed 100:
-#     field Score as number default 50 min 0 max 200
-#
-# The fallback row (without a guard) handles all reachable cases and remains valid.
+# This file covers both a bounded interval contradiction and a positive-constraint contradiction.
 
 precept DeadGuardsDemo
 
 field Score as number default 50 min 0 max 100
+field Rate as number default 5 positive
 
 state Review initial
 state Approved
+state Escalated
 
 event Submit
+event Escalate
 
-# C97: Score > 150 is always false — Score is at most 100. This row never executes.
-# EXPECT: C97 | severity=warning | contains=provably always false
+# C97: Score can never exceed 150 when the field is capped at 100.
+# EXPECT: C97 | severity=warning | match=exact | message=Guard 'when Score > 150' is provably always false — this row can never execute. | line=19 | start=27 | end=38
 from Review on Submit when Score > 150 -> transition Approved
-
-# Fallback: the reachable path that handles all valid Score values.
 from Review on Submit -> transition Approved
+
+# C97: a positive field can never satisfy <= 0.
+# EXPECT: C97 | severity=warning | match=exact | message=Guard 'when Rate <= 0' is provably always false — this row can never execute. | line=24 | start=29 | end=38
+from Review on Escalate when Rate <= 0 -> transition Escalated
+from Review on Escalate -> transition Escalated

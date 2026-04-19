@@ -1,41 +1,45 @@
-# Demonstrates: C92, C93 — divisor safety: literal zero and unproven divisor
+# Demonstrates: C92, C93 — literal zero, exact-zero expressions, and unresolved proof variants
 
-# DIVISOR SAFETY
-# The proof engine checks every division site at compile time.
-#
-# C92: Division by the literal 0 is always provably wrong — reject immediately.
-#
-# C93: Division by a field that has no compile-time nonzero proof.
-#   The engine cannot certify the divisor is nonzero without one of:
-#     - a 'positive' constraint on the divisor field, or
-#     - a 'rule Divisor != 0' (or 'rule Divisor > 0'), or
-#     - a 'when Divisor > 0' guard narrowing the context before the division.
-#
-# REMEDIATION for C93:
-#   Option A — constrain the field at declaration:
-#     field Divisor as number default 1 positive
-#
-#   Option B — guard the transition:
-#     from Active on Divide when Divisor > 0 -> set Result = Amount / Divisor -> no transition
-#
-#   After applying Option A or B, the C93 diagnostic disappears.
+# This file covers all three shipped C93 message branches plus a second C92 shape.
 
 precept DivisorSafetyDemo
 
 field Amount as number default 100 positive
-field Divisor as number default 1
-field Quotient1 as number default 0
-field Quotient2 as number default 0
+field UnknownDivisor as number default 1
+field NonnegativeDivisor as number default 0 nonnegative
+field BoundedOffset as number default 1 min 0 max 2
+field Result as number default 0
 
 state Active initial
-event DivideByZero
+state Done
+
+event DivideByLiteralZero
+event DivideByExactZeroExpression
 event DivideByUnproven
+event DivideByNonnegative
+event DivideByRanged
+event DivideSafely
 
-# C92: literal zero — the divisor is provably zero at every execution of this row.
-# EXPECT: C92 | severity=error | contains=is provably zero
-from Active on DivideByZero -> set Quotient1 = Amount / 0 -> no transition
+# C92: literal 0 is always provably zero.
+# EXPECT: C92 | severity=error | match=exact | message=Division by zero: divisor '0' is provably zero. (from: constant expression) | line=25 | start=60 | end=61
+from Active on DivideByLiteralZero -> set Result = Amount / 0 -> transition Done
 
-# C93: Divisor has no nonzero proof. The default value 1 is a runtime value,
-# not a compile-time guarantee. Add 'positive' to the field or guard the transition.
-# EXPECT: C93 | severity=error | contains=has no compile-time nonzero proof
-from Active on DivideByUnproven -> set Quotient2 = Amount / Divisor -> no transition
+# C92: a normalized exact-zero expression is also provably zero.
+# EXPECT: C92 | severity=error | match=exact | message=Division by zero: divisor 'expression' is provably zero. (from: constant expression) | line=29 | start=68 | end=101
+from Active on DivideByExactZeroExpression -> set Result = Amount / (UnknownDivisor - UnknownDivisor) -> transition Done
+
+# C93: UnknownDivisor has no compile-time nonzero proof at all.
+# EXPECT: C93 | severity=error | match=exact | message=Divisor 'UnknownDivisor' has no compile-time nonzero proof. Consider adding a 'positive' constraint, 'rule UnknownDivisor != 0', or 'when UnknownDivisor != 0' guard. | line=33 | start=57 | end=71
+from Active on DivideByUnproven -> set Result = Amount / UnknownDivisor -> transition Done
+
+# C93: nonnegative still allows zero, so the proof obligation remains unresolved.
+# EXPECT: C93 | severity=error | match=exact | message=Divisor 'NonnegativeDivisor' is nonnegative but not nonzero — 'nonnegative' allows zero. Consider 'positive' instead. (from: field constraint: nonnegative) | line=37 | start=60 | end=78
+from Active on DivideByNonnegative -> set Result = Amount / NonnegativeDivisor -> transition Done
+
+# C93: BoundedOffset - 1 produces the bounded interval [-1, 1], which still includes zero.
+# EXPECT: C93 | severity=error | match=exact | message=Divisor 'expression' interval [-1, 1] may include zero. Consider restructuring with a 'positive' constraint or 'rule != 0'. | line=41 | start=55 | end=74
+from Active on DivideByRanged -> set Result = Amount / (BoundedOffset - 1) -> transition Done
+
+# SAFE: the guard proves UnknownDivisor > 0 inside this row.
+from Active on DivideSafely when UnknownDivisor > 0 -> set Result = Amount / UnknownDivisor -> transition Done
+from Active on DivideSafely -> transition Done

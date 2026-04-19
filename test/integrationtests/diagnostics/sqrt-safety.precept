@@ -1,27 +1,6 @@
-# Demonstrates: C76 — sqrt() requires a non-negative argument
+# Demonstrates: C76 — unresolved and contradictory sqrt() proof outcomes
 
-# SQRT SAFETY
-# The proof engine requires a non-negative argument proof before allowing sqrt().
-# If the argument field may be negative, C76 fires at the call site.
-#
-# C76 fires for:
-#   - Fields with no lower-bound constraint (default is no constraint → may be negative)
-#   - Fields whose constraint interval includes negative values (e.g., default 0 with no min)
-#
-# REMEDIATION:
-#   Option A — add a 'nonnegative' constraint to the field:
-#     field Measurement as number default 0 nonnegative
-#
-#   Option B — add a rule:
-#     rule Measurement >= 0 because "Measurement cannot be negative"
-#
-#   Option C — narrow via guard:
-#     from Active on Compute when Measurement >= 0 -> set Root = sqrt(Measurement) -> no transition
-#
-#   Option D — use a state ensure on the initial state:
-#     in Active ensure Measurement >= 0 because "Measurement must be non-negative in Active"
-#
-# After applying any of these, the C76 diagnostic disappears.
+# C76 currently covers both "may be negative" and "provably negative" message paths.
 
 precept SqrtSafetyDemo
 
@@ -29,8 +8,20 @@ field Measurement as number default 0
 field Root as number default 0
 
 state Active initial
-event Compute
+state Done
 
-# C76: Measurement has no nonnegative proof; its interval includes negative values.
-# EXPECT: C76 | severity=error | contains=may be negative
-from Active on Compute -> set Root = sqrt(Measurement) -> no transition
+event ComputeMaybeNegative
+event ComputeProvablyNegative
+event ComputeGuarded
+
+# C76: Measurement has no nonnegative proof, so sqrt() remains unresolved.
+# EXPECT: C76 | severity=error | match=exact | message=sqrt() requires a non-negative argument. 'Measurement' may be negative. Add a 'nonnegative' constraint, 'rule Measurement >= 0', state/event 'ensure', or guard with 'Measurement >= 0'. | line=19 | start=55 | end=66
+from Active on ComputeMaybeNegative -> set Root = sqrt(Measurement) -> transition Done
+
+# C76: 0.0 - 1.0 is a constant negative expression, so the contradiction branch fires.
+# EXPECT: C76 | severity=error | match=exact | message=sqrt() argument 'expression' is provably negative. (from: constant expression) | line=23 | start=58 | end=67
+from Active on ComputeProvablyNegative -> set Root = sqrt(0.0 - 1.0) -> transition Done
+
+# SAFE: the guard proves Measurement >= 0 inside the row.
+from Active on ComputeGuarded when Measurement >= 0 -> set Root = sqrt(Measurement) -> transition Done
+from Active on ComputeGuarded -> transition Done

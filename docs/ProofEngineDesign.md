@@ -1380,10 +1380,11 @@ The `test/integrationtests/diagnostics/` folder is a living catalog of proof eng
 
 **Drift prevention tests:** Each diagnostic sample has a corresponding `[Theory]` test case in `DiagnosticSampleDriftTests.cs` that compiles the file via `PreceptCompiler.CompileFromText()` and asserts:
 
-1. **Expected diagnostics present** — every diagnostic code listed in the sample's `# Demonstrates:` comment header must appear in the compilation result.
-2. **No unexpected errors** — no error-severity diagnostic codes beyond those listed in the header. (Additional warnings are tolerated — the engine may add new warning-level diagnostics without breaking existing samples.)
+1. **Header coverage** — the sample's `# Demonstrates:` header exactly matches the distinct diagnostic codes declared by its `# EXPECT:` annotations.
+2. **Exact diagnostic contract** — every `# EXPECT:` annotation declares the code, severity, message match mode, visible message text, and emitted `Line` / `Column` / `EndColumn` values for one diagnostic.
+3. **No extras at any severity** — the actual compilation result must match the declared expectation set exactly. No undeclared errors, warnings, or hints are allowed.
 
-Each sample file's `# Demonstrates:` header is the contract: it declares exactly which diagnostic codes the file is designed to trigger. The test reads this header and uses it as the assertion set — no hardcoded test data that can drift from the sample content.
+The `# Demonstrates:` header remains the summary contract, but the line-by-line `# EXPECT:` annotations are the precise executable contract. This keeps the sample file itself as the single source of truth for what the author should see in the editor, including squiggle placement.
 
 This mirrors the existing `SampleFile_ParsesAndCompilesClean` pattern for regular samples, but inverts the assertion: regular samples must compile clean, diagnostic samples must produce their declared diagnostics.
 

@@ -17,7 +17,8 @@ public static class CompileTool
 
         var diagnostics = result.Diagnostics
             .Select(d => new DiagnosticDto(d.Line, d.Column, d.Message, d.Code,
-                d.Severity.ToString().ToLowerInvariant()))
+                d.Severity.ToString().ToLowerInvariant(),
+                d.EndColumn > d.Column ? d.EndColumn : null))
             .ToList();
 
         if (model is null)
@@ -212,7 +213,7 @@ public sealed record CompileResult(
         new(false, false, null, null, 0, 0, null, null, null, null, null, null, null, null, null, diagnostics);
 }
 
-public sealed record DiagnosticDto(int Line, int Column, string Message, string? Code, string Severity);
+public sealed record DiagnosticDto(int Line, int Column, string Message, string? Code, string Severity, int? EndColumn = null);
 
 public sealed record StateDto(string Name, IReadOnlyList<string> Rules);
 public sealed record FieldDto(string Name, string Type, bool Nullable, object? Default,

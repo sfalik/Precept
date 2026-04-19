@@ -107,7 +107,19 @@ The `test/integrationtests/diagnostics/` folder contains `.precept` files that d
 
 **Evolution:** As the proof engine grows (collection reasoning, string constraints, cross-field analysis), new samples should be added to cover those scenarios. The `test/integrationtests/diagnostics/` folder is a living catalog of what the engine can prove.
 
-**Drift prevention:** Every diagnostic sample is backed by a test in `test/Precept.Tests/DiagnosticSampleDriftTests.cs`. The test reads each sample's `# Demonstrates:` header, compiles the file, and asserts the declared diagnostic codes appear with no unexpected errors. A discovery test fails if any sample file lacks the header. When adding a new sample, no manual test wiring is needed — the theory test auto-discovers `test/integrationtests/diagnostics/*.precept` files.
+**Expectation contract:** Every emitted diagnostic in a diagnostic sample must have an adjacent `# EXPECT:` comment that declares the full assertion contract:
+
+```text
+# EXPECT: C94 | severity=error | match=exact | message=Assignment to 'Score' is provably outside the field's constraint range. Expression produces 200 to 600 (inclusive), but field requires 0 to 100 (inclusive). | line=19 | start=39 | end=52
+```
+
+- `code` is the human-facing diagnostic family (`C76`, `C92`, etc.)
+- `severity` is `error`, `warning`, or `hint`
+- `match` is `exact` or `contains`
+- `message` is the required visible diagnostic text; prefer `match=exact` and use `contains` only when the visible surface intentionally includes dynamic context that would make exact matching brittle
+- `line`, `start`, and `end` are the exact `Line`, `Column`, and `EndColumn` values emitted by `PreceptCompiler.CompileFromText()`
+
+**Drift prevention:** Every diagnostic sample is backed by a test in `test/Precept.Tests/DiagnosticSampleDriftTests.cs`. The test reads the sample's `# Demonstrates:` header and `# EXPECT:` comments, compiles the file, and asserts the expectations match the emitted diagnostics exactly. No extra diagnostics of any severity are allowed — not just no unexpected errors. A discovery test fails if any sample file lacks the header or malformed expectation metadata. When adding a new sample, no manual test wiring is needed — the theory test auto-discovers `test/integrationtests/diagnostics/*.precept` files.
 
 #### Proposal content at merge time
 

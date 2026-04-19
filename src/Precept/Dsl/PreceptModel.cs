@@ -167,7 +167,9 @@ public sealed record PreceptCollectionMutation(
     string? IntoField = null,
     int SourceLine = 0,
     int ExpressionStartColumn = 0,
-    int ExpressionEndColumn = 0);
+    int ExpressionEndColumn = 0,
+    int IntoFieldStartColumn = 0,
+    int IntoFieldEndColumn = 0);
 
 public enum PreceptCollectionMutationVerb
 {
@@ -267,7 +269,8 @@ public sealed record PreceptTransitionRow(
     IReadOnlyList<PreceptCollectionMutation>? CollectionMutations = null,
     string? WhenText = null,
     PreceptExpression? WhenGuard = null,
-    int SourceLine = 0);
+    int SourceLine = 0,
+    int GuardSourceLine = 0);
 
 /// <summary>
 /// Editable field declaration: <c>in &lt;State&gt; edit &lt;Field&gt;, &lt;Field&gt;</c>.

@@ -2099,6 +2099,7 @@ public sealed class PreceptEngine
 public sealed record PreceptDiagnostic(
     int Line,
     int Column,
+    int EndColumn,
     string Message,
     string? Code,
     ConstraintSeverity Severity,
@@ -2199,10 +2200,10 @@ public static class PreceptCompiler
     }
 
     private static PreceptDiagnostic ToDiagnostic(ParseDiagnostic diagnostic)
-        => new(diagnostic.Line, diagnostic.Column, diagnostic.Message, diagnostic.Code, ConstraintSeverity.Error);
+        => new(diagnostic.Line, diagnostic.Column, 0, diagnostic.Message, diagnostic.Code, ConstraintSeverity.Error);
 
     private static PreceptDiagnostic ToDiagnostic(PreceptValidationDiagnostic diagnostic)
-        => new(diagnostic.Line, diagnostic.Column, diagnostic.Message, diagnostic.DiagnosticCode, diagnostic.Constraint.Severity, diagnostic.StateContext);
+        => new(diagnostic.Line, diagnostic.Column, diagnostic.EndColumn, diagnostic.Message, diagnostic.DiagnosticCode, diagnostic.Constraint.Severity, diagnostic.StateContext);
 
     private static void ThrowIfValidationFailed(ValidationResult validation)
     {
@@ -2402,7 +2403,8 @@ public static class PreceptCompiler
                         DiagnosticCatalog.C32,
                         DiagnosticCatalog.C32.FormatMessage(("sourceLine", assignment.SourceLine), ("key", assignment.Key), ("expression", assignment.ExpressionText), ("reason", rule.Reason)),
                         assignment.SourceLine,
-                        Column: assignment.Expression.Position?.StartColumn ?? 0));
+                        Column: assignment.Expression.Position?.StartColumn ?? 0,
+                        EndColumn: assignment.Expression.Position?.EndColumn ?? 0));
                 }
             }
         }

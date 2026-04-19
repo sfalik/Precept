@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -58,6 +59,8 @@ public class DiagnosticSpanPrecisionTests
         "C92", // division by literal zero
         "C93", // divisor not provably nonzero
         "C94", // assignment outside field constraint interval
+        "C97", // dead guard
+        "C98", // tautological guard
     };
 
     /// <summary>
@@ -98,8 +101,6 @@ public class DiagnosticSpanPrecisionTests
         "C88", // computed field assigned via set
         "C95", // contradictory rule
         "C96", // vacuous rule
-        "C97", // dead guard
-        "C98", // tautological guard
     };
 
     // ════════════════════════════════════════════════════════════════
@@ -138,16 +139,16 @@ public class DiagnosticSpanPrecisionTests
     }
 
     /// <summary>
-    /// Ensures every expression-level diagnostic has an actual Column > 0 test — either
+    /// Ensures every expression-level diagnostic has an actual span test — either
     /// an [InlineData] on the Theory or a dedicated [Fact]. Classifying without testing
     /// is not enough; this closes the gap.
     /// </summary>
     [Fact]
-    public void AllExpressionLevelDiagnostics_HaveColumnTest()
+    public void AllExpressionLevelDiagnostics_HaveSpanTest()
     {
         // IDs covered by the parameterized Theory via [InlineData]
         var method = typeof(DiagnosticSpanPrecisionTests)
-            .GetMethod(nameof(ExpressionLevelDiagnostic_HasNonZeroColumn))!;
+            .GetMethod(nameof(ExpressionLevelDiagnostic_HasNonZeroSpan))!;
 
         var theoryTestedIds = method
             .GetCustomAttributes<InlineDataAttribute>()
@@ -163,14 +164,14 @@ public class DiagnosticSpanPrecisionTests
         var untested = ExpressionLevelDiagnostics.Except(allTestedIds).ToList();
 
         untested.Should().BeEmpty(
-            "every expression-level diagnostic must have a Column > 0 test. " +
-            "Add an [InlineData] to ExpressionLevelDiagnostic_HasNonZeroColumn or a dedicated [Fact]. " +
+            "every expression-level diagnostic must have a span test. " +
+            "Add an [InlineData] to ExpressionLevelDiagnostic_HasNonZeroSpan or a dedicated [Fact]. " +
             "Untested: {0}",
             string.Join(", ", untested));
     }
 
     // ════════════════════════════════════════════════════════════════
-    // Expression-level diagnostics must have Column > 0
+    // Expression-level diagnostics must have a real span
     // ════════════════════════════════════════════════════════════════
     //
     // Each InlineData triggers exactly one target diagnostic via a
@@ -254,7 +255,13 @@ public class DiagnosticSpanPrecisionTests
     // C94: assignment outside field constraint interval
     [InlineData("C94", "PRECEPT094",
         "precept Test\nfield Score as number default 50 max 100\nstate A initial\nevent Go\nfrom A on Go -> set Score = 150 -> no transition\n")]
-    public void ExpressionLevelDiagnostic_HasNonZeroColumn(string constraintId, string expectedCode, string dsl)
+    // C97: dead guard
+    [InlineData("C97", "PRECEPT097",
+        "precept Test\nfield X as number default 15 min 10\nstate A initial\nevent Go\nfrom A on Go when X < 0 -> no transition\nfrom A on Go -> no transition\n")]
+    // C98: tautological guard
+    [InlineData("C98", "PRECEPT098",
+        "precept Test\nfield X as number default 15 min 10\nstate A initial\nevent Go\nfrom A on Go when X >= 0 -> no transition\n")]
+    public void ExpressionLevelDiagnostic_HasNonZeroSpan(string constraintId, string expectedCode, string dsl)
     {
         var result = PreceptCompiler.CompileFromText(dsl);
 
@@ -268,6 +275,106 @@ public class DiagnosticSpanPrecisionTests
             "expression-level diagnostic {0} ({1}) should have Column > 0 for token-precise highlighting. " +
             "Message: {2}",
             constraintId, expectedCode, diagnostic.Message);
+
+        diagnostic.EndColumn.Should().BeGreaterThan(diagnostic.Column,
+            "expression-level diagnostic {0} ({1}) should emit EndColumn > Column for a real highlighted span, not a collapsed point. " +
+            "Message: {2}",
+            constraintId, expectedCode, diagnostic.Message);
+    }
+
+    [Fact]
+    public void C92_FlowedZeroIdentifierDivisor_UsesFullIdentifierSpan()
+    {
+        const string dsl = "precept Test\nfield Amount as number default 100\nfield Rate as number default 5 positive\nfield Result as number default 0\nstate Active initial\nevent Break\nfrom Active on Break\n    -> set Rate = 0\n    -> set Result = Amount / Rate\n    -> no transition\n";
+
+        var result = PreceptCompiler.CompileFromText(dsl);
+        var diagnostic = result.Diagnostics.First(d => d.Code == "PRECEPT092");
+        var lineText = dsl.Split('\n')[8];
+        var expectedStart = lineText.LastIndexOf("Rate", StringComparison.Ordinal);
+        var expectedEnd = expectedStart + "Rate".Length;
+
+        diagnostic.Line.Should().Be(9,
+            "PRECEPT092 should point at the divisor expression line after the prior set mutates Rate to zero");
+        diagnostic.Column.Should().Be(expectedStart,
+            "PRECEPT092 should start at the multi-character identifier divisor, not the whole expression");
+        diagnostic.EndColumn.Should().Be(expectedEnd,
+            "PRECEPT092 should cover the full identifier divisor span for precise squiggles");
+    }
+
+    [Fact]
+    public void C93_IdentifierDivisor_UsesFullIdentifierSpan()
+    {
+        const string dsl = "precept Test\nfield Amount as number default 100\nfield Rate as number default 1\nfield Result as number default 0\nstate Active initial\nevent Break\nfrom Active on Break\n    -> set Result = Amount / Rate\n    -> no transition\n";
+
+        var result = PreceptCompiler.CompileFromText(dsl);
+        var diagnostic = result.Diagnostics.First(d => d.Code == "PRECEPT093");
+        var lineText = dsl.Split('\n')[7];
+        var expectedStart = lineText.LastIndexOf("Rate", StringComparison.Ordinal);
+        var expectedEnd = expectedStart + "Rate".Length;
+
+        diagnostic.Line.Should().Be(8,
+            "PRECEPT093 should be reported on the divisor expression line");
+        diagnostic.Column.Should().Be(expectedStart,
+            "PRECEPT093 should start at the identifier divisor, not the start of the set expression");
+        diagnostic.EndColumn.Should().Be(expectedEnd,
+            "PRECEPT093 should cover the full identifier divisor span for precise squiggles");
+    }
+
+    [Fact]
+    public void C94_AssignmentConstraintViolation_UsesFullExpressionSpan()
+    {
+        const string dsl = "precept Test\nfield Score as number default 50 min 0 max 100\nfield Boost as number default 200 min 200 max 500\nstate Review initial\nevent AddBoost\nfrom Review on AddBoost -> set Score = Score + Boost -> no transition\n";
+
+        var result = PreceptCompiler.CompileFromText(dsl);
+        var diagnostic = result.Diagnostics.First(d => d.Code == "PRECEPT094");
+        var lineText = dsl.Split('\n')[5];
+        var expectedStart = lineText.IndexOf("Score + Boost", StringComparison.Ordinal);
+        var expectedEnd = expectedStart + "Score + Boost".Length;
+
+        diagnostic.Line.Should().Be(6,
+            "PRECEPT094 should be reported on the assignment expression line");
+        diagnostic.Column.Should().Be(expectedStart,
+            "PRECEPT094 should start at the first token of the violating RHS expression");
+        diagnostic.EndColumn.Should().Be(expectedEnd,
+            "PRECEPT094 should cover the full RHS expression span for precise squiggles");
+    }
+
+    [Fact]
+    public void C76_SqrtArgument_UsesFullArgumentSpan()
+    {
+        const string dsl = "precept Test\nfield Measurement as number default 0\nfield Root as number default 0\nstate Active initial\nevent Compute\nfrom Active on Compute -> set Root = sqrt(Measurement) -> no transition\n";
+
+        var result = PreceptCompiler.CompileFromText(dsl);
+        var diagnostic = result.Diagnostics.First(d => d.Code == "PRECEPT076");
+        var lineText = dsl.Split('\n')[5];
+        var expectedStart = lineText.IndexOf("Measurement", StringComparison.Ordinal);
+        var expectedEnd = expectedStart + "Measurement".Length;
+
+        diagnostic.Line.Should().Be(6,
+            "PRECEPT076 should be reported on the sqrt argument line");
+        diagnostic.Column.Should().Be(expectedStart,
+            "PRECEPT076 should start at the argument expression, not at the start of sqrt()");
+        diagnostic.EndColumn.Should().Be(expectedEnd,
+            "PRECEPT076 should cover the full argument span for precise squiggles");
+    }
+
+    [Fact]
+    public void C98_TautologicalGuard_UsesGuardExpressionSpan()
+    {
+        const string dsl = "precept Test\nfield X as number default 15 min 10\nstate A initial\nevent Go\nfrom A on Go\n    when X >= 0\n    -> no transition\n";
+
+        var result = PreceptCompiler.CompileFromText(dsl);
+        var diagnostic = result.Diagnostics.First(d => d.Code == "PRECEPT098");
+        var lineText = dsl.Split('\n')[5];
+        var expectedStart = lineText.IndexOf("X >= 0", StringComparison.Ordinal);
+        var expectedEnd = expectedStart + "X >= 0".Length;
+
+        diagnostic.Line.Should().Be(6,
+            "C98 should be reported on the multiline when-clause line, not the from-row line");
+        diagnostic.Column.Should().Be(expectedStart,
+            "C98 should start at the guard expression, not the start of the transition row");
+        diagnostic.EndColumn.Should().Be(expectedEnd,
+            "C98 should cover the full guard expression span for precise squiggles");
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -276,7 +383,7 @@ public class DiagnosticSpanPrecisionTests
     // ════════════════════════════════════════════════════════════════
 
     [Fact]
-    public void C71_UnknownFunction_HasNonZeroColumn_WhenPositionProvided()
+    public void C71_UnknownFunction_HasNonZeroSpan_WhenPositionProvided()
     {
         // C71 can only be triggered via model construction since the parser
         // rejects unknown function names. When Position is set on the
@@ -304,6 +411,8 @@ public class DiagnosticSpanPrecisionTests
         diag.Should().NotBeNull("C71 should be triggered for unknown function 'unknownfn'");
         diag!.Column.Should().BeGreaterThan(0,
             "C71 should use the function expression's Position for column precision");
+        diag.EndColumn.Should().BeGreaterThan(diag.Column,
+            "C71 should preserve the full function-call span when Position is available");
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -312,7 +421,7 @@ public class DiagnosticSpanPrecisionTests
     // ════════════════════════════════════════════════════════════════
 
     [Fact]
-    public void C43_CollectionTypeMismatch_HasNonZeroColumn()
+    public void C43_CollectionTypeMismatch_UsesIntoFieldSpan()
     {
         // dequeue a number collection into a string field → C43
         const string dsl = """
@@ -329,9 +438,13 @@ public class DiagnosticSpanPrecisionTests
 
         var diagnostic = result.Diagnostics.FirstOrDefault(d => d.Code == "PRECEPT043");
         diagnostic.Should().NotBeNull("C43 should fire for type mismatch on dequeue into");
-        // C43 targets the mutation expression, which may have Column=0 if the
-        // expression position isn't available (dequeue expressions don't have a
-        // value expression in the same way set does). Accept Column >= 0 for now.
-        // The key is that this is tracked — if Position becomes available, Column > 0.
+        var lineText = dsl.Split('\n')[6];
+        var expectedStart = lineText.LastIndexOf("Target", StringComparison.Ordinal);
+        var expectedEnd = expectedStart + "Target".Length;
+
+        diagnostic!.Column.Should().Be(expectedStart,
+            "C43 should point at the into-target field identifier, which is the author-facing source of the assignment mismatch");
+        diagnostic.EndColumn.Should().Be(expectedEnd,
+            "C43 should cover the full into-target identifier span for precise editor squiggles");
     }
 }

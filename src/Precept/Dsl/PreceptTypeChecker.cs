@@ -24,10 +24,47 @@ internal sealed record PreceptValidationDiagnostic(
     string Message,
     int Line,
     int Column = 0,
+    int EndColumn = 0,
     string? StateContext = null,
     ProofAssessment? Assessment = null)
 {
     public string DiagnosticCode => DiagnosticCatalog.ToDiagnosticCode(Constraint.Id);
+}
+
+internal static class PreceptValidationDiagnosticFactory
+{
+    public static PreceptValidationDiagnostic FromExpression(
+        LanguageConstraint constraint,
+        string message,
+        int line,
+        PreceptExpression? expression,
+        string? stateContext = null,
+        ProofAssessment? assessment = null)
+        => new(
+            constraint,
+            message,
+            line,
+            Column: expression?.Position?.StartColumn ?? 0,
+            EndColumn: expression?.Position?.EndColumn ?? 0,
+            StateContext: stateContext,
+            Assessment: assessment);
+
+    public static PreceptValidationDiagnostic FromColumns(
+        LanguageConstraint constraint,
+        string message,
+        int line,
+        int startColumn,
+        int endColumn,
+        string? stateContext = null,
+        ProofAssessment? assessment = null)
+        => new(
+            constraint,
+            message,
+            line,
+            Column: startColumn,
+            EndColumn: endColumn,
+            StateContext: stateContext,
+            Assessment: assessment);
 }
 
 internal sealed record PreceptTypeExpressionInfo(
@@ -314,8 +351,10 @@ internal static class PreceptTypeChecker
 
                     if (row.WhenGuard is not null && !string.IsNullOrWhiteSpace(row.WhenText))
                     {
+                        var guardSourceLine = row.GuardSourceLine > 0 ? row.GuardSourceLine : row.SourceLine;
+
                         scopes.Add(new PreceptTypeScopeInfo(
-                            row.SourceLine,
+                            guardSourceLine,
                             "when",
                             new Dictionary<string, StaticValueKind>(branchContext.Symbols, StringComparer.Ordinal),
                             item.State,
@@ -323,7 +362,7 @@ internal static class PreceptTypeChecker
                         ValidateExpression(
                             row.WhenGuard,
                             row.WhenText!,
-                            row.SourceLine,
+                            guardSourceLine,
                             branchContext,
                             StaticValueKind.Boolean,
                             "when predicate",
@@ -333,7 +372,7 @@ internal static class PreceptTypeChecker
                             isBooleanRulePosition: true);
 
                         // SYNC:CONSTRAINT:C97/C98: dead/tautological guard detection
-                        AssessGuard(row.WhenGuard, row.WhenText!, row.SourceLine,
+                        AssessGuard(row.WhenGuard, row.WhenText!, guardSourceLine,
                             dataFieldKinds.FieldIntervals, diagnostics, item.State);
 
                         setContext = ApplyNarrowing(row.WhenGuard, branchContext, assumeTrue: true);
@@ -376,6 +415,7 @@ internal static class PreceptTypeChecker
                                     ("name", assignment.Key)),
                                 assignment.SourceLine > 0 ? assignment.SourceLine : row.SourceLine,
                                 Column: assignment.Expression.Position?.StartColumn ?? 0,
+                                EndColumn: assignment.Expression.Position?.EndColumn ?? 0,
                                 StateContext: item.State));
                         }
 
@@ -395,6 +435,7 @@ internal static class PreceptTypeChecker
                                     ProofDiagnosticRenderer.Render(assessment),
                                     assignment.SourceLine > 0 ? assignment.SourceLine : row.SourceLine,
                                     Column: assignment.Expression.Position?.StartColumn ?? 0,
+                                    EndColumn: assignment.Expression.Position?.EndColumn ?? 0,
                                     StateContext: item.State,
                                     Assessment: assessment));
                             }
@@ -501,6 +542,7 @@ internal static class PreceptTypeChecker
                             ("name", assignment.Key)),
                         assignment.SourceLine > 0 ? assignment.SourceLine : action.SourceLine,
                         Column: assignment.Expression.Position?.StartColumn ?? 0,
+                        EndColumn: assignment.Expression.Position?.EndColumn ?? 0,
                         StateContext: action.State));
                 }
 
@@ -520,6 +562,7 @@ internal static class PreceptTypeChecker
                             ProofDiagnosticRenderer.Render(assessment),
                             assignment.SourceLine > 0 ? assignment.SourceLine : action.SourceLine,
                             Column: assignment.Expression.Position?.StartColumn ?? 0,
+                            EndColumn: assignment.Expression.Position?.EndColumn ?? 0,
                             StateContext: action.State,
                             Assessment: assessment));
                     }
@@ -1487,7 +1530,8 @@ internal static class PreceptTypeChecker
                         DiagnosticCatalog.C69,
                         DiagnosticCatalog.C69.FormatMessage(("name", fullName)),
                         sourceLine,
-                        Column: id.Position?.StartColumn ?? 0));
+                        Column: id.Position?.StartColumn ?? 0,
+                        EndColumn: id.Position?.EndColumn ?? 0));
                 }
                 break;
 
@@ -1690,6 +1734,7 @@ internal static class PreceptTypeChecker
             {
                 Line = sourceLine > 0 ? sourceLine : diagnostic.Line,
                 Column = diagnostic.Column != 0 ? diagnostic.Column : expression.Position?.StartColumn ?? 0,
+                EndColumn = diagnostic.EndColumn != 0 ? diagnostic.EndColumn : expression.Position?.EndColumn ?? 0,
                 StateContext = stateContext
             });
             return;
@@ -1702,6 +1747,7 @@ internal static class PreceptTypeChecker
             {
                 Line = sourceLine > 0 ? sourceLine : diagnostic.Line,
                 Column = diagnostic.Column != 0 ? diagnostic.Column : expression.Position?.StartColumn ?? 0,
+                EndColumn = diagnostic.EndColumn != 0 ? diagnostic.EndColumn : expression.Position?.EndColumn ?? 0,
                 StateContext = stateContext
             });
         }
@@ -1747,12 +1793,12 @@ internal static class PreceptTypeChecker
             stateContext,
             eventName));
 
-        diagnostics.Add(new PreceptValidationDiagnostic(
+        diagnostics.Add(PreceptValidationDiagnosticFactory.FromExpression(
             constraint,
             message,
             sourceLine,
-            Column: expression.Position?.StartColumn ?? 0,
-            StateContext: stateContext));
+            expression,
+            stateContext));
     }
 
     private static bool TryInferKind(
@@ -2131,6 +2177,7 @@ internal static class PreceptTypeChecker
                         ProofDiagnosticRenderer.Render(assessment),
                         0,
                         Column: arg.Position?.StartColumn ?? 0,
+                        EndColumn: arg.Position?.EndColumn ?? 0,
                         Assessment: assessment);
                     return false;
                 }
@@ -2302,6 +2349,7 @@ internal static class PreceptTypeChecker
                             ProofDiagnosticRenderer.Render(assessment),
                             0,
                             Column: binary.Right.Position?.StartColumn ?? 0,
+                            EndColumn: binary.Right.Position?.EndColumn ?? 0,
                             Assessment: assessment);
                         if (assessment.Outcome == ProofOutcome.Contradiction)
                             return false;
@@ -3196,6 +3244,8 @@ internal static class PreceptTypeChecker
                 DiagnosticCatalog.C97,
                 ProofDiagnosticRenderer.Render(assessment),
                 sourceLine,
+                Column: guard.Position?.StartColumn ?? 0,
+                EndColumn: guard.Position?.EndColumn ?? 0,
                 StateContext: stateContext,
                 Assessment: assessment));
             return;
@@ -3213,6 +3263,8 @@ internal static class PreceptTypeChecker
                 DiagnosticCatalog.C98,
                 ProofDiagnosticRenderer.Render(assessment),
                 sourceLine,
+                Column: guard.Position?.StartColumn ?? 0,
+                EndColumn: guard.Position?.EndColumn ?? 0,
                 StateContext: stateContext,
                 Assessment: assessment));
         }
@@ -3411,6 +3463,7 @@ internal static class PreceptTypeChecker
                                 ("name", mutation.TargetField)),
                             line,
                             Column: mutation.Expression.Position?.StartColumn ?? 0,
+                            EndColumn: mutation.Expression.Position?.EndColumn ?? 0,
                             StateContext: stateContext));
                     }
                     break;
@@ -3423,12 +3476,13 @@ internal static class PreceptTypeChecker
                     if (IsAssignable(innerKind, intoKind))
                         break;
 
-                    diagnostics.Add(new PreceptValidationDiagnostic(
+                    diagnostics.Add(PreceptValidationDiagnosticFactory.FromColumns(
                         DiagnosticCatalog.C43,
                         $"'{mutation.Verb.ToString().ToLowerInvariant()} {mutation.TargetField} into {mutation.IntoField}': cannot assign {FormatKinds(innerKind)} to target '{mutation.IntoField}' of type {FormatKinds(intoKind)}.",
                         line,
-                        Column: mutation.Expression?.Position?.StartColumn ?? 0,
-                        StateContext: stateContext));
+                        mutation.IntoFieldStartColumn,
+                        mutation.IntoFieldEndColumn,
+                        stateContext));
                     break;
             }
         }

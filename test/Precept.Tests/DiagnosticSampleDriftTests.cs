@@ -12,21 +12,55 @@ namespace Precept.Tests;
 /// Drift defense for the proof-engine sample catalog.
 ///
 /// Root samples (samples/*.precept): must parse and compile without errors.
-/// Diagnostic samples (test/integrationtests/diagnostics/*.precept): must compile and produce
-    /// exactly the diagnostic codes declared in their <c># Demonstrates: Cxx</c> header.
-/// A discovery test fails if any sample file lacks the header.
+/// Diagnostic samples (test/integrationtests/diagnostics/*.precept): must declare
+/// their exact expected diagnostics through <c># EXPECT:</c> comments and compile to
+/// exactly that diagnostic set, with no extra errors, warnings, or hints.
 ///
-/// Cross-surface consistency (D9):
-///   computed-tax-net.precept demonstrates consistent proof data across hover,
-///   diagnostics, and MCP precept_compile output. Verified by inspection.
+/// EXPECT contract:
+///   # EXPECT: C94 | severity=error | match=exact | message=... | line=12 | start=34 | end=47
 ///
-/// See temp/specs/step-15.md and CONTRIBUTING.md § Diagnostic Samples.
+/// See CONTRIBUTING.md § Diagnostic Samples and docs/ProofEngineDesign.md.
 /// </summary>
 public class DiagnosticSampleDriftTests
 {
-    // ════════════════════════════════════════════════════════════════════
-    // Helpers
-    // ════════════════════════════════════════════════════════════════════
+    private enum MessageMatchMode
+    {
+        Exact,
+        Contains,
+    }
+
+    private sealed record SampleExpectation(
+        string Code,
+        ConstraintSeverity Severity,
+        MessageMatchMode MatchMode,
+        string Message,
+        int Line,
+        int Start,
+        int End,
+        int ExpectationLine)
+    {
+        public string DiagnosticCode => DiagnosticCatalog.ToDiagnosticCode(Code);
+
+        public bool Matches(PreceptDiagnostic diagnostic)
+            => string.Equals(diagnostic.Code, DiagnosticCode, StringComparison.Ordinal)
+                && diagnostic.Severity == Severity
+                && diagnostic.Line == Line
+                && diagnostic.Column == Start
+                && diagnostic.EndColumn == End
+                && MatchesMessage(diagnostic.Message);
+
+        public string Describe()
+            => $"{DiagnosticCode}|{Severity}|line={Line}|start={Start}|end={End}|{MatchMode.ToString().ToLowerInvariant()}=\"{Message}\"";
+
+        private bool MatchesMessage(string actualMessage)
+            => MatchMode == MessageMatchMode.Exact
+                ? string.Equals(actualMessage, Message, StringComparison.Ordinal)
+                : actualMessage.Contains(Message, StringComparison.Ordinal);
+    }
+
+    private sealed record ParsedExpectations(
+        IReadOnlyList<SampleExpectation> Expectations,
+        IReadOnlyList<string> Errors);
 
     private static string FindRepoRoot()
     {
@@ -37,15 +71,12 @@ public class DiagnosticSampleDriftTests
                 return dir;
             dir = Directory.GetParent(dir)?.FullName;
         }
+
         throw new InvalidOperationException("Could not find repo root (Precept.slnx)");
     }
 
     private static string SamplesDir => Path.Combine(FindRepoRoot(), "samples");
     private static string DiagnosticSamplesDir => Path.Combine(FindRepoRoot(), "test", "integrationtests", "diagnostics");
-
-    // ════════════════════════════════════════════════════════════════════
-    // Test 1: Root sample file count guard
-    // ════════════════════════════════════════════════════════════════════
 
     [Fact]
     public void SampleDirectory_ContainsExpectedFileCount()
@@ -55,15 +86,10 @@ public class DiagnosticSampleDriftTests
             "samples/ should contain the baseline 25 files plus the Step 15 proof samples");
     }
 
-    // ════════════════════════════════════════════════════════════════════
-    // Test 2: Root samples parse without errors
-    // ════════════════════════════════════════════════════════════════════
-
     public static TheoryData<string> AllSampleFiles()
     {
         var data = new TheoryData<string>();
-        var samplesDir = Path.Combine(FindRepoRoot(), "samples");
-        foreach (var file in Directory.GetFiles(samplesDir, "*.precept"))
+        foreach (var file in Directory.GetFiles(SamplesDir, "*.precept"))
             data.Add(Path.GetFileName(file));
         return data;
     }
@@ -83,10 +109,6 @@ public class DiagnosticSampleDriftTests
             $"sample file '{fileName}' must produce a valid model");
     }
 
-    // ════════════════════════════════════════════════════════════════════
-    // Test 3: Root samples compile without errors
-    // ════════════════════════════════════════════════════════════════════
-
     [Theory]
     [MemberData(nameof(AllSampleFiles))]
     public void SampleFile_CompilesWithoutErrors(string fileName)
@@ -104,10 +126,6 @@ public class DiagnosticSampleDriftTests
             $"sample file '{fileName}' must compile without errors (warnings OK)");
     }
 
-    // ════════════════════════════════════════════════════════════════════
-    // Proof-demonstrating root samples — gap coverage (Step 15 spec §2–§4)
-    // ════════════════════════════════════════════════════════════════════
-
     [Fact]
     public void ComputedTaxNetSample_ExistsAndCompiles()
     {
@@ -118,6 +136,116 @@ public class DiagnosticSampleDriftTests
     public void TransitiveOrderingSample_ExistsAndCompiles()
     {
         AssertSampleExistsAndCompiles("transitive-ordering.precept");
+    }
+
+    [Fact]
+    public void DiagnosticSamplesDirectory_Exists()
+    {
+        Directory.Exists(DiagnosticSamplesDir).Should().BeTrue(
+            "test/integrationtests/diagnostics/ must exist and contain the proof-engine diagnostic catalog");
+    }
+
+    public static TheoryData<string> AllDiagnosticSampleFiles()
+    {
+        var data = new TheoryData<string>();
+        if (!Directory.Exists(DiagnosticSamplesDir))
+            return data;
+
+        foreach (var file in Directory.GetFiles(DiagnosticSamplesDir, "*.precept"))
+            data.Add(Path.GetFileName(file));
+
+        return data;
+    }
+
+    [Theory]
+    [MemberData(nameof(AllDiagnosticSampleFiles))]
+    public void DiagnosticSample_HasDemonstratesHeader(string fileName)
+    {
+        var filePath = Path.Combine(DiagnosticSamplesDir, fileName);
+        var rawText = File.ReadAllText(filePath);
+
+        var headerLine = FindDemonstratesHeader(rawText);
+        headerLine.Should().NotBeNull(
+            $"diagnostic sample '{fileName}' must have a '# Demonstrates: Cxx[, Cyy...]' header");
+
+        ParseDeclaredCodes(headerLine!).Should().NotBeEmpty(
+            $"diagnostic sample '{fileName}' '# Demonstrates:' header must list at least one code");
+    }
+
+    [Theory]
+    [MemberData(nameof(AllDiagnosticSampleFiles))]
+    public void DiagnosticSample_StrictExpectations_AreWellFormed(string fileName)
+    {
+        var filePath = Path.Combine(DiagnosticSamplesDir, fileName);
+        var rawText = File.ReadAllText(filePath);
+
+        var parsed = ParseExpectations(rawText);
+        parsed.Errors.Should().BeEmpty(
+            $"diagnostic sample '{fileName}' has malformed '# EXPECT:' metadata:{Environment.NewLine}{string.Join(Environment.NewLine, parsed.Errors)}");
+
+        parsed.Expectations.Should().NotBeEmpty(
+            $"diagnostic sample '{fileName}' must declare at least one '# EXPECT:' contract row");
+    }
+
+    [Theory]
+    [MemberData(nameof(AllDiagnosticSampleFiles))]
+    public void DiagnosticSample_Expectations_CoverDemonstratedCodes(string fileName)
+    {
+        var filePath = Path.Combine(DiagnosticSamplesDir, fileName);
+        var rawText = File.ReadAllText(filePath);
+
+        var headerLine = FindDemonstratesHeader(rawText);
+        if (headerLine is null)
+            return;
+
+        var parsed = ParseExpectations(rawText);
+        if (parsed.Errors.Count > 0)
+            return;
+
+        var declaredCodes = ParseDeclaredCodes(headerLine)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var expectCodes = parsed.Expectations
+            .Select(expectation => expectation.Code)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        expectCodes.SetEquals(declaredCodes).Should().BeTrue(
+            $"'{fileName}': '# Demonstrates:' codes must exactly match the distinct codes declared in '# EXPECT:' annotations. " +
+            $"Header=[{string.Join(", ", declaredCodes.OrderBy(code => code))}] Expect=[{string.Join(", ", expectCodes.OrderBy(code => code))}]");
+    }
+
+    [Theory]
+    [MemberData(nameof(AllDiagnosticSampleFiles))]
+    public void DiagnosticSample_ExactExpectations_MatchDiagnostics_AndNoExtraDiagnostics(string fileName)
+    {
+        var filePath = Path.Combine(DiagnosticSamplesDir, fileName);
+        var rawText = File.ReadAllText(filePath);
+        var parsed = ParseExpectations(rawText);
+
+        if (parsed.Errors.Count > 0)
+            return;
+
+        var result = PreceptCompiler.CompileFromText(rawText);
+        var unmatchedActual = result.Diagnostics
+            .Select((diagnostic, index) => (diagnostic, index))
+            .ToList();
+
+        foreach (var expectation in parsed.Expectations)
+        {
+            var matches = unmatchedActual
+                .Where(candidate => expectation.Matches(candidate.diagnostic))
+                .ToList();
+
+            matches.Should().HaveCount(1,
+                $"'{fileName}': EXPECT on line {expectation.ExpectationLine} must match exactly one diagnostic. " +
+                $"Expected: {expectation.Describe()}{Environment.NewLine}" +
+                $"Actual diagnostics:{Environment.NewLine}{FormatDiagnostics(result.Diagnostics)}");
+
+            unmatchedActual.Remove(matches[0]);
+        }
+
+        unmatchedActual.Should().BeEmpty(
+            $"'{fileName}': every emitted diagnostic must be declared by '# EXPECT:' metadata. " +
+            $"Unexpected actual diagnostics:{Environment.NewLine}{FormatDiagnostics(unmatchedActual.Select(candidate => candidate.diagnostic))}");
     }
 
     private static void AssertSampleExistsAndCompiles(string fileName)
@@ -137,245 +265,197 @@ public class DiagnosticSampleDriftTests
             $"sample file '{fileName}' must compile without errors");
     }
 
-    // ════════════════════════════════════════════════════════════════════
-    // Test 4: Diagnostic samples directory exists
-    // ════════════════════════════════════════════════════════════════════
-
-    [Fact]
-    public void DiagnosticSamplesDirectory_Exists()
+    private static ParsedExpectations ParseExpectations(string text)
     {
-        Directory.Exists(DiagnosticSamplesDir).Should().BeTrue(
-            "test/integrationtests/diagnostics/ must exist and contain the proof-engine diagnostic catalog");
-    }
-
-    // ════════════════════════════════════════════════════════════════════
-    // Test 5: Each diagnostic sample has a # Demonstrates: header
-    // ════════════════════════════════════════════════════════════════════
-
-    public static TheoryData<string> AllDiagnosticSampleFiles()
-    {
-        var data = new TheoryData<string>();
-        var dir = Path.Combine(FindRepoRoot(), "test", "integrationtests", "diagnostics");
-        if (!Directory.Exists(dir)) return data;
-        foreach (var file in Directory.GetFiles(dir, "*.precept"))
-            data.Add(Path.GetFileName(file));
-        return data;
-    }
-
-    [Theory]
-    [MemberData(nameof(AllDiagnosticSampleFiles))]
-    public void DiagnosticSample_HasDemonstratesHeader(string fileName)
-    {
-        var filePath = Path.Combine(DiagnosticSamplesDir, fileName);
-        var rawText = File.ReadAllText(filePath);
-
-        var headerLine = FindDemonstratesHeader(rawText);
-        headerLine.Should().NotBeNull(
-            $"diagnostic sample '{fileName}' must have a '# Demonstrates: Cxx[, Cyy...]' header");
-
-        ParseDeclaredCodes(headerLine!).Should().NotBeEmpty(
-            $"diagnostic sample '{fileName}' '# Demonstrates:' header must list at least one code");
-    }
-
-    // ════════════════════════════════════════════════════════════════════
-    // Test 6: Each diagnostic sample emits declared codes, no unexpected errors
-    // ════════════════════════════════════════════════════════════════════
-
-    [Theory]
-    [MemberData(nameof(AllDiagnosticSampleFiles))]
-    public void DiagnosticSample_EmitsDeclaredCodes_AndNoUnexpectedErrors(string fileName)
-    {
-        var filePath = Path.Combine(DiagnosticSamplesDir, fileName);
-        var rawText = File.ReadAllText(filePath);
-
-        var headerLine = FindDemonstratesHeader(rawText);
-        headerLine.Should().NotBeNull(
-            $"diagnostic sample '{fileName}' must have a '# Demonstrates:' header");
-
-        var declaredCodes = ParseDeclaredCodes(headerLine!);
-        var preceptCodes = declaredCodes
-            .Select(DiagnosticCatalog.ToDiagnosticCode)
-            .ToHashSet(StringComparer.Ordinal);
-
-        var result = PreceptCompiler.CompileFromText(rawText);
-
-        // Every declared code must appear in the compilation diagnostics
-        foreach (var code in preceptCodes)
-        {
-            result.Diagnostics.Any(d => d.Code == code).Should().BeTrue(
-                $"diagnostic sample '{fileName}' must emit {code} (declared in # Demonstrates: header)");
-        }
-
-        // No error-severity diagnostics beyond those declared in the header
-        var unexpectedErrors = result.Diagnostics
-            .Where(d => d.Severity == ConstraintSeverity.Error && !preceptCodes.Contains(d.Code!))
-            .ToList();
-        unexpectedErrors.Should().BeEmpty(
-            $"diagnostic sample '{fileName}' must not emit error-severity diagnostics beyond those declared in its header");
-    }
-
-    // ════════════════════════════════════════════════════════════════════
-    // Test 7: EXPECT annotations cover all Demonstrates codes
-    // ════════════════════════════════════════════════════════════════════
-
-    [Theory]
-    [MemberData(nameof(AllDiagnosticSampleFiles))]
-    public void DiagnosticSample_ExpectAnnotations_CoverDemonstratedCodes(string fileName)
-    {
-        var filePath = Path.Combine(DiagnosticSamplesDir, fileName);
-        var rawText = File.ReadAllText(filePath);
-
-        var headerLine = FindDemonstratesHeader(rawText);
-        if (headerLine is null) return; // Caught by HasDemonstratesHeader test
-
-        var declaredCodes = ParseDeclaredCodes(headerLine)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        if (declaredCodes.Count == 0) return;
-
-        var expectCodes = ParseExpectations(rawText)
-            .Select(e => e.Code)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var code in declaredCodes)
-        {
-            expectCodes.Should().Contain(code,
-                $"'{fileName}': '# Demonstrates: {code}' must have at least one '# EXPECT: {code}' annotation");
-        }
-    }
-
-    // ════════════════════════════════════════════════════════════════════
-    // Test 8: Per-line EXPECT annotations match actual diagnostics
-    // ════════════════════════════════════════════════════════════════════
-
-    [Theory]
-    [MemberData(nameof(AllDiagnosticSampleFiles))]
-    public void DiagnosticSample_PerLineExpectations_MatchDiagnostics(string fileName)
-    {
-        var filePath = Path.Combine(DiagnosticSamplesDir, fileName);
-        var rawText = File.ReadAllText(filePath);
-
-        var expectations = ParseExpectations(rawText);
-        if (expectations.Count == 0)
-            return; // No EXPECT annotations — nothing to verify
-
-        var result = PreceptCompiler.CompileFromText(rawText);
-
-        foreach (var exp in expectations)
-        {
-            var preceptCode = DiagnosticCatalog.ToDiagnosticCode(exp.Code);
-
-            var onLine = result.Diagnostics
-                .Where(d => d.Code == preceptCode && d.Line == exp.ExecutableLine)
-                .ToList();
-
-            onLine.Should().NotBeEmpty(
-                $"'{fileName}': expected {exp.Code} on line {exp.ExecutableLine} (contains='{exp.Contains}')," +
-                $" but found none. All diagnostics: [{string.Join(", ", result.Diagnostics.Select(d => $"line {d.Line} {d.Code}"))}]");
-
-            onLine.Should().HaveCount(1,
-                $"'{fileName}': each # EXPECT annotation should correspond to exactly one {exp.Code} diagnostic on line {exp.ExecutableLine}");
-
-            onLine.Should().Contain(d => d.Severity == exp.Severity,
-                $"'{fileName}': {exp.Code} on line {exp.ExecutableLine} should have severity={exp.Severity}," +
-                $" but got {onLine.First().Severity}");
-
-            onLine.Should().Contain(d => d.Message.Contains(exp.Contains, StringComparison.OrdinalIgnoreCase),
-                $"'{fileName}': {exp.Code} on line {exp.ExecutableLine} message should contain '{exp.Contains}'," +
-                $" but got: '{onLine.First().Message}'");
-        }
-    }
-
-    // ════════════════════════════════════════════════════════════════════
-    // Helpers for diagnostic sample discovery
-    // ════════════════════════════════════════════════════════════════════
-
-    private sealed record SampleExpectation(
-        string Code,
-        ConstraintSeverity Severity,
-        string Contains,
-        int ExecutableLine);
-
-    /// <summary>
-    /// Parses all <c># EXPECT: CODE | severity=... | contains=...</c> annotations from
-    /// a diagnostic sample file and maps each to the 1-based line number of the next
-    /// non-comment, non-blank DSL line (the executable line the diagnostic attaches to).
-    /// </summary>
-    private static List<SampleExpectation> ParseExpectations(string text)
-    {
+        var expectations = new List<SampleExpectation>();
+        var errors = new List<string>();
         var lines = text.Split('\n');
-        var result = new List<SampleExpectation>();
 
-        for (int i = 0; i < lines.Length; i++)
+        for (var i = 0; i < lines.Length; i++)
         {
             var trimmed = lines[i].TrimEnd('\r').Trim();
             if (!trimmed.StartsWith("# EXPECT:", StringComparison.OrdinalIgnoreCase))
                 continue;
 
-            if (!TryParseExpectLine(trimmed, out var code, out var severity, out var contains))
-                continue;
-
-            // Scan forward for the next non-comment, non-blank executable line (1-based)
-            int execLine = -1;
-            for (int j = i + 1; j < lines.Length; j++)
+            if (TryParseExpectation(trimmed, i + 1, out var expectation, out var error))
             {
-                var candidate = lines[j].TrimEnd('\r').Trim();
-                if (candidate.Length == 0) continue;
-                if (candidate.StartsWith('#')) continue;
-                execLine = j + 1;
-                break;
+                expectations.Add(expectation!);
+                continue;
             }
 
-            if (execLine < 0) continue;
-
-            result.Add(new SampleExpectation(code!, severity, contains!, execLine));
+            errors.Add(error!);
         }
 
-        return result;
+        return new ParsedExpectations(expectations, errors);
     }
 
-    /// <summary>
-    /// Parses a single <c># EXPECT: CODE | severity=... | contains=...</c> line.
-    /// Returns false if the line is malformed or missing required fields.
-    /// </summary>
-    private static bool TryParseExpectLine(
+    private static bool TryParseExpectation(
         string line,
-        out string? code,
-        out ConstraintSeverity severity,
-        out string? contains)
+        int expectationLine,
+        out SampleExpectation? expectation,
+        out string? error)
     {
-        code = null;
-        severity = ConstraintSeverity.Error;
-        contains = null;
+        expectation = null;
+        error = null;
 
         var colon = line.IndexOf("EXPECT:", StringComparison.OrdinalIgnoreCase);
-        if (colon < 0) return false;
-
-        var rest = line.Substring(colon + "EXPECT:".Length).Trim();
-        var parts = rest.Split('|').Select(p => p.Trim()).ToArray();
-        if (parts.Length == 0) return false;
-
-        code = parts[0].Trim();
-        if (string.IsNullOrEmpty(code) || !code.StartsWith("C", StringComparison.OrdinalIgnoreCase))
-            return false;
-
-        foreach (var part in parts.Skip(1))
+        if (colon < 0)
         {
-            if (part.StartsWith("severity=", StringComparison.OrdinalIgnoreCase))
-            {
-                var sev = part.Substring("severity=".Length).Trim();
-                severity = sev.Equals("error", StringComparison.OrdinalIgnoreCase)
-                    ? ConstraintSeverity.Error
-                    : sev.Equals("warning", StringComparison.OrdinalIgnoreCase)
-                        ? ConstraintSeverity.Warning
-                        : ConstraintSeverity.Hint;
-            }
-            else if (part.StartsWith("contains=", StringComparison.OrdinalIgnoreCase))
-            {
-                contains = part.Substring("contains=".Length).Trim();
-            }
+            error = $"line {expectationLine}: missing 'EXPECT:' marker";
+            return false;
         }
 
-        return !string.IsNullOrEmpty(contains);
+        var rest = line.Substring(colon + "EXPECT:".Length).Trim();
+        var parts = rest.Split('|').Select(static part => part.Trim()).ToArray();
+        if (parts.Length < 7)
+        {
+            error = $"line {expectationLine}: EXPECT must include code plus severity, match, message, line, start, and end";
+            return false;
+        }
+
+        var code = parts[0];
+        if (string.IsNullOrWhiteSpace(code) || !code.StartsWith("C", StringComparison.OrdinalIgnoreCase))
+        {
+            error = $"line {expectationLine}: first EXPECT segment must be a diagnostic code like C94";
+            return false;
+        }
+
+        var metadata = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var part in parts.Skip(1))
+        {
+            var separator = part.IndexOf('=');
+            if (separator <= 0 || separator == part.Length - 1)
+            {
+                error = $"line {expectationLine}: malformed EXPECT segment '{part}'";
+                return false;
+            }
+
+            var key = part.Substring(0, separator).Trim();
+            var value = part.Substring(separator + 1).Trim();
+            metadata[key] = value;
+        }
+
+        if (!TryParseSeverity(metadata, expectationLine, out var severity, out error)
+            || !TryParseMatchMode(metadata, expectationLine, out var matchMode, out error)
+            || !TryGetRequired(metadata, "message", expectationLine, out var message, out error)
+            || !TryParseInt(metadata, "line", expectationLine, out var lineNumber, out error)
+            || !TryParseInt(metadata, "start", expectationLine, out var start, out error)
+            || !TryParseInt(metadata, "end", expectationLine, out var end, out error))
+        {
+            return false;
+        }
+
+        expectation = new SampleExpectation(
+            code.ToUpperInvariant(),
+            severity,
+            matchMode,
+            message!,
+            lineNumber,
+            start,
+            end,
+            expectationLine);
+        return true;
+    }
+
+    private static bool TryParseSeverity(
+        IReadOnlyDictionary<string, string> metadata,
+        int expectationLine,
+        out ConstraintSeverity severity,
+        out string? error)
+    {
+        severity = ConstraintSeverity.Error;
+        error = null;
+
+        if (!TryGetRequired(metadata, "severity", expectationLine, out var rawSeverity, out error))
+            return false;
+
+        if (rawSeverity!.Equals("error", StringComparison.OrdinalIgnoreCase))
+        {
+            severity = ConstraintSeverity.Error;
+            return true;
+        }
+
+        if (rawSeverity.Equals("warning", StringComparison.OrdinalIgnoreCase))
+        {
+            severity = ConstraintSeverity.Warning;
+            return true;
+        }
+
+        if (rawSeverity.Equals("hint", StringComparison.OrdinalIgnoreCase))
+        {
+            severity = ConstraintSeverity.Hint;
+            return true;
+        }
+
+        error = $"line {expectationLine}: unsupported severity '{rawSeverity}'";
+        return false;
+    }
+
+    private static bool TryParseMatchMode(
+        IReadOnlyDictionary<string, string> metadata,
+        int expectationLine,
+        out MessageMatchMode matchMode,
+        out string? error)
+    {
+        matchMode = MessageMatchMode.Exact;
+        error = null;
+
+        if (!TryGetRequired(metadata, "match", expectationLine, out var rawMode, out error))
+            return false;
+
+        if (rawMode!.Equals("exact", StringComparison.OrdinalIgnoreCase))
+        {
+            matchMode = MessageMatchMode.Exact;
+            return true;
+        }
+
+        if (rawMode.Equals("contains", StringComparison.OrdinalIgnoreCase))
+        {
+            matchMode = MessageMatchMode.Contains;
+            return true;
+        }
+
+        error = $"line {expectationLine}: unsupported match mode '{rawMode}'";
+        return false;
+    }
+
+    private static bool TryParseInt(
+        IReadOnlyDictionary<string, string> metadata,
+        string key,
+        int expectationLine,
+        out int value,
+        out string? error)
+    {
+        value = 0;
+        error = null;
+
+        if (!TryGetRequired(metadata, key, expectationLine, out var rawValue, out error))
+            return false;
+
+        if (int.TryParse(rawValue, out value) && value >= 0)
+            return true;
+
+        error = $"line {expectationLine}: '{key}' must be a non-negative integer";
+        return false;
+    }
+
+    private static bool TryGetRequired(
+        IReadOnlyDictionary<string, string> metadata,
+        string key,
+        int expectationLine,
+        out string? value,
+        out string? error)
+    {
+        value = null;
+        error = null;
+
+        if (!metadata.TryGetValue(key, out value) || string.IsNullOrWhiteSpace(value))
+        {
+            error = $"line {expectationLine}: EXPECT is missing required '{key}=' metadata";
+            return false;
+        }
+
+        return true;
     }
 
     private static string? FindDemonstratesHeader(string text)
@@ -386,21 +466,31 @@ public class DiagnosticSampleDriftTests
             if (trimmed.StartsWith("# Demonstrates:", StringComparison.OrdinalIgnoreCase))
                 return trimmed;
         }
+
         return null;
     }
 
     private static string[] ParseDeclaredCodes(string headerLine)
     {
-        // "# Demonstrates: C92, C93 — some description" → ["C92", "C93"]
         var colon = headerLine.IndexOf("Demonstrates:", StringComparison.OrdinalIgnoreCase);
         var after = headerLine.Substring(colon + "Demonstrates:".Length);
-        // Strip any trailing description after an em-dash
         var dash = after.IndexOf('—');
-        if (dash >= 0) after = after.Substring(0, dash);
+        if (dash >= 0)
+            after = after.Substring(0, dash);
+
         return after.Split(',')
-            .Select(c => c.Trim())
-            .Where(c => c.Length > 0 && c.StartsWith("C", StringComparison.OrdinalIgnoreCase))
+            .Select(static code => code.Trim())
+            .Where(code => code.Length > 0 && code.StartsWith("C", StringComparison.OrdinalIgnoreCase))
             .ToArray();
     }
 
+    private static string FormatDiagnostics(IEnumerable<PreceptDiagnostic> diagnostics)
+    {
+        var rows = diagnostics
+            .Select(diagnostic =>
+                $"- {diagnostic.Code}|{diagnostic.Severity}|line={diagnostic.Line}|start={diagnostic.Column}|end={diagnostic.EndColumn}|message=\"{diagnostic.Message}\"")
+            .ToArray();
+
+        return rows.Length == 0 ? "- <none>" : string.Join(Environment.NewLine, rows);
+    }
 }

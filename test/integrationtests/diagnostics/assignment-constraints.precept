@@ -1,37 +1,27 @@
-# Demonstrates: C94 — assignment expression is provably outside the field's constraint range
+# Demonstrates: C94 — assignment expressions provably outside the target field range
 
-# ASSIGNMENT CONSTRAINTS
-# The proof engine checks assignment expressions at compile time.
-# C94 fires when the proof engine can prove the assigned value lies entirely
-# outside the target field's constraint interval.
-#
-# Note: C94 fires only for TOTAL mismatch — when the expression's entire
-# interval is outside the field's valid range. Partial overlap (some values
-# valid, some not) produces no diagnostic under Principle #8 conservatism.
-#
-# TRIGGER:
-#   field Score has constraint [0, 100] (min 0 max 100).
-#   Penalty has constraint [200, 500] (min 200 max 500).
-#   Score + Penalty produces interval [200, 600], entirely above 100.
-#   C94 fires: the assignment cannot possibly satisfy Score's max 100 constraint.
-#
-# PARTIAL OVERLAP (no diagnostic):
-#   If Penalty were min 50 max 200, Score + Penalty would produce [50, 300].
-#   This partially overlaps [0, 100], so C94 would not fire (conservative).
-#
-# REMEDIATION:
-#   - Use a guard to ensure the expression is within range before assigning.
-#   - Restructure the logic so the assignment respects the field constraint.
-#   - Widen the field constraint if the broader range is intentional.
+# These rows lock both C94 message shapes used here.
+# The final row is intentionally safe because its interval partially overlaps [0, 100].
 
 precept AssignmentConstraintsDemo
 
 field Score as number default 50 min 0 max 100
-field Penalty as number default 200 min 200 max 500
+field Boost as number default 200 min 200 max 500
 
 state Review initial
-event Penalize
+state Applied
 
-# C94: Score + Penalty produces [200, 600], entirely outside Score's constraint [0, 100].
-# EXPECT: C94 | severity=error | contains=outside the field's constraint range
-from Review on Penalize -> set Score = Score + Penalty -> no transition
+event AddBoost
+event ApplyDrop
+event SafeAdjust
+
+# C94: Score + Boost always lands above the field's maximum.
+# EXPECT: C94 | severity=error | match=exact | message=Assignment to 'Score' is provably outside the field's constraint range. Expression produces 200 to 600 (inclusive), but field requires 0 to 100 (inclusive). | line=20 | start=39 | end=52
+from Review on AddBoost -> set Score = Score + Boost -> transition Applied
+
+# C94: Score - Boost always lands below the field's minimum.
+# EXPECT: C94 | severity=error | match=exact | message=Assignment to 'Score' is provably outside the field's constraint range. Expression produces -500 to -100 (inclusive), but field requires 0 to 100 (inclusive). | line=24 | start=40 | end=53
+from Review on ApplyDrop -> set Score = Score - Boost -> transition Applied
+
+# SAFE: Score - 60 produces [-10, 40], which partially overlaps [0, 100], so no C94 fires.
+from Review on SafeAdjust -> set Score = Score - 60 -> transition Applied

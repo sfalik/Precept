@@ -310,12 +310,17 @@ public static class PreceptParser
     private static TokenListParser<PreceptToken, PreceptExpression> UnaryRef()
         => Unary;
 
-    private static readonly TokenListParser<PreceptToken, string?> OptionalIntoFieldParser =
+    private sealed record ParsedIntoField(string? Name = null, int StartColumn = 0, int EndColumn = 0);
+
+    private static readonly TokenListParser<PreceptToken, ParsedIntoField> OptionalIntoFieldParser =
         (from _into in Token.EqualTo(PreceptToken.Into)
          from identifier in Token.EqualTo(PreceptToken.Identifier)
-         select (string?)identifier.ToText())
+         select new ParsedIntoField(
+             identifier.ToText(),
+             identifier.Span.Position.Column - 1,
+             identifier.Span.Position.Column - 1 + identifier.Span.Length))
         .Try()
-        .Or(Superpower.Parse.Return<PreceptToken, string?>(null));
+        .Or(Superpower.Parse.Return<PreceptToken, ParsedIntoField>(new ParsedIntoField()));
 
     private static readonly TokenListParser<PreceptToken, PreceptExpression> ParenExpr =
         from lp in Token.EqualTo(PreceptToken.LeftParen)
@@ -811,8 +816,10 @@ public static class PreceptParser
         from field in Token.EqualTo(PreceptToken.Identifier)
         from intoField in OptionalIntoFieldParser
         select (ParsedAction)new CollectionAction(new PreceptCollectionMutation(
-            PreceptCollectionMutationVerb.Dequeue, field.ToText(), null, null, intoField,
-            SourceLine: kw.Span.Position.Line));
+            PreceptCollectionMutationVerb.Dequeue, field.ToText(), null, null, intoField.Name,
+            SourceLine: kw.Span.Position.Line,
+            IntoFieldStartColumn: intoField.StartColumn,
+            IntoFieldEndColumn: intoField.EndColumn));
 
     private static readonly TokenListParser<PreceptToken, ParsedAction> PushActionParser =
         from kw in Token.EqualTo(PreceptToken.Push)
@@ -827,8 +834,10 @@ public static class PreceptParser
         from field in Token.EqualTo(PreceptToken.Identifier)
         from intoField in OptionalIntoFieldParser
         select (ParsedAction)new CollectionAction(new PreceptCollectionMutation(
-            PreceptCollectionMutationVerb.Pop, field.ToText(), null, null, intoField,
-            SourceLine: kw.Span.Position.Line));
+            PreceptCollectionMutationVerb.Pop, field.ToText(), null, null, intoField.Name,
+            SourceLine: kw.Span.Position.Line,
+            IntoFieldStartColumn: intoField.StartColumn,
+            IntoFieldEndColumn: intoField.EndColumn));
 
     private static readonly TokenListParser<PreceptToken, ParsedAction> ClearActionParser =
         from kw in Token.EqualTo(PreceptToken.Clear)
@@ -1117,19 +1126,29 @@ public static class PreceptParser
         .Try()
         .Or(Superpower.Parse.Return<PreceptToken, PreceptExpression?>(null));
 
+    private sealed record ParsedWhenGuard(PreceptExpression? Expression, int SourceLine = 0);
+
+    private static readonly TokenListParser<PreceptToken, ParsedWhenGuard> OptionalWhenGuardWithLineParser =
+        (from when in Token.EqualTo(PreceptToken.When)
+         from expr in BoolExpr
+         select new ParsedWhenGuard(expr, when.Span.Position.Line))
+        .Try()
+        .Or(Superpower.Parse.Return<PreceptToken, ParsedWhenGuard>(new ParsedWhenGuard(null, 0)));
+
     // from <StateTarget> on <Event> [when <BoolExpr>] [-> <actions>]* -> <outcome>
     private static readonly TokenListParser<PreceptToken, StatementResult> TransitionRowParser =
         (from kwFrom in Token.EqualTo(PreceptToken.From)
          from states in StateTarget
          from __ in Token.EqualTo(PreceptToken.On)
          from eventName in Token.EqualTo(PreceptToken.Identifier)
-         from whenGuard in OptionalWhenGuardParser
+         from whenGuard in OptionalWhenGuardWithLineParser
          from actionsAndOutcome in Token.EqualTo(PreceptToken.Arrow)
              .IgnoreThen(AnyAction.Try().Or(Outcome.Select(o => (ParsedAction)new OutcomeAction(o))))
              .AtLeastOnce()
          select (StatementResult)new TransitionRowResult(
-             states, eventName.ToText(), whenGuard, actionsAndOutcome,
-             SourceLine: kwFrom.Span.Position.Line))
+             states, eventName.ToText(), whenGuard.Expression, actionsAndOutcome,
+             SourceLine: kwFrom.Span.Position.Line,
+             GuardSourceLine: whenGuard.SourceLine))
         .Named("transition row")
             .Register(new ConstructInfo(
                 "transition-row",
@@ -1165,7 +1184,8 @@ public static class PreceptParser
     private sealed record RootEditResult(string[] Fields,
         string? WhenText = null, PreceptExpression? WhenGuard = null, int SourceLine = 0) : StatementResult;
     private sealed record TransitionRowResult(string[] States, string EventName,
-        PreceptExpression? WhenGuard, ParsedAction[] ActionsAndOutcome, int SourceLine = 0) : StatementResult;
+        PreceptExpression? WhenGuard, ParsedAction[] ActionsAndOutcome, int SourceLine = 0,
+        int GuardSourceLine = 0) : StatementResult;
 
     /// <summary>Union parser: tries each statement kind in priority order.</summary>
     private static readonly TokenListParser<PreceptToken, StatementResult> Statement =
@@ -1334,7 +1354,7 @@ public static class PreceptParser
                         transitionRows.Add(new PreceptTransitionRow(
                             stateName, trr.EventName, outcome, rowSets, 
                             rowMutations.Count > 0 ? rowMutations : null,
-                            whenText, trr.WhenGuard, trr.SourceLine));
+                            whenText, trr.WhenGuard, trr.SourceLine, trr.GuardSourceLine));
                     });
                     break;
             }

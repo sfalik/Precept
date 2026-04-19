@@ -611,10 +611,10 @@ Tools use two DTO types for structured feedback — diagnostics (compile-time) a
 **`DiagnosticDto`** (inline in `CompileTool.cs` — sole consumer) — parse, type-check, and graph analysis findings:
 
 ```json
-{ "line": 12, "column": 18, "message": "unknown identifier 'Missing'.", "code": "PRECEPT038", "severity": "error" }
+{ "line": 12, "column": 18, "message": "unknown identifier 'Missing'.", "code": "PRECEPT038", "severity": "error", "endColumn": 25 }
 ```
 
-Fields: `line` (1-based), `column` (0-based, optional), `message`, `code` (optional — present for all registered constraints), `severity` (`"error"`, `"warning"`, or `"hint"`).
+Fields: `line` (1-based), `column` (0-based, optional), `message`, `code` (optional — present for all registered constraints), `severity` (`"error"`, `"warning"`, or `"hint"`), `endColumn` (0-based, optional exclusive end when the compiler can identify a precise expression span).
 
 **`ViolationDto`** (shared `Tools/ViolationDto.cs` — used by inspect, fire, and update) — runtime constraint violations:
 

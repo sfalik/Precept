@@ -1,34 +1,25 @@
-# Demonstrates: C98 — vacuous guard: provably always true given field constraints
+# Demonstrates: C98 — vacuous guards provably true from field constraints
 
-# VACUOUS GUARDS
-# C98 fires when a transition guard expression is provably always true given field constraints.
-# The 'when' clause has no effect — the branch always executes regardless.
-#
-# C98 is a WARNING: it does not block compilation, but the guard is noise and
-# should be removed.
-#
-# Example:
-#   field Score min 0 max 100  → interval [0, 100]
-#   when Score >= 0            → requires Score >= 0; Score is always >= 0 given min 0
-#   Tautological: the guard is always true. C98 fires.
-#
-# REMEDIATION:
-#   Remove the vacuous 'when' clause. The transition fires unconditionally,
-#   which is what the tautological guard already guaranteed.
-#     from Review on Submit -> transition Approved
-#
-#   If you intended a meaningful condition, tighten the threshold:
-#     from Review on Submit when Score >= 60 -> transition Approved
+# This file covers both lower-bound and positive-constraint tautologies.
 
 precept VacuousGuardsDemo
 
 field Score as number default 50 min 0 max 100
+field Rate as number default 5 positive
 
 state Review initial
 state Approved
+state Escalated
 
 event Submit
+event Escalate
 
-# C98: Score >= 0 is always true — Score has min 0. The 'when' clause has no effect.
-# EXPECT: C98 | severity=warning | contains=provably always true
+# C98: Score is always >= 0 because the field has min 0.
+# EXPECT: C98 | severity=warning | match=exact | message=Guard 'when Score >= 0' is provably always true — the condition has no effect. | line=19 | start=27 | end=37
 from Review on Submit when Score >= 0 -> transition Approved
+from Review on Submit -> transition Approved
+
+# C98: Rate is always > 0 because the field is positive.
+# EXPECT: C98 | severity=warning | match=exact | message=Guard 'when Rate > 0' is provably always true — the condition has no effect. | line=24 | start=29 | end=37
+from Review on Escalate when Rate > 0 -> transition Escalated
+from Review on Escalate -> transition Escalated
