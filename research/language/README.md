@@ -25,7 +25,7 @@ This folder is the durable, domain-first research map for Precept language work.
 | Expression expansion | `#9`, `#10`, `#15`, `#16`, `#31` | [expressiveness/expression-expansion-domain.md](./expressiveness/expression-expansion-domain.md) | [references/expression-evaluation.md](./references/expression-evaluation.md) | One vocabulary lane for conditionals, string operations, functions, and logical keywords. |
 | Entity-modeling surface | `#17`, `#22` | [expressiveness/entity-modeling-surface.md](./expressiveness/entity-modeling-surface.md), [expressiveness/computed-fields.md](./expressiveness/computed-fields.md), [expressiveness/data-only-precepts-research.md](./expressiveness/data-only-precepts-research.md) | [references/expression-evaluation.md](./references/expression-evaluation.md) | Governs stored-vs-derived facts and lifecycle-light entities. |
 | Transition shorthand | — | [expressiveness/transition-shorthand.md](./expressiveness/transition-shorthand.md) | [references/multi-event-shorthand.md](./references/multi-event-shorthand.md), [references/state-machine-expressiveness.md](./references/state-machine-expressiveness.md) | Horizon domain with no open proposal yet. |
-| Static reasoning expansion | — | [references/static-reasoning-expansion.md](./references/static-reasoning-expansion.md) | [references/static-reasoning-expansion.md](./references/static-reasoning-expansion.md) | Horizon domain; currently theory-first rather than proposal-first. |
+| Static reasoning expansion | `#106` (implemented, PR #108) | [references/static-reasoning-expansion.md](./references/static-reasoning-expansion.md) | [references/static-reasoning-expansion.md](./references/static-reasoning-expansion.md) | Implemented via local proof engine in PR #108 (compile-time divisor safety, unified interval + relational inference). |
 | Structural lifecycle modifiers | — | [expressiveness/structural-lifecycle-modifiers.md](./expressiveness/structural-lifecycle-modifiers.md) | [references/state-machine-expressiveness.md](./references/state-machine-expressiveness.md), [references/static-reasoning-expansion.md](./references/static-reasoning-expansion.md) | Horizon domain. `terminal` is the strong Tier 1 candidate; `required`/`transient` are Tier 2. |
 | Type-system follow-ons | — | [expressiveness/type-system-follow-ons.md](./expressiveness/type-system-follow-ons.md) | [references/type-system-survey.md](./references/type-system-survey.md) | Residual type pressure after the main type wave; no active proposal yet. |
 | Event action hooks | `#65` | [expressiveness/event-hooks.md](./expressiveness/event-hooks.md) | [references/state-machine-expressiveness.md](./references/state-machine-expressiveness.md) | Two-case split: stateless (Issue A, #65, ready) and stateful (Issue B, deferred). Issue A has zero Principle 7 tension. |
@@ -52,6 +52,7 @@ Use this table when you already know the issue number and need its research grou
 | `#29` | `integer` type | Type system expansion | [expressiveness/type-system-domain-survey.md](./expressiveness/type-system-domain-survey.md), [references/type-system-survey.md](./references/type-system-survey.md) |
 | `#31` | Logical keyword forms (`and` / `or` / `not`) | Expression expansion | [expressiveness/expression-expansion-domain.md](./expressiveness/expression-expansion-domain.md), [references/expression-evaluation.md](./references/expression-evaluation.md) |
 | `#65` | Event action hooks (stateless) | Event action hooks | [expressiveness/event-hooks.md](./expressiveness/event-hooks.md), [references/state-machine-expressiveness.md](./references/state-machine-expressiveness.md) |
+| `#106` | Compile-time divisor safety (local proof engine) | Static reasoning expansion | [references/static-reasoning-expansion.md](./references/static-reasoning-expansion.md) |
 
 ## Cross-cutting research that supports multiple domains
 
@@ -70,9 +71,14 @@ Use this table when you already know the issue number and need its research grou
 These docs are deliberate horizon groundwork, not orphaned notes:
 
 - [expressiveness/transition-shorthand.md](./expressiveness/transition-shorthand.md)
-- [references/static-reasoning-expansion.md](./references/static-reasoning-expansion.md)
 - [expressiveness/type-system-follow-ons.md](./expressiveness/type-system-follow-ons.md)
 - [expressiveness/structural-lifecycle-modifiers.md](./expressiveness/structural-lifecycle-modifiers.md)
+
+## Implemented domains
+
+Research that grounded a shipped feature:
+
+- [references/static-reasoning-expansion.md](./references/static-reasoning-expansion.md) — grounded issue `#106` (local proof engine, PR #108)
 
 ## Workflow reminder
 
