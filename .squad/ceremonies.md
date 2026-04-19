@@ -38,6 +38,35 @@
 
 ---
 
+## External Research
+
+| Field | Value |
+|-------|-------|
+| **Trigger** | auto |
+| **When** | before (Design Review) |
+| **Condition** | Track B proposal, OR any proposal where design decisions lack external precedent evidence, OR user requests "research" |
+| **Facilitator** | lead |
+| **Participants** | 2+ agents with complementary research angles (e.g., architecture + implementation, brand + PM) |
+| **Time budget** | focused |
+| **Enabled** | ✅ yes |
+| **Completion gate** | Research file(s) committed to `research/`, referenced from the proposal issue |
+
+**Methodology:** Follow `.squad/skills/external-research/SKILL.md` for research angles, source quality, output format, and the commit-to-repo requirement.
+
+**Agent assignment:**
+- Decompose the research question into 3–5 complementary angles
+- Assign each angle to the agent best equipped for it (see skill for mapping)
+- Spawn researchers in parallel — no data dependencies between angles
+
+**Output:**
+1. Research file(s) in `research/{domain}/` with cited sources, DD mapping, and summary table
+2. Issue comment on the proposal linking to the research file(s)
+3. Open questions flagged for the Design Review agenda
+
+**Sequencing:** This ceremony runs BEFORE Design Review. Research findings are inputs to the review — reviewers cite them when evaluating design decisions. If research surfaces challenges to design decisions, the proposer updates the design doc before the review ceremony begins.
+
+---
+
 ## PR Review
 
 | Field | Value |
