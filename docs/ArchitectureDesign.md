@@ -30,18 +30,9 @@ flowchart TD
 
     subgraph RT["Run-Time"]
         ENG["⚙️ Engine  ·  PreceptEngine"]
-        I1(["CreateInstance\n→ PreceptInstance"])
-        I2(["Inspect\n→ simulate, no commit"])
-        FIRE["Fire\n→ simulate + commit"]
-        UPD["Update\n→ simulate + commit"]
+        OPS(["CreateInstance · Inspect\nFire · Update"])
         EVAL["🧮 Evaluator\nguards · assignments\nderived fields · rules"]
-        ENG --> I1
-        I1 --> I2
-        I1 --> FIRE
-        I1 --> UPD
-        I2 --> EVAL
-        FIRE --> EVAL
-        UPD --> EVAL
+        ENG --> OPS --> EVAL
     end
 
     OUT["📤 Outcomes\nTransition  ·  NoTransition  ·  Rejected\nConstraintFailure  ·  Unmatched  ·  Undefined\nUneditableField  ·  InvalidInput  ·  Update"]
