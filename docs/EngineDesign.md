@@ -29,7 +29,7 @@ PreceptCompiler.CompileFromText / Compile
     ├─ TypeChecker.Check → TypeCheckResult
     │       (injects ComputedFieldOrder into engine at construction)
     │
-    └─ new PreceptEngine(definition, typeCheckResult)
+    └─ new PreceptEngine(validatedModel)
             │
             └─ Instance lifecycle (CreateInstance / Inspect / Fire / Update)
                     │
@@ -53,7 +53,7 @@ At construction, the engine precomputes the following internal structures:
 | `_guardedEditBlocks` | `List<GuardedEditBlock>` | Guarded `edit` blocks (those with `when` guards). NOT precomputed — evaluated per-call. Fail-closed: guard evaluation exception → field not granted. |
 | `_stateActionMap` | `Dictionary<(EnsureAnchor Prep, string State), List<PreceptStateAction>>` | Entry (`to`) and exit (`from`) automatic mutations per state. |
 | `_computedFieldOrder` | `List<string>?` | Topological evaluation order for computed fields. Null if no computed fields. Injected from `TypeCheckResult`. |
-| `_computedFieldDependencies` | `IReadOnlyDictionary<string, IReadOnlyList<string>>` | Transitive stored-field dependency map for computed fields. Used when a constraint failure must name the user-visible field, not an intermediate computed field. |
+| `_computedFieldDependencies` | `IReadOnlyDictionary<string, IReadOnlyList<string>>?` | Transitive stored-field dependency map for computed fields. Used when a constraint failure must name the user-visible field, not an intermediate computed field. |
 
 The `IsStateless` property is derived at every call from `States.Count == 0` — not a flag set at construction. This means stateless detection is always consistent with the actual definition model.
 
