@@ -32,8 +32,10 @@ event DivideByZero
 event DivideByUnproven
 
 # C92: literal zero — the divisor is provably zero at every execution of this row.
+# EXPECT: C92 | severity=error | contains=is provably zero
 from Active on DivideByZero -> set Quotient1 = Amount / 0 -> no transition
 
 # C93: Divisor has no nonzero proof. The default value 1 is a runtime value,
 # not a compile-time guarantee. Add 'positive' to the field or guard the transition.
+# EXPECT: C93 | severity=error | contains=has no compile-time nonzero proof
 from Active on DivideByUnproven -> set Quotient2 = Amount / Divisor -> no transition

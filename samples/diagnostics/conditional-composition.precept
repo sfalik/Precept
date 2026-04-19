@@ -47,7 +47,9 @@ from Active on ComputeGuarded when Divisor > 0 -> set Share = Amount / Divisor -
 from Active on ComputeGuarded -> no transition
 
 # C93: no guard narrows Divisor; the proof engine sees Divisor in (-∞, +∞).
+# EXPECT: C93 | severity=error | contains=has no compile-time nonzero proof
 from Active on ComputeUnguarded -> set Share2 = Amount / Divisor -> no transition
 
 # C92: literal zero divisor — always provably wrong.
+# EXPECT: C92 | severity=error | contains=is provably zero
 from Active on ComputeBad -> set BadShare = Amount / 0 -> no transition

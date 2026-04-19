@@ -33,4 +33,5 @@ state Review initial
 event Penalize
 
 # C94: Score + Penalty produces [200, 600], entirely outside Score's constraint [0, 100].
+# EXPECT: C94 | severity=error | contains=outside the field's constraint range
 from Review on Penalize -> set Score = Score + Penalty -> no transition

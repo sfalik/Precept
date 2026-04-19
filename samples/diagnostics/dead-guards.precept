@@ -33,6 +33,7 @@ state Approved
 event Submit
 
 # C97: Score > 150 is always false — Score is at most 100. This row never executes.
+# EXPECT: C97 | severity=warning | contains=provably always false
 from Review on Submit when Score > 150 -> transition Approved
 
 # Fallback: the reachable path that handles all valid Score values.

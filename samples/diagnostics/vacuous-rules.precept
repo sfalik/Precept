@@ -26,7 +26,9 @@ field Limit as number default 50 min 1 max 100
 field Rate as number default 5 positive
 
 # C96: Limit >= 0 is always true because Limit has min 1 (interval [1, 100]).
+# EXPECT: C96 | severity=warning | contains=is vacuous
 rule Limit >= 0 because "Limit must be non-negative"
 
 # C96: Rate > 0 is always true because Rate has 'positive' constraint (interval (0, +∞)).
+# EXPECT: C96 | severity=warning | contains=is vacuous
 rule Rate > 0 because "Rate must be positive"

@@ -32,4 +32,5 @@ state Active initial
 event Compute
 
 # C76: Measurement has no nonnegative proof; its interval includes negative values.
+# EXPECT: C76 | severity=error | contains=may be negative
 from Active on Compute -> set Root = sqrt(Measurement) -> no transition

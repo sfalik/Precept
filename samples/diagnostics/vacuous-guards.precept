@@ -30,4 +30,5 @@ state Approved
 event Submit
 
 # C98: Score >= 0 is always true — Score has min 0. The 'when' clause has no effect.
+# EXPECT: C98 | severity=warning | contains=provably always true
 from Review on Submit when Score >= 0 -> transition Approved
