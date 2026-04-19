@@ -953,7 +953,7 @@ internal sealed class PreceptAnalyzer
             _ => DiagnosticSeverity.Error
         };
 
-        return new Diagnostic
+        var result = new Diagnostic
         {
             Severity = severity,
             Message = message,
@@ -961,8 +961,17 @@ internal sealed class PreceptAnalyzer
             Code = new DiagnosticCode(diagnostic.DiagnosticCode),
             Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
                 new Position(lineIndex, Math.Max(0, diagnostic.Column)),
-                new Position(lineIndex, Math.Max(diagnostic.Column + 1, lineLength)))
+                new Position(lineIndex, Math.Max(diagnostic.Column + 1, lineLength))),
+            Data = diagnostic.Assessment is { } assessment
+                ? Newtonsoft.Json.Linq.JObject.FromObject(new
+                {
+                    subject = assessment.SubjectDescription,
+                    requirement = assessment.Requirement.ToString()
+                })
+                : null
         };
+
+        return result;
     }
 
     private static void AddEntryEnsureDiagnostics(

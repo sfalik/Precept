@@ -24,7 +24,8 @@ internal sealed record PreceptValidationDiagnostic(
     string Message,
     int Line,
     int Column = 0,
-    string? StateContext = null)
+    string? StateContext = null,
+    ProofAssessment? Assessment = null)
 {
     public string DiagnosticCode => DiagnosticCatalog.ToDiagnosticCode(Constraint.Id);
 }
@@ -394,7 +395,8 @@ internal static class PreceptTypeChecker
                                     ProofDiagnosticRenderer.Render(assessment),
                                     assignment.SourceLine > 0 ? assignment.SourceLine : row.SourceLine,
                                     Column: assignment.Expression.Position?.StartColumn ?? 0,
-                                    StateContext: item.State));
+                                    StateContext: item.State,
+                                    Assessment: assessment));
                             }
                         }
 
@@ -518,7 +520,8 @@ internal static class PreceptTypeChecker
                             ProofDiagnosticRenderer.Render(assessment),
                             assignment.SourceLine > 0 ? assignment.SourceLine : action.SourceLine,
                             Column: assignment.Expression.Position?.StartColumn ?? 0,
-                            StateContext: action.State));
+                            StateContext: action.State,
+                            Assessment: assessment));
                     }
                 }
 
@@ -1311,7 +1314,8 @@ internal static class PreceptTypeChecker
                         diagnostics.Add(new PreceptValidationDiagnostic(
                             DiagnosticCatalog.C95,
                             ProofDiagnosticRenderer.Render(assessment),
-                            rule.SourceLine));
+                            rule.SourceLine,
+                            Assessment: assessment));
                     }
                     // SYNC:CONSTRAINT:C96: vacuous rule detection
                     // If the constraint interval is entirely within the rule interval,
@@ -1326,7 +1330,8 @@ internal static class PreceptTypeChecker
                         diagnostics.Add(new PreceptValidationDiagnostic(
                             DiagnosticCatalog.C96,
                             ProofDiagnosticRenderer.Render(assessment),
-                            rule.SourceLine));
+                            rule.SourceLine,
+                            Assessment: assessment));
                     }
                 }
             }
@@ -2125,7 +2130,8 @@ internal static class PreceptTypeChecker
                         assessment.DiagnosticCode,
                         ProofDiagnosticRenderer.Render(assessment),
                         0,
-                        Column: arg.Position?.StartColumn ?? 0);
+                        Column: arg.Position?.StartColumn ?? 0,
+                        Assessment: assessment);
                     return false;
                 }
             }
@@ -2295,7 +2301,8 @@ internal static class PreceptTypeChecker
                             assessment.DiagnosticCode,
                             ProofDiagnosticRenderer.Render(assessment),
                             0,
-                            Column: binary.Right.Position?.StartColumn ?? 0);
+                            Column: binary.Right.Position?.StartColumn ?? 0,
+                            Assessment: assessment);
                         if (assessment.Outcome == ProofOutcome.Contradiction)
                             return false;
                     }
@@ -3189,7 +3196,8 @@ internal static class PreceptTypeChecker
                 DiagnosticCatalog.C97,
                 ProofDiagnosticRenderer.Render(assessment),
                 sourceLine,
-                StateContext: stateContext));
+                StateContext: stateContext,
+                Assessment: assessment));
             return;
         }
 
@@ -3205,7 +3213,8 @@ internal static class PreceptTypeChecker
                 DiagnosticCatalog.C98,
                 ProofDiagnosticRenderer.Render(assessment),
                 sourceLine,
-                StateContext: stateContext));
+                StateContext: stateContext,
+                Assessment: assessment));
         }
     }
 
