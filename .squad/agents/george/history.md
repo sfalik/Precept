@@ -179,3 +179,12 @@ Methods extracted: `ExtractFieldInterval`, `TryInferInterval`, `FlipComparisonOp
 - Line-array surgery via `[System.IO.File]::ReadAllLines` + `WriteAllLines` (UTF8 no-BOM) is the reliable approach for 400-line block extraction when replace_string_in_file would require exact matching of the entire block.
 - Targeted test run (5 test classes, 148 tests): all passed. Build: succeeded with same 2 pre-existing CS8629 warnings.
 - Commit: `eb88c4e`.
+
+### 2026-04-19 — Issue #118 Slice 5: extract TypeInference partial class
+- Extracted 4 type-inference methods from `PreceptTypeChecker.cs` into `src/Precept/Dsl/PreceptTypeChecker.TypeInference.cs`.
+- Methods moved: `ValidateExpression`, `TryInferKind`, `TryInferFunctionCallKind`, `TryInferBinaryKind` (~748 lines).
+- Used PowerShell line-range splice (`$content[0..1171] + $content[1920..$last]`) to remove lines 1173–1920 from main file — preserves exactly one blank-line separator between the preceding method and `ValidateCollectionMutations`.
+- TypeInference is the highest fan-in partial: callers live in Main; bodies call into Narrowing (`ApplyNarrowing`), ProofChecks (`AssessDivisorSafety`, `AssessNonnegativeArgument`), and Helpers (13 utility methods). Extracted last for cleanliness; all dependencies already in final locations.
+- `using System.Linq;` is required (for `Enumerable.Range`, `Select`, `Where`, `DefaultIfEmpty`, `First`, `LastOrDefault` inside `TryInferFunctionCallKind`).
+- Build: clean (same 2 pre-existing CS8629 warnings, no new warnings). Targeted tests: 211/211 (PreceptTypeCheckerTests + ConditionalExpressionTests + StringAccessorTests). Full suite: 1752/1752.
+- Commit: `ad3f65d`.
