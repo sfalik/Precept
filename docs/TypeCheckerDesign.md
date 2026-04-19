@@ -2,7 +2,7 @@
 
 Date: 2026-04-19
 
-Status: **Implemented** — 6-partial-class architecture (3,783 LOC) landed in PR #118. All validation phases operational: type inference, narrowing, proof-backed assessments, field constraints, computed fields, collection mutations. Diagnostic surface covers C1–C99 constraint codes. Research-backed architecture review confirmed alignment with Kotlin K2, Roslyn Binder, and F# Checking precedents.
+Status: **Implemented** — 6-partial-class architecture (3,783 LOC) landed in PR #123 (issue #118). All validation phases operational: type inference, narrowing, proof-backed assessments, field constraints, computed fields, collection mutations. Diagnostic surface covers C1–C99 constraint codes. Research-backed architecture review confirmed alignment with Kotlin K2, Roslyn Binder, and F# Checking precedents.
 
 > **Research grounding:** [typechecker-architecture-survey-frank.md](../research/architecture/typechecker-architecture-survey-frank.md) (6 production type checkers) and [typechecker-implementation-patterns-george.md](../research/architecture/typechecker-implementation-patterns-george.md) (.NET implementation patterns). Combined verdict: **KEEP AS-IS.**
 
@@ -26,7 +26,7 @@ The type checker is **not** part of the proof engine. The proof engine (`ProofCo
 | Collection mutations (add/remove/enqueue/push/dequeue/pop) | `ValidateCollectionMutations` | C43, C68 |
 | Expression type inference (literals, identifiers, binary, unary, functions, conditionals) | `ValidateExpression` → `TryInferKind` | C38–C42, C56, C60, C65, C67, C71–C79, C92–C93 |
 | Guard narrowing (null checks, numeric comparisons) | `ApplyNarrowing` | (Refines proof context; no direct diagnostics) |
-| Proof-backed assessments (divisor safety, sqrt args, dead/vacuous guards) | `AssessDivisorSafety`, `AssessNonnegativeArgument`, `AssessGuard` | C92–C98 |
+| Proof-backed assessments (divisor safety, sqrt args, dead/vacuous guards) | `AssessDivisorSafety`, `AssessNonnegativeArgument`, `AssessGuard` | C76, C92–C98 |
 
 ### Architecture Summary
 
@@ -127,9 +127,9 @@ The type checker's tractability rests on structural properties of Precept's exec
 |---|---:|---|---|---|
 | [PreceptTypeChecker.cs](../src/Precept/Dsl/PreceptTypeChecker.cs) (Main) | 1,260 | Front-matter types, `Check()` entry point, transition/state/rule/computed field validation, collection mutations | PreceptCompiler, language server, tests | TypeInference, Narrowing, ProofChecks, Helpers, FieldConstraints |
 | [PreceptTypeChecker.TypeInference.cs](../src/Precept/Dsl/PreceptTypeChecker.TypeInference.cs) | 762 | `ValidateExpression`, `TryInferKind`, `TryInferFunctionCallKind`, `TryInferBinaryKind` | Main (highest fan-in) | Narrowing (`ApplyNarrowing`), ProofChecks (`AssessDivisorSafety`, `AssessNonnegativeArgument`), Helpers |
-| [PreceptTypeChecker.Narrowing.cs](../src/Precept/Dsl/PreceptTypeChecker.Narrowing.cs) | 606 | `BuildEventEnsureSymbols`, `BuildStateEnsureNarrowings`, `BuildEventEnsureNarrowings`, `ApplyNarrowing`, `ApplyAssignmentNarrowing`, null/numeric comparison narrowing | Main, TypeInference | Helpers, ProofContext (via `IntervalOf` for compound RHS) |
-| [PreceptTypeChecker.ProofChecks.cs](../src/Precept/Dsl/PreceptTypeChecker.ProofChecks.cs) | 416 | `ExtractFieldInterval`, `TryInferInterval`, `AssessDivisorSafety`, `AssessNonnegativeArgument`, `AssessGuard`, `TryExtractSingleFieldComparison`, `FlipComparisonOperator` | TypeInference, Main | Helpers, ProofContext (`IntervalOf`, `KnowsNonnegative`) |
-| [PreceptTypeChecker.Helpers.cs](../src/Precept/Dsl/PreceptTypeChecker.Helpers.cs) | 398 | 29 methods: mapping (`MapFieldContractKind`, `MapScalarType`, `MapKind`), assignability (`IsAssignable`, `NormalizeChoiceKind`), kind predicates (`HasFlag`, `IsExactly`, `IsNumericKind`), formatting (`FormatKinds`, `KindLabel`, `BuildC60Message`, `BuildC79Message`), copy helpers (`CopyRelationalFacts`, `CopyFieldIntervals`, `CopyFlags`, `CopyExprFacts`), symbol builders (`ExpandRowStates`, `BuildSymbolKinds`) | All other partials | (leaf — no outgoing calls to other partials) |
+| [PreceptTypeChecker.Narrowing.cs](../src/Precept/Dsl/PreceptTypeChecker.Narrowing.cs) | 606 | `BuildEventEnsureSymbols`, `BuildStateEnsureNarrowings`, `BuildEventEnsureNarrowings`, `ApplyNarrowing`, `ApplyAssignmentNarrowing`, `TryApplyNullComparisonNarrowing`, `TryApplyNumericComparisonNarrowing`, `TryStoreLinearFact`, `TryDecomposeNullOrPattern` | Main, TypeInference | Helpers, ProofChecks (`FlipComparisonOperator`), ProofContext (via `IntervalOf` for compound RHS) |
+| [PreceptTypeChecker.ProofChecks.cs](../src/Precept/Dsl/PreceptTypeChecker.ProofChecks.cs) | 416 | `ExtractFieldInterval`, `TryInferInterval`, `AssessDivisorSafety`, `AssessNonnegativeArgument`, `AssessGuard`, `TryExtractSingleFieldComparison`, `FlipComparisonOperator`, `DescribeExpression`, `TryGetNumericLiteral` | TypeInference, Main, Narrowing | Helpers, ProofContext (`IntervalOf`, `KnowsNonnegative`) |
+| [PreceptTypeChecker.Helpers.cs](../src/Precept/Dsl/PreceptTypeChecker.Helpers.cs) | 398 | 29 methods: mapping (`MapFieldContractKind`, `MapScalarType`, `MapKind`), assignability (`IsAssignable`, `NormalizeChoiceKind`), kind predicates (`HasFlag`, `IsExactly`, `IsNumericKind`), formatting (`FormatKinds`, `KindLabel`, `BuildC60Message`, `BuildC79Message`), copy helpers (`CopyRelationalFacts`, `CopyFieldIntervals`, `CopyFlags`, `CopyExprFacts`), symbol builders (`ExpandRowStates`, `BuildSymbolKinds`) | Main, TypeInference, Narrowing, ProofChecks | (leaf — no outgoing calls to other partials) |
 | [PreceptTypeChecker.FieldConstraints.cs](../src/Precept/Dsl/PreceptTypeChecker.FieldConstraints.cs) | 341 | `ValidateFieldConstraints`, `ValidateChoiceField`, `ValidateConstraintTypes`, `ValidateConstraintDuplicates`, `ValidateConstraintDefault`, `ConstraintKindKey`, `ConstraintLabel` | Main (single caller) | (self-contained — no dependencies on Narrowing or ProofChecks) |
 
 ### Front-Matter Type Inventory
@@ -173,18 +173,18 @@ Helpers ←────── Main
     ↑           ↑  ↑  ↑
     ├── TypeInference  │  │
     ├── Narrowing ─────┘  │
-    ├── ProofChecks ──────┘
-    └── FieldConstraints
+    └── ProofChecks ──────┘
 
 TypeInference ──→ Narrowing (ApplyNarrowing for and/or short-circuit narrowing)
 TypeInference ──→ ProofChecks (AssessDivisorSafety, AssessNonnegativeArgument)
+Narrowing ──→ ProofChecks (FlipComparisonOperator)
 Main ──→ Narrowing (BuildStateEnsureNarrowings, BuildEventEnsureNarrowings, ApplyNarrowing, ApplyAssignmentNarrowing)
 Main ──→ ProofChecks (AssessGuard, TryExtractSingleFieldComparison)
 Main ──→ FieldConstraints (ValidateFieldConstraints)
 Main ──→ TypeInference (ValidateExpression)
 ```
 
-Helpers is the leaf — all other partials depend on it, it depends on none. FieldConstraints is self-contained — called only from Main, no dependencies on Narrowing or ProofChecks. TypeInference has the highest fan-in: called from Main for every expression validation.
+Helpers is the leaf — Main, TypeInference, Narrowing, and ProofChecks all depend on it; it depends on none. FieldConstraints is self-contained — called only from Main, no dependencies on Narrowing, ProofChecks, or Helpers. TypeInference has the highest fan-in: called from Main for every expression validation.
 
 ---
 
@@ -356,13 +356,13 @@ The `ProofAssessment` is the contract center: diagnostics, hover, and MCP all co
 
 ### DD6: Proof Engine as Separate Component, Consulted at Integration Points
 
-**Decision:** The proof engine (`ProofContext`, `LinearForm`, `RelationalGraph`) is a separate set of types, not embedded in the type checker. The type checker consults it at ~7 specific call sites via `IntervalOf`, `KnowsNonzero`, `KnowsNonnegative`, `WithAssignment`, `WithRule`.
+**Decision:** The proof engine (`ProofContext`, `LinearForm`, `RelationalGraph`) is a separate set of types, not embedded in the type checker. The type checker consults it at specific call sites via `IntervalOf` and `KnowsNonnegative`, plus direct use of proof-engine types (`NumericInterval.AreDisjoint`, `NumericInterval.Contains`, `LinearForm`).
 
 **Rationale:** The proof engine's concerns (interval arithmetic, relational closure, fact storage) are orthogonal to type checking concerns (kind inference, assignability, scope resolution). Embedding proof logic in the type checker would violate single responsibility and make the proof engine untestable in isolation.
 
 **Precedent:** F# separates `ConstraintSolver.fs` from type checking. Rust separates `rustc_infer` from `rustc_hir_typeck`.
 
-**Tradeoff accepted:** Integration points between the type checker and proof engine must be maintained as both components evolve. The 7 call sites are documented in § Integration Points above.
+**Tradeoff accepted:** Integration points between the type checker and proof engine must be maintained as both components evolve. The call sites are documented in § Integration Points above. Note: [ProofEngineDesign.md](ProofEngineDesign.md) counts 5 `IntervalOf` consultation sites specifically; this document's § Integration Points table counts all proof-engine integration points including interval comparison utilities and flag queries, yielding the broader tally of 7.
 
 ### DD7: Narrowing and ProofChecks as Separate Partials (Not Merged)
 

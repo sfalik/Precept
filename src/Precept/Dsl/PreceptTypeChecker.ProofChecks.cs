@@ -6,7 +6,7 @@ namespace Precept;
 // Partial-class file for PreceptTypeChecker — proof-check logic.
 // Contains interval inference, proof-backed assessments, and proof-analysis helpers
 // that back the divisor-safety (C92/C93), guard-tautology (C97/C98), and
-// sqrt-argument (C94/C95) diagnostic checks.
+// sqrt-argument (C76) diagnostic checks.
 internal static partial class PreceptTypeChecker
 {
 

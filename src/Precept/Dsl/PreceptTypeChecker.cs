@@ -127,7 +127,8 @@ internal sealed record ValidationResult(
 // Partial-class file for PreceptTypeChecker — main orchestration.
 // Hosts the front-matter types (StaticValueKind, diagnostics, TypeCheckResult, etc.)
 // and the primary orchestration entry points (Check, ValidateTransitionRows,
-// ValidateStateActions, ValidateRules, ValidateCollectionMutations, and related helpers).
+// ValidateStateActions, ValidateComputedFields, ValidateRules,
+// ValidateCollectionMutations, CheckCrossScopeGuardIdentifiers, and related helpers).
 // Extracted logic lives in: Helpers, FieldConstraints, Narrowing, ProofChecks, TypeInference.
 internal static partial class PreceptTypeChecker
 {
