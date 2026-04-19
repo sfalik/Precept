@@ -53,7 +53,7 @@ flowchart TD
     EVAL --> OUT
 ```
 
-> **Diagram note:** The bidirectional arrow between Proof Engine and Type Checker is not symmetric — see [Compile-Time Phase](#compile-time-phase) for the information flow direction. `CreateInstance` calls the evaluator only for computed field initialization, not for constraint evaluation. The diagram is an overview; see [EngineDesign.md](EngineDesign.md) for the full operation-level execution model.
+> **Diagram note:** The two arrows between Type Checker and Proof Engine show direction: the type checker queries the proof engine for interval facts; the proof engine returns narrowing facts back. See [Compile-Time Phase](#compile-time-phase) for detail. `CreateInstance` calls the evaluator only for computed field initialization, not for constraint evaluation. The diagram is an overview; see [EngineDesign.md](EngineDesign.md) for the full operation-level execution model.
 
 The architecture is grounded in three philosophy commitments:
 
