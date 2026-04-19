@@ -23,10 +23,13 @@ flowchart TD
     src(["📄 .precept"])
 
     subgraph CT["Compile-Time"]
-        P["🔤 Parser"] -->|definition model| TC["🔍 Type Checker\n📐 Proof Engine"]
+        direction LR
+        P["🔤 Parser"] -->|definition model| TC["🔍 Type Checker"]
+        TC <-->|interval queries /\nnarrowing facts| PE["📐 Proof Engine"]
     end
 
     subgraph RT["Run-Time"]
+        direction LR
         ENG["⚙️ Engine  ·  PreceptEngine"]
         I1(["CreateInstance\n→ PreceptInstance"])
         I2(["Inspect\n→ simulate, no commit"])
@@ -49,7 +52,7 @@ flowchart TD
     EVAL --> OUT
 ```
 
-> **Diagram note:** The Type Checker and Proof Engine are shown as a single node — they operate as a unit during validation (see [Compile-Time Phase](#compile-time-phase) and Principle 3 for the information flow between them). `CreateInstance` calls the evaluator only for computed field initialization, not for constraint evaluation. The diagram is an overview; see [EngineDesign.md](EngineDesign.md) for the full operation-level execution model.
+> **Diagram note:** The bidirectional arrow between Type Checker and Proof Engine is not symmetric — the type checker queries the proof engine for interval facts; the proof engine returns narrowing facts. See [Compile-Time Phase](#compile-time-phase) and Principle 3 for detail. `CreateInstance` calls the evaluator only for computed field initialization, not for constraint evaluation. The diagram is an overview; see [EngineDesign.md](EngineDesign.md) for the full operation-level execution model.
 
 The architecture is grounded in three philosophy commitments:
 
