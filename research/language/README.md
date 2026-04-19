@@ -31,6 +31,7 @@ This folder is the durable, domain-first research map for Precept language work.
 | Type-system follow-ons | — | [expressiveness/type-system-follow-ons.md](./expressiveness/type-system-follow-ons.md) | [references/type-system-survey.md](./references/type-system-survey.md) | Residual type pressure after the main type wave; no active proposal yet. |
 | Event action hooks | `#65` | [expressiveness/event-hooks.md](./expressiveness/event-hooks.md) | [references/state-machine-expressiveness.md](./references/state-machine-expressiveness.md) | Two-case split: stateless (Issue A, #65, ready) and stateful (Issue B, deferred). Issue A has zero Principle 7 tension. |
 | Stateless events | `#112` | [expressiveness/stateless-events.md](./expressiveness/stateless-events.md) | [expressiveness/data-only-precepts-research.md](./expressiveness/data-only-precepts-research.md), [expressiveness/event-hooks.md](./expressiveness/event-hooks.md) | `on EventName` mutation surface for stateless precepts. Extends #22 (data-only precepts) with event-driven mutation. |
+| Evaluator semantic fidelity | `#115` | [evaluator-architecture-survey.md](./evaluator-architecture-survey.md) | [references/expression-evaluation.md](./references/expression-evaluation.md), [expressiveness/type-system-domain-survey.md](./expressiveness/type-system-domain-survey.md) | Numeric lane integrity campaign. Three-lane evaluator (integer/decimal/number), dispatch table, context-sensitive literals. Track B with `docs/EvaluatorDesign.md`. |
 
 ## Open proposal issue map
 
@@ -56,6 +57,7 @@ Use this table when you already know the issue number and need its research grou
 | `#65` | Event action hooks (stateless) | Event action hooks | [expressiveness/event-hooks.md](./expressiveness/event-hooks.md), [references/state-machine-expressiveness.md](./references/state-machine-expressiveness.md) |
 | `#106` | Compile-time divisor safety (local proof engine) | Static reasoning expansion | [references/static-reasoning-expansion.md](./references/static-reasoning-expansion.md) |
 | `#112` | Stateless events — `on EventName` mutation surface | Stateless events | [expressiveness/stateless-events.md](./expressiveness/stateless-events.md), [expressiveness/data-only-precepts-research.md](./expressiveness/data-only-precepts-research.md) |
+| `#115` | Evaluator numeric lane integrity | Evaluator semantic fidelity | [evaluator-architecture-survey.md](./evaluator-architecture-survey.md) |
 
 ## Cross-cutting research that supports multiple domains
 
@@ -64,6 +66,7 @@ Use this table when you already know the issue number and need its research grou
 | [expressiveness/expression-language-audit.md](./expressiveness/expression-language-audit.md) | Runtime-grounded inventory of current expression limits and proposal pressure. |
 | [expressiveness/internal-verbosity-analysis.md](./expressiveness/internal-verbosity-analysis.md) | Corpus evidence for compactness and declaration-pressure work. |
 | [expressiveness/conditional-logic-strategy.md](./expressiveness/conditional-logic-strategy.md) | Guard vocabulary and conditional-shape guidance across the language surface. |
+| [evaluator-architecture-survey.md](./evaluator-architecture-survey.md) | CEL, FEEL, NCalc, C# spec, F#, Kotlin — evaluator dispatch patterns, numeric lane precedent, context-sensitive literal typing survey. Supports #115. |
 | [expressiveness/case-insensitive-comparison-survey.md](./expressiveness/case-insensitive-comparison-survey.md) | `~=` precedent survey, CI comparison patterns across 15+ systems, cascade analysis. Supports `#16`. |
 | [domain-map.md](./domain-map.md) | Full durable map of every language research domain. |
 | [domain-research-batches.md](./domain-research-batches.md) | Sequencing plan for active and horizon domain research. |
