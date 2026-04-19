@@ -14,7 +14,13 @@ Research grounding: [research/language/evaluator-architecture-survey.md](../rese
 
 The expression evaluator is Precept's runtime computation layer — the mechanism through which every philosophy commitment becomes operational. It evaluates every DSL expression — guards, rules, ensures, set assignments, computed fields, and conditional branches — against a live entity instance, producing the values that the runtime engine uses to decide whether an operation commits or rejects.
 
-The evaluator provides eight interlocking guarantees that together realize Precept's core philosophy:
+1. **Prevention.** Guards, rules, and ensures are evaluated honestly — the evaluator is the mechanism that makes boolean gates real. When a guard evaluates to `false`, the transition is structurally blocked. When an ensure evaluates to `false`, the operation rejects. The evaluator never fakes a result, never swallows an error, and never lets an invalid configuration slip through by returning a convenient default.
+
+2. **Full inspectability.** Expression-isolated, side-effect-free evaluation is what makes Inspect trustworthy. Every evaluation result is honest and serializable — the same code path runs for both preview and commit, so what Inspect shows is exactly what Fire would produce. No hidden state, no observation-dependent behavior, no "preview mode" shortcuts.
+
+3. **Determinism.** Same expression plus same data produces the same result — across machines, across cultures, across time. The evaluator uses no culture-dependent formatting or comparison, no mutable shared state, and no floating-point operations where exact arithmetic is declared. A `decimal` expression evaluated in Tokyo produces the same value as one evaluated in New York.
+
+The evaluator provides eight interlocking guarantees that together realize these commitments:
 
 | Guarantee | What it means | Philosophy root |
 |-----------|---------------|-----------------|
@@ -52,6 +58,14 @@ The evaluator supports the following expression forms:
 | **Accessor** | `.count`, `.length`, `.min`, `.max`, `.peek` |
 
 These guarantees are not independent — they form a dependency chain. Expression isolation enables inspectability. Totality enables prevention (a guard that fails to evaluate can't gate anything). Determinism enables inspectability (Inspect is trustworthy only if the preview matches the actual fire). Semantic fidelity enables type contracts (lane boundaries are meaningless if values silently cross them). Together, they realize the philosophy's promise: the engine is deterministic, nothing is hidden, and invalid configurations cannot exist.
+
+### Properties
+
+- **Total.** Every well-typed expression produces a definite value or a definite error. There is no undefined behavior, no silent NaN propagation, and no null surprise — the evaluator always returns an `EvaluationResult` with an explicit success or failure.
+- **Pure.** Expression evaluation has no side effects — no mutation of entity state, no observable interaction beyond reading the evaluation context. This is the foundation of Inspect (preview without commit) and rollback safety.
+- **Lane-preserving.** The C# type of every successful result matches the expression's declared or inferred type family. A `decimal` expression returns `decimal`, an `integer` expression returns `long`, a `number` expression returns `double`. Lane boundaries are never crossed silently.
+- **Deterministic.** Same expression and same data produce the same result. No culture-sensitive operations, no mutable shared state, no timing-dependent behavior.
+- **Short-circuit correct.** `and`/`or` evaluate left-to-right with guaranteed short-circuit semantics, enabling safe null-guard patterns like `Field != null and Field > 0`.
 
 ### Expression Evaluation Pipeline
 
