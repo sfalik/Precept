@@ -14,6 +14,7 @@ This folder is the durable, domain-first research map for Precept language work.
 | Research execution order | [domain-research-batches.md](./domain-research-batches.md) |
 | Domain packets and comparative research | [expressiveness/README.md](./expressiveness/README.md) |
 | Theory and formal reference work | [references/README.md](./references/README.md) |
+| Parser / grammar scalability analysis | [parser-combinator-scalability.md](./parser-combinator-scalability.md) |
 
 ## Domain index
 

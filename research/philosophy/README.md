@@ -7,6 +7,8 @@ Philosophy research is distinct from language research. Language research inform
 ## Start here
 
 - [`entity-first-positioning-evidence.md`](entity-first-positioning-evidence.md) — Evidence base for entity-first framing, states-are-optional, and category positioning against validators, state machines, policy engines, and enterprise record-model platforms.
+- [`domain-integrity-formal-concept.md`](domain-integrity-formal-concept.md) — Is Precept's "domain integrity" use coherent? Relational integrity (Date), DDD aggregate invariants (Evans/Young), and recommendation for "governed integrity" as the load-bearing term.
+- [`formal-spec-languages-comparators.md`](formal-spec-languages-comparators.md) — Are Alloy, TLA+, Event-B, Z notation relevant positioning comparators? (Verdict: omission justified; Event-B parallel worth surfacing in technical outreach.)
 
 ## What belongs here
 
