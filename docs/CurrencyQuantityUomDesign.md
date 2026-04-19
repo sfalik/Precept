@@ -472,6 +472,8 @@ field Measurement as quantity             # open — unit comes from event data
 
 **Backing type:** `string` (validated against UCUM registry or entity-scoped units)
 
+**Runtime validation:** Allowlist-only. Values must match a known UCUM unit atom (excluding temporal units, which belong to the `period` type family) or an entity-scoped unit declared within the precept. Structural characters (`/`, `*`, `^`, `.`) are rejected in atomic unit positions — they are syntactic operators in compound unit expressions and must not appear in `unitofmeasure` values, preventing injection into compound unit parsing.
+
 **Declaration:**
 
 ```precept
@@ -894,6 +896,7 @@ Discrete equality narrowing plugs into the existing guard-narrowing pipeline fro
 3. **Cross-branch accumulation** — Already works. `else` branches see the negation; subsequent `when` branches see accumulated narrowing.
 4. **Sequential assignment flow** — `set X = Y` where Y is narrowed copies the markers (already handled by `ApplyAssignmentNarrowing`).
 5. **Compatibility check** — The type checker consumes `$eq:` markers alongside static `in`/`of` constraints when checking arithmetic operands.
+6. **Static `in` seeding** — Fields declared with static `in` values (e.g., `field Cost as money in 'USD'`) pre-seed `$eq:` markers at compile time. The type checker resolves the `in` value and injects `$eq:Cost.currency:USD` into the symbol table unconditionally — no guard required. This is why `money in 'USD'` fields can participate in arithmetic directly while open fields cannot.
 
 ### Accessors per type
 
@@ -1473,7 +1476,7 @@ This proposal extends mechanisms established by the temporal proposal (Issue #10
 | Dependency | Why |
 |---|---|
 | [Issue #107](https://github.com/sfalik/Precept/issues/107) — Temporal type system | Establishes `period`, `duration`, typed constant delimiter, `in` syntax, and the NodaTime alignment directive this proposal extends. |
-| [Issue #115](https://github.com/sfalik/Precept/issues/115) — `decimal` precision bug | `TryToNumber` converts through `double`, losing precision. Will be completed before this proposal ships — no blocking dependency at implementation time. |
+| [Issue #115](https://github.com/sfalik/Precept/issues/115) — `decimal` precision bug | `TryToNumber` converts through `double`, losing precision. This is a security prerequisite — `double` intermediates for financial values are a trust-boundary violation, not just a correctness bug. Will be completed before this proposal ships — no blocking dependency at implementation time. |
 | [Issue #106](https://github.com/sfalik/Precept/issues/106) — Proof engine | Provides the narrowing infrastructure (guard decomposition, marker injection, cross-branch accumulation) that discrete equality narrowing reuses. |
 | [Issue #111](https://github.com/sfalik/Precept/issues/111) — `nonzero` constraint | Needed for `money / number` and `price / number` divisor safety. |
 
@@ -1498,6 +1501,7 @@ This proposal extends mechanisms established by the temporal proposal (Issue #10
 - Enforce mutual exclusivity: `in` and `of` on the same field declaration is a parse error.
 - Parse unit expressions inside `'...'` — distinguish period basis (atoms separated by `&`), currency codes (3 uppercase letters), UCUM unit names, and compound price/rate expressions (containing `/` between a currency and a unit).
 - Parse category names inside `of '...'` — validate against the known UCUM dimension vocabulary for `quantity`, and the fixed set `'date'`/`'time'` for `period`.
+- **Typed-constant content parsing belongs in the parser phase**, not the type checker. Content-shape recognition (detecting `<number> <3-uppercase>` vs `<number> <unit>` vs `<bare-name>`) happens during parsing so that diagnostics attach to the correct token span. The type checker consumes already-classified typed constants.
 
 ### Type checker changes
 
@@ -1510,6 +1514,8 @@ This proposal extends mechanisms established by the temporal proposal (Issue #10
 - **Discrete equality narrowing:** New `TryApplyEqualityNarrowing` method (~30 lines) pattern-matches `when Field.accessor == 'literal'` guards, injecting `$eq:Field.accessor:value` markers. Reuses existing guard decomposition, cross-branch accumulation, and `ApplyAssignmentNarrowing` infrastructure.
 - **Money precision:** ISO 4217 minor-units lookup during constraint resolution. Default `maxplaces` derived from currency code. Half-even rounding on all money arithmetic results.
 - **Duration cancellation (D15):** When a duration operand appears against a compound type with a time-unit denominator, verify the denominator is `hours`, `minutes`, or `seconds`. Emit a compile error for `days`/`weeks`/`months`/`years` denominators with duration operands, with a teachable message explaining the fixed-length boundary.
+
+> **Implementation risk — cancellation algebra complexity:** Compound-type cancellation (`price × quantity = money`, `amount / exchangerate = money`) is the highest-complexity implementation item in this proposal. The design deliberately constrains scope via D15's single-basis matching rule — periods must match compound denominators exactly, multi-hop conversion chains and compound denominators are out of scope. Even so, the cancellation verifier touches type checking, operator resolution, and unit compatibility in a single pass. Budget implementation time accordingly.
 
 ### Runtime engine changes
 
