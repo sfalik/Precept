@@ -707,6 +707,7 @@ These enhance existing analysis precision without adding new enforcement categor
 
 - **`nonzero` modifier as first-class constraint:** Would enable `Nonzero` as a flag that survives compound expressions better. Already filed as issue #111.
 - **Product sign analysis:** `X * Y` is nonzero when both X and Y are nonzero. Currently only proven when both intervals exclude zero; could also check `Nonzero` flags for each factor.
+- **`NumericInterval` bounds representation.** `NumericInterval` stores bounds as `double`. All current endpoint values originate from parsed source literals, where the `decimal`→`double` cast is exact or a known slight widening — soundness is maintained in practice. It is not formally proved for accumulated or computed bounds (multi-hop interval derivation chains). Before expanding the proof surface to include cross-event interval carryover, derived-field interval chaining, or new accumulated-bound operations, the formal precision contract should be documented. Reference: `research/architecture/proof-engine-abstract-interpretation.md` and the `## Numeric Precision and IEEE 754` section above.
 
 For the comprehensive enforcement catalog — assignment constraint checking, dead rule/guard detection, and transition reachability sharpening — see **§ Comprehensive Compile-Time Enforcement** below.
 
