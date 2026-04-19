@@ -8,14 +8,11 @@ field CurrentBorrower as string nullable
 field PromotedPatron as string nullable
 field ReadyPatron as string nullable
 field PickupCode as string nullable
-field PickupExpiryDay as number default 0
-field CurrentDay as number default 0
+field PickupExpiryDay as number default 0 nonnegative
+field CurrentDay as number default 0 nonnegative
 
 field HoldQueue as queue of string
 field BorrowerHistory as stack of string
-
-rule CurrentDay >= 0 because "The day counter cannot be negative"
-rule PickupExpiryDay >= 0 because "Pickup expiry cannot be negative"
 
 state OnShelf initial
 state CheckedOut
@@ -30,18 +27,15 @@ to HoldReady -> set ReadyPatron = PromotedPatron -> set PickupCode = "READY" -> 
 # Leaving HoldReady clears the temporary handoff fields.
 from HoldReady -> set PromotedPatron = null -> set ReadyPatron = null -> set PickupCode = null
 
-event Checkout with PatronId as string
-on Checkout ensure PatronId != "" because "A patron id is required to check out a book"
+event Checkout with PatronId as string notempty
 
 event ReturnBook
 
-event PlaceHold with PatronId as string
-on PlaceHold ensure PatronId != "" because "A patron id is required for a hold"
+event PlaceHold with PatronId as string notempty
 
 event ProcessNextHold
 
-event CollectHold with PatronId as string
-on CollectHold ensure PatronId != "" because "The collecting patron must be identified"
+event CollectHold with PatronId as string notempty
 
 event AdvanceDay with DayNumber as number
 on AdvanceDay ensure DayNumber >= 0 because "The day counter cannot be negative"

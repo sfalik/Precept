@@ -5,15 +5,11 @@ precept SubscriptionCancellationRetention
 
 field SubscriberName as string nullable
 field PlanName as string nullable
-field MonthlyPrice as number default 0
+field MonthlyPrice as number default 0 nonnegative
 field SaveOfferAccepted as boolean default false
-field RetentionDiscount as number default 0
+field RetentionDiscount as number default 0 nonnegative max 100
 field CancellationReason as string nullable
 field LastAgentNote as string nullable
-
-rule MonthlyPrice >= 0 because "Monthly price cannot be negative"
-rule RetentionDiscount >= 0 because "Retention discounts cannot be negative"
-rule RetentionDiscount <= 100 because "Retention discounts are percentages and must stay within 0-100"
 
 state Active initial
 state RetentionReview
@@ -21,11 +17,8 @@ state Cancelled
 
 in RetentionReview edit LastAgentNote
 
-event RequestCancellation with Name as string, Plan as string, Price as number, Reason as string
-on RequestCancellation ensure Name != "" because "The subscriber name is required"
-on RequestCancellation ensure Plan != "" because "The plan name is required"
+event RequestCancellation with Name as string notempty, Plan as string notempty, Price as number, Reason as string notempty
 on RequestCancellation ensure Price >= 0 because "The plan price cannot be negative"
-on RequestCancellation ensure Reason != "" because "A cancellation reason is required"
 
 event MakeSaveOffer with DiscountPercent as number default 10
 on MakeSaveOffer ensure DiscountPercent > 0 because "Save offers must include a positive discount"
@@ -33,8 +26,7 @@ on MakeSaveOffer ensure DiscountPercent <= 100 because "Save offers cannot excee
 
 event AcceptOffer
 
-event DeclineOffer with Note as string nullable default null
-on DeclineOffer ensure Note == null or Note != "" because "A supplied decline note cannot be blank"
+event DeclineOffer with Note as string nullable default null notempty
 
 from Active on RequestCancellation -> set SubscriberName = RequestCancellation.Name -> set PlanName = RequestCancellation.Plan -> set MonthlyPrice = RequestCancellation.Price -> set CancellationReason = RequestCancellation.Reason -> set SaveOfferAccepted = false -> transition RetentionReview
 

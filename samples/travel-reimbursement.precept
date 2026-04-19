@@ -6,18 +6,14 @@ precept TravelReimbursement
 # RequestedTotal is a computed field — always equal to the sum of its components.
 
 field EmployeeName as string nullable
-field TripDays as number default 1
+field TripDays as number default 1 positive
 field LodgingTotal as number default 0
 field MealsTotal as number default 0
 field MileageTotal as decimal default 0 maxplaces 2
 field MileageRate as number default 0.67
-field RequestedTotal as number -> LodgingTotal + MealsTotal + MileageTotal
-field ApprovedTotal as number default 0
+field RequestedTotal as number -> LodgingTotal + MealsTotal + MileageTotal nonnegative
+field ApprovedTotal as number default 0 nonnegative
 field FinanceNote as string nullable
-
-rule TripDays > 0 because "Trip days must be positive"
-rule RequestedTotal >= 0 because "Requested total cannot be negative"
-rule ApprovedTotal >= 0 because "Approved total cannot be negative"
 rule ApprovedTotal <= RequestedTotal because "Approved total cannot exceed the request"
 
 state Draft initial
@@ -28,20 +24,17 @@ state Rejected
 
 in Paid ensure ApprovedTotal > 0 because "Paid reimbursements must have an approved amount"
 
-event Submit with Employee as string, Days as number, Lodging as number, Meals as number, Miles as number, Rate as number default 0.67
-on Submit ensure Employee != "" because "An employee name is required"
+event Submit with Employee as string notempty, Days as number, Lodging as number, Meals as number, Miles as number, Rate as number default 0.67
 on Submit ensure Days > 0 because "Trip days must be positive"
 on Submit ensure Lodging >= 0 because "Lodging cannot be negative"
 on Submit ensure Meals >= 0 because "Meals cannot be negative"
 on Submit ensure Miles >= 0 because "Mileage cannot be negative"
 on Submit ensure Rate >= 0 because "Mileage rate cannot be negative"
 
-event Approve with Amount as number, Note as string nullable default null
+event Approve with Amount as number, Note as string nullable default null notempty
 on Approve ensure Amount > 0 because "Approved amounts must be positive"
-on Approve ensure Note == null or Note != "" because "A supplied finance note cannot be blank"
 
-event Reject with Note as string
-on Reject ensure Note != "" because "A rejection note is required"
+event Reject with Note as string notempty
 
 event Pay
 

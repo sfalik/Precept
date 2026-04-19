@@ -7,9 +7,9 @@ precept InvoiceLineItem
 # no lifecycle states or events, just structural constraints and derived math.
 
 field Description as string nullable
-field UnitPrice as number default 0
-field Quantity as number default 1
-field DiscountPercent as number default 0
+field UnitPrice as number default 0 nonnegative
+field Quantity as number default 1 min 1
+field DiscountPercent as number default 0 nonnegative max 100
 field TaxRate as number default 8
 
 # Computed fields — derived from editable source fields.
@@ -21,8 +21,3 @@ field LineTotal as number -> TaxableAmount + TaxAmount nonnegative
 
 # Only source fields are editable; derived totals are locked.
 edit Description, UnitPrice, Quantity, DiscountPercent
-
-rule Quantity >= 1 because "Quantity must be at least 1"
-rule UnitPrice >= 0 because "Unit price cannot be negative"
-rule DiscountPercent >= 0 because "Discount cannot be negative"
-rule DiscountPercent <= 100 because "Discount cannot exceed 100%"

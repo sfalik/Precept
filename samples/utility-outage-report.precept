@@ -5,17 +5,14 @@ precept UtilityOutageReport
 
 field ReporterName as string nullable
 field RegionName as string nullable
-field EstimatedCustomers as number default 0
+field EstimatedCustomers as number default 0 nonnegative
 field Verified as boolean default false
 field AssignedCrew as string nullable
 field RestorationNote as string nullable
-field DispatchRound as number default 0
+field DispatchRound as number default 0 nonnegative
 
 field AffectedBlocks as set of string
 field CrewQueue as queue of string
-
-rule EstimatedCustomers >= 0 because "Estimated customers cannot be negative"
-rule DispatchRound >= 0 because "Dispatch rounds cannot be negative"
 
 state Reported initial
 state VerifiedState
@@ -26,25 +23,19 @@ state Closed
 in VerifiedState edit EstimatedCustomers
 in Dispatched ensure AssignedCrew != null because "Dispatched outages must name a crew"
 
-event FileReport with Reporter as string, Region as string, Customers as number
-on FileReport ensure Reporter != "" because "A reporter name is required"
-on FileReport ensure Region != "" because "A region name is required"
+event FileReport with Reporter as string notempty, Region as string notempty, Customers as number
 on FileReport ensure Customers >= 0 because "Estimated customers cannot be negative"
 
-event AddBlock with BlockName as string
-on AddBlock ensure BlockName != "" because "A block name is required"
+event AddBlock with BlockName as string notempty
 
-event RemoveBlock with BlockName as string
-on RemoveBlock ensure BlockName != "" because "A block name is required"
+event RemoveBlock with BlockName as string notempty
 
-event RegisterCrew with CrewName as string
-on RegisterCrew ensure CrewName != "" because "A crew name is required"
+event RegisterCrew with CrewName as string notempty
 
 event VerifyReport
 event DispatchCrew
 
-event MarkRestored with Note as string
-on MarkRestored ensure Note != "" because "A restoration note is required"
+event MarkRestored with Note as string notempty
 
 event CloseIncident
 

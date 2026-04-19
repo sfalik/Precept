@@ -5,7 +5,7 @@ precept BuildingAccessBadgeRequest
 
 field EmployeeName as string nullable
 field Department as string nullable
-field AccessReason as string nullable
+field AccessReason as string nullable maxlength 200
 field ReviewerNote as string nullable
 field LowestRequestedFloor as number default 0
 field HighestRequestedFloor as number default 0
@@ -14,7 +14,6 @@ field BadgePrinted as boolean default false
 field RequestedFloors as set of number
 
 rule RequestedFloors.count == 0 or LowestRequestedFloor <= HighestRequestedFloor because "Requested floor bounds must stay ordered"
-rule AccessReason == null or AccessReason.length <= 200 because "Access reasons cannot exceed 200 characters"
 
 state Draft initial
 state Submitted
@@ -38,11 +37,9 @@ event RemoveFloor with Floor as number
 on RemoveFloor ensure Floor > 0 because "Floors must be positive"
 
 event Submit
-event Approve with Note as string nullable default null
-on Approve ensure Note == null or Note != "" because "An approval note cannot be blank when supplied"
+event Approve with Note as string nullable default null notempty
 
-event Reject with Reason as string
-on Reject ensure Reason != "" because "A rejection reason is required"
+event Reject with Reason as string notempty
 
 event PrintBadge
 

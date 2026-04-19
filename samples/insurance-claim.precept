@@ -5,20 +5,16 @@ precept InsuranceClaim
 # Built-in functions (min, trim) keep the logic clear.
 
 field ClaimantName as string nullable
-field ClaimAmount as decimal default 0 maxplaces 2
-field ApprovedAmount as decimal default 0 maxplaces 2
+field ClaimAmount as decimal default 0 nonnegative maxplaces 2
+field ApprovedAmount as decimal default 0 nonnegative maxplaces 2
 field AdjusterName as string nullable
-field DecisionNote as string nullable
+field DecisionNote as string nullable maxlength 500
 field PoliceReportRequired as boolean default false
 field FraudFlag as boolean default false
 
 field MissingDocuments as set of string
-
-rule ClaimAmount >= 0 because "Claim amounts cannot be negative"
-rule ApprovedAmount >= 0 because "Approved amounts cannot be negative"
 rule ApprovedAmount <= ClaimAmount because "Approved amounts cannot exceed the claim"
 rule ApprovedAmount * 2 <= ClaimAmount when FraudFlag because "Fraud-flagged claims are capped at half the claimed amount"
-rule DecisionNote == null or DecisionNote.length <= 500 because "Decision notes cannot exceed 500 characters"
 
 state Draft initial
 state Submitted
@@ -32,26 +28,20 @@ in UnderReview when not FraudFlag edit AdjusterName
 in Approved ensure ApprovedAmount > 0 because "Approved claims must specify a payout amount"
 in Approved ensure DecisionNote != null when FraudFlag because "Fraud-flagged approvals require a decision note"
 
-event Submit with Claimant as string, Amount as decimal, RequiresPoliceReport as boolean default false
-on Submit ensure Claimant != "" because "A claimant name is required"
+event Submit with Claimant as string notempty, Amount as decimal, RequiresPoliceReport as boolean default false
 on Submit ensure Amount > 0 because "Claim amounts must be positive"
 on Submit ensure Amount <= 100000 when RequiresPoliceReport because "Police-report claims are capped at $100,000"
 
-event RequestDocument with Name as string
-on RequestDocument ensure Name != "" because "A document name is required"
+event RequestDocument with Name as string notempty
 
-event ReceiveDocument with Name as string
-on ReceiveDocument ensure Name != "" because "A document name is required"
+event ReceiveDocument with Name as string notempty
 
-event AssignAdjuster with Name as string
-on AssignAdjuster ensure Name != "" because "An adjuster name is required"
+event AssignAdjuster with Name as string notempty
 
-event Approve with Amount as decimal, Note as string nullable default null
+event Approve with Amount as decimal, Note as string nullable default null notempty
 on Approve ensure Amount > 0 because "Approved claim amounts must be positive"
-on Approve ensure Note == null or Note != "" because "A supplied decision note cannot be blank"
 
-event Deny with Note as string
-on Deny ensure Note != "" because "A denial note is required"
+event Deny with Note as string notempty
 
 event PayClaim
 
