@@ -103,19 +103,44 @@ public static class CompileTool
         var fieldEntries = new Dictionary<string, ProofFieldInfo>(StringComparer.Ordinal);
         foreach (var (name, entry) in proofDump.Fields)
         {
-            if (entry.Interval is null || entry.Display is null || entry.Display == "unknown")
+            if (entry.Display is null || entry.Display == "unknown")
                 continue;
+
+            var interval = entry.Lower is not null
+                ? new IntervalDto(entry.Lower.Value, entry.LowerInclusive!.Value,
+                    entry.Upper!.Value, entry.UpperInclusive!.Value, entry.Display)
+                : null;
+
             fieldEntries[name] = new ProofFieldInfo(
-                entry.Interval,
+                interval,
                 entry.Display,
-                Array.Empty<string>(),
-                "global");
+                entry.Sources ?? Array.Empty<string>());
         }
 
-        if (fieldEntries.Count == 0)
+        List<ProofExpressionInfo>? exprInfos = null;
+        if (proofDump.ExpressionFacts.Count > 0)
+        {
+            exprInfos = new List<ProofExpressionInfo>();
+            foreach (var ef in proofDump.ExpressionFacts)
+            {
+                var display = ef.Display ?? ef.Interval;
+                var interval = ef.Lower is not null
+                    ? new IntervalDto(ef.Lower.Value, ef.LowerInclusive!.Value,
+                        ef.Upper!.Value, ef.UpperInclusive!.Value, display)
+                    : null;
+
+                exprInfos.Add(new ProofExpressionInfo(ef.Form, interval, display));
+            }
+        }
+
+        if (fieldEntries.Count == 0 && (exprInfos is null || exprInfos.Count == 0))
             return null;
 
-        return new ProofSnapshot(fieldEntries, null);
+        var global = new ProofScopeDto(
+            fieldEntries.Count > 0 ? fieldEntries : null,
+            exprInfos);
+
+        return new ProofSnapshot(global, null);
     }
 
     private static List<string> GetStateRules(PreceptDefinition model, string stateName)
@@ -212,17 +237,26 @@ public sealed record EditBlockDto(string? State, string? When, IReadOnlyList<str
 // ── Proof snapshot DTOs (AI-consumption, no compiler internals) ──
 
 public sealed record ProofSnapshot(
+    ProofScopeDto? Global,
+    IReadOnlyDictionary<string, ProofScopeDto>? Events);
+
+public sealed record ProofScopeDto(
     IReadOnlyDictionary<string, ProofFieldInfo>? Fields,
     IReadOnlyList<ProofExpressionInfo>? Expressions);
 
+public sealed record IntervalDto(
+    double Lower,
+    bool LowerInclusive,
+    double Upper,
+    bool UpperInclusive,
+    string Display);
+
 public sealed record ProofFieldInfo(
-    string Interval,
+    IntervalDto? Interval,
     string Display,
-    IReadOnlyList<string> Sources,
-    string Scope);
+    IReadOnlyList<string> Sources);
 
 public sealed record ProofExpressionInfo(
     string Expression,
-    string Interval,
-    string Display,
-    IReadOnlyList<string> Sources);
+    IntervalDto? Interval,
+    string Display);

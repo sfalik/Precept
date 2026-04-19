@@ -541,16 +541,26 @@ internal sealed class GlobalProofContext
         foreach (var (name, interval) in _fieldIntervals)
         {
             _flags.TryGetValue(name, out var flagVal);
+            var sources = BuildFieldAttribution(name).Sources;
             fields[name] = new ProofDump.FieldEntry(
                 FormatInterval(interval),
                 FormatDisplay(interval),
-                flagVal);
+                flagVal,
+                interval.Lower,
+                interval.LowerInclusive,
+                interval.Upper,
+                interval.UpperInclusive,
+                sources.Count > 0 ? sources : null);
         }
         // Include fields that have flags but no interval entry
         foreach (var (name, flagVal) in _flags)
         {
             if (!fields.ContainsKey(name))
-                fields[name] = new ProofDump.FieldEntry(null, null, flagVal);
+            {
+                var sources = BuildFieldAttribution(name).Sources;
+                fields[name] = new ProofDump.FieldEntry(null, null, flagVal,
+                    Sources: sources.Count > 0 ? sources : null);
+            }
         }
 
         var relational = new List<ProofDump.RelationalEntry>();
@@ -559,7 +569,12 @@ internal sealed class GlobalProofContext
 
         var exprFacts = new List<ProofDump.ExprFactEntry>();
         foreach (var (form, interval) in _exprFacts)
-            exprFacts.Add(new ProofDump.ExprFactEntry(form.ToString(), FormatInterval(interval)));
+            exprFacts.Add(new ProofDump.ExprFactEntry(
+                form.ToString(),
+                FormatInterval(interval),
+                FormatDisplay(interval),
+                interval.Lower, interval.LowerInclusive,
+                interval.Upper, interval.UpperInclusive));
 
         return new ProofDump(fields, relational, exprFacts);
     }
@@ -658,7 +673,15 @@ public sealed record ProofDump(
     IReadOnlyList<ProofDump.RelationalEntry> RelationalFacts,
     IReadOnlyList<ProofDump.ExprFactEntry> ExpressionFacts)
 {
-    public sealed record FieldEntry(string? Interval, string? Display, NumericFlags Flags);
+    public sealed record FieldEntry(
+        string? Interval, string? Display, NumericFlags Flags,
+        double? Lower = null, bool? LowerInclusive = null,
+        double? Upper = null, bool? UpperInclusive = null,
+        IReadOnlyList<string>? Sources = null);
     public sealed record RelationalEntry(string Form, string Kind);
-    public sealed record ExprFactEntry(string Form, string Interval);
+    public sealed record ExprFactEntry(
+        string Form, string Interval,
+        string? Display = null,
+        double? Lower = null, bool? LowerInclusive = null,
+        double? Upper = null, bool? UpperInclusive = null);
 }
