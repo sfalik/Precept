@@ -180,6 +180,19 @@ Methods extracted: `ExtractFieldInterval`, `TryInferInterval`, `FlipComparisonOp
 - Targeted test run (5 test classes, 148 tests): all passed. Build: succeeded with same 2 pre-existing CS8629 warnings.
 - Commit: `eb88c4e`.
 
+### 2026-04-19 — Issue #118 Slice 6: final cleanup and verification (PR #123)
+
+All 5 extracted partial files already had header comments from their respective slice commits. The only missing header was on the main file (`PreceptTypeChecker.cs`), which is also a partial-class file and should have one.
+
+- Added 5-line header comment to `PreceptTypeChecker.cs` before `internal static partial class PreceptTypeChecker` — describing it as the main orchestration partial hosting front-matter types and the 9 orchestration entry points.
+- Verified all 8 required front-matter types present in main file: `StaticValueKind`, `PreceptValidationDiagnostic`, `PreceptValidationDiagnosticFactory`, `PreceptTypeExpressionInfo`, `PreceptTypeScopeInfo`, `PreceptTypeContext`, `TypeCheckResult`, `ValidationResult`.
+- Verified `using` directives in all partial files are trimmed correctly: `Helpers.cs` (`System` + `Collections.Generic`), `FieldConstraints.cs` (`System` + `Collections.Generic` + `Linq`), `Narrowing.cs` (`System` + `Collections.Generic` + `Linq`), `ProofChecks.cs` (`System` + `Collections.Generic`), `TypeInference.cs` (`System` + `Collections.Generic` + `Linq`). Main file retains `System.Text.RegularExpressions` (used by `Regex.Replace` at L274).
+- Confirmed no duplicate method bodies across partial files (each method name is unique per file).
+- Pre-existing test failures (2 `DiagnosticSampleDriftTests` — `assignment-constraints.precept` and `sqrt-safety.precept`) are pre-existing, not introduced by this refactor. Confirmed by stash/test-without-change/stash-pop cycle.
+- Build: clean solution build. Full test suite: 1742/1744 passed, same 2 pre-existing failures, 0 new failures.
+- Commit: `49e9090`.
+- Key lesson: the main partial file is often overlooked during header-comment audits because it predates the extracted files. Check it explicitly during Slice 6.
+
 ### 2026-04-19 — Issue #118 Slice 5: extract TypeInference partial class
 - Extracted 4 type-inference methods from `PreceptTypeChecker.cs` into `src/Precept/Dsl/PreceptTypeChecker.TypeInference.cs`.
 - Methods moved: `ValidateExpression`, `TryInferKind`, `TryInferFunctionCallKind`, `TryInferBinaryKind` (~748 lines).
