@@ -6,6 +6,10 @@
 
 ## Learnings
 
+- When a test is added to satisfy a "count" AC, always verify it also satisfies any "correctness" sub-clauses (e.g., StateContext, message text). A test that checks `ContainSingle()` for AC #21 does NOT satisfy the "correct state context" part of that AC.
+- Prior-round blockers can be marked "fixed" while still having a gap: B2 (AC #21) shipped the right test method but the assertion stopped at count=1, never checking StateContext. The AC said "with correct state context."
+- Integration tests (diagnostic samples with EXPECT annotations) can cover message text gaps that unit tests leave open — but unit tests with code-only assertions are a weaker safety net. Both should be present where the design specifies message content.
+- When Elaine-B1 (FormatInterval → natural language) ships, divisor-safety.precept:41 EXPECT line will need updating. Track this dependency proactively.
 - Compile-time/default-data behavior must be tested explicitly whenever new guard semantics are introduced.
 - Guard scope rules need separate coverage for field-scoped and arg-scoped contexts.
 - Regression risk is highest where hydration, editability, and inspect/update paths share runtime machinery.
