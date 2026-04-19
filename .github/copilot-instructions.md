@@ -24,7 +24,7 @@ dotnet build
 # Build language server only (default build task — Ctrl+Shift+B)
 dotnet build tools/Precept.LanguageServer/Precept.LanguageServer.csproj --artifacts-path temp/dev-language-server
 
-# Run all tests (xUnit + FluentAssertions, 666 tests across 3 projects)
+# Run all tests (xUnit + FluentAssertions, ~2000 tests across 3 projects)
 dotnet test
 
 # Run a single test project

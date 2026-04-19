@@ -151,6 +151,17 @@ The `functions` section in the JSON output provides structured `FunctionDto` obj
 
 **Implementation:** Serializes `ConstructCatalog.Constructs` + `DiagnosticCatalog.Diagnostics` + reflected `PreceptToken` vocabulary. No MCP-specific data — everything comes from core infrastructure.
 
+**Constraint DTO shape** — each entry in the `constraints` array is a `ConstraintDto`:
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `id` | string | Diagnostic code (e.g. `"C92"`) |
+| `phase` | string | `"parse"` or `"compile"` |
+| `rule` | string | Human-readable rule description |
+| `assessmentModel` | string? | Proof assessment model (e.g. `"Nonzero"`, `"InConstraintRange"`) — present for proof-engine diagnostics |
+| `remediation` | string? | Suggested fix guidance — present for proof-engine diagnostics |
+| `proofDependency` | string? | What the proof depends on (e.g. `"IntervalOf(divisor)"`) — present for proof-engine diagnostics |
+
 ---
 
 ### 2. `precept_compile`
@@ -179,15 +190,15 @@ The `functions` section in the JSON output provides structured `FunctionDto` obj
   ],
   "fields": [
     { "name": "Assignee", "type": "string", "nullable": true, "default": null },
-    { "name": "Priority", "type": "number", "nullable": false, "default": 3 }
+    { "name": "Priority", "type": "number", "nullable": false, "default": 3, "constraints": ["nonnegative"] }
   ],
   "collectionFields": [
-    { "name": "PendingSignatories", "kind": "set", "innerType": "string" }
+    { "name": "PendingSignatories", "kind": "set", "innerType": "string", "constraints": ["notempty"] }
   ],
   "events": [
     {
       "name": "Block",
-      "args": [{ "name": "Reason", "type": "string", "nullable": false, "required": true }]
+      "args": [{ "name": "Reason", "type": "string", "nullable": false, "required": true, "constraints": ["notempty"] }]
     }
   ],
   "transitions": [
@@ -250,6 +261,14 @@ The `functions` section in the JSON output provides structured `FunctionDto` obj
 
 **Implementation:** Calls `PreceptCompiler.CompileFromText(text)` — a composed pipeline that runs parse → structured validation → compile. Returns the full model projection when parsing succeeds (even with type errors), diagnostics only when parsing fails. Graph analysis findings (C48–C53) appear as warning/hint-severity diagnostics alongside any type errors. The tool is a thin projection of the core result into JSON.
 
+**DTO shape reference** — each output array element carries optional properties omitted when `null`:
+
+| DTO | Required properties | Optional properties (omitted when null/empty) |
+|-----|---------------------|-----------------------------------------------|
+| `FieldDto` | `name`, `type`, `nullable`, `default` | `constraints`, `choiceValues`, `isOrdered`, `isComputed`, `expression` |
+| `CollectionFieldDto` | `name`, `kind`, `innerType` | `constraints` |
+| `EventArgDto` | `name`, `type`, `nullable`, `required` | `constraints`, `choiceValues`, `isOrdered` |
+
 **Declaration arrays:** The compile output includes four arrays surfacing rules, state ensures, event ensures, and edit blocks from the parsed definition:
 
 | Array | Item shape |
@@ -285,6 +304,71 @@ The `when` property is present only when the declaration includes a `when <Guard
   "diagnostics": []
 }
 ```
+
+#### Proof
+
+When the definition contains numeric fields with constraints or rules, `precept_compile` includes a `proof` key with the engine's compile-time interval analysis. The proof snapshot surfaces proven ranges, natural-language display, and source attribution for every numeric field and expression fact — enabling AI agents to inspect what the engine proved without reading diagnostic messages.
+
+**Schema:**
+
+```json
+{
+  "proof": {
+    "global": {
+      "fields": {
+        "Rate": {
+          "interval": {
+            "lower": 1,
+            "lowerInclusive": true,
+            "upper": 100,
+            "upperInclusive": true,
+            "display": "1 to 100, inclusive"
+          },
+          "display": "1 to 100, inclusive",
+          "sources": ["rule Rate >= 1", "rule Rate <= 100"]
+        },
+        "Quantity": {
+          "interval": {
+            "lower": 0,
+            "lowerInclusive": false,
+            "upper": "Infinity",
+            "upperInclusive": false,
+            "display": "greater than 0"
+          },
+          "display": "greater than 0",
+          "sources": ["field constraint positive"]
+        }
+      },
+      "expressions": [
+        {
+          "expression": "Rate - Fee",
+          "interval": {
+            "lower": 0,
+            "lowerInclusive": false,
+            "upper": "Infinity",
+            "upperInclusive": false,
+            "display": "greater than 0"
+          },
+          "display": "greater than 0"
+        }
+      ]
+    },
+    "events": null
+  }
+}
+```
+
+**DTO types:**
+
+| Type | Fields | Description |
+|------|--------|-------------|
+| `ProofSnapshot` | `Global` (`ProofScopeDto?`), `Events` (`Dictionary<string, ProofScopeDto>?`) | Top-level proof container. `Events` is always `null` in the current implementation — the schema is ready for per-event scoping. |
+| `ProofScopeDto` | `Fields` (`Dictionary<string, ProofFieldInfo>?`), `Expressions` (`List<ProofExpressionInfo>?`) | Proof data for a single scope (global or per-event). |
+| `ProofFieldInfo` | `Interval` (`IntervalDto?`), `Display` (`string`), `Sources` (`string[]`) | Proven range for a field. `Sources` lists the DSL declarations that contributed (e.g., `"rule Rate >= 1"`, `"field constraint positive"`). |
+| `IntervalDto` | `Lower` (`double`), `LowerInclusive` (`bool`), `Upper` (`double`), `UpperInclusive` (`bool`), `Display` (`string`) | Numeric interval with natural-language display. |
+| `ProofExpressionInfo` | `Expression` (`string`), `Interval` (`IntervalDto?`), `Display` (`string`) | Proven range for a compound expression fact (e.g., intermediate assignment results). |
+
+Fields with `unknown` intervals are omitted from the output. When no fields or expressions have known intervals, `proof` is `null`.
 
 ---
 

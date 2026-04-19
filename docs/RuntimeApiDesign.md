@@ -264,15 +264,15 @@ There are no `__collection__` prefix keys in instances returned by the engine. T
 ```csharp
 public enum TransitionOutcome
 {
-    // Success
-    Transition,          // Event fired; state changed to TargetState / NewState
-    NoTransition,        // 'no transition' outcome; state unchanged, data may change
-
     // Failure
+    Undefined,           // Event or state is unknown to the engine
+    Unmatched,           // All when-guards failed, no row matched
     Rejected,            // Explicit reject outcome in transition row
     ConstraintFailure,   // Post-mutation rule or state ensure violation
-    Unmatched,           // All when-guards failed, no row matched
-    Undefined            // Event or state is unknown to the engine
+
+    // Success
+    Transition,          // Event fired; state changed to TargetState / NewState
+    NoTransition         // 'no transition' outcome; state unchanged, data may change
 }
 ```
 
@@ -450,11 +450,12 @@ The following types are returned by `PreceptParser.Parse` and consumed by `Prece
 | `Rejection` | Row outcome: `reject "<message>"` |
 | `NoTransition` | Row outcome: `no transition` |
 | `PreceptEditBlock` | Editable field declaration: state-scoped `in <State> [when <Guard>] edit <Field>, ...` or stateless root-level `edit <Field>, ... [when <Guard>]` |
+| `PreceptStateAction` | State entry/exit action: `to <State> ->` or `from <State> ->` automatic mutations |
 
 ### Scalar and Collection Enums
 
 ```csharp
-public enum PreceptScalarType  { String, Number, Boolean, Null }
+public enum PreceptScalarType  { String, Number, Boolean, Null, Integer, Decimal, Choice }
 public enum PreceptCollectionKind { Set, Queue, Stack }
 ```
 
@@ -466,8 +467,10 @@ Guard predicates and rule expressions are pre-parsed at compile time into a `Pre
 |-----------|-----------|
 | `PreceptLiteralExpression` | `true`, `false`, `null`, string literal, number literal |
 | `PreceptIdentifierExpression` | bare field/arg name, or dotted `EventName.ArgKey` form |
-| `PreceptUnaryExpression` | `!` operator |
-| `PreceptBinaryExpression` | `&&`, `\|\|`, `==`, `!=`, `<`, `>`, `<=`, `>=`, `+`, `-`, `*`, `/` |
+| `PreceptUnaryExpression` | `not` operator |
+| `PreceptBinaryExpression` | `and`, `or`, `==`, `!=`, `<`, `>`, `<=`, `>=`, `+`, `-`, `*`, `/`, `contains` |
 | `PreceptParenthesizedExpression` | `( … )` grouping |
+| `PreceptFunctionCallExpression` | Built-in function calls: `round()`, `abs()`, `pow()`, `sqrt()`, etc. |
+| `PreceptConditionalExpression` | `if ... then ... else` conditional expressions |
 
-The AST is evaluated by `PreceptExpressionRuntimeEvaluator` (internal). Callers never need to evaluate the AST directly.
+The AST is evaluated by `PreceptExpressionEvaluator` (internal). Callers never need to evaluate the AST directly.
