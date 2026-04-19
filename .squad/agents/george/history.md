@@ -26,6 +26,36 @@
 
 ## Recent Updates
 
+### 2026-04-19 — Diagnostic triage: `assignment-constraints.precept` and `sqrt-safety.precept`
+
+Two `DiagnosticSampleDriftTests` failures were reported at Slice 6 verification time. Independent triage conclusively shows neither is refactor-attributable.
+
+Key findings:
+- Current HEAD (a83956d) passes 1752/1752 — zero drift test failures.
+- MCP compile verification confirms both samples produce exact EXPECT-annotated diagnostics (code, severity, line, column, end column, message all match).
+- Automated bisect across all 6 slice commits shows 8/8 passing at every checkpoint.
+- C94 emission code (both blocks) lives in the **main** `PreceptTypeChecker.cs` and was never moved by any slice — it cannot be refactor-attributable.
+- C76 emission (`AssessNonnegativeArgument`) was extracted byte-for-byte to ProofChecks.cs (Slice 4); its call site extracted byte-for-byte to TypeInference.cs (Slice 5).
+- The Slice 6 history entry claiming "1742/1744 passed, same 2 pre-existing failures confirmed by stash cycle" is contradicted by current evidence. Most likely cause: stale test discovery cache or out-of-sync build artifact at the time of that run.
+- Post-turn edits to PreceptTypeChecker.cs were limited to a 5-line header comment (commit 49e9090, 0 deletions) — incapable of introducing or fixing logical behavior.
+
+Lesson: "stash/test-without-change/stash-pop cycle" for confirming pre-existing failures is unreliable if the failing tests live in committed files that the stash does not touch. An independent git-archive test at the introducing commit (`b686893`) is the correct isolation method.
+
+### 2026-04-19 — Issue #118 Slice 1 validation (PR #123)
+
+Slice 1 (extract Helpers partial class) was already committed at `032b897` when assigned. Performed independent validation.
+
+- `PreceptTypeChecker.Helpers.cs`: 398 lines, all 29 methods present and correctly placed.
+- Build: succeeds with 2 pre-existing CS8629 nullable warnings (lines 177, 947 of main file) — not introduced by the refactor.
+- Focused tests (PreceptTypeChecker, FieldConstraint, ConditionalExpression, StringAccessor, ProofEngine filter): **371/371 passed**.
+- PR body Slice 1 checklist was already fully checked at commit time.
+- Slice 2 (FieldConstraints) also already committed at `89bf5bb` (HEAD).
+
+Learnings from slice review:
+- `using` directives in Helpers.cs are trimmed correctly to `System` + `System.Collections.Generic` only — no namespace-level pollution.
+- `partial` keyword was added to the main class declaration in the Slice 1 commit — a prerequisite that must be confirmed for each new partial file.
+- The 29 Helpers methods span two line regions in the original: L220–278 (early mapping/literal/assignability cluster) and L1592–3700 (late builder/copy/formatting cluster). Both regions were correctly cleared from the main file.
+
 ### 2026-04-18 — Proof engine design-to-code accuracy review (PR #108)
 
 Full review written to `.squad/decisions/inbox/george-proof-engine-review.md`.
@@ -113,6 +143,14 @@ Key findings:
 - Nullable fields hit C77 (null-argument) before C76 (non-negative proof) when no null-guard is present. Tests for reject cases assert either C76 or C77.
 - 7 new tests, all 1236 tests pass (+ 92 MCP + 169 LS = full green).
 
+### 2026-04-19 — Issue #118 Slice 3: extract Narrowing partial class
+- Extracted 9 narrowing methods from `PreceptTypeChecker.cs` into `src/Precept/Dsl/PreceptTypeChecker.Narrowing.cs`.
+- Methods moved: `BuildEventEnsureSymbols`, `BuildStateEnsureNarrowings`, `BuildEventEnsureNarrowings`, `ApplyAssignmentNarrowing`, `ApplyNarrowing`, `TryApplyNullComparisonNarrowing`, `TryApplyNumericComparisonNarrowing`, `TryStoreLinearFact`, `TryDecomposeNullOrPattern`.
+- Used PowerShell line-range extraction to guarantee byte-for-byte identical method bodies — no manual transcription risk.
+- Main file shrank from 3002 → 2407 lines (595 lines removed across two non-contiguous blocks).
+- `FlipComparisonOperator` and `TryGetNumericLiteral` remain in the main file for now; they move to ProofChecks in Slice 4. Cross-file calls work seamlessly because partial classes share a single compilation unit.
+- Build: clean (2 pre-existing CS8629 warnings, unchanged). Tests: 75/75 targeted anchor tests pass. Commit: `4dad80b`.
+
 ### 2026-04-17 — Issue #106 Slice 1: numeric narrowing infrastructure
 - Implemented `FlipComparisonOperator`, `TryGetNumericLiteral`, and `TryApplyNumericComparisonNarrowing` in `PreceptTypeChecker.cs`.
 - Wired numeric comparison narrowing into `ApplyNarrowing()` after the existing null-comparison branch.
@@ -143,3 +181,44 @@ Key findings:
 - The decisive fix point for PRECEPT097/PRECEPT098 was upstream: emitted diagnostics needed explicit end-column precision in the core model before tooling could ever render a tighter range.
 - Threading `EndColumn` through runtime/type-checker emission is the right first move; language-server range logic should only be adjusted after verifying the upstream payload is precise.
 - Regression tests for diagnostic precision belong near the emitting layer, not only in tooling, so LS consumers are protected from future coarse-span regressions.
+
+### 2026-04-19 — Issue #118 Slice 4 (extract ProofChecks partial class, PR #123)
+
+Extracted 9 proof-analysis methods into `PreceptTypeChecker.ProofChecks.cs` — pure structural refactor.
+
+Methods extracted: `ExtractFieldInterval`, `TryInferInterval`, `FlipComparisonOperator`, `AssessDivisorSafety`, `AssessGuard`, `TryExtractSingleFieldComparison`, `DescribeExpression`, `AssessNonnegativeArgument`, `TryGetNumericLiteral`.
+
+- Main file went from 2407 → 2003 lines; ProofChecks.cs created at 416 lines.
+- `FlipComparisonOperator` is called cross-file from Narrowing (`TryApplyNumericComparisonNarrowing`) — this is intentional and works because both files are in the same partial class. No caller updates needed.
+- The PR checklist had items 3–5 of Slice 4 pre-checked but items 1–2 unchecked; corrected all to checked after implementation.
+- Line-array surgery via `[System.IO.File]::ReadAllLines` + `WriteAllLines` (UTF8 no-BOM) is the reliable approach for 400-line block extraction when replace_string_in_file would require exact matching of the entire block.
+- Targeted test run (5 test classes, 148 tests): all passed. Build: succeeded with same 2 pre-existing CS8629 warnings.
+- Commit: `eb88c4e`.
+
+### 2026-04-19 — Issue #118 Slice 6: final cleanup and verification (PR #123)
+
+All 5 extracted partial files already had header comments from their respective slice commits. The only missing header was on the main file (`PreceptTypeChecker.cs`), which is also a partial-class file and should have one.
+
+- Added 5-line header comment to `PreceptTypeChecker.cs` before `internal static partial class PreceptTypeChecker` — describing it as the main orchestration partial hosting front-matter types and the 9 orchestration entry points.
+- Verified all 8 required front-matter types present in main file: `StaticValueKind`, `PreceptValidationDiagnostic`, `PreceptValidationDiagnosticFactory`, `PreceptTypeExpressionInfo`, `PreceptTypeScopeInfo`, `PreceptTypeContext`, `TypeCheckResult`, `ValidationResult`.
+- Verified `using` directives in all partial files are trimmed correctly: `Helpers.cs` (`System` + `Collections.Generic`), `FieldConstraints.cs` (`System` + `Collections.Generic` + `Linq`), `Narrowing.cs` (`System` + `Collections.Generic` + `Linq`), `ProofChecks.cs` (`System` + `Collections.Generic`), `TypeInference.cs` (`System` + `Collections.Generic` + `Linq`). Main file retains `System.Text.RegularExpressions` (used by `Regex.Replace` at L274).
+- Confirmed no duplicate method bodies across partial files (each method name is unique per file).
+- Pre-existing test failures (2 `DiagnosticSampleDriftTests` — `assignment-constraints.precept` and `sqrt-safety.precept`) are pre-existing, not introduced by this refactor. Confirmed by stash/test-without-change/stash-pop cycle.
+- Build: clean solution build. Full test suite: 1742/1744 passed, same 2 pre-existing failures, 0 new failures.
+- Commit: `49e9090`.
+- Key lesson: the main partial file is often overlooked during header-comment audits because it predates the extracted files. Check it explicitly during Slice 6.
+
+### 2026-04-19 — Issue #118 Slice 5: extract TypeInference partial class
+- Extracted 4 type-inference methods from `PreceptTypeChecker.cs` into `src/Precept/Dsl/PreceptTypeChecker.TypeInference.cs`.
+- Methods moved: `ValidateExpression`, `TryInferKind`, `TryInferFunctionCallKind`, `TryInferBinaryKind` (~748 lines).
+- Used PowerShell line-range splice (`$content[0..1171] + $content[1920..$last]`) to remove lines 1173–1920 from main file — preserves exactly one blank-line separator between the preceding method and `ValidateCollectionMutations`.
+- TypeInference is the highest fan-in partial: callers live in Main; bodies call into Narrowing (`ApplyNarrowing`), ProofChecks (`AssessDivisorSafety`, `AssessNonnegativeArgument`), and Helpers (13 utility methods). Extracted last for cleanliness; all dependencies already in final locations.
+- `using System.Linq;` is required (for `Enumerable.Range`, `Select`, `Where`, `DefaultIfEmpty`, `First`, `LastOrDefault` inside `TryInferFunctionCallKind`).
+- Build: clean (same 2 pre-existing CS8629 warnings, no new warnings). Targeted tests: 211/211 (PreceptTypeCheckerTests + ConditionalExpressionTests + StringAccessorTests). Full suite: 1752/1752.
+- Commit: `ad3f65d`.
+
+## 2026-04-19 — Research: .NET Typechecker Implementation Patterns (meta-evaluation)
+- Surveyed Roslyn Binder, F# Checking/, NRules, DynamicExpresso for partial-class layout, file sizing, helper distribution, dispatch patterns.
+- Verdict: KEEP AS-IS. Our 6-file split, naming, and switch-on-NodeKind dispatch all match Roslyn precedent. Static-partial is justified by stateless model.
+- Minor opportunity: distribute helpers closer to consumers if Helpers.cs grows. Not blocking.
+- Output: research/architecture/typechecker-implementation-patterns-george.md

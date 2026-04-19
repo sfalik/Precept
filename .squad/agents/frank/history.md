@@ -13,6 +13,27 @@
 
 ## Recent Updates
 
+### 2026-04-19 — Drafted `docs/TypeCheckerDesign.md` (Track B design doc)
+- Canonical design document describing the CURRENT implemented architecture of `PreceptTypeChecker`.
+- 6-partial decomposition (3,783 LOC): Main, TypeInference, Narrowing, ProofChecks, Helpers, FieldConstraints.
+- 7 design decisions with rationale, alternatives rejected, and tradeoffs accepted.
+- Research-grounded: references both architecture survey (Frank) and implementation patterns (George).
+- Philosophy-traced: 6 principles each linking to `docs/philosophy.md`.
+- Integration points table covering proof engine (~7 call sites), language server (3 consumers), MCP (4 tools), and compiler pipeline.
+- Re-evaluation triggers from research (2K LOC per file, 5K total, phase formalization, incremental compilation).
+- Decision filed at `.squad/decisions/inbox/frank-typechecker-design-doc.md`.
+
+### 2026-04-19 — Design review of issue #118: PreceptTypeChecker decomposition
+- **Verdict: APPROVED WITH NOTES.** Proposal is architecturally sound and ready for implementation planning.
+- Verified all 67 class-level methods against proposed 6-file grouping. Method inventory is complete — no methods missing, no phantom methods.
+- Actual file size: 3695 lines (proposal said ~3200 — likely from a pre-PR#108 baseline).
+- Main file size underestimated by ~100-200 lines (computed ~1132 methods-only vs estimated ~950-1050). Not blocking.
+- ProofChecks overestimated by ~100-150 lines (computed ~404 vs estimated ~500-550). The vague "C94-C98 helpers" bullet is redundant with individually named methods.
+- Copy helpers (CopyRelationalFacts, CopyFieldIntervals, CopyFlags, CopyExprFacts) correctly placed in Helpers — called from both Main and Narrowing, genuinely cross-cutting.
+- 7 non-blocking notes filed: size estimates, fully explicit Helpers inventory, front-matter type placement in acceptance criteria, per-file `using` directives.
+- Full review at `.squad/decisions/inbox/frank-issue-118-design-review.md`.
+- **Key architectural learning:** partial class decomposition of a static class is the correct pattern for large single-concern files in this codebase. The zero-visibility-change property is the key enabler.
+
 ### 2026-04-10 — Issue #31 shipped
 - PR #50 merged to main (squash SHA `305ec03`). Issue #31 closed. 775 tests passing.
 
@@ -276,3 +297,8 @@ Key structural decisions:
 - **All other 5 files confirmed clean fit:** FieldConstraints (+90-160 lines from `in`/`of` validation, temporal constraint rejection), ProofChecks (+20-40, neither proposal adds proof engine integration — currency doc explicitly says "proof engine does not need modification"), Narrowing (+70-120, discrete equality narrowing via `TryApplyEqualityNarrowing` fits existing pattern), Helpers (+100-160, mechanical `StaticValueKind`/`MapScalarType` additions), Main (stable).
 - Key insight: discrete equality narrowing (`$eq:` markers for unit/currency/dimension compatibility) is a parallel layer to existing numeric/null narrowing — same pipeline, different proof surface.
 - Updated issue #118 body with expanded per-file impact table, scaling analysis, planned split documentation, and revised routing table.
+
+## 2026-04-19 — Research: Type Checker Architecture (meta-evaluation)
+- Researched 6 production typecheckers (Roslyn, TypeScript, Rust, Swift, Kotlin K2, F#) to evaluate Precept's 6-partial-class split.
+- Verdict: KEEP AS-IS. Our split has good external precedent. Strongest match is Kotlin K2's phase model.
+- Output: research/architecture/typechecker-architecture-survey-frank.md

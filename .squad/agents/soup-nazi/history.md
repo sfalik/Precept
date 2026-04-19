@@ -16,6 +16,7 @@
 - When slice agents do their job, drift tests arrive pre-populated — audit confirms rather than creates. Slice 5 agent added C92/C93 drift entries correctly.
 - Event arg constraint keyword → C93 suppression must be tested separately from event arg ensure → C93 suppression. The mechanism overlaps but the AC names them as distinct.
 - `from any` expansion tests must cover each proof-scoped diagnostic independently. A null-narrowing `from any` test does NOT satisfy the divisor `from any` AC.
+- For structural refactors, regression anchors must map to the moved method clusters' real owning test files, not just the broad umbrella suite. Helper extraction especially needs explicit canaries for row expansion, symbol-table construction, accessor resolution, and proof-context lookup.
 - Theory-based tests with `messageFragment` inline data are the strongest pattern for context-aware diagnostic messages — each row self-documents what the message should say.
 - Principle #8 stance from the testing seat: compile-clean should not imply safety the checker did not actually prove. Runtime failure tests are a backstop, not the guarantee, but tighter philosophy must preserve already-proven compound patterns rather than flattening the language into trivial-only proofs.
 
@@ -76,3 +77,24 @@
 - Audited 5 sample files: loan-application, invoice-line-item, insurance-claim, travel-reimbursement, clinic-appointment-scheduling — all compile clean, zero C92/C93 diagnostics.
 - Critical validation: `travel-reimbursement.precept` with `Submit.Lodging / Submit.Days` (non-literal divisor) produces no C93 warning, confirming `BuildEventEnsureNarrowings` (Slice 4) is working correctly.
 - No code changes needed. All 1290 tests pass.
+
+### 2026-04-19 — Issue #118 regression gate audit (PR #123 structural refactor)
+- Audited issue #118 acceptance criteria and PR #123 regression anchors against the actual test surface of `PreceptTypeChecker`.
+- Verdict: MANAGEABLE.
+- Slice 1 anchors are directionally right, but the exact watch methods that matter most are `Check_TypeContext_CapturesScopedSymbolsForGuardedTransition`, `Check_FromAny_UsesPerStateExpansionAndStateEnsureNarrowing`, `Check_DivisorFromAny_PartialStateEnsure_C93WithContext`, `Check_DottedEventArgNullNarrowing_NarrowsSuccessfully`, `Check_BareEventArgInTransitionGuard_ProducesC38`, `Check_StateEnsure_AppliesInCorrectState_C93InOtherState`, and `Regression_CollectionCount_ParsesAndCompiles_Unaffected`.
+- Slice 2 anchors in the PR body are incomplete. `ValidateChoiceField(...)` coverage lives in `PreceptChoiceTypeTests.cs` (`C62/C63/C64/C66`), and `C61` maxplaces coverage lives in `PreceptDecimalTypeTests.cs` and `PreceptIntegerTypeTests.cs`, not just `FieldConstraintTests.cs`.
+- Slices 3-5 are directionally sufficient if each one runs `dotnet build` plus the targeted anchor set from the PR body before moving on.
+- Filed inbox note: `.squad/decisions/inbox/soup-nazi-issue-118-regression-gate.md`.
+- Recommended targeted commands before full suite:
+	- Slice 1: `dotnet test test/Precept.Tests/ --filter "FullyQualifiedName~Precept.Tests.PreceptTypeCheckerTests|FullyQualifiedName~Precept.Tests.ProofContextScopeTests|FullyQualifiedName~Precept.Tests.StringAccessorTests"`
+	- Slice 2: `dotnet test test/Precept.Tests/ --filter "FullyQualifiedName~Precept.Tests.FieldConstraintTests|FullyQualifiedName~Precept.Tests.PreceptChoiceTypeTests|FullyQualifiedName~Precept.Tests.PreceptDecimalTypeTests|FullyQualifiedName~Precept.Tests.PreceptIntegerTypeTests"`
+- Full gate: `dotnet build` per slice, then `dotnet test` before PR-ready.
+- Verified current branch health for the proposed gate: Slice 1 candidate set 190 passed; Slice 2 candidate set 137 passed.
+- Current build still emits 2 warnings in `PreceptTypeChecker.cs`, so the bar stays “no new warnings attributable to the refactor,” not merely “build succeeds.”
+
+### 2026-04-19 — Issue #118 diagnostic drift triage (PR #123)
+- Re-ran `DiagnosticSampleDriftTests` locally on current `feature/issue-118`: targeted drift theory passed, and a fresh full-suite run passed `2073/2073`.
+- Verified the two reported sample failures are not baseline by running the same drift theory on pre-refactor commit `b686893`; it passed there too.
+- Walked the refactor commits `032b897`, `89bf5bb`, `4dad80b`, `eb88c4e`, `ad3f65d`, and `49e9090`; the same drift theory passed on every retained slice commit.
+- Read the current branch diff from `b686893..a83956d`: no sample or drift-harness changes, only `PreceptTypeChecker` partial extraction files plus main-file edits.
+- Key lesson: when a handoff claims named failing samples but no assertion payload survives, do not classify from squad notes alone. Re-run the exact theory on the pre-refactor base, each retained slice commit, and current `HEAD` before calling something baseline or regression-attributable.
