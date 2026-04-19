@@ -91,9 +91,9 @@ These principles apply to every expression the evaluator processes, regardless o
 
 5. **Short-circuit is a semantic guarantee, not an optimization.** `and` evaluates left-to-right; if the left operand is `false`, the right operand is never evaluated. `or` evaluates left-to-right; if the left operand is `true`, the right operand is never evaluated. This enables the safe guard idiom: `Name != null and Name.length >= 2` never evaluates `.length` on null. Short-circuit makes the evaluator's own totality guarantee composable — authors can chain preconditions without nesting, and the evaluator guarantees that guarded sub-expressions are only reached when their preconditions hold. *(Philosophy: totality + safe guard patterns.)*
 
-6. **Operators are defined for their declared types. Nothing else.** `boolean + boolean` is an error. `string > string` is an error. `string * number` is an error. `"42" == 42` is an error. The type checker catches most of these at compile time; the evaluator is the runtime safety net. No implicit coercion across type families — the evaluator does not convert `string` to `number` for comparison, does not treat `0` as `false`, does not auto-convert between incompatible families. If a value reaches an operator with an incompatible type, the evaluator rejects the operation explicitly. *(Philosophy: "Prevention at the surface, not detection at depth.")*
+6. **Operators are defined for their declared types. Nothing else.** `boolean + boolean` is an error. `string > string` is an error. `string * number` is an error. `"42" == 42` is an error. The type checker catches all of these at compile time — a precept that compiles without diagnostics will not produce type errors at runtime (see Principle 18). The evaluator's runtime type checks are defensive assertions (belt-and-suspenders), not the primary enforcement layer. No implicit coercion across type families — the evaluator does not convert `string` to `number` for comparison, does not treat `0` as `false`, does not auto-convert between incompatible families. If a value reaches an operator with an incompatible type, the evaluator rejects the operation explicitly — but this indicates a bug in the type checker, not expected runtime behavior. *(Philosophy: "Prevention at the surface, not detection at depth.")*
 
-7. **Evaluation results are honest and serializable.** When Inspect, MCP tools, or the preview panel present evaluation results, the serialized form preserves type identity. A `decimal` field serializes with its exact decimal representation. An `integer` field serializes as a JSON integer. A `number` field serializes as a JSON number (IEEE 754). A `string` function always returns `string` (or `boolean` for predicates). The consumer can distinguish types from the serialized output. The evaluator never presents an approximate value as exact or an exact value as approximate. *(Philosophy: "Full inspectability. The engine exposes the complete reasoning.")*
+7. **Evaluation results are honest and serializable.** Within the runtime, evaluation results preserve type identity — a `decimal` field holds `decimal`, an `integer` field holds `long`, a `number` field holds `double`. A `string` function always returns `string` (or `boolean` for predicates). The evaluator never presents an approximate value as exact or an exact value as approximate. Serialized output uses standard JSON — consumers recover lane identity from the precept definition, not from the serialized value (see Principle 14, DD17). *(Philosophy: "Full inspectability. The engine exposes the complete reasoning.")*
 
 ### Numeric Integrity
 
@@ -120,13 +120,15 @@ These principles govern the evaluator's three numeric type families: integer (`l
 
 13. **Determinism across all lanes.** Same expression, same data, same numeric lane, same result. The evaluator does not use culture-dependent formatting, non-deterministic rounding, or platform-dependent floating-point modes. `decimal` arithmetic uses C#'s deterministic `decimal` operators. `double` arithmetic uses IEEE 754 semantics. *(Philosophy: determinism.)*
 
-14. **Inspectability through honest types.** When the MCP `precept_inspect` or `precept_fire` tools serialize instance data, the serialized value preserves lane identity. A `decimal` field serializes as a JSON number with its exact decimal representation. An `integer` field serializes as a JSON integer. A `number` field serializes as a JSON number (IEEE 754). The consumer can distinguish lanes from the serialized output. *(Philosophy: full inspectability, nothing hidden.)*
+14. **Inspectability through honest types.** The runtime preserves lane identity — a `decimal` stays `decimal`, an `integer` stays `long`, a `number` stays `double` throughout every evaluation step. Serialized output uses standard JSON — no typed wrappers, no lane metadata. JSON numbers lose lane identity; consumers recover lane information from the precept definition (`precept_compile` output). Data outside Precept is outside Precept's guarantees. *(Philosophy: full inspectability within the runtime. Standard mechanisms for serialization — see DD17.)*
 
 15. **Two explicit bridges, not many hidden ones.** `round(number, places) → decimal` is the deliberate bridge from the approximate `number` lane into the exact `decimal` lane. `approximate(decimal) → number` is the deliberate bridge from the exact `decimal` lane into the approximate `number` lane. These bridges are symmetric in intent — `round` says "normalize this to N places," `approximate` says "approximate this value." No other implicit or hidden cross-lane paths exist for arithmetic or assignment contexts. *(Locked design note, issue #115. Updated by DD11.)*
 
 16. **Tests assert the contract, not the leak.** Test expectations must match the semantic contract: decimal-lane tests assert `decimal`-typed results, integer-shaped surface tests assert `long` results, and `number`-lane tests assert `double` results. Tests that normalize via `Convert.ToDouble()` and approximate comparisons are themselves part of the semantic drift surface and must be updated alongside the evaluator. *(Locked design note, issue #115.)*
 
 17. **Function lane integrity rule.** A function keeps its decimal overload if and only if the mathematical operation is closed over finite decimals — meaning: decimal input always produces a result exactly representable as a finite decimal. All current functions except `sqrt` satisfy this. `sqrt` is inherently approximate — `sqrt(x)` is irrational for most inputs — so `sqrt` lives exclusively in the number lane. Future functions (`log`, `sin`, `cos`, `exp`, non-integer `pow`) are inherently approximate and would likewise live exclusively in the number lane. The author reaches them via `approximate()`. *(Locked design note, DD16, issue #115.)*
+
+18. **Static completeness.** If a precept compiles without diagnostics, it will not produce type errors at runtime. The type checker and proof engine together must statically reject every expression that could produce a type error — they are the primary enforcement layer. The evaluator's runtime type checks are defensive redundancy (belt-and-suspenders), not the safety net. If a type error reaches the evaluator at runtime, that is a bug in the type checker, not expected evaluator behavior. The only legitimate runtime failures are: overflow (checked integer arithmetic — DD19), `DecimalPow` edge cases (division by zero, decimal overflow — DD14), and guard/rule business logic producing `false`. This principle reframes the contract throughout: the type checker does not catch "most" type errors — it catches ALL of them. *(Locked design note, issue #115.)*
 
 ---
 
@@ -497,7 +499,7 @@ Relational operators (`>`, `>=`, `<`, `<=`) are valid on choice fields **only** 
 #### Error Cases
 
 - **Value not in ordered set:** If either operand's string value is not found in the `ChoiceValues` list, the evaluator produces an evaluation error: `"'value' is not a member of the ordered choice set."` This is a hard error, not a silent `false`.
-- **Unordered choice with relational operator:** If the field lacks the `ordered` constraint, `TryGetChoiceOrdinals` returns `false`, and the evaluator falls through to the numeric comparison path, which fails with `"operator '>' requires numeric operands."` The type checker prevents this at compile time, but the evaluator enforces it as a safety net.
+- **Unordered choice with relational operator:** If the field lacks the `ordered` constraint, `TryGetChoiceOrdinals` returns `false`, and the evaluator falls through to the numeric comparison path, which fails with `"operator '>' requires numeric operands."` The type checker prevents this at compile time; the evaluator's check is defensive redundancy (see Principle 18).
 - **Cross-field ordered comparison:** Ordinal rank is field-local. Comparing two different ordered choice fields is meaningless because their orderings are independent.
 
 #### Arithmetic on Choice
@@ -731,7 +733,7 @@ Fractional numeric literals in the DSL (e.g., `0.1`, `3.14`, `1.5`) do not have 
 | Update pipeline | Runtime | `PreceptRuntime.cs` | Same assignment contract enforced for direct field edits. |
 | Computed fields | Runtime | `PreceptRuntime.cs` | Same assignment contract enforced during recomputation. |
 | Proof engine | Type checker | `ProofContext.cs` | Interval arithmetic operates in the `double` (`NumericInterval`) lane per [ProofEngineDesign.md](ProofEngineDesign.md). The proof engine uses `double` for interval bounds — this is correct because proof intervals are over-approximations, and IEEE 754 widening is conservative (see ProofEngineDesign.md § Numeric Precision and IEEE 754). |
-| MCP serialization | MCP tools | `tools/Precept.Mcp/Tools/` | Instance data serialization preserves lane identity. `decimal` values serialize with exact decimal representation. `long` values serialize as JSON integers. `double` values serialize as JSON numbers. |
+| MCP serialization | MCP tools | `tools/Precept.Mcp/Tools/` | Instance data serialization uses standard JSON. Lane identity is runtime-scoped — consumers recover lane info from the precept definition (DD17, DD18). |
 
 ---
 
@@ -904,7 +906,7 @@ The following table documents the implementation status of each function contrac
 
 **Alternatives rejected:** (a) Single `double` lane (current broken state) — violates philosophy's numeric exactness commitment. (b) Single `decimal` lane (FEEL/DMN approach) — too slow for approximate-acceptable domains, cannot represent `sqrt` natively. (c) Two lanes (`integer` + `decimal` only) — forces approximate operations to produce decimal results, which are misleadingly exact-looking.
 
-**Tradeoff accepted:** Three lanes increase operator dispatch complexity (6 binary operand combinations instead of 1). The type checker catches most cross-lane errors at compile time, limiting runtime dispatch to well-typed expressions.
+**Tradeoff accepted:** Three lanes increase operator dispatch complexity (6 binary operand combinations instead of 1). The type checker catches all cross-lane errors at compile time (see Principle 18), limiting runtime dispatch to well-typed expressions.
 
 ### DD2: Decimal Lane Closed Over Exact Operations
 
@@ -1089,6 +1091,58 @@ The following table documents the implementation status of each function contrac
 **Rationale:** This rule makes the decimal/number boundary principled rather than ad-hoc. Instead of evaluating each new function individually, the rule provides a clear test: "Is the operation closed over finite decimals?" If yes, decimal overload. If no, number-only. The `approximate()` bridge provides the escape hatch.
 
 **Tradeoff accepted:** Some useful operations on decimal values (like `sqrt`) require an extra `approximate()` call. This is the correct trade — the alternative is pretending approximation is exactness.
+
+### DD17: Runtime-Scoped Lane Identity
+
+**Decision:** Lane identity is preserved within the CLR runtime — `decimal` stays `decimal`, `number` stays `double`, `integer` stays `long` throughout every evaluation step. Serialized output uses standard JSON — no typed wrappers, no lane metadata. Consumers recover lane information from the precept definition (`precept_compile` output).
+
+**Rationale:** "Don't reinvent serialization, use standard mechanisms." Data outside Precept is outside Precept's guarantees. The runtime is the integrity boundary — once values cross into JSON, they are plain JSON values. Lane recovery is a metadata lookup against the precept definition, not a property of the serialized value.
+
+**Narrows Principle 14.** The previous formulation implied consumers could distinguish lanes from the serialized output alone. The corrected formulation: the runtime preserves lane identity; serialization uses standard formats.
+
+**External precedent:** Every major serialization format (JSON, Protocol Buffers, MessagePack) collapses numeric types. JSON has one `number` type. Typed-value wrappers (e.g., `{"type": "decimal", "value": "0.1"}`) are non-standard and poorly supported by downstream tooling.
+
+**Alternatives rejected:** Typed-value wrappers in MCP output — overengineered, non-standard, creates a custom serialization format that every consumer must understand.
+
+**Tradeoff accepted:** JSON numbers lose lane identity. A `decimal` field value `0.1` and a `number` field value `0.1` are indistinguishable in JSON output. Consumers must cross-reference the precept definition to recover lane semantics.
+
+### DD18: MCP Boundary Uses Standard JSON
+
+**Decision:** `JsonConvert.cs` converting JSON numbers to `double` is acceptable — this is standard JSON behavior. MCP input is "outside Precept" — the runtime coerces incoming values to the declared field type on ingestion. No schema-aware JSON parsing is needed at the MCP boundary.
+
+**Rationale:** Same as DD17 — standard mechanisms, Precept's guarantees are runtime-scoped. The MCP boundary is an ingestion point, not an integrity boundary. The runtime's coercion rules (§ Assignment & Coercion — Runtime Coercion Rules) enforce lane-correct storage after ingestion.
+
+**Resolves:** MCP input lane collapse concerns. A `double` arriving from JSON for a `decimal` field is coerced by the runtime's existing type coercion contract — the MCP layer does not need to perform schema-aware parsing.
+
+**Tradeoff accepted:** MCP consumers sending values for `decimal` fields via JSON may experience the standard JSON numeric precision limitations. The runtime coercion contract handles the boundary.
+
+### DD19: Checked Integer Arithmetic
+
+**Decision:** All integer arithmetic in the evaluator uses `checked` contexts. Overflow produces `EvaluationResult.Fail` — a definite error, not an unhandled exception or silent wraparound.
+
+**Scope:** Covers the `IntegerPow` multiplication loop, rounding-to-`long` casts in `floor`/`ceil`/`truncate`/`round`, and any future integer arithmetic path.
+
+**Rationale:** Totality guarantee (Principle 4) — every expression evaluates to a result or a definite error. Silent integer overflow in a domain integrity engine is unacceptable — it produces silently corrupted values that downstream guards and rules operate on as if valid. The `long` range (±9.2×10¹⁸) covers all realistic business-domain integer values; overflow indicates a logic error or adversarial input, not a normal condition.
+
+**Performance:** `checked` arithmetic adds approximately one CPU instruction per integer operation (an overflow-flag test). Negligible in a business-rule engine where expression evaluation is not the throughput bottleneck.
+
+**Alternatives rejected:** Unchecked arithmetic (current behavior for some paths) — silent overflow corruption in a domain integrity engine is worse than the ~1 instruction overhead.
+
+**Tradeoff accepted:** ~1 CPU instruction overhead per integer operation. Expressions that would silently overflow now produce `EvaluationResult.Fail` instead of a silently wrong value.
+
+### DD20: Integer Pow Restricts to Non-Negative Exponents
+
+**Decision:** `pow(integer, integer)` requires exponent ≥ 0. The type checker rejects negative integer literal exponents. The proof engine must verify non-negative when the exponent is a field reference.
+
+**Rationale:** "Thinly wrap math — don't invent integer behavior for operations that produce non-integer results." `pow(2, -1) = 0.5` is not an integer. Rather than inventing a truncation convention (`pow(2, -1) → 0`) or returning a different type, the type system rejects the operation outright. Authors who need `x⁻ⁿ` should use the decimal or number lane: `pow(approximate(x), -n)` or `pow(x_as_decimal, -n)`.
+
+**External precedent:** Python `int ** -1` → `float` (lane-crosses); Haskell `(^)` restricts to non-negative exponents (type error for negative); SQL `POWER()` returns `float` regardless of input types. Precept follows Haskell's approach — the operation is undefined for the integer type rather than silently crossing lanes.
+
+**Proof engine obligation:** When the exponent is a field reference (not a literal), the proof engine must verify that the field's value range is non-negative. If the proof engine cannot prove non-negative, a diagnostic is emitted.
+
+**Alternatives rejected:** Truncated integer division (`pow(2, -1) → 0`) — surprising and inconsistent. Most developers expect `2⁻¹ = 0.5`, not `0`. Returning `0` sends mixed signals about what the operation means.
+
+**Tradeoff accepted:** Authors cannot compute negative-exponent powers in the integer lane. They must explicitly cross to decimal or number, which makes the non-integer result visible in the type system.
 
 ---
 
