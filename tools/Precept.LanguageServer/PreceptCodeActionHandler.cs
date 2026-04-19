@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
@@ -15,7 +16,11 @@ internal sealed class PreceptCodeActionHandler : ICodeActionHandler
         Language = "precept"
     });
 
-    private static readonly Regex C93DivisorNameRegex = new(@"Divisor '([^']+)'", RegexOptions.Compiled);
+    private static readonly HashSet<string> ProofDiagnosticCodes = new(StringComparer.Ordinal)
+    {
+        "PRECEPT092", "PRECEPT093", "PRECEPT076",
+        "PRECEPT095", "PRECEPT096", "PRECEPT097", "PRECEPT098"
+    };
 
     public Task<CommandOrCodeActionContainer?> Handle(CodeActionParams request, CancellationToken cancellationToken)
     {
@@ -69,19 +74,39 @@ internal sealed class PreceptCodeActionHandler : ICodeActionHandler
             });
         }
 
-        // ── C93: Unproven divisor safety ──
-        var c93Diagnostics = (request.Context.Diagnostics ?? Enumerable.Empty<Diagnostic>())
-            .Where(d => d.Code is { String: "PRECEPT093" })
+        // ── Proof-backed diagnostics: C92, C93, C76, C95-C98 ──
+        var proofDiagnostics = (request.Context.Diagnostics ?? Enumerable.Empty<Diagnostic>())
+            .Where(d => d.Code is not null && d.Code.Value.String is not null && ProofDiagnosticCodes.Contains(d.Code.Value.String))
             .ToArray();
 
-        if (c93Diagnostics.Length > 0)
+        if (proofDiagnostics.Length > 0)
         {
             var (model, parseDiags) = PreceptParser.ParseWithDiagnostics(text);
             if (parseDiags.Count == 0 && model is not null)
             {
                 var lines = text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
-                foreach (var c93 in c93Diagnostics)
-                    AddC93CodeActions(actions, lines, text, request.TextDocument.Uri, model, c93);
+                foreach (var diag in proofDiagnostics)
+                {
+                    var code = diag.Code!.Value.String;
+                    switch (code)
+                    {
+                        case "PRECEPT092":
+                            AddDivisorCodeActions(actions, lines, text, request.TextDocument.Uri, model, diag, isContradiction: true);
+                            break;
+                        case "PRECEPT093":
+                            AddDivisorCodeActions(actions, lines, text, request.TextDocument.Uri, model, diag, isContradiction: false);
+                            break;
+                        case "PRECEPT076":
+                            AddSqrtCodeActions(actions, lines, text, request.TextDocument.Uri, model, diag);
+                            break;
+                        case "PRECEPT095":
+                        case "PRECEPT096":
+                        case "PRECEPT097":
+                        case "PRECEPT098":
+                            AddRemoveLineCodeAction(actions, lines, request.TextDocument.Uri, diag);
+                            break;
+                    }
+                }
             }
         }
 
@@ -261,73 +286,118 @@ internal sealed class PreceptCodeActionHandler : ICodeActionHandler
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // C93 — Unproven divisor safety code actions
+    // Proof-backed code actions (C92, C93, C76, C95-C98)
     // ═══════════════════════════════════════════════════════════════
 
-    private static void AddC93CodeActions(
+    /// <summary>Extracts the subject name from the diagnostic's structured Data field.</summary>
+    private static string? ExtractSubjectFromData(Diagnostic diagnostic)
+    {
+        if (diagnostic.Data is JObject data && data.TryGetValue("subject", out var subjectToken))
+            return subjectToken.Value<string>();
+        return null;
+    }
+
+    private static readonly Regex IdentifierTokenRegex = new(@"^[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)?", RegexOptions.Compiled);
+
+    /// <summary>
+    /// Extracts the subject name from a proof diagnostic. Prefers structured Data;
+    /// falls back to span-based token extraction at the diagnostic position.
+    /// </summary>
+    private static string? ExtractSubjectName(Diagnostic diagnostic, string[] lines)
+    {
+        // Prefer structured metadata from Diagnostic.Data
+        var subject = ExtractSubjectFromData(diagnostic);
+        if (subject is not null)
+            return subject;
+
+        // Fallback: span-driven token extraction at diagnostic position
+        var startLine = (int)diagnostic.Range.Start.Line;
+        var startChar = (int)diagnostic.Range.Start.Character;
+
+        if (startLine >= 0 && startLine < lines.Length && startChar > 0)
+        {
+            var line = lines[startLine];
+            if (startChar < line.Length)
+            {
+                var rest = line[startChar..];
+                var tokenMatch = IdentifierTokenRegex.Match(rest);
+                if (tokenMatch.Success)
+                    return tokenMatch.Value;
+            }
+        }
+
+        return null;
+    }
+
+    private static (bool IsDotted, string? EventName, string? ArgName, string? FieldName) ParseSubjectName(string subjectName)
+    {
+        if (subjectName.Contains('.'))
+        {
+            var dotIndex = subjectName.IndexOf('.');
+            return (true, subjectName[..dotIndex], subjectName[(dotIndex + 1)..], null);
+        }
+        return (false, null, null, subjectName);
+    }
+
+    // ── C92/C93: Division safety code actions ──
+
+    private static void AddDivisorCodeActions(
         List<CommandOrCodeAction> actions,
         string[] lines,
         string text,
         DocumentUri uri,
         PreceptDefinition model,
-        Diagnostic diagnostic)
+        Diagnostic diagnostic,
+        bool isContradiction)
     {
-        var divisorName = ExtractC93DivisorName(diagnostic.Message);
-        if (divisorName is null)
+        var subjectName = ExtractSubjectName(diagnostic, lines);
+        if (subjectName is null)
             return;
 
-        var isDotted = divisorName.Contains('.');
-        string? eventName = null;
-        string? argName = null;
-        string? fieldName = null;
+        var (isDotted, eventName, argName, fieldName) = ParseSubjectName(subjectName);
 
-        if (isDotted)
+        // For C92 (contradiction) the divisor is provably zero. Adding a `positive` constraint
+        // may still be meaningful if the field lacks one — it would turn the contradiction into
+        // a constraint+rule mismatch the user can debug. But the main useful action is a guard.
+        if (!isContradiction)
         {
-            var dotIndex = divisorName.IndexOf('.');
-            eventName = divisorName[..dotIndex];
-            argName = divisorName[(dotIndex + 1)..];
-        }
-        else
-        {
-            fieldName = divisorName;
-        }
+            // Action: Add `positive` constraint
+            var positiveEdit = isDotted
+                ? BuildAddPositiveToEventArgEdit(lines, uri, model, eventName!, argName!)
+                : BuildAddPositiveToFieldEdit(lines, uri, model, fieldName!);
 
-        // Action 1: Add `positive` constraint
-        var positiveEdit = isDotted
-            ? BuildAddPositiveToEventArgEdit(lines, uri, model, eventName!, argName!)
-            : BuildAddPositiveToFieldEdit(lines, uri, model, fieldName!);
-
-        if (positiveEdit is not null)
-        {
-            var displayName = isDotted ? argName! : fieldName!;
-            actions.Add(new CodeAction
+            if (positiveEdit is not null)
             {
-                Title = $"Add `positive` constraint to field `{displayName}`",
-                Kind = CodeActionKind.QuickFix,
-                Diagnostics = new Container<Diagnostic>(diagnostic),
-                Edit = positiveEdit
-            });
-        }
-
-        // Action 2: Add ensure (event-arg only)
-        if (isDotted)
-        {
-            var ensureEdit = BuildAddEnsureEdit(lines, text, uri, model, eventName!, argName!);
-            if (ensureEdit is not null)
-            {
+                var displayName = isDotted ? argName! : fieldName!;
                 actions.Add(new CodeAction
                 {
-                    Title = $"Add `ensure {argName} > 0` to event",
+                    Title = $"Add `positive` constraint to field `{displayName}`",
                     Kind = CodeActionKind.QuickFix,
                     Diagnostics = new Container<Diagnostic>(diagnostic),
-                    Edit = ensureEdit
+                    Edit = positiveEdit
                 });
+            }
+
+            // Action: Add ensure (event-arg only)
+            if (isDotted)
+            {
+                var ensureEdit = BuildAddEnsureEdit(lines, text, uri, model, eventName!, argName!, "> 0", "must be positive");
+                if (ensureEdit is not null)
+                {
+                    actions.Add(new CodeAction
+                    {
+                        Title = $"Add `ensure {argName} > 0` to event",
+                        Kind = CodeActionKind.QuickFix,
+                        Diagnostics = new Container<Diagnostic>(diagnostic),
+                        Edit = ensureEdit
+                    });
+                }
             }
         }
 
-        // Action 3: Add `when` guard
-        var guardName = isDotted ? divisorName : fieldName!;
-        var guardEdit = BuildAddWhenGuardEdit(lines, uri, (int)diagnostic.Range.Start.Line, guardName);
+        // Action: Add `when` guard (useful for both C92 and C93)
+        var guardName = isDotted ? subjectName : fieldName!;
+        var guardEdit = BuildAddWhenGuardEdit(lines, uri, (int)diagnostic.Range.Start.Line, guardName, "!= 0");
         if (guardEdit is not null)
         {
             actions.Add(new CodeAction
@@ -340,14 +410,121 @@ internal sealed class PreceptCodeActionHandler : ICodeActionHandler
         }
     }
 
-    private static string? ExtractC93DivisorName(string message)
+    // ── C76: sqrt non-negative safety code actions ──
+
+    private static void AddSqrtCodeActions(
+        List<CommandOrCodeAction> actions,
+        string[] lines,
+        string text,
+        DocumentUri uri,
+        PreceptDefinition model,
+        Diagnostic diagnostic)
     {
-        var match = C93DivisorNameRegex.Match(message);
-        return match.Success ? match.Groups[1].Value : null;
+        var subjectName = ExtractSubjectName(diagnostic, lines);
+        if (subjectName is null)
+            return;
+
+        var (isDotted, eventName, argName, fieldName) = ParseSubjectName(subjectName);
+
+        // Action: Add `nonnegative` constraint
+        var constraintEdit = isDotted
+            ? BuildAddConstraintToEventArgEdit(lines, uri, model, eventName!, argName!, "nonnegative")
+            : BuildAddConstraintToFieldEdit(lines, uri, model, fieldName!, "nonnegative");
+
+        if (constraintEdit is not null)
+        {
+            var displayName = isDotted ? argName! : fieldName!;
+            actions.Add(new CodeAction
+            {
+                Title = $"Add `nonnegative` constraint to field `{displayName}`",
+                Kind = CodeActionKind.QuickFix,
+                Diagnostics = new Container<Diagnostic>(diagnostic),
+                Edit = constraintEdit
+            });
+        }
+
+        // Action: Add ensure (event-arg only)
+        if (isDotted)
+        {
+            var ensureEdit = BuildAddEnsureEdit(lines, text, uri, model, eventName!, argName!, ">= 0", "must be non-negative");
+            if (ensureEdit is not null)
+            {
+                actions.Add(new CodeAction
+                {
+                    Title = $"Add `ensure {argName} >= 0` to event",
+                    Kind = CodeActionKind.QuickFix,
+                    Diagnostics = new Container<Diagnostic>(diagnostic),
+                    Edit = ensureEdit
+                });
+            }
+        }
+
+        // Action: Add `when` guard
+        var guardName = isDotted ? subjectName : fieldName!;
+        var guardEdit = BuildAddWhenGuardEdit(lines, uri, (int)diagnostic.Range.Start.Line, guardName, ">= 0");
+        if (guardEdit is not null)
+        {
+            actions.Add(new CodeAction
+            {
+                Title = $"Add `when {guardName} >= 0` guard",
+                Kind = CodeActionKind.QuickFix,
+                Diagnostics = new Container<Diagnostic>(diagnostic),
+                Edit = guardEdit
+            });
+        }
+    }
+
+    // ── C95-C98: Remove problematic line code actions ──
+
+    private static void AddRemoveLineCodeAction(
+        List<CommandOrCodeAction> actions,
+        string[] lines,
+        DocumentUri uri,
+        Diagnostic diagnostic)
+    {
+        var lineIndex = (int)diagnostic.Range.Start.Line;
+        if (lineIndex < 0 || lineIndex >= lines.Length)
+            return;
+
+        var code = diagnostic.Code!.Value.String;
+        var title = code switch
+        {
+            "PRECEPT095" => "Remove contradictory rule",
+            "PRECEPT096" => "Remove vacuous rule",
+            "PRECEPT097" => "Remove unreachable transition",
+            "PRECEPT098" => "Remove tautological guard",
+            _ => "Remove line"
+        };
+
+        var ranges = BuildContiguousLineDeletionRanges(lines, new[] { lineIndex });
+        var edits = ranges
+            .Select(range => new TextEdit { Range = range, NewText = string.Empty })
+            .ToArray();
+
+        if (edits.Length == 0)
+            return;
+
+        actions.Add(new CodeAction
+        {
+            Title = title,
+            Kind = CodeActionKind.QuickFix,
+            Diagnostics = new Container<Diagnostic>(diagnostic),
+            Edit = new WorkspaceEdit
+            {
+                Changes = new Dictionary<DocumentUri, IEnumerable<TextEdit>>
+                {
+                    [uri] = edits
+                }
+            }
+        });
     }
 
     private static WorkspaceEdit? BuildAddPositiveToFieldEdit(
         string[] lines, DocumentUri uri, PreceptDefinition model, string fieldName)
+        => BuildAddConstraintToFieldEdit(lines, uri, model, fieldName, "positive");
+
+    private static WorkspaceEdit? BuildAddConstraintToFieldEdit(
+        string[] lines, DocumentUri uri, PreceptDefinition model, string fieldName, string constraint)
     {
         var field = model.Fields.FirstOrDefault(f =>
             string.Equals(f.Name, fieldName, StringComparison.Ordinal));
@@ -364,13 +541,17 @@ internal sealed class PreceptCodeActionHandler : ICodeActionHandler
             return null;
 
         var insertPos = typeMatch.Index + typeMatch.Length;
-        var newLine = line[..insertPos] + " positive" + line[insertPos..];
+        var newLine = line[..insertPos] + " " + constraint + line[insertPos..];
 
         return MakeSingleLineEdit(uri, lineIndex, line.Length, newLine);
     }
 
     private static WorkspaceEdit? BuildAddPositiveToEventArgEdit(
         string[] lines, DocumentUri uri, PreceptDefinition model, string eventName, string argName)
+        => BuildAddConstraintToEventArgEdit(lines, uri, model, eventName, argName, "positive");
+
+    private static WorkspaceEdit? BuildAddConstraintToEventArgEdit(
+        string[] lines, DocumentUri uri, PreceptDefinition model, string eventName, string argName, string constraint)
     {
         var evt = model.Events.FirstOrDefault(e =>
             string.Equals(e.Name, eventName, StringComparison.Ordinal));
@@ -388,13 +569,14 @@ internal sealed class PreceptCodeActionHandler : ICodeActionHandler
             return null;
 
         var insertPos = argMatch.Index + argMatch.Length;
-        var newLine = line[..insertPos] + " positive" + line[insertPos..];
+        var newLine = line[..insertPos] + " " + constraint + line[insertPos..];
 
         return MakeSingleLineEdit(uri, lineIndex, line.Length, newLine);
     }
 
     private static WorkspaceEdit? BuildAddEnsureEdit(
-        string[] lines, string text, DocumentUri uri, PreceptDefinition model, string eventName, string argName)
+        string[] lines, string text, DocumentUri uri, PreceptDefinition model, string eventName, string argName,
+        string comparison = "> 0", string reason = "must be positive")
     {
         var evt = model.Events.FirstOrDefault(e =>
             string.Equals(e.Name, eventName, StringComparison.Ordinal));
@@ -410,7 +592,7 @@ internal sealed class PreceptCodeActionHandler : ICodeActionHandler
         var indentStr = eventLine[..indent];
 
         var newline = text.Contains("\r\n") ? "\r\n" : "\n";
-        var ensureLine = $"{indentStr}on {eventName} ensure {argName} > 0 because \"{argName} must be positive\"";
+        var ensureLine = $"{indentStr}on {eventName} ensure {argName} {comparison} because \"{argName} {reason}\"";
 
         var insertPosition = new Position(lineIndex + 1, 0);
 
@@ -432,7 +614,7 @@ internal sealed class PreceptCodeActionHandler : ICodeActionHandler
     }
 
     private static WorkspaceEdit? BuildAddWhenGuardEdit(
-        string[] lines, DocumentUri uri, int diagnosticLineIndex, string guardName)
+        string[] lines, DocumentUri uri, int diagnosticLineIndex, string guardName, string comparison = "!= 0")
     {
         if (diagnosticLineIndex < 0 || diagnosticLineIndex >= lines.Length)
             return null;
@@ -449,12 +631,12 @@ internal sealed class PreceptCodeActionHandler : ICodeActionHandler
         if (prefix.Contains(" when ", StringComparison.Ordinal))
         {
             // Existing when clause — append with `and`
-            newLine = prefix.TrimEnd() + $" and {guardName} != 0 " + suffix;
+            newLine = prefix.TrimEnd() + $" and {guardName} {comparison} " + suffix;
         }
         else
         {
             // No when clause — insert before ->
-            newLine = prefix.TrimEnd() + $" when {guardName} != 0 " + suffix;
+            newLine = prefix.TrimEnd() + $" when {guardName} {comparison} " + suffix;
         }
 
         return MakeSingleLineEdit(uri, diagnosticLineIndex, line.Length, newLine);

@@ -192,6 +192,7 @@ Statement          := FieldDecl | Rule | StateDecl | StateEnsure | StateAction
                     | Comment | Blank
 
 FieldDecl          := "field" Identifier ("," Identifier)* "as" TypeRef FieldModifier*
+                    | "field" Identifier "as" TypeRef "->" Expr ConstraintSuffix*
 FieldModifier      := "nullable" | "default" LiteralOrList | ConstraintSuffix | "ordered"
 ConstraintSuffix   := "nonnegative" | "positive" | "notempty"
                     | "min" NumberLiteral | "max" NumberLiteral
@@ -254,8 +255,11 @@ LiteralOrList      := ScalarLiteral | ListLiteral
 ScalarLiteral      := NumberLiteral | BooleanLiteral | StringLiteral | NullLiteral
 ListLiteral        := "[" (ScalarLiteral ("," ScalarLiteral)*)? "]"
 
-BoolExpr           := <expression grammar; carried forward>
-Identifier         := <token>
+BoolExpr           := Expr
+                      (* Expression grammar uses standard precedence:
+                         or < and < not < comparison < contains < arithmetic < unary.
+                         Atoms: literals, identifiers, parenthesized, function calls,
+                         if/then/else conditionals, dotted member access. *)\nIdentifier         := <token>
 StringLiteral      := '"' ... '"'
 Comment            := "#" ... end-of-line
 Blank              := (whitespace only)
@@ -597,10 +601,10 @@ Constraint keywords may appear on field declarations and event argument declarat
 
 | Keyword | Applies to | Desugar |
 |---------|------------|---------|
-| `nonnegative` | number | `Field >= 0` |
-| `positive` | number | `Field > 0` |
-| `min N` | number | `Field >= N` |
-| `max N` | number | `Field <= N` |
+| `nonnegative` | `number`, `integer`, `decimal` | `Field >= 0` |
+| `positive` | `number`, `integer`, `decimal` | `Field > 0` |
+| `min N` | `number`, `integer`, `decimal` | `Field >= N` |
+| `max N` | `number`, `integer`, `decimal` | `Field <= N` |
 | `notempty` | string, collection | `Field != ""` / `Field.count > 0` |
 | `minlength N` | string | `Field.length >= N` |
 | `maxlength N` | string | `Field.length <= N` |
@@ -1136,7 +1140,7 @@ The compiler checks the right operand of `/` and `%` for a compile-time nonzero 
 | Divisor is an identifier with no nonzero proof | C93 | Error | `Divisor '{name}' has no compile-time nonzero proof. Consider adding a 'positive' constraint, 'rule {name} != 0', or 'when {name} != 0' guard.` |
 | Divisor is nonnegative but not nonzero | C93 | Error | `Divisor '{name}' is nonnegative but not nonzero — 'nonnegative' allows zero. Consider 'positive' instead.` |
 
-C92 is an **error** because the compiler can prove a contradiction — dividing by literal zero is always wrong. C93 is also an **error** because an unproven divisor risks runtime division by zero, which produces IEEE 754 Infinity or NaN — values that silently corrupt field state and cannot be serialized. The runtime guards against this at evaluation time, but the compile-time error ensures authors fix the proof gap before deployment. Compound expressions (binary operations, function calls) are assumed satisfiable and produce no diagnostic — the inspector catches those at simulation time.
+C92 is an **error** because the compiler can prove a contradiction — dividing by literal zero is always wrong. C93 is also an **error** because an unproven divisor risks runtime division by zero, which produces IEEE 754 Infinity or NaN — values that silently corrupt field state and cannot be serialized. The runtime guards against this at evaluation time, but the compile-time error ensures authors fix the proof gap before deployment. Compound expressions (binary operations, function calls) are analyzed by the proof engine using interval arithmetic, relational inference, and sequential assignment flow. For the full design of the interval-arithmetic proof engine that powers compound-expression analysis, see [ProofEngineDesign.md](ProofEngineDesign.md).
 
 **Proof sources that suppress C93:**
 
@@ -1152,6 +1156,24 @@ C92 is an **error** because the compiler can prove a contradiction — dividing 
 | Event `ensure Arg > 0` | `on Submit ensure Amount > 0 because "..."` | `$positive:` |
 
 **The `nonnegative` ≠ nonzero distinction:** `nonnegative` (and `min 0`) prove `Field >= 0` — a `$nonneg:` marker. This does *not* prove nonzero, because zero is a valid nonnegative value. Dividing by a nonnegative field triggers C93 with a context-aware message explaining that `nonnegative` allows zero and suggesting `positive` instead.
+
+### Proof-backed integrity diagnostics (Locked)
+
+The proof engine uses interval arithmetic and relational inference to detect structural integrity issues beyond divisor safety. These diagnostics fire when the engine can prove a property from field constraints, rules, and guards — they never guess.
+
+| Condition | Diagnostic | Severity | Message |
+|---|---|---|---|
+| Assignment provably outside target field's constraint range | C94 | Error | `Assignment expression is provably outside the target field's constraint range.` |
+| Rules are contradictory — no value can satisfy both simultaneously | C95 | Error | `Rules are contradictory — no value can satisfy both simultaneously.` |
+| Rule is vacuous — provably always true given field constraints | C96 | Warning | `Rule is vacuous — provably always true given field constraints.` |
+| Guard is dead — provably always false; row/block can never execute | C97 | Warning | `Guard is dead — provably always false; this row/block can never execute.` |
+| Guard is tautological — provably always true; the `when` clause has no effect | C98 | Warning | `Guard is tautological — provably always true; the 'when' clause has no effect.` |
+
+C94 is an **error** because the engine can prove the assignment will always violate a field constraint — the runtime will reject every execution of this row, making it structurally dead code. C95 is an **error** when rules form a global integrity failure (no value satisfies all rules simultaneously). C96–C98 are **warnings** — the constructs are not harmful, but they indicate unnecessary or unreachable logic that likely represents an authoring mistake.
+
+All five diagnostics use the shared assessment model: the proof engine classifies the outcome (proven contradiction, proven vacuity, proven dead, proven tautological), and the diagnostic message is a rendering of the structured assessment. The message template includes `{message}` which carries the engine's natural-language explanation of the proof, including attribution to the contributing constraints and rules.
+
+These diagnostics currently analyze simple single-field comparisons (`Field <op> Literal`). Cross-field and complex expressions are unanalyzed — the engine conservatively skips what it cannot prove.
 
 ---
 
@@ -1389,8 +1411,8 @@ All diagnostics follow a three-tier severity model:
 
 | Severity | Meaning | Examples |
 |---|---|---|
-| **Error** | Provably wrong — the checker can prove a contradiction from types, null-flow, or structural rules. Blocks compilation. | Type mismatches (C39–C41), null-flow violations (C42), unknown identifiers (C38), non-boolean rule positions (C46), identical-guard duplicates (C47), unreachable rows, missing outcomes, literal zero divisor (C92), unproven divisor (C93) |
-| **Warning** | Probably wrong — structural quality issue that is almost certainly a mistake but could be intentional. Does not block compilation. | Reject-only (state, event) pairs (C51), events that never succeed (C52), unreachable states (C48), orphaned events (C49) |
+| **Error** | Provably wrong — the checker can prove a contradiction from types, null-flow, or structural rules. Blocks compilation. | Type mismatches (C39–C41), null-flow violations (C42), unknown identifiers (C38), non-boolean rule positions (C46), identical-guard duplicates (C47), unreachable rows, missing outcomes, literal zero divisor (C92), unproven divisor (C93), assignment constraint violation (C94), contradictory rules (C95) |
+| **Warning** | Probably wrong — structural quality issue that is almost certainly a mistake but could be intentional. Does not block compilation. | Reject-only (state, event) pairs (C51), events that never succeed (C52), unreachable states (C48), orphaned events (C49), vacuous rules (C96), dead guards (C97), tautological guards (C98) |
 | **Hint** | Informational — observation that may or may not indicate a problem. | Dead-end states (C50), empty precept (C53) |
 
 The rule: if the checker can **prove** it, it’s an **error**. If the analyzer can **observe** a structural concern, it’s a **warning** or **hint**. The checker never guesses — uncertain cases are left to the inspector.

@@ -99,7 +99,7 @@ See the [Quickstart Guide](docs/RuntimeApiDesign.md) for a complete runtime inte
 - One file, all rules — guards, constraints, rules, and transitions together
 - Lifecycle optional — stateless precepts enforce field declarations, rules, and constraints without a state machine
 - Full inspectability — preview any action's outcome without executing it
-- Compile-time checking — unreachable states, type errors, null-flow violations, and divisor safety caught before runtime
+- Compile-time proof engine — a unified interval + relational inference engine that proves numeric properties at compile time, before any instance exists. Catches divisor safety (C92/C93), sqrt safety (C76), assignment constraint violations (C94), contradictory rules (C95), vacuous rules (C96), dead guards (C97), and tautological guards (C98). Proof covers compound operands, sum-on-RHS rules, computed-field intermediaries, transitive ordering chains, and 10 built-in numeric functions. All diagnostics include source attribution so authors see what was proved and why.
 - **Stateful or stateless** — precepts can govern stateful workflows (with lifecycle states and transitions) or stateless domain objects (fields and edit rules only, no states)
 - **Conditional declarations** — `when` guards on rules, ensures, and edit blocks make rules apply only when a precondition is met
 - **Conditional expressions** — `if...then...else` selects between values inline, replacing row duplication for data-dependent field assignments
@@ -117,7 +117,7 @@ Precept is not a workflow orchestrator, event sourcing framework, or ORM — it 
 | [Language Reference](docs/PreceptLanguageDesign.md) | Full DSL syntax and construct reference |
 | [Quickstart Guide](docs/RuntimeApiDesign.md) | Step-by-step runtime integration walkthrough |
 | [MCP Server Docs](docs/McpServerDesign.md) | Tool reference for AI agent integration |
-| [Sample Catalog](samples/) | 25 domain models in `.precept` |
+| [Sample Catalog](samples/) | 28 domain models in `.precept` |
 
 **Highlighted samples:**
 

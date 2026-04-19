@@ -2099,6 +2099,7 @@ public sealed class PreceptEngine
 public sealed record PreceptDiagnostic(
     int Line,
     int Column,
+    int EndColumn,
     string Message,
     string? Code,
     ConstraintSeverity Severity,
@@ -2107,7 +2108,8 @@ public sealed record PreceptDiagnostic(
 public sealed record CompileFromTextResult(
     PreceptDefinition? Model,
     PreceptEngine? Engine,
-    IReadOnlyList<PreceptDiagnostic> Diagnostics)
+    IReadOnlyList<PreceptDiagnostic> Diagnostics,
+    ProofDump? ProofDump = null)
 {
     public bool HasErrors => Diagnostics.Any(static diagnostic => diagnostic.Severity == ConstraintSeverity.Error);
 }
@@ -2162,9 +2164,15 @@ public static class PreceptCompiler
         CollectCompileTimeDiagnostics(model, diagnostics);
 
         if (!diagnostics.Any(diagnostic => diagnostic.Constraint.Id is "C27" or "C28"))
-            diagnostics.AddRange(PreceptAnalysis.Analyze(model).Diagnostics);
+        {
+            var deadGuardLines = new HashSet<int>(
+                typeCheck.Diagnostics
+                    .Where(d => d.Constraint.Id == "C97")
+                    .Select(d => d.Line));
+            diagnostics.AddRange(PreceptAnalysis.Analyze(model, deadGuardLines).Diagnostics);
+        }
 
-        return new ValidationResult(diagnostics, typeCheck.TypeContext, model);
+        return new ValidationResult(diagnostics, typeCheck.TypeContext, model, typeCheck.ProofContext);
     }
 
     public static CompileFromTextResult CompileFromText(string text)
@@ -2176,10 +2184,11 @@ public static class PreceptCompiler
         var validation = Validate(model);
         var validatedModel = validation.ValidatedModel ?? model;
         var diagnostics = validation.Diagnostics.Select(ToDiagnostic).ToArray();
+        var proofDump = validation.ProofContext?.Dump();
         if (validation.HasErrors)
-            return new CompileFromTextResult(validatedModel, null, diagnostics);
+            return new CompileFromTextResult(validatedModel, null, diagnostics, proofDump);
 
-        return new CompileFromTextResult(validatedModel, new PreceptEngine(validatedModel), diagnostics);
+        return new CompileFromTextResult(validatedModel, new PreceptEngine(validatedModel), diagnostics, proofDump);
     }
 
     public static PreceptEngine Compile(PreceptDefinition model)
@@ -2191,10 +2200,10 @@ public static class PreceptCompiler
     }
 
     private static PreceptDiagnostic ToDiagnostic(ParseDiagnostic diagnostic)
-        => new(diagnostic.Line, diagnostic.Column, diagnostic.Message, diagnostic.Code, ConstraintSeverity.Error);
+        => new(diagnostic.Line, diagnostic.Column, 0, diagnostic.Message, diagnostic.Code, ConstraintSeverity.Error);
 
     private static PreceptDiagnostic ToDiagnostic(PreceptValidationDiagnostic diagnostic)
-        => new(diagnostic.Line, diagnostic.Column, diagnostic.Message, diagnostic.DiagnosticCode, diagnostic.Constraint.Severity, diagnostic.StateContext);
+        => new(diagnostic.Line, diagnostic.Column, diagnostic.EndColumn, diagnostic.Message, diagnostic.DiagnosticCode, diagnostic.Constraint.Severity, diagnostic.StateContext);
 
     private static void ThrowIfValidationFailed(ValidationResult validation)
     {
@@ -2393,7 +2402,9 @@ public static class PreceptCompiler
                     diagnostics.Add(new PreceptValidationDiagnostic(
                         DiagnosticCatalog.C32,
                         DiagnosticCatalog.C32.FormatMessage(("sourceLine", assignment.SourceLine), ("key", assignment.Key), ("expression", assignment.ExpressionText), ("reason", rule.Reason)),
-                        assignment.SourceLine));
+                        assignment.SourceLine,
+                        Column: assignment.Expression.Position?.StartColumn ?? 0,
+                        EndColumn: assignment.Expression.Position?.EndColumn ?? 0));
                 }
             }
         }

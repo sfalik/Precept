@@ -1,0 +1,26 @@
+# Demonstrates: C29, C95 — contradictory rules also fail default-value validation
+
+# C95 proves the rule and field constraints are disjoint.
+# C29 also appears because defaults must satisfy every rule that ships in the file.
+
+precept ContradictoryRulesDemo
+
+field Threshold as number default 10 min 10 max 20
+field PositiveOnly as number default 5 positive
+
+state Review initial
+state Done
+
+event Advance
+
+from Review on Advance -> transition Done
+
+# C95 + C29: [10, 20] and (-inf, 5) do not overlap.
+# EXPECT: C95 | severity=error | match=exact | message=Rule 'Threshold < 5' contradicts the constraints on 'Threshold'. Rule requires always less than 5, but field is constrained to 10 to 20 (inclusive). | line=21 | start=0 | end=0
+# EXPECT: C29 | severity=error | match=exact | message=Compile-time rule violation: "Threshold must stay below 5" is violated by default field values. | line=21 | start=0 | end=0
+rule Threshold < 5 because "Threshold must stay below 5"
+
+# C95 + C29: PositiveOnly is constrained to (0, +inf), so <= 0 is impossible.
+# EXPECT: C95 | severity=error | match=exact | message=Rule 'PositiveOnly <= 0' contradicts the constraints on 'PositiveOnly'. Rule requires 0 or less, but field is constrained to always greater than 0. | line=26 | start=0 | end=0
+# EXPECT: C29 | severity=error | match=exact | message=Compile-time rule violation: "PositiveOnly cannot be zero or negative" is violated by default field values. | line=26 | start=0 | end=0
+rule PositiveOnly <= 0 because "PositiveOnly cannot be zero or negative"

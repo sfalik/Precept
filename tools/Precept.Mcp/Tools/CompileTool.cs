@@ -17,7 +17,8 @@ public static class CompileTool
 
         var diagnostics = result.Diagnostics
             .Select(d => new DiagnosticDto(d.Line, d.Column, d.Message, d.Code,
-                d.Severity.ToString().ToLowerInvariant()))
+                d.Severity.ToString().ToLowerInvariant(),
+                d.EndColumn > d.Column ? d.EndColumn : null))
             .ToList();
 
         if (model is null)
@@ -90,7 +91,57 @@ public static class CompileTool
             stateEnsures,
             eventEnsures,
             editBlocks,
-            diagnostics);
+            diagnostics,
+            BuildProofSnapshot(result));
+    }
+
+    private static ProofSnapshot? BuildProofSnapshot(CompileFromTextResult result)
+    {
+        var proofDump = result.ProofDump;
+        if (proofDump is null)
+            return null;
+
+        var fieldEntries = new Dictionary<string, ProofFieldInfo>(StringComparer.Ordinal);
+        foreach (var (name, entry) in proofDump.Fields)
+        {
+            if (entry.Display is null || entry.Display == "unknown")
+                continue;
+
+            var interval = entry.Lower is not null
+                ? new IntervalDto(entry.Lower.Value, entry.LowerInclusive!.Value,
+                    entry.Upper!.Value, entry.UpperInclusive!.Value, entry.Display)
+                : null;
+
+            fieldEntries[name] = new ProofFieldInfo(
+                interval,
+                entry.Display,
+                entry.Sources ?? Array.Empty<string>());
+        }
+
+        List<ProofExpressionInfo>? exprInfos = null;
+        if (proofDump.ExpressionFacts.Count > 0)
+        {
+            exprInfos = new List<ProofExpressionInfo>();
+            foreach (var ef in proofDump.ExpressionFacts)
+            {
+                var display = ef.Display ?? ef.Interval;
+                var interval = ef.Lower is not null
+                    ? new IntervalDto(ef.Lower.Value, ef.LowerInclusive!.Value,
+                        ef.Upper!.Value, ef.UpperInclusive!.Value, display)
+                    : null;
+
+                exprInfos.Add(new ProofExpressionInfo(ef.Form, interval, display));
+            }
+        }
+
+        if (fieldEntries.Count == 0 && (exprInfos is null || exprInfos.Count == 0))
+            return null;
+
+        var global = new ProofScopeDto(
+            fieldEntries.Count > 0 ? fieldEntries : null,
+            exprInfos);
+
+        return new ProofSnapshot(global, null);
     }
 
     private static List<string> GetStateRules(PreceptDefinition model, string stateName)
@@ -155,13 +206,14 @@ public sealed record CompileResult(
     IReadOnlyList<StateEnsureDto>? StateEnsures,
     IReadOnlyList<EventEnsureDto>? EventEnsures,
     IReadOnlyList<EditBlockDto>? EditBlocks,
-    IReadOnlyList<DiagnosticDto> Diagnostics)
+    IReadOnlyList<DiagnosticDto> Diagnostics,
+    ProofSnapshot? Proof = null)
 {
     public static CompileResult DiagnosticsOnly(IReadOnlyList<DiagnosticDto> diagnostics) =>
         new(false, false, null, null, 0, 0, null, null, null, null, null, null, null, null, null, diagnostics);
 }
 
-public sealed record DiagnosticDto(int Line, int Column, string Message, string? Code, string Severity);
+public sealed record DiagnosticDto(int Line, int Column, string Message, string? Code, string Severity, int? EndColumn = null);
 
 public sealed record StateDto(string Name, IReadOnlyList<string> Rules);
 public sealed record FieldDto(string Name, string Type, bool Nullable, object? Default,
@@ -182,3 +234,30 @@ public sealed record RuleDto(string Expression, string? When, string Reason, int
 public sealed record StateEnsureDto(string Anchor, string State, string Expression, string? When, string Reason, int Line);
 public sealed record EventEnsureDto(string Event, string Expression, string? When, string Reason, int Line);
 public sealed record EditBlockDto(string? State, string? When, IReadOnlyList<string> Fields, int Line);
+
+// ── Proof snapshot DTOs (AI-consumption, no compiler internals) ──
+
+public sealed record ProofSnapshot(
+    ProofScopeDto? Global,
+    IReadOnlyDictionary<string, ProofScopeDto>? Events);
+
+public sealed record ProofScopeDto(
+    IReadOnlyDictionary<string, ProofFieldInfo>? Fields,
+    IReadOnlyList<ProofExpressionInfo>? Expressions);
+
+public sealed record IntervalDto(
+    double Lower,
+    bool LowerInclusive,
+    double Upper,
+    bool UpperInclusive,
+    string Display);
+
+public sealed record ProofFieldInfo(
+    IntervalDto? Interval,
+    string Display,
+    IReadOnlyList<string> Sources);
+
+public sealed record ProofExpressionInfo(
+    string Expression,
+    IntervalDto? Interval,
+    string Display);

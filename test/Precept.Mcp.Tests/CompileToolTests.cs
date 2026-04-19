@@ -254,6 +254,27 @@ public class CompileToolTests
     }
 
     [Fact]
+    public void DiagnosticsIncludeEndColumnWhenAvailable()
+    {
+        var text = """
+            precept Test
+            field X as number default 15 min 10
+            state A initial
+            event Go
+            from A on Go when X >= 0 -> no transition
+            """;
+
+        var result = CompileTool.Run(text);
+        var diagnostic = result.Diagnostics.Single(d => d.Code == "PRECEPT098");
+        var lineText = text.Split('\n')[4];
+        var expectedStart = lineText.IndexOf("X >= 0", StringComparison.Ordinal);
+        var expectedEnd = expectedStart + "X >= 0".Length;
+
+        diagnostic.Column.Should().Be(expectedStart);
+        diagnostic.EndColumn.Should().Be(expectedEnd);
+    }
+
+    [Fact]
     public void IntegerField_SerializesAsIntegerType()
     {
         var text = """

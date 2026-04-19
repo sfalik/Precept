@@ -942,6 +942,12 @@ internal sealed class PreceptAnalyzer
     {
         var lineIndex = Math.Max(0, diagnostic.Line - 1);
         var lineLength = lineIndex < lines.Length ? lines[lineIndex].Length : 1;
+        var startCharacter = Math.Max(0, diagnostic.Column);
+        var endCharacter = diagnostic.EndColumn > startCharacter
+            ? Math.Min(diagnostic.EndColumn, lineLength)
+            : startCharacter == 0
+                ? lineLength
+                : Math.Min(startCharacter + 1, lineLength);
         var message = string.IsNullOrWhiteSpace(diagnostic.StateContext)
             ? diagnostic.Message
             : $"{diagnostic.Message} [state {diagnostic.StateContext}]";
@@ -953,16 +959,25 @@ internal sealed class PreceptAnalyzer
             _ => DiagnosticSeverity.Error
         };
 
-        return new Diagnostic
+        var result = new Diagnostic
         {
             Severity = severity,
             Message = message,
             Source = "precept",
             Code = new DiagnosticCode(diagnostic.DiagnosticCode),
             Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
-                new Position(lineIndex, Math.Max(0, diagnostic.Column)),
-                new Position(lineIndex, Math.Max(diagnostic.Column + 1, lineLength)))
+                new Position(lineIndex, startCharacter),
+                new Position(lineIndex, endCharacter)),
+            Data = diagnostic.Assessment is { } assessment
+                ? Newtonsoft.Json.Linq.JObject.FromObject(new
+                {
+                    subject = assessment.SubjectDescription,
+                    requirement = assessment.Requirement.ToString()
+                })
+                : null
         };
+
+        return result;
     }
 
     private static void AddEntryEnsureDiagnostics(

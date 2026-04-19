@@ -126,7 +126,14 @@ public enum PreceptScalarType
     Choice,    // #25 (scaffold)
 }
 
-public abstract record PreceptExpression;
+/// <summary>Source position span for an expression node (1-based columns from tokenizer).</summary>
+public sealed record SourceSpan(int StartColumn = 0, int EndColumn = 0);
+
+public abstract record PreceptExpression
+{
+    /// <summary>Source position of this expression in the original text (null when constructed without position info).</summary>
+    public SourceSpan? Position { get; init; }
+}
 
 public sealed record PreceptLiteralExpression(object? Value) : PreceptExpression;
 
@@ -160,7 +167,9 @@ public sealed record PreceptCollectionMutation(
     string? IntoField = null,
     int SourceLine = 0,
     int ExpressionStartColumn = 0,
-    int ExpressionEndColumn = 0);
+    int ExpressionEndColumn = 0,
+    int IntoFieldStartColumn = 0,
+    int IntoFieldEndColumn = 0);
 
 public enum PreceptCollectionMutationVerb
 {
@@ -260,7 +269,8 @@ public sealed record PreceptTransitionRow(
     IReadOnlyList<PreceptCollectionMutation>? CollectionMutations = null,
     string? WhenText = null,
     PreceptExpression? WhenGuard = null,
-    int SourceLine = 0);
+    int SourceLine = 0,
+    int GuardSourceLine = 0);
 
 /// <summary>
 /// Editable field declaration: <c>in &lt;State&gt; edit &lt;Field&gt;, &lt;Field&gt;</c>.

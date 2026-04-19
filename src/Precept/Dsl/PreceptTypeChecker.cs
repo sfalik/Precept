@@ -24,9 +24,47 @@ internal sealed record PreceptValidationDiagnostic(
     string Message,
     int Line,
     int Column = 0,
-    string? StateContext = null)
+    int EndColumn = 0,
+    string? StateContext = null,
+    ProofAssessment? Assessment = null)
 {
     public string DiagnosticCode => DiagnosticCatalog.ToDiagnosticCode(Constraint.Id);
+}
+
+internal static class PreceptValidationDiagnosticFactory
+{
+    public static PreceptValidationDiagnostic FromExpression(
+        LanguageConstraint constraint,
+        string message,
+        int line,
+        PreceptExpression? expression,
+        string? stateContext = null,
+        ProofAssessment? assessment = null)
+        => new(
+            constraint,
+            message,
+            line,
+            Column: expression?.Position?.StartColumn ?? 0,
+            EndColumn: expression?.Position?.EndColumn ?? 0,
+            StateContext: stateContext,
+            Assessment: assessment);
+
+    public static PreceptValidationDiagnostic FromColumns(
+        LanguageConstraint constraint,
+        string message,
+        int line,
+        int startColumn,
+        int endColumn,
+        string? stateContext = null,
+        ProofAssessment? assessment = null)
+        => new(
+            constraint,
+            message,
+            line,
+            Column: startColumn,
+            EndColumn: endColumn,
+            StateContext: stateContext,
+            Assessment: assessment);
 }
 
 internal sealed record PreceptTypeExpressionInfo(
@@ -71,7 +109,8 @@ internal sealed class PreceptTypeContext(
 internal sealed record TypeCheckResult(
     IReadOnlyList<PreceptValidationDiagnostic> Diagnostics,
     PreceptTypeContext TypeContext,
-    IReadOnlyList<string>? ComputedFieldOrder = null)
+    IReadOnlyList<string>? ComputedFieldOrder = null,
+    GlobalProofContext? ProofContext = null)
 {
     public bool HasErrors => Diagnostics.Any(static diagnostic => diagnostic.Constraint.Severity == ConstraintSeverity.Error);
 }
@@ -79,7 +118,8 @@ internal sealed record TypeCheckResult(
 internal sealed record ValidationResult(
     IReadOnlyList<PreceptValidationDiagnostic> Diagnostics,
     PreceptTypeContext TypeContext,
-    PreceptDefinition? ValidatedModel = null)
+    PreceptDefinition? ValidatedModel = null,
+    GlobalProofContext? ProofContext = null)
 {
     public bool HasErrors => Diagnostics.Any(static diagnostic => diagnostic.Constraint.Severity == ConstraintSeverity.Error);
 }
@@ -92,10 +132,10 @@ internal static class PreceptTypeChecker
         var expressions = new List<PreceptTypeExpressionInfo>();
         var scopes = new List<PreceptTypeScopeInfo>();
 
-        IReadOnlyDictionary<string, StaticValueKind> dataFieldKinds = model.Fields.ToDictionary(
+        GlobalProofContext dataFieldKinds = new GlobalProofContext(model.Fields.ToDictionary(
             field => field.Name,
             MapFieldContractKind,
-            StringComparer.Ordinal);
+            StringComparer.Ordinal));
 
         // Replace bespoke constraint-inspection loop with unified narrowing from rules.
         // Constraints desugar to synthetic rules at parse time (e.g., `positive` → `rule Field > 0`).
@@ -107,6 +147,42 @@ internal static class PreceptTypeChecker
             {
                 dataFieldKinds = ApplyNarrowing(rule.Expression, dataFieldKinds, assumeTrue: true);
             }
+        }
+
+        // Slice 12: inject interval data from explicit min/max constraints.
+        // nonnegative/positive flags are already covered by _flags injected above.
+        {
+            var markerDict = new Dictionary<string, StaticValueKind>(dataFieldKinds.Symbols, StringComparer.Ordinal);
+            var fieldIntervals = CopyFieldIntervals(dataFieldKinds);
+            foreach (var field in model.Fields)
+            {
+                if (field.Constraints is not { Count: > 0 }) continue;
+                if (field.Type is not (PreceptScalarType.Number or PreceptScalarType.Integer or PreceptScalarType.Decimal)) continue;
+
+                double? minVal = null;
+                double? maxVal = null;
+                foreach (var c in field.Constraints)
+                {
+                    if (c is FieldConstraint.Min m) minVal = m.Value;
+                    else if (c is FieldConstraint.Max mx) maxVal = mx.Value;
+                    else if (c is FieldConstraint.Positive) minVal = minVal is null || minVal.Value <= 0 ? double.Epsilon : minVal;
+                    else if (c is FieldConstraint.Nonnegative) minVal ??= 0;
+                }
+
+                if (minVal is null && maxVal is null) continue;
+
+                var lower = minVal ?? double.NegativeInfinity;
+                var upper = maxVal ?? double.PositiveInfinity;
+                var lowerInclusive = minVal.HasValue && !(field.Constraints.Any(c => c is FieldConstraint.Positive) && minVal.Value == double.Epsilon);
+                if (field.Constraints.Any(c => c is FieldConstraint.Positive) && minVal.Value == double.Epsilon)
+                {
+                    lower = 0;
+                    lowerInclusive = false;
+                }
+                var ival = new NumericInterval(lower, lowerInclusive, upper, maxVal.HasValue);
+                fieldIntervals[field.Name] = ival;
+            }
+            dataFieldKinds = new GlobalProofContext(markerDict, new Dictionary<LinearForm, RelationalFact>(dataFieldKinds.RelationalFacts), fieldIntervals, CopyFlags(dataFieldKinds), CopyExprFacts(dataFieldKinds));
         }
 
         var eventArgKinds = model.Events.ToDictionary(
@@ -131,7 +207,7 @@ internal static class PreceptTypeChecker
 
         var computedFieldOrder = ValidateComputedFields(model, dataFieldKinds, eventArgKinds, collectionFieldMap, diagnostics, expressions, scopes);
 
-        return new TypeCheckResult(diagnostics, new PreceptTypeContext(expressions, scopes), computedFieldOrder);
+        return new TypeCheckResult(diagnostics, new PreceptTypeContext(expressions, scopes), computedFieldOrder, dataFieldKinds);
     }
 
     internal static StaticValueKind MapFieldContractKind(PreceptField field)
@@ -194,11 +270,11 @@ internal static class PreceptTypeChecker
 
     private static void ValidateTransitionRows(
         PreceptDefinition model,
-        IReadOnlyDictionary<string, StaticValueKind> dataFieldKinds,
+        GlobalProofContext dataFieldKinds,
         IReadOnlyDictionary<string, Dictionary<string, StaticValueKind>> eventArgKinds,
         IReadOnlyDictionary<string, PreceptCollectionField> collectionFieldMap,
-        IReadOnlyDictionary<string, IReadOnlyDictionary<string, StaticValueKind>> stateEnsureNarrowings,
-        IReadOnlyDictionary<string, IReadOnlyDictionary<string, StaticValueKind>> eventEnsureNarrowings,
+        IReadOnlyDictionary<string, GlobalProofContext> stateEnsureNarrowings,
+        IReadOnlyDictionary<string, GlobalProofContext> eventEnsureNarrowings,
         List<PreceptValidationDiagnostic> diagnostics,
         List<PreceptTypeExpressionInfo> expressions,
         List<PreceptTypeScopeInfo> scopes)
@@ -220,16 +296,16 @@ internal static class PreceptTypeChecker
             foreach (var stateGroup in groupedRows)
             {
                 var baseSymbols = BuildSymbolKinds(
-                    dataFieldKinds,
+                    dataFieldKinds.Symbols,
                     eventArgKinds,
                     eventName,
                     model.CollectionFields,
-                    stateEnsureNarrowings.TryGetValue(stateGroup.Key, out var stateNarrowing) ? stateNarrowing : null);
+                    stateEnsureNarrowings.TryGetValue(stateGroup.Key, out var stateNarrowing) ? stateNarrowing.Symbols : null);
 
                 // Merge event ensure narrowings (dotted-form proof markers) into transition-row scope
                 if (eventEnsureNarrowings.TryGetValue(eventName, out var eventNarrowing))
                 {
-                    foreach (var pair in eventNarrowing)
+                    foreach (var pair in eventNarrowing.Symbols)
                         baseSymbols[pair.Key] = pair.Value;
                 }
 
@@ -240,7 +316,7 @@ internal static class PreceptTypeChecker
                     stateGroup.Key,
                     eventName));
 
-                IReadOnlyDictionary<string, StaticValueKind> branchSymbols = baseSymbols;
+                GlobalProofContext branchContext = dataFieldKinds.ChildMerging(baseSymbols, stateNarrowing, eventNarrowing);
 
                 // C47: detect identical guard text for the same (state, event) group
                 var seenGuards = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -248,7 +324,7 @@ internal static class PreceptTypeChecker
                 foreach (var item in stateGroup.OrderBy(x => x.Row.SourceLine))
                 {
                     var row = item.Row;
-                    IReadOnlyDictionary<string, StaticValueKind> setSymbols = branchSymbols;
+                    GlobalProofContext setContext = branchContext;
 
                     // C47: duplicate guard detection for this (state, event) group
                     if (row.WhenGuard is not null && !string.IsNullOrWhiteSpace(row.WhenText))
@@ -275,17 +351,19 @@ internal static class PreceptTypeChecker
 
                     if (row.WhenGuard is not null && !string.IsNullOrWhiteSpace(row.WhenText))
                     {
+                        var guardSourceLine = row.GuardSourceLine > 0 ? row.GuardSourceLine : row.SourceLine;
+
                         scopes.Add(new PreceptTypeScopeInfo(
-                            row.SourceLine,
+                            guardSourceLine,
                             "when",
-                            new Dictionary<string, StaticValueKind>(branchSymbols, StringComparer.Ordinal),
+                            new Dictionary<string, StaticValueKind>(branchContext.Symbols, StringComparer.Ordinal),
                             item.State,
                             eventName));
                         ValidateExpression(
                             row.WhenGuard,
                             row.WhenText!,
-                            row.SourceLine,
-                            branchSymbols,
+                            guardSourceLine,
+                            branchContext,
                             StaticValueKind.Boolean,
                             "when predicate",
                             diagnostics,
@@ -293,27 +371,31 @@ internal static class PreceptTypeChecker
                             stateContext: item.State,
                             isBooleanRulePosition: true);
 
-                        setSymbols = ApplyNarrowing(row.WhenGuard, branchSymbols, assumeTrue: true);
-                        branchSymbols = ApplyNarrowing(row.WhenGuard, branchSymbols, assumeTrue: false);
+                        // SYNC:CONSTRAINT:C97/C98: dead/tautological guard detection
+                        AssessGuard(row.WhenGuard, row.WhenText!, guardSourceLine,
+                            dataFieldKinds.FieldIntervals, diagnostics, item.State);
+
+                        setContext = ApplyNarrowing(row.WhenGuard, branchContext, assumeTrue: true);
+                        branchContext = ApplyNarrowing(row.WhenGuard, branchContext, assumeTrue: false);
                     }
 
                     scopes.Add(new PreceptTypeScopeInfo(
                         row.SourceLine,
                         "transition-actions",
-                        new Dictionary<string, StaticValueKind>(setSymbols, StringComparer.Ordinal),
+                        new Dictionary<string, StaticValueKind>(setContext.Symbols, StringComparer.Ordinal),
                         item.State,
                         eventName));
 
                     foreach (var assignment in row.SetAssignments)
                     {
-                        if (!dataFieldKinds.TryGetValue(assignment.Key, out var targetKind))
+                        if (!dataFieldKinds.Symbols.TryGetValue(assignment.Key, out var targetKind))
                             continue;
 
                         ValidateExpression(
                             assignment.Expression,
                             assignment.ExpressionText,
                             assignment.SourceLine > 0 ? assignment.SourceLine : row.SourceLine,
-                            setSymbols,
+                            setContext,
                             targetKind,
                             $"set target '{assignment.Key}'",
                             diagnostics,
@@ -332,14 +414,41 @@ internal static class PreceptTypeChecker
                                     ("values", string.Join(", ", choiceVals.Select(v => $"\"{v}\""))),
                                     ("name", assignment.Key)),
                                 assignment.SourceLine > 0 ? assignment.SourceLine : row.SourceLine,
+                                Column: assignment.Expression.Position?.StartColumn ?? 0,
+                                EndColumn: assignment.Expression.Position?.EndColumn ?? 0,
                                 StateContext: item.State));
                         }
+
+                        // SYNC:CONSTRAINT:C94: assignment provably outside field constraint range
+                        if (dataFieldKinds.FieldIntervals.TryGetValue(assignment.Key, out var constraintIval94))
+                        {
+                            var rhsProof = setContext.IntervalOf(assignment.Expression);
+                            var rhsIval = rhsProof.Interval;
+                            if (!rhsIval.IsUnknown && NumericInterval.AreDisjoint(rhsIval, constraintIval94))
+                            {
+                                var assessment = new ProofAssessment(
+                                    ProofRequirement.AssignmentConstraint, ProofOutcome.Contradiction,
+                                    assignment.Key, rhsIval, rhsProof.Attribution,
+                                    ConstraintInterval: constraintIval94);
+                                diagnostics.Add(new PreceptValidationDiagnostic(
+                                    DiagnosticCatalog.C94,
+                                    ProofDiagnosticRenderer.Render(assessment),
+                                    assignment.SourceLine > 0 ? assignment.SourceLine : row.SourceLine,
+                                    Column: assignment.Expression.Position?.StartColumn ?? 0,
+                                    EndColumn: assignment.Expression.Position?.EndColumn ?? 0,
+                                    StateContext: item.State,
+                                    Assessment: assessment));
+                            }
+                        }
+
+                        // Layer 1: thread post-assignment proof state into subsequent assignments.
+                        setContext = ApplyAssignmentNarrowing(assignment.Key, assignment.Expression, setContext);
                     }
 
                     ValidateCollectionMutations(
                         row.CollectionMutations,
-                        setSymbols,
-                        dataFieldKinds,
+                        setContext,
+                        dataFieldKinds.Symbols,
                         collectionFieldMap,
                         diagnostics,
                         expressions,
@@ -353,9 +462,9 @@ internal static class PreceptTypeChecker
 
     private static void ValidateStateActions(
         PreceptDefinition model,
-        IReadOnlyDictionary<string, StaticValueKind> dataFieldKinds,
+        GlobalProofContext dataFieldKinds,
         IReadOnlyDictionary<string, PreceptCollectionField> collectionFieldMap,
-        IReadOnlyDictionary<string, IReadOnlyDictionary<string, StaticValueKind>> stateEnsureNarrowings,
+        IReadOnlyDictionary<string, GlobalProofContext> stateEnsureNarrowings,
         List<PreceptValidationDiagnostic> diagnostics,
         List<PreceptTypeExpressionInfo> expressions,
         List<PreceptTypeScopeInfo> scopes)
@@ -371,7 +480,7 @@ internal static class PreceptTypeChecker
         {
             // Build data-only symbols with collection accessors, narrowed by state ensures
             var baseSymbols = new Dictionary<string, StaticValueKind>(
-                stateEnsureNarrowings.TryGetValue(action.State, out var narrowed) ? narrowed : dataFieldKinds,
+                stateEnsureNarrowings.TryGetValue(action.State, out var narrowed) ? narrowed.Symbols : dataFieldKinds.Symbols,
                 StringComparer.Ordinal);
 
             foreach (var col in model.CollectionFields)
@@ -401,16 +510,19 @@ internal static class PreceptTypeChecker
                 new Dictionary<string, StaticValueKind>(baseSymbols, StringComparer.Ordinal),
                 action.State));
 
+            // Layer 1: thread post-assignment proof state into subsequent assignments.
+            GlobalProofContext assignmentContext = new GlobalProofContext(baseSymbols, new Dictionary<LinearForm, RelationalFact>(dataFieldKinds.RelationalFacts), CopyFieldIntervals(dataFieldKinds), CopyFlags(dataFieldKinds), CopyExprFacts(dataFieldKinds));
+
             foreach (var assignment in action.SetAssignments)
             {
-                if (!dataFieldKinds.TryGetValue(assignment.Key, out var targetKind))
+                if (!dataFieldKinds.Symbols.TryGetValue(assignment.Key, out var targetKind))
                     continue;
 
                 ValidateExpression(
                     assignment.Expression,
                     assignment.ExpressionText,
                     assignment.SourceLine > 0 ? assignment.SourceLine : action.SourceLine,
-                    baseSymbols,
+                    assignmentContext,
                     targetKind,
                     $"set target '{assignment.Key}'",
                     diagnostics,
@@ -429,14 +541,40 @@ internal static class PreceptTypeChecker
                             ("values", string.Join(", ", choiceVals.Select(v => $"\"{v}\""))),
                             ("name", assignment.Key)),
                         assignment.SourceLine > 0 ? assignment.SourceLine : action.SourceLine,
+                        Column: assignment.Expression.Position?.StartColumn ?? 0,
+                        EndColumn: assignment.Expression.Position?.EndColumn ?? 0,
                         StateContext: action.State));
                 }
+
+                // SYNC:CONSTRAINT:C94: assignment provably outside field constraint range
+                if (dataFieldKinds.FieldIntervals.TryGetValue(assignment.Key, out var constraintIval94))
+                {
+                    var rhsProof = assignmentContext.IntervalOf(assignment.Expression);
+                    var rhsIval = rhsProof.Interval;
+                    if (!rhsIval.IsUnknown && NumericInterval.AreDisjoint(rhsIval, constraintIval94))
+                    {
+                        var assessment = new ProofAssessment(
+                            ProofRequirement.AssignmentConstraint, ProofOutcome.Contradiction,
+                            assignment.Key, rhsIval, rhsProof.Attribution,
+                            ConstraintInterval: constraintIval94);
+                        diagnostics.Add(new PreceptValidationDiagnostic(
+                            DiagnosticCatalog.C94,
+                            ProofDiagnosticRenderer.Render(assessment),
+                            assignment.SourceLine > 0 ? assignment.SourceLine : action.SourceLine,
+                            Column: assignment.Expression.Position?.StartColumn ?? 0,
+                            EndColumn: assignment.Expression.Position?.EndColumn ?? 0,
+                            StateContext: action.State,
+                            Assessment: assessment));
+                    }
+                }
+
+                assignmentContext = ApplyAssignmentNarrowing(assignment.Key, assignment.Expression, assignmentContext);
             }
 
             ValidateCollectionMutations(
                 action.CollectionMutations,
-                baseSymbols,
-                dataFieldKinds,
+                assignmentContext,
+                dataFieldKinds.Symbols,
                 collectionFieldMap,
                 diagnostics,
                 expressions,
@@ -787,7 +925,7 @@ internal static class PreceptTypeChecker
     /// </summary>
     private static IReadOnlyList<string>? ValidateComputedFields(
         PreceptDefinition model,
-        IReadOnlyDictionary<string, StaticValueKind> dataFieldKinds,
+        GlobalProofContext dataFieldKinds,
         IReadOnlyDictionary<string, Dictionary<string, StaticValueKind>> eventArgKinds,
         IReadOnlyDictionary<string, PreceptCollectionField> collectionFieldMap,
         List<PreceptValidationDiagnostic> diagnostics,
@@ -816,7 +954,7 @@ internal static class PreceptTypeChecker
         var unsafeAccessors = new HashSet<string>(StringComparer.Ordinal) { "peek", "min", "max" };
 
         // Build full data-symbols scope for expression type checking (same as ValidateRules)
-        var dataSymbols = new Dictionary<string, StaticValueKind>(dataFieldKinds, StringComparer.Ordinal);
+        var dataSymbols = new Dictionary<string, StaticValueKind>(dataFieldKinds.Symbols, StringComparer.Ordinal);
         foreach (var col in model.CollectionFields)
         {
             dataSymbols[$"{col.Name}.count"] = StaticValueKind.Number;
@@ -847,7 +985,7 @@ internal static class PreceptTypeChecker
                 field.DerivedExpression!,
                 field.DerivedExpressionText!,
                 field.SourceLine,
-                dataSymbols,
+                new GlobalProofContext(dataSymbols),
                 expectedKind,
                 $"computed field '{field.Name}'",
                 diagnostics,
@@ -1094,13 +1232,13 @@ internal static class PreceptTypeChecker
 
     private static void ValidateRules(
         PreceptDefinition model,
-        IReadOnlyDictionary<string, StaticValueKind> dataFieldKinds,
+        GlobalProofContext dataFieldKinds,
         IReadOnlyDictionary<string, Dictionary<string, StaticValueKind>> eventArgKinds,
         List<PreceptValidationDiagnostic> diagnostics,
         List<PreceptTypeExpressionInfo> expressions,
         List<PreceptTypeScopeInfo> scopes)
     {
-        var dataSymbols = new Dictionary<string, StaticValueKind>(dataFieldKinds, StringComparer.Ordinal);
+        var dataSymbols = new Dictionary<string, StaticValueKind>(dataFieldKinds.Symbols, StringComparer.Ordinal);
         foreach (var col in model.CollectionFields)
         {
             dataSymbols[$"{col.Name}.count"] = StaticValueKind.Number;
@@ -1132,7 +1270,12 @@ internal static class PreceptTypeChecker
                     rule.Expression,
                     rule.ExpressionText,
                     rule.SourceLine,
-                    dataSymbols,
+                    new GlobalProofContext(
+                        dataSymbols,
+                        new Dictionary<LinearForm, RelationalFact>(dataFieldKinds.RelationalFacts),
+                        CopyFieldIntervals(dataFieldKinds),
+                        CopyFlags(dataFieldKinds),
+                        CopyExprFacts(dataFieldKinds)),
                     StaticValueKind.Boolean,
                     "rule",
                     diagnostics,
@@ -1145,7 +1288,12 @@ internal static class PreceptTypeChecker
                         rule.WhenGuard,
                         rule.WhenText!,
                         rule.SourceLine,
-                        dataSymbols,
+                        new GlobalProofContext(
+                            dataSymbols,
+                            new Dictionary<LinearForm, RelationalFact>(dataFieldKinds.RelationalFacts),
+                            CopyFieldIntervals(dataFieldKinds),
+                            CopyFlags(dataFieldKinds),
+                            CopyExprFacts(dataFieldKinds)),
                         StaticValueKind.Boolean,
                         "rule when guard",
                         diagnostics,
@@ -1158,6 +1306,80 @@ internal static class PreceptTypeChecker
             }
         }
 
+        // SYNC:CONSTRAINT:C95: non-synthetic rule contradicts field constraints
+        if (model.Rules is not null)
+        {
+            // Build constraint-only intervals from field definitions (min/max/positive/nonnegative).
+            var fieldConstraintIntervals = new Dictionary<string, NumericInterval>(StringComparer.Ordinal);
+            foreach (var field in model.Fields)
+            {
+                if (field.Constraints is not { Count: > 0 }) continue;
+                if (field.Type is not (PreceptScalarType.Number or PreceptScalarType.Integer or PreceptScalarType.Decimal)) continue;
+
+                double? minVal = null;
+                double? maxVal = null;
+                foreach (var c in field.Constraints)
+                {
+                    if (c is FieldConstraint.Min m) minVal = m.Value;
+                    else if (c is FieldConstraint.Max mx) maxVal = mx.Value;
+                    else if (c is FieldConstraint.Positive) minVal = minVal is null || minVal.Value <= 0 ? double.Epsilon : minVal;
+                    else if (c is FieldConstraint.Nonnegative) minVal ??= 0;
+                }
+
+                if (minVal is null && maxVal is null) continue;
+
+                var lower = minVal ?? double.NegativeInfinity;
+                var upper = maxVal ?? double.PositiveInfinity;
+                // positive uses open lower bound (0, +∞); min uses closed [min, …]
+                var lowerInclusive = minVal.HasValue && !(field.Constraints.Any(c => c is FieldConstraint.Positive) && minVal.Value == double.Epsilon);
+                if (field.Constraints.Any(c => c is FieldConstraint.Positive) && minVal.Value == double.Epsilon)
+                {
+                    lower = 0;
+                    lowerInclusive = false;
+                }
+                var ival = new NumericInterval(lower, lowerInclusive, upper, maxVal.HasValue);
+                fieldConstraintIntervals[field.Name] = ival;
+            }
+
+            foreach (var rule in model.Rules.Where(r => !r.IsSynthetic && r.WhenGuard is null))
+            {
+                if (TryExtractSingleFieldComparison(rule.Expression, out var fieldName, out var ruleInterval)
+                    && fieldConstraintIntervals.TryGetValue(fieldName, out var constraintIval))
+                {
+                    // SYNC:CONSTRAINT:C95: contradictory rule detection
+                    if (NumericInterval.AreDisjoint(ruleInterval, constraintIval))
+                    {
+                        var assessment = new ProofAssessment(
+                            ProofRequirement.RuleSatisfiability, ProofOutcome.Contradiction,
+                            fieldName, ruleInterval, ProofAttribution.None,
+                            ConstraintInterval: constraintIval,
+                            ConstraintDescription: rule.ExpressionText);
+                        diagnostics.Add(new PreceptValidationDiagnostic(
+                            DiagnosticCatalog.C95,
+                            ProofDiagnosticRenderer.Render(assessment),
+                            rule.SourceLine,
+                            Assessment: assessment));
+                    }
+                    // SYNC:CONSTRAINT:C96: vacuous rule detection
+                    // If the constraint interval is entirely within the rule interval,
+                    // the rule adds no new information — it's always true given constraints.
+                    else if (!constraintIval.IsUnknown && NumericInterval.Contains(ruleInterval, constraintIval))
+                    {
+                        var assessment = new ProofAssessment(
+                            ProofRequirement.RuleVacuity, ProofOutcome.Satisfied,
+                            fieldName, ruleInterval, ProofAttribution.None,
+                            ConstraintInterval: constraintIval,
+                            ConstraintDescription: rule.ExpressionText);
+                        diagnostics.Add(new PreceptValidationDiagnostic(
+                            DiagnosticCatalog.C96,
+                            ProofDiagnosticRenderer.Render(assessment),
+                            rule.SourceLine,
+                            Assessment: assessment));
+                    }
+                }
+            }
+        }
+
         if (model.StateEnsures is not null)
         {
             foreach (var stateEnsure in model.StateEnsures)
@@ -1166,7 +1388,12 @@ internal static class PreceptTypeChecker
                     stateEnsure.Expression,
                     stateEnsure.ExpressionText,
                     stateEnsure.SourceLine,
-                    dataSymbols,
+                    new GlobalProofContext(
+                        dataSymbols,
+                        new Dictionary<LinearForm, RelationalFact>(dataFieldKinds.RelationalFacts),
+                        CopyFieldIntervals(dataFieldKinds),
+                        CopyFlags(dataFieldKinds),
+                        CopyExprFacts(dataFieldKinds)),
                     StaticValueKind.Boolean,
                     $"state ensure on '{stateEnsure.State}'",
                     diagnostics,
@@ -1180,7 +1407,12 @@ internal static class PreceptTypeChecker
                         stateEnsure.WhenGuard,
                         stateEnsure.WhenText!,
                         stateEnsure.SourceLine,
-                        dataSymbols,
+                        new GlobalProofContext(
+                            dataSymbols,
+                            new Dictionary<LinearForm, RelationalFact>(dataFieldKinds.RelationalFacts),
+                            CopyFieldIntervals(dataFieldKinds),
+                            CopyFlags(dataFieldKinds),
+                            CopyExprFacts(dataFieldKinds)),
                         StaticValueKind.Boolean,
                         "state ensure when guard",
                         diagnostics,
@@ -1209,7 +1441,12 @@ internal static class PreceptTypeChecker
                     eventEnsure.Expression,
                     eventEnsure.ExpressionText,
                     eventEnsure.SourceLine,
-                    symbols,
+                    new GlobalProofContext(
+                        symbols,
+                        new Dictionary<LinearForm, RelationalFact>(dataFieldKinds.RelationalFacts),
+                        CopyFieldIntervals(dataFieldKinds),
+                        CopyFlags(dataFieldKinds),
+                        CopyExprFacts(dataFieldKinds)),
                     StaticValueKind.Boolean,
                     $"event ensure on '{eventEnsure.EventName}'",
                     diagnostics,
@@ -1223,7 +1460,12 @@ internal static class PreceptTypeChecker
                         eventEnsure.WhenGuard,
                         eventEnsure.WhenText!,
                         eventEnsure.SourceLine,
-                        symbols,
+                        new GlobalProofContext(
+                            symbols,
+                            new Dictionary<LinearForm, RelationalFact>(dataFieldKinds.RelationalFacts),
+                            CopyFieldIntervals(dataFieldKinds),
+                            CopyFlags(dataFieldKinds),
+                            CopyExprFacts(dataFieldKinds)),
                         StaticValueKind.Boolean,
                         "event ensure when guard",
                         diagnostics,
@@ -1247,7 +1489,12 @@ internal static class PreceptTypeChecker
                         editBlock.WhenGuard,
                         editBlock.WhenText!,
                         editBlock.SourceLine,
-                        dataSymbols,
+                        new GlobalProofContext(
+                            dataSymbols,
+                            new Dictionary<LinearForm, RelationalFact>(dataFieldKinds.RelationalFacts),
+                            CopyFieldIntervals(dataFieldKinds),
+                            CopyFlags(dataFieldKinds),
+                            CopyExprFacts(dataFieldKinds)),
                         StaticValueKind.Boolean,
                         "edit when guard",
                         diagnostics,
@@ -1282,7 +1529,9 @@ internal static class PreceptTypeChecker
                     diagnostics.Add(new PreceptValidationDiagnostic(
                         DiagnosticCatalog.C69,
                         DiagnosticCatalog.C69.FormatMessage(("name", fullName)),
-                        sourceLine));
+                        sourceLine,
+                        Column: id.Position?.StartColumn ?? 0,
+                        EndColumn: id.Position?.EndColumn ?? 0));
                 }
                 break;
 
@@ -1340,11 +1589,11 @@ internal static class PreceptTypeChecker
         return [row.FromState];
     }
 
-    private static IReadOnlyDictionary<string, IReadOnlyDictionary<string, StaticValueKind>> BuildStateEnsureNarrowings(
+    private static IReadOnlyDictionary<string, GlobalProofContext> BuildStateEnsureNarrowings(
         PreceptDefinition model,
-        IReadOnlyDictionary<string, StaticValueKind> dataFieldKinds)
+        GlobalProofContext dataFieldKinds)
     {
-        var result = new Dictionary<string, IReadOnlyDictionary<string, StaticValueKind>>(StringComparer.Ordinal);
+        var result = new Dictionary<string, GlobalProofContext>(StringComparer.Ordinal);
         if (model.StateEnsures is null || model.StateEnsures.Count == 0)
             return result;
 
@@ -1352,7 +1601,12 @@ internal static class PreceptTypeChecker
             .Where(static stateEnsure => stateEnsure.Anchor == EnsureAnchor.In && stateEnsure.WhenGuard is null)
             .GroupBy(static stateEnsure => stateEnsure.State, StringComparer.Ordinal))
         {
-            IReadOnlyDictionary<string, StaticValueKind> narrowed = new Dictionary<string, StaticValueKind>(dataFieldKinds, StringComparer.Ordinal);
+            GlobalProofContext narrowed = new GlobalProofContext(
+                new Dictionary<string, StaticValueKind>(dataFieldKinds.Symbols, StringComparer.Ordinal),
+                new Dictionary<LinearForm, RelationalFact>(),
+                CopyFieldIntervals(dataFieldKinds),
+                CopyFlags(dataFieldKinds),
+                CopyExprFacts(dataFieldKinds));
 
             foreach (var stateEnsure in group)
                 narrowed = ApplyNarrowing(stateEnsure.Expression, narrowed, assumeTrue: true);
@@ -1363,11 +1617,11 @@ internal static class PreceptTypeChecker
         return result;
     }
 
-    private static IReadOnlyDictionary<string, IReadOnlyDictionary<string, StaticValueKind>> BuildEventEnsureNarrowings(
+    private static IReadOnlyDictionary<string, GlobalProofContext> BuildEventEnsureNarrowings(
         PreceptDefinition model,
         IReadOnlyDictionary<string, Dictionary<string, StaticValueKind>> eventArgKinds)
     {
-        var result = new Dictionary<string, IReadOnlyDictionary<string, StaticValueKind>>(StringComparer.Ordinal);
+        var result = new Dictionary<string, GlobalProofContext>(StringComparer.Ordinal);
         if (model.EventEnsures is null || model.EventEnsures.Count == 0)
             return result;
 
@@ -1380,32 +1634,35 @@ internal static class PreceptTypeChecker
                 continue;
 
             // Build bare-name symbol table for the event's args
-            IReadOnlyDictionary<string, StaticValueKind> bareSymbols =
-                new Dictionary<string, StaticValueKind>(args, StringComparer.Ordinal);
+            GlobalProofContext bareContext = new GlobalProofContext(new Dictionary<string, StaticValueKind>(args, StringComparer.Ordinal));
 
             foreach (var eventEnsure in group)
-                bareSymbols = ApplyNarrowing(eventEnsure.Expression, bareSymbols, assumeTrue: true);
+                bareContext = ApplyNarrowing(eventEnsure.Expression, bareContext, assumeTrue: true);
 
-            // Translate proof markers from bare form to dotted form for transition-row scope.
+            // Translate typed stores from bare arg names to dotted form for transition-row scope.
             // Event ensures use bare arg names (e.g. "Days"), but transition rows use dotted names
-            // (e.g. "Submit.Days"). Markers like "$positive:Days" become "$positive:Submit.Days".
-            var dottedMarkers = new Dictionary<string, StaticValueKind>(StringComparer.Ordinal);
-            foreach (var pair in bareSymbols)
-            {
-                if (pair.Key.Length == 0 || pair.Key[0] != '$')
-                    continue;
+            // (e.g. "Submit.Days").
+            var dottedSymbols = new Dictionary<string, StaticValueKind>(StringComparer.Ordinal);
+            foreach (var pair in bareContext.Symbols)
+                dottedSymbols[eventName + "." + pair.Key] = pair.Value;
 
-                var colonIndex = pair.Key.IndexOf(':');
-                if (colonIndex < 0)
-                    continue;
+            var dottedFieldIntervals = new Dictionary<string, NumericInterval>(StringComparer.Ordinal);
+            foreach (var pair in bareContext.FieldIntervals)
+                dottedFieldIntervals[eventName + "." + pair.Key] = pair.Value;
 
-                var prefix = pair.Key.AsSpan(0, colonIndex + 1);  // e.g. "$positive:"
-                var fieldName = pair.Key.AsSpan(colonIndex + 1);  // e.g. "Days"
-                dottedMarkers[$"{prefix}{eventName}.{fieldName}"] = pair.Value;
-            }
+            var dottedFlags = new Dictionary<string, NumericFlags>(StringComparer.Ordinal);
+            foreach (var pair in bareContext.Flags)
+                dottedFlags[eventName + "." + pair.Key] = pair.Value;
 
-            if (dottedMarkers.Count > 0)
-                result[eventName] = dottedMarkers;
+            var dottedRelational = new Dictionary<LinearForm, RelationalFact>();
+            foreach (var pair in bareContext.RelationalFacts)
+                dottedRelational[pair.Key.Rekey(eventName)] = pair.Value;
+
+            var dottedExprFacts = new Dictionary<LinearForm, NumericInterval>();
+            foreach (var pair in bareContext.ExprFacts)
+                dottedExprFacts[pair.Key.Rekey(eventName)] = pair.Value;
+
+            result[eventName] = new GlobalProofContext(dottedSymbols, dottedRelational, dottedFieldIntervals, dottedFlags, dottedExprFacts);
         }
 
         return result;
@@ -1462,7 +1719,7 @@ internal static class PreceptTypeChecker
         PreceptExpression expression,
         string expressionText,
         int sourceLine,
-        IReadOnlyDictionary<string, StaticValueKind> symbols,
+        GlobalProofContext context,
         StaticValueKind expectedKind,
         string expectedLabel,
         List<PreceptValidationDiagnostic> diagnostics,
@@ -1471,11 +1728,13 @@ internal static class PreceptTypeChecker
         string? eventName = null,
         bool isBooleanRulePosition = false)
     {
-        if (!TryInferKind(expression, symbols, out var actualKind, out var diagnostic))
+        if (!TryInferKind(expression, context, out var actualKind, out var diagnostic))
         {
             diagnostics.Add(diagnostic! with
             {
                 Line = sourceLine > 0 ? sourceLine : diagnostic.Line,
+                Column = diagnostic.Column != 0 ? diagnostic.Column : expression.Position?.StartColumn ?? 0,
+                EndColumn = diagnostic.EndColumn != 0 ? diagnostic.EndColumn : expression.Position?.EndColumn ?? 0,
                 StateContext = stateContext
             });
             return;
@@ -1487,6 +1746,8 @@ internal static class PreceptTypeChecker
             diagnostics.Add(diagnostic with
             {
                 Line = sourceLine > 0 ? sourceLine : diagnostic.Line,
+                Column = diagnostic.Column != 0 ? diagnostic.Column : expression.Position?.StartColumn ?? 0,
+                EndColumn = diagnostic.EndColumn != 0 ? diagnostic.EndColumn : expression.Position?.EndColumn ?? 0,
                 StateContext = stateContext
             });
         }
@@ -1532,21 +1793,23 @@ internal static class PreceptTypeChecker
             stateContext,
             eventName));
 
-        diagnostics.Add(new PreceptValidationDiagnostic(
+        diagnostics.Add(PreceptValidationDiagnosticFactory.FromExpression(
             constraint,
             message,
             sourceLine,
-            StateContext: stateContext));
+            expression,
+            stateContext));
     }
 
     private static bool TryInferKind(
         PreceptExpression expression,
-        IReadOnlyDictionary<string, StaticValueKind> symbols,
+        GlobalProofContext context,
         out StaticValueKind kind,
         out PreceptValidationDiagnostic? diagnostic)
     {
         kind = StaticValueKind.None;
         diagnostic = null;
+        var symbols = context.Symbols;
 
         switch (expression)
         {
@@ -1564,7 +1827,8 @@ internal static class PreceptTypeChecker
                     diagnostic = new PreceptValidationDiagnostic(
                         DiagnosticCatalog.C38,
                         $"unknown identifier '{key}'.",
-                        0);
+                        0,
+                        Column: identifier.Position?.StartColumn ?? 0);
                     return false;
                 }
 
@@ -1577,7 +1841,8 @@ internal static class PreceptTypeChecker
                     diagnostic = new PreceptValidationDiagnostic(
                         DiagnosticCatalog.C56,
                         DiagnosticCatalog.C56.FormatMessage(("field", identifier.Name)),
-                        0);
+                        0,
+                        Column: identifier.Position?.StartColumn ?? 0);
                     return false;
                 }
 
@@ -1591,7 +1856,8 @@ internal static class PreceptTypeChecker
                         diagnostic = new PreceptValidationDiagnostic(
                             DiagnosticCatalog.C56,
                             DiagnosticCatalog.C56.FormatMessage(("field", argKey)),
-                            0);
+                            0,
+                            Column: identifier.Position?.StartColumn ?? 0);
                         return false;
                     }
                 }
@@ -1600,11 +1866,11 @@ internal static class PreceptTypeChecker
             }
 
             case PreceptParenthesizedExpression parenthesized:
-                return TryInferKind(parenthesized.Inner, symbols, out kind, out diagnostic);
+                return TryInferKind(parenthesized.Inner, context, out kind, out diagnostic);
 
             case PreceptUnaryExpression unary:
             {
-                if (!TryInferKind(unary.Operand, symbols, out var operandKind, out diagnostic))
+                if (!TryInferKind(unary.Operand, context, out var operandKind, out diagnostic))
                     return false;
 
                 if (unary.Operator == "not")
@@ -1614,7 +1880,8 @@ internal static class PreceptTypeChecker
                         diagnostic = new PreceptValidationDiagnostic(
                             DiagnosticCatalog.C40,
                             "operator 'not' requires boolean operand.",
-                            0);
+                            0,
+                            Column: unary.Operand.Position?.StartColumn ?? 0);
                         return false;
                     }
 
@@ -1630,7 +1897,8 @@ internal static class PreceptTypeChecker
                         diagnostic = new PreceptValidationDiagnostic(
                             DiagnosticCatalog.C40,
                             "unary '-' requires numeric operand.",
-                            0);
+                            0,
+                            Column: unary.Operand.Position?.StartColumn ?? 0);
                         return false;
                     }
 
@@ -1641,22 +1909,23 @@ internal static class PreceptTypeChecker
                 diagnostic = new PreceptValidationDiagnostic(
                     DiagnosticCatalog.C40,
                     $"unsupported unary operator '{unary.Operator}'.",
-                    0);
+                    0,
+                    Column: unary.Position?.StartColumn ?? 0);
                 return false;
             }
 
             case PreceptBinaryExpression binary:
-                return TryInferBinaryKind(binary, symbols, out kind, out diagnostic);
+                return TryInferBinaryKind(binary, context, out kind, out diagnostic);
 
             case PreceptFunctionCallExpression fn:
-                return TryInferFunctionCallKind(fn, symbols, out kind, out diagnostic);
+                return TryInferFunctionCallKind(fn, context, out kind, out diagnostic);
 
             // SYNC:CONSTRAINT:C78
             // SYNC:CONSTRAINT:C79
             case PreceptConditionalExpression cond:
             {
                 // Infer condition type
-                if (!TryInferKind(cond.Condition, symbols, out var condKind, out diagnostic))
+                if (!TryInferKind(cond.Condition, context, out var condKind, out diagnostic))
                     return false;
 
                 // C78: condition must be non-nullable boolean
@@ -1665,17 +1934,18 @@ internal static class PreceptTypeChecker
                     diagnostic = new PreceptValidationDiagnostic(
                         DiagnosticCatalog.C78,
                         DiagnosticCatalog.C78.FormatMessage(("actual", FormatKinds(condKind))),
-                        0);
+                        0,
+                        Column: cond.Condition.Position?.StartColumn ?? 0);
                     return false;
                 }
 
                 // Null-narrow symbols for then-branch (condition assumed true)
-                var thenSymbols = ApplyNarrowing(cond.Condition, symbols, assumeTrue: true);
-                if (!TryInferKind(cond.ThenBranch, thenSymbols, out var thenKind, out diagnostic))
+                var thenContext = ApplyNarrowing(cond.Condition, context, assumeTrue: true);
+                if (!TryInferKind(cond.ThenBranch, thenContext, out var thenKind, out diagnostic))
                     return false;
 
                 // Else branch uses original symbols (no reverse narrowing)
-                if (!TryInferKind(cond.ElseBranch, symbols, out var elseKind, out diagnostic))
+                if (!TryInferKind(cond.ElseBranch, context, out var elseKind, out diagnostic))
                     return false;
 
                 // C79: branches must produce compatible scalar types (with integer widening)
@@ -1701,7 +1971,8 @@ internal static class PreceptTypeChecker
                     diagnostic = new PreceptValidationDiagnostic(
                         DiagnosticCatalog.C79,
                         BuildC79Message(thenKind, elseKind),
-                        0);
+                        0,
+                        Column: cond.ElseBranch.Position?.StartColumn ?? 0);
                     return false;
                 }
 
@@ -1714,19 +1985,21 @@ internal static class PreceptTypeChecker
                 diagnostic = new PreceptValidationDiagnostic(
                     DiagnosticCatalog.C39,
                     "unsupported expression node.",
-                    0);
+                    0,
+                    Column: expression.Position?.StartColumn ?? 0);
                 return false;
         }
     }
 
     private static bool TryInferFunctionCallKind(
         PreceptFunctionCallExpression fn,
-        IReadOnlyDictionary<string, StaticValueKind> symbols,
+        GlobalProofContext context,
         out StaticValueKind kind,
         out PreceptValidationDiagnostic? diagnostic)
     {
         kind = StaticValueKind.None;
         diagnostic = null;
+        var symbols = context.Symbols;
 
         // SYNC:CONSTRAINT:C71 — unknown function name
         if (!FunctionRegistry.TryGetFunction(fn.Name, out var funcDef))
@@ -1734,7 +2007,8 @@ internal static class PreceptTypeChecker
             diagnostic = new PreceptValidationDiagnostic(
                 DiagnosticCatalog.C71,
                 $"Unknown function '{fn.Name}'.",
-                0);
+                0,
+                Column: fn.Position?.StartColumn ?? 0);
             return false;
         }
 
@@ -1742,7 +2016,7 @@ internal static class PreceptTypeChecker
         var argKinds = new StaticValueKind[fn.Arguments.Length];
         for (int i = 0; i < fn.Arguments.Length; i++)
         {
-            if (!TryInferKind(fn.Arguments[i], symbols, out argKinds[i], out diagnostic))
+            if (!TryInferKind(fn.Arguments[i], context, out argKinds[i], out diagnostic))
                 return false;
 
             // SYNC:CONSTRAINT:C77 — nullable arguments
@@ -1752,7 +2026,8 @@ internal static class PreceptTypeChecker
                 diagnostic = new PreceptValidationDiagnostic(
                     DiagnosticCatalog.C77,
                     $"Function '{fn.Name}' does not accept nullable arguments. '{argName}' may be null. Add a null check.",
-                    0);
+                    0,
+                    Column: fn.Arguments[i].Position?.StartColumn ?? 0);
                 return false;
             }
         }
@@ -1810,7 +2085,8 @@ internal static class PreceptTypeChecker
                 diagnostic = new PreceptValidationDiagnostic(
                     DiagnosticCatalog.C75,
                     $"pow() exponent must be integer type, but got {KindLabel(argKinds[1])}.",
-                    0);
+                    0,
+                    Column: fn.Arguments[1].Position?.StartColumn ?? 0);
                 return false;
             }
 
@@ -1833,7 +2109,8 @@ internal static class PreceptTypeChecker
                             diagnostic = new PreceptValidationDiagnostic(
                                 DiagnosticCatalog.C73,
                                 $"{fn.Name}() no matching overload: {param.Name} argument expects {KindLabel(param.AcceptedTypes)} but got {KindLabel(argKinds[i])}.",
-                                0);
+                                0,
+                                Column: fn.Arguments[i].Position?.StartColumn ?? 0);
                             return false;
                         }
                     }
@@ -1848,7 +2125,8 @@ internal static class PreceptTypeChecker
                             diagnostic = new PreceptValidationDiagnostic(
                                 DiagnosticCatalog.C73,
                                 $"{fn.Name}() no matching overload: {param.Name} argument expects {KindLabel(param.AcceptedTypes)} but got {KindLabel(argKinds[i])}.",
-                                0);
+                                0,
+                                Column: fn.Arguments[i].Position?.StartColumn ?? 0);
                             return false;
                         }
                     }
@@ -1859,7 +2137,8 @@ internal static class PreceptTypeChecker
             diagnostic = new PreceptValidationDiagnostic(
                 DiagnosticCatalog.C72,
                 $"{fn.Name}() called with {fn.Arguments.Length} argument(s), but no matching overload found.",
-                0);
+                0,
+                Column: fn.Position?.StartColumn ?? 0);
             return false;
         }
 
@@ -1880,7 +2159,8 @@ internal static class PreceptTypeChecker
                     diagnostic = new PreceptValidationDiagnostic(
                         DiagnosticCatalog.C74,
                         "round() precision argument must be a non-negative integer literal.",
-                        0);
+                        0,
+                        Column: fn.Arguments[argIndex].Position?.StartColumn ?? 0);
                     return false;
                 }
             }
@@ -1889,26 +2169,16 @@ internal static class PreceptTypeChecker
             if (param.Constraint == FunctionArgConstraint.RequiresNonNegativeProof)
             {
                 var arg = fn.Arguments[argIndex];
-                bool isNonNeg = arg switch
+                var assessment = AssessNonnegativeArgument(arg, context);
+                if (assessment is not null && assessment.Outcome != ProofOutcome.Satisfied)
                 {
-                    PreceptLiteralExpression { Value: long lval } => lval >= 0,
-                    PreceptLiteralExpression { Value: double dval } => dval >= 0,
-                    PreceptLiteralExpression { Value: decimal mval } => mval >= 0,
-                    PreceptFunctionCallExpression { Name: "abs" } => true,
-                    PreceptIdentifierExpression idArg when TryGetIdentifierKey(idArg, out var idKey) =>
-                        symbols.ContainsKey($"$nonneg:{idKey}") || symbols.ContainsKey($"$positive:{idKey}"),
-                    _ => false,
-                };
-
-                if (!isNonNeg)
-                {
-                    var argName = arg is PreceptIdentifierExpression nid
-                        ? (nid.Member is null ? nid.Name : $"{nid.Name}.{nid.Member}")
-                        : "argument";
                     diagnostic = new PreceptValidationDiagnostic(
-                        DiagnosticCatalog.C76,
-                        $"sqrt() requires a non-negative argument. '{argName}' may be negative. Add a 'nonnegative' constraint, 'rule {argName} >= 0', state/event 'ensure', or guard with '{argName} >= 0'.",
-                        0);
+                        assessment.DiagnosticCode,
+                        ProofDiagnosticRenderer.Render(assessment),
+                        0,
+                        Column: arg.Position?.StartColumn ?? 0,
+                        EndColumn: arg.Position?.EndColumn ?? 0,
+                        Assessment: assessment);
                     return false;
                 }
             }
@@ -1920,33 +2190,34 @@ internal static class PreceptTypeChecker
 
     private static bool TryInferBinaryKind(
         PreceptBinaryExpression binary,
-        IReadOnlyDictionary<string, StaticValueKind> symbols,
+        GlobalProofContext context,
         out StaticValueKind kind,
         out PreceptValidationDiagnostic? diagnostic)
     {
         kind = StaticValueKind.None;
         diagnostic = null;
+        var symbols = context.Symbols;
 
         switch (binary.Operator)
         {
             case "and":
             {
-                if (!TryInferKind(binary.Left, symbols, out var leftKind, out diagnostic))
+                if (!TryInferKind(binary.Left, context, out var leftKind, out diagnostic))
                     return false;
 
                 if (!IsExactly(leftKind, StaticValueKind.Boolean))
                 {
-                    diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C41, "operator 'and' requires boolean operands.", 0);
+                    diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C41, "operator 'and' requires boolean operands.", 0, Column: binary.Left.Position?.StartColumn ?? 0);
                     return false;
                 }
 
-                var rightSymbols = ApplyNarrowing(binary.Left, symbols, assumeTrue: true);
-                if (!TryInferKind(binary.Right, rightSymbols, out var rightKind, out diagnostic))
+                var rightContext = ApplyNarrowing(binary.Left, context, assumeTrue: true);
+                if (!TryInferKind(binary.Right, rightContext, out var rightKind, out diagnostic))
                     return false;
 
                 if (!IsExactly(rightKind, StaticValueKind.Boolean))
                 {
-                    diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C41, "operator 'and' requires boolean operands.", 0);
+                    diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C41, "operator 'and' requires boolean operands.", 0, Column: binary.Right.Position?.StartColumn ?? 0);
                     return false;
                 }
 
@@ -1956,22 +2227,22 @@ internal static class PreceptTypeChecker
 
             case "or":
             {
-                if (!TryInferKind(binary.Left, symbols, out var leftKind, out diagnostic))
+                if (!TryInferKind(binary.Left, context, out var leftKind, out diagnostic))
                     return false;
 
                 if (!IsExactly(leftKind, StaticValueKind.Boolean))
                 {
-                    diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C41, "operator 'or' requires boolean operands.", 0);
+                    diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C41, "operator 'or' requires boolean operands.", 0, Column: binary.Left.Position?.StartColumn ?? 0);
                     return false;
                 }
 
-                var rightSymbols = ApplyNarrowing(binary.Left, symbols, assumeTrue: false);
-                if (!TryInferKind(binary.Right, rightSymbols, out var rightKind, out diagnostic))
+                var rightContext = ApplyNarrowing(binary.Left, context, assumeTrue: false);
+                if (!TryInferKind(binary.Right, rightContext, out var rightKind, out diagnostic))
                     return false;
 
                 if (!IsExactly(rightKind, StaticValueKind.Boolean))
                 {
-                    diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C41, "operator 'or' requires boolean operands.", 0);
+                    diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C41, "operator 'or' requires boolean operands.", 0, Column: binary.Right.Position?.StartColumn ?? 0);
                     return false;
                 }
 
@@ -1981,8 +2252,8 @@ internal static class PreceptTypeChecker
 
             case "+":
             {
-                if (!TryInferKind(binary.Left, symbols, out var leftKind, out diagnostic) ||
-                    !TryInferKind(binary.Right, symbols, out var rightKind, out diagnostic))
+                if (!TryInferKind(binary.Left, context, out var leftKind, out diagnostic) ||
+                    !TryInferKind(binary.Right, context, out var rightKind, out diagnostic))
                     return false;
 
                 var stringCandidate = IsExactly(leftKind, StaticValueKind.String) && IsExactly(rightKind, StaticValueKind.String);
@@ -1999,7 +2270,7 @@ internal static class PreceptTypeChecker
                     return true;
                 }
 
-                diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C41, "operator '+' requires number+number or string+string.", 0);
+                diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C41, "operator '+' requires number+number or string+string.", 0, Column: binary.Position?.StartColumn ?? 0);
                 return false;
             }
 
@@ -2012,8 +2283,8 @@ internal static class PreceptTypeChecker
             case "<":
             case "<=":
             {
-                if (!TryInferKind(binary.Left, symbols, out var leftKind, out diagnostic) ||
-                    !TryInferKind(binary.Right, symbols, out var rightKind, out diagnostic))
+                if (!TryInferKind(binary.Left, context, out var leftKind, out diagnostic) ||
+                    !TryInferKind(binary.Right, context, out var rightKind, out diagnostic))
                     return false;
 
                 // Choice-type ordinal checks apply only to the comparison operators, not arithmetic.
@@ -2028,7 +2299,8 @@ internal static class PreceptTypeChecker
                         diagnostic = new PreceptValidationDiagnostic(
                             DiagnosticCatalog.C65,
                             DiagnosticCatalog.C65.FormatMessage(("operator", binary.Operator)),
-                            0);
+                            0,
+                            Column: binary.Left.Position?.StartColumn ?? 0);
                         return false;
                     }
 
@@ -2038,7 +2310,8 @@ internal static class PreceptTypeChecker
                         diagnostic = new PreceptValidationDiagnostic(
                             DiagnosticCatalog.C67,
                             DiagnosticCatalog.C67.FormatMessage(("operator", binary.Operator)),
-                            0);
+                            0,
+                            Column: binary.Position?.StartColumn ?? 0);
                         return false;
                     }
 
@@ -2056,53 +2329,31 @@ internal static class PreceptTypeChecker
                     diagnostic = new PreceptValidationDiagnostic(
                         DiagnosticCatalog.C41,
                         $"operator '{binary.Operator}' requires numeric operands.",
-                        0);
+                        0,
+                        Column: binary.Position?.StartColumn ?? 0);
                     return false;
                 }
 
-                // SYNC:CONSTRAINT:C92 — literal zero divisor
+                // SYNC:CONSTRAINT:C92 — provably-zero divisor
                 // SYNC:CONSTRAINT:C93 — unproven divisor safety
-                // Principle #8 ("never guess"): C92 is error (literal zero — provably wrong).
+                // Principle #8 ("never guess"): C92 is error (provably zero — contradiction).
                 // C93 is error (unproven divisor — risks IEEE 754 Infinity/NaN at runtime).
-                // Two-tier: C92 = proven contradiction, C93 = unproven nonzero gap.
+                // Unified assessment: C92 = proven contradiction, C93 = unresolved obligation.
                 if (binary.Operator is "/" or "%")
                 {
-                    if (TryGetNumericLiteral(binary.Right, out var divisorValue))
+                    var assessment = AssessDivisorSafety(binary.Right, context);
+                    if (assessment is not null && assessment.Outcome != ProofOutcome.Satisfied)
                     {
-                        if (divisorValue == 0.0)
-                        {
-                            diagnostic = new PreceptValidationDiagnostic(
-                                DiagnosticCatalog.C92,
-                                "Division by zero: the divisor is literal 0.",
-                                0);
+                        diagnostic = new PreceptValidationDiagnostic(
+                            assessment.DiagnosticCode,
+                            ProofDiagnosticRenderer.Render(assessment),
+                            0,
+                            Column: binary.Right.Position?.StartColumn ?? 0,
+                            EndColumn: binary.Right.Position?.EndColumn ?? 0,
+                            Assessment: assessment);
+                        if (assessment.Outcome == ProofOutcome.Contradiction)
                             return false;
-                        }
-                        // Non-zero literal — safe, no diagnostic
                     }
-                    else if (TryGetIdentifierKey(binary.Right, out var key))
-                    {
-                        if (!symbols.ContainsKey($"$nonzero:{key}") && !symbols.ContainsKey($"$positive:{key}"))
-                        {
-                            var name = key;
-                            if (symbols.ContainsKey($"$nonneg:{key}"))
-                            {
-                                // Context-aware: field is nonnegative but not nonzero
-                                diagnostic = new PreceptValidationDiagnostic(
-                                    DiagnosticCatalog.C93,
-                                    $"Divisor '{name}' is nonnegative but not nonzero — 'nonnegative' allows zero. Consider 'positive' instead.",
-                                    0);
-                            }
-                            else
-                            {
-                                // Generic: no proof at all
-                                diagnostic = new PreceptValidationDiagnostic(
-                                    DiagnosticCatalog.C93,
-                                    $"Divisor '{name}' has no compile-time nonzero proof. Consider adding a 'positive' constraint, 'rule {name} != 0', or 'when {name} != 0' guard.",
-                                    0);
-                            }
-                        }
-                    }
-                    // Compound expressions (binary, function calls, etc.) — no diagnostic (Principle #8 conservatism)
                 }
 
                 kind = binary.Operator is ">" or ">=" or "<" or "<="
@@ -2114,8 +2365,8 @@ internal static class PreceptTypeChecker
             case "==":
             case "!=":
             {
-                if (!TryInferKind(binary.Left, symbols, out var leftEqKind, out diagnostic) ||
-                    !TryInferKind(binary.Right, symbols, out var rightEqKind, out diagnostic))
+                if (!TryInferKind(binary.Left, context, out var leftEqKind, out diagnostic) ||
+                    !TryInferKind(binary.Right, context, out var rightEqKind, out diagnostic))
                     return false;
 
                 // Normalize choice kinds to String for equality compatibility:
@@ -2129,14 +2380,14 @@ internal static class PreceptTypeChecker
                 if (leftIsNull && !HasFlag(rightEqKind, StaticValueKind.Null))
                 {
                     diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C41,
-                        $"operator '{binary.Operator}' cannot compare non-nullable {FormatKinds(rightEqKind)} with null.", 0);
+                        $"operator '{binary.Operator}' cannot compare non-nullable {FormatKinds(rightEqKind)} with null.", 0, Column: binary.Left.Position?.StartColumn ?? 0);
                     return false;
                 }
 
                 if (rightIsNull && !HasFlag(leftEqKind, StaticValueKind.Null))
                 {
                     diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C41,
-                        $"operator '{binary.Operator}' cannot compare non-nullable {FormatKinds(leftEqKind)} with null.", 0);
+                        $"operator '{binary.Operator}' cannot compare non-nullable {FormatKinds(leftEqKind)} with null.", 0, Column: binary.Right.Position?.StartColumn ?? 0);
                     return false;
                 }
 
@@ -2153,7 +2404,7 @@ internal static class PreceptTypeChecker
                 if (!isIntNumberMix && !isDecimalMix && leftEqFamily != StaticValueKind.None && rightEqFamily != StaticValueKind.None && leftEqFamily != rightEqFamily)
                 {
                     diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C41,
-                        $"operator '{binary.Operator}' requires operands of the same type, but found {FormatKinds(leftEqKind)} and {FormatKinds(rightEqKind)}.", 0);
+                        $"operator '{binary.Operator}' requires operands of the same type, but found {FormatKinds(leftEqKind)} and {FormatKinds(rightEqKind)}.", 0, Column: binary.Position?.StartColumn ?? 0);
                     return false;
                 }
 
@@ -2165,17 +2416,17 @@ internal static class PreceptTypeChecker
             {
                 if (binary.Left is not PreceptIdentifierExpression { Member: null } collectionIdentifier)
                 {
-                    diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C41, "'contains' requires a collection field on the left side.", 0);
+                    diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C41, "'contains' requires a collection field on the left side.", 0, Column: binary.Left.Position?.StartColumn ?? 0);
                     return false;
                 }
 
-                if (!TryInferKind(binary.Right, symbols, out var rightKind, out diagnostic))
+                if (!TryInferKind(binary.Right, context, out var rightKind, out diagnostic))
                     return false;
 
                 var collectionKey = $"{collectionIdentifier.Name}.count";
                 if (!symbols.ContainsKey(collectionKey))
                 {
-                    diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C38, $"unknown identifier '{collectionIdentifier.Name}'.", 0);
+                    diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C38, $"unknown identifier '{collectionIdentifier.Name}'.", 0, Column: collectionIdentifier.Position?.StartColumn ?? 0);
                     return false;
                 }
 
@@ -2197,7 +2448,8 @@ internal static class PreceptTypeChecker
                     diagnostic = new PreceptValidationDiagnostic(
                         DiagnosticCatalog.C41,
                         $"operator 'contains' requires RHS of type {FormatKinds(innerKind)} but expression produces {FormatKinds(rightKind)}.",
-                        0);
+                        0,
+                        Column: binary.Right.Position?.StartColumn ?? 0);
                     return false;
                 }
 
@@ -2206,30 +2458,308 @@ internal static class PreceptTypeChecker
             }
 
             default:
-                diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C41, $"unsupported binary operator '{binary.Operator}'.", 0);
+                diagnostic = new PreceptValidationDiagnostic(DiagnosticCatalog.C41, $"unsupported binary operator '{binary.Operator}'.", 0, Column: binary.Position?.StartColumn ?? 0);
                 return false;
         }
     }
 
-    private static IReadOnlyDictionary<string, StaticValueKind> ApplyNarrowing(
+    /// <summary>
+    /// Extracts the tightest <see cref="NumericInterval"/> for <paramref name="key"/> from the
+    /// typed proof stores. Used by <c>TryInferInterval</c> (Layer 3) to initialize leaf intervals.
+    /// Priority: typed interval store → flag-based interval (Positive → Nonneg+Nonzero → Nonneg) → Unknown.
+    /// </summary>
+    private static NumericInterval ExtractFieldInterval(
+        string key,
+        GlobalProofContext context)
+    {
+        // 1. Typed interval store takes priority (most specific).
+        if (context.FieldIntervals.TryGetValue(key, out var ival))
+            return ival;
+
+        // 2. Flag-based interval.
+        if (context.Flags.TryGetValue(key, out var flags))
+        {
+            if ((flags & NumericFlags.Positive) != 0)
+                return NumericInterval.Positive;
+            if ((flags & NumericFlags.Nonnegative) != 0 && (flags & NumericFlags.Nonzero) != 0)
+                return NumericInterval.Positive; // nonneg + nonzero = strictly positive
+            if ((flags & NumericFlags.Nonnegative) != 0)
+                return NumericInterval.Nonneg;
+        }
+
+        return NumericInterval.Unknown;
+    }
+
+    /// <summary>
+    /// Recursively infers the <see cref="NumericInterval"/> for <paramref name="expression"/>
+    /// using Layer 2 transfer rules (interval arithmetic) and Layer 5 conditional hull synthesis.
+    /// Each identifier leaf is initialized via <see cref="ExtractFieldInterval"/>.
+    /// Returns <see cref="NumericInterval.Unknown"/> for any expression whose bounds cannot be determined.
+    /// </summary>
+    internal static NumericInterval TryInferInterval(
         PreceptExpression expression,
-        IReadOnlyDictionary<string, StaticValueKind> symbols,
+        GlobalProofContext context)
+    {
+        switch (expression)
+        {
+            case PreceptLiteralExpression { Value: long l }:
+                return new NumericInterval(l, true, l, true);
+            case PreceptLiteralExpression { Value: double d }:
+                return new NumericInterval(d, true, d, true);
+            case PreceptLiteralExpression { Value: decimal m }:
+                return new NumericInterval((double)m, true, (double)m, true);
+
+            case PreceptIdentifierExpression idExpr:
+                if (TryGetIdentifierKey(idExpr, out var idKey))
+                    return ExtractFieldInterval(idKey, context);
+                return NumericInterval.Unknown;
+
+            case PreceptParenthesizedExpression paren:
+                return TryInferInterval(paren.Inner, context);
+
+            case PreceptUnaryExpression { Operator: "-" } unary:
+                return NumericInterval.Negate(TryInferInterval(unary.Operand, context));
+
+            case PreceptBinaryExpression binary:
+            {
+                // Use IntervalOf (not TryInferInterval) on sub-expressions so relational facts
+                // are consulted for each leaf before combining (e.g. (A-B)*C with rule A>B, C positive).
+                var left  = context.IntervalOf(binary.Left).Interval;
+                var right = context.IntervalOf(binary.Right).Interval;
+                return binary.Operator switch
+                {
+                    "+" => NumericInterval.Add(left, right),
+                    "-" => NumericInterval.Subtract(left, right),
+                    "*" => NumericInterval.Multiply(left, right),
+                    "/" => NumericInterval.Divide(left, right),
+                    "%" => right.ExcludesZero
+                             ? (left.IsNonnegative && right.IsPositive
+                                 ? new NumericInterval(0, true, Math.Abs(right.Upper), false) // [0, |B|) — tighter for non-negative dividend
+                                 : new NumericInterval(-Math.Abs(right.Upper), false, Math.Abs(right.Upper), false))
+                             : NumericInterval.Unknown,
+                    _   => NumericInterval.Unknown,
+                };
+            }
+
+            case PreceptFunctionCallExpression fn when fn.Arguments.Length >= 1:
+            {
+                var a0 = TryInferInterval(fn.Arguments[0], context);
+                switch (fn.Name)
+                {
+                    case "abs":
+                        return NumericInterval.Abs(a0);
+                    case "min" when fn.Arguments.Length == 2:
+                        return NumericInterval.Min(a0, TryInferInterval(fn.Arguments[1], context));
+                    case "max" when fn.Arguments.Length == 2:
+                        return NumericInterval.Max(a0, TryInferInterval(fn.Arguments[1], context));
+                    case "clamp" when fn.Arguments.Length == 3:
+                        return NumericInterval.Clamp(a0,
+                            TryInferInterval(fn.Arguments[1], context),
+                            TryInferInterval(fn.Arguments[2], context));
+                    case "sqrt":
+                        if (a0.IsNonnegative)
+                        {
+                            var sqrtLo = Math.Sqrt(Math.Max(0, a0.Lower));
+                            var sqrtHi = double.IsPositiveInfinity(a0.Upper)
+                                ? double.PositiveInfinity
+                                : Math.Sqrt(a0.Upper);
+                            return new NumericInterval(sqrtLo, a0.LowerInclusive, sqrtHi, a0.UpperInclusive);
+                        }
+                        return NumericInterval.Unknown;
+                    case "floor":
+                        return new NumericInterval(Math.Floor(a0.Lower), true, Math.Floor(a0.Upper), true);
+                    case "ceil":
+                        return new NumericInterval(Math.Ceiling(a0.Lower), true, Math.Ceiling(a0.Upper), true);
+                    case "round":
+                        return new NumericInterval(Math.Floor(a0.Lower), true, Math.Ceiling(a0.Upper), true);
+                    case "truncate":
+                        if (a0.IsUnknown) return NumericInterval.Unknown;
+                        var tLo = a0.Lower >= 0 ? Math.Floor(a0.Lower) : Math.Ceiling(a0.Lower);
+                        var tHi = a0.Upper >= 0 ? Math.Floor(a0.Upper) : Math.Ceiling(a0.Upper);
+                        return new NumericInterval(Math.Min(tLo, tHi), true, Math.Max(tLo, tHi), true);
+                    case "pow" when fn.Arguments.Length == 2:
+                        var exp = TryInferInterval(fn.Arguments[1], context);
+                        // Only handle constant integer exponents.
+                        if (exp.Lower != exp.Upper || exp.Lower != Math.Floor(exp.Lower))
+                            return NumericInterval.Unknown;
+                        int n = (int)exp.Lower;
+                        if (n % 2 == 0)
+                        {
+                            // Even exponent: result is nonneg.
+                            if (a0.IsNonnegative)
+                                return new NumericInterval(Math.Pow(a0.Lower, n), true, Math.Pow(a0.Upper, n), true);
+                            if (a0.Upper <= 0)
+                                return new NumericInterval(Math.Pow(a0.Upper, n), true, Math.Pow(a0.Lower, n), true);
+                            // Mixed sign: [0, max(lo^n, hi^n)]
+                            var maxPow = Math.Max(Math.Pow(a0.Lower, n), Math.Pow(a0.Upper, n));
+                            bool baseNonzero = fn.Arguments[0] is PreceptIdentifierExpression baseId
+                                && context.Flags.TryGetValue(
+                                    baseId.Member is not null ? $"{baseId.Name}.{baseId.Member}" : baseId.Name,
+                                    out var baseFlags)
+                                && (baseFlags & (NumericFlags.Nonzero | NumericFlags.Positive)) != 0;
+                            return new NumericInterval(0, !baseNonzero, maxPow, true);
+                        }
+                        else
+                        {
+                            // Odd exponent: preserves monotonicity.
+                            return new NumericInterval(Math.Pow(a0.Lower, n), true, Math.Pow(a0.Upper, n), true);
+                        }
+                    default:
+                        return NumericInterval.Unknown;
+                }
+            }
+
+            case PreceptConditionalExpression cond:
+            {
+                var thenContext = ApplyNarrowing(cond.Condition, context, assumeTrue: true);
+                var elseContext = ApplyNarrowing(cond.Condition, context, assumeTrue: false);
+                // Use IntervalOf (not TryInferInterval) so relational facts stored by ApplyNarrowing
+                // are consulted when tightening branch sub-expressions (e.g. A-B given A>B).
+                var thenInterval = thenContext.IntervalOf(cond.ThenBranch).Interval;
+                var elseInterval = elseContext.IntervalOf(cond.ElseBranch).Interval;
+                return NumericInterval.Hull(thenInterval, elseInterval);
+            }
+
+            default:
+                return NumericInterval.Unknown;
+        }
+    }
+
+    /// <summary>
+    /// Updates proof markers in <paramref name="symbols"/> after a <c>set <paramref name="targetField"/> = <paramref name="rhs"/></c>
+    /// assignment. Called within assignment loops to thread post-mutation proof state into subsequent
+    /// assignments in the same row or state action (Layer 1: Sequential Assignment Flow).
+    /// </summary>
+    internal static GlobalProofContext ApplyAssignmentNarrowing(
+        string targetField,
+        PreceptExpression rhs,
+        GlobalProofContext context)
+    {
+        var markers = new Dictionary<string, StaticValueKind>(context.Symbols, StringComparer.Ordinal);
+        var fieldIntervals = CopyFieldIntervals(context);
+        var flags = CopyFlags(context);
+        var exprFacts = CopyExprFacts(context);
+
+        // Always kill existing numeric proof state for the target field first.
+        flags.Remove(targetField);
+
+        fieldIntervals.Remove(targetField);
+
+        // Kill exprFacts entries where the LinearForm mentions the reassigned field.
+        var exprKeysToKill = new List<LinearForm>();
+        foreach (var lf in exprFacts.Keys)
+        {
+            if (lf.Terms.ContainsKey(targetField))
+                exprKeysToKill.Add(lf);
+        }
+        foreach (var k in exprKeysToKill)
+            exprFacts.Remove(k);
+
+        rhs = StripParentheses(rhs);
+
+        if (rhs is PreceptLiteralExpression lit)
+        {
+            double? val = lit.Value switch
+            {
+                long l => (double)l,
+                double d => d,
+                decimal m => (double)m,
+                _ => null   // null literal — all numeric markers already killed above
+            };
+
+            if (val is double numVal)
+            {
+                if (numVal > 0)
+                {
+                    flags[targetField] = NumericFlags.Positive | NumericFlags.Nonnegative | NumericFlags.Nonzero;
+                }
+                else if (numVal == 0.0)
+                {
+                    flags[targetField] = NumericFlags.Nonnegative;
+                }
+                else // negative literal — nonzero but not positive/nonneg
+                {
+                    flags[targetField] = NumericFlags.Nonzero;
+                }
+
+                // Also inject a point interval for precise interval arithmetic in subsequent expressions.
+                var pointIval = new NumericInterval(numVal, true, numVal, true);
+                fieldIntervals[targetField] = pointIval;
+            }
+        }
+        else if (TryGetIdentifierKey(rhs, out var sourceKey))
+        {
+            // Copy numeric proof state from source identifier to target field.
+            if (context.Flags.TryGetValue(sourceKey, out var srcFlags))
+                flags[targetField] = srcFlags;
+
+            // Copy interval from source to target via typed store.
+            if (context.FieldIntervals.TryGetValue(sourceKey, out var srcIval))
+            {
+                fieldIntervals[targetField] = srcIval;
+            }
+        }
+        else
+        {
+            // Compound RHS: derive interval from proof engine and inject sign markers.
+            var rhsInterval = context.IntervalOf(rhs).Interval;
+            if (!rhsInterval.IsUnknown)
+            {
+                fieldIntervals[targetField] = rhsInterval;
+                if (rhsInterval.IsPositive)
+                {
+                    flags[targetField] = NumericFlags.Positive | NumericFlags.Nonnegative | NumericFlags.Nonzero;
+                }
+                else if (rhsInterval.IsNonnegative)
+                {
+                    flags[targetField] = NumericFlags.Nonnegative;
+                }
+                else if (rhsInterval.ExcludesZero)
+                {
+                    flags[targetField] = NumericFlags.Nonzero;
+                }
+
+                // Dual-write: store compound RHS interval in exprFacts (step 7b-iii).
+                var rhsForm = LinearForm.TryNormalize(rhs);
+                if (rhsForm is not null)
+                {
+                    exprFacts[rhsForm] = rhsInterval;
+                    var targetForm = LinearForm.FromField(targetField);
+                    exprFacts[targetForm.Subtract(rhsForm)] = new NumericInterval(0, true, 0, true);
+                }
+            }
+        }
+
+        // Preserve relational facts, killing any that mention the reassigned field.
+        var relFacts = new Dictionary<LinearForm, RelationalFact>();
+        foreach (var (lf, fact) in context.RelationalFacts)
+        {
+            if (!lf.Terms.ContainsKey(targetField))
+                relFacts[lf] = fact;
+        }
+
+        return new GlobalProofContext(markers, relFacts, fieldIntervals, flags, exprFacts);
+    }
+
+    internal static GlobalProofContext ApplyNarrowing(
+        PreceptExpression expression,
+        GlobalProofContext context,
         bool assumeTrue)
     {
         expression = StripParentheses(expression);
 
         if (expression is PreceptUnaryExpression { Operator: "not" } unary)
-            return ApplyNarrowing(unary.Operand, symbols, !assumeTrue);
+            return ApplyNarrowing(unary.Operand, context, !assumeTrue);
 
         if (expression is not PreceptBinaryExpression binary)
-            return symbols;
+            return context;
 
         if (binary.Operator == "and")
         {
             if (!assumeTrue)
-                return symbols;
+                return context;
 
-            var leftNarrowed = ApplyNarrowing(binary.Left, symbols, assumeTrue: true);
+            var leftNarrowed = ApplyNarrowing(binary.Left, context, assumeTrue: true);
             return ApplyNarrowing(binary.Right, leftNarrowed, assumeTrue: true);
         }
 
@@ -2240,32 +2770,32 @@ internal static class PreceptTypeChecker
                 // SOUNDNESS: This proof is sound ONLY because C42 independently prevents null fields
                 // from reaching arithmetic. If C42 is ever relaxed for nullable arithmetic, this
                 // decomposition becomes unsound.
-                if (TryDecomposeNullOrPattern(binary, symbols, out var decomposed))
+                if (TryDecomposeNullOrPattern(binary, context, out var decomposed))
                     return decomposed;
-                return symbols;
+                return context;
             }
 
-            var leftNarrowed = ApplyNarrowing(binary.Left, symbols, assumeTrue: false);
+            var leftNarrowed = ApplyNarrowing(binary.Left, context, assumeTrue: false);
             return ApplyNarrowing(binary.Right, leftNarrowed, assumeTrue: false);
         }
 
         if (binary.Operator is "==" or "!=" &&
-            TryApplyNullComparisonNarrowing(binary, symbols, assumeTrue, out var nullNarrowed))
+            TryApplyNullComparisonNarrowing(binary, context, assumeTrue, out var nullNarrowed))
             return nullNarrowed;
 
-        if (TryApplyNumericComparisonNarrowing(binary, symbols, assumeTrue, out var numericNarrowed))
+        if (TryApplyNumericComparisonNarrowing(binary, context, assumeTrue, out var numericNarrowed))
             return numericNarrowed;
 
-        return symbols;
+        return context;
     }
 
     private static bool TryApplyNullComparisonNarrowing(
         PreceptBinaryExpression binary,
-        IReadOnlyDictionary<string, StaticValueKind> symbols,
+        GlobalProofContext context,
         bool assumeTrue,
-        out IReadOnlyDictionary<string, StaticValueKind> narrowed)
+        out GlobalProofContext narrowed)
     {
-        narrowed = symbols;
+        narrowed = context;
 
         var leftIsNull = IsNullLiteral(binary.Left);
         var rightIsNull = IsNullLiteral(binary.Right);
@@ -2284,7 +2814,7 @@ internal static class PreceptTypeChecker
                 return false;
         }
 
-        if (!symbols.TryGetValue(key, out var existingKind))
+        if (!context.Symbols.TryGetValue(key, out var existingKind))
             return false;
 
         var expectsNull = binary.Operator switch
@@ -2298,23 +2828,43 @@ internal static class PreceptTypeChecker
             ? StaticValueKind.Null
             : (existingKind & ~StaticValueKind.Null);
 
-        narrowed = new Dictionary<string, StaticValueKind>(symbols, StringComparer.Ordinal)
-        {
-            [key] = updatedKind
-        };
+        narrowed = new GlobalProofContext(
+            new Dictionary<string, StaticValueKind>(context.Symbols, StringComparer.Ordinal)
+            {
+                [key] = updatedKind
+            },
+            new Dictionary<LinearForm, RelationalFact>(),
+            CopyFieldIntervals(context),
+            CopyFlags(context),
+            CopyExprFacts(context));
         return true;
     }
 
     private static bool TryApplyNumericComparisonNarrowing(
         PreceptBinaryExpression binary,
-        IReadOnlyDictionary<string, StaticValueKind> symbols,
+        GlobalProofContext context,
         bool assumeTrue,
-        out IReadOnlyDictionary<string, StaticValueKind> result)
+        out GlobalProofContext result)
     {
-        result = symbols;
+        result = context;
 
         if (!assumeTrue)
-            return false;
+        {
+            // Negate the comparison: not(A > B) ≡ A <= B, etc.
+            var negatedOp = binary.Operator switch
+            {
+                ">" => "<=",
+                ">=" => "<",
+                "<" => ">=",
+                "<=" => ">",
+                "!=" => "==",
+                "==" => "!=",
+                _ => (string?)null
+            };
+            if (negatedOp is null) return false;
+            var negated = new PreceptBinaryExpression(negatedOp, binary.Left, binary.Right);
+            return TryApplyNumericComparisonNarrowing(negated, context, assumeTrue: true, out result);
+        }
 
         if (binary.Operator is not (">" or ">=" or "<" or "<=" or "!=" or "=="))
             return false;
@@ -2340,62 +2890,177 @@ internal static class PreceptTypeChecker
             lit = leftVal;
             op = FlipComparisonOperator(binary.Operator);
         }
+        else if (leftIsId && rightIsId)
+        {
+            var relMarkers = new Dictionary<string, StaticValueKind>(context.Symbols, StringComparer.Ordinal);
+            var relFacts = CopyRelationalFacts(context);
+            switch (binary.Operator)
+            {
+                case ">":
+                    TryStoreLinearFact(binary.Left, binary.Right, RelationKind.GreaterThan, relFacts);
+                    break;
+                case ">=":
+                    TryStoreLinearFact(binary.Left, binary.Right, RelationKind.GreaterThanOrEqual, relFacts);
+                    break;
+                case "<":  // B < A → A > B (canonicalized)
+                    TryStoreLinearFact(binary.Right, binary.Left, RelationKind.GreaterThan, relFacts);
+                    break;
+                case "<=": // B <= A → A >= B (canonicalized)
+                    TryStoreLinearFact(binary.Right, binary.Left, RelationKind.GreaterThanOrEqual, relFacts);
+                    break;
+                default:
+                    return false;
+            }
+            result = new GlobalProofContext(relMarkers, relFacts, CopyFieldIntervals(context), CopyFlags(context), CopyExprFacts(context));
+            return true;
+        }
+        else if (binary.Operator is ">" or ">=" or "<" or "<=")
+        {
+            // General case: compound expressions on one or both sides.
+            // Try to normalize both sides. If both normalize, store a LinearForm-keyed fact (closes Gap 2).
+            var leftForm  = LinearForm.TryNormalize(binary.Left);
+            var rightForm = LinearForm.TryNormalize(binary.Right);
+            if (leftForm is null || rightForm is null)
+                return false;
+
+            var relFacts = CopyRelationalFacts(context);
+            switch (binary.Operator)
+            {
+                case ">":
+                    relFacts[GlobalProofContext.GcdNormalize(leftForm.Subtract(rightForm))] = new RelationalFact(RelationKind.GreaterThan);
+                    break;
+                case ">=":
+                    relFacts[GlobalProofContext.GcdNormalize(leftForm.Subtract(rightForm))] = new RelationalFact(RelationKind.GreaterThanOrEqual);
+                    break;
+                case "<":
+                    relFacts[GlobalProofContext.GcdNormalize(rightForm.Subtract(leftForm))] = new RelationalFact(RelationKind.GreaterThan);
+                    break;
+                case "<=":
+                    relFacts[GlobalProofContext.GcdNormalize(rightForm.Subtract(leftForm))] = new RelationalFact(RelationKind.GreaterThanOrEqual);
+                    break;
+                default:
+                    return false;
+            }
+            result = new GlobalProofContext(new Dictionary<string, StaticValueKind>(context.Symbols, StringComparer.Ordinal), relFacts, CopyFieldIntervals(context), CopyFlags(context), CopyExprFacts(context));
+            return true;
+        }
         else
         {
             return false;
         }
 
         // Canonicalized: key <op> lit
-        var markers = new Dictionary<string, StaticValueKind>(symbols, StringComparer.Ordinal);
+        var markers = new Dictionary<string, StaticValueKind>(context.Symbols, StringComparer.Ordinal);
+        var flags = CopyFlags(context);
         bool injected = false;
 
         if (op == ">" && lit >= 0)
         {
-            markers[$"$positive:{key}"] = StaticValueKind.Boolean;
-            markers[$"$nonneg:{key}"] = StaticValueKind.Boolean;
-            markers[$"$nonzero:{key}"] = StaticValueKind.Boolean;
+            flags[key] = flags.GetValueOrDefault(key) | NumericFlags.Positive | NumericFlags.Nonnegative | NumericFlags.Nonzero;
             injected = true;
         }
         else if (op == ">=" && lit > 0)
         {
-            markers[$"$positive:{key}"] = StaticValueKind.Boolean;
-            markers[$"$nonneg:{key}"] = StaticValueKind.Boolean;
-            markers[$"$nonzero:{key}"] = StaticValueKind.Boolean;
+            flags[key] = flags.GetValueOrDefault(key) | NumericFlags.Positive | NumericFlags.Nonnegative | NumericFlags.Nonzero;
             injected = true;
         }
         else if (op == ">=" && lit == 0)
         {
-            markers[$"$nonneg:{key}"] = StaticValueKind.Boolean;
+            flags[key] = flags.GetValueOrDefault(key) | NumericFlags.Nonnegative;
             injected = true;
         }
         else if (op == "!=" && lit == 0)
         {
-            markers[$"$nonzero:{key}"] = StaticValueKind.Boolean;
+            flags[key] = flags.GetValueOrDefault(key) | NumericFlags.Nonzero;
             injected = true;
         }
         else if (op == "<" && lit <= 0)
         {
-            markers[$"$nonzero:{key}"] = StaticValueKind.Boolean;
+            flags[key] = flags.GetValueOrDefault(key) | NumericFlags.Nonzero;
             injected = true;
         }
 
         if (!injected)
             return false;
 
-        result = markers;
+        result = new GlobalProofContext(markers, CopyRelationalFacts(context), CopyFieldIntervals(context), flags, CopyExprFacts(context));
         return true;
     }
 
     /// <summary>
-    /// Recognizes <c>Field == null or Field > 0</c> (or reversed ordering) produced by MaybeNullGuard
+    /// Returns a mutable copy of <paramref name="context"/>'s typed relational fact store.
+    /// Used by <see cref="TryApplyNumericComparisonNarrowing"/> to produce copy-on-write updates.
+    /// </summary>
+    private static Dictionary<LinearForm, RelationalFact> CopyRelationalFacts(GlobalProofContext context)
+    {
+        var copy = new Dictionary<LinearForm, RelationalFact>();
+        foreach (var kvp in context.RelationalFacts)
+            copy[kvp.Key] = kvp.Value;
+        return copy;
+    }
+
+    /// <summary>
+    /// Returns a mutable copy of <paramref name="context"/>'s typed field interval store.
+    /// Used for copy-on-write propagation when constructing derived <see cref="GlobalProofContext"/> instances.
+    /// </summary>
+    private static Dictionary<string, NumericInterval> CopyFieldIntervals(GlobalProofContext context)
+    {
+        var copy = new Dictionary<string, NumericInterval>(StringComparer.Ordinal);
+        foreach (var kvp in context.FieldIntervals)
+            copy[kvp.Key] = kvp.Value;
+        return copy;
+    }
+
+    /// <summary>
+    /// Returns a mutable copy of <paramref name="context"/>'s typed numeric flags store.
+    /// </summary>
+    private static Dictionary<string, NumericFlags> CopyFlags(GlobalProofContext context)
+    {
+        var copy = new Dictionary<string, NumericFlags>(StringComparer.Ordinal);
+        foreach (var kvp in context.Flags)
+            copy[kvp.Key] = kvp.Value;
+        return copy;
+    }
+
+    /// <summary>
+    /// Returns a mutable copy of <paramref name="context"/>'s typed expression-level interval store.
+    /// </summary>
+    private static Dictionary<LinearForm, NumericInterval> CopyExprFacts(GlobalProofContext context)
+    {
+        var copy = new Dictionary<LinearForm, NumericInterval>();
+        foreach (var kvp in context.ExprFacts)
+            copy[kvp.Key] = kvp.Value;
+        return copy;
+    }
+
+    /// <summary>
+    /// Attempts to normalize <paramref name="lhs"/> and <paramref name="rhs"/> to
+    /// <see cref="LinearForm"/> and store <c>lhs - rhs &gt; 0</c> (or <c>&gt;= 0</c>)
+    /// as a typed <see cref="RelationalFact"/> in <paramref name="relFacts"/>.
+    /// No-op when either side is non-normalizable.
+    /// </summary>
+    private static void TryStoreLinearFact(
+        PreceptExpression lhs,
+        PreceptExpression rhs,
+        RelationKind kind,
+        Dictionary<LinearForm, RelationalFact> relFacts)
+    {
+        var lf = LinearForm.TryNormalize(lhs);
+        var rf = LinearForm.TryNormalize(rhs);
+        if (lf is not null && rf is not null)
+            relFacts[GlobalProofContext.GcdNormalize(lf.Subtract(rf))] = new RelationalFact(kind);
+    }
+
+    /// <summary>
+    /// Recognizes <c>Field == null or Field &gt; 0</c> (or reversed ordering) produced by MaybeNullGuard
     /// for nullable fields with numeric constraints, and extracts the numeric proof from the non-null branch.
     /// </summary>
     private static bool TryDecomposeNullOrPattern(
         PreceptBinaryExpression binary,
-        IReadOnlyDictionary<string, StaticValueKind> symbols,
-        out IReadOnlyDictionary<string, StaticValueKind> result)
+        GlobalProofContext context,
+        out GlobalProofContext result)
     {
-        result = symbols;
+        result = context;
 
         if (binary.Operator != "or")
             return false;
@@ -2404,9 +3069,9 @@ internal static class PreceptTypeChecker
         var left = StripParentheses(binary.Left);
         var right = StripParentheses(binary.Right);
 
-        if (TryDecomposeOrdered(left, right, symbols, out result))
+        if (TryDecomposeOrdered(left, right, context, out result))
             return true;
-        if (TryDecomposeOrdered(right, left, symbols, out result))
+        if (TryDecomposeOrdered(right, left, context, out result))
             return true;
 
         return false;
@@ -2414,8 +3079,8 @@ internal static class PreceptTypeChecker
         static bool TryDecomposeOrdered(
             PreceptExpression nullCandidate,
             PreceptExpression numericCandidate,
-            IReadOnlyDictionary<string, StaticValueKind> syms,
-            out IReadOnlyDictionary<string, StaticValueKind> res)
+            GlobalProofContext syms,
+            out GlobalProofContext res)
         {
             res = syms;
 
@@ -2443,7 +3108,7 @@ internal static class PreceptTypeChecker
             {
                 // Compound: Field == null or (Field >= 0 and Field < 100)
                 // Recurse into each 'and' operand to accumulate markers
-                var accumulated = new Dictionary<string, StaticValueKind>(syms, StringComparer.Ordinal);
+                GlobalProofContext accumulated = syms;
                 bool anyInjected = false;
 
                 foreach (var operand in new[] { andBinary.Left, andBinary.Right })
@@ -2455,7 +3120,7 @@ internal static class PreceptTypeChecker
                     var narrowed = ApplyNarrowing(operand, accumulated, assumeTrue: true);
                     if (!ReferenceEquals(narrowed, accumulated))
                     {
-                        accumulated = new Dictionary<string, StaticValueKind>(narrowed, StringComparer.Ordinal);
+                        accumulated = narrowed;
                         anyInjected = true;
                     }
                 }
@@ -2508,6 +3173,222 @@ internal static class PreceptTypeChecker
         _ => op // == and != are symmetric
     };
 
+    /// <summary>
+    /// Assesses divisor safety using the unified proof model.
+    /// Returns <c>null</c> when no diagnostic is needed (non-numeric or non-division context).
+    /// </summary>
+    private static ProofAssessment? AssessDivisorSafety(
+        PreceptExpression divisor, GlobalProofContext context)
+    {
+        var proofResult = context.IntervalOf(divisor);
+        var interval = proofResult.Interval;
+        var attribution = proofResult.Attribution;
+        var subject = DescribeExpression(divisor);
+
+        // Provably zero: contradiction → C92
+        if (interval is { Lower: 0, Upper: 0, LowerInclusive: true, UpperInclusive: true })
+            return new ProofAssessment(
+                ProofRequirement.NonzeroDivisor, ProofOutcome.Contradiction,
+                subject, interval, attribution);
+
+        // Provably nonzero via interval: satisfied → no diagnostic
+        if (interval.ExcludesZero)
+            return new ProofAssessment(
+                ProofRequirement.NonzeroDivisor, ProofOutcome.Satisfied,
+                subject, interval, attribution);
+
+        // Flag-based nonzero proof for identifiers: the Nonzero flag (from rule != 0,
+        // when != 0, etc.) cannot be expressed as a single contiguous interval, so
+        // check the flags dictionary directly for identifier expressions.
+        if (TryGetIdentifierKey(divisor, out var key) &&
+            context.Flags.TryGetValue(key, out var flags) &&
+            (flags & (NumericFlags.Nonzero | NumericFlags.Positive)) != 0)
+            return new ProofAssessment(
+                ProofRequirement.NonzeroDivisor, ProofOutcome.Satisfied,
+                subject, interval, attribution);
+
+        // Obligation: zero still possible or unknown → C93
+        return new ProofAssessment(
+            ProofRequirement.NonzeroDivisor, ProofOutcome.Obligation,
+            subject, interval, attribution);
+    }
+
+    /// <summary>
+    /// Assesses a guard expression for C97 (dead guard — always false) and
+    /// C98 (tautological guard — always true) using field constraint intervals.
+    /// Only handles simple single-field comparisons (e.g. <c>when X &lt; 0</c>).
+    /// </summary>
+    private static void AssessGuard(
+        PreceptExpression guard,
+        string guardText,
+        int sourceLine,
+        IReadOnlyDictionary<string, NumericInterval> fieldIntervals,
+        List<PreceptValidationDiagnostic> diagnostics,
+        string? stateContext)
+    {
+        if (!TryExtractSingleFieldComparison(guard, out var fieldName, out var guardTrueInterval))
+            return;
+
+        if (!fieldIntervals.TryGetValue(fieldName, out var constraintIval) || constraintIval.IsUnknown)
+            return;
+
+        // C97: guard's "true" interval is disjoint from field constraints → always false
+        if (NumericInterval.AreDisjoint(guardTrueInterval, constraintIval))
+        {
+            var assessment = new ProofAssessment(
+                ProofRequirement.GuardSatisfiability, ProofOutcome.Contradiction,
+                fieldName, guardTrueInterval, ProofAttribution.None,
+                ConstraintInterval: constraintIval,
+                ConstraintDescription: guardText.Trim());
+            diagnostics.Add(new PreceptValidationDiagnostic(
+                DiagnosticCatalog.C97,
+                ProofDiagnosticRenderer.Render(assessment),
+                sourceLine,
+                Column: guard.Position?.StartColumn ?? 0,
+                EndColumn: guard.Position?.EndColumn ?? 0,
+                StateContext: stateContext,
+                Assessment: assessment));
+            return;
+        }
+
+        // C98: field constraints are entirely within the guard's "true" interval → always true
+        if (NumericInterval.Contains(guardTrueInterval, constraintIval))
+        {
+            var assessment = new ProofAssessment(
+                ProofRequirement.GuardTautology, ProofOutcome.Satisfied,
+                fieldName, guardTrueInterval, ProofAttribution.None,
+                ConstraintInterval: constraintIval,
+                ConstraintDescription: guardText.Trim());
+            diagnostics.Add(new PreceptValidationDiagnostic(
+                DiagnosticCatalog.C98,
+                ProofDiagnosticRenderer.Render(assessment),
+                sourceLine,
+                Column: guard.Position?.StartColumn ?? 0,
+                EndColumn: guard.Position?.EndColumn ?? 0,
+                StateContext: stateContext,
+                Assessment: assessment));
+        }
+    }
+
+    /// <summary>
+    /// Extracts a single field-vs-literal comparison from a rule expression (e.g. <c>X &lt; 5</c>)
+    /// and returns the field name plus the numeric interval the comparison implies for that field.
+    /// Returns <c>false</c> when the expression is not a simple <c>identifier op literal</c> form.
+    /// </summary>
+    private static bool TryExtractSingleFieldComparison(
+        PreceptExpression expr,
+        out string fieldName,
+        out NumericInterval ruleInterval)
+    {
+        fieldName = default!;
+        ruleInterval = default;
+
+        if (expr is not PreceptBinaryExpression bin) return false;
+
+        // One side must be identifier, other must be numeric literal
+        string? name = null;
+        double? value = null;
+        bool identifierOnLeft = false;
+
+        if (bin.Left is PreceptIdentifierExpression id && id.Member is null
+            && bin.Right is PreceptLiteralExpression lit && TryGetNumericValue(lit.Value, out var rv))
+        {
+            name = id.Name;
+            value = rv;
+            identifierOnLeft = true;
+        }
+        else if (bin.Right is PreceptIdentifierExpression id2 && id2.Member is null
+                 && bin.Left is PreceptLiteralExpression lit2 && TryGetNumericValue(lit2.Value, out var lv))
+        {
+            name = id2.Name;
+            value = lv;
+            identifierOnLeft = false;
+        }
+
+        static bool TryGetNumericValue(object? val, out double result)
+        {
+            switch (val)
+            {
+                case double d: result = d; return true;
+                case long l: result = l; return true;
+                case int i: result = i; return true;
+                default: result = 0; return false;
+            }
+        }
+
+        if (name is null || value is null) return false;
+
+        fieldName = name;
+
+        // Convert comparison to interval the field must satisfy.
+        // identifierOnLeft: "X op value" → interval for X
+        // !identifierOnLeft: "value op X" → flip the operator for X
+        var op = bin.Operator;
+        if (!identifierOnLeft)
+        {
+            op = FlipComparisonOperator(op);
+        }
+
+        ruleInterval = op switch
+        {
+            "<" => new NumericInterval(double.NegativeInfinity, false, value.Value, false),
+            "<=" => new NumericInterval(double.NegativeInfinity, false, value.Value, true),
+            ">" => new NumericInterval(value.Value, false, double.PositiveInfinity, false),
+            ">=" => new NumericInterval(value.Value, true, double.PositiveInfinity, false),
+            "==" => new NumericInterval(value.Value, true, value.Value, true),
+            "!=" => NumericInterval.Unknown, // Can't express "not equal" as single interval
+            _ => NumericInterval.Unknown,
+        };
+
+        return !ruleInterval.IsUnknown;
+    }
+
+    /// <summary>
+    /// Returns a human-readable description of an expression for use in diagnostic messages.
+    /// </summary>
+    private static string DescribeExpression(PreceptExpression expr) => expr switch
+    {
+        PreceptLiteralExpression lit => lit.Value?.ToString() ?? "null",
+        PreceptIdentifierExpression id when id.Member is null => id.Name,
+        PreceptIdentifierExpression id => $"{id.Name}.{id.Member}",
+        _ => "expression",
+    };
+
+    /// <summary>
+    /// Assesses whether a sqrt() argument is provably non-negative using the unified proof model.
+    /// Returns <c>null</c> when no diagnostic is needed (argument is provably non-negative).
+    /// </summary>
+    private static ProofAssessment? AssessNonnegativeArgument(
+        PreceptExpression arg, GlobalProofContext context)
+    {
+        var subject = DescribeExpression(arg);
+
+        // Check literals directly.
+        if (arg is PreceptLiteralExpression { Value: long lval } && lval >= 0)
+            return null;
+        if (arg is PreceptLiteralExpression { Value: double dval } && dval >= 0)
+            return null;
+        if (arg is PreceptLiteralExpression { Value: decimal mval } && mval >= 0)
+            return null;
+
+        if (context.KnowsNonnegative(arg))
+            return null;
+
+        var proofResult = context.IntervalOf(arg);
+        var interval = proofResult.Interval;
+
+        // Provably negative: contradiction
+        if (interval is { Upper: < 0 })
+            return new ProofAssessment(
+                ProofRequirement.NonnegativeArgument, ProofOutcome.Contradiction,
+                subject, interval, proofResult.Attribution);
+
+        // Obligation: may be negative
+        return new ProofAssessment(
+            ProofRequirement.NonnegativeArgument, ProofOutcome.Obligation,
+            subject, interval, proofResult.Attribution);
+    }
+
     private static bool TryGetNumericLiteral(PreceptExpression expr, out double value)
     {
         var stripped = StripParentheses(expr);
@@ -2527,7 +3408,7 @@ internal static class PreceptTypeChecker
 
     private static void ValidateCollectionMutations(
         IReadOnlyList<PreceptCollectionMutation>? mutations,
-        IReadOnlyDictionary<string, StaticValueKind> symbols,
+        GlobalProofContext context,
         IReadOnlyDictionary<string, StaticValueKind> dataFieldKinds,
         IReadOnlyDictionary<string, PreceptCollectionField> collectionFieldMap,
         List<PreceptValidationDiagnostic> diagnostics,
@@ -2560,7 +3441,7 @@ internal static class PreceptTypeChecker
                         mutation.Expression,
                         mutation.ExpressionText,
                         line,
-                        symbols,
+                        context,
                         innerKind,
                         $"'{mutation.Verb.ToString().ToLowerInvariant()} {mutation.TargetField}' value",
                         diagnostics,
@@ -2581,6 +3462,8 @@ internal static class PreceptTypeChecker
                                 ("values", string.Join(", ", collectionField.ChoiceValues.Select(v => $"\"{v}\""))),
                                 ("name", mutation.TargetField)),
                             line,
+                            Column: mutation.Expression.Position?.StartColumn ?? 0,
+                            EndColumn: mutation.Expression.Position?.EndColumn ?? 0,
                             StateContext: stateContext));
                     }
                     break;
@@ -2593,11 +3476,13 @@ internal static class PreceptTypeChecker
                     if (IsAssignable(innerKind, intoKind))
                         break;
 
-                    diagnostics.Add(new PreceptValidationDiagnostic(
+                    diagnostics.Add(PreceptValidationDiagnosticFactory.FromColumns(
                         DiagnosticCatalog.C43,
                         $"'{mutation.Verb.ToString().ToLowerInvariant()} {mutation.TargetField} into {mutation.IntoField}': cannot assign {FormatKinds(innerKind)} to target '{mutation.IntoField}' of type {FormatKinds(intoKind)}.",
                         line,
-                        StateContext: stateContext));
+                        mutation.IntoFieldStartColumn,
+                        mutation.IntoFieldEndColumn,
+                        stateContext));
                     break;
             }
         }

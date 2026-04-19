@@ -1,0 +1,27 @@
+precept TransitiveOrdering
+
+# Demonstrates transitive chain proofs via the proof engine's RelationalGraph.
+# Two relational rules together prove a third relationship transitively.
+#
+# Given:
+#   rule High > Mid
+#   rule Mid > Low
+#
+# The engine performs a bounded BFS over the relational graph and derives
+# High > Low. This proves High - Low is strictly positive, satisfying the
+# 'positive' constraint on the computed field Spread.
+#
+# Gap 4 closure: transitive closure was added in feature/issue-106-divisor-safety.
+# See docs/ProofEngineDesign.md § Gap Closure for details.
+
+field High as number default 100 positive
+field Mid as number default 50 positive
+field Low as number default 10 positive
+
+rule High > Mid because "High must exceed Mid"
+rule Mid > Low because "Mid must exceed Low"
+
+# Spread is provably positive: the proof engine derives High > Low transitively.
+field Spread as number -> High - Low positive
+
+edit High, Mid, Low

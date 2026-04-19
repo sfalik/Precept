@@ -6,6 +6,24 @@
 
 ---
 
+### 2026-04-18T15:00:00Z: Proof engine full-team design review ceremony — 7 reviewer findings captured
+**By:** Frank, George, Soup Nazi, Elaine, Kramer, Newman, Steinbrenner
+**Status:** Captured — detailed review files retained in `.squad/decisions/inbox/` pending Shane review
+
+| Reviewer | Verdict | Summary |
+|---|---|---|
+| Frank | **APPROVED w/ blockers** | Architecture is correct for Precept's guarantee surface, but merge is blocked on else-branch negated guard narrowing and a defined hover-proof attribution mechanism. |
+| George | **CHANGES_NEEDED** | Design doc status and implementation are out of sync: typed stores, scope split, proof assessment, `Dump()`, truth-based divisor routing, and C94-C98 remain incomplete. |
+| Soup Nazi | **CHANGES_NEEDED** | Proof-test inventory is large but incomplete at the guarantee boundary: no C94-C98 regression suite, no truth-based C92/C93 lock, and no hard-cap or proof-surface coverage. |
+| Elaine | **CHANGES_NEEDED** | Proof UX needs a complete natural-language interval map, natural-language diagnostics, evidence-format rules, and explicit hover behavior for expressions and multi-source attribution. |
+| Kramer | **CHANGES_NEEDED** | Tooling already publishes diagnostics, but proof metadata is not yet structured enough for reliable hover and code-action integration. |
+| Newman | **CHANGES_NEEDED** | MCP proof exposure needs an explicit `precept_compile.proof` schema, diagnostic linkage, and documented proof-family semantics in MCP docs. |
+| Steinbrenner | **CHANGES_NEEDED** | Delivery plan still needs a cross-surface completion bar, performance acceptance targets, remediation expectations, and one mandatory canonical sample. |
+
+**Ceremony note:** The team converged on a consistent read: the proof engine direction is strong and strategically aligned, but PR #108 cannot claim completion until Phase 2 closes the remaining implementation, tooling, MCP, UX, performance, and test obligations. All seven detailed reviews were merged into the canonical decision record as this ceremony summary and intentionally left in `.squad/decisions/inbox/` for Shane's direct review.
+
+---
+
 ### 2026-04-11T17:00:00Z: Shane — Verdict modifier research decisions (5 owner answers)
 **By:** Shane (owner)
 **Status:** Captured — team collaboration completed

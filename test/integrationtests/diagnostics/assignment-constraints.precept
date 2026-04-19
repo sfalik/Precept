@@ -1,0 +1,27 @@
+# Demonstrates: C94 — assignment expressions provably outside the target field range
+
+# These rows lock both C94 message shapes used here.
+# The final row is intentionally safe because its interval partially overlaps [0, 100].
+
+precept AssignmentConstraintsDemo
+
+field Score as number default 50 min 0 max 100
+field Boost as number default 200 min 200 max 500
+
+state Review initial
+state Applied
+
+event AddBoost
+event ApplyDrop
+event SafeAdjust
+
+# C94: Score + Boost always lands above the field's maximum.
+# EXPECT: C94 | severity=error | match=exact | message=Assignment to 'Score' is provably outside the field's constraint range. Expression produces 200 to 600 (inclusive), but field requires 0 to 100 (inclusive). | line=20 | start=39 | end=52
+from Review on AddBoost -> set Score = Score + Boost -> transition Applied
+
+# C94: Score - Boost always lands below the field's minimum.
+# EXPECT: C94 | severity=error | match=exact | message=Assignment to 'Score' is provably outside the field's constraint range. Expression produces -500 to -100 (inclusive), but field requires 0 to 100 (inclusive). | line=24 | start=40 | end=53
+from Review on ApplyDrop -> set Score = Score - Boost -> transition Applied
+
+# SAFE: Score - 60 produces [-10, 40], which partially overlaps [0, 100], so no C94 fires.
+from Review on SafeAdjust -> set Score = Score - 60 -> transition Applied

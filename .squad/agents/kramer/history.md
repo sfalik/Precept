@@ -72,6 +72,8 @@
 - Public tooling docs should improve usability without claiming behavior the extension or servers do not yet support.
 - C93 code actions: extracting structured info (divisor name, field vs event-arg) from diagnostic messages via regex is reliable when the message format is stable. The `Divisor '{name}'` pattern carries enough to distinguish field refs from dotted event-arg refs and drive all three fix variants.
 - For `when` guard insertion, splitting the transition row at the first `->` and checking for ` when ` in the prefix is the simplest reliable approach — no need to re-parse the row.
+- Tooling trust collapses faster from false-positive-heavy proof diagnostics than from selective under-approximation; if Principle #8 tightens, proof-gap diagnostics need distinct wording and actionable fixes instead of generic red squiggles.
+- Proof diagnostics already have a working Problems-panel publication path through `PreceptAnalyzer` and `PreceptTextDocumentSyncHandler`; the real tooling risk is missing structured proof metadata, because hover and quick fixes both become brittle as soon as diagnostic prose shifts to truth-based/natural-language rendering.
 
 ## Recent Updates
 
@@ -88,3 +90,8 @@
 
 ### 2026-04-11 — `when` guard completions + grammar verification
 - Confirmed grammar support and added context-aware completions for declaration guards and guarded edit forms.
+
+### 2026-04-19 — Diagnostic range mapping depends on upstream span fidelity
+- When editor ranges look wrong, first inspect the upstream diagnostic payload; a language-server mapping bug and a coarse source span can present the same symptom.
+- Honor `EndColumn` when it is present and reserve full-line fallback for diagnostics that are genuinely line-scoped, otherwise tooling precision regresses silently.
+- Focused LS span tests should pin both the precise-range path and the line-level fallback path so later runtime precision work does not get flattened in the editor.

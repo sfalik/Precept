@@ -700,12 +700,12 @@ public static class DiagnosticCatalog
     // Compile-phase constraints: divisor safety (C92–C93)
     // ═══════════════════════════════════════════════════════════════
 
-    /// <summary>Division by zero: the divisor is literal 0.</summary>
+    /// <summary>Division by zero: the divisor is provably zero.</summary>
     // SYNC:CONSTRAINT:C92
     public static readonly LanguageConstraint C92 = Register(
         "C92", "compile",
-        "Division by zero: the divisor is literal 0.",
-        "Division by zero: the divisor is literal 0.");
+        "Division by zero: the divisor is provably zero.",
+        "Division by zero: the divisor is provably zero.");
 
     /// <summary>Divisor has no compile-time nonzero proof.</summary>
     // SYNC:CONSTRAINT:C93
@@ -713,4 +713,42 @@ public static class DiagnosticCatalog
         "C93", "compile",
         "Divisor has no compile-time nonzero proof.",
         "{message}");
+
+    /// <summary>Assignment expression is provably outside the target field's constraint range.</summary>
+    // SYNC:CONSTRAINT:C94
+    public static readonly LanguageConstraint C94 = Register(
+        "C94", "compile",
+        "Assignment expression is provably outside the target field's constraint range.",
+        "{message}");
+
+    /// <summary>Rules are contradictory — no value can satisfy both simultaneously.</summary>
+    // SYNC:CONSTRAINT:C95
+    public static readonly LanguageConstraint C95 = Register(
+        "C95", "compile",
+        "Rules are contradictory — no value can satisfy both simultaneously.",
+        "{message}");
+
+    /// <summary>Rule is vacuous — provably always true given field constraints.</summary>
+    // SYNC:CONSTRAINT:C96
+    public static readonly LanguageConstraint C96 = Register(
+        "C96", "compile",
+        "Rule is vacuous — provably always true given field constraints.",
+        "{message}",
+        ConstraintSeverity.Warning);
+
+    /// <summary>Guard is dead — provably always false; this row/block can never execute.</summary>
+    // SYNC:CONSTRAINT:C97
+    public static readonly LanguageConstraint C97 = Register(
+        "C97", "compile",
+        "Guard is dead — provably always false; this row/block can never execute.",
+        "{message}",
+        ConstraintSeverity.Warning);
+
+    /// <summary>Guard is tautological — provably always true; the 'when' clause has no effect.</summary>
+    // SYNC:CONSTRAINT:C98
+    public static readonly LanguageConstraint C98 = Register(
+        "C98", "compile",
+        "Guard is tautological — provably always true; the 'when' clause has no effect.",
+        "{message}",
+        ConstraintSeverity.Warning);
 }
