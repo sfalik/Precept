@@ -4,10 +4,24 @@ External research on architectural patterns, evaluated against Precept's current
 
 ## Files
 
+### Type Checker Architecture (original survey)
+
 | File | Author | Angle |
 |------|--------|-------|
 | [typechecker-architecture-survey-frank.md](typechecker-architecture-survey-frank.md) | Frank (Lead/Architect) | Architectural patterns in 6 production type checkers (Roslyn, TypeScript, Rust, Swift, Kotlin K2, F#) |
 | [typechecker-implementation-patterns-george.md](typechecker-implementation-patterns-george.md) | George (Runtime Dev) | .NET implementation patterns at file/class/method level (Roslyn, F#, NRules, DynamicExpresso) |
+
+### Architecture Foundation Research (2026-04-19)
+
+| File | Author | Priority | Angle |
+|------|--------|----------|-------|
+| [compile-time-gate-pattern.md](compile-time-gate-pattern.md) | Frank | 🔴 High | Smart constructor / opaque validated type — formal grounding for "prevention, not detection" |
+| [proof-engine-abstract-interpretation.md](proof-engine-abstract-interpretation.md) | Frank | 🔴 High | Precept's proof engine vs. abstract interpretation theory (Cousot, Miné octagon domain, ASTRÉE) |
+| [atomic-working-copy-pattern.md](atomic-working-copy-pattern.md) | George | 🔴 High | Constraint-gated functional update — working-copy pattern vs. Redux, Datomic, DDD aggregates, MVCC |
+| [first-match-routing-state-machine-theory.md](first-match-routing-state-machine-theory.md) | Frank | 🟡 Medium | First-match guard routing vs. Harel Statecharts, SCXML DocumentOrder, XState |
+| [outcome-taxonomy-result-types.md](outcome-taxonomy-result-types.md) | George | 🟡 Medium | 8-outcome taxonomy completeness — Railway-Oriented Programming, Rust Result<T,E>, typed error models |
+| [incremental-compilation-patterns.md](incremental-compilation-patterns.md) | George | 🔵 Low | salsa, Kotlin K2 FIR, Roslyn red/green tree — when Precept needs incremental compilation |
+| [single-pass-type-checking.md](single-pass-type-checking.md) | Frank | 🔵 Low | Formal conditions for single-pass soundness — bidirectional typing, Dunfield-Krishnaswami survey |
 
 ## Synthesis
 
