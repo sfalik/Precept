@@ -49,7 +49,7 @@ flowchart TD
 
     src --> CT
     CT -->|PreceptEngine| RT
-    EVAL --> OUT
+    RT --> OUT
 ```
 
 > **Diagram note:** The bidirectional arrow between Type Checker and Proof Engine is not symmetric — the type checker queries the proof engine for interval facts; the proof engine returns narrowing facts. See [Compile-Time Phase](#compile-time-phase) and Principle 3 for detail. `CreateInstance` calls the evaluator only for computed field initialization, not for constraint evaluation. The diagram is an overview; see [EngineDesign.md](EngineDesign.md) for the full operation-level execution model.
