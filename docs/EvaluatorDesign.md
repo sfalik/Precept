@@ -48,7 +48,7 @@ The evaluator supports the following expression forms:
 | **Logical** | `and`, `or` (short-circuit), `not` (unary) |
 | **Conditional** | `if Condition then ThenBranch else ElseBranch` |
 | **Contains** | `Collection contains Expr` — collection membership test |
-| **Function call** | `abs`, `floor`, `ceil`, `round`, `truncate`, `min`, `max`, `clamp`, `pow`, `sqrt`, `toLower`, `toUpper`, `trim`, `startsWith`, `endsWith`, `left`, `right`, `mid` |
+| **Function call** | `abs`, `floor`, `ceil`, `round`, `truncate`, `min`, `max`, `clamp`, `pow`, `sqrt`, `approximate`, `toLower`, `toUpper`, `trim`, `startsWith`, `endsWith`, `left`, `right`, `mid` |
 | **Accessor** | `.count`, `.length`, `.min`, `.max`, `.peek` |
 
 These guarantees are not independent — they form a dependency chain. Expression isolation enables inspectability. Totality enables prevention (a guard that fails to evaluate can't gate anything). Determinism enables inspectability (Inspect is trustworthy only if the preview matches the actual fire). Semantic fidelity enables type contracts (lane boundaries are meaningless if values silently cross them). Together, they realize the philosophy's promise: the engine is deterministic, nothing is hidden, and invalid configurations cannot exist.
@@ -85,7 +85,16 @@ These principles govern the evaluator's three numeric type families: integer (`l
 
 9. **Approximation is explicit, not hidden.** The `number` lane exists for inherently approximate operations: `sqrt`, `pow` with non-integer exponents (future), and any domain where IEEE 754 double precision is the correct model. Values in the `number` lane are honestly approximate. The contract does not pretend they are exact. *(Philosophy: "If approximation is part of the domain, the contract must say so plainly.")*
 
-10. **Lane boundaries are type boundaries.** Moving a value from one numeric lane to another is a type-system event, not a silent coercion. Integer→decimal widening is exact and implicit. Integer→number widening is implicit (range-preserving, though precision may narrow for very large integers). Number→decimal is a **type error** unless the author explicitly bridges via `round(value, places)`, `floor(value)`, `ceil(value)`, or `truncate(value)`. Decimal→number widening is implicit (the value may lose precision — this is the author's explicit choice by using a number-typed context). *(Philosophy: "that line [between exact and approximate] must be visible in the type system and public surface.")*
+10. **Lane boundaries are type boundaries.** Moving a value from one numeric lane to another is a type-system event, not a silent coercion. Integer→decimal widening is exact and implicit. Integer→number widening is implicit (range-preserving, though precision may narrow for very large integers). Number→decimal is a **type error** unless the author explicitly bridges via `round(value, places)`, `floor(value)`, `ceil(value)`, or `truncate(value)`. Decimal→number crossing is **context-dependent** — the mechanism varies by expression position:
+
+    | Context | Decimal → Number | Mechanism |
+    |---------|-----------------|----------|
+    | Function argument | Requires `approximate()` | Explicit bridge |
+    | Arithmetic operator | Type error | Type checker blocks |
+    | Comparison operator | Implicit (already allowed) | Result is `boolean`, no lane contamination |
+    | Assignment to number field | Requires `approximate()` | Explicit bridge |
+
+    The key insight: comparisons produce `boolean`, not a stored numeric value, so implicit decimal→number widening in comparisons does not contaminate either lane. Arithmetic and assignment produce stored numeric values, so the author must explicitly acknowledge the precision loss via `approximate()`. *(Philosophy: "that line [between exact and approximate] must be visible in the type system and public surface.")* *(Refined in DD15, issue #115.)*
 
 11. **Prevention at the surface, not detection at depth.** The type checker rejects expressions that would silently cross lane boundaries. A `decimal` field cannot be assigned a `number` expression without explicit conversion. This prevents precision loss by construction — the invalid assignment is never evaluated. *(Philosophy: prevention, not detection.)*
 
@@ -95,9 +104,11 @@ These principles govern the evaluator's three numeric type families: integer (`l
 
 14. **Inspectability through honest types.** When the MCP `precept_inspect` or `precept_fire` tools serialize instance data, the serialized value preserves lane identity. A `decimal` field serializes as a JSON number with its exact decimal representation. An `integer` field serializes as a JSON integer. A `number` field serializes as a JSON number (IEEE 754). The consumer can distinguish lanes from the serialized output. *(Philosophy: full inspectability, nothing hidden.)*
 
-15. **One explicit bridge, not many hidden ones.** `round(number, places) → decimal` is the sole deliberate bridge from the approximate `number` lane into the exact `decimal` lane. This bridge does not "recover" exactness from the source value — it produces a `decimal` value normalized to authored precision. No other implicit or hidden `number → decimal` paths exist. *(Locked design note, issue #115.)*
+15. **Two explicit bridges, not many hidden ones.** `round(number, places) → decimal` is the deliberate bridge from the approximate `number` lane into the exact `decimal` lane. `approximate(decimal) → number` is the deliberate bridge from the exact `decimal` lane into the approximate `number` lane. These bridges are symmetric in intent — `round` says "normalize this to N places," `approximate` says "approximate this value." No other implicit or hidden cross-lane paths exist for arithmetic or assignment contexts. *(Locked design note, issue #115. Updated by DD11.)*
 
 16. **Tests assert the contract, not the leak.** Test expectations must match the semantic contract: decimal-lane tests assert `decimal`-typed results, integer-shaped surface tests assert `long` results, and `number`-lane tests assert `double` results. Tests that normalize via `Convert.ToDouble()` and approximate comparisons are themselves part of the semantic drift surface and must be updated alongside the evaluator. *(Locked design note, issue #115.)*
+
+17. **Function lane integrity rule.** A function keeps its decimal overload if and only if the mathematical operation is closed over finite decimals — meaning: decimal input always produces a result exactly representable as a finite decimal. All current functions except `sqrt` satisfy this. `sqrt` is inherently approximate — `sqrt(x)` is irrational for most inputs — so `sqrt` lives exclusively in the number lane. Future functions (`log`, `sin`, `cos`, `exp`, non-integer `pow`) are inherently approximate and would likewise live exclusively in the number lane. The author reaches them via `approximate()`. *(Locked design note, DD16, issue #115.)*
 
 ---
 
@@ -153,6 +164,14 @@ The expression evaluator exists and is functionally correct for most expression 
 
 `DecimalPow(0m, -1)` ([PreceptExpressionEvaluator.cs](../src/Precept/Dsl/PreceptExpressionEvaluator.cs#L580)) computes `1m / DecimalPow(0m, 1)` which triggers `DivideByZeroException`. Unlike every other division path in the evaluator (which guards against zero divisors and returns `EvaluationResult.Fail`), this path throws an unhandled exception. This violates the totality guarantee (Principle 4) — the evaluator must return a definite error, not crash.
 
+### Critical Finding 13: `DecimalPow` throws on large-exponent overflow
+
+`DecimalPow(10m, 29)` and similar large-exponent cases throw an unhandled `OverflowException` when the result exceeds `decimal.MaxValue`. Like Critical Finding 12, this is a totality violation (Principle 4) — the evaluator must catch the overflow and return `EvaluationResult.Fail` with a descriptive error, not propagate the exception. *(Identified in DD14.)*
+
+### Critical Finding 14: `min`/`max` decimal comparison routes through `double`
+
+`ReduceComparable()` ([PreceptExpressionEvaluator.cs](../src/Precept/Dsl/PreceptExpressionEvaluator.cs#L500)) uses `TryToNumber` (which returns `double`) for all comparisons in `min`/`max`, even when all arguments are `decimal`. Two `decimal` values `0.1m` and `0.2m` are compared as `double`, producing correct results in most cases but violating the lane-preservation contract and risking edge-case divergence for values near `decimal`'s precision limits. The fix is a decimal fast-path using native `decimal.CompareTo`, mirroring the existing `long` fast-path. *(Identified in DD13.)*
+
 ### Root Cause
 
 These are not independent bugs. They share a single root cause: the evaluator was originally built with `double` as the universal numeric representation, before the three-type numeric system (`integer`/`decimal`/`number`) was fully specified. The `long` integer lane was added later (issue #29) with correct fast paths for homogeneous integer operations, but the `decimal` lane was scaffolded (issue #27) without corresponding evaluator, collection, or runtime support. The result is a system that declares three numeric lanes in the type system but collapses to two (`long` and `double`) at evaluation time.
@@ -200,11 +219,11 @@ Binary arithmetic operators dispatch by matching both operands' runtime types, f
 3. **Both `double`** → number arithmetic (`double` result)
 4. **Mixed integer + decimal** → widen integer to `decimal`, decimal arithmetic (`decimal` result)
 5. **Mixed integer + number** → widen integer to `double`, number arithmetic (`double` result)
-6. **Mixed decimal + number** → widen decimal to `double`, number arithmetic (`double` result)
+6. **Mixed decimal + number** → **type error for arithmetic** (the type checker blocks `decimal + number`, `decimal * number`, etc.). For **comparison operators** (`==`, `!=`, `<`, `<=`, `>`, `>=`), the decimal operand is widened to `double` and compared in the number lane — this is permitted because comparisons produce `boolean`, not a stored numeric value, so no lane contamination occurs. The author must use `approximate()` to explicitly cross into the number lane for arithmetic or assignment.
 
-Cases 1–5 mirror the C# language specification's binary numeric promotion rules (§12.4.7.3), which **forbid** mixing `decimal` with `float`/`double` in arithmetic — it is a binding-time error. Case 6 is permitted at the evaluator level only for comparison expressions that the type checker explicitly allows; arithmetic mixing of decimal and number remains a type error.
+Cases 1–5 mirror the C# language specification's binary numeric promotion rules (§12.4.7.3), which **forbid** mixing `decimal` with `float`/`double` in arithmetic — it is a binding-time error. Case 6 follows the same prohibition for arithmetic but permits comparisons, which produce `boolean` and do not store a numeric value in either lane. *(Aligned with DD12 and DD15.)*
 
-The type checker prevents case 6 in most contexts (assigning a `number` expression to a `decimal` field is a type error), but the evaluator must handle it correctly for expressions that the type checker permits (e.g., a `number`-typed function result used in a comparison with a `decimal` value).
+The type checker enforces the arithmetic prohibition. The evaluator handles the comparison case correctly when the type checker permits it (e.g., a `number`-typed function result compared with a `decimal` value).
 
 **Division special case:** Integer division (`long / long`) produces truncated-toward-zero `long` results (C# semantics). This is the expected behavior for integer arithmetic. Authors who need exact fractional results from integer operands should declare their field as `decimal`.
 
@@ -227,9 +246,16 @@ round(any, int places) → decimal (2-arg: Math.Round to N places → decimal)
 min(long, long, ...)       → long     (comparison via long)
 min(decimal, decimal, ...) → decimal  (comparison via decimal)
 min(double, double, ...)   → double   (comparison via double)
+
+approximate(decimal) → double  (explicit bridge: decimal → number)
+sqrt(double)         → double  (Math.Sqrt — number lane only)
 ```
 
-The `round(number, places) → decimal` overload is the **explicit normalization bridge** from the approximate `number` lane into the exact `decimal` lane. This is by design — it is the sole sanctioned crossing point from approximate to exact.
+Two explicit bridges connect the lanes:
+- `round(number, places) → decimal` is the **explicit normalization bridge** from the approximate `number` lane into the exact `decimal` lane.
+- `approximate(decimal) → number` is the **explicit approximation bridge** from the exact `decimal` lane into the approximate `number` lane.
+
+These are symmetric in intent: `round` says "normalize this to N places," `approximate` says "approximate this value." Author pattern: `set adjusted = round(pow(approximate(Price), Rate), 2)`.
 
 ### Collection Semantics
 
@@ -272,7 +298,7 @@ Values entering the runtime from external sources (JSON, C# API callers) are coe
 | Source type | Target `integer` | Target `decimal` | Target `number` |
 |-------------|------------------|-------------------|-----------------|
 | `long` / `int` / `short` / `byte` | `long` (exact) | `decimal` (exact widening) | `double` (range-preserving) |
-| `decimal` | Type error | `decimal` (identity) | `double` (lossy — explicit choice) |
+| `decimal` | Type error | `decimal` (identity) | Type error (requires `approximate()` per DD12/DD15) |
 | `double` / `float` | Type error | Type error | `double` (identity) |
 | JSON integer | `long` | `decimal` | `double` |
 | JSON fractional | Type error | `decimal` (via `JsonElement.GetDecimal()`) | `double` (via `JsonElement.GetDouble()`) |
@@ -329,12 +355,11 @@ This section defines the core numeric lane contracts. These are the evaluator's 
 - `max(decimal, decimal, ...)` → `decimal`
 - `clamp(decimal, decimal, decimal)` → `decimal`
 - `pow(decimal, long)` → `decimal`
-- `sqrt(decimal)` → `decimal` (note: internally uses `(decimal)Math.Sqrt((double)d)` — inherently approximate but returns to decimal lane; see § Helper/Function Type Contracts for the precision note)
 - Homogeneous decimal arithmetic (`decimal op decimal` → `decimal`)
 - Mixed integer+decimal arithmetic (`long op decimal` → `decimal`)
 
 **Widening rules:**
-- Decimal → number: implicit (`(double)decimalValue`). **Lossy** — the value may lose precision. This widening is permitted because the author has explicitly placed the value in a `number` context, accepting the precision trade.
+- Decimal → number: **context-dependent** (see Principle 10). Implicit for comparisons (result is `boolean`, no lane contamination). Requires `approximate()` for arithmetic operands or assignment to number fields. The type checker enforces this.
 - Decimal → integer: type error. Use `floor()`, `ceil()`, `truncate()`, or `round()`.
 
 **Closure guarantee:** Homogeneous decimal expressions — where all operands are `decimal` — remain in the decimal lane through every intermediate step. No intermediate value is ever computed as `double`. This is the core semantic fidelity guarantee for business arithmetic.
@@ -350,6 +375,7 @@ This section defines the core numeric lane contracts. These are the evaluator's 
 - Number-declared fields (`field Score as number`)
 - Number-typed event arguments
 - `sqrt(number)` → `number` (natively approximate — `Math.Sqrt`)
+- `approximate(decimal)` → `number` (explicit bridge from exact to approximate lane)
 - `abs(double)` → `double`
 - `min(double, double, ...)` → `double`
 - `max(double, double, ...)` → `double`
@@ -357,7 +383,6 @@ This section defines the core numeric lane contracts. These are the evaluator's 
 - `pow(double, long)` → `double`
 - Homogeneous number arithmetic (`double op double` → `double`)
 - Mixed integer+number arithmetic (`long op double` → `double`)
-- Mixed decimal+number arithmetic (`decimal op double` → `double`)
 
 **Narrowing rules:**
 - Number → decimal: **type error.** The author must use `round(value, places)` to explicitly bridge.
@@ -369,7 +394,7 @@ This section defines the core numeric lane contracts. These are the evaluator's 
 |-----------|----------|-----------|-----------|
 | Integer → Decimal | Yes (implicit) | `(decimal)longValue` | Exact |
 | Integer → Number | Yes (implicit) | `(double)longValue` | Range-preserving (±2⁵³ limit) |
-| Decimal → Number | Yes (implicit) | `(double)decimalValue` | Lossy — author's explicit choice |
+| Decimal → Number | **Context-dependent** | Comparisons: implicit (result is `boolean`). Arithmetic/assignment: requires `approximate()` | Lossy — explicit bridge required for non-comparison contexts |
 | Decimal → Integer | **No** | Requires `floor`/`ceil`/`truncate`/`round` | N/A |
 | Number → Decimal | **No** | Requires `round(value, places)` | Normalized to authored precision |
 | Number → Integer | **No** | Requires `floor`/`ceil`/`truncate`/`round` | N/A |
@@ -385,7 +410,7 @@ For the relational comparison and equality operators (`==`, `!=`, `>`, `>=`, `<`
 | `double` vs `double` | Number (`double` comparison) | IEEE 754 |
 | `long` vs `decimal` | Decimal (widen integer) | Exact |
 | `long` vs `double` | Number (widen integer) | Approximate |
-| `decimal` vs `double` | Number (widen decimal) | Approximate — the `decimal` operand is the author's explicit choice to compare in the number lane |
+| `decimal` vs `double` | Number (widen decimal) | Approximate — comparisons are the one context where implicit decimal→number widening is permitted (DD15), because the result is `boolean` with no lane contamination |
 
 **Design Decision (Option A — decimal scalar operand, not number):** When a decimal field is multiplied by a literal or compared to a literal, the literal resolves as `decimal` (not `number`). The expression `Price * 1.08` with `field Price as decimal` evaluates as `decimal * decimal → decimal`. The literal `1.08` is not parsed as `double` — it is resolved as `decimal` by context-sensitive literal typing (see § Context-Sensitive Literal Typing).
 
@@ -449,8 +474,8 @@ Every built-in function has explicit lane contracts. The following table documen
 | `pow(integer, integer)` | `long, long` | `long` | Stays integer | None (correct today) |
 | `pow(decimal, integer)` | `decimal, long` | `decimal` | Stays decimal | None (correct today) |
 | `pow(number, integer)` | `double, long` | `double` | Stays number | None (correct today) |
-| `sqrt(decimal)` | `decimal` | `decimal` | Returns to decimal | **Precision note**: internally computes `(decimal)Math.Sqrt((double)d)` — the result is approximate, returned as `decimal`. This is a known precision limitation documented in the contract. |
 | `sqrt(number)` | `double` | `double` | Stays number | None (correct today) |
+| `approximate(decimal)` | `decimal` | `double` | **Explicit bridge**: decimal→number | New function (DD11) |
 
 ### String Functions
 
@@ -720,7 +745,7 @@ All three write paths — **Fire** (transition row `set` assignments), **Update*
    a. If value type matches target field type → proceed
    b. If value is long and target is decimal → widen to decimal (exact)
    c. If value is long and target is number → widen to double
-   d. If value is decimal and target is number → widen to double (lossy, author's choice)
+   d. If value is decimal and target is number → type error (author must use `approximate()` to bridge explicitly, per DD12/DD15)
    e. Otherwise → type error (reject the operation)
 3. Constraint enforcement (on the lane-native value):
    a. nonnegative: value >= 0 (compared in target's lane)
@@ -822,7 +847,7 @@ Computed fields (`field Net as decimal = Gross - Tax`) are recomputed after ever
 
 ### DD5: `round(number, places) → decimal` as Explicit Bridge
 
-**Decision:** `round(number, places)` is the sole sanctioned bridge from the approximate `number` lane to the exact `decimal` lane. No implicit `number → decimal` coercion paths exist.
+**Decision:** `round(number, places)` is the sole sanctioned bridge from the approximate `number` lane to the exact `decimal` lane. The symmetric bridge in the other direction is `approximate(decimal) → number` (see DD11). No implicit coercion paths exist for arithmetic or assignment contexts.
 
 **Rationale:** Rounding is a deliberate normalization — the author declares "I accept the approximate value and want to fix it to N decimal places." This is philosophically distinct from implicit coercion, which hides the precision loss. The bridge does not "recover" exactness — it produces a `decimal` value normalized to authored precision. The distinction must be clear in the contract.
 
@@ -852,11 +877,15 @@ Computed fields (`field Net as decimal = Gross - Tax`) are recomputed after ever
 
 **Tradeoff accepted:** Proof intervals for `decimal` fields may be slightly wider than the true range due to `decimal → double` conversion. This is a rare false negative, not a correctness issue.
 
-### DD8: `sqrt(decimal) → decimal` Retains Approximate Internals
+### DD8: `sqrt(decimal) → decimal` Retains Approximate Internals *(Superseded by DD10)*
 
-**Decision:** `sqrt(decimal)` is computed as `(decimal)Math.Sqrt((double)d)`. The result is returned as `decimal` to stay in the decimal lane, but the computation is inherently approximate due to the `double` intermediary.
+**Status: Superseded.** DD10 removes the `sqrt(decimal) → decimal` overload entirely. The rationale below is retained for historical context — it documents the intermediate position that DD10 replaces.
 
-**Rationale:** C# does not have a native `decimal` square root function. `Math.Sqrt` operates on `double`. The result is cast back to `decimal`, but precision loss from the `double` intermediary is inherent. This is documented in the function contract — the user knows that `sqrt` on a `decimal` is approximate.
+**Original decision:** `sqrt(decimal)` is computed as `(decimal)Math.Sqrt((double)d)`. The result is returned as `decimal` to stay in the decimal lane, but the computation is inherently approximate due to the `double` intermediary.
+
+**Original rationale:** C# does not have a native `decimal` square root function. `Math.Sqrt` operates on `double`. The result is cast back to `decimal`, but precision loss from the `double` intermediary is inherent. This is documented in the function contract — the user knows that `sqrt` on a `decimal` is approximate.
+
+**Why superseded:** DD10 recognized that returning an approximate result as `decimal` pretends approximation is exactness — violating the semantic fidelity guarantee. The correct design is to remove the decimal overload entirely and require authors to use `sqrt(approximate(value))` when they need a square root of a decimal value.
 
 **External precedent:** .NET generic math (`INumber<T>`, .NET 7+) explicitly separates `decimal` from IEEE 754 types — `decimal` participates in `IFloatingPoint` but NOT `IFloatingPointIeee754`. Generic `Sqrt` is defined in terms of IEEE 754 types only. This confirms that `sqrt(decimal)` is inherently a bridge operation in the .NET ecosystem, not a native decimal capability.
 
@@ -876,6 +905,99 @@ Computed fields (`field Net as decimal = Gross - Tax`) are recomputed after ever
 
 **Tradeoff accepted:** The inference mechanism adds complexity to the type checker. The non-ambiguous invariant ensures the complexity is bounded — every literal has exactly one resolution, determined statically. Authors familiar with C# may initially expect unsuffixed `0.1` to be `double` — the DSL's context-sensitive behavior should be documented clearly in the language design doc.
 
+### DD10: Remove `sqrt(decimal) → decimal` Overload
+
+**Decision:** The `sqrt(decimal) → decimal` overload is removed. Only `sqrt(number) → number` remains. Authors who need the square root of a decimal value use `sqrt(approximate(value))`.
+
+**Rationale:** `sqrt` is inherently approximate — `sqrt(x)` is irrational for most inputs. The decimal overload (which internally computed `(decimal)Math.Sqrt((double)d)`) pretended approximation was exactness by returning a `decimal`-typed result for an approximate computation. This violates the semantic fidelity guarantee (Principle 7) and the function lane integrity rule (Principle 17). Removing the overload makes the approximation honest — `sqrt` lives exclusively in the number lane, and the author must explicitly cross into it via `approximate()`.
+
+**Supersedes:** DD8 (`sqrt(decimal) → decimal` Retains Approximate Internals).
+
+**Author pattern:** `set adjusted = round(sqrt(approximate(Price)), 2)` — the author explicitly bridges to number, computes the sqrt, and bridges back to decimal with explicit precision.
+
+**Tradeoff accepted:** Authors with decimal fields who need `sqrt` now write `sqrt(approximate(x))` instead of `sqrt(x)`. This adds one function call but eliminates the silent precision lie.
+
+### DD11: `approximate(value)` — Explicit Bridge from Decimal to Number
+
+**Decision:** New DSL function: `approximate(decimal) → number`. This is the explicit bridge from the exact `decimal` lane into the approximate `number` lane.
+
+**Rationale:** Named after business intent — what it does to the value — not after the type system. `approximate()` reads as a verb describing the semantic effect: "approximate this value." Symmetric with `round(value, places)` going the other direction: "round this to N places."
+
+| Direction | Bridge | Reads as |
+|-----------|--------|----------|
+| number → decimal | `round(value, places)` | "Round this to N places" |
+| decimal → number | `approximate(value)` | "Approximate this value" |
+| decimal/number → integer | `floor` / `ceil` / `truncate` / `round` | Named by rounding behavior |
+
+**Author pattern:** `set adjusted = round(pow(approximate(Price), Rate), 2)`
+
+**Alternatives rejected:** (a) `toNumber(value)` — names the type system mechanism, not the business intent. (b) `widen(value)` — too abstract; doesn't communicate what happens to the value. (c) Implicit widening — hides the precision loss.
+
+**Tradeoff accepted:** A new function name to learn. The name is self-documenting and appears at every decimal→number boundary, making precision loss visible in the source code.
+
+### DD12: Decimal + Number Arithmetic Is a Type Error
+
+**Decision:** Case 6 in operator dispatch stays as-is: decimal + number arithmetic is blocked by the type checker. The author must use `approximate()` to cross explicitly. Comparisons (`<`, `<=`, `>`, `>=`, `==`, `!=`) remain allowed — they produce `boolean`, not a stored numeric value.
+
+**Rationale:** Arithmetic operators produce a numeric result that would be stored in a field. If `decimal * number` silently produced a `double`, the author's decimal field would silently receive an approximate value. Comparisons produce `boolean` — no numeric value is stored, so no lane is contaminated.
+
+**Alignment:** This is consistent with C# §12.4.7.3 which forbids mixing `decimal` with `float`/`double` in arithmetic. Precept extends the same principle to its type system.
+
+**Tradeoff accepted:** Authors who want `Price * Rate` where `Price` is decimal and `Rate` is number must write `approximate(Price) * Rate` or convert `Rate` to decimal first. This friction is intentional.
+
+### DD13: Fix `min`/`max` Decimal Comparison Path
+
+**Decision:** `ReduceComparable` must add a decimal fast-path using native `decimal` comparison. The current implementation routes decimal values through `double` for comparison.
+
+**Critical Finding:** `ReduceComparable()` uses `TryToNumber` (which returns `double`) for all comparisons, even when all arguments are `decimal`. Two `decimal` values `0.1m` and `0.2m` are compared as `double`, producing correct results in most cases but violating the lane-preservation contract and risking edge-case divergence for values near `decimal`'s precision limits.
+
+**Implementation fix:** Add a `decimal` branch in `ReduceComparable` that detects when all arguments are `decimal` and compares via native `decimal.CompareTo`, bypassing the `TryToNumber` → `double` path entirely. This mirrors the existing `long` fast-path pattern.
+
+**Totality note:** This is a correctness fix, not a new feature. The lane integrity contract already requires decimal-native comparison (see § Helper/Function Type Contracts); the current implementation fails to honor it.
+
+### DD14: Guard `DecimalPow` Edge Cases
+
+**Decision:** Guard `DecimalPow` against two edge cases that currently violate the totality guarantee (Principle 4):
+
+1. **`pow(0, -N)`** — currently computes `1m / DecimalPow(0m, N)` which triggers an unhandled `DivideByZeroException`. Must return `EvaluationResult.Fail` with an error message instead.
+2. **`pow(10, 29)` and similar large-exponent cases** — currently throws an unhandled `OverflowException` when the result exceeds `decimal.MaxValue`. Must catch `OverflowException` and return `EvaluationResult.Fail` with an error message instead.
+
+**Critical Finding:** Both cases are totality violations. The evaluator's contract (Principle 4) requires that every expression evaluates to a result or a definite error — not an unhandled exception. The existing Critical Finding 12 documents the `DivideByZeroException` case; this decision extends the fix to also cover `OverflowException`.
+
+**Implementation fix:** Wrap the `DecimalPow` computation in a try-catch that handles both `DivideByZeroException` and `OverflowException`, returning `EvaluationResult.Fail` with descriptive error messages (e.g., `"pow(0, -N) is undefined: division by zero"` and `"pow result exceeds decimal range"`).
+
+### DD15: Principle 10 Refinement — Resolve the Contradiction
+
+**Decision:** Replace the blanket "Decimal→number widening is implicit" claim in Principle 10 with a context-specific rule table.
+
+**Rationale:** The prior Principle 10 stated "Decimal→number widening is implicit." This directly contradicted Case 6 in operator dispatch, which blocks decimal+number arithmetic as a type error. The contradiction existed because comparisons and arithmetic were conflated — comparisons produce `boolean` (no lane contamination), while arithmetic produces stored numeric values (lane contamination).
+
+**Refined rule:**
+
+| Context | Decimal → Number | Mechanism |
+|---------|-----------------|-----------|
+| Function argument | Requires `approximate()` | Explicit bridge |
+| Arithmetic operator | Type error | Type checker blocks |
+| Comparison operator | Implicit (already allowed) | Result is `boolean`, no lane contamination |
+| Assignment to number field | Requires `approximate()` | Explicit bridge |
+
+**Tradeoff accepted:** The rule is now context-dependent rather than a simple "implicit/explicit" binary. This adds nuance but eliminates the contradiction.
+
+### DD16: Function Lane Integrity Rule
+
+**Decision:** Establish a governing rule for which functions get decimal overloads:
+
+> A function keeps its decimal overload if and only if the mathematical operation is closed over finite decimals — meaning: decimal input always produces a result exactly representable as a finite decimal.
+
+**Current function audit:**
+- **Satisfy the rule (keep decimal overload):** `abs`, `floor`, `ceil`, `truncate`, `round`, `min`, `max`, `clamp`, `pow(decimal, integer)` — all produce exact decimal results from decimal inputs.
+- **Violate the rule (number-only):** `sqrt` — `sqrt(x)` is irrational for most inputs. Removed per DD10.
+- **Future functions (number-only by this rule):** `log`, `sin`, `cos`, `exp`, non-integer `pow` — all inherently approximate. They would live exclusively in the number lane. Authors reach them via `approximate()`.
+
+**Rationale:** This rule makes the decimal/number boundary principled rather than ad-hoc. Instead of evaluating each new function individually, the rule provides a clear test: "Is the operation closed over finite decimals?" If yes, decimal overload. If no, number-only. The `approximate()` bridge provides the escape hatch.
+
+**Tradeoff accepted:** Some useful operations on decimal values (like `sqrt`) require an extra `approximate()` call. This is the correct trade — the alternative is pretending approximation is exactness.
+
 ---
 
 ## Test Obligations
@@ -894,7 +1016,9 @@ The test suite must cover the following categories to verify lane integrity:
 
 - **Integer → decimal widening:** `long + decimal → decimal`, value is exact
 - **Integer → number widening:** `long + double → double`
-- **Decimal → number widening:** `decimal + double → double` (explicit author choice)
+- **Decimal + number arithmetic error:** `decimal + double` produces type error (DD12)
+- **Decimal → number via `approximate()`:** `approximate(decimal)` produces `double`
+- **Decimal vs number comparison allowed:** `decimal < double` produces `boolean` (implicit widening for comparisons, DD15)
 - **Number → decimal error:** Assigning `double` result to `decimal` field produces type error
 - **Number → integer error:** Assigning `double` result to `integer` field produces type error
 
@@ -935,10 +1059,10 @@ The test suite must cover the following categories to verify lane integrity:
 
 The following items are explicitly excluded from issue #115:
 
-- **New DSL syntax.** No new keywords, operators, or expression forms are introduced. The change is behavioral — the evaluator's type contracts change, but the language surface does not.
+- **New DSL syntax (beyond `approximate()`).** The `approximate()` function (DD11) is the sole new language surface addition. No new keywords, operators, or expression forms beyond this are introduced.
 - **Proof engine decimal intervals.** The proof engine continues to operate on `double` intervals per DD7. A separate `decimal` interval arithmetic layer is not warranted.
 - **Literal suffix syntax.** No `0.1m` or `0.1d` suffixes are added to the DSL. Context-sensitive literal typing is the chosen mechanism (DD9).
 - **Currency or unit-of-measure types.** Issue #115 establishes the numeric lane foundation. Higher-level business types are tracked separately.
-- **`sqrt(decimal)` exact implementation.** The `(decimal)Math.Sqrt((double)d)` pattern is accepted per DD8. A native `decimal` sqrt is not needed.
+- **`sqrt(decimal)` overload.** Removed per DD10. The `sqrt` function is number-only. Authors use `sqrt(approximate(value))` for decimal inputs.
 - **Cross-event computed-field carryover.** This is the proof engine's soundness boundary, not an evaluator concern. Tracked in ProofEngineDesign.md.
 - **Backward-compatible migration tooling.** Breaking changes to the runtime API (e.g., `CoerceToDecimal` rejecting `double`) are documented but no automatic migration path is provided in this issue.
