@@ -4,6 +4,8 @@ Date: 2026-04-19
 
 Status: **Draft — Track B design for issue #115. Pending design review.**
 
+Research grounding: [research/language/evaluator-architecture-survey.md](../research/language/evaluator-architecture-survey.md) — CEL, FEEL/DMN, C# spec §12.4.7, F#, Kotlin, NCalc, DynamicExpresso, EF Core, OData, NodaMoney, FsCheck precedent survey.
+
 > This document describes the **target state** of the expression evaluator after the numeric lane integrity campaign (issue #115). Sections describing architecture, rules, and contracts are written in "to be" form — as if the target implementation is complete. The "Current State Analysis" section describes what is broken today and why.
 
 ---
@@ -134,7 +136,7 @@ The critical invariant: **`Value` in a successful `EvaluationResult` always has 
 
 ### Operator Dispatch
 
-Binary arithmetic operators dispatch by matching both operands' runtime types. Dispatch priority ensures the narrowest exact lane is preserved:
+Binary arithmetic operators dispatch by matching both operands' runtime types, following a dispatch-table model inspired by [CEL's named-function overloads](https://github.com/google/cel-spec/blob/master/doc/langdef.md) (`_+_(int, int) → int`, `_+_(double, double) → double`). Each `(operator, leftType, rightType)` triple maps to a specific implementation and result type. Dispatch priority ensures the narrowest exact lane is preserved:
 
 1. **Both `long`** → integer arithmetic (`long` result)
 2. **Both `decimal`** → decimal arithmetic (`decimal` result)
@@ -142,6 +144,8 @@ Binary arithmetic operators dispatch by matching both operands' runtime types. D
 4. **Mixed integer + decimal** → widen integer to `decimal`, decimal arithmetic (`decimal` result)
 5. **Mixed integer + number** → widen integer to `double`, number arithmetic (`double` result)
 6. **Mixed decimal + number** → widen decimal to `double`, number arithmetic (`double` result)
+
+Cases 1–5 mirror the C# language specification's binary numeric promotion rules (§12.4.7.3), which **forbid** mixing `decimal` with `float`/`double` in arithmetic — it is a binding-time error. Case 6 is permitted at the evaluator level only for comparison expressions that the type checker explicitly allows; arithmetic mixing of decimal and number remains a type error.
 
 The type checker prevents case 6 in most contexts (assigning a `number` expression to a `decimal` field is a type error), but the evaluator must handle it correctly for expressions that the type checker permits (e.g., a `number`-typed function result used in a comparison with a `decimal` value).
 
@@ -502,7 +506,9 @@ Computed fields (`field Net as decimal = Gross - Tax`) are recomputed after ever
 
 **Rationale:** Business domains require both exact arithmetic (money, rates, tax) and approximate arithmetic (scientific calculations, scoring). A single `double`-backed numeric type cannot serve both — `0.1 + 0.2 != 0.3` in IEEE 754 is unacceptable for financial calculations. A single `decimal`-backed type is too slow and too restrictive for domains that accept approximation. The three-lane model matches C#'s own numeric type hierarchy and gives authors explicit control over precision semantics.
 
-**Alternatives rejected:** (a) Single `double` lane (current broken state) — violates philosophy's numeric exactness commitment. (b) Single `decimal` lane — too slow for approximate-acceptable domains, cannot represent `sqrt` natively. (c) Two lanes (`integer` + `decimal` only) — forces approximate operations to produce decimal results, which are misleadingly exact-looking.
+**External precedent:** CEL (Google Common Expression Language) uses three distinct numeric types (`int`, `uint`, `double`) with no automatic arithmetic conversions — cross-type arithmetic is a type error. C# itself (§12.4.7) defines separate predefined operators per numeric type and forbids mixing `decimal` with `float`/`double`. F# forbids all implicit numeric conversions. FEEL/DMN uses a single Decimal128 type — simpler but less expressive. Precept's three-lane model sits between CEL's strictness and C#'s promotion rules.
+
+**Alternatives rejected:** (a) Single `double` lane (current broken state) — violates philosophy's numeric exactness commitment. (b) Single `decimal` lane (FEEL/DMN approach) — too slow for approximate-acceptable domains, cannot represent `sqrt` natively. (c) Two lanes (`integer` + `decimal` only) — forces approximate operations to produce decimal results, which are misleadingly exact-looking.
 
 **Tradeoff accepted:** Three lanes increase operator dispatch complexity (6 binary operand combinations instead of 1). The type checker catches most cross-lane errors at compile time, limiting runtime dispatch to well-typed expressions.
 
@@ -514,7 +520,9 @@ Computed fields (`field Net as decimal = Gross - Tax`) are recomputed after ever
 
 **Alternatives rejected:** Selective decimal paths (e.g., decimal arithmetic but `double` comparison) — creates inconsistency where `decimal + decimal` is exact but `decimal == decimal` is approximate.
 
-**Tradeoff accepted:** `decimal` arithmetic is slower than `double` arithmetic (~10–20x for division). Acceptable for a business-rule engine where correctness dominates throughput.
+**Tradeoff accepted:** `decimal` arithmetic is materially slower than `double` arithmetic (exact ratio varies by operation and hardware — the .NET team benchmarks decimal operations separately in `Perf.Decimal.cs`). Acceptable for a business-rule engine where correctness dominates throughput.
+
+**Decimal overflow policy:** When a homogeneous `decimal` operation overflows `decimal` range, the evaluator throws an `OverflowException` — it does NOT silently widen to `double`. NCalc's `DecimalAsDefault` mode silently falls back to `double` infinity on decimal overflow; Precept explicitly rejects this pattern because silent widening is exactly the lane violation this design prevents.
 
 ### DD3: Integer-Shaped Surfaces Return Integer
 
@@ -552,6 +560,8 @@ Computed fields (`field Net as decimal = Gross - Tax`) are recomputed after ever
 
 **Rationale:** If the runtime accepts `double` values for `decimal` fields, the entire evaluator lane integrity is undermined at the API boundary. An external caller passing `0.1` (double) into a `decimal` field silently imports `0.1000000000000000055...` into the exact lane.
 
+**External precedent:** Java's `new BigDecimal(double)` is the most-cited numeric precision pitfall in business software — `new BigDecimal(0.1)` produces `0.1000000000000000055511151231257827021181583404541015625`, not `0.1`. NodaMoney's `MoneyJsonConverter` preserves decimal fidelity by reading with `reader.GetDecimal()` rather than `GetDouble()`. EF Core carries type mapping metadata through translation to preserve decimal semantics even when the backend is awkward.
+
 **Alternatives rejected:** Accept `double` and round to a configured number of places — this silently modifies the input, which violates the principle that the engine is transparent about what it does.
 
 **Tradeoff accepted:** C# callers must explicitly pass `decimal` values (e.g., `0.1m` not `0.1`). JSON callers must ensure their serializer produces decimal-fidelity numbers. This is a breaking change for callers who currently pass `double` values.
@@ -572,6 +582,8 @@ Computed fields (`field Net as decimal = Gross - Tax`) are recomputed after ever
 
 **Rationale:** C# does not have a native `decimal` square root function. `Math.Sqrt` operates on `double`. The result is cast back to `decimal`, but precision loss from the `double` intermediary is inherent. This is documented in the function contract — the user knows that `sqrt` on a `decimal` is approximate.
 
+**External precedent:** .NET generic math (`INumber<T>`, .NET 7+) explicitly separates `decimal` from IEEE 754 types — `decimal` participates in `IFloatingPoint` but NOT `IFloatingPointIeee754`. Generic `Sqrt` is defined in terms of IEEE 754 types only. This confirms that `sqrt(decimal)` is inherently a bridge operation in the .NET ecosystem, not a native decimal capability.
+
 **Alternatives rejected:** (a) Make `sqrt(decimal)` return `number` — this would force decimal-lane users into the number lane for a common operation. (b) Implement a Newton's method `decimal` sqrt — overkill for a DSL runtime; the `double` precision (~15 significant digits) is sufficient for all practical business-domain sqrt uses.
 
 **Tradeoff accepted:** `sqrt(decimal)` is the one function where the decimal lane's exactness guarantee is relaxed. The contract is explicit about this.
@@ -582,9 +594,11 @@ Computed fields (`field Net as decimal = Gross - Tax`) are recomputed after ever
 
 **Rationale:** A literal `0.1` in `set Price = 0.1` (where `Price` is `decimal`) should produce `decimal 0.1m`, not `double 0.1`. Context-sensitive typing achieves this without requiring suffix syntax (e.g., `0.1m` vs `0.1d`). Suffix syntax was considered and rejected because it introduces PLT ceremony inappropriate for a business-rule DSL.
 
-**Alternatives rejected:** (a) Always parse as `decimal`, convert in number contexts — viable but asymmetric. (b) Require literal suffixes (`0.1m`, `0.1d`) — too much syntax for domain authors. (c) Always parse as `double` (current broken state) — irrecoverably destroys decimal precision.
+**This is a deliberate DSL policy choice, not host-language precedent.** C#, F#, and Kotlin all default unsuffixed fractional literals to `double` and require explicit suffixes (`m`/`M`) for `decimal`. No mainstream programming language uses context-sensitive literal typing for numeric types. However, evaluator libraries provide precedent: NCalc's `DecimalAsDefault` option and DynamicExpresso's configurable literal parsing both support evaluator-wide policies that resolve unsuffixed literals as `decimal`. Precept's approach is more precise — context-sensitive rather than global — but the pattern of "the evaluator decides, not the author's suffix" is established in production systems.
 
-**Tradeoff accepted:** The inference mechanism adds complexity to the type checker. The non-ambiguous invariant ensures the complexity is bounded — every literal has exactly one resolution, determined statically.
+**Alternatives rejected:** (a) Always parse as `decimal`, convert in number contexts — viable but asymmetric; NCalc uses this approach with its `DecimalAsDefault` flag. (b) Require literal suffixes (`0.1m`, `0.1d`) — too much syntax for domain authors; OData uses suffixes but targets developer-facing query syntax, not business-rule authoring. (c) Always parse as `double` (current broken state) — irrecoverably destroys decimal precision.
+
+**Tradeoff accepted:** The inference mechanism adds complexity to the type checker. The non-ambiguous invariant ensures the complexity is bounded — every literal has exactly one resolution, determined statically. Authors familiar with C# may initially expect unsuffixed `0.1` to be `double` — the DSL's context-sensitive behavior should be documented clearly in the language design doc.
 
 ---
 
@@ -597,7 +611,8 @@ The test suite must cover the following categories to verify lane integrity:
 - **Homogeneous integer arithmetic:** `long + long → long`, `long * long → long`, `long / long → long` (truncating), `long % long → long`
 - **Homogeneous decimal arithmetic:** `decimal + decimal → decimal`, `decimal * decimal → decimal`, `decimal / decimal → decimal`, `decimal % decimal → decimal`
 - **Homogeneous number arithmetic:** `double + double → double`, etc.
-- **Result type assertion:** Tests must assert the C# type of the result, not just the numeric value. `Assert.IsType<decimal>(result)` not `Assert.Equal(0.3, Convert.ToDouble(result))`.
+- **Decimal closure canary:** `0.3 - 0.2 - 0.1 == 0.0` in the decimal lane — this is false in IEEE 754 but must be true in Precept's decimal lane. NCalc's `DecimalsTests.cs` uses this exact pattern.
+- **Result type assertion:** Tests must assert both the C# runtime type AND the numeric value of every result. `Assert.IsType<decimal>(result)` not `Assert.Equal(0.3, Convert.ToDouble(result))`. Value-only assertions will miss lane regressions where the result is numerically close but in the wrong type. This pattern is established in NCalc's test suite (`DecimalsTests.cs`, `MathTests.cs`).
 
 ### Cross-Lane Tests
 
@@ -633,9 +648,10 @@ The test suite must cover the following categories to verify lane integrity:
 
 ### Runtime Boundary Tests
 
-- **JSON `decimal` field receives `decimal`:** `JsonElement.GetDecimal()` path
-- **`double` input to `decimal` field rejected:** `CoerceToDecimal` type error
+- **JSON `decimal` field receives `decimal`:** `JsonElement.GetDecimal()` path — validated by NodaMoney's `MoneyJsonConverter` pattern (decimal-first parse, no hidden double hop)
+- **`double` input to `decimal` field rejected:** `CoerceToDecimal` type error — mirrors Java BigDecimal's `new BigDecimal(double)` footgun prevention
 - **API `decimal` round-trip:** Write `decimal 0.1m`, serialize, deserialize → `decimal 0.1m`
+- **Decimal overflow produces error:** `decimal.MaxValue + 1` throws `OverflowException`, does NOT silently widen to `double`
 
 ---
 
