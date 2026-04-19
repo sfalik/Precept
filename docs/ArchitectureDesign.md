@@ -25,7 +25,8 @@ flowchart TD
     subgraph CT["Compile-Time"]
         direction LR
         P["🔤 Parser"] -->|definition model| TC["🔍 Type Checker"]
-        PE["📐 Proof Engine"] <-->|interval queries| TC
+        TC -->|interval queries| PE["📐 Proof Engine"]
+        PE -->|narrowing facts| TC
     end
 
     subgraph RT["Run-Time"]
