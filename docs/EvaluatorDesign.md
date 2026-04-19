@@ -1194,6 +1194,54 @@ The following table documents the implementation status of each function contrac
 
 **Tradeoff accepted:** Moderate implementation cost (context enrichment in type inference). The type checker must carry more context through binary expression analysis, but the payoff is a complete static guarantee: every compiled choice comparison uses valid members only.
 
+### DD23: EvalFailCode Enum — Internal, Classified with Attributes
+
+**Decision:** Introduce an internal `EvalFailCode` enum that catalogs every evaluator failure mode. Each member is classified with `[StaticallyPreventable("CXX")]` (linked to `DiagnosticCatalog`) or `[LegitimatelyDynamic]`. The enum is internal — invisible to API consumers and MCP output.
+
+**Rationale:** Free-form `Fail(string)` calls have no structural identity — George's audit (Appendix D) required manual source-text scanning to discover and classify 72 Fail sites. The enum provides stable identity, makes classification a first-class architectural concept, and enables automated sentinel tests. The `[StaticallyPreventable("CXX")]` attribute creates a bi-directional link: evaluator failure → compiler diagnostic.
+
+**Alternatives rejected:** (a) Public enum visible in `EvaluationResult` — premature API surface commitment. (b) External classification file — decouples classification from code, easier to drift. (c) Sentinel tests only — detects drift reactively but does not prevent it.
+
+**Tradeoff accepted:** ~75 existing Fail call sites must be updated to pass an `EvalFailCode` member. Mechanical but non-trivial.
+
+**See:** Appendix F § F.2 for full specification.
+
+### DD24: Function Evaluation Is Registry-Driven
+
+**Decision:** Extend `FunctionOverload` with a `Func<object?[], EvaluationResult>? Evaluator` delegate. The evaluator's `EvaluateFunction` dispatches through the registry instead of a hand-coded switch. Every registered overload must have a non-null `Evaluator` delegate.
+
+**Rationale:** The `FunctionRegistry` already provides a declarative contract that the type checker reads — but the evaluator ignores it and reimplements every function body independently. This is the archetype of compiler↔evaluator drift. George's gap G5 (`pow(integer, negative)`) is the canonical example: the registry declared `RequiresNonNegativeProof`, but the evaluator's switch arm did not enforce it.
+
+**Alternatives rejected:** (a) Keep hand-coded switch with sentinel tests — detects drift but does not prevent it. (b) Code-generate the switch from the registry — adds build complexity, makes debugging harder.
+
+**Tradeoff accepted:** Evaluation delegates in a static registry replace direct pattern-matching. Performance delta is negligible. Debugging goes through delegates instead of named methods — mitigation: each delegate references a named static method.
+
+**See:** Appendix F § F.3 for full specification.
+
+### DD25: Operator Dispatch Is Registry-Driven
+
+**Decision:** Introduce an `OperatorRegistry` that declares the full operator × type-family matrix — legal combinations, result types, widening rules, and evaluation delegates. Both the type checker and evaluator consume this registry as their single source of truth.
+
+**Rationale:** The type checker and evaluator independently implement the same semantic rules for operator dispatch (~200 LOC binary, ~30 LOC unary). George's gaps G2 (unary minus rejects decimal in type checker) and G4 (ordered choice comparison) both stem from this independent implementation. A shared registry makes disagreement structurally impossible.
+
+**Alternatives rejected:** (a) Registry for functions only, sentinels for operators — sentinels need to enumerate the full matrix anyway. (b) Dispatch table without evaluation delegates — provides agreement on legality but not evaluation behavior.
+
+**Tradeoff accepted:** The operator registry is more complex than the function registry due to widening, lane promotion, and comparison-vs-arithmetic distinction. The operator set is stable (11 operators), so per-entry drift-prevention value is lower than functions — but the type-family dimension is where drift occurs.
+
+**See:** Appendix F § F.4 for full specification.
+
+### DD26: Roslyn Analyzer Enforces Fail Site Classification at Build Time
+
+**Decision:** A Roslyn analyzer discovers `EvaluationResult.Fail(...)` call sites during `dotnet build` and enforces that every call passes an `EvalFailCode` member. Unclassified enum members trigger build warnings.
+
+**Rationale:** DD23 makes classification possible; the Roslyn analyzer makes it mandatory. Without it, a developer can add `Fail("bare string")` without touching the enum — the sentinel test catches it in CI, but the analyzer catches it during local `dotnet build`.
+
+**Alternatives rejected:** (a) Source-text scanning in tests — fragile, regex-based, test-time only. (b) Convention enforcement via code review — the 7 gaps prove this is insufficient. (c) Source generator — generators produce code, not diagnostics.
+
+**Tradeoff accepted:** Adds a `Precept.Analyzers` project to the solution. Build-time analyzer loading has negligible performance impact scoped to `EvaluationResult.Fail` call sites.
+
+**See:** Appendix F § F.5 for full specification.
+
 ---
 
 ## Appendix C: Test Obligations
@@ -1433,11 +1481,11 @@ Maintains an explicit operator × type-family matrix. Adding a new operator or a
 
 #### Evaluator Failure Classification
 
-Reflects over (or statically enumerates) every `EvaluationResult.Fail` return site in the evaluator. Each site must be mapped to either:
-- A compiler diagnostic code (statically preventable — the type checker catches this).
-- An `AllowedDynamicState` marker (legitimately dynamic — runtime-dependent).
+Every `EvaluationResult.Fail` call site passes an `EvalFailCode` member (enforced by the Roslyn analyzer at build time — see Appendix F § F.5). Each `EvalFailCode` member must be classified with `[StaticallyPreventable("CXX")]` or `[LegitimatelyDynamic]`. The EvalFailCode sentinel test (Appendix F § F.7) reflects over the enum and asserts the mapping:
+- `[StaticallyPreventable("CXX")]` members must have a matching `DiagnosticCatalog` entry and a conformance test proving the type checker emits that diagnostic.
+- `[LegitimatelyDynamic]` members are accepted — no compiler rule is expected.
 
-An unmapped `Fail` site fails the sentinel.
+An unclassified `EvalFailCode` member or a bare-string `Fail` call (without `EvalFailCode`) fails the build.
 
 #### Regression Anchor Registry
 
@@ -1464,4 +1512,413 @@ The following named tests must exist in the conformance test suite. Each anchors
 | `CheckedIntegerOverflow` | Integer overflow produces `Fail`, not silent wraparound | DD19 |
 | `DecimalPowZeroBaseNegativeExponent` | `pow(0m, -1)` produces `Fail`, not exception | DD14, CF12 |
 | `UnaryMinusDecimalAccepted` | `-Price` where `Price` is decimal compiles and evaluates | CF15, G2 |
+| `EvalFailCodeSentinel_AllStaticallyPreventableHaveCompilerRule` | Every `[StaticallyPreventable]` EvalFailCode member maps to a DiagnosticCatalog entry | DD23, Appendix F |
+| `FunctionRegistryEvaluatorCompleteness` | Every `FunctionRegistry` overload has a non-null `Evaluator` delegate | DD24, Appendix F |
+| `OperatorRegistryCompleteness` | Every `OperatorRegistry` entry has an evaluation delegate | DD25, Appendix F |
+| `RoslynAnalyzer_UnclassifiedFailSite` | Roslyn analyzer flags `EvaluationResult.Fail` calls without `EvalFailCode` | DD26, Appendix F |
+
+---
+
+## Appendix F: Compiler↔Evaluator Conformance Architecture
+
+This appendix specifies the structural mechanisms that enforce Principle 18 (static completeness) at the architecture level. The goal: make compiler↔evaluator drift a build error, not a review finding. Where Appendix D documents the audit that found 7 gaps in 72 error paths, and Appendix E defines the test architecture that detects drift after the fact, this appendix defines the structural enforcement that prevents drift by construction.
+
+### F.1 Motivation
+
+Principle 18 makes a hard promise: if a precept compiles without diagnostics, it will not produce type errors at runtime. George's conformance audit (Appendix D) found 7 gaps across 72 evaluator error paths — a 90% coverage rate arrived at through heroic manual effort. The audit proved that the compiler and evaluator can drift, and that the drift is invisible without systematic review.
+
+The structural risk has three dimensions:
+
+1. **Independent authoring.** The evaluator dispatches on runtime CLR types (`is long`, `is decimal`, `is string`) and returns `EvaluationResult.Fail(string)`. The type checker dispatches on `StaticValueKind` flags and emits diagnostics via `DiagnosticCatalog`. No compile-time or structural relationship ties these two error surfaces together.
+
+2. **Free-form failure identity.** Every `EvaluationResult.Fail("operator '+' requires ...")` is an ad-hoc string with no catalog identity. There is no enum, no diagnostic code, and no way for a test to discover "this Fail site exists" without source-text scanning or reflection.
+
+3. **Growth vector.** New language features add evaluator paths first — parser support, then evaluator handling, then type-checker rules, then tests. Steps 3 and 4 are the ones that get missed under pressure, and the evaluator silently becomes the safety net instead of defense-in-depth.
+
+The conformance test architecture in Appendix E detects drift reactively — sentinel tests discover new Fail sites and demand classification. This appendix defines three structural mechanisms that prevent drift proactively:
+
+- **EvalFailCode catalog** — gives every Fail site a stable identity and a declared classification (Phase 1).
+- **Registry-driven function evaluation** — eliminates function-level drift by construction (Phase 2).
+- **Operator registry** — eliminates operator-level drift by construction (Phase 3).
+
+A fourth mechanism — a **Roslyn analyzer** — enforces classification discipline at build time, making it impossible to add an unclassified Fail site without a build warning.
+
+All four mechanisms ship together in issue #115.
+
+### F.2 EvalFailCode Catalog
+
+#### Design
+
+Every `EvaluationResult.Fail` call site in the evaluator passes an `EvalFailCode` enum member that identifies the failure mode. The enum is internal — invisible to consumers, used only for structural enforcement within the compiler/evaluator boundary.
+
+```csharp
+internal enum EvalFailCode
+{
+    // ── Statically preventable ──────────────────────────────────
+    // These MUST have a matching type-checker or proof-engine rule.
+    // The [StaticallyPreventable] attribute links to DiagnosticCatalog.
+
+    [StaticallyPreventable("C38")] OperatorTypeMismatch,
+    [StaticallyPreventable("C41")] FunctionArgTypeMismatch,
+    [StaticallyPreventable("C78")] ConditionalConditionNotBoolean,
+    [StaticallyPreventable("C68")] ChoiceLiteralNotInSet,          // DD22
+    [StaticallyPreventable("C85")] CollectionAccessorWithoutGuard, // DD21
+    [StaticallyPreventable]        UnsupportedUnaryOperator,
+    [StaticallyPreventable]        UnsupportedBinaryOperator,
+    [StaticallyPreventable]        UnknownFunction,
+    [StaticallyPreventable]        UnknownCollectionProperty,
+    // ... every statically preventable Fail site gets a member
+
+    // ── Legitimately dynamic ────────────────────────────────────
+    // These depend on runtime state — no compiler rule can prevent them.
+
+    [LegitimatelyDynamic] IntegerOverflow,           // DD19
+    [LegitimatelyDynamic] DecimalPowEdgeCase,        // DD14
+    [LegitimatelyDynamic] DivisionByZero_RuntimeValue,
+    [LegitimatelyDynamic] CollectionEmpty_BehindGuard,
+    [LegitimatelyDynamic] SqrtNegative_BehindProof,
+    [LegitimatelyDynamic] RoundingCastOverflow,      // DD19 scope (G7)
+}
+```
+
+#### Attributes
+
+Two custom attributes classify each enum member:
+
+- **`[StaticallyPreventable("CXX")]`** — links the evaluator failure to its `DiagnosticCatalog` counterpart. The string argument is the constraint ID (e.g., `"C38"`). When the diagnostic code is not yet assigned (new constructs), the parameterless `[StaticallyPreventable]` overload marks the member as requiring a compiler rule — the sentinel test will fail until one is linked.
+
+- **`[LegitimatelyDynamic]`** — declares that the failure depends on runtime state and has no static counterpart. The sentinel test skips these members.
+
+Both attributes are internal, applied only to `EvalFailCode` members.
+
+#### Fail Signature
+
+The `EvaluationResult.Fail` factory method gains an `EvalFailCode` parameter:
+
+```csharp
+internal sealed record EvaluationResult(bool Success, object? Value, EvalFailCode? FailCode, string? Error)
+{
+    internal static EvaluationResult Ok(object? value) => new(true, value, null, null);
+    internal static EvaluationResult Fail(EvalFailCode code, string? detail = null)
+        => new(false, null, code, detail);
+}
+```
+
+The `FailCode` is internal — it does not appear in MCP output, API responses, or any consumer-facing surface. The `Error` string remains for human-readable diagnostics. The enum carries the structural identity; the string carries the context.
+
+#### How New Fail Sites Are Added
+
+When a developer adds a new `EvaluationResult.Fail(...)` call:
+
+1. They must pass an `EvalFailCode` member — the Roslyn analyzer (§ F.5) flags bare string Fail calls.
+2. They must add the corresponding enum member to `EvalFailCode`.
+3. They must classify it with `[StaticallyPreventable("CXX")]` or `[LegitimatelyDynamic]`.
+4. If `[StaticallyPreventable]`, the sentinel test (§ F.7) fails until a matching compiler diagnostic exists and is tested.
+
+This makes classification a conscious architectural decision at the point of authoring, not a post-hoc audit finding.
+
+### F.3 Registry-Driven Function Evaluation
+
+#### Problem
+
+The `FunctionRegistry` is declarative — it specifies function names, overload signatures, accepted types, return types, and argument constraints. The type checker reads this registry. The evaluator does NOT — it has a parallel hand-coded switch in `EvaluateFunction` that independently implements every function body. This is the archetype of the drift problem: two implementations of the same contract, one declarative and one imperative, with no enforcement that they agree.
+
+George's audit identified G5 (`pow(integer, negative)`) as a direct consequence: the registry declares `RequiresNonNegativeProof` on the exponent parameter, but the evaluator's hand-coded `IntegerPow` body does not enforce it — the constraint lives in one implementation but not the other.
+
+#### Design
+
+Extend `FunctionOverload` with an evaluation delegate:
+
+```csharp
+internal sealed record FunctionOverload(
+    FunctionParameter[] Parameters,
+    StaticValueKind ReturnType,
+    int? MinArity = null,
+    Func<object?[], EvaluationResult>? Evaluator = null);
+```
+
+The `Evaluator` delegate receives the evaluated arguments (already type-checked by the registry's parameter declarations) and returns an `EvaluationResult`. Every overload in `FunctionRegistry` supplies its evaluation delegate at registration time:
+
+```csharp
+Register(new FunctionDefinition("abs", "Returns the absolute value.",
+[
+    new([new("value", StaticValueKind.Integer)], StaticValueKind.Integer,
+        Evaluator: args => EvaluationResult.Ok(Math.Abs((long)args[0]!))),
+    new([new("value", StaticValueKind.Decimal)], StaticValueKind.Decimal,
+        Evaluator: args => EvaluationResult.Ok(Math.Abs((decimal)args[0]!))),
+    new([new("value", StaticValueKind.Number)], StaticValueKind.Number,
+        Evaluator: args => EvaluationResult.Ok(Math.Abs((double)args[0]!))),
+]));
+```
+
+#### How EvaluateFunction Changes
+
+The evaluator's `EvaluateFunction` method transforms from a hand-coded name switch to a registry lookup:
+
+1. **Look up the function** in `FunctionRegistry` by name. If not found → `EvaluationResult.Fail(EvalFailCode.UnknownFunction, ...)`.
+2. **Match the overload** by comparing the runtime argument types against the registry's parameter declarations. If no match → `EvaluationResult.Fail(EvalFailCode.FunctionArgTypeMismatch, ...)`.
+3. **Invoke the delegate** on the matched overload: `overload.Evaluator!(evaluatedArgs)`.
+
+The hand-coded function switch — currently ~18 arms dispatching `abs`, `floor`, `ceil`, `round`, `truncate`, `min`, `max`, `clamp`, `pow`, `sqrt`, `approximate`, `toLower`, `toUpper`, `trim`, `startsWith`, `endsWith`, `left`, `right`, `mid` — is deleted entirely. Argument-count checks, argument-type checks, and function-body dispatch all flow through the registry.
+
+#### Why This Eliminates Function-Level Drift
+
+Adding a new function to `FunctionRegistry` requires specifying both the type signature (for the type checker) and the evaluation delegate (for the evaluator) in a single registration call. There is no second location to update, no parallel switch arm to add, and no way for the type checker and evaluator to disagree about which functions exist or what types they accept. The registry is the single source of truth.
+
+The sentinel test (Function Registry Completeness, Appendix E) enforces that every overload has a non-null `Evaluator` delegate. An overload registered with `Evaluator: null` fails the sentinel — type-checking-only registrations without evaluation paths are structurally impossible.
+
+### F.4 Operator Registry
+
+#### Problem
+
+Operator dispatch is the largest surface area in the evaluator — 5 arithmetic operators × 6 type-family combinations × {result type, widening rule, evaluation body} = a dispatch matrix that the evaluator implements imperatively and the type checker implements independently via `TryInferBinaryKind`. Both implementations encode the same semantic rules (which operator × type combinations are legal, what the result type is, what widening applies), but they share no data structure. Drift between them produced George's gaps G2 (unary minus rejects decimal) and G4 (ordered choice comparison).
+
+#### Design
+
+A new `OperatorRegistry` declares the full operator × type-family matrix in one place:
+
+```csharp
+internal static class OperatorRegistry
+{
+    internal sealed record OperatorEntry(
+        string Operator,
+        StaticValueKind LeftType,
+        StaticValueKind RightType,
+        StaticValueKind ResultType,
+        Func<object, object, EvaluationResult> Evaluate);
+
+    internal sealed record UnaryEntry(
+        string Operator,
+        StaticValueKind OperandType,
+        StaticValueKind ResultType,
+        Func<object, EvaluationResult> Evaluate);
+}
+```
+
+Each entry declares:
+- The operator symbol (`+`, `-`, `*`, `/`, `%`, `==`, `!=`, `>`, `>=`, `<`, `<=`).
+- The accepted operand type families (e.g., `Integer`, `Decimal`, `Number`).
+- The result type (e.g., `Integer` for `long + long`, `Boolean` for `decimal < double`).
+- The evaluation delegate.
+
+#### Widening Rules Encoded Declaratively
+
+The operator × type-family matrix encodes widening explicitly rather than imperatively:
+
+| Left | Right | Arithmetic result | Comparison result | Widening |
+|------|-------|-------------------|-------------------|----------|
+| `Integer` | `Integer` | `Integer` | `Boolean` | None |
+| `Decimal` | `Decimal` | `Decimal` | `Boolean` | None |
+| `Number` | `Number` | `Number` | `Boolean` | None |
+| `Integer` | `Decimal` | `Decimal` | `Boolean` | Integer → Decimal |
+| `Integer` | `Number` | `Number` | `Boolean` | Integer → Number |
+| `Decimal` | `Number` | **Type error** | `Boolean` | Decimal → Number (comparison only) |
+
+The registry contains entries for each legal combination. Illegal combinations (e.g., `Decimal + Number`) have no entry — both the type checker and evaluator consult the same registry to determine legality.
+
+For unary operators, the registry declares:
+
+| Operator | Operand | Result | Evaluation |
+|----------|---------|--------|------------|
+| `-` | `Integer` | `Integer` | `-(long)x` |
+| `-` | `Decimal` | `Decimal` | `-(decimal)x` |
+| `-` | `Number` | `Number` | `-(double)x` |
+| `not` | `Boolean` | `Boolean` | `!(bool)x` |
+
+#### Why Operators Are More Complex Than Functions
+
+The operator registry is architecturally more complex than the function registry for three reasons:
+
+1. **Widening.** Functions accept explicit parameter types — `abs(decimal)` takes a `decimal`. Operators accept pairs where one operand may be widened: `long + decimal` widens the `long` to `decimal`. The registry must encode the widening rule per entry, and the evaluator must apply the widening before invoking the delegate.
+
+2. **Lane promotion.** Comparison operators produce `boolean` regardless of operand lane, so `decimal < double` is legal (the decimal is widened to double for comparison, and the result is `boolean` — no numeric lane contamination). Arithmetic operators produce a numeric result in the wider lane, so `decimal + double` is illegal (the result would be an ambiguously-laned numeric value). The registry must encode this distinction: some operator × type combinations are legal for comparisons but illegal for arithmetic.
+
+3. **String and choice dispatch.** `+` is overloaded for string concatenation. `==`/`!=` work on strings and choices. Relational operators work on ordered choices via declaration-position ordinal comparison. These are structurally distinct from numeric dispatch and require their own registry entries with different evaluation delegates.
+
+#### How the Type Checker and Evaluator Both Consume the Registry
+
+The type checker calls `OperatorRegistry.TryGetResultType(operator, leftKind, rightKind)` to determine whether an operator × type combination is legal and what its result type is. The evaluator calls `OperatorRegistry.TryGetEntry(operator, leftType, rightType)` to find the evaluation delegate. Both consult the same data structure — if an entry exists, the combination is legal and evaluable; if no entry exists, both reject it.
+
+### F.5 Roslyn Analyzer
+
+#### Purpose
+
+The Roslyn analyzer is a structural sentinel that operates at build time. It discovers `EvaluationResult.Fail(...)` call sites in the evaluator and enforces classification discipline:
+
+1. **Every Fail call must pass an `EvalFailCode`.** A call to `EvaluationResult.Fail(string)` (the old bare-string signature) triggers a diagnostic: `PRECEPT_EVAL001: EvaluationResult.Fail must use an EvalFailCode member.` This prevents new Fail sites from bypassing the classification system.
+
+2. **Every `EvalFailCode` member must be classified.** An enum member without `[StaticallyPreventable]` or `[LegitimatelyDynamic]` triggers a diagnostic: `PRECEPT_EVAL002: EvalFailCode member lacks classification attribute.`
+
+3. **New Fail sites are surfaced.** The analyzer does not block the build — diagnostics are warnings, not errors. This allows incremental development (add the Fail site, then add the classification). But CI treats warnings-as-errors for the `Precept` project, so unclassified sites fail the pipeline.
+
+#### Integration
+
+The analyzer ships as a project reference in the `Precept` project (not as a NuGet package — it is internal tooling):
+
+```xml
+<ProjectReference Include="..\Precept.Analyzers\Precept.Analyzers.csproj"
+                  OutputItemType="Analyzer"
+                  ReferenceOutputAssembly="false" />
+```
+
+The analyzer runs during every `dotnet build` invocation. It requires no manual invocation, no source-text scanning, and no reflection — it operates on the Roslyn syntax tree directly, which is robust against formatting changes, comment changes, and refactoring.
+
+#### Why Roslyn Analyzer, Not Source Scanning
+
+Appendix E's Evaluator Failure Classification sentinel originally contemplated source-text scanning (regex over C# source) or static enumeration as discovery mechanisms. The Roslyn analyzer supersedes both:
+
+| Mechanism | Fragility | Build integration | False positives |
+|-----------|-----------|-------------------|-----------------|
+| Source-text scanning (regex) | High — breaks on formatting, comments, string literals containing "Fail" | Test-time only — runs in CI but not during local builds | Moderate — regex cannot distinguish `Fail(string)` from `Fail(EvalFailCode, string)` reliably |
+| Static enumeration (manual list) | Medium — requires updating the list when adding Fail sites | Test-time only | None — but misses new sites by definition |
+| **Roslyn analyzer** | **None — operates on typed syntax tree** | **Build-time — runs during `dotnet build`** | **None — inspects actual method signatures** |
+
+The Roslyn analyzer turns the Evaluator Failure Classification sentinel from a reactive test-time check into a proactive build-time enforcement.
+
+### F.6 Design Decisions
+
+#### DD23: EvalFailCode Enum — Internal, Classified with Attributes
+
+**Decision:** Introduce an internal `EvalFailCode` enum that catalogs every evaluator failure mode. Each member is classified with `[StaticallyPreventable("CXX")]` (linked to `DiagnosticCatalog`) or `[LegitimatelyDynamic]`. The enum is internal — invisible to API consumers and MCP output.
+
+**Rationale:** Free-form `Fail(string)` calls have no structural identity. George's audit required manual source-text scanning to discover and classify 72 Fail sites. The enum provides the stable identity that free-form strings lack, makes classification a first-class architectural concept, and enables automated sentinel tests.
+
+**Alternatives rejected:**
+- (a) Public enum visible in `EvaluationResult` — exposes internal classification to consumers, adds API surface commitment before the classification is stable. Premature.
+- (b) External classification file (JSON/YAML mapping Fail messages to codes) — decouples the classification from the code, making it easier to drift. The enum-on-the-call-site pattern co-locates the classification with the failure point.
+- (c) No enum, sentinel tests only (Option C from the proposal) — detects drift reactively but does not prevent it. Free-form strings remain, and two Fail sites can have the same message with different conditions that the sentinel cannot distinguish.
+
+**Tradeoff accepted:** Every existing Fail call site (~75 sites) must be updated to pass an `EvalFailCode` member. This is mechanical but non-trivial. The enum grows with every new construct — manageable because the growth rate matches the evaluator's surface area growth.
+
+#### DD24: Function Evaluation Is Registry-Driven
+
+**Decision:** Extend `FunctionOverload` with a `Func<object?[], EvaluationResult>? Evaluator` delegate. The evaluator's `EvaluateFunction` method dispatches through the registry instead of a hand-coded switch. Every registered overload must have a non-null `Evaluator` delegate.
+
+**Rationale:** The `FunctionRegistry` already provides a declarative contract for function signatures — the type checker reads it, but the evaluator ignores it and reimplements every function body in a parallel switch. This is the archetype of the drift problem. Extending the registry with evaluation delegates closes the loop: one registration, two consumers, zero divergence. George's gap G5 (`pow(integer, negative)`) is the canonical example — the registry declared `RequiresNonNegativeProof`, but the evaluator's independent switch arm did not enforce it.
+
+**Alternatives rejected:**
+- (a) Keep the hand-coded switch and add sentinel tests — detects drift but does not prevent it. New functions would still require two independent implementations.
+- (b) Code-generate the evaluator switch from the registry — adds a build step, makes debugging harder, and the generated code still has no structural link back to the registry entry.
+
+**Tradeoff accepted:** Evaluation delegates in a static registry may complicate step-through debugging — the call stack goes through a delegate instead of a named method. Mitigation: each delegate can be a named static method referenced by the registry, preserving debuggability. The hand-coded evaluator's optimization (direct pattern-matching on `is long`) is replaced by registry lookup + delegate invocation — the performance delta is negligible for a business-rule engine.
+
+#### DD25: Operator Dispatch Is Registry-Driven
+
+**Decision:** Introduce an `OperatorRegistry` that declares the full operator × type-family matrix: legal operand combinations, result types, widening rules, and evaluation delegates. Both the type checker and evaluator consume this registry as their single source of truth for operator semantics.
+
+**Rationale:** Operator dispatch is the largest surface area in the evaluator (~200 LOC of binary dispatch, ~30 LOC of unary dispatch). The type checker and evaluator independently implement the same semantic rules — which combinations are legal, what widening applies, what the result type is. George's gaps G2 (unary minus rejects decimal in type checker but evaluator handles it) and G4 (ordered choice comparison not validated) both stem from this independent implementation. A shared registry makes disagreement structurally impossible.
+
+**Alternatives rejected:**
+- (a) Registry for functions only, sentinels for operators — the operator set is stable (11 operators), but the type-family matrix grows with each new type. Sentinels would need to enumerate the full matrix anyway; a registry is the same information in a consumable form.
+- (b) Operator dispatch table as a static data structure without evaluation delegates — provides type-checker/evaluator agreement on legality but not on evaluation behavior. Evaluation delegates close the full loop.
+
+**Tradeoff accepted:** The operator registry is more complex than the function registry due to widening, lane promotion, and the comparison-vs-arithmetic distinction. Implementation cost is higher. The operator set changes rarely (11 operators, stable since project inception), so the registry's drift-prevention value is lower per-entry than the function registry's. The value is in the type-family dimension: adding a new numeric type or changing widening rules requires updating one registry, not two independent dispatch implementations.
+
+#### DD26: Roslyn Analyzer Enforces Fail Site Classification at Build Time
+
+**Decision:** A Roslyn analyzer discovers `EvaluationResult.Fail(...)` call sites at build time and enforces that every call passes an `EvalFailCode` member. Unclassified `EvalFailCode` members (missing both `[StaticallyPreventable]` and `[LegitimatelyDynamic]`) trigger a build warning.
+
+**Rationale:** The EvalFailCode enum (DD23) makes classification possible; the Roslyn analyzer makes classification mandatory. Without the analyzer, a developer can add `EvaluationResult.Fail("new error")` without touching the enum — the sentinel test catches it eventually, but only at test time in CI, not during local development. The analyzer provides immediate feedback during `dotnet build`, making drift a build warning rather than a CI surprise.
+
+**Alternatives rejected:**
+- (a) Source-text scanning in a test (Appendix E's original design) — fragile, regex-based, breaks on formatting changes, cannot distinguish method overloads, runs only at test time.
+- (b) Convention enforcement via code review — does not scale, depends on reviewer vigilance, and the historical drift (7 gaps in 72 paths) proves this is insufficient.
+- (c) Build-time source generator instead of analyzer — source generators produce code, not diagnostics. The requirement is to flag violations, not generate code.
+
+**Tradeoff accepted:** Adds a Roslyn analyzer project (`Precept.Analyzers`) to the solution. This is a build dependency — analyzer assemblies are loaded during compilation. The analyzer is scoped to `EvaluationResult.Fail` call sites only, so its performance impact is negligible. Analyzer tests (verifying that the analyzer correctly flags violations and passes clean code) add to the test surface.
+
+### F.7 Conformance Test Obligations
+
+The architecture defined in this appendix requires four structural tests beyond the conformance test categories in Appendix E.
+
+#### EvalFailCode Sentinel Test
+
+Reflects over the `EvalFailCode` enum at test time:
+
+1. For every member with `[StaticallyPreventable("CXX")]`: assert that `DiagnosticCatalog` contains constraint `CXX`, and that a conformance test exists proving the type checker emits that diagnostic for the condition the enum member describes.
+2. For every member with `[StaticallyPreventable]` (no code): fail — the member is declared as statically preventable but has no linked diagnostic. This forces the developer to either assign a diagnostic code or reclassify as `[LegitimatelyDynamic]`.
+3. For every member with `[LegitimatelyDynamic]`: pass — no compiler rule is expected. Optionally assert that a defense-in-depth test exists (evaluator produces `Fail`, not an unhandled exception).
+4. For every member with neither attribute: fail — unclassified members are not allowed.
+
+#### Function Registry Evaluator Completeness
+
+Reflects over `FunctionRegistry.AllFunctions` at test time. For every overload in every function definition: assert that `overload.Evaluator` is not null. A null delegate means the overload has a type-checking signature but no evaluation path — a structural hole.
+
+#### Operator Registry Completeness
+
+Reflects over `OperatorRegistry` at test time. For every declared `OperatorEntry` and `UnaryEntry`: assert that the evaluation delegate is not null and that a conformance test exists exercising that entry. An entry without a test means the registry declares a legal combination that has never been verified.
+
+#### Roslyn Analyzer Tests
+
+Standard Roslyn analyzer test infrastructure (Microsoft.CodeAnalysis.Testing):
+
+- **Positive:** A `Fail(EvalFailCode.SomeCode, "detail")` call produces no diagnostic.
+- **Negative:** A `Fail("bare string")` call produces `PRECEPT_EVAL001`.
+- **Enum classification:** An `EvalFailCode` member without `[StaticallyPreventable]` or `[LegitimatelyDynamic]` produces `PRECEPT_EVAL002`.
+
+### F.8 How This Catches George's 7 Gaps
+
+The following walkthrough shows how the architecture defined in this appendix would have auto-detected each gap identified in the Appendix D conformance audit — without a manual audit.
+
+#### G1: Collection accessor on empty collection
+
+**Detection path:** The evaluator's `.min`/`.max`/`.peek` empty-collection Fail sites are classified as `EvalFailCode.CollectionAccessorEmpty` with `[StaticallyPreventable("C85")]`. The sentinel test (§ F.7) asserts that diagnostic C85 exists and that the type checker rejects bare accessor use. Before DD21 introduced the conditional guard requirement, C85 did not exist → sentinel fails → gap surfaced.
+
+#### G2: Unary minus rejects decimal in type checker
+
+**Detection path:** The evaluator's unary minus Fail site for non-numeric operands is `EvalFailCode.UnsupportedUnaryOperator` with `[StaticallyPreventable]`. Under the operator registry (§ F.4), unary minus on `Decimal` has an explicit entry — the type checker reads the registry and accepts it. Before the registry, the type checker independently rejected decimal → the positive-path conformance test (compile `-(decimal)` and evaluate) fails → gap surfaced.
+
+#### G3: Division by zero (already covered)
+
+**Detection path:** The evaluator's division-by-zero Fail site is `EvalFailCode.DivisionByZero_RuntimeValue` with `[LegitimatelyDynamic]`. The sentinel skips it — no compiler rule expected. Separately, C92/C93 cover literal-zero and proof-engine divisor safety at compile time. No gap.
+
+#### G4: Ordered choice non-member literal
+
+**Detection path:** The evaluator's `TryGetChoiceOrdinals` Fail site for non-member values is `EvalFailCode.ChoiceLiteralNotInSet` with `[StaticallyPreventable("C68")]`. The sentinel asserts that C68 covers comparison contexts (not just `set` assignment contexts). Before DD22 extended C68 to comparisons, the sentinel's conformance test (compile `Priority > "Bogus"` and expect rejection) fails → gap surfaced.
+
+#### G5: `pow(integer, negative)` not rejected
+
+**Detection path:** Under registry-driven function evaluation (§ F.3), `pow(integer, integer)` is registered with `RequiresNonNegativeProof` on the exponent parameter. The type checker reads this constraint and rejects negative literal exponents. The evaluator dispatches through the registry delegate, which never receives a negative exponent for integer pow. Before the registry extension, the evaluator's hand-coded `IntegerPow` accepted negative exponents independently → the bypass-path conformance test (skip type checker, evaluate `pow(2, -1)`) reveals divergence → gap surfaced.
+
+#### G6: `sqrt()` missing NaN guard
+
+**Detection path:** Under registry-driven function evaluation (§ F.3), the `sqrt` evaluation delegate includes the NaN guard:
+
+```csharp
+Evaluator: args =>
+{
+    var v = (double)args[0]!;
+    if (v < 0) return EvaluationResult.Fail(EvalFailCode.SqrtNegative_BehindProof, "sqrt requires non-negative argument.");
+    return EvaluationResult.Ok(Math.Sqrt(v));
+}
+```
+
+The guard is co-located with the registration — there is no separate method to forget to harden. `EvalFailCode.SqrtNegative_BehindProof` is classified as `[LegitimatelyDynamic]` (the proof engine's C94 covers the static case). The sentinel accepts it.
+
+#### G7: Rounding overflow on `long` cast
+
+**Detection path:** Under registry-driven function evaluation (§ F.3), every rounding function's evaluation delegate uses `checked` casts:
+
+```csharp
+Evaluator: args =>
+{
+    var v = (double)args[0]!;
+    try { return EvaluationResult.Ok(checked((long)Math.Floor(v))); }
+    catch (OverflowException) { return EvaluationResult.Fail(EvalFailCode.RoundingCastOverflow, "floor result exceeds integer range."); }
+}
+```
+
+The overflow guard is co-located with the delegate — there is no separate function body where the `checked` cast could be omitted. `EvalFailCode.RoundingCastOverflow` is classified as `[LegitimatelyDynamic]` (DD19 scope). The sentinel accepts it.
+
+#### Summary
+
+| Gap | EvalFailCode member | Classification | Detection mechanism |
+|-----|---------------------|----------------|---------------------|
+| G1 | `CollectionAccessorEmpty` | `[StaticallyPreventable("C85")]` | Sentinel demands C85 |
+| G2 | `UnsupportedUnaryOperator` | `[StaticallyPreventable]` | Operator registry + positive-path test |
+| G3 | `DivisionByZero_RuntimeValue` | `[LegitimatelyDynamic]` | No gap — already covered |
+| G4 | `ChoiceLiteralNotInSet` | `[StaticallyPreventable("C68")]` | Sentinel demands C68 in comparisons |
+| G5 | `FunctionArgTypeMismatch` | `[StaticallyPreventable("C41")]` | Registry-driven — structurally impossible |
+| G6 | `SqrtNegative_BehindProof` | `[LegitimatelyDynamic]` | Co-located delegate hardening |
+| G7 | `RoundingCastOverflow` | `[LegitimatelyDynamic]` | Co-located delegate hardening |
 
