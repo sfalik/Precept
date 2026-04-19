@@ -12,7 +12,20 @@ Research grounding: [research/language/evaluator-architecture-survey.md](../rese
 
 ## Overview
 
-The expression evaluator is Precept's runtime computation layer. It evaluates every DSL expression — guards, rules, ensures, set assignments, computed fields, and conditional branches — against a live entity instance, producing the values that the runtime engine uses to decide whether a transition commits or rejects.
+The expression evaluator is Precept's runtime computation layer — the mechanism through which every philosophy commitment becomes operational. It evaluates every DSL expression — guards, rules, ensures, set assignments, computed fields, and conditional branches — against a live entity instance, producing the values that the runtime engine uses to decide whether an operation commits or rejects.
+
+The evaluator provides eight interlocking guarantees that together realize Precept's core philosophy:
+
+| Guarantee | What it means | Philosophy root |
+|-----------|---------------|-----------------|
+| **Prevention** | Guard, rule, and ensure evaluations produce the boolean gates that structurally prevent invalid configurations | "Invalid configurations cannot exist" |
+| **Determinism** | Same expression + same data = same result, across machines, cultures, and time | "The engine is deterministic — same definition, same data, same outcome" |
+| **Inspectability** | Every evaluation result is honest, complete, and serializable — powering Inspect and preview without committing anything | "Full inspectability. Nothing is hidden." |
+| **Totality** | Every well-typed expression produces a definite value or a definite error — no undefined behavior, no silent NaN/Infinity/null | "Nothing is hidden" |
+| **Type contract** | Operators are defined only for their declared operand types — no implicit coercion across type families | "Prevention at the surface, not detection at depth" |
+| **Semantic fidelity** | Every value preserves the type identity declared for it — a decimal stays a decimal, an integer stays an integer, lane boundaries are explicit | "Precept does not present approximation as exactness" |
+| **Short-circuit correctness** | `and`/`or` short-circuit left-to-right as a semantic guarantee, enabling safe null-guard patterns | Totality + safe guard idioms |
+| **Expression isolation** | Expressions are pure — no mutation, no side effects, no observation outside the evaluation context | Foundation of Inspect and rollback |
 
 The evaluator operates over five type families:
 
@@ -38,33 +51,53 @@ The evaluator supports the following expression forms:
 | **Function call** | `abs`, `floor`, `ceil`, `round`, `truncate`, `min`, `max`, `clamp`, `pow`, `sqrt`, `toLower`, `toUpper`, `trim`, `startsWith`, `endsWith`, `left`, `right`, `mid` |
 | **Accessor** | `.count`, `.length`, `.min`, `.max`, `.peek` |
 
-**The semantic fidelity guarantee:** Every value produced by the evaluator preserves the type identity declared or inferred for it in the DSL. A `decimal` field's value is always a C# `decimal`; it is never silently widened to `double` for comparison, storage, or arithmetic. An integer-shaped surface (`.count`, `.length`) always produces a `long`. A `string` function always returns `string` (or `boolean` for predicates). The evaluator does not present approximation as exactness — the boundary between exact and approximate lanes is visible, explicit, and enforced at every evaluation point.
-
-This guarantee is grounded in Precept's philosophy: *"Precept does not present approximation as exactness. If a value or operation is inherently approximate, that fact must be explicit in the contract."*
+These guarantees are not independent — they form a dependency chain. Expression isolation enables inspectability. Totality enables prevention (a guard that fails to evaluate can't gate anything). Determinism enables inspectability (Inspect is trustworthy only if the preview matches the actual fire). Semantic fidelity enables type contracts (lane boundaries are meaningless if values silently cross them). Together, they realize the philosophy's promise: the engine is deterministic, nothing is hidden, and invalid configurations cannot exist.
 
 ---
 
 ## Philosophy-Rooted Design Principles
 
-The following principles govern the evaluator's design. Each traces to Precept's core philosophy commitments.
+The following principles govern the evaluator's design. They are organized from the most fundamental (those that apply to all types and all expression positions) to the most specific (numeric lane integrity). Each traces to Precept's core philosophy commitments.
 
-1. **Exactness is the default for business arithmetic.** The `decimal` lane exists because most business-domain calculations — pricing, tax, fees, balances, rates — require exact base-10 arithmetic. An invoice total of `$100.10` must not become `$100.09999999999999` through an internal IEEE 754 intermediary. The `decimal` backing type provides this guarantee. This is the direct realization of the philosophy's numeric exactness commitment. *(Philosophy: "Silent approximation inside an exact-looking path weakens the user's ability to reason about outcomes.")*
+### Foundational Guarantees
 
-2. **Approximation is explicit, not hidden.** The `number` lane exists for inherently approximate operations: `sqrt`, `pow` with non-integer exponents (future), and any domain where IEEE 754 double precision is the correct model. Values in the `number` lane are honestly approximate. The contract does not pretend they are exact. *(Philosophy: "If approximation is part of the domain, the contract must say so plainly.")*
+These principles apply to every expression the evaluator processes, regardless of type family.
 
-3. **Lane boundaries are type boundaries.** Moving a value from one numeric lane to another is a type-system event, not a silent coercion. Integer→decimal widening is exact and implicit. Integer→number widening is implicit (range-preserving, though precision may narrow for very large integers). Number→decimal is a **type error** unless the author explicitly bridges via `round(value, places)`, `floor(value)`, `ceil(value)`, or `truncate(value)`. Decimal→number widening is implicit (the value may lose precision — this is the author's explicit choice by using a number-typed context). *(Philosophy: "that line [between exact and approximate] must be visible in the type system and public surface.")*
+1. **The evaluator is the prevention engine.** Every guard, rule, and ensure is an expression that the evaluator resolves to a boolean. That boolean is the gate: `false` means the operation is rejected or the row is skipped. The evaluator does not suggest, warn, or log — it prevents. If a guard evaluates to `false`, the transition row does not fire. If a rule evaluates to `false` after mutation, the entire transition rolls back. The evaluator is what makes "invalid configurations structurally impossible" true at runtime, not just at compile time. *(Philosophy: "Prevention, not detection.")*
 
-4. **Prevention at the surface, not detection at depth.** The type checker rejects expressions that would silently cross lane boundaries. A `decimal` field cannot be assigned a `number` expression without explicit conversion. This prevents precision loss by construction — the invalid assignment is never evaluated. *(Philosophy: prevention, not detection.)*
+2. **Same expression, same data, same result. Always.** The evaluator is fully deterministic. No culture-dependent formatting, no platform-dependent floating-point modes, no observable side effects, no external state. String operations use invariant culture. String comparisons use ordinal semantics. Numeric operations use C#'s deterministic operators. Two evaluations of the same expression against the same entity data produce the same value, on any machine, at any time. *(Philosophy: "The engine is deterministic — same definition, same data, same outcome. Nothing is hidden.")*
 
-5. **Integer means integer.** Surfaces that produce or consume discrete counts — `.count`, `.length`, collection indices, string slicing parameters — are typed as `integer`, not as generic `number`. The evaluator produces `long` values for these surfaces. Callers with `number` values must normalize explicitly (`floor`, `ceil`, `truncate`, `round`) before crossing into integer-shaped APIs. No silent truncation. *(Philosophy: "Precept should not advertise a broader numeric contract than the runtime meaning actually supports.")*
+3. **Expressions are pure.** Expression evaluation cannot mutate entity state, trigger side effects, or observe anything outside the evaluation context (current field values and event arguments). A guard evaluation does not change the entity. A rule evaluation does not write to a log. A `set` RHS computes a value but does not assign it — the runtime engine performs assignment after the evaluator returns. This purity is what makes Inspect safe: evaluating every guard and rule for every possible event touches nothing. It is also what makes rollback possible: if post-mutation validation fails, nothing outside the entity's proposed state was affected. *(Philosophy: "Full inspectability — preview every possible action without executing anything.")*
 
-6. **Determinism across all lanes.** Same expression, same data, same numeric lane, same result. The evaluator does not use culture-dependent formatting, non-deterministic rounding, or platform-dependent floating-point modes. `decimal` arithmetic uses C#'s deterministic `decimal` operators. `double` arithmetic uses IEEE 754 semantics. *(Philosophy: determinism.)*
+4. **Every expression evaluates to a result or a definite error.** There is no undefined behavior, no silent failure, no partial evaluation. The evaluator returns a value or an explicit error message. Division by zero is an error, not `Infinity`. `.peek` on an empty collection is an error, not `null`. `.length` on a null string is an error, not `0`. Silent production of `NaN`, `Infinity`, or unexpected `null` is a bug — these values corrupt downstream evaluations without any visible failure signal. *(Philosophy: "Nothing is hidden.")*
 
-7. **Inspectability through honest types.** When the MCP `precept_inspect` or `precept_fire` tools serialize instance data, the serialized value preserves lane identity. A `decimal` field serializes as a JSON number with its exact decimal representation. An `integer` field serializes as a JSON integer. A `number` field serializes as a JSON number (IEEE 754). The consumer can distinguish lanes from the serialized output. *(Philosophy: full inspectability, nothing hidden.)*
+5. **Short-circuit is a semantic guarantee, not an optimization.** `and` evaluates left-to-right; if the left operand is `false`, the right operand is never evaluated. `or` evaluates left-to-right; if the left operand is `true`, the right operand is never evaluated. This enables the safe guard idiom: `Name != null and Name.length >= 2` never evaluates `.length` on null. Short-circuit makes the evaluator's own totality guarantee composable — authors can chain preconditions without nesting, and the evaluator guarantees that guarded sub-expressions are only reached when their preconditions hold. *(Philosophy: totality + safe guard patterns.)*
 
-8. **One explicit bridge, not many hidden ones.** `round(number, places) → decimal` is the sole deliberate bridge from the approximate `number` lane into the exact `decimal` lane. This bridge does not "recover" exactness from the source value — it produces a `decimal` value normalized to authored precision. No other implicit or hidden `number → decimal` paths exist. *(Locked design note, issue #115.)*
+6. **Operators are defined for their declared types. Nothing else.** `boolean + boolean` is an error. `string > string` is an error. `string * number` is an error. `"42" == 42` is an error. The type checker catches most of these at compile time; the evaluator is the runtime safety net. No implicit coercion across type families — the evaluator does not convert `string` to `number` for comparison, does not treat `0` as `false`, does not auto-convert between incompatible families. If a value reaches an operator with an incompatible type, the evaluator rejects the operation explicitly. *(Philosophy: "Prevention at the surface, not detection at depth.")*
 
-9. **Tests assert the contract, not the leak.** Test expectations must match the semantic contract: decimal-lane tests assert `decimal`-typed results, integer-shaped surface tests assert `long` results, and `number`-lane tests assert `double` results. Tests that normalize via `Convert.ToDouble()` and approximate comparisons are themselves part of the semantic drift surface and must be updated alongside the evaluator. *(Locked design note, issue #115.)*
+7. **Evaluation results are honest and serializable.** When Inspect, MCP tools, or the preview panel present evaluation results, the serialized form preserves type identity. A `decimal` field serializes with its exact decimal representation. An `integer` field serializes as a JSON integer. A `number` field serializes as a JSON number (IEEE 754). A `string` function always returns `string` (or `boolean` for predicates). The consumer can distinguish types from the serialized output. The evaluator never presents an approximate value as exact or an exact value as approximate. *(Philosophy: "Full inspectability. The engine exposes the complete reasoning.")*
+
+### Numeric Integrity
+
+These principles govern the evaluator's three numeric type families: integer (`long`), decimal (`decimal`), and number (`double`). They are the specific realization of the foundational guarantees applied to Precept's numeric type system.
+
+8. **Exactness is the default for business arithmetic.** The `decimal` lane exists because most business-domain calculations — pricing, tax, fees, balances, rates — require exact base-10 arithmetic. An invoice total of `$100.10` must not become `$100.09999999999999` through an internal IEEE 754 intermediary. The `decimal` backing type provides this guarantee. This is the direct realization of the philosophy's numeric exactness commitment. *(Philosophy: "Silent approximation inside an exact-looking path weakens the user's ability to reason about outcomes.")*
+
+9. **Approximation is explicit, not hidden.** The `number` lane exists for inherently approximate operations: `sqrt`, `pow` with non-integer exponents (future), and any domain where IEEE 754 double precision is the correct model. Values in the `number` lane are honestly approximate. The contract does not pretend they are exact. *(Philosophy: "If approximation is part of the domain, the contract must say so plainly.")*
+
+10. **Lane boundaries are type boundaries.** Moving a value from one numeric lane to another is a type-system event, not a silent coercion. Integer→decimal widening is exact and implicit. Integer→number widening is implicit (range-preserving, though precision may narrow for very large integers). Number→decimal is a **type error** unless the author explicitly bridges via `round(value, places)`, `floor(value)`, `ceil(value)`, or `truncate(value)`. Decimal→number widening is implicit (the value may lose precision — this is the author's explicit choice by using a number-typed context). *(Philosophy: "that line [between exact and approximate] must be visible in the type system and public surface.")*
+
+11. **Prevention at the surface, not detection at depth.** The type checker rejects expressions that would silently cross lane boundaries. A `decimal` field cannot be assigned a `number` expression without explicit conversion. This prevents precision loss by construction — the invalid assignment is never evaluated. *(Philosophy: prevention, not detection.)*
+
+12. **Integer means integer.** Surfaces that produce or consume discrete counts — `.count`, `.length`, collection indices, string slicing parameters — are typed as `integer`, not as generic `number`. The evaluator produces `long` values for these surfaces. Callers with `number` values must normalize explicitly (`floor`, `ceil`, `truncate`, `round`) before crossing into integer-shaped APIs. No silent truncation. *(Philosophy: "Precept should not advertise a broader numeric contract than the runtime meaning actually supports.")*
+
+13. **Determinism across all lanes.** Same expression, same data, same numeric lane, same result. The evaluator does not use culture-dependent formatting, non-deterministic rounding, or platform-dependent floating-point modes. `decimal` arithmetic uses C#'s deterministic `decimal` operators. `double` arithmetic uses IEEE 754 semantics. *(Philosophy: determinism.)*
+
+14. **Inspectability through honest types.** When the MCP `precept_inspect` or `precept_fire` tools serialize instance data, the serialized value preserves lane identity. A `decimal` field serializes as a JSON number with its exact decimal representation. An `integer` field serializes as a JSON integer. A `number` field serializes as a JSON number (IEEE 754). The consumer can distinguish lanes from the serialized output. *(Philosophy: full inspectability, nothing hidden.)*
+
+15. **One explicit bridge, not many hidden ones.** `round(number, places) → decimal` is the sole deliberate bridge from the approximate `number` lane into the exact `decimal` lane. This bridge does not "recover" exactness from the source value — it produces a `decimal` value normalized to authored precision. No other implicit or hidden `number → decimal` paths exist. *(Locked design note, issue #115.)*
+
+16. **Tests assert the contract, not the leak.** Test expectations must match the semantic contract: decimal-lane tests assert `decimal`-typed results, integer-shaped surface tests assert `long` results, and `number`-lane tests assert `double` results. Tests that normalize via `Convert.ToDouble()` and approximate comparisons are themselves part of the semantic drift surface and must be updated alongside the evaluator. *(Locked design note, issue #115.)*
 
 ---
 
@@ -111,6 +144,14 @@ The expression evaluator exists and is functionally correct for most expression 
 ### Critical Finding 10: String slicing silently truncates
 
 `left()`, `right()`, and `mid()` ([PreceptExpressionEvaluator.cs](../src/Precept/Dsl/PreceptExpressionEvaluator.cs#L645)) accept any numeric type for their count/start/length parameters via `TryToNumber`, then silently truncate to `int` via `(int)countNum`. A call `left(Name, 3.7)` silently becomes `left(Name, 3)` — the fractional part is discarded without warning.
+
+### Critical Finding 11: Unary minus collapses `decimal` to `double`
+
+`EvaluateUnary()` ([PreceptExpressionEvaluator.cs](../src/Precept/Dsl/PreceptExpressionEvaluator.cs#L99)) checks for `long` first, then falls through to `TryToNumber`, which converts `decimal` to `double`. The expression `-Price` where `Price` is `decimal` produces a `double` result, silently leaving the exact lane. This is the same class of bug as the arithmetic operator violations (Critical Finding 5) but applied to the unary negation operator.
+
+### Critical Finding 12: `DecimalPow` throws on zero base with negative exponent
+
+`DecimalPow(0m, -1)` ([PreceptExpressionEvaluator.cs](../src/Precept/Dsl/PreceptExpressionEvaluator.cs#L580)) computes `1m / DecimalPow(0m, 1)` which triggers `DivideByZeroException`. Unlike every other division path in the evaluator (which guards against zero divisors and returns `EvaluationResult.Fail`), this path throws an unhandled exception. This violates the totality guarantee (Principle 4) — the evaluator must return a definite error, not crash.
 
 ### Root Cause
 
