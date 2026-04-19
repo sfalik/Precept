@@ -498,7 +498,7 @@ Relational operators (`>`, `>=`, `<`, `<=`) are valid on choice fields **only** 
 
 #### Error Cases
 
-- **Value not in ordered set:** If either operand's string value is not found in the `ChoiceValues` list, the evaluator produces an evaluation error: `"'value' is not a member of the ordered choice set."` This is a hard error, not a silent `false`.
+- **Value not in ordered set:** If either operand's string value is not found in the `ChoiceValues` list, the evaluator produces an evaluation error: `"'value' is not a member of the ordered choice set."` This is a hard error, not a silent `false`. **Compile-time validation (DD22):** The type checker validates that string literals used in ordered choice comparisons (e.g., `Priority > "Urgent"`) are members of the declared choice set. This extends the existing C68 pattern (which validates choice members in `set` assignments) to comparison contexts. When the literal is a non-member, the type checker rejects the expression at compile time — the runtime error path is defensive redundancy only (Principle 18).
 - **Unordered choice with relational operator:** If the field lacks the `ordered` constraint, `TryGetChoiceOrdinals` returns `false`, and the evaluator falls through to the numeric comparison path, which fails with `"operator '>' requires numeric operands."` The type checker prevents this at compile time; the evaluator's check is defensive redundancy (see Principle 18).
 - **Cross-field ordered comparison:** Ordinal rank is field-local. Comparing two different ordered choice fields is meaningless because their orderings are independent.
 
@@ -600,6 +600,8 @@ Collection accessors:
 - `.min` / `.max` on `set<integer>` → `long` (preserves inner type)
 - `.min` / `.max` on `set<number>` → `double` (preserves inner type)
 - `.peek` on `queue<T>` / `stack<T>` → inner type
+
+**Emptiness guard requirement (DD21):** `.min`, `.max`, and `.peek` require a conditional guard — the type checker rejects bare accessor use outside a conditional expression whose condition tests `.count > 0`. The idiomatic pattern is: `if Items.count > 0 then Items.min else 0`. This ensures that compiled precepts never produce a runtime error from accessing an empty collection (Principle 18 — static completeness). See DD21 for rationale and alternatives considered.
 
 Collections preserve element type identity through storage, retrieval, comparison, and serialization.
 
@@ -838,6 +840,24 @@ The expression evaluator exists and is functionally correct for most expression 
 *(Violates § Function Contracts — Numeric Functions (`min`/`max` decimal overloads).)*
 
 `ReduceComparable()` ([PreceptExpressionEvaluator.cs](../src/Precept/Dsl/PreceptExpressionEvaluator.cs#L500)) uses `TryToNumber` (which returns `double`) for all comparisons in `min`/`max`, even when all arguments are `decimal`. Two `decimal` values `0.1m` and `0.2m` are compared as `double`, producing correct results in most cases but violating the lane-preservation contract and risking edge-case divergence for values near `decimal`'s precision limits. The fix is a decimal fast-path using native `decimal.CompareTo`, mirroring the existing `long` fast-path. *(Identified in DD13.)*
+
+### Critical Finding 15: Unary minus rejects decimal in type checker
+
+*(Gap G2 — type checker too strict for unary minus on decimal.)*
+
+The type checker rejects unary minus applied to `decimal`-typed expressions, but the evaluator correctly handles it by collapsing through `TryToNumber`. The type checker should accept unary minus for all three numeric lanes. This is a trivial fix in `TypeInference.cs` — add `decimal` to the accepted operand types for unary minus. *(Resolves Gap G2.)*
+
+### Critical Finding 16: Collection `.min`/`.max`/`.peek` on empty collection produces runtime Fail
+
+*(Gap G1 — empty collection accessor not caught by type checker.)*
+
+Accessing `.min`, `.max`, or `.peek` on an empty collection produces `EvaluationResult.Fail` at runtime. The type checker does not statically prevent this — the emptiness condition depends on runtime state. Resolved by DD21: the type checker now requires a conditional guard (`if Collection.count > 0 then Collection.min else fallback`), making bare accessor use a compile-time error. *(Resolves Gap G1 via DD21.)*
+
+### Critical Finding 17: Ordered choice comparison with non-member literal produces runtime Fail
+
+*(Gap G4 — ordered choice literal not validated at compile time.)*
+
+An ordered choice comparison like `when Priority > "Bogus"` compiles without diagnostics but fails at runtime with `"'Bogus' is not a member of the ordered choice set."` The type checker validates choice members in `set` assignments (C68) but not in comparison contexts. Resolved by DD22: the type checker now validates string literals in ordered choice comparisons against the declared choice set. *(Resolves Gap G4 via DD22.)*
 
 ### Root Cause
 
@@ -1144,6 +1164,36 @@ The following table documents the implementation status of each function contrac
 
 **Tradeoff accepted:** Authors cannot compute negative-exponent powers in the integer lane. They must explicitly cross to decimal or number, which makes the non-integer result visible in the type system.
 
+### DD21: Collection Accessor Emptiness — Blanket Prohibition
+
+**Decision:** `.min`, `.max`, and `.peek` require a conditional guard: `if Collection.count > 0 then Collection.min else fallback`. The type checker rejects bare `.min`/`.max`/`.peek` use outside a conditional expression whose condition tests `.count > 0`.
+
+**Rationale:** Principle 18 (static completeness) — no runtime errors from compiled precepts. Collection emptiness is statically unprovable today: the proof engine cannot determine whether a collection is guaranteed non-empty, because collection population depends on runtime event history. The conditional guard pattern makes the emptiness check explicit in the source code, eliminating the runtime failure path for compiled precepts.
+
+**Diagnostic:** New diagnostic (extend C85 or new code) in `TryInferKind` for identifier expressions with `.min`/`.max`/`.peek` member access. The diagnostic fires when the accessor appears outside a conditional expression whose condition tests the collection's `.count > 0`.
+
+**Implementation:** The type checker inspects the AST context of `.min`/`.max`/`.peek` accessor expressions. If the accessor is the `ThenBranch` of a conditional expression whose `Condition` is a comparison of the same collection's `.count` against `0` (using `>`), the accessor is permitted. Otherwise, a diagnostic is emitted.
+
+**Alternative rejected:** Count-aware proof engine extension — extending the proof engine to track collection cardinality intervals, enabling bare `.min`/`.max`/`.peek` when the collection is provably non-empty. This approach is tractable but deferred: filed as issue #131 for future investigation. The blanket prohibition is the conservative starting point.
+
+**Tradeoff accepted:** More verbose syntax — `if Items.count > 0 then Items.min else 0` instead of bare `Items.min`. The verbosity makes the emptiness assumption explicit, which is both safe and readable. The conditional pattern is standard in the sample corpus (see `computed-tax-net.precept`, `fee-schedule.precept`).
+
+### DD22: Choice Literal Validation in Comparisons
+
+**Decision:** The type checker validates that string literals used in ordered choice comparisons (`Priority > "Urgent"`) are members of the declared choice set. Invalid literals produce a compile-time diagnostic.
+
+**Rationale:** Principle 18 (static completeness) — `when Priority > "Bogus"` currently compiles without diagnostics but fails at runtime with `"'Bogus' is not a member of the ordered choice set."` This violates the static completeness guarantee: a compiled precept should not produce type errors at runtime.
+
+**Extends:** The existing C68 diagnostic pattern, which validates choice members in `set` assignments. DD22 extends the same validation to comparison contexts.
+
+**Implementation:** `TryInferBinaryKind` needs access to field metadata (specifically `PreceptField.ChoiceValues`) when one operand is an identifier referencing a choice field and the other is a string literal. The type checker resolves the field, checks `IsOrdered`, and validates the literal against `ChoiceValues`. If the literal is not a member, a diagnostic is emitted.
+
+**Context enrichment:** The type inference path for binary expressions currently operates on `StaticValueKind` without field metadata. DD22 requires threading field metadata (choice value lists) into the type inference context so that `TryInferBinaryKind` can perform membership validation. This is a moderate implementation cost — the type checker must carry field context through binary expression inference.
+
+**Alternative rejected:** Leave as runtime error — this directly violates Principle 18. The runtime error path becomes defensive redundancy only after DD22.
+
+**Tradeoff accepted:** Moderate implementation cost (context enrichment in type inference). The type checker must carry more context through binary expression analysis, but the payoff is a complete static guarantee: every compiled choice comparison uses valid members only.
+
 ---
 
 ## Appendix C: Test Obligations
@@ -1198,4 +1248,220 @@ The test suite must cover the following categories to verify lane integrity:
 - **`double` input to `decimal` field rejected:** `CoerceToDecimal` type error — mirrors Java BigDecimal's `new BigDecimal(double)` footgun prevention
 - **API `decimal` round-trip:** Write `decimal 0.1m`, serialize, deserialize → `decimal 0.1m`
 - **Decimal overflow produces error:** `decimal.MaxValue + 1` throws `OverflowException`, does NOT silently widen to `double`
+
+---
+
+## Appendix D: Compiler↔Evaluator Conformance Audit
+
+This appendix documents the results of the compiler↔evaluator conformance audit — a systematic review of all evaluator error paths to verify that Principle 18 (static completeness) holds: every statically preventable runtime error has a corresponding type-checker or proof-engine rule that prevents it at compile time.
+
+### Audit Scope
+
+The audit examined all 72 distinct evaluator error paths — every `EvaluationResult.Fail(...)` return site and every unguarded exception path in `PreceptExpressionEvaluator.cs`. Each path was classified as either:
+
+- **Statically preventable** — the type checker or proof engine can reject the input at compile time.
+- **Legitimately dynamic** — the error depends on runtime state that cannot be determined statically (overflow, DecimalPow edge cases, empty collections with conditional guard).
+
+### Coverage Summary
+
+| Category | Count | Status |
+|----------|-------|--------|
+| Fully covered by type checker | 38 | No action needed — type checker already rejects |
+| Gaps needing type-checker changes | 2 | G2, G5 — trivial fixes |
+| Gaps needing evaluator hardening only | 3 | G6, G7, unchecked arithmetic — defense-in-depth |
+| Gaps resolved by new design decisions | 2 | G1 (DD21), G4 (DD22) |
+| **Total error paths audited** | **72** | |
+
+**After the 7 gaps are resolved:** Every statically preventable evaluator `Fail` has a matching compiler rule. The only runtime failures from compiled precepts will be legitimately dynamic: integer overflow (DD19), `DecimalPow` edge cases (DD14), and guard/rule business logic producing `false`.
+
+### Gap Detail
+
+#### G1: Collection accessor on empty collection → DD21
+
+**Trigger:** `.min`, `.max`, or `.peek` on a collection with zero elements.
+
+**Location:** `EvaluateIdentifier()` → member accessor dispatch for `.min`/`.max`/`.peek`.
+
+**Fix:** DD21 — the type checker requires a conditional guard (`if Collection.count > 0 then Collection.min else fallback`). Bare accessor use is now a compile-time error. The evaluator's runtime check remains as defensive redundancy.
+
+#### G2: Unary minus rejects decimal in type checker
+
+**Trigger:** Unary minus applied to a `decimal`-typed expression. The type checker rejects it; the evaluator would handle it correctly (via `TryToNumber` collapse).
+
+**Location:** `TryInferKind()` for unary expressions in `PreceptTypeChecker.cs`.
+
+**Fix:** Trivial — add `StaticValueKind.Decimal` to the accepted operand types for unary minus in the type checker. Also see CF15.
+
+#### G3: Division/modulo by zero
+
+**Trigger:** `x / 0` or `x % 0` where the divisor is a literal or field value equal to zero.
+
+**Status:** Already covered by C92 (literal zero divisor) and C93 (proof-engine divisor safety). NaN/Infinity from extreme floating-point values is a DD19 carve-out (legitimate runtime). No gap.
+
+#### G4: Ordered choice comparison with non-member literal → DD22
+
+**Trigger:** `when Priority > "Bogus"` where `"Bogus"` is not in the declared choice set.
+
+**Location:** `TryGetChoiceOrdinals()` → ordinal lookup failure in evaluator.
+
+**Fix:** DD22 — the type checker validates string literals in ordered choice comparisons against the declared choice set at compile time. The evaluator's runtime check remains as defensive redundancy.
+
+#### G5: `pow(integer, negative)` not rejected by type checker
+
+**Trigger:** `pow(Count, -2)` where both arguments are integer-typed and the exponent is negative.
+
+**Location:** `FunctionRegistry` → `IntegerPow` body. The evaluator computes `1/pow(x,|n|)` which truncates to 0 for most inputs.
+
+**Fix:** Trivial — DD20 compliance. Add a type-checker rule that rejects negative integer literal exponents for `pow(integer, integer)`. When the exponent is a field reference, the proof engine must verify ≥ 0.
+
+#### G6: `sqrt()` missing NaN guard
+
+**Trigger:** `sqrt(x)` where `x` is negative. `Math.Sqrt(-1.0)` returns `double.NaN`, which then propagates silently.
+
+**Location:** `FunctionRegistry` → `sqrt(double)` body.
+
+**Fix:** Evaluator hardening — add a guard that returns `EvaluationResult.Fail` when the argument is negative. The proof engine already enforces non-negativity for `sqrt` arguments (C94); this is defense-in-depth only.
+
+#### G7: `floor`/`ceil`/`truncate`/`round` overflow on cast to `long`
+
+**Trigger:** `floor(1e18)` where the rounded result exceeds `long.MaxValue` or is below `long.MinValue`.
+
+**Location:** `FunctionRegistry` → rounding function bodies that cast `double`/`decimal` to `long`.
+
+**Fix:** DD19 scope — use `checked` casts in all rounding-to-`long` paths. Overflow produces `EvaluationResult.Fail` (a legitimate dynamic failure, like integer arithmetic overflow).
+
+### Classification
+
+**Statically preventable** (must have compiler rules — drift = bug):
+- All 38 already-covered error paths
+- G1 (DD21), G2 (type-checker fix), G4 (DD22), G5 (DD20 compliance)
+
+**Legitimately dynamic** (runtime failures that cannot be statically prevented):
+- Integer arithmetic overflow (DD19 — checked arithmetic)
+- `DecimalPow` edge cases: division by zero with zero base + negative exponent, decimal range overflow (DD14)
+- `floor`/`ceil`/`truncate`/`round` overflow on `long` cast (G7 — DD19 scope)
+- `sqrt` NaN guard (G6 — defense-in-depth behind proof engine's C94)
+- Guard/rule business logic producing `false` (by design — this is the prevention engine)
+
+The full error-path catalog is maintained in the conformance test suite (see Appendix E) rather than reproduced here. The test suite enforces the classification: every statically preventable `Fail` path is paired with a compiler-rejection test, and every legitimate dynamic failure is paired with an `AllowedDynamicState` marker.
+
+---
+
+## Appendix E: Conformance Test Architecture
+
+This appendix specifies the conformance test architecture that enforces Principle 18 (static completeness). The test suite systematically verifies that the type checker and evaluator agree on every construct — if the type checker accepts an expression, the evaluator must evaluate it without type errors; if the type checker rejects an expression, the evaluator must also reject it when the type checker is bypassed.
+
+### Scope
+
+The test architecture addresses two classes of evaluator failures:
+
+1. **Statically preventable** — errors that the type checker or proof engine should catch at compile time. If a statically preventable error reaches the evaluator at runtime, it indicates drift between the compiler and evaluator. These are bugs.
+2. **Legitimately dynamic** — errors that depend on runtime state: integer overflow (DD19), `DecimalPow` edge cases (DD14), empty collections behind conditional guards (DD21), and guard/rule business logic producing `false`. These are expected runtime behaviors, not drift.
+
+### Seven Conformance Test Categories
+
+#### 1. Registry-Derived Function Conformance
+
+Auto-generated test matrix from `FunctionRegistry`. For every registered function overload:
+- **Positive:** Compile succeeds AND evaluate succeeds — assert CLR result type matches declared output type and value is correct.
+- **Negative:** Compile rejects when argument types don't match any registered overload.
+- **Bypass:** Evaluator also rejects when type checker is skipped — the evaluator's own type dispatch produces `Fail`, not an unhandled exception.
+
+New overloads added to `FunctionRegistry` auto-require tests — the anti-drift sentinel (see below) detects untested overloads.
+
+#### 2. Operator Dispatch and Lane Matrix
+
+Operator × type-family matrix covering all 6 binary operand combinations (`long×long`, `decimal×decimal`, `double×double`, `long×decimal`, `long×double`, `decimal×double`) for all 5 arithmetic operators (`+`, `-`, `*`, `/`, `%`) and all 6 comparison operators (`==`, `!=`, `>`, `>=`, `<`, `<=`):
+- **Positive:** Each legal combination compiles and evaluates with correct result type and value.
+- **Negative:** Each illegal combination (e.g., `decimal + double`) is rejected by the type checker.
+- **Bypass:** Evaluator also rejects illegal combinations via its own dispatch.
+
+#### 3. Accessor and Collection Conformance
+
+Tests for `.count`, `.length`, `.min`, `.max`, `.peek`, and `contains`:
+- **`.count` and `.length` return `long`** — assert `typeof(long)`, not `typeof(double)`.
+- **`.min`/`.max` preserve inner type** — `set<decimal>.min` returns `decimal`, not `double`.
+- **`.min`/`.max`/`.peek` require conditional guard** — bare use is rejected by type checker (DD21).
+- **`contains` uses lane-native comparison** — `set<decimal> contains 0.1` compares via `decimal`, not `double`.
+
+#### 4. Proof-Obligation Conformance
+
+Tests for proof-engine obligations: divisor safety (C92/C93), `sqrt` non-negativity (C94), `pow` non-negative exponent (DD20), and assignment interval validation:
+- **Positive:** Expression with provably safe operands compiles and evaluates.
+- **Negative:** Expression with unprovable operands emits the correct diagnostic.
+- **Bypass:** Evaluator also rejects (defense-in-depth) when proof is skipped.
+
+#### 5. Assignment and Runtime-Boundary Conformance
+
+Tests for the three write paths — Fire (`set` assignments), Update (direct field edits), and computed-field recomputation:
+- **Lane compatibility:** Each write path enforces the same lane rules (§ Assignment & Coercion).
+- **Constraint enforcement:** Constraints are checked in the target field's lane-native type.
+- **Coercion rules:** Runtime boundary coercion follows the documented table (§ Runtime Coercion Rules).
+
+#### 6. Evaluator-Failure Parity
+
+Every statically preventable `EvaluationResult.Fail` return site in the evaluator is mapped to a compiler rule:
+- For each `Fail` site, a test asserts that the type checker emits the corresponding diagnostic.
+- Sites that are legitimately dynamic are mapped to `AllowedDynamicState` markers instead.
+- The sentinel (see below) detects unmapped `Fail` sites — a new `Fail` return added to the evaluator without a matching compiler rule or `AllowedDynamicState` marker fails the test suite.
+
+#### 7. Regression Anchors
+
+Named tests for every Appendix A critical finding and every design decision with behavioral impact. These tests encode the specific bugs and decisions that shaped the current design — they cannot be silently deleted or renamed without failing the anchor registry sentinel.
+
+### Dual-Path Testing Pattern
+
+Every construct is tested from three sides:
+
+1. **Positive path:** Compile succeeds AND evaluate succeeds. Assert both the CLR type (`Assert.IsType<decimal>()`) and the value (`Assert.Equal(expected, actual)`) of the result. Value-only assertions miss lane regressions where the result is numerically close but in the wrong type (Principle 16).
+
+2. **Negative path:** Compile rejects with the expected diagnostic code and message. Assert that the diagnostic is correct — wrong code or wrong message is a failure.
+
+3. **Bypass path:** Skip the type checker and invoke the evaluator directly. Assert that the evaluator also rejects the input with `EvaluationResult.Fail`. This is the defense-in-depth guarantee — even if the type checker has a bug, the evaluator does not silently produce a wrong-typed result.
+
+### Anti-Drift Sentinels
+
+Four sentinel mechanisms detect drift before it reaches production:
+
+#### Function Registry Completeness
+
+Reflects over `FunctionRegistry` at test time. For every registered overload `(functionName, inputTypes, outputType)`, asserts that a corresponding conformance test exists. A new overload added without a test fails the sentinel.
+
+#### Operator Manifest Completeness
+
+Maintains an explicit operator × type-family matrix. Adding a new operator or a new type family without updating the matrix fails the sentinel.
+
+#### Evaluator Failure Classification
+
+Reflects over (or statically enumerates) every `EvaluationResult.Fail` return site in the evaluator. Each site must be mapped to either:
+- A compiler diagnostic code (statically preventable — the type checker catches this).
+- An `AllowedDynamicState` marker (legitimately dynamic — runtime-dependent).
+
+An unmapped `Fail` site fails the sentinel.
+
+#### Regression Anchor Registry
+
+Maintains a list of named regression anchor tests. Deleting or renaming an anchor test without updating the registry fails the sentinel. This prevents silent removal of tests that encode critical findings and design decisions.
+
+### Regression Anchors Table
+
+The following named tests must exist in the conformance test suite. Each anchors a specific critical finding or design decision:
+
+| Anchor name | What it tests | Origin |
+|-------------|---------------|--------|
+| `DecimalClosure_SubtractionCanary` | `0.3m - 0.2m - 0.1m == 0.0m` in decimal lane | CF5, DD2 |
+| `CountReturnsInteger` | `.count` returns `long`, not `double` | CF8, DD3 |
+| `LengthReturnsInteger` | `.length` returns `long`, not `double` | CF8, DD3 |
+| `SqrtDecimalOverloadRemoved` | `sqrt(decimal)` is a compile error | DD10, DD16 |
+| `ApproximateFunctionExists` | `approximate(decimal) → double` compiles and evaluates | DD11 |
+| `PowIntegerNegativeExponentRejects` | `pow(integer, -1)` is a compile error | DD20 |
+| `DecimalPlusNumberTypeError` | `decimal + number` is a compile error | DD12 |
+| `MinDecimalReturnsDecimal` | `min(decimal, decimal)` returns `decimal`, not `double` | CF14, DD13 |
+| `MaxDecimalReturnsDecimal` | `max(decimal, decimal)` returns `decimal`, not `double` | CF14, DD13 |
+| `RoundBridgeReturnsDecimal` | `round(number, 2)` returns `decimal` | DD5 |
+| `CollectionAccessorRequiresGuard` | Bare `.min`/`.max`/`.peek` is a compile error | DD21, CF16 |
+| `ChoiceLiteralValidatedInComparison` | `Priority > "Bogus"` is a compile error | DD22, CF17 |
+| `CheckedIntegerOverflow` | Integer overflow produces `Fail`, not silent wraparound | DD19 |
+| `DecimalPowZeroBaseNegativeExponent` | `pow(0m, -1)` produces `Fail`, not exception | DD14, CF12 |
+| `UnaryMinusDecimalAccepted` | `-Price` where `Price` is decimal compiles and evaluates | CF15, G2 |
 
