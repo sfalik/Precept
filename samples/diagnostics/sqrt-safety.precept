@@ -1,0 +1,35 @@
+// Demonstrates: C76 — sqrt() requires a non-negative argument
+
+# SQRT SAFETY
+# The proof engine requires a non-negative argument proof before allowing sqrt().
+# If the argument field may be negative, C76 fires at the call site.
+#
+# C76 fires for:
+#   - Fields with no lower-bound constraint (default is no constraint → may be negative)
+#   - Fields whose constraint interval includes negative values (e.g., default 0 with no min)
+#
+# REMEDIATION:
+#   Option A — add a 'nonnegative' constraint to the field:
+#     field Measurement as number default 0 nonnegative
+#
+#   Option B — add a rule:
+#     rule Measurement >= 0 because "Measurement cannot be negative"
+#
+#   Option C — narrow via guard:
+#     from Active on Compute when Measurement >= 0 -> set Root = sqrt(Measurement) -> no transition
+#
+#   Option D — use a state ensure on the initial state:
+#     in Active ensure Measurement >= 0 because "Measurement must be non-negative in Active"
+#
+# After applying any of these, the C76 diagnostic disappears.
+
+precept SqrtSafetyDemo
+
+field Measurement as number default 0
+field Root as number default 0
+
+state Active initial
+event Compute
+
+# C76: Measurement has no nonnegative proof; its interval includes negative values.
+from Active on Compute -> set Root = sqrt(Measurement) -> no transition

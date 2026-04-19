@@ -1,0 +1,33 @@
+// Demonstrates: C98 — vacuous guard: provably always true given field constraints
+
+# VACUOUS GUARDS
+# C98 fires when a transition guard expression is provably always true given field constraints.
+# The 'when' clause has no effect — the branch always executes regardless.
+#
+# C98 is a WARNING: it does not block compilation, but the guard is noise and
+# should be removed.
+#
+# Example:
+#   field Score min 0 max 100  → interval [0, 100]
+#   when Score >= 0            → requires Score >= 0; Score is always >= 0 given min 0
+#   Tautological: the guard is always true. C98 fires.
+#
+# REMEDIATION:
+#   Remove the vacuous 'when' clause. The transition fires unconditionally,
+#   which is what the tautological guard already guaranteed.
+#     from Review on Submit -> transition Approved
+#
+#   If you intended a meaningful condition, tighten the threshold:
+#     from Review on Submit when Score >= 60 -> transition Approved
+
+precept VacuousGuardsDemo
+
+field Score as number default 50 min 0 max 100
+
+state Review initial
+state Approved
+
+event Submit
+
+# C98: Score >= 0 is always true — Score has min 0. The 'when' clause has no effect.
+from Review on Submit when Score >= 0 -> transition Approved

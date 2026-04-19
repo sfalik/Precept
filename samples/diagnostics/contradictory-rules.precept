@@ -1,0 +1,38 @@
+// Demonstrates: C95, C29 — contradictory rule: rule interval disjoint from field constraints
+
+# CONTRADICTORY RULES
+# C95 fires when a rule's required interval is disjoint from the field's constraint interval.
+# No value can simultaneously satisfy both the field constraint and the rule.
+#
+# Example:
+#   field Threshold min 10 max 20 → interval [10, 20]
+#   rule Threshold < 5           → rule requires interval (-∞, 5)
+#   These intervals are disjoint — no value satisfies both.
+#
+# C95 is a WARNING: it flags the logical contradiction so you can fix the rule or the field.
+#
+# C29 is an ERROR: it enforces that rules must hold for default field values at compile time.
+# Because no value can satisfy both the constraint and the rule, the default value (10)
+# satisfies the field constraint but violates the rule — triggering C29 as well.
+#
+# C29 and C95 always appear together when a rule contradicts field constraints,
+# because the default value cannot satisfy an unsatisfiable rule.
+#
+# REMEDIATION:
+#   Option A — fix the rule so its interval overlaps the field constraint:
+#     rule Threshold < 25 because "Threshold must stay reasonably small"
+#
+#   Option B — relax the field constraint so valid values exist:
+#     field Threshold as number default 3 min 1 max 4  (now [1,4] overlaps (-∞,5))
+#
+#   Option C — remove the contradictory rule entirely if it was added by mistake.
+
+precept ContradictoryRulesDemo
+
+field Threshold as number default 10 min 10 max 20
+
+state Review initial
+
+# C95 + C29: Threshold < 5 requires (-∞, 5), but field is constrained to [10, 20].
+# The default value 10 satisfies the field constraint but violates the rule.
+rule Threshold < 5 because "Threshold must stay below 5"

@@ -1,0 +1,39 @@
+// Demonstrates: C92, C93 — divisor safety: literal zero and unproven divisor
+
+# DIVISOR SAFETY
+# The proof engine checks every division site at compile time.
+#
+# C92: Division by the literal 0 is always provably wrong — reject immediately.
+#
+# C93: Division by a field that has no compile-time nonzero proof.
+#   The engine cannot certify the divisor is nonzero without one of:
+#     - a 'positive' constraint on the divisor field, or
+#     - a 'rule Divisor != 0' (or 'rule Divisor > 0'), or
+#     - a 'when Divisor > 0' guard narrowing the context before the division.
+#
+# REMEDIATION for C93:
+#   Option A — constrain the field at declaration:
+#     field Divisor as number default 1 positive
+#
+#   Option B — guard the transition:
+#     from Active on Divide when Divisor > 0 -> set Result = Amount / Divisor -> no transition
+#
+#   After applying Option A or B, the C93 diagnostic disappears.
+
+precept DivisorSafetyDemo
+
+field Amount as number default 100 positive
+field Divisor as number default 1
+field Quotient1 as number default 0
+field Quotient2 as number default 0
+
+state Active initial
+event DivideByZero
+event DivideByUnproven
+
+# C92: literal zero — the divisor is provably zero at every execution of this row.
+from Active on DivideByZero -> set Quotient1 = Amount / 0 -> no transition
+
+# C93: Divisor has no nonzero proof. The default value 1 is a runtime value,
+# not a compile-time guarantee. Add 'positive' to the field or guard the transition.
+from Active on DivideByUnproven -> set Quotient2 = Amount / Divisor -> no transition

@@ -1,0 +1,32 @@
+// Demonstrates: C96 — vacuous rule: provably always true given field constraints
+
+# VACUOUS RULES
+# C96 fires when a rule is provably always true given the field's existing constraints.
+# The rule adds no new information — it is redundant and can be removed.
+#
+# C96 is a WARNING: it does not block compilation, but flags the unnecessary rule.
+#
+# Examples:
+#   field Limit min 1 max 100  → interval [1, 100]
+#   rule Limit >= 0            → rule requires [0, +∞); field already guarantees Limit >= 1
+#   Vacuous: Limit is always >= 0 given min 1. C96 fires.
+#
+#   field Rate positive        → interval (0, +∞)
+#   rule Rate > 0              → rule requires (0, +∞); identical to 'positive' constraint
+#   Vacuous: Rate is always > 0 given 'positive'. C96 fires.
+#
+# REMEDIATION:
+#   Remove the vacuous rule. The field constraint already enforces the invariant.
+#   If the rule was intended to document intent, the field constraint's declaration
+#   is the authoritative statement — the rule is noise.
+
+precept VacuousRulesDemo
+
+field Limit as number default 50 min 1 max 100
+field Rate as number default 5 positive
+
+# C96: Limit >= 0 is always true because Limit has min 1 (interval [1, 100]).
+rule Limit >= 0 because "Limit must be non-negative"
+
+# C96: Rate > 0 is always true because Rate has 'positive' constraint (interval (0, +∞)).
+rule Rate > 0 because "Rate must be positive"

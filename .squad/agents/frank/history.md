@@ -119,3 +119,10 @@ Key structural decisions:
 ### 2026-04-12 — Issue #9 design review resolutions incorporated
 - Folded the resolved design decisions back into the issue body, including null-handling, split diagnostics (C72/C73), and inspect trace expectations.
 - Design left implementation-ready after proposal/body synchronization.
+
+### 2026-04-18 — Issue #118 future-proofing: temporal + quantity fit analysis
+- Mapped detailed designs for #107 (temporal, 8 types) and #95 (currency/quantity, 7 types) against the proposed 6-file partial class decomposition in issue #118.
+- **TypeInference.cs scaling problem:** Combined growth from both proposals balloons the file from ~800 to ~1680-2135 lines (operator tables, typed constants, dot-accessor resolution). Planned split point: extract `TryInferTemporalBinaryKind` and `TryInferDomainBinaryKind` dispatch into a 7th partial `PreceptTypeChecker.DomainTypeInference.cs` when the first proposal lands — not pre-emptively.
+- **All other 5 files confirmed clean fit:** FieldConstraints (+90-160 lines from `in`/`of` validation, temporal constraint rejection), ProofChecks (+20-40, neither proposal adds proof engine integration — currency doc explicitly says "proof engine does not need modification"), Narrowing (+70-120, discrete equality narrowing via `TryApplyEqualityNarrowing` fits existing pattern), Helpers (+100-160, mechanical `StaticValueKind`/`MapScalarType` additions), Main (stable).
+- Key insight: discrete equality narrowing (`$eq:` markers for unit/currency/dimension compatibility) is a parallel layer to existing numeric/null narrowing — same pipeline, different proof surface.
+- Updated issue #118 body with expanded per-file impact table, scaling analysis, planned split documentation, and revised routing table.

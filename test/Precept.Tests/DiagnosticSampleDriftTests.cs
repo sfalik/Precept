@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using FluentAssertions;
@@ -8,22 +9,18 @@ using Xunit;
 namespace Precept.Tests;
 
 /// <summary>
-/// Drift defense for diagnostic sample files.
-/// Ensures that sample .precept files exist, parse cleanly, and that
-/// proof-family diagnostics (C94–C98) have exercising samples once implemented.
+/// Drift defense for the proof-engine sample catalog.
 ///
-/// Dependency checklist — which samples need which codes:
-///   C94 (assignment constraint violations) → sample demonstrating assignment-time proof violations
-///   C95 (contradictory rule detection)     → sample with mutually exclusive rules the engine flags
-///   C97 (vacuous rules)                    → sample with always-true rules the engine flags
-///   C98 (dead/tautological guards)         → sample with guards that are always true or always false
+/// Root samples (samples/*.precept): must parse and compile without errors.
+/// Diagnostic samples (samples/diagnostics/*.precept): must compile and produce
+/// exactly the diagnostic codes declared in their <c>// Demonstrates: Cxx</c> header.
+/// A discovery test fails if any sample file lacks the header.
 ///
 /// Cross-surface consistency (D9):
-///   At least one sample (computed-tax-net.precept when it exists) must show consistent
-///   proof data across hover, diagnostics, and MCP precept_compile output.
-///   D9 verification depends on Steps 13 + 14 being complete.
+///   computed-tax-net.precept demonstrates consistent proof data across hover,
+///   diagnostics, and MCP precept_compile output. Verified by inspection.
 ///
-/// See temp/specs/step-15.md for the full contract and verification gates.
+/// See temp/specs/step-15.md and CONTRIBUTING.md § Diagnostic Samples.
 /// </summary>
 public class DiagnosticSampleDriftTests
 {
@@ -44,24 +41,22 @@ public class DiagnosticSampleDriftTests
     }
 
     private static string SamplesDir => Path.Combine(FindRepoRoot(), "samples");
-
-    private static string[] GetSampleFiles() =>
-        Directory.GetFiles(SamplesDir, "*.precept");
+    private static string DiagnosticSamplesDir => Path.Combine(SamplesDir, "diagnostics");
 
     // ════════════════════════════════════════════════════════════════════
-    // Test 1: Sample file count guard
+    // Test 1: Root sample file count guard
     // ════════════════════════════════════════════════════════════════════
 
     [Fact]
     public void SampleDirectory_ContainsExpectedFileCount()
     {
-        var files = GetSampleFiles();
-        files.Length.Should().BeGreaterThanOrEqualTo(25,
-            "samples/ should contain at least 25 .precept files (will grow as proof samples land)");
+        var files = Directory.GetFiles(SamplesDir, "*.precept");
+        files.Length.Should().BeGreaterThanOrEqualTo(27,
+            "samples/ should contain the baseline 25 files plus the Step 15 proof samples");
     }
 
     // ════════════════════════════════════════════════════════════════════
-    // Test 2: All sample files parse without errors
+    // Test 2: Root samples parse without errors
     // ════════════════════════════════════════════════════════════════════
 
     public static TheoryData<string> AllSampleFiles()
@@ -89,7 +84,7 @@ public class DiagnosticSampleDriftTests
     }
 
     // ════════════════════════════════════════════════════════════════════
-    // Test 3: All sample files compile without errors
+    // Test 3: Root samples compile without errors
     // ════════════════════════════════════════════════════════════════════
 
     [Theory]
@@ -110,99 +105,18 @@ public class DiagnosticSampleDriftTests
     }
 
     // ════════════════════════════════════════════════════════════════════
-    // Proof-family diagnostic samples — C94, C95, C97, C98
-    //
-    // These tests are scaffolded with Skip because the diagnostic codes
-    // do not exist yet. They will be implemented in Commit 12
-    // (proof-family diagnostics). Once C94–C98 land, remove the Skip
-    // attributes and fill in the sample file paths and assertions.
+    // Proof-demonstrating root samples — gap coverage (Step 15 spec §2–§4)
     // ════════════════════════════════════════════════════════════════════
 
-    [Fact(Skip = "Requires C94 implementation — Commit 12")]
-    public void C94_AssignmentConstraintViolation_HasExercisingSample()
-    {
-        // PLAN: Verify that at least one sample file triggers C94
-        // (assignment-time constraint violation detected by proof engine).
-        // The sample should demonstrate a literal assignment that the engine
-        // can statically prove violates a field constraint.
-        AssertDiagnosticExercisedBySample("C94");
-    }
-
-    [Fact(Skip = "Requires C95 implementation — Commit 12")]
-    public void C95_ContradictoryRuleDetection_HasExercisingSample()
-    {
-        // PLAN: Verify that at least one sample file triggers C95
-        // (contradictory rules — two rules that cannot both be satisfied).
-        // The sample should have rules like `rule X > 10` and `rule X < 5`.
-        AssertDiagnosticExercisedBySample("C95");
-    }
-
-    [Fact(Skip = "Requires C97 implementation — Commit 12")]
-    public void C97_VacuousRule_HasExercisingSample()
-    {
-        // PLAN: Verify that at least one sample file triggers C97
-        // (vacuous rule — a rule that is always true given the constraints).
-        // The sample should have a rule like `rule X >= 0` on a field with
-        // `nonnegative` constraint, making the rule vacuously true.
-        AssertDiagnosticExercisedBySample("C97");
-    }
-
-    [Fact(Skip = "Requires C98 implementation — Commit 12")]
-    public void C98_DeadOrTautologicalGuard_HasExercisingSample()
-    {
-        // PLAN: Verify that at least one sample file triggers C98
-        // (dead or tautological guard — a guard whose condition is always
-        // true or always false given the proof context).
-        AssertDiagnosticExercisedBySample("C98");
-    }
-
-    /// <summary>
-    /// Shared assertion: at least one sample file must produce a diagnostic
-    /// with the given constraint ID when compiled.
-    /// </summary>
-    private static void AssertDiagnosticExercisedBySample(string constraintId)
-    {
-        var sampleFiles = GetSampleFiles();
-        var found = false;
-
-        foreach (var filePath in sampleFiles)
-        {
-            var dsl = File.ReadAllText(filePath);
-            var model = PreceptParser.Parse(dsl);
-            var validation = PreceptCompiler.Validate(model);
-
-            if (validation.Diagnostics.Any(d => d.Constraint.Id == constraintId))
-            {
-                found = true;
-                break;
-            }
-        }
-
-        found.Should().BeTrue(
-            $"at least one sample file in samples/ should exercise diagnostic {constraintId}");
-    }
-
-    // ════════════════════════════════════════════════════════════════════
-    // Computed-field proof samples — gap coverage (Step 15 spec §2–§4)
-    //
-    // These verify that the new proof-demonstrating samples exist and
-    // compile cleanly once created. Skipped until the samples land.
-    // ════════════════════════════════════════════════════════════════════
-
-    [Fact(Skip = "Requires computed-tax-net.precept — Step 15 sample creation")]
+    [Fact]
     public void ComputedTaxNetSample_ExistsAndCompiles()
     {
-        // PLAN: computed-tax-net.precept demonstrates computed-field intermediary
-        // proofs (gap 3). Fields like Subtotal, TaxRate, Tax = Subtotal * TaxRate,
-        // Net = Subtotal - Tax, where the engine proves Net > 0.
         AssertSampleExistsAndCompiles("computed-tax-net.precept");
     }
 
-    [Fact(Skip = "Requires transitive-ordering.precept — Step 15 sample creation")]
+    [Fact]
     public void TransitiveOrderingSample_ExistsAndCompiles()
     {
-        // PLAN: transitive-ordering.precept demonstrates transitive chain proofs
-        // (gap 4). Rules like A > B, B > C → engine proves A > C.
         AssertSampleExistsAndCompiles("transitive-ordering.precept");
     }
 
@@ -221,5 +135,121 @@ public class DiagnosticSampleDriftTests
             .ToList();
         errors.Should().BeEmpty(
             $"sample file '{fileName}' must compile without errors");
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Test 4: Diagnostic samples directory exists
+    // ════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void DiagnosticSamplesDirectory_Exists()
+    {
+        Directory.Exists(DiagnosticSamplesDir).Should().BeTrue(
+            "samples/diagnostics/ must exist and contain the proof-engine diagnostic catalog");
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Test 5: Each diagnostic sample has a // Demonstrates: header
+    // ════════════════════════════════════════════════════════════════════
+
+    public static TheoryData<string> AllDiagnosticSampleFiles()
+    {
+        var data = new TheoryData<string>();
+        var dir = Path.Combine(FindRepoRoot(), "samples", "diagnostics");
+        if (!Directory.Exists(dir)) return data;
+        foreach (var file in Directory.GetFiles(dir, "*.precept"))
+            data.Add(Path.GetFileName(file));
+        return data;
+    }
+
+    [Theory]
+    [MemberData(nameof(AllDiagnosticSampleFiles))]
+    public void DiagnosticSample_HasDemonstratesHeader(string fileName)
+    {
+        var filePath = Path.Combine(DiagnosticSamplesDir, fileName);
+        var rawText = File.ReadAllText(filePath);
+
+        var headerLine = FindDemonstratesHeader(rawText);
+        headerLine.Should().NotBeNull(
+            $"diagnostic sample '{fileName}' must have a '// Demonstrates: Cxx[, Cyy...]' header");
+
+        ParseDeclaredCodes(headerLine!).Should().NotBeEmpty(
+            $"diagnostic sample '{fileName}' '// Demonstrates:' header must list at least one code");
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Test 6: Each diagnostic sample emits declared codes, no unexpected errors
+    // ════════════════════════════════════════════════════════════════════
+
+    [Theory]
+    [MemberData(nameof(AllDiagnosticSampleFiles))]
+    public void DiagnosticSample_EmitsDeclaredCodes_AndNoUnexpectedErrors(string fileName)
+    {
+        var filePath = Path.Combine(DiagnosticSamplesDir, fileName);
+        var rawText = File.ReadAllText(filePath);
+
+        var headerLine = FindDemonstratesHeader(rawText);
+        headerLine.Should().NotBeNull(
+            $"diagnostic sample '{fileName}' must have a '// Demonstrates:' header");
+
+        var declaredCodes = ParseDeclaredCodes(headerLine!);
+        var preceptCodes = declaredCodes
+            .Select(DiagnosticCatalog.ToDiagnosticCode)
+            .ToHashSet(StringComparer.Ordinal);
+
+        // The precept DSL parser uses # for comments; // is not a valid comment token.
+        // Diagnostic sample files use // for the Demonstrates: metadata header — strip
+        // those lines before compiling so the parser sees only valid precept syntax.
+        var compilableText = StripLineComments(rawText);
+        var result = PreceptCompiler.CompileFromText(compilableText);
+
+        // Every declared code must appear in the compilation diagnostics
+        foreach (var code in preceptCodes)
+        {
+            result.Diagnostics.Any(d => d.Code == code).Should().BeTrue(
+                $"diagnostic sample '{fileName}' must emit {code} (declared in // Demonstrates: header)");
+        }
+
+        // No error-severity diagnostics beyond those declared in the header
+        var unexpectedErrors = result.Diagnostics
+            .Where(d => d.Severity == ConstraintSeverity.Error && !preceptCodes.Contains(d.Code!))
+            .ToList();
+        unexpectedErrors.Should().BeEmpty(
+            $"diagnostic sample '{fileName}' must not emit error-severity diagnostics beyond those declared in its header");
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Helpers for diagnostic sample discovery
+    // ════════════════════════════════════════════════════════════════════
+
+    private static string? FindDemonstratesHeader(string text)
+    {
+        foreach (var line in text.Split('\n'))
+        {
+            var trimmed = line.Trim();
+            if (trimmed.StartsWith("// Demonstrates:", StringComparison.OrdinalIgnoreCase))
+                return trimmed;
+        }
+        return null;
+    }
+
+    private static string[] ParseDeclaredCodes(string headerLine)
+    {
+        // "// Demonstrates: C92, C93 — some description" → ["C92", "C93"]
+        var colon = headerLine.IndexOf("Demonstrates:", StringComparison.OrdinalIgnoreCase);
+        var after = headerLine.Substring(colon + "Demonstrates:".Length);
+        // Strip any trailing description after an em-dash
+        var dash = after.IndexOf('—');
+        if (dash >= 0) after = after.Substring(0, dash);
+        return after.Split(',')
+            .Select(c => c.Trim())
+            .Where(c => c.Length > 0 && c.StartsWith("C", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+    }
+
+    private static string StripLineComments(string text)
+    {
+        var lines = text.Split('\n');
+        return string.Join('\n', lines.Where(l => !l.TrimStart().StartsWith("//")));
     }
 }
