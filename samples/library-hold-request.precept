@@ -34,28 +34,65 @@ event CollectHold with PatronId as string notempty
 event AdvanceDay with DayNumber as number
 on AdvanceDay ensure DayNumber >= 0 because "The day counter cannot be negative"
 
-from OnShelf on Checkout -> set CurrentBorrower = Checkout.PatronId -> push BorrowerHistory Checkout.PatronId -> transition CheckedOut
+from OnShelf on Checkout
+    -> set CurrentBorrower = Checkout.PatronId
+    -> push BorrowerHistory Checkout.PatronId
+    -> transition CheckedOut
 
 # When the item is available, the first hold can be promoted immediately.
-from OnShelf on PlaceHold -> enqueue HoldQueue PlaceHold.PatronId -> dequeue HoldQueue into PromotedPatron -> transition HoldReady
+from OnShelf on PlaceHold
+    -> enqueue HoldQueue PlaceHold.PatronId
+    -> dequeue HoldQueue into PromotedPatron
+    -> transition HoldReady
 
-from CheckedOut on PlaceHold -> enqueue HoldQueue PlaceHold.PatronId -> no transition
-from CheckedOut on ReturnBook when HoldQueue.count > 0 -> dequeue HoldQueue into PromotedPatron -> set CurrentBorrower = null -> transition HoldReady
-from CheckedOut on ReturnBook -> set CurrentBorrower = null -> transition OnShelf
+from CheckedOut on PlaceHold
+    -> enqueue HoldQueue PlaceHold.PatronId
+    -> no transition
+from CheckedOut on ReturnBook when HoldQueue.count > 0
+    -> dequeue HoldQueue into PromotedPatron
+    -> set CurrentBorrower = null
+    -> transition HoldReady
+from CheckedOut on ReturnBook
+    -> set CurrentBorrower = null
+    -> transition OnShelf
 
-from OnShelf on ProcessNextHold when HoldQueue.count > 0 -> dequeue HoldQueue into PromotedPatron -> transition HoldReady
-from OnShelf on ProcessNextHold -> reject "There is no waiting patron to promote"
+from OnShelf on ProcessNextHold when HoldQueue.count > 0
+    -> dequeue HoldQueue into PromotedPatron
+    -> transition HoldReady
+from OnShelf on ProcessNextHold
+    -> reject "There is no waiting patron to promote"
 
-from HoldReady on CollectHold when CollectHold.PatronId == ReadyPatron -> set CurrentBorrower = CollectHold.PatronId -> push BorrowerHistory CollectHold.PatronId -> transition CheckedOut
-from HoldReady on CollectHold -> reject "Only the ready patron can collect this hold"
+from HoldReady on CollectHold when CollectHold.PatronId == ReadyPatron
+    -> set CurrentBorrower = CollectHold.PatronId
+    -> push BorrowerHistory CollectHold.PatronId
+    -> transition CheckedOut
+from HoldReady on CollectHold
+    -> reject "Only the ready patron can collect this hold"
 
-from OnShelf on AdvanceDay when AdvanceDay.DayNumber > CurrentDay -> set CurrentDay = AdvanceDay.DayNumber -> no transition
-from OnShelf on AdvanceDay -> reject "The day counter must move forward"
+from OnShelf on AdvanceDay when AdvanceDay.DayNumber > CurrentDay
+    -> set CurrentDay = AdvanceDay.DayNumber
+    -> no transition
+from OnShelf on AdvanceDay
+    -> reject "The day counter must move forward"
 
-from CheckedOut on AdvanceDay when AdvanceDay.DayNumber > CurrentDay -> set CurrentDay = AdvanceDay.DayNumber -> no transition
-from CheckedOut on AdvanceDay -> reject "The day counter must move forward"
+from CheckedOut on AdvanceDay when AdvanceDay.DayNumber > CurrentDay
+    -> set CurrentDay = AdvanceDay.DayNumber
+    -> no transition
+from CheckedOut on AdvanceDay
+    -> reject "The day counter must move forward"
 
-from HoldReady on AdvanceDay when AdvanceDay.DayNumber > CurrentDay and AdvanceDay.DayNumber <= PickupExpiryDay -> set CurrentDay = AdvanceDay.DayNumber -> no transition
-from HoldReady on AdvanceDay when AdvanceDay.DayNumber > CurrentDay and HoldQueue.count > 0 -> set CurrentDay = AdvanceDay.DayNumber -> dequeue HoldQueue into PromotedPatron -> set ReadyPatron = PromotedPatron -> set PickupCode = "READY" -> set PickupExpiryDay = AdvanceDay.DayNumber + 3 -> no transition
-from HoldReady on AdvanceDay when AdvanceDay.DayNumber > CurrentDay -> set CurrentDay = AdvanceDay.DayNumber -> transition OnShelf
-from HoldReady on AdvanceDay -> reject "The day counter must move forward"
+from HoldReady on AdvanceDay when AdvanceDay.DayNumber > CurrentDay and AdvanceDay.DayNumber <= PickupExpiryDay
+    -> set CurrentDay = AdvanceDay.DayNumber
+    -> no transition
+from HoldReady on AdvanceDay when AdvanceDay.DayNumber > CurrentDay and HoldQueue.count > 0
+    -> set CurrentDay = AdvanceDay.DayNumber
+    -> dequeue HoldQueue into PromotedPatron
+    -> set ReadyPatron = PromotedPatron
+    -> set PickupCode = "READY"
+    -> set PickupExpiryDay = AdvanceDay.DayNumber + 3
+    -> no transition
+from HoldReady on AdvanceDay when AdvanceDay.DayNumber > CurrentDay
+    -> set CurrentDay = AdvanceDay.DayNumber
+    -> transition OnShelf
+from HoldReady on AdvanceDay
+    -> reject "The day counter must move forward"

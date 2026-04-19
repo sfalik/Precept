@@ -21,13 +21,28 @@ event MarkSeated
 event CloseService
 event ReopenService
 
-from Accepting on JoinWaitlist -> enqueue PartyQueue JoinWaitlist.PartyName -> set EstimatedWaitMinutes = PartyQueue.count * 10 -> no transition
+from Accepting on JoinWaitlist
+    -> enqueue PartyQueue JoinWaitlist.PartyName
+    -> set EstimatedWaitMinutes = PartyQueue.count * 10
+    -> no transition
 
 # The queue's front party is visible through .peek before the dequeue happens.
-from Accepting on SeatNextParty when PartyQueue.count > 0 -> set LastCalledParty = PartyQueue.peek -> dequeue PartyQueue into CurrentParty -> transition Seating
-from Accepting on SeatNextParty -> reject "No party is currently waiting"
+from Accepting on SeatNextParty when PartyQueue.count > 0
+    -> set LastCalledParty = PartyQueue.peek
+    -> dequeue PartyQueue into CurrentParty
+    -> transition Seating
+from Accepting on SeatNextParty
+    -> reject "No party is currently waiting"
 
-from Seating on MarkSeated -> set CurrentParty = null -> set EstimatedWaitMinutes = PartyQueue.count * 10 -> transition Accepting
+from Seating on MarkSeated
+    -> set CurrentParty = null
+    -> set EstimatedWaitMinutes = PartyQueue.count * 10
+    -> transition Accepting
 
-from any on CloseService -> set WalkInOpen = false -> transition Closed
-from Closed on ReopenService -> set WalkInOpen = true -> set EstimatedWaitMinutes = PartyQueue.count * 10 -> transition Accepting
+from any on CloseService
+    -> set WalkInOpen = false
+    -> transition Closed
+from Closed on ReopenService
+    -> set WalkInOpen = true
+    -> set EstimatedWaitMinutes = PartyQueue.count * 10
+    -> transition Accepting

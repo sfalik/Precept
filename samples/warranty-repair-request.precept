@@ -34,17 +34,36 @@ event UndoLastStep
 event FinishRepair
 event ConfirmReturn
 
-from Draft on Submit -> set CustomerName = Submit.Customer -> set ProductName = Submit.Product -> set SerialNumber = Submit.Serial -> transition Submitted
+from Draft on Submit
+    -> set CustomerName = Submit.Customer
+    -> set ProductName = Submit.Product
+    -> set SerialNumber = Submit.Serial
+    -> transition Submitted
 
-from Submitted on Approve -> set ApprovalNote = Approve.Note -> transition Approved
-from Submitted on Deny -> set ApprovalNote = Deny.Note -> transition Denied
+from Submitted on Approve
+    -> set ApprovalNote = Approve.Note
+    -> transition Approved
+from Submitted on Deny
+    -> set ApprovalNote = Deny.Note
+    -> transition Denied
 
-from Approved on StartRepair -> transition InRepair
+from Approved on StartRepair
+    -> transition InRepair
 
-from InRepair on LogRepairStep -> push RepairSteps LogRepairStep.StepName -> no transition
-from InRepair on UndoLastStep when RepairSteps.count > 0 -> pop RepairSteps into LastReversedStep -> no transition
-from InRepair on UndoLastStep -> reject "There is no logged repair step to undo"
-from InRepair on FinishRepair when RepairSteps.count > 0 -> set RepairComplete = true -> transition ReadyToReturn
-from InRepair on FinishRepair -> reject "At least one repair step must be logged before the repair can finish"
+from InRepair on LogRepairStep
+    -> push RepairSteps LogRepairStep.StepName
+    -> no transition
+from InRepair on UndoLastStep when RepairSteps.count > 0
+    -> pop RepairSteps into LastReversedStep
+    -> no transition
+from InRepair on UndoLastStep
+    -> reject "There is no logged repair step to undo"
+from InRepair on FinishRepair when RepairSteps.count > 0
+    -> set RepairComplete = true
+    -> transition ReadyToReturn
+from InRepair on FinishRepair
+    -> reject "At least one repair step must be logged before the repair can finish"
 
-from ReadyToReturn on ConfirmReturn -> clear RepairSteps -> transition Closed
+from ReadyToReturn on ConfirmReturn
+    -> clear RepairSteps
+    -> transition Closed

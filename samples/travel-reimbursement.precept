@@ -24,7 +24,13 @@ state Rejected
 
 in Paid ensure ApprovedTotal > 0 because "Paid reimbursements must have an approved amount"
 
-event Submit with Employee as string notempty, Days as number, Lodging as number, Meals as number, Miles as number, Rate as number default 0.67
+event Submit with
+    Employee as string notempty,
+    Days as number,
+    Lodging as number,
+    Meals as number,
+    Miles as number,
+    Rate as number default 0.67
 on Submit ensure Days > 0 because "Trip days must be positive"
 on Submit ensure Lodging >= 0 because "Lodging cannot be negative"
 on Submit ensure Meals >= 0 because "Meals cannot be negative"
@@ -38,11 +44,26 @@ event Reject with Note as string notempty
 event Pay
 
 # Average lodging per day is checked with division to keep the example realistic.
-from Draft on Submit when Submit.Lodging / Submit.Days <= 350 -> set EmployeeName = Submit.Employee -> set TripDays = Submit.Days -> set LodgingTotal = Submit.Lodging -> set MealsTotal = Submit.Meals -> set MileageTotal = round(Submit.Miles * Submit.Rate, 2) -> set MileageRate = Submit.Rate -> transition Submitted
-from Draft on Submit -> reject "Average lodging per day exceeds the policy cap"
+from Draft on Submit when Submit.Lodging / Submit.Days <= 350
+    -> set EmployeeName = Submit.Employee
+    -> set TripDays = Submit.Days
+    -> set LodgingTotal = Submit.Lodging
+    -> set MealsTotal = Submit.Meals
+    -> set MileageTotal = round(Submit.Miles * Submit.Rate, 2)
+    -> set MileageRate = Submit.Rate
+    -> transition Submitted
+from Draft on Submit
+    -> reject "Average lodging per day exceeds the policy cap"
 
-from Submitted on Approve when Approve.Amount <= RequestedTotal -> set ApprovedTotal = min(Approve.Amount, RequestedTotal) -> set FinanceNote = Approve.Note -> transition Approved
-from Submitted on Approve -> reject "Finance cannot approve more than the requested total"
-from Submitted on Reject -> set FinanceNote = Reject.Note -> transition Rejected
+from Submitted on Approve when Approve.Amount <= RequestedTotal
+    -> set ApprovedTotal = min(Approve.Amount, RequestedTotal)
+    -> set FinanceNote = Approve.Note
+    -> transition Approved
+from Submitted on Approve
+    -> reject "Finance cannot approve more than the requested total"
+from Submitted on Reject
+    -> set FinanceNote = Reject.Note
+    -> transition Rejected
 
-from Approved on Pay -> transition Paid
+from Approved on Pay
+    -> transition Paid

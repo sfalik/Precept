@@ -23,7 +23,10 @@ in AwaitingPickup ensure PickupCode != null because "Loaded lockers must store a
 to PickedUp -> clear ReminderLog
 to Returned -> clear ReminderLog
 
-event LoadParcel with Locker as string notempty, Recipient as string notempty, Code as string notempty
+event LoadParcel with
+    Locker as string notempty,
+    Recipient as string notempty,
+    Code as string notempty
 event SendReminder with Note as string notempty
 event PickUp with Code as string notempty
 event AdvanceDay with DayNumber as number
@@ -31,16 +34,36 @@ on AdvanceDay ensure DayNumber >= 0 because "Days cannot be negative"
 
 event ReturnParcel
 
-from Empty on LoadParcel -> set LockerId = LoadParcel.Locker -> set RecipientName = LoadParcel.Recipient -> set PickupCode = LoadParcel.Code -> set ReminderCount = 0 -> set LastReminderDay = CurrentDay -> transition AwaitingPickup
+from Empty on LoadParcel
+    -> set LockerId = LoadParcel.Locker
+    -> set RecipientName = LoadParcel.Recipient
+    -> set PickupCode = LoadParcel.Code
+    -> set ReminderCount = 0
+    -> set LastReminderDay = CurrentDay
+    -> transition AwaitingPickup
 
-from AwaitingPickup on SendReminder when CurrentDay - LastReminderDay >= 1 -> push ReminderLog SendReminder.Note -> set ReminderCount = ReminderCount + 1 -> set LastReminderDay = CurrentDay -> set LastReminderNote = ReminderLog.peek -> no transition
-from AwaitingPickup on SendReminder -> reject "Reminders can only be sent once per day"
+from AwaitingPickup on SendReminder when CurrentDay - LastReminderDay >= 1
+    -> push ReminderLog SendReminder.Note
+    -> set ReminderCount = ReminderCount + 1
+    -> set LastReminderDay = CurrentDay
+    -> set LastReminderNote = ReminderLog.peek
+    -> no transition
+from AwaitingPickup on SendReminder
+    -> reject "Reminders can only be sent once per day"
 
-from AwaitingPickup on PickUp when PickUp.Code == PickupCode -> transition PickedUp
-from AwaitingPickup on PickUp -> reject "The pickup code does not match"
+from AwaitingPickup on PickUp when PickUp.Code == PickupCode
+    -> transition PickedUp
+from AwaitingPickup on PickUp
+    -> reject "The pickup code does not match"
 
-from AwaitingPickup on AdvanceDay when AdvanceDay.DayNumber > CurrentDay and AdvanceDay.DayNumber - LastReminderDay >= 3 -> set CurrentDay = AdvanceDay.DayNumber -> transition Returned
-from AwaitingPickup on AdvanceDay when AdvanceDay.DayNumber > CurrentDay -> set CurrentDay = AdvanceDay.DayNumber -> no transition
-from AwaitingPickup on AdvanceDay -> reject "Days must advance forward"
+from AwaitingPickup on AdvanceDay when AdvanceDay.DayNumber > CurrentDay and AdvanceDay.DayNumber - LastReminderDay >= 3
+    -> set CurrentDay = AdvanceDay.DayNumber
+    -> transition Returned
+from AwaitingPickup on AdvanceDay when AdvanceDay.DayNumber > CurrentDay
+    -> set CurrentDay = AdvanceDay.DayNumber
+    -> no transition
+from AwaitingPickup on AdvanceDay
+    -> reject "Days must advance forward"
 
-from AwaitingPickup on ReturnParcel -> transition Returned
+from AwaitingPickup on ReturnParcel
+    -> transition Returned

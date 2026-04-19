@@ -39,11 +39,27 @@ event CheckIn with Note as string nullable default null notempty
 event CompleteVisit
 event Cancel with Reason as string nullable default null notempty
 
-from Draft on Schedule -> set PatientName = Schedule.Name -> set ScheduledDay = Schedule.DayNumber -> set ScheduledMinute = Schedule.MinuteOfDay -> transition Scheduled
+from Draft on Schedule
+    -> set PatientName = Schedule.Name
+    -> set ScheduledDay = Schedule.DayNumber
+    -> set ScheduledMinute = Schedule.MinuteOfDay
+    -> transition Scheduled
 
-from Scheduled on Reschedule -> set ScheduledDay = Reschedule.DayNumber -> set ScheduledMinute = Reschedule.MinuteOfDay -> set ReminderSent = false -> no transition
-from Scheduled on SendReminder -> set ReminderSent = true -> no transition
-from Scheduled on CheckIn -> set CheckInNote = CheckIn.Note -> transition CheckedIn
-from Scheduled on Cancel -> set CancellationReason = Cancel.Reason -> transition Cancelled
+from Scheduled on Reschedule
+    -> set ScheduledDay = Reschedule.DayNumber
+    -> set ScheduledMinute = Reschedule.MinuteOfDay
+    -> set ReminderSent = false
+    -> no transition
+from Scheduled on SendReminder
+    -> set ReminderSent = true
+    -> no transition
+from Scheduled on CheckIn
+    -> set CheckInNote = CheckIn.Note
+    -> transition CheckedIn
+from Scheduled on Cancel
+    -> set CancellationReason = Cancel.Reason
+    -> transition Cancelled
 
-from CheckedIn on CompleteVisit -> set VisitCompleted = true -> transition Completed
+from CheckedIn on CompleteVisit
+    -> set VisitCompleted = true
+    -> transition Completed
