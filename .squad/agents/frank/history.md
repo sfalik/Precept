@@ -287,3 +287,8 @@ Key structural decisions:
 - **All other 5 files confirmed clean fit:** FieldConstraints (+90-160 lines from `in`/`of` validation, temporal constraint rejection), ProofChecks (+20-40, neither proposal adds proof engine integration — currency doc explicitly says "proof engine does not need modification"), Narrowing (+70-120, discrete equality narrowing via `TryApplyEqualityNarrowing` fits existing pattern), Helpers (+100-160, mechanical `StaticValueKind`/`MapScalarType` additions), Main (stable).
 - Key insight: discrete equality narrowing (`$eq:` markers for unit/currency/dimension compatibility) is a parallel layer to existing numeric/null narrowing — same pipeline, different proof surface.
 - Updated issue #118 body with expanded per-file impact table, scaling analysis, planned split documentation, and revised routing table.
+
+## 2026-04-19 — Research: Type Checker Architecture (meta-evaluation)
+- Researched 6 production typecheckers (Roslyn, TypeScript, Rust, Swift, Kotlin K2, F#) to evaluate Precept's 6-partial-class split.
+- Verdict: KEEP AS-IS. Our split has good external precedent. Strongest match is Kotlin K2's phase model.
+- Output: research/architecture/typechecker-architecture-survey-frank.md

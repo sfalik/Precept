@@ -216,3 +216,9 @@ All 5 extracted partial files already had header comments from their respective 
 - `using System.Linq;` is required (for `Enumerable.Range`, `Select`, `Where`, `DefaultIfEmpty`, `First`, `LastOrDefault` inside `TryInferFunctionCallKind`).
 - Build: clean (same 2 pre-existing CS8629 warnings, no new warnings). Targeted tests: 211/211 (PreceptTypeCheckerTests + ConditionalExpressionTests + StringAccessorTests). Full suite: 1752/1752.
 - Commit: `ad3f65d`.
+
+## 2026-04-19 — Research: .NET Typechecker Implementation Patterns (meta-evaluation)
+- Surveyed Roslyn Binder, F# Checking/, NRules, DynamicExpresso for partial-class layout, file sizing, helper distribution, dispatch patterns.
+- Verdict: KEEP AS-IS. Our 6-file split, naming, and switch-on-NodeKind dispatch all match Roslyn precedent. Static-partial is justified by stateless model.
+- Minor opportunity: distribute helpers closer to consumers if Helpers.cs grows. Not blocking.
+- Output: research/architecture/typechecker-implementation-patterns-george.md
