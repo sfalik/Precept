@@ -20,11 +20,9 @@ The **Run-Time phase** accepts a `PreceptEngine` and exposes an instance lifecyc
 
 ```mermaid
 flowchart TD
-    src(["📄 .precept"])
-
     subgraph CT["Compile-Time"]
         direction LR
-        P["🔤 Parser"] -->|definition model| TC["🔍 Type Checker"]
+        src(["📄 .precept"]) --> P["🔤 Parser"] -->|definition model| TC["🔍 Type Checker"]
         TC -->|interval queries| PE["📐 Proof Engine"]
         PE -->|narrowing facts| TC
     end
@@ -48,7 +46,6 @@ flowchart TD
 
     OUT["📤 Outcomes\nTransition  ·  NoTransition  ·  Rejected\nConstraintFailure  ·  Unmatched  ·  Undefined\nUneditableField  ·  InvalidInput  ·  Update"]
 
-    src --> P
     TC -->|PreceptEngine| ENG
     EVAL --> OUT
 ```
