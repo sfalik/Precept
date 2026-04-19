@@ -144,6 +144,23 @@ The coordinator MUST include the issue number and the target status in Scribe's 
 
 **Scribe posts all proposal reviews.** The coordinator quality-checks review content, then passes pre-validated payloads to Scribe in the spawn manifest. Scribe writes each to a temp file and posts via GitHub API. See Scribe charter § Review Posting Responsibilities.
 
+## Track B — Inline PR Review Comments on Design Docs
+
+When a proposal declares Track B (introduces a new or substantially expanded canonical design doc), reviewers ALSO post **inline PR review comments** on the design doc markdown diff, in addition to the structured issue comments above.
+
+**When Track B applies:**
+- The proposal issue declares "introduces canonical design: docs/Foo.md" (or a major new section in an existing design doc).
+- The PR branch contains the design doc committed in "to be" form before implementation begins.
+
+**Reviewer responsibilities (Track B only):**
+1. Review the design doc diff on the PR using inline review comments — the same mechanism used for code review.
+2. Comments target specific markdown sections, definitions, examples, or claims in the design doc.
+3. Each inline comment should be actionable: identify what needs to change, not just what's wrong.
+
+**Completion requirement:** All inline PR review comments on the design doc must be resolved before the design review ceremony is considered complete. This is separate from the structured issue-comment reviews (which follow the standard proposal-review format above). Both surfaces must clear.
+
+**This is NOT the pr-review skill.** The pr-review skill covers code review of implementation. Track B inline comments are part of the design review ceremony and target only the design doc markdown, not implementation code.
+
 ### Coordinator's role:
 1. Collect structured JSON from each reviewer agent.
 2. Validate: correct format, no hallucinated findings, verdicts are justified.

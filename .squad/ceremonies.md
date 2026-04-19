@@ -8,13 +8,24 @@
 |-------|-------|
 | **Trigger** | auto |
 | **When** | before |
-| **Condition** | multi-agent task involving 2+ agents modifying shared systems, OR any language-surface change (new type, keyword, operator, constraint) |
+| **Condition** | multi-agent task involving 2+ agents modifying shared systems, OR any language-surface change (new type, keyword, operator, constraint), OR any proposal (Track A or Track B — see `CONTRIBUTING.md` § 3. Design Review) |
 | **Facilitator** | lead |
 | **Participants** | all-relevant (implementing devs MUST attend for language-surface changes) |
 | **Time budget** | focused |
 | **Enabled** | ✅ yes |
+| **Completion gate** | Owner (Shane) sign-off. No implementation plan is authored until this gate clears. |
 
-**Output:** Follow `.squad/skills/proposal-review/SKILL.md` for structured output format and posting workflow. Every reviewer produces structured JSON; the coordinator posts each review as a GitHub issue comment on the proposal issue. Reviews are durable on the issue, not buried in chat.
+**Track A (standard proposal — no new canonical design):**
+- Design review targets the proposal issue — decisions, acceptance criteria, scope.
+- Review comments are posted as structured issue comments (per `proposal-review` skill).
+
+**Track B (design-introducing proposal — PR contains a new or substantially expanded canonical design doc):**
+- Design review targets the proposal issue AND the design doc on the PR.
+- Reviewers post structured issue comments on the proposal AND inline PR review comments on the markdown diff.
+- All inline PR review comments must be resolved before the ceremony is considered complete.
+- The proposer declares Track B in the issue body.
+
+**Output:** Follow `.squad/skills/proposal-review/SKILL.md` for structured output format and posting workflow. Every reviewer produces structured JSON; the coordinator posts each review as a GitHub issue comment on the proposal issue. For Track B, reviewers also post inline PR comments on the design doc diff.
 
 **Agenda:**
 1. Review the task and requirements
@@ -23,6 +34,7 @@
 4. Identify risks and edge cases
 5. Assign action items
 6. **Post reviews** — coordinator posts each reviewer's structured comment to the GitHub issue
+7. **(Track B only)** Verify all inline PR review comments on the design doc are resolved
 
 ---
 

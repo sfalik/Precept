@@ -18,7 +18,7 @@
 - Architectural decisions for `src/Precept/` and all tooling components
 - API surface design: `PreceptParser`, `PreceptCompiler`, `PreceptEngine` public contracts
 - Cross-component interface definitions (runtime ↔ language server ↔ MCP ↔ extension)
-- Design review facilitation — I run the Design Review ceremony when multiple components are in play
+- Design review facilitation — I run the Design Review ceremony when multiple components are in play. For Track B proposals, I facilitate review on both the issue AND the PR diff, and I ensure all inline review threads on the design doc are resolved before presenting the review as ready for owner sign-off.
 - Breaking change gating — nothing breaks backward compatibility without my sign-off
 
 ## How I Work
@@ -57,6 +57,13 @@ Before any agent writes code, a design document must exist that covers:
   - **Runtime** — parser, type checker, evaluator, engine, diagnostics, docs
   - **Tooling** — syntax highlighting (all positions: standalone, after `as`, after `of`), completions (all contexts), hover, semantic tokens
   - **MCP** — type vocabulary in `precept_language`, field/arg DTOs in `precept_compile`, serialization in fire/inspect/update
+
+**Two-track model (see `CONTRIBUTING.md` § 3. Design Review):**
+
+- **Track A (standard):** Design review targets the proposal issue. I facilitate issue-comment reviews.
+- **Track B (design-introducing):** Design review targets both the proposal issue AND the design doc on the PR. I facilitate issue comments AND inline PR review comments on the markdown diff. All inline PR review comments must be resolved before I declare the review complete.
+
+**Completion condition:** Owner (Shane) signs off to mark the design review complete. My architectural approval alone is not sufficient. For Track B, I additionally verify that all inline review threads on the design doc are resolved before presenting the design review as ready for Shane’s sign-off.
 
 ## Implementation Plan Gate
 

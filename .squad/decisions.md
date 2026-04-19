@@ -10784,3 +10784,22 @@ All 5 blocking findings trace directly to semantic contracts the research docume
 ## Recommendation
 
 The proposal is close. The core design is sound, the syntax is well-grounded, and the locked decisions are solid. What's missing is the second half of the research's output — the semantic contracts and open questions section. A single editing pass addressing Findings 1–5 would resolve all blocking issues. The advisory findings can be addressed in the same pass or during implementation.
+
+---
+
+### 2026-04-19: Design review gate formalization — two-track proposal model, owner sign-off gate
+**By:** Shane (owner directive), Frank (process architect)
+**Status:** Standing policy — active from 2026-04-19 forward
+
+Formalized the design review gate as a mandatory process step for all proposals. Introduced a two-track model to distinguish proposals that introduce new canonical designs from those that don't.
+
+**Policy:**
+1. **Design review is a formal gate for every proposal.** No implementation plan is authored until the design review ceremony completes with owner (Shane) sign-off.
+2. **Track A (standard proposal):** Design review targets the proposal issue — decisions, acceptance criteria, scope. Review comments live on the issue as structured issue comments.
+3. **Track B (design-introducing proposal):** The proposal PR carries a new or substantially expanded canonical design doc committed in "to be" form. Design review targets both the issue AND the design doc on the PR (inline PR review comments on the markdown diff). All inline PR review comments must be resolved before the design review is considered complete.
+4. **Owner sign-off is the completion gate** for both tracks. Architectural approval alone is not sufficient.
+5. **The implementation PR may be opened early** — to carry research, design docs, or other pre-implementation artifacts — but `## Implementation Plan` says "Pending design review" until the gate clears.
+6. **Track B docs on the branch are an exception** to the rule that design docs track what EXISTS. They describe the target state but are gated behind the same PR as the implementation that realizes them. They only reach `main` alongside implementing code.
+7. **Same branch, same PR for Track B.** The PR starts as a design PR and evolves into a design+implementation PR.
+
+**Files updated:** `CONTRIBUTING.md` (canonical process — § 3. Design Review, lifecycle diagram, doc sync carve-out, Where Things Live), `.squad/ceremonies.md` (Track A/B conditions, owner sign-off gate, resolution requirement), `.github/copilot-instructions.md` (§ Issue Implementation Workflow), `.github/agents/squad.agent.md` (§ Implementation Gate), `.squad/agents/frank/charter.md` (§ Design Gate, § What I Own), `.squad/skills/proposal-review/SKILL.md` (§ Track B).
