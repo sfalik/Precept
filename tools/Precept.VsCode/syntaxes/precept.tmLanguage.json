@@ -13,6 +13,7 @@
     { "include": "#fieldCollectionDeclaration" },
     { "include": "#fieldScalarDeclaration" },
     { "include": "#ruleStatement" },
+    { "include": "#stateEditDeclaration" },
     { "include": "#ensureStatement" },
     { "include": "#fromOnHeader" },
     { "include": "#transitionTarget" },
@@ -141,6 +142,70 @@
                   "name": "punctuation.separator.comma.precept",
                   "match": ","
                 }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "stateEditDeclaration": {
+      "comment": "in <StateTarget> [when <Guard>] edit all | edit Field1, Field2",
+      "patterns": [
+        {
+          "name": "meta.declaration.edit.state.precept",
+          "match": "^(\\s*)(in)(\\s+)(any|(?:[A-Za-z_][A-Za-z0-9_]*(?:\\s*,\\s*[A-Za-z_][A-Za-z0-9_]*)*))(.*)$",
+          "captures": {
+            "2": { "name": "keyword.other.precept" },
+            "4": {
+              "patterns": [
+                {
+                  "name": "keyword.other.precept",
+                  "match": "\\bany\\b"
+                },
+                {
+                  "name": "entity.name.type.state.precept",
+                  "match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b"
+                },
+                {
+                  "name": "punctuation.separator.comma.precept",
+                  "match": ","
+                }
+              ]
+            },
+            "5": {
+              "patterns": [
+                { "include": "#controlKeywords" },
+                {
+                  "name": "meta.declaration.edit.target.precept",
+                  "match": "\\b(edit)(\\s+)(all|(?:[A-Za-z_][A-Za-z0-9_]*(?:\\s*,\\s*[A-Za-z_][A-Za-z0-9_]*)*))",
+                  "captures": {
+                    "1": { "name": "keyword.other.precept" },
+                    "3": {
+                      "patterns": [
+                        {
+                          "name": "keyword.other.precept",
+                          "match": "\\ball\\b"
+                        },
+                        {
+                          "name": "variable.other.field.precept",
+                          "match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b"
+                        },
+                        {
+                          "name": "punctuation.separator.comma.precept",
+                          "match": ","
+                        }
+                      ]
+                    }
+                  }
+                },
+                { "include": "#functionCall" },
+                { "include": "#collectionMemberAccess" },
+                { "include": "#stringMemberAccess" },
+                { "include": "#operators" },
+                { "include": "#booleanNull" },
+                { "include": "#numbers" },
+                { "include": "#strings" },
+                { "include": "#identifierReference" }
               ]
             }
           }

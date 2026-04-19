@@ -199,10 +199,21 @@ internal sealed class PreceptSemanticTokensHandler : SemanticTokensHandlerBase
         var (constrainedStates, constrainedEvents, guardedFields) = BuildConstraintSets(text);
 
         PreceptToken? previousKind = null;
+        var previousLine = -1;
         var declContext = DeclContext.None;
 
         foreach (var token in tokens)
         {
+            var currentLine = token.Span.Position.Line;
+            if (currentLine != previousLine)
+            {
+                // The tokenizer strips whitespace, including newlines, so declaration context must
+                // be reset from token positions rather than waiting for a NewLine token.
+                previousKind = null;
+                declContext = DeclContext.None;
+                previousLine = currentLine;
+            }
+
             if (token.Kind == PreceptToken.State)
                 declContext = DeclContext.State;
             else if (token.Kind == PreceptToken.Event)
