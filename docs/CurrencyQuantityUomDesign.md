@@ -6,7 +6,7 @@
 **Date:** 2026-04-18 (v2 — restructured to match temporal design doc format; D15 amended for dual cancellation)
 **Status:** Design — canonical reference
 **Depends on:** [Temporal Type System Design](TemporalTypeSystemDesign.md) (Issue #107) — establishes `period`, `duration`, `timezone`, the typed constant delimiter, and the `in` syntax pattern this proposal extends.
-**Prerequisite bug:** [Issue #115](https://github.com/sfalik/Precept/issues/115) — `decimal` arithmetic silently loses precision through `double` conversion. Must be fixed before `money` or `decimal`-backed `quantity` implementation.
+**Prerequisite bug:** [Issue #115](https://github.com/sfalik/Precept/issues/115) — `decimal` arithmetic silently loses precision through `double` conversion. Will be completed before this proposal ships.
 
 **Related artifacts:**
 - **Research document:** [`research/language/expressiveness/currency-quantity-uom-research.md`](../research/language/expressiveness/currency-quantity-uom-research.md)
@@ -245,7 +245,7 @@ A field declaration may carry **at most one** of `in` or `of`. Declaring both is
 | Type | `of` meaning | Example |
 |------|-------------|--------|
 | `quantity` | UCUM dimension category | `field Distance as quantity of 'length'` |
-| `period` | Component category | `field GracePeriod as period of 'date'` |
+| `period` | Temporal dimension category | `field GracePeriod as period of 'date'` |
 
 `of` is available on `quantity` and `period`. It is **not** available on `money`, `currency`, `price`, `exchangerate`, `unitofmeasure`, or `dimension`. The identity types (`currency`, `unitofmeasure`, `dimension`) do not carry a separate category slot — they ARE the identity. Use `when` guards for category checks (e.g., `when UOM.dimension == 'mass'`).
 
@@ -261,14 +261,15 @@ A field declaration may carry **at most one** of `in` or `of`. Declaring both is
 
 Time units (`s`, `min`, `h`, `d`) are excluded from the `quantity` category system because they belong to NodaTime's temporal types. Counting units (`each`, `case`, `pack`, `dozen`) are **opaque** — each is its own unit with no shared dimension and no auto-conversion. Conversion between counting units requires explicit multiplication by a typed conversion factor (e.g., `quantity in 'each/case'`).
 
-#### Period component categories
+#### Period temporal dimensions
 
-`period of 'date'` and `period of 'time'` replace the temporal design's `dateonly` and `timeonly` constraint suffixes with the same general `of` mechanism. The proof semantics are identical — the compiler uses the category to verify that `time ± period` and `date ± period` are safe.
+`period of 'date'` and `period of 'time'` replace the temporal design's `dateonly` and `timeonly` constraint suffixes with the same general `of` mechanism. The `of` value is a `dimension` from the temporal partition — the same type used for UCUM dimensions on `quantity`, unified under a single partitioned registry. The proof semantics are identical — the compiler uses the dimension to verify that `time ± period` and `date ± period` are safe.
 
-| Category | Admitted components | Replaces | NodaTime safety guarantee |
+| Temporal dimension | Admitted components | Replaces | NodaTime safety guarantee |
 |---|---|---|---|
 | `'date'` | years, months, weeks, days | `dateonly` | `LocalDate.Plus(Period)` throws on time components |
 | `'time'` | hours, minutes, seconds | `timeonly` | `LocalTime.Plus(Period)` throws on date components |
+| `'datetime'` | all components | (new) | `LocalDateTime.Plus(Period)` accepts all |
 
 ### Admission vs arithmetic
 
@@ -337,9 +338,9 @@ field Budget as money in 'EUR' nullable
 
 **Constraints:** `in '<currency>'`, `nullable`, `default '...'`, `nonnegative`. The `maxplaces` constraint overrides the ISO 4217 default when needed.
 
-**Default precision (D10):** `money in 'USD'` defaults to 2 decimal places. `money in 'JPY'` defaults to 0. `money in 'BHD'` defaults to 3. ISO 4217 minor units determine the natural precision. The default rounding mode is half-even (banker's rounding).
+**Default precision (D10):** `money in 'USD'` carries an implicit `maxplaces 2` (ISO 4217 minor units). `money in 'JPY'` → `maxplaces 0`. `money in 'BHD'` → `maxplaces 3`. This is a validation constraint, not auto-rounding — assigning `'1.999 USD'` to a 2-place field is a constraint violation. An explicit `maxplaces` on the field overrides the ISO default. See D10 for full semantics.
 
-**Serialization:** `{ "amount": 100.00, "currency": "USD" }`
+**Serialization:** `"100 USD"` (string — matches typed constant literal syntax). The runtime type handles `Parse`/`ToString` natively, like NodaTime types. No special JSON conversion logic in MCP or hosting layer.
 
 **Teachable error messages:**
 
@@ -452,7 +453,7 @@ field Measurement as quantity             # open — unit comes from event data
 
 **Constraints:** `in '<unit>'`, `of '<dimension>'`, `nullable`, `default '...'`, `nonnegative`.
 
-**Serialization:** `{ "amount": 5, "unit": "kg" }`
+**Serialization:** `"5 kg"` (string — matches typed constant literal syntax). The runtime type handles `Parse`/`ToString` natively.
 
 **Teachable error messages:**
 
@@ -510,9 +511,9 @@ field SelectedUnit as unitofmeasure nullable
 
 ### `dimension`
 
-**What it makes explicit:** This is a UCUM dimension category identifier — not a string. It identifies a dimension category (e.g., mass, length, volume) but carries no magnitude or specific unit.
+**What it makes explicit:** This is a measurement category identifier — not a string. It classifies the family a measurement belongs to: physical dimensions (UCUM: `'mass'`, `'length'`, `'volume'`) or temporal dimensions (`'date'`, `'time'`, `'datetime'`). The registry is partitioned by parent type — the type checker knows which partition to validate against.
 
-**Backing type:** `string` (validated against UCUM dimension registry)
+**Backing type:** `string` (validated against the dimension registry — UCUM partition for `quantity`/`unitofmeasure`, temporal partition for `period`)
 
 **Declaration:**
 
@@ -521,7 +522,7 @@ field MeasuredDimension as dimension default 'mass'
 field AllowedDimension as dimension nullable
 ```
 
-**Typed constant literal:** `'mass'` — a bare name matching the UCUM dimension registry → `dimension` when the target field is declared as `dimension`. Distinguishable from unit names because the UCUM unit registry and dimension registry are disjoint sets.
+**Typed constant literal:** `'mass'` — a bare name matching the dimension registry → `dimension` when the target field is declared as `dimension`. Distinguishable from unit names because the UCUM unit registry and dimension registry are disjoint sets. Temporal dimension names (`'date'`, `'time'`, `'datetime'`) are also disjoint from both.
 
 **Operators:** None. `dimension` is a reference type.
 
@@ -533,9 +534,18 @@ field AllowedDimension as dimension nullable
 
 **Serialization:** `"mass"` (string)
 
-**Relationship to `quantity` and `unitofmeasure`:**
+**Dimension registry partitions:**
 
-The `.dimension` accessor on `quantity` and `unitofmeasure` fields returns a `dimension` value. This enables type-safe cross-field consistency checks:
+| Partition | Valid values | Used by |
+|-----------|-------------|--------|
+| UCUM (physical) | `'mass'`, `'length'`, `'volume'`, `'area'`, `'temperature'`, ... | `quantity.dimension`, `unitofmeasure.dimension`, `quantity of '...'` |
+| Temporal | `'date'`, `'time'`, `'datetime'` | `period.dimension`, `period of '...'` |
+
+The type checker enforces partition correctness: `quantity.dimension == 'date'` is a compile error because `'date'` is not in the UCUM partition. `period.dimension == 'mass'` is a compile error because `'mass'` is not in the temporal partition. Cross-type comparison `quantity.dimension == period.dimension` is a compile error — different partitions are never equal.
+
+**Relationship to `quantity`, `unitofmeasure`, and `period`:**
+
+The `.dimension` accessor on `quantity`, `unitofmeasure`, and `period` fields returns a `dimension` value. This enables type-safe cross-field consistency checks:
 
 ```precept
 field AllowedDimension as dimension
@@ -546,7 +556,7 @@ from Active on RecordReading
     set LastReading = Reading
 ```
 
-The `of` keyword in `quantity of 'mass'` uses the same dimension registry — `of` is a static compile-time constraint, while the `dimension` type holds the same category as runtime data.
+The `of` keyword in `quantity of 'mass'` and `period of 'date'` uses the same dimension registry — `of` is a static compile-time constraint, while the `dimension` type holds the same category as runtime data.
 
 ---
 
@@ -604,7 +614,7 @@ field DynamicRate as price                # open — currency/unit from event da
 
 **Constraints:** `in '<currency>/<unit>'`, `nullable`, `default '...'`.
 
-**Serialization:** `{ "amount": 4.17, "currency": "USD", "unit": "each" }`
+**Serialization:** `"4.17 USD/each"` (string — matches typed constant literal syntax). The runtime type handles `Parse`/`ToString` natively.
 
 **Dimensional cancellation — the two paths:**
 
@@ -690,7 +700,7 @@ field SpotRate as exchangerate nullable
 
 **Constraints:** `in '<currency>/<currency>'`, `nullable`, `default '...'`.
 
-**Serialization:** `{ "amount": 1.08, "numerator": "USD", "denominator": "EUR" }`
+**Serialization:** `"1.08 USD/EUR"` (string — matches typed constant literal syntax). The runtime type handles `Parse`/`ToString` natively.
 
 **Currency conversion example:**
 
@@ -873,7 +883,7 @@ Open fields (declared without `in` or `of`) participate in the full type system 
 | `field X as quantity of 'mass'` | Dimension known. Same-dimension arithmetic allowed. | Direct for dimension-compatible operations. Unit-specific ops need `when X.unit == 'kg'`. |
 | `field X as quantity` | Fully open. | `when X.dimension == 'length'` for dimension, `when X.unit == 'kg'` for unit. |
 
-This is the same contract as nullable narrowing: `field X as number?` is open (nullable). Using `X` in arithmetic is a compile error unless `when X != null` narrows it. Discrete equality narrowing extends this principle to unit, currency, dimension, basis, and component accessors.
+This is the same contract as nullable narrowing: `field X as number?` is open (nullable). Using `X` in arithmetic is a compile error unless `when X != null` narrows it. Discrete equality narrowing extends this principle to unit, currency, dimension, and basis accessors.
 
 ### Mechanism
 
@@ -887,14 +897,19 @@ Discrete equality narrowing plugs into the existing guard-narrowing pipeline fro
 
 ### Accessors per type
 
-| Type | Accessors available | Notes |
-|------|-------------------|-------|
-| `money` | `.currency` | ISO 4217 code |
-| `quantity` | `.unit`, `.dimension` | `.unit` = specific UCUM unit, `.dimension` = UCUM dimension category (returns `dimension` type) |
-| `period` | `.basis`, `.component` | `.basis` = NodaTime PeriodUnits, `.component` = `'date'` or `'time'` |
-| `price` | `.currency`, `.unit` | Numerator currency, denominator unit |
-| `exchangerate` | `.numerator`, `.denominator` | Both are currency codes |
-| `unitofmeasure` | `.dimension` | UCUM dimension category (returns `dimension` type) |
+| Type | Accessors available | Returns | Notes |
+|------|-------------------|---------|-------|
+| `money` | `.currency` | `currency` | ISO 4217 code |
+| `money` | `.amount` | `decimal` | Magnitude (the numeric part) |
+| `quantity` | `.unit` | `unitofmeasure` | Specific UCUM unit |
+| `quantity` | `.dimension` | `dimension` | UCUM dimension category |
+| `period` | `.basis` | `string` | Canonical basis name from the field's `in` constraint (e.g., `'hours'`, `'hours&minutes'`). For open periods, returns the runtime decomposition basis. NodaTime lowering: computed from which `PeriodUnits` flags are non-zero in the `Period` value |
+| `period` | `.dimension` | `dimension` | Temporal dimension: `'date'`, `'time'`, or `'datetime'`. Date bases: `years`, `months`, `weeks`, `days`. Time bases: `hours`, `minutes`, `seconds`, `milliseconds`, `nanoseconds`, `ticks`. Multi-basis periods spanning both date and time components (e.g., `'days&hours'`) return `'datetime'`. NodaTime lowering: computed from `HasDateComponent` / `HasTimeComponent` boolean properties |
+| `price` | `.currency` | `currency` | Numerator currency |
+| `price` | `.unit` | `unitofmeasure` | Denominator unit |
+| `exchangerate` | `.numerator` | `currency` | Numerator currency code |
+| `exchangerate` | `.denominator` | `currency` | Denominator currency code |
+| `unitofmeasure` | `.dimension` | `dimension` | UCUM dimension category |
 
 ### Example — open money with guard narrowing
 
@@ -922,14 +937,14 @@ from Pending on Record
     reject "Expected a mass measurement"
 ```
 
-### Example — open period with component narrowing
+### Example — open period with dimension narrowing
 
 ```precept
 field Interval as period                   # open — any components
 field DueDate as date
 
 from Active on Extend
-  when Interval.component == 'date'        # narrows to date-component period
+  when Interval.dimension == 'date'        # narrows to date-dimension period
     set DueDate = DueDate + Interval       # valid — proven date-safe for LocalDate.Plus
   else
     reject "Extension interval must use date components"
@@ -951,7 +966,7 @@ The proof engine does not need modification. Discrete equality narrowing is a pa
 
 ## Period Extensions
 
-This proposal extends the temporal `period` type with two mechanisms: unit-basis selection via `in`, and component-category constraint via `of`.
+This proposal extends the temporal `period` type with two mechanisms: unit-basis selection via `in`, and temporal dimension constraint via `of`.
 
 ### Period basis — Noda-faithful semantics
 
@@ -1108,7 +1123,7 @@ when InvoiceCurrency == 'USD'
 | Type | Static | Interpolated | Example |
 |---|---|---|---|
 | `quantity` | `of 'mass'` | `of '{AllowedDimension}'` | `field Reading as quantity of '{AllowedDimension}'` |
-| `period` | `of 'date'` | `of '{ComponentCategory}'` | `field Grace as period of '{ComponentCategory}'` |
+| `period` | `of 'date'` | `of '{TemporalDimension}'` | `field Grace as period of '{TemporalDimension}'` |
 
 **Compound unit interpolation** — any component in a compound `in` constraint can be interpolated independently:
 
@@ -1348,20 +1363,20 @@ When operations combine typed values, the result type is determined by the dimen
   | `quantity` | `.unit` | `when X.unit == 'kg'` | `$eq:X.unit:kg` |
   | `quantity` | `.dimension` | `when X.dimension == 'length'` | `$eq:X.dimension:length` |
   | `period` | `.basis` | `when X.basis == 'hours&minutes'` | `$eq:X.basis:hours&minutes` |
-  | `period` | `.component` | `when X.component == 'date'` | `$eq:X.component:date` |
+  | `period` | `.dimension` | `when X.dimension == 'date'` | `$eq:X.dimension:date` |
   | `price` | `.currency`, `.unit` | `when X.currency == 'USD'` | `$eq:X.currency:USD` |
   | `exchangerate` | `.numerator`, `.denominator` | `when X.numerator == 'USD'` | `$eq:X.numerator:USD` |
 - **Alternatives rejected:** (A) Require `in`/`of` on every field — eliminates open-field use cases. (B) Allow open fields but block all arithmetic. (C) Runtime validation — violates philosophy.
 - **Precedent:** Same contract as nullable narrowing. Same friction, same reason.
 - **Tradeoff accepted:** Authors who use open fields must write guards.
 
-### D10. ISO 4217 default precision and half-even rounding for `money`
+### D10. ISO 4217 default precision as implicit `maxplaces` for `money`
 
-- **What:** `money in 'USD'` defaults to 2 decimal places (ISO 4217 minor units). `money in 'JPY'` defaults to 0. `money in 'BHD'` defaults to 3. `maxplaces` overrides. Default rounding mode: half-even.
-- **Why:** ISO 4217 defines the natural precision. Half-even eliminates systematic bias.
-- **Alternatives rejected:** (A) No auto-rounding. (B) `maxplaces` required on every field. (C) Half-up rounding — upward bias.
+- **What:** `money in 'USD'` carries an implicit `maxplaces 2` derived from ISO 4217 minor units. `money in 'JPY'` carries `maxplaces 0`. `money in 'BHD'` carries `maxplaces 3`. An explicit `maxplaces` on the field overrides the ISO default. The implicit `maxplaces` is a **validation constraint, not an auto-rounding rule** — assigning `'1.999 USD'` to a field with `maxplaces 2` is a constraint violation (compile-time via C94 for literals, runtime at the fire/update boundary for event args), not a silent truncation to `'2.00 USD'`. When the author wants rounding, they apply it explicitly. Default rounding mode for explicit rounding operations: half-even (banker's rounding).
+- **Why:** ISO 4217 defines the natural precision. Making it an implicit `maxplaces` means authors get correct precision by default without annotating every field, while preserving Precept's prevention guarantee — no silent data loss. Half-even eliminates systematic bias when authors do round.
+- **Alternatives rejected:** (A) Auto-round to ISO precision — hides precision loss, violates prevention guarantee. (B) `maxplaces` required on every money field — boilerplate when ISO already provides the answer. (C) Half-up rounding — upward bias. (D) No default precision — money fields accept arbitrary decimal places, defeating the purpose of ISO 4217 awareness.
 - **Precedent:** NMoneys, Java `Currency.getDefaultFractionDigits()`, Python `decimal`.
-- **Tradeoff accepted:** Non-standard precision requires explicit `maxplaces`.
+- **Tradeoff accepted:** Non-standard precision requires explicit `maxplaces` override. Authors who need sub-cent precision (e.g., gas station pricing at `maxplaces 3`) must declare it.
 
 ### D11. Cross-currency `money` arithmetic requires explicit `exchangerate`
 
@@ -1386,12 +1401,28 @@ When operations combine typed values, the result type is determined by the dimen
 - **Precedent:** NodaTime itself embeds TZDB data as a static resource. Same principle: own the data, not the library.
 - **Tradeoff accepted:** Precept owns registry updates. ISO 4217 changes ~1-2 times/year. UCUM core units are stable.
 
+### D13a. String-form serialization — types own their own `Parse`/`ToString`
+
+- **What:** All compound business-domain types serialize to JSON as strings matching their typed constant literal syntax: `"100 USD"` (money), `"5 kg"` (quantity), `"4.17 USD/each"` (price), `"1.08 USD/EUR"` (exchangerate). Identity types serialize as bare strings: `"USD"` (currency), `"kg"` (unitofmeasure), `"mass"` (dimension). The runtime types implement `Parse`/`ToString` natively — no special serialization logic in MCP tools, `JsonConvert`, or the hosting layer.
+- **Why:** Consistent with temporal types, where NodaTime's STJ converters serialize `date` as `"2026-03-15"`, `duration` as `"72:00:00"`, etc. The type owns its string representation. MCP `data` dicts, `precept_fire` results, and `precept_inspect` snapshots all use the same string form. One parsing path, one format, no structural mismatch between literal syntax and wire format.
+- **Alternatives rejected:** (A) Structured JSON objects (`{ "amount": 100, "currency": "USD" }`) — requires `JsonConvert.ToNative` to handle nested objects (currently silently discards them), creates a second parsing path divergent from literal syntax, and makes MCP tool consumers learn a different representation than what appears in `.precept` files. (B) Mixed — strings for simple types, objects for compound — inconsistent, harder to document.
+- **Precedent:** NodaTime serialization — every NodaTime type serializes to a string via its own pattern. `LocalDate` → `"2026-03-15"`, `Duration` → `"72:00:00"`, `Period` → `"P1Y2M3D"`. The type is the serializer.
+- **Tradeoff accepted:** String parsing at deserialization boundaries. But the parser already exists (literal parsing), and the string form is human-readable in MCP tool output.
+
 ### D14. `in` is a uniform assignment constraint across all types
 
 - **What:** `in` constrains assignment, not just decomposition. `period in 'months'` means only months-component periods can be assigned — same as `money in 'USD'` rejecting EUR.
 - **Why:** `in` must mean the same thing everywhere. Making it a "hint" for period but a "constraint" for money would be an inconsistency.
 - **Alternatives rejected:** (A) `in` governs decomposition only for period — inconsistent with money/quantity. (B) Silently truncate incompatible components — lossy, violates NodaTime faithfulness. (C) Warn but allow — detection, not prevention.
 - **Tradeoff accepted:** Authors must explicitly extract components or use intermediate fields when assigning mixed-component periods to single-component fields.
+
+**Reconciliation with D3:** D3 and D14 govern different phases of the same `in` keyword. D3 governs the **decomposition basis** — which NodaTime `PeriodUnits` overload `Period.Between()` uses. D14 governs the **assignment constraint** — what values the field accepts. Both apply simultaneously: a `period in 'months'` field uses the months decomposition basis (D3) AND rejects assignments containing non-months components (D14).
+
+**Enforcement mechanism:** The proof engine's C94 diagnostic (`InConstraintRange` — see `ProofEngineDesign.md`) enforces `in` constraints at compile time using the proven-violation-only policy. Three enforcement tiers:
+
+1. **Literals with statically-known content:** `set CostUsd = '100 EUR'` where `CostUsd` is `money in 'USD'` — the compiler resolves the literal's currency to EUR, proves it violates the USD constraint, and emits C94 as a compile-time error. Same for `set MonthsField = '30 days'` against `period in 'months'`.
+2. **Expressions with guard-narrowed proof:** `when Payment.currency == 'USD'` seeds a `$eq:Payment.currency:USD` proof marker. An assignment to `money in 'USD'` succeeds because the proof engine can verify the constraint is satisfied. Without the guard, C94 fires (unproven — open field assigned to constrained field).
+3. **Runtime boundary validation:** Event args and `precept_fire`/`precept_update` inputs are validated at the API boundary before entering the engine. This is input validation, not mid-evaluation exception — consistent with the temporal proposal's `TryValidateEventArguments` pattern.
 
 ### D15. Time-unit denominators use NodaTime vocabulary and cancel against `period` or `duration`
 
@@ -1411,6 +1442,9 @@ When operations combine typed values, the result type is determined by the dimen
 - **Operators enabled:**
   - Period path: `price × period → money`, `money ÷ period → price`, `quantity(compound) × period → quantity`, `quantity ÷ period → quantity(compound)` — cancels any time denominator.
   - Duration path: `price × duration → money`, `money ÷ duration → price`, `quantity(compound) × duration → quantity`, `quantity ÷ duration → quantity(compound)` — cancels `hours`/`minutes`/`seconds` only.
+- **Period single-basis cancellation rule:** A `period` cancels a single-unit time denominator **only when the period has a single matching basis**. `period in 'hours'` cancels `price in 'USD/hours'`. `period in 'hours&minutes'` does **not** cancel `price in 'USD/hours'` — it is a compile error. NodaTime stores period components separately (`.Hours`, `.Minutes`, `.Seconds`) with no native `TotalHours` conversion. Converting a multi-basis period to a single unit would require Precept-invented arithmetic that NodaTime deliberately refuses. The author must decompose first: extract the hours component or use a single-basis period. The proof engine's C94 enforces this — a multi-basis period assignment to a single-unit denominator context is a proven constraint violation.
+- **Duration is exempt from this restriction.** `Duration` is a single scalar (nanoseconds internally) — `duration.ToInt64Nanoseconds()` always yields an exact conversion to any time unit. There is no multi-basis ambiguity. `duration` cancels any fixed-length time denominator (`hours`/`minutes`/`seconds`) regardless of how the duration was constructed.
+- **Date-component denominators remain period-only.** `days`, `weeks`, `months`, `years` denominators cancel only with `period`, and follow the same single-basis rule: `period in 'months'` cancels `price in 'USD/months'`, but `period in 'months&days'` does not — because NodaTime cannot convert "2 months + 15 days" into a pure months count without a reference date.
 - **Alternatives rejected:** (A) UCUM time units — requires translation table. (B) Time spans as `quantity` — dead end #6. (C) No cancellation — makes `HourlyRate * HoursWorked` impossible. (D) `period`-only — blocks `instant - instant → duration` from compound arithmetic. (E) Compiler warning on dual paths — second-guessing the author's deliberate type choice.
 - **Precedent:** NodaTime separates `Duration` (fixed elapsed) from `Period` (calendar distance). The temporal proposal preserves this. The boundary is faithful to NodaTime's model.
 - **Tradeoff accepted:** UCUM time units not valid in denominators. Minor vocabulary restriction for zero-translation cancellation.
@@ -1439,7 +1473,7 @@ This proposal extends mechanisms established by the temporal proposal (Issue #10
 | Dependency | Why |
 |---|---|
 | [Issue #107](https://github.com/sfalik/Precept/issues/107) — Temporal type system | Establishes `period`, `duration`, typed constant delimiter, `in` syntax, and the NodaTime alignment directive this proposal extends. |
-| [Issue #115](https://github.com/sfalik/Precept/issues/115) — `decimal` precision bug | `TryToNumber` converts through `double`, losing precision. Must be fixed before `money` or `decimal`-backed `quantity` ships. |
+| [Issue #115](https://github.com/sfalik/Precept/issues/115) — `decimal` precision bug | `TryToNumber` converts through `double`, losing precision. Will be completed before this proposal ships — no blocking dependency at implementation time. |
 | [Issue #106](https://github.com/sfalik/Precept/issues/106) — Proof engine | Provides the narrowing infrastructure (guard decomposition, marker injection, cross-branch accumulation) that discrete equality narrowing reuses. |
 | [Issue #111](https://github.com/sfalik/Precept/issues/111) — `nonzero` constraint | Needed for `money / number` and `price / number` divisor safety. |
 
@@ -1470,7 +1504,7 @@ This proposal extends mechanisms established by the temporal proposal (Issue #10
 - New types: `money`, `currency`, `quantity`, `unitofmeasure`, `dimension`, `price`, `exchangerate`.
 - Unit compatibility enforcement: same-currency for money arithmetic, same-unit for quantity arithmetic, dimensional cancellation for price × quantity.
 - Dimension category validation: for `quantity of` fields, verify that assigned values' units are commensurable with the declared dimension.
-- Period component category validation: for `period of 'date'`/`period of 'time'`, enforce the same proof semantics as the temporal design's `dateonly`/`timeonly`.
+- Period temporal dimension validation: for `period of 'date'`/`period of 'time'`, enforce the same proof semantics as the temporal design's `dateonly`/`timeonly`. The `of` value is a `dimension` from the temporal partition.
 - Period basis validation: verify that declared basis components are legal for the source operation type.
 - Mutual exclusivity: reject any field declaration that has both `in` and `of`.
 - **Discrete equality narrowing:** New `TryApplyEqualityNarrowing` method (~30 lines) pattern-matches `when Field.accessor == 'literal'` guards, injecting `$eq:Field.accessor:value` markers. Reuses existing guard decomposition, cross-branch accumulation, and `ApplyAssignmentNarrowing` infrastructure.
@@ -1489,7 +1523,7 @@ This proposal extends mechanisms established by the temporal proposal (Issue #10
 
 ### Language server changes
 
-- Completions: ISO 4217 codes after `money in '`, UCUM unit names after `quantity in '`, UCUM dimension names after `quantity of '` and `dimension` field assignment, `date`/`time` after `period of '`, period unit atoms after `period in '`.
+- Completions: ISO 4217 codes after `money in '`, UCUM unit names after `quantity in '`, UCUM dimension names after `quantity of '` and `dimension` field assignment, temporal dimension names (`date`/`time`/`datetime`) after `period of '`, period unit atoms after `period in '`.
 - Diagnostics: cross-currency arithmetic errors, unit mismatch errors, invalid period basis for source type, `in`/`of` mutual exclusivity violation, dimension mismatch on `of` fields, duration-vs-variable-length-denominator errors.
 
 ### TextMate grammar changes
