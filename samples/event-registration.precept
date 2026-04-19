@@ -38,9 +38,7 @@ event UpdateSeats with Seats as number
 on UpdateSeats ensure Seats > 0 because "Updated seat count must stay positive"
 
 event RecordPayment
-
 event Cancel with Reason as string nullable default null notempty
-
 event CheckIn with Desk as string notempty
 
 from Draft on StartRegistration -> set RegistrantName = StartRegistration.Name -> set ContactEmail = StartRegistration.Email -> set SeatsReserved = StartRegistration.Seats -> set AmountDue = if StartRegistration.Seats >= 10 then round(StartRegistration.Seats * StartRegistration.PricePerSeat * 0.9, 2) else round(StartRegistration.Seats * StartRegistration.PricePerSeat, 2) -> transition PendingPayment

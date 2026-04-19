@@ -18,14 +18,11 @@ state FlashingRed
 in Red edit VehiclesWaiting, LeftTurnQueued
 
 event Advance
-
 event Emergency with AuthorizedBy as string notempty, Reason as string notempty
-
 event VehiclesArrive with Count as number default 5
 on VehiclesArrive ensure Count > 0 because "Vehicle count must be positive"
 
 event LeftTurnRequest
-
 event ClearEmergency
 
 from any on VehiclesArrive -> set VehiclesWaiting = VehiclesWaiting + VehiclesArrive.Count -> no transition

@@ -9,7 +9,6 @@ field AdvisorName as string nullable
 field ApprovedWorkCount as number default 0 nonnegative
 field InvoiceTotal as number default 0 nonnegative
 field PickupContacted as boolean default false
-
 field RecommendedServices as set of string
 
 state Scheduled initial
@@ -28,11 +27,8 @@ from AwaitingApproval ensure RecommendedServices.count > 0 because "Approval can
 to ReadyForPickup -> set PickupContacted = true
 
 event CheckIn with Customer as string notempty, Plate as string notempty, Advisor as string notempty
-
 event RecommendService with ServiceName as string notempty
-
 event RemoveServiceRecommendation with ServiceName as string notempty
-
 event ApproveEstimate with ApprovedCount as number, EstimateTotal as number
 on ApproveEstimate ensure ApprovedCount > 0 because "At least one service must be approved"
 on ApproveEstimate ensure EstimateTotal >= 0 because "Estimate totals cannot be negative"

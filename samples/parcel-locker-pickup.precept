@@ -10,7 +10,6 @@ field ReminderCount as number default 0 nonnegative
 field CurrentDay as number default 0 nonnegative
 field LastReminderDay as number default 0 nonnegative
 field LastReminderNote as string nullable
-
 field ReminderLog as stack of string
 
 state Empty initial
@@ -25,11 +24,8 @@ to PickedUp -> clear ReminderLog
 to Returned -> clear ReminderLog
 
 event LoadParcel with Locker as string notempty, Recipient as string notempty, Code as string notempty
-
 event SendReminder with Note as string notempty
-
 event PickUp with Code as string notempty
-
 event AdvanceDay with DayNumber as number
 on AdvanceDay ensure DayNumber >= 0 because "Days cannot be negative"
 

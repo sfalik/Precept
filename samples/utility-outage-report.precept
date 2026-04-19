@@ -10,7 +10,6 @@ field Verified as boolean default false
 field AssignedCrew as string nullable
 field RestorationNote as string nullable
 field DispatchRound as number default 0 nonnegative
-
 field AffectedBlocks as set of string
 field CrewQueue as queue of string
 
@@ -27,16 +26,11 @@ event FileReport with Reporter as string notempty, Region as string notempty, Cu
 on FileReport ensure Customers >= 0 because "Estimated customers cannot be negative"
 
 event AddBlock with BlockName as string notempty
-
 event RemoveBlock with BlockName as string notempty
-
 event RegisterCrew with CrewName as string notempty
-
 event VerifyReport
 event DispatchCrew
-
 event MarkRestored with Note as string notempty
-
 event CloseIncident
 
 from Reported on FileReport -> set ReporterName = FileReport.Reporter -> set RegionName = FileReport.Region -> set EstimatedCustomers = FileReport.Customers -> no transition

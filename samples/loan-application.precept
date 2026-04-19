@@ -34,12 +34,10 @@ on Submit ensure Income >= 0 because "Income cannot be negative"
 on Submit ensure Debt >= 0 because "Debt cannot be negative"
 
 event VerifyDocuments
-
 event Approve with Amount as number, Note as string nullable default null notempty
 on Approve ensure Amount > 0 because "Approved amounts must be positive"
 
 event Decline with Note as string notempty
-
 event FundLoan
 
 from Draft on Submit -> set ApplicantName = Submit.Applicant -> set RequestedAmount = Submit.Amount -> set CreditScore = Submit.Score -> set AnnualIncome = Submit.Income -> set ExistingDebt = Submit.Debt -> transition UnderReview

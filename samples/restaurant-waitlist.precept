@@ -7,7 +7,6 @@ field CurrentParty as string nullable
 field LastCalledParty as string nullable
 field EstimatedWaitMinutes as number default 0 nonnegative
 field WalkInOpen as boolean default true
-
 field PartyQueue as queue of string
 
 state Accepting initial
@@ -17,7 +16,6 @@ state Closed
 in Seating ensure CurrentParty != null because "The seating state must know which party is being seated"
 
 event JoinWaitlist with PartyName as string notempty
-
 event SeatNextParty
 event MarkSeated
 event CloseService

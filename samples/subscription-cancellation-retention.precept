@@ -25,7 +25,6 @@ on MakeSaveOffer ensure DiscountPercent > 0 because "Save offers must include a 
 on MakeSaveOffer ensure DiscountPercent <= 100 because "Save offers cannot exceed 100 percent"
 
 event AcceptOffer
-
 event DeclineOffer with Note as string nullable default null notempty
 
 from Active on RequestCancellation -> set SubscriberName = RequestCancellation.Name -> set PlanName = RequestCancellation.Plan -> set MonthlyPrice = RequestCancellation.Price -> set CancellationReason = RequestCancellation.Reason -> set SaveOfferAccepted = false -> transition RetentionReview
