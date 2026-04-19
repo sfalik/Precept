@@ -26,6 +26,21 @@
 
 ## Recent Updates
 
+### 2026-04-19 — Issue #118 Slice 1 validation (PR #123)
+
+Slice 1 (extract Helpers partial class) was already committed at `032b897` when assigned. Performed independent validation.
+
+- `PreceptTypeChecker.Helpers.cs`: 398 lines, all 29 methods present and correctly placed.
+- Build: succeeds with 2 pre-existing CS8629 nullable warnings (lines 177, 947 of main file) — not introduced by the refactor.
+- Focused tests (PreceptTypeChecker, FieldConstraint, ConditionalExpression, StringAccessor, ProofEngine filter): **371/371 passed**.
+- PR body Slice 1 checklist was already fully checked at commit time.
+- Slice 2 (FieldConstraints) also already committed at `89bf5bb` (HEAD).
+
+Learnings from slice review:
+- `using` directives in Helpers.cs are trimmed correctly to `System` + `System.Collections.Generic` only — no namespace-level pollution.
+- `partial` keyword was added to the main class declaration in the Slice 1 commit — a prerequisite that must be confirmed for each new partial file.
+- The 29 Helpers methods span two line regions in the original: L220–278 (early mapping/literal/assignability cluster) and L1592–3700 (late builder/copy/formatting cluster). Both regions were correctly cleared from the main file.
+
 ### 2026-04-18 — Proof engine design-to-code accuracy review (PR #108)
 
 Full review written to `.squad/decisions/inbox/george-proof-engine-review.md`.
@@ -113,6 +128,14 @@ Key findings:
 - Nullable fields hit C77 (null-argument) before C76 (non-negative proof) when no null-guard is present. Tests for reject cases assert either C76 or C77.
 - 7 new tests, all 1236 tests pass (+ 92 MCP + 169 LS = full green).
 
+### 2026-04-19 — Issue #118 Slice 3: extract Narrowing partial class
+- Extracted 9 narrowing methods from `PreceptTypeChecker.cs` into `src/Precept/Dsl/PreceptTypeChecker.Narrowing.cs`.
+- Methods moved: `BuildEventEnsureSymbols`, `BuildStateEnsureNarrowings`, `BuildEventEnsureNarrowings`, `ApplyAssignmentNarrowing`, `ApplyNarrowing`, `TryApplyNullComparisonNarrowing`, `TryApplyNumericComparisonNarrowing`, `TryStoreLinearFact`, `TryDecomposeNullOrPattern`.
+- Used PowerShell line-range extraction to guarantee byte-for-byte identical method bodies — no manual transcription risk.
+- Main file shrank from 3002 → 2407 lines (595 lines removed across two non-contiguous blocks).
+- `FlipComparisonOperator` and `TryGetNumericLiteral` remain in the main file for now; they move to ProofChecks in Slice 4. Cross-file calls work seamlessly because partial classes share a single compilation unit.
+- Build: clean (2 pre-existing CS8629 warnings, unchanged). Tests: 75/75 targeted anchor tests pass. Commit: `4dad80b`.
+
 ### 2026-04-17 — Issue #106 Slice 1: numeric narrowing infrastructure
 - Implemented `FlipComparisonOperator`, `TryGetNumericLiteral`, and `TryApplyNumericComparisonNarrowing` in `PreceptTypeChecker.cs`.
 - Wired numeric comparison narrowing into `ApplyNarrowing()` after the existing null-comparison branch.
@@ -143,3 +166,16 @@ Key findings:
 - The decisive fix point for PRECEPT097/PRECEPT098 was upstream: emitted diagnostics needed explicit end-column precision in the core model before tooling could ever render a tighter range.
 - Threading `EndColumn` through runtime/type-checker emission is the right first move; language-server range logic should only be adjusted after verifying the upstream payload is precise.
 - Regression tests for diagnostic precision belong near the emitting layer, not only in tooling, so LS consumers are protected from future coarse-span regressions.
+
+### 2026-04-19 — Issue #118 Slice 4 (extract ProofChecks partial class, PR #123)
+
+Extracted 9 proof-analysis methods into `PreceptTypeChecker.ProofChecks.cs` — pure structural refactor.
+
+Methods extracted: `ExtractFieldInterval`, `TryInferInterval`, `FlipComparisonOperator`, `AssessDivisorSafety`, `AssessGuard`, `TryExtractSingleFieldComparison`, `DescribeExpression`, `AssessNonnegativeArgument`, `TryGetNumericLiteral`.
+
+- Main file went from 2407 → 2003 lines; ProofChecks.cs created at 416 lines.
+- `FlipComparisonOperator` is called cross-file from Narrowing (`TryApplyNumericComparisonNarrowing`) — this is intentional and works because both files are in the same partial class. No caller updates needed.
+- The PR checklist had items 3–5 of Slice 4 pre-checked but items 1–2 unchecked; corrected all to checked after implementation.
+- Line-array surgery via `[System.IO.File]::ReadAllLines` + `WriteAllLines` (UTF8 no-BOM) is the reliable approach for 400-line block extraction when replace_string_in_file would require exact matching of the entire block.
+- Targeted test run (5 test classes, 148 tests): all passed. Build: succeeded with same 2 pre-existing CS8629 warnings.
+- Commit: `eb88c4e`.
