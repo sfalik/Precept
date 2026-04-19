@@ -13,6 +13,17 @@
 
 ## Recent Updates
 
+### 2026-04-19 — Design review of issue #118: PreceptTypeChecker decomposition
+- **Verdict: APPROVED WITH NOTES.** Proposal is architecturally sound and ready for implementation planning.
+- Verified all 67 class-level methods against proposed 6-file grouping. Method inventory is complete — no methods missing, no phantom methods.
+- Actual file size: 3695 lines (proposal said ~3200 — likely from a pre-PR#108 baseline).
+- Main file size underestimated by ~100-200 lines (computed ~1132 methods-only vs estimated ~950-1050). Not blocking.
+- ProofChecks overestimated by ~100-150 lines (computed ~404 vs estimated ~500-550). The vague "C94-C98 helpers" bullet is redundant with individually named methods.
+- Copy helpers (CopyRelationalFacts, CopyFieldIntervals, CopyFlags, CopyExprFacts) correctly placed in Helpers — called from both Main and Narrowing, genuinely cross-cutting.
+- 7 non-blocking notes filed: size estimates, fully explicit Helpers inventory, front-matter type placement in acceptance criteria, per-file `using` directives.
+- Full review at `.squad/decisions/inbox/frank-issue-118-design-review.md`.
+- **Key architectural learning:** partial class decomposition of a static class is the correct pattern for large single-concern files in this codebase. The zero-visibility-change property is the key enabler.
+
 ### 2026-04-10 — Issue #31 shipped
 - PR #50 merged to main (squash SHA `305ec03`). Issue #31 closed. 775 tests passing.
 
