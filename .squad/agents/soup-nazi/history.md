@@ -13,6 +13,9 @@
 - Event arg constraint keyword → C93 suppression must be tested separately from event arg ensure → C93 suppression. The mechanism overlaps but the AC names them as distinct.
 - `from any` expansion tests must cover each proof-scoped diagnostic independently. A null-narrowing `from any` test does NOT satisfy the divisor `from any` AC.
 - Theory-based tests with `messageFragment` inline data are the strongest pattern for context-aware diagnostic messages — each row self-documents what the message should say.
+- Temporal type proposals create most of their risk in the type-checker and runtime boundary layers, not in raw arithmetic alone; the dangerous paths are context-dependent quantity resolution, DST mediation, null/default interactions, and field-constraint desugaring.
+- Design-doc review must flag spec contradictions as test blockers immediately: interpolation expression scope, diagnostic severity, and unresolved nullable/default semantics all prevent writing stable assertions.
+- Collection and ordering interactions need explicit temporal coverage because set semantics depend on comparability; date/time/instant/duration/datetime are set-safe, while period/timezone/zoneddatetime must fail with teachable diagnostics.
 
 ## Recent Updates
 

@@ -42,6 +42,7 @@ These files compare Precept against adjacent tools and systems. They are not pro
 |---|---|---|
 | [../references/cel-comparison.md](../references/cel-comparison.md) | Google CEL: expression model, type system, logical operators, extension model, safety guarantees | Expression expansion, keyword vs symbol surface |
 | [function-library-comparison.md](./function-library-comparison.md) | Excel, SQL, .NET `System.Math`: function-by-function mapping against Precept's proposed 23-signature library | `#16` built-in function library validation |
+| [low-code-function-patterns.md](./low-code-function-patterns.md) | Function-call vs dot-access syntax across 8+ low-code/business platforms (Power Fx, Coda, Notion, FEEL, Power Automate, etc.) | Temporal operation syntax decisions, dot-accessor surface expansion |
 
 ## Cross-cutting analysis docs
 

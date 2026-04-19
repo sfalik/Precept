@@ -256,7 +256,8 @@ ListLiteral        := "[" (ScalarLiteral ("," ScalarLiteral)*)? "]"
 
 BoolExpr           := <expression grammar; carried forward>
 Identifier         := <token>
-StringLiteral      := '"' ... '"'
+StringLiteral      := '"' ... '"'   # supports {expr} interpolation — see LiteralSystemDesign.md
+TypedConstant      := "'" ... "'"   # type inferred from content shape — see LiteralSystemDesign.md
 Comment            := "#" ... end-of-line
 Blank              := (whitespace only)
 ```
@@ -391,7 +392,7 @@ When multiple rows target the same `(State, Event)` pair, rows are evaluated in 
 ## Identifiers, Keywords, and Strings
 
 - Identifiers are case-sensitive and compared ordinally.
-- String literals use double quotes: `"like this"`.
+- String literals use double quotes: `"like this"`. Strings support `{expr}` interpolation for embedding field values: `"Score {CreditScore} is below minimum"`. See [`LiteralSystemDesign.md`](LiteralSystemDesign.md) for the complete literal system — primitives, strings, typed constants (`'...'`), interpolation, and escape sequences.
 - Reasons on `on ... ensure`/`rule` are **required** and must be quoted strings.
 
 ### Reserved keywords (Locked)
@@ -519,7 +520,7 @@ Defaults:
 - Non-nullable scalar fields must declare a `default ...`.
 - Nullable scalar fields default to `null` when `default ...` is omitted.
 - Collection fields default to empty when `default ...` is omitted.
-- Collection defaults may be expressed using a list literal, e.g. `default ["a", "b"]`.
+- Collection defaults may be expressed using a list literal, e.g. `default ["a", "b"]`. See [`LiteralSystemDesign.md`](LiteralSystemDesign.md) for the complete literal syntax specification.
 
 Constraints:
 - No duplicate field names (within a single declaration or across declarations).
@@ -1091,6 +1092,19 @@ Dotted member accessors:
 | `Field.length` | `string` | `number` | UTF-16 code unit count. Null-unsafe — requires non-null narrowing first (C56). See [String accessors](#string-accessors). |
 | `EventName.ArgName` | event arg in transition row `when` guard | arg type | Required dotted form to avoid field shadowing. See [Expression scope in transitions](#expression-scope-in-transitions). |
 | `EventName.ArgName.length` | `string` event arg | `number` | Three-level form — combines arg dotted form with string `.length`. |
+
+### Dot access vs function call (Locked)
+
+**Rule: If the value owns the operation, use dot access. If the operation is freestanding, use a function call.**
+
+The ownership test: *does this operation make sense only on values of THIS type, or does it apply across many types?*
+
+| Surface | Form | Examples | Rationale |
+|---|---|---|---|
+| **Dot access** (value owns it) | `value.member` or `value.method(arg)` | `Start.inZone(tz)`, `Zdt.localdatetime`, `Date.year`, `Items.count`, `Name.length`, `Submit.Claimant` | The operation is intrinsic to the receiver type — only instants have `.inZone()`, only strings have `.length`, only collections have `.count`. |
+| **Function call** (freestanding) | `function(value, ...)` | `abs(x)`, `min(a, b)`, `trim(Name)`, `toLower(Name)`, `round(x, 2)` | The operation applies to any value of a compatible type — `abs` works on any numeric, `trim` works on any string. The value is an input, not the owner. |
+
+This rule extends Precept's two grammar voices: **verb-first for actions** (`set`, `transition`, `add`, `reject`) and **noun-centric for expressions** (`Submit.Claimant`, `Items.count`). Dot access in expression position continues the noun-centric reading — the subject leads, and properties, accessors, and type-owned operations chain left to right. Function calls serve the verb-first voice where the operation name leads.
 
 Built-in functions:
 
