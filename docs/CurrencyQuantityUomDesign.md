@@ -249,15 +249,19 @@ A field declaration may carry **at most one** of `in` or `of`. Declaring both is
 
 `of` is available on `quantity` and `period`. It is **not** available on `money`, `currency`, `price`, `exchangerate`, `unitofmeasure`, or `dimension`. The identity types (`currency`, `unitofmeasure`, `dimension`) do not carry a separate category slot — they ARE the identity. Use `when` guards for category checks (e.g., `when UOM.dimension == 'mass'`).
 
-#### UCUM dimension categories
+#### UCUM dimension categories (curated registry)
+
+Precept ships a curated set of dimension categories for the UCUM partition. UCUM itself defines 7 base dimensions and ~85 informal "kind of quantity" labels across its tables, but does not publish a formal taxonomy of dimension categories. Precept selects the subset relevant to business-domain quantities and assigns each a friendly name mapped to UCUM base-dimension exponents.
 
 | Category name | Base dimension | Example units admitted |
 |---|---|---|
-| `length` | L | m, km, ft, mi, in, cm, mm |
-| `mass` | M | kg, g, lb, oz, t |
-| `volume` | L³ | L, mL, gal, fl_oz |
-| `area` | L² | m2, ft2, acre, ha |
-| `temperature` | Θ | Cel, [degF], K |
+| `'length'` | L | m, km, ft, mi, in, cm, mm |
+| `'mass'` | M | kg, g, lb, oz, t |
+| `'volume'` | L³ | L, mL, gal, fl_oz |
+| `'area'` | L² | m2, ft2, acre, ha |
+| `'temperature'` | Θ | Cel, [degF], K |
+
+This registry is **extensible** — additional categories (e.g., `'pressure'`, `'energy'`, `'force'`, `'speed'`) can be added in future versions without breaking changes. Each addition maps a friendly name to a UCUM base-dimension vector and is purely additive.
 
 Time units (`s`, `min`, `h`, `d`) are excluded from the `quantity` category system because they belong to NodaTime's temporal types. Counting units (`each`, `case`, `pack`, `dozen`) are **opaque** — each is its own unit with no shared dimension and no auto-conversion. Conversion between counting units requires explicit multiplication by a typed conversion factor (e.g., `quantity in 'each/case'`).
 
@@ -540,7 +544,7 @@ field AllowedDimension as dimension nullable
 
 | Partition | Valid values | Used by |
 |-----------|-------------|--------|
-| UCUM (physical) | `'mass'`, `'length'`, `'volume'`, `'area'`, `'temperature'`, ... | `quantity.dimension`, `unitofmeasure.dimension`, `quantity of '...'` |
+| UCUM (physical) | `'mass'`, `'length'`, `'volume'`, `'area'`, `'temperature'` | `quantity.dimension`, `unitofmeasure.dimension`, `quantity of '...'` |
 | Temporal | `'date'`, `'time'`, `'datetime'` | `period.dimension`, `period of '...'` |
 
 The type checker enforces partition correctness: `quantity.dimension == 'date'` is a compile error because `'date'` is not in the UCUM partition. `period.dimension == 'mass'` is a compile error because `'mass'` is not in the temporal partition. Cross-type comparison `quantity.dimension == period.dimension` is a compile error — different partitions are never equal.
