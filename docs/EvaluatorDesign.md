@@ -126,11 +126,11 @@ The expression evaluator exists and is functionally correct for most expression 
 
 ### Critical Finding 3: Type checker maps `decimal` as `number`
 
-`PreceptTypeChecker.MapLiteralKind()` ([PreceptTypeChecker.cs](../src/Precept/Dsl/PreceptTypeChecker.cs#L3512)) classifies C# `decimal` runtime values as `StaticValueKind.Number`, not `StaticValueKind.Decimal`. This means the type checker cannot distinguish exact decimal values from approximate number values during type inference — the decimal lane is invisible at type-check time.
+`PreceptTypeChecker.MapLiteralKind()` ([PreceptTypeChecker.Helpers.cs](../src/Precept/Dsl/PreceptTypeChecker.Helpers.cs#L58)) classifies C# `decimal` runtime values as `StaticValueKind.Number`, not `StaticValueKind.Decimal`. This means the type checker cannot distinguish exact decimal values from approximate number values during type inference — the decimal lane is invisible at type-check time.
 
 ### Critical Finding 4: Type checker maps `.count` and `.length` as `number`
 
-`BuildSymbolKinds()` ([PreceptTypeChecker.cs](../src/Precept/Dsl/PreceptTypeChecker.cs#L489)) maps `Collection.count` and `Field.length` to `StaticValueKind.Number`. These are discrete integer surfaces — a collection cannot have 2.5 elements — but the type system treats them as approximate floating-point values.
+`BuildSymbolKinds()` ([PreceptTypeChecker.Helpers.cs](../src/Precept/Dsl/PreceptTypeChecker.Helpers.cs#L352)) maps `Collection.count` and `Field.length` to `StaticValueKind.Number`. These are discrete integer surfaces — a collection cannot have 2.5 elements — but the type system treats them as approximate floating-point values.
 
 ### Critical Finding 5: Evaluator collapses all arithmetic through `double`
 
@@ -786,8 +786,8 @@ Computed fields (`field Net as decimal = Gross - Tax`) are recomputed after ever
 | Integration point | Component | File | Role |
 |---|---|---|---|
 | Literal parsing | Parser | `PreceptParser.cs` | `ToNumericLiteralValue()` produces lane-preserving C# types. Fractional literals stored as text or `decimal`, resolved at type-check time. |
-| Literal kind inference | Type checker | `PreceptTypeChecker.cs` | `MapLiteralKind()` maps `long` → `Integer`, `decimal` → `Decimal`, `double` → `Number`. Context-sensitive literal resolution determines the final type. |
-| Symbol table | Type checker | `PreceptTypeChecker.cs` | `BuildSymbolKinds()` maps `.count` and `.length` to `StaticValueKind.Integer`. |
+| Literal kind inference | Type checker | `PreceptTypeChecker.Helpers.cs` | `MapLiteralKind()` maps `long` → `Integer`, `decimal` → `Decimal`, `double` → `Number`. Context-sensitive literal resolution determines the final type. |
+| Symbol table | Type checker | `PreceptTypeChecker.Helpers.cs` | `BuildSymbolKinds()` maps `.count` and `.length` to `StaticValueKind.Integer`. |
 | Constraint storage | Model | `PreceptModel.cs` | `FieldConstraint.Min` and `FieldConstraint.Max` store values in lane-appropriate types. |
 | Expression evaluation | Evaluator | `PreceptExpressionEvaluator.cs` | All operator dispatch, function evaluation, and collection operations preserve lane identity. |
 | Runtime coercion | Runtime | `PreceptRuntime.cs` | `CoerceToDecimal()` rejects `double`/`float` inputs. `CoerceToNumber()` returns `double`. `CoerceToInteger()` returns `long`. JSON unwrapping uses `GetDecimal()` for decimal fields. |
