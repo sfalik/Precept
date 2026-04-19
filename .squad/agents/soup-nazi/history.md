@@ -54,6 +54,10 @@
 - Created new `test/Precept.Tests/PreceptKeywordLogicalOperatorTests.cs` covering: basic keyword parsing (not/and/or), precedence validation (not > and > or), null narrowing through `not (Field == null)`, `!=` operator unaffected, old symbols `&&`/`||`/`!` produce parse errors, compound expression parse/evaluate, invariant context (or/and).
 - George's runtime changes (parser, tokenizer, type checker, evaluator, samples) were already on the branch — tests written against the finished spec.
 - Key learning: always check if the partner's runtime changes are already on branch before assuming tests will fail. The old-symbol-produces-error tests and keyword tests may pass immediately if George's work is complete.
+### 2026-04-15 — Issue #100 Testing Gate: Precept Name Token Scope
+- **BLOCKED** PR #101. The TextMate grammar fix is correct (`entity.name.precept.message.precept` → `entity.name.type.precept.precept`), but the semantic token handler (`PreceptSemanticTokensHandler.cs` line 331) still maps `PreceptToken.Precept => "preceptMessage"`. Because `editor.semanticHighlighting.enabled = true` is set for precept files, the semantic path overrides TextMate and the precept name still renders gold.
+- Identified that `GetClassifiedTokens_PreceptName_IsPreceptMessage` (line 125, `PreceptSemanticTokensClassificationTests.cs`) asserts the broken behavior and must be updated as part of the fix.
+- Required: semantic handler change + legend registration (if new type) + package.json semantic color rule + test update.
 
 ### 2026-04-11 — Guarded declaration validation sweep
 - Built and verified multi-layer tests for guarded invariants, state asserts, event asserts, and guarded edit blocks, including runtime and MCP coverage.

@@ -7,7 +7,7 @@
 Every language or runtime change follows this flow:
 
 ```
-Idea → GitHub Issue (proposal) → Research → Implementation PR → Merge → Docs updated
+Idea → GitHub Issue (proposal) → Research → Design Review (owner sign-off) → Implementation PR → Merge → Docs updated
 ```
 
 #### 1. Proposal (GitHub Issue)
@@ -42,7 +42,47 @@ Research files are linked from the issue, not the other way around. The issue ma
 
 **Quality bar for rationale:** `research/language/expressiveness/computed-fields.md` and the Issue #17 proposal demonstrate the expected depth — alternatives surveyed with precedent, explicit tradeoff analysis, and design philosophy grounding each locked decision.
 
-#### 3. Implementation (Feature Branch + PR)
+#### 3. Design Review
+
+Design review is a formal gate for every proposal. No implementation plan is authored until the design review ceremony completes with owner (Shane) sign-off.
+
+Proposals follow one of two tracks:
+
+**Track A — Standard proposal (no new canonical design):**
+
+```
+Issue → Research → Design Review Ceremony (issue comments, owner sign-off)
+  → Implementation plan authored in PR body → Implement in vertical slices → Code Review → Merge
+```
+
+- Design review targets the proposal issue — decisions, acceptance criteria, scope.
+- Review comments live on the issue as structured issue comments (per the proposal-review skill).
+- Existing design docs (`docs/`) are updated as a final slice in the implementation PR. This rule is unchanged.
+
+**Track B — Design-introducing proposal:**
+
+A proposal declares Track B in the issue body when it introduces a new or substantially expanded canonical design document (a new file in `docs/` OR a major new section in an existing design doc).
+
+```
+Issue (declares "introduces canonical design: docs/Foo.md") → Research
+  → Draft PR (design doc committed in "to be" form)
+  → Design Review Ceremony (issue comments + inline PR comments on markdown, owner sign-off)
+  → All inline review comments resolved → Implementation plan authored in PR body
+  → Implement in vertical slices → Code Review → Merge
+```
+
+- Design review targets the proposal issue AND the design doc on the PR (inline review comments on the markdown diff).
+- All inline PR review comments on the design doc must be resolved before the design review is considered complete.
+- The design doc is the first artifact on the branch; implementation follows. Both land on `main` together when the PR merges — no future-state docs on `main` without implementing code.
+- Same branch, same PR — the PR starts as a design PR and evolves into a design+implementation PR.
+
+**Universal rules (both tracks):**
+
+1. The implementation PR may be opened early — to carry research, design docs, or other pre-implementation artifacts — but `## Implementation Plan` stays empty (or explicitly says "Pending design review") until the gate clears.
+2. Owner (Shane) signs off to mark the design review complete.
+3. No implementation plan is authored, and no coding begins, until design review is complete.
+
+#### 4. Implementation (Feature Branch + PR)
 
 When ready to implement:
 
@@ -52,8 +92,8 @@ When ready to implement:
    - `## Summary` — what changed in reviewer-facing terms
    - `## Linked Issue` — include `Closes #N`
    - `## Why` — why this PR exists, what problem it addresses, and any implementation-specific reviewer context; do **not** duplicate the full proposal rationale or alternatives from the issue/research docs
-   - `## Implementation Plan` — checkbox checklist tracking vertical slices
-4. **Build a detailed implementation plan before coding.** The plan lives in the PR body's `## Implementation Plan` section. See the [Implementation Plan Quality Bar](#implementation-plan-quality-bar) below for requirements.
+   - `## Implementation Plan` — checkbox checklist tracking vertical slices. **Note:** This section says "Pending design review" until the design review gate clears (see § 3. Design Review above). Do not author the plan until owner sign-off.
+4. **Build a detailed implementation plan after design review completes.** The plan lives in the PR body's `## Implementation Plan` section. See the [Implementation Plan Quality Bar](#implementation-plan-quality-bar) below for requirements.
 5. **Check off items as you complete them.** Update the PR body after each slice or logical group — not at the end. The checkbox list is a live progress tracker; it should reflect current state throughout development so reviewers and collaborators always know where things stand. Keep the `## Summary` and `## Why` sections current too if the shipped scope or reviewer context changes during implementation. Use the GitHub UI or `mcp_github_update_pull_request` to keep the PR body current.
 6. Implement in vertical slices. Suggested order for cross-cutting changes:
    - Parser + model + diagnostics
@@ -67,7 +107,7 @@ When ready to implement:
    - Documentation updates
 7. Mark the PR as ready for review when all acceptance criteria are met.
 
-#### 4. Documentation Sync (Same PR — Non-Negotiable)
+#### 5. Documentation Sync (Same PR — Non-Negotiable)
 
 Every implementation PR must update documentation in the same pass:
 
@@ -80,11 +120,11 @@ Every implementation PR must update documentation in the same pass:
 | Feature claims in README | `README.md` |
 | New or changed proof engine diagnostic (C76, C92–C98, future) | `test/integrationtests/diagnostics/` — add or update a `.precept` sample that demonstrates the diagnostic scenario. See § Diagnostic Samples below. |
 
-**Design docs track what EXISTS in the runtime, not what's planned.** They are updated at implementation time, never before.
+**Design docs track what EXISTS in the runtime, not what's planned.** They are updated at implementation time, never before. **Exception — Track B proposals:** For Track B proposals, the design doc is committed on the branch in "to be" form as the first artifact. It only reaches `main` alongside the implementing code. This is an exception to the general rule — Track B docs describe the target state but are gated behind the same PR as the implementation that realizes them.
 
 **Docs are a final slice, not interleaved.** Update documentation at the end of the implementation — after runtime, tooling, and tests are complete — but still in the same PR. Tests get the "throughout, not at the end" treatment; docs get the "final slice, same PR" treatment.
 
-#### 5. Diagnostic Samples (Same PR — Non-Negotiable)
+#### 6. Diagnostic Samples (Same PR — Non-Negotiable)
 
 The `test/integrationtests/diagnostics/` folder contains `.precept` files that demonstrate the proof engine's diagnostic scenarios. These are **user-facing reference samples** — not test fixtures. They show authors what the proof engine catches, what messages it produces, and how to fix the code.
 
@@ -171,7 +211,7 @@ The `## Implementation Plan` in the PR body is the execution blueprint. A plan t
 
 **A plan that fails this bar is incomplete.** Send it back for detail before coding begins — just as a proposal without rationale is sent back for rationale.
 
-#### 5. Merge and Close
+#### 7. Merge and Close
 
 After review approval:
 - Squash merge into `main`
@@ -203,6 +243,7 @@ Language proposals are assigned to wave milestones that reflect priority and dep
 | What a feature SHOULD BE | GitHub issue body | Until implemented |
 | WHY a decision was made | Issue body (per-decision rationale) + `research/` (full evidence base) | Permanent — rationale lives in both places |
 | What changed, why this PR exists, and HOW to implement (summary + reviewer context + checklist) | PR body | Ephemeral — dies with the PR |
+| Design doc in "to be" form (Track B) | PR branch — reaches `main` only with implementing code | Ephemeral on branch — permanent once merged |
 | AI agent directives | `.github/copilot-instructions.md` | Permanent — updated as process evolves |
 
 ### Why not separate implementation plan docs?

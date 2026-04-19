@@ -20,6 +20,9 @@ A `.precept` file declares the entity's **fields** (scalar values and typed coll
 - **Update**: edit a field directly. The same constraint enforcement applies. Which fields can change depends on where the entity is in its lifecycle — the definition declares this, and the engine enforces it.
 
 The engine is deterministic — same definition, same data, same outcome. Nothing is hidden.
+Precept does not present approximation as exactness. If a value or operation is inherently approximate, that fact must be explicit in the contract. Exact-value lanes remain exact.
+
+A contract is only trustworthy if its semantics are honest at the surface. Silent approximation inside an exact-looking path weakens the user's ability to reason about outcomes, even when the runtime is internally consistent. Precept therefore draws a hard line between exact and approximate behavior and requires that line to be visible in the type system and public surface. If approximation is part of the domain, the contract must say so plainly so inspection, enforcement, and consuming code all operate against the same truth.
 
 ---
 
