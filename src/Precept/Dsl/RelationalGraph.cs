@@ -40,6 +40,8 @@ internal sealed class RelationalGraph
             return NumericInterval.Unknown;
 
         // Identify the positive-coefficient variable (target) and negative-coefficient variable (source).
+        // Guard: only unit coefficients (+1, -1) are safe for transitive chaining.
+        // Non-unit forms like 2A - B > 0 (meaning 2A > B, not A > B) would be unsound.
         string? posVar = null, negVar = null;
         foreach (var (key, coeff) in form.Terms)
         {
@@ -48,6 +50,10 @@ internal sealed class RelationalGraph
         }
 
         if (posVar is null || negVar is null)
+            return NumericInterval.Unknown;
+
+        // Reject non-unit coefficient queries — magnitude matters for soundness.
+        if (form.Terms[posVar] != Rational.One || form.Terms[negVar] != Rational.NegativeOne)
             return NumericInterval.Unknown;
 
         // BFS: each node is a variable name; each edge comes from a 2-variable fact.
@@ -77,8 +83,14 @@ internal sealed class RelationalGraph
                     else if (coeff < Rational.Zero) fNeg = key;
                 }
 
+                // Skip facts with non-unit coefficients — they are not safe BFS edges.
+                if (fPos is null || fNeg is null)
+                    continue;
+                if (factForm.Terms[fPos] != Rational.One || factForm.Terms[fNeg] != Rational.NegativeOne)
+                    continue;
+
                 // Edge B → A: only follow when the fact's negative variable matches current node.
-                if (fNeg is null || fPos is null || fNeg != current)
+                if (fNeg != current)
                     continue;
 
                 var combined = CombineStrictness(accumulated, factFact.Kind);

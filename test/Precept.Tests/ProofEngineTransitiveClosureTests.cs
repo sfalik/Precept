@@ -490,6 +490,133 @@ public class ProofEngineTransitiveClosureTests
         result.Diagnostics.Where(d => d.Constraint.Id == "C76").Should().BeEmpty();
     }
 
+    // ── Non-unit coefficient guard (soundness regression) ──────────────────
+
+    [Fact]
+    public void Check_Transitive_NonUnitCoefficient_FactIgnored_EmitsC93()
+    {
+        // rule 2 * A > B stores LinearForm({A:2, B:-1}, 0) GT.
+        // GcdNormalize: gcd(|2|,|-1|) = 1 → no change; coefficients remain {A:2, B:-1}.
+        // Mathematically 2A > B means A > B/2, NOT A > B.
+        // BFS must skip this fact because the coefficient on A is 2, not 1.
+        // Query {A:1, B:-1} (A - B): direct lookup misses (stored key differs).
+        // BFS from B: fact {A:2, B:-1} has fNeg=B, fPos=A, but coefficient on A is 2 → skip.
+        // No proof found → C93 fires.
+        const string dsl = """
+            precept Test
+            field A as number default 5
+            field B as number default 3
+            field Y as number default 1
+            rule 2 * A > B because "two-A exceeds B"
+            state Open initial
+            event Go
+            from Open on Go -> set Y = Y / (A - B) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C93",
+            "rule 2*A > B produces non-unit coefficient {A:2,B:-1}; BFS must skip this fact");
+    }
+
+    [Fact]
+    public void Check_Transitive_NonUnitCoefficient_QueryForm_EmitsC93()
+    {
+        // rule A > B stores LinearForm({A:1, B:-1}, 0) GT — unit coefficients, valid fact.
+        // Query form: Y / (2 * A - B) → divisor is 2A - B → LinearForm({A:2, B:-1}, 0).
+        // Query coefficient check: A has coefficient 2 ≠ 1 → query rejected → Unknown → C93.
+        const string dsl = """
+            precept Test
+            field A as number default 5
+            field B as number default 3
+            field Y as number default 1
+            rule A > B because "A exceeds B"
+            state Open initial
+            event Go
+            from Open on Go -> set Y = Y / (2 * A - B) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C93",
+            "query form 2A - B has non-unit coefficient on A; BFS must reject the query");
+    }
+
+    [Fact]
+    public void Check_Transitive_NonUnitCoefficient_ChainWithNonUnitLink_EmitsC93()
+    {
+        // Chain: rule A > B (unit) + rule 2 * B > C (non-unit).
+        // Fact 1: {A:1, B:-1} GT — unit coefficients, valid BFS edge.
+        // Fact 2: {B:2, C:-1} GT — non-unit coefficient on B (2 ≠ 1), BFS skips this edge.
+        // Query {A:1, C:-1} (A - C): BFS from C. Fact 2 has fNeg=C but coefficients non-unit → skip.
+        // No other edges from C → no proof → C93 fires.
+        const string dsl = """
+            precept Test
+            field A as number default 10
+            field B as number default 5
+            field C as number default 1
+            field Y as number default 1
+            rule A > B because "A exceeds B"
+            rule 2 * B > C because "two-B exceeds C"
+            state Open initial
+            event Go
+            from Open on Go -> set Y = Y / (A - C) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C93",
+            "second link 2B > C has non-unit coefficient; transitive chain is broken");
+    }
+
+    [Fact]
+    public void Check_Transitive_UnitCoefficient_ExplicitMultiply_NoC93()
+    {
+        // rule A > B stores {A:1, B:-1} GT — standard unit-coefficient fact.
+        // Query A - B: unit coefficients, direct lookup succeeds. No C93.
+        // Positive control: the unit-coefficient path is unaffected by the guard.
+        const string dsl = """
+            precept Test
+            field A as number default 5
+            field B as number default 3
+            field Y as number default 1
+            rule A > B because "A exceeds B"
+            state Open initial
+            event Go
+            from Open on Go -> set Y = Y / (A - B) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Where(d => d.Constraint.Id == "C93").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_Transitive_NegativeNonUnitCoefficient_FactIgnored_EmitsC93()
+    {
+        // rule A > 2 * B stores LinearForm(A) - LinearForm(2B) = {A:1, B:-2} GT.
+        // GcdNormalize: gcd(|1|,|-2|) = 1 → no change; coefficients remain {A:1, B:-2}.
+        // Mathematically A > 2B means A/2 > B, NOT A > B.
+        // Query {A:1, B:-1} (A - B): direct lookup misses (stored key {A:1,B:-2} differs).
+        // BFS from B: fact {A:1, B:-2} has coefficient on B = -2 (magnitude 2 ≠ 1) → skip.
+        // No proof found → C93 fires.
+        const string dsl = """
+            precept Test
+            field A as number default 5
+            field B as number default 1
+            field Y as number default 1
+            rule A > 2 * B because "A exceeds two-B"
+            state Open initial
+            event Go
+            from Open on Go -> set Y = Y / (A - B) -> no transition
+            """;
+
+        var result = Check(dsl);
+
+        result.Diagnostics.Should().Contain(d => d.Constraint.Id == "C93",
+            "rule A > 2*B produces {A:1,B:-2}; magnitude of B coefficient is 2, not 1");
+    }
+
     // ── Private helpers ───────────────────────────────────────────────────────
 
     private static TypeCheckResult Check(string dsl) =>
