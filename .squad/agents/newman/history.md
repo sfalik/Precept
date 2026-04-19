@@ -11,6 +11,10 @@
 - Label/automation removals should be staged through sync workflows and disabled notices, not silent deletion.
 - Proof-engine MCP integration is only agent-complete when `precept_compile` exposes a documented proof schema with structured assessments; a raw `Dump()` reference is not a sufficient contract.
 - `precept_language` already has the right catalog-driven insertion point for proof diagnostics, but `id`/`phase`/`rule` alone is too thin for contradiction-vs-unresolved proof semantics.
+### 2026-04-10 — Issue #31 shipped
+- PR #50 merged to main (squash SHA `305ec03`). Issue #31 closed. 775 tests passing.
+
+### Issue #31 Slice 6 — Operator Inventory (2026-04-10)
 
 ## Recent Updates
 

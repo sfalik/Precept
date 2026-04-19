@@ -6,14 +6,10 @@ precept VehicleServiceAppointment
 field CustomerName as string nullable
 field VehiclePlate as string nullable
 field AdvisorName as string nullable
-field ApprovedWorkCount as number default 0
-field InvoiceTotal as number default 0
+field ApprovedWorkCount as number default 0 nonnegative
+field InvoiceTotal as number default 0 nonnegative
 field PickupContacted as boolean default false
-
 field RecommendedServices as set of string
-
-rule ApprovedWorkCount >= 0 because "Approved work count cannot be negative"
-rule InvoiceTotal >= 0 because "Invoice totals cannot be negative"
 
 state Scheduled initial
 state CheckedIn
@@ -30,17 +26,9 @@ from AwaitingApproval ensure RecommendedServices.count > 0 because "Approval can
 
 to ReadyForPickup -> set PickupContacted = true
 
-event CheckIn with Customer as string, Plate as string, Advisor as string
-on CheckIn ensure Customer != "" because "A customer name is required"
-on CheckIn ensure Plate != "" because "A vehicle plate is required"
-on CheckIn ensure Advisor != "" because "An advisor name is required"
-
-event RecommendService with ServiceName as string
-on RecommendService ensure ServiceName != "" because "A recommended service must be named"
-
-event RemoveServiceRecommendation with ServiceName as string
-on RemoveServiceRecommendation ensure ServiceName != "" because "A service name is required"
-
+event CheckIn with Customer as string notempty, Plate as string notempty, Advisor as string notempty
+event RecommendService with ServiceName as string notempty
+event RemoveServiceRecommendation with ServiceName as string notempty
 event ApproveEstimate with ApprovedCount as number, EstimateTotal as number
 on ApproveEstimate ensure ApprovedCount > 0 because "At least one service must be approved"
 on ApproveEstimate ensure EstimateTotal >= 0 because "Estimate totals cannot be negative"
@@ -48,16 +36,33 @@ on ApproveEstimate ensure EstimateTotal >= 0 because "Estimate totals cannot be 
 event FinishService
 event PickUpVehicle
 
-from Scheduled on CheckIn -> set CustomerName = CheckIn.Customer -> set VehiclePlate = CheckIn.Plate -> set AdvisorName = CheckIn.Advisor -> transition CheckedIn
+from Scheduled on CheckIn
+    -> set CustomerName = CheckIn.Customer
+    -> set VehiclePlate = CheckIn.Plate
+    -> set AdvisorName = CheckIn.Advisor
+    -> transition CheckedIn
 
-from CheckedIn on RecommendService -> add RecommendedServices RecommendService.ServiceName -> transition AwaitingApproval
+from CheckedIn on RecommendService
+    -> add RecommendedServices RecommendService.ServiceName
+    -> transition AwaitingApproval
 
-from AwaitingApproval on RecommendService -> add RecommendedServices RecommendService.ServiceName -> no transition
-from AwaitingApproval on RemoveServiceRecommendation when RecommendedServices contains RemoveServiceRecommendation.ServiceName -> remove RecommendedServices RemoveServiceRecommendation.ServiceName -> no transition
-from AwaitingApproval on RemoveServiceRecommendation -> reject "That recommendation is not on the estimate"
+from AwaitingApproval on RecommendService
+    -> add RecommendedServices RecommendService.ServiceName
+    -> no transition
+from AwaitingApproval on RemoveServiceRecommendation when RecommendedServices contains RemoveServiceRecommendation.ServiceName
+    -> remove RecommendedServices RemoveServiceRecommendation.ServiceName
+    -> no transition
+from AwaitingApproval on RemoveServiceRecommendation
+    -> reject "That recommendation is not on the estimate"
 
-from AwaitingApproval on ApproveEstimate when RecommendedServices.count == ApproveEstimate.ApprovedCount -> set ApprovedWorkCount = ApproveEstimate.ApprovedCount -> set InvoiceTotal = ApproveEstimate.EstimateTotal -> transition InService
-from AwaitingApproval on ApproveEstimate -> reject "The approved count must match the recommended services still on the estimate"
+from AwaitingApproval on ApproveEstimate when RecommendedServices.count == ApproveEstimate.ApprovedCount
+    -> set ApprovedWorkCount = ApproveEstimate.ApprovedCount
+    -> set InvoiceTotal = ApproveEstimate.EstimateTotal
+    -> transition InService
+from AwaitingApproval on ApproveEstimate
+    -> reject "The approved count must match the recommended services still on the estimate"
 
-from InService on FinishService -> transition ReadyForPickup
-from ReadyForPickup on PickUpVehicle -> transition Closed
+from InService on FinishService
+    -> transition ReadyForPickup
+from ReadyForPickup on PickUpVehicle
+    -> transition Closed

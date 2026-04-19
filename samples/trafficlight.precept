@@ -4,13 +4,10 @@ precept TrafficLight
 # the light cycles through standard phases, and an authorized Emergency event
 # forces flashing red until explicitly cleared.
 
-field VehiclesWaiting as number default 0
-field CycleCount as number default 0
+field VehiclesWaiting as number default 0 nonnegative
+field CycleCount as number default 0 nonnegative
 field LeftTurnQueued as boolean default false
 field EmergencyReason as string nullable
-
-rule VehiclesWaiting >= 0 because "Vehicles waiting cannot be negative"
-rule CycleCount >= 0 because "Cycle count cannot be negative"
 
 state Red initial
 state FlashingGreen
@@ -21,30 +18,48 @@ state FlashingRed
 in Red edit VehiclesWaiting, LeftTurnQueued
 
 event Advance
-
-event Emergency with AuthorizedBy as string, Reason as string
-on Emergency ensure AuthorizedBy != "" because "AuthorizedBy is required"
-on Emergency ensure Reason != "" because "Reason is required"
-
+event Emergency with AuthorizedBy as string notempty, Reason as string notempty
 event VehiclesArrive with Count as number default 5
 on VehiclesArrive ensure Count > 0 because "Vehicle count must be positive"
 
 event LeftTurnRequest
-
 event ClearEmergency
 
-from any on VehiclesArrive -> set VehiclesWaiting = VehiclesWaiting + VehiclesArrive.Count -> no transition
-from any on LeftTurnRequest -> set LeftTurnQueued = true -> no transition
+from any on VehiclesArrive
+    -> set VehiclesWaiting = VehiclesWaiting + VehiclesArrive.Count
+    -> no transition
+from any on LeftTurnRequest
+    -> set LeftTurnQueued = true
+    -> no transition
 
-from Red on Advance when LeftTurnQueued -> set LeftTurnQueued = false -> set CycleCount = CycleCount + 1 -> transition FlashingGreen
-from Red on Advance when VehiclesWaiting > 0 -> set VehiclesWaiting = 0 -> set CycleCount = CycleCount + 1 -> transition Green
-from Red on Advance -> reject "No demand detected at red"
+from Red on Advance when LeftTurnQueued
+    -> set LeftTurnQueued = false
+    -> set CycleCount = CycleCount + 1
+    -> transition FlashingGreen
+from Red on Advance when VehiclesWaiting > 0
+    -> set VehiclesWaiting = 0
+    -> set CycleCount = CycleCount + 1
+    -> transition Green
+from Red on Advance
+    -> reject "No demand detected at red"
 
-from FlashingGreen on Advance -> set VehiclesWaiting = 0 -> set CycleCount = CycleCount + 1 -> transition Green
-from Green on Advance -> set CycleCount = CycleCount + 1 -> transition Yellow
-from Yellow on Advance -> transition Red
+from FlashingGreen on Advance
+    -> set VehiclesWaiting = 0
+    -> set CycleCount = CycleCount + 1
+    -> transition Green
+from Green on Advance
+    -> set CycleCount = CycleCount + 1
+    -> transition Yellow
+from Yellow on Advance
+    -> transition Red
 
-from any on Emergency -> set EmergencyReason = Emergency.AuthorizedBy + ": " + Emergency.Reason -> transition FlashingRed
+from any on Emergency
+    -> set EmergencyReason = Emergency.AuthorizedBy + ": " + Emergency.Reason
+    -> transition FlashingRed
 
-from FlashingRed on Advance -> set CycleCount = CycleCount + 1 -> no transition
-from FlashingRed on ClearEmergency -> set EmergencyReason = null -> transition Red
+from FlashingRed on Advance
+    -> set CycleCount = CycleCount + 1
+    -> no transition
+from FlashingRed on ClearEmergency
+    -> set EmergencyReason = null
+    -> transition Red

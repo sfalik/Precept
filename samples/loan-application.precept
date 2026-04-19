@@ -5,19 +5,14 @@ precept LoanApplication
 # Built-in functions (min, round, clamp) keep the logic readable without external helpers.
 
 field ApplicantName as string nullable
-field RequestedAmount as number default 0
-field ApprovedAmount as number default 0
+field RequestedAmount as number default 0 nonnegative
+field ApprovedAmount as number default 0 nonnegative
 field CreditScore as number default 0
-field AnnualIncome as number default 0
-field ExistingDebt as number default 0
+field AnnualIncome as number default 0 nonnegative
+field ExistingDebt as number default 0 nonnegative
 field DecisionNote as string nullable
 field DocumentsVerified as boolean default false
-
-rule RequestedAmount >= 0 because "Requested amount cannot be negative"
-rule ApprovedAmount >= 0 because "Approved amount cannot be negative"
 rule ApprovedAmount <= RequestedAmount because "Approved amount cannot exceed the request"
-rule AnnualIncome >= 0 because "Annual income cannot be negative"
-rule ExistingDebt >= 0 because "Existing debt cannot be negative"
 rule ExistingDebt <= AnnualIncome * 3 when DocumentsVerified because "Verified applications must have a debt-to-income ratio of 3x or less"
 
 state Draft initial
@@ -32,30 +27,45 @@ in Funded ensure ApprovedAmount > 0 because "Funded loans must have a positive a
 
 in UnderReview when DocumentsVerified edit DecisionNote
 
-event Submit with Applicant as string, Amount as number, Score as number, Income as number, Debt as number
-on Submit ensure Applicant != "" because "An applicant name is required"
+event Submit with
+    Applicant as string notempty,
+    Amount as number,
+    Score as number,
+    Income as number,
+    Debt as number
 on Submit ensure Amount > 0 because "Loan requests must be positive"
 on Submit ensure Score >= 0 because "Credit score cannot be negative"
 on Submit ensure Income >= 0 because "Income cannot be negative"
 on Submit ensure Debt >= 0 because "Debt cannot be negative"
 
 event VerifyDocuments
-
-event Approve with Amount as number, Note as string nullable default null
+event Approve with Amount as number, Note as string nullable default null notempty
 on Approve ensure Amount > 0 because "Approved amounts must be positive"
-on Approve ensure Note == null or Note != "" because "A supplied decision note cannot be blank"
 
-event Decline with Note as string
-on Decline ensure Note != "" because "A decline note is required"
-
+event Decline with Note as string notempty
 event FundLoan
 
-from Draft on Submit -> set ApplicantName = Submit.Applicant -> set RequestedAmount = Submit.Amount -> set CreditScore = Submit.Score -> set AnnualIncome = Submit.Income -> set ExistingDebt = Submit.Debt -> transition UnderReview
+from Draft on Submit
+    -> set ApplicantName = Submit.Applicant
+    -> set RequestedAmount = Submit.Amount
+    -> set CreditScore = Submit.Score
+    -> set AnnualIncome = Submit.Income
+    -> set ExistingDebt = Submit.Debt
+    -> transition UnderReview
 
-from UnderReview on VerifyDocuments -> set DocumentsVerified = true -> no transition
+from UnderReview on VerifyDocuments
+    -> set DocumentsVerified = true
+    -> no transition
 
-from UnderReview on Approve when DocumentsVerified and CreditScore >= 680 and AnnualIncome >= ExistingDebt * 2 and RequestedAmount < AnnualIncome / 2 and Approve.Amount <= RequestedAmount -> set ApprovedAmount = min(Approve.Amount, RequestedAmount) -> set DecisionNote = if Approve.Note != null then Approve.Note else if CreditScore >= 750 then "Prime tier  — auto-approved" else "Standard tier — approved" -> transition Approved
-from UnderReview on Approve -> reject "Approval requires verified documents, strong credit, and affordable debt load"
+from UnderReview on Approve when DocumentsVerified and CreditScore >= 680 and AnnualIncome >= ExistingDebt * 2 and RequestedAmount < AnnualIncome / 2 and Approve.Amount <= RequestedAmount
+    -> set ApprovedAmount = min(Approve.Amount, RequestedAmount)
+    -> set DecisionNote = if Approve.Note != null then Approve.Note else if CreditScore >= 750 then "Prime tier  — auto-approved" else "Standard tier — approved"
+    -> transition Approved
+from UnderReview on Approve
+    -> reject "Approval requires verified documents, strong credit, and affordable debt load"
 
-from UnderReview on Decline -> set DecisionNote = Decline.Note -> transition Declined
-from Approved on FundLoan -> transition Funded
+from UnderReview on Decline
+    -> set DecisionNote = Decline.Note
+    -> transition Declined
+from Approved on FundLoan
+    -> transition Funded

@@ -5,17 +5,13 @@ precept EventRegistration
 
 field RegistrantName as string nullable
 field ContactEmail as string nullable
-field SeatsReserved as number default 0
-field TicketsIssued as number default 0
-field AmountDue as decimal default 0
+field SeatsReserved as number default 0 nonnegative
+field TicketsIssued as number default 0 nonnegative
+field AmountDue as decimal default 0 nonnegative
 field PaymentReceived as boolean default false
 field CancellationReason as string nullable
 field CheckInDesk as string nullable
-
-rule SeatsReserved >= 0 because "Reserved seats cannot be negative"
-rule TicketsIssued >= 0 because "Issued tickets cannot be negative"
 rule TicketsIssued <= SeatsReserved because "Issued tickets cannot exceed reserved seats"
-rule AmountDue >= 0 because "Amount due cannot be negative"
 
 state Draft initial
 state PendingPayment
@@ -34,9 +30,11 @@ in CheckedIn ensure CheckInDesk != null because "Checked-in registrations must r
 # Every transition into Confirmed finishes the same bookkeeping.
 to Confirmed -> set PaymentReceived = true -> set AmountDue = 0
 
-event StartRegistration with Name as string, Email as string, Seats as number default 1, PricePerSeat as number default 25
-on StartRegistration ensure Name != "" because "A registrant name is required"
-on StartRegistration ensure Email != "" because "A contact email is required"
+event StartRegistration with
+    Name as string notempty,
+    Email as string notempty,
+    Seats as number default 1,
+    PricePerSeat as number default 25
 on StartRegistration ensure Seats > 0 because "At least one seat must be reserved"
 on StartRegistration ensure PricePerSeat > 0 because "The seat price must be positive"
 
@@ -44,20 +42,34 @@ event UpdateSeats with Seats as number
 on UpdateSeats ensure Seats > 0 because "Updated seat count must stay positive"
 
 event RecordPayment
+event Cancel with Reason as string nullable default null notempty
+event CheckIn with Desk as string notempty
 
-event Cancel with Reason as string nullable default null
-on Cancel ensure Reason == null or Reason != "" because "If a cancellation reason is supplied, it cannot be blank"
+from Draft on StartRegistration
+    -> set RegistrantName = StartRegistration.Name
+    -> set ContactEmail = StartRegistration.Email
+    -> set SeatsReserved = StartRegistration.Seats
+    -> set AmountDue = if StartRegistration.Seats >= 10 then round(StartRegistration.Seats * StartRegistration.PricePerSeat * 0.9, 2) else round(StartRegistration.Seats * StartRegistration.PricePerSeat, 2)
+    -> transition PendingPayment
 
-event CheckIn with Desk as string
-on CheckIn ensure Desk != "" because "The check-in desk is required"
+from PendingPayment on UpdateSeats
+    -> set SeatsReserved = UpdateSeats.Seats
+    -> set TicketsIssued = 0
+    -> set AmountDue = round(UpdateSeats.Seats * 25, 2)
+    -> no transition
+from PendingPayment on RecordPayment when SeatsReserved > 0
+    -> set TicketsIssued = SeatsReserved
+    -> transition Confirmed
+from PendingPayment on RecordPayment
+    -> reject "A payment cannot be recorded before seats are reserved"
 
-from Draft on StartRegistration -> set RegistrantName = StartRegistration.Name -> set ContactEmail = StartRegistration.Email -> set SeatsReserved = StartRegistration.Seats -> set AmountDue = if StartRegistration.Seats >= 10 then round(StartRegistration.Seats * StartRegistration.PricePerSeat * 0.9, 2) else round(StartRegistration.Seats * StartRegistration.PricePerSeat, 2) -> transition PendingPayment
+from Draft on Cancel
+    -> set CancellationReason = Cancel.Reason
+    -> transition Cancelled
+from PendingPayment on Cancel
+    -> set CancellationReason = Cancel.Reason
+    -> transition Cancelled
 
-from PendingPayment on UpdateSeats -> set SeatsReserved = UpdateSeats.Seats -> set TicketsIssued = 0 -> set AmountDue = round(UpdateSeats.Seats * 25, 2) -> no transition
-from PendingPayment on RecordPayment when SeatsReserved > 0 -> set TicketsIssued = SeatsReserved -> transition Confirmed
-from PendingPayment on RecordPayment -> reject "A payment cannot be recorded before seats are reserved"
-
-from Draft on Cancel -> set CancellationReason = Cancel.Reason -> transition Cancelled
-from PendingPayment on Cancel -> set CancellationReason = Cancel.Reason -> transition Cancelled
-
-from Confirmed on CheckIn -> set CheckInDesk = CheckIn.Desk -> transition CheckedIn
+from Confirmed on CheckIn
+    -> set CheckInDesk = CheckIn.Desk
+    -> transition CheckedIn

@@ -10,7 +10,6 @@ field ApprovalNote as string nullable
 field LastReversedStep as string nullable
 field RepairComplete as boolean default false
 field ShippingLabelSent as boolean default false
-
 field RepairSteps as stack of string
 
 state Draft initial
@@ -26,37 +25,45 @@ in Closed ensure ShippingLabelSent because "Closed cases must have a return labe
 
 to ReadyToReturn -> set ShippingLabelSent = true
 
-event Submit with Customer as string, Product as string, Serial as string
-on Submit ensure Customer != "" because "A customer name is required"
-on Submit ensure Product != "" because "A product name is required"
-on Submit ensure Serial != "" because "A serial number is required"
-
-event Approve with Note as string nullable default null
-on Approve ensure Note == null or Note != "" because "A supplied approval note cannot be blank"
-
-event Deny with Note as string
-on Deny ensure Note != "" because "A denial note is required"
-
+event Submit with Customer as string notempty, Product as string notempty, Serial as string notempty
+event Approve with Note as string nullable default null notempty
+event Deny with Note as string notempty
 event StartRepair
-
-event LogRepairStep with StepName as string
-on LogRepairStep ensure StepName != "" because "A repair step must have a description"
-
+event LogRepairStep with StepName as string notempty
 event UndoLastStep
 event FinishRepair
 event ConfirmReturn
 
-from Draft on Submit -> set CustomerName = Submit.Customer -> set ProductName = Submit.Product -> set SerialNumber = Submit.Serial -> transition Submitted
+from Draft on Submit
+    -> set CustomerName = Submit.Customer
+    -> set ProductName = Submit.Product
+    -> set SerialNumber = Submit.Serial
+    -> transition Submitted
 
-from Submitted on Approve -> set ApprovalNote = Approve.Note -> transition Approved
-from Submitted on Deny -> set ApprovalNote = Deny.Note -> transition Denied
+from Submitted on Approve
+    -> set ApprovalNote = Approve.Note
+    -> transition Approved
+from Submitted on Deny
+    -> set ApprovalNote = Deny.Note
+    -> transition Denied
 
-from Approved on StartRepair -> transition InRepair
+from Approved on StartRepair
+    -> transition InRepair
 
-from InRepair on LogRepairStep -> push RepairSteps LogRepairStep.StepName -> no transition
-from InRepair on UndoLastStep when RepairSteps.count > 0 -> pop RepairSteps into LastReversedStep -> no transition
-from InRepair on UndoLastStep -> reject "There is no logged repair step to undo"
-from InRepair on FinishRepair when RepairSteps.count > 0 -> set RepairComplete = true -> transition ReadyToReturn
-from InRepair on FinishRepair -> reject "At least one repair step must be logged before the repair can finish"
+from InRepair on LogRepairStep
+    -> push RepairSteps LogRepairStep.StepName
+    -> no transition
+from InRepair on UndoLastStep when RepairSteps.count > 0
+    -> pop RepairSteps into LastReversedStep
+    -> no transition
+from InRepair on UndoLastStep
+    -> reject "There is no logged repair step to undo"
+from InRepair on FinishRepair when RepairSteps.count > 0
+    -> set RepairComplete = true
+    -> transition ReadyToReturn
+from InRepair on FinishRepair
+    -> reject "At least one repair step must be logged before the repair can finish"
 
-from ReadyToReturn on ConfirmReturn -> clear RepairSteps -> transition Closed
+from ReadyToReturn on ConfirmReturn
+    -> clear RepairSteps
+    -> transition Closed

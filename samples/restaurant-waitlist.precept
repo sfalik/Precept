@@ -5,12 +5,9 @@ precept RestaurantWaitlist
 
 field CurrentParty as string nullable
 field LastCalledParty as string nullable
-field EstimatedWaitMinutes as number default 0
+field EstimatedWaitMinutes as number default 0 nonnegative
 field WalkInOpen as boolean default true
-
 field PartyQueue as queue of string
-
-rule EstimatedWaitMinutes >= 0 because "Estimated wait time cannot be negative"
 
 state Accepting initial
 state Seating
@@ -18,21 +15,34 @@ state Closed
 
 in Seating ensure CurrentParty != null because "The seating state must know which party is being seated"
 
-event JoinWaitlist with PartyName as string
-on JoinWaitlist ensure PartyName != "" because "A party name is required"
-
+event JoinWaitlist with PartyName as string notempty
 event SeatNextParty
 event MarkSeated
 event CloseService
 event ReopenService
 
-from Accepting on JoinWaitlist -> enqueue PartyQueue JoinWaitlist.PartyName -> set EstimatedWaitMinutes = PartyQueue.count * 10 -> no transition
+from Accepting on JoinWaitlist
+    -> enqueue PartyQueue JoinWaitlist.PartyName
+    -> set EstimatedWaitMinutes = PartyQueue.count * 10
+    -> no transition
 
 # The queue's front party is visible through .peek before the dequeue happens.
-from Accepting on SeatNextParty when PartyQueue.count > 0 -> set LastCalledParty = PartyQueue.peek -> dequeue PartyQueue into CurrentParty -> transition Seating
-from Accepting on SeatNextParty -> reject "No party is currently waiting"
+from Accepting on SeatNextParty when PartyQueue.count > 0
+    -> set LastCalledParty = PartyQueue.peek
+    -> dequeue PartyQueue into CurrentParty
+    -> transition Seating
+from Accepting on SeatNextParty
+    -> reject "No party is currently waiting"
 
-from Seating on MarkSeated -> set CurrentParty = null -> set EstimatedWaitMinutes = PartyQueue.count * 10 -> transition Accepting
+from Seating on MarkSeated
+    -> set CurrentParty = null
+    -> set EstimatedWaitMinutes = PartyQueue.count * 10
+    -> transition Accepting
 
-from any on CloseService -> set WalkInOpen = false -> transition Closed
-from Closed on ReopenService -> set WalkInOpen = true -> set EstimatedWaitMinutes = PartyQueue.count * 10 -> transition Accepting
+from any on CloseService
+    -> set WalkInOpen = false
+    -> transition Closed
+from Closed on ReopenService
+    -> set WalkInOpen = true
+    -> set EstimatedWaitMinutes = PartyQueue.count * 10
+    -> transition Accepting

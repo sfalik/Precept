@@ -21,21 +21,39 @@ state Declined
 in Approved ensure MonthlyIncome >= RequestedRent * 3 because "Approved applicants must satisfy the 3x rent rule"
 in MoveInReady ensure DepositPaid and LeaseSigned because "Move-in ready applications need both a deposit and a signed lease"
 
-event Submit with Name as string notempty, Income as number nonnegative, Rent as number positive, Score as number nonnegative, Household as number default 1 positive
-
+event Submit with
+    Name as string notempty,
+    Income as number nonnegative,
+    Rent as number positive,
+    Score as number nonnegative,
+    Household as number default 1 positive
 event Approve with Note as string nullable default null notempty
-
 event PayDeposit
 event SignLease
-
 event Decline with Note as string notempty
 
-from Draft on Submit -> set ApplicantName = Submit.Name -> set MonthlyIncome = Submit.Income -> set RequestedRent = Submit.Rent -> set CreditScore = Submit.Score -> set HouseholdSize = Submit.Household -> transition Submitted
+from Draft on Submit
+    -> set ApplicantName = Submit.Name
+    -> set MonthlyIncome = Submit.Income
+    -> set RequestedRent = Submit.Rent
+    -> set CreditScore = Submit.Score
+    -> set HouseholdSize = Submit.Household
+    -> transition Submitted
 
-from Submitted on Approve when MonthlyIncome >= RequestedRent * 3 and CreditScore >= 650 and HouseholdSize < 8 -> set ReviewerNote = Approve.Note -> transition Approved
-from Submitted on Approve -> reject "Approval requires strong income coverage, acceptable credit, and a manageable household size"
-from Submitted on Decline -> set ReviewerNote = Decline.Note -> transition Declined
+from Submitted on Approve when MonthlyIncome >= RequestedRent * 3 and CreditScore >= 650 and HouseholdSize < 8
+    -> set ReviewerNote = Approve.Note
+    -> transition Approved
+from Submitted on Approve
+    -> reject "Approval requires strong income coverage, acceptable credit, and a manageable household size"
+from Submitted on Decline
+    -> set ReviewerNote = Decline.Note
+    -> transition Declined
 
-from Approved on PayDeposit -> set DepositPaid = true -> no transition
-from Approved on SignLease when DepositPaid -> set LeaseSigned = true -> transition MoveInReady
-from Approved on SignLease -> reject "The security deposit must be paid before the lease is signed"
+from Approved on PayDeposit
+    -> set DepositPaid = true
+    -> no transition
+from Approved on SignLease when DepositPaid
+    -> set LeaseSigned = true
+    -> transition MoveInReady
+from Approved on SignLease
+    -> reject "The security deposit must be paid before the lease is signed"

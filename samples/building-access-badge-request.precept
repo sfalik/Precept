@@ -5,16 +5,14 @@ precept BuildingAccessBadgeRequest
 
 field EmployeeName as string nullable
 field Department as string nullable
-field AccessReason as string nullable
+field AccessReason as string nullable maxlength 200
 field ReviewerNote as string nullable
 field LowestRequestedFloor as number default 0
 field HighestRequestedFloor as number default 0
 field BadgePrinted as boolean default false
-
 field RequestedFloors as set of number
 
 rule RequestedFloors.count == 0 or LowestRequestedFloor <= HighestRequestedFloor because "Requested floor bounds must stay ordered"
-rule AccessReason == null or AccessReason.length <= 200 because "Access reasons cannot exceed 200 characters"
 
 state Draft initial
 state Submitted
@@ -38,22 +36,33 @@ event RemoveFloor with Floor as number
 on RemoveFloor ensure Floor > 0 because "Floors must be positive"
 
 event Submit
-event Approve with Note as string nullable default null
-on Approve ensure Note == null or Note != "" because "An approval note cannot be blank when supplied"
-
-event Reject with Reason as string
-on Reject ensure Reason != "" because "A rejection reason is required"
-
+event Approve with Note as string nullable default null notempty
+event Reject with Reason as string notempty
 event PrintBadge
 
-from Draft on AddFloor -> add RequestedFloors AddFloor.Floor -> no transition
-from Draft on RemoveFloor when RequestedFloors contains RemoveFloor.Floor -> remove RequestedFloors RemoveFloor.Floor -> no transition
-from Draft on RemoveFloor -> reject "That floor is not currently requested"
+from Draft on AddFloor
+    -> add RequestedFloors AddFloor.Floor
+    -> no transition
+from Draft on RemoveFloor when RequestedFloors contains RemoveFloor.Floor
+    -> remove RequestedFloors RemoveFloor.Floor
+    -> no transition
+from Draft on RemoveFloor
+    -> reject "That floor is not currently requested"
 
-from Draft on Submit when EmployeeName != null and Department != null and AccessReason != null and AccessReason.length >= 5 and RequestedFloors.count > 0 -> set LowestRequestedFloor = RequestedFloors.min -> set HighestRequestedFloor = RequestedFloors.max -> transition Submitted
-from Draft on Submit -> reject "A complete request needs employee details, a reason, and at least one floor"
+from Draft on Submit when EmployeeName != null and Department != null and AccessReason != null and AccessReason.length >= 5 and RequestedFloors.count > 0
+    -> set LowestRequestedFloor = RequestedFloors.min
+    -> set HighestRequestedFloor = RequestedFloors.max
+    -> transition Submitted
+from Draft on Submit
+    -> reject "A complete request needs employee details, a reason, and at least one floor"
 
-from Submitted on Approve -> set ReviewerNote = Approve.Note -> transition Approved
-from Submitted on Reject -> set ReviewerNote = Reject.Reason -> transition Rejected
+from Submitted on Approve
+    -> set ReviewerNote = Approve.Note
+    -> transition Approved
+from Submitted on Reject
+    -> set ReviewerNote = Reject.Reason
+    -> transition Rejected
 
-from Approved on PrintBadge -> set BadgePrinted = true -> transition Issued
+from Approved on PrintBadge
+    -> set BadgePrinted = true
+    -> transition Issued

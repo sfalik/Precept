@@ -5,19 +5,13 @@ precept LibraryBookCheckout
 
 field BookTitle as string nullable
 field BorrowerId as string nullable
-field CurrentDay as number default 0
-field CheckoutDay as number default 0
-field DueDay as number default 0
-field RenewalCount as number default 0
-field FineAmount as number default 0
+field CurrentDay as number default 0 nonnegative
+field CheckoutDay as number default 0 nonnegative
+field DueDay as number default 0 nonnegative
+field RenewalCount as number default 0 nonnegative
+field FineAmount as number default 0 nonnegative
 field ConditionNote as string nullable
 field LostReported as boolean default false
-
-rule CurrentDay >= 0 because "The day counter cannot be negative"
-rule CheckoutDay >= 0 because "The checkout day cannot be negative"
-rule DueDay >= 0 because "The due day cannot be negative"
-rule RenewalCount >= 0 because "Renewal counts cannot be negative"
-rule FineAmount >= 0 because "Fines cannot be negative"
 
 state Available initial
 state CheckedOut
@@ -37,9 +31,10 @@ in Returned ensure BorrowerId == null because "Returned books must clear the bor
 in Lost ensure LostReported because "Lost books must be marked as reported lost"
 in Lost ensure BorrowerId != null because "Lost books must still record the last borrower"
 
-event Checkout with Title as string, PatronId as string, LoanDays as number default 14
-on Checkout ensure Title != "" because "A book title is required"
-on Checkout ensure PatronId != "" because "A patron id is required"
+event Checkout with
+    Title as string notempty,
+    PatronId as string notempty,
+    LoanDays as number default 14
 on Checkout ensure LoanDays > 0 because "Loan days must be positive"
 
 event Renew with ExtraDays as number default 7
@@ -48,34 +43,78 @@ on Renew ensure ExtraDays > 0 because "Renewal days must be positive"
 event AdvanceDay with DayNumber as number
 on AdvanceDay ensure DayNumber >= 0 because "The day counter cannot be negative"
 
-event ReturnBook with Condition as string nullable default null
-on ReturnBook ensure Condition == null or Condition != "" because "A supplied condition note cannot be blank"
-
-event ReportLost with Note as string nullable default null
-on ReportLost ensure Note == null or Note != "" because "A supplied loss note cannot be blank"
-
+event ReturnBook with Condition as string nullable default null notempty
+event ReportLost with Note as string nullable default null notempty
 event Shelve
-
 event ResolveLoss
 
-from Available on Checkout -> set BookTitle = Checkout.Title -> set BorrowerId = Checkout.PatronId -> set CheckoutDay = CurrentDay -> set DueDay = CurrentDay + Checkout.LoanDays -> set RenewalCount = 0 -> set FineAmount = 0 -> set ConditionNote = null -> set LostReported = false -> transition CheckedOut
+from Available on Checkout
+    -> set BookTitle = Checkout.Title
+    -> set BorrowerId = Checkout.PatronId
+    -> set CheckoutDay = CurrentDay
+    -> set DueDay = CurrentDay + Checkout.LoanDays
+    -> set RenewalCount = 0
+    -> set FineAmount = 0
+    -> set ConditionNote = null
+    -> set LostReported = false
+    -> transition CheckedOut
 
-from CheckedOut on Renew when RenewalCount < 2 and not LostReported and CurrentDay <= DueDay -> set DueDay = DueDay + Renew.ExtraDays -> set RenewalCount = RenewalCount + 1 -> no transition
-from CheckedOut on Renew -> reject "Only active loans with remaining renewals can be renewed"
+from CheckedOut on Renew when RenewalCount < 2 and not LostReported and CurrentDay <= DueDay
+    -> set DueDay = DueDay + Renew.ExtraDays
+    -> set RenewalCount = RenewalCount + 1
+    -> no transition
+from CheckedOut on Renew
+    -> reject "Only active loans with remaining renewals can be renewed"
 
-from CheckedOut on AdvanceDay when AdvanceDay.DayNumber > CurrentDay and AdvanceDay.DayNumber <= DueDay -> set CurrentDay = AdvanceDay.DayNumber -> no transition
-from CheckedOut on AdvanceDay when AdvanceDay.DayNumber > CurrentDay -> set CurrentDay = AdvanceDay.DayNumber -> set FineAmount = AdvanceDay.DayNumber - DueDay -> transition Overdue
-from CheckedOut on AdvanceDay -> reject "The day counter must move forward"
+from CheckedOut on AdvanceDay when AdvanceDay.DayNumber > CurrentDay and AdvanceDay.DayNumber <= DueDay
+    -> set CurrentDay = AdvanceDay.DayNumber
+    -> no transition
+from CheckedOut on AdvanceDay when AdvanceDay.DayNumber > CurrentDay
+    -> set CurrentDay = AdvanceDay.DayNumber
+    -> set FineAmount = AdvanceDay.DayNumber - DueDay
+    -> transition Overdue
+from CheckedOut on AdvanceDay
+    -> reject "The day counter must move forward"
 
-from Overdue on AdvanceDay when AdvanceDay.DayNumber > CurrentDay -> set CurrentDay = AdvanceDay.DayNumber -> set FineAmount = AdvanceDay.DayNumber - DueDay -> no transition
-from Overdue on AdvanceDay -> reject "The day counter must move forward"
+from Overdue on AdvanceDay when AdvanceDay.DayNumber > CurrentDay
+    -> set CurrentDay = AdvanceDay.DayNumber
+    -> set FineAmount = AdvanceDay.DayNumber - DueDay
+    -> no transition
+from Overdue on AdvanceDay
+    -> reject "The day counter must move forward"
 
-from CheckedOut on ReturnBook -> set BorrowerId = null -> set ConditionNote = ReturnBook.Condition -> transition Returned
-from Overdue on ReturnBook -> set BorrowerId = null -> set ConditionNote = ReturnBook.Condition -> transition Returned
+from CheckedOut on ReturnBook
+    -> set BorrowerId = null
+    -> set ConditionNote = ReturnBook.Condition
+    -> transition Returned
+from Overdue on ReturnBook
+    -> set BorrowerId = null
+    -> set ConditionNote = ReturnBook.Condition
+    -> transition Returned
 
-from CheckedOut on ReportLost -> set LostReported = true -> set ConditionNote = ReportLost.Note -> transition Lost
-from Overdue on ReportLost -> set LostReported = true -> set ConditionNote = ReportLost.Note -> transition Lost
+from CheckedOut on ReportLost
+    -> set LostReported = true
+    -> set ConditionNote = ReportLost.Note
+    -> transition Lost
+from Overdue on ReportLost
+    -> set LostReported = true
+    -> set ConditionNote = ReportLost.Note
+    -> transition Lost
 
-from Returned on Shelve -> set CheckoutDay = 0 -> set DueDay = 0 -> set RenewalCount = 0 -> set FineAmount = 0 -> set ConditionNote = null -> transition Available
+from Returned on Shelve
+    -> set CheckoutDay = 0
+    -> set DueDay = 0
+    -> set RenewalCount = 0
+    -> set FineAmount = 0
+    -> set ConditionNote = null
+    -> transition Available
 
-from Lost on ResolveLoss -> set BorrowerId = null -> set CheckoutDay = 0 -> set DueDay = 0 -> set RenewalCount = 0 -> set FineAmount = 0 -> set ConditionNote = null -> set LostReported = false -> transition Available
+from Lost on ResolveLoss
+    -> set BorrowerId = null
+    -> set CheckoutDay = 0
+    -> set DueDay = 0
+    -> set RenewalCount = 0
+    -> set FineAmount = 0
+    -> set ConditionNote = null
+    -> set LostReported = false
+    -> transition Available

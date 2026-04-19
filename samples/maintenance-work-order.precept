@@ -7,15 +7,12 @@ field RequesterName as string nullable
 field Location as string nullable
 field IssueSummary as string nullable
 field AssignedTechnician as string nullable
-field EstimatedHours as number default 0
-field ActualHours as number default 0
+field EstimatedHours as number default 0 nonnegative
+field ActualHours as number default 0 nonnegative
 field Urgent as boolean default false
 field PartsApproved as boolean default false
 field CompletionNote as string nullable
 field CancellationReason as string nullable
-
-rule EstimatedHours >= 0 because "Estimated hours cannot be negative"
-rule ActualHours >= 0 because "Actual hours cannot be negative"
 
 state Draft initial
 state Open
@@ -31,37 +28,53 @@ in Completed ensure CompletionNote != null because "Completed work orders need a
 # Leaving active work still requires a technician on record.
 from InProgress ensure AssignedTechnician != null because "Active work cannot finish without a technician"
 
-event Submit with Requester as string, WorkLocation as string, Summary as string, IsUrgent as boolean default false
-on Submit ensure Requester != "" because "A requester name is required"
-on Submit ensure WorkLocation != "" because "A location is required"
-on Submit ensure Summary != "" because "An issue summary is required"
-
-event Assign with Technician as string, Estimate as number
-on Assign ensure Technician != "" because "A technician is required"
+event Submit with
+    Requester as string notempty,
+    WorkLocation as string notempty,
+    Summary as string notempty,
+    IsUrgent as boolean default false
+event Assign with Technician as string notempty, Estimate as number
 on Assign ensure Estimate > 0 because "Estimated hours must be positive"
 
 event ApproveParts
 event StartWork
-
 event RecordProgress with Hours as number
 on RecordProgress ensure Hours > 0 because "Progress entries must be positive"
 
-event Complete with Note as string
-on Complete ensure Note != "" because "A completion note is required"
+event Complete with Note as string notempty
+event Cancel with Reason as string nullable default null notempty
 
-event Cancel with Reason as string nullable default null
-on Cancel ensure Reason == null or Reason != "" because "A supplied cancellation reason cannot be blank"
+from Draft on Submit
+    -> set RequesterName = Submit.Requester
+    -> set Location = Submit.WorkLocation
+    -> set IssueSummary = Submit.Summary
+    -> set Urgent = Submit.IsUrgent
+    -> transition Open
 
-from Draft on Submit -> set RequesterName = Submit.Requester -> set Location = Submit.WorkLocation -> set IssueSummary = Submit.Summary -> set Urgent = Submit.IsUrgent -> transition Open
+from Open on Assign
+    -> set AssignedTechnician = Assign.Technician
+    -> set EstimatedHours = Assign.Estimate
+    -> transition Scheduled
+from Open on Cancel
+    -> set CancellationReason = Cancel.Reason
+    -> transition Cancelled
 
-from Open on Assign -> set AssignedTechnician = Assign.Technician -> set EstimatedHours = Assign.Estimate -> transition Scheduled
-from Open on Cancel -> set CancellationReason = Cancel.Reason -> transition Cancelled
+from Scheduled on ApproveParts
+    -> set PartsApproved = true
+    -> no transition
+from Scheduled on StartWork when not Urgent or PartsApproved
+    -> transition InProgress
+from Scheduled on StartWork
+    -> reject "Urgent work must have parts approved before it starts"
+from Scheduled on Cancel
+    -> set CancellationReason = Cancel.Reason
+    -> transition Cancelled
 
-from Scheduled on ApproveParts -> set PartsApproved = true -> no transition
-from Scheduled on StartWork when not Urgent or PartsApproved -> transition InProgress
-from Scheduled on StartWork -> reject "Urgent work must have parts approved before it starts"
-from Scheduled on Cancel -> set CancellationReason = Cancel.Reason -> transition Cancelled
-
-from InProgress on RecordProgress -> set ActualHours = ActualHours + RecordProgress.Hours -> no transition
-from InProgress on Complete when ActualHours <= EstimatedHours + 4 -> set CompletionNote = Complete.Note -> transition Completed
-from InProgress on Complete -> reject "Work orders that exceed the estimate by more than four hours need review first"
+from InProgress on RecordProgress
+    -> set ActualHours = ActualHours + RecordProgress.Hours
+    -> no transition
+from InProgress on Complete when ActualHours <= EstimatedHours + 4
+    -> set CompletionNote = Complete.Note
+    -> transition Completed
+from InProgress on Complete
+    -> reject "Work orders that exceed the estimate by more than four hours need review first"

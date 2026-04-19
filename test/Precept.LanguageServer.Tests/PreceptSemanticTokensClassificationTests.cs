@@ -1,3 +1,4 @@
+using System.Linq;
 using FluentAssertions;
 using Precept.LanguageServer;
 using Xunit;
@@ -244,6 +245,25 @@ public class PreceptSemanticTokensClassificationTests
         tokens.Should().Contain(t =>
             t.Text == "ensure" &&
             t.Type == "preceptKeywordSemantic");
+    }
+
+    [Fact]
+    public void GetClassifiedTokens_StateEditFields_ArePreceptFieldNames_IncludingCommaTail()
+    {
+        const string dsl = """
+            precept M
+            field ScheduledDay as number default 0
+            field ScheduledMinute as number default 0
+            state Scheduled initial
+            in Scheduled edit ScheduledDay, ScheduledMinute
+            event Save
+            from Scheduled on Save -> no transition
+            """;
+
+        var tokens = PreceptSemanticTokensHandler.GetClassifiedTokens(dsl);
+
+        tokens.Count(t => t.Text == "ScheduledDay" && t.Type == "preceptFieldName").Should().Be(2);
+        tokens.Count(t => t.Text == "ScheduledMinute" && t.Type == "preceptFieldName").Should().Be(2);
     }
 
     [Fact]
