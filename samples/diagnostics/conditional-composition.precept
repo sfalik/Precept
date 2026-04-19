@@ -1,4 +1,4 @@
-// Demonstrates: C92, C93 — conditional composition: guard-narrowed divisor safety (Hull semantics)
+# Demonstrates: C92, C93 — conditional composition: guard-narrowed divisor safety (Hull semantics)
 
 # CONDITIONAL COMPOSITION AND DIVISOR SAFETY
 # This sample demonstrates how guard expressions create narrowed proof contexts

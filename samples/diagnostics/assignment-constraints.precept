@@ -1,4 +1,4 @@
-// Demonstrates: C94 — assignment expression is provably outside the field's constraint range
+# Demonstrates: C94 — assignment expression is provably outside the field's constraint range
 
 # ASSIGNMENT CONSTRAINTS
 # The proof engine checks assignment expressions at compile time.

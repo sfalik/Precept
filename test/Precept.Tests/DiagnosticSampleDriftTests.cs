@@ -13,7 +13,7 @@ namespace Precept.Tests;
 ///
 /// Root samples (samples/*.precept): must parse and compile without errors.
 /// Diagnostic samples (samples/diagnostics/*.precept): must compile and produce
-/// exactly the diagnostic codes declared in their <c>// Demonstrates: Cxx</c> header.
+    /// exactly the diagnostic codes declared in their <c># Demonstrates: Cxx</c> header.
 /// A discovery test fails if any sample file lacks the header.
 ///
 /// Cross-surface consistency (D9):
@@ -171,10 +171,10 @@ public class DiagnosticSampleDriftTests
 
         var headerLine = FindDemonstratesHeader(rawText);
         headerLine.Should().NotBeNull(
-            $"diagnostic sample '{fileName}' must have a '// Demonstrates: Cxx[, Cyy...]' header");
+            $"diagnostic sample '{fileName}' must have a '# Demonstrates: Cxx[, Cyy...]' header");
 
         ParseDeclaredCodes(headerLine!).Should().NotBeEmpty(
-            $"diagnostic sample '{fileName}' '// Demonstrates:' header must list at least one code");
+            $"diagnostic sample '{fileName}' '# Demonstrates:' header must list at least one code");
     }
 
     // ════════════════════════════════════════════════════════════════════
@@ -190,18 +190,14 @@ public class DiagnosticSampleDriftTests
 
         var headerLine = FindDemonstratesHeader(rawText);
         headerLine.Should().NotBeNull(
-            $"diagnostic sample '{fileName}' must have a '// Demonstrates:' header");
+            $"diagnostic sample '{fileName}' must have a '# Demonstrates:' header");
 
         var declaredCodes = ParseDeclaredCodes(headerLine!);
         var preceptCodes = declaredCodes
             .Select(DiagnosticCatalog.ToDiagnosticCode)
             .ToHashSet(StringComparer.Ordinal);
 
-        // The precept DSL parser uses # for comments; // is not a valid comment token.
-        // Diagnostic sample files use // for the Demonstrates: metadata header — strip
-        // those lines before compiling so the parser sees only valid precept syntax.
-        var compilableText = StripLineComments(rawText);
-        var result = PreceptCompiler.CompileFromText(compilableText);
+        var result = PreceptCompiler.CompileFromText(rawText);
 
         // Every declared code must appear in the compilation diagnostics
         foreach (var code in preceptCodes)
@@ -227,7 +223,7 @@ public class DiagnosticSampleDriftTests
         foreach (var line in text.Split('\n'))
         {
             var trimmed = line.Trim();
-            if (trimmed.StartsWith("// Demonstrates:", StringComparison.OrdinalIgnoreCase))
+            if (trimmed.StartsWith("# Demonstrates:", StringComparison.OrdinalIgnoreCase))
                 return trimmed;
         }
         return null;
@@ -235,7 +231,7 @@ public class DiagnosticSampleDriftTests
 
     private static string[] ParseDeclaredCodes(string headerLine)
     {
-        // "// Demonstrates: C92, C93 — some description" → ["C92", "C93"]
+        // "# Demonstrates: C92, C93 — some description" → ["C92", "C93"]
         var colon = headerLine.IndexOf("Demonstrates:", StringComparison.OrdinalIgnoreCase);
         var after = headerLine.Substring(colon + "Demonstrates:".Length);
         // Strip any trailing description after an em-dash
@@ -247,9 +243,4 @@ public class DiagnosticSampleDriftTests
             .ToArray();
     }
 
-    private static string StripLineComments(string text)
-    {
-        var lines = text.Split('\n');
-        return string.Join('\n', lines.Where(l => !l.TrimStart().StartsWith("//")));
-    }
 }

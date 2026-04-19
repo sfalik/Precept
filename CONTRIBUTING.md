@@ -98,7 +98,7 @@ The `samples/diagnostics/` folder contains `.precept` files that demonstrate the
 | **Structure** | Each file is a self-contained precept demonstrating one diagnostic family or closely related diagnostics |
 | **Comments** | Use `//` comments to explain what the proof engine proves, what diagnostic fires, and why |
 | **Both sides** | Show both the triggering pattern (diagnostic fires) AND the fixed version (diagnostic resolved) in the same file where practical |
-| **Attribution** | Comment at top: which diagnostics the file demonstrates (e.g., `// Demonstrates: C92, C93 — divisor safety`) |
+| **Attribution** | Comment at top: which diagnostics the file demonstrates (e.g., `# Demonstrates: C92, C93 — divisor safety`) |
 
 **When to add a new sample vs. update an existing one:**
 - New diagnostic family (e.g., C94 assignment constraints) → new file
@@ -107,7 +107,7 @@ The `samples/diagnostics/` folder contains `.precept` files that demonstrate the
 
 **Evolution:** As the proof engine grows (collection reasoning, string constraints, cross-field analysis), new samples should be added to cover those scenarios. The `samples/diagnostics/` folder is a living catalog of what the engine can prove.
 
-**Drift prevention:** Every diagnostic sample is backed by a test in `test/Precept.Tests/DiagnosticSampleDriftTests.cs`. The test reads each sample's `// Demonstrates:` header, compiles the file, and asserts the declared diagnostic codes appear with no unexpected errors. A discovery test fails if any sample file lacks the header. When adding a new sample, no manual test wiring is needed — the theory test auto-discovers `samples/diagnostics/*.precept` files.
+**Drift prevention:** Every diagnostic sample is backed by a test in `test/Precept.Tests/DiagnosticSampleDriftTests.cs`. The test reads each sample's `# Demonstrates:` header, compiles the file, and asserts the declared diagnostic codes appear with no unexpected errors. A discovery test fails if any sample file lacks the header. When adding a new sample, no manual test wiring is needed — the theory test auto-discovers `samples/diagnostics/*.precept` files.
 
 #### Proposal content at merge time
 

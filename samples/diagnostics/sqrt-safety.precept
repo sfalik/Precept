@@ -1,4 +1,4 @@
-// Demonstrates: C76 — sqrt() requires a non-negative argument
+# Demonstrates: C76 — sqrt() requires a non-negative argument
 
 # SQRT SAFETY
 # The proof engine requires a non-negative argument proof before allowing sqrt().

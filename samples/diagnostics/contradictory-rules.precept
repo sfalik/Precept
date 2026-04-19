@@ -1,4 +1,4 @@
-// Demonstrates: C95, C29 — contradictory rule: rule interval disjoint from field constraints
+# Demonstrates: C95, C29 — contradictory rule: rule interval disjoint from field constraints
 
 # CONTRADICTORY RULES
 # C95 fires when a rule's required interval is disjoint from the field's constraint interval.

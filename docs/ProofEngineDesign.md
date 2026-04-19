@@ -1382,10 +1382,10 @@ The `samples/diagnostics/` folder is a living catalog of proof engine scenarios 
 
 **Drift prevention tests:** Each diagnostic sample has a corresponding `[Theory]` test case in `DiagnosticSampleDriftTests.cs` that compiles the file via `PreceptCompiler.CompileFromText()` and asserts:
 
-1. **Expected diagnostics present** — every diagnostic code listed in the sample's `// Demonstrates:` comment header must appear in the compilation result.
+1. **Expected diagnostics present** — every diagnostic code listed in the sample's `# Demonstrates:` comment header must appear in the compilation result.
 2. **No unexpected errors** — no error-severity diagnostic codes beyond those listed in the header. (Additional warnings are tolerated — the engine may add new warning-level diagnostics without breaking existing samples.)
 
-Each sample file's `// Demonstrates:` header is the contract: it declares exactly which diagnostic codes the file is designed to trigger. The test reads this header and uses it as the assertion set — no hardcoded test data that can drift from the sample content.
+Each sample file's `# Demonstrates:` header is the contract: it declares exactly which diagnostic codes the file is designed to trigger. The test reads this header and uses it as the assertion set — no hardcoded test data that can drift from the sample content.
 
 This mirrors the existing `SampleFile_ParsesAndCompilesClean` pattern for regular samples, but inverts the assertion: regular samples must compile clean, diagnostic samples must produce their declared diagnostics.
 

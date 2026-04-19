@@ -1,4 +1,4 @@
-// Demonstrates: C98 — vacuous guard: provably always true given field constraints
+# Demonstrates: C98 — vacuous guard: provably always true given field constraints
 
 # VACUOUS GUARDS
 # C98 fires when a transition guard expression is provably always true given field constraints.

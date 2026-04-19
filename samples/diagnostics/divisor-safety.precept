@@ -1,4 +1,4 @@
-// Demonstrates: C92, C93 — divisor safety: literal zero and unproven divisor
+# Demonstrates: C92, C93 — divisor safety: literal zero and unproven divisor
 
 # DIVISOR SAFETY
 # The proof engine checks every division site at compile time.

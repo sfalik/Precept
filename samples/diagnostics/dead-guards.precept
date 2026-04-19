@@ -1,4 +1,4 @@
-// Demonstrates: C97 — dead guard: provably always false given field constraints
+# Demonstrates: C97 — dead guard: provably always false given field constraints
 
 # DEAD GUARDS
 # C97 fires when a transition guard expression is provably always false given field constraints.

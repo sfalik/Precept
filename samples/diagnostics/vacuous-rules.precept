@@ -1,4 +1,4 @@
-// Demonstrates: C96 — vacuous rule: provably always true given field constraints
+# Demonstrates: C96 — vacuous rule: provably always true given field constraints
 
 # VACUOUS RULES
 # C96 fires when a rule is provably always true given the field's existing constraints.
