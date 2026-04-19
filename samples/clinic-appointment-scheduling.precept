@@ -4,16 +4,13 @@ precept ClinicAppointmentScheduling
 # The event ensures show that modulo checks belong on event arguments, not fields.
 
 field PatientName as string nullable
-field ScheduledDay as number default 0
-field ScheduledMinute as number default 0
+field ScheduledDay as number default 0 nonnegative
+field ScheduledMinute as number default 0 nonnegative
 field ConfirmationCode as string nullable
 field ReminderSent as boolean default false
 field CheckInNote as string nullable
 field VisitCompleted as boolean default false
 field CancellationReason as string nullable
-
-rule ScheduledDay >= 0 because "Scheduled day cannot be negative"
-rule ScheduledMinute >= 0 because "Scheduled minute cannot be negative"
 
 state Draft initial
 state Scheduled
@@ -27,8 +24,7 @@ in Completed ensure VisitCompleted because "Completed visits must be marked comp
 
 to Scheduled -> set ConfirmationCode = "CONFIRMED" -> set ReminderSent = false
 
-event Schedule with Name as string, DayNumber as number, MinuteOfDay as number
-on Schedule ensure Name != "" because "A patient name is required"
+event Schedule with Name as string notempty, DayNumber as number, MinuteOfDay as number
 on Schedule ensure DayNumber >= 0 because "The scheduled day cannot be negative"
 on Schedule ensure MinuteOfDay >= 0 because "The scheduled minute cannot be negative"
 on Schedule ensure MinuteOfDay % 15 == 0 because "Appointments must start on a 15-minute boundary"
@@ -40,12 +36,10 @@ on Reschedule ensure MinuteOfDay % 15 == 0 because "Appointments must start on a
 
 event SendReminder
 
-event CheckIn with Note as string nullable default null
-on CheckIn ensure Note == null or Note != "" because "A supplied check-in note cannot be blank"
+event CheckIn with Note as string nullable default null notempty
 
 event CompleteVisit
-event Cancel with Reason as string nullable default null
-on Cancel ensure Reason == null or Reason != "" because "A supplied cancellation reason cannot be blank"
+event Cancel with Reason as string nullable default null notempty
 
 from Draft on Schedule -> set PatientName = Schedule.Name -> set ScheduledDay = Schedule.DayNumber -> set ScheduledMinute = Schedule.MinuteOfDay -> transition Scheduled
 

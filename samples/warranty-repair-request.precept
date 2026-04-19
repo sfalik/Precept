@@ -26,21 +26,15 @@ in Closed ensure ShippingLabelSent because "Closed cases must have a return labe
 
 to ReadyToReturn -> set ShippingLabelSent = true
 
-event Submit with Customer as string, Product as string, Serial as string
-on Submit ensure Customer != "" because "A customer name is required"
-on Submit ensure Product != "" because "A product name is required"
-on Submit ensure Serial != "" because "A serial number is required"
+event Submit with Customer as string notempty, Product as string notempty, Serial as string notempty
 
-event Approve with Note as string nullable default null
-on Approve ensure Note == null or Note != "" because "A supplied approval note cannot be blank"
+event Approve with Note as string nullable default null notempty
 
-event Deny with Note as string
-on Deny ensure Note != "" because "A denial note is required"
+event Deny with Note as string notempty
 
 event StartRepair
 
-event LogRepairStep with StepName as string
-on LogRepairStep ensure StepName != "" because "A repair step must have a description"
+event LogRepairStep with StepName as string notempty
 
 event UndoLastStep
 event FinishRepair

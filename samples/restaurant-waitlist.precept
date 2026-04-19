@@ -5,12 +5,10 @@ precept RestaurantWaitlist
 
 field CurrentParty as string nullable
 field LastCalledParty as string nullable
-field EstimatedWaitMinutes as number default 0
+field EstimatedWaitMinutes as number default 0 nonnegative
 field WalkInOpen as boolean default true
 
 field PartyQueue as queue of string
-
-rule EstimatedWaitMinutes >= 0 because "Estimated wait time cannot be negative"
 
 state Accepting initial
 state Seating
@@ -18,8 +16,7 @@ state Closed
 
 in Seating ensure CurrentParty != null because "The seating state must know which party is being seated"
 
-event JoinWaitlist with PartyName as string
-on JoinWaitlist ensure PartyName != "" because "A party name is required"
+event JoinWaitlist with PartyName as string notempty
 
 event SeatNextParty
 event MarkSeated

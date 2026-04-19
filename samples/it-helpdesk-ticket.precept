@@ -4,18 +4,14 @@ precept ItHelpdeskTicket
 # It also shows from any rows that act like system-wide support events.
 
 field TicketTitle as string nullable
-field Severity as number default 3
+field Severity as number default 3 min 1 max 5
 field AssignedAgent as string nullable
 field LastQueuedAgent as string nullable
 field ResolutionNote as string nullable
-field ReopenCount as integer default 0
+field ReopenCount as integer default 0 nonnegative
 field Priority as choice("Low","Medium","High","Critical") default "Low"
 
 field AgentQueue as queue of string
-
-rule Severity >= 1 because "Severity cannot be lower than 1"
-rule Severity <= 5 because "Severity cannot be higher than 5"
-rule ReopenCount >= 0 because "Reopen count cannot be negative"
 
 state New initial
 state Assigned
@@ -26,23 +22,19 @@ state Closed
 in Assigned ensure AssignedAgent != null because "Assigned tickets must name an agent"
 in New edit Priority
 
-event RegisterAgent with AgentName as string
-on RegisterAgent ensure AgentName != "" because "An agent name is required"
+event RegisterAgent with AgentName as string notempty
 
-event Triage with Title as string, Level as number default 3
-on Triage ensure Title != "" because "A ticket title is required"
+event Triage with Title as string notempty, Level as number default 3
 on Triage ensure Level >= 1 and Level <= 5 because "Severity must stay within the supported range"
 
 event Assign
 
 event CustomerReply
-event Resolve with Note as string
-on Resolve ensure Note != "" because "A resolution note is required"
+event Resolve with Note as string notempty
 
 event CloseTicket
 
-event Reopen with Note as string nullable default null
-on Reopen ensure Note == null or Note != "" because "A supplied reopen note cannot be blank"
+event Reopen with Note as string nullable default null notempty
 
 from New on RegisterAgent -> enqueue AgentQueue RegisterAgent.AgentName -> no transition
 from Assigned on RegisterAgent -> enqueue AgentQueue RegisterAgent.AgentName -> no transition

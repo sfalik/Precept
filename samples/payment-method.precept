@@ -10,14 +10,10 @@ precept PaymentMethod
 
 field CardholderName as string nullable
 field LastFour as string nullable
-field ExpiryMonth as number default 1
-field ExpiryYear as number default 2025
+field ExpiryMonth as number default 1 min 1 max 12
+field ExpiryYear as number default 2025 min 2025
 field IsDefault as boolean default false
 field Nickname as string nullable
-
-rule ExpiryMonth >= 1 because "Expiry month must be at least 1"
-rule ExpiryMonth <= 12 because "Expiry month cannot exceed 12"
-rule ExpiryYear >= 2025 because "Expiry year must be current or future"
 
 # Cardholders may rename the card and toggle the default flag.
 # All other fields are immutable once the payment method is stored.

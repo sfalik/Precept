@@ -4,13 +4,10 @@ precept TrafficLight
 # the light cycles through standard phases, and an authorized Emergency event
 # forces flashing red until explicitly cleared.
 
-field VehiclesWaiting as number default 0
-field CycleCount as number default 0
+field VehiclesWaiting as number default 0 nonnegative
+field CycleCount as number default 0 nonnegative
 field LeftTurnQueued as boolean default false
 field EmergencyReason as string nullable
-
-rule VehiclesWaiting >= 0 because "Vehicles waiting cannot be negative"
-rule CycleCount >= 0 because "Cycle count cannot be negative"
 
 state Red initial
 state FlashingGreen
@@ -22,9 +19,7 @@ in Red edit VehiclesWaiting, LeftTurnQueued
 
 event Advance
 
-event Emergency with AuthorizedBy as string, Reason as string
-on Emergency ensure AuthorizedBy != "" because "AuthorizedBy is required"
-on Emergency ensure Reason != "" because "Reason is required"
+event Emergency with AuthorizedBy as string notempty, Reason as string notempty
 
 event VehiclesArrive with Count as number default 5
 on VehiclesArrive ensure Count > 0 because "Vehicle count must be positive"
