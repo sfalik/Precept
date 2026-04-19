@@ -381,12 +381,13 @@ internal static class PreceptTypeChecker
                         // SYNC:CONSTRAINT:C94: assignment provably outside field constraint range
                         if (dataFieldKinds.FieldIntervals.TryGetValue(assignment.Key, out var constraintIval94))
                         {
-                            var rhsIval = setContext.IntervalOf(assignment.Expression);
+                            var rhsProof = setContext.IntervalOf(assignment.Expression);
+                            var rhsIval = rhsProof.Interval;
                             if (!rhsIval.IsUnknown && NumericInterval.AreDisjoint(rhsIval, constraintIval94))
                             {
                                 var assessment = new ProofAssessment(
                                     ProofRequirement.AssignmentConstraint, ProofOutcome.Contradiction,
-                                    assignment.Key, rhsIval, ProofAttribution.None,
+                                    assignment.Key, rhsIval, rhsProof.Attribution,
                                     ConstraintInterval: constraintIval94);
                                 diagnostics.Add(new PreceptValidationDiagnostic(
                                     DiagnosticCatalog.C94,
@@ -504,12 +505,13 @@ internal static class PreceptTypeChecker
                 // SYNC:CONSTRAINT:C94: assignment provably outside field constraint range
                 if (dataFieldKinds.FieldIntervals.TryGetValue(assignment.Key, out var constraintIval94))
                 {
-                    var rhsIval = assignmentContext.IntervalOf(assignment.Expression);
+                    var rhsProof = assignmentContext.IntervalOf(assignment.Expression);
+                    var rhsIval = rhsProof.Interval;
                     if (!rhsIval.IsUnknown && NumericInterval.AreDisjoint(rhsIval, constraintIval94))
                     {
                         var assessment = new ProofAssessment(
                             ProofRequirement.AssignmentConstraint, ProofOutcome.Contradiction,
-                            assignment.Key, rhsIval, ProofAttribution.None,
+                            assignment.Key, rhsIval, rhsProof.Attribution,
                             ConstraintInterval: constraintIval94);
                         diagnostics.Add(new PreceptValidationDiagnostic(
                             DiagnosticCatalog.C94,
@@ -2467,8 +2469,8 @@ internal static class PreceptTypeChecker
             {
                 // Use IntervalOf (not TryInferInterval) on sub-expressions so relational facts
                 // are consulted for each leaf before combining (e.g. (A-B)*C with rule A>B, C positive).
-                var left  = context.IntervalOf(binary.Left);
-                var right = context.IntervalOf(binary.Right);
+                var left  = context.IntervalOf(binary.Left).Interval;
+                var right = context.IntervalOf(binary.Right).Interval;
                 return binary.Operator switch
                 {
                     "+" => NumericInterval.Add(left, right),
@@ -2558,8 +2560,8 @@ internal static class PreceptTypeChecker
                 var elseContext = ApplyNarrowing(cond.Condition, context, assumeTrue: false);
                 // Use IntervalOf (not TryInferInterval) so relational facts stored by ApplyNarrowing
                 // are consulted when tightening branch sub-expressions (e.g. A-B given A>B).
-                var thenInterval = thenContext.IntervalOf(cond.ThenBranch);
-                var elseInterval = elseContext.IntervalOf(cond.ElseBranch);
+                var thenInterval = thenContext.IntervalOf(cond.ThenBranch).Interval;
+                var elseInterval = elseContext.IntervalOf(cond.ElseBranch).Interval;
                 return NumericInterval.Hull(thenInterval, elseInterval);
             }
 
@@ -2645,7 +2647,7 @@ internal static class PreceptTypeChecker
         else
         {
             // Compound RHS: derive interval from proof engine and inject sign markers.
-            var rhsInterval = context.IntervalOf(rhs);
+            var rhsInterval = context.IntervalOf(rhs).Interval;
             if (!rhsInterval.IsUnknown)
             {
                 fieldIntervals[targetField] = rhsInterval;
@@ -3123,20 +3125,22 @@ internal static class PreceptTypeChecker
     private static ProofAssessment? AssessDivisorSafety(
         PreceptExpression divisor, GlobalProofContext context)
     {
-        var interval = context.IntervalOf(divisor);
+        var proofResult = context.IntervalOf(divisor);
+        var interval = proofResult.Interval;
+        var attribution = proofResult.Attribution;
         var subject = DescribeExpression(divisor);
 
         // Provably zero: contradiction → C92
         if (interval is { Lower: 0, Upper: 0, LowerInclusive: true, UpperInclusive: true })
             return new ProofAssessment(
                 ProofRequirement.NonzeroDivisor, ProofOutcome.Contradiction,
-                subject, interval, ProofAttribution.None);
+                subject, interval, attribution);
 
         // Provably nonzero via interval: satisfied → no diagnostic
         if (interval.ExcludesZero)
             return new ProofAssessment(
                 ProofRequirement.NonzeroDivisor, ProofOutcome.Satisfied,
-                subject, interval, ProofAttribution.None);
+                subject, interval, attribution);
 
         // Flag-based nonzero proof for identifiers: the Nonzero flag (from rule != 0,
         // when != 0, etc.) cannot be expressed as a single contiguous interval, so
@@ -3146,12 +3150,12 @@ internal static class PreceptTypeChecker
             (flags & (NumericFlags.Nonzero | NumericFlags.Positive)) != 0)
             return new ProofAssessment(
                 ProofRequirement.NonzeroDivisor, ProofOutcome.Satisfied,
-                subject, interval, ProofAttribution.None);
+                subject, interval, attribution);
 
         // Obligation: zero still possible or unknown → C93
         return new ProofAssessment(
             ProofRequirement.NonzeroDivisor, ProofOutcome.Obligation,
-            subject, interval, ProofAttribution.None);
+            subject, interval, attribution);
     }
 
     /// <summary>
@@ -3309,18 +3313,19 @@ internal static class PreceptTypeChecker
         if (context.KnowsNonnegative(arg))
             return null;
 
-        var interval = context.IntervalOf(arg);
+        var proofResult = context.IntervalOf(arg);
+        var interval = proofResult.Interval;
 
         // Provably negative: contradiction
         if (interval is { Upper: < 0 })
             return new ProofAssessment(
                 ProofRequirement.NonnegativeArgument, ProofOutcome.Contradiction,
-                subject, interval, ProofAttribution.None);
+                subject, interval, proofResult.Attribution);
 
         // Obligation: may be negative
         return new ProofAssessment(
             ProofRequirement.NonnegativeArgument, ProofOutcome.Obligation,
-            subject, interval, ProofAttribution.None);
+            subject, interval, proofResult.Attribution);
     }
 
     private static bool TryGetNumericLiteral(PreceptExpression expr, out double value)

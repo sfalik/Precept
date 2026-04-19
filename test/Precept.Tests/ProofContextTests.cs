@@ -42,7 +42,7 @@ public class ProofContextTests
             new Dictionary<LinearForm, NumericInterval>());
         var expr = PreceptParser.ParseExpression("Price");
 
-        var interval = ctx.IntervalOf(expr);
+        var interval = ctx.IntervalOf(expr).Interval;
 
         interval.IsPositive.Should().BeTrue();
     }
@@ -53,7 +53,7 @@ public class ProofContextTests
         var ctx = new GlobalProofContext(new Dictionary<string, StaticValueKind>());
         var expr = PreceptParser.ParseExpression("42");
 
-        var interval = ctx.IntervalOf(expr);
+        var interval = ctx.IntervalOf(expr).Interval;
 
         interval.Lower.Should().Be(42);
         interval.Upper.Should().Be(42);
@@ -179,7 +179,7 @@ public class ProofContextTests
                 RelationKind.GreaterThan,
                 PreceptParser.ParseExpression("B"));
 
-        var interval = ctx.IntervalOf(PreceptParser.ParseExpression("A - B"));
+        var interval = ctx.IntervalOf(PreceptParser.ParseExpression("A - B")).Interval;
 
         interval.IsPositive.Should().BeTrue();
     }
@@ -195,7 +195,7 @@ public class ProofContextTests
                 RelationKind.GreaterThan,
                 PreceptParser.ParseExpression("B"));
 
-        var interval = ctx.IntervalOf(PreceptParser.ParseExpression("B - A"));
+        var interval = ctx.IntervalOf(PreceptParser.ParseExpression("B - A")).Interval;
 
         interval.ExcludesZero.Should().BeTrue();
         interval.Upper.Should().BeLessThanOrEqualTo(0);
@@ -226,7 +226,7 @@ public class ProofContextTests
                 RelationKind.GreaterThanOrEqual,
                 PreceptParser.ParseExpression("B"));
 
-        var interval = ctx.IntervalOf(PreceptParser.ParseExpression("A - B"));
+        var interval = ctx.IntervalOf(PreceptParser.ParseExpression("A - B")).Interval;
 
         interval.IsNonnegative.Should().BeTrue();
         interval.IsPositive.Should().BeFalse("gte only proves nonneg; the divisor could equal zero when A == B");
@@ -264,7 +264,7 @@ public class ProofContextTests
                 RelationKind.GreaterThan,
                 PreceptParser.ParseExpression("B"));
 
-        var interval = ctx.IntervalOf(PreceptParser.ParseExpression("(A + 1) - B"));
+        var interval = ctx.IntervalOf(PreceptParser.ParseExpression("(A + 1) - B")).Interval;
 
         interval.IsPositive.Should().BeTrue();
     }
@@ -282,7 +282,7 @@ public class ProofContextTests
                 RelationKind.GreaterThan,
                 PreceptParser.ParseExpression("Tax + Fee"));
 
-        var interval = ctx.IntervalOf(PreceptParser.ParseExpression("Total - Tax - Fee"));
+        var interval = ctx.IntervalOf(PreceptParser.ParseExpression("Total - Tax - Fee")).Interval;
 
         interval.IsPositive.Should().BeTrue();
     }
@@ -325,7 +325,7 @@ public class ProofContextTests
                 RelationKind.GreaterThan,
                 PreceptParser.ParseExpression("B"));
 
-        var interval = ctx.IntervalOf(PreceptParser.ParseExpression("3 * A - 3 * B"));
+        var interval = ctx.IntervalOf(PreceptParser.ParseExpression("3 * A - 3 * B")).Interval;
 
         interval.IsPositive.Should().BeTrue();
     }
@@ -343,7 +343,7 @@ public class ProofContextTests
         var narrowed = empty.WithGuard(condition, branch: true);
 
         narrowed.Should().NotBeSameAs(empty);
-        narrowed.IntervalOf(PreceptParser.ParseExpression("A - B")).IsPositive.Should().BeTrue();
+        narrowed.IntervalOf(PreceptParser.ParseExpression("A - B")).Interval.IsPositive.Should().BeTrue();
     }
 
     [Fact]
@@ -356,7 +356,7 @@ public class ProofContextTests
                 RelationKind.GreaterThan,
                 PreceptParser.ParseExpression("Cost"));
 
-        ctx.IntervalOf(PreceptParser.ParseExpression("Price - Cost")).IsPositive.Should().BeTrue();
+        ctx.IntervalOf(PreceptParser.ParseExpression("Price - Cost")).Interval.IsPositive.Should().BeTrue();
     }
 
     // ── Additional tests ──────────────────────────────────────────────────────
@@ -374,9 +374,9 @@ public class ProofContextTests
 
         narrowed.Should().NotBeSameAs(original);
         // original has no relational fact for A - B — result should NOT be positive:
-        original.IntervalOf(PreceptParser.ParseExpression("A - B")).IsPositive.Should().BeFalse();
+        original.IntervalOf(PreceptParser.ParseExpression("A - B")).Interval.IsPositive.Should().BeFalse();
         // narrowed does have the fact:
-        narrowed.IntervalOf(PreceptParser.ParseExpression("A - B")).IsPositive.Should().BeTrue();
+        narrowed.IntervalOf(PreceptParser.ParseExpression("A - B")).Interval.IsPositive.Should().BeTrue();
     }
 
     [Fact]
@@ -417,7 +417,7 @@ public class ProofContextTests
                 RelationKind.GreaterThan,
                 PreceptParser.ParseExpression("B + C"));
 
-        ctx.IntervalOf(PreceptParser.ParseExpression("A - (B + C)")).IsPositive.Should().BeTrue();
+        ctx.IntervalOf(PreceptParser.ParseExpression("A - (B + C)")).Interval.IsPositive.Should().BeTrue();
     }
 
     [Fact]
@@ -427,7 +427,7 @@ public class ProofContextTests
         // The engine should return the singleton interval [0, 0].
         var ctx = new GlobalProofContext(new Dictionary<string, StaticValueKind>());
 
-        var interval = ctx.IntervalOf(PreceptParser.ParseExpression("A - A"));
+        var interval = ctx.IntervalOf(PreceptParser.ParseExpression("A - A")).Interval;
 
         interval.Lower.Should().Be(0);
         interval.Upper.Should().Be(0);
@@ -448,7 +448,7 @@ public class ProofContextTests
         // Literal 42 → singleton interval [42, 42] → IsPositive = true.
         var ctx = new GlobalProofContext(new Dictionary<string, StaticValueKind>());
 
-        var interval = ctx.IntervalOf(PreceptParser.ParseExpression("42"));
+        var interval = ctx.IntervalOf(PreceptParser.ParseExpression("42")).Interval;
 
         interval.IsPositive.Should().BeTrue();
     }
@@ -487,7 +487,7 @@ public class ProofContextTests
                 RelationKind.GreaterThan,
                 PreceptParser.ParseExpression("B"));
 
-        ctx.IntervalOf(PreceptParser.ParseExpression("0.5 * A - 0.5 * B")).IsPositive.Should().BeTrue();
+        ctx.IntervalOf(PreceptParser.ParseExpression("0.5 * A - 0.5 * B")).Interval.IsPositive.Should().BeTrue();
     }
 
     [Fact]
@@ -499,7 +499,7 @@ public class ProofContextTests
 
         var narrowed = empty.WithGuard(condition, branch: true);
 
-        narrowed.IntervalOf(PreceptParser.ParseExpression("A - B")).IsNonnegative.Should().BeTrue();
+        narrowed.IntervalOf(PreceptParser.ParseExpression("A - B")).Interval.IsNonnegative.Should().BeTrue();
     }
 
     [Fact]
@@ -543,7 +543,7 @@ public class ProofContextTests
                 RelationKind.GreaterThanOrEqual,
                 PreceptParser.ParseExpression("B"));
 
-        var interval = ctx.IntervalOf(PreceptParser.ParseExpression("A - B"));
+        var interval = ctx.IntervalOf(PreceptParser.ParseExpression("A - B")).Interval;
 
         interval.Lower.Should().Be(0);
         interval.LowerInclusive.Should().BeTrue("A >= B means A - B >= 0, so [0, +∞) not (0, +∞)");
@@ -561,7 +561,7 @@ public class ProofContextTests
                 RelationKind.GreaterThan,
                 PreceptParser.ParseExpression("2 * B"));
 
-        var interval = ctx.IntervalOf(PreceptParser.ParseExpression("A - B"));
+        var interval = ctx.IntervalOf(PreceptParser.ParseExpression("A - B")).Interval;
 
         interval.ExcludesZero.Should().BeTrue("GCD normalization should make 2A-2B → A-B at storage, matching the lookup");
         interval.IsPositive.Should().BeTrue();
@@ -582,7 +582,7 @@ public class ProofContextTests
                 RelationKind.GreaterThanOrEqual,
                 PreceptParser.ParseExpression("B + 1"));
 
-        var interval = ctx.IntervalOf(PreceptParser.ParseExpression("A - B"));
+        var interval = ctx.IntervalOf(PreceptParser.ParseExpression("A - B")).Interval;
 
         interval.Lower.Should().Be(1.0);
         interval.LowerInclusive.Should().BeTrue("W1 fix: >= with non-negative offset must be inclusive");
@@ -602,7 +602,7 @@ public class ProofContextTests
                 RelationKind.GreaterThan,
                 PreceptParser.ParseExpression("2 * B"));
 
-        var interval = ctx.IntervalOf(PreceptParser.ParseExpression("A - B"));
+        var interval = ctx.IntervalOf(PreceptParser.ParseExpression("A - B")).Interval;
 
         interval.IsPositive.Should().BeTrue("2A > 2B normalizes to A > B at storage time");
     }

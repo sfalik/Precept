@@ -115,8 +115,10 @@ internal sealed class GlobalProofContext
     // ── Primary query methods ─────────────────────────────────────────────────
 
     /// <summary>
-    /// Returns the tightest <see cref="NumericInterval"/> for <paramref name="expr"/> by
+    /// Returns the tightest <see cref="ProofResult"/> for <paramref name="expr"/> by
     /// composing interval arithmetic with relational fact lookup via <see cref="LinearForm"/>.
+    /// The result pairs a <see cref="NumericInterval"/> with a <see cref="ProofAttribution"/>
+    /// tracking which rules, field constraints, and assignments contributed.
     /// </summary>
     /// <remarks>
     /// Step 1: Interval arithmetic via <see cref="PreceptTypeChecker.TryInferInterval"/>.
@@ -129,9 +131,10 @@ internal sealed class GlobalProofContext
     ///   (f) legacy string-marker fallback for simple A−B forms.
     /// The result is the intersection of all available information.
     /// </remarks>
-    public NumericInterval IntervalOf(PreceptExpression expr)
+    public ProofResult IntervalOf(PreceptExpression expr)
     {
         var arithmetic = PreceptTypeChecker.TryInferInterval(expr, this);
+        var attribution = ProofAttribution.None;
 
         var form = LinearForm.TryNormalize(expr);
         if (form is not null)
@@ -140,33 +143,48 @@ internal sealed class GlobalProofContext
             if (form.Terms.IsEmpty)
             {
                 double constVal = (double)form.Constant.Numerator / form.Constant.Denominator;
-                return new NumericInterval(constVal, true, constVal, true);
+                return new ProofResult(
+                    new NumericInterval(constVal, true, constVal, true),
+                    new ProofAttribution(new[] { "constant expression" }));
             }
 
             // Typed expression facts (from assignment-derived proofs).
             if (_exprFacts.TryGetValue(form, out var exprFact))
+            {
                 arithmetic = NumericInterval.Intersect(arithmetic, exprFact);
+                attribution = ProofAttribution.Merge(attribution,
+                    new ProofAttribution(new[] { "derived from assignment" }));
+            }
 
             var relational = LookupRelationalInterval(form);
-            arithmetic = NumericInterval.Intersect(arithmetic, relational);
+            if (!relational.IsUnknown)
+            {
+                arithmetic = NumericInterval.Intersect(arithmetic, relational);
+                attribution = ProofAttribution.Merge(attribution,
+                    BuildRelationalAttribution(form));
+            }
         }
 
-        return arithmetic;
+        // If arithmetic is non-unknown but no attribution yet, attribute from field constraints or literals.
+        if (!arithmetic.IsUnknown && attribution.Sources.Count == 0)
+            attribution = BuildExpressionAttribution(expr);
+
+        return new ProofResult(arithmetic, attribution);
     }
 
     /// <summary>
     /// Returns <c>true</c> when <paramref name="expr"/> is provably nonzero.
     /// Delegates entirely to <see cref="IntervalOf"/>: relational facts are composed there.
     /// </summary>
-    public bool KnowsNonzero(PreceptExpression expr) => IntervalOf(expr).ExcludesZero;
+    public bool KnowsNonzero(PreceptExpression expr) => IntervalOf(expr).Interval.ExcludesZero;
 
     /// <summary>Returns <c>true</c> when <paramref name="expr"/> is provably non-negative.</summary>
-    public bool KnowsNonnegative(PreceptExpression expr) => IntervalOf(expr).IsNonnegative;
+    public bool KnowsNonnegative(PreceptExpression expr) => IntervalOf(expr).Interval.IsNonnegative;
 
     /// <summary>Derives the sign class of <paramref name="expr"/> from its inferred interval.</summary>
     public ProofSign SignOf(PreceptExpression expr)
     {
-        var ival = IntervalOf(expr);
+        var ival = IntervalOf(expr).Interval;
         if (ival.IsPositive)    return ProofSign.Positive;
         if (ival.ExcludesZero)  return ProofSign.Nonzero;
         if (ival.IsNonnegative) return ProofSign.Nonneg;
@@ -331,6 +349,139 @@ internal sealed class GlobalProofContext
                 return false;
         }
         return true;
+    }
+
+    // ── Attribution helpers ───────────────────────────────────────────────────
+
+    /// <summary>
+    /// Builds attribution for the arithmetic tier result when no other tier contributed.
+    /// Handles simple identifiers (field constraints/flags) and literal constants.
+    /// </summary>
+    private ProofAttribution BuildExpressionAttribution(PreceptExpression expr)
+    {
+        var stripped = expr;
+        while (stripped is PreceptParenthesizedExpression p) stripped = p.Inner;
+
+        if (stripped is PreceptIdentifierExpression id)
+        {
+            var key = id.Member is null ? id.Name : $"{id.Name}.{id.Member}";
+            return BuildFieldAttribution(key);
+        }
+
+        if (stripped is PreceptLiteralExpression)
+            return new ProofAttribution(new[] { "constant expression" });
+
+        return ProofAttribution.None;
+    }
+
+    /// <summary>
+    /// Builds attribution from field constraint and flag stores for the given field key.
+    /// </summary>
+    private ProofAttribution BuildFieldAttribution(string key)
+    {
+        var sources = new List<string>();
+
+        if (_fieldIntervals.TryGetValue(key, out var ival))
+        {
+            bool hasPositiveFlag = _flags.TryGetValue(key, out var f) && (f & NumericFlags.Positive) != 0;
+
+            if (ival.Lower == 0 && !ival.LowerInclusive && double.IsPositiveInfinity(ival.Upper))
+            {
+                sources.Add("field constraint: positive");
+            }
+            else
+            {
+                if (!double.IsNegativeInfinity(ival.Lower))
+                {
+                    if (ival.Lower == 0 && ival.LowerInclusive)
+                        sources.Add("field constraint: nonnegative");
+                    else if (ival.LowerInclusive)
+                        sources.Add(string.Create(CultureInfo.InvariantCulture,
+                            $"field constraint: min {ival.Lower}"));
+                }
+
+                if (!double.IsPositiveInfinity(ival.Upper) && ival.UpperInclusive)
+                    sources.Add(string.Create(CultureInfo.InvariantCulture,
+                        $"field constraint: max {ival.Upper}"));
+            }
+        }
+        else if (_flags.TryGetValue(key, out var flags))
+        {
+            if ((flags & NumericFlags.Positive) != 0)
+                sources.Add("field constraint: positive");
+            else if ((flags & NumericFlags.Nonnegative) != 0)
+                sources.Add("field constraint: nonnegative");
+        }
+
+        return sources.Count > 0 ? new ProofAttribution(sources) : ProofAttribution.None;
+    }
+
+    /// <summary>
+    /// Builds attribution for a relational fact match by reconstructing the rule description
+    /// from the <see cref="LinearForm"/> that matched in <see cref="LookupRelationalInterval"/>.
+    /// Follows the same lookup tiers as <see cref="LookupRelationalInterval"/> to identify which
+    /// fact matched, then describes it in DSL terms (e.g., "rule A > B").
+    /// </summary>
+    private ProofAttribution BuildRelationalAttribution(LinearForm form)
+    {
+        // 1. Direct fact lookup.
+        if (_relationalFacts.TryGetValue(form, out var fact))
+            return DescribeRelationalFact(form, fact);
+
+        // 2. GCD-normalized lookup.
+        var normalized = GcdNormalize(form);
+        bool wasNormalized = !ReferenceEquals(normalized, form);
+        if (wasNormalized && _relationalFacts.TryGetValue(normalized, out var normFact))
+            return DescribeRelationalFact(normalized, normFact);
+
+        // 3. Negated form lookup.
+        var negated = GcdNormalize(form.Negate());
+        if (_relationalFacts.TryGetValue(negated, out var negFact))
+        {
+            var flippedKind = negFact.Kind == RelationKind.GreaterThan
+                ? RelationKind.GreaterThan : RelationKind.GreaterThanOrEqual;
+            return DescribeRelationalFact(negated, negFact);
+        }
+
+        // 4/5. Constant-offset or transitive: generic description.
+        return new ProofAttribution(new[] { "relational rule inference" });
+    }
+
+    /// <summary>
+    /// Describes a relational fact as a DSL rule string (e.g., "rule A &gt; B").
+    /// </summary>
+    private static ProofAttribution DescribeRelationalFact(LinearForm form, RelationalFact fact)
+    {
+        var op = fact.Kind == RelationKind.GreaterThan ? ">" : ">=";
+
+        // Two-term form: {A: 1, B: -1} → "rule A > B" or "rule A >= B"
+        if (form.Terms.Count == 2 && Rational.IsZero(form.Constant))
+        {
+            string? pos = null, neg = null;
+            foreach (var (key, coeff) in form.Terms)
+            {
+                if (coeff == Rational.One) pos = key;
+                else if (coeff == Rational.NegativeOne) neg = key;
+            }
+            if (pos is not null && neg is not null)
+                return new ProofAttribution(new[] { $"rule {pos} {op} {neg}" });
+        }
+
+        // Single-term + constant: {A: 1, c: -N} → "rule A > N" or "rule A >= N"
+        if (form.Terms.Count == 1)
+        {
+            var (key, coeff) = form.Terms.First();
+            if (coeff == Rational.One && !Rational.IsZero(form.Constant))
+            {
+                var constVal = -(double)form.Constant.Numerator / form.Constant.Denominator;
+                return new ProofAttribution(new[] {
+                    string.Create(CultureInfo.InvariantCulture,
+                        $"rule {key} {op} {constVal}") });
+            }
+        }
+
+        // Complex form: use generic description.
+        return new ProofAttribution(new[] { $"rule ({form} {op} 0)" });
     }
 
     // ── Scope isolation ───────────────────────────────────────────────────────
