@@ -124,6 +124,11 @@ internal sealed record ValidationResult(
     public bool HasErrors => Diagnostics.Any(static diagnostic => diagnostic.Constraint.Severity == ConstraintSeverity.Error);
 }
 
+// Partial-class file for PreceptTypeChecker — main orchestration.
+// Hosts the front-matter types (StaticValueKind, diagnostics, TypeCheckResult, etc.)
+// and the primary orchestration entry points (Check, ValidateTransitionRows,
+// ValidateStateActions, ValidateRules, ValidateCollectionMutations, and related helpers).
+// Extracted logic lives in: Helpers, FieldConstraints, Narrowing, ProofChecks, TypeInference.
 internal static partial class PreceptTypeChecker
 {
     public static TypeCheckResult Check(PreceptDefinition model)
