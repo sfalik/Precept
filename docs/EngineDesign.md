@@ -42,7 +42,7 @@ The engine is downstream of the compiler and upstream of everything that works w
 
 ## Engine Construction
 
-Construction is performed by `PreceptCompiler`, not by callers directly. The compiler invokes `TypeChecker.Check` first and injects the resulting `TypeCheckResult` — specifically `ComputedFieldOrder` and the global `ProofContext` — into the engine. The engine does not independently determine computed field evaluation order; the type checker owns topological sort.
+Construction is performed by `PreceptCompiler`, not by callers directly. The compiler invokes `TypeChecker.Check` first and injects the resulting `TypeCheckResult` — specifically `ComputedFieldOrder` — into the engine. The engine does not independently determine computed field evaluation order; the type checker owns topological sort.
 
 At construction, the engine precomputes the following internal structures:
 
@@ -51,9 +51,9 @@ At construction, the engine precomputes the following internal structures:
 | `_transitionRowMap` | `Dictionary<(State, Event), List<TransitionRow>>` | All transition rows, keyed by (state, event). First-match wins at runtime. Keys are ordinal case-sensitive. |
 | `_editableFieldsByState` | `Dictionary<string, HashSet<string>>` | Statically declared editable fields per state (unguarded `edit` blocks only). Precomputed; `["all"]` expands to all non-computed scalar + collection fields. |
 | `_guardedEditBlocks` | `List<GuardedEditBlock>` | Guarded `edit` blocks (those with `when` guards). NOT precomputed — evaluated per-call. Fail-closed: guard evaluation exception → field not granted. |
-| `_stateActionMap` | `Dictionary<(EnsureAnchor, State), StateAction>` | Entry (`to`) and exit (`from`) automatic mutations per state. |
+| `_stateActionMap` | `Dictionary<(EnsureAnchor Prep, string State), List<PreceptStateAction>>` | Entry (`to`) and exit (`from`) automatic mutations per state. |
 | `_computedFieldOrder` | `List<string>?` | Topological evaluation order for computed fields. Null if no computed fields. Injected from `TypeCheckResult`. |
-| `_computedFieldDependencies` | `Dictionary<string, HashSet<string>>` | Transitive stored-field dependency map for computed fields. Used when a constraint failure must name the user-visible field, not an intermediate computed field. |
+| `_computedFieldDependencies` | `IReadOnlyDictionary<string, IReadOnlyList<string>>` | Transitive stored-field dependency map for computed fields. Used when a constraint failure must name the user-visible field, not an intermediate computed field. |
 
 The `IsStateless` property is derived at every call from `States.Count == 0` — not a flag set at construction. This means stateless detection is always consistent with the actual definition model.
 
@@ -269,6 +269,7 @@ All outcomes derive from `TransitionOutcome` (or the Update-specific `UpdateOutc
 | `Unmatched` | Fire, Inspect | ✗ | null | Rows exist but all guards failed for current data |
 | `Undefined` | Fire, Inspect | ✗ | null | No rows defined for this event in this state |
 | `UneditableField` | Update | ✗ | null | Patch targets a field not editable in current state |
+| `InvalidInput` | Update | ✗ | null | Patch is structurally malformed — conflict, empty patch, computed field target, type error, or unsupported operation |
 | `Update` (outcome) | Update | ✓ | non-null | Direct field edit committed |
 
 **`Rejected` vs `ConstraintFailure`:** These serve different diagnostic purposes. `Rejected` means the event is explicitly prohibited by the definition — a `reject` row is a designed prohibition, not a data validation failure. `ConstraintFailure` means the event pipeline would succeed (a row matched, mutations executed) but the result would violate a rule or ensure. Callers should diagnose these differently: a `Rejected` outcome may prompt a user message about why the action is not permitted; a `ConstraintFailure` outcome should surface the specific constraint violation to guide the user toward a valid state.

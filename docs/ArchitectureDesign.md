@@ -45,7 +45,7 @@ flowchart TD
         UPD --> EVAL
     end
 
-    OUT["📤 Outcomes\nTransition  ·  NoTransition  ·  Rejected\nConstraintFailure  ·  UneditableField  ·  Update"]
+    OUT["📤 Outcomes\nTransition  ·  NoTransition  ·  Rejected\nConstraintFailure  ·  Unmatched  ·  Undefined\nUneditableField  ·  InvalidInput  ·  Update"]
 
     src --> P
     TC -->|PreceptEngine| ENG
@@ -180,6 +180,7 @@ Every runtime operation produces a typed outcome. The outcome carries diagnostic
 | `Rejected` | Fire, Inspect | Explicit `reject` row matched — a designed prohibition in the definition |
 | `ConstraintFailure` | Fire, Inspect, Update | Mutations would violate a rule or ensure; rolled back |
 | `UneditableField` | Update | Patch targets a field not editable in the current state |
+| `InvalidInput` | Update | Patch is structurally malformed — conflict, empty patch, computed field target, type error, or unsupported operation |
 | `Update` (outcome) | Update | Direct field edit committed; instance updated |
 | `Unmatched` | Fire, Inspect | Transition rows exist for the event but all guards failed |
 | `Undefined` | Fire, Inspect | No transition rows defined for this event in the current state |
