@@ -20,15 +20,17 @@ The **Run-Time phase** accepts a `PreceptEngine` and exposes an instance lifecyc
 
 ```mermaid
 flowchart TD
+    src(["📄 .precept"])
+
     subgraph CT["Compile-Time"]
         direction LR
-        src(["📄 .precept"]) --> P["🔤 Parser"] -->|definition model| TC["🔍 Type Checker"]
+        P["🔤 Parser"] -->|definition model| TC["🔍 Type Checker"]
         TC <-->|interval queries /\nnarrowing facts| PE["📐 Proof Engine"]
     end
 
     subgraph RT["Run-Time"]
         direction LR
-        ENG["⚙️ Engine"]
+        ENG["⚙️ Engine  ·  PreceptEngine"]
         I1(["CreateInstance\n→ PreceptInstance"])
         I2(["Inspect\n→ simulate, no commit"])
         FIRE["Fire\n→ simulate + commit"]
@@ -45,6 +47,7 @@ flowchart TD
 
     OUT["📤 Outcomes\nTransition  ·  NoTransition  ·  Rejected\nConstraintFailure  ·  Unmatched  ·  Undefined\nUneditableField  ·  InvalidInput  ·  Update"]
 
+    src --> CT
     CT -->|PreceptEngine| RT
     EVAL --> OUT
 ```
