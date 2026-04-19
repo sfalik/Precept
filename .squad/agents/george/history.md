@@ -124,3 +124,8 @@ Key findings:
 
 ### 2026-04-11 — Issue #14 documentation sync
 - Synced language, runtime, editability, MCP, and README docs for declaration `when` guards after implementation.
+
+### 2026-04-19 — PRECEPT097/PRECEPT098 diagnostic-span root cause
+- The decisive fix point for PRECEPT097/PRECEPT098 was upstream: emitted diagnostics needed explicit end-column precision in the core model before tooling could ever render a tighter range.
+- Threading `EndColumn` through runtime/type-checker emission is the right first move; language-server range logic should only be adjusted after verifying the upstream payload is precise.
+- Regression tests for diagnostic precision belong near the emitting layer, not only in tooling, so LS consumers are protected from future coarse-span regressions.

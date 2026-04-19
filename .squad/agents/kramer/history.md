@@ -29,3 +29,8 @@
 
 ### 2026-04-11 — `when` guard completions + grammar verification
 - Confirmed grammar support and added context-aware completions for declaration guards and guarded edit forms.
+
+### 2026-04-19 — Diagnostic range mapping depends on upstream span fidelity
+- When editor ranges look wrong, first inspect the upstream diagnostic payload; a language-server mapping bug and a coarse source span can present the same symptom.
+- Honor `EndColumn` when it is present and reserve full-line fallback for diagnostics that are genuinely line-scoped, otherwise tooling precision regresses silently.
+- Focused LS span tests should pin both the precise-range path and the line-level fallback path so later runtime precision work does not get flattened in the editor.
