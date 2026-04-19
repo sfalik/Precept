@@ -18,6 +18,22 @@ The engine holds the compiled definition state: the field map, transition table,
 
 The engine exposes four operations on `PreceptInstance` objects: `CreateInstance`, `Inspect`, `Fire`, and `Update`. All four operations that evaluate expressions route through the same expression evaluator — the same component, with the same isolation and determinism guarantees, at every invocation. The engine does not evaluate expressions itself; it orchestrates evaluation by building the correct evaluation context and handing it to `PreceptExpressionRuntimeEvaluator`.
 
+The engine's design is grounded in three philosophy commitments:
+
+1. **Prevention, not detection.** A `PreceptEngine` can only be constructed from a definition that passed validation. The engine is the runtime realization of the compile-time gate: a caller who holds a `PreceptEngine` has already passed prevention. At runtime, `Fire` and `Update` extend prevention into the instance lifecycle — mutations execute on working copies and commit only if every constraint holds. An invalid configuration is never written, even transiently.
+
+2. **Full inspectability.** `Inspect` is a first-class operation with the same depth as `Fire`. It executes the complete event pipeline on a working copy — guards, state actions, mutations, derived field recomputation, constraint evaluation — and returns the predicted outcome without committing. Inspectability is not a reporting layer bolted onto the engine; it is part of the operation surface from the start. The engine's evaluator isolation makes this honest: there is no way for an Inspect call to affect the entity or any shared state.
+
+3. **Determinism.** Same engine, same instance, same event — same outcome, always. The engine contains no mutable state after construction. The evaluator is expression-isolated and side-effect-free. The atomic execution model means partial states never persist. This is what makes the engine trustworthy as a business rules host and auditable as an AI agent tool.
+
+### Properties
+
+- **Construction invariant.** `PreceptEngine` cannot be constructed from an invalid definition. `PreceptCompiler` is the only path; the engine constructor is internal.
+- **Immutability.** The engine's internal state never changes after construction. `PreceptInstance` records are immutable; every successful operation produces a new instance.
+- **Atomic mutations.** `Fire` and `Update` operate on working copies. If any constraint fails, the working copy is discarded — the caller's instance is unchanged.
+- **Evaluator purity.** `PreceptExpressionRuntimeEvaluator` cannot mutate entity state or observe anything outside its evaluation context. This is an architectural property, not a caller convention.
+- **Deterministic.** Same engine, same instance data, same event and arguments — same outcome. No non-deterministic paths, no mutable shared state, no culture-dependent operations.
+
 ---
 
 ## Architecture Position
