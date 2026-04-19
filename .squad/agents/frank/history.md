@@ -13,6 +13,16 @@
 
 ## Recent Updates
 
+### 2026-04-19 — Drafted `docs/TypeCheckerDesign.md` (Track B design doc)
+- Canonical design document describing the CURRENT implemented architecture of `PreceptTypeChecker`.
+- 6-partial decomposition (3,783 LOC): Main, TypeInference, Narrowing, ProofChecks, Helpers, FieldConstraints.
+- 7 design decisions with rationale, alternatives rejected, and tradeoffs accepted.
+- Research-grounded: references both architecture survey (Frank) and implementation patterns (George).
+- Philosophy-traced: 6 principles each linking to `docs/philosophy.md`.
+- Integration points table covering proof engine (~7 call sites), language server (3 consumers), MCP (4 tools), and compiler pipeline.
+- Re-evaluation triggers from research (2K LOC per file, 5K total, phase formalization, incremental compilation).
+- Decision filed at `.squad/decisions/inbox/frank-typechecker-design-doc.md`.
+
 ### 2026-04-19 — Design review of issue #118: PreceptTypeChecker decomposition
 - **Verdict: APPROVED WITH NOTES.** Proposal is architecturally sound and ready for implementation planning.
 - Verified all 67 class-level methods against proposed 6-file grouping. Method inventory is complete — no methods missing, no phantom methods.
