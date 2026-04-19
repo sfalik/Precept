@@ -6,6 +6,62 @@
 
 ---
 
+### 2026-04-19T14:00:00Z: Decision inbox merge — April 17-19 proof-engine and issue #118 records canonicalized
+**By:** Scribe
+**Status:** Merged, deduplicated, inbox cleared
+
+**Owner directives retained**
+- Skip a structured `suggestion` block in MCP `precept_compile`; diagnostic teaching stays in message text and `precept_language`.
+- Implement a repo-owned `readonly record struct Rational(long Numerator, long Denominator) : INumber<Rational>`; do not take a NuGet dependency.
+- Keep `INumber<Rational>` despite the extra code and include scalar-multiple `LinearForm` lookup / GCD normalization in PR #108.
+- For stateless events: philosophy update approved, implicit `no transition` allowed, and no extra `precept_inspect` pattern flag.
+- Re-open Principle #8 posture because the current `assumes satisfiable` wording risks false security; meanwhile PR #108 is held to the engine-closure completion bar, must ship the proof-diagnostic redesign and full tooling/doc surface, and must close the conditional-plus-relational composition gap in-PR.
+
+**Issue #118 / PR #123**
+- Frank approved issue #118's 6-file `PreceptTypeChecker` decomposition with 7 non-blocking notes: the method inventory is complete, partial classes are the right zero-visibility-change refactor, helpers belong in a shared file, and the size estimates need modest correction.
+- Frank's compatibility pass against #107 temporal types and #95 currency/quantity/UOM concluded the split still works, but `TypeInference.cs` grows to roughly ~1680-2135 lines if both major type expansions land unchanged; future re-splitting may be warranted.
+- Frank then converted the approved decomposition into PR #123's implementation plan: 6 slices, 58 method moves, all 7 review notes incorporated, behavior-preserving file moves only.
+
+**Proof engine architecture and scope**
+- Frank endorsed the bounded proof-engine plus author-adaptation model and later recommended revising Principle #8 so every syntactically decidable proof obligation must be discharged before the checker falls back to conservative assumptions.
+- Frank retracted earlier general-PL complexity estimates; George independently confirmed the corrected Precept-grounded model: flat single-pass analysis, roughly ~500 new lines plus ~80 changed for the core non-SMT stack.
+- Frank promoted relational inference to load-bearing status, proposed literal-only sequential proof invalidation as the safe first Layer 3 step, and designed the C94-C99 compile-time enforcement family.
+- Frank created `docs/ProofEngineDesign.md`, then reviewed the proof engine as architecturally approved with two remaining blockers: missing else-branch negated-guard narrowing and an unspecified hover-attribution mechanism.
+- George added two technical guardrails to the proof design: `checked` `Rational` arithmetic with null fallback on overflow, and staged sequential symbol-table flow that always clears stale proofs and only rebuilds from soundly knowable assignments in the first pass.
+- Frank's earlier 5-slice non-SMT proof-stack plan is retained only as superseded history; the active direction is the later unified proof-engine plan already reflected in PR #108.
+- Frank's Wave 2 review approved the typed-store migration work in PR #108, and his Wave 4 plan locked the attribution-first `IntervalOf -> ProofResult` signature change as the correct path for proof hover and diagnostics.
+- Captured implementation-progress notes: George's Step 7a introduced typed proof stores and attribution types in `ProofContext`, and Step 10 applied the W1 inclusivity fix plus W2 GCD normalization.
+
+**Stateless events**
+- Frank recommended stateless bare `on EventName` handlers, subject to the philosophy update and structural limits already approved by Shane.
+- George judged the feature technically feasible across parser, runtime, and tooling layers.
+- Frank's guardrail design stands: `transition` is invalid in stateless `on` blocks, mixed stateful/stateless routing is a hard error, and pseudo-lifecycle patterns should be taught with compiler diagnostics rather than inspector-only metadata.
+
+**Review findings retained beyond the existing 2026-04-18 ceremony summary**
+- Elaine: proof UX still needs a full interval-shape natural-language map, stricter diagnostic authorship rules, and a clearer presentation contract from assessment data to surfaced copy.
+- George: PR #108 code is materially behind the design-doc claims until typed stores, scope split, the full proof family, and related completion work actually land; doc status must track reality.
+- Kramer: tooling is blocked on structured proof metadata and attribution plumbing, not just new prose; code actions and hover cannot stay message-driven.
+- Newman: MCP needs a defined `precept_compile.proof` schema with stable semantics and diagnostic linkage, not just a vague `Dump()` mention.
+- Soup Nazi: tests still lack the full C94-C98 family, 64-fact / 256-visit bound coverage, truth-based C92/C93 assertions, and one PR #108 AC #21 `StateContext == "A"` assertion.
+- Steinbrenner: the proof program needs a product-level completion bar across diagnostics, hover, MCP, and performance, with Commit 15 the only clearly negotiable scope item.
+
+**Testing and sample-contract notes**
+- Proof-diagnostic integration samples must use explicit `# EXPECT:` metadata naming code, severity, match mode, visible text, and exact span coordinates.
+- Step 15 prep added `DiagnosticSampleDriftTests.cs` scaffolding for sample count, parse, compile, and later drift assertions.
+- Workaround-flagging diagnostics for unsupported proof patterns remain a follow-up PR, not part of the core proof-engine closure branch.
+- PR #108 round-2 gap retained: AC #21 coverage must assert the expected `StateContext` value, not just the presence of a single diagnostic.
+
+**Planning / portfolio**
+- Steinbrenner's priority order stands: #106 / PR #108 first, then #111, then #107, then #95, with #112 available to pull forward if proof work stalls.
+- Steinbrenner also recommended milestone restructuring: close M1 and M2, retire M3's original theme, and redistribute the remaining work into new milestone groupings.
+
+**Deduplicated / superseded during merge**
+- The existing 2026-04-18T15:00:00Z proof-engine ceremony entry remains the canonical multi-review snapshot; the detailed review files were reduced to unique blocker and contract details instead of being copied verbatim.
+- The existing 2026-04-18 PreceptTypeChecker decomposition entry remains the canonical issue-filing note; this merge adds only the later approval, scale-fit follow-up, and PR #123 planning result.
+- Inbox-only implementation notes and superseded planning artifacts were compressed into the active guidance above before inbox deletion.
+
+---
+
 ### 2026-04-18T15:00:00Z: Proof engine full-team design review ceremony — 7 reviewer findings captured
 **By:** Frank, George, Soup Nazi, Elaine, Kramer, Newman, Steinbrenner
 **Status:** Captured — detailed review files retained in `.squad/decisions/inbox/` pending Shane review
