@@ -12,6 +12,14 @@ Status: **Implemented** — Core engine and all four implementation waves shippe
 
 The proof engine is Precept's compile-time reasoning layer. It infers numeric intervals and relational facts from the `.precept` definition — field constraints, rules, guards, ensures, and assignments — and uses them to prove or disprove properties of every numeric expression before any entity instance exists. This is the mechanism that delivers the philosophy's prevention commitment for numeric integrity.
 
+The engine's design is grounded in three philosophy commitments:
+
+1. **Prevention before instantiation.** The proof engine fires at compile time, before any entity instance exists. Divisor-safety, sqrt-operand safety, and assignment-constraint violations are compile-time errors — the invalid configuration never reaches runtime. This is the direct realization of the prevention commitment: invalid configurations are structurally impossible, not caught at runtime.
+
+2. **Full inspectability.** Proof results are not private compiler state. Every proven range and its source attribution — the field constraints, rules, and guards that contributed — surfaces through hover displays, diagnostic messages, and MCP structured proof output. The author sees what the engine proved, what it could not prove, and why. Inspectability is architectural, not optional.
+
+3. **Determinism.** Same definition produces the same proof outcome. The proof engine uses interval arithmetic and bounded relational closure — no non-deterministic solvers, no timing-dependent analysis, no stochastic reasoning. When the engine cannot prove safety, it says so explicitly. The author is never confronted with an unexplainable verdict.
+
 The engine serves three purposes:
 
 1. **Safety enforcement.** Prove that divisors are nonzero (C92/C93), sqrt operands are non-negative (C76), and assignments satisfy field constraints (C94). Interval transfer rules propagate proof information through all 10 built-in numeric functions (`abs`, `min`, `max`, `clamp`, `sqrt`, `floor`, `ceil`, `round`, `truncate`, `pow`) so that proof-backed diagnostics fire correctly when these functions appear in expressions. These are compile-time errors or warnings — the invalid configuration never reaches runtime.
