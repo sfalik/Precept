@@ -232,6 +232,145 @@ public class PreceptHoverProofTests
         content.Should().Contain("1 to 100 (inclusive)");
     }
 
+    // ── R10: Rule keyword hover ────────────────────────────────────────────
+
+    [Fact]
+    public void Hover_RuleKeyword_ShowsThisRuleProves()
+    {
+        const string text = """
+            precept M
+            field Rate as number default 50
+            ru$$le Rate >= 1 because "rate must be positive"
+            state A initial
+            event Go
+            from A on Go -> no transition
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var info = PreceptDocumentIntellisense.Analyze(code);
+        var hover = PreceptDocumentIntellisense.CreateHover(info, position);
+
+        hover.Should().NotBeNull();
+        var content = hover!.Contents.ToString()!;
+        content.Should().Contain("This rule proves Rate is 1 or greater.");
+        content.Should().Contain("from:");
+        content.Should().Contain("rule Rate >= 1");
+    }
+
+    [Fact]
+    public void Hover_RuleKeyword_LessThanOrEqual_ShowsUpperBound()
+    {
+        const string text = """
+            precept M
+            field Rate as number default 50
+            ru$$le Rate <= 100 because "rate capped"
+            state A initial
+            event Go
+            from A on Go -> no transition
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var info = PreceptDocumentIntellisense.Analyze(code);
+        var hover = PreceptDocumentIntellisense.CreateHover(info, position);
+
+        hover.Should().NotBeNull();
+        var content = hover!.Contents.ToString()!;
+        content.Should().Contain("This rule proves Rate is 100 or less.");
+        content.Should().Contain("rule Rate <= 100");
+    }
+
+    [Fact]
+    public void Hover_RuleKeyword_StrictGreaterThan_ShowsAlwaysGreaterThan()
+    {
+        const string text = """
+            precept M
+            field Score as number default 10
+            ru$$le Score > 0 because "score must be positive"
+            state A initial
+            event Go
+            from A on Go -> no transition
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var info = PreceptDocumentIntellisense.Analyze(code);
+        var hover = PreceptDocumentIntellisense.CreateHover(info, position);
+
+        hover.Should().NotBeNull();
+        var content = hover!.Contents.ToString()!;
+        content.Should().Contain("This rule proves Score is always greater than 0.");
+        content.Should().Contain("rule Score > 0");
+    }
+
+    [Fact]
+    public void Hover_RuleKeyword_NoProofForNonComparison_FallsThrough()
+    {
+        // Rule with complex boolean expression that isn't a simple comparison
+        // should fall through to normal keyword hover
+        const string text = """
+            precept M
+            field A as number default 1
+            field B as number default 2
+            ru$$le A + B > 0 because "sum positive"
+            state X initial
+            event Go
+            from X on Go -> no transition
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var info = PreceptDocumentIntellisense.Analyze(code);
+        var hover = PreceptDocumentIntellisense.CreateHover(info, position);
+
+        // Should still get a hover (falls through to keyword hover)
+        hover.Should().NotBeNull();
+        var content = hover!.Contents.ToString()!;
+        // Should NOT contain "This rule proves" since A + B isn't a simple field comparison
+        content.Should().NotContain("This rule proves");
+    }
+
+    // ── R10: When keyword hover ────────────────────────────────────────────
+
+    [Fact]
+    public void Hover_WhenKeyword_ShowsThisGuardNarrows()
+    {
+        const string text = """
+            precept M
+            field Score as number default 10
+            state A initial
+            event Go
+            from A on Go wh$$en Score > 0 -> no transition
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var info = PreceptDocumentIntellisense.Analyze(code);
+        var hover = PreceptDocumentIntellisense.CreateHover(info, position);
+
+        hover.Should().NotBeNull();
+        var content = hover!.Contents.ToString()!;
+        content.Should().Contain("This guard narrows Score to always greater than 0 in this branch.");
+        content.Should().Contain("from:");
+        content.Should().Contain("when Score > 0");
+    }
+
+    [Fact]
+    public void Hover_WhenKeyword_LessThanGuard_ShowsUpperBound()
+    {
+        const string text = """
+            precept M
+            field Amount as number default 50
+            state A initial
+            event Go
+            from A on Go wh$$en Amount < 1000 -> no transition
+            """;
+
+        var (code, position) = ExtractPosition(text);
+        var info = PreceptDocumentIntellisense.Analyze(code);
+        var hover = PreceptDocumentIntellisense.CreateHover(info, position);
+
+        hover.Should().NotBeNull();
+        var content = hover!.Contents.ToString()!;
+        content.Should().Contain("This guard narrows Amount to always less than 1000 in this branch.");
+    }
+
     private static (string text, Position position) ExtractPosition(string textWithMarker)
     {
         var index = textWithMarker.IndexOf("$$", StringComparison.Ordinal);

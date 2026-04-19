@@ -179,8 +179,204 @@ internal static class PreceptDocumentIntellisense
             };
         }
 
+        // R10: rule/when declaration keyword hover — shows what the declaration proves
+        var declHover = CreateDeclarationProofHover(info, position);
+        if (declHover is not null)
+            return declHover;
+
         // Fall back to construct/keyword hover from catalogs
         return CreateKeywordHover(info, position);
+    }
+
+    /// <summary>
+    /// R10: When the cursor is on a <c>rule</c> or <c>when</c> keyword of a declaration line,
+    /// shows what that single declaration contributes to the proof state.
+    /// </summary>
+    private static Hover? CreateDeclarationProofHover(PreceptDocumentInfo info, Position position)
+    {
+        if (info.Model is null || info.ProofContext is null)
+            return null;
+
+        var lineIndex = (int)position.Line;
+        if (lineIndex < 0 || lineIndex >= info.Lines.Length)
+            return null;
+
+        var line = info.Lines[lineIndex];
+        if (!TryGetIdentifierAtPosition(line, (int)position.Character, out var word, out var start, out var end))
+            return null;
+
+        // Rule keyword hover: "This rule proves {field} is {interval}."
+        if (string.Equals(word, "rule", StringComparison.OrdinalIgnoreCase))
+        {
+            var rules = info.Model.Rules;
+            if (rules is null) return null;
+
+            // SourceLine is 1-based (Superpower), LSP position.Line is 0-based
+            var rule = rules.FirstOrDefault(r => !r.IsSynthetic && r.SourceLine - 1 == lineIndex);
+            if (rule is null) return null;
+
+            var proofText = BuildRuleKeywordHover(rule);
+            if (proofText is not null)
+            {
+                return new Hover
+                {
+                    Contents = new MarkedStringsOrMarkupContent(new MarkupContent
+                    {
+                        Kind = MarkupKind.Markdown,
+                        Value = proofText
+                    }),
+                    Range = CreateRange(lineIndex, start, end)
+                };
+            }
+        }
+
+        // When keyword hover: "This guard narrows {field} to {interval} in this branch."
+        if (string.Equals(word, "when", StringComparison.OrdinalIgnoreCase))
+        {
+            var guardHover = BuildWhenKeywordHover(info.Model, lineIndex);
+            if (guardHover is not null)
+            {
+                return new Hover
+                {
+                    Contents = new MarkedStringsOrMarkupContent(new MarkupContent
+                    {
+                        Kind = MarkupKind.Markdown,
+                        Value = guardHover
+                    }),
+                    Range = CreateRange(lineIndex, start, end)
+                };
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Builds R10 hover text for a <c>rule</c> keyword: "This rule proves {field} is {interval}."
+    /// </summary>
+    private static string? BuildRuleKeywordHover(PreceptRule rule)
+    {
+        if (!TryExtractComparisonFieldAndInterval(rule.Expression, out var fieldName, out var interval))
+            return null;
+
+        var natural = interval.ToNaturalLanguage();
+        if (natural is null)
+            return null;
+
+        return $"This rule proves {fieldName} is {natural}.\n\n*from:* `rule {rule.ExpressionText}`";
+    }
+
+    /// <summary>
+    /// Builds R10 hover text for a <c>when</c> keyword on a transition row or rule guard:
+    /// "This guard narrows {field} to {interval} in this branch."
+    /// </summary>
+    private static string? BuildWhenKeywordHover(PreceptDefinition model, int lineIndex)
+    {
+        // Check transition rows for when guards on this line
+        if (model.TransitionRows is not null)
+        {
+            foreach (var row in model.TransitionRows)
+            {
+                if (row.WhenGuard is not null && row.SourceLine - 1 == lineIndex)
+                {
+                    if (TryExtractComparisonFieldAndInterval(row.WhenGuard, out var field, out var interval))
+                    {
+                        var natural = interval.ToNaturalLanguage();
+                        if (natural is not null)
+                            return $"This guard narrows {field} to {natural} in this branch.\n\n*from:* `when {row.WhenText}`";
+                    }
+                }
+            }
+        }
+
+        // Check rule when guards on this line
+        if (model.Rules is not null)
+        {
+            foreach (var rule in model.Rules)
+            {
+                if (!rule.IsSynthetic && rule.WhenGuard is not null && rule.SourceLine - 1 == lineIndex)
+                {
+                    if (TryExtractComparisonFieldAndInterval(rule.WhenGuard, out var field, out var interval))
+                    {
+                        var natural = interval.ToNaturalLanguage();
+                        if (natural is not null)
+                            return $"This guard narrows {field} to {natural} in this branch.\n\n*from:* `when {rule.WhenText}`";
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Extracts the field name and proven interval from a simple comparison expression.
+    /// Handles patterns like <c>Field &gt;= N</c>, <c>N &lt;= Field</c>, etc.
+    /// </summary>
+    private static bool TryExtractComparisonFieldAndInterval(
+        PreceptExpression expr, out string fieldName, out NumericInterval interval)
+    {
+        fieldName = string.Empty;
+        interval = NumericInterval.Unknown;
+
+        if (expr is not PreceptBinaryExpression binary)
+            return false;
+
+        var op = binary.Operator;
+        if (op is not (">=" or "<=" or ">" or "<"))
+            return false;
+
+        // field op literal
+        if (binary.Left is PreceptIdentifierExpression leftId && TryGetNumericValue(binary.Right, out var rightVal))
+        {
+            fieldName = leftId.Name;
+            interval = ComparisonToInterval(op, rightVal);
+            return true;
+        }
+
+        // literal op field (e.g., 1 <= Rate)
+        if (binary.Right is PreceptIdentifierExpression rightId && TryGetNumericValue(binary.Left, out var leftVal))
+        {
+            fieldName = rightId.Name;
+            interval = ComparisonToInterval(FlipOperator(op), leftVal);
+            return true;
+        }
+
+        return false;
+    }
+
+    private static NumericInterval ComparisonToInterval(string op, double value) => op switch
+    {
+        ">=" => new NumericInterval(value, true, double.PositiveInfinity, false),
+        ">"  => new NumericInterval(value, false, double.PositiveInfinity, false),
+        "<=" => new NumericInterval(double.NegativeInfinity, false, value, true),
+        "<"  => new NumericInterval(double.NegativeInfinity, false, value, false),
+        _    => NumericInterval.Unknown
+    };
+
+    private static string FlipOperator(string op) => op switch
+    {
+        ">=" => "<=",
+        "<=" => ">=",
+        ">"  => "<",
+        "<"  => ">",
+        _    => op
+    };
+
+    private static bool TryGetNumericValue(PreceptExpression expr, out double value)
+    {
+        value = 0;
+        if (expr is PreceptLiteralExpression literal)
+        {
+            switch (literal.Value)
+            {
+                case double d: value = d; return true;
+                case long l:   value = l; return true;
+                case int i:    value = i; return true;
+                case decimal m: value = (double)m; return true;
+            }
+        }
+        return false;
     }
 
     /// <summary>
