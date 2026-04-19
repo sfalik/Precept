@@ -260,7 +260,21 @@ public class NumericIntervalTests
     public void ToNaturalLanguage_MixedBounded_ReturnsBoundedDescription()
     {
         var mixed = new NumericInterval(1, false, 100, true);
-        mixed.ToNaturalLanguage().Should().Be("greater than 1 to up to 100");
+        mixed.ToNaturalLanguage().Should().Be("greater than 1 to 100");
+    }
+
+    [Fact]
+    public void ToNaturalLanguage_BothExclusive_ReturnsBetweenExclusive()
+    {
+        var bothExcl = new NumericInterval(1, false, 100, false);
+        bothExcl.ToNaturalLanguage().Should().Be("between 1 and 100 (exclusive)");
+    }
+
+    [Fact]
+    public void ToNaturalLanguage_LowerInclusiveUpperExclusive_ReturnsToLessThan()
+    {
+        var halfOpen = new NumericInterval(1, true, 100, false);
+        halfOpen.ToNaturalLanguage().Should().Be("1 to less than 100");
     }
 
 }

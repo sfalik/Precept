@@ -46,12 +46,12 @@ internal static class ProofDiagnosticRenderer
         { Requirement: ProofRequirement.AssignmentConstraint, Outcome: ProofOutcome.Contradiction } a
             when a.ConstraintInterval is not null =>
             $"Assignment to '{a.SubjectDescription}' is provably outside the field's constraint range. " +
-            $"Expression produces {FormatInterval(a.StrongestFact)}, but field requires {FormatInterval(a.ConstraintInterval.Value)}.",
+            $"Expression produces {a.StrongestFact.ToNaturalLanguage() ?? FormatInterval(a.StrongestFact)}, but field requires {a.ConstraintInterval.Value.ToNaturalLanguage() ?? FormatInterval(a.ConstraintInterval.Value)}.",
 
         { Requirement: ProofRequirement.RuleSatisfiability, Outcome: ProofOutcome.Contradiction } a
             when a.ConstraintInterval is not null && a.ConstraintDescription is not null =>
             $"Rule '{a.ConstraintDescription}' contradicts the constraints on '{a.SubjectDescription}'. " +
-            $"Rule requires {FormatInterval(a.StrongestFact)}, but field is constrained to {FormatInterval(a.ConstraintInterval.Value)}.",
+            $"Rule requires {a.StrongestFact.ToNaturalLanguage() ?? FormatInterval(a.StrongestFact)}, but field is constrained to {a.ConstraintInterval.Value.ToNaturalLanguage() ?? FormatInterval(a.ConstraintInterval.Value)}.",
 
         { Requirement: ProofRequirement.RuleSatisfiability, Outcome: ProofOutcome.Contradiction } a =>
             $"Rules for '{a.SubjectDescription}' are contradictory — no value can satisfy all simultaneously.",
@@ -59,7 +59,7 @@ internal static class ProofDiagnosticRenderer
         { Requirement: ProofRequirement.RuleVacuity, Outcome: ProofOutcome.Satisfied } a
             when a.ConstraintInterval is not null && a.ConstraintDescription is not null =>
             $"Rule '{a.ConstraintDescription}' is vacuous — field '{a.SubjectDescription}' constraints already guarantee this " +
-            $"(field constrained to {FormatInterval(a.ConstraintInterval.Value)}, rule requires {FormatInterval(a.StrongestFact)}).",
+            $"(field constrained to {a.ConstraintInterval.Value.ToNaturalLanguage() ?? FormatInterval(a.ConstraintInterval.Value)}, rule requires {a.StrongestFact.ToNaturalLanguage() ?? FormatInterval(a.StrongestFact)}).",
 
         { Requirement: ProofRequirement.RuleVacuity, Outcome: ProofOutcome.Satisfied } a =>
             $"Rule is vacuous — field '{a.SubjectDescription}' constraints already guarantee this.",

@@ -313,12 +313,16 @@ internal readonly record struct NumericInterval(
         if (LowerInclusive && UpperInclusive)
             return $"{Lower.ToString(CultureInfo.InvariantCulture)} to {Upper.ToString(CultureInfo.InvariantCulture)} (inclusive)";
 
+        // (L, U) — both exclusive, finite
+        if (!LowerInclusive && !UpperInclusive)
+            return $"between {Lower.ToString(CultureInfo.InvariantCulture)} and {Upper.ToString(CultureInfo.InvariantCulture)} (exclusive)";
+
         // Other bounded ranges
         var loPart = LowerInclusive
             ? Lower.ToString(CultureInfo.InvariantCulture)
             : $"greater than {Lower.ToString(CultureInfo.InvariantCulture)}";
         var hiPart = UpperInclusive
-            ? $"up to {Upper.ToString(CultureInfo.InvariantCulture)}"
+            ? Upper.ToString(CultureInfo.InvariantCulture)
             : $"less than {Upper.ToString(CultureInfo.InvariantCulture)}";
         return $"{loPart} to {hiPart}";
     }
