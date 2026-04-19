@@ -30,9 +30,19 @@ flowchart TD
 
     subgraph RT["Run-Time"]
         ENG["⚙️ Engine  ·  PreceptEngine"]
-        OPS(["CreateInstance · Inspect\nFire · Update"])
+        I1(["CreateInstance"]):::op
+        I2(["Inspect"]):::op
+        FIRE(["Fire"]):::op
+        UPD(["Update"]):::op
         EVAL["🧮 Evaluator\nguards · assignments\nderived fields · rules"]
-        ENG --> OPS --> EVAL
+        ENG --> I1
+        ENG --> I2
+        ENG --> FIRE
+        ENG --> UPD
+        I1 --> EVAL
+        I2 --> EVAL
+        FIRE --> EVAL
+        UPD --> EVAL
     end
 
     OUT["📤 Outcomes\nTransition  ·  NoTransition  ·  Rejected\nConstraintFailure  ·  Unmatched  ·  Undefined\nUneditableField  ·  InvalidInput  ·  Update"]
@@ -40,6 +50,8 @@ flowchart TD
     src --> CT
     CT -->|PreceptEngine| RT
     RT --> OUT
+
+    classDef op font-size:11px,fill:#f5f5f5,stroke:#ccc,color:#666
 ```
 
 > **Diagram note:** The diagram is an overview; see [EngineDesign.md](EngineDesign.md) for the full operation-level execution model.
