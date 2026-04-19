@@ -1230,17 +1230,17 @@ The following table documents the implementation status of each function contrac
 
 **See:** Appendix F § F.4 for full specification.
 
-### DD26: Roslyn Analyzer Enforces Fail Site Classification at Build Time
+### DD26: Roslyn Analyzer as Default Structural Enforcement (11 Rules)
 
-**Decision:** A Roslyn analyzer discovers `EvaluationResult.Fail(...)` call sites during `dotnet build` and enforces that every call passes an `EvalFailCode` member. Unclassified enum members trigger build warnings.
+**Decision:** A single `Precept.Analyzers` project containing 11 Roslyn analyzer rules (PREC001–PREC011) is the default structural enforcement mechanism for the codebase. Rules cover evaluator failure classification, exhaustive switch coverage, token metadata completeness, and cross-catalog consistency. Four existing reflection-based drift tests are replaced and deleted.
 
-**Rationale:** DD23 makes classification possible; the Roslyn analyzer makes it mandatory. Without it, a developer can add `Fail("bare string")` without touching the enum — the sentinel test catches it in CI, but the analyzer catches it during local `dotnet build`.
+**Rationale:** DD23 makes failure classification possible; the Roslyn analyzer makes structural discipline mandatory and immediate. The shift-left benefit — from test-time CI discovery to edit-time IDE red squiggles — applies to all structural invariants enforceable from the syntax tree, not just `EvaluationResult.Fail` calls.
 
-**Alternatives rejected:** (a) Source-text scanning in tests — fragile, regex-based, test-time only. (b) Convention enforcement via code review — the 7 gaps prove this is insufficient. (c) Source generator — generators produce code, not diagnostics.
+**Alternatives rejected:** (a) Source-text scanning in tests — fragile, regex-based, test-time only. (b) Convention enforcement via code review — the 7 gaps prove this is insufficient. (c) Source generator — generators produce code, not diagnostics. (d) Keep reflection tests alongside analyzer — parallel enforcement provides no value.
 
-**Tradeoff accepted:** Adds a `Precept.Analyzers` project to the solution. Build-time analyzer loading has negligible performance impact scoped to `EvaluationResult.Fail` call sites.
+**Tradeoff accepted:** Adds a `Precept.Analyzers` project with 11 rules. Build-time analyzer loading has negligible performance impact. Reflection-based drift tests remain only for C#↔JSON boundaries (e.g., FunctionRegistry ↔ TextMate grammar) where Roslyn cannot reach.
 
-**See:** Appendix F § F.5 for full specification.
+**See:** Appendix F § F.5 for the full rule catalog.
 
 ---
 
@@ -1515,7 +1515,9 @@ The following named tests must exist in the conformance test suite. Each anchors
 | `EvalFailCodeSentinel_AllStaticallyPreventableHaveCompilerRule` | Every `[StaticallyPreventable]` EvalFailCode member maps to a DiagnosticCatalog entry | DD23, Appendix F |
 | `FunctionRegistryEvaluatorCompleteness` | Every `FunctionRegistry` overload has a non-null `Evaluator` delegate | DD24, Appendix F |
 | `OperatorRegistryCompleteness` | Every `OperatorRegistry` entry has an evaluation delegate | DD25, Appendix F |
-| `RoslynAnalyzer_UnclassifiedFailSite` | Roslyn analyzer flags `EvaluationResult.Fail` calls without `EvalFailCode` | DD26, Appendix F |
+| `RoslynAnalyzer_PREC001_BareStringFail` | Roslyn analyzer flags `EvaluationResult.Fail` calls without `EvalFailCode` | DD26, Appendix F |
+| `RoslynAnalyzer_PREC002_ExhaustiveExpressionSwitch` | Roslyn analyzer flags non-exhaustive switch over `PreceptExpression` subtypes | DD26, Appendix F |
+| `FunctionRegistry_GrammarSync` | `FunctionRegistry.FunctionNames` matches TextMate grammar `functionCall` pattern | Appendix F |
 
 ---
 
@@ -1743,17 +1745,54 @@ The type checker calls `OperatorRegistry.TryGetResultType(operator, leftKind, ri
 
 #### Purpose
 
-The Roslyn analyzer is a structural sentinel that operates at build time. It discovers `EvaluationResult.Fail(...)` call sites in the evaluator and enforces classification discipline:
+The Roslyn analyzer is the **default structural enforcement mechanism** for the Precept codebase. It operates at build time, discovering violations during `dotnet build` and surfacing them as IDE red squiggles during editing. Roslyn replaces reflection-based drift tests wherever possible — reflection tests remain only for cross-boundary enforcement that Roslyn cannot reach (e.g., C#↔JSON grammar sync).
 
-1. **Every Fail call must pass an `EvalFailCode`.** A call to `EvaluationResult.Fail(string)` (the old bare-string signature) triggers a diagnostic: `PRECEPT_EVAL001: EvaluationResult.Fail must use an EvalFailCode member.` This prevents new Fail sites from bypassing the classification system.
+The analyzer enforces 11 rules across four categories: evaluator failure classification, exhaustive switch coverage, token metadata completeness, and cross-catalog consistency.
 
-2. **Every `EvalFailCode` member must be classified.** An enum member without `[StaticallyPreventable]` or `[LegitimatelyDynamic]` triggers a diagnostic: `PRECEPT_EVAL002: EvalFailCode member lacks classification attribute.`
+#### Rule Catalog
 
-3. **New Fail sites are surfaced.** The analyzer does not block the build — diagnostics are warnings, not errors. This allows incremental development (add the Fail site, then add the classification). But CI treats warnings-as-errors for the `Precept` project, so unclassified sites fail the pipeline.
+| Rule ID | Severity | What It Enforces | Replaces |
+|---------|----------|-----------------|----------|
+| PREC001 | Warning | `EvaluationResult.Fail()` must pass an `EvalFailCode` member — no bare-string overload | New |
+| PREC002 | Warning | Switch over `PreceptExpression` subtypes must be exhaustive (TypeChecker + Evaluator) — `default` arm does not count | Convention only |
+| PREC003 | Warning | Every `PreceptToken` enum member must have both `[TokenCategory]` and `[Description]` attributes | `AllTokens_HaveCategoryAndDescription` reflection test |
+| PREC004 | Warning | Keyword/operator `PreceptToken` members must have `[TokenSymbol]` attribute | `KeywordAndOperatorTokens_HaveSymbol` reflection test |
+| PREC005 | Warning | No duplicate `[TokenSymbol]` values across `PreceptToken` enum members | New |
+| PREC006 | Warning | Switch over `EvalFailCode` must be exhaustive — `default` arm does not count | New |
+| PREC007 | Warning | Switch over `FunctionArgConstraint` must be exhaustive — `default` arm does not count | Convention only |
+| PREC008 | Warning | Switch over `StaticValueKind` must be exhaustive — `default` arm does not count | Convention only |
+| PREC009 | Warning | Every `[StaticallyPreventable]` `EvalFailCode` member must have a matching `DiagnosticCatalog` code | Sentinel test |
+| PREC010 | Warning | `// SYNC:` comments must reference valid `DiagnosticCatalog` codes | `SyncComments_MatchDiagnosticCatalog` reflection test |
+| PREC011 | Warning | Declaration record types (e.g., `PreceptField`, `PreceptState`, `PreceptEvent`) must have an `int SourceLine` property | `ModelRecords_HaveSourceLine` reflection test |
+
+All diagnostics are warnings. CI treats warnings-as-errors for the `Precept` project, so violations fail the pipeline. This allows incremental development locally (add the construct, then fix the diagnostic) while preventing unresolved violations from merging.
+
+#### Rule Categories
+
+**Evaluator failure classification (PREC001).** Discovers `EvaluationResult.Fail(...)` call sites and enforces that every call passes an `EvalFailCode` member. A call to `EvaluationResult.Fail(string)` (the old bare-string signature) triggers the diagnostic.
+
+**Exhaustive switch coverage (PREC002, PREC006–PREC008).** These four rules share a common Roslyn pattern: enumerate all subtypes of a sealed type hierarchy (for `PreceptExpression`) or all members of an enum (for `EvalFailCode`, `FunctionArgConstraint`, `StaticValueKind`), find all switch sites over that type, and verify every subtype/member has an explicit case arm. The `default` arm is NOT counted as coverage — explicit arms are required. This catches the category of bug where a new expression form, failure code, or constraint kind is added but switch sites are not updated.
+
+**Token metadata completeness (PREC003–PREC005).** Enforces that the `PreceptToken` enum — the source of truth for syntax highlighting, semantic tokens, and the `precept_language` MCP tool — is fully annotated. PREC003 requires `[TokenCategory]` + `[Description]` on every member. PREC004 requires `[TokenSymbol]` on keyword/operator members. PREC005 catches duplicate symbol values that would create ambiguous tokenization.
+
+**Cross-catalog consistency (PREC009–PREC011).** PREC009 enforces the contract between `EvalFailCode` and `DiagnosticCatalog` — every `[StaticallyPreventable("CXX")]` member must have a matching catalog entry. PREC010 validates `// SYNC:` comments that cross-reference diagnostic codes. PREC011 enforces the structural contract that all declaration record types carry source-line provenance for diagnostic reporting.
+
+#### Reflection Test Retirement
+
+The following reflection-based `CatalogDriftTests` are replaced by Roslyn analyzer rules and will be deleted once the analyzer ships:
+
+| Reflection Test | Replaced By |
+|----------------|-------------|
+| `AllTokens_HaveCategoryAndDescription` | PREC003 |
+| `KeywordAndOperatorTokens_HaveSymbol` | PREC004 |
+| `SyncComments_MatchDiagnosticCatalog` | PREC010 |
+| `ModelRecords_HaveSourceLine` | PREC011 |
+
+No parallel enforcement — the reflection tests are deleted, not kept alongside the analyzer rules. The shift-left benefit: reflection tests discover problems at test-time in CI (minutes); the Roslyn analyzer discovers them at edit-time in the IDE (instant red squiggles) and enforces at build-time.
 
 #### Integration
 
-The analyzer ships as a project reference in the `Precept` project (not as a NuGet package — it is internal tooling):
+All 11 rules live in a single `Precept.Analyzers` project, referenced by the `Precept` project as internal tooling (not a NuGet package):
 
 ```xml
 <ProjectReference Include="..\Precept.Analyzers\Precept.Analyzers.csproj"
@@ -1771,9 +1810,10 @@ Appendix E's Evaluator Failure Classification sentinel originally contemplated s
 |-----------|-----------|-------------------|-----------------|
 | Source-text scanning (regex) | High — breaks on formatting, comments, string literals containing "Fail" | Test-time only — runs in CI but not during local builds | Moderate — regex cannot distinguish `Fail(string)` from `Fail(EvalFailCode, string)` reliably |
 | Static enumeration (manual list) | Medium — requires updating the list when adding Fail sites | Test-time only | None — but misses new sites by definition |
-| **Roslyn analyzer** | **None — operates on typed syntax tree** | **Build-time — runs during `dotnet build`** | **None — inspects actual method signatures** |
+| Reflection-based drift tests | Low — operates on compiled types | Test-time only — runs in CI but not during local builds | None — but still reactive, not proactive |
+| **Roslyn analyzer** | **None — operates on typed syntax tree** | **Build-time — runs during `dotnet build` and in IDE** | **None — inspects actual syntax and symbol tables** |
 
-The Roslyn analyzer turns the Evaluator Failure Classification sentinel from a reactive test-time check into a proactive build-time enforcement.
+The Roslyn analyzer turns structural enforcement from a reactive test-time check into proactive build-time and edit-time enforcement.
 
 ### F.6 Design Decisions
 
@@ -1814,22 +1854,26 @@ The Roslyn analyzer turns the Evaluator Failure Classification sentinel from a r
 
 **Tradeoff accepted:** The operator registry is more complex than the function registry due to widening, lane promotion, and the comparison-vs-arithmetic distinction. Implementation cost is higher. The operator set changes rarely (11 operators, stable since project inception), so the registry's drift-prevention value is lower per-entry than the function registry's. The value is in the type-family dimension: adding a new numeric type or changing widening rules requires updating one registry, not two independent dispatch implementations.
 
-#### DD26: Roslyn Analyzer Enforces Fail Site Classification at Build Time
+#### DD26: Roslyn Analyzer as Default Structural Enforcement
 
-**Decision:** A Roslyn analyzer discovers `EvaluationResult.Fail(...)` call sites at build time and enforces that every call passes an `EvalFailCode` member. Unclassified `EvalFailCode` members (missing both `[StaticallyPreventable]` and `[LegitimatelyDynamic]`) trigger a build warning.
+**Decision:** A single `Precept.Analyzers` project containing 11 Roslyn analyzer rules (PREC001–PREC011) enforces structural discipline across the codebase at build time: evaluator failure classification, exhaustive switch coverage over sealed type hierarchies and enums, token metadata completeness, and cross-catalog consistency. Roslyn is the default enforcement mechanism — reflection-based drift tests are replaced wherever Roslyn can reach.
 
-**Rationale:** The EvalFailCode enum (DD23) makes classification possible; the Roslyn analyzer makes classification mandatory. Without the analyzer, a developer can add `EvaluationResult.Fail("new error")` without touching the enum — the sentinel test catches it eventually, but only at test time in CI, not during local development. The analyzer provides immediate feedback during `dotnet build`, making drift a build warning rather than a CI surprise.
+**Rationale:** DD23 makes failure classification possible; the Roslyn analyzer makes structural discipline mandatory and immediate. The original DD26 scope (2 evaluator-specific rules) addressed only `EvaluationResult.Fail` sites. The expanded scope recognizes that the same shift-left benefit — from test-time discovery to edit-time red squiggles — applies to all structural invariants enforceable from the syntax tree: exhaustive switch coverage, token metadata, cross-catalog references, and declaration-record contracts. Four existing reflection-based `CatalogDriftTests` (`AllTokens_HaveCategoryAndDescription`, `KeywordAndOperatorTokens_HaveSymbol`, `SyncComments_MatchDiagnosticCatalog`, `ModelRecords_HaveSourceLine`) are replaced by analyzer rules (PREC003, PREC004, PREC010, PREC011) and deleted — no parallel enforcement.
 
 **Alternatives rejected:**
-- (a) Source-text scanning in a test (Appendix E's original design) — fragile, regex-based, breaks on formatting changes, cannot distinguish method overloads, runs only at test time.
-- (b) Convention enforcement via code review — does not scale, depends on reviewer vigilance, and the historical drift (7 gaps in 72 paths) proves this is insufficient.
-- (c) Build-time source generator instead of analyzer — source generators produce code, not diagnostics. The requirement is to flag violations, not generate code.
+- (a) Source-text scanning in tests — fragile, regex-based, test-time only.
+- (b) Convention enforcement via code review — the 7 gaps prove this is insufficient.
+- (c) Source generator instead of analyzer — generators produce code, not diagnostics.
+- (d) Keep reflection tests alongside the analyzer — parallel enforcement provides no value and creates maintenance burden. The analyzer is strictly superior for everything it can reach.
+- (e) Separate analyzer projects per category — unnecessary complexity. The 11 rules share infrastructure (symbol resolution, attribute inspection) and the combined project is small.
 
-**Tradeoff accepted:** Adds a Roslyn analyzer project (`Precept.Analyzers`) to the solution. This is a build dependency — analyzer assemblies are loaded during compilation. The analyzer is scoped to `EvaluationResult.Fail` call sites only, so its performance impact is negligible. Analyzer tests (verifying that the analyzer correctly flags violations and passes clean code) add to the test surface.
+**Tradeoff accepted:** Adds a `Precept.Analyzers` project with 11 rules to the solution. This is a build dependency — analyzer assemblies are loaded during compilation. The performance impact is negligible: each rule is narrowly scoped to specific syntax patterns. Analyzer tests (verifying that each rule correctly flags violations and passes clean code) add to the test surface — 11 rules × (positive + negative) minimum. Reflection-based drift tests remain only for the C#↔JSON boundary (e.g., FunctionRegistry ↔ TextMate grammar sync) where Roslyn cannot reach.
+
+**See:** Appendix F § F.5 for the full rule catalog and integration details.
 
 ### F.7 Conformance Test Obligations
 
-The architecture defined in this appendix requires four structural tests beyond the conformance test categories in Appendix E.
+The architecture defined in this appendix requires structural tests beyond the conformance test categories in Appendix E.
 
 #### EvalFailCode Sentinel Test
 
@@ -1850,11 +1894,68 @@ Reflects over `OperatorRegistry` at test time. For every declared `OperatorEntry
 
 #### Roslyn Analyzer Tests
 
-Standard Roslyn analyzer test infrastructure (Microsoft.CodeAnalysis.Testing):
+Standard Roslyn analyzer test infrastructure (`Microsoft.CodeAnalysis.Testing`). Each of the 11 rules (PREC001–PREC011) requires at minimum a positive test (clean code produces no diagnostic) and a negative test (violating code produces the expected diagnostic).
 
-- **Positive:** A `Fail(EvalFailCode.SomeCode, "detail")` call produces no diagnostic.
-- **Negative:** A `Fail("bare string")` call produces `PRECEPT_EVAL001`.
-- **Enum classification:** An `EvalFailCode` member without `[StaticallyPreventable]` or `[LegitimatelyDynamic]` produces `PRECEPT_EVAL002`.
+**PREC001 — Bare-string Fail:**
+- **Positive:** `Fail(EvalFailCode.SomeCode, "detail")` produces no diagnostic.
+- **Negative:** `Fail("bare string")` produces PREC001.
+
+**PREC002 — Exhaustive PreceptExpression switch:**
+- **Positive:** Switch with explicit arms for every `PreceptExpression` subtype produces no diagnostic.
+- **Negative:** Switch missing one subtype (with only a `default` arm) produces PREC002.
+
+**PREC003 — Token category and description:**
+- **Positive:** `PreceptToken` member with both `[TokenCategory]` and `[Description]` produces no diagnostic.
+- **Negative:** Member missing either attribute produces PREC003.
+
+**PREC004 — Token symbol on keywords/operators:**
+- **Positive:** Keyword `PreceptToken` member with `[TokenSymbol]` produces no diagnostic.
+- **Negative:** Keyword member missing `[TokenSymbol]` produces PREC004.
+
+**PREC005 — Duplicate token symbols:**
+- **Positive:** All `[TokenSymbol]` values are unique — no diagnostic.
+- **Negative:** Two members with `[TokenSymbol("if")]` produces PREC005.
+
+**PREC006 — Exhaustive EvalFailCode switch:**
+- **Positive:** Switch with explicit arms for every `EvalFailCode` member produces no diagnostic.
+- **Negative:** Switch missing one member (relying on `default`) produces PREC006.
+
+**PREC007 — Exhaustive FunctionArgConstraint switch:**
+- **Positive:** Switch with explicit arms for every `FunctionArgConstraint` member produces no diagnostic.
+- **Negative:** Missing member produces PREC007.
+
+**PREC008 — Exhaustive StaticValueKind switch:**
+- **Positive:** Switch with explicit arms for every `StaticValueKind` member produces no diagnostic.
+- **Negative:** Missing member produces PREC008.
+
+**PREC009 — StaticallyPreventable ↔ DiagnosticCatalog:**
+- **Positive:** `[StaticallyPreventable("C41")]` member where `DiagnosticCatalog` contains C41 produces no diagnostic.
+- **Negative:** `[StaticallyPreventable("C99")]` where C99 does not exist in the catalog produces PREC009.
+
+**PREC010 — SYNC comment references:**
+- **Positive:** `// SYNC: C41` where C41 exists in `DiagnosticCatalog` produces no diagnostic.
+- **Negative:** `// SYNC: C999` where C999 does not exist produces PREC010.
+
+**PREC011 — Declaration record SourceLine:**
+- **Positive:** Declaration record type with `int SourceLine` property produces no diagnostic.
+- **Negative:** Declaration record type missing `SourceLine` produces PREC011.
+
+#### FunctionRegistry ↔ Grammar Drift Test
+
+A reflection-based drift test that compares `FunctionRegistry.FunctionNames` against the TextMate grammar's `functionCall` regex pattern in `precept.tmLanguage.json`. This test covers the C#↔JSON boundary that the Roslyn analyzer cannot reach — the grammar file is not C# source. Every function name registered in the C# `FunctionRegistry` must appear as an alternative in the grammar's `functionCall` pattern, and vice versa.
+
+This is a companion to the Roslyn analyzer, not a replacement. It validates the one cross-boundary contract where Roslyn has no jurisdiction.
+
+#### Reflection Test Retirement
+
+The following existing reflection-based tests in `CatalogDriftTests` are deleted once the corresponding Roslyn analyzer rules ship. No parallel enforcement — the analyzer supersedes them:
+
+| Deleted Reflection Test | Replaced By |
+|------------------------|-------------|
+| `AllTokens_HaveCategoryAndDescription` | PREC003 |
+| `KeywordAndOperatorTokens_HaveSymbol` | PREC004 |
+| `SyncComments_MatchDiagnosticCatalog` | PREC010 |
+| `ModelRecords_HaveSourceLine` | PREC011 |
 
 ### F.8 How This Catches George's 7 Gaps
 
