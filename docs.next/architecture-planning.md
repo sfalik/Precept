@@ -14,7 +14,7 @@ The language vision is the authoritative specification of what the system must s
 
 ### What this document covers
 
-The full path from source text to evaluation outcome. The compiler pipeline (lexer → parser → type checker → graph analyzer → proof engine → emitter), the executable model that bridges compiler and runtime, and the runtime (evaluator, entity representation, result types, constraint evaluation, working copy atomicity, fault production, and public API surface).
+The full path from source text to evaluation outcome. The compiler pipeline (lexer → parser → type checker → graph analyzer → proof engine) produces a `CompilationResult`. A separate emitter step lowers the compilation result into the executable model that bridges compiler and runtime. The runtime (evaluator, entity representation, result types, constraint evaluation, working copy atomicity, fault production, and public API surface) operates against the executable model.
 
 ### What this document intentionally excludes
 
@@ -27,8 +27,8 @@ The full path from source text to evaluation outcome. The compiler pipeline (lex
 
 The two-artifact split is committed:
 
-- **Compilation Result** — the tooling-surface artifact (diagnostics, typed model, proof, graph). Consumed by LS and MCP. Produced on every pipeline run, including broken input.
-- **Executable Model** — the runtime-surface artifact (dispatch tables, slot-indexed expression trees, scope-indexed constraints). Sealed, immutable, evaluation-ready. Only produced on error-free compilation.
+- **Compilation Result** — the tooling-surface artifact (diagnostics, typed model, proof, graph). Consumed by LS and MCP. Produced by the compiler on every pipeline run, including broken input.
+- **Executable Model** — the runtime-surface artifact (dispatch tables, slot-indexed expression trees, scope-indexed constraints). Sealed, immutable, evaluation-ready. Produced by the emitter — a separate step outside the compile pipeline — only from an error-free compilation result.
 
 The fault-correspondence chain is committed: `FaultCode` ↔ `DiagnosticCode` via `[StaticallyPreventable]`, with analyzers PREC0001 and PREC0002 enforcing structural coverage.
 
@@ -46,7 +46,7 @@ The committed stubs (`Precept`, `Version`, `Fault`, `Evaluator`) represent early
 
 The language vision establishes the execution model properties that directly determine pipeline shape: no loops, no control-flow branches, no reconverging flow, closed type vocabulary, finite state space, expression purity, no separate compilation. These are not incidental — they are the architectural constraints that make the pipeline tractable.
 
-The required pipeline has **six functional stages** in dependency order. Stages 1–5 produce the analysis artifacts; Stage 6 lowers those into the runtime-consumable executable model.
+The compiler pipeline has **five functional stages** in dependency order. All five stages contribute to the `CompilationResult` — the tooling-surface artifact consumed by the LS and MCP. The emitter is a separate step outside the compilation pipeline that lowers an error-free compilation result into the runtime-consumable executable model.
 
 #### Stage 1 — Lexer
 
@@ -83,13 +83,6 @@ A Precept-specific stage. The vision describes eight graph reasoning capabilitie
 
 Interval-based numeric reasoning over typed expression trees. Handles: divisor safety, sqrt non-negativity obligations, assignment range impossibility, contradictory rule detection, vacuous rule detection, dead guard detection, and compile-time constraint checking. Every proof result carries structured attribution. SMT solvers are excluded by language principle.
 
-#### Stage 6 — Emitter
-
-**Input:** Typed semantic model + graph analysis results + proof model
-**Output:** Executable model (sealed, immutable, evaluation-ready artifact)
-
-The emitter lowers the analysis-oriented typed model into a runtime-optimized executable form. This is not code generation — it is structural transformation of a correct semantic model into a representation the evaluator can walk without symbol-table lookups, declaration scanning, or dependency re-sorting. See §3 for full emitter and executable model design.
-
 #### Stage Ordering
 
 1. Lexer → Parser (input dependency)
@@ -97,7 +90,8 @@ The emitter lowers the analysis-oriented typed model into a runtime-optimized ex
 3. Type Checker → Graph Analyzer and Proof Engine (both consume the typed model)
 4. Graph Analyzer and Proof Engine can run in parallel after Type Checker
 5. Optional synchronization: Proof Engine can use graph results to sharpen reachability reasoning
-6. Emitter runs after Stages 3–5, only on error-free input
+
+The compiler pipeline terminates here. Its output is the `CompilationResult`. The emitter is a separate step that runs after compilation, only on error-free input. See §3 for emitter and executable model design.
 
 ### 1.2 Two Pipeline Artifacts
 
@@ -109,11 +103,11 @@ The pipeline produces **two distinct artifacts** for **two distinct consumers**:
 
 The executable model is not a Roslyn-style `Compilation` (a tooling query surface). It is closer to CEL's `Program` (a compiled expression evaluated against an activation) or OPA's `PreparedEvalQuery` (compiled state held internally, safe to share across goroutines). The distinction matters: the LS never touches the executable model; the runtime never queries the compilation result for diagnostics.
 
-**Correctness invariant:** `inspect` MUST go through the full pipeline including the emitter. If inspect and fire both consume the executable model via the same evaluation path, semantic agreement between tooling preview and runtime execution is structural, not conventional.
+**Correctness invariant:** `inspect` MUST consume the executable model via the same evaluation path as `fire`. The emitter is invoked separately from compilation — but inspect and fire both depend on it. Semantic agreement between tooling preview and runtime execution is structural, not conventional.
 
 ### 1.3 Runtime Shape
 
-The runtime has four major components downstream of the emitter, plus the executable model that bridges the two halves.
+The runtime has four major components that operate against the executable model.
 
 **Evaluator** — the execution engine. Walks the executable model's expression trees against entity data to produce outcomes. The language vision's execution model properties (no loops, no branches, no reconverging flow, expression purity, finite state space) make tree-walking interpretation the natural strategy — confirmed by CEL's `Interpretable.Eval(Activation)` pattern operating under similar constraints.
 
@@ -233,7 +227,7 @@ This section covers the **tooling-surface artifact** (compilation result) and it
 - Cancellation — long-running proof/graph analysis must be cancellable on new keystrokes
 
 **Cross-cutting design questions:**
-- What is the relationship between the two artifacts? Produced from the same pipeline session but distinct types with distinct API contracts.
+- What is the relationship between the compilation result and the executable model? The compiler produces the `CompilationResult`. The emitter — a separate step outside the compile pipeline — takes an error-free compilation result and produces the `ExecutableModel`. Distinct types with distinct API contracts and distinct consumers.
 - Proof model placement — proof results serve both consumers: tooling (hover diagnostics) and potentially runtime (skip redundant checks based on proven ranges). Where does the proof model live, and is it shared or duplicated?
 - Does `inspect` consume the executable model (guaranteeing semantic agreement with `fire`) or the compilation result? The architectural position is: inspect MUST consume the executable model.
 
@@ -243,7 +237,7 @@ This section covers the **tooling-surface artifact** (compilation result) and it
 
 ## 3. Emitter & Executable Model
 
-The emitter and the executable model sit at the boundary between compiler and runtime. The emitter is the last compiler stage; the executable model is the first thing the runtime touches. Neither belongs exclusively to one side — the emitter's design is driven by what the evaluator needs, and the executable model's contract is co-owned.
+The emitter and the executable model sit at the boundary between compiler and runtime. The emitter is NOT a compiler stage — it is a separate lowering step that takes an error-free `CompilationResult` and produces the executable model. The executable model is the first thing the runtime touches. The emitter's design is driven by what the evaluator needs, and the executable model's contract is co-owned by both sides.
 
 ### 3.1 Emitter
 
@@ -255,7 +249,7 @@ The emitter lowers the analysis-oriented typed model into a runtime-optimized ex
 - **Constraint/rule scope indexing** — pre-buckets constraints and rules by scope: `constraintsFor[state]`, `rulesFor[event]`, `entryActionsFor[state]`, `exitActionsFor[state]`
 - **Pre-resolved expression trees** — slot-read nodes with lane-resolved literals; self-contained for evaluation without a symbol table
 
-The emitter only runs when Stages 1–5 produce no errors. On broken input, the pipeline stops at the analysis artifacts — the LS and MCP consume those directly. The executable model is never produced from a definition with diagnostics.
+The emitter only runs when the compilation result has no errors. On broken input, the LS and MCP consume the compilation result directly. The executable model is never produced from a definition with diagnostics.
 
 **Design questions:**
 - What lowering operations are needed beyond the five identified?
@@ -457,7 +451,7 @@ Fifteen decisions that must be resolved before implementation. D1–D8 cover com
 
 **Question:** What are the two pipeline artifacts (compilation result and executable model), what is in each, and how are they produced and related?
 **Survey grounding:** Compilation-result-type survey (Roslyn for the tooling surface), compiler-result-to-runtime survey (CEL Ast→Program for the runtime surface).
-**Coupling:** Couples to D7 (LS strategy), D4 (diagnostic aggregation), and D8 (emitter contract). Resolve first.
+**Coupling:** Couples to D7 (LS strategy), D4 (diagnostic aggregation), and D8 (executable model contract). Resolve first.
 
 #### D2 — Literal resolution mechanism
 
@@ -495,11 +489,11 @@ Fifteen decisions that must be resolved before implementation. D1–D8 cover com
 **Survey grounding:** Language-server-integration survey. Same-codebase is the dominant pattern. LS-to-compiler code ratio at DSL scale is 1:3 to 1:10.
 **Coupling:** Couples to D1 and D6.
 
-#### D8 — Emitter contract (= R4)
+#### D8 — Executable model contract (= R4)
 
 **Question:** What structural invariants does the emitter guarantee that the evaluator can rely on unconditionally? What is the lowering boundary — which transformations happen in the emitter vs. lazily in the evaluator?
 **Survey grounding:** Compiler-result-to-runtime survey (CEL Program internals, OPA PreparedEvalQuery).
-**Coupling:** Couples to D1 (defines executable model content) and blocks evaluator design. This is the same specification as R4 — co-designed from both sides.
+**Coupling:** Couples to D1 (the compilation result is the emitter's input) and blocks evaluator design. This is the same specification as R4 — co-designed from both sides. The emitter is a separate step outside the compile pipeline, but its contract must be designed alongside the compiler artifacts it consumes.
 
 ### Runtime Decisions
 
@@ -567,7 +561,7 @@ Sixteen design documents need to be written, organized across three locations by
 | 3 | Parser | `docs.next/compiler/parser.md` | D6 applied | compiler-pipeline-architecture-survey |
 | 3 | Type Checker | `docs.next/compiler/type-checker.md` | D2, D3 applied | All Phase 2 documents |
 | 3 | Graph Analyzer | `docs.next/compiler/graph-analyzer.md` | — | state-graph-analysis-survey |
-| 4 | Emitter | `docs.next/compiler/emitter.md` | D8 applied | compiler-result-to-runtime-survey, dry-run-preview-inspect-api-survey |
+| 4 | Emitter | `docs.next/emitter.md` | D8 applied | compiler-result-to-runtime-survey, dry-run-preview-inspect-api-survey |
 | 4 | Proof Engine | `docs.next/compiler/proof-engine.md` | D5 | proof-engine-interval-arithmetic-survey, proof-attribution-witness-design-survey |
 | 4 | Runtime API | `docs.next/runtime/runtime-api.md` | R2 applied, R3 | XState MachineSnapshot, CEL Activation |
 | 4 | Evaluator | `docs.next/runtime/evaluator.md` | R1, R5 | compiler-result-to-runtime-survey, exact-decimal-arithmetic-survey, dry-run-preview-inspect-api-survey |
@@ -605,11 +599,11 @@ Phase 2 documents can be written in parallel with each other. Can overlap with P
 
 All Phase 3 documents can be written in parallel once Phase 1 and 2 are complete.
 
-### Phase 4 — Emitter, Proof & Runtime Design
+### Phase 4 — Boundary, Proof & Runtime Design
 
 | Document | Dependencies |
 |----------|-------------|
-| **Emitter** | Phase 1 (D1, D8/R4), Phase 3 (type checker) |
+| **Emitter** (boundary) | Phase 1 (D1, D8/R4), Phase 3 (type checker) |
 | **Proof Engine** | Phase 3 (type checker) + D5 |
 | **Runtime API** | Phase 1 (R2, D8/R4) |
 | **Evaluator** | Emitter design + Phase 1 (R1 resolved, R2, D8/R4) |
@@ -632,7 +626,7 @@ Phase 3: Lexer, Parser,            ↓                       ↓
          Type Checker,              ↓                       ↓
          Graph Analyzer             ↓                       ↓
               ↓                     ↓                       ↓
-Phase 4: ┌─ Emitter ←──────────────┤           ┌─ Runtime API ←───┤
+Phase 4: ┌─ Emitter (boundary) ←───┤           ┌─ Runtime API ←───┤
          ├─ Proof Engine            │           ├─ Evaluator ←─────┤
          │                          │           ├─ Constraints ←───┤
          │                          │           └─ Fault System ←──┘
@@ -640,7 +634,7 @@ Phase 4: ┌─ Emitter ←──────────────┤        
          └──────────────────────────┴── Evaluator depends on Emitter
 ```
 
-Phases 2 and 3 are compiler-only. Phase 4 runtime documents can start as soon as Phase 1 completes — they don't depend on compiler Phases 2-3. The Evaluator doc is the exception: it depends on the Emitter design (which depends on Phases 1-3).
+Phases 2 and 3 are compiler-only. Phase 4 runtime documents can start as soon as Phase 1 completes — they don't depend on compiler Phases 2-3. The Evaluator doc is the exception: it depends on the Emitter design (which depends on Phases 1-3). The Emitter is not a compiler stage — it is a boundary component that sits between the compiler output and the runtime input.
 
 ---
 
