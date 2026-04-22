@@ -99,7 +99,7 @@ The pipeline produces **two distinct artifacts** for **two distinct consumers**:
 
 **Compilation Result** (tooling surface) — the analysis artifact. Contains: all-stage diagnostics (collected, not short-circuited), typed semantic model queryable by span, proof results, graph analysis results. Produced on every pipeline run, including broken input. Consumed by the language server (hover, completions, go-to-definition, diagnostics) and MCP tools. Follows the Roslyn pattern of an immutable snapshot with partial results on every keystroke.
 
-**Executable Model** (runtime surface) — the execution artifact. Contains: transition dispatch table, slot-indexed expression trees, scope-indexed constraint lists, field descriptor array, topological action chains, graph analysis results (reachability sets, available events per state, edge classifications). Sealed, immutable, evaluation-ready. Only produced when the compilation result has no errors. Follows the CEL `Ast → Program` pattern — a compiled representation that an evaluator runs against entity data to produce outcomes.
+**Executable Model** (runtime surface) — the execution artifact. Contains: transition dispatch table, slot-indexed expression trees, scope-indexed constraint lists, field descriptor array (including per-state access mode resolution: omit/read/write per field per state, with D3 baseline), topological action chains, graph analysis results (reachability sets, available events per state, edge classifications). Sealed, immutable, evaluation-ready. Only produced when the compilation result has no errors. Follows the CEL `Ast → Program` pattern — a compiled representation that an evaluator runs against entity data to produce outcomes.
 
 The executable model serves two roles: (1) the evaluator consumes it to execute fire/edit operations, and (2) the `Precept` type exposes it as a definition-level query surface — all states, all events, all fields, state graph structure. Entity instances (`Version`) reference their governing `Precept` and combine its precomputed structural knowledge with their current data to provide a single inspectable surface.
 
@@ -117,7 +117,7 @@ The runtime has five major concerns that operate against the executable model.
 
 **Entity representation** — the data envelope. Current state + current field data + reference to the governing executable model. Operations produce new entity snapshots — the input is never mutated. Survey evidence strongly favors immutable snapshots (XState `MachineSnapshot`, CEL activations, CUE `Value`, Dhall `Val`).
 
-**Public API surface** — what callers touch. Two mutating operations (fire, edit) plus construction (compile → executable model → initial entity). Inspection is not a separate operation — `Version` is the inspectable surface. Structural queries (available events, editable fields) are precomputed from graph analysis baked into the executable model. Data-dependent queries (can this event fire? what would happen?) delegate to the evaluator via the same path as fire, differing only in commit behavior.
+**Public API surface** — what callers touch. Two mutating operations (fire, edit) plus construction (compile → executable model → initial entity). Inspection is not a separate operation — `Version` is the inspectable surface. Structural queries (available events, field access modes per state) are precomputed from graph analysis baked into the executable model. Data-dependent queries (can this event fire? what would happen?) delegate to the evaluator via the same path as fire, differing only in commit behavior.
 
 **Constraint evaluator** — collect-all evaluation of rules and ensures with structured attribution. Distinct from the transition-routing first-match evaluation.
 
@@ -127,7 +127,7 @@ The language vision is explicit: "Inspection is not a reporting layer — it is 
 
 **R5 decision: `Version` is the single inspectable surface.** There is no separate `Inspect()` operation. Instead, `Version` combines three kinds of access:
 
-1. **Structural queries** — `AvailableEvents`, `EditableFields`, `RequiredArgs(eventName)`. These are precomputed from graph analysis results baked into the executable model during construction. They answer "what could happen from this state?" with zero evaluation cost — the executable model already knows the answer.
+1. **Structural queries** — `AvailableEvents`, `FieldAccess` (per-field access mode in current state: omit/read/write), `RequiredArgs(eventName)`. These are precomputed from graph analysis results baked into the executable model during construction. They answer "what could happen from this state?" with zero evaluation cost — the executable model already knows the answer.
 
 2. **Data-dependent queries** — `CanFire(eventName, args)`, `Preview(eventName, args)`, `PreviewEdit(fieldName, value)`. These run the evaluator against a working copy (same path as fire/edit) and discard the result. They answer "what would happen with this data?" and carry the same fidelity as the corresponding operation.
 
@@ -199,7 +199,7 @@ The unification: `Preview`/`PreviewEdit` share the evaluation path with `Fire`/`
 ### 2.5 Proof Engine
 
 **Design questions:**
-- Abstract value representation — closed interval `[lo, hi]` for numerics, with "unknown" state, null handling for nullable fields, finite set for choice
+- Abstract value representation — closed interval `[lo, hi]` for numerics, with "unknown" state, presence handling for optional fields, finite set for choice
 - Forward propagation model — single-pass walk over action chains; reassignment invalidates prior facts
 - Constraint contribution model — field constraints, rules, and guards enter the proof state with attribution
 - Relational reasoning scope — transitive interval narrowing only, or full constraint propagation? This MUST be pinned before implementation.
@@ -336,6 +336,9 @@ The evaluator walks the executable model's expression trees against entity data.
 - Evaluation strategy — tree-walking interpreter over slot-indexed expression trees produced during executable model construction. No JIT compilation.
 - Collect-all vs. first-match execution modes — two separate entry points with shared expression machinery, or parameterized by mode?
 - Preview as fire variant — `Preview` is `Fire` with a working copy that is always discarded. Both consume the executable model via the same evaluation path. Must share the same code.
+- Presence operators — `is set`/`is not set` evaluate against optional field slots. The evaluator must distinguish "slot holds a value" from "slot is unset" without using null as the sentinel (or must define the sentinel convention clearly).
+- `clear` execution — `clear` on optional fields resets to unset; on non-optional fields with defaults, resets to the declared default. The evaluator walks the executable model's field descriptor to determine the reset behavior.
+- `omit` clearing on state entry — when a transition targets a state where a field is `omit`ted, the evaluator clears that field's slot on the working copy during the transition action chain. Does not apply to `no transition`.
 
 **Research grounding:**
 - CEL's tree-walking interpreter with `Interpretable.Eval(Activation)` is the primary structural reference.
@@ -353,9 +356,11 @@ The entity is the data envelope: current state + current field data + reference 
 
 - Slot array vs. dictionary for field storage? The executable model resolves field names to slot indices during construction, enabling array-based storage: `object?[slotCount]` instead of `Dictionary<string, object?>`. Array access is O(1) with no hashing overhead. A hybrid — slot array internally, name-based access methods on the public API — resolves both concerns.
 
-- What does the initial entity look like? Create field array from declared defaults, set initial state, compute computed fields in topological order, validate rules and entry-ensures against the initial configuration.
+- What does the initial entity look like? Create field array from declared defaults, set initial state, compute computed fields in topological order, validate rules and entry-ensures against the initial configuration. For fields `omit`ted in the initial state, slots are cleared to the unset sentinel.
 
 - Does the entity carry its own state name, or just a state index? Both — internal slot index for evaluation, name for external consumption.
+
+- Field access mode awareness. The entity must know the governing access mode for each field in its current state (precomputed in the executable model). The public API must enforce access modes: `omit` fields are not accessible (read or write), `read` fields are read-only via the update API, `write` fields are read-write. The field indexer (`this[fieldName]`) must handle `omit` — accessing an omitted field is a structural error, not a null.
 
 - Stateless entities. Stateless precepts have no state field. A single type with optional state, two sibling types, or common base with specialization. XState's pattern (state machines are one `ActorLogic` implementation among several) suggests a unified interface with stateless as a degenerate case.
 
@@ -445,9 +450,9 @@ The committed fault-correspondence chain: every `FaultCode` has `[StaticallyPrev
 The language vision specifies two mutating operations, a construction path, and an inspectable surface:
 
 1. **Fire** — send an event to an entity, producing a new version or an outcome explaining why not.
-2. **Edit** — directly mutate an editable field, producing a new version or an outcome explaining why not.
+2. **Edit** — directly mutate a `write`-accessible field, producing a new version or an outcome explaining why not.
 3. **Construction** — create an executable model from a compilation result; create an initial entity version from an executable model.
-4. **Inspection** — not a separate operation. `Version` is the inspectable surface (see §1.4). Structural queries (available events, editable fields, required args) are precomputed from graph analysis. Data-dependent queries (preview fire, preview edit, can-fire) delegate to the evaluator. Definition-level queries go through `Version.Precept`.
+4. **Inspection** — not a separate operation. `Version` is the inspectable surface (see §1.4). Structural queries (available events, field access modes, required args) are precomputed from graph analysis. Data-dependent queries (preview fire, preview edit, can-fire) delegate to the evaluator. Definition-level queries go through `Version.Precept`.
 
 The provisional stubs place fire/edit as instance methods on `Version`. XState separates concerns: `transition(machine, state, event)` is a standalone function; the snapshot is passive data. For Precept, instance methods on the entity are a reasonable convenience API, but the underlying implementation should be the shared static evaluation function (per R1/R5).
 
@@ -538,7 +543,7 @@ Fifteen decisions that must be resolved before implementation. D1–D8 cover com
 #### R5 — Version as inspectable surface ✅ RESOLVED
 
 **Question:** How do callers inspect the current state of an entity without committing changes?
-**Decision:** `Version` is the single inspectable surface. No separate `Inspect()` operation. Three access tiers: (1) structural queries (`AvailableEvents`, `EditableFields`, `RequiredArgs`) precomputed from graph analysis — free; (2) data-dependent queries (`CanFire`, `Preview`, `PreviewEdit`) delegate to the evaluator via the same path as fire/edit — same fidelity, working copy discarded; (3) definition-level queries via `Version.Precept` — all states, events, fields, graph structure.
+**Decision:** `Version` is the single inspectable surface. No separate `Inspect()` operation. Three access tiers: (1) structural queries (`AvailableEvents`, `FieldAccess`, `RequiredArgs`) precomputed from graph analysis — free; (2) data-dependent queries (`CanFire`, `Preview`, `PreviewEdit`) delegate to the evaluator via the same path as fire/edit — same fidelity, working copy discarded; (3) definition-level queries via `Version.Precept` — all states, events, fields, graph structure.
 **Survey grounding:** XState's `transition()`/`getNextSnapshot()` pair. CEL's `ExhaustiveEval`.
 **Dependencies:** Depends on R1 ✅ and R2. Depends on R4.
 
@@ -820,7 +825,7 @@ public sealed record class Version(Precept Precept, string State, ImmutableDicti
 **Assessment:** Structurally aligned with XState's `MachineSnapshot`. Tensions:
 
 1. **Return type.** `Fire`/`Edit` return `Version` — implying success. The 9-outcome taxonomy requires that these can fail. Return type should be the result type (R2).
-2. **Inspectable surface.** R5 resolved: `Version` IS the inspectable surface. Structural queries (`AvailableEvents`, `EditableFields`, `RequiredArgs`) are precomputed from graph analysis. Data-dependent queries (`CanFire`, `Preview`, `PreviewEdit`) delegate to the evaluator via the same path as fire/edit. Definition-level access via `Version.Precept`. No separate `Inspect()` method.
+2. **Inspectable surface.** R5 resolved: `Version` IS the inspectable surface. Structural queries (`AvailableEvents`, `FieldAccess` with per-field access mode in current state, `RequiredArgs`) are precomputed from graph analysis. Data-dependent queries (`CanFire`, `Preview`, `PreviewEdit`) delegate to the evaluator via the same path as fire/edit. Definition-level access via `Version.Precept`. No separate `Inspect()` method.
 3. **`ImmutableDictionary<string, object?>` for `Data`.** Slot array (`object?[]`) would be more aligned with the executable model. Hybrid (slot array internally, name-based API) resolves both.
 4. **Instance methods vs. standalone functions.** Operations as methods on `Version` is a convenience API; underlying implementation should be the shared static evaluation function (R1/R5).
 5. **Stateless precepts.** Stub requires `State` but stateless precepts have no state.

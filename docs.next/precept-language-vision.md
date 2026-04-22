@@ -38,6 +38,7 @@ This summary is grounded in:
 6. The latest PR head for issue #107.
 7. Issues #65, #58, and #86 for planned language surface growth.
 8. Issue #115 evaluator redesign: semantic fidelity and lane integrity — establishing the numeric lane system, bridge functions, static completeness guarantee, and evaluator contract.
+9. Issue #134 null-reduction and per-state field access modes — establishing `optional` (replacing `nullable`), `is set`/`is not set` presence operators, `clear` action keyword, `null` removal from expressions, and `omit`/`read`/`write` per-state field access verb triple (replacing `edit`).
 
 ---
 
@@ -163,8 +164,8 @@ The language envelope includes these top-level forms:
 | `in/to/from <State> ensure <Expr> [when <Guard>] because "..."` | Declares state-scoped constraints |
 | `on <Event> ensure <Expr> [when <Guard>] because "..."` | Declares event-scoped arg constraints |
 | `to/from <State> -> ...` | Declares state entry or exit actions |
-| `in <State> ... edit ...` | Declares state-scoped editability |
-| `edit ...` | Declares root editability for stateless precepts |
+| `in <State> ... write/read/omit ...` | Declares state-scoped field access modes |
+| `write ...` | Declares root editability for stateless precepts |
 | `from <State> on <Event> ... -> ...` | Declares transition routing and mutation |
 | `on <Event> -> ...` | Declares stateless event action hooks |
 
@@ -192,13 +193,15 @@ The language is keyword-dominant for structure and domain meaning.
 
 Keyword families:
 
-1. Declaration keywords: `precept`, `field`, `state`, `event`, `rule`, `ensure`, `edit`.
+1. Declaration keywords: `precept`, `field`, `state`, `event`, `rule`, `ensure`, `write`.
 2. Structural prepositions: `in`, `to`, `from`, `on`, `of`, `with`, `into`.
 3. Control keywords: `when`, `if`, `then`, `else`.
 4. Action keywords: `set`, `add`, `remove`, `enqueue`, `dequeue`, `push`, `pop`, `clear`, `transition`, `reject`, `no`.
-5. Constraint keywords: `nullable`, `default`, `because`, `nonnegative`, `positive`, `nonzero`, `notempty`, `min`, `max`, `minlength`, `maxlength`, `mincount`, `maxcount`, `maxplaces`, `ordered`.
-6. Literal keywords: `true`, `false`, `null`.
+5. Constraint keywords: `optional`, `default`, `because`, `nonnegative`, `positive`, `nonzero`, `notempty`, `min`, `max`, `minlength`, `maxlength`, `mincount`, `maxcount`, `maxplaces`, `ordered`.
+6. Literal keywords: `true`, `false`.
 7. Modifier keywords: `initial`, `all`, `any`, and future modifier vocabulary attached to declarations.
+8. Access mode keywords: `omit`, `read`, `write`.
+9. Presence operators: `is set`, `is not set`.
 
 ### Operators
 
@@ -238,7 +241,8 @@ Primitive literals remain bare tokens:
 
 1. Numeric literals.
 2. Boolean literals.
-3. `null`.
+
+The language has no `null` literal. Optional fields use `is set`/`is not set` for presence testing and `clear` for value removal.
 
 ### String literals
 
@@ -363,11 +367,11 @@ Each primitive type has a defined operator surface. Operations outside this surf
 | `choice` (unordered) | Yes (ordinal) | Type error | Type error | Type error |
 | `choice` (ordered) | Yes (ordinal) | Yes (declaration-position rank) | Type error | Type error |
 
-There is no truthy/falsy coercion. `0`, `""`, and `null` are not boolean. Conditions (`when`, `if`, `rule`, `ensure`) require `boolean`-typed expressions.
+There is no truthy/falsy coercion. `0` and `""` are not boolean. Conditions (`when`, `if`, `rule`, `ensure`) require `boolean`-typed expressions.
 
 String concatenation requires both operands to be `string`. Mixed-type concatenation (`string + number`, `string + boolean`) is a type error — the language does not implicitly coerce non-string operands to string. String relational comparison is not available on plain strings — only on `choice` fields with the `ordered` constraint.
 
-`.length` on a `null` value produces an error, not a silent `0`. The type checker enforces a null guard for nullable string fields before `.length` access.
+`.length` on an unset `optional` string field produces an error, not a silent `0`. The type checker enforces a presence guard (`is set`) for optional string fields before `.length` access.
 
 ### 2. Collection types
 
@@ -495,7 +499,7 @@ Computed fields imply a dependency graph. The compiler must:
 
 The constraint surface includes at least:
 
-1. `nullable`
+1. `optional`
 2. `default`
 3. `nonnegative`
 4. `positive`
@@ -545,6 +549,7 @@ The expression language is a pure, deterministic expression system.
 3. Logical: `and`, `or`, `not` — deterministic left-to-right short-circuit.
 4. Membership: `contains` — collection membership only. Not available for substring testing on strings; use `startsWith` and `endsWith` for prefix/suffix testing.
 5. Assignment: `=` (in `set` actions only).
+6. Presence: `is set`, `is not set` — boolean presence test for `optional` fields.
 
 ### Dotted access
 
@@ -607,7 +612,7 @@ The language prefers dot access for parameterless type-owned properties (`.lengt
 
 Expression scope is declaration-dependent.
 
-1. Rules, state ensures, and edit guards operate in field scope.
+1. Rules, state ensures, and write guards operate in field scope.
 2. Event ensures operate in event-arg scope.
 3. Transition guards and transition actions operate in mixed field plus event-arg scope.
 4. Stateless event hooks operate in mixed field plus event-arg scope.
@@ -720,14 +725,49 @@ on Deposit -> set Balance = Balance + Deposit.Amount
 
 This form gives stateless entities meaningful event-driven behavior without inventing a fake state machine.
 
-### Editability
+### Field Access Modes
 
-The surface includes both:
+The language declares per-state field access modes using a three-verb system:
 
-1. `in <State> ... edit ...` for stateful entities.
-2. `edit ...` for stateless entities.
+| Verb | Meaning | Update API | Fire pipeline (`set`) |
+|------|---------|------------|----------------------|
+| `omit` | Field structurally absent from the state's data shape | Not accessible | Blocked (compile error) |
+| `read` | Field present and readonly | Read only | Allowed |
+| `write` | Field present and editable | Read + write | Allowed |
 
-Guarded editability remains part of the language envelope.
+The surface includes:
+
+1. `in <State> write/read/omit <Fields>` for stateful entities.
+2. `write <Fields>` or `write all` for stateless entities.
+3. Root-level `read` and `omit` are not valid syntax — D3 is the baseline.
+
+#### D3 per-pair baseline
+
+For any (field, state) pair without an explicit declaration, the default access mode is `read`. D3 operates per-(field, state) pair and never turns off. This means the author only declares exceptions to readonly — no boilerplate required for the common case.
+
+#### Composition rules
+
+1. **D3 is the universal per-pair baseline** — undeclared pairs default to `read`.
+2. **Explicit declarations override D3** for the specific (field, state) pair only.
+3. **Guarded `write` is the only guarded access mode** — `read`/`omit` cannot have guards.
+4. **`omit` clears on state entry** — value reset to default on any transition into an `omit` state (including cycles); does NOT apply to `no transition`.
+5. **`set` validation against target state** — `set` targeting a field `omit`ted in the target state is a compile error; `read`/`write` do NOT restrict `set`.
+6. **Contradiction detection** — same (field, state) pair with conflicting modes is a compile error.
+7. **Root-level `write` for stateless precepts only** — root-level `read`/`omit` is not valid syntax.
+
+#### Guarded write
+
+Guards apply only to `write` declarations:
+
+```precept
+in UnderReview when not FraudFlag write AdjusterName
+```
+
+When the guard is true, the field is `write`. When false, the field falls back to D3 (`read`). This is the only conditional access mode — `read` and `omit` cannot be guarded because "conditionally readable" and "conditionally absent" break static guarantees.
+
+#### `write` replaces `edit`
+
+`write` replaces `edit` everywhere. This is a hard break for verb-triple consistency: `read`/`edit` is asymmetric — `read` names a data operation, `edit` names a user action. `read`/`write` is the universal pair (POSIX r/w/x, SQL SELECT/UPDATE, REST GET/PUT, OpenAPI readOnly/writeOnly).
 
 ---
 
@@ -742,7 +782,8 @@ The mutation vocabulary:
 5. `dequeue <QueueField> [into <Field>]`
 6. `push <StackField> <Expr>`
 7. `pop <StackField> [into <Field>]`
-8. `clear <CollectionField>`
+8. `clear <CollectionField>` — empties a collection
+9. `clear <Field>` — resets an `optional` field to unset; resets a non-optional field with a `default` to its declared default value; compile error on non-optional fields without a default
 
 Actions are sequenced and read prior writes in the same chain. Each assignment sees the state produced by all preceding assignments in the same row. When a field is reassigned, proof facts about its prior value are invalidated before the new facts are recorded.
 
@@ -766,8 +807,8 @@ The future compiler and runtime model must be able to distinguish at least:
 4. **Constraint failure.** Mutations would violate a rule or ensure; rolled back.
 5. **Unmatched routed event.** Transition rows exist for the event but all guards failed — an instance data condition.
 6. **Undefined event surface.** No transition rows defined for this event in the current state — a definition gap.
-7. **Successful direct update.** Field edit committed.
-8. **Uneditable-field failure.** Patch targets a field not editable in the current state.
+7. **Successful direct update.** Field write committed.
+8. **Access mode failure.** Patch targets a field not `write`-accessible in the current state — either `read` (readonly) or `omit` (structurally absent).
 9. **Invalid input failure.** Patch is structurally malformed.
 
 These distinctions are semantically significant, not just diagnostic convenience:
@@ -881,6 +922,12 @@ The parser must:
 5. Parse guarded declarations and guarded routing.
 6. Parse computed fields and action chains.
 7. Parse declaration-attached modifiers when they land.
+8. Parse `optional` as a field modifier.
+9. Parse `is set` / `is not set` as multi-word presence operators in expression contexts.
+10. Parse `clear <Field>` as an action in transition rows and hooks.
+11. Parse `omit`/`read`/`write` with chained verb groups after `in <State>`.
+12. Reject `null` as a literal or keyword (removed from the language).
+13. Reject `nullable` and `edit` with migration diagnostics.
 
 ### Typechecker responsibilities
 
@@ -888,7 +935,7 @@ The typechecker must:
 
 1. Resolve declaration identity and scope.
 2. Enforce field, event, state, and transition legality.
-3. Enforce nullability and guard-based narrowing.
+3. Enforce `optional` field presence rules and `is set`/`is not set` operator restrictions (target must be `optional`; non-optional fields are always set).
 4. Enforce collection semantics and inner-type legality.
 5. Enforce computed-field dependency legality.
 6. Enforce temporal operator compatibility.
@@ -896,7 +943,7 @@ The typechecker must:
 8. Enforce business-domain operator compatibility, qualification compatibility, currency pairing, and unit commensurability.
 9. Enforce the two-door literal admission and narrowing model.
 10. Enforce stateless event hook legality.
-11. Enforce root versus state-scoped editability rules.
+11. Enforce per-state field access mode rules: D3 per-pair baseline resolution, explicit declaration overrides, contradiction detection (conflicting modes on same field/state pair), `set`-into-`omit` validation (compile error), root-level `read`/`omit` rejection, guarded `read`/`omit` rejection.
 12. Enforce modifier compatibility and contradiction rules.
 13. Enforce numeric lane integrity: reject cross-lane arithmetic (decimal + number), require explicit bridges, and resolve context-sensitive literal types.
 14. Enforce collection accessor emptiness guards: reject bare `.min`/`.max`/`.peek` outside a conditional expression that tests `.count > 0`.
@@ -904,6 +951,7 @@ The typechecker must:
 16. Enforce integer-lane requirement for string slicing parameters (`left`, `right`, `mid`).
 17. Enforce non-negative exponent for `pow(integer, integer)` when the exponent is a literal.
 18. Enforce `sqrt` number-lane restriction: reject `sqrt(decimal)` — authors use `sqrt(approximate(value))`.
+19. Enforce `clear` target legality: `optional` field resets to unset; non-optional field with `default` resets to default; non-optional field without `default` is a compile error.
 
 ### Graph analysis responsibilities
 
@@ -980,7 +1028,9 @@ Any clean-room compiler for Precept must be able to serve a language with all of
 15. Semantic distinction between rejection (authored prohibition), constraint failure (data truth violation), unmatched routing (instance data), and undefined routing (definition gap).
 16. A three-lane numeric type system (integer, decimal, number) with explicit bridge functions, context-sensitive literal typing, and compile-time lane integrity enforcement.
 17. Static completeness: if a precept compiles without diagnostics, no type errors occur at runtime.
-18. Totality: every expression evaluates to a result or a definite error — no silent NaN, Infinity, or null.
+18. Totality: every expression evaluates to a result or a definite error — no silent NaN, Infinity, or null propagation.
+19. No `null` literal — `optional` fields, `is set`/`is not set` presence operators, and `clear` replace all null-based patterns.
+20. Per-state field access modes (`omit`/`read`/`write`) with D3 per-pair baseline, guarded `write`, `omit` clearing on state entry, and compile-time access mode enforcement.
 
 That is the language target. The compiler architecture may change completely, but the language contract above is what the new system must honor.
 
