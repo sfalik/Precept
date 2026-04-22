@@ -127,7 +127,7 @@ The language vision is explicit: "Inspection is not a reporting layer — it is 
 
 **R5 decision: `Version` is the single inspectable surface.** There is no separate `Inspect()` operation. Instead, `Version` combines three kinds of access:
 
-1. **Structural queries** — `AvailableEvents`, `FieldAccess` (per-field access mode in current state: omit/read/write), `RequiredArgs(eventName)`. These are precomputed from graph analysis results baked into the executable model during construction. They answer "what could happen from this state?" with zero evaluation cost — the executable model already knows the answer.
+1. **Structural queries** — `AvailableEvents`, `FieldAccess` (accessible fields in current state with their mode: read or write — omitted fields are structurally absent from the collection), `RequiredArgs(eventName)`. These are precomputed from graph analysis results baked into the executable model during construction. They answer "what could happen from this state?" with zero evaluation cost — the executable model already knows the answer.
 
 2. **Data-dependent queries** — `CanFire(eventName, args)`, `Preview(eventName, args)`, `PreviewEdit(fieldName, value)`. These run the evaluator against a working copy (same path as fire/edit) and discard the result. They answer "what would happen with this data?" and carry the same fidelity as the corresponding operation.
 
@@ -360,7 +360,7 @@ The entity is the data envelope: current state + current field data + reference 
 
 - Does the entity carry its own state name, or just a state index? Both — internal slot index for evaluation, name for external consumption.
 
-- Field access mode awareness. The entity must know the governing access mode for each field in its current state (precomputed in the executable model). The public API must enforce access modes: `omit` fields are not accessible (read or write), `read` fields are read-only via the update API, `write` fields are read-write. The field indexer (`this[fieldName]`) must handle `omit` — accessing an omitted field is a structural error, not a null.
+- Field access mode awareness. The entity must know the governing access mode for each field in its current state (precomputed in the executable model). The public API must enforce access modes: `omit` fields are structurally absent — they do not appear in `FieldAccess` and accessing them via the field indexer is a structural error (not a null). `read` fields are read-only via the update API, `write` fields are read-write.
 
 - Stateless entities. Stateless precepts have no state field. A single type with optional state, two sibling types, or common base with specialization. XState's pattern (state machines are one `ActorLogic` implementation among several) suggests a unified interface with stateless as a degenerate case.
 
