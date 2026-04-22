@@ -84,6 +84,18 @@
   3. "Add `when != 0` guard" — prepends or appends to the transition row's guard clause.
 - 4 new tests covering field-positive, arg-positive, arg-ensure, and guard-append scenarios.
 - All 173 LS tests + 1290 core tests pass.
+- Chained verb-group patterns (like `in <State> omit F1 view F2 edit F3`) require `begin`/`end` TextMate patterns rather than single `match` — arbitrary repetition of verb+fieldlist blocks can't be captured in one regex.
+- The `[TokenCategory(Declaration)]` attribute auto-registers new keywords in `BuildSemanticTypeMap()`, `BuildKeywordItems()`, and `BuildTopLevelItems()` — but declaration-scoped verbs like `omit`/`view` that are only valid after `in <State>` must be explicitly excluded from `TopLevelItems` to prevent incorrect statement-start suggestions.
+- Attribute-driven architecture means token enum + `[TokenSymbol]` is the single point of registration for tokenizer, semantic tokens, hover, and MCP keyword listings. Tooling changes for new keywords are nearly zero-cost once the enum member exists.
+
+## Recent Updates
+
+### 2026-04-15 — Field access mode tooling impact analysis
+- Analyzed full tooling impact for `omit`/`view`/`edit` chained verb-group syntax decided for `in <State>` blocks.
+- Identified: 2 token enum members, 1 medium-high grammar pattern (begin/end for chaining), 5-6 completion regex branches, 2-line semantic tokens update, zero hover handler changes (automatic from attributes).
+- Flagged TopLevelItems exclusion needed to prevent `omit`/`view` appearing as standalone statement-start suggestions.
+- Raised open questions: computed field semantics for omit/view, guarded omit/view validity.
+- Output: `.squad/decisions/inbox/kramer-tooling-impact-field-access.md`
 
 ### 2026-04-12 — Conditional expression tooling sync
 - Added `if/then/else` grammar keywords and expression-context completions while preserving statement-level keyword discipline.
