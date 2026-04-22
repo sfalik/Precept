@@ -14,7 +14,7 @@ The language vision is the authoritative specification of what the system must s
 
 ### What this document covers
 
-The full path from source text to evaluation outcome. The compiler pipeline (lexer → parser → type checker → graph analyzer → proof engine) produces a `CompilationResult`. A separate emitter step lowers the compilation result into the executable model that bridges compiler and runtime. The runtime (evaluator, entity representation, result types, constraint evaluation, working copy atomicity, fault production, and public API surface) operates against the executable model.
+The full path from source text to evaluation outcome. The compiler pipeline (lexer → parser → type checker → graph analyzer → proof engine) produces a `CompilationResult`. The runtime constructs an executable model from an error-free compilation result (`Precept.From(CompilationResult)`) and operates against it (evaluator, entity representation, result types, constraint evaluation, working copy atomicity, fault production, and public API surface).
 
 ### What this document intentionally excludes
 
@@ -28,7 +28,7 @@ The full path from source text to evaluation outcome. The compiler pipeline (lex
 The two-artifact split is committed:
 
 - **Compilation Result** — the tooling-surface artifact (diagnostics, typed model, proof, graph). Consumed by LS and MCP. Produced by the compiler on every pipeline run, including broken input.
-- **Executable Model** — the runtime-surface artifact (dispatch tables, slot-indexed expression trees, scope-indexed constraints). Sealed, immutable, evaluation-ready. Produced by the emitter — a separate step outside the compile pipeline — only from an error-free compilation result.
+- **Executable Model** — the runtime-surface artifact (dispatch tables, slot-indexed expression trees, scope-indexed constraints). Sealed, immutable, evaluation-ready. Constructed by the runtime (`Precept.From(CompilationResult)`) only from an error-free compilation result.
 
 The fault-correspondence chain is committed: `FaultCode` ↔ `DiagnosticCode` via `[StaticallyPreventable]`, with analyzers PREC0001 and PREC0002 enforcing structural coverage.
 
@@ -46,7 +46,7 @@ The committed stubs (`Precept`, `Version`, `Fault`, `Evaluator`) represent early
 
 The language vision establishes the execution model properties that directly determine pipeline shape: no loops, no control-flow branches, no reconverging flow, closed type vocabulary, finite state space, expression purity, no separate compilation. These are not incidental — they are the architectural constraints that make the pipeline tractable.
 
-The compiler pipeline has **five functional stages** in dependency order. All five stages contribute to the `CompilationResult` — the tooling-surface artifact consumed by the LS and MCP. The emitter is a separate step outside the compilation pipeline that lowers an error-free compilation result into the runtime-consumable executable model.
+The compiler pipeline has **five functional stages** in dependency order. All five stages contribute to the `CompilationResult` — the tooling-surface artifact consumed by the LS and MCP. The compiler’s boundary is the `CompilationResult`. Construction of the executable model from an error-free compilation result is the runtime’s responsibility (`Precept.From(CompilationResult)`).
 
 #### Stage 1 — Lexer
 
@@ -91,7 +91,7 @@ Interval-based numeric reasoning over typed expression trees. Handles: divisor s
 4. Graph Analyzer and Proof Engine can run in parallel after Type Checker
 5. Optional synchronization: Proof Engine can use graph results to sharpen reachability reasoning
 
-The compiler pipeline terminates here. Its output is the `CompilationResult`. The emitter is a separate step that runs after compilation, only on error-free input. See §3 for emitter and executable model design.
+The compiler pipeline terminates here. Its output is the `CompilationResult`. See §3 for executable model design.
 
 ### 1.2 Two Pipeline Artifacts
 
@@ -103,11 +103,13 @@ The pipeline produces **two distinct artifacts** for **two distinct consumers**:
 
 The executable model is not a Roslyn-style `Compilation` (a tooling query surface). It is closer to CEL's `Program` (a compiled expression evaluated against an activation) or OPA's `PreparedEvalQuery` (compiled state held internally, safe to share across goroutines). The distinction matters: the LS never touches the executable model; the runtime never queries the compilation result for diagnostics.
 
-**Correctness invariant:** `inspect` MUST consume the executable model via the same evaluation path as `fire`. The emitter is invoked separately from compilation — but inspect and fire both depend on it. Semantic agreement between tooling preview and runtime execution is structural, not conventional.
+**Correctness invariant:** `inspect` MUST consume the executable model via the same evaluation path as `fire`. Semantic agreement between tooling preview and runtime execution is structural, not conventional.
 
 ### 1.3 Runtime Shape
 
-The runtime has four major components that operate against the executable model.
+The runtime has five major concerns that operate against the executable model.
+
+**Executable model construction** — `Precept.From(CompilationResult)` lowers the analysis-oriented typed model into a runtime-optimized executable form. This is a runtime responsibility, not a compiler stage. The lowering operations (dispatch table construction, slot resolution, topological sorting, scope indexing, expression tree lowering) are internal construction logic of the `Precept` type.
 
 **Evaluator** — the execution engine. Walks the executable model's expression trees against entity data to produce outcomes. The language vision's execution model properties (no loops, no branches, no reconverging flow, expression purity, finite state space) make tree-walking interpretation the natural strategy — confirmed by CEL's `Interpretable.Eval(Activation)` pattern operating under similar constraints.
 
@@ -227,7 +229,7 @@ This section covers the **tooling-surface artifact** (compilation result) and it
 - Cancellation — long-running proof/graph analysis must be cancellable on new keystrokes
 
 **Cross-cutting design questions:**
-- What is the relationship between the compilation result and the executable model? The compiler produces the `CompilationResult`. The emitter — a separate step outside the compile pipeline — takes an error-free compilation result and produces the `ExecutableModel`. Distinct types with distinct API contracts and distinct consumers.
+- What is the relationship between the compilation result and the executable model? The compiler produces the `CompilationResult`. The runtime constructs the executable model from it (`Precept.From(CompilationResult)`). Distinct types with distinct API contracts and distinct consumers.
 - Proof model placement — proof results serve both consumers: tooling (hover diagnostics) and potentially runtime (skip redundant checks based on proven ranges). Where does the proof model live, and is it shared or duplicated?
 - Does `inspect` consume the executable model (guaranteeing semantic agreement with `fire`) or the compilation result? The architectural position is: inspect MUST consume the executable model.
 
@@ -235,13 +237,13 @@ This section covers the **tooling-surface artifact** (compilation result) and it
 
 ---
 
-## 3. Emitter & Executable Model
+## 3. Executable Model
 
-The emitter and the executable model sit at the boundary between compiler and runtime. The emitter is NOT a compiler stage — it is a separate lowering step that takes an error-free `CompilationResult` and produces the executable model. The executable model is the first thing the runtime touches. The emitter's design is driven by what the evaluator needs, and the executable model's contract is co-owned by both sides.
+The executable model is the boundary between compiler and runtime. The compiler produces a `CompilationResult`; the runtime constructs the executable model from it via `Precept.From(CompilationResult)`. There is no intermediate stage or component — the lowering is the executable model's construction logic.
 
-### 3.1 Emitter
+### 3.1 Construction (Lowering)
 
-The emitter lowers the analysis-oriented typed model into a runtime-optimized executable form. Concrete lowering operations:
+`Precept.From(CompilationResult)` lowers the analysis-oriented typed model into a runtime-optimized executable form. Concrete lowering operations:
 
 - **Transition dispatch table** — builds `(state, event) → TransitionRow[]` index for O(1) lookup on every `fire`
 - **Field slot resolution** — resolves field name references in expression trees to working-copy slot indices, eliminating string dictionary lookups at evaluation time
@@ -249,25 +251,25 @@ The emitter lowers the analysis-oriented typed model into a runtime-optimized ex
 - **Constraint/rule scope indexing** — pre-buckets constraints and rules by scope: `constraintsFor[state]`, `rulesFor[event]`, `entryActionsFor[state]`, `exitActionsFor[state]`
 - **Pre-resolved expression trees** — slot-read nodes with lane-resolved literals; self-contained for evaluation without a symbol table
 
-The emitter only runs when the compilation result has no errors. On broken input, the LS and MCP consume the compilation result directly. The executable model is never produced from a definition with diagnostics.
+Construction only succeeds when the compilation result has no errors. On broken input, the LS and MCP consume the compilation result directly. The executable model is never produced from a definition with diagnostics. If construction fails despite an error-free compilation result, that is a compiler bug — not a user-facing condition.
 
 **Design questions:**
 - What lowering operations are needed beyond the five identified?
 - How is the transition dispatch table keyed — `(state, event)` tuple, or separate nested lookups? How are wildcard/default rows ordered?
 - Is expression tree lowering a structural transformation (new node types) or an in-place annotation (slot indices added to existing nodes)?
-- Does the emitter produce a single sealed object or a family of related immutable structures?
+- Does construction produce a single sealed object or a family of related immutable structures?
 
-**Research grounding:** Compiler-result-to-runtime survey (CEL Ast→Program lowering, OPA PreparedEvalQuery), dry-run-preview-inspect-api survey (XState compiled machine).
+**Research grounding:** Compiler-result-to-runtime survey (CEL `env.Program(ast)` — lowering is the `Program` constructor; OPA `rego.PrepareForEval(ctx)` — lowering is inside preparation), dry-run-preview-inspect-api survey (XState `createMachine` — machine creation IS the lowering).
 
-**Right-sizing:** The lowering is real but bounded. At Precept's scale, individual operations (dispatch table construction, slot assignment, topological sort) are straightforward. The design complexity is in the contract — what invariants the emitter guarantees and the evaluator assumes. If that contract is well-specified, the implementation is modest.
+**Right-sizing:** The lowering is real but bounded. At Precept's scale, individual operations (dispatch table construction, slot assignment, topological sort) are straightforward. The design complexity is in the contract — what invariants the executable model guarantees and the evaluator assumes. If that contract is well-specified, the implementation is modest.
 
 ### 3.2 Executable Model Contract
 
-The executable model is the sealed, immutable artifact the emitter produces and the evaluator consumes. It is NOT the entity's data — it is the definition's compiled rules. A single executable model serves all instances of the same precept definition. This mirrors CEL's architecture: one `Program` evaluated against many `Activation` bindings.
+The executable model is the sealed, immutable artifact that `Precept.From(CompilationResult)` produces and the evaluator consumes. It is NOT the entity's data — it is the definition's compiled rules. A single executable model serves all instances of the same precept definition. This mirrors CEL's architecture: one `Program` evaluated against many `Activation` bindings.
 
 **Contents:** Transition dispatch table keyed by `(state, event)`, slot-indexed expression trees, scope-indexed constraint lists, field descriptor array, topological action chains for computed fields, entry/exit action chains per state.
 
-**Contract — what the emitter guarantees and the evaluator assumes:**
+**Contract — what the executable model guarantees and the evaluator assumes:**
 
 At minimum:
 - Every slot index in an expression tree refers to a valid field slot.
@@ -277,7 +279,7 @@ At minimum:
 - Constraint scope indices are complete: every applicable constraint for every state/event combination is indexed.
 
 **Design questions:**
-- What is the full type-level contract between the executable model and the evaluator? What can the evaluator assume without checking? (This is compiler D8 and runtime R4 — the same question from two sides.)
+- What is the full type-level contract between the executable model and the evaluator? What can the evaluator assume without checking? (This is D8 and R4 — the same question from two sides.)
 - How are stateless precepts represented? They lack states and transition routing but have events, hooks, editability, rules, and fields. Degenerate single-state, or separate model shape?
 - How is computed field dependency ordering represented? Ordered list of slot indices, or a structured dependency graph?
 - Does the executable model carry proof results? If so, the evaluator could skip proven-safe constraints — but this couples the proof model to the evaluation path.
@@ -321,7 +323,7 @@ The evaluator walks the executable model's expression trees against entity data.
 
   Precept sits between Dhall and CEL: the type checker catches all type errors, but value-dependent faults (division by zero, overflow) remain as defensive paths handled via `FaultCode`.
 
-- Evaluation strategy — tree-walking interpreter over emitter-produced, slot-indexed expression trees. No JIT compilation.
+- Evaluation strategy — tree-walking interpreter over slot-indexed expression trees produced during executable model construction. No JIT compilation.
 - Collect-all vs. first-match execution modes — two separate entry points with shared expression machinery, or parameterized by mode?
 - Inspect as fire variant — `inspect` is `fire` with a working copy that is always discarded. Both consume the executable model via the same evaluation path. Must share the same code.
 
@@ -339,7 +341,7 @@ The entity is the data envelope: current state + current field data + reference 
 **Design questions:**
 - Immutable record vs. mutable-with-copy-on-write? Survey evidence overwhelmingly favors immutable snapshots (XState `MachineSnapshot`, CEL activations, CUE `Value`, Dhall `Val`).
 
-- Slot array vs. dictionary for field storage? The emitter resolves field names to slot indices, enabling array-based storage: `object?[slotCount]` instead of `Dictionary<string, object?>`. Array access is O(1) with no hashing overhead. A hybrid — slot array internally, name-based access methods on the public API — resolves both concerns.
+- Slot array vs. dictionary for field storage? The executable model resolves field names to slot indices during construction, enabling array-based storage: `object?[slotCount]` instead of `Dictionary<string, object?>`. Array access is O(1) with no hashing overhead. A hybrid — slot array internally, name-based access methods on the public API — resolves both concerns.
 
 - What does the initial entity look like? Create field array from declared defaults, set initial state, compute computed fields in topological order, validate rules and entry-ensures against the initial configuration.
 
@@ -491,9 +493,9 @@ Fifteen decisions that must be resolved before implementation. D1–D8 cover com
 
 #### D8 — Executable model contract (= R4)
 
-**Question:** What structural invariants does the emitter guarantee that the evaluator can rely on unconditionally? What is the lowering boundary — which transformations happen in the emitter vs. lazily in the evaluator?
+**Question:** What structural invariants does the executable model guarantee that the evaluator can rely on unconditionally? What is the lowering boundary — which transformations happen during construction vs. lazily in the evaluator?
 **Survey grounding:** Compiler-result-to-runtime survey (CEL Program internals, OPA PreparedEvalQuery).
-**Coupling:** Couples to D1 (the compilation result is the emitter's input) and blocks evaluator design. This is the same specification as R4 — co-designed from both sides. The emitter is a separate step outside the compile pipeline, but its contract must be designed alongside the compiler artifacts it consumes.
+**Coupling:** Couples to D1 (the compilation result is the construction input) and blocks evaluator design. This is the same specification as R4 — co-designed from both sides.
 
 ### Runtime Decisions
 
@@ -514,7 +516,7 @@ Fifteen decisions that must be resolved before implementation. D1–D8 cover com
 #### R3 — Entity representation
 
 **Question:** Immutable record, working copy mechanism, slot array vs. dictionary. What is the shape of the entity snapshot?
-**Survey grounding:** XState `MachineSnapshot`, CEL `Activation`, CUE `Value` — all immutable. Slot array vs. dictionary is driven by the emitter's slot resolution.
+**Survey grounding:** XState `MachineSnapshot`, CEL `Activation`, CUE `Value` — all immutable. Slot array vs. dictionary is driven by the executable model's slot resolution.
 **Coupling:** Couples to R1, R4 (slot layout), and working copy design.
 
 #### R4 — Executable model contract (= D8)
@@ -547,7 +549,7 @@ Fifteen decisions that must be resolved before implementation. D1–D8 cover com
 
 ### Design Document Map
 
-Sixteen design documents need to be written, organized across three locations by ownership. The executable model contract is the shared boundary document.
+Fifteen design documents need to be written, organized across three locations by ownership. The executable model contract is the shared boundary document.
 
 | Phase | Document | Path | Decisions | Primary Survey References |
 |-------|----------|------|-----------|--------------------------|
@@ -561,7 +563,6 @@ Sixteen design documents need to be written, organized across three locations by
 | 3 | Parser | `docs.next/compiler/parser.md` | D6 applied | compiler-pipeline-architecture-survey |
 | 3 | Type Checker | `docs.next/compiler/type-checker.md` | D2, D3 applied | All Phase 2 documents |
 | 3 | Graph Analyzer | `docs.next/compiler/graph-analyzer.md` | — | state-graph-analysis-survey |
-| 4 | Emitter | `docs.next/emitter.md` | D8 applied | compiler-result-to-runtime-survey, dry-run-preview-inspect-api-survey |
 | 4 | Proof Engine | `docs.next/compiler/proof-engine.md` | D5 | proof-engine-interval-arithmetic-survey, proof-attribution-witness-design-survey |
 | 4 | Runtime API | `docs.next/runtime/runtime-api.md` | R2 applied, R3 | XState MachineSnapshot, CEL Activation |
 | 4 | Evaluator | `docs.next/runtime/evaluator.md` | R1, R5 | compiler-result-to-runtime-survey, exact-decimal-arithmetic-survey, dry-run-preview-inspect-api-survey |
@@ -599,18 +600,17 @@ Phase 2 documents can be written in parallel with each other. Can overlap with P
 
 All Phase 3 documents can be written in parallel once Phase 1 and 2 are complete.
 
-### Phase 4 — Boundary, Proof & Runtime Design
+### Phase 4 — Proof & Runtime Design
 
 | Document | Dependencies |
 |----------|-------------|
-| **Emitter** (boundary) | Phase 1 (D1, D8/R4), Phase 3 (type checker) |
 | **Proof Engine** | Phase 3 (type checker) + D5 |
 | **Runtime API** | Phase 1 (R2, D8/R4) |
-| **Evaluator** | Emitter design + Phase 1 (R1 resolved, R2, D8/R4) |
+| **Evaluator** | Phase 1 (R1 resolved, R2, D8/R4) |
 | **Constraint Evaluation** | Phase 1 (R2, D8/R4) |
 | **Fault System** | Phase 1 (R2, D8/R4) |
 
-The Emitter design must precede or accompany the Evaluator design — the evaluator's hot path depends on the data structures the emitter produces. Proof Engine can proceed in parallel with Emitter since they share no output dependency. Runtime API, Constraint Evaluation, and Fault System can proceed in parallel once Phase 1 is complete — their internal design does not depend on the evaluator shape (R1) or entity representation (R3), only on the boundary contracts (D8/R4) and result type (R2).
+All Phase 4 runtime documents can proceed in parallel once Phase 1 is complete — they don't depend on compiler Phases 2-3. The executable model contract (D8/R4, Phase 1) defines the boundary; the lowering implementation is internal to `Precept.From()` and documented in the Evaluator design alongside the evaluation logic it serves. The Proof Engine depends on Phase 3 (type checker output) + D5 (proof attribution schema).
 
 ### Unified Dependency Graph
 
@@ -626,15 +626,16 @@ Phase 3: Lexer, Parser,            ↓                       ↓
          Type Checker,              ↓                       ↓
          Graph Analyzer             ↓                       ↓
               ↓                     ↓                       ↓
-Phase 4: ┌─ Emitter (boundary) ←───┤           ┌─ Runtime API ←───┤
-         ├─ Proof Engine            │           ├─ Evaluator ←─────┤
+Phase 4: ┌─ Proof Engine            │           ┌─ Runtime API ←───┤
+         │                          │           ├─ Evaluator ←─────┤
          │                          │           ├─ Constraints ←───┤
          │                          │           └─ Fault System ←──┘
          │                          │
-         └──────────────────────────┴── Evaluator depends on Emitter
+         └─ Proof depends on        └── Runtime depends on
+            Phase 3 + D5               D8/R4 + R2
 ```
 
-Phases 2 and 3 are compiler-only. Phase 4 runtime documents can start as soon as Phase 1 completes — they don't depend on compiler Phases 2-3. The Evaluator doc is the exception: it depends on the Emitter design (which depends on Phases 1-3). The Emitter is not a compiler stage — it is a boundary component that sits between the compiler output and the runtime input.
+Phases 2 and 3 are compiler-only. Phase 4 runtime documents can start as soon as Phase 1 completes — they don't depend on compiler Phases 2-3. The lowering logic (dispatch table construction, slot resolution, etc.) is internal to `Precept.From()` and covered in the Evaluator design doc alongside the evaluation logic it serves.
 
 ---
 
@@ -683,7 +684,7 @@ The DSL-scale systems (CEL, OPA, Dhall, Jsonnet) consistently show: 30K–200K l
 
 **Modifier system.** Novel language feature with no survey precedent for admission logic.
 
-**Emitter node identity preservation.** Node identity must survive lowering for LS-to-evaluation correlation. No surveyed system formally specifies this invariant.
+**Node identity preservation through lowering.** Node identity must survive the `Precept.From()` lowering for LS-to-evaluation correlation. No surveyed system formally specifies this invariant.
 
 **Result type taxonomy.** 9 outcomes exceeds all surveyed systems. Purpose-built.
 
@@ -701,7 +702,7 @@ The DSL-scale systems (CEL, OPA, Dhall, Jsonnet) consistently show: 30K–200K l
 | Multi-terminal dominator path obligations | LLVM DominatorTree (single root) | No surveyed system provides multi-terminal path obligation as compiler API |
 | Proof engine + unit type coupling | F# UoM (erases before codegen), SPARK (no units) | No system retains unit info through proof-level reasoning |
 | Business-domain semantic operators | Dimensional analysis cancellation | Operators beyond standard arithmetic are Precept-specific |
-| `inspect` as fire-via-emitter | CEL EvalState, OPA partial evaluation | No system uses emitter's executable model for per-event preview |
+| `inspect` via executable model | CEL EvalState, OPA partial evaluation | No system uses the executable model for per-event preview |
 | Unit error diagnostic UX | F#, Boost.Units, Haskell `units` (all poor) | No good model to adopt |
 
 ### Where DSL-scale and GP-scale diverge
@@ -740,8 +741,8 @@ All surveyed dominator algorithms assume single-entry/single-exit. **Get a mathe
 ### R7: LS responsiveness under proof load
 DSL-scale systems doing full recompile are NOT doing proof-level analysis. **Cancellation token threading is the first defense.**
 
-### R8: Emitter semantic drift
-If the LS consumes the typed model while the runtime evaluates the executable model, an emitter bug causes silent semantic disagreement. **The emitter must preserve node identity through lowering. `inspect` must go through the emitter. Round-trip tests must verify faithful lowering.**
+### R8: Lowering semantic drift
+If the LS consumes the typed model while the runtime evaluates the executable model, a bug in `Precept.From()` lowering causes silent semantic disagreement. **The lowering must preserve node identity. `inspect` must consume the executable model. Round-trip tests must verify faithful lowering.**
 
 ### R9: Branch-conditional narrowing algorithm
 The proof engine must split abstract state at branch conditions, propagate independently, and rejoin. **The branch narrowing algorithm must be fully specified before Phase 4.**
@@ -793,7 +794,7 @@ public sealed class Precept
 
 **Assessment:** Conflates two concerns: `From(CompilationResult)` creates the executable model, `From(state, data)` creates an entity instance. CEL separates these: `env.Program(ast)` creates the executable; `program.Eval(activation)` is separate. XState separates: `createMachine(config)` vs. `createActor(machine, options)`. Consider whether instance construction belongs on a separate type.
 
-Additionally, `From(string state, ImmutableDictionary<string, object?> data)` uses string state names and a string-keyed dictionary, but the emitter produces slot and state indices. The public API may want name-based access for ergonomics, but internally the executable model works with indices.
+Additionally, `From(string state, ImmutableDictionary<string, object?> data)` uses string state names and a string-keyed dictionary, but the executable model works with slot and state indices internally. The public API may want name-based access for ergonomics, but internally the executable model works with indices.
 
 ### `Version` record — the entity snapshot
 
