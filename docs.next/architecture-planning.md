@@ -32,7 +32,7 @@ The two-artifact split is committed:
 
 The fault-correspondence chain is committed: `FaultCode` ↔ `DiagnosticCode` via `[StaticallyPreventable]`, with analyzers PREC0001 and PREC0002 enforcing structural coverage.
 
-The correctness invariant is committed: `inspect` MUST consume the executable model via the same evaluation path as `fire`, guaranteeing structural semantic agreement between tooling preview and runtime execution.
+The correctness invariant is committed: data-dependent preview queries (`Preview`, `CanFire`) MUST consume the executable model via the same evaluation path as `Fire`, guaranteeing structural semantic agreement between preview and execution.
 
 ### Provisional stubs under evaluation
 
@@ -99,11 +99,13 @@ The pipeline produces **two distinct artifacts** for **two distinct consumers**:
 
 **Compilation Result** (tooling surface) — the analysis artifact. Contains: all-stage diagnostics (collected, not short-circuited), typed semantic model queryable by span, proof results, graph analysis results. Produced on every pipeline run, including broken input. Consumed by the language server (hover, completions, go-to-definition, diagnostics) and MCP tools. Follows the Roslyn pattern of an immutable snapshot with partial results on every keystroke.
 
-**Executable Model** (runtime surface) — the execution artifact. Contains: transition dispatch table, slot-indexed expression trees, scope-indexed constraint lists, field descriptor array, topological action chains. Sealed, immutable, evaluation-ready. Only produced when the compilation result has no errors. Consumed by the runtime operations (`fire`, `inspect`, `update`). Follows the CEL `Ast → Program` pattern — a compiled representation that an evaluator runs against entity data to produce outcomes.
+**Executable Model** (runtime surface) — the execution artifact. Contains: transition dispatch table, slot-indexed expression trees, scope-indexed constraint lists, field descriptor array, topological action chains, graph analysis results (reachability sets, available events per state, edge classifications). Sealed, immutable, evaluation-ready. Only produced when the compilation result has no errors. Follows the CEL `Ast → Program` pattern — a compiled representation that an evaluator runs against entity data to produce outcomes.
+
+The executable model serves two roles: (1) the evaluator consumes it to execute fire/edit operations, and (2) the `Precept` type exposes it as a definition-level query surface — all states, all events, all fields, state graph structure. Entity instances (`Version`) reference their governing `Precept` and combine its precomputed structural knowledge with their current data to provide a single inspectable surface.
 
 The executable model is not a Roslyn-style `Compilation` (a tooling query surface). It is closer to CEL's `Program` (a compiled expression evaluated against an activation) or OPA's `PreparedEvalQuery` (compiled state held internally, safe to share across goroutines). The distinction matters: the LS never touches the executable model; the runtime never queries the compilation result for diagnostics.
 
-**Correctness invariant:** `inspect` MUST consume the executable model via the same evaluation path as `fire`. Semantic agreement between tooling preview and runtime execution is structural, not conventional.
+**Correctness invariant:** Data-dependent preview queries on `Version` (e.g., `Preview(event)`) MUST consume the executable model via the same evaluation path as `Fire`. Semantic agreement between preview and execution is structural, not conventional.
 
 ### 1.3 Runtime Shape
 
@@ -115,20 +117,28 @@ The runtime has five major concerns that operate against the executable model.
 
 **Entity representation** — the data envelope. Current state + current field data + reference to the governing executable model. Operations produce new entity snapshots — the input is never mutated. Survey evidence strongly favors immutable snapshots (XState `MachineSnapshot`, CEL activations, CUE `Value`, Dhall `Val`).
 
-**Public API surface** — what callers touch. Three operations (fire, edit, inspect) plus construction (compile → executable model → initial entity). Inspect must share the same evaluation path as fire, differing only in commit behavior.
+**Public API surface** — what callers touch. Two mutating operations (fire, edit) plus construction (compile → executable model → initial entity). Inspection is not a separate operation — `Version` is the inspectable surface. Structural queries (available events, editable fields) are precomputed from graph analysis baked into the executable model. Data-dependent queries (can this event fire? what would happen?) delegate to the evaluator via the same path as fire, differing only in commit behavior.
 
 **Constraint evaluator** — collect-all evaluation of rules and ensures with structured attribution. Distinct from the transition-routing first-match evaluation.
 
-### 1.4 Inspect/Fire Relationship
+### 1.4 Version as the Inspectable Surface
 
 The language vision is explicit: "Inspection is not a reporting layer — it is a fundamental language operation. It must have the same depth as event execution."
 
-Survey evidence provides two patterns:
+**R5 decision: `Version` is the single inspectable surface.** There is no separate `Inspect()` operation. Instead, `Version` combines three kinds of access:
+
+1. **Structural queries** — `AvailableEvents`, `EditableFields`, `RequiredArgs(eventName)`. These are precomputed from graph analysis results baked into the executable model during construction. They answer "what could happen from this state?" with zero evaluation cost — the executable model already knows the answer.
+
+2. **Data-dependent queries** — `CanFire(eventName, args)`, `Preview(eventName, args)`, `PreviewEdit(fieldName, value)`. These run the evaluator against a working copy (same path as fire/edit) and discard the result. They answer "what would happen with this data?" and carry the same fidelity as the corresponding operation.
+
+3. **Definition-level queries** — `Version.Precept` exposes the governing executable model: all states, all events, all fields, state graph structure. This is the full definition of the precept, not filtered by current state.
+
+**Survey grounding for this shape:**
 
 - **XState v5's pure `transition()` function.** `transition(machine, state, event)` returns `[nextSnapshot, actions]` without side effects. `getNextSnapshot()` returns just the snapshot for preview. The same evaluation code path serves both — the difference is whether actions are executed.
 - **CEL's exhaustive evaluation mode.** `ExhaustiveEval` forces all branches to evaluate regardless of short-circuit, producing a complete trace. The same `Interpretable` tree is walked; only the evaluation mode flag differs.
 
-For Precept, the natural unification: fire and inspect share the evaluation path up to and including constraint checking on the working copy. Fire promotes the working copy on success; inspect always discards it. The outcome record is identical in both cases.
+The unification: `Preview`/`PreviewEdit` share the evaluation path with `Fire`/`Edit` up to and including constraint checking on the working copy. Operations promote the working copy on success; previews always discard it. The outcome record is identical — callers can inspect the full result without committing.
 
 ---
 
@@ -231,7 +241,7 @@ This section covers the **tooling-surface artifact** (compilation result) and it
 **Cross-cutting design questions:**
 - What is the relationship between the compilation result and the executable model? The compiler produces the `CompilationResult`. The runtime constructs the executable model from it (`Precept.From(CompilationResult)`). Distinct types with distinct API contracts and distinct consumers.
 - Proof model placement — proof results serve both consumers: tooling (hover diagnostics) and potentially runtime (skip redundant checks based on proven ranges). Where does the proof model live, and is it shared or duplicated?
-- Does `inspect` consume the executable model (guaranteeing semantic agreement with `fire`) or the compilation result? The architectural position is: inspect MUST consume the executable model.
+- Do preview queries consume the executable model (guaranteeing semantic agreement with `fire`) or the compilation result? The architectural position is: preview MUST consume the executable model.
 
 **Research grounding:** Language-server-integration survey, compilation-result-type survey, compiler-result-to-runtime survey (CEL Ast→Program, OPA PreparedEvalQuery), outcome-type-taxonomy survey, dry-run-preview-inspect-api survey.
 
@@ -325,7 +335,7 @@ The evaluator walks the executable model's expression trees against entity data.
 
 - Evaluation strategy — tree-walking interpreter over slot-indexed expression trees produced during executable model construction. No JIT compilation.
 - Collect-all vs. first-match execution modes — two separate entry points with shared expression machinery, or parameterized by mode?
-- Inspect as fire variant — `inspect` is `fire` with a working copy that is always discarded. Both consume the executable model via the same evaluation path. Must share the same code.
+- Preview as fire variant — `Preview` is `Fire` with a working copy that is always discarded. Both consume the executable model via the same evaluation path. Must share the same code.
 
 **Research grounding:**
 - CEL's tree-walking interpreter with `Interpretable.Eval(Activation)` is the primary structural reference.
@@ -360,7 +370,7 @@ The language vision identifies 9 semantically distinct outcomes. The runtime mus
 **Design questions:**
 - Sealed hierarchy vs. discriminated union? C# sealed class hierarchy with `abstract record Outcome` and sealed subtypes is the idiomatic C# pattern. The compiler plan states: "9 outcomes must be structurally distinguishable at the C# type level (sealed hierarchy, not string codes)."
 
-- Per-operation or unified result type? Fire, edit, and inspect have different applicable outcome subsets. Options: unified `Outcome` with all 9 variants, or per-operation families (`FireOutcome`, `EditOutcome`, `InspectOutcome`). The inspect/fire unification requirement complicates per-operation types since they share the evaluation path.
+- Per-operation or unified result type? Fire, edit, and preview have different applicable outcome subsets. Options: unified `Outcome` with all 9 variants, or per-operation families (`FireOutcome`, `EditOutcome`, `PreviewOutcome`). The shared evaluation path between fire and preview complicates per-operation types since they share the evaluation path.
 
 - What does each outcome carry? Successful outcomes carry the new entity. Failures carry violation details with semantic-subject attribution. Rejections carry the authored reason. Each variant has different payload requirements.
 
@@ -398,11 +408,11 @@ The language vision's atomicity guarantee: "All mutations execute on a working c
 **Design questions:**
 - Working copy representation. Full clone of the slot array at the start of each operation. At Precept's scale (10–50 fields), `Array.Copy` is essentially free. Copy-on-write adds complexity for a problem that does not exist.
 
-- Working copy lifecycle. Created per fire/edit/inspect operation. Populated with current field values. Mutated by action chain. Evaluated against constraints. Promoted (fire/edit on success) or discarded (inspect always, fire/edit on failure). Never escapes the operation boundary.
+- Working copy lifecycle. Created per fire/edit/preview operation. Populated with current field values. Mutated by action chain. Evaluated against constraints. Promoted (fire/edit on success) or discarded (preview always, fire/edit on failure). Never escapes the operation boundary.
 
 - Computed field recomputation. After action chain completes, recompute in topological order on the working copy before constraint evaluation.
 
-- Working copy for inspect. One working copy per event being previewed. Each independent, each discarded after evaluation.
+- Working copy for preview. One working copy per event being previewed. Each independent, each discarded after evaluation.
 
 **Research grounding:** CEL's hierarchical `Activation` (overlay-based variable resolution), OPA's store transactions (snapshot isolation), XState's pure `transition()` (compute next state without modifying current).
 
@@ -432,12 +442,12 @@ The committed fault-correspondence chain: every `FaultCode` has `[StaticallyPrev
 
 ### 4.7 Public API Surface
 
-The language vision specifies three operations and one structural requirement:
+The language vision specifies two mutating operations, a construction path, and an inspectable surface:
 
 1. **Fire** — send an event to an entity, producing a new version or an outcome explaining why not.
 2. **Edit** — directly mutate an editable field, producing a new version or an outcome explaining why not.
-3. **Inspect** — preview what every event would do from the current state without committing.
-4. **Construction** — create an executable model from a compilation result; create an initial entity version from an executable model.
+3. **Construction** — create an executable model from a compilation result; create an initial entity version from an executable model.
+4. **Inspection** — not a separate operation. `Version` is the inspectable surface (see §1.4). Structural queries (available events, editable fields, required args) are precomputed from graph analysis. Data-dependent queries (preview fire, preview edit, can-fire) delegate to the evaluator. Definition-level queries go through `Version.Precept`.
 
 The provisional stubs place fire/edit as instance methods on `Version`. XState separates concerns: `transition(machine, state, event)` is a standalone function; the snapshot is passive data. For Precept, instance methods on the entity are a reasonable convenience API, but the underlying implementation should be the shared static evaluation function (per R1/R5).
 
@@ -505,13 +515,13 @@ Fifteen decisions that must be resolved before implementation. D1–D8 cover com
 
 **Survey grounding:** CEL's `Interpretable.Eval(Activation)`, XState's `transition(machine, state, event)`, Dhall's `eval(env, expr)` — all stateless/functional for pure-expression languages.
 
-**Dependencies:** Blocks R3 (entity representation must know who manages the working copy) and R5 (inspect/fire unification).
+**Dependencies:** Blocks R3 (entity representation must know who manages the working copy). R5 resolved — Version delegates to Evaluator.
 
 #### R2 — Result type taxonomy
 
 **Question:** What is the shape of the result type? Sealed class hierarchy with 9 leaf types? Per-operation result families or unified?
 **Survey grounding:** CEL's three-value return, XState's 3 statuses, CUE's 2-value distinction. No surveyed system has 9 categories — purpose-built.
-**Coupling:** Couples to R1 (evaluator's return type) and R5 (inspect returns the same shape). Couples to R6 (violation records as payload).
+**Coupling:** Couples to R1 (evaluator's return type) and R5 (preview returns the same shape as fire). Couples to R6 (violation records as payload).
 
 #### R3 — Entity representation
 
@@ -525,11 +535,12 @@ Fifteen decisions that must be resolved before implementation. D1–D8 cover com
 **Survey grounding:** CEL's `Program` (trusted unconditionally), OPA's `PreparedEvalQuery`.
 **Coupling:** D8 and R4 are two halves of the same specification. Blocks R1 and R5.
 
-#### R5 — Inspect/Fire unification
+#### R5 — Version as inspectable surface ✅ RESOLVED
 
-**Question:** How do inspect and fire share the evaluation path while differing only in commit behavior?
+**Question:** How do callers inspect the current state of an entity without committing changes?
+**Decision:** `Version` is the single inspectable surface. No separate `Inspect()` operation. Three access tiers: (1) structural queries (`AvailableEvents`, `EditableFields`, `RequiredArgs`) precomputed from graph analysis — free; (2) data-dependent queries (`CanFire`, `Preview`, `PreviewEdit`) delegate to the evaluator via the same path as fire/edit — same fidelity, working copy discarded; (3) definition-level queries via `Version.Precept` — all states, events, fields, graph structure.
 **Survey grounding:** XState's `transition()`/`getNextSnapshot()` pair. CEL's `ExhaustiveEval`.
-**Dependencies:** Depends on R1 and R2. Depends on R4.
+**Dependencies:** Depends on R1 ✅ and R2. Depends on R4.
 
 #### R6 — Constraint evaluation: collect-all attribution model
 
@@ -771,9 +782,9 @@ Questions this plan intentionally does not answer:
 
 6. **Error message formatting.** How are `because` messages formatted? Localization? Template system?
 
-7. **Performance characteristics of inspect.** Working-copy-per-event cost model should be verified against realistic definitions.
+7. **Performance characteristics of preview.** Working-copy-per-event cost model should be verified against realistic definitions.
 
-8. **Edit operation scope.** Same evaluation path as fire (with "edit" pseudo-event), or separate path? R5 covers fire/inspect but not edit.
+8. **Edit operation scope.** Same evaluation path as fire (with "edit" pseudo-event), or separate path? R5 covers fire/preview but not edit.
 
 ---
 
@@ -809,7 +820,7 @@ public sealed record class Version(Precept Precept, string State, ImmutableDicti
 **Assessment:** Structurally aligned with XState's `MachineSnapshot`. Tensions:
 
 1. **Return type.** `Fire`/`Edit` return `Version` — implying success. The 9-outcome taxonomy requires that these can fail. Return type should be the result type (R2).
-2. **Missing `Inspect`.** First-class operation required by language vision.
+2. **Inspectable surface.** R5 resolved: `Version` IS the inspectable surface. Structural queries (`AvailableEvents`, `EditableFields`, `RequiredArgs`) are precomputed from graph analysis. Data-dependent queries (`CanFire`, `Preview`, `PreviewEdit`) delegate to the evaluator via the same path as fire/edit. Definition-level access via `Version.Precept`. No separate `Inspect()` method.
 3. **`ImmutableDictionary<string, object?>` for `Data`.** Slot array (`object?[]`) would be more aligned with the executable model. Hybrid (slot array internally, name-based API) resolves both.
 4. **Instance methods vs. standalone functions.** Operations as methods on `Version` is a convenience API; underlying implementation should be the shared static evaluation function (R1/R5).
 5. **Stateless precepts.** Stub requires `State` but stateless precepts have no state.
@@ -836,7 +847,7 @@ public static class Evaluator
 }
 ```
 
-**Assessment:** Static shape aligns with R1 (RESOLVED). Awaits Fire/Edit/Inspect signatures pending R2 (result type taxonomy) and D8/R4 (executable model contract).
+**Assessment:** Static shape aligns with R1 (RESOLVED). Awaits Fire/Edit/Preview signatures pending R2 (result type taxonomy) and D8/R4 (executable model contract).
 
 ---
 
@@ -846,7 +857,7 @@ public static class Evaluator
 
 - **R1 (Evaluator shape):** CEL, XState, and Dhall converge on stateless/functional evaluation. ✅ RESOLVED.
 - **R3 (Entity representation):** XState, CEL, CUE, and Dhall use immutable snapshots. Survey consensus is clear.
-- **R5 (Inspect/Fire unification):** XState's `transition()`/`getNextSnapshot()` pair directly demonstrates the pattern.
+- **R5 (Version as inspectable surface):** XState's `transition()`/`getNextSnapshot()` pair demonstrates the shared-path preview pattern. CEL's `ExhaustiveEval` demonstrates full-depth preview. Precept's contribution: structural queries from graph analysis are free on Version, data-dependent queries share the fire path. ✅ RESOLVED.
 
 ### Decisions with moderate survey grounding
 
