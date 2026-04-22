@@ -120,6 +120,28 @@ namespace Precept.Runtime
     }
 
     [Fact]
+    public async Task Fail_in_unrelated_namespace_is_not_flagged()
+    {
+        // PREC0001 only applies to Fail() methods defined in Precept.Runtime.
+        // A Fail() method in a third-party library must not be flagged.
+        var source = @"
+namespace ThirdParty.Logging
+{
+    public class Logger
+    {
+        public void Fail(string message) { }
+
+        public void M()
+        {
+            Fail(""something went wrong"");
+        }
+    }
+}";
+        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<Prec0001FailMustUseFaultCode>(source);
+        diagnostics.Where(d => d.Id == Prec0001FailMustUseFaultCode.DiagnosticId).Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task Fail_with_third_party_FaultCode_reports_PREC0001()
     {
         // A type named FaultCode from a different namespace must not bypass PREC0001.

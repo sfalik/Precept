@@ -10,12 +10,9 @@ namespace Precept.Analyzers;
 /// This prevents unclassified evaluator error paths that bypass the FaultCode chain.
 /// </summary>
 /// <remarks>
-/// The check is scoped by method name only — any method named <c>Fail</c> anywhere in the
-/// codebase must supply a <c>Precept.Runtime.FaultCode</c> first argument. This is intentional:
-/// all evaluator subclasses (in any namespace) must classify their failure paths through the
-/// same FaultCode chain. Narrowing to a specific containing type would allow subclasses in
-/// other assemblies to silently bypass classification. If a third-party method named Fail is
-/// ever needed without a FaultCode, suppress PREC0001 at that call site with a justification.
+/// The check is scoped to <c>Fail</c> methods whose defining type lives in the
+/// <c>Precept.Runtime</c> namespace. The evaluator is sealed — there are no subclasses —
+/// so name-only matching would risk false positives on third-party <c>Fail()</c> methods.
 /// </remarks>
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public sealed class Prec0001FailMustUseFaultCode : DiagnosticAnalyzer
@@ -47,6 +44,12 @@ public sealed class Prec0001FailMustUseFaultCode : DiagnosticAnalyzer
         var op = (IInvocationOperation)ctx.Operation;
 
         if (op.TargetMethod.Name != "Fail")
+            return;
+
+        // Only flag Fail() methods defined in Precept.Runtime. The evaluator is sealed, so
+        // name-only matching is unnecessary and risks false positives on third-party code.
+        var methodNamespace = op.TargetMethod.ContainingType?.ContainingNamespace?.ToDisplayString();
+        if (methodNamespace != "Precept.Runtime")
             return;
 
         // The first argument must be of type Precept.Runtime.FaultCode.
