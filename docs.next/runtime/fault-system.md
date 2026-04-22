@@ -11,9 +11,9 @@ The runtime fault system classifies and communicates evaluator failure modes. It
 | Compiler (pipeline) | Runtime (evaluator) |
 |---------------------|---------------------|
 | `DiagnosticCode` | `FaultCode` |
-| `DiagnosticMeta` | `FaultMeta` |
+| `DiagnosticMeta(Code, Stage, Severity, MessageTemplate)` | `FaultMeta(Code, MessageTemplate)` |
 | `Diagnostics` | `Faults` |
-| `Diagnostic` | `Fault` |
+| `Diagnostic(Severity, Stage, string Code, Message, Range)` | `Fault(FaultCode Code, string CodeName, Message)` |
 
 The relationship between the two systems is structural, not incidental. Every `FaultCode` member carries a `[StaticallyPreventable(DiagnosticCode.X)]` attribute — a compiler-enforced assertion that there exists a pipeline diagnostic which, if emitted, guarantees this fault can never occur at runtime. See `diagnostic-system.md` for the full enforcement chain.
 
@@ -36,23 +36,26 @@ public readonly record struct Fault(
 
 ```csharp
 // src/Precept.Next/Runtime/Faults.cs
-public sealed record FaultMeta(string MessageTemplate);
+public sealed record FaultMeta(
+    string Code,
+    string MessageTemplate
+);
 ```
 
-Currently a single-field record. Expected to grow alongside `Fault`.
+Same shape as `DiagnosticMeta`: a `Code` string derived via `nameof()` in the exhaustive switch, and a message template for formatting. `Faults.Create()` derives `CodeName` on `Fault` from `meta.Code` — the same `nameof()`-at-the-registry pattern used by `Diagnostics.Create()` for `Diagnostic.Code`.
 
 ### Faults
 
 ```csharp
 public static class Faults
 {
-    public static FaultMeta GetMeta(FaultCode code) => code switch { /* exhaustive */ };
-    public static Fault Create(FaultCode code, params object?[] args);
+    public static FaultMeta GetMeta(FaultCode code) => code switch { /* exhaustive, nameof()-derived */ };
+    public static Fault Create(FaultCode code, params object?[] args);  // derives CodeName from meta.Code
     public static IReadOnlyList<FaultMeta> All { get; }
 }
 ```
 
-Same shape as `Diagnostics`: exhaustive switch, factory, enumeration.
+Same shape as `Diagnostics`: exhaustive switch, factory, enumeration. `Create()` derives `Fault.CodeName` from `meta.Code` (which is `nameof(FaultCode.X)` from the switch arm) — not from `code.ToString()`. Roslyn rule **PREC0004** enforces that all `Fault` constructions go through `Create()`, closing the string-field bypass path. See `diagnostic-system.md` for the full PREC rule set rationale.
 
 ## Open Design Questions
 

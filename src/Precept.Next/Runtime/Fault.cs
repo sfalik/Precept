@@ -5,6 +5,6 @@ namespace Precept.Runtime;
 // triggered the fault, and linkage back to the DiagnosticCode that should have prevented it.
 public readonly record struct Fault(
     FaultCode Code,
-    string    CodeName,  // code.ToString() — stable identity for logging / MCP
+    string    CodeName,  // nameof-derived via Faults.Create() — stable identity for logging / MCP
     string    Message    // pre-formatted, final English string
 );
