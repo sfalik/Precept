@@ -3,6 +3,8 @@
 > Raw research collection. No interpretation, no conclusions for Precept, no recommendations.
 > The question: what operations do systems expose for interacting with a running state machine instance, and what do those operations return?
 
+> **Survey dimension note:** The "Direct Field Update Without Transition" dimension was included because the target system under design supports direct field mutation outside the event/transition mechanism. Most surveyed systems do not offer this operation. The dimension is included to document that gap honestly — not to validate or invalidate the design choice.
+
 ---
 
 ## Table of Contents

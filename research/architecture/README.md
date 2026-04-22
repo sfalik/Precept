@@ -2,6 +2,13 @@
 
 External research on architectural patterns, evaluated against Precept's current implementation.
 
+## Structure
+
+| Location | Purpose |
+|----------|---------|
+| `compiler/` | 15-survey external research corpus for the clean-room compiler redesign. Covers pipeline architecture, proof systems, type systems, numeric/temporal/unit types, state graph analysis, LS integration, and runtime APIs. See [compiler/README.md](compiler/README.md) for reading order. |
+| *(root files below)* | Earlier architecture research: type checker architecture surveys and synthesis for the existing implementation. |
+
 ## Files
 
 ### Type Checker Architecture (original survey)

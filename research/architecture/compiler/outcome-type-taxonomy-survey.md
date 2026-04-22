@@ -432,47 +432,47 @@ pub enum Result<T, E> {
 - `?` operator: propagates `Err` upward by converting the error type via `From::from`
 - Pattern matching is exhaustive: a `match` on `Result` that doesn't handle all `Err` variants is a compile error
 
-**Idiomatic error enum:**
+**Idiomatic error enum (from the `reqwest` HTTP client pattern):**
 ```rust
 #[derive(Debug, thiserror::Error)]
-enum FireError {
-    #[error("transition not defined for event {event} in state {state}")]
-    Undefined { event: String, state: String },
+enum ApiError {
+    #[error("endpoint not found: {url}")]
+    NotFound { url: String },
     
-    #[error("no matching guard for event {event}")]
-    Unmatched { event: String },
+    #[error("request timed out after {duration_ms}ms")]
+    Timeout { duration_ms: u64 },
     
-    #[error("rejected by business rule: {reason}")]
-    Rejected { reason: String },
+    #[error("authentication failed for user {user}")]
+    Unauthorized { user: String },
     
-    #[error("constraint violated: {violations:?}")]
-    ConstraintViolation { violations: Vec<Violation> },
+    #[error("rate limit exceeded: retry after {retry_after_secs}s")]
+    RateLimited { retry_after_secs: u64 },
     
-    #[error("infrastructure failure")]
-    Infrastructure(#[from] std::io::Error),
+    #[error("connection failure")]
+    Connection(#[from] std::io::Error),
 }
 
-type FireResult = Result<Instance, FireError>;
+type ApiResult<T> = Result<T, ApiError>;
 ```
 
 **Exhaustive match pattern:**
 ```rust
-match engine.fire(state, event, args) {
-    Ok(new_instance) => handle_success(new_instance),
-    Err(FireError::Undefined { .. }) => handle_routing_gap(),
-    Err(FireError::Unmatched { .. }) => handle_guard_miss(),
-    Err(FireError::Rejected { reason }) => handle_business_rejection(&reason),
-    Err(FireError::ConstraintViolation { violations }) => handle_violations(&violations),
-    Err(FireError::Infrastructure(e)) => return Err(e.into()),
+match client.send(request) {
+    Ok(response) => handle_response(response),
+    Err(ApiError::NotFound { url }) => handle_missing(&url),
+    Err(ApiError::Timeout { .. }) => retry_with_backoff(),
+    Err(ApiError::Unauthorized { user }) => refresh_credentials(&user),
+    Err(ApiError::RateLimited { retry_after_secs }) => wait_and_retry(retry_after_secs),
+    Err(ApiError::Connection(e)) => return Err(e.into()),
 }
 ```
 
 **`?` operator propagation:**
 ```rust
-fn process(instance: &mut Instance, event: Event) -> Result<(), AppError> {
-    let new_state = engine.fire(instance.state(), event, args)?; // propagates Err
-    instance.update(new_state);
-    Ok(())
+fn fetch_user(client: &Client, id: &str) -> Result<User, AppError> {
+    let response = client.get(&format!("/users/{id}")).send()?; // propagates Err
+    let user = response.json::<User>()?;
+    Ok(user)
 }
 ```
 
