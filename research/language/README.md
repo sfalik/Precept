@@ -56,6 +56,7 @@ Use this table when you already know the issue number and need its research grou
 | `#65` | Event action hooks (stateless) | Event action hooks | [expressiveness/event-hooks.md](./expressiveness/event-hooks.md), [references/state-machine-expressiveness.md](./references/state-machine-expressiveness.md) |
 | `#106` | Compile-time divisor safety (local proof engine) | Static reasoning expansion | [references/static-reasoning-expansion.md](./references/static-reasoning-expansion.md) |
 | `#112` | Stateless events — `on EventName` mutation surface | Stateless events | [expressiveness/stateless-events.md](./expressiveness/stateless-events.md), [expressiveness/data-only-precepts-research.md](./expressiveness/data-only-precepts-research.md) |
+| `#134` | Null-reduction and per-state field access modes | Null vocabulary + Field access modes | [expressiveness/null-reduction-proposal.md](./expressiveness/null-reduction-proposal.md), [expressiveness/field-access-mode-precedents.md](./expressiveness/field-access-mode-precedents.md), [expressiveness/field-access-mode-workflow-precedents.md](./expressiveness/field-access-mode-workflow-precedents.md), [expressiveness/field-access-mode-platform-precedents.md](./expressiveness/field-access-mode-platform-precedents.md), [expressiveness/null-elimination-research.md](./expressiveness/null-elimination-research.md) |
 
 ## Cross-cutting research that supports multiple domains
 
@@ -67,7 +68,10 @@ Use this table when you already know the issue number and need its research grou
 | [expressiveness/case-insensitive-comparison-survey.md](./expressiveness/case-insensitive-comparison-survey.md) | `~=` precedent survey, CI comparison patterns across 15+ systems, cascade analysis. Supports `#16`. |
 | [expressiveness/nullable-computed-fields-research.md](./expressiveness/nullable-computed-fields-research.md) | 10-system survey of null propagation approaches; taxonomy of implicit/explicit/monadic/absence-eliminates strategies. Supports `#17`. |
 | [expressiveness/null-elimination-research.md](./expressiveness/null-elimination-research.md) | Deep external research on eliminating nulls from Precept — surveys null-free languages, config DSLs, serialization formats, databases, UI form modeling. Supports `#17`. |
-| [expressiveness/null-reduction-proposal.md](./expressiveness/null-reduction-proposal.md) | Full design proposal for null reduction — `optional`, state-scoped visibility, presence operators, `clear`. Supports `#17`. |
+| [expressiveness/null-reduction-proposal.md](./expressiveness/null-reduction-proposal.md) | Full design proposal for null reduction and field access modes — `optional`, `is set`/`is not set`, `clear`, `omit`/`read`/`write`. Canonical proposal for `#134`. |
+| [expressiveness/field-access-mode-precedents.md](./expressiveness/field-access-mode-precedents.md) | 10-system PLT/DSL precedent survey (Alloy, TLA+, SCXML, Plaid, Rust typestate, TypeScript, XState, Drools, Cedar, Rego). Supports `#134`. |
+| [expressiveness/field-access-mode-workflow-precedents.md](./expressiveness/field-access-mode-workflow-precedents.md) | 11-system workflow precedent survey. Supports `#134`. |
+| [expressiveness/field-access-mode-platform-precedents.md](./expressiveness/field-access-mode-platform-precedents.md) | 11-system platform/CMS precedent survey. Supports `#134`. |
 | [expressiveness/grammar-consistency-audit.md](./expressiveness/grammar-consistency-audit.md) | Comprehensive audit of 21 grammar consistency items — keyword overloading, operator positions, classification gaps, naming patterns. Triggered during null-reduction proposal refinement. |
 | [domain-map.md](./domain-map.md) | Full durable map of every language research domain. |
 | [domain-research-batches.md](./domain-research-batches.md) | Sequencing plan for active and horizon domain research. |
