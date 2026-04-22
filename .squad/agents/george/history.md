@@ -170,6 +170,23 @@ Key findings:
 - LinearForm depth bound (8): verified parens do NOT blow the budget in practice (7-level paren nesting compiles clean today). Plan should clarify that `PreceptParenthesizedExpression` unwrapping does not decrement depth counter.
 - CodeContracts Pentagons: confirms architectural validity. Our lazy composition (query-time reduced product) is sufficient for divisor-safety — no backward propagation from relational → interval needed. No patterns to adopt.
 - Confidence on §8a completeness: MEDIUM-HIGH. Systematically checked all 11 expression forms, all rule/guard/ensure contexts, cross-namespace patterns, negation, scaling, depth stress. The 2 missing patterns are low-frequency with simple workarounds.
+- Field access mode syntax (`in S omit/view/edit`) estimated at ~400-520 lines across 7 source areas. Type checker conflict detection and engine Inspect generalization carry the most complexity. Design decisions needed before implementation: whether `omit` affects Fire evaluation context, whether invariants respect `omit`, and whether root-level `omit`/`view` should exist.
+- The `PreceptEditBlock` model record can be extended with a `Mode` property (default `Edit`) for backward compatibility — avoids breaking all existing consumers. Option A (extend) beats Option B (replace) for incremental delivery.
+- Superpower's `AtLeastOnce()` naturally handles chained VerbGroups after `in <StateList>`. The LL(1) property of verbs (`omit`/`view`/`edit`/`when`) as leading tokens makes parsing clean.
+
+## Recent Updates
+
+### 2026-04-15 — Runtime impact analysis: field access mode syntax
+- Analyzed full runtime impact of decided `in <StateList> (omit|view|edit) <FieldList>` syntax across 7 source areas.
+- Tokenizer: 2 new tokens (`omit`, `view`), zero-drift auto-registered. Parser: ~100 lines, VerbGroup chaining via `AtLeastOnce()`. Model: extend `PreceptEditBlock` with `FieldAccessMode` enum. Type checker: ~200 lines for conflict detection (C89–C92). Engine: ~120 lines for Inspect generalization. Compiler: ~20 lines wiring. Diagnostics: 4+ new codes.
+- Flagged 4 design decisions requiring Shane's input before implementation starts.
+- Written to `.squad/decisions/inbox/george-runtime-impact-field-access.md`.
+
+### 2026-05-15 — External research: per-state field access mode precedents
+- Surveyed 11 systems (XState v5, Temporal.io, AWS Step Functions, Spring SM, gen_statem, Camunda/BPMN, Windows WF, SMACH/ROS, Unity Animator, Akka FSM, SCXML) for per-state field access patterns.
+- Key finding: no mainstream system provides declarative per-state field access modes (absent/readonly/editable). Precept's `in <StateList> define <FieldList> <mode>` is genuinely novel.
+- SMACH (ROS) is the strongest partial precedent — its `input_keys`/`output_keys`/`io_keys` model declares per-state data access. Windows WF provides activity-scoped variables with a ReadOnly modifier.
+- Research written to `research/language/expressiveness/field-access-mode-workflow-precedents.md`.
 
 ### 2026-04-12 — Issue #17 computed fields feasibility
 - Confirmed computed fields are feasible with additive parser/model/runtime work and a single recomputation helper inserted before constraint evaluation.

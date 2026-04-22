@@ -67,6 +67,8 @@ Use this table when you already know the issue number and need its research grou
 | [expressiveness/case-insensitive-comparison-survey.md](./expressiveness/case-insensitive-comparison-survey.md) | `~=` precedent survey, CI comparison patterns across 15+ systems, cascade analysis. Supports `#16`. |
 | [expressiveness/nullable-computed-fields-research.md](./expressiveness/nullable-computed-fields-research.md) | 10-system survey of null propagation approaches; taxonomy of implicit/explicit/monadic/absence-eliminates strategies. Supports `#17`. |
 | [expressiveness/null-elimination-research.md](./expressiveness/null-elimination-research.md) | Deep external research on eliminating nulls from Precept — surveys null-free languages, config DSLs, serialization formats, databases, UI form modeling. Supports `#17`. |
+| [expressiveness/null-reduction-proposal.md](./expressiveness/null-reduction-proposal.md) | Full design proposal for null reduction — `optional`, state-scoped visibility, presence operators, `clear`. Supports `#17`. |
+| [expressiveness/grammar-consistency-audit.md](./expressiveness/grammar-consistency-audit.md) | Comprehensive audit of 21 grammar consistency items — keyword overloading, operator positions, classification gaps, naming patterns. Triggered during null-reduction proposal refinement. |
 | [domain-map.md](./domain-map.md) | Full durable map of every language research domain. |
 | [domain-research-batches.md](./domain-research-batches.md) | Sequencing plan for active and horizon domain research. |
 | [references/cel-comparison.md](./references/cel-comparison.md) | Full Precept vs CEL language-level comparison — validates expression expansion priorities. |
