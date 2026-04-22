@@ -10859,3 +10859,319 @@ Formalized the design review gate as a mandatory process step for all proposals.
 7. **Same branch, same PR for Track B.** The PR starts as a design PR and evolves into a design+implementation PR.
 
 **Files updated:** `CONTRIBUTING.md` (canonical process — § 3. Design Review, lifecycle diagram, doc sync carve-out, Where Things Live), `.squad/ceremonies.md` (Track A/B conditions, owner sign-off gate, resolution requirement), `.github/copilot-instructions.md` (§ Issue Implementation Workflow), `.github/agents/squad.agent.md` (§ Implementation Gate), `.squad/agents/frank/charter.md` (§ Design Gate, § What I Own), `.squad/skills/proposal-review/SKILL.md` (§ Track B).
+
+---
+# Decision: Clean-Room Compiler Architecture v2 (Revised)
+
+**Date:** 2026-04-21
+**Author:** Frank (Lead/Architect & Language Designer)
+**Status:** Proposed — awaiting owner review
+**Artifact:** `docs.next/compiler-architecture-proposal.md`
+**Revision note:** Clean-room redesign. Previous proposal rejected for anchoring on prototype pipeline design. This version derives architecture from first principles: language data dependencies, v2 requirements, and research base only.
+
+---
+
+## Summary
+
+Designed a four-phase compiler architecture (Parse → Check → Verify → Build) derived from the Precept language's data dependencies. Each phase boundary follows from what the language's compilation naturally requires as input and output — not from the prototype's stage inventory.
+
+The architecture replaces Superpower with a hand-written recursive descent parser (to satisfy non-negotiable error recovery requirements), unifies structural and positional access into a single `SemanticModel` (to eliminate consumer re-derivation), bundles proof and graph analysis into a single Verify phase with sub-accessors (same dependency, same consumers), and designs every artifact from what consumers need rather than from what phases produce.
+
+## Key Decisions
+
+### 1. Four-Phase Pipeline: Parse → Check → Verify → Build
+
+Derived from data dependencies: Parse needs source text → produces structure. Check needs syntax tree → produces meaning. Verify needs complete typed model → produces safety guarantees. Build needs verified model → produces execution. Neither five phases nor three is justified by this language's properties. Five was the prototype's count — the difference is that proof is now cleanly post-type-checking (not interleaved), and the prototype's separate "analysis" and "assembly" stages collapse naturally.
+
+### 2. Drop Superpower — Hand-Written Recursive Descent Parser
+
+Three v2 requirements are structurally incompatible with Superpower: multi-error diagnostics (Req 4), partial results under errors (Req 5), and first-class error recovery (Req 10). Superpower's stop-on-first-error model cannot be worked around — any wrapper that adds recovery is a hand-written parser on top of Superpower, combining the cost of both. ANTLR rejected: overkill for an LL(1) keyword-anchored grammar with no left recursion. Estimated RD parser: 1,500–2,500 lines.
+
+### 3. Unified SemanticModel with Position-Based Query API
+
+Single-file DSL needs one semantic model, not Roslyn's multi-tree split. `GetSymbolAt(position)`, `GetSymbolsInScope(position)`, `GetReferencesTo(symbol)`, `Classify(token)` — all compiler-owned. The LS is a translation layer (SemanticModel query → LSP response), not a reimplementation. Eliminates the prototype's seven documented re-derivation cases.
+
+### 4. Verification Phase Bundles Proof and Graph as Sub-Concerns
+
+Both consume the complete typed model, serve the same consumers, and complete in <1ms. No consumer needs one without the other. Separately accessible via `verification.Proof` and `verification.Graph`. If proof grows heavy, splitting is a local refactoring — not an architectural change.
+
+### 5. Consumer-Ready Typed Model Granularity
+
+Transitions carry `FromState` and `OnEvent` directly. Rules carry `ReferencedFields`. The MCP does not re-group. The LS does not re-derive scope. For a single-file DSL with hundreds of declarations, normalized-then-project adds correctness risk for negligible memory savings.
+
+### 6. Compiler-Owned Language Metadata via LanguageCatalog
+
+Static `LanguageCatalog` populated from the compiler's own token enum, type registry, and function library. The MCP server reads and serializes — never maintains parallel lists.
+
+### 7. Compiler-Owned Semantic Token Classification
+
+Classification in Check phase as a by-product of symbol resolution. `SemanticModel.Tokens.Classify(token)` returns semantic category. LS maps to LSP token types. No re-tokenization.
+
+### 8. Cooperative Cancellation at Phase Boundaries
+
+Each phase <5ms. Checked before each phase starts. At most one phase of wasted work. Finer-grained cancellation is a local enhancement if files grow past ~1,000 lines.
+
+## All 8 Open Questions Answered
+
+See proposal §7 for full rationale on each: natural stages (Q1: four), proof/graph bundling (Q2: yes, sub-accessors), typed model + position queries (Q3: one SemanticModel), semantic token classification (Q4: Check phase), language metadata (Q5: LanguageCatalog), typed model granularity (Q6: consumer-ready), cancellation (Q7: phase-boundary cooperative), error recovery (Q8: three-level compose — lexical → syntactic → semantic).
+
+## Anti-Anchoring Verification
+
+For every structural choice, I asked: "Am I choosing this because the language requires it, or because the old design had it?"
+
+- **Four phases, not five:** The prototype had five. This design has four because proof is now post-type-checking (not interleaved), and the prototype's separate analysis/assembly stages are not justified by independent data dependencies.
+- **SemanticModel, not flat TypeCheckResult:** The prototype returned a flat result. This design's SemanticModel carries position-based queries because the LS needs them — not because Roslyn has a SemanticModel.
+- **Verify bundles proof + graph:** The prototype had them as separate stages. This design bundles them because they share a dependency and consumers — not because bundling is simpler to implement.
+- **RD parser, not Superpower:** The prototype used Superpower. This design drops it because the v2 requirements demand capabilities Superpower cannot provide — not because RD is fashionable.
+
+## Grounding
+
+- `docs.next/compilation-pipeline-design-v2.md` — requirements (11 requirements, 8 open questions)
+- `docs.next/precept-language-vision.md` — language target (18 compiler obligations)
+- `docs/philosophy.md` — product identity
+- 11 research documents in `research/architecture/` and `research/language/`
+
+## Next Step
+
+Owner (Shane) design review. If approved, this proposal becomes the basis for the implementation plan.
+
+---
+# George's Evaluator Design v2 — Decision Record
+
+**Date:** 2026-04-21
+**Author:** George (Runtime Dev)
+**Artifact:** `docs.next/evaluator-design-proposal.md`
+**Status:** Proposed — awaiting design review
+
+---
+
+## Summary
+
+Designed a clean-room expression evaluator tightly linked to Frank's four-phase compiler pipeline. The core mechanism is **four shared registry tables** (BinaryOperatorTable, UnaryOperatorTable, FunctionTable, AccessorTable) that serve as the single source of truth for both the type checker and evaluator. Each table entry contains the type signature (consumed by the type checker) and the evaluation delegate (consumed by the evaluator) in a single registration. The type checker produces `TypedExpression` trees carrying pre-resolved registry entries, so the evaluator is a mechanical executor that never infers types or resolves overloads.
+
+## Key Decisions Made
+
+| ID | Decision | Rationale |
+|---|---|---|
+| E1 | Typed expression tree as evaluator input | Eliminates the evaluator as an independent type resolver — the drift pattern behind all 17 critical findings in #115 |
+| E2 | Four shared registry tables | One registration serves both type checker and evaluator; structural impossibility of disagreement |
+| E3 | No default arms in evaluator dispatch | Exhaustive switch coverage enforced by Roslyn analyzer; new expression forms are build errors until handled |
+| E4 | EvalFailCode classification is build-time enforced | Adopted from #115 DD23/DD26 — every failure path is classified and linked to compiler diagnostics |
+| E5 | Evaluator is proof-agnostic | Proof results inform compile-time diagnostics, not runtime evaluation behavior; prevents proof bugs from becoming evaluator bugs |
+| E6 | Adopt #115 numeric lane system without modification | Three-lane model (integer/decimal/number) is correct; clean-room contribution is the enforcement mechanism, not the lane model |
+| E7 | Evaluator returns Fail, never throws | Total evaluation — every failure path returns structured EvaluationResult.Fail, never an unhandled CLR exception |
+
+## Relationship to #115
+
+Complementary, not competing. #115 is the domain analysis (discovered problems, designed lane system, classified failure modes). This design is the architectural integration (embeds #115's insights in Frank's pipeline through structural mechanisms — shared registries, typed expression trees, build-time enforcement).
+
+## Open for Review
+
+- Whether the AccessorTable (for `.count`, `.length`, `.min`, `.max`, `.peek`) justifies a separate table or should be folded into FunctionTable as zero-argument method calls.
+- Whether the `TypedExpression` tree should be a separate data structure or whether the existing `SemanticModel` typed declarations can carry enough annotation to serve the evaluator without a new tree.
+- The runtime cost of typed expression tree construction during the Check phase (~10-15% of Check time) — need to validate this estimate against real files.
+
+---
+# Decision: Parser Strategy for v2 Compiler
+
+**Author:** George (Runtime Dev)
+**Date:** 2026-04-21
+**Status:** Proposed
+**Scope:** Tokenizer and parser architecture for the clean-room compiler effort.
+
+---
+
+## Decision
+
+Replace Superpower with a hand-written recursive-descent parser and a hand-written character-scanner tokenizer.
+
+## Context
+
+The v2 compilation pipeline requirements (Requirements 4, 5, 10, and Lessons 1/4) explicitly identify the prototype's stop-on-first-error parsing as the most damaging failure mode. The language server could not provide hover, completions, or semantic tokens for any part of a file that contained a single syntax error. The entire IDE experience degraded to a single red squiggle.
+
+## Rationale
+
+Precept's grammar is keyword-anchored, LL(1) at statement level, with a standard 5-level expression hierarchy — simple enough to hand-write, complex enough that error recovery matters. Of the four options evaluated (Superpower, ANTLR, hand-written recursive descent, other combinator libraries), only hand-written recursive descent fully satisfies all three non-negotiable v2 requirements:
+
+- **Multi-error diagnostics** — the parser reports all syntax errors, not just the first.
+- **Partial results** — the parse tree is always structurally complete; valid statements become typed AST nodes, error regions become error markers.
+- **Active error recovery** — statement-level synchronization to keyword anchors continues parsing after failures.
+
+## Alternatives Rejected
+
+- **Superpower (current):** Cannot produce partial results or report multiple errors. This is the exact failure the v2 requirements were written to address.
+- **ANTLR:** Overkill for the grammar's simplicity. Adds build-time code generation, runtime dependency, and `.g4` maintenance without proportional benefit. Generic error recovery is inferior to hand-written recovery for a keyword-anchored grammar.
+- **Other combinator libraries (Pidgin, etc.):** Same structural limitation as Superpower — combinator composition cannot support statement-level synchronization or partial AST construction.
+
+## Tradeoffs Accepted
+
+- More parser code (~1,500–2,500 lines vs. ~1,100 lines of Superpower combinators). Acceptable for the capability gain.
+- No declarative grammar specification. Grammar changes require manual parser updates. Acceptable given Precept's slow grammar evolution.
+- Error recovery paths must be maintained alongside happy paths for every new statement form.
+
+## Full Analysis
+
+See `docs.next/tokenizer-parser-analysis.md` for the complete grammar analysis, strategy evaluation, tokenizer design, parser design, and type checker integration plan.
+
+---
+# Decision: Language Server Design From Consumer Needs
+
+**Date:** 2026-04-21
+**Author:** Kramer (Tooling Dev)
+**Status:** Proposed - awaiting owner review
+**Artifact:** `docs.next/language-server-design.md`
+
+---
+
+## Summary
+
+Designed the next language server from the LSP consumer side rather than from a legacy pipeline description. The result is a document-snapshot LS that compiles each document version once through Verify, caches one immutable snapshot, and keeps handlers as thin projections over compiler-owned data.
+
+## Key Decisions
+
+### 1. The LS is a snapshot host, not an alternate compiler
+
+All language intelligence should come from one cached Parse -> Check -> Verify snapshot per document version. Handlers should never parse, tokenize, type-check, infer proof facts, or rebuild structural analysis on their own.
+
+### 2. Build is lazy and preview-specific
+
+Standard LSP features stop at Verify. The runtime engine should be built only for preview-like operations that actually need execution semantics.
+
+### 3. Current duplication is concentrated in three LS utility surfaces
+
+The real problem is not the wrapper handlers. It is the combination of `PreceptAnalyzer.cs`, `PreceptDocumentIntellisense.cs`, and `PreceptSemanticTokensHandler.cs`, where the LS currently re-derives diagnostics, completions, symbol resolution, proof hover, semantic tokens, and structural issues.
+
+### 4. Frank's artifact model is mostly sufficient
+
+`SyntaxTree`, `SemanticModel`, `Verification`, accumulated diagnostics, `CompileResult`, and `Compiler.Language` are the right artifact families for the LS.
+
+### 5. The remaining gaps are query-shape gaps, not new-phase gaps
+
+The compiler still needs richer consumer-facing queries for:
+
+1. completion payloads;
+2. proof and construct explanations at a position;
+3. anchored structural issues and fix metadata;
+4. document outline data;
+5. hover-facing language metadata.
+
+## Concrete Contract Additions Requested
+
+1. `SemanticModel.CompletionsAt(position)` returns a compiler-neutral `CompletionContext`, not just raw symbols.
+2. `SemanticModel.HoverAt(position)` or an equivalent `Verification.ExplanationAt(position)` surface exists so hover does not pattern-match expressions in LS code.
+3. `Verification.StructuralIssues` exposes issue kind, source span, related diagnostic, and optional fix recipe metadata.
+4. `SemanticModel.DocumentOutline` or equivalent declaration-tree output exists for document symbols.
+5. `Compiler.Language` includes hover-ready construct and function documentation, not just vocabulary lists.
+
+## Delivery Implication
+
+If those contract additions land, the LS handler set should reduce to transport and mapping code plus one shared document-compilation manager. If they do not land, the current LS duplication will reappear even on top of the new compiler.
+
+## Next Step
+
+Owner review of the LS contract additions alongside Frank's compiler proposal so the compiler exposes the consumer-facing queries before LS cutover work starts.
+---
+# Decision: MCP Server v2 — Design for AI Authoring Quality
+
+**Date:** 2026-04-21
+**Author:** Newman (MCP Dev)
+**Status:** Proposed — awaiting owner review
+**Design doc:** `docs.next/mcp-server-design.md`
+
+---
+
+## Context
+
+The MCP server is the AI's sole interface for learning, writing, compiling, and debugging Precept — a DSL with zero LLM training data. The current 5-tool surface works but was designed before Frank's clean-room compiler architecture. This decision captures the design choices for the v2 MCP server aligned with the new compiler.
+
+## Decisions
+
+### D1: Enhance `precept_language` with type system and patterns — no new tools
+
+Add `typeSystem` (scalar types with operators/constraints/lanes, collection types with accessors/mutations, lane rules, nullability semantics) and `patterns` (5 minimal working examples covering stateful, stateless, guarded transitions, collections, computed fields) to the language tool response. This teaches composition and idiom, not just vocabulary.
+
+**Rejected:** Separate `precept_examples` tool (extra tool call, patterns are small enough to embed), `precept_teach` progressive-disclosure tool (AI can't ask about features it doesn't know exist).
+
+### D2: Enrich compile diagnostics with phase, context, and subjects
+
+Add `phase` (parse/check/verify), `context` (state/event scope), and `subjects` (affected field names) to `DiagnosticDto`. Maps directly to Frank's `Diagnostic` type which already carries this data.
+
+**Rejected:** Message-only diagnostics (unreliable for unknown language), error code lookup tables (requires extra tool call to decode).
+
+### D3: Return partial structural results under parse errors
+
+When the error-recovery parser produces partial results, the compile tool returns whatever structural data survived alongside the diagnostics. `valid: false` + partial model + diagnostics.
+
+**Rejected:** Diagnostics-only on parse failure (current behavior — AI loses all structural context).
+
+### D4: Keep 5 tools — no additions
+
+Evaluated `precept_trace` (multi-step execution), `precept_examples` (sample retrieval), `precept_explain` (NL explanation), `precept_validate_intent` (intent alignment). None clears the bar: trace is premature, examples are better embedded in language tool, explain duplicates LLM capability, intent validation is infeasible at the MCP layer.
+
+### D5: MCP and LS are peer consumers of the compiler — no coupling between them
+
+Both read from `CompilationResult` and `LanguageCatalog`. Neither imports from the other. Independent evolution, independent availability.
+
+## Compiler Dependencies
+
+The design requires Frank's `LanguageCatalog` to expose:
+- Type → constraint applicability mappings
+- Type → operator surface mappings
+- Numeric lane rules as structured data
+- Collection kind → accessor/mutation surface
+
+These are additions to the `LanguageCatalog` proposed in Frank's Q5 answer, not new artifacts.
+
+## Tradeoffs Accepted
+
+1. Language tool response grows by ~800 tokens (patterns + type system). Accepted: called once per session, avoids 2-3 compile-fix cycles.
+2. Diagnostic objects are larger. Accepted: diagnostics are the AI's primary error-recovery signal.
+3. Sequential `precept_fire` for multi-step scenarios (N calls for N steps). Accepted: each call is <10ms, AI sees intermediate state, `precept_trace` can be added later if needed.
+
+## Next Step
+
+Owner review of MCP design alongside Frank's compiler proposal and Kramer's LS design — the three consumer contracts should be reviewed together to ensure the compiler exposes what all consumers need.
+---
+### 2026-04-22: R1 RESOLVED — Static evaluator with pure functions
+**By:** Shane (owner), via findings walk-through
+**Status:** Accepted — implemented
+
+Finding 1 accepted. The runtime evaluator (`Evaluator.cs`) is a static utility class with pure functions — no instance state, no inheritance hierarchy. Single choke point for fault production via `Fail()` method. Fire/Edit/Inspect signatures deferred pending R2 (result type taxonomy) and R4 (executable model contract).
+
+**Artifact:** `src/Precept.Next/Runtime/Evaluator.cs`
+
+---
+
+### 2026-04-22: R3 accepted — Immutable entity snapshots confirm existing Version shape
+**By:** Shane (owner), via findings walk-through
+**Status:** Accepted — no code changes needed
+
+Finding 2 accepted. R3 (immutable snapshots) confirms the existing `Version` type shape is correct. This is a public API contract belonging in `runtime-api.md`, not an evaluator implementation detail in `evaluator.md`.
+
+**Design doc placement:** `docs.next/runtime/runtime-api.md` (Phase 4)
+
+---
+
+### 2026-04-22: Unified architecture proposal — merge compiler + runtime planning docs
+**By:** Shane (owner directive)
+**Status:** Accepted — implemented
+
+Merged `compiler-architecture-proposal.md` and `runtime-architecture-proposal.md` into a single `architecture-proposal.md`. Rationale: D8 (compiler emitter) and R4 (runtime executable model) are two halves of the same specification — phasing can't be read independently. A single document makes the dependency graph visible.
+
+**Key structural decisions:**
+- §3 "Emitter & Executable Model" sits at the boundary — not forced into compiler or runtime
+- Design doc for the boundary contract: `docs.next/executable-model.md` (peer to both subdirectories)
+- Decision identifiers preserved: D1-D8 (compiler), R1-R7 (runtime)
+- Unified 4-phase design work sequencing with 16-document map
+- Design docs split: `docs.next/compiler/`, `docs.next/runtime/`, `docs.next/executable-model.md`
+
+**Artifacts:** `docs.next/architecture-proposal.md` (created), old files removed
+
+---
+
+### 2026-04-22: Design doc placement — R3 belongs in runtime-api.md
+**By:** Shane (owner, challenged during walk-through)
+**Status:** Standing decision
+
+Shane challenged the initial placement of R3 (immutability guarantees). Resolution: immutability is a public API contract, not an evaluator implementation detail. R3 documentation belongs in `docs.next/runtime/runtime-api.md`, not `docs.next/runtime/evaluator.md`.
+
