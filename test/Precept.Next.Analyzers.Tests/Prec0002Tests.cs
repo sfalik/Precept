@@ -93,4 +93,18 @@ namespace Precept.Runtime
         var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<Prec0002FaultCodeMustHaveStaticallyPreventable>(source);
         diagnostics.Where(d => d.Id == Prec0002FaultCodeMustHaveStaticallyPreventable.DiagnosticId).Should().BeEmpty();
     }
+
+    [Fact]
+    public async Task Empty_FaultCode_enum_reports_nothing()
+    {
+        // An empty FaultCode enum has no members to validate — analyzer must not crash or
+        // produce spurious diagnostics. Zero members means zero violations.
+        var source = Preamble + @"
+namespace Precept.Runtime
+{
+    public enum FaultCode { }
+}";
+        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<Prec0002FaultCodeMustHaveStaticallyPreventable>(source);
+        diagnostics.Where(d => d.Id == Prec0002FaultCodeMustHaveStaticallyPreventable.DiagnosticId).Should().BeEmpty();
+    }
 }

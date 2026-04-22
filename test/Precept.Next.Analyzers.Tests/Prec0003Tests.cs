@@ -85,4 +85,43 @@ namespace Precept.Pipeline
         var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<Prec0003DiagnosticMustUseCreate>(source);
         diagnostics.Where(d => d.Id == Prec0003DiagnosticMustUseCreate.DiagnosticId).Should().BeEmpty();
     }
+
+    [Fact]    public async Task Target_typed_new_Diagnostic_reports_PREC0003()
+    {
+        // Target-typed new (Diagnostic d = new(...)) must be caught — same IObjectCreationOperation.
+        var source = DiagnosticTypeDecl + @"
+namespace Precept.Pipeline
+{
+    public class SomePipelineStage
+    {
+        public void M()
+        {
+            var range = new SourceRange();
+            Diagnostic d = new(Severity.Error, DiagnosticStage.Type, ""SomeCode"", ""message"", range);
+        }
+    }
+}";
+        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<Prec0003DiagnosticMustUseCreate>(source);
+        diagnostics.Where(d => d.Id == Prec0003DiagnosticMustUseCreate.DiagnosticId).Should().HaveCount(1);
+    }
+
+    [Fact]    public async Task Non_Create_method_in_Diagnostics_class_reports_PREC0003()
+    {
+        // The exemption is scoped to Diagnostics.Create() only.
+        // Any other method inside Diagnostics that constructs a Diagnostic directly must still be flagged.
+        var source = DiagnosticTypeDecl + @"
+namespace Precept.Pipeline
+{
+    public static class Diagnostics
+    {
+        public static Diagnostic Build()
+        {
+            var range = new SourceRange();
+            return new Diagnostic(Severity.Error, DiagnosticStage.Type, ""SomeCode"", ""message"", range);
+        }
+    }
+}";
+        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<Prec0003DiagnosticMustUseCreate>(source);
+        diagnostics.Where(d => d.Id == Prec0003DiagnosticMustUseCreate.DiagnosticId).Should().HaveCount(1);
+    }
 }

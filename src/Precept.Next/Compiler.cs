@@ -16,6 +16,7 @@ public static class Compiler
 
         ImmutableArray<Diagnostic> diagnostics =
         [
+            ..tokens.Diagnostics,
             ..tree.Diagnostics,
             ..model.Diagnostics,
             ..graph.Diagnostics,

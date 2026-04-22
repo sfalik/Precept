@@ -9,6 +9,14 @@ namespace Precept.Analyzers;
 /// PREC0001 — Every call to Fail() must pass a FaultCode as its first argument.
 /// This prevents unclassified evaluator error paths that bypass the FaultCode chain.
 /// </summary>
+/// <remarks>
+/// The check is scoped by method name only — any method named <c>Fail</c> anywhere in the
+/// codebase must supply a <c>Precept.Runtime.FaultCode</c> first argument. This is intentional:
+/// all evaluator subclasses (in any namespace) must classify their failure paths through the
+/// same FaultCode chain. Narrowing to a specific containing type would allow subclasses in
+/// other assemblies to silently bypass classification. If a third-party method named Fail is
+/// ever needed without a FaultCode, suppress PREC0001 at that call site with a justification.
+/// </remarks>
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public sealed class Prec0001FailMustUseFaultCode : DiagnosticAnalyzer
 {
@@ -41,10 +49,14 @@ public sealed class Prec0001FailMustUseFaultCode : DiagnosticAnalyzer
         if (op.TargetMethod.Name != "Fail")
             return;
 
-        // The first argument must be of type FaultCode.
+        // The first argument must be of type Precept.Runtime.FaultCode.
         // An empty Fail() or Fail(string) bypasses the classification chain.
-        if (op.Arguments.Length == 0 ||
-            op.Arguments[0].Value.Type?.Name != "FaultCode")
+        // Namespace is checked to avoid false negatives from third-party types named FaultCode.
+        var firstArgType = op.Arguments.Length > 0 ? op.Arguments[0].Value.Type : null;
+        var isFaultCode = firstArgType?.Name == "FaultCode" &&
+                          firstArgType.ContainingNamespace?.ToDisplayString() == "Precept.Runtime";
+
+        if (!isFaultCode)
         {
             ctx.ReportDiagnostic(Diagnostic.Create(Rule, op.Syntax.GetLocation()));
         }
