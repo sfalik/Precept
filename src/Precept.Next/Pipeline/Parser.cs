@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+
 namespace Precept.Pipeline;
 
 public static class Parser
