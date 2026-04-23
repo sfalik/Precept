@@ -240,6 +240,8 @@ When `{` is encountered inside a String or TypedConstant mode, the lexer pushes 
 | `{{` | `{` | Do NOT enter Interpolation mode |
 | `}}` | `}` | |
 
+Any `\X` where X is not one of the recognized sequences above emits `UnrecognizedStringEscape` — the `\` and the following character are both skipped and scanning continues. A lone `}` that is not part of `}}` emits `UnescapedBraceInLiteral`; the `}` is preserved in the token's `Text`.
+
 **Typed constant mode escapes** (`'...'` only):
 
 | Sequence | Resolves to |
@@ -249,7 +251,7 @@ When `{` is encountered inside a String or TypedConstant mode, the lexer pushes 
 | `{{` | `{` |
 | `}}` | `}` |
 
-`\n` and `\t` are not valid inside typed constants — typed constant content is opaque data (dates, durations, units), not human-readable prose. An unrecognized escape sequence inside a typed constant is an `InvalidCharacter` diagnostic.
+`\n` and `\t` are not valid inside typed constants — typed constant content is opaque data (dates, durations, units), not human-readable prose. Any unrecognized escape sequence (including `\n` and `\t`) inside a typed constant emits `UnrecognizedTypedConstantEscape` — the `\` and the following character are both skipped. A lone `}` that is not part of `}}` emits `UnescapedBraceInLiteral`; the `}` is preserved in the token's `Text`.
 
 #### List literal tokens
 

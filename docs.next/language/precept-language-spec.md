@@ -224,6 +224,8 @@ Every token the lexer can produce. Organized by category to match the `TokenKind
 
 **`Token.Text` contract for quoted literals:** `Text` contains the semantic content — delimiters stripped, escape sequences resolved. `StringLiteral` for `"hello"` → `Text = "hello"`. `StringStart` for `"Hello {` → `Text = "Hello "`. `StringEnd` for `} world"` → `Text = " world"`. `TypedConstant` for `'2026-04-23'` → `Text = "2026-04-23"`. A zero-length segment (e.g. `"{Name}"` where nothing precedes the first `{`) produces an empty `Text` — the token is still emitted.
 
+**`Token.Offset` and `Token.Length` contract for quoted literals:** `Offset` and `Length` span the full raw source range including opening and closing delimiters. `StringLiteral` for `"hello"` has `Length = 7` (both quotes included). `StringStart` for `"Hello {` spans through the `{`. This allows tools to highlight or replace the exact source text without having to re-infer delimiter positions. `Text` (content-only) and `Offset`/`Length` (raw-source span) are complementary.
+
 See [§1.3 Literal Syntax](#13-literal-syntax) for full rules. See `docs.next/compiler/literal-system.md` for the complete literal system design.
 
 #### Identifiers
@@ -436,13 +438,16 @@ Nesting is fully supported: a string interpolation expression can contain a type
 
 The lexer emits diagnostics for malformed input. These are collected alongside tokens in the `TokenStream`.
 
-| Condition | Severity | Description |
-|-----------|----------|-------------|
-| Input too large | Error | Source exceeds 65536 characters (64 KB); lexing is aborted, no tokens produced |
-| Unterminated string literal | Error | `"hello` with no closing `"` before end of line/source |
-| Unterminated typed constant | Error | `'2026-01-01` with no closing `'` before end of line/source |
-| Unterminated interpolation | Error | `"hello {Name` with no closing `}` |
-| Unrecognized character | Error | Character that is not part of any valid token |
+| Condition | Diagnostic Code | Severity | Description |
+|-----------|-----------------|----------|-------------|
+| Input too large | `InputTooLarge` | Error | Source exceeds 65536 characters (64 KB); lexing is aborted, no tokens produced |
+| Unterminated string literal | `UnterminatedStringLiteral` | Error | `"hello` with no closing `"` before end of line/source |
+| Unterminated typed constant | `UnterminatedTypedConstant` | Error | `'2026-01-01` with no closing `'` before end of line/source |
+| Unterminated interpolation | `UnterminatedInterpolation` | Error | `"hello {Name` with no closing `}` before end of line |
+| Unrecognized character | `InvalidCharacter` | Error | Character that is not part of any valid token |
+| Unrecognized string escape | `UnrecognizedStringEscape` | Error | `\X` inside `"..."` where X is not `"`, `\`, `n`, or `t` |
+| Unrecognized typed constant escape | `UnrecognizedTypedConstantEscape` | Error | `\X` inside `'...'` where X is not `'` or `\` (note: `\n` and `\t` are also invalid here) |
+| Unescaped `}` in literal | `UnescapedBraceInLiteral` | Error | A lone `}` inside a string or typed constant that was not doubled (`}}`) |
 
 The lexer continues scanning after diagnostics to maximize token recovery for downstream error reporting.
 
@@ -456,6 +461,9 @@ Each error condition has a defined recovery boundary:
 | Unterminated typed constant | Scan to end of current line; resume in `Normal` mode on the next line | Same as above for `'...'` literals |
 | Unterminated interpolation | Scan forward for a `}` at depth 0; if none found before end of current line, resume in the enclosing literal mode at the next line | Recovers the enclosing literal context where possible |
 | Unrecognized character | Skip the single character; resume scanning at the next character | Minimal disruption — one bad character should not invalidate surrounding tokens |
+| Unrecognized string escape | Skip the `\` and the following character; continue in `String` mode | Preserves surrounding content; the bad sequence is omitted from `Text` |
+| Unrecognized typed constant escape | Skip the `\` and the following character; continue in `TypedConstant` mode | Same as above |
+| Unescaped `}` in literal | Preserve the `}` as literal content in the token's `Text`; continue scanning | Recovers the character so surrounding content remains intact |
 
 In all cases the invalid source span still produces a diagnostic with the correct `SourceRange`. Post-recovery tokens are emitted normally so the parser and downstream stages can report additional errors.
 
