@@ -9,6 +9,9 @@
 - README form work is mostly hierarchy, line economy, and plaintext resilience.
 - Preview concepts must be validated against realistic sample complexity, not only small demo precepts.
 - Verdict modifiers are strongest as subtle authored-intent cues layered beneath runtime outcomes.
+- Diagnostic messages must pass the domain-author test, not just the developer test. "Typed constant," "interpolation expression," "member accessor," and "provably unsatisfiable" all fail. The audience thinks in fields, values, states, conditions — not tokens, types, and satisfiability.
+- `InvalidCharacter` is the single most structurally broken diagnostic in the lexer: it covers three completely different problems (invalid source char, unrecognized escape, lone `}` in a text value) with one undifferentiated message. Each needs its own code and fix-oriented message.
+- The lone `}` case is the highest-probability first-contact failure for domain authors using interpolation in text values. It has zero instructional value in the current message.
 
 ## Recent Updates
 

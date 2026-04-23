@@ -8,6 +8,9 @@ public enum DiagnosticCode
     UnterminatedTypedConstant,
     UnterminatedInterpolation,
     InvalidCharacter,
+    UnrecognizedStringEscape,
+    UnrecognizedTypedConstantEscape,
+    UnescapedBraceInLiteral,
 
     // ── Parse ────────────────────────────────────────────
     ExpectedToken,

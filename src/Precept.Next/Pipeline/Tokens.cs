@@ -197,10 +197,12 @@ public static class Tokens
     /// <summary>
     /// Keyword text → TokenKind lookup. Used by the lexer to classify identifier
     /// text as a keyword. Dual-use tokens appear once — the parser disambiguates.
+    /// <c>SetType</c> is explicitly excluded: the lexer always emits <c>Set</c>;
+    /// the parser synthesizes <c>SetType</c> from context.
     /// </summary>
     public static FrozenDictionary<string, TokenKind> Keywords { get; } =
         All
-            .Where(m => m.Text is not null && m.Categories.Any(c =>
+            .Where(m => m.Text is not null && m.Kind != TokenKind.SetType && m.Categories.Any(c =>
                 c is TokenCategory.Declaration or TokenCategory.Preposition
                     or TokenCategory.Control or TokenCategory.Action
                     or TokenCategory.Outcome or TokenCategory.AccessMode

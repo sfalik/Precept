@@ -1,5 +1,6 @@
+using System.Collections.Frozen;
 using System.Collections.Immutable;
-using System.Text;
+using System.Diagnostics;
 
 namespace Precept.Pipeline;
 
@@ -33,12 +34,36 @@ public static class Lexer
     private static bool IsWordChar(char c) =>
         IsLetter(c) || IsDigit(c) || c == '_';
 
+    /// <summary>
+    /// Returns a display-safe string for <paramref name="c"/>.
+    /// Printable characters are returned as-is; control and non-printable
+    /// characters are formatted as <c>\uXXXX</c> so they are visible in
+    /// diagnostic messages and IDE tooltips.
+    /// </summary>
+    private static string DisplayChar(char c) =>
+        char.IsControl(c) || char.GetUnicodeCategory(c) is
+            System.Globalization.UnicodeCategory.OtherNotAssigned or
+            System.Globalization.UnicodeCategory.Format
+            ? $"\\u{(int)c:X4}"
+            : c.ToString();
+
     private enum LexerMode
     {
         Normal,
         String,
         TypedConstant,
         Interpolation,
+    }
+
+    private struct ModeState
+    {
+        public LexerMode Mode;
+        public int SegmentIndex;
+        // Span origin for the current segment — includes the opening delimiter (" or ')
+        // on the first segment, and the closing } on subsequent segments.
+        public int SegStartOffset;
+        public int SegStartLine;
+        public int SegStartColumn;
     }
 
     private struct Scanner
@@ -49,7 +74,11 @@ public static class Lexer
         private int _column;
         private readonly ImmutableArray<Token>.Builder _tokens;
         private readonly ImmutableArray<Diagnostic>.Builder _diagnostics;
-        private readonly Stack<LexerMode> _modeStack;
+        private readonly ModeState[] _modeStack;
+        private int _modeDepth;
+        private readonly FrozenDictionary<string, TokenKind>.AlternateLookup<ReadOnlySpan<char>> _keywordLookup;
+        private char[] _contentBuffer;
+        private int _contentLength;
 
         public Scanner(string source)
         {
@@ -59,9 +88,25 @@ public static class Lexer
             _column = 1;
             _tokens = ImmutableArray.CreateBuilder<Token>();
             _diagnostics = ImmutableArray.CreateBuilder<Diagnostic>();
-            _modeStack = new Stack<LexerMode>();
-            _modeStack.Push(LexerMode.Normal);
+            _modeStack = new ModeState[MaxModeStackDepth];
+            _modeStack[0] = new ModeState { Mode = LexerMode.Normal };
+            _modeDepth = 1;
+            _keywordLookup = Tokens.Keywords.GetAlternateLookup<ReadOnlySpan<char>>();
+            _contentBuffer = new char[128];
+            _contentLength = 0;
         }
+
+        private void ResetContent() => _contentLength = 0;
+
+        private void AppendContent(char c)
+        {
+            if (_contentLength == _contentBuffer.Length)
+                Array.Resize(ref _contentBuffer, _contentBuffer.Length * 2);
+            _contentBuffer[_contentLength++] = c;
+        }
+
+        private string ContentToString() =>
+            new string(_contentBuffer.AsSpan(0, _contentLength));
 
         private bool IsAtEnd => _offset >= _source.Length;
 
@@ -70,14 +115,28 @@ public static class Lexer
         private char PeekNext =>
             _offset + 1 < _source.Length ? _source[_offset + 1] : '\0';
 
-        private LexerMode CurrentMode => _modeStack.Peek();
+        private LexerMode CurrentMode => _modeStack[_modeDepth - 1].Mode;
 
-        private void PushMode(LexerMode mode) => _modeStack.Push(mode);
+        private void PushMode(LexerMode mode, int segStartOffset, int segStartLine, int segStartColumn)
+        {
+            // The mode stack alternates literal ↔ Interpolation. A literal can only
+            // push Interpolation, and Interpolation can only push a literal. The depth
+            // check in each literal scanner (>= MaxModeStackDepth) prevents overflow
+            // before we get here, so this assert should never fire in production.
+            Debug.Assert(_modeDepth < MaxModeStackDepth, "Mode stack overflow — alternating-parity invariant violated");
+            _modeStack[_modeDepth++] = new ModeState
+            {
+                Mode = mode,
+                SegStartOffset = segStartOffset,
+                SegStartLine = segStartLine,
+                SegStartColumn = segStartColumn,
+            };
+        }
 
         private void PopMode()
         {
-            if (_modeStack.Count > 1)
-                _modeStack.Pop();
+            if (_modeDepth > 1)
+                _modeDepth--;
         }
 
         private void Advance()
@@ -107,6 +166,22 @@ public static class Lexer
 
         public TokenStream Build()
         {
+            // Emit diagnostics for any modes still open at EOF (innermost first).
+            // Normal (depth 0) is always present and needs no diagnostic.
+            for (int i = _modeDepth - 1; i >= 1; i--)
+            {
+                ref var s = ref _modeStack[i];
+                var range = new SourceRange(s.SegStartLine, s.SegStartColumn, _line, _column);
+                var code = s.Mode switch
+                {
+                    LexerMode.Interpolation  => DiagnosticCode.UnterminatedInterpolation,
+                    LexerMode.String         => DiagnosticCode.UnterminatedStringLiteral,
+                    LexerMode.TypedConstant  => DiagnosticCode.UnterminatedTypedConstant,
+                    _                        => DiagnosticCode.UnterminatedStringLiteral,
+                };
+                _diagnostics.Add(Diagnostics.Create(code, range));
+            }
+
             _tokens.Add(new Token(TokenKind.EndOfSource, "", _line, _column, _offset, 0));
             return new TokenStream(_tokens.ToImmutable(), _diagnostics.ToImmutable());
         }
@@ -125,6 +200,19 @@ public static class Lexer
             }
 
             // ── Newlines ───────────────────────────────────────────
+            // In Interpolation mode a newline terminates the expression (spec §1.8).
+            // Emit the diagnostic, pop back to the enclosing literal mode, and leave
+            // the newline unconsumed so that mode's content scanner fires its own
+            // unterminated diagnostic on the same character.
+            if ((c == '\n' || c == '\r') && CurrentMode == LexerMode.Interpolation)
+            {
+                ref var interp = ref _modeStack[_modeDepth - 1];
+                _diagnostics.Add(Diagnostics.Create(
+                    DiagnosticCode.UnterminatedInterpolation,
+                    new SourceRange(interp.SegStartLine, interp.SegStartColumn, _line, _column)));
+                PopMode(); // back to String or TypedConstant — newline left unconsumed
+                return;
+            }
             if (c == '\n')
             {
                 EmitNewLine(1);
@@ -147,8 +235,15 @@ public static class Lexer
             // ── Closing brace in Interpolation mode ────────────────
             if (c == '}' && CurrentMode == LexerMode.Interpolation)
             {
+                // Capture } position before advancing so the next segment's span includes it.
+                int closeOff = _offset, closeLine = _line, closeCol = _column;
                 Advance(); // consume '}'
                 PopMode(); // back to String or TypedConstant
+                // Update enclosing mode's segment span origin to start at the '}'.
+                ref var enclosing = ref _modeStack[_modeDepth - 1];
+                enclosing.SegStartOffset = closeOff;
+                enclosing.SegStartLine = closeLine;
+                enclosing.SegStartColumn = closeCol;
                 return;
             }
 
@@ -192,7 +287,7 @@ public static class Lexer
             _diagnostics.Add(Diagnostics.Create(
                 DiagnosticCode.InvalidCharacter,
                 new SourceRange(_line, _column, _line, _column),
-                c));
+                DisplayChar(c)));
             Advance();
         }
 
@@ -200,14 +295,30 @@ public static class Lexer
 
         private void BeginString()
         {
+            // Capture position of '"' before advancing so the token span includes it.
+            int delimOff = _offset, delimLine = _line, delimCol = _column;
             Advance(); // consume opening "
-            PushMode(LexerMode.String);
+            _modeStack[_modeDepth++] = new ModeState
+            {
+                Mode = LexerMode.String,
+                SegStartOffset = delimOff,
+                SegStartLine = delimLine,
+                SegStartColumn = delimCol,
+            };
         }
 
         private void BeginTypedConstant()
         {
+            // Capture position of '\'' before advancing so the token span includes it.
+            int delimOff = _offset, delimLine = _line, delimCol = _column;
             Advance(); // consume opening '
-            PushMode(LexerMode.TypedConstant);
+            _modeStack[_modeDepth++] = new ModeState
+            {
+                Mode = LexerMode.TypedConstant,
+                SegStartOffset = delimOff,
+                SegStartLine = delimLine,
+                SegStartColumn = delimCol,
+            };
         }
 
         /// <summary>
@@ -217,20 +328,11 @@ public static class Lexer
         /// </summary>
         private void ScanStringContent()
         {
-            int startLine = _line, startCol = _column, startOff = _offset;
-            bool hadInterpolation = false;
-            int segmentIndex = 0; // how many segments already emitted for this string
-            var content = new StringBuilder();
-
-            // Check if we're resuming after an interpolation (we'll have already
-            // emitted StringStart or StringMiddle for a prior segment).
-            // We can detect this: if the previous token is an expression token
-            // and the mode is String, we're after a } that just popped Interpolation.
-            // Actually, segmentIndex tracking: count how many StringStart/StringMiddle
-            // tokens have been emitted for the current string by scanning backwards.
-            segmentIndex = CountPriorStringSegments();
-            if (segmentIndex > 0)
-                hadInterpolation = true;
+            ref var state = ref _modeStack[_modeDepth - 1];
+            int startOff = state.SegStartOffset, startLine = state.SegStartLine, startCol = state.SegStartColumn;
+            int segmentIndex = state.SegmentIndex;
+            bool hadInterpolation = segmentIndex > 0;
+            ResetContent();
 
             while (!IsAtEnd)
             {
@@ -239,7 +341,7 @@ public static class Lexer
                 // ── End of line → unterminated ──────────────────────
                 if (c == '\n' || c == '\r')
                 {
-                    EmitStringSegment(content.ToString(), startLine, startCol, startOff,
+                    EmitStringSegment(ContentToString(), startLine, startCol, startOff,
                         hadInterpolation, segmentIndex, isFinal: false);
                     _diagnostics.Add(Diagnostics.Create(
                         DiagnosticCode.UnterminatedStringLiteral,
@@ -252,16 +354,16 @@ public static class Lexer
                 if (c == '"')
                 {
                     Advance(); // consume closing "
-                    EmitStringSegment(content.ToString(), startLine, startCol, startOff,
+                    EmitStringSegment(ContentToString(), startLine, startCol, startOff,
                         hadInterpolation, segmentIndex, isFinal: true);
                     PopMode();
                     return;
                 }
 
                 // ── Escape: \" ─────────────────────────────────────
-                if (c == '\\' && !IsAtEnd && PeekNext == '"')
+                if (c == '\\' && PeekNext == '"')
                 {
-                    content.Append('"');
+                    AppendContent('"');
                     Advance(); Advance();
                     continue;
                 }
@@ -269,7 +371,7 @@ public static class Lexer
                 // ── Escape: \\ ─────────────────────────────────────
                 if (c == '\\' && PeekNext == '\\')
                 {
-                    content.Append('\\');
+                    AppendContent('\\');
                     Advance(); Advance();
                     continue;
                 }
@@ -277,7 +379,7 @@ public static class Lexer
                 // ── Escape: \n ─────────────────────────────────────
                 if (c == '\\' && PeekNext == 'n')
                 {
-                    content.Append('\n');
+                    AppendContent('\n');
                     Advance(); Advance();
                     continue;
                 }
@@ -285,15 +387,26 @@ public static class Lexer
                 // ── Escape: \t ─────────────────────────────────────
                 if (c == '\\' && PeekNext == 't')
                 {
-                    content.Append('\t');
+                    AppendContent('\t');
                     Advance(); Advance();
+                    continue;
+                }
+
+                // ── Unrecognized escape → diagnostic ───────────────
+                if (c == '\\')
+                {
+                    _diagnostics.Add(Diagnostics.Create(
+                        DiagnosticCode.UnrecognizedStringEscape,
+                        new SourceRange(_line, _column, _line, _column),
+                        DisplayChar(PeekNext)));
+                    Advance(); Advance(); // skip \ and the unrecognized char
                     continue;
                 }
 
                 // ── Escaped brace {{ → literal { ───────────────────
                 if (c == '{' && PeekNext == '{')
                 {
-                    content.Append('{');
+                    AppendContent('{');
                     Advance(); Advance();
                     continue;
                 }
@@ -301,21 +414,33 @@ public static class Lexer
                 // ── Escaped brace }} → literal } ───────────────────
                 if (c == '}' && PeekNext == '}')
                 {
-                    content.Append('}');
+                    AppendContent('}');
                     Advance(); Advance();
+                    continue;
+                }
+
+                // ── Lone } → diagnostic (use }} for a literal }) ─────
+                if (c == '}')
+                {
+                    _diagnostics.Add(Diagnostics.Create(
+                        DiagnosticCode.UnescapedBraceInLiteral,
+                        new SourceRange(_line, _column, _line, _column)));
+                    AppendContent(c); // preserve in segment text for recovery
+                    Advance();
                     continue;
                 }
 
                 // ── Interpolation start { ──────────────────────────
                 if (c == '{')
                 {
+                    int braceOff = _offset, braceLine = _line, braceCol = _column;
                     Advance(); // consume '{'
                     hadInterpolation = true;
                     var kind = segmentIndex == 0 ? TokenKind.StringStart : TokenKind.StringMiddle;
-                    _tokens.Add(new Token(kind, content.ToString(), startLine, startCol, startOff, _offset - startOff));
-                    segmentIndex++;
+                    _tokens.Add(new Token(kind, ContentToString(), startLine, startCol, startOff, _offset - startOff));
+                    _modeStack[_modeDepth - 1].SegmentIndex = segmentIndex + 1;
 
-                    if (_modeStack.Count >= MaxModeStackDepth)
+                    if (_modeDepth >= MaxModeStackDepth)
                     {
                         _diagnostics.Add(Diagnostics.Create(
                             DiagnosticCode.UnterminatedInterpolation,
@@ -323,17 +448,17 @@ public static class Lexer
                         RecoverFromUnterminatedInterpolation();
                         return;
                     }
-                    PushMode(LexerMode.Interpolation);
+                    PushMode(LexerMode.Interpolation, braceOff, braceLine, braceCol);
                     return;
                 }
 
                 // ── Regular character ──────────────────────────────
-                content.Append(c);
+                AppendContent(c);
                 Advance();
             }
 
             // End of source without closing " → unterminated
-            EmitStringSegment(content.ToString(), startLine, startCol, startOff,
+            EmitStringSegment(ContentToString(), startLine, startCol, startOff,
                 hadInterpolation, segmentIndex, isFinal: false);
             _diagnostics.Add(Diagnostics.Create(
                 DiagnosticCode.UnterminatedStringLiteral,
@@ -367,14 +492,11 @@ public static class Lexer
         /// </summary>
         private void ScanTypedConstantContent()
         {
-            int startLine = _line, startCol = _column, startOff = _offset;
-            bool hadInterpolation = false;
-            int segmentIndex = 0;
-            var content = new StringBuilder();
-
-            segmentIndex = CountPriorTypedConstantSegments();
-            if (segmentIndex > 0)
-                hadInterpolation = true;
+            ref var state = ref _modeStack[_modeDepth - 1];
+            int startOff = state.SegStartOffset, startLine = state.SegStartLine, startCol = state.SegStartColumn;
+            int segmentIndex = state.SegmentIndex;
+            bool hadInterpolation = segmentIndex > 0;
+            ResetContent();
 
             while (!IsAtEnd)
             {
@@ -383,7 +505,7 @@ public static class Lexer
                 // ── End of line → unterminated ──────────────────────
                 if (c == '\n' || c == '\r')
                 {
-                    EmitTypedConstantSegment(content.ToString(), startLine, startCol, startOff,
+                    EmitTypedConstantSegment(ContentToString(), startLine, startCol, startOff,
                         hadInterpolation, segmentIndex, isFinal: false);
                     _diagnostics.Add(Diagnostics.Create(
                         DiagnosticCode.UnterminatedTypedConstant,
@@ -396,7 +518,7 @@ public static class Lexer
                 if (c == '\'')
                 {
                     Advance(); // consume closing '
-                    EmitTypedConstantSegment(content.ToString(), startLine, startCol, startOff,
+                    EmitTypedConstantSegment(ContentToString(), startLine, startCol, startOff,
                         hadInterpolation, segmentIndex, isFinal: true);
                     PopMode();
                     return;
@@ -405,7 +527,7 @@ public static class Lexer
                 // ── Escape: \' ─────────────────────────────────────
                 if (c == '\\' && PeekNext == '\'')
                 {
-                    content.Append('\'');
+                    AppendContent('\'');
                     Advance(); Advance();
                     continue;
                 }
@@ -413,15 +535,27 @@ public static class Lexer
                 // ── Escape: \\ ─────────────────────────────────────
                 if (c == '\\' && PeekNext == '\\')
                 {
-                    content.Append('\\');
+                    AppendContent('\\');
                     Advance(); Advance();
+                    continue;
+                }
+
+                // ── Unrecognized escape → diagnostic ───────────────
+                // (\n and \t are not valid in typed constants)
+                if (c == '\\')
+                {
+                    _diagnostics.Add(Diagnostics.Create(
+                        DiagnosticCode.UnrecognizedTypedConstantEscape,
+                        new SourceRange(_line, _column, _line, _column),
+                        DisplayChar(PeekNext)));
+                    Advance(); Advance(); // skip \ and the unrecognized char
                     continue;
                 }
 
                 // ── Escaped brace {{ → literal { ───────────────────
                 if (c == '{' && PeekNext == '{')
                 {
-                    content.Append('{');
+                    AppendContent('{');
                     Advance(); Advance();
                     continue;
                 }
@@ -429,21 +563,33 @@ public static class Lexer
                 // ── Escaped brace }} → literal } ───────────────────
                 if (c == '}' && PeekNext == '}')
                 {
-                    content.Append('}');
+                    AppendContent('}');
                     Advance(); Advance();
+                    continue;
+                }
+
+                // ── Lone } → diagnostic (use }} for a literal }) ─────
+                if (c == '}')
+                {
+                    _diagnostics.Add(Diagnostics.Create(
+                        DiagnosticCode.UnescapedBraceInLiteral,
+                        new SourceRange(_line, _column, _line, _column)));
+                    AppendContent(c); // preserve in segment text for recovery
+                    Advance();
                     continue;
                 }
 
                 // ── Interpolation start { ──────────────────────────
                 if (c == '{')
                 {
+                    int braceOff = _offset, braceLine = _line, braceCol = _column;
                     Advance(); // consume '{'
                     hadInterpolation = true;
                     var kind = segmentIndex == 0 ? TokenKind.TypedConstantStart : TokenKind.TypedConstantMiddle;
-                    _tokens.Add(new Token(kind, content.ToString(), startLine, startCol, startOff, _offset - startOff));
-                    segmentIndex++;
+                    _tokens.Add(new Token(kind, ContentToString(), startLine, startCol, startOff, _offset - startOff));
+                    _modeStack[_modeDepth - 1].SegmentIndex = segmentIndex + 1;
 
-                    if (_modeStack.Count >= MaxModeStackDepth)
+                    if (_modeDepth >= MaxModeStackDepth)
                     {
                         _diagnostics.Add(Diagnostics.Create(
                             DiagnosticCode.UnterminatedInterpolation,
@@ -451,17 +597,17 @@ public static class Lexer
                         RecoverFromUnterminatedInterpolation();
                         return;
                     }
-                    PushMode(LexerMode.Interpolation);
+                    PushMode(LexerMode.Interpolation, braceOff, braceLine, braceCol);
                     return;
                 }
 
                 // ── Regular character ──────────────────────────────
-                content.Append(c);
+                AppendContent(c);
                 Advance();
             }
 
             // End of source without closing ' → unterminated
-            EmitTypedConstantSegment(content.ToString(), startLine, startCol, startOff,
+            EmitTypedConstantSegment(ContentToString(), startLine, startCol, startOff,
                 hadInterpolation, segmentIndex, isFinal: false);
             _diagnostics.Add(Diagnostics.Create(
                 DiagnosticCode.UnterminatedTypedConstant,
@@ -488,58 +634,6 @@ public static class Lexer
         }
 
         /// <summary>
-        /// Counts how many StringStart/StringMiddle tokens trail the token list
-        /// for the current string (scanning backwards past expression tokens).
-        /// Used to determine the segment index when resuming after interpolation.
-        /// </summary>
-        private int CountPriorStringSegments()
-        {
-            int count = 0;
-            for (int i = _tokens.Count - 1; i >= 0; i--)
-            {
-                var k = _tokens[i].Kind;
-                if (k == TokenKind.StringStart || k == TokenKind.StringMiddle)
-                {
-                    count++;
-                    break; // only need to know if we had at least one
-                }
-                // Skip expression tokens (identifiers, operators, etc.)
-                // but stop if we hit a StringLiteral/StringEnd/TypedConstant* or structural token
-                // that can't be part of our current interpolated string.
-                if (k == TokenKind.StringLiteral || k == TokenKind.StringEnd
-                    || k == TokenKind.TypedConstant || k == TokenKind.TypedConstantEnd
-                    || k == TokenKind.NewLine || k == TokenKind.Comment
-                    || k == TokenKind.EndOfSource)
-                    break;
-            }
-            return count;
-        }
-
-        /// <summary>
-        /// Counts how many TypedConstantStart/TypedConstantMiddle tokens trail the token list
-        /// for the current typed constant.
-        /// </summary>
-        private int CountPriorTypedConstantSegments()
-        {
-            int count = 0;
-            for (int i = _tokens.Count - 1; i >= 0; i--)
-            {
-                var k = _tokens[i].Kind;
-                if (k == TokenKind.TypedConstantStart || k == TokenKind.TypedConstantMiddle)
-                {
-                    count++;
-                    break;
-                }
-                if (k == TokenKind.TypedConstant || k == TokenKind.TypedConstantEnd
-                    || k == TokenKind.StringLiteral || k == TokenKind.StringEnd
-                    || k == TokenKind.NewLine || k == TokenKind.Comment
-                    || k == TokenKind.EndOfSource)
-                    break;
-            }
-            return count;
-        }
-
-        /// <summary>
         /// Recovery for unterminated interpolation when max depth is exceeded.
         /// Scan forward for a <c>}</c> at depth 0; if none found before end of line,
         /// resume in the enclosing literal mode.
@@ -551,11 +645,14 @@ public static class Lexer
                 if (Current == '}')
                 {
                     Advance();
-                    return; // stay in current enclosing mode (String/TypedConstant)
+                    return; // stay in enclosing literal mode — content scanning resumes
                 }
                 Advance();
             }
-            // Hit end of line — pop back to enclosing literal mode (already there since we didn't push)
+            // Hit end of line without finding } — pop the enclosing literal mode
+            // so we don't re-enter string/typed-constant scanning and emit a
+            // second unterminated diagnostic for the same line.
+            PopMode();
         }
 
         // ── Helpers ────────────────────────────────────────────────
@@ -576,7 +673,7 @@ public static class Lexer
             while (!IsAtEnd && Current != '\n' && Current != '\r')
                 Advance();
             int len = _offset - startOff;
-            _tokens.Add(new Token(TokenKind.Comment, _source.Substring(startOff, len), startLine, startCol, startOff, len));
+            _tokens.Add(new Token(TokenKind.Comment, _source.AsSpan(startOff, len).ToString(), startLine, startCol, startOff, len));
         }
 
         private void ScanWord()
@@ -586,9 +683,9 @@ public static class Lexer
             while (!IsAtEnd && IsWordChar(Current))
                 Advance();
             int len = _offset - startOff;
-            var text = _source.Substring(startOff, len);
-            var kind = Tokens.Keywords.TryGetValue(text, out var kw) ? kw : TokenKind.Identifier;
-            _tokens.Add(new Token(kind, text, startLine, startCol, startOff, len));
+            var span = _source.AsSpan(startOff, len);
+            var kind = _keywordLookup.TryGetValue(span, out var kw) ? kw : TokenKind.Identifier;
+            _tokens.Add(new Token(kind, span.ToString(), startLine, startCol, startOff, len));
         }
 
         private void ScanNumber()
@@ -624,7 +721,7 @@ public static class Lexer
             }
 
             int len = _offset - startOff;
-            _tokens.Add(new Token(TokenKind.NumberLiteral, _source.Substring(startOff, len), startLine, startCol, startOff, len));
+            _tokens.Add(new Token(TokenKind.NumberLiteral, _source.AsSpan(startOff, len).ToString(), startLine, startCol, startOff, len));
         }
 
         private bool TryScanOperator()
