@@ -7,6 +7,7 @@
   <Project Path="src/Precept.Next.Analyzers/Precept.Next.Analyzers.csproj" />
   <Project Path="test/Precept.LanguageServer.Tests/Precept.LanguageServer.Tests.csproj" />
   <Project Path="test/Precept.Tests/Precept.Tests.csproj" />
+  <Project Path="test/Precept.Next.Tests/Precept.Next.Tests.csproj" />
   <Project Path="test/Precept.Mcp.Tests/Precept.Mcp.Tests.csproj" />
   <Project Path="test/Precept.Next.Analyzers.Tests/Precept.Next.Analyzers.Tests.csproj" />
   <Project Path="tools/Precept.LanguageServer/Precept.LanguageServer.csproj" />
