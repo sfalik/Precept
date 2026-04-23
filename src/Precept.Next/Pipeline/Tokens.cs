@@ -183,8 +183,8 @@ public static class Tokens
         TokenKind.Identifier  => new(kind, null, Cat_Id, "User-defined identifier"),
 
         // ── Structural ─────────────────────────────────────────────
-        TokenKind.EndOfFile   => new(kind, null, Cat_Str, "End of input"),
-        TokenKind.Newline     => new(kind, null, Cat_Str, "Line terminator"),
+        TokenKind.EndOfSource => new(kind, null, Cat_Str, "End of source"),
+        TokenKind.NewLine     => new(kind, null, Cat_Str, "Line terminator"),
         TokenKind.Comment     => new(kind, null, Cat_Str, "Comment"),
 
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),

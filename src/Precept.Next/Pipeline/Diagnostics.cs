@@ -11,7 +11,10 @@ public static class Diagnostics
 {
     public static DiagnosticMeta GetMeta(DiagnosticCode code) => code switch
     {
+        DiagnosticCode.InputTooLarge                 => new(nameof(DiagnosticCode.InputTooLarge),                 DiagnosticStage.Lex,   Severity.Error,   "Source input exceeds the maximum allowed size of 65536 characters"),
         DiagnosticCode.UnterminatedStringLiteral      => new(nameof(DiagnosticCode.UnterminatedStringLiteral),      DiagnosticStage.Lex,   Severity.Error,   "Unterminated string literal"),
+        DiagnosticCode.UnterminatedTypedConstant       => new(nameof(DiagnosticCode.UnterminatedTypedConstant),       DiagnosticStage.Lex,   Severity.Error,   "Unterminated typed constant"),
+        DiagnosticCode.UnterminatedInterpolation       => new(nameof(DiagnosticCode.UnterminatedInterpolation),       DiagnosticStage.Lex,   Severity.Error,   "Unterminated interpolation expression"),
         DiagnosticCode.InvalidCharacter               => new(nameof(DiagnosticCode.InvalidCharacter),               DiagnosticStage.Lex,   Severity.Error,   "Invalid character '{0}'"),
         DiagnosticCode.ExpectedToken                  => new(nameof(DiagnosticCode.ExpectedToken),                  DiagnosticStage.Parse, Severity.Error,   "Expected '{0}' but found '{1}'"),
         DiagnosticCode.UnexpectedKeyword              => new(nameof(DiagnosticCode.UnexpectedKeyword),              DiagnosticStage.Parse, Severity.Error,   "Unexpected keyword '{0}' inside {1} block"),

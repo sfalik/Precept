@@ -95,6 +95,10 @@ public enum TokenKind
     DecimalType,
     NumberType,
     ChoiceType,
+    /// <summary>
+    /// Parser-synthesized only. The lexer always emits <see cref="Set"/> for the word "set".
+    /// The parser reinterprets it as <c>SetType</c> when the preceding token is <see cref="As"/> or <see cref="Of"/>.
+    /// </summary>
     SetType,
     QueueType,
     StackType,
@@ -160,7 +164,7 @@ public enum TokenKind
     Identifier,
 
     // ── Structural ─────────────────────────────────────────────────
-    EndOfFile,
-    Newline,
+    EndOfSource,
+    NewLine,
     Comment,
 }

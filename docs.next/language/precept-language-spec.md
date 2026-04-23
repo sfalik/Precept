@@ -222,6 +222,8 @@ Every token the lexer can produce. Organized by category to match the `TokenKind
 | `TypedConstantMiddle` | `}...{` — typed constant between interpolation segments |
 | `TypedConstantEnd` | `}...'` — typed constant after last interpolation |
 
+**`Token.Text` contract for quoted literals:** `Text` contains the semantic content — delimiters stripped, escape sequences resolved. `StringLiteral` for `"hello"` → `Text = "hello"`. `StringStart` for `"Hello {` → `Text = "Hello "`. `StringEnd` for `} world"` → `Text = " world"`. `TypedConstant` for `'2026-04-23'` → `Text = "2026-04-23"`. A zero-length segment (e.g. `"{Name}"` where nothing precedes the first `{`) produces an empty `Text` — the token is still emitted.
+
 See [§1.3 Literal Syntax](#13-literal-syntax) for full rules. See `docs.next/compiler/literal-system.md` for the complete literal system design.
 
 #### Identifiers
@@ -280,16 +282,18 @@ The language has two quoted literal forms with distinct roles. Double-quoted str
 
 #### Numeric literals
 
-A numeric literal is a sequence of decimal digits, optionally containing one `.` followed by more digits. No leading `+` or `-` (unary minus is a separate operator token). No underscores or grouping separators. No exponent notation.
+A numeric literal is a sequence of decimal digits, optionally followed by a decimal part and/or an exponent part. No leading `+` or `-` (unary minus is a separate operator token). No underscores or grouping separators.
 
 ```
-NumberLiteral  :=  Digits ('.' Digits)?
+NumberLiteral  :=  Digits ('.' Digits)? (('e' | 'E') ('+' | '-')? Digits)?
 Digits         :=  [0-9]+
 ```
 
-Examples: `0`, `42`, `3.14`, `0.5`, `100.00`
+Examples: `0`, `42`, `3.14`, `0.5`, `100.00`, `1.5e2`, `1e-5`, `3.0E+10`
 
-The lexer produces a single `NumberLiteral` token. The type checker determines the specific numeric type (integer, decimal, or number) based on context (see [§3.3 Context-Sensitive Type Resolution](#33-context-sensitive-type-resolution)).
+The lexer produces a single `NumberLiteral` token for all numeric forms. The type checker determines the specific numeric type based on context (see [§3.3 Context-Sensitive Type Resolution](#33-context-sensitive-type-resolution)).
+
+**Exponent notation and numeric types:** Exponent notation (`e`/`E`) is only valid for the `number` type. It is a type error to use exponent notation in a context that requires `integer` or `decimal` — `integer` is whole numbers only, and `decimal` is exact base-10 representation where exponent form would be semantically misleading. The lexer accepts all forms; the type checker enforces the restriction.
 
 #### String literals (`"..."`)
 
@@ -305,6 +309,8 @@ String literals are delimited by double quotes. They always produce `string` typ
 → `StringStart("Hello ")`, `Identifier(Name)`, `StringMiddle(", your balance is ")`, `Identifier(Balance)`, `StringEnd("")`
 
 Interpolation is always-on — `{` inside a string always opens an interpolation expression. To include a literal `{`, escape it as `{{`. To include a literal `}`, escape it as `}}`.
+
+**Empty interpolation:** `"{}"` is lexically valid. The lexer emits `StringStart("")`, then immediately sees `}` and emits `StringEnd("")` with no expression tokens between them. The parser rejects empty interpolation as a syntax error (expected expression). Zero-length `Text` on `StringStart`/`StringEnd` is normal and expected — the lexer always emits the boundary token even when the content is empty.
 
 **Escape sequences in strings:** `\"` (double quote), `\\` (backslash), `\n` (newline), `\t` (tab), `{{` (literal brace), `}}` (literal brace).
 
@@ -375,7 +381,7 @@ Three tokens serve double duty. The lexer emits a single token kind for each; th
 
 A third use exists: `set` as an adjective in the presence operators `is set` / `is not set` (for `optional` fields). This is not a lexer disambiguation concern — the lexer emits separate `Is`, `Not`, and `Set` tokens, and the parser composes the multi-token operator.
 
-At the lexer level, `set` may produce either `Set` or `SetType` — or the lexer may produce a unified token and let the parser distinguish. The key requirement is that no ambiguity exists at LL(1): the preceding token always determines the meaning.
+**Lexer strategy (locked):** The lexer always emits `TokenKind.Set` for the word `set`. `TokenKind.SetType` is never produced by the lexer — it is a parser-synthesized token kind used in the AST to represent `set` in a type position. The `Tokens.Keywords` dictionary maps `"set"` to `TokenKind.Set` only. The parser reinterprets the `Set` token as `SetType` when the preceding token is `As` or `Of`.
 
 #### `min` / `max` — Constraint Keyword and Built-in Function
 
@@ -424,7 +430,7 @@ The lexer uses a mode stack to handle nested interpolation in string and typed-c
 | Interpolation | `"` | String (push) | (nested string inside interpolation) |
 | Interpolation | `'` | TypedConstant (push) | (nested typed constant inside interpolation) |
 
-Nesting is fully supported: a string interpolation expression can contain a typed constant, and vice versa. The mode stack depth is bounded by practical nesting limits.
+Nesting is fully supported: a string interpolation expression can contain a typed constant, and vice versa. The mode stack has a maximum depth of **8**. If a push would exceed this limit, the lexer emits an `UnterminatedInterpolation` diagnostic and resumes using the recovery rule for unterminated interpolations. Realistic nesting depth is 3 or fewer; the limit exists to prevent unbounded stack growth on adversarial input.
 
 ### 1.8 Lexer Diagnostics
 
@@ -432,12 +438,26 @@ The lexer emits diagnostics for malformed input. These are collected alongside t
 
 | Condition | Severity | Description |
 |-----------|----------|-------------|
+| Input too large | Error | Source exceeds 65536 characters (64 KB); lexing is aborted, no tokens produced |
 | Unterminated string literal | Error | `"hello` with no closing `"` before end of line/source |
 | Unterminated typed constant | Error | `'2026-01-01` with no closing `'` before end of line/source |
 | Unterminated interpolation | Error | `"hello {Name` with no closing `}` |
 | Unrecognized character | Error | Character that is not part of any valid token |
 
 The lexer continues scanning after diagnostics to maximize token recovery for downstream error reporting.
+
+#### Recovery rules
+
+Each error condition has a defined recovery boundary:
+
+| Condition | Recovery boundary | Rationale |
+|-----------|-------------------|-----------|
+| Unterminated string literal | Scan to end of current line; resume in `Normal` mode on the next line | Prevents the rest of the file from being consumed as string content |
+| Unterminated typed constant | Scan to end of current line; resume in `Normal` mode on the next line | Same as above for `'...'` literals |
+| Unterminated interpolation | Scan forward for a `}` at depth 0; if none found before end of current line, resume in the enclosing literal mode at the next line | Recovers the enclosing literal context where possible |
+| Unrecognized character | Skip the single character; resume scanning at the next character | Minimal disruption — one bad character should not invalidate surrounding tokens |
+
+In all cases the invalid source span still produces a diagnostic with the correct `SourceRange`. Post-recovery tokens are emitted normally so the parser and downstream stages can report additional errors.
 
 ---
 

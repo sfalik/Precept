@@ -38,11 +38,11 @@ Primitive literals are bare tokens — no delimiters. Type is intrinsic to the t
 
 All numeric forms produce a single `NumberLiteral` token kind. The lexer recognizes integers, decimals, and scientific notation:
 
-| Form | Examples | Notes |
-|------|----------|-------|
-| Integer | `42`, `0`, `999` | Whole digits |
-| Decimal | `3.14`, `0.001`, `100.0` | Digits with decimal point |
-| Scientific | `1.5e2`, `1e-5`, `3.0E+10` | Exponential notation |
+| Form | Examples | Valid for types | Notes |
+|------|----------|-----------------|-------|
+| Integer | `42`, `0`, `999` | `integer`, `decimal`, `number` | Whole digits |
+| Decimal | `3.14`, `0.001`, `100.0` | `decimal`, `number` | Digits with decimal point |
+| Scientific | `1.5e2`, `1e-5`, `3.0E+10` | `number` only | Exponent notation — type error for `integer`/`decimal` |
 
 **Negative numbers** are not a single token. The parser handles unary minus (`Minus` token) followed by `NumberLiteral`.
 
@@ -229,10 +229,27 @@ When `{` is encountered inside a String or TypedConstant mode, the lexer pushes 
 
 #### Escape handling
 
-- `\"` inside String mode → include literal `"` in token text, stay in String mode.
-- `\\` inside String/TypedConstant mode → include literal `\` in token text.
-- `{{` inside String/TypedConstant mode → include literal `{` in token text, do NOT enter Interpolation mode.
-- `}}` inside String/TypedConstant mode → include literal `}` in token text.
+**String mode escapes** (`"..."` only):
+
+| Sequence | Resolves to | Notes |
+|----------|------------|-------|
+| `\"` | `"` | Stay in String mode |
+| `\\` | `\` | |
+| `\n` | newline (U+000A) | String-only — not valid in typed constants |
+| `\t` | tab (U+0009) | String-only — not valid in typed constants |
+| `{{` | `{` | Do NOT enter Interpolation mode |
+| `}}` | `}` | |
+
+**Typed constant mode escapes** (`'...'` only):
+
+| Sequence | Resolves to |
+|----------|------------|
+| `\'` | `'` |
+| `\\` | `\` |
+| `{{` | `{` |
+| `}}` | `}` |
+
+`\n` and `\t` are not valid inside typed constants — typed constant content is opaque data (dates, durations, units), not human-readable prose. An unrecognized escape sequence inside a typed constant is an `InvalidCharacter` diagnostic.
 
 #### List literal tokens
 

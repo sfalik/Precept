@@ -3,7 +3,10 @@ namespace Precept.Pipeline;
 public enum DiagnosticCode
 {
     // ── Lex ──────────────────────────────────────────────
+    InputTooLarge,
     UnterminatedStringLiteral,
+    UnterminatedTypedConstant,
+    UnterminatedInterpolation,
     InvalidCharacter,
 
     // ── Parse ────────────────────────────────────────────

@@ -26,6 +26,11 @@ public readonly record struct SourceRange(
 public readonly record struct Diagnostic(
     Severity        Severity,
     DiagnosticStage Stage,
+    /// <summary>
+    /// The string identifier for this diagnostic. Always equal to <c>nameof(<see cref="DiagnosticCode"/>.XYZ)</c>
+    /// for the corresponding enum value — e.g. <c>"UnterminatedStringLiteral"</c>.
+    /// Use <see cref="Diagnostics.Create"/> to construct; never set this field directly.
+    /// </summary>
     string          Code,
     string          Message,
     SourceRange     Range
