@@ -73,11 +73,12 @@ public sealed record StateDeclaration(
     ImmutableArray<StateEntry> Entries
 ) : Declaration(Span);
 
-/// <summary>event Identifier ("," Identifier)* ("with" ArgList)?</summary>
+/// <summary>event Identifier ("," Identifier)* ("with" ArgList)? ("initial")?</summary>
 public sealed record EventDeclaration(
     SourceSpan                     Span,
     ImmutableArray<Token>          Names,
-    ImmutableArray<ArgDeclaration> Args
+    ImmutableArray<ArgDeclaration> Args,
+    bool                           IsInitial
 ) : Declaration(Span);
 
 /// <summary>rule BoolExpr WhenOpt "because" StringExpr</summary>
@@ -89,15 +90,18 @@ public sealed record RuleDeclaration(
 ) : Declaration(Span);
 
 /// <summary>
-/// "edit" FieldTarget WhenOpt                              (root-level)
-/// "in" StateTarget WhenOpt "edit" FieldTarget             (state-scoped)
+/// "in" StateTarget AccessMode FieldTarget ("when" Guard)?   (state-scoped)
+/// "write" FieldTarget                                        (root-level stateless)
 /// </summary>
-public sealed record EditDeclaration(
+public sealed record AccessModeDeclaration(
     SourceSpan   Span,
-    StateTarget? StateScope,
-    Expression?  Guard,
-    FieldTarget  Fields
+    StateTarget? StateScope,    // null for root-level write
+    AccessMode   Mode,
+    FieldTarget  Fields,
+    Expression?  Guard          // only valid when Mode == Write and StateScope != null
 ) : Declaration(Span);
+
+public enum AccessMode { Write, Read, Omit }
 
 /// <summary>"from" StateTarget "on" Identifier WhenOpt ActionChain? "-&gt;" Outcome</summary>
 public sealed record TransitionRowDeclaration(
@@ -126,6 +130,13 @@ public sealed record EventEnsureDeclaration(
     Expression  Condition,
     Expression? Guard,
     Expression  Message
+) : Declaration(Span);
+
+/// <summary>"on" Identifier ActionChain — stateless event-driven mutation hook.</summary>
+public sealed record StatelessEventHookDeclaration(
+    SourceSpan                Span,
+    Token                     EventName,
+    ImmutableArray<Statement> Actions
 ) : Declaration(Span);
 
 /// <summary>"to"|"from" StateTarget ActionChain</summary>
@@ -206,7 +217,7 @@ public abstract record TypeRef(SourceSpan Span) : SyntaxNode(Span);
 
 /// <summary>Primitive scalar type: string, number, integer, decimal, boolean, temporal, domain.</summary>
 public sealed record ScalarTypeRef(
-    SourceSpan Span, ScalarTypeKind Kind
+    SourceSpan Span, ScalarTypeKind Kind, TypeQualifier? Qualifier
 ) : TypeRef(Span);
 
 /// <summary>Collection type: set of T, queue of T, stack of T.</summary>
@@ -233,12 +244,21 @@ public enum ScalarTypeKind
 
 public enum CollectionKind { Set, Queue, Stack }
 
+/// <summary>Type qualifier: "in" TypedConstant | "of" TypedConstant — narrows value domain.</summary>
+public sealed record TypeQualifier(
+    SourceSpan        Span,
+    TypeQualifierKind Kind,
+    Expression        Value    // the typed constant: 'USD', 'kg', 'length', etc.
+) : SyntaxNode(Span);
+
+public enum TypeQualifierKind { In, Of }
+
 // ── Field modifiers ────────────────────────────────────────────────────────────
 
 /// <summary>Modifier or constraint suffix on a field declaration.</summary>
 public abstract record FieldModifier(SourceSpan Span) : SyntaxNode(Span);
 
-public sealed record NullableModifier(SourceSpan Span)    : FieldModifier(Span);
+public sealed record OptionalModifier(SourceSpan Span)    : FieldModifier(Span);
 public sealed record OrderedModifier(SourceSpan Span)     : FieldModifier(Span);
 public sealed record NonnegativeModifier(SourceSpan Span) : FieldModifier(Span);
 public sealed record PositiveModifier(SourceSpan Span)    : FieldModifier(Span);
@@ -280,9 +300,9 @@ public sealed record ConditionalExpression(
     SourceSpan Span, Expression Condition, Expression Consequence, Expression Alternative
 ) : Expression(Span);
 
-/// <summary>Identifier.Member (event arg, collection member, field member).</summary>
+/// <summary>Expr.Member — dotted access (event arg, collection member, field member, chained).</summary>
 public sealed record MemberAccessExpression(
-    SourceSpan Span, Token Object, Token Member
+    SourceSpan Span, Expression Object, Token Member
 ) : Expression(Span);
 
 /// <summary>FunctionName(Arg, ...) — min, max, round, clamp.</summary>
@@ -370,7 +390,7 @@ public sealed record StateTarget(
     ImmutableArray<Token> Names
 ) : SyntaxNode(Span);
 
-/// <summary>Field target for edit declarations: "all" or Identifier ("," Identifier)*.</summary>
+/// <summary>Field target for access mode declarations: "all" or Identifier ("," Identifier)*.</summary>
 public sealed record FieldTarget(
     SourceSpan            Span,
     bool                  IsAll,

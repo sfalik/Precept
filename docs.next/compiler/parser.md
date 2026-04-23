@@ -110,11 +110,11 @@ After the `precept <Name>` header, the parser enters a loop that dispatches on t
 | `state` | `ParseStateDeclaration()` |
 | `event` | `ParseEventDeclaration()` |
 | `rule` | `ParseRuleDeclaration()` |
-| `edit` | `ParseRootEditDeclaration()` |
-| `in` | `ParseInStatement()` → StateEnsure, StateEditDecl, or StateAction |
+| `write` | `ParseRootWriteDeclaration()` |
+| `in` | `ParseInStatement()` → StateEnsure or AccessModeDeclaration |
 | `to` | `ParseToStatement()` → StateEnsure or StateAction |
 | `from` | `ParseFromStatement()` → StateEnsure, StateAction, or TransitionRow |
-| `on` | `ParseEventEnsureDeclaration()` |
+| `on` | `ParseOnStatement()` → EventEnsureDeclaration or StatelessEventHookDeclaration |
 | `EndOfSource` | exit loop |
 | _anything else_ | emit diagnostic, resync |
 
@@ -232,12 +232,13 @@ public sealed record StateDeclaration(
 ) : Declaration(Span);
 
 /// <summary>
-/// event Identifier ("," Identifier)* ("with" ArgList)?
+/// event Identifier ("," Identifier)* ("with" ArgList)? ("initial")?
 /// </summary>
 public sealed record EventDeclaration(
     SourceSpan                    Span,
     ImmutableArray<Token>         Names,
-    ImmutableArray<ArgDeclaration> Args     // empty when no "with" clause
+    ImmutableArray<ArgDeclaration> Args,     // empty when no "with" clause
+    bool                           IsInitial  // true when "initial" keyword present
 ) : Declaration(Span);
 
 /// <summary>
@@ -251,14 +252,24 @@ public sealed record RuleDeclaration(
 ) : Declaration(Span);
 
 /// <summary>
-/// "edit" FieldTarget ("when" BoolExpr)?       (root-level)
-/// "in" StateTarget ("when" BoolExpr)? "edit" FieldTarget  (state-scoped)
+/// "in" StateTarget AccessMode FieldTarget ("when" Guard)?   (state-scoped)
+/// "write" FieldTarget                                        (root-level stateless)
 /// </summary>
-public sealed record EditDeclaration(
+public sealed record AccessModeDeclaration(
     SourceSpan   Span,
-    StateTarget? StateScope,    // null for root-level edit
-    Expression?  Guard,
-    FieldTarget  Fields
+    StateTarget? StateScope,    // null for root-level write
+    AccessMode   Mode,
+    FieldTarget  Fields,
+    Expression?  Guard          // only valid when Mode == Write and StateScope != null
+) : Declaration(Span);
+
+public enum AccessMode { Write, Read, Omit }
+
+/// <summary>"on" Identifier ActionChain — stateless event-driven mutation hook.</summary>
+public sealed record StatelessEventHookDeclaration(
+    SourceSpan                Span,
+    Token                     EventName,
+    ImmutableArray<Statement> Actions
 ) : Declaration(Span);
 
 /// <summary>
@@ -390,7 +401,7 @@ public abstract record TypeRef(SourceSpan Span) : SyntaxNode(Span);
 
 /// <summary>string | number | integer | decimal | boolean + v2 temporal/domain types</summary>
 public sealed record ScalarTypeRef(
-    SourceSpan Span, ScalarTypeKind Kind
+    SourceSpan Span, ScalarTypeKind Kind, TypeQualifier? Qualifier
 ) : TypeRef(Span);
 
 /// <summary>set of T | queue of T | stack of T</summary>
@@ -416,6 +427,15 @@ public enum ScalarTypeKind
 }
 
 public enum CollectionKind { Set, Queue, Stack }
+
+/// <summary>Type qualifier: "in" TypedConstant | "of" TypedConstant — narrows value domain.</summary>
+public sealed record TypeQualifier(
+    SourceSpan        Span,
+    TypeQualifierKind Kind,
+    Expression        Value    // the typed constant: 'USD', 'kg', 'length', etc.
+) : SyntaxNode(Span);
+
+public enum TypeQualifierKind { In, Of }
 ```
 
 ---
@@ -425,7 +445,7 @@ public enum CollectionKind { Set, Queue, Stack }
 ```csharp
 public abstract record FieldModifier(SourceSpan Span) : SyntaxNode(Span);
 
-public sealed record NullableModifier(SourceSpan Span)   : FieldModifier(Span);  // "nullable" / "optional"
+public sealed record OptionalModifier(SourceSpan Span)   : FieldModifier(Span);  // "optional"
 public sealed record OrderedModifier(SourceSpan Span)    : FieldModifier(Span);
 public sealed record NonnegativeModifier(SourceSpan Span): FieldModifier(Span);
 public sealed record PositiveModifier(SourceSpan Span)   : FieldModifier(Span);
@@ -461,8 +481,8 @@ public sealed record ContainsExpression(
     SourceSpan Span, Expression Collection, Expression Value
 ) : Expression(Span);
 
-/// <summary>Expr is null | Expr is not null</summary>
-public sealed record IsNullExpression(
+/// <summary>Expr is set | Expr is not set — presence test for optional fields.</summary>
+public sealed record IsSetExpression(
     SourceSpan Span, Expression Operand, bool IsNot
 ) : Expression(Span);
 
@@ -471,9 +491,9 @@ public sealed record ConditionalExpression(
     SourceSpan Span, Expression Condition, Expression Consequence, Expression Alternative
 ) : Expression(Span);
 
-/// <summary>Identifier.Member (event arg access, collection member, field member)</summary>
+/// <summary>Expr.Member — dotted access (event arg, collection member, field member, chained).</summary>
 public sealed record MemberAccessExpression(
-    SourceSpan Span, Token Object, Token Member
+    SourceSpan Span, Expression Object, Token Member
 ) : Expression(Span);
 
 /// <summary>FunctionName(Arg, ...) — min, max, round, clamp</summary>
@@ -519,9 +539,6 @@ public sealed record InterpolatedTypedConstantExpression(
     SourceSpan                        Span,
     ImmutableArray<InterpolationSegment> Segments
 ) : Expression(Span);
-
-/// <summary>null literal (for nullable field defaults and null-checks).</summary>
-public sealed record NullLiteralExpression(SourceSpan Span) : Expression(Span);
 
 /// <summary>[ Expr, Expr, ... ] — list literal for default values on collection fields.</summary>
 public sealed record ListLiteralExpression(
@@ -574,7 +591,7 @@ public sealed record StateTarget(
     ImmutableArray<Token> Names         // empty when IsAny
 ) : SyntaxNode(Span);
 
-/// <summary>The field target for edit declarations.</summary>
+/// <summary>The field target for access mode declarations.</summary>
 public sealed record FieldTarget(
     SourceSpan            Span,
     bool                  IsAll,        // true when "all" keyword
@@ -668,23 +685,23 @@ ParseRuleDeclaration() → RuleDeclaration
   Call:    ParseStringExpression() → Message
 ```
 
-### `edit` declaration
+### `write` / access-mode declaration
 
 ```
-ParseRootEditDeclaration() → EditDeclaration (StateScope = null)
-  Consume: edit
+ParseRootWriteDeclaration() → AccessModeDeclaration (StateScope = null, Mode = Write)
+  Consume: write
   Call:    ParseFieldTarget()
-  Optional: if Current.Kind == When → Consume When, ParseExpression(0) → Guard
+  (Guard not valid at root level)
 
 ParseInStatement() branches:
-  if peek-ahead finds "edit":
+  if peek-ahead finds "write"|"read"|"omit":
     StateScope = ParseStateTarget()
-    Optional When guard
-    Consume Edit
+    Consume AccessMode keyword → Mode
     ParseFieldTarget()
-    → EditDeclaration (StateScope set)
+    Optional: if Mode == Write and Current.Kind == When → Consume When, ParseExpression(0) → Guard
+    → AccessModeDeclaration (StateScope set)
   if "ensure":     → StateEnsureDeclaration (Anchor = In)
-  else:            → StateActionDeclaration (Anchor = From-equivalent)
+  else:            → emit diagnostic, resync (no other production begins with in)
 ```
 
 ### `in` / `to` / `from` statements
@@ -694,7 +711,7 @@ ParseInStatement() branches:
 | After preposition | Token that disambiguates | Production |
 |-------------------|--------------------------|-----------|
 | `in <target>` | `ensure` after target | `StateEnsureDeclaration` (Anchor=In) |
-| `in <target>` | `edit` after (optional when) | `EditDeclaration` (state-scoped) |
+| `in <target>` | `write`/`read`/`omit` after target | `AccessModeDeclaration` (state-scoped) |
 | `to <target>` | `ensure` after target | `StateEnsureDeclaration` (Anchor=To) |
 | `to <target>` | `->` after target | `StateActionDeclaration` (Anchor=To) |
 | `from <target>` | `ensure` after target | `StateEnsureDeclaration` (Anchor=From) |
@@ -720,6 +737,22 @@ ParseOutcome():
   else         → IsMissing TransitionOutcomeNode, emit diagnostic
 ```
 
+### `on` statement
+
+```
+ParseOnStatement()
+  Consume:  On
+  Expect:   Identifier → EventName
+  if Current.Kind == Ensure → ParseEventEnsureDeclaration(eventName)
+  else                      → ParseStatelessEventHookDeclaration(eventName)
+
+ParseStatelessEventHookDeclaration(eventName) → StatelessEventHookDeclaration
+  (On and EventName already consumed by ParseOnStatement)
+  Expect:  Arrow (→)
+  Loop:    while Current.Kind ∈ ActionKeywords → ParseActionStatement()
+  Recover: if no Arrow, emit diagnostic, resync
+```
+
 ### State/event ensure
 
 ```
@@ -731,9 +764,8 @@ ParseStateEnsureDeclaration(anchor) → StateEnsureDeclaration
   Expect:   Because
   Call:     ParseStringExpression() → Message
 
-ParseEventEnsureDeclaration() → EventEnsureDeclaration
-  Consume: On
-  Expect:  Identifier → EventName
+ParseEventEnsureDeclaration(eventName) → EventEnsureDeclaration
+  (On and EventName already consumed by ParseOnStatement)
   Expect:  Ensure
   (same as above for condition/guard/because)
 ```
@@ -773,6 +805,16 @@ ParseTypeRef() → TypeRef
     Consume type keyword (Set/QueueType/StackType)
     Expect: Of
     Call:   ParseScalarTypeRef() → ElementType
+
+  ScalarTypeRef (optional qualifier after type keyword):
+    Optional: if Current.Kind ∈ {In, Of} → ParseTypeQualifier() → Qualifier
+    → ScalarTypeRef(Kind, Qualifier?)
+
+ParseTypeQualifier() → TypeQualifier
+  Consume: In or Of → Kind (TypeQualifierKind)
+  Consume: TypedConstant (non-interpolated) or TypedConstantStart (interpolated)
+  Call:    ParseTypedConstantExpression() → Value
+  → TypeQualifier(Kind, Value)
 ```
 
 ---
@@ -790,7 +832,7 @@ The expression parser uses **Pratt parsing** (top-down operator precedence). `Pa
 | `not` | prefix | — | 25 | right (prefix) |
 | `==`, `!=`, `<`, `>`, `<=`, `>=` | binary infix | 30 | — | non-associative |
 | `contains` | binary infix | 40 | — | left |
-| `is` | binary infix (null-check) | 40 | — | left |
+| `is` | binary infix (presence: `is set` / `is not set`) | 40 | — | left |
 | `+`, `-` (infix) | binary infix | 50 | — | left |
 | `*`, `/`, `%` | binary infix | 60 | — | left |
 | `-` (prefix unary) | prefix | — | 65 | right (prefix) |
@@ -811,7 +853,6 @@ Non-associative comparisons: `A == B == C` is a parse error (the parser emits a 
 | `StringStart` | `ParseInterpolatedString()` |
 | `TypedConstant` | `TypedConstantExpression` |
 | `TypedConstantStart` | `ParseInterpolatedTypedConstant()` |
-| `Null` | `NullLiteralExpression` |
 | `LeftBracket` | `ParseListLiteral()` |
 | `LeftParen` | Consume, `ParseExpression(0)`, Expect RightParen → `ParenthesizedExpression` |
 | `Not` | Consume, `ParseExpression(25)` → `UnaryExpression(Not, ...)` |
@@ -835,7 +876,7 @@ private Expression Led(Expression left, Token op)
         LessThanOrEqual  => new BinaryExpression(left, BinaryOp.LessOrEqual,  ParseExpression(31), ...),
         GreaterThanOrEqual=>new BinaryExpression(left, BinaryOp.GreaterOrEqual,ParseExpression(31),...),
         Contains         => new ContainsExpression(left,                       ParseExpression(40), ...),
-        Is               => ParseIsNullExpression(left, ...),
+        Is               => ParseIsSetExpression(left, ...),
         Plus             => new BinaryExpression(left, BinaryOp.Plus,         ParseExpression(50), ...),
         Minus            => new BinaryExpression(left, BinaryOp.Minus,        ParseExpression(50), ...),
         Star             => new BinaryExpression(left, BinaryOp.Star,         ParseExpression(60), ...),
@@ -847,7 +888,7 @@ private Expression Led(Expression left, Token op)
 }
 ```
 
-`ParseIsNullExpression`: after `is`, expect optional `Not`, then `Null` keyword. Returns `IsNullExpression`.
+`ParseIsSetExpression`: after `is`, expect optional `Not`, then `Set` keyword. Returns `IsSetExpression`.
 
 `ParseConditionalExpression`: Consume `If`, `ParseExpression(0)` → Condition, Expect `Then`, `ParseExpression(0)` → Consequence, Expect `Else`, `ParseExpression(0)` → Alternative.
 
@@ -969,7 +1010,6 @@ private void SkipToNextSyncPoint()
 | `To`       | `to` |
 | `In`       | `in` |
 | `On`       | `on` |
-| `Edit`     | `edit` |
 
 These are the unambiguous top-level starters — every one of them can only appear at the beginning of a new declaration. Continuation tokens (`when`, `->`, `set`, `transition`, `ensure`, `because`, constraint keywords) are never sync points: they always appear mid-production and would cause the parser to skip valid content if used as resync anchors.
 
