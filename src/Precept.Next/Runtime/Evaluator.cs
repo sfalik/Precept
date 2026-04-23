@@ -22,8 +22,30 @@ namespace Precept.Runtime;
 /// </remarks>
 public static class Evaluator
 {
-    // TODO: Fire / Edit / Inspect signatures pending R2 (result type taxonomy)
-    // and R4 (executable model contract).
+    // ── Commit ──────────────────────────────────────────────────────
+    // TODO D8/R4: All string parameters become typed metadata descriptors from
+    // the executable model. The evaluator consumes descriptors, not strings.
+
+    internal static EventOutcome Fire(Precept precept, Version version, string eventName, IReadOnlyDictionary<string, object?> args)       // TODO D8/R4: descriptor-keyed
+        => throw new NotImplementedException();
+
+    internal static UpdateOutcome Update(Precept precept, Version version, IReadOnlyDictionary<string, object?> fields)                    // TODO D8/R4: descriptor-keyed
+        => throw new NotImplementedException();
+
+    // ── Inspect ─────────────────────────────────────────────────────
+
+    internal static EventInspection InspectFire(Precept precept, Version version, string eventName, IReadOnlyDictionary<string, object?>? args)     // TODO D8/R4: descriptor-keyed
+        => throw new NotImplementedException();
+
+    internal static UpdateInspection InspectUpdate(Precept precept, Version version, IReadOnlyDictionary<string, object?>? fields)                  // TODO D8/R4: descriptor-keyed
+        => throw new NotImplementedException();
+
+    // ── Restore ─────────────────────────────────────────────────────
+
+    internal static RestoreOutcome Restore(Precept precept, string? state, IReadOnlyDictionary<string, object?> fields)                            // TODO D8/R4: descriptor-keyed
+        => throw new NotImplementedException();
+
+    // ── Fault production ────────────────────────────────────────────
 
     internal static Fault Fail(FaultCode code, params object?[] args)
         => Faults.Create(code, args);
