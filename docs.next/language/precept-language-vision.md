@@ -429,7 +429,9 @@ These types exist so the compiler can reason about domain meaning rather than pr
 
 #### Qualification system
 
-Two mutually exclusive qualifiers apply to relevant field types:
+Type qualifiers are distinct from declaration modifiers. A **modifier** asserts a structural or semantic property of the declaration itself (`terminal`, `optional`, `required`). A **type qualifier** is part of the type annotation — it narrows the set of values the field may hold. The distinction matters: modifiers affect compile-time analysis and diagnostics; type qualifiers constrain the value domain.
+
+Two mutually exclusive type qualifiers apply to relevant field types:
 
 ```precept
 field Amount as money in 'USD'

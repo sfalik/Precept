@@ -386,7 +386,18 @@ At the lexer level, `set` may produce either `Set` or `SetType` — or the lexer
 
 The `(` disambiguates: constraint keywords are never followed by `(`, function calls always are.
 
-### 1.7 Lexer Mode Stack (Interpolation)
+#### `in` / `of` — Preposition and Type Qualifier
+
+`in` and `of` each serve two roles: routing/scoping prepositions and type-position qualifiers.
+
+| Context | Role | Example |
+|---------|------|---------|
+| After a state name (`in Draft ensure ...`) | Routing preposition | `in Draft ensure Amount > 0` |
+| After a domain type in a field declaration | Type qualifier | `field Amount as money in 'USD'` |
+| After `set of`, `queue of`, `stack of` | Collection inner type | `field Tags as set of string` |
+| After a domain type in a field declaration | Dimension family qualifier | `field Distance as quantity of 'length'` |
+
+Type qualifiers narrow the value domain of the field — they are part of the type annotation, not a declaration modifier. `in '<unit>'` pins to a specific unit or currency basis. `of '<family>'` constrains to a dimension or component family. A field may use `in` or `of`, never both. The preceding token (always a type keyword or collection keyword) makes the type-qualifier role unambiguous at LL(1).
 
 The lexer uses a mode stack to handle nested interpolation in string and typed-constant literals. This ensures `{expr}` inside a literal correctly lexes the expression tokens and then returns to the literal context.
 
