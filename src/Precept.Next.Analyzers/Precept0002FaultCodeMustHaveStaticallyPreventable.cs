@@ -6,13 +6,13 @@ using Microsoft.CodeAnalysis.Diagnostics;
 namespace Precept.Analyzers;
 
 /// <summary>
-/// PREC0002 — Every FaultCode enum member must carry [StaticallyPreventable(DiagnosticCode.X)].
+/// PRECEPT0002 — Every FaultCode enum member must carry [StaticallyPreventable(DiagnosticCode.X)].
 /// This ensures every runtime fault maps to a compile-time diagnostic that prevents it.
 /// </summary>
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
-public sealed class Prec0002FaultCodeMustHaveStaticallyPreventable : DiagnosticAnalyzer
+public sealed class PRECEPT0002FaultCodeMustHaveStaticallyPreventable : DiagnosticAnalyzer
 {
-    public const string DiagnosticId = "PREC0002";
+    public const string DiagnosticId = "PRECEPT0002";
 
     private static readonly DiagnosticDescriptor Rule = new(
         DiagnosticId,

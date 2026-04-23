@@ -3,7 +3,7 @@ using Xunit;
 
 namespace Precept.Analyzers.Tests;
 
-public class Prec0002Tests
+public class PRECEPT0002Tests
 {
     private const string Preamble = @"
 namespace Precept.Pipeline
@@ -35,12 +35,12 @@ namespace Precept.Runtime
         TypeMismatch,
     }
 }";
-        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<Prec0002FaultCodeMustHaveStaticallyPreventable>(source);
-        diagnostics.Where(d => d.Id == Prec0002FaultCodeMustHaveStaticallyPreventable.DiagnosticId).Should().BeEmpty();
+        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<PRECEPT0002FaultCodeMustHaveStaticallyPreventable>(source);
+        diagnostics.Where(d => d.Id == PRECEPT0002FaultCodeMustHaveStaticallyPreventable.DiagnosticId).Should().BeEmpty();
     }
 
     [Fact]
-    public async Task Member_missing_attribute_reports_PREC0002()
+    public async Task Member_missing_attribute_reports_PRECEPT0002()
     {
         var source = Preamble + @"
 namespace Precept.Runtime
@@ -53,15 +53,15 @@ namespace Precept.Runtime
         TypeMismatch,
     }
 }";
-        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<Prec0002FaultCodeMustHaveStaticallyPreventable>(source);
+        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<PRECEPT0002FaultCodeMustHaveStaticallyPreventable>(source);
         diagnostics
-            .Where(d => d.Id == Prec0002FaultCodeMustHaveStaticallyPreventable.DiagnosticId)
+            .Where(d => d.Id == PRECEPT0002FaultCodeMustHaveStaticallyPreventable.DiagnosticId)
             .Should().ContainSingle()
             .Which.GetMessage().Should().Contain("TypeMismatch");
     }
 
     [Fact]
-    public async Task All_members_missing_attribute_each_report_PREC0002()
+    public async Task All_members_missing_attribute_each_report_PRECEPT0002()
     {
         var source = Preamble + @"
 namespace Precept.Runtime
@@ -72,9 +72,9 @@ namespace Precept.Runtime
         TypeMismatch,
     }
 }";
-        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<Prec0002FaultCodeMustHaveStaticallyPreventable>(source);
+        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<PRECEPT0002FaultCodeMustHaveStaticallyPreventable>(source);
         diagnostics
-            .Where(d => d.Id == Prec0002FaultCodeMustHaveStaticallyPreventable.DiagnosticId)
+            .Where(d => d.Id == PRECEPT0002FaultCodeMustHaveStaticallyPreventable.DiagnosticId)
             .Should().HaveCount(2);
     }
 
@@ -90,8 +90,8 @@ namespace Precept.Runtime
         Value2,
     }
 }";
-        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<Prec0002FaultCodeMustHaveStaticallyPreventable>(source);
-        diagnostics.Where(d => d.Id == Prec0002FaultCodeMustHaveStaticallyPreventable.DiagnosticId).Should().BeEmpty();
+        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<PRECEPT0002FaultCodeMustHaveStaticallyPreventable>(source);
+        diagnostics.Where(d => d.Id == PRECEPT0002FaultCodeMustHaveStaticallyPreventable.DiagnosticId).Should().BeEmpty();
     }
 
     [Fact]
@@ -104,7 +104,7 @@ namespace Precept.Runtime
 {
     public enum FaultCode { }
 }";
-        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<Prec0002FaultCodeMustHaveStaticallyPreventable>(source);
-        diagnostics.Where(d => d.Id == Prec0002FaultCodeMustHaveStaticallyPreventable.DiagnosticId).Should().BeEmpty();
+        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<PRECEPT0002FaultCodeMustHaveStaticallyPreventable>(source);
+        diagnostics.Where(d => d.Id == PRECEPT0002FaultCodeMustHaveStaticallyPreventable.DiagnosticId).Should().BeEmpty();
     }
 }

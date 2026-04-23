@@ -6,13 +6,13 @@ using Microsoft.CodeAnalysis.Operations;
 namespace Precept.Analyzers;
 
 /// <summary>
-/// PREC0003 — Diagnostic must be constructed via Diagnostics.Create(), not with new Diagnostic(...).
+/// PRECEPT0003 — Diagnostic must be constructed via Diagnostics.Create(), not with new Diagnostic(...).
 /// Direct construction bypasses the nameof()-derived Code string in the exhaustive switch.
 /// </summary>
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
-public sealed class Prec0003DiagnosticMustUseCreate : DiagnosticAnalyzer
+public sealed class PRECEPT0003DiagnosticMustUseCreate : DiagnosticAnalyzer
 {
-    public const string DiagnosticId = "PREC0003";
+    public const string DiagnosticId = "PRECEPT0003";
 
     private static readonly DiagnosticDescriptor Rule = new(
         DiagnosticId,

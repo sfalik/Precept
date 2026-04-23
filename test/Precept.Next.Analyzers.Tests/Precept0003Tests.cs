@@ -3,7 +3,7 @@ using Xunit;
 
 namespace Precept.Analyzers.Tests;
 
-public class Prec0003Tests
+public class PRECEPT0003Tests
 {
     private const string DiagnosticTypeDecl = @"
 namespace Precept.Pipeline
@@ -33,12 +33,12 @@ namespace Some.Other.Lib
         public Diagnostic M() => new Diagnostic(""x"");
     }
 }";
-        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<Prec0003DiagnosticMustUseCreate>(source);
-        diagnostics.Where(d => d.Id == Prec0003DiagnosticMustUseCreate.DiagnosticId).Should().BeEmpty();
+        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<PRECEPT0003DiagnosticMustUseCreate>(source);
+        diagnostics.Where(d => d.Id == PRECEPT0003DiagnosticMustUseCreate.DiagnosticId).Should().BeEmpty();
     }
 
     [Fact]
-    public async Task Direct_new_Precept_Pipeline_Diagnostic_reports_PREC0003()
+    public async Task Direct_new_Precept_Pipeline_Diagnostic_reports_PRECEPT0003()
     {
         var source = DiagnosticTypeDecl + @"
 namespace Precept.Pipeline
@@ -52,8 +52,8 @@ namespace Precept.Pipeline
         }
     }
 }";
-        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<Prec0003DiagnosticMustUseCreate>(source);
-        diagnostics.Where(d => d.Id == Prec0003DiagnosticMustUseCreate.DiagnosticId).Should().HaveCount(1);
+        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<PRECEPT0003DiagnosticMustUseCreate>(source);
+        diagnostics.Where(d => d.Id == PRECEPT0003DiagnosticMustUseCreate.DiagnosticId).Should().HaveCount(1);
     }
 
     [Fact]
@@ -82,11 +82,11 @@ namespace Precept.Pipeline
         }
     }
 }";
-        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<Prec0003DiagnosticMustUseCreate>(source);
-        diagnostics.Where(d => d.Id == Prec0003DiagnosticMustUseCreate.DiagnosticId).Should().BeEmpty();
+        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<PRECEPT0003DiagnosticMustUseCreate>(source);
+        diagnostics.Where(d => d.Id == PRECEPT0003DiagnosticMustUseCreate.DiagnosticId).Should().BeEmpty();
     }
 
-    [Fact]    public async Task Target_typed_new_Diagnostic_reports_PREC0003()
+    [Fact]    public async Task Target_typed_new_Diagnostic_reports_PRECEPT0003()
     {
         // Target-typed new (Diagnostic d = new(...)) must be caught — same IObjectCreationOperation.
         var source = DiagnosticTypeDecl + @"
@@ -101,11 +101,11 @@ namespace Precept.Pipeline
         }
     }
 }";
-        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<Prec0003DiagnosticMustUseCreate>(source);
-        diagnostics.Where(d => d.Id == Prec0003DiagnosticMustUseCreate.DiagnosticId).Should().HaveCount(1);
+        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<PRECEPT0003DiagnosticMustUseCreate>(source);
+        diagnostics.Where(d => d.Id == PRECEPT0003DiagnosticMustUseCreate.DiagnosticId).Should().HaveCount(1);
     }
 
-    [Fact]    public async Task Non_Create_method_in_Diagnostics_class_reports_PREC0003()
+    [Fact]    public async Task Non_Create_method_in_Diagnostics_class_reports_PRECEPT0003()
     {
         // The exemption is scoped to Diagnostics.Create() only.
         // Any other method inside Diagnostics that constructs a Diagnostic directly must still be flagged.
@@ -121,7 +121,7 @@ namespace Precept.Pipeline
         }
     }
 }";
-        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<Prec0003DiagnosticMustUseCreate>(source);
-        diagnostics.Where(d => d.Id == Prec0003DiagnosticMustUseCreate.DiagnosticId).Should().HaveCount(1);
+        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<PRECEPT0003DiagnosticMustUseCreate>(source);
+        diagnostics.Where(d => d.Id == PRECEPT0003DiagnosticMustUseCreate.DiagnosticId).Should().HaveCount(1);
     }
 }

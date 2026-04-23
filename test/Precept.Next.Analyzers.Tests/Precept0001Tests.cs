@@ -3,7 +3,7 @@ using Xunit;
 
 namespace Precept.Analyzers.Tests;
 
-public class Prec0001Tests
+public class PRECEPT0001Tests
 {
     private const string FaultCodeDecl = @"
 namespace Precept.Runtime
@@ -28,12 +28,12 @@ namespace Precept.Runtime
         }
     }
 }";
-        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<Prec0001FailMustUseFaultCode>(source);
-        diagnostics.Where(d => d.Id == Prec0001FailMustUseFaultCode.DiagnosticId).Should().BeEmpty();
+        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<PRECEPT0001FailMustUseFaultCode>(source);
+        diagnostics.Where(d => d.Id == PRECEPT0001FailMustUseFaultCode.DiagnosticId).Should().BeEmpty();
     }
 
     [Fact]
-    public async Task Fail_with_string_arg_reports_PREC0001()
+    public async Task Fail_with_string_arg_reports_PRECEPT0001()
     {
         var source = FaultCodeDecl + @"
 namespace Precept.Runtime
@@ -50,12 +50,12 @@ namespace Precept.Runtime
         }
     }
 }";
-        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<Prec0001FailMustUseFaultCode>(source);
-        diagnostics.Where(d => d.Id == Prec0001FailMustUseFaultCode.DiagnosticId).Should().HaveCount(1);
+        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<PRECEPT0001FailMustUseFaultCode>(source);
+        diagnostics.Where(d => d.Id == PRECEPT0001FailMustUseFaultCode.DiagnosticId).Should().HaveCount(1);
     }
 
     [Fact]
-    public async Task Fail_with_no_args_reports_PREC0001()
+    public async Task Fail_with_no_args_reports_PRECEPT0001()
     {
         var source = FaultCodeDecl + @"
 namespace Precept.Runtime
@@ -71,8 +71,8 @@ namespace Precept.Runtime
         }
     }
 }";
-        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<Prec0001FailMustUseFaultCode>(source);
-        diagnostics.Where(d => d.Id == Prec0001FailMustUseFaultCode.DiagnosticId).Should().HaveCount(1);
+        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<PRECEPT0001FailMustUseFaultCode>(source);
+        diagnostics.Where(d => d.Id == PRECEPT0001FailMustUseFaultCode.DiagnosticId).Should().HaveCount(1);
     }
 
     [Fact]
@@ -93,12 +93,12 @@ namespace Precept.Runtime
         }
     }
 }";
-        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<Prec0001FailMustUseFaultCode>(source);
-        diagnostics.Where(d => d.Id == Prec0001FailMustUseFaultCode.DiagnosticId).Should().BeEmpty();
+        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<PRECEPT0001FailMustUseFaultCode>(source);
+        diagnostics.Where(d => d.Id == PRECEPT0001FailMustUseFaultCode.DiagnosticId).Should().BeEmpty();
     }
 
     [Fact]
-    public async Task Multiple_Fail_violations_in_one_method_each_report_PREC0001()
+    public async Task Multiple_Fail_violations_in_one_method_each_report_PRECEPT0001()
     {
         var source = FaultCodeDecl + @"
 namespace Precept.Runtime
@@ -115,14 +115,14 @@ namespace Precept.Runtime
         }
     }
 }";
-        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<Prec0001FailMustUseFaultCode>(source);
-        diagnostics.Where(d => d.Id == Prec0001FailMustUseFaultCode.DiagnosticId).Should().HaveCount(2);
+        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<PRECEPT0001FailMustUseFaultCode>(source);
+        diagnostics.Where(d => d.Id == PRECEPT0001FailMustUseFaultCode.DiagnosticId).Should().HaveCount(2);
     }
 
     [Fact]
     public async Task Fail_in_unrelated_namespace_is_not_flagged()
     {
-        // PREC0001 only applies to Fail() methods defined in Precept.Runtime.
+        // PRECEPT0001 only applies to Fail() methods defined in Precept.Runtime.
         // A Fail() method in a third-party library must not be flagged.
         var source = @"
 namespace ThirdParty.Logging
@@ -137,14 +137,14 @@ namespace ThirdParty.Logging
         }
     }
 }";
-        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<Prec0001FailMustUseFaultCode>(source);
-        diagnostics.Where(d => d.Id == Prec0001FailMustUseFaultCode.DiagnosticId).Should().BeEmpty();
+        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<PRECEPT0001FailMustUseFaultCode>(source);
+        diagnostics.Where(d => d.Id == PRECEPT0001FailMustUseFaultCode.DiagnosticId).Should().BeEmpty();
     }
 
     [Fact]
-    public async Task Fail_with_third_party_FaultCode_reports_PREC0001()
+    public async Task Fail_with_third_party_FaultCode_reports_PRECEPT0001()
     {
-        // A type named FaultCode from a different namespace must not bypass PREC0001.
+        // A type named FaultCode from a different namespace must not bypass PRECEPT0001.
         var source = @"
 namespace ThirdParty
 {
@@ -162,7 +162,7 @@ namespace Precept.Runtime
         }
     }
 }";
-        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<Prec0001FailMustUseFaultCode>(source);
-        diagnostics.Where(d => d.Id == Prec0001FailMustUseFaultCode.DiagnosticId).Should().HaveCount(1);
+        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<PRECEPT0001FailMustUseFaultCode>(source);
+        diagnostics.Where(d => d.Id == PRECEPT0001FailMustUseFaultCode.DiagnosticId).Should().HaveCount(1);
     }
 }

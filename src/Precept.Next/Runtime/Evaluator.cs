@@ -14,10 +14,10 @@ namespace Precept.Runtime;
 /// stateless/functional evaluation for pure-expression languages.
 ///
 /// Every failure path must go through <see cref="Fail"/> with a classified
-/// <see cref="FaultCode"/>. This is enforced by PREC0001. Every FaultCode
+/// <see cref="FaultCode"/>. This is enforced by PRECEPT0001. Every FaultCode
 /// must carry <see cref="StaticallyPreventableAttribute"/> linking it to the
 /// <see cref="Pipeline.DiagnosticCode"/> the compiler should have emitted —
-/// enforced by PREC0002. Together these guarantee fault–diagnostic correspondence:
+/// enforced by PRECEPT0002. Together these guarantee fault–diagnostic correspondence:
 /// if the compiler emits no errors, the evaluator should never fault.
 /// </remarks>
 public static class Evaluator

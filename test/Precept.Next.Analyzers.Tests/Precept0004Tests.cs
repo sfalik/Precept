@@ -3,7 +3,7 @@ using Xunit;
 
 namespace Precept.Analyzers.Tests;
 
-public class Prec0004Tests
+public class PRECEPT0004Tests
 {
     private const string FaultTypeDecl = @"
 namespace Precept.Runtime
@@ -17,7 +17,7 @@ namespace Precept.Runtime
 }";
 
     [Fact]
-    public async Task Direct_new_Fault_reports_PREC0004()
+    public async Task Direct_new_Fault_reports_PRECEPT0004()
     {
         var source = FaultTypeDecl + @"
 namespace Precept.Runtime
@@ -30,12 +30,12 @@ namespace Precept.Runtime
         }
     }
 }";
-        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<Prec0004FaultMustUseCreate>(source);
-        diagnostics.Where(d => d.Id == Prec0004FaultMustUseCreate.DiagnosticId).Should().HaveCount(1);
+        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<PRECEPT0004FaultMustUseCreate>(source);
+        diagnostics.Where(d => d.Id == PRECEPT0004FaultMustUseCreate.DiagnosticId).Should().HaveCount(1);
     }
 
     [Fact]
-    public async Task Target_typed_new_Fault_reports_PREC0004()
+    public async Task Target_typed_new_Fault_reports_PRECEPT0004()
     {
         // Target-typed new (Fault f = new(...)) must be caught — same IObjectCreationOperation.
         var source = FaultTypeDecl + @"
@@ -50,8 +50,8 @@ namespace Precept.Runtime
         }
     }
 }";
-        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<Prec0004FaultMustUseCreate>(source);
-        diagnostics.Where(d => d.Id == Prec0004FaultMustUseCreate.DiagnosticId).Should().HaveCount(1);
+        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<PRECEPT0004FaultMustUseCreate>(source);
+        diagnostics.Where(d => d.Id == PRECEPT0004FaultMustUseCreate.DiagnosticId).Should().HaveCount(1);
     }
 
     [Fact]
@@ -77,8 +77,8 @@ namespace Precept.Runtime
         }
     }
 }";
-        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<Prec0004FaultMustUseCreate>(source);
-        diagnostics.Where(d => d.Id == Prec0004FaultMustUseCreate.DiagnosticId).Should().BeEmpty();
+        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<PRECEPT0004FaultMustUseCreate>(source);
+        diagnostics.Where(d => d.Id == PRECEPT0004FaultMustUseCreate.DiagnosticId).Should().BeEmpty();
     }
 
     [Fact]
@@ -94,11 +94,11 @@ namespace Some.Other.Library
         public Fault M() => new Fault(""oops"");
     }
 }";
-        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<Prec0004FaultMustUseCreate>(source);
-        diagnostics.Where(d => d.Id == Prec0004FaultMustUseCreate.DiagnosticId).Should().BeEmpty();
+        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<PRECEPT0004FaultMustUseCreate>(source);
+        diagnostics.Where(d => d.Id == PRECEPT0004FaultMustUseCreate.DiagnosticId).Should().BeEmpty();
     }
 
-    [Fact]    public async Task Fully_qualified_new_Fault_from_external_namespace_reports_PREC0004()
+    [Fact]    public async Task Fully_qualified_new_Fault_from_external_namespace_reports_PRECEPT0004()
     {
         // Construction from outside Precept.Runtime using a fully qualified type name must still be flagged.
         // The analyzer checks op.Type (resolved type), not the call-site namespace.
@@ -116,12 +116,12 @@ namespace Some.Consumer
         }
     }
 }";
-        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<Prec0004FaultMustUseCreate>(source);
-        diagnostics.Where(d => d.Id == Prec0004FaultMustUseCreate.DiagnosticId).Should().HaveCount(1);
+        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<PRECEPT0004FaultMustUseCreate>(source);
+        diagnostics.Where(d => d.Id == PRECEPT0004FaultMustUseCreate.DiagnosticId).Should().HaveCount(1);
     }
 
     [Fact]
-    public async Task Non_Create_method_in_Faults_class_reports_PREC0004()
+    public async Task Non_Create_method_in_Faults_class_reports_PRECEPT0004()
     {
         // The exemption is scoped to Faults.Create() only.
         // Any other method inside Faults that constructs a Fault directly must still be flagged.
@@ -136,7 +136,7 @@ namespace Precept.Runtime
         }
     }
 }";
-        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<Prec0004FaultMustUseCreate>(source);
-        diagnostics.Where(d => d.Id == Prec0004FaultMustUseCreate.DiagnosticId).Should().HaveCount(1);
+        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<PRECEPT0004FaultMustUseCreate>(source);
+        diagnostics.Where(d => d.Id == PRECEPT0004FaultMustUseCreate.DiagnosticId).Should().HaveCount(1);
     }
 }

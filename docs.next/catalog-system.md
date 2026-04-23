@@ -133,10 +133,10 @@ The exhaustive switch enforces **catalog completeness** — every enum member mu
 
 | Rule | Invariant | What it prevents |
 |------|-----------|-----------------|
-| **PREC0001** | `Fail()` must pass a `FaultCode` as its first argument | Unclassified evaluator failure paths — a bare `Fail("some message")` bypasses the FaultCode chain |
-| **PREC0002** | Every `FaultCode` member must carry `[StaticallyPreventable(DiagnosticCode.X)]` | A runtime fault with no corresponding compile-time diagnostic — breaks the guarantee that every fault is preventable |
-| **PREC0003** | `Diagnostic` must be constructed via `Diagnostics.Create()` | Direct `new Diagnostic(...)` construction with arbitrary string codes that escape the registry |
-| **PREC0004** | `Fault` must be constructed via `Faults.Create()` | Direct `new Fault(...)` construction with arbitrary string codes that escape the registry |
+| **PRECEPT0001** | `Fail()` must pass a `FaultCode` as its first argument | Unclassified evaluator failure paths — a bare `Fail("some message")` bypasses the FaultCode chain |
+| **PRECEPT0002** | Every `FaultCode` member must carry `[StaticallyPreventable(DiagnosticCode.X)]` | A runtime fault with no corresponding compile-time diagnostic — breaks the guarantee that every fault is preventable |
+| **PRECEPT0003** | `Diagnostic` must be constructed via `Diagnostics.Create()` | Direct `new Diagnostic(...)` construction with arbitrary string codes that escape the registry |
+| **PRECEPT0004** | `Fault` must be constructed via `Faults.Create()` | Direct `new Fault(...)` construction with arbitrary string codes that escape the registry |
 
 All four are `DiagnosticSeverity.Error` with `isEnabledByDefault: true`. Combined with `<TreatWarningsAsErrors>true</TreatWarningsAsErrors>`, they are build-breaking.
 
@@ -147,7 +147,7 @@ The catalog pattern uses two enforcement layers, each covering a different class
 | Layer | Mechanism | What it enforces | Example failure |
 |-------|-----------|-----------------|-----------------|
 | **Compiler** | CS8509 (exhaustive switch) | Every enum member has a metadata entry | Add `DiagnosticCode.NewRule` without a `GetMeta()` arm → build fails |
-| **Roslyn** | PREC0001–PREC0004 | Output values go through the factory; cross-catalog linkage is present | `new Diagnostic(...)` bypassing `Diagnostics.Create()` → build fails |
+| **Roslyn** | PRECEPT0001–PRECEPT0004 | Output values go through the factory; cross-catalog linkage is present | `new Diagnostic(...)` bypassing `Diagnostics.Create()` → build fails |
 
 The compiler layer is free — it comes from the language. The Roslyn layer is the cost of the pattern: four analyzers, four test files, one analyzer project. At Precept's scale this is proportional — each rule covers a single invariant on a single type.
 

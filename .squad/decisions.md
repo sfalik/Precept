@@ -10927,7 +10927,7 @@ For every structural choice, I asked: "Am I choosing this because the language r
 ## Grounding
 
 - `docs.next/compilation-pipeline-design-v2.md` — requirements (11 requirements, 8 open questions)
-- `docs.next/precept-language-vision.md` — language target (18 compiler obligations)
+- `docs.next/language/precept-language-vision.md` — language target (18 compiler obligations)
 - `docs/philosophy.md` — product identity
 - 11 research documents in `research/architecture/` and `research/language/`
 

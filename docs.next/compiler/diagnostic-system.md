@@ -293,19 +293,19 @@ case BinaryOperator.Divide:
 | Check | Mechanism | Custom? |
 |-------|-----------|---------|
 | Catalog completeness — every `DiagnosticCode` has metadata | CS8509 exhaustive switch on `Diagnostics.GetMeta()` | No — C# compiler |
-| Fail classification — every `Fail()` uses `FaultCode` | Roslyn **PREC0001** | Yes |
-| Chain completeness — every `FaultCode` has `[StaticallyPreventable]` referencing a valid `DiagnosticCode` | Roslyn **PREC0002** | Yes |
-| Pipeline stage bypass — every `Diagnostic` is constructed via `Diagnostics.Create()` | Roslyn **PREC0003** | Yes |
+| Fail classification — every `Fail()` uses `FaultCode` | Roslyn **PRECEPT0001** | Yes |
+| Chain completeness — every `FaultCode` has `[StaticallyPreventable]` referencing a valid `DiagnosticCode` | Roslyn **PRECEPT0002** | Yes |
+| Pipeline stage bypass — every `Diagnostic` is constructed via `Diagnostics.Create()` | Roslyn **PRECEPT0003** | Yes |
 | Fault catalog completeness — every `FaultCode` has metadata | CS8509 exhaustive switch on `Faults.GetMeta()` | No — C# compiler |
 | Referenced `DiagnosticCode` member exists | Enum type safety | No — C# compiler |
-| Fault bypass — every `Fault` is constructed via `Faults.Create()` | Roslyn **PREC0004** | Yes |
+| Fault bypass — every `Fault` is constructed via `Faults.Create()` | Roslyn **PRECEPT0004** | Yes |
 
 ### The full enforcement chain — no reflection
 
 ```
 Add FaultCode.StackUnderflow
-  → PREC0001: Fail() must use FaultCode ← Roslyn
-  → PREC0002: must have [StaticallyPreventable] ← Roslyn
+  → PRECEPT0001: Fail() must use FaultCode ← Roslyn
+  → PRECEPT0002: must have [StaticallyPreventable] ← Roslyn
   → add [StaticallyPreventable(DiagnosticCode.StackUnderflow)]
   → DiagnosticCode.StackUnderflow doesn't exist ← C# compiler
   → add DiagnosticCode.StackUnderflow to the enum
@@ -318,21 +318,21 @@ Add FaultCode.StackUnderflow
 
 Every step is compiler-enforced or Roslyn-enforced. One custom attribute. Two exhaustive switches. Four Roslyn rules. The chain is unbreakable without making the build fail.
 
-### Why PREC0003 and PREC0004 are both needed
+### Why PRECEPT0003 and PRECEPT0004 are both needed
 
 `Diagnostic.Code` and `Fault.CodeName` are both `string` fields on public output types. That string is derived from the enum via `nameof()` inside `Diagnostics.Create()` and `Faults.Create()`. Without enforcement, a call site can bypass the factory and pass any arbitrary string:
 
 ```csharp
-// Bypasses nameof() derivation — PREC0003 catches this
+// Bypasses nameof() derivation — PRECEPT0003 catches this
 new Diagnostic(Severity.Error, DiagnosticStage.Type, "some-raw-string", "message", range)
 
-// Bypasses nameof() derivation — PREC0004 catches this
+// Bypasses nameof() derivation — PRECEPT0004 catches this
 new Fault(FaultCode.TypeMismatch, "some-raw-string", "message")
 ```
 
-The typed `FaultCode Code` field on `Fault` prevents one bypass — you can't use a raw string for the enum. But `string CodeName` remains open. PREC0004 closes it by requiring all `Fault` constructions to go through `Faults.Create()`.
+The typed `FaultCode Code` field on `Fault` prevents one bypass — you can't use a raw string for the enum. But `string CodeName` remains open. PRECEPT0004 closes it by requiring all `Fault` constructions to go through `Faults.Create()`.
 
-`Fault` is a public output type (returned to MCP `precept_fire`, preview inspector, and external consumers). The rule is justified by the same reasoning as PREC0003: public output types with string identity fields must derive that string from the registry, not from freeform arguments.
+`Fault` is a public output type (returned to MCP `precept_fire`, preview inspector, and external consumers). The rule is justified by the same reasoning as PRECEPT0003: public output types with string identity fields must derive that string from the registry, not from freeform arguments.
 
 ### The divide-by-zero example, end to end
 

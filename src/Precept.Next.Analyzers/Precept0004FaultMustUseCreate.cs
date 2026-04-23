@@ -6,15 +6,15 @@ using Microsoft.CodeAnalysis.Operations;
 namespace Precept.Analyzers;
 
 /// <summary>
-/// PREC0004 — Fault must be constructed via Faults.Create(), not with new Fault(...).
+/// PRECEPT0004 — Fault must be constructed via Faults.Create(), not with new Fault(...).
 /// Direct construction bypasses the nameof()-derived CodeName string in the exhaustive switch.
 /// Fault is a public output type (MCP, preview inspector, external consumers) — the same
-/// bypass pressure that justifies PREC0003 on Diagnostic applies here.
+/// bypass pressure that justifies PRECEPT0003 on Diagnostic applies here.
 /// </summary>
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
-public sealed class Prec0004FaultMustUseCreate : DiagnosticAnalyzer
+public sealed class PRECEPT0004FaultMustUseCreate : DiagnosticAnalyzer
 {
-    public const string DiagnosticId = "PREC0004";
+    public const string DiagnosticId = "PRECEPT0004";
 
     private static readonly DiagnosticDescriptor Rule = new(
         DiagnosticId,

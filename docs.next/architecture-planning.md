@@ -30,7 +30,7 @@ The two-artifact split is committed:
 - **Compilation Result** — the tooling-surface artifact (diagnostics, typed model, proof, graph). Consumed by LS and MCP. Produced by the compiler on every pipeline run, including broken input.
 - **Executable Model** — the runtime-surface artifact (dispatch tables, slot-indexed expression trees, scope-indexed constraints). Sealed, immutable, evaluation-ready. Constructed by the runtime (`Precept.From(CompilationResult)`) only from an error-free compilation result.
 
-The fault-correspondence chain is committed: `FaultCode` ↔ `DiagnosticCode` via `[StaticallyPreventable]`, with analyzers PREC0001 and PREC0002 enforcing structural coverage.
+The fault-correspondence chain is committed: `FaultCode` ↔ `DiagnosticCode` via `[StaticallyPreventable]`, with analyzers PRECEPT0001 and PRECEPT0002 enforcing structural coverage.
 
 The correctness invariant is committed: data-dependent preview queries (`Preview`, `CanFire`) MUST consume the executable model via the same evaluation path as `Fire`, guaranteeing structural semantic agreement between preview and execution.
 
@@ -542,7 +542,7 @@ The language vision's atomicity guarantee: "All mutations execute on a working c
 
 ### 4.6 Fault Production
 
-The committed fault-correspondence chain: every `FaultCode` has `[StaticallyPreventable(DiagnosticCode.X)]`. PREC0001 ensures every `Fail()` call takes a `FaultCode`. PREC0002 ensures every `FaultCode` has `[StaticallyPreventable]`.
+The committed fault-correspondence chain: every `FaultCode` has `[StaticallyPreventable(DiagnosticCode.X)]`. PRECEPT0001 ensures every `Fail()` call takes a `FaultCode`. PRECEPT0002 ensures every `FaultCode` has `[StaticallyPreventable]`.
 
 **Design questions:**
 - Concrete `FaultCode` values. Division by zero, overflow, empty-collection accessor, null dereference. Each linked to the `DiagnosticCode` that should have prevented it.

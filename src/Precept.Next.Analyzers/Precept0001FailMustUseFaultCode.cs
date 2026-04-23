@@ -6,7 +6,7 @@ using Microsoft.CodeAnalysis.Operations;
 namespace Precept.Analyzers;
 
 /// <summary>
-/// PREC0001 — Every call to Fail() must pass a FaultCode as its first argument.
+/// PRECEPT0001 — Every call to Fail() must pass a FaultCode as its first argument.
 /// This prevents unclassified evaluator error paths that bypass the FaultCode chain.
 /// </summary>
 /// <remarks>
@@ -15,9 +15,9 @@ namespace Precept.Analyzers;
 /// so name-only matching would risk false positives on third-party <c>Fail()</c> methods.
 /// </remarks>
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
-public sealed class Prec0001FailMustUseFaultCode : DiagnosticAnalyzer
+public sealed class PRECEPT0001FailMustUseFaultCode : DiagnosticAnalyzer
 {
-    public const string DiagnosticId = "PREC0001";
+    public const string DiagnosticId = "PRECEPT0001";
 
     private static readonly DiagnosticDescriptor Rule = new(
         DiagnosticId,

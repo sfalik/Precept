@@ -55,7 +55,7 @@ public static class Faults
 }
 ```
 
-Same shape as `Diagnostics`: exhaustive switch, factory, enumeration. `Create()` derives `Fault.CodeName` from `meta.Code` (which is `nameof(FaultCode.X)` from the switch arm) — not from `code.ToString()`. Roslyn rule **PREC0004** enforces that all `Fault` constructions go through `Create()`, closing the string-field bypass path. See `diagnostic-system.md` for the full PREC rule set rationale.
+Same shape as `Diagnostics`: exhaustive switch, factory, enumeration. `Create()` derives `Fault.CodeName` from `meta.Code` (which is `nameof(FaultCode.X)` from the switch arm) — not from `code.ToString()`. Roslyn rule **PRECEPT0004** enforces that all `Fault` constructions go through `Create()`, closing the string-field bypass path. See `diagnostic-system.md` for the full PREC rule set rationale.
 
 ## Open Design Questions
 
