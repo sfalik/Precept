@@ -2,7 +2,7 @@
 
 **Date:** 2026-04-22
 **Status:** Pre-design planning artifact — identifies what must be designed, in what order, grounded in what evidence
-**Inputs:** Language Vision (`docs.next/precept-language-vision.md`), 15 compiler research surveys (`research/architecture/compiler/`), Runtime Evaluator Architecture Survey (`research/architecture/runtime/runtime-evaluator-architecture-survey.md`)
+**Inputs:** Language Vision (`docs.next/language/precept-language-vision.md`), 15 compiler research surveys (`research/architecture/compiler/`), Runtime Evaluator Architecture Survey (`research/architecture/runtime/runtime-evaluator-architecture-survey.md`)
 
 ---
 
@@ -368,26 +368,123 @@ The entity is the data envelope: current state + current field data + reference 
 
 **Right-sizing:** An immutable record with a slot array and a state discriminator. The design complexity is in the construction path and working copy interaction, not the entity type itself.
 
-### 4.3 Result Types (Outcome Representation)
+### 4.3 Result Types (Outcome Representation) ✅ RESOLVED
 
-The language vision identifies 9 semantically distinct outcomes. The runtime must structurally distinguish all 9 — not via string codes or integer discriminators, but as distinct types that callers can pattern-match against.
+The runtime uses three distinct type families: commit outcomes for Fire and Update (flat, single answer), and inspection types for progressive evaluation (annotated landscape).
 
-**Design questions:**
-- Sealed hierarchy vs. discriminated union? C# sealed class hierarchy with `abstract record Outcome` and sealed subtypes is the idiomatic C# pattern. The compiler plan states: "9 outcomes must be structurally distinguishable at the C# type level (sealed hierarchy, not string codes)."
+#### Commit outcome families
 
-- Per-operation or unified result type? Fire, edit, and preview have different applicable outcome subsets. Options: unified `Outcome` with all 9 variants, or per-operation families (`FireOutcome`, `EditOutcome`, `PreviewOutcome`). The shared evaluation path between fire and preview complicates per-operation types since they share the evaluation path.
+Fire and Update each return a sealed hierarchy. Faults throw `FaultException` — they are evaluator-level errors the type checker should have prevented and do not appear in the outcome hierarchy.
 
-- What does each outcome carry? Successful outcomes carry the new entity. Failures carry violation details with semantic-subject attribution. Rejections carry the authored reason. Each variant has different payload requirements.
+```csharp
+// Event outcomes — returned by Fire
+public abstract record EventOutcome;
+public sealed record Transitioned(Version Result) : EventOutcome;
+public sealed record Applied(Version Result) : EventOutcome;          // no-transition or stateless success
+public sealed record Rejected(string Reason) : EventOutcome;          // authored reject row matched
+public sealed record InvalidArgs(string Reason) : EventOutcome;       // arg validation failure (wrong type, unknown key)
+public sealed record EventConstraintsFailed(IReadOnlyList<ConstraintViolation> Violations) : EventOutcome;
+    // ^ covers all post-fire constraints: global rules, state ensures (in/to/from), and event ensures
+public sealed record Unmatched() : EventOutcome;                      // all guards failed (including when precondition)
+public sealed record UndefinedEvent() : EventOutcome;                 // no rows for this event in current state
 
-- Fault vs. constraint violation — distinct categories. A fault is an evaluator-level error (division by zero) the type checker should have prevented. A constraint violation is normal business-rule operation. The result type must keep them separate.
+// Update outcomes — returned by Update
+public abstract record UpdateOutcome;
+public sealed record FieldWriteCommitted(Version Result) : UpdateOutcome;
+public sealed record UpdateConstraintsFailed(IReadOnlyList<ConstraintViolation> Violations) : UpdateOutcome;
+public sealed record AccessDenied(string FieldName, FieldAccessMode ActualMode) : UpdateOutcome;
+public sealed record InvalidInput(string Reason) : UpdateOutcome;
+```
+
+**Design decisions:**
+- **Two families, not one.** Fire and Update have non-overlapping outcome sets. A unified type would force callers to handle variants that cannot occur. DDD per-command result types is the closest precedent.
+- **Sealed hierarchy with exhaustive matching.** C# sealed records with pattern matching. Rust/F# evidence: exhaustive matching is the gold standard for preventing missed cases.
+- **Faults throw, not return.** A fault means the type checker has a gap — it is a compiler bug, not business operation. Temporal's `NonDeterminismException` is the precedent. Faults are not in the outcome taxonomy.
+- **`Applied` replaces `NoTransitionApplied`.** Covers both stateful no-transition outcomes and stateless event success. Stateless events are reachable — all EventOutcome variants except Transitioned apply.
+- **`Rejected` vs `InvalidArgs`.** `Rejected` is an authored business prohibition (a `reject` row matched). `InvalidArgs` is a caller error (wrong type, unknown key). Symmetric with UpdateOutcome's `InvalidInput`. DDD's "business rejection vs. invalid input" distinction applied consistently across both families.
+
+#### Inspection types
+
+`InspectFire` and `InspectUpdate` return distinct inspection types. Both carry progressive certainty annotations — the evaluator runs the full pipeline as far as available data allows.
+
+```csharp
+public enum Prospect { Certain, Possible, Impossible }
+public enum ConstraintStatus { Satisfied, Violated, Unresolvable }
+
+// UpdateInspection — returned by InspectUpdate
+// Shows all non-omitted fields (post-patch, with derived recomputation),
+// constraint status, and full row detail for all events defined in the
+// current state, evaluated against the hypothetical field state.
+public sealed record UpdateInspection(
+    IReadOnlyList<FieldSnapshot> Fields,
+    IReadOnlyList<ConstraintResult> Constraints,
+    IReadOnlyList<EventInspection> Events,            // events defined in current state only
+    Version? HypotheticalResult);
+
+// EventInspection — returned by InspectFire, also nested in UpdateInspection.Events
+public sealed record EventInspection(
+    string EventName,
+    Prospect OverallProspect,                          // reduced from Rows: any Certain/Possible → enabled
+    IReadOnlyList<ConstraintResult> EventEnsures,
+    IReadOnlyList<RowInspection> Rows);                // empty = undefined event
+
+public sealed record RowInspection(
+    Prospect Prospect,
+    RowEffect Effect,
+    IReadOnlyList<FieldSnapshot> ResultingFields,      // ALL non-omitted in target state, post-mutation
+    IReadOnlyList<ConstraintResult> Constraints,       // rules + state ensures for this row
+    Version? HypotheticalResult);                      // non-null when pipeline fully resolves
+
+// Row effects
+public abstract record RowEffect;
+public sealed record TransitionTo(string TargetState) : RowEffect;
+public sealed record NoTransition() : RowEffect;
+public sealed record Rejection(string Reason) : RowEffect;
+
+// Shared inspection primitives
+public sealed record FieldSnapshot(
+    string FieldName,
+    FieldAccessMode Mode,         // Read or Write in the target state
+    string FieldType,
+    bool IsResolved,              // false when value could not be computed (missing arg dependency)
+    object? Value);               // post-mutation value; meaningful only when IsResolved = true
+
+public sealed record ConstraintResult(
+    string Description,           // the "because" text
+    IReadOnlyList<string> FieldNames,  // attributed fields (empty for entity-level constraints)
+    ConstraintStatus Status);     // Satisfied, Violated, or Unresolvable
+
+public sealed record ArgInfo(
+    string Name,
+    string Type);                 // declared type name (string, number, boolean, etc.)
+```
+
+**Design decisions:**
+- **Inspect replaces CanFire/CanUpdate.** Inspection is not a boolean predicate — it returns a landscape of annotated possibilities. `EventInspection.OverallProspect` provides the reduced answer: any `Certain` or `Possible` row → event is enabled.
+- **InspectFire/InspectUpdate are separate, not a unified Inspect.** Fire and Update are mutually exclusive commit operations — field patches and event args produce a new Version through fundamentally different pipelines (row matching + transition vs. access-mode check + constraint evaluation). A unified `Inspect(fields?, event?, args?)` would force callers to disentangle which combination was evaluated and would conflate two non-overlapping input/output shapes. Two methods, each shaped for its use case.
+- **Update replaces Edit.** The commit verb was renamed from `Edit` to `Update` to avoid confusion with `edit` declarations in the DSL (the per-state field access blocks). `Update` also aligns with the verb triple (`omit`/`read`/`write`) — it describes what the caller does to field values, not what the precept author declares.
+- **Three-value Prospect, not four.** A fourth value (`ArgDependent`) was considered for guards that are `Possible` specifically because args are missing. Rejected: the three-value model is sufficient — the UI already knows which args are missing via `RequiredArgs` and can infer arg-absence from context. Adding a fourth value would complicate pattern matching at every consumer site for a signal that's redundant with information already on the Version surface.
+- **Progressive evaluation.** The evaluator works ahead as far as data allows. With no args, guards with arg-dependent terms are `Possible`; field-only terms resolve immediately. With partial args, the evaluator executes set assignments, recomputes derived fields, and evaluates constraints against the working copy. Each constraint carries `ConstraintStatus` (Satisfied/Violated/Unresolvable) individually.
+- **Prospect propagation.** First-match routing means a `Certain` row makes all subsequent rows `Impossible`. An `Impossible` row opens up the next row. The evaluator propagates certainty through the ordered row list.
+- **Field patches re-evaluate event prospects.** `InspectUpdate` with a field patch returns event inspections for all events defined in the current state, evaluated against the hypothetical field state — changing a field value shifts which event buttons should be enabled.
+- **All non-omitted fields in every result.** Both inspections return ALL non-omitted fields with post-evaluation values. Derived fields are recomputed. Omitted fields are absent (consistent with the omit-as-absence principle).
+- **FieldSnapshot carries `IsResolved` flag.** Distinguishes between genuinely-null field values (`IsResolved = true, Value = null`) and unresolvable slots where a required arg dependency is missing (`IsResolved = false`). The evaluator propagates unresolvability transitively through computed field chains.
+- **ConstraintResult carries field attribution.** `FieldNames` identifies which fields a constraint relates to, enabling per-field inline validation in the UI. Entity-level constraints (no specific field) have an empty list.
+- **ArgInfo replaces string-only arg names.** `RequiredArgs` returns `IReadOnlyList<ArgInfo>` with name and type, enabling the UI to render typed input controls.
+- **Always return full landscape.** Both inspection methods return the full annotated result, not a lightweight boolean or summary. At DSL scale (10–50 fields, 5–15 events) the full pipeline is sub-millisecond — premature optimization would add API surface for no measurable gain. If profiling later reveals a hot path, a lightweight mode can be added without changing the existing signature (the full inspection is strictly more information).
 
 **Survey grounding:**
-- CEL's three-value return `(ref.Val, *EvalDetails, error)` — 3-4 categories, not 9.
-- XState's `status: 'active' | 'done' | 'error'` — 3 statuses.
-- Eiffel's blame model (client vs. supplier) maps to Precept's rejection vs. constraint violation.
-- No surveyed system has 9 distinct outcomes. This is purpose-built.
+- K8s dry-run returns same type as real operation — Precept's commit operations follow this pattern.
+- XState's `transition()` returns same `State` type — preview/commit return type parity. XState v5 has 4 snapshot statuses (`active`/`done`/`error`/`stopped`).
+- Terraform plan's progressive resolution model — partial evaluation with annotation.
+- No surveyed system has progressive annotation with per-constraint certainty. Purpose-built.
 
-**Right-sizing:** 9 outcome types is more than any surveyed system, but each distinction is semantically meaningful. A sealed hierarchy with 9 leaf types is a bounded, designable surface.
+**Right-sizing:** Two commit families (7 + 4 variants = 11 leaf types) plus two inspection types with shared primitives. More outcome types than any surveyed system, but each distinction is semantically meaningful and enables exhaustive matching.
+
+**Open evaluator-design requirements** (deferred to D8/R4 and evaluator design doc):
+- Per-expression arg-dependency sets must be baked into the executable model during `Precept.From()` — a lowering-time tree walk, not a runtime check.
+- Transitive unresolvability propagation through computed field chains must be specified in the working copy design.
+- Guard evaluation under partial args must use Kleene three-value logic (short-circuit semantics for `and`/`or`/`not` with Unknown operands).
 
 ### 4.4 Constraint Evaluator
 
@@ -406,6 +503,24 @@ The language vision distinguishes two constraint evaluation modes: collect-all (
 
 **Right-sizing:** A loop over pre-bucketed constraints with working-copy evaluation. Low algorithmic complexity; design complexity is in the violation record shape and transitive attribution.
 
+**Three-tier constraint exposure model (decided):**
+
+Constraints are exposed at three tiers — each backed by `ConstraintDescriptor` as the canonical identity:
+
+| Tier | Surface | Contents | Cost |
+|------|---------|----------|------|
+| **1. Catalog** | `Precept.Constraints` | Every declared rule, ensure (all anchors), rejection | Precomputed |
+| **2. Applicable** | `Version.ApplicableConstraints` | Constraints active for current state (global rules + `in`/`from` ensures + event ensures for available events) | Precomputed |
+| **3. Evaluated** | `ConstraintResult` / `ConstraintViolation` | Per-constraint evaluation status in inspection and commit results | Evaluator |
+
+`ConstraintDescriptor` carries: kind (`Rule`, `StateEnsureIn`/`To`/`From`, `EventEnsure`), scope target (state or event name), expression text (source as written), `because` rationale, referenced fields (with transitive expansion of computed field refs), guard presence, and source line number. Transition rejections (`reject`) are NOT a constraint kind — they are author-intentional routing outcomes (`EventOutcome.Rejected`). Created during `Precept.From()`, immutable, reference-equal across all three tiers.
+
+`to <State> ensure` constraints are transitional — they do NOT appear in `Version.ApplicableConstraints` (Tier 2). They only surface in Tier 3 during inspect/fire when the target state is known from row matching. Tier 2 = "what must hold in my current state"; Tier 3 = "what was evaluated for this specific operation".
+
+**Provisional (G1/G9):** `ReferencedFields` and `ConstraintViolation.FieldNames` are flat string lists. The prototype carries a typed target hierarchy (field, event-arg, event, state, definition) for rich attribution. When metadata descriptors (D8/R4) are defined, these become typed target lists.
+
+See `docs.next/runtime/runtime-api.md` § Constraint Exposure Model for the full type definitions and tier 2 scope rules.
+
 ### 4.5 Working Copy / Atomicity Mechanism
 
 The language vision's atomicity guarantee: "All mutations execute on a working copy. Constraints are evaluated against the working copy after all mutations complete. If every constraint passes, the working copy is promoted. If any constraint fails, the working copy is discarded."
@@ -418,6 +533,8 @@ The language vision's atomicity guarantee: "All mutations execute on a working c
 - Computed field recomputation. After action chain completes, recompute in topological order on the working copy before constraint evaluation.
 
 - Working copy for preview. One working copy per event being previewed. Each independent, each discarded after evaluation.
+
+- **Working copy for inspection (R2 requirement).** Inspection working copies must carry an `IsResolved` flag per slot. Unresolvable slots arise when a `set` assignment references a missing arg. Derived fields depending on unresolvable inputs are transitively unresolvable. The recomputation loop must propagate unresolvability through the computed field dependency chain. Constraints evaluated against unresolvable slots produce `ConstraintStatus.Unresolvable` rather than spurious violations.
 
 **Research grounding:** CEL's hierarchical `Activation` (overlay-based variable resolution), OPA's store transactions (snapshot isolation), XState's pure `transition()` (compute next state without modifying current).
 
@@ -447,20 +564,79 @@ The committed fault-correspondence chain: every `FaultCode` has `[StaticallyPrev
 
 ### 4.7 Public API Surface
 
-The language vision specifies two mutating operations, a construction path, and an inspectable surface:
+The language vision specifies two mutating operations, a construction path, and an inspectable surface.
 
-1. **Fire** — send an event to an entity, producing a new version or an outcome explaining why not.
-2. **Edit** — directly mutate a `write`-accessible field, producing a new version or an outcome explaining why not.
-3. **Construction** — create an executable model from a compilation result; create an initial entity version from an executable model.
-4. **Inspection** — not a separate operation. `Version` is the inspectable surface (see §1.4). Structural queries (available events, field access modes, required args) are precomputed from graph analysis. Data-dependent queries (preview fire, preview edit, can-fire) delegate to the evaluator. Definition-level queries go through `Version.Precept`.
+**Precept carries construction and definition-level queries:**
 
-The provisional stubs place fire/edit as instance methods on `Version`. XState separates concerns: `transition(machine, state, event)` is a standalone function; the snapshot is passive data. For Precept, instance methods on the entity are a reasonable convenience API, but the underlying implementation should be the shared static evaluation function (per R1/R5).
+```csharp
+public sealed class Precept
+{
+    public static Precept From(CompilationResult compilation);
+
+    // Entity creation — mirrors Version's commit/inspect pattern
+    public EventOutcome Create(IReadOnlyDictionary<string, object?>? args = null);
+    public EventInspection InspectCreate(IReadOnlyDictionary<string, object?>? args = null);
+
+    // Entity restoration — validated reconstruction from persisted data
+    public RestoreOutcome Restore(string? state, IReadOnlyDictionary<string, object?> fields);
+
+    // Construction metadata
+    public string? InitialEvent { get; }             // null = no initial event
+
+    // Definition-level queries
+    public IReadOnlyList<string> States { get; }
+    public IReadOnlyList<string> Fields { get; }
+    public IReadOnlyList<string> Events { get; }
+    public string? InitialState { get; }
+    public bool IsStateless { get; }
+
+    // Constraint catalog (Tier 1)
+    public IReadOnlyList<ConstraintDescriptor> Constraints { get; }
+}
+```
+
+`Create` is entity construction. If the precept declares an `initial` event, `Create` fires it atomically: build hollow version (defaults + initial state + omitted fields) → fire initial event with args → return `EventOutcome`. If no initial event, constructs from defaults and returns `Applied`. `InspectCreate` provides the same progressive inspection model as `InspectFire`. The compiler enforces C100/C101 to guarantee construction coherence.
+
+**Version carries four methods — two commit, two inspect:**
+
+```csharp
+public sealed record Version
+{
+    public Precept Precept { get; }
+    public string? State { get; }                                // null for stateless
+    public object? this[string fieldName] { get; }               // throws on omitted field
+    public IReadOnlyList<FieldAccessInfo> FieldAccess { get; }   // omit = absent
+    public IReadOnlyList<string> AvailableEvents { get; }
+    public IReadOnlyList<ArgInfo> RequiredArgs(string eventName);
+
+    // Commit — require complete input, return one outcome, mutate state
+    EventOutcome    Fire(string eventName, IReadOnlyDictionary<string, object?> args);
+    UpdateOutcome   Update(IReadOnlyDictionary<string, object?> fields);
+
+    // Inspect — input optional, return annotated landscape, no mutation
+    EventInspection   InspectFire(string eventName, IReadOnlyDictionary<string, object?>? args = null);
+    UpdateInspection  InspectUpdate(IReadOnlyDictionary<string, object?>? fields = null);
+}
+```
+
+1. **Create** — construct the initial entity. If an initial event is declared, fires it with args through the full pipeline (guards, mutations, ensures, constraints). Returns `EventOutcome`. All 7 variants valid — including `Transitioned` (construction-time routing), `Rejected` (business rejection at intake). `UndefinedEvent` cannot occur (compiler guarantee).
+2. **InspectCreate** — progressive inspection of construction. Same model as `InspectFire`.
+3. **Restore** — validated reconstruction from persisted data. Accepts state + all fields, bypasses access mode checks, recomputes computed fields, evaluates constraints. Returns `RestoreOutcome`: `Restored(Version)` on success, `RestoreConstraintsFailed(Violations)` or `RestoreInvalidInput(Reason)` on failure. Restoring an entity in an invalid state is not allowed — if the definition changed, the correct response is migration (future), not silent acceptance.
+4. **Fire** — send an event to an entity, producing a new version or an outcome explaining why not.
+5. **Update** — directly mutate `write`-accessible fields, producing a new version or an outcome explaining why not. Input is a dictionary of field names to values.
+6. **InspectFire** — progressive inspection of an event. Returns all rows with certainty annotations, field snapshots per row, and constraint results. Optional args refine the landscape from Possible toward Certain.
+7. **InspectUpdate** — progressive inspection of a field edit. Returns all non-omitted fields with post-patch values, constraint results, and full event inspection for ALL events evaluated against the hypothetical field state. Optional field patch refines the landscape.
+8. **Structural queries** — `AvailableEvents`, `FieldAccess`, `RequiredArgs` are precomputed from graph analysis. Definition-level queries go through `Version.Precept`.
+
+Instance methods on `Version` are the convenience API. The underlying implementation is the shared static evaluation function (per R1/R5). See §4.3 for the full outcome and inspection type definitions.
+
+**Construction-time constraint composition:** When an initial event fires during `Create`, constraints compose in this order: (1) arg ensures on the initial event — pre-assignment validation, (2) field constraints (rules/ensures) — post-assignment, (3) global rules — always, (4) `to <InitialState> ensure` — construction-specific entry truth, (5) `in <InitialState> ensure` — while-in-state truth. No new language surface is needed: `to <InitialState> ensure` naturally serves as construction-time rules.
 
 ---
 
 ## 5. Key Design Decisions
 
-Fifteen decisions that must be resolved before implementation. D1–D8 cover compiler concerns; R1–R7 cover runtime concerns. D8 and R4 are two halves of the same specification — the executable model contract.
+Fifteen decisions that must be resolved before implementation. D1–D8 cover compiler concerns; R1–R8 cover runtime concerns. D8 and R4 are two halves of the same specification — the executable model contract.
 
 ### Compiler Decisions
 
@@ -512,6 +688,10 @@ Fifteen decisions that must be resolved before implementation. D1–D8 cover com
 **Survey grounding:** Compiler-result-to-runtime survey (CEL Program internals, OPA PreparedEvalQuery).
 **Coupling:** Couples to D1 (the compilation result is the construction input) and blocks evaluator design. This is the same specification as R4 — co-designed from both sides.
 
+**R2-derived requirement (binding):** The executable model must carry per-expression arg-dependency sets — an annotation on each expression node indicating which event arguments appear in its subtree. This is computed as a lowering-time tree walk during `Precept.From()`. Without it, the evaluator cannot distinguish field-only guards from arg-dependent guards for progressive inspection. See `docs.next/runtime/result-types.md` § Evaluator Design Requirements.
+
+**Metadata-first requirement (binding):** D8/R4 must define typed metadata descriptors (field descriptor, event descriptor, state descriptor, arg descriptor) that replace raw strings throughout the runtime API. The evaluator operates against descriptors, not strings. Descriptors carry the full compiled metadata — name, type, slot index, access modes, constraints, arg-dependency sets — and are the canonical identity for every declared element. All string placeholders in the current `Precept.Next/Runtime/` stubs are provisional gaps pending this decision.
+
 ### Runtime Decisions
 
 #### R1 — Evaluator shape ✅ RESOLVED
@@ -522,11 +702,11 @@ Fifteen decisions that must be resolved before implementation. D1–D8 cover com
 
 **Dependencies:** Blocks R3 (entity representation must know who manages the working copy). R5 resolved — Version delegates to Evaluator.
 
-#### R2 — Result type taxonomy
+#### R2 — Result type taxonomy ✅ RESOLVED
 
-**Question:** What is the shape of the result type? Sealed class hierarchy with 9 leaf types? Per-operation result families or unified?
-**Survey grounding:** CEL's three-value return, XState's 3 statuses, CUE's 2-value distinction. No surveyed system has 9 categories — purpose-built.
-**Coupling:** Couples to R1 (evaluator's return type) and R5 (preview returns the same shape as fire). Couples to R6 (violation records as payload).
+**Decision:** Two commit outcome families (EventOutcome: 7 variants, UpdateOutcome: 4 variants) plus two inspection types (EventInspection, UpdateInspection) with progressive certainty annotations. Faults throw FaultException — not in the outcome hierarchy. See §4.3 for the full type definitions.
+**Survey grounding:** CEL's three-value return, XState's 4 snapshot statuses, K8s dry-run same-type return, Terraform progressive resolution. No surveyed system has 11 categories — purpose-built.
+**Coupling:** Couples to R1 ✅ (evaluator's return type) and R5 ✅ (inspect methods on Version). Couples to R6 (violation records as payload).
 
 #### R3 — Entity representation
 
@@ -543,9 +723,9 @@ Fifteen decisions that must be resolved before implementation. D1–D8 cover com
 #### R5 — Version as inspectable surface ✅ RESOLVED
 
 **Question:** How do callers inspect the current state of an entity without committing changes?
-**Decision:** `Version` is the single inspectable surface. No separate `Inspect()` operation. Three access tiers: (1) structural queries (`AvailableEvents`, `FieldAccess`, `RequiredArgs`) precomputed from graph analysis — free; (2) data-dependent queries (`CanFire`, `Preview`, `PreviewEdit`) delegate to the evaluator via the same path as fire/edit — same fidelity, working copy discarded; (3) definition-level queries via `Version.Precept` — all states, events, fields, graph structure.
-**Survey grounding:** XState's `transition()`/`getNextSnapshot()` pair. CEL's `ExhaustiveEval`.
-**Dependencies:** Depends on R1 ✅ and R2. Depends on R4.
+**Decision:** `Version` is the single inspectable surface with four methods: `Fire`, `Update` (commit), and `InspectFire`, `InspectUpdate` (progressive inspection). Inspection runs the full evaluation pipeline as far as available data allows, annotating each row and constraint with `Prospect` (Certain/Possible/Impossible) and `ConstraintResult` (passes/fails/unresolvable). Three access tiers: (1) structural queries (`AvailableEvents`, `FieldAccess`, `RequiredArgs`) precomputed from graph analysis — free; (2) progressive inspection (`InspectFire`, `InspectUpdate`) delegates to the evaluator via the same pipeline as fire/update — same fidelity, working copy discarded, returns annotated landscape; (3) definition-level queries via `Version.Precept` — all states, events, fields, graph structure.
+**Survey grounding:** XState's `transition()`/`getNextSnapshot()` pair. CEL's `ExhaustiveEval`. Terraform plan's progressive resolution model.
+**Dependencies:** Depends on R1 ✅ and R2 ✅. Depends on R4.
 
 #### R6 — Constraint evaluation: collect-all attribution model
 
@@ -558,6 +738,41 @@ Fifteen decisions that must be resolved before implementation. D1–D8 cover com
 **Question:** What does the runtime DO when a statically-preventable fault fires despite a clean compile?
 **Survey grounding:** SPARK (proved = eliminated), Dhall (total — no faults possible), CEL (errors are values), Temporal (throw `NonDeterminismException`).
 **Coupling:** Couples to R2 (faults in result taxonomy) and committed `Fault` type shape.
+
+#### R8 — Entity construction model ✅ RESOLVED
+
+**Question:** How are entities created? `CreateInitialVersion()` was parameterless — how do callers pass initial values when the precept has required fields without defaults?
+**Decision:** Construction is modeled as an **initial event** that fires atomically during `Create`:
+
+1. `Precept.Create(args?)` returns `EventOutcome`. Internally: build hollow version (defaults + initial state + omitted fields) → if initial event declared, fire it with args → return outcome. If no initial event, evaluate computed fields + run rules/ensures → return `Applied`.
+2. `Precept.InspectCreate(args?)` returns `EventInspection` — same progressive inspection as `InspectFire`.
+3. `Precept.InitialEvent` — the initial event name, or `null`.
+4. DSL modifier: `event Create initial` (reuses existing `initial` keyword — no new syntax).
+5. Compiler enforcement: **C100** (required fields without defaults require an initial event) and **C101** (initial event must assign all required fields lacking defaults).
+6. Construction-time constraints compose naturally: arg ensures → field constraints → global rules → `to <InitialState> ensure` → `in <InitialState> ensure`. No new language surface.
+7. All 7 `EventOutcome` variants are valid at construction — including `Transitioned` (construction-time routing), `Rejected` (business rejection at intake). `UndefinedEvent` cannot occur (compiler guarantee).
+
+**Alternatives rejected:**
+- Parameterless `CreateInitialVersion()` — forced authors to either use nonsense defaults or make things optional that shouldn't be optional. No way to enforce business invariants at intake.
+- Separate construction API with its own result type — duplicated the event pipeline. Construction goes through the same guards, mutations, ensures, and constraints as any other event.
+- Builder pattern (fluent `.WithField().WithField().Build()`) — lacks the atomic guarantee and doesn't compose with the constraint system.
+
+**Survey grounding:** C# constructor parallel (constructor fires first, establishes invariants), OPA's input binding at eval time. The initial-event-as-constructor pattern is purpose-built for Precept's pipeline model.
+
+#### R9 — Entity restoration model ✅ RESOLVED
+
+**Question:** How are entities reconstituted from persisted data? Is restoration trust-based (skip validation) or validated (run constraints)?
+**Decision:** Restoration is **validated reconstruction** — restoring an entity in an invalid state is not allowed.
+
+1. `Precept.Restore(state, fields)` returns `RestoreOutcome`: `Restored(Version)`, `RestoreConstraintsFailed(Violations)`, or `RestoreInvalidInput(Reason)`.
+2. Restore is a distinct Evaluator entry point — not a mode of Fire or Update. No event matching, no mutations from rows, no access mode checks. State is set directly from caller input. All stored fields are accepted regardless of the restored state's write/read/omit declarations.
+3. Pipeline: build working copy with state + all fields → recompute computed fields → evaluate constraints (global rules + `in <State> ensure`) → return outcome.
+4. Future migration logic runs before the validation pipeline — transforming persisted data to conform to the current definition before constraints are evaluated.
+
+**Alternatives rejected:**
+- Trust-based hydration (skip validation) — if the definition changed, entities could exist in states that violate current constraints. Makes the governance guarantee hollow. Refusing to load is better than silently accepting invalid data.
+- Running the full event pipeline (Fire-without-event) — no event to match, no row to select, no mutations to apply. Restore is "here's complete data, validate it" — a distinct entry point.
+- Separate `Validate()` on Version (load then check) — splits the trust boundary across two calls. The caller could use the Version before checking. Validated restoration is atomic: you either get a valid Version or a diagnostic.
 
 ---
 
@@ -573,8 +788,12 @@ Fifteen design documents need to be written, organized across three locations by
 | 1 | Diagnostic System | `docs.next/compiler/diagnostic-system.md` | D4 | diagnostic-and-output-design-survey, proof-attribution-witness-design-survey |
 | 1 | Executable Model Contract | `docs.next/executable-model.md` | D8, R4 | CEL Program internals, OPA PreparedEvalQuery, compiler-result-to-runtime-survey |
 | 1 | Result Type Taxonomy | `docs.next/runtime/result-types.md` | R2 | CEL three-value return, XState MachineSnapshot, CUE Value/Bottom |
+| 1* | Literal System | `docs.next/compiler/literal-system.md` | Lexer decision 3 | PR #114 prototype (`docs/LiteralSystemDesign.md`), language vision § Literal System |
 | 2 | Literal Resolution Mechanism | `docs.next/compiler/literal-resolution.md` | D2 | context-sensitive-literal-typing-survey |
 | 2 | Unit/Dimension Algebra | `docs.next/compiler/unit-algebra.md` | D3 | units-of-measure-dimensional-analysis-survey, temporal-type-hierarchy-survey |
+| 2 | Numeric Lane System | `docs.next/compiler/numeric-lanes.md` | — | language vision § Numeric lane system, issue #115, PR #116 |
+| 2 | Temporal Type System | `docs.next/compiler/temporal-types.md` | — | issue #107 (PR #114 prototype), language vision § Temporal types |
+| 2 | Quantity / UOM / Money Types | `docs.next/compiler/quantity-types.md` | — | issue #95, issue #107 § Forward Design, language vision § Type System |
 | 3 | Lexer | `docs.next/compiler/lexer.md` | — | compiler-pipeline-architecture-survey |
 | 3 | Parser | `docs.next/compiler/parser.md` | D6 applied | compiler-pipeline-architecture-survey |
 | 3 | Type Checker | `docs.next/compiler/type-checker.md` | D2, D3 applied | All Phase 2 documents |
@@ -602,8 +821,11 @@ Phase 1 documents can be written in parallel with each other. They must be resol
 |----------|-------------------|
 | **Literal Resolution Mechanism** | D2 |
 | **Unit/Dimension Algebra** | D3 |
+| **Numeric Lane System** | — (type checker contracts for integer/decimal/number) |
+| **Temporal Type System** | — (type checker contracts for 8 NodaTime-backed types) |
+| **Quantity / UOM / Money Types** | — (type checker contracts for currency, quantity, price) |
 
-Phase 2 documents can be written in parallel with each other. Can overlap with Phase 1 — literal resolution and unit algebra are independent of result/diagnostic shape decisions.
+Phase 2 documents can be written in parallel with each other. Can overlap with Phase 1 — literal resolution and unit algebra are independent of result/diagnostic shape decisions. The three type system docs (numeric lanes, temporal, quantity) are clean room designs organized by the contracts the type checker needs — they will be written when the parser is complete and type checker design begins, using prototype designs on PR #114 and issues #95/#107 as reference.
 
 ### Phase 3 — Pipeline Component Designs (parallelizable)
 
@@ -743,7 +965,7 @@ Compound unit types require embedding unit dimension vectors in the type represe
 The vision mentions relational reasoning but does not define its scope. Full two-variable constraint solving expands into constraint programming. Transitive interval narrowing leaves many proofs "unresolved." **Must be pinned to a precise definition before proof engine implementation.**
 
 ### R3: Typed constant narrowing failure mode
-The two-door literal system may produce ambiguous context. Every surveyed system with literal type inference designed an explicit failure diagnostic. **Design the narrowing algorithm and its failure mode explicitly.**
+The typed constant literal system may produce ambiguous context. Every surveyed system with literal type inference designed an explicit failure diagnostic. **Design the narrowing algorithm and its failure mode explicitly.**
 
 ### R4: Proof attribution is a blocking dependency
 Every surveyed proof system designed its attribution schema before implementing the proof engine. **Design the attribution data type first — it constrains what the engine must produce.**
@@ -877,3 +1099,62 @@ public static class Evaluator
 - **R6 (Constraint attribution):** Collect-all has precedent (OPA, CUE). Semantic-subject attribution with transitive expansion has zero precedent.
 - **D3 (Unit/dimension algebra):** F# UoM is the structural reference, but coupling with proof engine has no precedent.
 - **D5 (Proof attribution schema):** Exceeds what any surveyed system provides natively.
+
+---
+
+## 12. Deferred Work Items
+
+Work items parked during the R2/runtime-API deep dive. Each has enough context to resume without reconstructing the session.
+
+### 12.1 Survey Findings Walk-Through (Findings 4–13)
+
+**Source:** `research/architecture/compiler/dry-run-preview-inspect-api-survey.md`
+
+We walked findings 1–3 from the dry-run/preview/inspect API survey. Finding 2 (result type taxonomy) triggered the R2 rabbit hole that consumed multiple sessions. Findings 4–13 have not been reviewed against the architecture plan.
+
+**Resume point:** Read findings 4–13 from the survey. For each, check whether the architecture-planning doc already addresses it, whether it surfaces a new design question, or whether it confirms an existing decision.
+
+### 12.2 D8/R4 — Executable Model Contract
+
+**Status:** Unresolved. This is the single biggest blocker. Every runtime stub has `TODO D8/R4` annotations because the runtime types are consumers of whatever the compiler produces.
+
+**What must be defined:**
+- Field descriptor shape (name, type, slot index, constraints, default, computed expression, dependency chain)
+- Event descriptor shape (name, arg contracts, which states it appears in, transition row indices)
+- State descriptor shape (name, field access modes per field, applicable ensures, entry/exit action chains)
+- Constraint descriptor internals (compiled expression tree, guard expression, slot indices — the internal side of what `ConstraintDescriptor` exposes publicly)
+- Transition dispatch table shape (keyed by what, row ordering, wildcard handling)
+- Slot-indexed expression tree node types (replacing string-keyed identifier lookups)
+
+**Approach decided:** Work forward from `CompilationResult` → `Precept.From()` → executable model. Define the producer, then let descriptor shapes flow into the runtime API.
+
+**Dependencies:** Blocks R3, R6, and all `TODO D8/R4` annotations across 7+ files.
+
+### 12.3 R3 — Entity Representation
+
+**Status:** Unresolved. Depends on D8/R4 (slot layout defines the working copy shape).
+
+**Key questions:** Immutable record vs. slot array. Working copy mechanism (clone-on-write, copy-on-fire). How `Version` snapshots entity state.
+
+### 12.4 R6 — Constraint Attribution Model
+
+**Status:** Partially resolved. The three-tier exposure model (Precept.Constraints → Version.ApplicableConstraints → ConstraintResult/ConstraintViolation) is decided. The *violation target hierarchy* is deferred — currently flat `FieldNames` strings, needs typed targets (field, event-arg, event, state, definition) once D8/R4 descriptors exist.
+
+**Prototype reference:** `src/Precept/Dsl/ConstraintViolation.cs` — the `ConstraintTarget` hierarchy and `ExpressionSubjects` AST walker are the production-validated design to port forward.
+
+### 12.5 G1/G9 — Typed Violation Target Hierarchy
+
+**Status:** Annotated as provisional. Gated on D8/R4.
+
+**What's needed:** Replace `IReadOnlyList<string> FieldNames` on `ConstraintResult` and `ConstraintViolation` with a typed target list that distinguishes field targets from arg targets from event targets from state targets. Targets should reference metadata descriptors, not strings. The prototype's `ConstraintTarget` hierarchy is the design reference.
+
+### 12.6 Remaining Survey Walk-Throughs
+
+Other surveys in `research/architecture/compiler/` that informed the planning doc but whose findings have not been individually walked:
+- `compilation-result-type-survey.md` — feeds D1
+- `compiler-result-to-runtime-survey.md` — feeds D8/R4
+- `compiler-pipeline-architecture-survey.md` — feeds Phase 3 component designs
+- `context-sensitive-literal-typing-survey.md` — feeds D2
+- `proof-engine-interval-arithmetic-survey.md` — feeds D5 and proof engine design
+
+These are lower priority — the surveys grounded the planning doc's design questions. Individual findings become relevant when the corresponding design document is being written.

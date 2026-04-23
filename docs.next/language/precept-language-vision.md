@@ -161,6 +161,7 @@ The language envelope includes these top-level forms:
 | `rule <Expr> [when <Guard>] because "..."` | Declares global data constraints |
 | `state ...` | Declares lifecycle states |
 | `event ...` | Declares triggers and typed arguments |
+| `event <Name>(...) initial` | Declares the construction event (initial event) |
 | `in/to/from <State> ensure <Expr> [when <Guard>] because "..."` | Declares state-scoped constraints |
 | `on <Event> ensure <Expr> [when <Guard>] because "..."` | Declares event-scoped arg constraints |
 | `to/from <State> -> ...` | Declares state entry or exit actions |
@@ -233,7 +234,7 @@ Time-unit words such as `days`, `hours`, `minutes`, `seconds`, `months`, `years`
 
 ## Literal System
 
-The language uses a closed two-door literal model plus primitive and list literals.
+The language has two quoted literal forms — strings and typed constants — plus primitive and list literals.
 
 ### Primitive literals
 
@@ -695,6 +696,38 @@ The routing model remains:
 
 State is not a passive label — it is an active rule-activator. An entity in `Approved` has different data requirements than the same entity in `Draft`. The state defines what must be true about the data there. State activates the constraint set appropriate to that position, authorizes which fields can be mutated directly, and gates which transitions are available.
 
+### Entity construction
+
+Construction is modeled as an **initial event** — the precept's constructor. This solves the fundamental problem that entities with required fields (non-optional, no default) cannot be constructed parameterlessly: the author would be forced to either invent nonsense defaults or make things optional that shouldn't be.
+
+```precept
+event Create(ApplicantName as string, Amount as currency in USD, CreditScore as integer) initial
+```
+
+The `initial` modifier on an event designates it as the construction event. The runtime's `Create(args)` operation fires this event atomically as part of entity creation:
+
+1. Build a hollow version (defaults applied, initial state set, omitted fields structurally absent).
+2. Fire the initial event with the caller's args through the standard pipeline — same guards, same mutations, same ensures, same constraint checking as any other event.
+3. Return the `EventOutcome` — same 7 variants the caller uses for every `Fire`.
+
+If the precept does not declare an initial event, `Create()` is parameterless and always succeeds (the compiler guarantees all fields have defaults or are optional — enforced by C59/C86).
+
+**Construction-time constraint composition.** When the initial event fires, constraints compose naturally with no new language surface:
+
+1. **Arg ensures** (`on Create ensure ...`) — pre-assignment validation of caller-provided args.
+2. **Field constraints** (rules, field-level ensures) — post-assignment truth.
+3. **Global rules** (`rule ...`) — always evaluated.
+4. **Entry ensures** (`to <InitialState> ensure ...`) — construction-specific truth. These are the same entry ensures that fire on any transition into the initial state, but at construction time they serve as the intake invariant — what must be true about data when the entity first exists.
+5. **Residency ensures** (`in <InitialState> ensure ...`) — while-in-state truth.
+
+No special "construction constraint" form is needed. `to <InitialState> ensure` is the natural construction-time rule: it fires when the entity enters the initial state, which is exactly what construction does.
+
+**Compiler enforcement:**
+- **C100:** Precept has required fields (non-optional, no default) but does not declare an initial event — construction cannot produce a valid initial version.
+- **C101:** Initial event does not assign all required fields that lack defaults — post-construction state may violate constraints.
+
+**Design rationale:** Construction goes through the full event pipeline because entities must satisfy their constraints from the moment they exist. A parameterless construction path cannot enforce business invariants at intake. By modeling construction as an event, the language reuses all existing machinery — guards can discriminate construction routing, ensures validate args, `reject` can refuse intake, and the caller uses the same pattern matching they use for every event.
+
 ### Inspection as a first-class operation
 
 Inspection is not a reporting layer — it is a fundamental language operation. It must have the same depth as event execution: guard evaluation, exit actions, mutations, entry actions, computed field recomputation, and constraint evaluation — all executed on a working copy without committing. The answer to "what would happen?" must always be available, from any state, for any event, and must be honest. Inspectability is what makes the governance contract trustworthy — you can always ask, and the language guarantees the answer matches what execution would do.
@@ -817,6 +850,10 @@ These distinctions are semantically significant, not just diagnostic convenience
 - **Unmatched vs undefined.** Undefined means no routing surface exists (a definition gap the author should address); unmatched means routing exists but the current data doesn't satisfy any guard (an instance data condition the caller can address).
 - **Transition vs no-transition.** Both are successes. No-transition events execute mutations without state change — a meaningful event-driven pattern, not a degenerate case.
 
+**Construction outcomes.** Entity construction via the initial event produces the same outcome space. All event outcomes are valid at construction: `Transitioned` (construction-time routing to a different state), `Applied` (stayed in initial state), `Rejected` (business rejection at intake), `ConstraintsFailed` (data truth violation at intake), `Unmatched` (guarded initial rows, none matched). `UndefinedEvent` cannot occur — the compiler guarantees the initial event exists. The caller uses the same pattern matching for construction that they use for every event.
+
+**Restoration outcomes.** Entity restoration from persisted data produces a distinct outcome space: successful restoration (data valid, constraints passed), constraint failure (persisted data violates current definition's rules/ensures), or invalid input (structural mismatch — undefined state, unknown fields, type mismatch). Restoring an entity in an invalid state is not allowed — the governance guarantee applies from the moment an entity is loaded, not just when it is mutated. Future migration logic runs before constraint evaluation, transforming persisted data to conform to the current definition.
+
 ### Constraint violation subject attribution
 
 When a constraint is violated, the language must support semantic subject attribution — not just the violation message, but what the violation is about.
@@ -842,7 +879,10 @@ The modifier system is a major language expansion.
 
 ### Current precedent
 
-The language already has one declaration modifier: `initial` on states.
+The language already has one declaration modifier: `initial` on states, and (as of the construction model) `initial` on events.
+
+- `state Draft initial` — marks `Draft` as the initial state.
+- `event Create(...) initial` — marks `Create` as the construction event (see Entity construction under Lifecycle and Routing).
 
 ### Planned direction
 
@@ -873,7 +913,7 @@ The graph is constructed from declared states, events, and transition rows. The 
 3. **Dead-end state detection.** Non-terminal states where all outgoing rows reject or produce no-transition. These have transition machinery that never succeeds — likely authoring mistakes (C50).
 4. **Incoming/outgoing edge analysis.** Per-state: which events fire into this state, which events fire out. Required for `guarded` (all incoming transitions have guards), `entry` (event fires only from initial), `isolated` (event fires from exactly one state), `universal` (event fires from every reachable non-terminal state).
 5. **Dominator analysis.** Required for `required`/`milestone` — the modifier asserts that all initial→terminal paths must visit this state. Dominator analysis (O(V+E) via Lengauer-Tarjan) determines whether a state is on every such path.
-6. **Reverse-reachability.** Required for `irreversible` (no path from target back to source) and `sealed after <State>` (no mutation after the named state is entered — requires reachability analysis from the named state forward).
+6. **Reverse-reachability.** Required for `irreversible` (no path from this state back to any ancestor state in the initial→forward ordering) and `sealed after <State>` (no mutation after the named state is entered — requires reachability analysis from the named state forward).
 7. **Row-partition analysis.** Required for `writeonce` (field set at most once across all reachable transition rows) and `sealed after` (no row reachable after the named state assigns to the field).
 8. **Outcome-type analysis.** Per (state, event) pair: do all rows produce `transition`? `no transition`? All `reject`? Required for `advancing` (every success is a state transition), `settling` (every success is no-transition), `completing` (transitions only to terminal states), `absorbing` (event handlers never transition out), and for existing diagnostics like C51 (reject-only pairs) and C52 (events that never succeed).
 
@@ -881,17 +921,53 @@ The graph is constructed from declared states, events, and transition rows. The 
 
 **Interaction with existing diagnostics.** The graph analysis that modifiers require is an extension of the analysis the compiler already performs for C48 (unreachable states), C49 (orphaned events), C50 (dead-end states), C51 (reject-only pairs), and C52 (events that never succeed). Modifiers do not replace these diagnostics — they make them stronger by adding author-declared intent that the compiler can cross-check against the graph structure.
 
-### Early likely cohort
+### v2 initial modifiers
 
-The language includes modifiers in areas such as:
+The following modifiers are in scope for the v2 initial release. All apply to states.
 
-1. `terminal` — lifecycle exit; no outgoing transitions.
-2. `entry` — event fires only from the initial state.
-3. `advancing` — every successful outcome is a state transition.
-4. `settling` — every successful outcome is no-transition.
-5. `writeonce` — field set at most once across the lifecycle.
-6. `sealed after <State>` — no mutation after the named state is entered.
-7. `warning` on rule-like declarations.
+**Structural:**
+
+1. `initial` on states — marks the starting state. Already implemented in v1.
+2. `initial` on events — marks the construction event. Fires atomically during `Create`. Decided for v2 (see Entity construction).
+3. `terminal` — lifecycle exit; no outgoing transitions.
+4. `required` — all initial→terminal paths must visit this state (dominator analysis).
+5. `irreversible` — no path from this state back to any ancestor state in the initial→forward ordering. Once entered, the lifecycle can only move forward.
+
+**Semantic:**
+
+6. `success` — marks a state as a success outcome.
+7. `warning` — marks a state as a warning outcome.
+8. `error` — marks a state as an error outcome.
+
+### Future modifiers (deferred)
+
+The following modifiers are planned but deferred beyond the initial v2 release.
+
+**Structural — event modifiers:**
+
+- `entry` — event fires only from the initial state.
+- `advancing` — every successful outcome is a state transition.
+- `settling` — every successful outcome is no-transition.
+- `completing` — transitions only to terminal states.
+- `absorbing` — event handlers never transition out.
+- `guarded` — all incoming transitions have guards.
+- `isolated` — event fires from exactly one state.
+- `universal` — event fires from every reachable non-terminal state.
+
+**Structural — field modifiers:**
+
+- `writeonce` — field set at most once across the lifecycle.
+- `sealed after <State>` — no mutation after the named state is entered.
+
+**Semantic:**
+
+- `sensitive` — PII/security marking on fields.
+- `audit` — audit trail marking on fields/events.
+- `deprecated` — migration signal on any declaration.
+
+**Severity (on rules):**
+
+- Severity modifiers that control whether rule violations surface as warnings versus hard errors. Planned as a future concern.
 
 The language supports declaration-attached modifier metadata, validation, and composition rules as a first-class concern.
 
@@ -941,7 +1017,7 @@ The typechecker must:
 6. Enforce temporal operator compatibility.
 7. Enforce strict temporal hierarchy and mediation rules.
 8. Enforce business-domain operator compatibility, qualification compatibility, currency pairing, and unit commensurability.
-9. Enforce the two-door literal admission and narrowing model.
+9. Enforce the typed constant admission and narrowing model.
 10. Enforce stateless event hook legality.
 11. Enforce per-state field access mode rules: D3 per-pair baseline resolution, explicit declaration overrides, contradiction detection (conflicting modes on same field/state pair), `set`-into-`omit` validation (compile error), root-level `read`/`omit` rejection, guarded `read`/`omit` rejection.
 12. Enforce modifier compatibility and contradiction rules.
@@ -1013,7 +1089,7 @@ Any clean-room compiler for Precept must be able to serve a language with all of
 
 1. A flat keyword-anchored grammar with no indentation semantics.
 2. Stateful and stateless entity definitions in the same language.
-3. A two-door quoted literal system with interpolation.
+3. Two quoted literal forms (strings and typed constants) with interpolation.
 4. A mixed primitive, temporal, and business-domain type system with a closed type vocabulary.
 5. Domain-sensitive operator tables with unit cancellation.
 6. Explicit contextual truth via rules and ensures with mandatory rationale.
