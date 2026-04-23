@@ -879,10 +879,20 @@ The modifier system is a major language expansion.
 
 ### Current precedent
 
-The language already has one declaration modifier: `initial` on states, and (as of the construction model) `initial` on events.
+The language already has declaration-attached modifiers in two areas:
 
-- `state Draft initial` — marks `Draft` as the initial state.
-- `event Create(...) initial` — marks `Create` as the construction event (see Entity construction under Lifecycle and Routing).
+**State modifiers:**
+- `initial` — marks the starting state. `state Draft initial`.
+
+**Event modifiers:**
+- `initial` — marks the construction event (v2). `event Create(...) initial`.
+
+**Field modifiers:**
+- `optional` — field may have no value (v2, replaces `nullable`).
+- `default <value>` — default value when not explicitly set.
+- Constraint keywords: `nonnegative`, `positive`, `nonzero`, `notempty`, `min`, `max`, `minlength`, `maxlength`, `mincount`, `maxcount`, `maxplaces`, `ordered`.
+
+Field modifiers are already a rich surface — constraints are declaration-attached structural properties that the compiler enforces. The modifier system expansion extends this pattern to states and events with structural, semantic, and severity modifiers.
 
 ### Planned direction
 
