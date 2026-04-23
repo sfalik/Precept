@@ -6,6 +6,7 @@ namespace Precept.Pipeline;
 
 public static class Lexer
 {
+    // Security guardrail: cap source size to bound lexer work and memory usage on hostile input.
     private const int MaxSourceLength = 65_536;
     private const int MaxModeStackDepth = 8;
 
@@ -399,7 +400,9 @@ public static class Lexer
                         DiagnosticCode.UnrecognizedStringEscape,
                         new SourceRange(_line, _column, _line, _column),
                         DisplayChar(PeekNext)));
-                    Advance(); Advance(); // skip \ and the unrecognized char
+                    Advance(); // skip \
+                    if (!IsAtEnd && Current != '\n' && Current != '\r')
+                        Advance(); // skip the unrecognized char when it is not a line break
                     continue;
                 }
 
@@ -548,7 +551,9 @@ public static class Lexer
                         DiagnosticCode.UnrecognizedTypedConstantEscape,
                         new SourceRange(_line, _column, _line, _column),
                         DisplayChar(PeekNext)));
-                    Advance(); Advance(); // skip \ and the unrecognized char
+                    Advance(); // skip \
+                    if (!IsAtEnd && Current != '\n' && Current != '\r')
+                        Advance(); // skip the unrecognized char when it is not a line break
                     continue;
                 }
 

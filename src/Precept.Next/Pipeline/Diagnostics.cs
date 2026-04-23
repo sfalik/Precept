@@ -11,7 +11,7 @@ public static class Diagnostics
 {
     public static DiagnosticMeta GetMeta(DiagnosticCode code) => code switch
     {
-        DiagnosticCode.InputTooLarge                 => new(nameof(DiagnosticCode.InputTooLarge),                 DiagnosticStage.Lex,   Severity.Error,   "This definition is too large to process (65,536 character limit) — consider splitting it into multiple precept definitions"),
+        DiagnosticCode.InputTooLarge                 => new(nameof(DiagnosticCode.InputTooLarge),                 DiagnosticStage.Lex,   Severity.Error,   "This definition exceeds the 65,536-character security limit and cannot be processed"),
         DiagnosticCode.UnterminatedStringLiteral      => new(nameof(DiagnosticCode.UnterminatedStringLiteral),      DiagnosticStage.Lex,   Severity.Error,   "Text value opened with \" is missing its closing quote — every \" must have a matching \""),
         DiagnosticCode.UnterminatedTypedConstant       => new(nameof(DiagnosticCode.UnterminatedTypedConstant),       DiagnosticStage.Lex,   Severity.Error,   "Value opened with ' is missing its closing quote — every ' must have a matching '"),
         DiagnosticCode.UnterminatedInterpolation       => new(nameof(DiagnosticCode.UnterminatedInterpolation),       DiagnosticStage.Lex,   Severity.Error,   "Expression inside {{ }} is not closed — add a closing }} on the same line"),

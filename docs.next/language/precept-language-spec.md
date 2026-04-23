@@ -11,6 +11,8 @@
 
 The lexer transforms source text into a flat token stream. It produces `TokenStream` containing an `ImmutableArray<Token>` and an `ImmutableArray<Diagnostic>` for lexer-level errors (unterminated strings, unrecognized characters).
 
+The lexer enforces a hard source-size ceiling of **65,536 characters (64 KB)** as a **security guardrail**. The limit exists to bound lexer work and memory usage on adversarial input; it is not a language expressiveness rule.
+
 ### 1.1 Token Vocabulary
 
 Every token the lexer can produce. Organized by category to match the `TokenKind` enum.
@@ -438,9 +440,11 @@ Nesting is fully supported: a string interpolation expression can contain a type
 
 The lexer emits diagnostics for malformed input. These are collected alongside tokens in the `TokenStream`.
 
+The `InputTooLarge` diagnostic is different from the other entries in this table: it is a security failure, not a syntax failure. Once the source crosses the 65,536-character ceiling, lexing aborts immediately and returns only the `EndOfSource` sentinel so downstream stages never process the hostile input.
+
 | Condition | Diagnostic Code | Severity | Description |
 |-----------|-----------------|----------|-------------|
-| Input too large | `InputTooLarge` | Error | Source exceeds 65536 characters (64 KB); lexing is aborted, no tokens produced |
+| Input too large | `InputTooLarge` | Error | Source exceeds 65536 characters (64 KB), which is the lexer security limit; lexing is aborted and the token stream contains only the `EndOfSource` sentinel |
 | Unterminated string literal | `UnterminatedStringLiteral` | Error | `"hello` with no closing `"` before end of line/source |
 | Unterminated typed constant | `UnterminatedTypedConstant` | Error | `'2026-01-01` with no closing `'` before end of line/source |
 | Unterminated interpolation | `UnterminatedInterpolation` | Error | `"hello {Name` with no closing `}` before end of line |
