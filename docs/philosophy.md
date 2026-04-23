@@ -79,6 +79,14 @@ For the external evidence base behind these positioning claims, see [Entity-Firs
 
 ---
 
+## Who authors a precept
+
+The primary author of a `.precept` file is a domain expert or a business analyst — someone who owns the rules of the business entity they are defining. They may be familiar with SQL or structured data, but they are not primarily software developers. The language is designed for someone who thinks in terms of what the data *means* and what it is *allowed to become*.
+
+A developer integrates the compiled engine into a .NET application — wiring up `Fire`, `Inspect`, and `Update` at the application boundary. The developer may also author `.precept` files, but this is not the primary case the language design optimizes for.
+
+---
+
 ## The word itself
 
 "Precept" means a strict rule or principle of action. The product treats business constraints as unbreakable precepts.
