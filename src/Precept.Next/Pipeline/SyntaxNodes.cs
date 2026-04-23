@@ -270,6 +270,11 @@ public sealed record ContainsExpression(
     SourceSpan Span, Expression Collection, Expression Value
 ) : Expression(Span);
 
+/// <summary>Expr is set | Expr is not set — presence test for optional fields.</summary>
+public sealed record IsSetExpression(
+    SourceSpan Span, Expression Operand, bool IsNot
+) : Expression(Span);
+
 /// <summary>if Cond then Consequence else Alternative</summary>
 public sealed record ConditionalExpression(
     SourceSpan Span, Expression Condition, Expression Consequence, Expression Alternative
