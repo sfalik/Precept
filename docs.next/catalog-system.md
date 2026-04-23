@@ -125,6 +125,47 @@ The exhaustive switch uses the C# compiler directly:
 
 The trade-off: the switch is more verbose than attributes (one line per member vs. one attribute per member). At Precept's scale (50–170 enum members per catalog), this is acceptable — the switch is a single, greppable, self-contained artifact.
 
+## Roslyn Enforcement Layer
+
+The exhaustive switch enforces **catalog completeness** — every enum member must have metadata. But catalogs have a second invariant: **construction discipline**. Output values (`Diagnostic`, `Fault`) carry string fields derived from the metadata via `nameof()` in the switch. If code constructs these types directly (bypassing the `Create()` factory), it can introduce arbitrary strings that escape the registry. Roslyn analyzers enforce this at build time.
+
+### Implemented Rules
+
+| Rule | Invariant | What it prevents |
+|------|-----------|-----------------|
+| **PREC0001** | `Fail()` must pass a `FaultCode` as its first argument | Unclassified evaluator failure paths — a bare `Fail("some message")` bypasses the FaultCode chain |
+| **PREC0002** | Every `FaultCode` member must carry `[StaticallyPreventable(DiagnosticCode.X)]` | A runtime fault with no corresponding compile-time diagnostic — breaks the guarantee that every fault is preventable |
+| **PREC0003** | `Diagnostic` must be constructed via `Diagnostics.Create()` | Direct `new Diagnostic(...)` construction with arbitrary string codes that escape the registry |
+| **PREC0004** | `Fault` must be constructed via `Faults.Create()` | Direct `new Fault(...)` construction with arbitrary string codes that escape the registry |
+
+All four are `DiagnosticSeverity.Error` with `isEnabledByDefault: true`. Combined with `<TreatWarningsAsErrors>true</TreatWarningsAsErrors>`, they are build-breaking.
+
+### Two-Layer Enforcement Model
+
+The catalog pattern uses two enforcement layers, each covering a different class of invariant:
+
+| Layer | Mechanism | What it enforces | Example failure |
+|-------|-----------|-----------------|-----------------|
+| **Compiler** | CS8509 (exhaustive switch) | Every enum member has a metadata entry | Add `DiagnosticCode.NewRule` without a `GetMeta()` arm → build fails |
+| **Roslyn** | PREC0001–PREC0004 | Output values go through the factory; cross-catalog linkage is present | `new Diagnostic(...)` bypassing `Diagnostics.Create()` → build fails |
+
+The compiler layer is free — it comes from the language. The Roslyn layer is the cost of the pattern: four analyzers, four test files, one analyzer project. At Precept's scale this is proportional — each rule covers a single invariant on a single type.
+
+### Why Token Has No Construction Rule
+
+`Token` is produced by the lexer from scan state (line, column, offset, length) — there is no metadata-derived string field that could be bypassed. The token catalog's role is metadata lookup and keyword classification (`Tokens.GetMeta()`, `Tokens.Keywords`), not construction. The lexer creates `Token` values directly, and that's correct.
+
+### Future Rules
+
+When the Functions and Operators catalogs land, they will likely need dispatch-enforcement rules:
+
+| Planned rule | Invariant |
+|-------------|-----------|
+| Functions: evaluator must dispatch through catalog | Evaluator calls the catalog's evaluation delegate, not a hand-coded function switch |
+| Operators: evaluator must dispatch through catalog | Evaluator calls the catalog's operator dispatch table, not independent type×operator logic |
+
+These cannot be written until the evaluator and the catalogs exist. The rule shape will depend on whether dispatch is via delegate lookup (data-driven — Roslyn rule enforces no direct `switch` on function name) or via interface call (structural — no rule needed if the dispatch point is the only call site).
+
 ## When an Enum Earns a Catalog
 
 Not every enum needs a catalog. The criteria:
