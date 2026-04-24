@@ -2,6 +2,8 @@
 
 Implementation blueprints for each stage of the Precept v2 compiler pipeline. Each doc follows a consistent structure: Overview → Design Principles → Architecture → domain-specific sections → Error Recovery → Consumer Contracts → Deliberate Exclusions → Cross-References → Source Files.
 
+**Design decisions placement:** Each stage doc has a dedicated `## Design Decisions` section that catalogs all decisions as an auditable index. The type checker's section (T1–T9) contains full standalone rationales. The lexer (L1–L10, R1–R5, D1) and parser (P1–P7) sections are catalog tables with cross-references to the inline discussions where the rationale lives. Both forms serve the same purpose: a single place to verify that every decision is documented.
+
 ## Pipeline Order
 
 The compiler is a linear five-stage pipeline. Read the stage docs in this order:

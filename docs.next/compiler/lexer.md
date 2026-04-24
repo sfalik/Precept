@@ -299,6 +299,31 @@ The `Text` field carries the **decoded content** for quoted literals (escape seq
 
 ---
 
+## Design Decisions
+
+Decision rationales are discussed inline in the sections where they arise. This catalog provides a single auditable index.
+
+| ID | Decision | Section |
+|---|---|---|
+| L1 | Hand-written lexer — no parser-generator dependency | Design Principles § Right-sized for Precept's scale |
+| L2 | Static pure function — `Lexer.Lex(string) → TokenStream`, no instance | Design Principles § Same input always produces same output |
+| L3 | `Scanner` struct isolation — all mutable state stack-allocated, discarded after `Lex()` | Architecture § Static class + private Scanner struct |
+| L4 | Mode stack for interpolation — four modes (Normal, String, TypedConstant, Interpolation) with push/pop | Architecture § Mode stack for interpolation |
+| L5 | Array-backed mode stack — fixed `ModeState[8]`, no `Stack<T>` heap allocation | Architecture § Array-backed mode stack |
+| L6 | `ModeState` segment origin fields — stores delimiter position for correct span attribution | Architecture § `ModeState` struct |
+| L7 | `FrozenDictionary` keyword lookup with `ReadOnlySpan<char>` — zero-allocation per-word check | Architecture § Keyword recognition |
+| L8 | Reusable `char[]` content buffer — single buffer across all segments, no `StringBuilder` | Architecture § Content buffer |
+| L9 | 64KB source length limit — security guardrail, immediate return before scanning | Security |
+| L10 | Token span contract — `Offset + Length` spans full source extent including delimiters | Token Span Contract |
+| R1 | EOF cleanup — walk mode stack innermost-to-outermost, one diagnostic per open mode | Error Recovery § EOF with open modes |
+| R2 | Newline in Interpolation pops mode, leaves newline unconsumed for enclosing literal | Error Recovery § Newline in Interpolation mode |
+| R3 | No synthetic closing tokens — missing `End` is a structural signal for the parser | Error Recovery § No synthetic closing tokens |
+| R4 | Escape recovery — skip `\X`, guard against consuming line breaks | Error Recovery § Escape recovery |
+| R5 | Lone `}` preserved in segment text with diagnostic — content not altered | Error Recovery § Lone `}` in literal |
+| D1 | Diagnostic audience is the domain author — plain language, no compiler jargon | Diagnostic Audience |
+
+---
+
 ## Deliberate Exclusions
 
 The lexer intentionally does NOT:

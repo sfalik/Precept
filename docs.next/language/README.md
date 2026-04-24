@@ -17,7 +17,8 @@ Documents defining the Precept DSL surface — what the language looks like to a
 1. **Start here:** [precept-language-vision.md](precept-language-vision.md) — the full target language surface in one document
 2. **Primitive types:** [primitive-types.md](primitive-types.md) — canonical reference for primitives and numeric lane rules
 3. **Formal spec:** [precept-language-spec.md](precept-language-spec.md) — locked decisions only, grows per compiler stage
-4. **Type extensions:** [temporal-type-system.md](temporal-type-system.md) → [business-domain-types.md](business-domain-types.md) (business types depend on temporal)
+4. **Implementation blueprint:** [../compiler/type-checker.md](../compiler/type-checker.md) — how the language surface is enforced (operator tables, accessor tables, comparison rules, diagnostic codes)
+5. **Type extensions:** [temporal-type-system.md](temporal-type-system.md) → [business-domain-types.md](business-domain-types.md) (business types depend on temporal)
 
 ## Relationship to Other Docs
 

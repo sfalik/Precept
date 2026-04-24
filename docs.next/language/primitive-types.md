@@ -458,6 +458,33 @@ set Tier = if Category ~= "premium" then "Gold" else "Standard"
 
 These two functions — plus the rounding family for `→ integer` — are the **only** mechanisms that cross lane boundaries. No cast syntax. No implicit coercion.
 
+### Edge-value behavior
+
+Rounding and bridge functions must define behavior at boundaries:
+
+| Scenario | `floor` | `ceil` | `truncate` | `round` (banker's) |
+|----------|---------|--------|------------|---------------------|
+| `2.5` | `2` | `3` | `2` | `2` (banker's: round-half-to-even) |
+| `-2.5` | `-3` | `-2` | `-2` | `-2` (banker's: round-half-to-even) |
+| `3.5` | `3` | `4` | `3` | `4` (banker's: round-half-to-even) |
+| `0.0` | `0` | `0` | `0` | `0` |
+
+**`round(value, places)` with large `places`:** If `places` exceeds the value's actual precision, the result is unchanged (no zero-padding artifacts). `places` must be ≥ 0 — negative places are a compile-time error.
+
+**`approximate(value)` precision characteristics:** Converts `decimal` to IEEE 754 `double`. Values with more than ~15-17 significant digits lose trailing precision. This is the known cost of the bridge — the function name "approximate" makes this explicit.
+
+**Non-finite `number` inputs:** IEEE 754 `double` can represent `+∞`, `-∞`, and `NaN`. Precept's `number` lane inherits these representations. Behavior when non-finite values reach rounding functions:
+
+| Input | `floor` / `ceil` / `truncate` / `round` | `round(value, places)` |
+|-------|------------------------------------------|------------------------|
+| `+∞` | Runtime fault — integer overflow | Runtime fault — cannot round infinity |
+| `-∞` | Runtime fault — integer overflow | Runtime fault — cannot round infinity |
+| `NaN` | Runtime fault — NaN is not a number | Runtime fault — NaN is not a number |
+
+Non-finite values cannot reach `decimal`-lane rounding (since `decimal` has no infinity/NaN representation). They can only occur in the `number` lane. The proof engine may be able to prove non-finiteness is impossible for specific expressions, but the runtime must handle it defensively.
+
+**Integer conversion overflow:** `floor(1e20)` produces a value outside `integer` range. This is a runtime fault — the value exceeds `long.MaxValue` / `long.MinValue`. The same applies to `ceil`, `truncate`, and `round` on very large `number` or `decimal` values. Statically preventable when the proof engine can bound the expression range.
+
 ### String functions
 
 | Function | Signature | Return type | Notes |

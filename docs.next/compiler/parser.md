@@ -1086,6 +1086,22 @@ The ~35 lines of resync logic are in `SkipToNextSyncPoint()` and `IsSyncToken()`
 
 ---
 
+## Design Decisions
+
+Decision rationales are discussed inline in the sections where they arise. This catalog provides a single auditable index.
+
+| ID | Decision | Section |
+|---|---|---|
+| P1 | AST not CST — no trivia nodes, no whitespace spans, no comment attachment | Design Principles § AST, not CST |
+| P2 | Hybrid error recovery — missing-node insertion within productions, sync-point resync between them | Error Recovery |
+| P3 | Structural statement boundaries — productions terminate by grammar, not by newline | Design Principles § Structural statement boundaries |
+| P4 | Parser/type-checker boundary at the grammar line — parser enforces syntax, type checker enforces semantics | Design Principles § Parser owns grammar |
+| P5 | Typed constant interior is opaque — content validation is the type checker's job | Design Principles § Typed constant interior is opaque |
+| P6 | Depth-unaware interpolation reassembly — lexer segmented correctly, parser just reads the sequence | Design Principles § Depth-unaware interpolation reassembly |
+| P7 | AST node representation — abstract record base with `SourceSpan`, grouped intermediate types, `IsMissing` flag | AST Node Hierarchy |
+
+---
+
 ## Consumer Contracts
 
 ### Language server

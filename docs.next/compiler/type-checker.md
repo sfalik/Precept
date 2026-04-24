@@ -15,7 +15,7 @@ The type checker is the third stage of the Precept compiler pipeline. It transfo
 SyntaxTree  →  TypeChecker.Check  →  TypedModel
 ```
 
-The type checker's job is pure semantic analysis. It has no knowledge of state-graph reachability or interval arithmetic. Its output is consumed by `GraphAnalyzer.Analyze` and `ProofEngine.Prove`.
+The type checker's job is pure semantic analysis — build symbol tables, resolve names, assign types to every expression, validate semantic constraints, and emit diagnostics. It has no knowledge of state-graph reachability or interval arithmetic. Its output is consumed by `GraphAnalyzer.Analyze` and `ProofEngine.Prove`.
 
 The public surface is a static class `TypeChecker` with a single method:
 
@@ -25,28 +25,9 @@ public static TypedModel Check(SyntaxTree tree)
 
 No instance, no DI, no configuration. Tests call the method directly and assert on the output.
 
-The type checker's job is:
+**Bright-line boundaries:** The parser owns grammar rules (syntax structure, missing tokens). The type checker owns everything that requires knowing what a name means — duplicate names, undeclared references, type mismatches, modifier validity, scope rules, function signatures. The graph analyzer owns state-transition reachability. The proof engine owns interval reasoning (unsatisfiable guards, division-by-zero provability). The type checker builds the typed model that makes those downstream analyses possible.
 
-1. **Build a symbol table** from declarations — fields, states, events, args.
-2. **Resolve every name reference** to its declaration.
-3. **Assign a resolved type to every expression** in the AST.
-4. **Validate semantic constraints** — type compatibility, modifier applicability, scope rules, function signatures.
-5. **Emit diagnostics** for every violation using the `Diagnostics.Create()` infrastructure.
-
-### Bright-Line Boundaries
-
-| Responsibility | Owner | Boundary rationale |
-|----------------|-------|--------------------|
-| Syntax structure, missing tokens, malformed productions | **Parser** | Grammar rules — no name knowledge needed |
-| Duplicate names, undeclared references, type mismatches, modifier validity, scope rules, function signatures | **Type Checker** | Requires symbol table and type knowledge |
-| State reachability, dead-end states, unhandled events | **Graph Analyzer** | Requires state-transition graph structure |
-| Unsatisfiable guards, division-by-zero provability, sqrt negativity | **Proof Engine** | Requires interval reasoning over typed expressions |
-
-The type checker does **not** build a transition graph, does **not** reason about reachability, and does **not** perform interval arithmetic. It builds the typed model that makes those downstream analyses possible.
-
-### Stateless precepts
-
-A precept with no `state` declarations and no `from ... on ...` transition rows is a **stateless precept** (e.g., `CustomerProfile`). The type checker handles this naturally — the symbol table simply has an empty state map. Rules, field declarations, access modes (`write all` / `edit all`), and stateless event hooks are all valid in stateless precepts. Transition rows, state ensures, and state actions are structurally absent from the AST, so no special-casing is needed.
+**Stateless precepts:** A precept with no `state` declarations and no `from ... on ...` transition rows is a stateless precept (e.g., `CustomerProfile`). The type checker handles this naturally — the symbol table simply has an empty state map. Rules, field declarations, access modes, and stateless event hooks are all valid. Transition rows, state ensures, and state actions are structurally absent from the AST, so no special-casing is needed.
 
 ---
 
@@ -82,7 +63,7 @@ Numeric lane crossing (`decimal ↔ number`) requires explicit bridge functions 
 
 ### Static class + private CheckSession struct
 
-The public surface is a static class `TypeChecker` with a single method `Check`. All mutable checking state lives in a private `CheckSession` struct instantiated inside `Check()` and discarded after:
+All mutable checking state lives in a private `CheckSession` struct instantiated inside `Check()` and discarded after:
 
 ```csharp
 public static class TypeChecker
@@ -113,6 +94,8 @@ Rejected alternative: _Single-pass with forward-reference fixup_ — adds comple
 ---
 
 ## Input & Output Contracts
+
+> **Structural note:** This section is unique to the type-checker blueprint. The lexer and parser docs embed their contract information in the Architecture and Consumer Contracts sections. The type checker's contracts are broken out separately because it has the richest input assumptions (parser guarantees) and the most consumers (graph analyzer, proof engine, LS, MCP).
 
 ### Input: `SyntaxTree`
 
@@ -1162,7 +1145,7 @@ See Architecture § Two-pass processing above. Two clean passes — registration
 
 ### Graph analyzer
 
-`GraphAnalyzer.Analyze(TypedModel)` receives the typed model as input. Its contracts:
+`GraphAnalyzer.Analyze(TypedModel)` receives the typed model as input. See [architecture-planning.md § 2.4](../architecture-planning.md#24-graph-analyzer) for the graph analyzer's scope and design requirements. Its contracts:
 
 - Reads `TypedModel.TransitionRows` to build the state-event transition graph.
 - Reads `TypedModel.States` and `TypedModel.InitialState` for the state set.
@@ -1171,7 +1154,7 @@ See Architecture § Two-pass processing above. Two clean passes — registration
 
 ### Proof engine
 
-`ProofEngine.Prove(TypedModel)` receives the typed model as input. Its contracts:
+`ProofEngine.Prove(TypedModel)` receives the typed model as input. See [architecture-planning.md § 2.5](../architecture-planning.md#25-proof-engine) for the proof engine's scope, proof attribution model, and design requirements. Its contracts:
 
 - Reads `TypedModel.Rules`, `TypedModel.Ensures`, and guard expressions on `TypedModel.TransitionRows`.
 - Uses `TypedExpression.Type` to determine which interval arithmetic operations apply.
