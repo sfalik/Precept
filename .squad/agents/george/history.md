@@ -29,6 +29,21 @@
 
 ## Recent Updates
 
+### 2026-04-24 — Precept.Next code/doc consistency review
+
+Full audit of `src/Precept.Next/Pipeline/` and `src/Precept.Next/Runtime/` against `docs.next/`.
+
+Key findings:
+- Lexer and Parser are real implementations. TypeChecker, GraphAnalyzer, ProofEngine are pure stubs (NotImplementedException).
+- TypedModel, GraphResult, ProofModel are hollow — only Diagnostics; all doc-specified content missing from code.
+- All TypeChecker output types (FieldSymbol, StateSymbol, EventSymbol, ResolvedType hierarchy, TypedExpression, all resolved declaration types) live only in type-checker.md — zero code yet.
+- `pipeline-artifacts-and-consumer-contracts.md` has a stale Version API (Fire() → Version, Edit() method) that contradicts the actual code and runtime-api.md. The newer runtime-api.md is the truth.
+- Runtime layer (Precept.cs, Version.cs, Evaluator.cs) has correct type shapes for outcome/inspection types but all operational methods throw. Wired to v2 pipeline types but can't do work until TypeChecker lands.
+- ~string / CaseInsensitive is correctly captured in SyntaxNodes (ScalarTypeRef.CaseInsensitive), operators (TokenKind.CaseInsensitiveEquals), and planned in ResolvedType doc. Three behavior questions unspecified: ~= on plain string, set-of-~string contains semantics, and ~string←string assignability.
+- `Compiler.Compile()` is structurally complete and calls all five stages correctly; throws at TypeChecker step because it's stubbed.
+- GraphResult and ProofModel shapes need design work — docs specify diagnostics only; actual graph/proof content not yet specified in any doc.
+- Full findings written to `.squad/decisions/inbox/george-precept-next-impl-review.md`.
+
 ### 2026-04-19 — Diagnostic triage: `assignment-constraints.precept` and `sqrt-safety.precept`
 
 Two `DiagnosticSampleDriftTests` failures were reported at Slice 6 verification time. Independent triage conclusively shows neither is refactor-attributable.

@@ -1,3 +1,17 @@
+## Recent Updates
+
+### 2026-04-24 — Precept.Next pre-TypeChecker coverage audit
+
+- Audited all files in `test/Precept.Next.Tests/` against `src/Precept.Next/Pipeline/` and `src/Precept.Next/Runtime/`.
+- Test suite currently has exactly 2 files: `LexerTests.cs` (54 tests) and `ParserTests.cs` (~151 test cases after InlineData expansion). Total: ~205 test cases.
+- All 3 downstream pipeline stages are 1-line stubs: `TypeChecker.cs`, `GraphAnalyzer.cs`, `ProofEngine.cs` all throw `NotImplementedException`.
+- All `Runtime/` classes (`Evaluator`, `Precept`, `Version`) are stubs. Only `Faults.cs` has real logic — no tests exist for it.
+- `TypedModel.cs`, `GraphResult.cs`, `ProofModel.cs` are stub records with only `ImmutableArray<Diagnostic> Diagnostics` — none have the rich shape described in the docs.
+- Found 2 BLOCKERS before TypeChecker tests can compile: (1) TypedModel shape is a stub; (2) DiagnosticCode.cs is missing all type-checker-specific codes (~20 missing codes listed in the type-checker doc).
+- `~string` lexer coverage: 6 tests (tilde standalone, not emitted for ~= or !~, set/queue/stack of ~string). Parser: 6 tests. TypeChecker: 0 (blocked — stub).
+- `DiagnosticCode.cs` has only 6 type-stage codes (`UndeclaredField`, `TypeMismatch`, `NullInNonNullableContext`, `InvalidMemberAccess`, `FunctionArityMismatch`, `FunctionArgConstraintViolation`) vs ~26 needed per the type-checker doc.
+- Filed decisions inbox: `.squad/decisions/inbox/soup-nazi-precept-next-coverage-audit.md`
+
 ## Core Context
 
 - Owns test discipline across parser, type checker, runtime, MCP, and language-server validation.
@@ -6,6 +20,9 @@
 
 ## Learnings
 
+- 2026-04-24 Precept.Next coverage audit: TypedModel stub shape is a compile-time blocker for TypeChecker tests — the record needs real fields before any model assertion can compile. DiagnosticCode.cs missing type-checker codes is the second compile-time blocker. Both must be resolved before TypeCheckerTests.cs can be written.
+- `Faults.cs` has real testable code (GetMeta, Create, All) but zero tests. This is a pre-existing gap that can be closed at any time without waiting for downstream stubs.
+- `DiagnosticCode.cs` enum + `Diagnostics.GetMeta` switch must stay in sync with the type-checker doc as new codes are added. A drift test (parallel to `CatalogDriftTests` in v1) should be added when TypeChecker is implemented.
 - 2026-04-24 v2 design review: block test implementation until the docs reconcile five contract collisions: numeric lanes, function catalog / return typing, typed-constant validity stage, diagnostic identity (named vs `C###`), and collection totality. Tests need one oracle, not three.
 - Temporal/business surface drift is now the main risk: the specialized design docs assume first-class accessors, qualifiers, and domain-preserving functions, while the core checker blueprint still treats those areas as deferred or numeric-only.
 

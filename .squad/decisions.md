@@ -6,6 +6,73 @@
 
 ---
 
+### 2026-04-24T00:00:00Z: Decision inbox merge — Precept.Next v2 design review corpus and pre-TypeChecker gate
+**By:** Scribe
+**Status:** Merged, deduplicated, inbox cleared (15 files)
+
+**Precept.Next pre-TypeChecker gate (Frank, George, Soup Nazi — 2026-04-24)**
+
+Four blockers block TypeChecker implementation:
+- **F1 / G1 / SN-B1 (convergent):** `TypedModel` is a one-field stub (`ImmutableArray<Diagnostic> Diagnostics` only). The type-checker doc specifies a 12-property record with full symbol tables (FieldSymbol, StateSymbol, EventSymbol, ArgSymbol), resolved declaration arrays (Rules, Ensures, TransitionRows, AccessModes, StateActions, StatelessHooks), InitialState, TypedExpression annotation, ResolvedModifiers, and a 27-type ResolvedType hierarchy. None of these types exist in the codebase. Resolution: define the full TypedModel shape before TypeChecker implementation begins. Doc is authoritative.
+- **F2:** `SyntaxTree.Root` is typed `PreceptNode?` in code; type-checker doc guarantees it is always non-null (IsMissing, never null). Resolution: change to `PreceptNode` (non-nullable); parser must synthesize an IsMissing PreceptNode on catastrophic failure.
+- **F3 / SN-B2 (convergent):** `DiagnosticCode.cs` is missing at least 13 type-stage codes: DuplicateFieldName, DuplicateStateName, DuplicateEventName, DuplicateArgName, UndeclaredState, UndeclaredEvent, MultipleInitialStates, NoInitialState, CaseInsensitiveStringOnNonCollection, InvalidModifierBounds, UnguardedCollectionAccess, UnguardedCollectionMutation, NonOrderableCollectionExtreme (and likely more in temporal/business-domain sections). Resolution: audit full type-checker doc, add all missing `DiagnosticCode` values, add `GetMeta()` entries in `Diagnostics.cs`.
+- **F4:** No SourceSpan→SourceRange bridge defined. TypeChecker receives SyntaxTree with SourceSpan nodes; `Diagnostics.Create` requires SourceRange. Two options: (a) `TypeChecker.Check(SyntaxTree, string source)` — pass source text and build line map internally; (b) store `SourceRange` on `SyntaxNode` alongside `SourceSpan` at parse time. One must be chosen before implementation.
+
+George's additional findings (not converged with Frank):
+- **G2:** GraphResult and ProofModel are equally hollow (only `Diagnostics`). GraphResult must carry reachability sets, dominator trees, edge classifications. ProofModel must carry proof attribution. Both must be designed before GraphAnalyzer/ProofEngine implementation.
+- **G3:** `pipeline-artifacts-and-consumer-contracts.md` has stale Version API (`Edit()` does not exist; `Fire()` returns `Version` not `EventOutcome`). Newer `docs.next/runtime/runtime-api.md` is correct. Fix the stale doc independently.
+- **G5:** `~string` CaseInsensitive: syntax exists (ScalarTypeRef.CaseInsensitive, TokenKind.Tilde, BinaryOp.CaseInsensitiveEqual); type system behavior unspecified. Lock before TypeChecker implementation: (a) Is `~=` valid between plain `string` and `~string`? (b) Does `set of ~string` make `contains` case-insensitive? (c) Is `~string` assignable from `string`?
+
+Soup Nazi's additional findings:
+- No test files exist for TypeChecker, GraphAnalyzer, ProofEngine, Compiler, or Runtime.
+- Non-blocking gaps: FaultsTests.cs (~10 tests warranted today), CompilerTests.cs (smoke placeholder appropriate), ~string tests belong in TypeCheckerTests.cs, GraphAnalyzerTests/ProofEngineTests deferred.
+- Recommended TypeChecker slice order: expand DiagnosticCodes → define TypedModel shape → add GetMeta entries → create TypeCheckerTests.cs stubs → implement TypeChecker.Check.
+
+**Precept.Next v2 design review corpus (Frank, George, Soup Nazi, Elaine — 2026-04-23/24)**
+
+Cross-document blockers affecting all v2 stages (converged across Frank, George, Soup Nazi):
+- **Numeric-lane contract contradiction:** `precept-language-spec.md` §3.6 says `decimal op number → number` via common-type widening. `type-checker.md` §4.2a says `decimal + number` is a type error requiring `approximate()`. These are mutually exclusive. Resolution (Frank's recommendation): spec §3.6 should add an explicit exception — `decimal op number → type error` in arithmetic expression context; the widening chain `integer → decimal → number` holds for assignment context only. Spec §3.7 already describes `approximate()` as the bridge.
+- **Type-checker function catalog incomplete:** Spec §3.7 lists 14 functions; type-checker doc Built-in Function Catalog lists only 8. Missing: `floor`, `ceil`, `truncate`, `round(value)`, `approximate`, `pow`. Bridge functions are described in §4.2a but not registered in the catalog table. Resolution: make the catalog table match §3.7 exactly.
+- **Typed-constant validation stage contradiction:** temporal-type-system.md and business-domain-types.md promise compile-time errors for invalid constants (e.g., `'2026-02-30'`); type-checker.md Deliberate Exclusions says these are runtime-only. Resolution: lock stage ownership, assign diagnostic codes.
+- **`nullable` surface leakage (George + Soup Nazi):** temporal-type-system.md and business-domain-types.md still show `field X as <type> nullable` throughout. v2 uses `optional`. Update both docs.
+
+Frank's docs.next/ architecture review findings (2026-04-24):
+- **Language README NodaTime name leakage:** `docs.next/language/README.md` uses `localdate`/`localtime`/`localdatetime` (NodaTime class names) instead of DSL surface names `date`/`time`/`datetime`; `zoneddatetime` is missing. Fix.
+- **Spec §3.6 / type-checker doc numeric-lane contradiction** (same convergent issue above).
+- **Function catalog incompleteness** (same convergent issue above).
+- **B4 (Frank-docs):** Language README has stale description of docs.next structure; minor, fix alongside B1.
+
+Frank's v2 AST & parser design review findings (2026-04-23):
+- **No method-call expression support:** `.inZone(tz)` cannot be represented. No `MethodCallExpression` node; no Led handler for `(`; nud Identifier peek approach prevents chained `expr.method(args)`. Decision needed: add `MethodCallExpression(Expression Object, Token Method, ImmutableArray<Expression> Args)` + Led handler (recommended if any temporal/domain method needs args), or redesign `.inZone(tz)` as prefix `inZone(expr, tz)`.
+- **Transition row action-chain grammar incorrectly specified:** double-consumption bug in the grammar mapping; misaligned with stateless hook pattern. Fix: `Expect Arrow; while ActionKeywords → ParseActionStatement()` (single arrow, consecutive actions, then outcome keyword).
+- **Non-blocking:** nud Identifier peek logic is non-standard Pratt; computed field modifier ordering unclear in XML comment; event arg syntax vision (`event Create(...)`) vs parser (`event ... with ...`) needs decision; guarded-write ordering vision (`when Guard write Fields`) vs parser (`write Fields when Guard`) needs decision; `(` in binding power table has no Led handler.
+
+George's v2 design review findings (2026-04-23/24):
+- **TypedModel qualifier incompleteness:** `MoneyType(string? CurrencyBasis)` and `QuantityType(string? DimensionFamily)` exist but `PeriodType`, `PriceType`, `ExchangeRateType` are bare. Declaration-position interpolation (`in '{BaseCurrency}'`) makes qualifier depend on data fields — not representable as static ResolvedType. Qualifiers must be first-class; dynamic interpolation needs a decision on representability.
+- **Typed-constant family registry incomplete:** literal-system.md only covers temporal families; business-domain types (`money`, `quantity`, `currency`, `unitofmeasure`, `dimension`, `price`, `exchangerate`) lack matcher entries. `Word/Word` already means timezone; business docs need slash-based families too. One authoritative registry-backed matcher table is required.
+- **v2 AST stale grammar (George finding):** `SyntaxNodes.cs` and `parser.md` still show `event ... with ...` and `in State write Fields when Guard` — vision uses `event Name(...) initial` and `in State when Guard write Fields`.
+
+Soup Nazi's v2 design review findings (2026-04-24):
+- **Diagnostic identity model unresolved:** Core compiler docs use name-based codes (`TypeMismatch`, `UndeclaredField`); business-domain doc reserves numeric `C99`–`C110`; diagnostic-system doc rejects numeric codes. `TypeMismatch` shared across structurally distinct errors. Must lock one model before regression tests can be stable.
+- **Business-domain/temporal type integration deferred in checker blueprint:** temporal accessors (`.inZone(tz)`), operator tables, qualifier checks, and `in`/`of` enforcement are not folded into the main type-checker semantic tables. Core checker blueprint is not the single authoritative test matrix.
+- **Collection totality unspecified:** vision doc requires emptiness guards for `.min`/`.max`/`.peek`; checker blueprint only exposes `.peek`; no emptiness-check rule or diagnostic defined. `dequeue`/`pop` empty-collection behavior also unspecified.
+
+Elaine's diagnostic UX review (2026-04-23):
+- **BLOCKED:** 8 messages use vocabulary a domain expert cannot act on. Key findings: `UnterminatedStringLiteral`/`UnterminatedTypedConstant`/`UnterminatedInterpolation` use compiler vocab ("string literal", "typed constant", "interpolation expression"); `InvalidCharacter` is structurally broken — fires for 3 distinct problems (unrecognized char, unrecognized escape, lone `}`) with one undifferentiated message. Requires 3 separate codes. `InputTooLarge` exposes raw power-of-two number with no actionable direction. `NullInNonNullableContext` uses "non-nullable." `InvalidMemberAccess` uses "member accessor." `UnsatisfiableGuard` uses "provably unsatisfiable."
+- All 8 proposed replacement messages documented in inbox file with rationale.
+
+Lexer reviews (Frank, Soup Nazi — 2026-04-23):
+- **Frank's lexer design review — APPROVED WITH CONDITIONS:** (a) TokenStream missing token array — add `ImmutableArray<Token> Tokens` to `TokenStream`; (b) DiagnosticCode missing `UnterminatedTypedConstant` and `UnterminatedInterpolation` — add with GetMeta arms; (c) spec §1.3 "no exponent notation" contradicts literal-system.md listing `1.5e2` as valid — spec governs, update literal-system.md. Non-blocking gaps: `EndOfSource`/`EndOfFile` name mismatch; `set` dual-use strategy implicit, needs documentation comment.
+- **Soup Nazi lexer design sync:** 3 test gaps found and closed — inclusive 65,536-character security ceiling, empty string interpolation boundary-token emission, nested string literal lexing inside interpolation. `dotnet test` passed 42/42. Focused Lexer.cs coverage: 517/519 lines (99.6%). No remaining meaningful lexer design/spec coverage gaps.
+- **Soup Nazi lexer tail coverage:** Added contract-level tests for invisible invalid characters, mid-literal bad-escape recovery, plain EOF-unterminated literals, typed-constant middle segments, numeric lookahead fallback. Did not add filler for unreachable branches.
+- **Soup Nazi lexer test plan — BLOCKED:** (a) input-too-large contract not locked — spec says lex abort with no tokens; code still returns EndOfSource token; (b) quoted-literal recovery not stable for lone backslash at EOF. First test slice must lock malformed quoted-literal tail before broader golden assertions. Full test plan: 100–110 cases across 10 files (keywords/identifiers, numbers/operators, structural tokens, string literals, typed constants, interpolation/nesting, diagnostics/recovery, boundary/adversarial, sample smoke). First slice: scaffold + quoted-literal tokens and recovery (~18–20 tests) + one boundary test for input-too-large.
+- **Coordinator lexer directive:** Lexer does NOT emit synthetic closing tokens on unterminated interpolated literals. Parser MUST handle missing closing token as error-recovery path. Check for EndOfSource when walking Start/End pairs.
+
+**Emitter architecture decision (Shane directive, 2026-04-22):**
+No "emitter" as a named component. Lowering lives inside `Precept.From(CompilationResult)` — it is the runtime's construction logic, not a separate pipeline stage. `Precept.From()` guards on `CompilationResult.HasErrors` and throws on failure. Pipeline: 5 stages (no emitter). Architecture docs updated: `architecture-planning.md` §3 reframed as "Executable Model", emitter.md row removed from design doc map, all emitter references replaced with runtime/executable model/Precept.From() language.
+
+---
+
 ### 2026-04-19T14:00:00Z: Decision inbox merge — April 17-19 proof-engine and issue #118 records canonicalized
 **By:** Scribe
 **Status:** Merged, deduplicated, inbox cleared

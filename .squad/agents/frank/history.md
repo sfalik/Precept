@@ -192,7 +192,25 @@
 - The slippery slope concern is acknowledged but self-correcting: the escape hatch is cheap enough that demand for stateless events won't reach critical mass.
 - Decision filed at `.squad/decisions/inbox/frank-stateless-event-boundary.md`.
 
+### 2026-04-24 — Precept.Next contract consistency review (docs.next vs src/Precept.Next/Pipeline)
+- **Verdict: 4 BLOCKERS, 3 GAPS, 2 NOTES. TypeChecker implementation is NOT safe to start.**
+- **B1 (TypedModel stub):** TypedModel has only `Diagnostics`. The doc specifies 12 fields plus 27 ResolvedType subtypes, 5 symbol types, 9 resolved declaration types, TypedExpression. None exist in code. Must be defined before TypeChecker.Check can be implemented.
+- **B2 (Root nullability):** `SyntaxTree.Root` is `PreceptNode?` (nullable). Type-checker doc guarantees it is always non-null. Hard contradiction. Fix: change to `PreceptNode` (non-nullable) and enforce the guarantee at the Parser boundary via IsMissing synthesis.
+- **B3 (Missing DiagnosticCodes):** DiagnosticCode enum has 6 Type-stage codes. Type-checker doc specifies at least 13 more (DuplicateFieldName, DuplicateStateName, DuplicateEventName, DuplicateArgName, UndeclaredState, UndeclaredEvent, MultipleInitialStates, NoInitialState, CaseInsensitiveStringOnNonCollection, InvalidModifierBounds, UnguardedCollectionAccess, UnguardedCollectionMutation, NonOrderableCollectionExtreme, plus more in temporal/business-domain sections).
+- **B4 (SourceSpan→SourceRange bridge):** AST nodes carry SourceSpan (offset/length). Diagnostics require SourceRange (line/column). TypeChecker.Check(SyntaxTree) has no source text, no line map, no token stream. No conversion utility exists. Three options: (a) add source text param to Check, (b) store SourceRange on SyntaxNode (Parser already has it from Token), (c) unify Diagnostic to SourceSpan. Decision must be documented before implementation.
+- **G5/G6:** GraphResult and ProofModel are also single-field stubs. Don't block TypeChecker but block downstream stages.
+- **G7:** All three stage classes (TypeChecker, GraphAnalyzer, ProofEngine) throw NotImplementedException — correct scaffolding state.
+- **N8:** compiler/README.md says "GraphModel"; code and all other docs say "GraphResult". One-word fix.
+- **N9:** Pipeline-artifacts type strategy table lists DiagnosticStage as "Parse, Type, Graph, Proof" — missing "Lex". Code has 5 values including Lex (used by the working Lexer).
+- Full review filed at `.squad/decisions/inbox/frank-precept-next-contract-review.md`.
+- **Key file paths:** `src/Precept.Next/Pipeline/TypedModel.cs`, `SyntaxTree.cs`, `DiagnosticCode.cs`, `Diagnostics.cs`, `Diagnostic.cs`, `SourceSpan.cs`, `Token.cs`, `Compiler.cs`, `TypeChecker.cs`.
+- **Compiler.cs pipeline order matches docs exactly.** CompilationResult shape matches docs exactly. Both are clean.
+
 ## Learnings
+
+- **A doc guarantee about non-nullability is worthless if the type signature allows null.** "Always non-null" in prose and `T?` in code is a hard contradiction. The type system is the contract; prose is commentary on it. Fix the type; don't rely on the comment.
+- **SourceSpan/SourceRange coordinate model must be decided at architecture time, not deferred.** AST offset/length and diagnostic line/column are different coordinate systems. If stages emit diagnostics, the bridge must be designed and accessible before the first stage is implemented. Token carries both — don't discard line/column at parse time if downstream stages need it.
+- **Pre-implementation scaffolding should define model stubs that match their doc specs, not single-field placeholders.** A stub with only Diagnostics makes it impossible to write tests against the stage contract. Even empty symbol tables and empty arrays are better scaffolding than a wrong shape.
 
 - **Cross-document function catalogs must be a single source of truth.** The type-checker doc's Lane Integrity section described bridge functions (approximate, floor, ceil, truncate, round) that the same document's formal catalog table didn't list. When a function exists in narrative prose but not in the implementer's contract table, it's invisible to implementation. One canonical table, referenced everywhere else.
 
