@@ -387,7 +387,7 @@ public static class Parser
                 TokenKind.Ensure =>
                     ParseStateEnsureDeclaration(start, EnsureAnchor.To, stateTarget, guard),
                 TokenKind.Arrow =>
-                    ParseStateActionDeclaration(start, StateActionAnchor.To, stateTarget),
+                    ParseStateActionDeclaration(start, StateActionAnchor.To, stateTarget, guard),
                 _ => EmitUnexpectedAndResync(start),
             };
         }
@@ -413,7 +413,7 @@ public static class Parser
                 TokenKind.Ensure =>
                     ParseStateEnsureDeclaration(start, EnsureAnchor.From, stateTarget, guard),
                 TokenKind.Arrow =>
-                    ParseStateActionDeclaration(start, StateActionAnchor.From, stateTarget),
+                    ParseStateActionDeclaration(start, StateActionAnchor.From, stateTarget, guard),
                 _ => EmitUnexpectedAndResync(start),
             };
         }
@@ -435,6 +435,7 @@ public static class Parser
             AddDiagnostic(DiagnosticCode.UnexpectedKeyword, SpanOf(Current), Current.Text, "declaration");
             SkipToNextSyncPoint();
             var missing = MissingToken(TokenKind.Identifier);
+            // Recovery node uses RuleDeclaration — cheapest two-child shape for a discardable placeholder.
             return new RuleDeclaration(
                 SourceSpan.Covering(SpanOf(start), SpanOf(Current)),
                 new IdentifierExpression(SourceSpan.Missing, missing) { IsMissing = true },
@@ -573,12 +574,12 @@ public static class Parser
         }
 
         private StateActionDeclaration ParseStateActionDeclaration(
-            Token start, StateActionAnchor anchor, StateTarget states)
+            Token start, StateActionAnchor anchor, StateTarget states, Expression? guard)
         {
             var actions = ParseArrowActions();
             return new StateActionDeclaration(
                 SourceSpan.Covering(SpanOf(start), LastSpan()),
-                anchor, states, actions);
+                anchor, states, guard, actions);
         }
 
         private AccessModeDeclaration ParseAccessModeDeclaration(
@@ -1074,13 +1075,13 @@ public static class Parser
                 TokenKind.Or  => MakeBinary(left, BinaryOp.Or, 10),
                 TokenKind.And => MakeBinary(left, BinaryOp.And, 20),
 
-                // Comparison (non-associative: rbp = 31)
-                TokenKind.DoubleEquals       => MakeBinary(left, BinaryOp.Equal, 31),
-                TokenKind.NotEquals          => MakeBinary(left, BinaryOp.NotEqual, 31),
-                TokenKind.LessThan           => MakeBinary(left, BinaryOp.Less, 31),
-                TokenKind.GreaterThan        => MakeBinary(left, BinaryOp.Greater, 31),
-                TokenKind.LessThanOrEqual    => MakeBinary(left, BinaryOp.LessOrEqual, 31),
-                TokenKind.GreaterThanOrEqual => MakeBinary(left, BinaryOp.GreaterOrEqual, 31),
+                // Comparison (non-associative: rbp = 31, explicit chaining check)
+                TokenKind.DoubleEquals       => MakeComparison(left, BinaryOp.Equal, op),
+                TokenKind.NotEquals          => MakeComparison(left, BinaryOp.NotEqual, op),
+                TokenKind.LessThan           => MakeComparison(left, BinaryOp.Less, op),
+                TokenKind.GreaterThan        => MakeComparison(left, BinaryOp.Greater, op),
+                TokenKind.LessThanOrEqual    => MakeComparison(left, BinaryOp.LessOrEqual, op),
+                TokenKind.GreaterThanOrEqual => MakeComparison(left, BinaryOp.GreaterOrEqual, op),
 
                 // Membership
                 TokenKind.Contains => MakeContains(left),
@@ -1106,6 +1107,18 @@ public static class Parser
             var right = ParseExpression(rbp);
             return new BinaryExpression(
                 SourceSpan.Covering(left.Span, right.Span), left, op, right);
+        }
+
+        private static bool IsComparisonOp(BinaryOp op) => op is
+            BinaryOp.Equal or BinaryOp.NotEqual or BinaryOp.Less or
+            BinaryOp.Greater or BinaryOp.LessOrEqual or BinaryOp.GreaterOrEqual;
+
+        private BinaryExpression MakeComparison(Expression left, BinaryOp op, Token opToken)
+        {
+            if (left is BinaryExpression { Op: var prevOp } && IsComparisonOp(prevOp))
+                AddDiagnostic(DiagnosticCode.NonAssociativeComparison, SpanOf(opToken),
+                    $"use 'and' to combine comparisons");
+            return MakeBinary(left, op, 31);
         }
 
         private ContainsExpression MakeContains(Expression left)
@@ -1152,7 +1165,7 @@ public static class Parser
                     ide.Name, args);
             }
 
-            AddDiagnostic(DiagnosticCode.InvalidCallTarget, left.Span);
+            AddDiagnostic(DiagnosticCode.InvalidCallTarget, left.Span, left.ToString()!);
             return left;
         }
 

@@ -490,8 +490,6 @@ The parser always runs to end-of-source. On malformed input it emits diagnostics
 
 ### 2.1 Expression Precedence
 
-The expression parser uses Pratt parsing (top-down operator precedence). `ParseExpression(int minBp)` parses a complete expression, stopping when it encounters a token whose left-binding power is ≤ `minBp`.
-
 | Precedence | Token(s) | Role | Associativity |
 |:----------:|----------|------|:-------------:|
 | 10 | `or` | logical disjunction | left |
@@ -506,7 +504,9 @@ The expression parser uses Pratt parsing (top-down operator precedence). `ParseE
 | 80 | `.` | member access | left |
 | 80 | `(` (postfix) | function/method call | left |
 
-**Non-associative comparisons:** `A == B == C` is a parse error. The right-binding power of comparison operators is 31, which prevents chaining. The parser emits a `NonAssociativeComparison` diagnostic.
+**Non-associative comparisons:** `A == B == C` is a parse error. The parser detects when the left operand is already a comparison expression and emits a `NonAssociativeComparison` diagnostic. (The right-binding power of 31 prevents right-associativity; the explicit left-operand check prevents left-associative chaining.)
+
+*Implementation note:* The expression parser uses Pratt parsing (top-down operator precedence). `ParseExpression(int minBp)` parses a complete expression, stopping when it encounters a token whose left-binding power is ≤ `minBp`.
 
 #### Null-denotation (atoms and prefix)
 
@@ -600,13 +600,13 @@ These preposition keywords parse a state target, then look ahead to select the p
 
 | Preposition | Following verb | Production |
 |-------------|---------------|-----------|
-| `in` | `ensure` | `StateEnsureDeclaration` (Anchor=In) |
-| `in` | `write`/`read`/`omit` | `AccessModeDeclaration` |
-| `to` | `ensure` | `StateEnsureDeclaration` (Anchor=To) |
-| `to` | `->` | `StateActionDeclaration` (Anchor=To) |
-| `from` | `on` | `TransitionRowDeclaration` |
-| `from` | `ensure` | `StateEnsureDeclaration` (Anchor=From) |
-| `from` | `->` | `StateActionDeclaration` (Anchor=From) |
+| `in` | `ensure` | state ensure (scoped to `in`) |
+| `in` | `write`/`read`/`omit` | access mode (state-scoped) |
+| `to` | `ensure` | state ensure (scoped to `to`) |
+| `to` | `->` | state action (entry hook) |
+| `from` | `on` | transition row |
+| `from` | `ensure` | state ensure (scoped to `from`) |
+| `from` | `->` | state action (exit hook) |
 
 All three support an optional `when` guard between the state target and the verb (except `from ... on`, where the guard is inside the transition row after the event name).
 
@@ -631,7 +631,7 @@ Outcome  :=  transition Identifier
           |  reject StringExpr
 ```
 
-Each action and the outcome are introduced by `->`. The parser loops consuming `->` followed by an action keyword, and breaks out when the token after `->` is an outcome keyword.
+Each action and the outcome are introduced by `->`. The `->` arrow is deliberately overloaded to create a visual pipeline that reads top-to-bottom: each step in a transition — guard, actions, outcome — flows through the same arrow. The parser loops consuming `->` followed by an action keyword, and breaks out when the token after `->` is an outcome keyword.
 
 #### State/event ensure
 
@@ -652,9 +652,11 @@ Event hooks without a `when`/`ensure` continuation are parsed as stateless event
 #### State action
 
 ```
-(to|from) StateTarget
+(to|from) StateTarget ("when" BoolExpr)?
 ("->" ActionStatement)*
 ```
+
+State actions support an optional `when` guard between the state target and the action chain. The guard is passed through to the AST node.
 
 #### Access mode
 
@@ -717,7 +719,7 @@ The parser reassembles interpolated literals from the segmented token stream the
 3. If `Middle` → `TextSegment`, go to step 2
 4. If `End` → `TextSegment`, done
 
-`ParseExpression(0)` terminates naturally at `StringMiddle`/`StringEnd`/`TypedConstantMiddle`/`TypedConstantEnd` because these token kinds have no binding power in the expression parser. This is the depth-unaware reassembly property — no depth tracking is needed.
+`ParseExpression(0)` terminates naturally at `StringMiddle`/`StringEnd`/`TypedConstantMiddle`/`TypedConstantEnd` because these token kinds have no binding power in the expression parser. This is the depth-unaware reassembly property: because `}` always ends an interpolation hole and has no meaning in the expression grammar, the parser stops naturally without tracking nesting depth.
 
 ### 2.6 Error Recovery
 
@@ -747,12 +749,12 @@ These are unambiguous top-level declaration starters. Continuation tokens (`when
 
 ### 2.7 Parser Diagnostics
 
-| Condition | Diagnostic Code | Severity |
-|-----------|-----------------|----------|
-| Expected token not found | `ExpectedToken` | Error |
-| Unrecognized keyword in declaration position | `UnexpectedKeyword` | Error |
-| Chained comparison (`A == B == C`) | `NonAssociativeComparison` | Error |
-| Non-callable expression followed by `(` | `InvalidCallTarget` | Error |
+| Condition | Diagnostic Code | Severity | Description |
+|-----------|-----------------|----------|-------------|
+| Expected token not found | `ExpectedToken` | Error | "Expected {0} here, but found '{1}'" |
+| Unrecognized keyword in declaration position | `UnexpectedKeyword` | Error | "'{0}' cannot appear inside a {1}" |
+| Chained comparison (`A == B == C`) | `NonAssociativeComparison` | Error | "Write '{0}' instead — comparison operators like == and < cannot be chained directly" |
+| Non-callable expression followed by `(` | `InvalidCallTarget` | Error | "Only named functions and methods can be called with parentheses, but found '{0}'" |
 
 ---
 

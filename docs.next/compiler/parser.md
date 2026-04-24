@@ -122,7 +122,7 @@ The `in`/`to`/`from` keywords dispatch to multi-production parsers that look ahe
 
 ### `set` disambiguation
 
-The lexer always emits `TokenKind.Set` for the word `set`. The parser reinterprets it as `TokenKind.SetType` (synthetic — never emitted by the lexer) when inside `ParseTypeRef()`, specifically when the preceding token is `As` or `Of`. This is a parser-side disambiguation: inside `ParseTypeRef()`, if the current token is `Set`, the parser treats it as the collection type keyword and proceeds to consume `of <ElementType>`. Outside `ParseTypeRef()`, `Set` is the action keyword introducing a `SetAction`.
+The lexer always emits `TokenKind.Set` for the word `set`. The parser contextually treats it as a collection type keyword when inside `ParseTypeRef()`: if `Current.Kind == Set && Peek(1).Kind == Of`, the parser proceeds to consume `of <ElementType>` as a collection type. Outside `ParseTypeRef()`, `Set` is the action keyword introducing a `SetAction`.
 
 This distinction cannot be made in the lexer because it requires knowing whether `set` appears in a field declaration context or an action body — information the lexer does not have.
 
@@ -184,12 +184,12 @@ public abstract record Expression(SourceSpan Span) : SyntaxNode(Span);
 
 ```csharp
 public sealed record class SyntaxTree(
-    PreceptNode?               Root,        // null only when EndOfSource precedes 'precept' keyword
+    PreceptNode?               Root,        // always non-null in current implementation; nullable annotation is defensive
     ImmutableArray<Diagnostic> Diagnostics
 );
 ```
 
-`Root` is null only when the source is entirely empty or the parser cannot find a `precept` keyword before end-of-source. In all other cases, `Root` is non-null (potentially with `IsMissing` on the `Name` token if the identifier is absent).
+`Root` is always non-null in the current implementation — `ParsePrecept()` uses `Expect(TokenKind.Precept)` to insert a missing node if needed and always returns a `PreceptNode`. The nullable annotation is defensive for potential future changes. `Root` may carry `IsMissing` on its `Name` token if the identifier is absent.
 
 ---
 
@@ -703,7 +703,7 @@ ParseRuleDeclaration() → RuleDeclaration
   Call:    ParseExpression(0) → Condition
   Optional: if Current.Kind == When → Consume When, ParseExpression(0) → Guard
   Expect:  Because
-  Call:    ParseStringExpression() → Message
+  Call:    ParseExpression(0) → Message
 ```
 
 ### `write` / access-mode declaration
@@ -745,7 +745,7 @@ ParseInStatement() branches:
   Optional: if Current.Kind == When → Consume When, ParseExpression(0) → Guard
   Dispatch:
     ensure → ParseStateEnsureDeclaration(Anchor=To, guard)
-    ->     → ParseStateActionDeclaration(Anchor=To, States)
+    ->     → ParseStateActionDeclaration(Anchor=To, States, guard)
     else   → emit diagnostic, resync
 
 `ParseFromStatement`:
@@ -755,7 +755,7 @@ ParseInStatement() branches:
   Optional: if Current.Kind == When → Consume When, ParseExpression(0) → Guard
   Dispatch:
     ensure → ParseStateEnsureDeclaration(Anchor=From, guard)
-    ->     → ParseStateActionDeclaration(Anchor=From, States)
+    ->     → ParseStateActionDeclaration(Anchor=From, States, guard)
     else   → emit diagnostic, resync
 
 ### Transition row
@@ -766,14 +766,13 @@ ParseTransitionRowDeclaration() → TransitionRowDeclaration
   Expect:   On
   Expect:   Identifier → EventName
   Optional: if Current.Kind == When → Consume When, ParseExpression(0) → Guard
-  Expect:   Arrow (→)
-  Loop:     while Current.Kind ∈ ActionKeywords → ParseActionStatement()
-  Call:     ParseOutcome()
+  Loop:     while Current.Kind == Arrow → Consume Arrow, dispatch action or outcome
+  Call:     ParseOutcome() for terminal outcome
 
 ParseOutcome():
   if Transition → Consume Transition, Expect Identifier → TransitionOutcomeNode
   if No        → Consume No, Expect Transition (keyword) → NoTransitionOutcomeNode
-  if Reject    → Consume Reject, ParseStringExpression() → RejectOutcomeNode
+  if Reject    → Consume Reject, ParseExpression(0) → RejectOutcomeNode
   else         → IsMissing TransitionOutcomeNode, emit diagnostic
 ```
 
@@ -788,14 +787,12 @@ ParseOnStatement()
 
 ParseStatelessEventHookDeclaration(eventName) → StatelessEventHookDeclaration
   (On and EventName already consumed by ParseOnStatement)
-  Expect:  Arrow (→)
-  Loop:    while Current.Kind ∈ ActionKeywords → ParseActionStatement()
-  Recover: if no Arrow, emit diagnostic, resync
+  Loop:    while Current.Kind == Arrow → Consume Arrow, ParseActionStatement()
+  (If no arrows, produces valid node with empty Actions array)
 
-ParseStateActionDeclaration(anchor, stateTarget) → StateActionDeclaration
-  (preposition and StateTarget already consumed by dispatch)
-  Expect:  Arrow (→)
-  Loop:    while Current.Kind ∈ ActionKeywords → ParseActionStatement()
+ParseStateActionDeclaration(anchor, stateTarget, guard?) → StateActionDeclaration
+  (preposition and StateTarget already consumed by dispatch; guard passed through if When was seen)
+  Loop:    while Current.Kind == Arrow → Consume Arrow, ParseActionStatement()
 ```
 
 ### State/event ensure
@@ -806,7 +803,7 @@ ParseStateEnsureDeclaration(anchor, guard?) → StateEnsureDeclaration
   Expect:   Ensure
   Call:     ParseExpression(0) → Condition
   Expect:   Because
-  Call:     ParseStringExpression() → Message
+  Call:     ParseExpression(0) → Message
 
 ParseEventEnsureDeclaration(eventName) → EventEnsureDeclaration
   (On and EventName already consumed by ParseOnStatement)
@@ -814,7 +811,7 @@ ParseEventEnsureDeclaration(eventName) → EventEnsureDeclaration
   Expect:   Ensure
   Call:     ParseExpression(0) → Condition
   Expect:   Because
-  Call:     ParseStringExpression() → Message
+  Call:     ParseExpression(0) → Message
 ```
 
 ### Action statement
@@ -859,8 +856,7 @@ ParseTypeRef() → TypeRef
 
 ParseTypeQualifier() → TypeQualifier
   Consume: In or Of → Kind (TypeQualifierKind)
-  Consume: TypedConstant (non-interpolated) or TypedConstantStart (interpolated)
-  Call:    ParseTypedConstantExpression() → Value
+  Call:    ParseExpression(0) → Value
   → TypeQualifier(Kind, Value)
 ```
 
@@ -910,35 +906,36 @@ Non-associative comparisons: `A == B == C` is a parse error (the parser emits a 
 ### Left-denotation (infix and postfix)
 
 ```csharp
-private Expression Led(Expression left, Token op)
+private Expression Led(Expression left)
 {
+    var op = Current;
+    Advance();
+
     return op.Kind switch
     {
-        Or               => new BinaryExpression(left, BinaryOp.Or,           ParseExpression(10), ...),
-        And              => new BinaryExpression(left, BinaryOp.And,          ParseExpression(20), ...),
-        DoubleEquals     => new BinaryExpression(left, BinaryOp.Equal,        ParseExpression(31), ...),  // non-assoc: rbp > lbp
-        NotEquals        => new BinaryExpression(left, BinaryOp.NotEqual,     ParseExpression(31), ...),
-        LessThan         => new BinaryExpression(left, BinaryOp.Less,         ParseExpression(31), ...),
-        GreaterThan      => new BinaryExpression(left, BinaryOp.Greater,      ParseExpression(31), ...),
-        LessThanOrEqual  => new BinaryExpression(left, BinaryOp.LessOrEqual,  ParseExpression(31), ...),
-        GreaterThanOrEqual=>new BinaryExpression(left, BinaryOp.GreaterOrEqual,ParseExpression(31),...),
-        Contains         => new ContainsExpression(left,                       ParseExpression(40), ...),
-        Is               => ParseIsSetExpression(left, ...),
-        Plus             => new BinaryExpression(left, BinaryOp.Plus,         ParseExpression(50), ...),
-        Minus            => new BinaryExpression(left, BinaryOp.Minus,        ParseExpression(50), ...),
-        Star             => new BinaryExpression(left, BinaryOp.Star,         ParseExpression(60), ...),
-        Slash            => new BinaryExpression(left, BinaryOp.Slash,        ParseExpression(60), ...),
-        Percent          => new BinaryExpression(left, BinaryOp.Percent,      ParseExpression(60), ...),
-        Dot              => ParseMemberAccessContinuation(left, ...),
-        LeftParen        => left is MemberAccessExpression mac
-                            ? ParseMethodCallContinuation(mac, ...)
-                            : /* left is IdentifierExpression ide */ ParseCallContinuation(ide, ...),
-        _                => /* should not reach — caller checked lbp > minBp */
+        Or               => MakeBinary(left, BinaryOp.Or,           10),
+        And              => MakeBinary(left, BinaryOp.And,          20),
+        DoubleEquals     => MakeComparison(left, BinaryOp.Equal,        op),  // non-assoc: rbp=31 + chaining check
+        NotEquals        => MakeComparison(left, BinaryOp.NotEqual,     op),
+        LessThan         => MakeComparison(left, BinaryOp.Less,         op),
+        GreaterThan      => MakeComparison(left, BinaryOp.Greater,      op),
+        LessThanOrEqual  => MakeComparison(left, BinaryOp.LessOrEqual,  op),
+        GreaterThanOrEqual=>MakeComparison(left, BinaryOp.GreaterOrEqual,op),
+        Contains         => MakeContains(left),
+        Is               => ParseIsExpression(left),
+        Plus             => MakeBinary(left, BinaryOp.Plus,         50),
+        Minus            => MakeBinary(left, BinaryOp.Minus,        50),
+        Star             => MakeBinary(left, BinaryOp.Star,         60),
+        Slash            => MakeBinary(left, BinaryOp.Slash,        60),
+        Percent          => MakeBinary(left, BinaryOp.Percent,      60),
+        Dot              => ParseMemberAccess(left),
+        LeftParen        => ParseCallOrMethodCall(left),
+        _                => left,
     };
 }
 ```
 
-`ParseIsSetExpression`: after `is`, expect optional `Not`, then `Set` keyword. Returns `IsSetExpression`.
+`MakeComparison`: checks if `left` is already a comparison `BinaryExpression` — if so, emits `NonAssociativeComparison` diagnostic before proceeding. This enforces non-associativity: `A == B == C` is a parse error.
 
 `ParseConditionalExpression`: Consume `If`, `ParseExpression(0)` → Condition, Expect `Then`, `ParseExpression(0)` → Consequence, Expect `Else`, `ParseExpression(0)` → Alternative.
 
@@ -1042,7 +1039,7 @@ Use this mechanism for: absent identifiers after declaration keywords, missing `
 
 ### Mechanism 2: Sync-point resync
 
-When the parser is structurally lost at the top level (the current token is not a valid declaration starter), it scans forward for a NewLine followed by a sync token:
+When the parser is structurally lost at the top level (the current token is not a valid declaration starter), it scans forward for a sync token, skipping trivia (newlines and comments) before each check:
 
 ```csharp
 private void SkipToNextSyncPoint()
@@ -1156,7 +1153,7 @@ The parser intentionally does NOT:
 
 | File | Purpose |
 |------|---------|
-| `src/Precept.Next/Pipeline/Parser.cs` | Parser implementation — `Parser` static class, `ParseSession` struct (~600 lines estimated) |
+| `src/Precept.Next/Pipeline/Parser.cs` | Parser implementation — `Parser` static class, `ParseSession` struct (~1,270 lines) |
 | `src/Precept.Next/Pipeline/SyntaxTree.cs` | `SyntaxTree` pipeline artifact — root node + diagnostics |
 | `src/Precept.Next/Pipeline/SyntaxNodes.cs` | All `SyntaxNode` concrete types — declarations, statements, expressions, outcomes, type refs, modifiers, auxiliary nodes |
 | `src/Precept.Next/Pipeline/SourceSpan.cs` | `SourceSpan` struct |

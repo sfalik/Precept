@@ -118,8 +118,10 @@ public class ParserTests
     {
         // Use in set RHS via transition row
         var tree = Parse("precept Test\nfield D as date\nfrom S on E\n-> set D = '2026-04-23'\n-> transition S2");
-        // Just check it parses — the typed constant is in a set action
         tree.Diagnostics.Should().BeEmpty();
+        var row = tree.Root!.Body[1].Should().BeOfType<TransitionRowDeclaration>().Subject;
+        var set = row.Actions[0].Should().BeOfType<SetActionStatement>().Subject;
+        set.Value.Should().BeOfType<TypedConstantExpression>();
     }
 
     [Fact]
@@ -663,6 +665,8 @@ on E
         tree.Diagnostics.Should().BeEmpty();
         var hook = tree.Root!.Body[1].Should().BeOfType<StatelessEventHookDeclaration>().Subject;
         hook.Actions.Should().HaveCount(2);
+        hook.Actions[0].Should().BeOfType<SetActionStatement>();
+        hook.Actions[1].Should().BeOfType<SetActionStatement>();
     }
 
     [Fact]
@@ -751,5 +755,418 @@ from Draft on Start
         tree.Root.Should().NotBeNull();
         tree.Root!.Name.Text.Should().Be("Minimal");
         tree.Root.Body.Should().HaveCount(6);
+    }
+
+    // ════════════════════════════════════════════════════════════════════════════
+    //  B1: Non-associative comparison enforcement
+    // ════════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Expr_ChainedComparison_EmitsDiagnostic()
+    {
+        var tree = Parse("precept Test\nrule A == B == C because \"msg\"");
+        tree.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.NonAssociativeComparison));
+    }
+
+    [Fact]
+    public void Expr_ChainedLessThan_EmitsDiagnostic()
+    {
+        var tree = Parse("precept Test\nrule A < B < C because \"msg\"");
+        tree.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.NonAssociativeComparison));
+    }
+
+    [Fact]
+    public void Expr_TwoSeparateComparisons_WithAnd_NoDiagnostic()
+    {
+        var tree = Parse("precept Test\nrule A > 0 and B < 10 because \"msg\"");
+        tree.Diagnostics.Should().BeEmpty();
+    }
+
+    // ════════════════════════════════════════════════════════════════════════════
+    //  B2: State action declarations with guard
+    // ════════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Decl_ToStateAction_ParsesActions()
+    {
+        var decl = ParseDecl("to Active\n-> set Flag = true");
+        var sa = decl.Should().BeOfType<StateActionDeclaration>().Subject;
+        sa.Anchor.Should().Be(StateActionAnchor.To);
+        sa.Guard.Should().BeNull();
+        sa.Actions.Should().ContainSingle();
+        sa.Actions[0].Should().BeOfType<SetActionStatement>();
+    }
+
+    [Fact]
+    public void Decl_ToStateActionWithGuard_ParsesGuard()
+    {
+        var decl = ParseDecl("to Active when Amount > 0\n-> set Flag = true");
+        var sa = decl.Should().BeOfType<StateActionDeclaration>().Subject;
+        sa.Anchor.Should().Be(StateActionAnchor.To);
+        sa.Guard.Should().NotBeNull();
+        sa.Guard.Should().BeOfType<BinaryExpression>();
+    }
+
+    [Fact]
+    public void Decl_FromStateAction_ParsesActions()
+    {
+        var decl = ParseDecl("from Draft\n-> set Flag = false");
+        var sa = decl.Should().BeOfType<StateActionDeclaration>().Subject;
+        sa.Anchor.Should().Be(StateActionAnchor.From);
+        sa.Actions.Should().ContainSingle();
+    }
+
+    [Fact]
+    public void Decl_FromStateActionWithGuard_ParsesGuard()
+    {
+        var decl = ParseDecl("from Draft when Active\n-> set Flag = false");
+        var sa = decl.Should().BeOfType<StateActionDeclaration>().Subject;
+        sa.Anchor.Should().Be(StateActionAnchor.From);
+        sa.Guard.Should().NotBeNull();
+    }
+
+    // ════════════════════════════════════════════════════════════════════════════
+    //  B4: to/from ensure declarations
+    // ════════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Decl_ToEnsure_ParsesAnchor()
+    {
+        var decl = ParseDecl("to Active ensure Amount > 0 because \"Required\"");
+        var ensure = decl.Should().BeOfType<StateEnsureDeclaration>().Subject;
+        ensure.Anchor.Should().Be(EnsureAnchor.To);
+    }
+
+    [Fact]
+    public void Decl_FromEnsure_ParsesAnchor()
+    {
+        var decl = ParseDecl("from Draft ensure Amount > 0 because \"Required\"");
+        var ensure = decl.Should().BeOfType<StateEnsureDeclaration>().Subject;
+        ensure.Anchor.Should().Be(EnsureAnchor.From);
+    }
+
+    // ════════════════════════════════════════════════════════════════════════════
+    //  B5: Declaration variants
+    // ════════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Decl_EventMultiName_ParsesAllNames()
+    {
+        var tree = Parse("precept Test\nevent Submit, Cancel, Retry");
+        tree.Diagnostics.Should().BeEmpty();
+        var ev = tree.Root!.Body[0].Should().BeOfType<EventDeclaration>().Subject;
+        ev.Names.Should().HaveCount(3);
+        ev.Names[0].Text.Should().Be("Submit");
+        ev.Names[1].Text.Should().Be("Cancel");
+        ev.Names[2].Text.Should().Be("Retry");
+    }
+
+    [Fact]
+    public void Decl_AccessModeOmit_ParsesMode()
+    {
+        var decl = ParseDecl("in Active omit Salary");
+        var am = decl.Should().BeOfType<AccessModeDeclaration>().Subject;
+        am.Mode.Should().Be(AccessMode.Omit);
+    }
+
+    [Fact]
+    public void Decl_AccessModeWithGuard_ParsesGuard()
+    {
+        var decl = ParseDecl("in Active when IsAdmin write Salary");
+        var am = decl.Should().BeOfType<AccessModeDeclaration>().Subject;
+        am.Guard.Should().NotBeNull();
+        am.Mode.Should().Be(AccessMode.Write);
+    }
+
+    [Fact]
+    public void Decl_StateTargetAny_ParsesIsAny()
+    {
+        var decl = ParseDecl("in any read all");
+        var am = decl.Should().BeOfType<AccessModeDeclaration>().Subject;
+        am.StateScope!.IsAny.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData("required")]
+    [InlineData("irreversible")]
+    [InlineData("success")]
+    [InlineData("warning")]
+    [InlineData("error")]
+    public void Decl_StateModifiers_ParseCorrectly(string modifier)
+    {
+        var tree = Parse($"precept Test\nstate S {modifier}");
+        tree.Diagnostics.Should().BeEmpty();
+        var state = tree.Root!.Body[0].Should().BeOfType<StateDeclaration>().Subject;
+        state.Entries[0].Modifiers.Should().ContainSingle();
+    }
+
+    // ════════════════════════════════════════════════════════════════════════════
+    //  B6: Queue/stack/enqueue/dequeue/push/pop actions
+    // ════════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Action_Enqueue_ParsesFieldAndValue()
+    {
+        var tree = Parse("precept Test\nfrom S on E\n-> enqueue Q \"item\"\n-> transition S2");
+        tree.Diagnostics.Should().BeEmpty();
+        var row = tree.Root!.Body[0].Should().BeOfType<TransitionRowDeclaration>().Subject;
+        var enq = row.Actions[0].Should().BeOfType<EnqueueActionStatement>().Subject;
+        enq.FieldName.Text.Should().Be("Q");
+    }
+
+    [Fact]
+    public void Action_DequeueWithoutInto_ParsesNullIntoField()
+    {
+        var tree = Parse("precept Test\nfrom S on E\n-> dequeue Q\n-> transition S2");
+        tree.Diagnostics.Should().BeEmpty();
+        var row = tree.Root!.Body[0].Should().BeOfType<TransitionRowDeclaration>().Subject;
+        var deq = row.Actions[0].Should().BeOfType<DequeueActionStatement>().Subject;
+        deq.FieldName.Text.Should().Be("Q");
+        deq.IntoField.Should().BeNull();
+    }
+
+    [Fact]
+    public void Action_DequeueWithInto_ParsesIntoField()
+    {
+        var tree = Parse("precept Test\nfrom S on E\n-> dequeue Q into Temp\n-> transition S2");
+        tree.Diagnostics.Should().BeEmpty();
+        var row = tree.Root!.Body[0].Should().BeOfType<TransitionRowDeclaration>().Subject;
+        var deq = row.Actions[0].Should().BeOfType<DequeueActionStatement>().Subject;
+        deq.IntoField.Should().NotBeNull();
+        deq.IntoField!.Value.Text.Should().Be("Temp");
+    }
+
+    [Fact]
+    public void Action_Push_ParsesFieldAndValue()
+    {
+        var tree = Parse("precept Test\nfrom S on E\n-> push Stack \"item\"\n-> transition S2");
+        tree.Diagnostics.Should().BeEmpty();
+        var row = tree.Root!.Body[0].Should().BeOfType<TransitionRowDeclaration>().Subject;
+        row.Actions[0].Should().BeOfType<PushActionStatement>();
+    }
+
+    [Fact]
+    public void Action_PopWithoutInto_ParsesNullIntoField()
+    {
+        var tree = Parse("precept Test\nfrom S on E\n-> pop Stack\n-> transition S2");
+        tree.Diagnostics.Should().BeEmpty();
+        var row = tree.Root!.Body[0].Should().BeOfType<TransitionRowDeclaration>().Subject;
+        var pop = row.Actions[0].Should().BeOfType<PopActionStatement>().Subject;
+        pop.IntoField.Should().BeNull();
+    }
+
+    [Fact]
+    public void Action_PopWithInto_ParsesIntoField()
+    {
+        var tree = Parse("precept Test\nfrom S on E\n-> pop Stack into Temp\n-> transition S2");
+        tree.Diagnostics.Should().BeEmpty();
+        var row = tree.Root!.Body[0].Should().BeOfType<TransitionRowDeclaration>().Subject;
+        var pop = row.Actions[0].Should().BeOfType<PopActionStatement>().Subject;
+        pop.IntoField.Should().NotBeNull();
+        pop.IntoField!.Value.Text.Should().Be("Temp");
+    }
+
+    // ════════════════════════════════════════════════════════════════════════════
+    //  B7: Type coverage — scalar types, queue, stack, qualifiers
+    // ════════════════════════════════════════════════════════════════════════════
+
+    [Theory]
+    [InlineData("string", ScalarTypeKind.String)]
+    [InlineData("number", ScalarTypeKind.Number)]
+    [InlineData("integer", ScalarTypeKind.Integer)]
+    [InlineData("decimal", ScalarTypeKind.Decimal)]
+    [InlineData("boolean", ScalarTypeKind.Boolean)]
+    [InlineData("date", ScalarTypeKind.Date)]
+    [InlineData("time", ScalarTypeKind.Time)]
+    [InlineData("instant", ScalarTypeKind.Instant)]
+    [InlineData("duration", ScalarTypeKind.Duration)]
+    [InlineData("period", ScalarTypeKind.Period)]
+    [InlineData("timezone", ScalarTypeKind.Timezone)]
+    [InlineData("zoneddatetime", ScalarTypeKind.ZonedDateTime)]
+    [InlineData("datetime", ScalarTypeKind.DateTime)]
+    [InlineData("money", ScalarTypeKind.Money)]
+    [InlineData("currency", ScalarTypeKind.Currency)]
+    [InlineData("quantity", ScalarTypeKind.Quantity)]
+    [InlineData("unitofmeasure", ScalarTypeKind.UnitOfMeasure)]
+    [InlineData("dimension", ScalarTypeKind.Dimension)]
+    [InlineData("price", ScalarTypeKind.Price)]
+    [InlineData("exchangerate", ScalarTypeKind.ExchangeRate)]
+    public void Decl_AllScalarTypes_ParseCorrectly(string typeName, ScalarTypeKind expected)
+    {
+        var decl = ParseDecl($"field F as {typeName}");
+        var field = decl.Should().BeOfType<FieldDeclaration>().Subject;
+        var scalar = field.Type.Should().BeOfType<ScalarTypeRef>().Subject;
+        scalar.Kind.Should().Be(expected);
+    }
+
+    [Fact]
+    public void Decl_QueueOfString_ParsesCollectionType()
+    {
+        var decl = ParseDecl("field Q as queue of string");
+        var field = decl.Should().BeOfType<FieldDeclaration>().Subject;
+        var coll = field.Type.Should().BeOfType<CollectionTypeRef>().Subject;
+        coll.Kind.Should().Be(CollectionKind.Queue);
+        coll.ElementType.Kind.Should().Be(ScalarTypeKind.String);
+    }
+
+    [Fact]
+    public void Decl_StackOfNumber_ParsesCollectionType()
+    {
+        var decl = ParseDecl("field S as stack of number");
+        var field = decl.Should().BeOfType<FieldDeclaration>().Subject;
+        var coll = field.Type.Should().BeOfType<CollectionTypeRef>().Subject;
+        coll.Kind.Should().Be(CollectionKind.Stack);
+        coll.ElementType.Kind.Should().Be(ScalarTypeKind.Number);
+    }
+
+    [Fact]
+    public void Decl_TypeQualifierIn_ParsesQualifier()
+    {
+        var decl = ParseDecl("field M as money in 'USD'");
+        var field = decl.Should().BeOfType<FieldDeclaration>().Subject;
+        var scalar = field.Type.Should().BeOfType<ScalarTypeRef>().Subject;
+        scalar.Qualifier.Should().NotBeNull();
+        scalar.Qualifier!.Kind.Should().Be(TypeQualifierKind.In);
+    }
+
+    [Fact]
+    public void Decl_TypeQualifierOf_ParsesQualifier()
+    {
+        var decl = ParseDecl("field Q as quantity of 'mass'");
+        var field = decl.Should().BeOfType<FieldDeclaration>().Subject;
+        var scalar = field.Type.Should().BeOfType<ScalarTypeRef>().Subject;
+        scalar.Qualifier.Should().NotBeNull();
+        scalar.Qualifier!.Kind.Should().Be(TypeQualifierKind.Of);
+    }
+
+    // ════════════════════════════════════════════════════════════════════════════
+    //  B8: Field modifier coverage
+    // ════════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Decl_Field_OptionalModifier_Parses()
+    {
+        var decl = ParseDecl("field F as string optional");
+        var field = decl.Should().BeOfType<FieldDeclaration>().Subject;
+        field.Modifiers.Should().ContainSingle().Which.Should().BeOfType<OptionalModifier>();
+    }
+
+    [Fact]
+    public void Decl_Field_OrderedModifier_Parses()
+    {
+        var decl = ParseDecl("field F as string ordered");
+        var field = decl.Should().BeOfType<FieldDeclaration>().Subject;
+        field.Modifiers.Should().ContainSingle().Which.Should().BeOfType<OrderedModifier>();
+    }
+
+    [Fact]
+    public void Decl_Field_NonzeroModifier_Parses()
+    {
+        var decl = ParseDecl("field F as number nonzero");
+        var field = decl.Should().BeOfType<FieldDeclaration>().Subject;
+        field.Modifiers.Should().ContainSingle().Which.Should().BeOfType<NonzeroModifier>();
+    }
+
+    [Fact]
+    public void Decl_Field_MinModifier_ParsesValue()
+    {
+        var decl = ParseDecl("field F as number min 0");
+        var field = decl.Should().BeOfType<FieldDeclaration>().Subject;
+        field.Modifiers.Should().ContainSingle().Which.Should().BeOfType<MinModifier>();
+    }
+
+    [Fact]
+    public void Decl_Field_MaxModifier_ParsesValue()
+    {
+        var decl = ParseDecl("field F as number max 100");
+        var field = decl.Should().BeOfType<FieldDeclaration>().Subject;
+        field.Modifiers.Should().ContainSingle().Which.Should().BeOfType<MaxModifier>();
+    }
+
+    [Fact]
+    public void Decl_Field_MinLengthModifier_ParsesValue()
+    {
+        var decl = ParseDecl("field F as string minlength 1");
+        var field = decl.Should().BeOfType<FieldDeclaration>().Subject;
+        field.Modifiers.Should().ContainSingle().Which.Should().BeOfType<MinLengthModifier>();
+    }
+
+    [Fact]
+    public void Decl_Field_MaxLengthModifier_ParsesValue()
+    {
+        var decl = ParseDecl("field F as string maxlength 255");
+        var field = decl.Should().BeOfType<FieldDeclaration>().Subject;
+        field.Modifiers.Should().ContainSingle().Which.Should().BeOfType<MaxLengthModifier>();
+    }
+
+    [Fact]
+    public void Decl_Field_MinCountModifier_ParsesValue()
+    {
+        var decl = ParseDecl("field F as set of string mincount 1");
+        var field = decl.Should().BeOfType<FieldDeclaration>().Subject;
+        field.Modifiers.Should().ContainSingle().Which.Should().BeOfType<MinCountModifier>();
+    }
+
+    [Fact]
+    public void Decl_Field_MaxCountModifier_ParsesValue()
+    {
+        var decl = ParseDecl("field F as set of string maxcount 10");
+        var field = decl.Should().BeOfType<FieldDeclaration>().Subject;
+        field.Modifiers.Should().ContainSingle().Which.Should().BeOfType<MaxCountModifier>();
+    }
+
+    [Fact]
+    public void Decl_Field_MaxPlacesModifier_ParsesValue()
+    {
+        var decl = ParseDecl("field F as decimal maxplaces 2");
+        var field = decl.Should().BeOfType<FieldDeclaration>().Subject;
+        field.Modifiers.Should().ContainSingle().Which.Should().BeOfType<MaxPlacesModifier>();
+    }
+
+    // ════════════════════════════════════════════════════════════════════════════
+    //  B6 (expr): Interpolated typed constant + InvalidCallTarget
+    // ════════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Expr_InvalidCallTarget_EmitsDiagnostic()
+    {
+        // (A + B)(C) — non-callable target
+        var tree = Parse("precept Test\nrule (A + B)(C) because \"msg\"");
+        tree.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.InvalidCallTarget));
+    }
+
+    // ════════════════════════════════════════════════════════════════════════════
+    //  Additional error recovery
+    // ════════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Error_FieldMissingAs_EmitsExpectedToken()
+    {
+        var tree = Parse("precept Test\nfield Name string");
+        tree.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.ExpectedToken));
+    }
+
+    [Fact]
+    public void Error_RuleMissingBecause_EmitsExpectedToken()
+    {
+        var tree = Parse("precept Test\nrule A > 0 \"msg\"");
+        tree.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.ExpectedToken));
+    }
+
+    [Fact]
+    public void Error_TransitionRowMissingOutcome_StillParses()
+    {
+        // from S on E with no outcome — should have diagnostic or empty outcome
+        var tree = Parse("precept Test\nfrom S on E");
+        tree.Root.Should().NotBeNull();
+        tree.Root!.Body.Should().NotBeEmpty();
+    }
+
+    [Fact]
+    public void Expr_SingleElementListLiteral_ParsesOneElement()
+    {
+        var expr = ParseExpr("[1]");
+        var list = expr.Should().BeOfType<ListLiteralExpression>().Subject;
+        list.Elements.Should().ContainSingle();
     }
 }

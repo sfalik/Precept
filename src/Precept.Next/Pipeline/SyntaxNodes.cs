@@ -202,11 +202,12 @@ public sealed record StatelessEventHookDeclaration(
     ImmutableArray<Statement> Actions
 ) : Declaration(Span);
 
-/// <summary>"to"|"from" StateTarget ActionChain</summary>
+/// <summary>"to"|"from" StateTarget ["when" Guard] ActionChain</summary>
 public sealed record StateActionDeclaration(
     SourceSpan                Span,
     StateActionAnchor         Anchor,
     StateTarget               States,
+    Expression?               Guard,
     ImmutableArray<Statement> Actions
 ) : Declaration(Span);
 
