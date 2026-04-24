@@ -173,7 +173,7 @@ if (source.Length > MaxSourceLength)
         ImmutableArray.Create(new Token(TokenKind.EndOfSource, "", 1, 1, 0, 0)),
         ImmutableArray.Create(Diagnostics.Create(
             DiagnosticCode.InputTooLarge,
-            new SourceRange(1, 1, 1, 1))));
+            new SourceSpan(0, 0, 1, 1, 1, 1))));
 }
 ```
 

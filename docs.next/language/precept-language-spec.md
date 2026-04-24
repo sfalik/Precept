@@ -471,7 +471,7 @@ Each error condition has a defined recovery boundary:
 | Unrecognized typed constant escape | Skip the `\` and the following character; continue in `TypedConstant` mode | Same as above |
 | Unescaped `}` in literal | Preserve the `}` as literal content in the token's `Text`; continue scanning | Recovers the character so surrounding content remains intact |
 
-In all cases the invalid source span still produces a diagnostic with the correct `SourceRange`. Post-recovery tokens are emitted normally so the parser and downstream stages can report additional errors.
+In all cases the invalid source span still produces a diagnostic with the correct `SourceSpan`. Post-recovery tokens are emitted normally so the parser and downstream stages can report additional errors.
 
 ---
 

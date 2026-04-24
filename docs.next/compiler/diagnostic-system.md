@@ -45,7 +45,7 @@ public readonly record struct Diagnostic(
     DiagnosticStage Stage,
     string          Code,       // "UndeclaredField" — derived from enum member name
     string          Message,    // pre-formatted, final English string
-    SourceRange     Range
+    SourceSpan      Span
 );
 ```
 
@@ -53,18 +53,11 @@ Five fields. The message is a pre-formatted string — no templates at the outpu
 
 `Diagnostic` is a `readonly record struct` — small, value-typed, zero-allocation-friendly in immutable arrays.
 
-### Source Ranges
+### Source Spans
 
-```csharp
-public readonly record struct SourceRange(
-    int StartLine,     // 1-based
-    int StartColumn,   // 1-based
-    int EndLine,       // 1-based
-    int EndColumn      // 1-based
-);
-```
+Diagnostics carry a `SourceSpan` — the same unified location type used on every AST node. This means downstream stages can emit located diagnostics directly from `node.Span` without needing the source text. See the parser doc for the full `SourceSpan` definition.
 
-1-based to align with LSP `Position` (which is 0-based — conversion happens at the LS layer, not in the diagnostic). Source ranges are required on every diagnostic — every diagnostic must point somewhere in the source.
+1-based line/column to align with LSP `Position` (which is 0-based — conversion happens at the LS layer, not in the diagnostic). Source spans are required on every diagnostic — every diagnostic must point somewhere in the source.
 
 ### Diagnostic Stages
 
@@ -219,11 +212,11 @@ public static class Diagnostics
     };
 
     public static Diagnostic Create(
-        DiagnosticCode code, SourceRange range, params object?[] args)
+        DiagnosticCode code, SourceSpan span, params object?[] args)
     {
         var meta = GetMeta(code);
         return new(meta.Severity, meta.Stage, meta.Code,
-            string.Format(meta.MessageTemplate, args), range);
+            string.Format(meta.MessageTemplate, args), span);
     }
 
     public static IReadOnlyList<DiagnosticMeta> All { get; } =

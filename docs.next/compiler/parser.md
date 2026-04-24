@@ -31,7 +31,7 @@ No instance, no DI, no configuration. Tests call the method directly and assert 
 
 ### AST, not CST
 
-The parser produces semantic structure — not a full-fidelity representation of the source. Comments and whitespace tokens are consumed silently. The tree contains no trivia nodes, no comment attachments, and no whitespace spans. Every AST node carries a `SourceSpan` (offset + length) pointing into the original source for diagnostics, hover, go-to-definition, and semantic tokens.
+The parser produces semantic structure — not a full-fidelity representation of the source. Comments and whitespace tokens are consumed silently. The tree contains no trivia nodes, no comment attachments, and no whitespace spans. Every AST node carries a `SourceSpan` (offset/length + line/column) pointing into the original source for diagnostics, hover, go-to-definition, and semantic tokens.
 
 Precept files are 50–200 lines. LSP is a text-edit protocol — no LS feature requires tree-to-source round-tripping. A full-fidelity CST (Roslyn's red-green tree model) solves a formatting and refactoring problem that does not exist in Precept's scope. The v1 language server already works on an AST and all its features work correctly. The v2 parser carries this forward.
 
@@ -134,17 +134,27 @@ This distinction cannot be made in the lexer because it requires knowing whether
 
 ```csharp
 /// <summary>
-/// A span in the source text. Offset is 0-based; Length is in characters.
-/// Used on every AST node for diagnostics, hover, go-to-definition, and semantic tokens.
+/// A span in the source text. Combines offset/length (for slicing) with
+/// line/column (for diagnostics and LSP). Both coordinate systems are carried
+/// on every AST node so downstream stages never need the raw source text to
+/// emit located diagnostics.
 /// </summary>
-public readonly record struct SourceSpan(int Offset, int Length)
+public readonly record struct SourceSpan(
+    int Offset,      // 0-based character offset
+    int Length,       // number of characters spanned
+    int StartLine,    // 1-based
+    int StartColumn,  // 1-based
+    int EndLine,      // 1-based
+    int EndColumn)    // 1-based, exclusive (like LSP)
 {
-    public static readonly SourceSpan Missing = new(0, 0);
+    public static readonly SourceSpan Missing = new(0, 0, 0, 0, 0, 0);
 
     public int End => Offset + Length;
 
     public static SourceSpan Covering(SourceSpan first, SourceSpan last) =>
-        new(first.Offset, last.End - first.Offset);
+        new(first.Offset, last.End - first.Offset,
+            first.StartLine, first.StartColumn,
+            last.EndLine, last.EndColumn);
 }
 ```
 

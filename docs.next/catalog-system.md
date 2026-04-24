@@ -79,11 +79,11 @@ public static class Diagnostics
     public static IReadOnlyList<DiagnosticMeta> All { get; } =
         Enum.GetValues<DiagnosticCode>().Select(GetMeta).ToList();
 
-    public static Diagnostic Create(DiagnosticCode code, SourceRange range, params object?[] args)
+    public static Diagnostic Create(DiagnosticCode code, SourceSpan span, params object?[] args)
     {
         var meta = GetMeta(code);
         return new(meta.Severity, meta.Stage, meta.Code,
-            string.Format(meta.MessageTemplate, args), range);
+            string.Format(meta.MessageTemplate, args), span);
     }
 }
 ```
@@ -106,7 +106,7 @@ public readonly record struct Diagnostic(
     DiagnosticStage Stage,
     string          Code,
     string          Message,
-    SourceRange     Range
+    SourceSpan      Span
 );
 ```
 
