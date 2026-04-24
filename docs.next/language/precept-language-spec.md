@@ -753,8 +753,8 @@ These are unambiguous top-level declaration starters. Continuation tokens (`when
 |-----------|-----------------|----------|-------------|
 | Expected token not found | `ExpectedToken` | Error | "Expected {0} here, but found '{1}'" |
 | Unrecognized keyword in declaration position | `UnexpectedKeyword` | Error | "'{0}' cannot appear inside a {1}" |
-| Chained comparison (`A == B == C`) | `NonAssociativeComparison` | Error | "Write '{0}' instead — comparison operators like == and < cannot be chained directly" |
-| Non-callable expression followed by `(` | `InvalidCallTarget` | Error | "Only named functions and methods can be called with parentheses, but found '{0}'" |
+| Chained comparison (`A == B == C`) | `NonAssociativeComparison` | Error | "Comparisons like == and < cannot be chained — {0}" |
+| Non-callable expression followed by `(` | `InvalidCallTarget` | Error | "Only built-in functions can be called this way — '{0}' is not a function name" |
 
 ---
 

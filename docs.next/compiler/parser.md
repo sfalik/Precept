@@ -308,7 +308,7 @@ public sealed record EventEnsureDeclaration(
 ) : Declaration(Span);
 
 /// <summary>
-/// "to"|"from" StateTarget ActionChain
+/// "to"|"from" StateTarget ("when" BoolExpr)? ActionChain
 /// </summary>
 public sealed record StateActionDeclaration(
     SourceSpan                Span,

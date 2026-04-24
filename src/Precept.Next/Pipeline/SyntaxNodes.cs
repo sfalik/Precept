@@ -186,7 +186,7 @@ public sealed record StateEnsureDeclaration(
     Expression   Message
 ) : Declaration(Span);
 
-/// <summary>"on" Identifier "ensure" BoolExpr WhenOpt "because" StringExpr</summary>
+/// <summary>"on" Identifier ("when" BoolExpr)? "ensure" BoolExpr "because" StringExpr</summary>
 public sealed record EventEnsureDeclaration(
     SourceSpan  Span,
     Token       EventName,
