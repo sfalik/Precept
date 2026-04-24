@@ -16,7 +16,7 @@ Add eight temporal types to the Precept DSL — `date`, `time`, `instant`, `dura
 - **Interpolated quantities:** `'{GraceDays} days'`, `'{X + 5} hours'` — `{expr}` interpolation inside `'...'`
 - **Combined quantities:** `'2 years + 6 months + 15 days'` — `+` combination inside `'...'`
 
-**Formatted temporal constants** use the single-quoted `'...'` delimiter — the typed constant delimiter — with type inferred from content shape. Temporal types are the first inhabitants of this mechanism; the delimiter is not temporal-specific:
+**Formatted temporal constants** use the single-quoted `'...'` delimiter — the typed constant delimiter — with type determined by expression context. Temporal types are the first inhabitants of this mechanism; the delimiter is not temporal-specific:
 - `'2026-06-01'` (date), `'14:30:00'` (time), `'2026-04-13T14:30:00Z'` (instant), `'2026-04-13T09:00:00'` (datetime), `'2026-04-13T14:30:00[America/New_York]'` (zoneddatetime), `'America/New_York'` (timezone)
 
 **Timezone mediation** uses a single dot-accessor operation — `.inZone(tz)` — that produces a `zoneddatetime`, with navigation to local types via dot chains:
@@ -48,7 +48,7 @@ timezone    ← IANA timezone identifier
 1. **Two-door model** — Door 3 (bare postfix keywords: `30 days`, `(GraceDays) days`) is eliminated. Quantities enter through Door 2 as typed constants: `'30 days'`, `'{GraceDays} days'`.
 2. **`{expr}` interpolation** — Both `"..."` and `'...'` support `{expr}` interpolation, always-on (no prefix), because `{` has no structural meaning in Precept.
 3. **Unit names are no longer keywords** — `days`, `hours`, `minutes`, `seconds`, `months`, `years`, `weeks` are validated strings inside `'...'`, not reserved words.
-4. **Type-family admission rule** — Content shape determines a type family (finite set); context narrows within the family. Replaces the strict self-identifying property.
+4. **Context-born typed constant resolution** — Expression context determines the type; content is then validated against the expected type. Replaces the strict self-identifying property.
 
 **What changed in v4:** Six locked decisions from the 2026-04-15 session revised the type surface and timezone mediation:
 1. **Bare English naming** (D10, revised) — `date`, `time`, `datetime` use natural English words. The absence of a `zoned` prefix signals "no timezone" — the bare name is the default; `zoneddatetime` is the marked form that carries additional information.
@@ -62,7 +62,7 @@ timezone    ← IANA timezone identifier
 1. **Unified postfix model** — All 7 function-call constructors (`days()`, `months()`, `hours()`, etc.) eliminated. Postfix was the sole quantity construction syntax. *(v5 further evolved this: postfix quantities moved into `'...'` typed constants — see v5 changes above.)*
 2. **`+` as sole combiner** — Composite juxtaposition (`2 years 6 months`) eliminated. Only `'2 years + 6 months'`.
 3. **No duration/period constructor literals** — `duration(PT72H)` and `period(P1Y6M)` eliminated. Typed constant quantities are the only surface.
-4. **Single-quoted typed constants** — `date(2026-01-15)` constructor form replaced by `'2026-01-15'`. All 6 formatted temporal types use the `'...'` typed constant delimiter with type inferred from content shape.
+4. **Single-quoted typed constants** — `date(2026-01-15)` constructor form replaced by `'2026-01-15'`. All 6 formatted temporal types use the `'...'` typed constant delimiter with type determined by expression context.
 
 **What changed in v2:** The NodaTime alignment directive: *"No obscurity, expose NodaTime. Don't reinvent the wheel. Force authors to think about the details."* The v1 proposal collapsed `Period` and `Duration` into a single surface type (`duration`) with custom dispatch rules. This was wrong. NodaTime deliberately keeps `Period` and `Duration` as separate types because they represent fundamentally different quantities — calendar distance vs. timeline distance. The v2 proposal exposes this distinction faithfully: `period` and `duration` are separate surface types, calendar units resolve to `period`, timeline units resolve to `duration`, and the type checker inherits NodaTime's enforcement for free. No custom operator dispatch. No re-inventing the wheel.
 
@@ -91,7 +91,7 @@ The governing question for every decision: **"If a domain author has this kind o
 
 ### Temporal types as the gateway beyond primitives
 
-Precept's type system today consists of primitives: `string`, `number`, `integer`, `decimal`, `boolean`. Temporal types are the **first step beyond primitives** — the gateway to a richer type vocabulary that lets domain authors express what their data *is*, not just what storage shape it occupies. The literal mechanisms established here — single-quoted typed constants (`'...'`) with `{expr}` interpolation — are not temporal features. They are the language's **expansion joints** for all future non-primitive types. The canonical design for these mechanisms lives in [Literal System](../compiler/literal-system.md). Every design decision here carries weight beyond temporal: the type-family admission rule for typed constants, the context-dependent resolution for quantities, and the zero-constructor discipline all set precedent for how the language grows.
+Precept's type system today consists of primitives: `string`, `number`, `integer`, `decimal`, `boolean`. Temporal types are the **first step beyond primitives** — the gateway to a richer type vocabulary that lets domain authors express what their data *is*, not just what storage shape it occupies. The literal mechanisms established here — single-quoted typed constants (`'...'`) with `{expr}` interpolation — are not temporal features. They are the language's **expansion joints** for all future non-primitive types. The canonical design for these mechanisms lives in [Literal System](../compiler/literal-system.md). Every design decision here carries weight beyond temporal: the context-born typed constant resolution model, the context-dependent resolution for quantities, and the zero-constructor discipline all set precedent for how the language grows.
 
 ### The NodaTime alignment directive
 
@@ -219,7 +219,7 @@ The second form satisfies the philosophy's "one file, complete rules" guarantee.
 - SLA and compliance timing rules stay in the hosting layer. The contract has a visible gap in its primary target domains (insurance, healthcare, finance).
 - Day-counter simulation events remain as boilerplate in 3+ samples.
 - The "one file, complete rules" philosophy claim is undermined for any domain with temporal constraints.
-- The literal mechanism framework (typed constant delimiter with interpolation, type-family admission rule) that would serve all future non-primitive types has no proving ground — future type proposals would each need to invent their own syntax.
+- The literal mechanism framework (typed constant delimiter with interpolation, context-born resolution model) that would serve all future non-primitive types has no proving ground — future type proposals would each need to invent their own syntax.
 
 ---
 
@@ -265,11 +265,11 @@ NodaTime is adopted as a runtime dependency for the entire temporal type system.
 
 ```precept
 field DueDate as date default '2026-06-01'
-field FilingDate as date nullable
+field FilingDate as date optional
 field ContractEnd as date default '2099-12-31'
 ```
 
-**Single-quoted literal:** `'2026-03-15'` — the single-quote delimiter signals a typed constant. Type is inferred from content shape: `YYYY-MM-DD` (digits and hyphens, no `T`) → `date`. The date's content shape is what qualifies it for the typed constant delimiter — distinguishable from every other inhabitant. Content is validated at compile time. `'2026-03-15'` is valid. `'03/15/2026'` is a compile error with a teachable message. See Locked Decision #18.
+**Single-quoted literal:** `'2026-03-15'` — the single-quote delimiter signals a typed constant. Type is determined by expression context — when the context expects `date`, the content `YYYY-MM-DD` is validated as an ISO 8601 date. Content is validated at compile time. `'2026-03-15'` is valid. `'03/15/2026'` is a compile error with a teachable message. See Locked Decision #18.
 
 **Operators:**
 
@@ -302,7 +302,7 @@ field ContractEnd as date default '2099-12-31'
 | `.day` | `integer` | Day of month (1–31) |
 | `.dayOfWeek` | `integer` | ISO day of week (Monday=1, Sunday=7) |
 
-**Constraints:** `nullable`, `default '...'` (single-quoted date). Numeric constraints (`nonnegative`, `min`, `max`, `maxplaces`, `minlength`, `maxlength`) are compile errors on `date`.
+**Constraints:** `optional`, `default '...'` (single-quoted date). Numeric constraints (`nonnegative`, `min`, `max`, `maxplaces`, `minlength`, `maxlength`) are compile errors on `date`.
 
 **Serialization:** ISO 8601 string: `"2026-03-15"`.
 
@@ -329,10 +329,10 @@ field ContractEnd as date default '2099-12-31'
 
 ```precept
 field AppointmentTime as time default '09:00:00'
-field CheckInTime as time nullable
+field CheckInTime as time optional
 ```
 
-**Single-quoted literal:** `'14:30:00'` — content shape `HH:mm:ss` (colons without hyphens-before-T) → `time`. The time's content shape is what qualifies it for the typed constant delimiter — distinguishable from all other inhabitants. Seconds may be omitted: `'14:30'` is valid (implies `:00`). See Locked Decision #18.
+**Single-quoted literal:** `'14:30:00'` — when context expects `time`, the content `HH:mm:ss` is validated as a time value. Seconds may be omitted: `'14:30'` is valid (implies `:00`). See Locked Decision #18.
 
 **Operators:**
 
@@ -366,7 +366,7 @@ field CheckInTime as time nullable
 | `.minute` | `integer` | Minute (0–59) |
 | `.second` | `integer` | Second (0–59) |
 
-**Constraints:** `nullable`, `default '...'` (single-quoted time).
+**Constraints:** `optional`, `default '...'` (single-quoted time).
 
 **Serialization:** ISO 8601 time string: `"14:30:00"`.
 
@@ -390,11 +390,11 @@ field CheckInTime as time nullable
 **Declaration:**
 
 ```precept
-field FiledAt as instant nullable
+field FiledAt as instant optional
 field IncidentTimestamp as instant
 ```
 
-**Single-quoted literal:** `'2026-04-13T14:30:00Z'` — content shape includes `T` and trailing `Z` → `instant`. The trailing `Z` is the distinguishing shape signal that qualifies `instant` for the typed constant delimiter. Without `Z`: compile error. See Locked Decision #18.
+**Single-quoted literal:** `'2026-04-13T14:30:00Z'` — when context expects `instant`, the content is validated as an ISO 8601 UTC timestamp (must include trailing `Z`). Without `Z`: compile error. See Locked Decision #18.
 
 **Operators:**
 
@@ -435,7 +435,7 @@ field IncidentTimestamp as instant
 
 **Accessors:** `.inZone(tz)` only. No component accessors. Deliberately empty — to get calendar components, navigate via `.inZone(tz)`.
 
-**Constraints:** `nullable`, `default '...'` (single-quoted instant).
+**Constraints:** `optional`, `default '...'` (single-quoted instant).
 
 **Serialization:** ISO 8601 UTC string: `"2026-04-13T14:30:00Z"`.
 
@@ -531,7 +531,7 @@ field ActualHours as duration default '0 hours'
 
 9 fields across 6 samples (MTBF, repair hours, work hours) are naturally `duration`.
 
-**Constraints:** `nullable`, `default '8 hours'` or `default '30 minutes'`, `nonnegative`, `nonzero` (#111). `min`/`max` are compile errors — constraint values are bare numbers, not duration quantities.
+**Constraints:** `optional`, `default '8 hours'` or `default '30 minutes'`, `nonnegative`, `nonzero` (#111). `min`/`max` are compile errors — constraint values are bare numbers, not duration quantities.
 
 **`nonzero` on duration:** A duration field used as a divisor (`duration / duration` → `number`) needs a nonzero proof to suppress C93. `nonzero` is the direct proof source: `field ShiftLength as duration default '8 hours' nonzero` — allows any non-zero duration (positive or negative), rejects only `Duration.Zero`. Runtime enforcement compares against `Duration.Zero`. This parallels `nonzero` on numeric types (#111) and completes the divisor safety story for `duration / duration`.
 
@@ -635,7 +635,7 @@ field ExtendedWarranty as period default '2 years + 6 months'
 
 10 period fields across 7 samples (`GracePeriodDays`, `TermLengthMonths`, `WarrantyMonths`, etc.) are currently `integer` surrogates. See Locked Decision #12.
 
-**Constraints:** `nullable`, `default '30 days'` / `default '12 months'` / `default '2 years'` / `default '2 weeks'`, or combined: `default '2 years + 6 months'`. `of 'time'` (hours/minutes/seconds only), `of 'date'` (years/months/weeks/days only) — see Decision #26. `in 'days'` / `in 'months'` / `in 'hours'` etc. pins to a specific NodaTime `PeriodUnits` basis — see the currency/quantity design doc for the full `in`/`of` qualification system.
+**Constraints:** `optional`, `default '30 days'` / `default '12 months'` / `default '2 years'` / `default '2 weeks'`, or combined: `default '2 years + 6 months'`. `of 'time'` (hours/minutes/seconds only), `of 'date'` (years/months/weeks/days only) — see Decision #26. `in 'days'` / `in 'months'` / `in 'hours'` etc. pins to a specific NodaTime `PeriodUnits` basis — see the currency/quantity design doc for the full `in`/`of` qualification system.
 
 **The `in` and `of` qualification system for `period`:**
 
@@ -674,10 +674,10 @@ field ExtendedWarranty as period default '2 years + 6 months'
 
 ```precept
 field IncidentTimezone as timezone
-field CustomerTimezone as timezone nullable
+field CustomerTimezone as timezone optional
 ```
 
-**Single-quoted literal:** `'America/New_York'` — content shape is an IANA timezone identifier (forward-slash-separated components, no ISO date characters) → `timezone`. The `Word/Word` pattern is what qualifies `timezone` for the typed constant delimiter — distinguishable from all other inhabitants. Validated at compile time against the IANA TZ database bundled with NodaTime. See Locked Decision #18.
+**Single-quoted literal:** `'America/New_York'` — when context expects `timezone`, the content is validated against the IANA TZ database bundled with NodaTime. See Locked Decision #18.
 
 **Operators:** `==`, `!=` only. No ordering, no arithmetic.
 
@@ -687,7 +687,7 @@ field CustomerTimezone as timezone nullable
 - **Compile-time:** Literal strings validated against IANA TZ database bundled with NodaTime. Deprecated aliases produce warnings.
 - **Runtime:** Event arguments typed `as timezone` validated at fire time.
 
-**Constraints:** `nullable`, `default '...'` (single-quoted IANA identifier). No ambient/global implicit timezone — defaults are explicit author intent per field.
+**Constraints:** `optional`, `default '...'` (single-quoted IANA identifier). No ambient/global implicit timezone — defaults are explicit author intent per field.
 
 **Serialization:** IANA identifier string: `"America/Los_Angeles"`.
 
@@ -712,10 +712,10 @@ field CustomerTimezone as timezone nullable
 
 ```precept
 field IncidentContext as zoneddatetime
-field FilingContext as zoneddatetime nullable
+field FilingContext as zoneddatetime optional
 ```
 
-**Single-quoted literal:** `'2026-04-13T14:30:00[America/New_York]'` — content shape includes `T` and bracket-enclosed timezone `[...]` → `zoneddatetime`. The bracket-enclosed timezone `[...]` is the distinguishing shape signal. See Locked Decision #18.
+**Single-quoted literal:** `'2026-04-13T14:30:00[America/New_York]'` — when context expects `zoneddatetime`, the content is validated as an ISO 8601 datetime with bracket-enclosed IANA timezone. See Locked Decision #18.
 
 **Construction via `.inZone(tz)` dot accessor:**
 
@@ -761,7 +761,7 @@ No standalone construction function exists. `zoneddatetime` is always reached vi
 | `.time` | `time` | Local time in bound timezone. |
 | `.year`, `.month`, `.day`, `.hour`, `.minute`, `.second`, `.dayOfWeek` | `integer` | Local components in bound timezone. |
 
-**Constraints:** `nullable`, `default '...'` (single-quoted zoneddatetime literal with bracket-enclosed timezone).
+**Constraints:** `optional`, `default '...'` (single-quoted zoneddatetime literal with bracket-enclosed timezone).
 
 **Serialization:** NodaTime STJ converter string (includes local time, UTC offset, and IANA zone identifier). Round-trips via `ZonedDateTimePattern`.
 
@@ -783,11 +783,11 @@ No standalone construction function exists. `zoneddatetime` is always reached vi
 **Declaration:**
 
 ```precept
-field DetectedAt as datetime nullable
+field DetectedAt as datetime optional
 field ScheduledFor as datetime default '2026-04-13T09:00:00'
 ```
 
-**Single-quoted literal:** `'2026-04-13T09:00:00'` — content shape includes `T` but no trailing `Z` and no bracket-enclosed timezone → `datetime`. The presence of `T` without `Z` or `[` is the distinguishing shape signal. See Locked Decision #18.
+**Single-quoted literal:** `'2026-04-13T09:00:00'` — when context expects `datetime`, the content is validated as an ISO 8601 local datetime (no trailing `Z`, no bracket-enclosed timezone). See Locked Decision #18.
 
 **Operators:**
 
@@ -822,7 +822,7 @@ Note: `datetime ± period` accepts all component categories — `LocalDateTime.P
 | `.year`, `.month`, `.day`, `.hour`, `.minute`, `.second` | `integer` | Direct components. |
 | `.dayOfWeek` | `integer` | ISO day of week (Monday=1, Sunday=7) |
 
-**Constraints:** `nullable`, `default '...'` (single-quoted datetime).
+**Constraints:** `optional`, `default '...'` (single-quoted datetime).
 
 **Serialization:** ISO 8601 without timezone: `"2026-04-13T14:30:00"`.
 
@@ -962,7 +962,7 @@ Unit names: `days`, `months`, `years`, `weeks`, `hours`, `minutes`, `seconds`. T
 
 #### Type resolution rules — context-dependent
 
-The type of a quantity typed constant (`period` or `duration`) is determined by expression context. `'3 days'` is not inherently `period` or `duration` — the surrounding expression resolves it, using the type-family admission rule defined in [Literal System](../compiler/literal-system.md).
+The type of a quantity typed constant (`period` or `duration`) is determined by expression context. `'3 days'` is not inherently `period` or `duration` — the surrounding expression resolves it, using the context-born resolution model defined in [Literal System](../compiler/literal-system.md).
 
 **For `days` and `weeks` — context-dependent:**
 
@@ -1019,33 +1019,33 @@ The type of a quantity typed constant (`period` or `duration`) is determined by 
 
 ## Literal Mechanism Architecture
 
-> The canonical design for Precept's literal system — the two-door model, admission rule, interpolation syntax, and expansion joints — lives in [Literal System](../compiler/literal-system.md). This section summarizes the temporal-specific aspects.
+> The canonical design for Precept's literal system — the two-door model, context-born resolution, interpolation syntax, and expansion joints — lives in [Literal System](../compiler/literal-system.md). This section summarizes the temporal-specific aspects.
 
 Every non-primitive value in Precept enters through one of **two doors**:
 
 | Door | Delimiter | What it carries | Type resolution | Temporal proof |
 |------|-----------|----------------|-----------------|----------------|
 | **1. String** | `"..."` | Text values with optional `{expr}` interpolation | Always `string` | N/A — strings remain strings |
-| **2. Typed constant** | `'...'` | Formatted constants and quantities with optional `{expr}` interpolation | Inferred from content shape → type family → narrowed by context | `date`, `time`, `datetime`, `instant`, `zoneddatetime`, `timezone`, quantities (`'30 days'`, `'{GraceDays} days'`) |
+| **2. Typed constant** | `'...'` | Formatted constants and quantities with optional `{expr}` interpolation | Context-born: expression context determines type, content validated | `date`, `time`, `datetime`, `instant`, `zoneddatetime`, `timezone`, quantities (`'30 days'`, `'{GraceDays} days'`) |
 
 **Zero constructors exist.** There is no `type(value)` form in the language — no `date(2026-01-15)`, no `duration(PT72H)`, no `money("100", "USD")`. Every value enters through one of the two doors above.
 
-### The admission rule — type families
+### Context-born resolution — type from context, then content validation
 
-A type qualifies for Door 2 (`'...'`) **if and only if** its content shape determines a **type family** — a finite, enumerable set of types — that is disjoint from every other family. Context narrows within the family. No shape may match two families.
+A type qualifies for Door 2 (`'...'`) when it can validate content at compile time. The expression context determines which type is expected; the content is then validated against that type. No context → compile error.
 
-The current inhabitants demonstrate family disjointness:
+The current inhabitants and their content validation:
 
-| Inhabitant | Shape signal | Type family |
-|------------|-------------|-------------|
-| `date` | `YYYY-MM-DD` | `{date}` (singleton) |
-| `time` | `HH:MM:SS` | `{time}` (singleton) |
-| `datetime` | `...T...` | `{datetime}` (singleton) |
-| `instant` | `...T...Z` | `{instant}` (singleton) |
-| `zoneddatetime` | `...T...[...]` | `{zoneddatetime}` (singleton) |
-| `timezone` | `Word/Word` | `{timezone}` (singleton) |
-| Quantities | `<value> <unit>` | `{period, duration}` (narrowed by context) |
-| State names | Plain identifier | `{state}` (validated against declarations) |
+| Inhabitant | Expected content format | Content validation |
+|------------|------------------------|--------------------|
+| `date` | `YYYY-MM-DD` | ISO 8601 date |
+| `time` | `HH:MM:SS` | ISO 8601 time |
+| `datetime` | `...T...` (no Z, no bracket) | ISO 8601 local datetime |
+| `instant` | `...T...Z` | ISO 8601 UTC timestamp |
+| `zoneddatetime` | `...T...[...]` | ISO 8601 datetime + IANA timezone |
+| `timezone` | `Word/Word` | IANA TZ database identifier |
+| Quantities | `<value> <unit>` | `period` or `duration` from context |
+| State names | Plain identifier | Validated against declarations |
 
 ### Why two doors are sufficient
 
@@ -1155,9 +1155,9 @@ Cross-type comparison is always a type error.
 
 The type checker already knows both operand types. When either operand is a field identifier, include the field name and declared type in the diagnostic. This is a presentation concern — the underlying type rules are unchanged.
 
-### Nullable and default behavior
+### Optional and default behavior
 
-All temporal types support `nullable`. All follow existing null propagation rules.
+All temporal types support `optional`. All follow existing null propagation rules.
 
 | Type | Default value | Notes |
 |---|---|---|
@@ -1170,7 +1170,7 @@ All temporal types support `nullable`. All follow existing null propagation rule
 | `zoneddatetime` | `default '...'` | Author specifies (single-quoted zoneddatetime). No ambient implicit — explicit per field. |
 | `datetime` | `default '...'` | Author specifies (single-quoted datetime). |
 
-**`nullable` + `default`:** Permitted. A nullable field with a default starts at the default value but can be set to `null` via events. This follows the existing language rules — `nullable` and `default` are independent modifiers (see language spec § Field Declarations).
+**`optional` + `default`:** Permitted. An optional field with a default starts at the default value but can be set to `null` via events. This follows the existing language rules — `optional` and `default` are independent modifiers (see language spec § Field Declarations).
 
 ---
 
@@ -1481,9 +1481,9 @@ Single quotes win on all three criteria that matter for a DSL: refactoring safet
 
 **Resolution (v2 — strengthened, updated v5):** `date + 2.5` is a type error — `2.5` is not a `period`. `date + 2` is also a type error. `'0.5 days'` is a compile error — temporal typed constant quantities require integer values (Decision #28).
 
-### Challenge 3: `nullable + default` prohibition
+### Challenge 3: `optional + default` prohibition
 
-**Resolution:** No prohibition. `nullable` and `default` are independent modifiers — combining them is already permitted by the existing language rules. A nullable field with a default starts at the default value and can be set to `null` via events.
+**Resolution:** No prohibition. `optional` and `default` are independent modifiers — combining them is already permitted by the existing language rules. An optional field with a default starts at the default value and can be set to `null` via events.
 
 ### Challenge 4: `date - date` result type
 
@@ -1500,9 +1500,9 @@ Single quotes win on all three criteria that matter for a DSL: refactoring safet
 | #27 (decimal type) | Complementary. No cross-type arithmetic. |
 | #29 (integer type) | Postfix unit expressions take `integer`. Dependency. |
 | #16 (built-in functions) | Conversion functions from this proposal. Constructor functions eliminated — replaced by postfix units. |
-| #13 (field-level constraints) | `nullable`, `default`, `nonnegative` architecture. |
+| #13 (field-level constraints) | `optional`, `default`, `nonnegative` architecture. |
 | #106 (division-by-zero unified narrowing) | **Hard dependency for `duration` division.** NodaTime throws `DivideByZeroException` (not IEEE 754 `Infinity`) for `duration / 0` and `duration / Duration.Zero`. The compile-time literal check (C92) and unproven-divisor error (C93) from #106 must ship before or alongside temporal types. Without #106, three division-by-zero paths remain unguarded. |
-| #111 (`nonzero` modifier + C94–C99) | **Hard dependency for `duration / duration` divisor safety.** `nonzero` on duration fields provides the first-class proof source for C93 suppression when a duration is the divisor. Without #111, authors must use verbose `rule ShiftLength != '0 hours'` or `when ShiftLength != '0 hours'` guards. C94 assignment constraint enforcement may extend to temporal types in the future (requires `NumericInterval` for duration/period — deferred). |
+| #111 (`nonzero` modifier + proof-engine interval diagnostics) | **Hard dependency for `duration / duration` divisor safety.** `nonzero` on duration fields provides the first-class proof source for C93 suppression when a duration is the divisor. Without #111, authors must use verbose `rule ShiftLength != '0 hours'` or `when ShiftLength != '0 hours'` guards. Interval assignment constraint enforcement may extend to temporal types in the future (requires `NumericInterval` for duration/period — deferred). |
 | #118 (type checker decomposition) | Should land before this proposal. #107 adds ~360–540 lines to `TryInferBinaryKind` (temporal operator tables, typed-constant inference, dot-accessor chains including `.inZone(tz)`). #118 plans a `PreceptTypeChecker.DomainTypeInference.cs` 7th partial file as the split point — `TryInferBinaryKind` gains early type-family dispatch ("if either operand is temporal, delegate to `TryInferTemporalBinaryKind`"). Temporal constraint rejection lands in `FieldConstraints.cs`. Temporal desugar (`nonnegative`/`nonzero` on duration) lands in `Narrowing.cs`. |
 
 ---

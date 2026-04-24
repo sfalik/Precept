@@ -1100,6 +1100,8 @@ public static class Parser
                 // Comparison (non-associative: rbp = 31, explicit chaining check)
                 TokenKind.DoubleEquals       => MakeComparison(left, BinaryOp.Equal, op),
                 TokenKind.NotEquals          => MakeComparison(left, BinaryOp.NotEqual, op),
+                TokenKind.CaseInsensitiveEquals    => MakeComparison(left, BinaryOp.CaseInsensitiveEqual, op),
+                TokenKind.CaseInsensitiveNotEquals => MakeComparison(left, BinaryOp.CaseInsensitiveNotEqual, op),
                 TokenKind.LessThan           => MakeComparison(left, BinaryOp.Less, op),
                 TokenKind.GreaterThan        => MakeComparison(left, BinaryOp.Greater, op),
                 TokenKind.LessThanOrEqual    => MakeComparison(left, BinaryOp.LessOrEqual, op),
@@ -1132,7 +1134,9 @@ public static class Parser
         }
 
         private static bool IsComparisonOp(BinaryOp op) => op is
-            BinaryOp.Equal or BinaryOp.NotEqual or BinaryOp.Less or
+            BinaryOp.Equal or BinaryOp.NotEqual or
+            BinaryOp.CaseInsensitiveEqual or BinaryOp.CaseInsensitiveNotEqual or
+            BinaryOp.Less or
             BinaryOp.Greater or BinaryOp.LessOrEqual or BinaryOp.GreaterOrEqual;
 
         private BinaryExpression MakeComparison(Expression left, BinaryOp op, Token opToken)
@@ -1215,6 +1219,8 @@ public static class Parser
             TokenKind.And                  => 20,
             TokenKind.DoubleEquals         => 30,
             TokenKind.NotEquals            => 30,
+            TokenKind.CaseInsensitiveEquals => 30,
+            TokenKind.CaseInsensitiveNotEquals => 30,
             TokenKind.LessThan             => 30,
             TokenKind.GreaterThan          => 30,
             TokenKind.LessThanOrEqual      => 30,

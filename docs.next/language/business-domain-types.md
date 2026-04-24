@@ -306,10 +306,10 @@ Both rules require **commensurable** operands (same UCUM dimension). `'5 kg' + '
 
 | Source | Detection tier | Error type |
 |---|---|---|
-| Literal with statically-known unit: `set F = '5 kg'` where `F as quantity of 'length'` | **Compile time** — unit `kg` resolves to dimension `mass` ≠ `length` | C100 |
-| Field with statically-known `in`: `set F = WeightKg` where `WeightKg as quantity in 'kg'` and `F as quantity of 'length'` | **Compile time** — `kg` is `mass`, target requires `length` | C100 |
-| Open field without dimension narrowing: `set F = Reading` where `Reading as quantity` and `F as quantity of 'length'` | **Compile error** — dimension unproven; requires `when Reading.dimension == 'length'` guard before assignment | C100 |
-| Runtime event-arg input | **Fire/update boundary** — dimension is validated against the declared category before the engine runs | C100 |
+| Literal with statically-known unit: `set F = '5 kg'` where `F as quantity of 'length'` | **Compile time** — unit `kg` resolves to dimension `mass` ≠ `length` | `DimensionCategoryMismatch` |
+| Field with statically-known `in`: `set F = WeightKg` where `WeightKg as quantity in 'kg'` and `F as quantity of 'length'` | **Compile time** — `kg` is `mass`, target requires `length` | `DimensionCategoryMismatch` |
+| Open field without dimension narrowing: `set F = Reading` where `Reading as quantity` and `F as quantity of 'length'` | **Compile error** — dimension unproven; requires `when Reading.dimension == 'length'` guard before assignment | `DimensionCategoryMismatch` |
+| Runtime event-arg input | **Fire/update boundary** — dimension is validated against the declared category before the engine runs | `DimensionCategoryMismatch` |
 
 **Enforcement messages:**
 
@@ -334,10 +334,10 @@ Both rules require **commensurable** operands (same UCUM dimension). `'5 kg' + '
 ```precept
 field TotalCost as money in 'USD'
 field Payment as money                    # open — currency comes from event data
-field Budget as money in 'EUR' nullable
+field Budget as money in 'EUR' optional
 ```
 
-**Typed constant literal:** `'100 USD'` — content shape `<number> <3-uppercase-letters>` where the letters match an ISO 4217 code → `money`. The 3-uppercase-letter pattern is the distinguishing shape signal. See Literal Forms below.
+**Typed constant literal:** `'100 USD'` — when context expects `money`, the content `<number> <3-uppercase-letters>` is validated as a money value with the letters checked against the ISO 4217 registry. See Literal Forms below.
 
 **Interpolation:** `'{Amount} USD'`, `'100 {Curr}'`, `'{Amount} {Curr}'` — any component can be interpolated. Dynamic components require guard narrowing when assigned to an `in`-constrained field (D9).
 
@@ -372,7 +372,7 @@ field Budget as money in 'EUR' nullable
 | `.currency` | `currency` | ISO 4217 code (`'USD'`, `'EUR'`) |
 | `.amount` | `decimal` | Magnitude (the numeric part) |
 
-**Constraints:** `in '<currency>'`, `nullable`, `default '...'`, `nonnegative`. The `maxplaces` constraint overrides the ISO 4217 default when needed.
+**Constraints:** `in '<currency>'`, `optional`, `default '...'`, `nonnegative`. The `maxplaces` constraint overrides the ISO 4217 default when needed.
 
 **Default precision (D10):** `money in 'USD'` carries an implicit `maxplaces 2` (ISO 4217 minor units). `money in 'JPY'` → `maxplaces 0`. `money in 'BHD'` → `maxplaces 3`. This is a validation constraint, not auto-rounding — assigning `'1.999 USD'` to a 2-place field is a constraint violation. An explicit `maxplaces` on the field overrides the ISO default. See D10 for full semantics.
 
@@ -402,7 +402,7 @@ field Budget as money in 'EUR' nullable
 
 ```precept
 field BaseCurrency as currency default 'USD'
-field InvoiceCurrency as currency nullable
+field InvoiceCurrency as currency optional
 ```
 
 **Typed constant literal:** `'USD'` — content shape `<3-uppercase-letters>` matching an ISO 4217 code → `currency`. Distinguishable from timezone identifiers (which contain `/`), dates (which contain `-`), and unit names (which are lowercase/mixed).
@@ -418,7 +418,7 @@ field InvoiceCurrency as currency nullable
 
 **Accessors:** None.
 
-**Constraints:** `nullable`, `default '...'`.
+**Constraints:** `optional`, `default '...'`.
 
 **Serialization:** `"USD"` (string)
 
@@ -449,7 +449,7 @@ field Measurement as quantity             # open — unit comes from event data
 
 `in` and `of` are mutually exclusive — a field uses one or the other, never both.
 
-**Typed constant literal:** `'5 kg'` — content shape `<number> <unit-name>` where the unit name is not an ISO 4217 code and not a temporal unit name → `quantity`. Temporal unit names (`days`, `hours`, etc.) are a known closed set and resolve to `period`/`duration` instead.
+**Typed constant literal:** `'5 kg'` — when context expects `quantity`, the content `<number> <unit-name>` is validated as a quantity value with the unit name checked against UCUM and entity-scoped registries.
 
 **Interpolation:** `'{Weight} kg'`, `'5 {Unit}'`, `'{Weight} {Unit}'`
 
@@ -490,7 +490,7 @@ field Measurement as quantity             # open — unit comes from event data
 | `.dimension` | `dimension` | The UCUM dimension category (`'mass'`, `'length'`) |
 | `.amount` | `decimal` | Magnitude (the numeric part) |
 
-**Constraints:** `in '<unit>'`, `of '<dimension>'`, `nullable`, `default '...'`, `nonnegative`.
+**Constraints:** `in '<unit>'`, `of '<dimension>'`, `optional`, `default '...'`, `nonnegative`.
 
 **Serialization:** `"5 kg"` (string — matches typed constant literal syntax). The runtime type handles `Parse`/`ToString` natively.
 
@@ -520,10 +520,10 @@ field Measurement as quantity             # open — unit comes from event data
 
 ```precept
 field AllowedUnit as unitofmeasure default 'kg'
-field SelectedUnit as unitofmeasure nullable
+field SelectedUnit as unitofmeasure optional
 ```
 
-**Typed constant literal:** `'kg'` — a bare lowercase/mixed-case unit name not matching any other type family's content shape → `unitofmeasure` when the target field is declared as `unitofmeasure`. Disambiguation from `dimension` uses registry disjointness — unit names and dimension names never overlap.
+**Typed constant literal:** `'kg'` — when context expects `unitofmeasure`, the bare name is validated against the UCUM unit registry and entity-scoped unit declarations. Like `'USD'` for `currency`, bare identifiers are context-born — the type comes from the expression context, not from the content itself.
 
 **Operators:** None. `unitofmeasure` is a reference type.
 
@@ -547,7 +547,7 @@ field SelectedUnit as unitofmeasure nullable
 | **Standard registry** | ISO 4217, UCUM subset | `USD`, `EUR`, `kg`, `lbs` | Compile-time — large but closed set |
 | **Entity-scoped** | `units` block in precept definition | `each`, `case`, `six-pack` | Compile-time within the precept |
 
-**Constraints:** `nullable`, `default '...'`.
+**Constraints:** `optional`, `default '...'`.
 
 **Serialization:** `"kg"` (string)
 
@@ -569,10 +569,10 @@ field SelectedUnit as unitofmeasure nullable
 
 ```precept
 field MeasuredDimension as dimension default 'mass'
-field AllowedDimension as dimension nullable
+field AllowedDimension as dimension optional
 ```
 
-**Typed constant literal:** `'mass'` — a bare name matching the dimension registry → `dimension` when the target field is declared as `dimension`. Distinguishable from unit names because the UCUM unit registry and dimension registry are disjoint sets. Temporal dimension names (`'date'`, `'time'`, `'datetime'`) are also disjoint from both.
+**Typed constant literal:** `'mass'` — when context expects `dimension`, the bare name is validated against the UCUM dimension registry. Like other bare-identifier typed constants (`currency`, `unitofmeasure`), the type is context-born.
 
 **Operators:** None. `dimension` is a reference type.
 
@@ -580,7 +580,7 @@ field AllowedDimension as dimension nullable
 
 **Accessors:** None.
 
-**Constraints:** `nullable`, `default '...'`.
+**Constraints:** `optional`, `default '...'`.
 
 **Serialization:** `"mass"` (string)
 
@@ -672,7 +672,7 @@ field DynamicRate as price                # open — currency/unit from event da
 | **Partial** | `as price in 'USD'` (currency-only) | Currency is fixed; the denominator unit is data-driven. `price * quantity` still type-checks — the denominator-to-unit match is enforced at the runtime boundary. |
 | **Open** | `as price` | Both currency and denominator unit come from event data. Fewest compile-time guarantees. Use when accepting prices from external systems with unknown units. |
 
-**Typed constant literal:** `'4.17 USD/each'` — content shape `<number> <3-uppercase-letters>/<unit-name>` → `price`. The `/` between a currency and a non-currency unit is the distinguishing shape signal.
+**Typed constant literal:** `'4.17 USD/each'` — when context expects `price`, the content `<number> <currency>/<unit>` is validated as a price value with the currency checked against ISO 4217 and the unit checked against the unit registry.
 
 **Interpolation:** `'{Rate} USD/each'`, `'4.17 {Curr}/{Unit}'`, `'{Rate} {Curr}/{Unit}'`
 
@@ -712,7 +712,7 @@ field DynamicRate as price                # open — currency/unit from event da
 | `.unit` | `unitofmeasure` | Denominator unit (`'each'`, `'kg'`, `'hours'`) |
 | `.amount` | `decimal` | Magnitude (the numeric part) |
 
-**Constraints:** `in '<currency>/<unit>'`, `nullable`, `default '...'`.
+**Constraints:** `in '<currency>/<unit>'`, `optional`, `default '...'`.
 
 **Serialization:** `"4.17 USD/each"` (string — matches typed constant literal syntax). The runtime type handles `Parse`/`ToString` natively.
 
@@ -767,7 +767,7 @@ The field type declaration is the author's statement of business intent. `instan
 
 ```precept
 field FxRate as exchangerate in 'USD/EUR'
-field SpotRate as exchangerate nullable
+field SpotRate as exchangerate optional
 ```
 
 **Declaration patterns:**
@@ -778,7 +778,7 @@ field SpotRate as exchangerate nullable
 | **Partial** | `as exchangerate in 'USD'` (numerator-only) | Target currency is fixed; the source currency is data-driven. Useful when a system always converts INTO one currency but accepts multiple source currencies. |
 | **Open** | `as exchangerate` | Both currencies are runtime data. Required for general-purpose rate tables (multi-currency wallets, FX APIs). |
 
-**Typed constant literal:** `'1.08 USD/EUR'` — content shape `<number> <3-uppercase-letters>/<3-uppercase-letters>` where both match ISO 4217 → `exchangerate`. The `/` between two currency codes is the distinguishing shape signal.
+**Typed constant literal:** `'1.08 USD/EUR'` — when context expects `exchangerate`, the content `<number> <currency>/<currency>` is validated as an exchange rate value with both currency codes checked against ISO 4217.
 
 **Interpolation:** `'{Rate} USD/EUR'`, `'1.08 {From}/{To}'`, `'{Rate} {From}/{To}'`
 
@@ -812,7 +812,7 @@ field SpotRate as exchangerate nullable
 | `.denominator` | `currency` | Denominator currency (`'EUR'` in `'USD/EUR'`) |
 | `.amount` | `decimal` | Magnitude (the numeric part) |
 
-**Constraints:** `in '<currency>/<currency>'`, `nullable`, `default '...'`. **Implicit constraint:** `positive` — zero and negative exchange rates are always invalid configurations (see D16 Corollary 2). Declaring `positive` or `nonzero` explicitly is redundant.
+**Constraints:** `in '<currency>/<currency>'`, `optional`, `default '...'`. **Implicit constraint:** `positive` — zero and negative exchange rates are always invalid configurations (see D16 Corollary 2). Declaring `positive` or `nonzero` explicitly is redundant.
 
 **Serialization:** `"1.08 USD/EUR"` (string — matches typed constant literal syntax). The runtime type handles `Parse`/`ToString` natively.
 
@@ -997,7 +997,7 @@ Open fields (declared without `in` or `of`) participate in the full type system 
 | `field X as quantity of 'mass'` | Dimension known. Same-dimension arithmetic allowed. | Direct for dimension-compatible operations. Unit-specific ops need `when X.unit == 'kg'`. |
 | `field X as quantity` | Fully open. | `when X.dimension == 'length'` for dimension, `when X.unit == 'kg'` for unit. |
 
-This is the same contract as nullable narrowing: `field X as number?` is open (nullable). Using `X` in arithmetic is a compile error unless `when X != null` narrows it. Discrete equality narrowing extends this principle to unit, currency, dimension, and basis accessors.
+This is the same contract as optional narrowing: `field X as number optional` is open (optional). Using `X` in arithmetic is a compile error unless `when X != null` narrows it. Discrete equality narrowing extends this principle to unit, currency, dimension, and basis accessors.
 
 ### Mechanism
 
@@ -1171,23 +1171,26 @@ All new types enter through the existing two-door literal model established by t
 
 ### Door 2 — Typed constant (`'...'`) with interpolation
 
-| Content shape | Type family | Examples |
+Typed constants follow the context-born resolution model established in `literal-system.md` — the expression context determines the type, and the content is validated against it. Given context-determined type, valid content patterns:
+
+| Expected type | Valid content | Examples |
 |---|---|---|
-| `<number> <ISO-4217-code>` | `money` | `'100 USD'`, `'50.25 EUR'` |
-| `<number> <unit-name>` | `quantity` | `'5 kg'`, `'24 each'` |
-| `<number> <currency>/<unit>` | `price` | `'4.17 USD/each'` |
-| `<number> <currency>/<currency>` | `exchangerate` | `'1.08 USD/EUR'` |
-| `<ISO-4217-code>` (3-letter, no number) | `currency` | `'USD'`, `'EUR'` |
-| `<unit-name>` (no number) | `unitofmeasure` | `'kg'`, `'each'` |
-| `<dimension-name>` (no number, UCUM dimension registry) | `dimension` | `'mass'`, `'length'` |
+| `money` | `<number> <ISO-4217-code>` | `'100 USD'`, `'50.25 EUR'` |
+| `quantity` | `<number> <unit-name>` | `'5 kg'`, `'24 each'` |
+| `price` | `<number> <currency>/<unit>` | `'4.17 USD/each'` |
+| `exchangerate` | `<number> <currency>/<currency>` | `'1.08 USD/EUR'` |
+| `currency` | `<ISO-4217-code>` (3-letter) | `'USD'`, `'EUR'` |
+| `unitofmeasure` | Unit name | `'kg'`, `'each'` |
+| `dimension` | Dimension name (UCUM dimension registry) | `'mass'`, `'length'` |
 
-### Type-family admission rule
+### Content validation
 
-Each content shape must be distinguishable from all existing inhabitants:
-- ISO 4217 codes are 3 uppercase letters — distinguishable from IANA timezone identifiers (which contain `/`), ISO 8601 dates (which contain `-`), and unit names (which are lowercase or mixed).
-- Quantity literals (`<number> <unit>`) are distinguishable from temporal quantities because temporal unit names (`days`, `hours`, etc.) are a known closed set; non-temporal unit names come from ISO 4217 or UCUM registries.
-- Price/rate literals contain `/` between unit components — distinguishable from temporal and plain quantity forms.
-- `unitofmeasure` vs `dimension` bare strings: disambiguated by the target field's declared type. The UCUM unit registry and dimension registry are disjoint sets — unit names (`kg`, `m`, `lbs`) never overlap with dimension names (`mass`, `length`, `volume`), so context-free disambiguation is also possible.
+Content validation is compile-time. When the type's `ITypedConstantValidator` is registered, malformed content is a compile error:
+- `'XYZ 100.00'` in a `money` context → error (XYZ is not a recognized ISO 4217 code)
+- `'5 invalidunit'` in a `quantity` context → error (not in UCUM or entity-scoped registry)
+- `'1.08 USD/FAKE'` in an `exchangerate` context → error (FAKE is not ISO 4217)
+
+Bare-identifier typed constants (`currency`, `unitofmeasure`, `dimension`) are purely context-born — `'USD'` is only born as `currency` when the expression context expects it. This parallels how `42` is only born as `integer` when the context expects it.
 
 ### Integer requirement — scoped to temporal only
 
@@ -1356,12 +1359,12 @@ The seven business-domain types reuse the existing field-constraint vocabulary f
 2. **Event-arg input (runtime boundary):** `precept_fire`/`precept_update` validate event arg values at the input boundary. `{ "Amount": "1.999 USD" }` for a `maxplaces 2` field is rejected before the engine runs.
 3. **Arithmetic result assignment (runtime):** `set Cost = UnitPrice * Qty` where `UnitPrice = '1.333 USD/each'` and `Qty = '3 each'` produces exactly `'3.999 USD'` (exact `decimal` arithmetic — see D12). If `Cost` is `money in 'USD'` (implicit `maxplaces 2`), this is a constraint violation at `set` time. The author must apply `round()` explicitly: `set Cost = round(UnitPrice * Qty, 2)`.
 
-**Nullable interaction:** Business-domain magnitude types follow the same nullable pattern as `decimal` and `number`, with one addition: extracting a component (`.amount`, `.currency`, `.unit`) from a nullable field without a null guard is a compile error.
+**Optional interaction:** Business-domain magnitude types follow the same optional pattern as `decimal` and `number`, with one addition: extracting a component (`.amount`, `.currency`, `.unit`) from an optional field without a null guard is a compile error.
 
-- `field Payment as money? in 'USD'` — null requires a null guard before arithmetic: `when Payment != null`.
-- At the evaluator level: a null business value is `null` in the data dictionary. The evaluator must not attempt `decimal` extraction from a null entry — this would produce a `NullReferenceException` in the backing value. Same enforcement as `number?` arithmetic today.
-- `maxplaces` on nullable fields: the desugared constraint gains a null guard — `Field == null or Field.amount.DecimalPlaces <= N`. A null value always passes the `maxplaces` check (the field is absent, not violating).
-- `in` and `of` constraints on nullable fields: same pattern — `Field == null or <in/of check>`. Null passes; present values are validated normally.
+- `field Payment as money optional in 'USD'` — null requires a null guard before arithmetic: `when Payment != null`.
+- At the evaluator level: a null business value is `null` in the data dictionary. The evaluator must not attempt `decimal` extraction from a null entry — this would produce a `NullReferenceException` in the backing value. Same enforcement as `number optional` arithmetic today.
+- `maxplaces` on optional fields: the desugared constraint gains a null guard — `Field == null or Field.amount.DecimalPlaces <= N`. A null value always passes the `maxplaces` check (the field is absent, not violating).
+- `in` and `of` constraints on optional fields: same pattern — `Field == null or <in/of check>`. Null passes; present values are validated normally.
 
 **`nonzero` contract for magnitude types:** `nonzero` checks that the `decimal` magnitude component is not `0m`. C# `decimal` has no negative zero — `decimal.Negate(0m) == 0m` is true, so `nonzero` on a business type rejects any value where `.amount == 0m`. Component strings are unaffected. `'0 USD'` fails `nonzero`; `'0.001 USD'` passes regardless of `maxplaces`.
 
@@ -1526,7 +1529,7 @@ For business-domain types, comparison operators carry domain preconditions. **Cr
   | `price` | `.currency`, `.unit` | `when X.currency == 'USD'` | `$eq:X.currency:USD` |
   | `exchangerate` | `.numerator`, `.denominator` | `when X.numerator == 'USD'` | `$eq:X.numerator:USD` |
 - **Alternatives rejected:** (A) Require `in`/`of` on every field — eliminates open-field use cases. (B) Allow open fields but block all arithmetic. (C) Runtime validation — violates philosophy.
-- **Precedent:** Same contract as nullable narrowing. Same friction, same reason.
+- **Precedent:** Same contract as optional narrowing. Same friction, same reason.
 - **Tradeoff accepted:** Authors who use open fields must write guards.
 
 ### D10. ISO 4217 default precision as implicit `maxplaces` for `money`
@@ -1580,10 +1583,10 @@ For business-domain types, comparison operators carry domain preconditions. **Cr
 
 **Reconciliation with D3:** D3 and D14 govern different phases of the same `in` keyword. D3 governs the **decomposition basis** — which NodaTime `PeriodUnits` overload `Period.Between()` uses. D14 governs the **assignment constraint** — what values the field accepts. Both apply simultaneously: a `period in 'months'` field uses the months decomposition basis (D3) AND rejects assignments containing non-months components (D14).
 
-**Enforcement mechanism:** The C99 diagnostic enforces `in` constraints at compile time using the proven-violation-only policy (same principle as the proof engine's interval diagnostics — C94–C98 — which apply to numeric range violations). Three enforcement tiers:
+**Enforcement mechanism:** The `QualifierMismatch` diagnostic enforces `in` constraints at compile time using the proven-violation-only policy (same principle as the proof engine's interval diagnostics which apply to numeric range violations). Three enforcement tiers:
 
-1. **Literals with statically-known content:** `set CostUsd = '100 EUR'` where `CostUsd` is `money in 'USD'` — the compiler resolves the literal's currency to EUR, proves it violates the USD constraint, and emits C99 as a compile-time error. Same for `set MonthsField = '30 days'` against `period in 'months'`.
-2. **Expressions with guard-narrowed proof:** `when Payment.currency == 'USD'` seeds a `$eq:Payment.currency:USD` proof marker. An assignment to `money in 'USD'` succeeds because the proof engine can verify the constraint is satisfied. Without the guard, C99 fires (unproven — open field assigned to constrained field).
+1. **Literals with statically-known content:** `set CostUsd = '100 EUR'` where `CostUsd` is `money in 'USD'` — the compiler resolves the literal's currency to EUR, proves it violates the USD constraint, and emits `QualifierMismatch` as a compile-time error. Same for `set MonthsField = '30 days'` against `period in 'months'`.
+2. **Expressions with guard-narrowed proof:** `when Payment.currency == 'USD'` seeds a `$eq:Payment.currency:USD` proof marker. An assignment to `money in 'USD'` succeeds because the proof engine can verify the constraint is satisfied. Without the guard, `QualifierMismatch` fires (unproven — open field assigned to constrained field).
 3. **Runtime boundary validation:** Event args and `precept_fire`/`precept_update` inputs are validated at the API boundary before entering the engine. This is input validation, not mid-evaluation exception — consistent with the temporal proposal's `TryValidateEventArguments` pattern.
 
 ### D15. Time-unit denominators use NodaTime vocabulary and cancel against `period` or `duration`
@@ -1604,7 +1607,7 @@ For business-domain types, comparison operators carry domain preconditions. **Cr
 - **Operators enabled:**
   - Period path: `price × period → money`, `money ÷ period → price`, `quantity(compound) × period → quantity`, `quantity ÷ period → quantity(compound)` — cancels any time denominator.
   - Duration path: `price × duration → money`, `money ÷ duration → price`, `quantity(compound) × duration → quantity`, `quantity ÷ duration → quantity(compound)` — cancels `hours`/`minutes`/`seconds` only.
-- **Period single-basis cancellation rule:** A `period` cancels a single-unit time denominator **only when the period has a single matching basis**. `period in 'hours'` cancels `price in 'USD/hours'`. `period in 'hours&minutes'` does **not** cancel `price in 'USD/hours'` — it is a compile error. NodaTime stores period components separately (`.Hours`, `.Minutes`, `.Seconds`) with no native `TotalHours` conversion. Converting a multi-basis period to a single unit would require Precept-invented arithmetic that NodaTime deliberately refuses. The author must decompose first: extract the hours component or use a single-basis period. C105 enforces this — a multi-basis period assignment to a single-unit denominator context is a proven constraint violation.
+- **Period single-basis cancellation rule:** A `period` cancels a single-unit time denominator **only when the period has a single matching basis**. `period in 'hours'` cancels `price in 'USD/hours'`. `period in 'hours&minutes'` does **not** cancel `price in 'USD/hours'` — it is a compile error. NodaTime stores period components separately (`.Hours`, `.Minutes`, `.Seconds`) with no native `TotalHours` conversion. Converting a multi-basis period to a single unit would require Precept-invented arithmetic that NodaTime deliberately refuses. The author must decompose first: extract the hours component or use a single-basis period. `CompoundPeriodDenominator` enforces this — a compound period assignment to a single-unit denominator context is a proven constraint violation.
 - **Duration is exempt from this restriction.** `Duration` is a single scalar (nanoseconds internally) — `duration.ToInt64Nanoseconds()` always yields an exact conversion to any time unit. There is no multi-basis ambiguity. `duration` cancels any fixed-length time denominator (`hours`/`minutes`/`seconds`) regardless of how the duration was constructed.
 - **Date-component denominators remain period-only.** `days`, `weeks`, `months`, `years` denominators cancel only with `period`, and follow the same single-basis rule: `period in 'months'` cancels `price in 'USD/months'`, but `period in 'months&days'` does not — because NodaTime cannot convert "2 months + 15 days" into a pure months count without a reference date.
 - **Alternatives rejected:** (A) UCUM time units — requires translation table. (B) Time spans as `quantity` — dead end #6. (C) No cancellation — makes `HourlyRate * HoursWorked` impossible. (D) `period`-only — blocks `instant - instant → duration` from compound arithmetic. (E) Compiler warning on dual paths — second-guessing the author's deliberate type choice.
@@ -1751,7 +1754,7 @@ The evaluator must dispatch business-domain arithmetic via typed value objects, 
 3. **Compute** via the typed value object's operator overload (e.g., `MoneyValue.operator+(MoneyValue, MoneyValue)`). This keeps `decimal` arithmetic inside the type boundary.
 4. **Return** the typed result value object. The evaluator MUST NOT unwrap to `decimal` and re-wrap manually — doing so loses currency/unit identity.
 
-For scalar operands (`decimal` co-operand): the scalar is extracted first; the business-domain operand's operator overload accepts the `decimal` directly. Scalar extraction from a nullable business value without a null guard is a precondition failure (see Nullable contract above).
+For scalar operands (`decimal` co-operand): the scalar is extracted first; the business-domain operand's operator overload accepts the `decimal` directly. Scalar extraction from an optional business value without a null guard is a precondition failure (see Optional contract above).
 
 **Door 2 — `precept_update` deserialization contract:**
 
@@ -1767,7 +1770,7 @@ For scalar operands (`decimal` co-operand): the scalar is extracted first; the b
 | `unitofmeasure` | `"kg"` | Plain UCUM atom (lowercase) |
 | `dimension` | `"mass"` | Plain dimension name (lowercase) |
 
-Parse failure returns a `C99`/`C100` diagnostic (depending on which constraint is violated) at the `precept_update` call site — never a thrown exception. Unknown currency codes (not in ISO 4217 registry) and unknown unit names (not in UCUM registry or entity-scoped units block) are treated as parse failures.
+Parse failure returns a `QualifierMismatch`/`DimensionCategoryMismatch` diagnostic (depending on which constraint is violated) at the `precept_update` call site — never a thrown exception. Unknown currency codes (not in ISO 4217 registry) and unknown unit names (not in UCUM registry or entity-scoped units block) are treated as parse failures.
 
 ### Language server changes
 
@@ -1794,24 +1797,22 @@ This document covers the design of the seven new business-domain types, the peri
 
 ## Diagnostic Code Reference
 
-This proposal introduces diagnostic codes C99–C110 in the `DiagnosticCatalog`. These are reserved here as the canonical contract for implementors, language server authors, and MCP tool consumers. The exact code-to-`LanguageConstraint` wiring happens in the diagnostic catalog during implementation; these are the category assignments.
-
-> **Code range note:** C94–C98 are proof-engine codes introduced by Issue #106 / PR #108 (interval reachability, dead guards, conditional composition). Business-domain codes start at C99 to avoid collision.
+This proposal introduces business-domain diagnostic codes in the `DiagnosticCode` enum. These use the same symbolic naming convention as the core diagnostic system (`diagnostic-system.md`) — no numeric code prefixes. The exact `DiagnosticCode` → `DiagnosticMeta` wiring happens in the `Diagnostics` exhaustive switch during implementation; these are the category assignments.
 
 | Code | Phase | Condition | Triggering example |
 |---|---|---|---|
-| C99 | Compile / Runtime boundary | `in` constraint violation — assigned value's currency or unit does not match the field's declared `in` qualifier | `set CostUsd = '100 EUR'` against `money in 'USD'`; open field assigned to `in`-constrained field without dimension-equality proof |
-| C100 | Compile / Runtime boundary | `of` constraint violation — assigned value's dimension does not match the field's declared `of` category | `set F = '5 kg'` against `quantity of 'length'`; open `quantity` field assigned to `quantity of 'length'` without `when F.dimension == 'length'` proof |
-| C101 | Compile | Cross-currency arithmetic — `money` values with different currencies used in a single arithmetic expression | `CostUsd + CostEur` |
-| C102 | Compile | Cross-dimension arithmetic — `quantity` values with incompatible dimensions in an arithmetic expression | `'5 kg' + '3 mi'` (mass ≠ length) |
-| C103 | Compile | Denominator unit mismatch — the denominator of a `price` or compound `quantity` does not match the operand's unit | `price in 'USD/kg' * quantity in 'mi'` |
-| C104 | Compile | `duration` against variable-length time denominator — `duration` cannot cancel `days`, `weeks`, `months`, or `years` denominators (D15) | `price in 'USD/days' * duration` |
-| C105 | Compile | Multi-basis period against single-unit denominator — `period in 'hours&minutes'` cannot cancel against a rate whose denominator is a single time unit | `period in 'hours&minutes' * price in 'USD/hours'` |
-| C106 | Parse | `in` and `of` on the same field declaration — mutually exclusive | `field X as quantity in 'kg' of 'mass'` |
-| C107 | Compile / Runtime boundary | Invalid unit string for `unitofmeasure` field — structural characters (`/`, `*`) are not valid in an atomic unit value | `set SelectedUnit = 'kg/m'` |
-| C108 | Compile / Runtime boundary | Invalid ISO 4217 currency code | `'USDX'` used as a currency literal or `currency` field value |
-| C109 | Compile / Runtime boundary | Invalid dimension string — value is not a recognized UCUM dimension category; common case is passing a unit name (`'meters'`) where a dimension name (`'length'`) is required | `set AllowedDim = 'meters'` for `field AllowedDim as dimension` |
-| C110 | Compile / Runtime | `maxplaces` constraint violation — assigned value has more decimal places than allowed; fires at literal assignment (compile), event-arg input (runtime boundary), and arithmetic result `set` (runtime) | `'1.999 USD'` assigned to `money in 'USD'` (implicit `maxplaces 2`); `set Cost = round_result` where result has 3 places |
+| `QualifierMismatch` | Compile / Runtime boundary | `in` constraint violation — assigned value's currency or unit does not match the field's declared `in` qualifier | `set CostUsd = '100 EUR'` against `money in 'USD'`; open field assigned to `in`-constrained field without dimension-equality proof |
+| `DimensionCategoryMismatch` | Compile / Runtime boundary | `of` constraint violation — assigned value's dimension does not match the field's declared `of` category | `set F = '5 kg'` against `quantity of 'length'`; open `quantity` field assigned to `quantity of 'length'` without `when F.dimension == 'length'` proof |
+| `CrossCurrencyArithmetic` | Compile | Cross-currency arithmetic — `money` values with different currencies used in a single arithmetic expression | `CostUsd + CostEur` |
+| `CrossDimensionArithmetic` | Compile | Cross-dimension arithmetic — `quantity` values with incompatible dimensions in an arithmetic expression | `'5 kg' + '3 mi'` (mass ≠ length) |
+| `DenominatorUnitMismatch` | Compile | Denominator unit mismatch — the denominator of a `price` or compound `quantity` does not match the operand's unit | `price in 'USD/kg' * quantity in 'mi'` |
+| `DurationDenominatorMismatch` | Compile | `duration` against variable-length time denominator — `duration` cannot cancel `days`, `weeks`, `months`, or `years` denominators (D15) | `price in 'USD/days' * duration` |
+| `CompoundPeriodDenominator` | Compile | Compound period against single-unit denominator — `period in 'hours&minutes'` cannot cancel against a rate whose denominator is a single time unit | `period in 'hours&minutes' * price in 'USD/hours'` |
+| `MutuallyExclusiveQualifiers` | Parse | `in` and `of` on the same field declaration — mutually exclusive | `field X as quantity in 'kg' of 'mass'` |
+| `InvalidUnitString` | Compile / Runtime boundary | Invalid unit string for `unitofmeasure` field — structural characters (`/`, `*`) are not valid in an atomic unit value | `set SelectedUnit = 'kg/m'` |
+| `InvalidCurrencyCode` | Compile / Runtime boundary | Invalid ISO 4217 currency code | `'USDX'` used as a currency literal or `currency` field value |
+| `InvalidDimensionString` | Compile / Runtime boundary | Invalid dimension string — value is not a recognized UCUM dimension category; common case is passing a unit name (`'meters'`) where a dimension name (`'length'`) is required | `set AllowedDim = 'meters'` for `field AllowedDim as dimension` |
+| `MaxPlacesExceeded` | Compile / Runtime | `maxplaces` constraint violation — assigned value has more decimal places than allowed; fires at literal assignment (compile), event-arg input (runtime boundary), and arithmetic result `set` (runtime) | `'1.999 USD'` assigned to `money in 'USD'` (implicit `maxplaces 2`); `set Cost = round_result` where result has 3 places |
 
 **Phase key:**
 - `Compile` — type checker emits at parse/compile time; caught before fire/run

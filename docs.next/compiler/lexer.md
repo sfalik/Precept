@@ -21,7 +21,7 @@ The lexer handles three families of input:
 - **String literals** — `"..."` with `\"`, `\\`, `\n`, `\t` escapes and `{expr}` interpolation
 - **Typed constant literals** — `'...'` with `\'`, `\\` escapes and `{expr}` interpolation
 
-Typed constant content is opaque to the lexer. The lexer marks the boundaries (`TypedConstant`, `TypedConstantStart`, `TypedConstantMiddle`, `TypedConstantEnd`) but does not interpret what's inside. Shape matching and type resolution happen in the type checker.
+Typed constant content is opaque to the lexer. The lexer marks the boundaries (`TypedConstant`, `TypedConstantStart`, `TypedConstantMiddle`, `TypedConstantEnd`) but does not interpret what's inside. Type resolution (context-born) and content validation happen in the type checker.
 
 The `TokenStream` is the `CompilationResult.Tokens` field — it is part of the tooling surface and queryable by the language server for span-based operations.
 
@@ -239,7 +239,7 @@ The guard `!= '\n' && != '\r'` is a **critical recovery detail**: if the char af
 
 Known string escapes: `\"`, `\\`, `\n`, `\t`.
 Known typed constant escapes: `\'`, `\\`.
-(`\n` and `\t` are valid in strings but not typed constants — typed constant content is positional and whitespace-significant to the shape matcher.)
+(`\n` and `\t` are valid in strings but not typed constants — typed constant content is positional and whitespace-significant to the content validator.)
 
 ### Lone `}` in literal
 

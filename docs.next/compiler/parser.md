@@ -58,7 +58,7 @@ This boundary means the parser never builds a symbol table and never performs na
 
 ### Typed constant interior is opaque
 
-The parser assembles typed constant tokens (`TypedConstant`, `TypedConstantStart`/`Middle`/`End`) into `TypedConstantExpression` or `InterpolatedTypedConstantExpression` AST nodes but does NOT parse or validate the interior content. The `Text` field on the token is stored as-is. Shape matching, type-family resolution, and context narrowing are type-checker responsibilities.
+The parser assembles typed constant tokens (`TypedConstant`, `TypedConstantStart`/`Middle`/`End`) into `TypedConstantExpression` or `InterpolatedTypedConstantExpression` AST nodes but does NOT parse or validate the interior content. The `Text` field on the token is stored as-is. Type resolution (context-born) and content validation are type-checker responsibilities.
 
 This is a direct consequence of the parser/type-checker boundary: what `'30 days'` means is semantic, not syntactic. The grammar is `'` content `'` with optional interpolation. Whether "30 days" is a `duration`, `period`, or something else is determined by context that only the type checker has.
 
@@ -874,7 +874,7 @@ The expression parser uses **Pratt parsing** (top-down operator precedence). `Pa
 | `or` | binary infix | 10 | — | left |
 | `and` | binary infix | 20 | — | left |
 | `not` | prefix | — | 25 | right (prefix) |
-| `==`, `!=`, `<`, `>`, `<=`, `>=` | binary infix | 30 | — | non-associative |
+| `==`, `!=`, `~=`, `!~`, `<`, `>`, `<=`, `>=` | binary infix | 30 | — | non-associative |
 | `contains` | binary infix | 40 | — | left |
 | `is` | binary infix (presence: `is set` / `is not set`) | 40 | — | left |
 | `+`, `-` (infix) | binary infix | 50 | — | left |
@@ -1122,7 +1122,7 @@ MCP tools (`precept_compile`) receive `CompilationResult`, which contains `Synta
 The parser intentionally does NOT:
 
 - **Resolve names.** `IdentifierExpression` nodes carry raw name tokens. Name resolution is the type checker's job.
-- **Validate typed constant interiors.** The `Text` of `TypedConstant`/`TypedConstantStart`/`Middle`/`End` tokens is passed through as-is to the AST. Shape matching is the type checker's job.
+- **Validate typed constant interiors.** The `Text` of `TypedConstant`/`TypedConstantStart`/`Middle`/`End` tokens is passed through as-is to the AST. Content validation is the type checker's job.
 - **Synthesize `SetType` as a token kind.** The parser reads `TokenKind.Set` and contextually uses it as a collection type keyword within `ParseTypeRef()`. The `TokenKind.SetType` enum value exists as the parser's canonical kind annotation, but the parser never emits a `SetType` token — it reads `Set` and produces a `CollectionTypeRef(CollectionKind.Set, ...)` node.
 - **Validate state/event name uniqueness.** Duplicate names are a semantic error. The parser would need a symbol table to catch them — that is the type checker's job.
 - **Validate `initial` uniqueness.** Multiple `initial` modifiers on state entries is a semantic error — parser cannot count across declarations without symbol analysis.

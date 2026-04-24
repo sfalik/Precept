@@ -128,6 +128,8 @@ public enum TokenKind
     // ── Operators ──────────────────────────────────────────────────
     DoubleEquals,
     NotEquals,
+    CaseInsensitiveEquals,
+    CaseInsensitiveNotEquals,
     GreaterThanOrEqual,
     LessThanOrEqual,
     GreaterThan,

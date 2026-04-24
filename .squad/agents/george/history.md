@@ -23,6 +23,9 @@
 - The full non-SMT proof stack (sequential flow + interval arithmetic + relational patterns) is ~500 new lines of type checker code. The previous estimate of "high complexity" for intervals and "very high" for relational reasoning was inflated by 3-5x because it included complexity that doesn't apply to Precept's execution model.
 - Interval arithmetic subsumes sign analysis. Building both is redundant — intervals give you signs for free (Positive = `(0, ∞)`, Nonneg = `[0, ∞)`). The optimal build is A (sequential flow) → C (intervals) → D (relational patterns), skipping B (signs) as a separate step.
 - Relational inference in Precept is pattern matching, not symbolic algebra. `A - B` in divisor position + `$gt:A:B` marker = safe. No normalization, no canonicalization, no solver. ~65 lines total.
+- v2 design review lesson: type qualifiers must be first-class in `ResolvedType` or the checker/runtime/MCP contract collapses as soon as `in`/`of` become semantic, especially for `period`, `price`, and `exchangerate`.
+- Literal-family docs must stay unified. Once typed constants span temporal plus business-domain identities, a partial matcher table is worse than no table because the admission-rule guarantee depends on one authoritative ordering.
+- Numeric-lane bridge rules have to be identical across the checker blueprint, language spec, and function catalog. If one doc allows `decimal op number` widening while another requires explicit bridges, implementation and tests drift immediately.
 
 ## Recent Updates
 

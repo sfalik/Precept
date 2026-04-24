@@ -436,6 +436,7 @@ public enum BinaryOp
 {
     Or, And,
     Equal, NotEqual,
+    CaseInsensitiveEqual, CaseInsensitiveNotEqual,
     Less, Greater, LessOrEqual, GreaterOrEqual,
     Plus, Minus, Star, Slash, Percent
 }

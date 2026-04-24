@@ -147,6 +147,8 @@ public static class Tokens
         // ── Operators ──────────────────────────────────────────────
         TokenKind.DoubleEquals        => new(kind, "==", Cat_Op, "Equality comparison"),
         TokenKind.NotEquals           => new(kind, "!=", Cat_Op, "Inequality comparison"),
+        TokenKind.CaseInsensitiveEquals    => new(kind, "~=", Cat_Op, "Case-insensitive equality (string-only)"),
+        TokenKind.CaseInsensitiveNotEquals => new(kind, "!~", Cat_Op, "Case-insensitive not-equals (string-only)"),
         TokenKind.GreaterThanOrEqual  => new(kind, ">=", Cat_Op, "Greater-than-or-equal comparison"),
         TokenKind.LessThanOrEqual     => new(kind, "<=", Cat_Op, "Less-than-or-equal comparison"),
         TokenKind.GreaterThan         => new(kind, ">",  Cat_Op, "Greater-than comparison"),

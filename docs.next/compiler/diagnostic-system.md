@@ -115,6 +115,34 @@ public enum DiagnosticCode
     FunctionArityMismatch,
     FunctionArgConstraintViolation,
 
+    // ── Type: Business-domain ────────────────────────────
+    QualifierMismatch,
+    DimensionCategoryMismatch,
+    CrossCurrencyArithmetic,
+    CrossDimensionArithmetic,
+    DenominatorUnitMismatch,
+    DurationDenominatorMismatch,
+    CompoundPeriodDenominator,
+    MutuallyExclusiveQualifiers,
+    InvalidUnitString,
+    InvalidCurrencyCode,
+    InvalidDimensionString,
+    MaxPlacesExceeded,
+
+    // ── Type: Temporal ────────────────────────────────────
+    InvalidDateValue,
+    InvalidDateFormat,
+    InvalidTimeValue,
+    InvalidInstantFormat,
+    InvalidTimezoneId,
+    UnqualifiedPeriodArithmetic,
+    MissingTemporalUnit,
+    FractionalUnitValue,
+
+    // ── Type: Collection safety ───────────────────────────
+    UnguardedCollectionAccess,
+    UnguardedCollectionMutation,
+
     // ── Graph ────────────────────────────────────────────
     UnreachableState,
     UnhandledEvent,
@@ -154,6 +182,35 @@ public static class Diagnostics
         DiagnosticCode.InvalidMemberAccess            => new(nameof(DiagnosticCode.InvalidMemberAccess),            DiagnosticStage.Type,  Severity.Error,   "Member accessor '{0}' is not supported on type '{1}'"),
         DiagnosticCode.FunctionArityMismatch          => new(nameof(DiagnosticCode.FunctionArityMismatch),          DiagnosticStage.Type,  Severity.Error,   "Function '{0}' expects {1} arguments, got {2}"),
         DiagnosticCode.FunctionArgConstraintViolation => new(nameof(DiagnosticCode.FunctionArgConstraintViolation), DiagnosticStage.Type,  Severity.Error,   "Argument {0} to '{1}' violates constraint: {2}"),
+
+        // Business-domain type diagnostics
+        DiagnosticCode.QualifierMismatch              => new(nameof(DiagnosticCode.QualifierMismatch),              DiagnosticStage.Type,  Severity.Error,   "Value does not match the '{0}' qualifier on field '{1}'"),
+        DiagnosticCode.DimensionCategoryMismatch      => new(nameof(DiagnosticCode.DimensionCategoryMismatch),      DiagnosticStage.Type,  Severity.Error,   "Dimension '{0}' does not match the declared category '{1}' on field '{2}'"),
+        DiagnosticCode.CrossCurrencyArithmetic        => new(nameof(DiagnosticCode.CrossCurrencyArithmetic),        DiagnosticStage.Type,  Severity.Error,   "Cannot combine '{0}' ({1}) with '{2}' ({3}) — different currencies"),
+        DiagnosticCode.CrossDimensionArithmetic       => new(nameof(DiagnosticCode.CrossDimensionArithmetic),       DiagnosticStage.Type,  Severity.Error,   "Cannot combine '{0}' ({1}) with '{2}' ({3}) — incompatible dimensions"),
+        DiagnosticCode.DenominatorUnitMismatch        => new(nameof(DiagnosticCode.DenominatorUnitMismatch),        DiagnosticStage.Type,  Severity.Error,   "Denominator unit '{0}' does not match operand unit '{1}'"),
+        DiagnosticCode.DurationDenominatorMismatch    => new(nameof(DiagnosticCode.DurationDenominatorMismatch),    DiagnosticStage.Type,  Severity.Error,   "Duration cannot cancel '{0}' denominator — days, weeks, months, and years have variable length"),
+        DiagnosticCode.CompoundPeriodDenominator      => new(nameof(DiagnosticCode.CompoundPeriodDenominator),      DiagnosticStage.Type,  Severity.Error,   "Compound period '{0}' cannot cancel single-unit denominator '{1}' — decompose to a single basis first"),
+        DiagnosticCode.MutuallyExclusiveQualifiers    => new(nameof(DiagnosticCode.MutuallyExclusiveQualifiers),    DiagnosticStage.Parse, Severity.Error,   "'in' and 'of' cannot both appear on the same field declaration"),
+        DiagnosticCode.InvalidUnitString              => new(nameof(DiagnosticCode.InvalidUnitString),              DiagnosticStage.Type,  Severity.Error,   "'{0}' is not a valid unit — structural characters ('/', '*') are not allowed in an atomic unit value"),
+        DiagnosticCode.InvalidCurrencyCode            => new(nameof(DiagnosticCode.InvalidCurrencyCode),            DiagnosticStage.Type,  Severity.Error,   "'{0}' is not a recognized ISO 4217 currency code"),
+        DiagnosticCode.InvalidDimensionString         => new(nameof(DiagnosticCode.InvalidDimensionString),         DiagnosticStage.Type,  Severity.Error,   "'{0}' is not a recognized dimension — did you mean a dimension name like 'length' or 'mass' instead of a unit name?"),
+        DiagnosticCode.MaxPlacesExceeded              => new(nameof(DiagnosticCode.MaxPlacesExceeded),              DiagnosticStage.Type,  Severity.Error,   "Value has {0} decimal places, but field '{1}' allows at most {2}"),
+
+        // Temporal type diagnostics
+        DiagnosticCode.InvalidDateValue               => new(nameof(DiagnosticCode.InvalidDateValue),               DiagnosticStage.Type,  Severity.Error,   "Invalid date: {0} does not exist"),
+        DiagnosticCode.InvalidDateFormat              => new(nameof(DiagnosticCode.InvalidDateFormat),              DiagnosticStage.Type,  Severity.Error,   "Dates must be written as YYYY-MM-DD. Use '{0}'"),
+        DiagnosticCode.InvalidTimeValue               => new(nameof(DiagnosticCode.InvalidTimeValue),               DiagnosticStage.Type,  Severity.Error,   "Invalid time: {0} must be 0\u201323 for hours, 0\u201359 for minutes and seconds"),
+        DiagnosticCode.InvalidInstantFormat           => new(nameof(DiagnosticCode.InvalidInstantFormat),           DiagnosticStage.Type,  Severity.Error,   "Instants must end with Z to indicate UTC. Use '{0}Z'"),
+        DiagnosticCode.InvalidTimezoneId              => new(nameof(DiagnosticCode.InvalidTimezoneId),              DiagnosticStage.Type,  Severity.Error,   "'{0}' is not a recognized timezone \u2014 use canonical IANA form like 'America/New_York'"),
+        DiagnosticCode.UnqualifiedPeriodArithmetic    => new(nameof(DiagnosticCode.UnqualifiedPeriodArithmetic),    DiagnosticStage.Type,  Severity.Error,   "Period field '{0}' may contain {1} components \u2014 use `period of '{2}'` to constrain it"),
+        DiagnosticCode.MissingTemporalUnit            => new(nameof(DiagnosticCode.MissingTemporalUnit),            DiagnosticStage.Type,  Severity.Error,   "A bare number doesn't specify a unit. Use '{0} + ''{1}''' to add {1}"),
+        DiagnosticCode.FractionalUnitValue            => new(nameof(DiagnosticCode.FractionalUnitValue),            DiagnosticStage.Type,  Severity.Error,   "Unit values must be whole numbers. Use smaller units for fractions: '{0}'"),
+
+        // Collection safety diagnostics
+        DiagnosticCode.UnguardedCollectionAccess       => new(nameof(DiagnosticCode.UnguardedCollectionAccess),       DiagnosticStage.Type,  Severity.Error,   "'{0}' may be empty — guard with `if {0}.count > 0` before accessing `.{1}`"),
+        DiagnosticCode.UnguardedCollectionMutation     => new(nameof(DiagnosticCode.UnguardedCollectionMutation),     DiagnosticStage.Type,  Severity.Error,   "'{0}' may be empty — guard with `if {0}.count > 0` before `{1}`"),
+
         DiagnosticCode.UnreachableState               => new(nameof(DiagnosticCode.UnreachableState),               DiagnosticStage.Graph, Severity.Warning, "State '{0}' is unreachable from initial state '{1}'"),
         DiagnosticCode.UnhandledEvent                 => new(nameof(DiagnosticCode.UnhandledEvent),                 DiagnosticStage.Graph, Severity.Warning, "No transition handles event '{0}' in state '{1}'"),
         DiagnosticCode.UnsatisfiableGuard             => new(nameof(DiagnosticCode.UnsatisfiableGuard),             DiagnosticStage.Proof, Severity.Warning, "Guard '{0}' on event '{1}' is provably unsatisfiable when {2}"),
@@ -251,6 +308,12 @@ public enum FaultCode
 
     [StaticallyPreventable(DiagnosticCode.FunctionArgConstraintViolation)]
     FunctionArgConstraintViolation,
+
+    [StaticallyPreventable(DiagnosticCode.UnguardedCollectionAccess)]
+    EmptyCollectionAccess,
+
+    [StaticallyPreventable(DiagnosticCode.UnguardedCollectionMutation)]
+    EmptyCollectionMutation,
 }
 ```
 
@@ -274,6 +337,8 @@ public static class Faults
         FaultCode.InvalidMemberAccess            => new(nameof(FaultCode.InvalidMemberAccess),            "Member accessor not supported on this type"),
         FaultCode.FunctionArityMismatch          => new(nameof(FaultCode.FunctionArityMismatch),          "Function called with wrong number of arguments"),
         FaultCode.FunctionArgConstraintViolation => new(nameof(FaultCode.FunctionArgConstraintViolation), "Function argument violates constraint"),
+        FaultCode.EmptyCollectionAccess          => new(nameof(FaultCode.EmptyCollectionAccess),          "Accessor called on empty collection"),
+        FaultCode.EmptyCollectionMutation        => new(nameof(FaultCode.EmptyCollectionMutation),        "Dequeue/pop called on empty collection"),
     };
 }
 ```

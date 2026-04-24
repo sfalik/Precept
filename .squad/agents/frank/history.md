@@ -13,6 +13,17 @@
 
 ## Recent Updates
 
+### 2026-04-24 — Full design review: docs.next/ architecture lens (type-checker, spec, temporal, business-domain, READMEs)
+- **Verdict: BLOCKED.** Four blockers, all fixable without design changes. B2 requires a design alignment decision.
+- **B1:** Language README (`docs.next/language/README.md`) uses NodaTime C# names (`localdate`, `localtime`, `localdatetime`) instead of DSL surface names (`date`, `time`, `datetime`). Also missing `zoneddatetime`.
+- **B2:** Spec §3.6 and type-checker doc §4.2a directly contradict on `decimal op number` arithmetic. Spec says widening to `number`; type-checker says type error requiring `approximate()`. Must align — recommend bridging in arithmetic context, widening in assignment context.
+- **B3:** Type-checker function catalog table lists 8 of 14 functions. Missing: `floor`, `ceil`, `truncate`, `round()` (0-arg), `approximate`, `pow`. Bridge functions described in Lane Integrity section but absent from the formal catalog. `pow` absent entirely.
+- **B4:** Type-checker Deliberate Exclusion says "does not validate typed constant content format — runtime via NodaTime." Temporal design doc specifies compile-time errors for `'2026-02-30'`, `'25:00:00'`, etc. Inconsistent.
+- **Clean-room:** Both temporal and business-domain docs pass. "v1" = proposal-internal versions. No agent names, no `.squad/`, no `src/Precept/`. `PreceptTypeChecker.*` references in Implementation Scope are #118 context (appropriate).
+- **Structural alignment:** Type-checker doc follows compiler README pattern (Overview → Design Principles → Architecture → domain → Error Recovery → Consumer Contracts → Deliberate Exclusions → Cross-References → Source Files). CheckSession struct matches Scanner/ParseSession pattern exactly.
+- **Noteworthy:** T1 (flat symbol tables) decision is exceptionally well-argued — consumer path tracing eliminates phantom abstractions. Spec §3.3 and type-checker doc both missing `exchangerate` shape in typed constant resolution table. `PriceType()` and `ExchangeRateType()` records may need qualifier parameters for denominator cancellation.
+- Full review at `.squad/decisions/inbox/frank-docs-next-design-review.md`.
+
 ### 2026-04-23 — v2 AST & parser design review (SyntaxNodes.cs + parser.md)
 - **Verdict: BLOCKED.** Two blocking issues; clean room is fully clean; AST-to-doc sync is tight.
 - **B1:** No method-call expression support (`expr.method(args)`). The vision specifies `.inZone(tz)` as a temporal accessor, but the AST has no `MethodCallExpression` and the Pratt Led has no `LeftParen` handler. Decision needed: add method-call support or redesign as prefix function `inZone(expr, tz)`.
@@ -182,6 +193,14 @@
 - Decision filed at `.squad/decisions/inbox/frank-stateless-event-boundary.md`.
 
 ## Learnings
+
+- **Cross-document function catalogs must be a single source of truth.** The type-checker doc's Lane Integrity section described bridge functions (approximate, floor, ceil, truncate, round) that the same document's formal catalog table didn't list. When a function exists in narrative prose but not in the implementer's contract table, it's invisible to implementation. One canonical table, referenced everywhere else.
+
+- **Widening rules and lane bridge rules occupy different scopes and must not be conflated.** `decimal → number` widening for *assignment* (putting a decimal value into a number slot) is safe and lossless in one direction. `decimal op number` *arithmetic* produces a `number` result, silently losing decimal precision. These are different operations with different safety properties. The spec conflated them into one "widening" rule. Architecture review must always check whether a type system rule that's correct for assignment is also correct for arithmetic.
+
+- **READMEs are the first thing readers see and the last thing authors check.** The language README had NodaTime C# names (`localdate`) instead of DSL surface names (`date`) despite the temporal design doc being internally consistent. Navigation READMEs must be reviewed against the docs they describe, not written once and forgotten.
+
+- **Deliberate Exclusions must be versioned against the doc's own type inventory.** The type-checker doc's exclusion "does not validate typed constant content format" was correct when the doc only covered primitives. But the doc now includes temporal and business-domain types in its ResolvedType hierarchy and typed constant resolution table — the exclusion became stale. When a doc's scope expands, its exclusions must be re-evaluated.
 
 - Design review gate formalization (2026-04-19): Formalized the two-track design review model across 7 files (CONTRIBUTING.md, ceremonies.md, copilot-instructions.md, squad.agent.md, frank/charter.md, proposal-review/SKILL.md, decisions.md). Track A = issue-comment reviews; Track B = issue + inline PR review comments on design doc markdown. Owner sign-off is the universal completion gate. For Track B, all inline review threads must also be resolved. Key process files: `CONTRIBUTING.md` § 3. Design Review (canonical), `.squad/ceremonies.md` (ceremony definition), `.squad/skills/proposal-review/SKILL.md` (reviewer workflow). The implementation gate in `squad.agent.md` now checks design review status before authorizing implementation planning.
 

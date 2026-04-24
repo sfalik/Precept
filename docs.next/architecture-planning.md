@@ -595,7 +595,7 @@ public sealed class Precept
 }
 ```
 
-`Create` is entity construction. If the precept declares an `initial` event, `Create` fires it atomically: build hollow version (defaults + initial state + omitted fields) → fire initial event with args → return `EventOutcome`. If no initial event, constructs from defaults and returns `Applied`. `InspectCreate` provides the same progressive inspection model as `InspectFire`. The compiler enforces C100/C101 to guarantee construction coherence.
+`Create` is entity construction. If the precept declares an `initial` event, `Create` fires it atomically: build hollow version (defaults + initial state + omitted fields) → fire initial event with args → return `EventOutcome`. If no initial event, constructs from defaults and returns `Applied`. `InspectCreate` provides the same progressive inspection model as `InspectFire`. The compiler enforces `RequiredFieldsNeedInitialEvent`/`InitialEventMissingAssignments` to guarantee construction coherence.
 
 **Version carries four methods — two commit, two inspect:**
 
@@ -748,7 +748,7 @@ Fifteen decisions that must be resolved before implementation. D1–D8 cover com
 2. `Precept.InspectCreate(args?)` returns `EventInspection` — same progressive inspection as `InspectFire`.
 3. `Precept.InitialEvent` — the initial event name, or `null`.
 4. DSL modifier: `event Create initial` (reuses existing `initial` keyword — no new syntax).
-5. Compiler enforcement: **C100** (required fields without defaults require an initial event) and **C101** (initial event must assign all required fields lacking defaults).
+5. Compiler enforcement: **`RequiredFieldsNeedInitialEvent`** (required fields without defaults require an initial event) and **`InitialEventMissingAssignments`** (initial event must assign all required fields lacking defaults).
 6. Construction-time constraints compose naturally: arg ensures → field constraints → global rules → `to <InitialState> ensure` → `in <InitialState> ensure`. No new language surface.
 7. All 7 `EventOutcome` variants are valid at construction — including `Transitioned` (construction-time routing), `Rejected` (business rejection at intake). `UndefinedEvent` cannot occur (compiler guarantee).
 

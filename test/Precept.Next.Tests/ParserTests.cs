@@ -211,6 +211,7 @@ public class ParserTests
     {
         foreach (var (text, op) in new[] {
             ("A == B", BinaryOp.Equal), ("A != B", BinaryOp.NotEqual),
+            ("A ~= B", BinaryOp.CaseInsensitiveEqual), ("A !~ B", BinaryOp.CaseInsensitiveNotEqual),
             ("A < B", BinaryOp.Less), ("A > B", BinaryOp.Greater),
             ("A <= B", BinaryOp.LessOrEqual), ("A >= B", BinaryOp.GreaterOrEqual) })
         {
@@ -1287,5 +1288,70 @@ from Draft on Start
         var am = decl.Should().BeOfType<AccessModeDeclaration>().Subject;
         am.Fields.IsAll.Should().BeTrue();
         am.StateScope.Should().BeNull();
+    }
+
+    // ════════════════════════════════════════════════════════════════════════════
+    //  Case-insensitive comparison operators
+    // ════════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Expr_CaseInsensitiveEquals_ReturnsBinaryExpression()
+    {
+        var expr = ParseExpr("Name ~= \"test\"");
+        var bin = expr.Should().BeOfType<BinaryExpression>().Subject;
+        bin.Op.Should().Be(BinaryOp.CaseInsensitiveEqual);
+        bin.Left.Should().BeOfType<IdentifierExpression>().Which.Name.Text.Should().Be("Name");
+        bin.Right.Should().BeOfType<StringLiteralExpression>().Which.Value.Text.Should().Be("test");
+    }
+
+    [Fact]
+    public void Expr_CaseInsensitiveNotEquals_ReturnsBinaryExpression()
+    {
+        var expr = ParseExpr("Name !~ \"test\"");
+        var bin = expr.Should().BeOfType<BinaryExpression>().Subject;
+        bin.Op.Should().Be(BinaryOp.CaseInsensitiveNotEqual);
+        bin.Left.Should().BeOfType<IdentifierExpression>().Which.Name.Text.Should().Be("Name");
+        bin.Right.Should().BeOfType<StringLiteralExpression>().Which.Value.Text.Should().Be("test");
+    }
+
+    [Fact]
+    public void Expr_ChainedCaseInsensitiveEquals_EmitsDiagnostic()
+    {
+        var tree = Parse("precept Test\nrule A ~= B ~= C because \"msg\"");
+        tree.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.NonAssociativeComparison));
+    }
+
+    [Fact]
+    public void Expr_ChainedEqualsThenCaseInsensitive_EmitsDiagnostic()
+    {
+        var tree = Parse("precept Test\nrule A == B ~= C because \"msg\"");
+        tree.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.NonAssociativeComparison));
+    }
+
+    [Fact]
+    public void Expr_CaseInsensitivePrecedence_AndIsOuterNode()
+    {
+        // A ~= B and C !~ D  should parse as  (A ~= B) and (C !~ D)
+        var expr = ParseExpr("A ~= B and C !~ D");
+        var and = expr.Should().BeOfType<BinaryExpression>().Subject;
+        and.Op.Should().Be(BinaryOp.And);
+        and.Left.Should().BeOfType<BinaryExpression>().Which.Op.Should().Be(BinaryOp.CaseInsensitiveEqual);
+        and.Right.Should().BeOfType<BinaryExpression>().Which.Op.Should().Be(BinaryOp.CaseInsensitiveNotEqual);
+    }
+
+    [Fact]
+    public void Decl_TransitionRowWithCaseInsensitiveGuard_ParsesCorrectly()
+    {
+        var tree = Parse(@"precept Test
+field Name as string
+state S1 initial, S2
+event E
+from S1 on E when Name ~= ""admin""
+-> transition S2");
+        tree.Diagnostics.Should().BeEmpty();
+        var row = tree.Root!.Body[3].Should().BeOfType<TransitionRowDeclaration>().Subject;
+        row.Guard.Should().NotBeNull();
+        var bin = row.Guard.Should().BeOfType<BinaryExpression>().Subject;
+        bin.Op.Should().Be(BinaryOp.CaseInsensitiveEqual);
     }
 }

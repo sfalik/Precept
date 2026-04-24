@@ -195,8 +195,10 @@ Every token the lexer can produce. Organized by category to match the `TokenKind
 | `Slash` | `/` | Arithmetic |
 | `Percent` | `%` | Arithmetic (modulo) |
 | `Arrow` | `->` | Action chain / outcome separator |
+| `CaseInsensitiveEquals` | `~=` | Case-insensitive comparison (string-only) |
+| `CaseInsensitiveNotEquals` | `!~` | Case-insensitive not-equals (string-only) |
 
-**Scan order for operators:** Multi-character operators must be attempted before their single-character prefixes: `->` before `-`, `==` before `=`, `!=` before `!` (if ever reintroduced), `>=` before `>`, `<=` before `<`.
+**Scan order for operators:** Multi-character operators must be attempted before their single-character prefixes: `!~` before `!=` before `!` (if ever reintroduced), `~=` before `~` (reserved), `->` before `-`, `==` before `=`, `>=` before `>`, `<=` before `<`.
 
 #### Punctuation
 
@@ -319,7 +321,7 @@ Interpolation is always-on — `{` inside a string always opens an interpolation
 
 #### Typed constants (`'...'`)
 
-Typed constants are delimited by single quotes. The type is inferred from the content shape (date, time, duration, etc.) by the type checker — the lexer treats the content opaquely.
+Typed constants are delimited by single quotes. The type is determined by expression context (not by content) — the lexer treats the content opaquely.
 
 **Without interpolation:** `'2026-04-23'` → single `TypedConstant` token.
 
@@ -327,7 +329,7 @@ Typed constants are delimited by single quotes. The type is inferred from the co
 
 **Escape sequences:** `\'` (single quote), `\\` (backslash), `{{` (literal brace), `}}` (literal brace).
 
-**Content words are not keywords.** Words that appear inside typed constant content — such as `days`, `hours`, `minutes`, `seconds`, `months`, `years`, `weeks`, `USD`, `kg` — are not language keywords. They are validated by the type checker against the inferred type family, not by the lexer. This keeps the reserved keyword set stable as new literal families are added.
+**Content words are not keywords.** Words that appear inside typed constant content — such as `days`, `hours`, `minutes`, `seconds`, `months`, `years`, `weeks`, `USD`, `kg` — are not language keywords. They are validated by the type checker against the context-determined type, not by the lexer. This keeps the reserved keyword set stable as new types are added.
 
 #### List literals
 
@@ -495,7 +497,7 @@ The parser always runs to end-of-source. On malformed input it emits diagnostics
 | 10 | `or` | logical disjunction | left |
 | 20 | `and` | logical conjunction | left |
 | 25 (prefix) | `not` | logical negation | right (prefix) |
-| 30 | `==` `!=` `<` `>` `<=` `>=` | comparison | non-associative |
+| 30 | `==` `!=` `~=` `!~` `<` `>` `<=` `>=` | comparison | non-associative |
 | 40 | `contains` | collection membership | left |
 | 40 | `is` (`is set` / `is not set`) | presence test | left |
 | 50 | `+` `-` (infix) | additive arithmetic | left |
@@ -532,7 +534,7 @@ The parser always runs to end-of-source. On malformed input it emits diagnostics
 |-------|------------|
 | `Or` | `BinaryExpression(Or, ParseExpression(10))` |
 | `And` | `BinaryExpression(And, ParseExpression(20))` |
-| `==` `!=` `<` `>` `<=` `>=` | `BinaryExpression(op, ParseExpression(31))` |
+| `==` `!=` `~=` `!~` `<` `>` `<=` `>=` | `BinaryExpression(op, ParseExpression(31))` |
 | `Contains` | `ContainsExpression(left, ParseExpression(40))` |
 | `Is` | `IsSetExpression` — consumes optional `Not`, then `Set` |
 | `+` `-` (infix) | `BinaryExpression(op, ParseExpression(50))` |
@@ -783,16 +785,17 @@ Declaration order does not matter. A rule at line 5 can reference a field declar
 
 ### 3.2 Type Widening Rules
 
-Widening is implicit, lossless, and one-directional.
+Implicit widening is lossless and one-directional. Only two implicit widenings exist:
 
 ```
-integer  →  decimal  →  number
+integer  →  decimal     (implicit — lossless)
+integer  →  number      (implicit — lossless, direct)
 ```
 
 - `integer` widens to `decimal` — every integer is exactly representable in base-10.
-- `integer` widens to `number` — transitively through `decimal`, or directly (every integer is representable as a double within safe integer range).
-- `decimal` widens to `number` — precision may be lost. This is allowed because `number` fields explicitly accept approximate values.
-- No narrowing. A `number` value cannot be assigned to an `integer` or `decimal` field.
+- `integer` widens to `number` — every integer within safe integer range is exactly representable as an IEEE 754 double. This is a direct widening, not transitive through `decimal`.
+- `decimal` does **NOT** implicitly widen to `number` in any context. The conversion is lossy — IEEE 754 cannot exactly represent all base-10 values (`0.1 + 0.2 ≠ 0.3`). Use `approximate(decimalValue)` to explicitly convert `decimal → number`, or `round(numberValue, places)` to convert `number → decimal`. See §3.7 for bridge function signatures.
+- No implicit narrowing. A `number` value cannot be assigned to an `integer` or `decimal` field without an explicit bridge function (`round`, `floor`, `ceil`, `truncate`).
 
 **Widening applies in these contexts:**
 
@@ -803,6 +806,8 @@ integer  →  decimal  →  number
 | Function arguments | `min(IntegerExpr, DecimalExpr)` — `integer` widens to `decimal` |
 | Default values | `field X as decimal default 42` — `42` widens to `decimal` |
 | Comparison | `IntegerField > DecimalField` — `integer` widens, comparison is valid |
+
+For the complete conversion map — including the context-by-context matrix, bridge function catalog, and rationale for why comparisons also require bridging — see [Primitive Types · Numeric Lane Rules](primitive-types.md#numeric-lane-rules).
 
 ### 3.3 Context-Sensitive Type Resolution
 
@@ -824,24 +829,31 @@ No literal suffix syntax exists — context is the sole resolution mechanism.
 
 #### Typed constants
 
-A `TypedConstant` token's content is opaque to the lexer. The type checker resolves the type in two steps:
+A `TypedConstant` token's content is opaque to the lexer. The type checker resolves the type using context-born resolution — the same model as numeric literals:
 
-1. **Content shape → type family.** The content determines which type family the value belongs to. Shape matchers are applied in order; the first match wins. Shapes are disjoint — no content can match two families.
-2. **Context → specific type.** For singleton families (date, time, instant, etc.), the type is determined by shape alone. For multi-member families (duration/period), the expression context selects the specific type. If context cannot narrow, it is a compile error.
+1. **Context determines the type.** The expression context (field type, operator peer, function signature, comparison operand) propagates an expected type inward. This is the same top-down inference that resolves `42` to `integer`, `decimal`, or `number`.
+2. **Content is validated against the expected type.** The content is parsed and validated as a value of the context-determined type. Invalid content is a compile error.
+3. **No context → compile error.** A typed constant in a position with no type expectation is a compile error.
 
-| Shape pattern | Family | Context narrowing |
+**Content validation table** — given context-determined type, valid content patterns:
+
+| Expected type | Valid content | Examples |
 |---|---|---|
-| `YYYY-MM-DD` | `{date}` | Singleton — always `date` |
-| `HH:MM:SS`, `HH:MM` | `{time}` | Singleton — always `time` |
-| ISO 8601 with `T`, trailing `Z` | `{instant}` | Singleton — always `instant` |
-| ISO 8601 with `T`, no zone | `{datetime}` | Singleton — always `datetime` |
-| ISO 8601 with `T`, `[Zone]` bracket | `{zoneddatetime}` | Singleton — always `zoneddatetime` |
-| `Word/Word` (timezone pattern) | `{timezone}` | Singleton — always `timezone` |
-| `<number> <unit-word>` (with optional `+ <number> <unit-word>`) | `{duration, period}` | `date ±` → `period`; `instant ±` → `duration`; field type context selects |
-| `<number> <currency-code>` | `{money}` | Singleton — always `money` |
-| `<number> <unit>` (measurement) | `{quantity}` | Singleton — always `quantity` |
-| `<number> <unit>/<unit>` | `{price}` | Singleton — always `price` |
-| No shape match | **Compile error** | — |
+| `date` | `YYYY-MM-DD` | `'2026-04-15'` |
+| `time` | `HH:MM:SS` or `HH:MM` | `'14:30:00'` |
+| `instant` | ISO 8601 with `T`, trailing `Z` | `'2026-04-15T14:30:00Z'` |
+| `datetime` | ISO 8601 with `T`, no zone | `'2026-04-15T14:30:00'` |
+| `zoneddatetime` | ISO 8601 with `T`, `[Zone]` bracket | `'2026-04-15T14:30:00[America/New_York]'` |
+| `timezone` | `Word/Word` IANA identifier | `'America/New_York'` |
+| `duration` | `<integer> <temporal-unit>` (with optional `+`) | `'72 hours'` |
+| `period` | `<integer> <temporal-unit>` (with optional `+`) | `'30 days'`, `'2 years + 6 months'` |
+| `money` | `<number> <ISO-4217-code>` | `'100 USD'` |
+| `quantity` | `<number> <unit-name>` | `'5 kg'` |
+| `price` | `<number> <currency>/<unit>` | `'4.17 USD/each'` |
+| `exchangerate` | `<number> <currency>/<currency>` | `'1.08 USD/EUR'` |
+| `currency` | `<ISO-4217-code>` (3-letter) | `'USD'` |
+| `unitofmeasure` | Unit name | `'kg'` |
+| `dimension` | Dimension name (UCUM registry) | `'mass'` |
 
 ### 3.4 Name Resolution
 
@@ -878,7 +890,7 @@ Fields, states, and events are all declared at the top level. They are visible e
 | State action guard / actions | All field names |
 | Stateless event hook actions | All field names + current event's args |
 | Default value expression | Field names declared **before** this field (no self-reference, no forward reference) |
-| Computed expression (`field X as T -> Expr`) | All field names except the computed field itself (no self-reference) |
+| Computed expression (`field X as T -> Expr`) | All field names except those that would form a dependency cycle (no self-reference, no mutual cycles) |
 | Modifier value expressions (`min N`, `max N`, etc.) | Only literal values — no field references |
 
 #### Event arg access
@@ -893,19 +905,64 @@ Event args are accessed via dotted notation: `EventName.ArgName`. The type check
 
 #### Binary operators
 
+**Core scalar operators:**
+
 | Operator | Left type | Right type | Result type | Widening? |
 |----------|-----------|------------|-------------|-----------|
 | `+` `-` `*` `/` `%` | numeric | numeric | common numeric type | Yes — widen to common |
 | `+` | `string` | `string` | `string` | No (concatenation) |
-| `+` `-` | temporal | quantity | temporal (same as LHS) | No |
-| `==` `!=` | any T | same T | `boolean` | Yes — numeric widening |
-| `<` `>` `<=` `>=` | numeric | numeric | `boolean` | Yes — numeric widening |
+| `==` `!=` | any T | same T | `boolean` | Yes — `integer` widens to `decimal` or `number`; `decimal` vs `number` is a type error (see §3.2) |
+| `~=` `!~` | `string` | `string` | `boolean` | No — case-insensitive ordinal comparison (`OrdinalIgnoreCase`); type error on non-string operands |
+| `<` `>` `<=` `>=` | numeric | numeric | `boolean` | Yes — `integer` widens to `decimal` or `number`; `decimal` vs `number` is a type error (see §3.2) |
 | `<` `>` `<=` `>=` | `string` | `string` | `boolean` | No (lexicographic) |
 | `<` `>` `<=` `>=` | `choice` (ordered) | `choice` (ordered, same set) | `boolean` | No (ordinal) |
-| `<` `>` `<=` `>=` | temporal (same kind) | temporal (same kind) | `boolean` | No |
 | `and` `or` | `boolean` | `boolean` | `boolean` | No |
 
-**Common numeric type:** When two numeric operands have different lanes, the result is the wider type: `integer op decimal` → `decimal`; `integer op number` → `number`; `decimal op number` → `number`.
+**Common numeric type:** When two numeric operands have different lanes, the result is the wider type: `integer op decimal` → `decimal`; `integer op number` → `number`. However, `decimal op number` is a **type error** — the author must use an explicit bridge function (`approximate(decimalValue)` to convert to `number`, or `round(numberValue, places)` to convert to `decimal`). There is no implicit `decimal → number` widening in any context — the conversion is lossy. See [Primitive Types · Numeric Lane Rules](primitive-types.md#numeric-lane-rules) for the complete conversion map and §3.7 for bridge function signatures.
+
+**Temporal operators** — see the [temporal type system](temporal-type-system.md#semantic-rules) for the full per-type operator matrix. Summary:
+
+| Left | Op | Right | Result | Notes |
+|------|----|-------|--------|-------|
+| `date` | `±` | `period of 'date'` | `date` | Unconstrained period → `UnqualifiedPeriodArithmetic`. |
+| `date` | `-` | `date` | `period` | Calendar distance. |
+| `date` | `+` | `time` | `datetime` | Composition. Commutative. |
+| `time` | `±` | `period of 'time'` | `time` | Unconstrained period → `UnqualifiedPeriodArithmetic`. |
+| `time` | `±` | `duration` | `time` | Sub-day bridging. Wraps at midnight. |
+| `time` | `-` | `time` | `period` | |
+| `instant` | `-` | `instant` | `duration` | |
+| `instant` | `±` | `duration` | `instant` | |
+| `datetime` | `±` | `period` | `datetime` | Accepts all period components. |
+| `datetime` | `-` | `datetime` | `period` | |
+| `duration` | `±` | `duration` | `duration` | |
+| `duration` | `*` `/` | `integer` or `number` | `duration` | Scaling. `decimal` is a type error. Commutative for `*`. |
+| `duration` | `/` | `duration` | `number` | Ratio. |
+| `period` | `±` | `period` | `period` | |
+| `zoneddatetime` | `±` | `duration` | `zoneddatetime` | Timeline arithmetic. |
+| `zoneddatetime` | `-` | `zoneddatetime` | `duration` | |
+
+**Temporal comparison:** `date`, `time`, `instant`, `duration`, `datetime` support all comparison operators. `period`, `timezone`, and `zoneddatetime` support only `==`/`!=` — ordering operators are type errors. Cross-type temporal comparison is always a type error.
+
+**Business-domain operators** — see the [business-domain types](business-domain-types.md) for the full per-type operator matrix with cancellation rules. Summary:
+
+| Left | Op | Right | Result | Notes |
+|------|----|-------|--------|-------|
+| `money` | `±` | `money` | `money` | Same currency required. |
+| `money` | `*` `/` | `decimal` | `money` | Commutative for `*`. `number` is a type error. |
+| `money` | `/` | `money` (same curr.) | `decimal` | Dimensionless ratio. |
+| `money` | `/` | `money` (diff. curr.) | `exchangerate` | |
+| `money` | `/` | `quantity` / `period` / `duration` | `price` | Price derivation. |
+| `quantity` | `±` | `quantity` | `quantity` | Same dimension required. |
+| `quantity` | `*` `/` | `decimal` | `quantity` | Commutative for `*`. |
+| `quantity` | `/` | `quantity` (same dim.) | `decimal` | |
+| `quantity` | `/` | `quantity` (diff. dim.) | `quantity` (compound) | |
+| `price` | `*` | `quantity` / `period` / `duration` | `money` | Dimensional cancellation. Commutative. |
+| `price` | `*` `/` | `decimal` | `price` | Commutative for `*`. |
+| `price` | `±` | `price` | `price` | Same currency and unit required. |
+| `exchangerate` | `*` | `money` | `money` | Currency conversion. Commutative. |
+| `exchangerate` | `*` `/` | `decimal` | `exchangerate` | Commutative for `*`. |
+
+**Business-domain comparison:** `money`, `quantity`, `price` support all comparison operators (same currency/dimension/unit required). `exchangerate`, `currency`, `unitofmeasure`, `dimension` support only `==`/`!=` — ordering operators are type errors.
 
 #### Unary operators
 
@@ -913,6 +970,10 @@ Event args are accessed via dotted notation: `EventName.ArgName`. The type check
 |----------|-------------|-------------|
 | `not` | `boolean` | `boolean` |
 | `-` (negate) | numeric | same numeric type |
+| `-` (negate) | `duration` | `duration` |
+| `-` (negate) | `money` | `money` (preserves currency) |
+| `-` (negate) | `quantity` | `quantity` (preserves unit/dimension) |
+| `-` (negate) | `price` | `price` (preserves currency/unit) |
 
 #### `contains`
 
@@ -936,6 +997,8 @@ The `then` and `else` branches must have compatible types (same type, or one wid
 
 #### Member access (`.`)
 
+**Collection and core accessors:**
+
 | Object type | Member | Result type |
 |-------------|--------|-------------|
 | `set of T` | `count` | `integer` |
@@ -945,9 +1008,12 @@ The `then` and `else` branches must have compatible types (same type, or one wid
 | `stack of T` | `peek` | `T` |
 | `string` | `length` | `integer` |
 | Event arg reference (`EventName.ArgName`) | — | arg's declared type |
-| _other_ | — | `InvalidMemberAccess` diagnostic |
 
-Temporal and business-domain member accessors (e.g., `.year`, `.month` on `date`; `.amount`, `.currency` on `money`) are deferred to when those type families are implemented.
+**Temporal accessors** — see the [temporal type system](temporal-type-system.md) for the full per-type accessor tables. Summary: `date` has `.year`, `.month`, `.day`, `.dayOfWeek` → `integer`. `time` has `.hour`, `.minute`, `.second` → `integer`. `instant` has only `.inZone(tz)` → `zoneddatetime` (no skip-level accessors). `duration` has `.totalDays`, `.totalHours`, `.totalMinutes`, `.totalSeconds` → `number`. `period` has `.years`, `.months`, `.weeks`, `.days`, `.hours`, `.minutes`, `.seconds` → `integer`; `.hasDateComponent`, `.hasTimeComponent` → `boolean`; `.basis` → `string`; `.dimension` → `dimension`. `zoneddatetime` has `.instant`, `.timezone`, `.datetime`, `.date`, `.time` and integer component accessors. `datetime` has `.date`, `.time`, `.inZone(tz)`, and integer component accessors.
+
+**Business-domain accessors** — see the [business-domain types](business-domain-types.md#accessors-per-type) for the full accessor table. Summary: `money` has `.amount` → `decimal`, `.currency` → `currency`. `quantity` has `.amount` → `decimal`, `.unit` → `unitofmeasure`, `.dimension` → `dimension`. `price` has `.amount` → `decimal`, `.currency` → `currency`, `.unit` → `unitofmeasure`. `exchangerate` has `.amount` → `decimal`, `.numerator`/`.denominator` → `currency`. `unitofmeasure` has `.dimension` → `dimension`. `period` also has `.basis` → `string` and `.dimension` → `dimension` for its `in`/`of` qualification system.
+
+| _other_ | — | `InvalidMemberAccess` diagnostic |
 
 #### Function calls
 
@@ -963,7 +1029,7 @@ Each `{expr}` inside `"..."` is type-checked independently. Any scalar type is c
 
 #### Typed constant interpolation
 
-Each `{expr}` inside `'...'` is type-checked independently. After interpolation expressions are typed, the full content is shape-matched as described in §3.3.
+Each `{expr}` inside `'...'` is type-checked independently. After interpolation expressions are typed, the full content is validated against the context-determined type as described in §3.3.
 
 ### 3.7 Built-in Function Catalog
 
@@ -984,6 +1050,13 @@ Functions are validated against a closed catalog. There are no user-defined func
 | `pow(base, exp)` | `(numeric, integer) → numeric` | Same numeric type as `base` | `exp` must be non-negative for integer lane |
 | `sqrt(value)` | `(numeric) → number` | `number` | Number-lane only; proof engine checks non-negativity |
 | `trim(value)` | `(string) → string` | `string` | — |
+| `startsWith(s, prefix)` | `(string, string) → boolean` | `boolean` | Case-sensitive prefix test |
+| `endsWith(s, suffix)` | `(string, string) → boolean` | `boolean` | Case-sensitive suffix test |
+| `toLower(s)` | `(string) → string` | `string` | Lowercase (invariant culture) |
+| `toUpper(s)` | `(string) → string` | `string` | Uppercase (invariant culture) |
+| `left(s, n)` | `(string, integer) → string` | `string` | Leftmost N code units (clamped to string length) |
+| `right(s, n)` | `(string, integer) → string` | `string` | Rightmost N code units (clamped to string length) |
+| `mid(s, start, length)` | `(string, integer, integer) → string` | `string` | 1-indexed substring (clamped); `start` and `length` must be positive `integer` |
 | `now()` | `() → instant` | `instant` | — |
 
 **Lane bridge functions.** Two functions are the sole explicit bridges between numeric lanes: `approximate(decimal) → number` and `round(value, places) → decimal`. The rounding family (`floor`, `ceil`, `truncate`, `round` with no places) provide `decimal|number → integer`. No other mechanism crosses lane boundaries — `decimal * NumberField` without `approximate()` is a type error (see type-checker.md §4.2a).
@@ -1052,9 +1125,9 @@ Modifiers are constraints on field/arg values. The type checker validates applic
 | `add F Expr` | `set of T` | `T` | — |
 | `remove F Expr` | `set of T` | `T` | — |
 | `enqueue F Expr` | `queue of T` | `T` | — |
-| `dequeue F (into G)?` | `queue of T` | — | If `into G`, `G` must be type `T` |
+| `dequeue F (into G)?` | `queue of T` | — | If `into G`, `G` must be type `T`. Requires emptiness proof (`UnguardedCollectionMutation`) |
 | `push F Expr` | `stack of T` | `T` | — |
-| `pop F (into G)?` | `stack of T` | — | If `into G`, `G` must be type `T` |
+| `pop F (into G)?` | `stack of T` | — | If `into G`, `G` must be type `T`. Requires emptiness proof (`UnguardedCollectionMutation`) |
 | `clear F` | Any collection | — | — |
 
 Type errors: applying a set operation to a non-set field, a queue operation to a non-queue field, etc.
@@ -1073,6 +1146,7 @@ Type errors: applying a set operation to a non-set field, a queue operation to a
 | Check | Fires when | Diagnostic |
 |-------|-----------|------------|
 | Self-reference | Computed expression references its own field | `CircularComputedField` |
+| Transitive cycle | Computed fields form a dependency cycle (A→B→A, or A→B→C→A, etc.) | `CircularComputedField` |
 | Expression type mismatch | Computed expression type doesn't match field type | `TypeMismatch` |
 | Computed with default | Field has both `->` and `default` | `ComputedFieldWithDefault` |
 | Computed as write target | `set` action targets a computed field | `ComputedFieldNotWritable` |
@@ -1165,7 +1239,7 @@ The type checker emits diagnostics for root causes only. When `ErrorType` is flo
 | `RedundantModifier` | Warning | "'{0}' is unnecessary — '{1}' already implies it" | nonnegative + positive |
 | `ComputedFieldNotWritable` | Error | "Field '{0}' is computed and cannot be assigned" | `set` targeting computed field, or in `write` mode |
 | `ComputedFieldWithDefault` | Error | "Field '{0}' is computed and cannot have a default value" | Both `->` and `default` |
-| `CircularComputedField` | Error | "Computed field '{0}' cannot reference itself" | Self-reference in computed expr |
+| `CircularComputedField` | Error | "Computed field '{0}' has a circular dependency: {1}" | Self-reference or transitive cycle in computed field dependency graph |
 | `ConflictingAccessModes` | Error | "Field '{0}' has conflicting access modes in state '{1}'" | write + omit same field same state |
 | `ListLiteralOutsideDefault` | Error | "List values can only appear in default clauses" | `[...]` outside default position |
 | `DuplicateChoiceValue` | Error | "Choice value '{0}' is duplicated" | Repeated string in choice set |

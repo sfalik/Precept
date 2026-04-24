@@ -141,11 +141,13 @@ public class LexerTests
     [Fact]
     public void Lex_OperatorsAndPunctuation_ProduceExpectedTokenKindsInOrder()
     {
-        var stream = Lexer.Lex("== != >= <= > < = + - * / % -> . , ( ) [ ]");
+        var stream = Lexer.Lex("== != ~= !~ >= <= > < = + - * / % -> . , ( ) [ ]");
 
         stream.Tokens.Select(token => token.Kind).Should().Equal(
             TokenKind.DoubleEquals,
             TokenKind.NotEquals,
+            TokenKind.CaseInsensitiveEquals,
+            TokenKind.CaseInsensitiveNotEquals,
             TokenKind.GreaterThanOrEqual,
             TokenKind.LessThanOrEqual,
             TokenKind.GreaterThan,
@@ -586,5 +588,87 @@ public class LexerTests
             new Token(TokenKind.EndOfSource, string.Empty, 1, 2, 1, 0));
 
         stream.Diagnostics.Select(d => d.Code).Should().Equal(nameof(DiagnosticCode.InvalidCharacter));
+    }
+
+    // ════════════════════════════════════════════════════════════════════════════
+    //  Case-insensitive comparison operators
+    // ════════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Lex_TildeEquals_ProducesCaseInsensitiveEqualsToken()
+    {
+        var stream = Lexer.Lex("~=");
+
+        stream.Tokens.Should().Equal(
+            new Token(TokenKind.CaseInsensitiveEquals, "~=", 1, 1, 0, 2),
+            new Token(TokenKind.EndOfSource, string.Empty, 1, 3, 2, 0));
+
+        stream.Diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Lex_BangTilde_ProducesCaseInsensitiveNotEqualsToken()
+    {
+        var stream = Lexer.Lex("!~");
+
+        stream.Tokens.Should().Equal(
+            new Token(TokenKind.CaseInsensitiveNotEquals, "!~", 1, 1, 0, 2),
+            new Token(TokenKind.EndOfSource, string.Empty, 1, 3, 2, 0));
+
+        stream.Diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Lex_BangTildeBeforeBangEquals_ScanOrderIsCorrect()
+    {
+        var stream = Lexer.Lex("!~ !=");
+
+        stream.Tokens.Select(token => token.Kind).Should().Equal(
+            TokenKind.CaseInsensitiveNotEquals,
+            TokenKind.NotEquals,
+            TokenKind.EndOfSource);
+
+        stream.Diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Lex_TildeEqualsBeforeDoubleEquals_ScanOrderIsCorrect()
+    {
+        var stream = Lexer.Lex("~= ==");
+
+        stream.Tokens.Select(token => token.Kind).Should().Equal(
+            TokenKind.CaseInsensitiveEquals,
+            TokenKind.DoubleEquals,
+            TokenKind.EndOfSource);
+
+        stream.Diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Lex_CaseInsensitiveEqualsInExpressionContext_LexesCorrectly()
+    {
+        var stream = Lexer.Lex("Name ~= \"test\"");
+
+        stream.Tokens.Select(token => token.Kind).Should().Equal(
+            TokenKind.Identifier,
+            TokenKind.CaseInsensitiveEquals,
+            TokenKind.StringLiteral,
+            TokenKind.EndOfSource);
+
+        stream.Diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Lex_CaseInsensitiveNotEqualsInExpressionContext_LexesCorrectly()
+    {
+        var stream = Lexer.Lex("Name !~ \"test\"");
+
+        stream.Tokens.Select(token => token.Kind).Should().Equal(
+            TokenKind.Identifier,
+            TokenKind.CaseInsensitiveNotEquals,
+            TokenKind.StringLiteral,
+            TokenKind.EndOfSource);
+
+        stream.Diagnostics.Should().BeEmpty();
     }
 }

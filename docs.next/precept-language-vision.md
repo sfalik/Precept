@@ -162,8 +162,8 @@ The language envelope includes these top-level forms:
 | `state ...` | Declares lifecycle states |
 | `event ...` | Declares triggers and typed arguments |
 | `event <Name>(...) initial` | Declares the construction event (initial event) |
-| `in/to/from <State> [when <Guard>] ensure <Expr> because "..."` | Declares state-scoped constraints |
-| `on <Event> [when <Guard>] ensure <Expr> because "..."` | Declares event-scoped arg constraints |
+| `in/to/from <State> ensure <Expr> [when <Guard>] because "..."` | Declares state-scoped constraints |
+| `on <Event> ensure <Expr> [when <Guard>] because "..."` | Declares event-scoped arg constraints |
 | `to/from <State> -> ...` | Declares state entry or exit actions |
 | `in <State> ... write/read/omit ...` | Declares state-scoped field access modes |
 | `write ...` | Declares root editability for stateless precepts |
@@ -210,11 +210,10 @@ The core operator families remain:
 
 1. Arithmetic: `+`, `-`, `*`, `/`, `%`.
 2. Comparison: `==`, `!=`, `>`, `>=`, `<`, `<=`.
-3. Case-insensitive comparison: `~=`, `!~` — string-only, ordinal ignore-case.
-4. Logical: `and`, `or`, `not`.
-5. Membership: `contains`.
-6. Structural arrow: `->`.
-7. Member access: `.`.
+3. Logical: `and`, `or`, `not`.
+4. Membership: `contains`.
+5. Structural arrow: `->`.
+6. Member access: `.`.
 
 ### Delimiters and punctuation
 
@@ -235,7 +234,7 @@ Time-unit words such as `days`, `hours`, `minutes`, `seconds`, `months`, `years`
 
 ## Literal System
 
-The language has two quoted literal forms — strings and typed constants — plus primitive and list literals.
+The language uses a closed two-door literal model plus primitive and list literals.
 
 ### Primitive literals
 
@@ -258,17 +257,18 @@ rule Score >= 680 because "Score {Score} is below the minimum"
 
 ### Typed constants
 
-Typed constants use `'...'` and produce non-primitive values. Like numeric literals, typed constants are **context-born** — the expression context determines the type, and the content is then validated against that type.
+Typed constants use `'...'` and produce non-primitive values by content shape.
 
-The resolution model:
+The admission rule is:
 
-1. Context determines the type (field type, operator peer, function signature).
-2. Content is validated against the expected type.
-3. No context → compile error.
+1. Content shape determines a type family.
+2. Context narrows within that family.
+3. No content shape may belong to two unrelated families.
+4. If context cannot narrow a multi-member family, compilation fails.
 
 Examples:
 
-| Typed constant | Resolved type (from context) |
+| Typed constant | Family or type |
 |---|---|
 | `'2026-06-01'` | `date` |
 | `'14:30:00'` | `time` |
@@ -276,7 +276,7 @@ Examples:
 | `'2026-04-13T09:00:00'` | `datetime` |
 | `'2026-04-13T14:30:00[America/New_York]'` | `zoneddatetime` |
 | `'America/New_York'` | `timezone` |
-| `'30 days'` | `period` or `duration`, determined by context |
+| `'30 days'` | `period` or `duration`, narrowed by context |
 | `'100 USD'` | `money` |
 | `'5 kg'` | `quantity` |
 | `'24.50 USD/kg'` | `price` |
@@ -325,9 +325,10 @@ Lane rules:
 
 1. **Homogeneous arithmetic stays in lane.** `integer + integer → integer`, `decimal * decimal → decimal`, `number + number → number`. No silent lane crossing.
 2. **Integer widens losslessly.** `integer` may widen to `decimal` (exact) or `number` (range-preserving) in mixed-lane arithmetic.
-3. **Decimal and number never mix implicitly.** Every operation combining `decimal` and `number` — arithmetic, assignment, comparison, function arguments, default values — is a type error. The author must explicitly bridge via `approximate()` or `round(value, places)`. No exceptions. See [Primitive Types · Numeric Lane Rules](primitive-types.md#numeric-lane-rules) for the full conversion map.
-4. **Integer-shaped surfaces produce `integer`.** `.count`, `.length`, and rounding functions (`floor`, `ceil`, `truncate`, `round` with no places argument) return `integer`.
-5. **Explicit bridges only.** Two explicit bridge functions cross lane boundaries: `approximate(decimal) → number` and `round(value, places) → decimal`. No implicit coercion paths exist for arithmetic or assignment.
+3. **Decimal + number arithmetic is a type error.** The author must explicitly bridge via `approximate()` before combining decimal and number values in arithmetic. This prevents silent precision loss.
+4. **Decimal vs number comparison is allowed.** Comparison operators (`==`, `!=`, `<`, `<=`, `>`, `>=`) permit mixed decimal/number operands because the result is `boolean` — no numeric value is stored, so no lane is contaminated.
+5. **Integer-shaped surfaces produce `integer`.** `.count`, `.length`, and rounding functions (`floor`, `ceil`, `truncate`, `round` with no places argument) return `integer`.
+6. **Explicit bridges only.** Two explicit bridge functions cross lane boundaries: `approximate(decimal) → number` and `round(value, places) → decimal`. No implicit coercion paths exist for arithmetic or assignment.
 
 #### Context-sensitive literal typing
 
@@ -357,15 +358,15 @@ No literal suffix syntax (e.g., `0.1m`, `0.1d`) is part of the language. Context
 
 Each primitive type has a defined operator surface. Operations outside this surface are type errors.
 
-| Type | Equality (`==`, `!=`) | CI Equality (`~=`, `!~`) | Relational (`<`, `<=`, `>`, `>=`) | Arithmetic (`+`, `-`, `*`, `/`, `%`) | Logical (`and`, `or`, `not`) |
-|---|---|---|---|---|---|
-| `string` | Ordinal (case-sensitive) | ✓ Ordinal ignore-case | Type error | `+` is concatenation (both operands must be string; no implicit coercion) | Type error |
-| `boolean` | Yes | Type error | Type error | Type error | Yes (short-circuit) |
-| `integer` | Yes | Type error | Yes | Yes (stays integer, checked overflow) | Type error |
-| `decimal` | Yes (exact base-10) | Type error | Yes (exact base-10) | Yes (stays decimal, overflow is error) | Type error |
-| `number` | Yes (IEEE 754) | Type error | Yes (IEEE 754) | Yes (stays number) | Type error |
-| `choice` (unordered) | Yes (ordinal) | Type error | Type error | Type error | Type error |
-| `choice` (ordered) | Yes (ordinal) | Type error | Yes (declaration-position rank) | Type error | Type error |
+| Type | Equality (`==`, `!=`) | Relational (`<`, `<=`, `>`, `>=`) | Arithmetic (`+`, `-`, `*`, `/`, `%`) | Logical (`and`, `or`, `not`) |
+|---|---|---|---|---|
+| `string` | Ordinal (case-sensitive) | Type error | `+` is concatenation (both operands must be string; no implicit coercion) | Type error |
+| `boolean` | Yes | Type error | Type error | Yes (short-circuit) |
+| `integer` | Yes | Yes | Yes (stays integer, checked overflow) | Type error |
+| `decimal` | Yes (exact base-10) | Yes (exact base-10) | Yes (stays decimal, overflow is error) | Type error |
+| `number` | Yes (IEEE 754) | Yes (IEEE 754) | Yes (stays number) | Type error |
+| `choice` (unordered) | Yes (ordinal) | Type error | Type error | Type error |
+| `choice` (ordered) | Yes (ordinal) | Yes (declaration-position rank) | Type error | Type error |
 
 There is no truthy/falsy coercion. `0` and `""` are not boolean. Conditions (`when`, `if`, `rule`, `ensure`) require `boolean`-typed expressions.
 
@@ -428,9 +429,7 @@ These types exist so the compiler can reason about domain meaning rather than pr
 
 #### Qualification system
 
-Type qualifiers are distinct from declaration modifiers. A **modifier** asserts a structural or semantic property of the declaration itself (`terminal`, `optional`, `required`). A **type qualifier** is part of the type annotation — it narrows the set of values the field may hold. The distinction matters: modifiers affect compile-time analysis and diagnostics; type qualifiers constrain the value domain.
-
-Two mutually exclusive type qualifiers apply to relevant field types:
+Two mutually exclusive qualifiers apply to relevant field types:
 
 ```precept
 field Amount as money in 'USD'
@@ -548,11 +547,10 @@ The expression language is a pure, deterministic expression system.
 
 1. Arithmetic: `+`, `-`, `*`, `/`, `%`.
 2. Comparison: `==`, `!=`, `>`, `>=`, `<`, `<=`.
-3. Case-insensitive comparison: `~=`, `!~` — string-only, ordinal ignore-case.
-4. Logical: `and`, `or`, `not` — deterministic left-to-right short-circuit.
-5. Membership: `contains` — collection membership only. Not available for substring testing on strings; use `startsWith` and `endsWith` for prefix/suffix testing.
-6. Assignment: `=` (in `set` actions only).
-7. Presence: `is set`, `is not set` — boolean presence test for `optional` fields.
+3. Logical: `and`, `or`, `not` — deterministic left-to-right short-circuit.
+4. Membership: `contains` — collection membership only. Not available for substring testing on strings; use `startsWith` and `endsWith` for prefix/suffix testing.
+5. Assignment: `=` (in `set` actions only).
+6. Presence: `is set`, `is not set` — boolean presence test for `optional` fields.
 
 ### Dotted access
 
@@ -650,8 +648,8 @@ Ensures also support optional guards:
 
 ```precept
 in Review ensure Reviewers.count >= 2 because "Review requires at least two reviewers"
-in Open when Escalated ensure Priority >= 3 because "Escalated tickets must be high priority"
-on Submit when Submit.Type == "payment" ensure Submit.Amount > 0 because "Payment amounts must be positive"
+in Open ensure Priority >= 3 when Escalated because "Escalated tickets must be high priority"
+on Submit ensure Submit.Amount > 0 when Submit.Type == "payment" because "Payment amounts must be positive"
 ```
 
 The surface includes these anchors:
@@ -881,20 +879,10 @@ The modifier system is a major language expansion.
 
 ### Current precedent
 
-The language already has declaration-attached modifiers in two areas:
+The language already has one declaration modifier: `initial` on states, and (as of the construction model) `initial` on events.
 
-**State modifiers:**
-- `initial` — marks the starting state. `state Draft initial`.
-
-**Event modifiers:**
-- `initial` — marks the construction event (v2). `event Create(...) initial`.
-
-**Field modifiers:**
-- `optional` — field may have no value (v2, replaces `nullable`).
-- `default <value>` — default value when not explicitly set.
-- Constraint keywords: `nonnegative`, `positive`, `nonzero`, `notempty`, `min`, `max`, `minlength`, `maxlength`, `mincount`, `maxcount`, `maxplaces`, `ordered`.
-
-Field modifiers are already a rich surface — constraints are declaration-attached structural properties that the compiler enforces. The modifier system expansion extends this pattern to states and events with structural, semantic, and severity modifiers.
+- `state Draft initial` — marks `Draft` as the initial state.
+- `event Create(...) initial` — marks `Create` as the construction event (see Entity construction under Lifecycle and Routing).
 
 ### Planned direction
 
@@ -925,7 +913,7 @@ The graph is constructed from declared states, events, and transition rows. The 
 3. **Dead-end state detection.** Non-terminal states where all outgoing rows reject or produce no-transition. These have transition machinery that never succeeds — likely authoring mistakes (C50).
 4. **Incoming/outgoing edge analysis.** Per-state: which events fire into this state, which events fire out. Required for `guarded` (all incoming transitions have guards), `entry` (event fires only from initial), `isolated` (event fires from exactly one state), `universal` (event fires from every reachable non-terminal state).
 5. **Dominator analysis.** Required for `required`/`milestone` — the modifier asserts that all initial→terminal paths must visit this state. Dominator analysis (O(V+E) via Lengauer-Tarjan) determines whether a state is on every such path.
-6. **Reverse-reachability.** Required for `irreversible` (no path from this state back to any ancestor state in the initial→forward ordering) and `sealed after <State>` (no mutation after the named state is entered — requires reachability analysis from the named state forward).
+6. **Reverse-reachability.** Required for `irreversible` (no path from target back to source) and `sealed after <State>` (no mutation after the named state is entered — requires reachability analysis from the named state forward).
 7. **Row-partition analysis.** Required for `writeonce` (field set at most once across all reachable transition rows) and `sealed after` (no row reachable after the named state assigns to the field).
 8. **Outcome-type analysis.** Per (state, event) pair: do all rows produce `transition`? `no transition`? All `reject`? Required for `advancing` (every success is a state transition), `settling` (every success is no-transition), `completing` (transitions only to terminal states), `absorbing` (event handlers never transition out), and for existing diagnostics like C51 (reject-only pairs) and C52 (events that never succeed).
 
@@ -933,53 +921,19 @@ The graph is constructed from declared states, events, and transition rows. The 
 
 **Interaction with existing diagnostics.** The graph analysis that modifiers require is an extension of the analysis the compiler already performs for C48 (unreachable states), C49 (orphaned events), C50 (dead-end states), C51 (reject-only pairs), and C52 (events that never succeed). Modifiers do not replace these diagnostics — they make them stronger by adding author-declared intent that the compiler can cross-check against the graph structure.
 
-### v2 initial modifiers
+### Early likely cohort
 
-The following modifiers are in scope for the v2 initial release. All apply to states.
+The language includes modifiers in areas such as:
 
-**Structural:**
-
-1. `initial` on states — marks the starting state. Already implemented in v1.
-2. `initial` on events — marks the construction event. Fires atomically during `Create`. Decided for v2 (see Entity construction).
+1. `initial` on states — marks the starting state. Already implemented.
+2. `initial` on events — marks the construction event. Fires atomically during `Create`. Already resolved (see Entity construction).
 3. `terminal` — lifecycle exit; no outgoing transitions.
-4. `required` — all initial→terminal paths must visit this state (dominator analysis).
-5. `irreversible` — no path from this state back to any ancestor state in the initial→forward ordering. Once entered, the lifecycle can only move forward.
-
-**Semantic:**
-
-6. `success` — marks a state as a success outcome.
-7. `warning` — marks a state as a warning outcome.
-8. `error` — marks a state as an error outcome.
-
-### Future modifiers (deferred)
-
-The following modifiers are planned but deferred beyond the initial v2 release.
-
-**Structural — event modifiers:**
-
-- `entry` — event fires only from the initial state.
-- `advancing` — every successful outcome is a state transition.
-- `settling` — every successful outcome is no-transition.
-- `completing` — transitions only to terminal states.
-- `absorbing` — event handlers never transition out.
-- `guarded` — all incoming transitions have guards.
-- `isolated` — event fires from exactly one state.
-- `universal` — event fires from every reachable non-terminal state.
-
-**Structural — field modifiers:**
-
-- `writeonce` — field set at most once across the lifecycle.
-- `sealed after <State>` — no mutation after the named state is entered.
-
-**Semantic:**
-
-- `sensitive` — PII/security marking on fields.
-- `audit` — audit trail marking on fields/events.
-- `deprecated` — migration signal on any declaration.
-
-**Severity (on rules):**
-
-- Severity modifiers that control whether rule violations surface as warnings versus hard errors. Planned as a future concern.
+4. `entry` — event fires only from the initial state.
+5. `advancing` — every successful outcome is a state transition.
+6. `settling` — every successful outcome is no-transition.
+7. `writeonce` — field set at most once across the lifecycle.
+8. `sealed after <State>` — no mutation after the named state is entered.
+9. `warning` on rule-like declarations.
 
 The language supports declaration-attached modifier metadata, validation, and composition rules as a first-class concern.
 
@@ -1029,7 +983,7 @@ The typechecker must:
 6. Enforce temporal operator compatibility.
 7. Enforce strict temporal hierarchy and mediation rules.
 8. Enforce business-domain operator compatibility, qualification compatibility, currency pairing, and unit commensurability.
-9. Enforce the typed constant admission and narrowing model.
+9. Enforce the two-door literal admission and narrowing model.
 10. Enforce stateless event hook legality.
 11. Enforce per-state field access mode rules: D3 per-pair baseline resolution, explicit declaration overrides, contradiction detection (conflicting modes on same field/state pair), `set`-into-`omit` validation (compile error), root-level `read`/`omit` rejection, guarded `read`/`omit` rejection.
 12. Enforce modifier compatibility and contradiction rules.
@@ -1101,7 +1055,7 @@ Any clean-room compiler for Precept must be able to serve a language with all of
 
 1. A flat keyword-anchored grammar with no indentation semantics.
 2. Stateful and stateless entity definitions in the same language.
-3. Two quoted literal forms (strings and typed constants) with interpolation.
+3. A two-door quoted literal system with interpolation.
 4. A mixed primitive, temporal, and business-domain type system with a closed type vocabulary.
 5. Domain-sensitive operator tables with unit cancellation.
 6. Explicit contextual truth via rules and ensures with mandatory rationale.

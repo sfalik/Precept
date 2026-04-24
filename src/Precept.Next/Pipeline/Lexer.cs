@@ -738,6 +738,10 @@ public static class Lexer
             // Multi-char operators (scan order per §1.5)
             if (c == '-' && next == '>')
                 return EmitOperator(TokenKind.Arrow, "->", startLine, startCol, startOff);
+            if (c == '!' && next == '~')
+                return EmitOperator(TokenKind.CaseInsensitiveNotEquals, "!~", startLine, startCol, startOff);
+            if (c == '~' && next == '=')
+                return EmitOperator(TokenKind.CaseInsensitiveEquals, "~=", startLine, startCol, startOff);
             if (c == '=' && next == '=')
                 return EmitOperator(TokenKind.DoubleEquals, "==", startLine, startCol, startOff);
             if (c == '!' && next == '=')

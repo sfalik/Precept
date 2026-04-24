@@ -31,3 +31,12 @@
 - Missing specs identified: expression hover triggers, multi-source attribution formatting (cap at 3), partial-proof display guidance, hover for rule/guard declarations themselves.
 - What's right: shared assessment model, truth-based C92/C93 split, proven-violation-only C94 policy, silence on Unknown, no path for internal type names to reach hover.
 - Full review in `.squad/decisions/inbox/elaine-proof-engine-review.md`.
+
+### 2026-04-24 — docs.next/ full design review (document UX & navigability lens)
+- Reviewed all 4 READMEs (top-level, compiler/, language/, runtime/) and 3 pipeline docs (lexer, parser, type-checker) for usability, structural consistency, and information architecture.
+- Verdict: **APPROVED** — the navigation layer is well-built and the structural alignment across pipeline docs is strong.
+- Key strengths: README tables are consistent, reading orders match real learning paths, cross-references are dense and accurate, all referenced files exist (no dead-end navigation), AI agent navigability is excellent (list_dir + README → right doc in one hop).
+- Structural consistency across lexer/parser/type-checker is now very close — same section skeleton, same heading hierarchy, same pattern of Design Principles → Architecture → domain sections → Error Recovery → Consumer Contracts → Deliberate Exclusions → Cross-References → Source Files.
+- Nits: type-checker Overview has a mild structural redundancy (public surface described twice), and the top-level README doesn't mention the runtime/ folder's reading-order dependency on compiler docs.
+- The folder structure (compiler/, language/, runtime/) is intuitive and maps well to consumer mental models.
+- No blockers found. All navigation paths terminate at real files. The type-checker doc is implementable as a standalone blueprint.

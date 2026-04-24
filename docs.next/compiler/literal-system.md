@@ -100,46 +100,65 @@ Unlike C# (`$"..."`), Python (`f"..."`), or Kotlin (`"$expr"`), Precept does not
 
 ## Layer 3: Typed Constants — `'...'`
 
-Typed constants produce non-primitive values. The type is inferred from content shape, not from the delimiter.
+Typed constants produce non-primitive values. Like numeric literals, typed constants are **context-born** — the expression context determines the type, and the content is then validated against that type. The delimiter `'...'` is not type-specific; it marks a value whose type comes from context, not from the delimiter itself.
 
-### The admission rule — type families
+### Resolution model — context-born, then content-validated
 
-A type qualifies as a typed constant inhabitant if and only if:
+Typed constant resolution follows the same two-step model as numeric literals:
 
-1. Its content shape determines a **type family** — a finite, enumerable set of types.
-2. The family is **disjoint** from every other family. No content shape may match two families.
-3. Expression **context narrows** within the family to select the specific type.
-4. If context cannot narrow a multi-member family, it is a **compile error**.
+1. **Context determines the type.** The type checker propagates an expected type inward from the enclosing expression — field declaration, assignment target, operator peer, function parameter, or comparison operand. This is the same top-down inference that resolves `42` to `integer`, `decimal`, or `number`.
+2. **Content is validated against the expected type.** Once the expected type is known, the content is parsed and validated by the type's registered `ITypedConstantValidator`. If the content doesn't parse as the expected type, it is a compile error. If no validator is registered (domain module not yet shipped), shape validation only.
+3. **No context → compile error.** A typed constant in a position with no type expectation is a compile error, just as `42` in a contextless position is a compile error.
 
-### Current inhabitants
+This replaces the previous "shape-first" model where content determined the type. Shape is no longer the resolution mechanism — context is.
 
-| Inhabitant | Shape signal | Type family | Context narrowing |
-|------------|-------------|-------------|-------------------|
-| Dates | `YYYY-MM-DD` | `{date}` | Singleton |
-| Times | `HH:MM:SS` or `HH:MM` | `{time}` | Singleton |
-| DateTimes | Contains `T`, no trailing `Z`, no `[` | `{datetime}` | Singleton |
-| Instants | Contains `T`, trailing `Z` | `{instant}` | Singleton |
-| ZonedDateTimes | Contains `T`, bracket-enclosed timezone | `{zoneddatetime}` | Singleton |
-| Timezones | `Word/Word` pattern | `{timezone}` | Singleton |
-| Quantities | `<value> <unit-word>` | `{period, duration}` | `date ±` → period, `instant ±` → duration |
-| State names | Plain identifier | `{state}` | Validated against declarations |
+### Content validation table
 
-### Shape disambiguation priority
+Given the context-determined type, the content must parse as a valid value of that type:
 
-The type checker tests typed constant content against shape patterns in priority order. The first match wins.
+| Expected type | Valid content patterns | Examples |
+|---|---|---|
+| `date` | `YYYY-MM-DD` | `'2026-04-15'` |
+| `time` | `HH:MM:SS` or `HH:MM` | `'14:30:00'`, `'14:30'` |
+| `instant` | ISO 8601 with `T`, trailing `Z` | `'2026-04-15T14:30:00Z'` |
+| `datetime` | ISO 8601 with `T`, no zone | `'2026-04-15T14:30:00'` |
+| `zoneddatetime` | ISO 8601 with `T`, bracket-enclosed timezone | `'2026-04-15T14:30:00[America/New_York]'` |
+| `timezone` | `Word/Word` IANA identifier | `'America/New_York'` |
+| `duration` | `<integer> <temporal-unit>` (with optional `+ <integer> <unit>`) | `'72 hours'`, `'2 hours + 30 minutes'` |
+| `period` | `<integer> <temporal-unit>` (with optional `+ <integer> <unit>`) | `'30 days'`, `'2 years + 6 months'` |
+| `money` | `<number> <ISO-4217-code>` | `'100 USD'`, `'50.25 EUR'` |
+| `quantity` | `<number> <unit-name>` | `'5 kg'`, `'24 each'` |
+| `price` | `<number> <currency>/<unit>` | `'4.17 USD/each'` |
+| `exchangerate` | `<number> <currency>/<currency>` | `'1.08 USD/EUR'` |
+| `currency` | `<ISO-4217-code>` (3-letter) | `'USD'`, `'EUR'` |
+| `unitofmeasure` | Unit name (lowercase/mixed) | `'kg'`, `'each'` |
+| `dimension` | Dimension name (UCUM registry) | `'mass'`, `'length'` |
+| state ref | Plain identifier | `'Open'`, `'UnderReview'` |
 
-| Priority | Shape test | Family | Example |
-|----------|-----------|--------|--------|
-| 1 | Contains `T` + ends with `[...]` | `{zoneddatetime}` | `'2026-04-15T14:30:00[America/New_York]'` |
-| 2 | Contains `T` + ends with `Z` | `{instant}` | `'2026-04-15T14:30:00Z'` |
-| 3 | Contains `T` (no `Z`, no `[`) | `{datetime}` | `'2026-04-15T14:30:00'` |
-| 4 | Matches `YYYY-MM-DD` | `{date}` | `'2026-04-15'` |
-| 5 | Matches `HH:MM(:SS)?` | `{time}` | `'14:30:00'`, `'14:30'` |
-| 6 | Contains `/` (IANA pattern) | `{timezone}` | `'America/New_York'` |
-| 7 | Matches `<value> <unit-word>` | `{period, duration}` | `'30 days'`, `'2 years + 6 months'` |
-| 8 | Plain identifier | `{state}` | `'Open'`, `'UnderReview'` |
+**Content validation is compile-time.** When a validator is registered for the expected type, malformed content is a compile error — e.g., `'2026-02-30'` fails date validation, `'XYZ 100.00'` fails money validation (XYZ is not a recognized ISO 4217 code). The `ITypedConstantValidator` registry is layered: the checker defines the hook, each domain type family registers its validator. If no validator is registered, shape-only validation is accepted.
 
-No content matches two rows — the distinguishing signals are structurally disjoint: `T`, `Z`, `[`, hyphens-in-date-pattern, colons-in-time-pattern, `/` in IANA identifiers, and `<number> <word>` in quantities are mutually exclusive.
+### Context sources
+
+Context flows **inward** from the nearest enclosing typed node to the typed constant. This is standard top-down type inference — the type checker already holds the full expression tree.
+
+| Position | Context source | Example |
+|----------|---------------|--------|
+| `default` clause | Declared field type | `field X as period default '30 days'` → context = `period` |
+| `set X = '...'` | Target field's type | `set DueDate = '2026-06-01'` → context = `date` |
+| Right operand of `+`/`-` | Left operand's resolved type | `FiledAt + '30 days'` → left is `instant` → context = `duration` |
+| `set X = Y + '...'` | Type of `Y` | `set DueDate = FiledAt + '30 days'` → context from `FiledAt` |
+| Comparison (`==`, `!=`, `<`, etc.) | Other operand's type | `when DueDate > '2026-04-15'` → peer is `date` → context = `date` |
+| Compound chain | Result of the preceding sub-expression | `StartDate + '1 month' + '15 days'` → second constant gets context from first addition result |
+| No context / ambiguous | **Compile error** | *"Cannot determine the type of typed constant without context."* |
+
+### The parallel with numeric literals
+
+| Aspect | Numeric literal (`42`) | Typed constant (`'30 days'`) |
+|--------|----------------------|------------------------------|
+| Resolution mechanism | Context determines lane | Context determines type |
+| Validation | Content checked against lane (e.g., fractional → not `integer`) | Content checked against type (e.g., `'2026-02-30'` → not a valid `date`) |
+| No context | Compile error | Compile error |
+| Ambiguous context | Compile error | Compile error |
 
 ### Static typed constants
 
@@ -157,7 +176,7 @@ set DueDate = FiledAt + '{GraceDays} days'
 set SlaLimit = CreatedAt + '{SlaHours * 2} hours'
 ```
 
-Interpolation inside `'...'` uses the same `{expr}` syntax as strings. The expression is evaluated, the result is substituted into the content, and then the full content is shape-matched to determine the type family.
+Interpolation inside `'...'` uses the same `{expr}` syntax as strings. The expression is evaluated, the result is substituted into the content, and then the full content is validated against the context-determined type.
 
 ### Quantity unit names
 
@@ -312,22 +331,13 @@ The parser reassembles segmented tokens into AST nodes. Its contracts:
 The type checker's contracts:
 
 1. **String interpolation expressions** — type-check each `{expr}`, verify coercion to string is defined for the expression type. Collections are a compile error.
-2. **Typed constant content** — after substituting interpolation results, shape-match the content to determine the type family. Apply context narrowing to select the specific type.
-3. **Admission rule enforcement** — verify that the resolved type family is valid for the expression context. If context cannot narrow a multi-member family, emit a compile error.
-4. **Quantity type resolution** — use the context-dependent resolution table to select `period` vs `duration`.
+2. **Typed constant resolution** — determine the expected type from context (field type, operator peer, function signature), then validate the content against that type using the registered `ITypedConstantValidator`. No context → compile error.
+3. **Interpolated typed constants** — after substituting interpolation results, validate the full content against the context-determined type.
+4. **Quantity unit resolution** — for `duration` and `period`, validate the unit words against the temporal unit closed set.
 
 #### Context resolution for typed constants
 
-Context flows **inward** from the nearest enclosing typed node to the typed constant. This is standard top-down type inference — the type checker already holds the full expression tree.
-
-| Position | Context source | Example |
-|----------|---------------|--------|
-| Right operand of `+`/`-` | Left operand's resolved type | `FiledAt + '30 days'` → left is `instant` → context = `instant` |
-| `default` clause | Declared field type | `field X as period default '30 days'` → context = `period` |
-| `set X = Y + '...'` | Type of `Y` | `set DueDate = FiledAt + '30 days'` → context from `FiledAt` |
-| Comparison (`<=`, `>=`) | Other operand's type or subtraction result | `FiledAt - IncidentAt <= '72 hours'` → subtraction result provides context |
-| Compound chain | Result of the preceding sub-expression | `StartDate + '1 month' + '15 days'` → second constant gets context from first addition result |
-| No context / ambiguous | **Compile error** | *"Can't determine the type of `'30 days'` without context."* |
+See "Context sources" in the Resolution Model section above for the full context-flow table.
 
 #### Quantity type resolution tables
 
@@ -395,7 +405,7 @@ When an expression inside `{...}` in a string literal evaluates to a non-string 
 
 ### New typed constant inhabitants
 
-Future types that pass the admission rule (disjoint type family) can become typed constant inhabitants. The mechanism is ready; the decision is per-type.
+Future types that support context-born resolution can become typed constant inhabitants. The mechanism is ready: add a content validator for the new type, and any typed constant in a context expecting that type will be validated. The decision is per-type.
 
 ### New quantity domains
 
@@ -403,9 +413,11 @@ Each new domain adds validated string patterns to the typed constant shape match
 
 | Domain | Literal form | Interpolated form |
 |--------|-------------|-------------------|
-| Temporal (current) | `'30 days'` | `'{GraceDays} days'` |
-| Currency (future) | `'100 USD'` | `'{Subtotal} USD'` |
+| Temporal | `'30 days'` | `'{GraceDays} days'` |
+| Currency / money | `'100 USD'` | `'{Subtotal} USD'` |
+| Physical / quantity | `'5 kg'` | `'{Weight} kg'` |
+| Price | `'4.17 USD/each'` | `'{UnitPrice} USD/each'` |
+| Exchange rate | `'1.08 USD/EUR'` | `'{Rate} USD/EUR'` |
 | Percentage (future) | `'10 percent'` | `'{Rate} percent'` |
-| Physical (future) | `'5 kg'` | `'{Weight} kg'` |
 
 No new keywords, no new grammar, no new doors.

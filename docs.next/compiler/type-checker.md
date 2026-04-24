@@ -126,7 +126,7 @@ TypeChecker.Check(SyntaxTree tree) → TypedModel
 - Every node is structurally complete. Missing tokens are represented as `IsMissing` nodes with zero-length spans — never as nulls in required positions.
 - Expression subtrees are fully assembled — operator precedence, associativity, and parenthesization are resolved.
 - `IdentifierExpression` nodes carry raw name tokens. They are not resolved — the type checker performs all name resolution.
-- Typed constant interiors (`TypedConstantExpression`, `InterpolatedTypedConstantExpression`) carry opaque content. The type checker performs shape matching and type-family resolution.
+- Typed constant interiors (`TypedConstantExpression`, `InterpolatedTypedConstantExpression`) carry opaque content. The type checker determines the expected type from context, then validates the content against that type via registered `ITypedConstantValidator` instances.
 - `NumberLiteralExpression` tokens carry the raw numeric text. The type checker determines the numeric lane (integer/decimal/number) from context.
 
 **What `IsMissing` means for the type checker:**
@@ -352,7 +352,7 @@ public sealed record DateType()           : ResolvedType;
 public sealed record TimeType()           : ResolvedType;
 public sealed record InstantType()        : ResolvedType;
 public sealed record DurationType()       : ResolvedType;
-public sealed record PeriodType()         : ResolvedType;
+public sealed record PeriodType(string? Qualifier)  : ResolvedType;  // "date", "time", or null (unconstrained)
 public sealed record TimezoneType()       : ResolvedType;
 public sealed record ZonedDateTimeType()  : ResolvedType;
 public sealed record DateTimeType()       : ResolvedType;
@@ -363,6 +363,10 @@ public sealed record CurrencyType()                           : ResolvedType;
 public sealed record QuantityType(string? DimensionFamily)    : ResolvedType;
 public sealed record UnitOfMeasureType()                      : ResolvedType;
 public sealed record DimensionType()                          : ResolvedType;
+// TODO(B5): PriceType and ExchangeRateType need qualifier parameters
+// (currency, unit, numerator/denominator) to represent `in` declarations —
+// same pattern as MoneyType(CurrencyBasis) and QuantityType(DimensionFamily).
+// Design during implementation phase; see design review B5.
 public sealed record PriceType()                              : ResolvedType;
 public sealed record ExchangeRateType()                       : ResolvedType;
 
@@ -395,22 +399,23 @@ public sealed record StateRefType() : ResolvedType;
 |------|--------|--------------|-----------------|
 | `boolean` | `true`, `false` | Bare keywords | — |
 | `integer` | Whole numbers | `NumberLiteral` (no decimal point, no exponent) | `decimal`, `number` |
-| `decimal` | Exact base-10 | `NumberLiteral` (with or without decimal point) | `number` |
+| `decimal` | Exact base-10 | `NumberLiteral` (with or without decimal point) | — (`number` requires explicit `approximate()`) |
 | `number` | IEEE 754 double | `NumberLiteral` (any form including exponent) | — |
 | `string` | Text | `"..."` string literals | — |
 | `choice` | Finite string set | `"..."` string literals | — |
 
 ### Type Widening Rules
 
-Widening is implicit, lossless, and one-directional.
+Implicit widening is lossless and one-directional. Only two implicit widenings exist:
 
 ```
-integer  →  decimal  →  number
+integer  →  decimal     (implicit — lossless)
+integer  →  number      (implicit — lossless, direct)
 ```
 
 - `integer` widens to `decimal` (every integer is exactly representable in base-10).
-- `integer` widens to `number` (transitively through decimal, or directly — every integer is representable as a double within safe integer range).
-- `decimal` widens to `number` (precision may be lost — this is allowed because `number` fields explicitly accept approximate values).
+- `integer` widens to `number` (every integer within safe integer range is exactly representable as an IEEE 754 double — this is a direct widening, not transitive through `decimal`).
+- `decimal` does **NOT** implicitly widen to `number` in any context. The conversion is lossy — use `approximate(decimalValue)` to explicitly convert. See §4.2a.
 - No implicit narrowing. `number` values cannot be assigned to `integer` or `decimal` fields without an explicit bridge function (see §4.2a).
 
 **Widening applies in these contexts:**
@@ -420,6 +425,8 @@ integer  →  decimal  →  number
 - Function arguments: `min(IntegerExpr, DecimalExpr)` — `integer` widens to `decimal`.
 - Default values: `field X as decimal default 42` — `42` (integer form) widens to `decimal`.
 - Comparison: `IntegerField > DecimalField` — `integer` widens, comparison is valid.
+
+**No comparison exception.** `decimal == number`, `decimal > number`, etc. are also type errors. Cross-lane equality is semantically dangerous — IEEE 754 represents `0.1 + 0.2` as `0.30000000000000004`, so `number(0.1 + 0.2) == decimal(0.3)` silently returns `false`. The author must bridge one operand to choose which lane the comparison lives in.
 
 **Widening ceiling for business-domain types:** The `integer → decimal` widening applies when scalars interact with `money`, `quantity`, `price`, and `exchangerate` operators. The `decimal → number` widening does NOT — `number` is permanently excluded from business-domain operator tables (D12 in business-domain-types.md). The operator table per type is the authority on which scalar widenings are accepted.
 
@@ -432,15 +439,13 @@ The three numeric types form three **lanes** — `integer`, `decimal`, `number` 
 | Direction | Mechanism | Type checker behavior |
 |---|---|---|
 | `integer → decimal` | Implicit widening | Allowed silently in all expression contexts |
-| `integer → number` | Implicit widening | Allowed silently (transitive through `decimal`) |
-| `decimal → number` | `approximate(value)` | Required — `decimal * NumberField` without `approximate()` is a type error |
+| `integer → number` | Implicit widening | Allowed silently (direct — every integer is exactly representable as IEEE 754 double) |
+| `decimal → number` | `approximate(value)` | Required in all contexts — `decimal * NumberField` without `approximate()` is a type error; `set NumberField = decimalExpr` without `approximate()` is a type error |
 | `number → decimal` | `round(value, places)` | Required — the rounding makes precision loss explicit |
 | `number → integer` | `floor(value)`, `ceil(value)`, `truncate(value)`, `round(value)` | Required — the rounding mode makes truncation semantics explicit |
 | `decimal → integer` | `floor(value)`, `ceil(value)`, `truncate(value)`, `round(value)` | Required — same functions, same explicitness |
 
-**Key rule: `decimal + number` arithmetic is a type error.** The author must bridge one operand first. This prevents silent precision loss — the most common source of financial calculation bugs.
-
-**Comparison is an exception.** `decimal == number`, `decimal > number`, etc. are allowed because the result is `boolean` — no numeric value is produced, so no lane is contaminated.
+**Key rule: `decimal` and `number` cannot be mixed without an explicit bridge — no exceptions.** In arithmetic (`+`, `-`, `*`, `/`, `%`), `decimal op number` is a type error. In assignment, `set numberField = decimalExpr` is a type error without `approximate()`. In function arguments, passing a `decimal` where `number` is expected is a type error without `approximate()`. In comparisons, `decimal == number` and `decimal > number` are type errors — the author must bridge one operand first. This prevents silent precision loss in all contexts.
 
 **Bridge function signatures (type checker validates these):**
 
@@ -469,25 +474,36 @@ A `NumberLiteral` token does not intrinsically know its numeric lane. The type c
 
 ### Typed Constant Resolution
 
-Typed constants (`'...'`) follow the two-step resolution from `literal-system.md`:
+Typed constants (`'...'`) follow the same context-born resolution model as numeric literals (see `literal-system.md`):
 
-1. **Shape matching → type family.** The content determines which type family the value belongs to. Shape matchers are applied in order; the first match wins. Shapes are disjoint — no content can match two families.
+1. **Context determines the type.** The type checker propagates an expected type inward from the enclosing expression — field declaration, assignment target, operator peer, function parameter, or comparison operand. This is the same top-down inference that resolves `42` to `integer`, `decimal`, or `number`.
 
-2. **Context narrowing → specific type.** For singleton families (date, time, instant, etc.), the type is determined. For multi-member families (duration/period), the expression context selects the specific type. If context cannot narrow, it is a compile error.
+2. **Content is validated against the expected type.** Once the expected type is known, the content is parsed and validated by the type's registered `ITypedConstantValidator`. If the content doesn't parse as the expected type, it is a compile error.
 
-| Shape pattern | Family | Context narrowing |
+3. **Content validation → compile-time error on malformed values.** For example, `'2026-02-30'` fails date validation (no February 30th); `'XYZ 100.00'` fails money validation (XYZ is not a recognized ISO 4217 currency code). The `ITypedConstantValidator` registry is layered: the checker defines the hook, each domain type family registers its validator. If no validator is registered for a type, the checker accepts shape validation only. This layered approach avoids circular dependencies between the checker core and domain-specific validation logic.
+
+4. **No context → compile error.** A typed constant in a position with no type expectation is a compile error, just as a numeric literal in a contextless position is.
+
+**Content validation table** — given context-determined type, valid content patterns:
+
+| Expected type | Valid content | Examples |
 |---|---|---|
-| `YYYY-MM-DD` | `{date}` | Singleton — always `date` |
-| `HH:MM:SS`, `HH:MM` | `{time}` | Singleton — always `time` |
-| ISO 8601 with `T`, trailing `Z` | `{instant}` | Singleton — always `instant` |
-| ISO 8601 with `T`, no zone | `{datetime}` | Singleton — always `datetime` |
-| ISO 8601 with `T`, `[Zone]` bracket | `{zoneddatetime}` | Singleton — always `zoneddatetime` |
-| `Word/Word` (timezone pattern) | `{timezone}` | Singleton — always `timezone` |
-| `<number> <unit-word>` (with optional `+ <number> <unit-word>`) | `{duration, period}` | `date ±` → `period`; `instant ±` → `duration`; field type context selects |
-| `<number> <currency-code>` | `{money}` | Singleton — always `money` |
-| `<number> <unit>` (measurement) | `{quantity}` | Singleton — always `quantity` |
-| `<number> <unit>/<unit>` | `{price}` | Singleton — always `price` |
-| No shape match | **Compile error** | — |
+| `date` | `YYYY-MM-DD` | `'2026-04-15'` |
+| `time` | `HH:MM:SS` or `HH:MM` | `'14:30:00'`, `'14:30'` |
+| `instant` | ISO 8601 with `T`, trailing `Z` | `'2026-04-15T14:30:00Z'` |
+| `datetime` | ISO 8601 with `T`, no zone | `'2026-04-15T14:30:00'` |
+| `zoneddatetime` | ISO 8601 with `T`, `[Zone]` bracket | `'2026-04-15T14:30:00[America/New_York]'` |
+| `timezone` | `Word/Word` IANA identifier | `'America/New_York'` |
+| `duration` | `<integer> <temporal-unit>` (with optional `+`) | `'72 hours'` |
+| `period` | `<integer> <temporal-unit>` (with optional `+`) | `'30 days'`, `'2 years + 6 months'` |
+| `money` | `<number> <ISO-4217-code>` | `'100 USD'`, `'50.25 EUR'` |
+| `quantity` | `<number> <unit-name>` | `'5 kg'`, `'24 each'` |
+| `price` | `<number> <currency>/<unit>` | `'4.17 USD/each'` |
+| `exchangerate` | `<number> <currency>/<currency>` | `'1.08 USD/EUR'` |
+| `currency` | `<ISO-4217-code>` (3-letter) | `'USD'`, `'EUR'` |
+| `unitofmeasure` | Unit name (lowercase/mixed) | `'kg'`, `'each'` |
+| `dimension` | Dimension name (UCUM registry) | `'mass'`, `'length'` |
+| No context | **Compile error** | — |
 
 ### Collection Types
 
@@ -499,23 +515,116 @@ Typed constants (`'...'`) follow the two-step resolution from `literal-system.md
 
 Collection element types are always scalar — no nested collections.
 
+**Emptiness guard requirement.** Accessors that read from a collection (`.peek`, `.min`, `.max`) and mutations that consume from a collection (`dequeue`, `pop`) require proof that the collection is non-empty. Without proof, the type checker emits `UnguardedCollectionAccess` (for accessors) or `UnguardedCollectionMutation` (for mutations).
+
+Proof sources:
+- **Conditional guard:** `if Collection.count > 0` — the accessor/mutation appears in the `then` branch of a conditional whose condition tests `.count > 0` (or equivalently `.count != 0`, `.count >= 1`).
+- **`mincount` constraint:** `field Items as set of string mincount 1` — the field's `mincount` modifier guarantees the collection is never empty.
+
+The idiomatic pattern for safe access is `if Items.count > 0 then Items.peek else fallbackValue`.
+
 ### Expression Typing Rules
 
 #### Binary operators
+
+**Core scalar operators:**
 
 | Operator | Left type | Right type | Result type | Widening? |
 |----------|-----------|------------|-------------|-----------|
 | `+` `-` `*` `/` `%` | numeric | numeric | common numeric type | Yes — widen to common |
 | `+` | `string` | `string` | `string` | No (concatenation) |
-| `+` `-` | temporal | quantity | temporal (same as LHS) | No |
 | `==` `!=` | any T | same T | `boolean` | Yes — numeric widening |
+| `~=` `!~` | `string` | `string` | `boolean` | No — case-insensitive ordinal; type error on non-string |
 | `<` `>` `<=` `>=` | numeric | numeric | `boolean` | Yes — numeric widening |
 | `<` `>` `<=` `>=` | `string` | `string` | `boolean` | No (lexicographic) |
 | `<` `>` `<=` `>=` | `choice` (ordered) | `choice` (ordered, same set) | `boolean` | No (ordinal) |
-| `<` `>` `<=` `>=` | temporal (same kind) | temporal (same kind) | `boolean` | No |
 | `and` `or` | `boolean` | `boolean` | `boolean` | No |
 
-**Common numeric type resolution:** When two numeric operands have different lanes, the result is the wider type: `integer op decimal` → `decimal`; `integer op number` → `number`; `decimal op number` → `number`.
+**Common numeric type resolution:** When two numeric operands have different lanes, the result is the wider type: `integer op decimal` → `decimal`; `integer op number` → `number`. `decimal op number` is a **type error** — the author must bridge one operand first. See [Primitive Types · Numeric Lane Rules](../language/primitive-types.md#numeric-lane-rules) for the complete conversion map.
+
+**Temporal arithmetic operators** — per-type operator table. Cross-domain operations (e.g., `date ± duration`, `instant ± period`) are type errors; see the [temporal type system](../language/temporal-type-system.md#cross-type-arithmetic-whats-not-allowed-and-why) for the full rejection table with teachable messages.
+
+| Left | Op | Right | Result | Notes |
+|------|----|-------|--------|-------|
+| `date` | `±` | `period of 'date'` | `date` | Calendar arithmetic. Period must be provably date-only (constraint or guard). `date ± period` (unconstrained) is `UnqualifiedPeriodArithmetic`. |
+| `date` | `-` | `date` | `period` | Calendar distance. |
+| `date` | `+` | `time` | `datetime` | Composition. Commutative (`time + date` also valid). |
+| `time` | `±` | `period of 'time'` | `time` | Period must be provably time-only. `time ± period` (unconstrained) is `UnqualifiedPeriodArithmetic`. |
+| `time` | `±` | `duration` | `time` | Sub-day bridging. Wraps at midnight. |
+| `time` | `-` | `time` | `period` | Time-component period. |
+| `instant` | `-` | `instant` | `duration` | Elapsed time. |
+| `instant` | `±` | `duration` | `instant` | Offset forward/backward. |
+| `datetime` | `±` | `period` | `datetime` | Calendar arithmetic. No constraint — accepts all period components. |
+| `datetime` | `-` | `datetime` | `period` | Calendar distance. |
+| `duration` | `±` | `duration` | `duration` | Combined / difference. |
+| `duration` | `*` | `integer` or `number` | `duration` | Scaling. `decimal` is a type error. |
+| `integer` or `number` | `*` | `duration` | `duration` | Commutative. |
+| `duration` | `/` | `integer` or `number` | `duration` | Scaling. |
+| `duration` | `/` | `duration` | `number` | Ratio. |
+| `period` | `±` | `period` | `period` | Combined / difference. |
+| `zoneddatetime` | `±` | `duration` | `zoneddatetime` | Timeline arithmetic. |
+| `zoneddatetime` | `-` | `zoneddatetime` | `duration` | Instant subtraction. |
+
+**Temporal comparison operators:**
+
+| Type | `==` `!=` | `<` `>` `<=` `>=` | Notes |
+|------|-----------|-------------------|-------|
+| `date` | ✓ | ✓ | ISO calendar order. |
+| `time` | ✓ | ✓ | Within-day order. |
+| `instant` | ✓ | ✓ | Nanosecond timeline. |
+| `duration` | ✓ | ✓ | Nanosecond magnitude. |
+| `datetime` | ✓ | ✓ | Same-calendar order. |
+| `period` | ✓ | **✗ — type error** | No natural ordering (variable-length months). |
+| `timezone` | ✓ | **✗ — type error** | Equality by IANA identifier only. |
+| `zoneddatetime` | ✓ | **✗ — type error** | No natural ordering. Compare via `.instant` or `.datetime` accessor. |
+
+Cross-type temporal comparison is always a type error.
+
+**Business-domain arithmetic operators** — all seven types use `decimal` as magnitude backing. Scalar operands must be `decimal` (not `number`); `integer` widens to `decimal` losslessly. `number` scalars are type errors for all business-domain operations. See [business-domain types](../language/business-domain-types.md) for the complete proposal.
+
+| Left | Op | Right | Result | Notes |
+|------|----|-------|--------|-------|
+| `money` | `±` | `money` | `money` | Same currency required; cross-currency is a compile error. |
+| `money` | `*` | `decimal` | `money` | Scaling. Commutative. |
+| `money` | `/` | `decimal` | `money` | Division by scalar. Divisor safety applies. |
+| `money` | `/` | `money` (same currency) | `decimal` | Dimensionless ratio. |
+| `money` | `/` | `money` (different currency) | `exchangerate` | Currency-pair derivation. |
+| `money` | `/` | `quantity` | `price` | Price derivation. |
+| `money` | `/` | `period` | `price` | Time-based price derivation (D15). |
+| `money` | `/` | `duration` | `price` | Duration-based price derivation for fixed-length units (D15). |
+| `quantity` | `±` | `quantity` | `quantity` | Same dimension required; auto-converts if commensurable. |
+| `quantity` | `*` | `decimal` | `quantity` | Scaling. Commutative. |
+| `quantity` | `/` | `decimal` | `quantity` | Division by scalar. |
+| `quantity` | `/` | `quantity` (same dim.) | `decimal` | Dimensionless ratio. |
+| `quantity` | `/` | `quantity` (diff. dim.) | `quantity` (compound) | Compound unit: `kg / each → kg/each`. |
+| `quantity` | `/` | `period` | `quantity` (compound) | Time-denominator rate (D15). |
+| `quantity` | `/` | `duration` | `quantity` (compound) | Duration-denominator rate (D15). |
+| `quantity` (compound) | `*` | `quantity` | `quantity` | Dimensional cancellation: `(kg/each) × each → kg`. Commutative. |
+| `quantity` (compound) | `*` | `period` | `quantity` | Time-denominator cancellation (D15). Commutative. |
+| `quantity` (compound) | `*` | `duration` | `quantity` | Duration cancellation for fixed-length units (D15). Commutative. |
+| `price` | `*` | `quantity` | `money` | Dimensional cancellation: `(USD/each) × each → USD`. Commutative. |
+| `price` | `*` | `period` | `money` | Time-denominator cancellation (D15). Commutative. |
+| `price` | `*` | `duration` | `money` | Duration cancellation for fixed-length units (D15). Commutative. |
+| `price` | `*` | `decimal` | `price` | Scaling. Commutative. |
+| `price` | `/` | `decimal` | `price` | Division by scalar. |
+| `price` | `±` | `price` | `price` | Same currency and unit required. |
+| `exchangerate` | `*` | `money` | `money` | Currency conversion: `(USD/EUR) × EUR → USD`. Commutative. |
+| `exchangerate` | `*` | `decimal` | `exchangerate` | Scaling. Commutative. |
+| `exchangerate` | `/` | `decimal` | `exchangerate` | Division by scalar. |
+
+**Business-domain comparison operators:**
+
+| Type | `==` `!=` | `<` `>` `<=` `>=` | Notes |
+|------|-----------|-------------------|-------|
+| `money` | ✓ | ✓ | Same currency required. |
+| `quantity` | ✓ | ✓ | Same dimension required; auto-converts. |
+| `price` | ✓ | ✓ | Same currency and unit required. |
+| `exchangerate` | ✓ | **✗ — type error** | No meaningful ordering outside time context. |
+| `currency` | ✓ | **✗ — type error** | Identity type — equality only. |
+| `unitofmeasure` | ✓ | **✗ — type error** | Identity type — equality only. |
+| `dimension` | ✓ | **✗ — type error** | Identity type — equality only. |
+
+Cross-type business-domain comparison is always a type error.
 
 #### Unary operators
 
@@ -523,6 +632,10 @@ Collection element types are always scalar — no nested collections.
 |----------|-------------|-------------|
 | `not` | `boolean` | `boolean` |
 | `-` (negate) | numeric | same numeric type |
+| `-` (negate) | `duration` | `duration` |
+| `-` (negate) | `money` | `money` (preserves currency) |
+| `-` (negate) | `quantity` | `quantity` (preserves unit/dimension) |
+| `-` (negate) | `price` | `price` (preserves currency/unit) |
 
 #### `contains`
 
@@ -546,6 +659,8 @@ The `then` and `else` branches must have compatible types (same type, or one wid
 
 #### Member access (`.`)
 
+**Collection and core accessors:**
+
 | Object type | Member | Result type |
 |-------------|--------|-------------|
 | `set of T` | `count` | `integer` |
@@ -555,9 +670,67 @@ The `then` and `else` branches must have compatible types (same type, or one wid
 | `stack of T` | `peek` | `T` |
 | `string` | `length` | `integer` |
 | Event arg reference (`EventName.ArgName`) | — | arg's declared type |
-| _other_ | — | `InvalidMemberAccess` diagnostic |
 
-Temporal and business-domain member accessors (e.g., `.year`, `.month` on `date`; `.amount`, `.currency` on `money`) are deferred to when those type families are implemented. The type checker validates that the accessed member is known for the object's type.
+**Temporal accessors:**
+
+| Object type | Member | Result type | Notes |
+|-------------|--------|-------------|-------|
+| `date` | `.year` | `integer` | Calendar year |
+| `date` | `.month` | `integer` | Month (1–12) |
+| `date` | `.day` | `integer` | Day of month (1–31) |
+| `date` | `.dayOfWeek` | `integer` | ISO day of week (Mon=1, Sun=7) |
+| `time` | `.hour` | `integer` | Hour (0–23) |
+| `time` | `.minute` | `integer` | Minute (0–59) |
+| `time` | `.second` | `integer` | Second (0–59) |
+| `instant` | `.inZone(tz)` | `zoneddatetime` | Sole accessor on `instant`. `tz` is a `timezone` field reference. |
+| `duration` | `.totalDays` | `number` | Total elapsed 24-hour days (may be fractional) |
+| `duration` | `.totalHours` | `number` | Total elapsed hours |
+| `duration` | `.totalMinutes` | `number` | Total elapsed minutes |
+| `duration` | `.totalSeconds` | `number` | Total elapsed seconds |
+| `period` | `.years` | `integer` | Years component (structural, not normalized) |
+| `period` | `.months` | `integer` | Months component |
+| `period` | `.weeks` | `integer` | Weeks component |
+| `period` | `.days` | `integer` | Days component |
+| `period` | `.hours` | `integer` | Hours component |
+| `period` | `.minutes` | `integer` | Minutes component |
+| `period` | `.seconds` | `integer` | Seconds component |
+| `period` | `.hasDateComponent` | `boolean` | True if any date part is non-zero |
+| `period` | `.hasTimeComponent` | `boolean` | True if any time part is non-zero |
+| `period` | `.basis` | `string` | Canonical basis name from `in` constraint |
+| `period` | `.dimension` | `dimension` | `'date'`, `'time'`, or `'datetime'` |
+| `zoneddatetime` | `.instant` | `instant` | Underlying UTC point |
+| `zoneddatetime` | `.timezone` | `timezone` | Bound IANA timezone |
+| `zoneddatetime` | `.datetime` | `datetime` | Local date+time in bound timezone |
+| `zoneddatetime` | `.date` | `date` | Local calendar date |
+| `zoneddatetime` | `.time` | `time` | Local time |
+| `zoneddatetime` | `.year`, `.month`, `.day`, `.hour`, `.minute`, `.second`, `.dayOfWeek` | `integer` | Local components in bound timezone |
+| `datetime` | `.date` | `date` | Date component |
+| `datetime` | `.time` | `time` | Time component |
+| `datetime` | `.year`, `.month`, `.day`, `.hour`, `.minute`, `.second`, `.dayOfWeek` | `integer` | Direct components |
+| `datetime` | `.inZone(tz)` | `zoneddatetime` | Anchor local reading to timeline |
+
+**Strict hierarchy — no skip-level accessors (Decision #22).** `instant.date` is a compile error — must go through `instant.inZone(tz).date`. `instant.year`, `instant.hour`, etc. are all compile errors. The type checker validates that the accessed member is known for the object's resolved type.
+
+**Business-domain accessors:**
+
+| Object type | Member | Result type | Notes |
+|-------------|--------|-------------|-------|
+| `money` | `.amount` | `decimal` | Magnitude (numeric part) |
+| `money` | `.currency` | `currency` | ISO 4217 code |
+| `quantity` | `.amount` | `decimal` | Magnitude (numeric part) |
+| `quantity` | `.unit` | `unitofmeasure` | Specific UCUM unit |
+| `quantity` | `.dimension` | `dimension` | UCUM dimension category |
+| `price` | `.amount` | `decimal` | Magnitude (numeric part) |
+| `price` | `.currency` | `currency` | Numerator currency |
+| `price` | `.unit` | `unitofmeasure` | Denominator unit |
+| `exchangerate` | `.amount` | `decimal` | Magnitude (numeric part) |
+| `exchangerate` | `.numerator` | `currency` | Numerator currency code |
+| `exchangerate` | `.denominator` | `currency` | Denominator currency code |
+| `unitofmeasure` | `.dimension` | `dimension` | UCUM dimension category |
+
+**Discrete equality narrowing:** Business-domain accessors (`.currency`, `.unit`, `.dimension`, `.basis`) participate in guard narrowing. `when Payment.currency == 'USD'` injects `$eq:Payment.currency:USD` into the symbol table, enabling same-currency arithmetic in the guarded scope. Fields declared with static `in` values pre-seed `$eq:` markers unconditionally. See the [business-domain type proposal](../language/business-domain-types.md#discrete-equality-narrowing) for the full narrowing mechanism.
+
+| _other_ | — | `InvalidMemberAccess` diagnostic |
 
 #### Function calls
 
@@ -573,7 +746,7 @@ Each `{expr}` inside `"..."` is type-checked independently. Any scalar type is c
 
 #### Typed constant interpolation
 
-Each `{expr}` inside `'...'` is type-checked independently. After interpolation expressions are typed, the full content is shape-matched as described in §4.4.
+Each `{expr}` inside `'...'` is type-checked independently. After interpolation expressions are typed, the full content is validated against the context-determined type as described in §4.4.
 
 ---
 
@@ -657,7 +830,7 @@ Fields, states, and events are all declared at the top level. They are visible e
 | State action guard / actions | All field names |
 | Stateless event hook actions | All field names + current event's args |
 | Default value expression | Field names declared **before** this field (no self-reference, no forward reference in defaults) |
-| Computed expression (`field X as T -> Expr`) | All field names except the computed field itself (no self-reference) |
+| Computed expression (`field X as T -> Expr`) | All field names except those that would form a dependency cycle (no self-reference, no mutual cycles) |
 | Modifier value expressions (`min N`, `max N`, etc.) | Only literal values — no field references |
 
 #### Event arg access
@@ -692,12 +865,27 @@ The type checker validates function calls against a closed catalog of built-in f
 |----------|-----------|-------------|-------------|
 | `min(a, b)` | `(numeric, numeric) → numeric` | Common numeric type of args | — |
 | `max(a, b)` | `(numeric, numeric) → numeric` | Common numeric type of args | — |
-| `round(value, places)` | `(numeric, integer) → decimal` | `decimal` | `places` must be non-negative integer |
-| `clamp(value, lo, hi)` | `(numeric, numeric, numeric) → numeric` | Common numeric type | — |
-| `sqrt(value)` | `(numeric) → number` | `number` | Proof engine checks non-negativity |
 | `abs(value)` | `(numeric) → numeric` | Same numeric type as input | — |
+| `clamp(value, lo, hi)` | `(numeric, numeric, numeric) → numeric` | Common numeric type | — |
+| `floor(value)` | `(decimal\|number) → integer` | `integer` | — |
+| `ceil(value)` | `(decimal\|number) → integer` | `integer` | — |
+| `truncate(value)` | `(decimal\|number) → integer` | `integer` | — |
+| `round(value)` | `(decimal\|number) → integer` | `integer` | Banker's rounding |
+| `round(value, places)` | `(numeric, integer) → decimal` | `decimal` | `places` must be non-negative integer; **explicit bridge: number→decimal** |
+| `approximate(value)` | `(decimal) → number` | `number` | **Explicit bridge: decimal→number**; makes precision loss visible |
+| `pow(base, exp)` | `(numeric, integer) → numeric` | Same numeric type as `base` | `exp` must be non-negative for integer lane |
+| `sqrt(value)` | `(numeric) → number` | `number` | Number-lane only; proof engine checks non-negativity |
 | `trim(value)` | `(string) → string` | `string` | — |
+| `startsWith(s, prefix)` | `(string, string) → boolean` | `boolean` | Case-sensitive prefix test |
+| `endsWith(s, suffix)` | `(string, string) → boolean` | `boolean` | Case-sensitive suffix test |
+| `toLower(s)` | `(string) → string` | `string` | Lowercase (invariant culture) |
+| `toUpper(s)` | `(string) → string` | `string` | Uppercase (invariant culture) |
+| `left(s, n)` | `(string, integer) → string` | `string` | Leftmost N code units (clamped to string length) |
+| `right(s, n)` | `(string, integer) → string` | `string` | Rightmost N code units (clamped to string length) |
+| `mid(s, start, length)` | `(string, integer, integer) → string` | `string` | 1-indexed substring (clamped); `start` and `length` must be positive `integer` |
 | `now()` | `() → instant` | `instant` | — |
+
+**Lane bridge functions.** Two functions are the sole explicit bridges between numeric lanes: `approximate(decimal) → number` and `round(value, places) → decimal`. The rounding family (`floor`, `ceil`, `truncate`, `round` with no places) provide `decimal|number → integer`. No other mechanism crosses lane boundaries — `decimal * NumberField` without `approximate()` is a type error (see §4.2a).
 
 **Function validation checks:**
 
@@ -716,9 +904,9 @@ The type checker validates function calls against a closed catalog of built-in f
 | `add F Expr` | `set of T` | `T` | — |
 | `remove F Expr` | `set of T` | `T` | — |
 | `enqueue F Expr` | `queue of T` | `T` | — |
-| `dequeue F (into G)?` | `queue of T` | — | If `into G`, `G` must be type `T` |
+| `dequeue F (into G)?` | `queue of T` | — | If `into G`, `G` must be type `T`. Requires emptiness proof (`UnguardedCollectionMutation`) |
 | `push F Expr` | `stack of T` | `T` | — |
-| `pop F (into G)?` | `stack of T` | — | If `into G`, `G` must be type `T` |
+| `pop F (into G)?` | `stack of T` | — | If `into G`, `G` must be type `T`. Requires emptiness proof (`UnguardedCollectionMutation`) |
 | `clear F` | Any collection | — | — |
 
 Type errors: applying a set operation to a non-set field, a queue operation to a non-queue field, etc.
@@ -751,9 +939,14 @@ Type errors: applying a set operation to a non-set field, a queue operation to a
 | Check | Fires when | Diagnostic |
 |-------|-----------|------------|
 | **Self-reference** | Computed expression references its own field | `CircularComputedField` |
+| **Transitive cycle** | Computed fields form a dependency cycle (A→B→A, or A→B→C→A, etc.) | `CircularComputedField` |
 | **Expression type mismatch** | Computed expression type doesn't match field type | `TypeMismatch` |
 | **Computed field with default** | Field has both `->` and `default` | `ComputedFieldWithDefault` |
 | **Computed field as write target** | `set` action targets a computed field | `ComputedFieldNotWritable` |
+
+**Dependency graph construction.** The type checker builds a directed graph of computed field dependencies: an edge from field A to field B means A's computed expression references B. Self-references are detected during expression walking (immediate error). After all computed expressions are typed, the checker runs a topological sort on the dependency graph. If the sort fails (cycle detected), every field participating in the cycle receives a `CircularComputedField` diagnostic naming the cycle path.
+
+The topological order also determines the evaluation order for computed fields at runtime — fields that depend on nothing are evaluated first, then their dependents, and so on. This order is emitted as part of the typed model for the evaluator.
 
 ---
 
@@ -790,7 +983,7 @@ Type errors: applying a set operation to a non-set field, a queue operation to a
 | `RedundantModifier` | Type | Warning | "'{0}' is unnecessary — '{1}' already implies it" | nonnegative + positive |
 | `ComputedFieldNotWritable` | Type | Error | "Field '{0}' is computed and cannot be assigned" | `set` targeting computed field, or in `write` mode |
 | `ComputedFieldWithDefault` | Type | Error | "Field '{0}' is computed and cannot have a default value" | Both `->` and `default` |
-| `CircularComputedField` | Type | Error | "Computed field '{0}' cannot reference itself" | Self-reference in computed expr |
+| `CircularComputedField` | Type | Error | "Computed field '{0}' has a circular dependency: {1}" | Self-reference or transitive cycle in computed field dependency graph |
 | `ConflictingAccessModes` | Type | Error | "Field '{0}' has conflicting access modes in state '{1}'" | write + omit same field same state |
 | `ListLiteralOutsideDefault` | Type | Error | "List values can only appear in default clauses" | `[...]` outside default position |
 | `DuplicateChoiceValue` | Type | Error | "Choice value '{0}' is duplicated" | Repeated string in choice set |
@@ -800,9 +993,52 @@ Type errors: applying a set operation to a non-set field, a queue operation to a
 | `IsSetOnNonOptional` | Type | Error | "'{0}' always has a value — 'is set' only works on optional fields" | is set / is not set on required field |
 | `EventArgOutOfScope` | Type | Error | "Event '{0}' arguments are not accessible here" | Event.Arg access outside transition/ensure/hook |
 | `InvalidInterpolationCoercion` | Type | Error | "A {0} value cannot appear inside a text interpolation" | Collection in `{...}` inside string |
-| `UnresolvedTypedConstant` | Type | Error | "Cannot determine the type of '{0}' — the content does not match any known value pattern" | Typed constant shape doesn't match any family |
-| `AmbiguousTypedConstant` | Type | Error | "'{0}' could be a {1} or {2} — add context to disambiguate" | Multi-member family, no context to narrow |
+| `UnresolvedTypedConstant` | Type | Error | "Cannot determine the type of '{0}' — no type context available" | Typed constant in a position with no expected type |
+| `InvalidTypedConstantContent` | Type | Error | "'{0}' is not a valid {1} value" | Content doesn't parse as the context-determined type |
 | `DefaultForwardReference` | Type | Error | "Default value for '{0}' cannot reference '{1}', which is declared later" | Field default references later field |
+
+### Business-domain type codes
+
+These codes enforce business-domain type constraints (money, quantity, price, exchangerate, currency, unitofmeasure, dimension). Authoritative definitions in `business-domain-types.md`.
+
+| Code | Stage | Severity | Message template | Fires when |
+|------|-------|----------|------------------|------------|
+| `QualifierMismatch` | Type | Error | "Value does not match the '{0}' qualifier on field '{1}'" | `in` constraint violation — assigned currency/unit doesn't match |
+| `DimensionCategoryMismatch` | Type | Error | "Dimension '{0}' does not match the declared category '{1}' on field '{2}'" | `of` constraint violation — dimension mismatch |
+| `CrossCurrencyArithmetic` | Type | Error | "Cannot combine '{0}' ({1}) with '{2}' ({3}) — different currencies" | Money values with different currencies in arithmetic |
+| `CrossDimensionArithmetic` | Type | Error | "Cannot combine '{0}' ({1}) with '{2}' ({3}) — incompatible dimensions" | Quantity values with incompatible dimensions in arithmetic |
+| `DenominatorUnitMismatch` | Type | Error | "Denominator unit '{0}' does not match operand unit '{1}'" | Rate denominator doesn't match operand |
+| `DurationDenominatorMismatch` | Type | Error | "Duration cannot cancel '{0}' denominator — days, weeks, months, and years have variable length" | Duration vs variable-length time denominator |
+| `CompoundPeriodDenominator` | Type | Error | "Compound period '{0}' cannot cancel single-unit denominator '{1}'" | Compound period vs single-unit denominator |
+| `MutuallyExclusiveQualifiers` | Parse | Error | "'in' and 'of' cannot both appear on the same field declaration" | `in` and `of` on same field |
+| `InvalidUnitString` | Type | Error | "'{0}' is not a valid unit" | Structural chars in atomic unit value |
+| `InvalidCurrencyCode` | Type | Error | "'{0}' is not a recognized ISO 4217 currency code" | Invalid currency code |
+| `InvalidDimensionString` | Type | Error | "'{0}' is not a recognized dimension" | Not a recognized UCUM dimension |
+| `MaxPlacesExceeded` | Type | Error | "Value has {0} decimal places, but field '{1}' allows at most {2}" | Too many decimal places |
+
+### Temporal type codes
+
+These codes enforce temporal type constraints (date, time, instant, duration, period, timezone, zoneddatetime, datetime). Authoritative definitions in `temporal-type-system.md`.
+
+| Code | Stage | Severity | Message template | Fires when |
+|------|-------|----------|------------------|------------|
+| `InvalidDateValue` | Type | Error | "Invalid date: {0} does not exist" | Typed constant content is syntactically valid but refers to a nonexistent date (e.g., Feb 30) |
+| `InvalidDateFormat` | Type | Error | "Dates must be written as YYYY-MM-DD. Use '{0}'" | Typed constant content uses a non-ISO date format (e.g., MM/DD/YYYY) |
+| `InvalidTimeValue` | Type | Error | "Invalid time: {0} must be 0–23 for hours, 0–59 for minutes and seconds" | Typed constant content has out-of-range time components |
+| `InvalidInstantFormat` | Type | Error | "Instants must end with Z to indicate UTC. Use '{0}Z'" | Typed constant content is a valid datetime but missing the UTC designator |
+| `InvalidTimezoneId` | Type | Error | "'{0}' is not a recognized timezone — use canonical IANA form like 'America/New_York'" | Typed constant content is not a canonical IANA timezone identifier (legacy abbreviations, Windows names) |
+| `UnqualifiedPeriodArithmetic` | Type | Error | "Period field '{0}' may contain {1} components — use `period of '{2}'` to constrain it" | Arithmetic with a period field that lacks an `of` qualifier where the target type requires provably date-only or time-only components |
+| `MissingTemporalUnit` | Type | Error | "A bare number doesn't specify a unit. Use '{0} + ''{1}''' to add {1}" | Bare integer/number used in arithmetic with a temporal type (e.g., `DueDate + 2`) |
+| `FractionalUnitValue` | Type | Error | "Unit values must be whole numbers. Use smaller units for fractions: '{0}'" | Non-integer magnitude in a temporal unit literal (e.g., `'0.5 days'`) |
+
+### Collection safety codes
+
+These codes enforce the emptiness guard requirement for collection accessors and mutations. They ensure that `.peek`, `.min`, `.max`, `dequeue`, and `pop` never operate on an empty collection at runtime.
+
+| Code | Stage | Severity | Message template | Fires when |
+|------|-------|----------|------------------|------------|
+| `UnguardedCollectionAccess` | Type | Error | "'{0}' may be empty — guard with `if {0}.count > 0` before accessing `.{1}`" | `.peek`, `.min`, or `.max` used without emptiness proof (conditional guard or `mincount` constraint) |
+| `UnguardedCollectionMutation` | Type | Error | "'{0}' may be empty — guard with `if {0}.count > 0` before `{1}`" | `dequeue` or `pop` used without emptiness proof (conditional guard or `mincount` constraint) |
 
 ---
 
@@ -877,12 +1113,12 @@ This applies uniformly to:
 | Literal kind | Context source | No context → |
 |---|---|---|
 | Numeric (`42`, `3.14`) | Field type, operator peer, function signature | Diagnostic + ErrorType |
-| Typed constant multi-member family (`'3 days'`) | `date ±` → `period`, `instant ±` → `duration`, field type | Diagnostic + ErrorType |
+| Typed constant (`'30 days'`, `'USD'`, `'2026-04-15'`) | Field type, operator peer, function signature | Diagnostic + ErrorType |
 | List literal (`[1, 2, 3]`) | Target field's collection element type | Diagnostic + ErrorType |
 
 **Rationale:** An implicit fallback (e.g., "whole numbers default to integer") creates silent type assumptions. In every realistic Precept expression, context is always available — every expression traces back to a declared field, operator peer, or function signature. The only case where context is absent is a constant expression referencing no data (e.g., `rule 42 > 0 because "..."`), which shouldn't exist in a meaningful precept. Rejecting it explicitly is better than silently assuming a type.
 
-This is consistent with typed constant resolution (§4.4), which already treats "context cannot narrow a multi-member family" as a compile error.
+This applies uniformly: numeric literals, typed constants, and list literals all follow the same context-born resolution model.
 
 **Alternatives considered:**
 
@@ -967,7 +1203,7 @@ The type checker intentionally does NOT:
 - **Reason about state reachability.** Whether a state is reachable from the initial state, or whether a state is a dead end, requires graph traversal. The type checker builds the raw transition data that makes this analysis possible.
 - **Perform interval arithmetic.** Whether a guard is satisfiable, whether a `sqrt()` argument is provably non-negative, whether a `min`/`max` constraint is achievable — these require interval reasoning over typed expressions. That is the proof engine's job.
 - **Evaluate expressions at runtime.** The type checker assigns types to expressions but does not compute their values. Runtime evaluation is the evaluator's job.
-- **Validate typed constant content format.** The type checker performs shape matching (§4.4) to determine the type family, but does not validate that `'2026-02-30'` is an invalid date. Format validation happens at runtime via NodaTime parsing.
+- **Validate typed constant content without a registered validator.** The type checker validates content when a validator is registered for the expected type (§4.4 step 3). If no validator is registered for a type, the checker accepts shape validation only. Content validation is never deferred to runtime — when the validator exists, malformed constants are compile-time errors.
 - **Short-circuit on first error.** The type checker always runs to completion. `ErrorType` propagation ensures broken sub-expressions do not cascade into symptom diagnostics.
 - **Resolve names contextually.** All name resolution is flat — field names, state names, event names, arg names are looked up in their respective symbol tables. There are no nested scopes, no closures, no modules.
 

@@ -6,6 +6,9 @@
 
 ## Learnings
 
+- 2026-04-24 v2 design review: block test implementation until the docs reconcile five contract collisions: numeric lanes, function catalog / return typing, typed-constant validity stage, diagnostic identity (named vs `C###`), and collection totality. Tests need one oracle, not three.
+- Temporal/business surface drift is now the main risk: the specialized design docs assume first-class accessors, qualifiers, and domain-preserving functions, while the core checker blueprint still treats those areas as deferred or numeric-only.
+
 - 2026-04-23 v2 AST/parser clean-room audit: direct v1 names were scrubbed, but clean-room drift can still arrive through stale surface contracts. Watch the event-arg syntax (`with` vs `(...)`), guarded `write` word order, and newline-boundary rules across docs.
 - The current v2 AST cannot represent dotted call-style accessors like `.inZone(tz)` because `CallExpression` only accepts a bare function token and the parser design only starts calls from identifier nud.
 - Parser test floor for the current v2 surface: about 30 expression shapes, 13 structural declaration forms, and 20+ recovery scenarios before precedence, chaining, and resync permutations.
