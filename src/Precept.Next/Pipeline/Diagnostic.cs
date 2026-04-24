@@ -16,13 +16,6 @@ public enum Severity
     Error
 }
 
-public readonly record struct SourceRange(
-    int StartLine,
-    int StartColumn,
-    int EndLine,
-    int EndColumn
-);
-
 public readonly record struct Diagnostic(
     Severity        Severity,
     DiagnosticStage Stage,
@@ -33,6 +26,6 @@ public readonly record struct Diagnostic(
     /// </summary>
     string          Code,
     string          Message,
-    SourceRange     Range
+    SourceSpan      Span
 );
 

@@ -105,23 +105,12 @@ public static class Parser
         private Token MissingToken(TokenKind kind) =>
             new(kind, "", Current.Line, Current.Column, Current.Offset, 0);
 
-        private static SourceSpan SpanOf(Token t) => new(t.Offset, t.Length);
-
-        private SourceRange RangeOf(Token t) =>
-            new(t.Line, t.Column, t.Line, t.Column + Math.Max(t.Length, 1));
+        private static SourceSpan SpanOf(Token t) =>
+            new(t.Offset, t.Length, t.Line, t.Column, t.Line, t.Column + Math.Max(t.Length, 1));
 
         private void AddDiagnostic(DiagnosticCode code, SourceSpan span, params object?[] args)
         {
-            var range = new SourceRange(Current.Line, Current.Column, Current.Line, Current.Column + 1);
-            for (int i = 0; i < _tokens.Length; i++)
-            {
-                if (_tokens[i].Offset == span.Offset)
-                {
-                    range = RangeOf(_tokens[i]);
-                    break;
-                }
-            }
-            Diagnostics.Add(Pipeline.Diagnostics.Create(code, range, args));
+            Diagnostics.Add(Pipeline.Diagnostics.Create(code, span, args));
         }
 
         // ── Sync-point recovery ────────────────────────────────────────────────

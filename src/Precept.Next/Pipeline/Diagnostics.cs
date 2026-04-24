@@ -37,10 +37,10 @@ public static class Diagnostics
         _ => throw new ArgumentOutOfRangeException(nameof(code), code, null),
     };
 
-    public static Diagnostic Create(DiagnosticCode code, SourceRange range, params object?[] args)
+    public static Diagnostic Create(DiagnosticCode code, SourceSpan span, params object?[] args)
     {
         var meta = GetMeta(code);
-        return new(meta.Severity, meta.Stage, meta.Code, string.Format(meta.MessageTemplate, args), range);
+        return new(meta.Severity, meta.Stage, meta.Code, string.Format(meta.MessageTemplate, args), span);
     }
 
     public static IReadOnlyList<DiagnosticMeta> All { get; } =

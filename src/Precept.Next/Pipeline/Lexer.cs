@@ -18,7 +18,7 @@ public static class Lexer
                 ImmutableArray.Create(new Token(TokenKind.EndOfSource, "", 1, 1, 0, 0)),
                 ImmutableArray.Create(Diagnostics.Create(
                     DiagnosticCode.InputTooLarge,
-                    new SourceRange(1, 1, 1, 1))));
+                    new SourceSpan(0, 0, 1, 1, 1, 1))));
         }
 
         var scanner = new Scanner(source);
@@ -172,7 +172,7 @@ public static class Lexer
             for (int i = _modeDepth - 1; i >= 1; i--)
             {
                 ref var s = ref _modeStack[i];
-                var range = new SourceRange(s.SegStartLine, s.SegStartColumn, _line, _column);
+                var span = new SourceSpan(s.SegStartOffset, _offset - s.SegStartOffset, s.SegStartLine, s.SegStartColumn, _line, _column);
                 var code = s.Mode switch
                 {
                     LexerMode.Interpolation  => DiagnosticCode.UnterminatedInterpolation,
@@ -180,7 +180,7 @@ public static class Lexer
                     LexerMode.TypedConstant  => DiagnosticCode.UnterminatedTypedConstant,
                     _                        => DiagnosticCode.UnterminatedStringLiteral,
                 };
-                _diagnostics.Add(Diagnostics.Create(code, range));
+                _diagnostics.Add(Diagnostics.Create(code, span));
             }
 
             _tokens.Add(new Token(TokenKind.EndOfSource, "", _line, _column, _offset, 0));
@@ -210,7 +210,7 @@ public static class Lexer
                 ref var interp = ref _modeStack[_modeDepth - 1];
                 _diagnostics.Add(Diagnostics.Create(
                     DiagnosticCode.UnterminatedInterpolation,
-                    new SourceRange(interp.SegStartLine, interp.SegStartColumn, _line, _column)));
+                    new SourceSpan(interp.SegStartOffset, _offset - interp.SegStartOffset, interp.SegStartLine, interp.SegStartColumn, _line, _column)));
                 PopMode(); // back to String or TypedConstant — newline left unconsumed
                 return;
             }
@@ -287,7 +287,7 @@ public static class Lexer
             // ── Invalid character ──────────────────────────────────
             _diagnostics.Add(Diagnostics.Create(
                 DiagnosticCode.InvalidCharacter,
-                new SourceRange(_line, _column, _line, _column),
+                new SourceSpan(_offset, 1, _line, _column, _line, _column + 1),
                 DisplayChar(c)));
             Advance();
         }
@@ -346,7 +346,7 @@ public static class Lexer
                         hadInterpolation, segmentIndex, isFinal: false);
                     _diagnostics.Add(Diagnostics.Create(
                         DiagnosticCode.UnterminatedStringLiteral,
-                        new SourceRange(startLine, startCol, _line, _column)));
+                        new SourceSpan(startOff, _offset - startOff, startLine, startCol, _line, _column)));
                     PopMode();
                     return;
                 }
@@ -398,7 +398,7 @@ public static class Lexer
                 {
                     _diagnostics.Add(Diagnostics.Create(
                         DiagnosticCode.UnrecognizedStringEscape,
-                        new SourceRange(_line, _column, _line, _column),
+                        new SourceSpan(_offset, 1, _line, _column, _line, _column + 1),
                         DisplayChar(PeekNext)));
                     Advance(); // skip \
                     if (!IsAtEnd && Current != '\n' && Current != '\r')
@@ -427,7 +427,7 @@ public static class Lexer
                 {
                     _diagnostics.Add(Diagnostics.Create(
                         DiagnosticCode.UnescapedBraceInLiteral,
-                        new SourceRange(_line, _column, _line, _column)));
+                        new SourceSpan(_offset, 1, _line, _column, _line, _column + 1)));
                     AppendContent(c); // preserve in segment text for recovery
                     Advance();
                     continue;
@@ -447,7 +447,7 @@ public static class Lexer
                     {
                         _diagnostics.Add(Diagnostics.Create(
                             DiagnosticCode.UnterminatedInterpolation,
-                            new SourceRange(_line, _column, _line, _column)));
+                            new SourceSpan(_offset, 0, _line, _column, _line, _column)));
                         RecoverFromUnterminatedInterpolation();
                         return;
                     }
@@ -465,7 +465,7 @@ public static class Lexer
                 hadInterpolation, segmentIndex, isFinal: false);
             _diagnostics.Add(Diagnostics.Create(
                 DiagnosticCode.UnterminatedStringLiteral,
-                new SourceRange(startLine, startCol, _line, _column)));
+                new SourceSpan(startOff, _offset - startOff, startLine, startCol, _line, _column)));
             PopMode();
         }
 
@@ -512,7 +512,7 @@ public static class Lexer
                         hadInterpolation, segmentIndex, isFinal: false);
                     _diagnostics.Add(Diagnostics.Create(
                         DiagnosticCode.UnterminatedTypedConstant,
-                        new SourceRange(startLine, startCol, _line, _column)));
+                        new SourceSpan(startOff, _offset - startOff, startLine, startCol, _line, _column)));
                     PopMode();
                     return;
                 }
@@ -549,7 +549,7 @@ public static class Lexer
                 {
                     _diagnostics.Add(Diagnostics.Create(
                         DiagnosticCode.UnrecognizedTypedConstantEscape,
-                        new SourceRange(_line, _column, _line, _column),
+                        new SourceSpan(_offset, 1, _line, _column, _line, _column + 1),
                         DisplayChar(PeekNext)));
                     Advance(); // skip \
                     if (!IsAtEnd && Current != '\n' && Current != '\r')
@@ -578,7 +578,7 @@ public static class Lexer
                 {
                     _diagnostics.Add(Diagnostics.Create(
                         DiagnosticCode.UnescapedBraceInLiteral,
-                        new SourceRange(_line, _column, _line, _column)));
+                        new SourceSpan(_offset, 1, _line, _column, _line, _column + 1)));
                     AppendContent(c); // preserve in segment text for recovery
                     Advance();
                     continue;
@@ -598,7 +598,7 @@ public static class Lexer
                     {
                         _diagnostics.Add(Diagnostics.Create(
                             DiagnosticCode.UnterminatedInterpolation,
-                            new SourceRange(_line, _column, _line, _column)));
+                            new SourceSpan(_offset, 0, _line, _column, _line, _column)));
                         RecoverFromUnterminatedInterpolation();
                         return;
                     }
@@ -616,7 +616,7 @@ public static class Lexer
                 hadInterpolation, segmentIndex, isFinal: false);
             _diagnostics.Add(Diagnostics.Create(
                 DiagnosticCode.UnterminatedTypedConstant,
-                new SourceRange(startLine, startCol, _line, _column)));
+                new SourceSpan(startOff, _offset - startOff, startLine, startCol, _line, _column)));
             PopMode();
         }
 
