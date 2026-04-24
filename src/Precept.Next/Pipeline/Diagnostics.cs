@@ -21,6 +21,8 @@ public static class Diagnostics
         DiagnosticCode.UnescapedBraceInLiteral           => new(nameof(DiagnosticCode.UnescapedBraceInLiteral),           DiagnosticStage.Lex,   Severity.Error,   "Use '}}}}' to include a literal }} in this value — a single }} opens an expression"),
         DiagnosticCode.ExpectedToken                  => new(nameof(DiagnosticCode.ExpectedToken),                  DiagnosticStage.Parse, Severity.Error,   "Expected {0} here, but found '{1}'"),
         DiagnosticCode.UnexpectedKeyword              => new(nameof(DiagnosticCode.UnexpectedKeyword),              DiagnosticStage.Parse, Severity.Error,   "'{0}' cannot appear inside a {1}"),
+        DiagnosticCode.NonAssociativeComparison         => new(nameof(DiagnosticCode.NonAssociativeComparison),         DiagnosticStage.Parse, Severity.Error,   "Comparisons cannot be chained — use 'and' to combine them: {0}"),
+        DiagnosticCode.InvalidCallTarget                => new(nameof(DiagnosticCode.InvalidCallTarget),                DiagnosticStage.Parse, Severity.Error,   "Only named functions and methods can be called with parentheses"),
         DiagnosticCode.UndeclaredField                => new(nameof(DiagnosticCode.UndeclaredField),                DiagnosticStage.Type,  Severity.Error,   "Field '{0}' is not declared"),
         DiagnosticCode.TypeMismatch                   => new(nameof(DiagnosticCode.TypeMismatch),                   DiagnosticStage.Type,  Severity.Error,   "Expected a {0} value here, but got '{1}'"),
         DiagnosticCode.NullInNonNullableContext       => new(nameof(DiagnosticCode.NullInNonNullableContext),       DiagnosticStage.Type,  Severity.Error,   "'{0}' requires a value and cannot be empty here"),

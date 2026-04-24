@@ -15,6 +15,8 @@ public enum DiagnosticCode
     // ── Parse ────────────────────────────────────────────
     ExpectedToken,
     UnexpectedKeyword,
+    NonAssociativeComparison,
+    InvalidCallTarget,
 
     // ── Type ─────────────────────────────────────────────
     UndeclaredField,
