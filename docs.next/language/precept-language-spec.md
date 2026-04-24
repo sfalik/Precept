@@ -760,45 +760,425 @@ These are unambiguous top-level declaration starters. Continuation tokens (`when
 
 ## 3. Type Checker
 
-> **Status:** Stub — to be written when the type checker is designed and implemented.
+The type checker transforms a `SyntaxTree` into a `TypedModel` — a flat collection of symbol tables, resolved declarations, and diagnostics. It always produces a result, even on broken input (the pipeline's resilient contract).
 
-### 3.1 Type Widening Rules
+```
+SyntaxTree  →  TypeChecker.Check  →  TypedModel
+```
 
-> Carried forward from v1: integer widens to number and decimal (lossless).
+The public surface is a static method:
 
-### 3.2 Diagnostic Catalog
+```csharp
+public static TypedModel Check(SyntaxTree tree)
+```
 
-> To be specified. See `docs.next/compiler/literal-system.md` for literal-system-specific type checker contracts.
+### 3.1 Processing Model
+
+The type checker makes two passes over the declaration list:
+
+1. **Registration pass.** Walk all declarations, build symbol tables: field names → types, state names, event names → argument types. No expression checking. This pass ensures all names are available regardless of declaration order.
+2. **Checking pass.** Walk all declarations again, resolve expressions, validate types, emit diagnostics.
+
+Declaration order does not matter. A rule at line 5 can reference a field declared at line 50. A transition row can reference states declared after it.
+
+### 3.2 Type Widening Rules
+
+Widening is implicit, lossless, and one-directional.
+
+```
+integer  →  decimal  →  number
+```
+
+- `integer` widens to `decimal` — every integer is exactly representable in base-10.
+- `integer` widens to `number` — transitively through `decimal`, or directly (every integer is representable as a double within safe integer range).
+- `decimal` widens to `number` — precision may be lost. This is allowed because `number` fields explicitly accept approximate values.
+- No narrowing. A `number` value cannot be assigned to an `integer` or `decimal` field.
+
+**Widening applies in these contexts:**
+
+| Context | Example |
+|---------|---------|
+| Assignment | `set IntegerField = ...` where the RHS is `integer` and the field is `decimal` |
+| Binary operators | `IntegerField + DecimalField` — `integer` widens to `decimal`, result is `decimal` |
+| Function arguments | `min(IntegerExpr, DecimalExpr)` — `integer` widens to `decimal` |
+| Default values | `field X as decimal default 42` — `42` widens to `decimal` |
+| Comparison | `IntegerField > DecimalField` — `integer` widens, comparison is valid |
 
 ### 3.3 Context-Sensitive Type Resolution
 
-> **Status:** Stub — to be written when the type checker is designed and implemented.
+Multiple literal forms produce tokens whose specific type cannot be determined at lex time. The type checker resolves these uniformly using expression context: field type, assignment target, binary operator peer, function argument position, constraint value position, default value position.
 
-Multiple literal forms produce tokens whose specific type cannot be determined at lex time. The type checker resolves these uniformly using expression context (field type, assignment target, binary operator peer, function argument position, constraint value position, default value position).
+**Uniform rule:** If no context is available for any context-dependent literal, the type checker emits a diagnostic and assigns `ErrorType`. No implicit fallback.
 
-**Numeric literals.** A `NumberLiteral` token does not carry an inherent numeric lane. Context determines whether the value is `integer`, `decimal`, or `number`. Whole-number literals in integer context resolve as `integer`. Fractional literals resolve as `decimal` or `number` based on the target type. When no context is available, fractional literals default to `decimal` (the exact lane is the safer default for business-domain use). No literal suffix syntax exists — context is the sole resolution mechanism.
+#### Numeric literals
 
-**Typed constants.** A `TypedConstant` token's content is opaque to the lexer. The type checker resolves the type in two steps: (1) content shape identifies a type family, (2) context narrows within that family. The admission rules are:
+A `NumberLiteral` token does not carry an inherent numeric lane. Context determines the type.
 
-1. **Content shape determines a type family.** The content identifies which family of types it could belong to. Some shapes map to exactly one type (unambiguous); others match a multi-member family.
-2. **Context narrows within that family.** The surrounding expression context selects the specific type.
-3. **No content shape may belong to two unrelated families.** Each shape is claimed by at most one family.
-4. **If context cannot narrow a multi-member family, compilation fails.** The type checker reports the ambiguity — it never guesses.
-
-**Content shape examples:**
-
-| Typed constant | Shape resolves to | Narrowing needed? |
+| Literal form | Valid target types | Resolution rule |
 |---|---|---|
-| `'2026-06-01'` | `date` | No — unambiguous |
-| `'14:30:00'` | `time` | No — unambiguous |
-| `'2026-04-13T14:30:00Z'` | `instant` | No — unambiguous (Z suffix) |
-| `'2026-04-13T09:00:00'` | `datetime` | No — unambiguous (no zone) |
-| `'2026-04-13T14:30:00[America/New_York]'` | `zoneddatetime` | No — unambiguous (zone bracket) |
-| `'America/New_York'` | `timezone` | No — unambiguous |
-| `'30 days'` | `duration` or `period` | Yes — context selects |
-| `'100 USD'` | `money` | No — unambiguous |
-| `'5 kg'` | `quantity` | No — unambiguous |
-| `'24.50 USD/kg'` | `price` | No — unambiguous (compound unit) |
+| Whole number (`42`) | `integer`, `decimal`, `number` | Context determines. If target is `integer`, resolves as `integer`. If `decimal`, resolves as `decimal`. If `number`, resolves as `number`. If no context, diagnostic + `ErrorType`. |
+| Fractional (`3.14`) | `decimal`, `number` | If target is `decimal`, resolves as `decimal`. If `number`, resolves as `number`. If no context, diagnostic + `ErrorType`. Type error if target is `integer`. |
+| Exponent (`1.5e2`) | `number` only | Always `number`. Type error if target is `integer` or `decimal`. |
+
+No literal suffix syntax exists — context is the sole resolution mechanism.
+
+#### Typed constants
+
+A `TypedConstant` token's content is opaque to the lexer. The type checker resolves the type in two steps:
+
+1. **Content shape → type family.** The content determines which type family the value belongs to. Shape matchers are applied in order; the first match wins. Shapes are disjoint — no content can match two families.
+2. **Context → specific type.** For singleton families (date, time, instant, etc.), the type is determined by shape alone. For multi-member families (duration/period), the expression context selects the specific type. If context cannot narrow, it is a compile error.
+
+| Shape pattern | Family | Context narrowing |
+|---|---|---|
+| `YYYY-MM-DD` | `{date}` | Singleton — always `date` |
+| `HH:MM:SS`, `HH:MM` | `{time}` | Singleton — always `time` |
+| ISO 8601 with `T`, trailing `Z` | `{instant}` | Singleton — always `instant` |
+| ISO 8601 with `T`, no zone | `{datetime}` | Singleton — always `datetime` |
+| ISO 8601 with `T`, `[Zone]` bracket | `{zoneddatetime}` | Singleton — always `zoneddatetime` |
+| `Word/Word` (timezone pattern) | `{timezone}` | Singleton — always `timezone` |
+| `<number> <unit-word>` (with optional `+ <number> <unit-word>`) | `{duration, period}` | `date ±` → `period`; `instant ±` → `duration`; field type context selects |
+| `<number> <currency-code>` | `{money}` | Singleton — always `money` |
+| `<number> <unit>` (measurement) | `{quantity}` | Singleton — always `quantity` |
+| `<number> <unit>/<unit>` | `{price}` | Singleton — always `price` |
+| No shape match | **Compile error** | — |
+
+### 3.4 Name Resolution
+
+All names are registered in the first pass. The checking pass validates every reference against the symbol tables.
+
+| Check | Fires when | Diagnostic |
+|-------|-----------|------------|
+| Duplicate field name | Two `field` declarations declare the same name | `DuplicateFieldName` |
+| Duplicate state name | Two state entries have the same name | `DuplicateStateName` |
+| Duplicate event name | Two `event` declarations share a name | `DuplicateEventName` |
+| Duplicate event arg | Two args in the same event have the same name | `DuplicateArgName` |
+| Undeclared field reference | `IdentifierExpression` in expression context does not match a field name (or in-scope event arg) | `UndeclaredField` |
+| Undeclared state reference | State name in `from`/`to`/`in` target or `transition` outcome does not match a declared state | `UndeclaredState` |
+| Undeclared event reference | Event name in `from ... on`, `on` ensure, or stateless hook does not match a declared event | `UndeclaredEvent` |
+| Multiple initial states | More than one state entry has `initial` | `MultipleInitialStates` |
+| No initial state | Stateful precept (has states) but none is marked `initial` | `NoInitialState` |
+
+### 3.5 Scope Rules
+
+Precept has a small, well-defined scope model. There are no nested scopes, no imports, no modules.
+
+#### Global scope
+
+Fields, states, and events are all declared at the top level. They are visible everywhere in the precept body. Order of declaration does not matter (see §3.1 — registration pass).
+
+#### Expression scope
+
+| Context | What's in scope |
+|---------|----------------|
+| Rule condition / guard | All field names |
+| Ensure condition / guard | All field names |
+| Transition row guard | All field names + current event's args (via `EventName.ArgName`) |
+| Transition row actions (RHS of `set`, value of `add`/`enqueue`/`push`) | All field names + current event's args |
+| State action guard / actions | All field names |
+| Stateless event hook actions | All field names + current event's args |
+| Default value expression | Field names declared **before** this field (no self-reference, no forward reference) |
+| Computed expression (`field X as T -> Expr`) | All field names except the computed field itself (no self-reference) |
+| Modifier value expressions (`min N`, `max N`, etc.) | Only literal values — no field references |
+
+#### Event arg access
+
+Event args are accessed via dotted notation: `EventName.ArgName`. The type checker resolves this by:
+
+1. Checking if the object of a `MemberAccessExpression` is an `IdentifierExpression` that matches a declared event name.
+2. If so, the member is resolved against the event's arg declarations.
+3. Event arg access is only valid in contexts where an event is in scope (transition rows, event ensures, stateless hooks).
+
+### 3.6 Expression Typing Rules
+
+#### Binary operators
+
+| Operator | Left type | Right type | Result type | Widening? |
+|----------|-----------|------------|-------------|-----------|
+| `+` `-` `*` `/` `%` | numeric | numeric | common numeric type | Yes — widen to common |
+| `+` | `string` | `string` | `string` | No (concatenation) |
+| `+` `-` | temporal | quantity | temporal (same as LHS) | No |
+| `==` `!=` | any T | same T | `boolean` | Yes — numeric widening |
+| `<` `>` `<=` `>=` | numeric | numeric | `boolean` | Yes — numeric widening |
+| `<` `>` `<=` `>=` | `string` | `string` | `boolean` | No (lexicographic) |
+| `<` `>` `<=` `>=` | `choice` (ordered) | `choice` (ordered, same set) | `boolean` | No (ordinal) |
+| `<` `>` `<=` `>=` | temporal (same kind) | temporal (same kind) | `boolean` | No |
+| `and` `or` | `boolean` | `boolean` | `boolean` | No |
+
+**Common numeric type:** When two numeric operands have different lanes, the result is the wider type: `integer op decimal` → `decimal`; `integer op number` → `number`; `decimal op number` → `number`.
+
+#### Unary operators
+
+| Operator | Operand type | Result type |
+|----------|-------------|-------------|
+| `not` | `boolean` | `boolean` |
+| `-` (negate) | numeric | same numeric type |
+
+#### `contains`
+
+| Collection type | Value type | Result |
+|-----------------|-----------|--------|
+| `set of T` | `T` (or widens to `T`) | `boolean` |
+| `queue of T` | `T` | `boolean` |
+| `stack of T` | `T` | `boolean` |
+| non-collection | — | type error |
+
+#### `is set` / `is not set`
+
+| Operand | Valid? | Result |
+|---------|--------|--------|
+| `optional` field | Yes | `boolean` |
+| Non-optional field | Type error — field always has a value | — |
+
+#### Conditional (`if ... then ... else ...`)
+
+The `then` and `else` branches must have compatible types (same type, or one widens to the other). The result type is the common type.
+
+#### Member access (`.`)
+
+| Object type | Member | Result type |
+|-------------|--------|-------------|
+| `set of T` | `count` | `integer` |
+| `queue of T` | `count` | `integer` |
+| `queue of T` | `peek` | `T` |
+| `stack of T` | `count` | `integer` |
+| `stack of T` | `peek` | `T` |
+| `string` | `length` | `integer` |
+| Event arg reference (`EventName.ArgName`) | — | arg's declared type |
+| _other_ | — | `InvalidMemberAccess` diagnostic |
+
+Temporal and business-domain member accessors (e.g., `.year`, `.month` on `date`; `.amount`, `.currency` on `money`) are deferred to when those type families are implemented.
+
+#### Function calls
+
+See §3.7 for the complete built-in function catalog.
+
+#### Parenthesized expressions
+
+Type is the type of the inner expression. Transparent.
+
+#### String interpolation
+
+Each `{expr}` inside `"..."` is type-checked independently. Any scalar type is coercible to string. Collections are a type error inside string interpolation.
+
+#### Typed constant interpolation
+
+Each `{expr}` inside `'...'` is type-checked independently. After interpolation expressions are typed, the full content is shape-matched as described in §3.3.
+
+### 3.7 Built-in Function Catalog
+
+Functions are validated against a closed catalog. There are no user-defined functions, no registration mechanism, no extension point.
+
+| Function | Signature | Return type | Constraints |
+|----------|-----------|-------------|-------------|
+| `min(a, b)` | `(numeric, numeric) → numeric` | Common numeric type of args | — |
+| `max(a, b)` | `(numeric, numeric) → numeric` | Common numeric type of args | — |
+| `abs(value)` | `(numeric) → numeric` | Same numeric type as input | — |
+| `clamp(value, lo, hi)` | `(numeric, numeric, numeric) → numeric` | Common numeric type | — |
+| `floor(value)` | `(decimal\|number) → integer` | `integer` | — |
+| `ceil(value)` | `(decimal\|number) → integer` | `integer` | — |
+| `truncate(value)` | `(decimal\|number) → integer` | `integer` | — |
+| `round(value)` | `(decimal\|number) → integer` | `integer` | Banker's rounding |
+| `round(value, places)` | `(numeric, integer) → decimal` | `decimal` | `places` must be non-negative integer; **explicit bridge: number→decimal** |
+| `approximate(value)` | `(decimal) → number` | `number` | **Explicit bridge: decimal→number**; makes precision loss visible |
+| `pow(base, exp)` | `(numeric, integer) → numeric` | Same numeric type as `base` | `exp` must be non-negative for integer lane |
+| `sqrt(value)` | `(numeric) → number` | `number` | Number-lane only; proof engine checks non-negativity |
+| `trim(value)` | `(string) → string` | `string` | — |
+| `now()` | `() → instant` | `instant` | — |
+
+**Lane bridge functions.** Two functions are the sole explicit bridges between numeric lanes: `approximate(decimal) → number` and `round(value, places) → decimal`. The rounding family (`floor`, `ceil`, `truncate`, `round` with no places) provide `decimal|number → integer`. No other mechanism crosses lane boundaries — `decimal * NumberField` without `approximate()` is a type error (see type-checker.md §4.2a).
+
+**Function validation checks:**
+
+| Check | Fires when | Diagnostic |
+|-------|-----------|------------|
+| Unknown function name | `foo(...)` where `foo` is not in the catalog | `UndeclaredFunction` |
+| Wrong arity | `min(a)` or `min(a, b, c)` | `FunctionArityMismatch` |
+| Arg type mismatch | `min("a", "b")` — strings to numeric function | `TypeMismatch` |
+| Arg constraint violation | `round(x, -1)` — negative places | `FunctionArgConstraintViolation` |
+
+### 3.8 Semantic Checks
+
+#### Type compatibility
+
+| Check | Fires when | Diagnostic |
+|-------|-----------|------------|
+| Assignment type mismatch | `set Field = Expr` where `Expr`'s type is not assignable to `Field`'s type (after widening) | `TypeMismatch` |
+| Guard not boolean | `when Expr` where `Expr`'s type is not `boolean` | `TypeMismatch` |
+| Rule condition not boolean | `rule Expr` where `Expr`'s type is not `boolean` | `TypeMismatch` |
+| Ensure condition not boolean | `ensure Expr` where `Expr`'s type is not `boolean` | `TypeMismatch` |
+| Message not string | `because Expr` or `reject Expr` where `Expr` is not `string` | `TypeMismatch` |
+| Binary operator type error | Operator applied to incompatible types (e.g., `string + boolean`) | `TypeMismatch` |
+| Comparison on unordered choice | `<` / `>` / `<=` / `>=` on a `choice` field without the `ordered` modifier | `TypeMismatch` |
+| Conditional branch mismatch | `if ... then A else B` where A and B have no common type | `TypeMismatch` |
+| Default value type mismatch | `default Expr` where `Expr`'s type is incompatible with the field type | `TypeMismatch` |
+| Collection element type mismatch | `add Field Expr` where `Expr`'s type doesn't match the collection's element type | `TypeMismatch` |
+| Numeric literal incompatible | Fractional literal in `integer` context, or exponent literal in `integer`/`decimal` context | `TypeMismatch` |
+
+#### Modifier validation
+
+Modifiers are constraints on field/arg values. The type checker validates applicability:
+
+| Modifier | Applicable to | Error when applied to |
+|----------|---------------|----------------------|
+| `nonnegative` | `integer`, `decimal`, `number` | `string`, `boolean`, `choice`, collections, temporal, domain |
+| `positive` | `integer`, `decimal`, `number` | (same as above) |
+| `nonzero` | `integer`, `decimal`, `number` | (same as above) |
+| `notempty` | `string` | `number`, `integer`, `decimal`, `boolean`, `choice`, collections |
+| `min` / `max` | `integer`, `decimal`, `number` | `string`, `boolean`, collections |
+| `minlength` / `maxlength` | `string` | `number`, `integer`, `decimal`, `boolean`, collections |
+| `mincount` / `maxcount` | `set`, `queue`, `stack` | scalars |
+| `maxplaces` | `decimal` | `integer`, `number`, `string`, `boolean`, collections |
+| `ordered` | `choice` | all non-choice types |
+| `optional` | any field type | — (always valid) |
+
+**Modifier value validation:**
+
+| Check | Fires when | Diagnostic |
+|-------|-----------|------------|
+| `min` > `max` | `min` value exceeds `max` value on the same field | `InvalidModifierBounds` |
+| `minlength` > `maxlength` | `minlength` exceeds `maxlength` | `InvalidModifierBounds` |
+| `mincount` > `maxcount` | `mincount` exceeds `maxcount` | `InvalidModifierBounds` |
+| Negative count/length/places | `minlength`/`maxlength`/`mincount`/`maxcount`/`maxplaces` is negative | `InvalidModifierValue` |
+| `maxplaces` not integer | Decimal places must be a whole number | `InvalidModifierValue` |
+| Duplicate modifier | Same modifier applied twice to one field | `DuplicateModifier` |
+| Redundant modifier | `nonnegative` and `positive` on the same field (`positive` subsumes `nonnegative`) | `RedundantModifier` (warning) |
+
+#### Action statement validation
+
+| Action | Field type required | Value type required | Additional checks |
+|--------|--------------------|--------------------|-------------------|
+| `set F = Expr` | Any scalar | Assignable to field type | Field must not be computed |
+| `add F Expr` | `set of T` | `T` | — |
+| `remove F Expr` | `set of T` | `T` | — |
+| `enqueue F Expr` | `queue of T` | `T` | — |
+| `dequeue F (into G)?` | `queue of T` | — | If `into G`, `G` must be type `T` |
+| `push F Expr` | `stack of T` | `T` | — |
+| `pop F (into G)?` | `stack of T` | — | If `into G`, `G` must be type `T` |
+| `clear F` | Any collection | — | — |
+
+Type errors: applying a set operation to a non-set field, a queue operation to a non-queue field, etc.
+
+#### Access mode validation
+
+| Check | Fires when | Diagnostic |
+|-------|-----------|------------|
+| Field not declared | Access mode names a field that doesn't exist | `UndeclaredField` |
+| State not declared | Access mode scoped to a state that doesn't exist | `UndeclaredState` |
+| Computed field in write mode | A computed field is listed in a `write` access mode | `ComputedFieldNotWritable` |
+| Conflicting access modes | Same field has both `write` and `omit` in the same state | `ConflictingAccessModes` |
+
+#### Computed field validation
+
+| Check | Fires when | Diagnostic |
+|-------|-----------|------------|
+| Self-reference | Computed expression references its own field | `CircularComputedField` |
+| Expression type mismatch | Computed expression type doesn't match field type | `TypeMismatch` |
+| Computed with default | Field has both `->` and `default` | `ComputedFieldWithDefault` |
+| Computed as write target | `set` action targets a computed field | `ComputedFieldNotWritable` |
+
+#### Choice type validation
+
+| Check | Fires when | Diagnostic |
+|-------|-----------|------------|
+| Duplicate choice value | `choice("a", "a")` | `DuplicateChoiceValue` |
+| Empty choice | `choice()` — no values | `EmptyChoice` |
+| Non-string choice value | `choice(42)` | `TypeMismatch` |
+
+#### List literal validation
+
+| Check | Fires when | Diagnostic |
+|-------|-----------|------------|
+| Element type mismatch | List element type doesn't match collection element type | `TypeMismatch` |
+| List in non-default position | List literal used outside a `default` clause | `ListLiteralOutsideDefault` |
+| Empty list as default | Valid — empty collection | — |
+
+#### Transition outcome validation
+
+| Check | Fires when | Diagnostic |
+|-------|-----------|------------|
+| Undeclared target state | `transition StateName` where `StateName` is not declared | `UndeclaredState` |
+| Reject message not string | `reject Expr` where `Expr` is not string | `TypeMismatch` |
+
+#### Stateless/stateful cross-validation
+
+A precept that contains both `StatelessEventHookDeclaration` nodes (`on Event -> actions`) and any `state` declarations is an error. In a stateful precept, stateless hooks are redundant with `from any on Event -> no transition` followed by rules. Mixing the two creates ambiguity about execution order.
+
+A stateless precept (no states, no `from`, no transitions) that uses only event hooks is valid.
+
+### 3.9 Error Recovery
+
+#### ErrorType propagation
+
+When the type checker encounters an unresolvable expression (missing node, undeclared name, type error in a sub-expression), it assigns `ErrorType`. `ErrorType` is compatible with every other type for the purpose of further checking — it suppresses all downstream type errors that would cascade from the original failure.
+
+**Rules:**
+
+1. Any operation involving `ErrorType` produces `ErrorType`.
+2. `ErrorType` satisfies any type constraint — no further diagnostics are emitted for expressions that already carry `ErrorType`.
+3. `ErrorType` never appears in a valid program. It only exists in the presence of other diagnostics.
+
+#### Handling `IsMissing` AST nodes
+
+| Node category | Recovery behavior |
+|---|---|
+| Declaration with `IsMissing` name | Skip — do not add to symbol table. Parser already emitted a diagnostic. |
+| Expression with `IsMissing` | Assign `ErrorType`. No diagnostic emitted (parser already reported it). |
+| TypeRef with `IsMissing` | Resolve to `ErrorType`. Fields with error types still appear in the symbol table but their type is `ErrorType`. |
+| Guard with `IsMissing` subexpression | Guard is assigned `ErrorType`. The transition row is still processed — other checks continue. |
+| Missing state/event name tokens | Skip the containing declaration. |
+
+#### One diagnostic per root cause
+
+The type checker emits diagnostics for root causes only. When `ErrorType` is flowing through an expression tree, the type checker stays silent. The first diagnostic emitted for a given expression chain is the root cause; all subsequent type mismatches involving `ErrorType` are symptoms.
+
+### 3.10 Diagnostic Catalog
+
+#### Existing codes (already in `DiagnosticCode.cs`)
+
+| Code | Severity | Message template | Fires when |
+|------|----------|------------------|------------|
+| `UndeclaredField` | Error | "Field '{0}' is not declared" | Identifier in expression context doesn't match any field |
+| `TypeMismatch` | Error | "Expected a {0} value here, but got '{1}'" | Type incompatibility in any expression context |
+| `NullInNonNullableContext` | Error | "'{0}' requires a value and cannot be empty here" | Optional field used where value is required |
+| `InvalidMemberAccess` | Error | "'.{0}' is not available on {1} fields" | Dot access on unsupported type |
+| `FunctionArityMismatch` | Error | "'{0}' takes {1} inputs, but {2} were provided" | Wrong number of function arguments |
+| `FunctionArgConstraintViolation` | Error | "Value {0} for '{1}' is not valid: {2}" | Function arg violates constraint |
+
+#### New codes
+
+| Code | Severity | Message template | Fires when |
+|------|----------|------------------|------------|
+| `DuplicateFieldName` | Error | "Field '{0}' is already declared" | Two field declarations with same name |
+| `DuplicateStateName` | Error | "State '{0}' is already declared" | Duplicate state entry |
+| `DuplicateEventName` | Error | "Event '{0}' is already declared" | Duplicate event declaration |
+| `DuplicateArgName` | Error | "Argument '{0}' is already declared on event '{1}'" | Duplicate arg in same event |
+| `UndeclaredState` | Error | "State '{0}' is not declared" | Reference to non-existent state |
+| `UndeclaredEvent` | Error | "Event '{0}' is not declared" | Reference to non-existent event |
+| `UndeclaredFunction` | Error | "'{0}' is not a recognized function" | Unknown function name in call |
+| `MultipleInitialStates` | Error | "Only one state can be marked 'initial' — '{0}' and '{1}' both are" | Two or more initial states |
+| `NoInitialState` | Error | "This precept has states but none is marked 'initial'" | Stateful precept without initial |
+| `InvalidModifierForType` | Error | "The '{0}' constraint does not apply to {1} fields" | Modifier on inapplicable type |
+| `InvalidModifierBounds` | Error | "{0} ({1}) cannot exceed {2} ({3})" | min > max, minlength > maxlength, etc. |
+| `InvalidModifierValue` | Error | "The value for '{0}' must be {1}" | Negative count/length, non-integer maxplaces |
+| `DuplicateModifier` | Error | "The '{0}' constraint is already applied to this field" | Same modifier twice |
+| `RedundantModifier` | Warning | "'{0}' is unnecessary — '{1}' already implies it" | nonnegative + positive |
+| `ComputedFieldNotWritable` | Error | "Field '{0}' is computed and cannot be assigned" | `set` targeting computed field, or in `write` mode |
+| `ComputedFieldWithDefault` | Error | "Field '{0}' is computed and cannot have a default value" | Both `->` and `default` |
+| `CircularComputedField` | Error | "Computed field '{0}' cannot reference itself" | Self-reference in computed expr |
+| `ConflictingAccessModes` | Error | "Field '{0}' has conflicting access modes in state '{1}'" | write + omit same field same state |
+| `ListLiteralOutsideDefault` | Error | "List values can only appear in default clauses" | `[...]` outside default position |
+| `DuplicateChoiceValue` | Error | "Choice value '{0}' is duplicated" | Repeated string in choice set |
+| `EmptyChoice` | Error | "A choice type must have at least one value" | `choice()` with no args |
+| `CollectionOperationOnScalar` | Error | "'{0}' is a {1} operation, but '{2}' is not a {1}" | add/remove on non-set, etc. |
+| `ScalarOperationOnCollection` | Error | "'{0}' cannot be used with collection field '{1}'" | set = on collection field |
+| `IsSetOnNonOptional` | Error | "'{0}' always has a value — 'is set' only works on optional fields" | is set / is not set on required field |
+| `EventArgOutOfScope` | Error | "Event '{0}' arguments are not accessible here" | Event.Arg access outside transition/ensure/hook |
+| `InvalidInterpolationCoercion` | Error | "A {0} value cannot appear inside a text interpolation" | Collection in `{...}` inside string |
+| `UnresolvedTypedConstant` | Error | "Cannot determine the type of '{0}' — the content does not match any known value pattern" | Typed constant shape doesn't match any family |
+| `AmbiguousTypedConstant` | Error | "'{0}' could be a {1} or {2} — add context to disambiguate" | Multi-member family, no context to narrow |
+| `DefaultForwardReference` | Error | "Default value for '{0}' cannot reference '{1}', which is declared later" | Field default references later field |
+| `StatelessHookInStatefulPrecept` | Error | "Stateless event hooks cannot appear in a precept with state declarations" | `on Event ->` mixed with `state` declarations |
 
 ---
 

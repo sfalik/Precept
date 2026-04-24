@@ -124,6 +124,23 @@ A type qualifies as a typed constant inhabitant if and only if:
 | Quantities | `<value> <unit-word>` | `{period, duration}` | `date ±` → period, `instant ±` → duration |
 | State names | Plain identifier | `{state}` | Validated against declarations |
 
+### Shape disambiguation priority
+
+The type checker tests typed constant content against shape patterns in priority order. The first match wins.
+
+| Priority | Shape test | Family | Example |
+|----------|-----------|--------|--------|
+| 1 | Contains `T` + ends with `[...]` | `{zoneddatetime}` | `'2026-04-15T14:30:00[America/New_York]'` |
+| 2 | Contains `T` + ends with `Z` | `{instant}` | `'2026-04-15T14:30:00Z'` |
+| 3 | Contains `T` (no `Z`, no `[`) | `{datetime}` | `'2026-04-15T14:30:00'` |
+| 4 | Matches `YYYY-MM-DD` | `{date}` | `'2026-04-15'` |
+| 5 | Matches `HH:MM(:SS)?` | `{time}` | `'14:30:00'`, `'14:30'` |
+| 6 | Contains `/` (IANA pattern) | `{timezone}` | `'America/New_York'` |
+| 7 | Matches `<value> <unit-word>` | `{period, duration}` | `'30 days'`, `'2 years + 6 months'` |
+| 8 | Plain identifier | `{state}` | `'Open'`, `'UnderReview'` |
+
+No content matches two rows — the distinguishing signals are structurally disjoint: `T`, `Z`, `[`, hyphens-in-date-pattern, colons-in-time-pattern, `/` in IANA identifiers, and `<number> <word>` in quantities are mutually exclusive.
+
 ### Static typed constants
 
 ```precept
@@ -142,6 +159,28 @@ set SlaLimit = CreatedAt + '{SlaHours * 2} hours'
 
 Interpolation inside `'...'` uses the same `{expr}` syntax as strings. The expression is evaluated, the result is substituted into the content, and then the full content is shape-matched to determine the type family.
 
+### Quantity unit names
+
+The following unit names are recognized inside typed constants:
+
+| Unit | Calendar/Timeline | Always-period | Always-duration | Context-dependent |
+|------|-------------------|---------------|-----------------|-------------------|
+| `years` | Calendar | ✓ | | |
+| `months` | Calendar | ✓ | | |
+| `weeks` | Both | | | ✓ |
+| `days` | Both | | | ✓ |
+| `hours` | Timeline | | | ✓ |
+| `minutes` | Timeline | | | ✓ |
+| `seconds` | Timeline | | | ✓ |
+
+**These are NOT language keywords.** They are validated strings inside `'...'`. Field names, event names, and event arg names can use these words without collision. Future quantity domains add new validated strings, not new keywords.
+
+### Integer requirement for temporal quantities
+
+The magnitude in a temporal quantity typed constant must evaluate to an integer. `'0.5 days'` is a compile error: *"Unit values must be whole numbers. Use smaller units for fractions: `'12 hours'` for half a day."*
+
+**Scope:** This restriction applies to temporal unit names only. Future non-temporal quantity domains (e.g., currency with `'100.50 USD'`, physical with `'2.5 kg'`) may support non-integer magnitudes if their backing types accept them. The restriction is per-domain, not per-mechanism.
+
 ### Combined quantities
 
 The `+` inside `'...'` combines quantity components:
@@ -150,6 +189,8 @@ The `+` inside `'...'` combines quantity components:
 field ExtendedWarranty as period default '2 years + 6 months'
 set Expiry = StartDate + '1 year + 3 months + 15 days'
 ```
+
+**Left-associative `+` subtlety:** `date + '1 month' + '1 month'` applies sequential truncation (Jan 31 → Feb 28 → Mar 28). `date + '1 month + 1 month'` builds the period first, then applies once (Jan 31 → Mar 31). Both are valid. The `+` inside `'...'` builds a single compound quantity; the `+` outside `'...'` is sequential arithmetic.
 
 ---
 
@@ -273,7 +314,49 @@ The type checker's contracts:
 1. **String interpolation expressions** — type-check each `{expr}`, verify coercion to string is defined for the expression type. Collections are a compile error.
 2. **Typed constant content** — after substituting interpolation results, shape-match the content to determine the type family. Apply context narrowing to select the specific type.
 3. **Admission rule enforcement** — verify that the resolved type family is valid for the expression context. If context cannot narrow a multi-member family, emit a compile error.
-4. **Quantity type resolution** — use the context-dependent resolution table (documented in temporal/quantity design) to select `period` vs `duration`.
+4. **Quantity type resolution** — use the context-dependent resolution table to select `period` vs `duration`.
+
+#### Context resolution for typed constants
+
+Context flows **inward** from the nearest enclosing typed node to the typed constant. This is standard top-down type inference — the type checker already holds the full expression tree.
+
+| Position | Context source | Example |
+|----------|---------------|--------|
+| Right operand of `+`/`-` | Left operand's resolved type | `FiledAt + '30 days'` → left is `instant` → context = `instant` |
+| `default` clause | Declared field type | `field X as period default '30 days'` → context = `period` |
+| `set X = Y + '...'` | Type of `Y` | `set DueDate = FiledAt + '30 days'` → context from `FiledAt` |
+| Comparison (`<=`, `>=`) | Other operand's type or subtraction result | `FiledAt - IncidentAt <= '72 hours'` → subtraction result provides context |
+| Compound chain | Result of the preceding sub-expression | `StartDate + '1 month' + '15 days'` → second constant gets context from first addition result |
+| No context / ambiguous | **Compile error** | *"Can't determine the type of `'30 days'` without context."* |
+
+#### Quantity type resolution tables
+
+**`months`, `years` — always `period`:** No duration representation exists for calendar-length units. Always resolve to `period` regardless of context. `instant + '3 months'` is a type error.
+
+**`days`, `weeks` — context-dependent:**
+
+| Expression context | Resolves to |
+|---|---|
+| `date ±` / `datetime ±` | `period` |
+| `instant ±` / `zoneddatetime ±` | `duration` |
+| `time ±` | **compile error** — days/weeks don't apply to times |
+| `field X as period default` | `period` |
+| `field X as duration default` | `duration` |
+
+**`hours`, `minutes`, `seconds` — context-dependent:**
+
+| Expression context | Resolves to |
+|---|---|
+| `instant ±` / `zoneddatetime ±` | `duration` |
+| `datetime ±` | `period` |
+| `time ±` | bridges to `duration` (sub-day arithmetic) |
+| `date ±` | **compile error** — sub-day units don't apply to dates |
+| `field X as duration default` | `duration` |
+| `field X as period default` | `period` |
+
+#### Unit restrictions belong to constraints
+
+The literal system determines **which type** a quantity constant produces. Business rules about **which values are valid** — e.g., a grace period that must be in whole days or larger — are the job of constraint modifiers on the field declaration. The literal system does not need a unit-restriction mechanism; constraints handle it.
 
 ### Evaluator
 
