@@ -232,12 +232,12 @@ public sealed record StateDeclaration(
 ) : Declaration(Span);
 
 /// <summary>
-/// event Identifier ("," Identifier)* ("with" ArgList)? ("initial")?
+/// event Identifier ("," Identifier)* ("(" ArgList ")")? ("initial")?
 /// </summary>
 public sealed record EventDeclaration(
     SourceSpan                    Span,
     ImmutableArray<Token>         Names,
-    ImmutableArray<ArgDeclaration> Args,     // empty when no "with" clause
+    ImmutableArray<ArgDeclaration> Args,     // empty when no arg list
     bool                           IsInitial  // true when "initial" keyword present
 ) : Declaration(Span);
 
@@ -285,7 +285,7 @@ public sealed record TransitionRowDeclaration(
 ) : Declaration(Span);
 
 /// <summary>
-/// "in"|"to"|"from" StateTarget "ensure" BoolExpr ("when" BoolExpr)? "because" StringExpr
+/// "in"|"to"|"from" StateTarget ("when" BoolExpr)? "ensure" BoolExpr "because" StringExpr
 /// </summary>
 public sealed record StateEnsureDeclaration(
     SourceSpan      Span,
@@ -297,7 +297,7 @@ public sealed record StateEnsureDeclaration(
 ) : Declaration(Span);
 
 /// <summary>
-/// "on" Identifier "ensure" BoolExpr ("when" BoolExpr)? "because" StringExpr
+/// "on" Identifier ("when" BoolExpr)? "ensure" BoolExpr "because" StringExpr
 /// </summary>
 public sealed record EventEnsureDeclaration(
     SourceSpan  Span,
@@ -496,6 +496,14 @@ public sealed record MemberAccessExpression(
     SourceSpan Span, Expression Object, Token Member
 ) : Expression(Span);
 
+/// <summary>Expr.Method(Args) — method-style call on an expression (e.g., Timestamp.inZone(Tz)).</summary>
+public sealed record MethodCallExpression(
+    SourceSpan                 Span,
+    Expression                 Object,
+    Token                      Method,
+    ImmutableArray<Expression> Args
+) : Expression(Span);
+
 /// <summary>FunctionName(Arg, ...) — min, max, round, clamp</summary>
 public sealed record CallExpression(
     SourceSpan                 Span,
@@ -648,6 +656,14 @@ ParseFieldDeclaration() → FieldDeclaration
             optional so the next sync keyword naturally ends the production
 ```
 
+**G6 — Computed field modifier ordering.** Modifiers come BEFORE `->` for computed fields. The modifier loop runs before the `->` check, so modifiers always describe the declared type and constraints; the computed expression follows:
+
+```
+field TotalCost as number nonnegative -> BasePrice + Tax
+```
+
+This reads naturally as "TotalCost is a nonnegative number computed as BasePrice + Tax" — modifiers constrain the computed value, `->` introduces the expression. Any modifiers placed after `->` are a parse error (the `->` check fires first and `ParseExpression` would consume the modifier keyword as an expression identifier).
+
 ### `state` declaration
 
 ```
@@ -668,10 +684,15 @@ ParseEventDeclaration() → EventDeclaration
   Consume: event
   Expect:  Identifier
   Loop:    while Current.Kind == Comma → Consume Comma, Expect Identifier
-  Optional: if Current.Kind == With →
-    Consume With
-    ParseArgDeclaration()
+  Optional: if Current.Kind == LeftParen → ParseArgList()
+  Optional: if Current.Kind == Initial → Consume; IsInitial = true
+
+ParseArgList():
+  Consume: LeftParen
+  if Current.Kind != RightParen:
+    ParseArgDeclaration() → first arg
     while Current.Kind == Comma → Consume Comma, ParseArgDeclaration()
+  Expect: RightParen
 ```
 
 ### `rule` declaration
@@ -694,29 +715,48 @@ ParseRootWriteDeclaration() → AccessModeDeclaration (StateScope = null, Mode =
   (Guard not valid at root level)
 
 ParseInStatement() branches:
-  if peek-ahead finds "write"|"read"|"omit":
-    StateScope = ParseStateTarget()
-    Consume AccessMode keyword → Mode
-    ParseFieldTarget()
-    Optional: if Mode == Write and Current.Kind == When → Consume When, ParseExpression(0) → Guard
-    → AccessModeDeclaration (StateScope set)
-  if "ensure":     → StateEnsureDeclaration (Anchor = In)
-  else:            → emit diagnostic, resync (no other production begins with in)
+  Consume:  in
+  Parse:    ParseStateTarget() → StateScope
+  Optional: if Current.Kind == When → Consume When, ParseExpression(0) → Guard
+  Dispatch:
+    write/read/omit → Consume AccessMode keyword → Mode; ParseFieldTarget()
+                      → AccessModeDeclaration (StateScope set, Guard valid only when Mode == Write)
+    ensure          → ParseStateEnsureDeclaration(Anchor=In, guard)
+    else            → emit diagnostic, resync
 ```
 
 ### `in` / `to` / `from` statements
 
-`in`, `to`, and `from` are each shared-dispatch methods. After consuming the preposition keyword, the parser peeks at the sequence to determine which production follows:
+`in`, `to`, and `from` are each shared-dispatch methods. After consuming the preposition keyword and state target, the parser checks for an optional `when` guard, then dispatches on the following verb:
 
-| After preposition | Token that disambiguates | Production |
-|-------------------|--------------------------|-----------|
-| `in <target>` | `ensure` after target | `StateEnsureDeclaration` (Anchor=In) |
-| `in <target>` | `write`/`read`/`omit` after target | `AccessModeDeclaration` (state-scoped) |
-| `to <target>` | `ensure` after target | `StateEnsureDeclaration` (Anchor=To) |
-| `to <target>` | `->` after target | `StateActionDeclaration` (Anchor=To) |
-| `from <target>` | `ensure` after target | `StateEnsureDeclaration` (Anchor=From) |
-| `from <target>` | `->` after target | `StateActionDeclaration` (Anchor=From) |
-| `from <target>` | `on` after target | `TransitionRowDeclaration` |
+| After preposition | First non-`when` verb after target | Production |
+|-------------------|------------------------------------|-----------|
+| `in <target>` | `ensure` | `StateEnsureDeclaration` (Anchor=In) |
+| `in <target>` | `write`/`read`/`omit` | `AccessModeDeclaration` (state-scoped) |
+| `to <target>` | `ensure` | `StateEnsureDeclaration` (Anchor=To) |
+| `to <target>` | `->` | `StateActionDeclaration` (Anchor=To) |
+| `from <target>` | `on` (no when at preposition level) | `TransitionRowDeclaration` |
+| `from <target>` | `ensure` | `StateEnsureDeclaration` (Anchor=From) |
+| `from <target>` | `->` | `StateActionDeclaration` (Anchor=From) |
+
+`ParseToStatement`:
+  Consume:  to
+  Parse:    ParseStateTarget() → States
+  Optional: if Current.Kind == When → Consume When, ParseExpression(0) → Guard
+  Dispatch:
+    ensure → ParseStateEnsureDeclaration(Anchor=To, guard)
+    ->     → ParseStateActionDeclaration(Anchor=To, States)
+    else   → emit diagnostic, resync
+
+`ParseFromStatement`:
+  Consume:  from
+  Parse:    ParseStateTarget() → States
+  if Current.Kind == On → ParseTransitionRowDeclaration(States)  ← no when at preposition level
+  Optional: if Current.Kind == When → Consume When, ParseExpression(0) → Guard
+  Dispatch:
+    ensure → ParseStateEnsureDeclaration(Anchor=From, guard)
+    ->     → ParseStateActionDeclaration(Anchor=From, States)
+    else   → emit diagnostic, resync
 
 ### Transition row
 
@@ -726,8 +766,8 @@ ParseTransitionRowDeclaration() → TransitionRowDeclaration
   Expect:   On
   Expect:   Identifier → EventName
   Optional: if Current.Kind == When → Consume When, ParseExpression(0) → Guard
-  Loop:     while Current.Kind == Arrow → Consume Arrow, ParseActionStatement()
-  Expect:   Arrow (final → before outcome)
+  Expect:   Arrow (→)
+  Loop:     while Current.Kind ∈ ActionKeywords → ParseActionStatement()
   Call:     ParseOutcome()
 
 ParseOutcome():
@@ -743,31 +783,38 @@ ParseOutcome():
 ParseOnStatement()
   Consume:  On
   Expect:   Identifier → EventName
-  if Current.Kind == Ensure → ParseEventEnsureDeclaration(eventName)
-  else                      → ParseStatelessEventHookDeclaration(eventName)
+  if Current.Kind == When or Ensure → ParseEventEnsureDeclaration(eventName)
+  else                              → ParseStatelessEventHookDeclaration(eventName)
 
 ParseStatelessEventHookDeclaration(eventName) → StatelessEventHookDeclaration
   (On and EventName already consumed by ParseOnStatement)
   Expect:  Arrow (→)
   Loop:    while Current.Kind ∈ ActionKeywords → ParseActionStatement()
   Recover: if no Arrow, emit diagnostic, resync
+
+ParseStateActionDeclaration(anchor, stateTarget) → StateActionDeclaration
+  (preposition and StateTarget already consumed by dispatch)
+  Expect:  Arrow (→)
+  Loop:    while Current.Kind ∈ ActionKeywords → ParseActionStatement()
 ```
 
 ### State/event ensure
 
 ```
-ParseStateEnsureDeclaration(anchor) → StateEnsureDeclaration
-  (preposition already consumed; StateTarget already parsed)
+ParseStateEnsureDeclaration(anchor, guard?) → StateEnsureDeclaration
+  (preposition already consumed; StateTarget already parsed; guard already parsed if When was seen)
   Expect:   Ensure
   Call:     ParseExpression(0) → Condition
-  Optional: When guard
   Expect:   Because
   Call:     ParseStringExpression() → Message
 
 ParseEventEnsureDeclaration(eventName) → EventEnsureDeclaration
   (On and EventName already consumed by ParseOnStatement)
-  Expect:  Ensure
-  (same as above for condition/guard/because)
+  Optional: if Current.Kind == When → Consume When, ParseExpression(0) → Guard
+  Expect:   Ensure
+  Call:     ParseExpression(0) → Condition
+  Expect:   Because
+  Call:     ParseStringExpression() → Message
 ```
 
 ### Action statement
@@ -846,7 +893,7 @@ Non-associative comparisons: `A == B == C` is a parse error (the parser emits a 
 
 | Token | Action |
 |-------|--------|
-| `Identifier` | If peek is `(` → `ParseCallExpression()`; if peek is `.` → `ParseMemberAccessExpression()`; else → `IdentifierExpression` |
+| `Identifier` | `IdentifierExpression` (Led handles `.` and `(` at BP 80) |
 | `NumberLiteral` | `NumberLiteralExpression` |
 | `True` / `False` | `BooleanLiteralExpression` |
 | `StringLiteral` | `StringLiteralExpression` |
@@ -883,6 +930,9 @@ private Expression Led(Expression left, Token op)
         Slash            => new BinaryExpression(left, BinaryOp.Slash,        ParseExpression(60), ...),
         Percent          => new BinaryExpression(left, BinaryOp.Percent,      ParseExpression(60), ...),
         Dot              => ParseMemberAccessContinuation(left, ...),
+        LeftParen        => left is MemberAccessExpression mac
+                            ? ParseMethodCallContinuation(mac, ...)
+                            : /* left is IdentifierExpression ide */ ParseCallContinuation(ide, ...),
         _                => /* should not reach — caller checked lbp > minBp */
     };
 }
@@ -892,16 +942,26 @@ private Expression Led(Expression left, Token op)
 
 `ParseConditionalExpression`: Consume `If`, `ParseExpression(0)` → Condition, Expect `Then`, `ParseExpression(0)` → Consequence, Expect `Else`, `ParseExpression(0)` → Alternative.
 
-### Function calls
+### Function calls and method calls
 
-Built-in functions: `min`, `max`, `round`, `clamp`. The parser recognizes these by their identifier text (lowercase), not by token kind — they are identifiers whose name is in the known function set. Unknown identifiers followed by `(` are parsed as `CallExpression` with an unknown function name; the type checker emits an error on unrecognized function names.
+The Led handler for `LeftParen` (BP 80) dispatches based on what it received as `left`:
+
+- **`left` is `IdentifierExpression`** → `CallExpression`. The identifier is the function name. Built-in functions (`min`, `max`, `round`, `clamp`) are recognized by identifier text; unknown names are parsed identically and the type checker rejects them.
+- **`left` is `MemberAccessExpression`** → `MethodCallExpression`. The object and member are taken from the `MemberAccessExpression`; args are parsed from the paren list. Used for `Timestamp.inZone(Tz)` and similar method-style calls on typed values.
+- **`left` is anything else** → emit diagnostic, produce IsMissing node.
 
 ```
-ParseCallExpression(name: Token) → CallExpression
-  Consume: LeftParen
-  if Current.Kind != RightParen:
-    ParseExpression(0)
-    while Current.Kind == Comma → Consume Comma, ParseExpression(0)
+ParseCallContinuation(ide: IdentifierExpression) → CallExpression
+  (LeftParen already consumed by Led)
+  Parse arg list:
+    if Current.Kind != RightParen:
+      ParseExpression(0)
+      while Current.Kind == Comma → Consume Comma, ParseExpression(0)
+  Expect: RightParen
+
+ParseMethodCallContinuation(mac: MemberAccessExpression) → MethodCallExpression
+  (LeftParen already consumed by Led)
+  Parse arg list (same as above)
   Expect: RightParen
 ```
 

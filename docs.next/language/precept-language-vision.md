@@ -162,8 +162,8 @@ The language envelope includes these top-level forms:
 | `state ...` | Declares lifecycle states |
 | `event ...` | Declares triggers and typed arguments |
 | `event <Name>(...) initial` | Declares the construction event (initial event) |
-| `in/to/from <State> ensure <Expr> [when <Guard>] because "..."` | Declares state-scoped constraints |
-| `on <Event> ensure <Expr> [when <Guard>] because "..."` | Declares event-scoped arg constraints |
+| `in/to/from <State> [when <Guard>] ensure <Expr> because "..."` | Declares state-scoped constraints |
+| `on <Event> [when <Guard>] ensure <Expr> because "..."` | Declares event-scoped arg constraints |
 | `to/from <State> -> ...` | Declares state entry or exit actions |
 | `in <State> ... write/read/omit ...` | Declares state-scoped field access modes |
 | `write ...` | Declares root editability for stateless precepts |
@@ -650,8 +650,8 @@ Ensures also support optional guards:
 
 ```precept
 in Review ensure Reviewers.count >= 2 because "Review requires at least two reviewers"
-in Open ensure Priority >= 3 when Escalated because "Escalated tickets must be high priority"
-on Submit ensure Submit.Amount > 0 when Submit.Type == "payment" because "Payment amounts must be positive"
+in Open when Escalated ensure Priority >= 3 because "Escalated tickets must be high priority"
+on Submit when Submit.Type == "payment" ensure Submit.Amount > 0 because "Payment amounts must be positive"
 ```
 
 The surface includes these anchors:

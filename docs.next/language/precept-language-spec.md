@@ -42,7 +42,6 @@ Every token the lexer can produce. Organized by category to match the `TokenKind
 | `From` | `from` | Exit-gate ensure or transition source (`from State ...`) |
 | `On` | `on` | Event trigger (`on Event ensure ...`, `from State on Event ...`) |
 | `Of` | `of` | Collection inner type (`set of string`) |
-| `With` | `with` | Event argument list (`event Submit with ...`) |
 | `Into` | `into` | Dequeue/pop target (`dequeue Queue into Field`) |
 
 #### Keywords: Control
@@ -260,7 +259,7 @@ The complete v2 reserved keyword set:
 
 ```
 precept  field  as  default  optional  rule  because
-state  initial  terminal  required  irreversible  event  with  ensure
+state  initial  terminal  required  irreversible  event  ensure
 success  warning  error
 in  to  from  on  when  any  all  of
 set  add  remove  enqueue  dequeue  push  pop  clear  into

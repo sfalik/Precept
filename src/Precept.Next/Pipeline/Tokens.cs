@@ -47,7 +47,6 @@ public static class Tokens
         TokenKind.From        => new(kind, "from",        Cat_Prep, "Exit-gate ensure / transition source"),
         TokenKind.On          => new(kind, "on",          Cat_Prep, "Event trigger"),
         TokenKind.Of          => new(kind, "of",          Cat_Prep, "Collection inner type / dimension family qualifier"),
-        TokenKind.With        => new(kind, "with",        Cat_Prep, "Event argument list"),
         TokenKind.Into        => new(kind, "into",        Cat_Prep, "Dequeue/pop target"),
 
         // ── Keywords: Control ──────────────────────────────────────

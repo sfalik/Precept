@@ -24,7 +24,6 @@ public enum TokenKind
     From,
     On,
     Of,
-    With,
     Into,
 
     // ── Keywords: Control ──────────────────────────────────────────

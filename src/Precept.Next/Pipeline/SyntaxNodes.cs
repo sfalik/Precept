@@ -7,15 +7,78 @@ namespace Precept.Pipeline;
 //
 //  Design decisions: docs.next/compiler/parser.md (P1, P7a-c)
 //
-//  SyntaxNode (abstract)  ← SourceSpan + IsMissing
-//  ├── Declaration        ← top-level precept body entries
-//  ├── Statement          ← action steps inside transition rows / state actions
-//  ├── Expression         ← leaf values, operators, literals, calls
-//  ├── OutcomeNode        ← transition row outcomes
-//  ├── TypeRef            ← field type annotations
-//  ├── FieldModifier      ← field constraint/modifier suffixes
-//  ├── InterpolationSegment ← text/expression segments in interpolated literals
-//  └── (auxiliary nodes)  ← StateTarget, FieldTarget, StateEntry, ArgDeclaration
+//  SyntaxNode (abstract)                     ← SourceSpan + IsMissing
+//  │
+//  ├── PreceptNode                           ← root: precept name + body
+//  │
+//  ├── Declaration (abstract)                ← top-level precept body entries
+//  │   ├── FieldDeclaration                  ← field Name as Type modifiers
+//  │   ├── StateDeclaration                  ← state Name initial? modifiers
+//  │   ├── EventDeclaration                  ← event Name(args)? initial?
+//  │   ├── RuleDeclaration                   ← rule Expr when? because "..."
+//  │   ├── AccessModeDeclaration             ← in State write/read/omit Fields
+//  │   ├── TransitionRowDeclaration          ← from State on Event when? -> outcome
+//  │   ├── StateEnsureDeclaration            ← in/to/from State ensure Expr because "..."
+//  │   ├── EventEnsureDeclaration            ← on Event ensure Expr because "..."
+//  │   ├── StatelessEventHookDeclaration     ← on Event -> actions (stateless)
+//  │   └── StateActionDeclaration            ← to/from State -> actions
+//  │
+//  ├── Statement (abstract)                  ← action steps inside rows / state actions
+//  │   ├── SetActionStatement                ← set Field = Expr
+//  │   ├── AddActionStatement                ← add Field Expr
+//  │   ├── RemoveActionStatement             ← remove Field Expr
+//  │   ├── EnqueueActionStatement            ← enqueue Field Expr
+//  │   ├── DequeueActionStatement            ← dequeue Field into? Field
+//  │   ├── PushActionStatement               ← push Field Expr
+//  │   ├── PopActionStatement                ← pop Field into? Field
+//  │   └── ClearActionStatement              ← clear Field
+//  │
+//  ├── Expression (abstract)                 ← leaf values, operators, literals, calls
+//  │   ├── BinaryExpression                  ← Expr op Expr
+//  │   ├── UnaryExpression                   ← not Expr | -Expr
+//  │   ├── ContainsExpression                ← Expr contains Expr
+//  │   ├── IsSetExpression                   ← Expr is set | is not set
+//  │   ├── ConditionalExpression             ← if Cond then A else B
+//  │   ├── MemberAccessExpression            ← Expr.Member (chained)
+//  │   ├── MethodCallExpression             ← Expr.method(args)
+//  │   ├── CallExpression                    ← func(args)
+//  │   ├── IdentifierExpression              ← bare name
+//  │   ├── NumberLiteralExpression            ← 42, 3.14
+//  │   ├── BooleanLiteralExpression           ← true | false
+//  │   ├── StringLiteralExpression            ← "text"
+//  │   ├── InterpolatedStringExpression       ← "text {Expr} text"
+//  │   ├── TypedConstantExpression            ← '2026-04-23'
+//  │   ├── InterpolatedTypedConstantExpression ← '{Expr} days'
+//  │   ├── ListLiteralExpression              ← [1, 2, 3]
+//  │   └── ParenthesizedExpression            ← (Expr)
+//  │
+//  ├── OutcomeNode (abstract)                ← transition row outcomes
+//  │   ├── TransitionOutcomeNode             ← transition StateName
+//  │   ├── NoTransitionOutcomeNode           ← no transition
+//  │   └── RejectOutcomeNode                 ← reject "message"
+//  │
+//  ├── TypeRef (abstract)                    ← field type annotations
+//  │   ├── ScalarTypeRef                     ← string | number | ... + Qualifier?
+//  │   ├── CollectionTypeRef                 ← set of T | queue of T | stack of T
+//  │   └── ChoiceTypeRef                     ← choice("A", "B", ...)
+//  │
+//  ├── FieldModifier (abstract)              ← field constraint/modifier suffixes
+//  │   ├── OptionalModifier                  ← optional
+//  │   ├── OrderedModifier                   ← ordered
+//  │   ├── Nonnegative/Positive/Nonzero/NotemptyModifier
+//  │   ├── DefaultModifier                   ← default Expr
+//  │   ├── Min/Max/MinLength/MaxLength/MinCount/MaxCount/MaxPlacesModifier
+//  │   └── (all carry SourceSpan; value modifiers carry Expression)
+//  │
+//  ├── InterpolationSegment (abstract)       ← segments in interpolated literals
+//  │   ├── TextSegment                       ← literal text portion
+//  │   └── ExpressionSegment                 ← embedded {Expr}
+//  │
+//  ├── TypeQualifier                         ← in 'USD' | of 'length'
+//  ├── StateTarget                           ← any | Name, Name, ...
+//  ├── FieldTarget                           ← all | Name, Name, ...
+//  ├── StateEntry                            ← Name initial? terminal? ...
+//  └── ArgDeclaration                        ← Name as Type modifiers
 // ════════════════════════════════════════════════════════════════════════════════
 
 // ── Base type ──────────────────────────────────────────────────────────────────
@@ -73,7 +136,7 @@ public sealed record StateDeclaration(
     ImmutableArray<StateEntry> Entries
 ) : Declaration(Span);
 
-/// <summary>event Identifier ("," Identifier)* ("with" ArgList)? ("initial")?</summary>
+/// <summary>event Identifier ("," Identifier)* ("(" ArgList ")")? ("initial")?</summary>
 public sealed record EventDeclaration(
     SourceSpan                     Span,
     ImmutableArray<Token>          Names,
@@ -305,6 +368,14 @@ public sealed record MemberAccessExpression(
     SourceSpan Span, Expression Object, Token Member
 ) : Expression(Span);
 
+/// <summary>Expr.Method(Args) — method-style call on an expression (e.g., Timestamp.inZone(Tz)).</summary>
+public sealed record MethodCallExpression(
+    SourceSpan                 Span,
+    Expression                 Object,
+    Token                      Method,
+    ImmutableArray<Expression> Args
+) : Expression(Span);
+
 /// <summary>FunctionName(Arg, ...) — min, max, round, clamp.</summary>
 public sealed record CallExpression(
     SourceSpan                 Span,
@@ -405,7 +476,7 @@ public sealed record StateEntry(
     ImmutableArray<StateModifierKind> Modifiers
 ) : SyntaxNode(Span);
 
-/// <summary>An argument declaration in an event "with" clause.</summary>
+/// <summary>An argument declaration in an event arg list: Name as Type modifiers.</summary>
 public sealed record ArgDeclaration(
     SourceSpan                    Span,
     Token                         Name,

@@ -6,6 +6,10 @@
 
 ## Learnings
 
+- 2026-04-23 v2 AST/parser clean-room audit: direct v1 names were scrubbed, but clean-room drift can still arrive through stale surface contracts. Watch the event-arg syntax (`with` vs `(...)`), guarded `write` word order, and newline-boundary rules across docs.
+- The current v2 AST cannot represent dotted call-style accessors like `.inZone(tz)` because `CallExpression` only accepts a bare function token and the parser design only starts calls from identifier nud.
+- Parser test floor for the current v2 surface: about 30 expression shapes, 13 structural declaration forms, and 20+ recovery scenarios before precedence, chaining, and resync permutations.
+
 - When a test is added to satisfy a "count" AC, always verify it also satisfies any "correctness" sub-clauses (e.g., StateContext, message text). A test that checks `ContainSingle()` for AC #21 does NOT satisfy the "correct state context" part of that AC.
 - Prior-round blockers can be marked "fixed" while still having a gap: B2 (AC #21) shipped the right test method but the assertion stopped at count=1, never checking StateContext. The AC said "with correct state context."
 - Integration tests (diagnostic samples with EXPECT annotations) can cover message text gaps that unit tests leave open — but unit tests with code-only assertions are a weaker safety net. Both should be present where the design specifies message content.
@@ -98,3 +102,8 @@
 - Walked the refactor commits `032b897`, `89bf5bb`, `4dad80b`, `eb88c4e`, `ad3f65d`, and `49e9090`; the same drift theory passed on every retained slice commit.
 - Read the current branch diff from `b686893..a83956d`: no sample or drift-harness changes, only `PreceptTypeChecker` partial extraction files plus main-file edits.
 - Key lesson: when a handoff claims named failing samples but no assertion payload survives, do not classify from squad notes alone. Re-run the exact theory on the pre-refactor base, each retained slice commit, and current `HEAD` before calling something baseline or regression-attributable.
+
+### 2026-04-23 — v2 lexer audit and test-plan gate
+- Audited the v2 lexer against the synced lexer spec, literal-system design, diagnostic catalog, token contracts, and representative samples.
+- Verdict: BLOCKED for broad suite rollout until the team locks two contract edges: `InputTooLarge` token output and lone-backslash recovery at EOL / EOF inside quoted literals.
+- Recommended first slice: quoted-literal token + recovery tests, including blocker-confirming cases before wider parser-facing goldens.

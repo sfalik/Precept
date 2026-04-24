@@ -13,6 +13,23 @@
 
 ## Recent Updates
 
+### 2026-04-23 — v2 AST & parser design review (SyntaxNodes.cs + parser.md)
+- **Verdict: BLOCKED.** Two blocking issues; clean room is fully clean; AST-to-doc sync is tight.
+- **B1:** No method-call expression support (`expr.method(args)`). The vision specifies `.inZone(tz)` as a temporal accessor, but the AST has no `MethodCallExpression` and the Pratt Led has no `LeftParen` handler. Decision needed: add method-call support or redesign as prefix function `inZone(expr, tz)`.
+- **B2:** Transition row action-chain grammar is internally inconsistent in parser.md — the mapping double-consumes the outcome arrow and disagrees with the stateless hook action-chain format.
+- **Clean room:** Zero v1 contamination. All v2 renames verified: `OptionalModifier`, `AccessModeDeclaration`, `IsSetExpression`, `StatelessEventHookDeclaration`, `TypeQualifier`.
+- **Completeness:** All 14 declaration forms, 8 actions, 3 outcomes, 3 type refs, 14 modifiers, 16 expression forms, 25 scalar type kinds, 6 state modifiers present and accounted for.
+- **Sync:** `SyntaxNodes.cs` and `parser.md` Complete Node Catalog match exactly — property names, types, enum values all identical.
+- **Non-blocking observations:** (G5) nud Identifier peek logic is non-standard Pratt; (G7) event arg syntax disagrees between vision (parens) and parser/spec (`with`); (G8) guarded write ordering disagrees between vision (guard-before-mode) and parser (guard-after-fields); (G9) `LeftParen` in BP table but no Led handler.
+- Full review filed at `.squad/decisions/inbox/frank-v2-ast-review.md`.
+
+## Learnings
+
+- **Method-style accessors are a language decision, not just a parser gap.** If `.inZone(tz)` is the only case, a prefix-function redesign is defensible. If the language ever needs more (`.format(pattern)`, `.withZone(tz)`), method-call Led support is the correct investment. The decision should be made now, not deferred.
+- **Action chain format must be consistent across all declaration types.** Transition rows, stateless hooks, and state actions all contain action chains. The parser grammar mapping must use one mechanism, not different ones per declaration form.
+- **Vision doc and spec/parser can silently diverge on surface syntax.** The event arg syntax (parens vs `with`) and guarded write ordering (guard position) were different across files with no explicit decision record. Cross-referencing all three documents (vision, spec, parser design) in every review pass is non-negotiable.
+- **Pratt parser nud peek patterns are a code smell.** The standard approach (nud returns atoms, Led handles all infix/postfix) is more extensible and avoids ambiguity about which dispatch point handles a given token.
+
 ### 2026-04-19 — Drafted `docs/TypeCheckerDesign.md` (Track B design doc)
 - Canonical design document describing the CURRENT implemented architecture of `PreceptTypeChecker`.
 - 6-partial decomposition (3,783 LOC): Main, TypeInference, Narrowing, ProofChecks, Helpers, FieldConstraints.
