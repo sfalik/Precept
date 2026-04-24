@@ -63,14 +63,36 @@ public static class Parser
             return Advance();
         }
 
-        private Token Expect(TokenKind kind)
+        private Token Expect(TokenKind kind) => Expect(kind, DisplayName(kind));
+
+        private Token Expect(TokenKind kind, string display)
         {
             if (Current.Kind == kind)
                 return Advance();
 
-            AddDiagnostic(DiagnosticCode.ExpectedToken, SpanOf(Current), kind, Current.Text);
+            AddDiagnostic(DiagnosticCode.ExpectedToken, SpanOf(Current), display, Current.Text);
             return MissingToken(kind);
         }
+
+        private static string DisplayName(TokenKind kind) => kind switch
+        {
+            TokenKind.Identifier       => "a name",
+            TokenKind.Precept          => "the 'precept' keyword",
+            TokenKind.As               => "'as'",
+            TokenKind.Because          => "'because'",
+            TokenKind.Assign           => "'='",
+            TokenKind.RightParen       => "a closing ')'",
+            TokenKind.LeftParen        => "an opening '('",
+            TokenKind.RightBracket     => "a closing ']'",
+            TokenKind.Transition       => "'transition'",
+            TokenKind.Of               => "'of'",
+            TokenKind.Then             => "'then' after the condition",
+            TokenKind.Else             => "'else'",
+            TokenKind.Set              => "'set'",
+            TokenKind.StringEnd        => "a closing '\"' to end the text value",
+            TokenKind.TypedConstantEnd => "a closing ''' to end the value",
+            _                          => $"'{kind.ToString().ToLower()}'"
+        };
 
         private void SkipTrivia()
         {
@@ -128,7 +150,7 @@ public static class Parser
         {
             var start = Current;
             Expect(TokenKind.Precept);
-            var name = Expect(TokenKind.Identifier);
+            var name = Expect(TokenKind.Identifier, "the precept name");
 
             var body = ImmutableArray.CreateBuilder<Declaration>();
             while (Current.Kind != TokenKind.EndOfSource)
@@ -178,11 +200,11 @@ public static class Parser
             Consume(TokenKind.Field);
 
             var names = ImmutableArray.CreateBuilder<Token>();
-            names.Add(Expect(TokenKind.Identifier));
+            names.Add(Expect(TokenKind.Identifier, "a field name"));
             while (Current.Kind == TokenKind.Comma)
             {
                 Advance();
-                names.Add(Expect(TokenKind.Identifier));
+                names.Add(Expect(TokenKind.Identifier, "a field name"));
             }
 
             Expect(TokenKind.As);
@@ -222,7 +244,7 @@ public static class Parser
         private StateEntry ParseStateEntry()
         {
             var start = Current;
-            var name = Expect(TokenKind.Identifier);
+            var name = Expect(TokenKind.Identifier, "a state name");
             bool isInitial = false;
             if (Current.Kind == TokenKind.Initial)
             {
@@ -261,11 +283,11 @@ public static class Parser
             Consume(TokenKind.Event);
 
             var names = ImmutableArray.CreateBuilder<Token>();
-            names.Add(Expect(TokenKind.Identifier));
+            names.Add(Expect(TokenKind.Identifier, "an event name"));
             while (Current.Kind == TokenKind.Comma)
             {
                 Advance();
-                names.Add(Expect(TokenKind.Identifier));
+                names.Add(Expect(TokenKind.Identifier, "an event name"));
             }
 
             var args = ImmutableArray<ArgDeclaration>.Empty;
@@ -304,7 +326,7 @@ public static class Parser
         private ArgDeclaration ParseArgDeclaration()
         {
             var start = Current;
-            var name = Expect(TokenKind.Identifier);
+            var name = Expect(TokenKind.Identifier, "an argument name");
             Expect(TokenKind.As);
             var type = ParseTypeRef();
             var mods = ParseFieldModifiers();
@@ -422,7 +444,7 @@ public static class Parser
         {
             var start = Current;
             Consume(TokenKind.On);
-            var eventName = Expect(TokenKind.Identifier);
+            var eventName = Expect(TokenKind.Identifier, "an event name");
 
             if (Current.Kind is TokenKind.When or TokenKind.Ensure)
                 return ParseEventEnsureDeclaration(start, eventName);
@@ -432,7 +454,7 @@ public static class Parser
 
         private Declaration EmitUnexpectedAndResync(Token start)
         {
-            AddDiagnostic(DiagnosticCode.UnexpectedKeyword, SpanOf(Current), Current.Text, "declaration");
+            AddDiagnostic(DiagnosticCode.UnexpectedKeyword, SpanOf(Current), Current.Text, "this context");
             SkipToNextSyncPoint();
             var missing = MissingToken(TokenKind.Identifier);
             // Recovery node uses RuleDeclaration — cheapest two-child shape for a discardable placeholder.
@@ -449,7 +471,7 @@ public static class Parser
         private TransitionRowDeclaration ParseTransitionRowDeclaration(Token start, StateTarget fromStates)
         {
             Consume(TokenKind.On);
-            var eventName = Expect(TokenKind.Identifier);
+            var eventName = Expect(TokenKind.Identifier, "an event name");
 
             Expression? guard = null;
             if (Current.Kind == TokenKind.When)
@@ -497,7 +519,7 @@ public static class Parser
         {
             var start = Current;
             Consume(TokenKind.Transition);
-            var name = Expect(TokenKind.Identifier);
+            var name = Expect(TokenKind.Identifier, "a state name");
             return new TransitionOutcomeNode(
                 SourceSpan.Covering(SpanOf(start), SpanOf(name)), name);
         }
@@ -641,7 +663,7 @@ public static class Parser
         private SetActionStatement ParseSetAction(Token start)
         {
             Consume(TokenKind.Set);
-            var field = Expect(TokenKind.Identifier);
+            var field = Expect(TokenKind.Identifier, "a field name");
             Expect(TokenKind.Assign);
             var value = ParseExpression(0);
             return new SetActionStatement(
@@ -652,7 +674,7 @@ public static class Parser
         {
             var kind = Current.Kind;
             Advance();
-            var field = Expect(TokenKind.Identifier);
+            var field = Expect(TokenKind.Identifier, "a field name");
             var value = ParseExpression(0);
             var span = SourceSpan.Covering(SpanOf(start), value.Span);
             return kind switch
@@ -669,12 +691,12 @@ public static class Parser
         {
             var kind = Current.Kind;
             Advance();
-            var field = Expect(TokenKind.Identifier);
+            var field = Expect(TokenKind.Identifier, "a field name");
             Token? into = null;
             if (Current.Kind == TokenKind.Into)
             {
                 Advance();
-                into = Expect(TokenKind.Identifier);
+                into = Expect(TokenKind.Identifier, "a field name");
             }
             var span = SourceSpan.Covering(SpanOf(start), LastSpan());
             return kind switch
@@ -688,7 +710,7 @@ public static class Parser
         private ClearActionStatement ParseClearAction(Token start)
         {
             Consume(TokenKind.Clear);
-            var field = Expect(TokenKind.Identifier);
+            var field = Expect(TokenKind.Identifier, "a field name");
             return new ClearActionStatement(
                 SourceSpan.Covering(SpanOf(start), SpanOf(field)), field);
         }
@@ -696,7 +718,7 @@ public static class Parser
         private Statement ParseMissingAction(Token start)
         {
             AddDiagnostic(DiagnosticCode.ExpectedToken, SpanOf(Current),
-                "action keyword (set, add, remove, ...)", Current.Text);
+                "an action like set, add, or remove", Current.Text);
             var missing = MissingToken(TokenKind.Identifier);
             return new SetActionStatement(SpanOf(start), missing,
                 new IdentifierExpression(SourceSpan.Missing, missing) { IsMissing = true }
@@ -715,11 +737,11 @@ public static class Parser
             }
 
             var names = ImmutableArray.CreateBuilder<Token>();
-            names.Add(Expect(TokenKind.Identifier));
+            names.Add(Expect(TokenKind.Identifier, "a state name"));
             while (Current.Kind == TokenKind.Comma)
             {
                 Advance();
-                names.Add(Expect(TokenKind.Identifier));
+                names.Add(Expect(TokenKind.Identifier, "a state name"));
             }
             return new StateTarget(
                 SourceSpan.Covering(SpanOf(start), LastSpan()),
@@ -736,11 +758,11 @@ public static class Parser
             }
 
             var names = ImmutableArray.CreateBuilder<Token>();
-            names.Add(Expect(TokenKind.Identifier));
+            names.Add(Expect(TokenKind.Identifier, "a field name"));
             while (Current.Kind == TokenKind.Comma)
             {
                 Advance();
-                names.Add(Expect(TokenKind.Identifier));
+                names.Add(Expect(TokenKind.Identifier, "a field name"));
             }
             return new FieldTarget(
                 SourceSpan.Covering(SpanOf(start), LastSpan()),
@@ -803,7 +825,7 @@ public static class Parser
                 return new CollectionTypeRef(
                     SourceSpan.Covering(SpanOf(start), LastSpan()), kind, elem);
             }
-            AddDiagnostic(DiagnosticCode.ExpectedToken, SpanOf(Current), "element type", Current.Text);
+            AddDiagnostic(DiagnosticCode.ExpectedToken, SpanOf(Current), "the type for items in this collection (string, number, ...)", Current.Text);
             var missing = new ScalarTypeRef(SpanOf(elemStart), ScalarTypeKind.String, null) { IsMissing = true };
             return new CollectionTypeRef(SpanOf(start), kind, missing) { IsMissing = true };
         }
@@ -1057,7 +1079,7 @@ public static class Parser
 
         private Expression NudMissing(Token start)
         {
-            AddDiagnostic(DiagnosticCode.ExpectedToken, SpanOf(start), "expression", start.Text);
+            AddDiagnostic(DiagnosticCode.ExpectedToken, SpanOf(start), "a value or condition", start.Text);
             return new IdentifierExpression(SpanOf(start),
                 MissingToken(TokenKind.Identifier)) { IsMissing = true };
         }
@@ -1117,7 +1139,7 @@ public static class Parser
         {
             if (left is BinaryExpression { Op: var prevOp } && IsComparisonOp(prevOp))
                 AddDiagnostic(DiagnosticCode.NonAssociativeComparison, SpanOf(opToken),
-                    $"use 'and' to combine comparisons");
+                    "use 'and' to combine them");
             return MakeBinary(left, op, 31);
         }
 
@@ -1143,7 +1165,7 @@ public static class Parser
 
         private MemberAccessExpression ParseMemberAccess(Expression left)
         {
-            var member = Expect(TokenKind.Identifier);
+            var member = Expect(TokenKind.Identifier, "a member name after '.'");
             return new MemberAccessExpression(
                 SourceSpan.Covering(left.Span, SpanOf(member)), left, member);
         }

@@ -43,7 +43,7 @@ Rejected alternative: _AST with comment attachment_ — no LS or type-checker co
 
 Each `ParseX` method consumes tokens until its grammar production is satisfied. When the next meaningful token is not a valid continuation, the production is done. The top-level dispatch loop advances on that terminal token to the next declaration. NewLines and Comments are consumed silently by `SkipTrivia()` calls at every consumption point.
 
-Precept routinely spans productions across lines: multi-line `when` guards, action chains, transition rows with trailing `->`, and `event ... with` arg lists all span more than one line. Treating NewLine as a statement terminator would require special-casing every multi-line form and would add significant complexity for zero gain — the grammar is keyword-disjoint and terminates productions naturally.
+Precept routinely spans productions across lines: multi-line `when` guards, action chains, transition rows with trailing `->`, and event argument lists all span more than one line. Treating NewLine as a statement terminator would require special-casing every multi-line form and would add significant complexity for zero gain — the grammar is keyword-disjoint and terminates productions naturally.
 
 Rejected alternative: _NewLine as soft separator_ — creates an ambiguity problem where there is none. The grammar already terminates cleanly from keyword structure alone.
 
@@ -314,6 +314,7 @@ public sealed record StateActionDeclaration(
     SourceSpan                Span,
     StateActionAnchor         Anchor,    // To or From
     StateTarget               States,
+    Expression?               Guard,
     ImmutableArray<Statement> Actions
 ) : Declaration(Span);
 
@@ -614,7 +615,7 @@ public sealed record StateEntry(
     ImmutableArray<StateModifierKind> Modifiers   // v2: terminal, required, irreversible, success, warning, error
 ) : SyntaxNode(Span);
 
-/// <summary>An argument declaration in an event "with" clause.</summary>
+/// <summary>An argument declaration in an event's parenthesized arg list.</summary>
 public sealed record ArgDeclaration(
     SourceSpan                    Span,
     Token                         Name,
@@ -945,7 +946,7 @@ The Led handler for `LeftParen` (BP 80) dispatches based on what it received as 
 
 - **`left` is `IdentifierExpression`** → `CallExpression`. The identifier is the function name. Built-in functions (`min`, `max`, `round`, `clamp`) are recognized by identifier text; unknown names are parsed identically and the type checker rejects them.
 - **`left` is `MemberAccessExpression`** → `MethodCallExpression`. The object and member are taken from the `MemberAccessExpression`; args are parsed from the paren list. Used for `Timestamp.inZone(Tz)` and similar method-style calls on typed values.
-- **`left` is anything else** → emit diagnostic, produce IsMissing node.
+- **`left` is anything else** → emit `InvalidCallTarget` diagnostic, return the original `left` expression unchanged.
 
 ```
 ParseCallContinuation(ide: IdentifierExpression) → CallExpression
@@ -973,35 +974,33 @@ private InterpolatedStringExpression ParseInterpolatedString()
 {
     var segments = ImmutableArray.CreateBuilder<InterpolationSegment>();
     var startToken = Consume(TokenKind.StringStart);
-    var startSpan  = Span(startToken);
-
+    var startSpan = SpanOf(startToken);
     segments.Add(new TextSegment(startSpan, startToken));
 
     while (true)
     {
         // Expression between Start and Middle/End
         var expr = ParseExpression(0);
-        segments.Add(new ExpressionSegment(Span(expr), expr));
+        segments.Add(new ExpressionSegment(expr.Span, expr));
 
         if (Current.Kind == TokenKind.StringMiddle)
         {
-            var mid = Consume();
-            segments.Add(new TextSegment(Span(mid), mid));
+            var mid = Advance();
+            segments.Add(new TextSegment(SpanOf(mid), mid));
             // continue loop for next expression
         }
         else
         {
             // StringEnd — or missing End (error recovery)
-            var endToken = Expect(TokenKind.StringEnd, DiagnosticCode.UnterminatedStringLiteral);
-            segments.Add(new TextSegment(Span(endToken), endToken));
+            var end = Expect(TokenKind.StringEnd);
+            segments.Add(new TextSegment(SpanOf(end), end));
             break;
         }
     }
 
     return new InterpolatedStringExpression(
         SourceSpan.Covering(startSpan, segments[^1].Span),
-        segments.ToImmutable()
-    );
+        segments.ToImmutable());
 }
 ```
 
@@ -1079,7 +1078,7 @@ These are the unambiguous top-level starters — every one of them can only appe
 | `ParseStateDeclaration()` | Missing identifiers → missing-node | Next sync token |
 | `ParseEventDeclaration()` | Missing identifiers/arg names → missing-node | Next sync token |
 | `ParseTransitionRowDeclaration()` | Missing `on`/event/`->`/outcome → missing-node | If no valid outcome can be assembled |
-| `ParseActionStatement()` | Unknown action keyword → missing SetAction + resync | Next `->` or sync token |
+| `ParseActionStatement()` | Unknown action keyword → missing SetActionStatement (unreachable in practice — only called after `IsActionKeyword` check) | N/A |
 | `ParseExpression(0)` | Unknown atom → missing IdentifierExpression | None (caller resumes after returning) |
 | Top-level loop | Unknown declaration keyword | Always resyncs |
 

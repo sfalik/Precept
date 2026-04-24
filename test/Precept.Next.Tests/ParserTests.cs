@@ -1169,4 +1169,123 @@ from Draft on Start
         var list = expr.Should().BeOfType<ListLiteralExpression>().Subject;
         list.Elements.Should().ContainSingle();
     }
+
+    // ════════════════════════════════════════════════════════════════════════════
+    //  New coverage tests (Soup Nazi second review)
+    // ════════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Decl_Malformed_PrepositionKeyword_AfterResync_KeepsFollowingDeclaration()
+    {
+        // preposition keywords (in, to, from, on) that aren't valid continuations should
+        // emit diagnostics and resync, but the field after them must still parse.
+        var tree = Parse("precept Test\nin Active transition Done\nfield A as string");
+        tree.Root.Should().NotBeNull();
+        tree.Diagnostics.Should().NotBeEmpty();
+        // After recovery, FieldDeclaration should be present
+        tree.Root!.Body.Should().Contain(d => d is FieldDeclaration);
+    }
+
+    [Fact]
+    public void Decl_TransitionRow_TrailingArrowWithNoOutcome_ProducesMissingOutcome()
+    {
+        // Arrow with no valid outcome token at end of input
+        var tree = Parse("precept Test\nfrom Draft on Submit\n->");
+        tree.Root.Should().NotBeNull();
+        tree.Diagnostics.Should().NotBeEmpty();
+        var row = tree.Root!.Body[0].Should().BeOfType<TransitionRowDeclaration>().Subject;
+        row.Outcome.Should().NotBeNull();
+        row.Outcome!.IsMissing.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Expr_InterpolatedTypedConstant_ReassemblesAllSegments()
+    {
+        // 'Year-{Month}-{Day}' should produce 5 segments
+        var tree = Parse("precept Test\nrule true because \"ok\"\nfield F as instant default '2026-{Month}-{Day}'");
+        tree.Root.Should().NotBeNull();
+        var field = tree.Root!.Body[1].Should().BeOfType<FieldDeclaration>().Subject;
+        var def = field.Modifiers.Should().ContainSingle()
+            .Which.Should().BeOfType<DefaultModifier>().Subject;
+        var interp = def.Value.Should().BeOfType<InterpolatedTypedConstantExpression>().Subject;
+        // Text(2026-) + Expr(Month) + Text(-) + Expr(Day) + Text()  →  5 segments
+        interp.Segments.Should().HaveCount(5);
+        interp.Segments[0].Should().BeOfType<TextSegment>();
+        interp.Segments[1].Should().BeOfType<ExpressionSegment>();
+        interp.Segments[2].Should().BeOfType<TextSegment>();
+        interp.Segments[3].Should().BeOfType<ExpressionSegment>();
+    }
+
+    [Fact]
+    public void Decl_TypeRef_EmptyChoice_Parses()
+    {
+        // choice() with no values is syntactically valid (empty ChoiceTypeRef)
+        var decl = ParseDecl("field Status as choice()");
+        var field = decl.Should().BeOfType<FieldDeclaration>().Subject;
+        var choice = field.Type.Should().BeOfType<ChoiceTypeRef>().Subject;
+        choice.Choices.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Decl_TypeRef_MissingScalarType_EmitsDiagnosticAndIsMissing()
+    {
+        // "field F as" — missing type entirely
+        var tree = Parse("precept Test\nfield F as");
+        tree.Diagnostics.Should().NotBeEmpty();
+        tree.Root.Should().NotBeNull();
+        var field = tree.Root!.Body[0].Should().BeOfType<FieldDeclaration>().Subject;
+        field.Type.IsMissing.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Decl_Field_Notempty_Parses()
+    {
+        var decl = ParseDecl("field F as string notempty");
+        var field = decl.Should().BeOfType<FieldDeclaration>().Subject;
+        field.Modifiers.Should().ContainSingle().Which.Should().BeOfType<NotemptyModifier>();
+    }
+
+    [Fact]
+    public void Decl_Field_Positive_Parses()
+    {
+        var decl = ParseDecl("field F as number positive");
+        var field = decl.Should().BeOfType<FieldDeclaration>().Subject;
+        field.Modifiers.Should().ContainSingle().Which.Should().BeOfType<PositiveModifier>();
+    }
+
+    [Fact]
+    public void Decl_Field_Nonnegative_Parses()
+    {
+        var decl = ParseDecl("field F as number nonnegative");
+        var field = decl.Should().BeOfType<FieldDeclaration>().Subject;
+        field.Modifiers.Should().ContainSingle().Which.Should().BeOfType<NonnegativeModifier>();
+    }
+
+    [Fact]
+    public void Parse_EmptyInput_ReturnsRootWithDiagnostic()
+    {
+        // Completely empty input — should produce a root with missing name and a diagnostic
+        var tree = Parse("");
+        tree.Root.Should().NotBeNull();
+        tree.Diagnostics.Should().NotBeEmpty();
+        tree.Root!.Name.Text.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Expr_Conditional_MissingThen_EmitsDiagnostic()
+    {
+        // "if Active" with no "then" — parser should emit ExpectedToken
+        var tree = Parse("precept Test\nrule if Active A else B because \"msg\"");
+        tree.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.ExpectedToken));
+        tree.Root.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void Decl_AccessMode_AllKeyword_IsAll()
+    {
+        var decl = ParseDecl("write all");
+        var am = decl.Should().BeOfType<AccessModeDeclaration>().Subject;
+        am.Fields.IsAll.Should().BeTrue();
+        am.StateScope.Should().BeNull();
+    }
 }
