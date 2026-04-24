@@ -474,23 +474,285 @@ In all cases the invalid source span still produces a diagnostic with the correc
 
 ## 2. Parser
 
-> **Status:** Stub — to be written when the parser is designed and implemented.
-
-The parser transforms the flat token stream into an abstract syntax tree (AST). The v1 grammar in `docs/PreceptLanguageDesign.md` § Grammar is the baseline specification. The v2 parser will extend it with typed constants, interpolation reassembly, and any new declaration forms.
-
-### 2.1 Expression Precedence (Locked)
-
-Carried forward from v1. The expression grammar uses standard precedence:
+The parser transforms the flat `TokenStream` into a `SyntaxTree` — an abstract syntax tree representing the semantic structure of the precept definition. The parser is a hand-written recursive descent parser with a Pratt expression parser for operator precedence. It produces an AST (not a CST) — comments and whitespace are consumed silently.
 
 ```
-or < and < not < comparison < contains < arithmetic < unary
+TokenStream  →  Parser.Parse  →  SyntaxTree
 ```
 
-Atoms: literals, identifiers, parenthesized expressions, function calls (`min(...)`, `max(...)`, `round(...)`, `clamp(...)`), conditional expressions (`if/then/else`), dotted member access (`Event.Arg`, `Collection.count`, `Field.length`).
+The public surface is a static class `Parser` with a single method:
 
-### 2.2 Statement Grammar
+```csharp
+public static SyntaxTree Parse(TokenStream tokens)
+```
 
-> To be specified when the parser is implemented. The v1 EBNF in `docs/PreceptLanguageDesign.md` serves as the starting grammar.
+The parser always runs to end-of-source. On malformed input it emits diagnostics and inserts `IsMissing` nodes or skips to sync points, ensuring downstream stages receive a structurally coherent tree.
+
+### 2.1 Expression Precedence
+
+The expression parser uses Pratt parsing (top-down operator precedence). `ParseExpression(int minBp)` parses a complete expression, stopping when it encounters a token whose left-binding power is ≤ `minBp`.
+
+| Precedence | Token(s) | Role | Associativity |
+|:----------:|----------|------|:-------------:|
+| 10 | `or` | logical disjunction | left |
+| 20 | `and` | logical conjunction | left |
+| 25 (prefix) | `not` | logical negation | right (prefix) |
+| 30 | `==` `!=` `<` `>` `<=` `>=` | comparison | non-associative |
+| 40 | `contains` | collection membership | left |
+| 40 | `is` (`is set` / `is not set`) | presence test | left |
+| 50 | `+` `-` (infix) | additive arithmetic | left |
+| 60 | `*` `/` `%` | multiplicative arithmetic | left |
+| 65 (prefix) | `-` (unary) | negation | right (prefix) |
+| 80 | `.` | member access | left |
+| 80 | `(` (postfix) | function/method call | left |
+
+**Non-associative comparisons:** `A == B == C` is a parse error. The right-binding power of comparison operators is 31, which prevents chaining. The parser emits a `NonAssociativeComparison` diagnostic.
+
+#### Null-denotation (atoms and prefix)
+
+| Token | Production |
+|-------|------------|
+| `Identifier` | `IdentifierExpression` |
+| `NumberLiteral` | `NumberLiteralExpression` |
+| `True` / `False` | `BooleanLiteralExpression` |
+| `StringLiteral` | `StringLiteralExpression` |
+| `StringStart` | `InterpolatedStringExpression` (reassembly loop) |
+| `TypedConstant` | `TypedConstantExpression` |
+| `TypedConstantStart` | `InterpolatedTypedConstantExpression` (reassembly loop) |
+| `LeftBracket` | `ListLiteralExpression` |
+| `LeftParen` | `ParenthesizedExpression` |
+| `Not` | `UnaryExpression(Not, ParseExpression(25))` |
+| `Minus` | `UnaryExpression(Negate, ParseExpression(65))` |
+| `If` | `ConditionalExpression` (`if` Expr `then` Expr `else` Expr) |
+| _other_ | missing `IdentifierExpression` + diagnostic |
+
+#### Left-denotation (infix and postfix)
+
+| Token | Production |
+|-------|------------|
+| `Or` | `BinaryExpression(Or, ParseExpression(10))` |
+| `And` | `BinaryExpression(And, ParseExpression(20))` |
+| `==` `!=` `<` `>` `<=` `>=` | `BinaryExpression(op, ParseExpression(31))` |
+| `Contains` | `ContainsExpression(left, ParseExpression(40))` |
+| `Is` | `IsSetExpression` — consumes optional `Not`, then `Set` |
+| `+` `-` (infix) | `BinaryExpression(op, ParseExpression(50))` |
+| `*` `/` `%` | `BinaryExpression(op, ParseExpression(60))` |
+| `.` (Dot) | `MemberAccessExpression(left, Identifier)` |
+| `(` (LeftParen) | If `left` is `MemberAccessExpression` → `MethodCallExpression`; if `IdentifierExpression` → `CallExpression`; else → diagnostic |
+
+### 2.2 Declaration Grammar
+
+After the `precept <Name>` header, the parser enters a loop that dispatches on the current non-trivia token to select a declaration production.
+
+#### Top-level dispatch
+
+| Leading token | Production |
+|---------------|-----------|
+| `field` | `FieldDeclaration` |
+| `state` | `StateDeclaration` |
+| `event` | `EventDeclaration` |
+| `rule` | `RuleDeclaration` |
+| `write` | `AccessModeDeclaration` (root-level, no state scope) |
+| `in` | `StateEnsureDeclaration` or `AccessModeDeclaration` |
+| `to` | `StateEnsureDeclaration` or `StateActionDeclaration` |
+| `from` | `TransitionRowDeclaration`, `StateEnsureDeclaration`, or `StateActionDeclaration` |
+| `on` | `EventEnsureDeclaration` or `StatelessEventHookDeclaration` |
+| `EndOfSource` | exit loop |
+| _anything else_ | diagnostic + sync-point resync |
+
+#### `field` declaration
+
+```
+field Identifier ("," Identifier)* as TypeRef FieldModifier* ("->" Expr)?
+```
+
+Multi-name shorthand: `field A, B, C as string` declares three fields of the same type. Modifiers appear before the computed expression arrow. The `->` introduces a computed expression.
+
+#### `state` declaration
+
+```
+state StateEntry ("," StateEntry)*
+StateEntry  :=  Identifier ("initial")? StateModifier*
+StateModifier  :=  terminal | required | irreversible | success | warning | error
+```
+
+#### `event` declaration
+
+```
+event Identifier ("," Identifier)* ("(" ArgList ")")? ("initial")?
+ArgList  :=  ArgDecl ("," ArgDecl)*
+ArgDecl  :=  Identifier as TypeRef FieldModifier*
+```
+
+Event arguments use parenthesized syntax. The `initial` keyword follows the argument list.
+
+#### `rule` declaration
+
+```
+rule BoolExpr ("when" BoolExpr)? because StringExpr
+```
+
+The optional `when` guard scopes the rule to states where the guard is true.
+
+#### `in` / `to` / `from` dispatch
+
+These preposition keywords parse a state target, then look ahead to select the production:
+
+| Preposition | Following verb | Production |
+|-------------|---------------|-----------|
+| `in` | `ensure` | `StateEnsureDeclaration` (Anchor=In) |
+| `in` | `write`/`read`/`omit` | `AccessModeDeclaration` |
+| `to` | `ensure` | `StateEnsureDeclaration` (Anchor=To) |
+| `to` | `->` | `StateActionDeclaration` (Anchor=To) |
+| `from` | `on` | `TransitionRowDeclaration` |
+| `from` | `ensure` | `StateEnsureDeclaration` (Anchor=From) |
+| `from` | `->` | `StateActionDeclaration` (Anchor=From) |
+
+All three support an optional `when` guard between the state target and the verb (except `from ... on`, where the guard is inside the transition row after the event name).
+
+#### Transition row
+
+```
+from StateTarget on Identifier ("when" BoolExpr)?
+("->" ActionStatement)*
+"->" Outcome
+
+ActionStatement  :=  set Identifier "=" Expr
+                  |  add Identifier Expr
+                  |  remove Identifier Expr
+                  |  enqueue Identifier Expr
+                  |  dequeue Identifier ("into" Identifier)?
+                  |  push Identifier Expr
+                  |  pop Identifier ("into" Identifier)?
+                  |  clear Identifier
+
+Outcome  :=  transition Identifier
+          |  no transition
+          |  reject StringExpr
+```
+
+Each action and the outcome are introduced by `->`. The parser loops consuming `->` followed by an action keyword, and breaks out when the token after `->` is an outcome keyword.
+
+#### State/event ensure
+
+```
+(in|to|from) StateTarget ("when" BoolExpr)? ensure BoolExpr because StringExpr
+on Identifier ("when" BoolExpr)? ensure BoolExpr because StringExpr
+```
+
+#### Stateless event hook
+
+```
+on Identifier
+("->" ActionStatement)*
+```
+
+Event hooks without a `when`/`ensure` continuation are parsed as stateless event hooks with an arrow-prefixed action chain.
+
+#### State action
+
+```
+(to|from) StateTarget
+("->" ActionStatement)*
+```
+
+#### Access mode
+
+```
+(in StateTarget ("when" BoolExpr)?)? (write|read|omit) FieldTarget
+write FieldTarget
+```
+
+Root-level `write` has no state scope. State-scoped access modes support `write`, `read`, and `omit` with a field target that is either `all` or a comma-separated list of field names.
+
+### 2.3 Type References
+
+```
+TypeRef  :=  ScalarType TypeQualifier?
+          |  CollectionType
+          |  ChoiceType
+
+ScalarType  :=  string | number | integer | decimal | boolean
+             |  date | time | instant | duration | period
+             |  timezone | zoneddatetime | datetime
+             |  money | currency | quantity | unitofmeasure
+             |  dimension | price | exchangerate
+
+CollectionType  :=  (set | queue | stack) of ScalarType TypeQualifier?
+ChoiceType      :=  choice "(" StringExpr ("," StringExpr)* ")"
+TypeQualifier   :=  (in | of) Expr
+```
+
+Type qualifiers narrow the value domain: `in '<unit>'` pins to a specific unit or currency, `of '<family>'` constrains to a dimension family. A field may use `in` or `of`, not both.
+
+**`set` disambiguation:** The lexer always emits `TokenKind.Set`. In `ParseTypeRef()`, when followed by `of`, the parser treats it as the collection type. Outside type position, `set` is the action keyword.
+
+### 2.4 Field Modifiers
+
+Field modifiers appear after the type reference and before any computed expression.
+
+| Modifier | Syntax | Category |
+|----------|--------|----------|
+| `optional` | flag | Field is nullable; use `is set`/`is not set` for presence |
+| `ordered` | flag | Choice field supports ordinal comparison |
+| `nonnegative` | flag | Value ≥ 0 |
+| `positive` | flag | Value > 0 |
+| `nonzero` | flag | Value ≠ 0 |
+| `notempty` | flag | String is non-empty |
+| `default` _Expr_ | value | Default value |
+| `min` _Expr_ | value | Minimum value |
+| `max` _Expr_ | value | Maximum value |
+| `minlength` _Expr_ | value | Minimum string length |
+| `maxlength` _Expr_ | value | Maximum string length |
+| `mincount` _Expr_ | value | Minimum collection count |
+| `maxcount` _Expr_ | value | Maximum collection count |
+| `maxplaces` _Expr_ | value | Maximum decimal places |
+
+### 2.5 Interpolation Reassembly
+
+The parser reassembles interpolated literals from the segmented token stream the lexer produced. Both `ParseInterpolatedString()` and `ParseInterpolatedTypedConstant()` use the same loop:
+
+1. Consume `Start` token → `TextSegment`
+2. `ParseExpression(0)` → `ExpressionSegment`
+3. If `Middle` → `TextSegment`, go to step 2
+4. If `End` → `TextSegment`, done
+
+`ParseExpression(0)` terminates naturally at `StringMiddle`/`StringEnd`/`TypedConstantMiddle`/`TypedConstantEnd` because these token kinds have no binding power in the expression parser. This is the depth-unaware reassembly property — no depth tracking is needed.
+
+### 2.6 Error Recovery
+
+The parser uses two complementary mechanisms:
+
+#### Missing-node insertion
+
+When an expected token is absent, the parser emits a diagnostic and creates a synthetic token with `IsMissing = true` and a zero-length span at the current position. The resulting AST node is structurally complete. Used for: missing identifiers, missing keywords (`as`, `because`, `ensure`), missing expression atoms.
+
+#### Sync-point resync
+
+When the parser is structurally lost at the top level, it scans forward for a sync token:
+
+| Sync token | Keyword |
+|------------|---------|
+| `Precept` | `precept` |
+| `Field` | `field` |
+| `State` | `state` |
+| `Event` | `event` |
+| `Rule` | `rule` |
+| `From` | `from` |
+| `To` | `to` |
+| `In` | `in` |
+| `On` | `on` |
+
+These are unambiguous top-level declaration starters. Continuation tokens (`when`, `->`, `set`, `transition`, `ensure`, `because`) are never sync points — they appear mid-production and would cause the parser to skip valid content.
+
+### 2.7 Parser Diagnostics
+
+| Condition | Diagnostic Code | Severity |
+|-----------|-----------------|----------|
+| Expected token not found | `ExpectedToken` | Error |
+| Unrecognized keyword in declaration position | `UnexpectedKeyword` | Error |
+| Chained comparison (`A == B == C`) | `NonAssociativeComparison` | Error |
+| Non-callable expression followed by `(` | `InvalidCallTarget` | Error |
 
 ---
 
