@@ -20,8 +20,7 @@ public class ParserTests
     private static Expression ParseExpr(string expr)
     {
         var tree = Parse($"precept Test\nrule {expr} because \"test\"");
-        tree.Root.Should().NotBeNull();
-        tree.Root!.Body.Should().ContainSingle();
+        tree.Root.Body.Should().ContainSingle();
         var rule = tree.Root.Body[0].Should().BeOfType<RuleDeclaration>().Subject;
         return rule.Condition;
     }
@@ -30,8 +29,7 @@ public class ParserTests
     private static Declaration ParseDecl(string body)
     {
         var tree = Parse($"precept Test\n{body}");
-        tree.Root.Should().NotBeNull();
-        tree.Root!.Body.Should().NotBeEmpty();
+        tree.Root.Body.Should().NotBeEmpty();
         return tree.Root.Body[0];
     }
 
@@ -43,8 +41,7 @@ public class ParserTests
     public void Parse_EmptyPrecept_ReturnsRootWithEmptyBody()
     {
         var tree = Parse("precept Empty");
-        tree.Root.Should().NotBeNull();
-        tree.Root!.Name.Text.Should().Be("Empty");
+        tree.Root.Name.Text.Should().Be("Empty");
         tree.Root.Body.Should().BeEmpty();
         tree.Diagnostics.Should().BeEmpty();
     }
@@ -53,8 +50,7 @@ public class ParserTests
     public void Parse_MissingPreceptName_EmitsDiagnosticAndCreatesIsMissingName()
     {
         var tree = Parse("precept");
-        tree.Root.Should().NotBeNull();
-        tree.Root!.Name.Kind.Should().Be(TokenKind.Identifier);
+        tree.Root.Name.Kind.Should().Be(TokenKind.Identifier);
         tree.Root.Name.Text.Should().BeEmpty();
         tree.Diagnostics.Should().NotBeEmpty();
     }
@@ -108,7 +104,7 @@ public class ParserTests
     {
         // Use it in "because" position since rule condition expects bool
         var tree = Parse("precept Test\nrule true because \"hello world\"");
-        var rule = tree.Root!.Body[0].Should().BeOfType<RuleDeclaration>().Subject;
+        var rule = tree.Root.Body[0].Should().BeOfType<RuleDeclaration>().Subject;
         var str = rule.Message.Should().BeOfType<StringLiteralExpression>().Subject;
         str.Value.Text.Should().Be("hello world");
     }
@@ -119,7 +115,7 @@ public class ParserTests
         // Use in set RHS via transition row
         var tree = Parse("precept Test\nfield D as date\nfrom S on E\n-> set D = '2026-04-23'\n-> transition S2");
         tree.Diagnostics.Should().BeEmpty();
-        var row = tree.Root!.Body[1].Should().BeOfType<TransitionRowDeclaration>().Subject;
+        var row = tree.Root.Body[1].Should().BeOfType<TransitionRowDeclaration>().Subject;
         var set = row.Actions[0].Should().BeOfType<SetActionStatement>().Subject;
         set.Value.Should().BeOfType<TypedConstantExpression>();
     }
@@ -398,7 +394,7 @@ public class ParserTests
     public void Expr_InterpolatedString_ReturnsInterpolatedStringExpression()
     {
         var tree = Parse("precept Test\nrule true because \"hello {Name} world\"");
-        var rule = tree.Root!.Body[0].Should().BeOfType<RuleDeclaration>().Subject;
+        var rule = tree.Root.Body[0].Should().BeOfType<RuleDeclaration>().Subject;
         var interp = rule.Message.Should().BeOfType<InterpolatedStringExpression>().Subject;
         // TextSegment(hello ) + ExpressionSegment(Name) + TextSegment( world)
         interp.Segments.Should().HaveCount(3);
@@ -411,7 +407,7 @@ public class ParserTests
     public void Expr_InterpolatedStringMultiExpr_ParsesAllSegments()
     {
         var tree = Parse("precept Test\nrule true because \"a {B} c {D} e\"");
-        var rule = tree.Root!.Body[0].Should().BeOfType<RuleDeclaration>().Subject;
+        var rule = tree.Root.Body[0].Should().BeOfType<RuleDeclaration>().Subject;
         var interp = rule.Message.Should().BeOfType<InterpolatedStringExpression>().Subject;
         // TextSegment(a ) + ExprSegment(B) + TextSegment( c ) + ExprSegment(D) + TextSegment( e)
         interp.Segments.Should().HaveCount(5);
@@ -561,7 +557,7 @@ from Draft on Submit
 -> set Amount = 42
 -> transition Active");
         tree.Diagnostics.Should().BeEmpty();
-        var row = tree.Root!.Body[2].Should().BeOfType<TransitionRowDeclaration>().Subject;
+        var row = tree.Root.Body[2].Should().BeOfType<TransitionRowDeclaration>().Subject;
         row.FromStates.Names.Should().ContainSingle().Which.Text.Should().Be("Draft");
         row.EventName.Text.Should().Be("Submit");
         row.Guard.Should().BeNull();
@@ -579,7 +575,7 @@ event E
 from S1 on E when Amount > 0
 -> transition S2");
         tree.Diagnostics.Should().BeEmpty();
-        var row = tree.Root!.Body[2].Should().BeOfType<TransitionRowDeclaration>().Subject;
+        var row = tree.Root.Body[2].Should().BeOfType<TransitionRowDeclaration>().Subject;
         row.Guard.Should().NotBeNull();
         row.Guard.Should().BeOfType<BinaryExpression>();
     }
@@ -593,7 +589,7 @@ event E
 from S1 on E
 -> reject ""Not allowed""");
         tree.Diagnostics.Should().BeEmpty();
-        var row = tree.Root!.Body[2].Should().BeOfType<TransitionRowDeclaration>().Subject;
+        var row = tree.Root.Body[2].Should().BeOfType<TransitionRowDeclaration>().Subject;
         row.Outcome.Should().BeOfType<RejectOutcomeNode>();
     }
 
@@ -606,7 +602,7 @@ event E
 from S1 on E
 -> no transition");
         tree.Diagnostics.Should().BeEmpty();
-        var row = tree.Root!.Body[2].Should().BeOfType<TransitionRowDeclaration>().Subject;
+        var row = tree.Root.Body[2].Should().BeOfType<TransitionRowDeclaration>().Subject;
         row.Outcome.Should().BeOfType<NoTransitionOutcomeNode>();
     }
 
@@ -664,7 +660,7 @@ on E
 -> set Amount = 1
 -> set Name = ""test""");
         tree.Diagnostics.Should().BeEmpty();
-        var hook = tree.Root!.Body[1].Should().BeOfType<StatelessEventHookDeclaration>().Subject;
+        var hook = tree.Root.Body[1].Should().BeOfType<StatelessEventHookDeclaration>().Subject;
         hook.Actions.Should().HaveCount(2);
         hook.Actions[0].Should().BeOfType<SetActionStatement>();
         hook.Actions[1].Should().BeOfType<SetActionStatement>();
@@ -705,7 +701,7 @@ from S on E
 -> clear Items
 -> no transition");
         tree.Diagnostics.Should().BeEmpty();
-        var row = tree.Root!.Body[2].Should().BeOfType<TransitionRowDeclaration>().Subject;
+        var row = tree.Root.Body[2].Should().BeOfType<TransitionRowDeclaration>().Subject;
         row.Actions.Should().HaveCount(3);
         row.Actions[0].Should().BeOfType<AddActionStatement>();
         row.Actions[1].Should().BeOfType<RemoveActionStatement>();
@@ -723,16 +719,14 @@ from S on E
         var tree = Parse("precept Test\nrule because \"msg\"");
         tree.Diagnostics.Should().NotBeEmpty();
         // Should still have a root
-        tree.Root.Should().NotBeNull();
     }
 
     [Fact]
     public void Error_UnknownTopLevelKeyword_ResyncsAndContinues()
     {
         var tree = Parse("precept Test\ngarbage\nfield A as string");
-        tree.Root.Should().NotBeNull();
         // Should recover and parse the field
-        tree.Root!.Body.Should().ContainSingle()
+        tree.Root.Body.Should().ContainSingle()
             .Which.Should().BeOfType<FieldDeclaration>();
         tree.Diagnostics.Should().NotBeEmpty();
     }
@@ -753,8 +747,7 @@ in Active ensure Name is set because ""Active needs name""
 from Draft on Start
 -> transition Active");
         tree.Diagnostics.Should().BeEmpty();
-        tree.Root.Should().NotBeNull();
-        tree.Root!.Name.Text.Should().Be("Minimal");
+        tree.Root.Name.Text.Should().Be("Minimal");
         tree.Root.Body.Should().HaveCount(6);
     }
 
@@ -855,7 +848,7 @@ from Draft on Start
     {
         var tree = Parse("precept Test\nevent Submit, Cancel, Retry");
         tree.Diagnostics.Should().BeEmpty();
-        var ev = tree.Root!.Body[0].Should().BeOfType<EventDeclaration>().Subject;
+        var ev = tree.Root.Body[0].Should().BeOfType<EventDeclaration>().Subject;
         ev.Names.Should().HaveCount(3);
         ev.Names[0].Text.Should().Be("Submit");
         ev.Names[1].Text.Should().Be("Cancel");
@@ -897,7 +890,7 @@ from Draft on Start
     {
         var tree = Parse($"precept Test\nstate S {modifier}");
         tree.Diagnostics.Should().BeEmpty();
-        var state = tree.Root!.Body[0].Should().BeOfType<StateDeclaration>().Subject;
+        var state = tree.Root.Body[0].Should().BeOfType<StateDeclaration>().Subject;
         state.Entries[0].Modifiers.Should().ContainSingle();
     }
 
@@ -910,7 +903,7 @@ from Draft on Start
     {
         var tree = Parse("precept Test\nfrom S on E\n-> enqueue Q \"item\"\n-> transition S2");
         tree.Diagnostics.Should().BeEmpty();
-        var row = tree.Root!.Body[0].Should().BeOfType<TransitionRowDeclaration>().Subject;
+        var row = tree.Root.Body[0].Should().BeOfType<TransitionRowDeclaration>().Subject;
         var enq = row.Actions[0].Should().BeOfType<EnqueueActionStatement>().Subject;
         enq.FieldName.Text.Should().Be("Q");
     }
@@ -920,7 +913,7 @@ from Draft on Start
     {
         var tree = Parse("precept Test\nfrom S on E\n-> dequeue Q\n-> transition S2");
         tree.Diagnostics.Should().BeEmpty();
-        var row = tree.Root!.Body[0].Should().BeOfType<TransitionRowDeclaration>().Subject;
+        var row = tree.Root.Body[0].Should().BeOfType<TransitionRowDeclaration>().Subject;
         var deq = row.Actions[0].Should().BeOfType<DequeueActionStatement>().Subject;
         deq.FieldName.Text.Should().Be("Q");
         deq.IntoField.Should().BeNull();
@@ -931,7 +924,7 @@ from Draft on Start
     {
         var tree = Parse("precept Test\nfrom S on E\n-> dequeue Q into Temp\n-> transition S2");
         tree.Diagnostics.Should().BeEmpty();
-        var row = tree.Root!.Body[0].Should().BeOfType<TransitionRowDeclaration>().Subject;
+        var row = tree.Root.Body[0].Should().BeOfType<TransitionRowDeclaration>().Subject;
         var deq = row.Actions[0].Should().BeOfType<DequeueActionStatement>().Subject;
         deq.IntoField.Should().NotBeNull();
         deq.IntoField!.Value.Text.Should().Be("Temp");
@@ -942,7 +935,7 @@ from Draft on Start
     {
         var tree = Parse("precept Test\nfrom S on E\n-> push Stack \"item\"\n-> transition S2");
         tree.Diagnostics.Should().BeEmpty();
-        var row = tree.Root!.Body[0].Should().BeOfType<TransitionRowDeclaration>().Subject;
+        var row = tree.Root.Body[0].Should().BeOfType<TransitionRowDeclaration>().Subject;
         row.Actions[0].Should().BeOfType<PushActionStatement>();
     }
 
@@ -951,7 +944,7 @@ from Draft on Start
     {
         var tree = Parse("precept Test\nfrom S on E\n-> pop Stack\n-> transition S2");
         tree.Diagnostics.Should().BeEmpty();
-        var row = tree.Root!.Body[0].Should().BeOfType<TransitionRowDeclaration>().Subject;
+        var row = tree.Root.Body[0].Should().BeOfType<TransitionRowDeclaration>().Subject;
         var pop = row.Actions[0].Should().BeOfType<PopActionStatement>().Subject;
         pop.IntoField.Should().BeNull();
     }
@@ -961,7 +954,7 @@ from Draft on Start
     {
         var tree = Parse("precept Test\nfrom S on E\n-> pop Stack into Temp\n-> transition S2");
         tree.Diagnostics.Should().BeEmpty();
-        var row = tree.Root!.Body[0].Should().BeOfType<TransitionRowDeclaration>().Subject;
+        var row = tree.Root.Body[0].Should().BeOfType<TransitionRowDeclaration>().Subject;
         var pop = row.Actions[0].Should().BeOfType<PopActionStatement>().Subject;
         pop.IntoField.Should().NotBeNull();
         pop.IntoField!.Value.Text.Should().Be("Temp");
@@ -1159,8 +1152,7 @@ from Draft on Start
     {
         // from S on E with no outcome — should have diagnostic or empty outcome
         var tree = Parse("precept Test\nfrom S on E");
-        tree.Root.Should().NotBeNull();
-        tree.Root!.Body.Should().NotBeEmpty();
+        tree.Root.Body.Should().NotBeEmpty();
     }
 
     [Fact]
@@ -1181,10 +1173,9 @@ from Draft on Start
         // preposition keywords (in, to, from, on) that aren't valid continuations should
         // emit diagnostics and resync, but the field after them must still parse.
         var tree = Parse("precept Test\nin Active transition Done\nfield A as string");
-        tree.Root.Should().NotBeNull();
         tree.Diagnostics.Should().NotBeEmpty();
         // After recovery, FieldDeclaration should be present
-        tree.Root!.Body.Should().Contain(d => d is FieldDeclaration);
+        tree.Root.Body.Should().Contain(d => d is FieldDeclaration);
     }
 
     [Fact]
@@ -1192,9 +1183,8 @@ from Draft on Start
     {
         // Arrow with no valid outcome token at end of input
         var tree = Parse("precept Test\nfrom Draft on Submit\n->");
-        tree.Root.Should().NotBeNull();
         tree.Diagnostics.Should().NotBeEmpty();
-        var row = tree.Root!.Body[0].Should().BeOfType<TransitionRowDeclaration>().Subject;
+        var row = tree.Root.Body[0].Should().BeOfType<TransitionRowDeclaration>().Subject;
         row.Outcome.Should().NotBeNull();
         row.Outcome!.IsMissing.Should().BeTrue();
     }
@@ -1204,8 +1194,7 @@ from Draft on Start
     {
         // 'Year-{Month}-{Day}' should produce 5 segments
         var tree = Parse("precept Test\nrule true because \"ok\"\nfield F as instant default '2026-{Month}-{Day}'");
-        tree.Root.Should().NotBeNull();
-        var field = tree.Root!.Body[1].Should().BeOfType<FieldDeclaration>().Subject;
+        var field = tree.Root.Body[1].Should().BeOfType<FieldDeclaration>().Subject;
         var def = field.Modifiers.Should().ContainSingle()
             .Which.Should().BeOfType<DefaultModifier>().Subject;
         var interp = def.Value.Should().BeOfType<InterpolatedTypedConstantExpression>().Subject;
@@ -1233,8 +1222,7 @@ from Draft on Start
         // "field F as" — missing type entirely
         var tree = Parse("precept Test\nfield F as");
         tree.Diagnostics.Should().NotBeEmpty();
-        tree.Root.Should().NotBeNull();
-        var field = tree.Root!.Body[0].Should().BeOfType<FieldDeclaration>().Subject;
+        var field = tree.Root.Body[0].Should().BeOfType<FieldDeclaration>().Subject;
         field.Type.IsMissing.Should().BeTrue();
     }
 
@@ -1267,9 +1255,8 @@ from Draft on Start
     {
         // Completely empty input — should produce a root with missing name and a diagnostic
         var tree = Parse("");
-        tree.Root.Should().NotBeNull();
         tree.Diagnostics.Should().NotBeEmpty();
-        tree.Root!.Name.Text.Should().BeEmpty();
+        tree.Root.Name.Text.Should().BeEmpty();
     }
 
     [Fact]
@@ -1278,7 +1265,6 @@ from Draft on Start
         // "if Active" with no "then" — parser should emit ExpectedToken
         var tree = Parse("precept Test\nrule if Active A else B because \"msg\"");
         tree.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.ExpectedToken));
-        tree.Root.Should().NotBeNull();
     }
 
     [Fact]
@@ -1349,7 +1335,7 @@ event E
 from S1 on E when Name ~= ""admin""
 -> transition S2");
         tree.Diagnostics.Should().BeEmpty();
-        var row = tree.Root!.Body[3].Should().BeOfType<TransitionRowDeclaration>().Subject;
+        var row = tree.Root.Body[3].Should().BeOfType<TransitionRowDeclaration>().Subject;
         row.Guard.Should().NotBeNull();
         var bin = row.Guard.Should().BeOfType<BinaryExpression>().Subject;
         bin.Op.Should().Be(BinaryOp.CaseInsensitiveEqual);
