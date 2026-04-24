@@ -123,7 +123,7 @@ public sealed record class Version(
 )
 {
     public Version Fire(string eventName, ImmutableDictionary<string, object?>? args = null);
-    public Version Edit(string field, object? value);
+    public UpdateOutcome Update(IReadOnlyDictionary<string, object?> fields);
 }
 ```
 
@@ -134,7 +134,7 @@ Every operation returns a new `Version`. There is no mutation. The old version r
 | Consumer | Usage |
 |----------|-------|
 | MCP `precept_fire` | `version.Fire(event, args)` → returns new `Version` |
-| MCP `precept_update` | `version.Edit(field, value)` → returns new `Version` |
+| MCP `precept_update` | `version.Update(fields)` → returns `UpdateOutcome` |
 | MCP `precept_inspect` | Read properties from `Version` (state, data, available events) |
 | Application runtime | All of the above |
 
@@ -161,7 +161,7 @@ Precept.From(compilation) ──► Precept
 precept.From(state, data) ──► Version
     │
     ├── version.Fire(event) ──► Version (new)
-    └── version.Edit(field) ──► Version (new)
+    └── version.Update(fields) ──► UpdateOutcome
 ```
 
 ### Immutability Invariant
@@ -226,7 +226,7 @@ Each LSP handler reads from `_currentCompilation`. The reference is swapped atom
 | `GraphResult` | `sealed record class` | Stage artifact, immutable |
 | `ProofModel` | `sealed record class` | Stage artifact, immutable |
 | `Diagnostic` | `readonly record struct` | Small, value-typed, zero-allocation in collections |
-| `DiagnosticStage` | `enum` | Parse, Type, Graph, Proof |
+| `DiagnosticStage` | `enum` | Lex, Parse, Type, Graph, Proof |
 | `Severity` | `enum` | Info, Warning, Error |
 | `Precept` | `sealed class` | Runtime definition, not a data bag — has factory methods |
 | `Version` | `sealed record class` | Immutable entity snapshot, value equality |

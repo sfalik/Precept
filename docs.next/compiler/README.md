@@ -9,7 +9,7 @@ Implementation blueprints for each stage of the Precept v2 compiler pipeline. Ea
 The compiler is a linear five-stage pipeline. Read the stage docs in this order:
 
 ```
-Source string → Lexer.Lex → TokenStream → Parser.Parse → SyntaxTree → TypeChecker.Check → TypedModel → GraphAnalyzer.Analyze → GraphModel → ProofEngine.Prove → ProofModel
+Source string → Lexer.Lex → TokenStream → Parser.Parse → SyntaxTree → TypeChecker.Check → TypedModel → GraphAnalyzer.Analyze → GraphResult → ProofEngine.Prove → ProofModel
 ```
 
 | Stage | Document | Key decisions | Status |
