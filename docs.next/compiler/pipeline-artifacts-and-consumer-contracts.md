@@ -15,7 +15,7 @@ These are distinct types with distinct API contracts, produced from the same pip
 
 ## Pipeline Stages
 
-The compiler runs six stages in a fixed, unconditional order. Every stage runs on every compilation — there is no short-circuiting. Each stage returns a degraded artifact on bad input rather than throwing (Model A — resilient).
+The compiler runs five stages in a fixed, unconditional order. Every stage runs on every compilation — there is no short-circuiting. Each stage returns a degraded artifact on bad input rather than throwing (Model A — resilient).
 
 | Stage | Static Class | Input | Output |
 |-------|-------------|-------|--------|

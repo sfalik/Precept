@@ -2,6 +2,8 @@
 
 Design documents for the Precept v2 compiler pipeline and language surface. These are **clean-room** artifacts — they do not reference v1 implementation details.
 
+> **Precept.Next implementation track:** If you are designing or implementing `src/Precept.Next`, start here. `docs.next/` is the authoritative design set for that work. The `docs/` folder remains the legacy/current reference set for the implemented v1 surface, product reference, and historical context.
+
 ## Structure
 
 | Path | Purpose |

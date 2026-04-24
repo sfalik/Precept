@@ -1,5 +1,7 @@
 # How We Got Here
 
+> **Authority boundary:** This file lives in `docs/`, the repository's legacy/current reference set. Use it for the implemented v1 surface, current product reference, or historical context. If you are designing or implementing `src/Precept.Next` / the v2 clean-room pipeline, start in [docs.next/README.md](../docs.next/README.md) instead.
+
 ## Purpose
 
 This document is a factual map of how the repository arrived at its current direction. It is meant to save a future reader from replaying every exploratory branch, README pass, and design note just to understand what actually survived.

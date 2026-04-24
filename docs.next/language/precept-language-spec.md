@@ -197,8 +197,9 @@ Every token the lexer can produce. Organized by category to match the `TokenKind
 | `Arrow` | `->` | Action chain / outcome separator |
 | `CaseInsensitiveEquals` | `~=` | Case-insensitive comparison (string-only) |
 | `CaseInsensitiveNotEquals` | `!~` | Case-insensitive not-equals (string-only) |
+| `Tilde` | `~` | Case-insensitive collection inner type prefix (`set of ~string`) |
 
-**Scan order for operators:** Multi-character operators must be attempted before their single-character prefixes: `!~` before `!=` before `!` (if ever reintroduced), `~=` before `~` (reserved), `->` before `-`, `==` before `=`, `>=` before `>`, `<=` before `<`.
+**Scan order for operators:** Multi-character operators must be attempted before their single-character prefixes: `!~` before `!=` before `!` (if ever reintroduced), `~=` before `~`, `->` before `-`, `==` before `=`, `>=` before `>`, `<=` before `<`. A standalone `~` is only valid immediately before `string` in a collection inner type position — elsewhere it is a lexer error.
 
 #### Punctuation
 
@@ -405,10 +406,10 @@ The `(` disambiguates: constraint keywords are never followed by `(`, function c
 |---------|------|---------|
 | After a state name (`in Draft ensure ...`) | Routing preposition | `in Draft ensure Amount > 0` |
 | After a domain type in a field declaration | Type qualifier | `field Amount as money in 'USD'` |
-| After `set of`, `queue of`, `stack of` | Collection inner type | `field Tags as set of string` |
+| After `set of`, `queue of`, `stack of` | Collection inner type | `field Tags as set of string`, `field Labels as set of ~string` |
 | After a domain type in a field declaration | Dimension family qualifier | `field Distance as quantity of 'length'` |
 
-Type qualifiers narrow the value domain of the field — they are part of the type annotation, not a declaration modifier. `in '<unit>'` pins to a specific unit or currency basis. `of '<family>'` constrains to a dimension or component family. A field may use `in` or `of`, never both. The preceding token (always a type keyword or collection keyword) makes the type-qualifier role unambiguous at LL(1).
+Type qualifiers narrow the value domain of the field — they are part of the type annotation, not a declaration modifier. `in '<unit>'` pins to a specific unit or currency. `of '<family>'` constrains to a dimension or component family. A field may use `in` or `of`, never both — with one exception: `price` allows `in` (currency-only) combined with `of` (denominator dimension), because price has two independent axes. When `in` specifies a compound `'currency/unit'` value, `of` is rejected. The preceding token (always a type keyword or collection keyword) makes the type-qualifier role unambiguous at LL(1).
 
 The lexer uses a mode stack to handle nested interpolation in string and typed-constant literals. This ensures `{expr}` inside a literal correctly lexes the expression tokens and then returns to the literal context.
 
@@ -1002,6 +1003,8 @@ The `then` and `else` branches must have compatible types (same type, or one wid
 | Object type | Member | Result type |
 |-------------|--------|-------------|
 | `set of T` | `count` | `integer` |
+| `set of T` (T orderable) | `min` | `T` |
+| `set of T` (T orderable) | `max` | `T` |
 | `queue of T` | `count` | `integer` |
 | `queue of T` | `peek` | `T` |
 | `stack of T` | `count` | `integer` |
@@ -1011,7 +1014,7 @@ The `then` and `else` branches must have compatible types (same type, or one wid
 
 **Temporal accessors** — see the [temporal type system](temporal-type-system.md) for the full per-type accessor tables. Summary: `date` has `.year`, `.month`, `.day`, `.dayOfWeek` → `integer`. `time` has `.hour`, `.minute`, `.second` → `integer`. `instant` has only `.inZone(tz)` → `zoneddatetime` (no skip-level accessors). `duration` has `.totalDays`, `.totalHours`, `.totalMinutes`, `.totalSeconds` → `number`. `period` has `.years`, `.months`, `.weeks`, `.days`, `.hours`, `.minutes`, `.seconds` → `integer`; `.hasDateComponent`, `.hasTimeComponent` → `boolean`; `.basis` → `string`; `.dimension` → `dimension`. `zoneddatetime` has `.instant`, `.timezone`, `.datetime`, `.date`, `.time` and integer component accessors. `datetime` has `.date`, `.time`, `.inZone(tz)`, and integer component accessors.
 
-**Business-domain accessors** — see the [business-domain types](business-domain-types.md#accessors-per-type) for the full accessor table. Summary: `money` has `.amount` → `decimal`, `.currency` → `currency`. `quantity` has `.amount` → `decimal`, `.unit` → `unitofmeasure`, `.dimension` → `dimension`. `price` has `.amount` → `decimal`, `.currency` → `currency`, `.unit` → `unitofmeasure`. `exchangerate` has `.amount` → `decimal`, `.numerator`/`.denominator` → `currency`. `unitofmeasure` has `.dimension` → `dimension`. `period` also has `.basis` → `string` and `.dimension` → `dimension` for its `in`/`of` qualification system.
+**Business-domain accessors** — see the [business-domain types](business-domain-types.md#accessors-per-type) for the full accessor table. Summary: `money` has `.amount` → `decimal`, `.currency` → `currency`. `quantity` has `.amount` → `decimal`, `.unit` → `unitofmeasure`, `.dimension` → `dimension`. `price` has `.amount` → `decimal`, `.currency` → `currency`, `.unit` → `unitofmeasure`, `.dimension` → `dimension`. `exchangerate` has `.amount` → `decimal`, `.from`/`.to` → `currency`. `unitofmeasure` has `.dimension` → `dimension`. `period` also has `.basis` → `string` and `.dimension` → `dimension` for its `in`/`of` qualification system.
 
 | _other_ | — | `InvalidMemberAccess` diagnostic |
 

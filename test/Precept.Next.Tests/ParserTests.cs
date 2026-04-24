@@ -1354,4 +1354,78 @@ from S1 on E when Name ~= ""admin""
         var bin = row.Guard.Should().BeOfType<BinaryExpression>().Subject;
         bin.Op.Should().Be(BinaryOp.CaseInsensitiveEqual);
     }
+
+    // ════════════════════════════════════════════════════════════════════════════
+    //  Tilde (~string) case-insensitive collection inner types
+    // ════════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Decl_SetOfCaseInsensitiveString_ParsesWithFlag()
+    {
+        var decl = ParseDecl("field Labels as set of ~string");
+        var field = decl.Should().BeOfType<FieldDeclaration>().Subject;
+        var coll = field.Type.Should().BeOfType<CollectionTypeRef>().Subject;
+        coll.Kind.Should().Be(CollectionKind.Set);
+        coll.ElementType.Kind.Should().Be(ScalarTypeKind.String);
+        coll.ElementType.CaseInsensitive.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Decl_QueueOfCaseInsensitiveString_ParsesWithFlag()
+    {
+        var decl = ParseDecl("field Q as queue of ~string");
+        var field = decl.Should().BeOfType<FieldDeclaration>().Subject;
+        var coll = field.Type.Should().BeOfType<CollectionTypeRef>().Subject;
+        coll.Kind.Should().Be(CollectionKind.Queue);
+        coll.ElementType.Kind.Should().Be(ScalarTypeKind.String);
+        coll.ElementType.CaseInsensitive.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Decl_StackOfCaseInsensitiveString_ParsesWithFlag()
+    {
+        var decl = ParseDecl("field S as stack of ~string");
+        var field = decl.Should().BeOfType<FieldDeclaration>().Subject;
+        var coll = field.Type.Should().BeOfType<CollectionTypeRef>().Subject;
+        coll.Kind.Should().Be(CollectionKind.Stack);
+        coll.ElementType.Kind.Should().Be(ScalarTypeKind.String);
+        coll.ElementType.CaseInsensitive.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Decl_SetOfString_CaseInsensitiveFalseByDefault()
+    {
+        // Plain `set of string` (no ~) must have CaseInsensitive = false
+        var decl = ParseDecl("field Tags as set of string");
+        var field = decl.Should().BeOfType<FieldDeclaration>().Subject;
+        var coll = field.Type.Should().BeOfType<CollectionTypeRef>().Subject;
+        coll.Kind.Should().Be(CollectionKind.Set);
+        coll.ElementType.Kind.Should().Be(ScalarTypeKind.String);
+        coll.ElementType.CaseInsensitive.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Decl_SetOfCaseInsensitiveNonString_ParsesWithFlag()
+    {
+        // Parser accepts ~integer; the type checker (separate slice) rejects it
+        var decl = ParseDecl("field Scores as set of ~integer");
+        var field = decl.Should().BeOfType<FieldDeclaration>().Subject;
+        var coll = field.Type.Should().BeOfType<CollectionTypeRef>().Subject;
+        coll.Kind.Should().Be(CollectionKind.Set);
+        coll.ElementType.Kind.Should().Be(ScalarTypeKind.Integer);
+        coll.ElementType.CaseInsensitive.Should().BeTrue();
+        // No parser-level diagnostic — type checker rejects this, not the parser
+        var tree = Parse("precept Test\nfield Scores as set of ~integer");
+        tree.Diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Decl_CaseInsensitiveString_NoQualifierParsedWhenNonePresent()
+    {
+        // ~string has no qualifier suffix; verify Qualifier stays null
+        var decl = ParseDecl("field Labels as set of ~string");
+        var field = decl.Should().BeOfType<FieldDeclaration>().Subject;
+        var coll = field.Type.Should().BeOfType<CollectionTypeRef>().Subject;
+        coll.ElementType.Qualifier.Should().BeNull();
+    }
 }

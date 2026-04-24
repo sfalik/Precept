@@ -671,4 +671,99 @@ public class LexerTests
 
         stream.Diagnostics.Should().BeEmpty();
     }
+
+    // ════════════════════════════════════════════════════════════════════════════
+    //  Tilde prefix (~) for case-insensitive collection inner types
+    // ════════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Lex_Tilde_EmittedForStandalonePrefix()
+    {
+        // ~ not followed by = must produce a standalone Tilde token
+        var stream = Lexer.Lex("set of ~string");
+
+        stream.Tokens.Select(token => token.Kind).Should().Equal(
+            TokenKind.Set,
+            TokenKind.Of,
+            TokenKind.Tilde,
+            TokenKind.StringType,
+            TokenKind.EndOfSource);
+
+        stream.Diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Lex_Tilde_NotEmittedForCaseInsensitiveEquals()
+    {
+        // ~= must remain a single CaseInsensitiveEquals token — no standalone Tilde emitted
+        var stream = Lexer.Lex("~=");
+
+        stream.Tokens.Select(token => token.Kind).Should().Equal(
+            TokenKind.CaseInsensitiveEquals,
+            TokenKind.EndOfSource);
+
+        stream.Tokens.Should().NotContain(token => token.Kind == TokenKind.Tilde);
+        stream.Diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Lex_Tilde_NotEmittedForCaseInsensitiveNotEquals()
+    {
+        // !~ must remain a single CaseInsensitiveNotEquals token — Tilde is not part of it
+        var stream = Lexer.Lex("!~");
+
+        stream.Tokens.Select(token => token.Kind).Should().Equal(
+            TokenKind.CaseInsensitiveNotEquals,
+            TokenKind.EndOfSource);
+
+        stream.Tokens.Should().NotContain(token => token.Kind == TokenKind.Tilde);
+        stream.Diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Lex_Tilde_InQueueContext()
+    {
+        var stream = Lexer.Lex("queue of ~string");
+
+        stream.Tokens.Select(token => token.Kind).Should().Equal(
+            TokenKind.QueueType,
+            TokenKind.Of,
+            TokenKind.Tilde,
+            TokenKind.StringType,
+            TokenKind.EndOfSource);
+
+        stream.Diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Lex_Tilde_InStackContext()
+    {
+        var stream = Lexer.Lex("stack of ~string");
+
+        stream.Tokens.Select(token => token.Kind).Should().Equal(
+            TokenKind.StackType,
+            TokenKind.Of,
+            TokenKind.Tilde,
+            TokenKind.StringType,
+            TokenKind.EndOfSource);
+
+        stream.Diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Lex_Tilde_BeforeNonString()
+    {
+        // Lexer emits Tilde + IntegerType without a diagnostic.
+        // The parser accepts this; the type checker (separate slice) rejects it.
+        var stream = Lexer.Lex("set of ~integer");
+
+        stream.Tokens.Select(token => token.Kind).Should().Equal(
+            TokenKind.Set,
+            TokenKind.Of,
+            TokenKind.Tilde,
+            TokenKind.IntegerType,
+            TokenKind.EndOfSource);
+
+        stream.Diagnostics.Should().BeEmpty();
+    }
 }

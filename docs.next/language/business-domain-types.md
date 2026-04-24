@@ -245,8 +245,11 @@ A field declaration may carry **at most one** of `in` or `of`. Declaring both is
 |------|-------------|--------|
 | `quantity` | UCUM dimension category | `field Distance as quantity of 'length'` |
 | `period` | Temporal dimension category | `field GracePeriod as period of 'date'` |
+| `price` | Denominator dimension category | `field Rate as price of 'mass'` |
 
-`of` is available on `quantity` and `period`. It is **not** available on `money`, `currency`, `price`, `exchangerate`, `unitofmeasure`, or `dimension`. The identity types (`currency`, `unitofmeasure`, `dimension`) do not carry a separate category slot — they ARE the identity. Use `when` guards for category checks (e.g., `when UOM.dimension == 'mass'`).
+`of` is available on `quantity`, `period`, and `price`. It is **not** available on `money`, `currency`, `exchangerate`, `unitofmeasure`, or `dimension`. The identity types (`currency`, `unitofmeasure`, `dimension`) do not carry a separate category slot — they ARE the identity. Use `when` guards for category checks (e.g., `when UOM.dimension == 'mass'`).
+
+**`price` exception — `in` and `of` may coexist.** For types with a single unit axis (quantity, period), `in` and `of` are mutually exclusive. `price` has two independent axes (currency + unit), so `in` with a currency-only value may combine with `of` for the denominator dimension: `field Rate as price in 'USD' of 'mass'`. When `in` specifies a compound `'currency/unit'` value, `of` is rejected — both axes are already constrained. The compiler disambiguates bare `in` values by registry lookup: ISO 4217 match → currency, UCUM match → unit.
 
 #### UCUM dimension categories (curated registry)
 
@@ -661,7 +664,10 @@ rule InputOutputDimensionMatch
 field UnitPrice as price in 'USD/each'
 field HourlyRate as price in 'USD/hours'
 field PricePerKg as price in 'EUR/kg'
-field DynamicRate as price                # open — currency/unit from event data
+field MassRate as price in 'USD' of 'mass'  # currency fixed, any mass unit
+field WeightPrice as price in 'kg'          # unit fixed, currency from event data
+field MassPrice as price of 'mass'           # any mass-unit denominator, currency open
+field DynamicRate as price                   # open — currency/unit from event data
 ```
 
 **Declaration patterns:**
@@ -669,7 +675,10 @@ field DynamicRate as price                # open — currency/unit from event da
 | Pattern | Declaration form | When to use |
 |---------|-----------------|-------------|
 | **Fixed** | `as price in 'USD/each'` | Both currency and unit are known at design time. The compiler enforces both. Produces the strictest operator contract. |
-| **Partial** | `as price in 'USD'` (currency-only) | Currency is fixed; the denominator unit is data-driven. `price * quantity` still type-checks — the denominator-to-unit match is enforced at the runtime boundary. |
+| **Currency + dimension** | `as price in 'USD' of 'mass'` | Currency is fixed; the denominator must be a mass unit but the specific unit is data-driven. The only case where `in` and `of` coexist. |
+| **Currency-only** | `as price in 'USD'` | Currency is fixed; the denominator unit is data-driven. `price * quantity` still type-checks — the denominator-to-unit match is enforced at the runtime boundary. |
+| **Unit-only** | `as price in 'kg'` | Denominator unit is fixed; currency comes from event data. The compiler disambiguates bare `in` values by registry lookup (ISO 4217 → currency, UCUM → unit). |
+| **Dimension-only** | `as price of 'mass'` | Denominator must be in the mass dimension; both currency and specific unit are data-driven. |
 | **Open** | `as price` | Both currency and denominator unit come from event data. Fewest compile-time guarantees. Use when accepting prices from external systems with unknown units. |
 
 **Typed constant literal:** `'4.17 USD/each'` — when context expects `price`, the content `<number> <currency>/<unit>` is validated as a price value with the currency checked against ISO 4217 and the unit checked against the unit registry.
@@ -710,9 +719,10 @@ field DynamicRate as price                # open — currency/unit from event da
 |---|---|---|
 | `.currency` | `currency` | Numerator currency (`'USD'`) |
 | `.unit` | `unitofmeasure` | Denominator unit (`'each'`, `'kg'`, `'hours'`) |
+| `.dimension` | `dimension` | Denominator unit dimension category (`'mass'`, `'length'`, etc.) |
 | `.amount` | `decimal` | Magnitude (the numeric part) |
 
-**Constraints:** `in '<currency>/<unit>'`, `optional`, `default '...'`.
+**Constraints:** `in '<currency>/<unit>'`, `in '<currency>'`, `in '<unit>'`, `of '<dimension>'`, `in '<currency>' of '<dimension>'`, `optional`, `default '...'`.
 
 **Serialization:** `"4.17 USD/each"` (string — matches typed constant literal syntax). The runtime type handles `Parse`/`ToString` natively.
 
@@ -808,8 +818,8 @@ field SpotRate as exchangerate optional
 
 | Accessor | Returns | Description |
 |---|---|---|
-| `.numerator` | `currency` | Numerator currency (`'USD'` in `'USD/EUR'`) |
-| `.denominator` | `currency` | Denominator currency (`'EUR'` in `'USD/EUR'`) |
+| `.from` | `currency` | Source currency (`'USD'` in `'USD/EUR'`) |
+| `.to` | `currency` | Target currency (`'EUR'` in `'USD/EUR'`) |
 | `.amount` | `decimal` | Magnitude (the numeric part) |
 
 **Constraints:** `in '<currency>/<currency>'`, `optional`, `default '...'`. **Implicit constraint:** `positive` — zero and negative exchange rates are always invalid configurations (see D16 Corollary 2). Declaring `positive` or `nonzero` explicitly is redundant.
@@ -827,13 +837,13 @@ from Active on Convert
   set AmountUsd = FxRate * AmountEur    # (USD/EUR) × EUR → USD  ✓
 ```
 
-The compiler verifies that the exchange rate's denominator currency matches the source money's currency, and that the result matches the exchange rate's numerator currency.
+The compiler verifies that the exchange rate's target currency (`.to`) matches the source money's currency, and that the result matches the exchange rate's source currency (`.from`).
 
 **Teachable error messages:**
 
 | Invalid code | Error message |
 |---|---|
-| `FxUsdEur * AmountGbp` | `exchangerate in 'USD/EUR'` × `money in 'GBP'` — the denominator currency (`EUR`) doesn't match the money's currency (`GBP`). |
+| `FxUsdEur * AmountGbp` | `exchangerate in 'USD/EUR'` × `money in 'GBP'` — the target currency (`EUR`) doesn't match the money's currency (`GBP`). |
 | `FxUsdEur + FxGbpEur` | You can't add exchange rates together. Exchange rates are conversion factors, not additive quantities. |
 
 ---
@@ -1022,8 +1032,9 @@ Discrete equality narrowing plugs into the existing guard-narrowing pipeline fro
 | `period` | `.dimension` | `dimension` | Temporal dimension: `'date'`, `'time'`, or `'datetime'`. Date bases: `years`, `months`, `weeks`, `days`. Time bases: `hours`, `minutes`, `seconds`, `milliseconds`, `nanoseconds`, `ticks`. Multi-basis periods spanning both date and time components (e.g., `'days&hours'`) return `'datetime'`. NodaTime lowering: computed from `HasDateComponent` / `HasTimeComponent` boolean properties |
 | `price` | `.currency` | `currency` | Numerator currency |
 | `price` | `.unit` | `unitofmeasure` | Denominator unit |
-| `exchangerate` | `.numerator` | `currency` | Numerator currency code |
-| `exchangerate` | `.denominator` | `currency` | Denominator currency code |
+| `price` | `.dimension` | `dimension` | Denominator unit dimension category |
+| `exchangerate` | `.from` | `currency` | Source currency code |
+| `exchangerate` | `.to` | `currency` | Target currency code |
 | `unitofmeasure` | `.dimension` | `dimension` | UCUM dimension category |
 
 ### Example — open money with guard narrowing
@@ -1526,8 +1537,8 @@ For business-domain types, comparison operators carry domain preconditions. **Cr
   | `quantity` | `.dimension` | `when X.dimension == 'length'` | `$eq:X.dimension:length` |
   | `period` | `.basis` | `when X.basis == 'hours&minutes'` | `$eq:X.basis:hours&minutes` |
   | `period` | `.dimension` | `when X.dimension == 'date'` | `$eq:X.dimension:date` |
-  | `price` | `.currency`, `.unit` | `when X.currency == 'USD'` | `$eq:X.currency:USD` |
-  | `exchangerate` | `.numerator`, `.denominator` | `when X.numerator == 'USD'` | `$eq:X.numerator:USD` |
+  | `price` | `.currency`, `.unit`, `.dimension` | `when X.currency == 'USD'` | `$eq:X.currency:USD` |
+  | `exchangerate` | `.from`, `.to` | `when X.from == 'USD'` | `$eq:X.from:USD` |
 - **Alternatives rejected:** (A) Require `in`/`of` on every field — eliminates open-field use cases. (B) Allow open fields but block all arithmetic. (C) Runtime validation — violates philosophy.
 - **Precedent:** Same contract as optional narrowing. Same friction, same reason.
 - **Tradeoff accepted:** Authors who use open fields must write guards.
@@ -1717,11 +1728,11 @@ This proposal extends mechanisms established by the temporal proposal (Issue #10
 - Enforce mutual exclusivity: `in` and `of` on the same field declaration is a parse error.
 - Parse unit expressions inside `'...'` — distinguish period basis (atoms separated by `&`), currency codes (3 uppercase letters), UCUM unit names, and compound price/rate expressions (containing `/` between a currency and a unit).
 - Parse category names inside `of '...'` — validate against the known UCUM dimension vocabulary for `quantity`, and the fixed set `'date'`/`'time'` for `period`.
-- **Typed-constant content parsing belongs in the parser phase**, not the type checker. Content-shape recognition (detecting `<number> <3-uppercase>` vs `<number> <unit>` vs `<bare-name>`) happens during parsing so that diagnostics attach to the correct token span. The type checker consumes already-classified typed constants.
+- **Typed-constant content remains opaque through the parser phase.** The parser preserves the literal text and span only. The type checker performs context-directed parsing and validation so diagnostics still attach to the literal span, but type identity is never pre-classified in the parser.
 
 ### Type checker changes
 
-> **File placement (#118):** After the type checker decomposition (#118), new type-inference logic (operator tables, typed-constant content inference, dot-accessor resolution, dimensional cancellation) lands in `PreceptTypeChecker.DomainTypeInference.cs` via type-family dispatch from `TryInferBinaryKind`. Discrete equality narrowing lands in `Narrowing.cs`. `in`/`of` constraint validation lands in `FieldConstraints.cs`. See #118's future-proofing analysis for the full per-file growth estimates.
+> **File placement (#118):** After the type checker decomposition (#118), new type-inference logic (operator tables, typed-constant content validation, dot-accessor resolution, dimensional cancellation) lands in `PreceptTypeChecker.DomainTypeInference.cs` via expected-type dispatch from `TryInferBinaryKind`. Discrete equality narrowing lands in `Narrowing.cs`. `in`/`of` constraint validation lands in `FieldConstraints.cs`. See #118's future-proofing analysis for the full per-file growth estimates.
 
 - New types: `money`, `currency`, `quantity`, `unitofmeasure`, `dimension`, `price`, `exchangerate`.
 - Unit compatibility enforcement: same-currency for money arithmetic, same-unit for quantity arithmetic, dimensional cancellation for price × quantity.

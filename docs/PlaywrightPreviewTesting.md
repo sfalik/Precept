@@ -1,5 +1,7 @@
 # Playwright Preview UI Testing — Setup & Execution Guide
 
+> **Authority boundary:** This file lives in `docs/`, the repository's legacy/current reference set. Use it for the implemented v1 surface, current product reference, or historical context. If you are designing or implementing `src/Precept.Next` / the v2 clean-room pipeline, start in [docs.next/README.md](../docs.next/README.md) instead.
+
 ## Overview
 
 The Precept preview inspector is a standalone HTML file (`tools/Precept.VsCode/webview/inspector-preview.html`) that communicates with VS Code via `postMessage`. Because the HTML is self-contained, it can be loaded in a headless browser and driven with Playwright — no VS Code instance required.

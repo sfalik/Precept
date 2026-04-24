@@ -1,5 +1,7 @@
 # Type Checker Design
 
+> **Authority boundary:** This file lives in `docs/`, the repository's legacy/current reference set. Use it for the implemented v1 surface, current product reference, or historical context. If you are designing or implementing `src/Precept.Next` / the v2 clean-room pipeline, start in [docs.next/README.md](../docs.next/README.md) instead.
+
 Date: 2026-04-19
 
 Status: **Implemented** — 6-partial-class architecture (3,783 LOC) landed in PR #123 (issue #118). All validation phases operational: type inference, narrowing, proof-backed assessments, field constraints, computed fields, collection mutations. Diagnostic surface covers C1–C99 constraint codes. Research-backed architecture review confirmed alignment with Kotlin K2, Roslyn Binder, and F# Checking precedents.

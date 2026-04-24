@@ -1,5 +1,7 @@
 # Precept Language Design
 
+> **Authority boundary:** This file lives in `docs/`, the repository's legacy/current reference set. Use it for the implemented v1 surface, current product reference, or historical context. If you are designing or implementing `src/Precept.Next` / the v2 clean-room pipeline, start in [docs.next/README.md](../docs.next/README.md) instead.
+
 Date: 2026-03-05
 
 This document captures the surface syntax and semantics for the Precept DSL — a parser/tooling-friendly grammar that does **not** rely on indentation/offside rules. The language described here is fully implemented and is the current DSL.

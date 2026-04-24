@@ -9,7 +9,7 @@ Documents defining the Precept DSL surface — what the language looks like to a
 | [precept-language-spec.md](precept-language-spec.md) | Formal language specification (v2). Grows incrementally as each compiler stage locks decisions. Sections: §1 Lexer, §2 Parser, §3 Type Checker. | Incremental |
 | [precept-language-vision.md](precept-language-vision.md) | Target language surface — combines implemented features with approved proposals into a single future-state reference. | Working |
 | [primitive-types.md](primitive-types.md) | Canonical reference for `string`, `integer`, `decimal`, `number`, `boolean`, `choice`. Owns numeric lane rules, conversion map, constraints, and built-in functions. | Active |
-| [temporal-type-system.md](temporal-type-system.md) | NodaTime-aligned temporal types (`instant`, `localdate`, `localtime`, `localdatetime`, `period`, `duration`, `timezone`). Typed constants, operators, and bridge functions. | Draft — [Issue #107](https://github.com/sfalik/Precept/issues/107) |
+| [temporal-type-system.md](temporal-type-system.md) | NodaTime-aligned temporal types (`date`, `time`, `datetime`, `instant`, `period`, `duration`, `timezone`, `zoneddatetime`). Typed constants, operators, and bridge functions. | Draft — [Issue #107](https://github.com/sfalik/Precept/issues/107) |
 | [business-domain-types.md](business-domain-types.md) | Currency, quantity, unit-of-measure, and price types. Depends on temporal design for typed constant syntax and `in` pattern. | Draft — [Issue #95](https://github.com/sfalik/Precept/issues/95) |
 
 ## Reading Order

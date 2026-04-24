@@ -1,5 +1,7 @@
 # Engine Design
 
+> **Authority boundary:** This file lives in `docs/`, the repository's legacy/current reference set. Use it for the implemented v1 surface, current product reference, or historical context. If you are designing or implementing `src/Precept.Next` / the v2 clean-room pipeline, start in [docs.next/README.md](../docs.next/README.md) instead.
+
 Date: 2026-04-19
 
 Status: **Implemented** — `PreceptEngine` fully operational. All four instance operations (CreateInstance, Inspect, Fire, Update) shipped. Atomic execution model, outcome taxonomy, stateless and stateful modes, computed field pipeline, and guarded edit evaluation all active.

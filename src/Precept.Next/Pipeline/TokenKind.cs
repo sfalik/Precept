@@ -130,6 +130,7 @@ public enum TokenKind
     NotEquals,
     CaseInsensitiveEquals,
     CaseInsensitiveNotEquals,
+    Tilde,           // ~ prefix on string in collection inner type position
     GreaterThanOrEqual,
     LessThanOrEqual,
     GreaterThan,

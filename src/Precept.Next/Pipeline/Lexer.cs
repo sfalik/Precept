@@ -762,6 +762,7 @@ public static class Lexer
                 '*' => TokenKind.Star,
                 '/' => TokenKind.Slash,
                 '%' => TokenKind.Percent,
+                '~' => TokenKind.Tilde,
                 _ => (TokenKind?)null,
             };
 

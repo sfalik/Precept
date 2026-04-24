@@ -812,6 +812,15 @@ public static class Parser
             Advance(); // consume set/queue/stack
             Expect(TokenKind.Of);
             var elemStart = Current;
+
+            // ~string: case-insensitive string inner type
+            bool caseInsensitive = false;
+            if (Current.Kind == TokenKind.Tilde)
+            {
+                caseInsensitive = true;
+                Advance(); // consume ~
+            }
+
             var elemKind = TryMapScalarKind(Current.Kind);
             if (elemKind.HasValue)
             {
@@ -821,7 +830,7 @@ public static class Parser
                     qualifier = ParseTypeQualifier();
                 var elem = new ScalarTypeRef(
                     SourceSpan.Covering(SpanOf(elemStart), LastSpan()),
-                    elemKind.Value, qualifier);
+                    elemKind.Value, qualifier, caseInsensitive);
                 return new CollectionTypeRef(
                     SourceSpan.Covering(SpanOf(start), LastSpan()), kind, elem);
             }

@@ -54,6 +54,17 @@ Relational comparison (`<`, `>`, `<=`, `>=`) is not available on `string`. Arith
 
 **String interpolation:** `"Hello, {Name}"` — each `{expr}` is type-checked independently. Any scalar type is coercible to string inside `"..."` interpolation. Collections are a type error.
 
+**`~string` — case-insensitive collection inner type:**
+
+`~string` is not a standalone field type — it is only valid as the inner type of a collection:
+
+```precept
+field Tags   as set of string    # ordinal — "Apple" ≠ "apple", both can coexist
+field Labels as set of ~string   # OrdinalIgnoreCase — "Apple" and "apple" are the same element
+```
+
+The `~` prefix selects `StringComparer.OrdinalIgnoreCase` as the collection's comparer, which governs membership, deduplication, and ordering consistently. `set of ~string` supports `.min`/`.max` (OrdinalIgnoreCase ordering is deterministic). `field Name as ~string` is a type error (`CaseInsensitiveStringOnNonCollection`).
+
 ---
 
 ## `integer`

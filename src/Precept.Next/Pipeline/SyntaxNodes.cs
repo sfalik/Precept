@@ -58,7 +58,7 @@ namespace Precept.Pipeline;
 //  │   └── RejectOutcomeNode                 ← reject "message"
 //  │
 //  ├── TypeRef (abstract)                    ← field type annotations
-//  │   ├── ScalarTypeRef                     ← string | number | ... + Qualifier?
+//  │   ├── ScalarTypeRef                     ← string | ~string | number | ... + Qualifier?
 //  │   ├── CollectionTypeRef                 ← set of T | queue of T | stack of T
 //  │   └── ChoiceTypeRef                     ← choice("A", "B", ...)
 //  │
@@ -281,7 +281,8 @@ public abstract record TypeRef(SourceSpan Span) : SyntaxNode(Span);
 
 /// <summary>Primitive scalar type: string, number, integer, decimal, boolean, temporal, domain.</summary>
 public sealed record ScalarTypeRef(
-    SourceSpan Span, ScalarTypeKind Kind, TypeQualifier? Qualifier
+    SourceSpan Span, ScalarTypeKind Kind, TypeQualifier? Qualifier,
+    bool CaseInsensitive = false
 ) : TypeRef(Span);
 
 /// <summary>Collection type: set of T, queue of T, stack of T.</summary>

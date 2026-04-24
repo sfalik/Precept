@@ -1,5 +1,7 @@
 # Editable Fields Design Notes
 
+> **Authority boundary:** This file lives in `docs/`, the repository's legacy/current reference set. Use it for the implemented v1 surface, current product reference, or historical context. If you are designing or implementing `src/Precept.Next` / the v2 clean-room pipeline, start in [docs.next/README.md](../docs.next/README.md) instead.
+
 Date: 2026-03-04
 
 Status: **Runtime implemented.** Parser/model support was included in the language redesign; the runtime `Update` API, `IUpdatePatchBuilder`, editability enforcement, rule/ensure evaluation, and `Inspect` integration are now implemented.

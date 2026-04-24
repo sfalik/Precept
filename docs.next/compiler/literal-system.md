@@ -18,7 +18,7 @@ All non-primitive values enter the language through exactly two quoted forms:
 | Form | Delimiter | Produces | Interpolation |
 |------|-----------|----------|---------------|
 | String | `"..."` | Always `string` | `{expr}` — expression evaluated, coerced to string |
-| Typed constant | `'...'` | Non-primitive type, inferred from content shape | `{expr}` — expression evaluated, substituted before shape matching |
+| Typed constant | `'...'` | Non-primitive type, determined by expression context then content-validated | `{expr}` — expression evaluated, substituted before content validation |
 
 There is no third form. No bare postfix keywords, no constructor functions, no `type(value)` forms. Zero constructors exist in the language.
 
@@ -107,7 +107,7 @@ Typed constants produce non-primitive values. Like numeric literals, typed const
 Typed constant resolution follows the same two-step model as numeric literals:
 
 1. **Context determines the type.** The type checker propagates an expected type inward from the enclosing expression — field declaration, assignment target, operator peer, function parameter, or comparison operand. This is the same top-down inference that resolves `42` to `integer`, `decimal`, or `number`.
-2. **Content is validated against the expected type.** Once the expected type is known, the content is parsed and validated by the type's registered `ITypedConstantValidator`. If the content doesn't parse as the expected type, it is a compile error. If no validator is registered (domain module not yet shipped), shape validation only.
+2. **Content is validated against the expected type.** Once the expected type is known, the content is parsed and validated by the type's registered `ITypedConstantValidator`. If the content doesn't parse as the expected type, it is a compile error. If no validator is registered (domain module not yet shipped), structural validation only.
 3. **No context → compile error.** A typed constant in a position with no type expectation is a compile error, just as `42` in a contextless position is a compile error.
 
 This replaces the previous "shape-first" model where content determined the type. Shape is no longer the resolution mechanism — context is.
@@ -135,7 +135,7 @@ Given the context-determined type, the content must parse as a valid value of th
 | `dimension` | Dimension name (UCUM registry) | `'mass'`, `'length'` |
 | state ref | Plain identifier | `'Open'`, `'UnderReview'` |
 
-**Content validation is compile-time.** When a validator is registered for the expected type, malformed content is a compile error — e.g., `'2026-02-30'` fails date validation, `'XYZ 100.00'` fails money validation (XYZ is not a recognized ISO 4217 code). The `ITypedConstantValidator` registry is layered: the checker defines the hook, each domain type family registers its validator. If no validator is registered, shape-only validation is accepted.
+**Content validation is compile-time.** When a validator is registered for the expected type, malformed content is a compile error — e.g., `'2026-02-30'` fails date validation, `'XYZ 100.00'` fails money validation (XYZ is not a recognized ISO 4217 code). The `ITypedConstantValidator` registry is layered: the checker defines the hook, each domain type family registers its validator. If no validator is registered, structural validation is accepted.
 
 ### Context sources
 

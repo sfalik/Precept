@@ -1199,10 +1199,10 @@ All temporal types support `optional`. All follow existing null propagation rule
 
 ### 4. Single-quoted delimiter is the typed constant delimiter — not temporal-specific (revised — locked 2026-04-15)
 
-- **Why:** The `'...'` delimiter is the **typed constant delimiter** for any non-primitive type whose content shape determines a type family — not a temporal-specific feature. The two literal mechanisms are a closed set: `"..."` (string with optional `{expr}` interpolation) and `'...'` (typed constant with optional `{expr}` interpolation, type inferred from content shape via the type-family admission rule). Zero constructors exist in the language. A type qualifies for `'...'` if and only if its content shape determines a **type family** — a finite, enumerable set of types — that is disjoint from every other family. Context narrows within the family. See [Literal System](../compiler/literal-system.md) for the canonical two-door model. Temporal types are the **first inhabitants**: `date` (`YYYY-MM-DD`), `time` (`HH:MM:SS`), `datetime` (`...T...`), `instant` (`...T...Z`), `zoneddatetime` (`...T...[zone]`), `timezone` (`Word/Word`). Quantities (`'30 days'`) enter through the same door with type family `{period, duration}`, narrowed by expression context. This follows Precept's literal grain: `"hello"` doesn't need `string("hello")`, so `'2026-01-15'` doesn't need `date(2026-01-15)`.
+- **Why:** The `'...'` delimiter is the **typed constant delimiter** for non-primitive values that support compile-time content validation — not a temporal-specific feature. The two literal mechanisms are a closed set: `"..."` (string with optional `{expr}` interpolation) and `'...'` (typed constant with optional `{expr}` interpolation, type resolved from expression context and then validated). Zero constructors exist in the language. Temporal types are the **first inhabitants**: `date` (`YYYY-MM-DD`), `time` (`HH:MM:SS`), `datetime` (`...T...`), `instant` (`...T...Z`), `zoneddatetime` (`...T...[zone]`), `timezone` (`Word/Word`). Quantities (`'30 days'`) enter through the same door, with `period` or `duration` chosen by expression context. This follows Precept's literal grain: `"hello"` doesn't need `string("hello")`, so `'2026-01-15'` doesn't need `date(2026-01-15)`.
 - **Alternatives rejected:** (A) `date(2026-01-15)` (unquoted constructor — original Decision #4/18) — the initial recommendation. The string-delimiter precedent insight: if strings use `"..."` without a `string()` wrapper, temporal values should use a delimiter too. See "Double-Quote Alternative Analysis" below. (B) `date("2026-01-15")` (string constructor) — quotes suggest "a string being parsed." (C) Bare ISO `2024-01-15` — lexer ambiguity with subtraction. (D) `"2026-01-15"` (double-quoted, context-resolved) — explored and rejected; see "Double-Quote Alternative Analysis." (E) Sigil prefix (`#2026-01-15`) — non-obvious, not Precept's voice.
 - **Precedent:** SQL `'2026-01-15'` for value literals. Python `b'...'` / `r'...'` for typed string variants with distinct delimiters.
-- **Tradeoff:** Type is implicit in content shape rather than explicit in a keyword. Readers must recognize ISO formats. Mitigated by: (a) ISO date formats are culturally universal, (b) field declarations provide type context, (c) syntax highlighting colors single-quoted content distinctly.
+- **Tradeoff:** Type is implicit in expression context rather than explicit in a keyword. Readers must recognize ISO formats. Mitigated by: (a) ISO date formats are culturally universal, (b) field declarations and operator context make the expected type visible, (c) syntax highlighting colors single-quoted content distinctly.
 
 **`char` type permanent exclusion (supporting decision):** Precept will never have a `char` type — characters are programming-language implementation details, not business-domain data. Single quotes are permanently reserved for the typed constant delimiter with zero future collision risk.
 
@@ -1318,35 +1318,35 @@ All temporal types support `optional`. All follow existing null propagation rule
 
 ### 18. Single-quoted typed constants — `'...'` as the typed constant delimiter (rewritten 2026-04-15, reframed 2026-04-15, updated 2026-04-17)
 
-**What:** The `'...'` delimiter is the **typed constant delimiter** — a language-level mechanism for any non-primitive type whose content shape determines a type family. The canonical design lives in [Literal System](../compiler/literal-system.md). Temporal types are the first inhabitants, not the definition. Constants for `date`, `time`, `datetime`, `instant`, `zoneddatetime`, `timezone`, and temporal quantities use `'...'` with type inferred from content shape via the type-family admission rule.
+**What:** The `'...'` delimiter is the **typed constant delimiter** — a language-level mechanism for non-primitive values whose content can be validated at compile time. The canonical design lives in [Literal System](../compiler/literal-system.md). Temporal types are the first inhabitants, not the definition. The delimiter is not temporal-specific and does not infer type by content shape. Expression context determines the expected type; the content is then validated against that type. Temporal quantities such as `'30 days'` remain context-born: `date + ...` and `datetime + ...` contexts expect `period`; `instant + ...` and `zoneddatetime + ...` contexts expect `duration`.
 
-| Type | Literal | Content shape | Type family |
-|------|---------|--------------|-------------|
-| date | `'2026-01-15'` | `YYYY-MM-DD` | `{date}` |
-| time | `'14:30:00'` | `HH:MM:SS` | `{time}` |
-| datetime | `'2026-01-15T14:30:00'` | `...T...` (no `Z`, no `[`) | `{datetime}` |
-| instant | `'2026-01-15T14:30:00Z'` | `...T...Z` | `{instant}` |
-| zoneddatetime | `'2026-01-15T14:30:00[America/New_York]'` | `...T...[zone]` | `{zoneddatetime}` |
-| timezone | `'America/New_York'` | IANA identifier | `{timezone}` |
-| quantity | `'30 days'`, `'{GraceDays} days'` | `<value> <unit>` | `{period, duration}` |
+| Expected type | Literal | Content validated as |
+|------|---------|--------------|
+| date | `'2026-01-15'` | `YYYY-MM-DD` |
+| time | `'14:30:00'` | `HH:MM:SS` |
+| datetime | `'2026-01-15T14:30:00'` | local ISO 8601 datetime |
+| instant | `'2026-01-15T14:30:00Z'` | UTC ISO 8601 timestamp |
+| zoneddatetime | `'2026-01-15T14:30:00[America/New_York]'` | ISO 8601 datetime + IANA zone |
+| timezone | `'America/New_York'` | IANA identifier |
+| period / duration | `'30 days'`, `'{GraceDays} days'` | quantity content, resolved by expression context |
 
 **Delimiter semantics — the two-door model:**
 
 | Delimiter | Meaning | Type resolution |
 |-----------|---------|-----------------|
 | `"..."` | String with optional `{expr}` interpolation | Always `string` |
-| `'...'` | Typed constant with optional `{expr}` interpolation | Inferred from content shape → type family → narrowed by context |
+| `'...'` | Typed constant with optional `{expr}` interpolation | Context-born: expected type comes from expression context, then content is validated |
 
-**Type-family admission rule (updated 2026-04-17):** A type qualifies for `'...'` if and only if its content shape determines a **type family** — a finite, enumerable set of types — that is disjoint from every other family. Context narrows within the family. This replaces the original "self-identifying property" which required each shape to map to exactly one type. The type-family formulation allows quantities (`'30 days'` → family `{period, duration}`, narrowed by expression context) while preserving unambiguous type inference for singleton families (`'2026-01-15'` → `{date}`).
+**Door-2 admission rule:** A type qualifies for `'...'` if its content can be validated at compile time once an expected type is known. Context, not content shape, resolves type identity. Quantities such as `'30 days'` are valid because `period` and `duration` both define compile-time validators; the surrounding expression determines which one is expected.
 
-**Current inhabitants (temporal — first wave):** The eight types listed above (`date`, `time`, `instant`, `duration`, `period`, `timezone`, `zoneddatetime`, `datetime`). **Future candidates (illustrative, not committed):** UUID, email, URI, semver — each requires formal family-disjointness analysis. See [Literal System](../compiler/literal-system.md) § Forward Design.
+**Current inhabitants (temporal — first wave):** The eight types listed above (`date`, `time`, `instant`, `duration`, `period`, `timezone`, `zoneddatetime`, `datetime`). **Future candidates (illustrative, not committed):** UUID, email, URI, semver — each requires an explicit content validator and tooling design. See [Literal System](../compiler/literal-system.md) § Forward Design.
 
 **Design evolution:** The `date(2026-01-15)` constructor form was the team's unanimous initial recommendation (original Decision #18). The string-delimiter precedent insight: strings don't need `string("hello")` — the `"..."` delimiter IS the type signal. Why should temporal values need `date(...)` when a distinct delimiter can carry the same information? This led to exploring `"..."` with context resolution (rejected — see "Double-Quote Alternative Analysis" below), then to single quotes as the clean solution.
 
 - **Why:** (1) Follows Precept's literal grain — the delimiter IS the type signal. (2) Single token in the tokenizer (`'[^']*'`), same as `NumberLiteral` and `StringLiteral`. (3) Uniform across all 6 types. (4) `'` is an unambiguous IntelliSense trigger for temporal completions and progressive validation. (5) No `char` type collision — permanently safe.
 - **Alternatives rejected:** (A) `date(2026-01-15)` (unquoted constructor) — team's initial choice, superseded by delimiter insight. (B) `date("2026-01-15")` (string constructor) — quotes suggest "string being parsed." (C) `"2026-01-15"` (double-quoted, context-resolved) — explored and rejected; see "Double-Quote Alternative Analysis." (D) Bare ISO `2024-01-15` — lexer ambiguity with subtraction. (E) SQL-style `DATE '2026-01-15'` — redundant keyword when content shape is sufficient.
 - **Precedent:** SQL `'...'` for value literals including dates. Precept's own `"..."` → string pattern.
-- **Tradeoff:** Type is implicit in content shape rather than explicit in a keyword. Readers must recognize ISO formats. Mitigated by: (a) ISO formats are culturally universal, (b) field declarations provide type context, (c) syntax highlighting can color single-quoted content distinctly.
+- **Tradeoff:** Type is implicit in expression context rather than explicit in a constructor keyword. Readers must still recognize ISO formats, but field declarations, operator context, and syntax highlighting make the expected type visible.
 
 **Tooling implications:**
 - **IntelliSense:** `'` triggers temporal completions with format-aware ghost text. After `'2024-`, show `-MM-DD` placeholder. After `'14:`, show `mm:ss`. Content-shape detection enables type-specific validation as the author types.
@@ -1549,7 +1549,7 @@ Temporal types are valid as collection inner types where the collection's struct
 - Add `date`, `time`, `instant`, `duration`, `period`, `timezone`, `zoneddatetime`, `datetime` as type keywords.
 - Temporal unit names (`days`, `months`, `years`, `weeks`, `hours`, `minutes`, `seconds`) are **not** language keywords. They are validated strings inside `'...'` typed constants. No keyword reservation needed.
 - Add `inZone` as dot-accessor keyword for timezone mediation.
-- **Single-quoted typed constants with interpolation:** New token type `TypedConstantLiteral`. The tokenizer recognizes `{` inside `'...'` as interpolation start and switches to expression mode (same mechanism as string interpolation). Content inside single quotes — after interpolation resolution — is a constant pattern matched to determine the type family. `'2026-03-15'` is valid (date). `'03/15/2026'` is a compile error with a teachable message. `'30 days'` is valid (quantity). `'{GraceDays} days'` uses interpolation. See [Literal System](../compiler/literal-system.md) for the full tokenizer architecture.
+- **Single-quoted typed constants with interpolation:** New token type `TypedConstantLiteral`. The tokenizer recognizes `{` inside `'...'` as interpolation start and switches to expression mode (same mechanism as string interpolation). Content inside single quotes remains opaque through lexing and parsing; after interpolation resolution, the type checker validates it against the context-determined expected type. `'2026-03-15'` is valid in a `date` context. `'03/15/2026'` is a compile error with a teachable message. `'30 days'` is valid in a `period` or `duration` context. `'{GraceDays} days'` uses interpolation. See [Literal System](../compiler/literal-system.md) for the full tokenizer architecture.
 - **String interpolation:** `"..."` strings gain `{expr}` interpolation. The tokenizer recognizes `{` inside `"..."` as interpolation start. `{{` and `}}` produce literal `{` and `}`. See [Literal System](../compiler/literal-system.md).
 - **Quantity typed constants:** Quantity content (`'30 days'`, `'2 years + 6 months'`, `'{GraceDays} days'`) is parsed after interpolation resolution as: `<integer> <unit-name>`, with `+` combination for compound quantities. No bare postfix combinators needed at the expression level.
 - Parse `.inZone(tz)` dot-accessor form for timezone mediation on `instant` and `datetime` types.
@@ -1562,7 +1562,7 @@ Temporal types are valid as collection inner types where the collection's struct
 - 8 new type entries.
 - **Period/duration split enforcement:** `date + period ✓`, `date + duration ✗`, `instant + duration ✓`, `instant + period ✗`. Standard type-checking — no custom dispatch.
 - **Postfix unit type resolution:** Resolve quantity typed constants (`'<value> <unit>'`) to `period` or `duration` based on expression context. `date +` / `datetime +` context → `period`. `instant +` / `zoneddatetime +` context → `duration`. `months`/`years` → always `period`. Field default context → match declared field type. No context → compile error.
-- **Typed constant type inference:** Determine specific type from content shape via the type-family admission rule. Current inhabitants: `YYYY-MM-DD` without `T` = date, `HH:MM:SS` without `-` = time, `...T...` without `Z` or `[` = datetime, `...T...Z` = instant, `...T...[zone]` = zoneddatetime, IANA pattern = timezone, `<value> <unit>` = quantity (family `{period, duration}`). Framework is extensible to future inhabitants whose shapes produce disjoint families.
+- **Typed constant content validation:** No shape-first inference. The checker determines the expected type from expression context, then validates the content against that type. Quantity forms such as `'<value> <unit>'` validate as `period` or `duration` based on the surrounding expected type. No context → compile error.
 - **Cross-domain unit rejection:** `date + '3 hours'` → compile error (date requires `period of 'date'`; hours are time components). `time + '5 days'` → compile error (time requires `period of 'time'`; days are date components). Follows Decision #26.
 - Full cross-type interaction matrix.
 - `period` ordering rejection (`<`, `>`, `<=`, `>=`).
@@ -1654,7 +1654,7 @@ The critical insight: "case" means 24 for beer and 12 for wine. Conversion facto
 
 Each domain follows the grammar shapes established by this proposal — entering through one of the three literal doors:
 
-**Door 2 — Typed constant (`'...'`) with interpolation:** For values with a shape-recognizable constant form AND for magnitude+unit quantities. Future candidates beyond temporal: UUID (`'550e8400-...'` — `8-4-4-4-12` hex), email (`'user@example.com'` — `@` present), URI (`'https://...'` — scheme `://`), semver (`'2.1.0'` — `N.N.N`). Quantities like `'100 USD'`, `'24 each'`, `'{Quantity} each'` also enter through this door — the shape includes a numeric portion followed by a unit name. Interpolation (`'{expr}'`) allows computed values without a separate grammar form. Each inhabitant qualifies only if its content shape is distinguishable from all existing inhabitants via the type-family admission rule (see [Literal System](../compiler/literal-system.md)).
+**Door 2 — Typed constant (`'...'`) with interpolation:** For values with a compile-time-validatable constant form and for magnitude+unit quantities. Future candidates beyond temporal: UUID (`'550e8400-...'` — `8-4-4-4-12` hex), email (`'user@example.com'` — `@` present), URI (`'https://...'` — scheme `://`), semver (`'2.1.0'` — `N.N.N`). Quantities like `'100 USD'`, `'24 each'`, `'{Quantity} each'` also enter through this door. Interpolation (`'{expr}'`) allows computed values without a separate grammar form. Each inhabitant would need an explicit compile-time validator and a clear tooling story (see [Literal System](../compiler/literal-system.md)).
 
 **Door 1 — String (`"..."`) with interpolation:** For values with no distinguishing shape. Three-letter currency codes like `USD` are indistinguishable from other short strings — so currency *amounts* use typed constants (`'100 USD'`), but standalone currency codes remain strings. Interpolation (`"{expr}"`) allows dynamic content.
 
@@ -1713,4 +1713,4 @@ No programming language combines entity-scoped unit declarations, type-level enf
 
 ### Scope boundary
 
-This section is a **forward design note**, not a commitment. It documents why the literal mechanism decisions in this proposal carry more weight than temporal types alone — they establish the language's entire framework for moving beyond primitives. Temporal types are the gateway: they prove the typed constant delimiter with interpolation, the type-family admission rule, and the zero-constructor discipline. The actual design of future types (UUID, email, currency, physical quantity) belongs in separate proposals when demand warrants it. The temporal decisions should be made with this framework in mind, but should not be over-engineered to serve hypothetical future needs.
+This section is a **forward design note**, not a commitment. It documents why the literal mechanism decisions in this proposal carry more weight than temporal types alone — they establish the language's framework for moving beyond primitives. Temporal types are the gateway: they prove the typed constant delimiter with interpolation, the context-born resolution model, and the zero-constructor discipline. The actual design of future types (UUID, email, currency, physical quantity) belongs in separate proposals when demand warrants it. The temporal decisions should be made with this framework in mind, but should not be over-engineered to serve hypothetical future needs.

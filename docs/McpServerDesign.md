@@ -1,5 +1,7 @@
 # Precept MCP Server Design
 
+> **Authority boundary:** This file lives in `docs/`, the repository's legacy/current reference set. Use it for the implemented v1 surface, current product reference, or historical context. If you are designing or implementing `src/Precept.Next` / the v2 clean-room pipeline, start in [docs.next/README.md](../docs.next/README.md) instead.
+
 **Status:** Original 6-tool surface implemented (2026-03-06); packaging and Copilot workflow design updated (2026-03-22); redesigned to 4 tools with text input and structured feedback (2026-03-26); design decisions finalized (2026-03-27); expanded to 5 tools with `precept_update` + `precept_fire` rename (2026-03-27)
 
 ## Purpose

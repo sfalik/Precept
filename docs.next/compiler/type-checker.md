@@ -323,7 +323,7 @@ Each resolved declaration (`ResolvedRule`, `ResolvedTransitionRow`, etc.) carrie
 public abstract record ResolvedType;
 
 // ── Scalar types ────────────────────────────────────────────────
-public sealed record StringType()     : ResolvedType;
+public sealed record StringType(bool CaseInsensitive = false) : ResolvedType;
 public sealed record BooleanType()    : ResolvedType;
 public sealed record IntegerType()    : ResolvedType;
 public sealed record DecimalType()    : ResolvedType;
@@ -335,23 +335,19 @@ public sealed record DateType()           : ResolvedType;
 public sealed record TimeType()           : ResolvedType;
 public sealed record InstantType()        : ResolvedType;
 public sealed record DurationType()       : ResolvedType;
-public sealed record PeriodType(string? Qualifier)  : ResolvedType;  // "date", "time", or null (unconstrained)
+public sealed record PeriodType(string? Unit, string? Dimension)  : ResolvedType;
 public sealed record TimezoneType()       : ResolvedType;
 public sealed record ZonedDateTimeType()  : ResolvedType;
 public sealed record DateTimeType()       : ResolvedType;
 
 // ── Business-domain types ───────────────────────────────────────
-public sealed record MoneyType(string? CurrencyBasis)         : ResolvedType;
+public sealed record MoneyType(string? Currency)              : ResolvedType;
 public sealed record CurrencyType()                           : ResolvedType;
-public sealed record QuantityType(string? DimensionFamily)    : ResolvedType;
+public sealed record QuantityType(string? Unit, string? Dimension) : ResolvedType;
 public sealed record UnitOfMeasureType()                      : ResolvedType;
 public sealed record DimensionType()                          : ResolvedType;
-// TODO(B5): PriceType and ExchangeRateType need qualifier parameters
-// (currency, unit, numerator/denominator) to represent `in` declarations —
-// same pattern as MoneyType(CurrencyBasis) and QuantityType(DimensionFamily).
-// Design during implementation phase; see design review B5.
-public sealed record PriceType()                              : ResolvedType;
-public sealed record ExchangeRateType()                       : ResolvedType;
+public sealed record PriceType(string? Currency, string? Unit, string? Dimension) : ResolvedType;
+public sealed record ExchangeRateType(string? FromCurrency, string? ToCurrency) : ResolvedType;
 
 // ── Collection types ────────────────────────────────────────────
 public sealed record SetType(ResolvedType ElementType)   : ResolvedType;
@@ -368,9 +364,19 @@ public sealed record StateRefType() : ResolvedType;
 
 **Why an abstract record hierarchy (not an enum):**
 
-- Collection types carry an element type. Choice types carry the value set. Money and quantity types carry qualifiers. An enum cannot carry this data.
+- Collection types carry an element type. Choice types carry the value set. Period, money, quantity, price, and exchange-rate types carry qualifier payloads. An enum cannot carry this data.
 - Pattern matching on records is idiomatic C# and gives exhaustiveness checking with `switch` expressions (combined with a discard arm for `ErrorType`).
 - Each type record is a singleton-like value (no mutable state). Record equality works correctly for type comparison.
+
+**Qualifier-bearing type payloads:**
+
+- `MoneyType(Currency)` — `null` means open, `'USD'` means fixed-currency.
+- `QuantityType(Unit, Dimension)` — `in 'kg'` becomes `('kg', null)`, `of 'mass'` becomes `(null, 'mass')`, and unconstrained quantity becomes `(null, null)`. The parser rejects both `in` and `of`, so both fields are never non-null simultaneously.
+- `PeriodType(Unit, Dimension)` — `in 'days'` becomes `('days', null)`, `of 'date'` becomes `(null, 'date')`, and unconstrained period becomes `(null, null)`. As with quantity, `in` and `of` are mutually exclusive.
+- `PriceType(Currency, Unit, Dimension)` — fixed `in 'USD/kg'` becomes `('USD', 'kg', null)`; currency-only `in 'USD'` becomes `('USD', null, null)`; unit-only `in 'kg'` becomes `(null, 'kg', null)`; category `in 'USD' of 'mass'` becomes `('USD', null, 'mass')`; dimension-only `of 'mass'` becomes `(null, null, 'mass')`; open `price` becomes `(null, null, null)`. `Unit` and `Dimension` are mutually exclusive (same as quantity/period). `in` and `of` may coexist on `price` when `in` constrains a single axis (currency-only or unit-only); `in 'USD/kg'` already constrains both axes, so `of` is redundant and rejected. The compiler disambiguates bare `in` values by registry lookup: ISO 4217 → currency, UCUM → unit.
+- `ExchangeRateType(FromCurrency, ToCurrency)` — fixed `in 'USD/EUR'` becomes `('USD', 'EUR')`; partial `in 'USD'` becomes `('USD', null)`; open `exchangerate` becomes `(null, null)`.
+
+These payloads are enough to drive assignability, operator compatibility, narrowing, and result-type preservation without a second qualifier-resolution phase or TODO-shaped gap during implementation.
 
 ---
 
@@ -463,7 +469,7 @@ Typed constants (`'...'`) follow the same context-born resolution model as numer
 
 2. **Content is validated against the expected type.** Once the expected type is known, the content is parsed and validated by the type's registered `ITypedConstantValidator`. If the content doesn't parse as the expected type, it is a compile error.
 
-3. **Content validation → compile-time error on malformed values.** For example, `'2026-02-30'` fails date validation (no February 30th); `'XYZ 100.00'` fails money validation (XYZ is not a recognized ISO 4217 currency code). The `ITypedConstantValidator` registry is layered: the checker defines the hook, each domain type family registers its validator. If no validator is registered for a type, the checker accepts shape validation only. This layered approach avoids circular dependencies between the checker core and domain-specific validation logic.
+3. **Content validation → compile-time error on malformed values.** For example, `'2026-02-30'` fails date validation (no February 30th); `'XYZ 100.00'` fails money validation (XYZ is not a recognized ISO 4217 currency code). The `ITypedConstantValidator` registry is layered: the checker defines the hook, each domain type family registers its validator. If no validator is registered for a type, the checker accepts structural validation only. This layered approach avoids circular dependencies between the checker core and domain-specific validation logic.
 
 4. **No context → compile error.** A typed constant in a position with no type expectation is a compile error, just as a numeric literal in a contextless position is.
 
@@ -492,11 +498,15 @@ Typed constants (`'...'`) follow the same context-born resolution model as numer
 
 | Collection | Element constraint | Member accessors | Operations |
 |---|---|---|---|
-| `set of T` | T must be a scalar type | `.count` → `integer` | `add`, `remove`, `clear`, `contains` |
+| `set of T` | T must be a scalar type | `.count` → `integer`, `.min` → `T` ¹, `.max` → `T` ¹ | `add`, `remove`, `clear`, `contains` |
 | `queue of T` | T must be a scalar type | `.count` → `integer`, `.peek` → `T` | `enqueue`, `dequeue`, `clear` |
 | `stack of T` | T must be a scalar type | `.count` → `integer`, `.peek` → `T` | `push`, `pop`, `clear` |
 
 Collection element types are always scalar — no nested collections.
+
+¹ `.min` and `.max` are only available when T is **orderable** — supports `<`/`>` comparison. Orderable types: `integer`, `decimal`, `number`; `date`, `time`, `instant`, `duration`, `datetime`; `money`, `quantity`, `price` (qualifier constraints ensure commensurability); `choice` (with `ordered` modifier); `string` and `~string` (ordinal and OrdinalIgnoreCase respectively — both are deterministic and consistent with their `==` semantics). Non-orderable types (`boolean`, `period`, `timezone`, `zoneddatetime`, `exchangerate`, identity types) allow `set of T` for membership semantics but `.min`/`.max` on those sets are type errors (`NonOrderableCollectionExtreme`).
+
+**`~string` as a collection inner type:** `set of ~string` uses `StringComparer.OrdinalIgnoreCase` for membership, deduplication, and ordering — `"Apple"` and `"apple"` are the same element. `queue of ~string` and `stack of ~string` use `OrdinalIgnoreCase` for `.contains` only (insertion order is unaffected). `~string` is only valid as a collection inner type — `field Name as ~string` is a type error (`CaseInsensitiveStringOnNonCollection`). The `StringType` record carries this: `StringType(CaseInsensitive: false)` for plain `string`, `StringType(CaseInsensitive: true)` for `~string`.
 
 **Emptiness guard requirement.** Accessors that read from a collection (`.peek`, `.min`, `.max`) and mutations that consume from a collection (`dequeue`, `pop`) require proof that the collection is non-empty. Without proof, the type checker emits `UnguardedCollectionAccess` (for accessors) or `UnguardedCollectionMutation` (for mutations).
 
@@ -519,7 +529,6 @@ The idiomatic pattern for safe access is `if Items.count > 0 then Items.peek els
 | `==` `!=` | any T | same T | `boolean` | Yes — numeric widening |
 | `~=` `!~` | `string` | `string` | `boolean` | No — case-insensitive ordinal; type error on non-string |
 | `<` `>` `<=` `>=` | numeric | numeric | `boolean` | Yes — numeric widening |
-| `<` `>` `<=` `>=` | `string` | `string` | `boolean` | No (lexicographic) |
 | `<` `>` `<=` `>=` | `choice` (ordered) | `choice` (ordered, same set) | `boolean` | No (ordinal) |
 | `and` `or` | `boolean` | `boolean` | `boolean` | No |
 
@@ -647,6 +656,8 @@ The `then` and `else` branches must have compatible types (same type, or one wid
 | Object type | Member | Result type |
 |-------------|--------|-------------|
 | `set of T` | `count` | `integer` |
+| `set of T` | `min` | `T` |
+| `set of T` | `max` | `T` |
 | `queue of T` | `count` | `integer` |
 | `queue of T` | `peek` | `T` |
 | `stack of T` | `count` | `integer` |
@@ -706,12 +717,13 @@ The `then` and `else` branches must have compatible types (same type, or one wid
 | `price` | `.amount` | `decimal` | Magnitude (numeric part) |
 | `price` | `.currency` | `currency` | Numerator currency |
 | `price` | `.unit` | `unitofmeasure` | Denominator unit |
+| `price` | `.dimension` | `dimension` | Denominator unit dimension category |
 | `exchangerate` | `.amount` | `decimal` | Magnitude (numeric part) |
-| `exchangerate` | `.numerator` | `currency` | Numerator currency code |
-| `exchangerate` | `.denominator` | `currency` | Denominator currency code |
+| `exchangerate` | `.from` | `currency` | Source currency |
+| `exchangerate` | `.to` | `currency` | Target currency |
 | `unitofmeasure` | `.dimension` | `dimension` | UCUM dimension category |
 
-**Discrete equality narrowing:** Business-domain accessors (`.currency`, `.unit`, `.dimension`, `.basis`) participate in guard narrowing. `when Payment.currency == 'USD'` injects `$eq:Payment.currency:USD` into the symbol table, enabling same-currency arithmetic in the guarded scope. Fields declared with static `in` values pre-seed `$eq:` markers unconditionally. See the [business-domain type proposal](../language/business-domain-types.md#discrete-equality-narrowing) for the full narrowing mechanism.
+**Discrete equality narrowing:** Business-domain accessors (`.currency`, `.unit`, `.dimension`, `.basis`, `.from`, `.to`) participate in guard narrowing. `when Payment.currency == 'USD'` injects `$eq:Payment.currency:USD` into the symbol table, enabling same-currency arithmetic in the guarded scope. Fields declared with static `in` values pre-seed `$eq:` markers unconditionally. See the [business-domain type proposal](../language/business-domain-types.md#discrete-equality-narrowing) for the full narrowing mechanism.
 
 | _other_ | — | `InvalidMemberAccess` diagnostic |
 
@@ -763,6 +775,7 @@ Each `{expr}` inside `'...'` is type-checked independently. After interpolation 
 | **Conditional branch mismatch** | `if ... then A else B` where A and B have no common type | `TypeMismatch` |
 | **Default value type mismatch** | `default Expr` where `Expr`'s type is incompatible with the field type | `TypeMismatch` |
 | **Collection element type mismatch** | `add Field Expr` where `Expr`'s type doesn't match the collection's element type | `TypeMismatch` |
+| **`~string` on non-collection** | `field Name as ~string` — `~string` is only valid as a collection inner type | `CaseInsensitiveStringOnNonCollection` |
 | **Numeric literal incompatible** | Fractional literal in `integer` context, or exponent literal in `integer`/`decimal` context | `TypeMismatch` |
 
 ### Modifier Validation
@@ -1022,6 +1035,8 @@ These codes enforce the emptiness guard requirement for collection accessors and
 |------|-------|----------|------------------|------------|
 | `UnguardedCollectionAccess` | Type | Error | "'{0}' may be empty — guard with `if {0}.count > 0` before accessing `.{1}`" | `.peek`, `.min`, or `.max` used without emptiness proof (conditional guard or `mincount` constraint) |
 | `UnguardedCollectionMutation` | Type | Error | "'{0}' may be empty — guard with `if {0}.count > 0` before `{1}`" | `dequeue` or `pop` used without emptiness proof (conditional guard or `mincount` constraint) |
+| `NonOrderableCollectionExtreme` | Type | Error | "'.{1}' requires an orderable element type — '{0}' elements have no natural ordering" | `.min` or `.max` on a `set of T` where T does not support `<`/`>` (e.g., `set of period`, `set of boolean`) |
+| `CaseInsensitiveStringOnNonCollection` | Type | Error | "`~string` is only valid as a collection inner type — use `string` for field declarations" | `~string` used as a standalone field type outside a collection inner type position |
 
 ---
 
@@ -1186,7 +1201,7 @@ The type checker intentionally does NOT:
 - **Reason about state reachability.** Whether a state is reachable from the initial state, or whether a state is a dead end, requires graph traversal. The type checker builds the raw transition data that makes this analysis possible.
 - **Perform interval arithmetic.** Whether a guard is satisfiable, whether a `sqrt()` argument is provably non-negative, whether a `min`/`max` constraint is achievable — these require interval reasoning over typed expressions. That is the proof engine's job.
 - **Evaluate expressions at runtime.** The type checker assigns types to expressions but does not compute their values. Runtime evaluation is the evaluator's job.
-- **Validate typed constant content without a registered validator.** The type checker validates content when a validator is registered for the expected type (§4.4 step 3). If no validator is registered for a type, the checker accepts shape validation only. Content validation is never deferred to runtime — when the validator exists, malformed constants are compile-time errors.
+- **Validate typed constant content without a registered validator.** The type checker validates content when a validator is registered for the expected type (§4.4 step 3). If no validator is registered for a type, the checker accepts structural validation only. Content validation is never deferred to runtime — when the validator exists, malformed constants are compile-time errors.
 - **Short-circuit on first error.** The type checker always runs to completion. `ErrorType` propagation ensures broken sub-expressions do not cascade into symptom diagnostics.
 - **Resolve names contextually.** All name resolution is flat — field names, state names, event names, arg names are looked up in their respective symbol tables. There are no nested scopes, no closures, no modules.
 

@@ -1,5 +1,7 @@
 # Proof Engine Design
 
+> **Authority boundary:** This file lives in `docs/`, the repository's legacy/current reference set. Use it for the implemented v1 surface, current product reference, or historical context. If you are designing or implementing `src/Precept.Next` / the v2 clean-room pipeline, start in [docs.next/README.md](../docs.next/README.md) instead.
+
 Date: 2026-04-18
 
 Status: **Implemented** — Core engine and all four implementation waves shipped in PR #108. Coefficient guard soundness fix, ProofResult with real ProofAttribution, natural-language interval formatting, hover expansion (field declarations and rule/when keywords), assessment-driven code action structured metadata, MCP structured proof output, and 22 MCP proof tests all landed. Deferred items: full expression-level hover for compound sub-expressions, per-event proof scoping (Events DTO field always null — schema ready), and ensure keyword hover.

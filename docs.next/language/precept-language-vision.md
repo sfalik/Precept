@@ -265,6 +265,7 @@ The resolution model:
 1. Context determines the type (field type, operator peer, function signature).
 2. Content is validated against the expected type.
 3. No context → compile error.
+4. The delimiter is type-agnostic — it does not infer type by content shape.
 
 Examples:
 
@@ -560,7 +561,7 @@ Dotted access is a major part of the language surface.
 
 Families include:
 
-1. Collection accessors: `.count` (→ `integer`), `.min`, `.max` (→ inner type), `.peek` (→ inner type). The `.min`, `.max`, and `.peek` accessors require a conditional emptiness guard — the type checker rejects bare accessor use outside a conditional expression whose condition tests `.count > 0` (`UnguardedCollectionAccess`). The idiomatic pattern is `if Items.count > 0 then Items.min else 0`. The same guard requirement applies to `dequeue` and `pop` mutations (`UnguardedCollectionMutation`).
+1. Collection accessors: `.count` (→ `integer`), `.min`, `.max` (→ inner type, set-only, requires orderable T), `.peek` (→ inner type, queue/stack only). The `.min`, `.max`, and `.peek` accessors require a conditional emptiness guard — the type checker rejects bare accessor use outside a conditional expression whose condition tests `.count > 0` (`UnguardedCollectionAccess`). The idiomatic pattern is `if Items.count > 0 then Items.min else 0`. `.min`/`.max` on a `set of T` where T is non-orderable (e.g., `set of boolean`, `set of period`) is a `NonOrderableCollectionExtreme` type error. The same guard requirement applies to `dequeue` and `pop` mutations (`UnguardedCollectionMutation`).
 2. String accessors: `.length` (→ `integer`). Returns the code-unit count of the string.
 3. Event argument access such as `EventName.ArgName` in mixed-scope contexts. Dotted event-arg forms also support `.length`: `EventName.ArgName.length` → `integer`.
 4. Temporal accessors such as `.year`, `.month`, `.date`, `.time`, `.instant`, `.timezone`, and `.inZone(tz)` where valid.

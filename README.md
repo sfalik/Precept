@@ -79,6 +79,8 @@ Install the Precept plugin from the GitHub Copilot or Claude marketplace. It add
 
 Create `Subscription.precept` and type along with the example above. The language server provides completions, hover docs, and error detection in real time. The Copilot plugin gives AI agents the same structured access.
 
+> **Implementation track note:** This repository currently has two documentation tracks. For `src/Precept.Next` / the v2 clean-room pipeline, start in [docs.next/README.md](docs.next/README.md). The [docs/](docs/) folder remains the legacy/current reference set for the implemented v1 surface, product reference, and historical context.
+
 ### 4. Integrate the Runtime
 
 ```bash

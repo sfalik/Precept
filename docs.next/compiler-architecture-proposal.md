@@ -19,7 +19,7 @@ The language vision is the authoritative specification of what the compiler must
 
 The language vision establishes the execution model properties that directly determine pipeline shape: no loops, no control-flow branches, no reconverging flow, closed type vocabulary, finite state space, expression purity, no separate compilation. These are not incidental — they are the architectural constraints that make the pipeline tractable.
 
-The required pipeline has **six functional stages** in dependency order. Stages 1–5 produce the analysis artifacts; Stage 6 lowers those into the runtime-consumable executable model.
+The required pipeline has **five functional stages** in dependency order, producing a `CompilationResult` — the tooling-surface artifact consumed by the language server and MCP tools. Construction of the executable model from an error-free compilation result is the runtime's responsibility (`Precept.From(CompilationResult)`) — see Stage 6 below for the lowering operations, which live outside the compiler boundary.
 
 ### Stage 1 — Lexer
 
@@ -56,12 +56,12 @@ A Precept-specific stage. The vision describes eight graph reasoning capabilitie
 
 Interval-based numeric reasoning over typed expression trees. Handles: divisor safety, sqrt non-negativity obligations, assignment range impossibility, contradictory rule detection, vacuous rule detection, dead guard detection, and compile-time constraint checking. Every proof result carries structured attribution. SMT solvers are excluded by language principle.
 
-### Stage 6 — Emitter
+### Stage 6 — Emitter (runtime-side, outside compiler boundary)
 
-**Input:** Typed semantic model + graph analysis results + proof model
-**Output:** Executable model (sealed, immutable, evaluation-ready artifact)
+Input: Typed semantic model + graph analysis results + proof model
+Output: Executable model (sealed, immutable, evaluation-ready artifact)
 
-The emitter lowers the analysis-oriented typed model into a runtime-optimized executable form. This is not code generation — it is structural transformation of a correct semantic model into a representation the evaluator can walk without symbol-table lookups, declaration scanning, or dependency re-sorting. Concrete lowering operations:
+The emitter lowers the analysis-oriented typed model into a runtime-optimized executable form. This is not a compiler stage — it runs inside `Precept.From(CompilationResult)` on the runtime side. It is listed here for completeness because the lowering operations are a direct function of the compiler's output shape. This is not code generation — it is structural transformation of a correct semantic model into a representation the evaluator can walk without symbol-table lookups, declaration scanning, or dependency re-sorting. Concrete lowering operations:
 
 - **Transition dispatch table** — builds `(state, event) → TransitionRow[]` index for O(1) lookup on every `fire`
 - **Field slot resolution** — resolves field name references in expression trees to working-copy slot indices, eliminating string dictionary lookups at evaluation time

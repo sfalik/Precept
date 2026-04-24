@@ -1,5 +1,7 @@
 # State Diagram Layout Redesign — Options Analysis
 
+> **Authority boundary:** This file lives in `docs/`, the repository's legacy/current reference set. Use it for the implemented v1 surface, current product reference, or historical context. If you are designing or implementing `src/Precept.Next` / the v2 clean-room pipeline, start in [docs.next/README.md](../docs.next/README.md) instead.
+
 > **Status:** Implemented — Option B (Fix ELK) selected and implemented. See `tools/Precept.VsCode/src/extension.ts` and `tools/Precept.VsCode/webview/inspector-preview.html`.  
 > **Decision date:** 2026-03-03  
 > **Scope:** Inspector Preview diagram rendering in the VS Code extension
