@@ -27,6 +27,7 @@ Source string → Lexer.Lex → TokenStream → Parser.Parse → SyntaxTree → 
 | [pipeline-artifacts-and-consumer-contracts.md](pipeline-artifacts-and-consumer-contracts.md) | How pipeline stages connect — artifact types, consumer contracts, LS integration strategy | Draft |
 | [diagnostic-system.md](diagnostic-system.md) | Diagnostic codes, severity, message templates, audience model, stage attribution | Draft |
 | [literal-system.md](literal-system.md) | How literals flow through every pipeline stage — lexer segmentation, parser assembly, type-checker resolution, evaluator materialization | Draft |
+| _(tooling-surface.md — not yet written)_ | Syntax highlighting category system, TextMate scope policy for v2 tokens (`~`, `~=`, `!~`, single-quoted typed constants), semantic token two-pass design | Planned |
 
 ## Source Code
 

@@ -80,7 +80,7 @@ public sealed record class CompilationResult(
 | Consumer | What it reads |
 |----------|--------------|
 | Language server — diagnostics | `Diagnostics` (publishes merged list, may filter by stage) |
-| Language server — semantic tokens | `Model` (distinguishes field/state/event names) |
+| Language server — semantic tokens | Two passes: (1) keyword tokens classified from `TokenKind` metadata alone — no TypedModel needed; (2) identifier tokens resolved against `Model.Fields`, `Model.States`, `Model.Events` symbol tables |
 | Language server — completions | `Model` (what's in scope at cursor) |
 | Language server — hover | `Model` (type of expression under cursor) |
 | Language server — go-to-definition | `Model` (symbol resolution) |

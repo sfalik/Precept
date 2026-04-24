@@ -75,10 +75,11 @@ The emitter only runs when Stages 1–5 produce no errors. On broken input, the 
 
 1. Lexer → Parser (input dependency)
 2. Parser → Type Checker (structural skeleton needed)
-3. Type Checker → Graph Analyzer and Proof Engine (both consume the typed model)
-4. Graph Analyzer and Proof Engine can run in parallel after Type Checker
-5. Optional synchronization: Proof Engine can use graph results to sharpen reachability reasoning
-6. Emitter runs after Stages 3–5, only on error-free input
+3. Type Checker → Graph Analyzer (consumes typed model)
+4. Graph Analyzer → Proof Engine (Proof Engine requires both TypedModel and GraphResult)
+5. Emitter runs after Stages 3–4, only on error-free input
+
+> **Decision (pipeline-artifacts-and-consumer-contracts.md):** GraphAnalyzer and ProofEngine run in series. ProofEngine's dead-guard attribution requires `GraphResult.ReachableStates`. At DSL scale, GraphAnalyzer runs in microseconds — no performance case for parallelism.
 
 ### Two Pipeline Artifacts
 

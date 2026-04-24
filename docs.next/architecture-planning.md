@@ -87,9 +87,10 @@ Interval-based numeric reasoning over typed expression trees. Handles: divisor s
 
 1. Lexer → Parser (input dependency)
 2. Parser → Type Checker (structural skeleton needed)
-3. Type Checker → Graph Analyzer and Proof Engine (both consume the typed model)
-4. Graph Analyzer and Proof Engine can run in parallel after Type Checker
-5. Optional synchronization: Proof Engine can use graph results to sharpen reachability reasoning
+3. Type Checker → Graph Analyzer (consumes typed model)
+4. Graph Analyzer → Proof Engine (Proof Engine requires both TypedModel and GraphResult)
+
+> **Decision (pipeline-artifacts-and-consumer-contracts.md):** GraphAnalyzer and ProofEngine run in series. ProofEngine's dead-guard attribution requires `GraphResult.ReachableStates`. At DSL scale, GraphAnalyzer runs in microseconds — no performance case for parallelism.
 
 The compiler pipeline terminates here. Its output is the `CompilationResult`. See §3 for executable model design.
 

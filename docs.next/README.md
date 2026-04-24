@@ -27,7 +27,7 @@ Design documents for the Precept v2 compiler pipeline and language surface. Thes
 3. **Stage docs** (in pipeline order): [compiler/lexer.md](compiler/lexer.md) → [compiler/parser.md](compiler/parser.md) → [compiler/type-checker.md](compiler/type-checker.md)
 4. **Language surface:** [language/precept-language-spec.md](language/precept-language-spec.md) — grows per stage as decisions lock
 5. **Cross-cutting:** [catalog-system.md](catalog-system.md), [compiler/diagnostic-system.md](compiler/diagnostic-system.md), [compiler/literal-system.md](compiler/literal-system.md)
-6. **Runtime:** [runtime/runtime-api.md](runtime/runtime-api.md) — how the compiler's output is consumed at runtime (result types, fault system, fire/update API)
+6. **Runtime:** [runtime/runtime-api.md](runtime/runtime-api.md) — how the compiler's output is consumed at runtime (result types, fault system, fire/update API). Assumes familiarity with the compiler pipeline (steps 2–3) — read those first.
 
 ## Relationship to Other Docs
 

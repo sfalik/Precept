@@ -23,8 +23,6 @@ The public surface is a static class `TypeChecker` with a single method:
 public static TypedModel Check(SyntaxTree tree)
 ```
 
-No instance, no DI, no configuration. Tests call the method directly and assert on the output.
-
 **Bright-line boundaries:** The parser owns grammar rules (syntax structure, missing tokens). The type checker owns everything that requires knowing what a name means — duplicate names, undeclared references, type mismatches, modifier validity, scope rules, function signatures. The graph analyzer owns state-transition reachability. The proof engine owns interval reasoning (unsatisfiable guards, division-by-zero provability). The type checker builds the typed model that makes those downstream analyses possible.
 
 **Stateless precepts:** A precept with no `state` declarations and no `from ... on ...` transition rows is a stateless precept (e.g., `CustomerProfile`). The type checker handles this naturally — the symbol table simply has an empty state map. Rules, field declarations, access modes, and stateless event hooks are all valid. Transition rows, state ensures, and state actions are structurally absent from the AST, so no special-casing is needed.
@@ -1185,7 +1183,8 @@ The language server reads `CompilationResult.TypedModel`. Its contracts:
 | Hover | Symbol tables — `Fields[name]`, `States[name]`, `Events[name]` for type info display |
 | Go-to-definition | `FieldSymbol.Span`, `StateSymbol.Span`, `EventSymbol.Span` — declaration source positions |
 | Completions | `Fields`, `States`, `Events` dictionaries for name suggestions in expression positions |
-| Semantic tokens | `ResolvedType` on typed expressions for type-aware token classification |
+| Semantic tokens (keyword pass) | `TokenKind` metadata only — keyword tokens are classified from their kind; no TypedModel lookup needed |
+| Semantic tokens (identifier pass) | `Fields`, `States`, `Events` symbol tables — resolves bare identifiers to their declaration category |
 
 ### MCP server
 
