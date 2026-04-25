@@ -6,6 +6,49 @@
 
 ---
 
+### 2026-04-25T12:00:00Z: Full catalog-system review — 10-item metadata-driven design review (owner sign-off)
+**By:** Scribe
+**Status:** Merged from 17 inbox files (6 reviews + 5 owner gap resolutions + 6 recommendations)
+
+**Context:** Full team review of `docs/catalog-system.md` — the metadata-driven catalog architecture design doc. Reviews by Frank (architecture + completeness + pipeline + source-of-truth), George (pipeline feasibility), Kramer (tooling), Newman (AI/MCP), Soup Nazi (testing). Owner (Shane) dispositioned all gaps and design questions.
+
+**Key owner decisions (Shane sign-off, anti-AI-bias lens):**
+- **DQ1–DQ2:** `AllowedIn ConstructKind[]` added to both `ConstructMeta` and `ActionMeta` — uniform nesting/context pattern across both catalogs. LS completions filter by parent construct kind.
+- **DQ3:** Period dimension legality declared as `DimensionProofRequirement` (new `ProofRequirement` subtype) on `BinaryOperationMeta` entries for `date ± period` and `time ± period`. New `PeriodDimension` enum (`Any`, `Date`, `Time`).
+- **DQ4:** Qualifier-to-accessor identity declared via `QualifierAxis` enum and `ReturnsQualifier` field on `FixedReturnAccessor` — `.currency` on `money` returns the field's currency qualifier value.
+- **Gap 1 (Type Accessors):** `TypeAccessor` DU — base record (inner-type return for `.peek`/`.min`/`.max`) + `FixedReturnAccessor` sealed subtype (fixed `Returns: TypeKind` for `.count`/`.currency`/`.inZone(tz)`). New `TypeTrait` flags enum (`Orderable`). New `TypeMeta.Traits` and `TypeMeta.Accessors` fields.
+- **Gap 2 (Unary Operations):** `OperationMeta` becomes abstract base with `UnaryOperationMeta` and `BinaryOperationMeta` sealed subtypes. Separate frozen-dictionary indexes. 8 unary operations declared.
+- **Gap 3 (Widening):** `TypeMeta.WidensTo TypeKind[]` — only `integer → [Decimal, Number]`. `decimal → number` is NOT implicit (requires `approximate()`).
+- **Gap 4 (Subsumption + Implied Modifiers):** `ModifierMeta.Subsumes ModifierKind[]` (e.g., `Positive.Subsumes = [Nonnegative, Nonzero]`). `TypeMeta.ImpliedModifiers ModifierKind[]` (e.g., `ExchangeRate.ImpliedModifiers = [Positive]`). Roslyn analyzer enforces consistency.
+- **Gap 5 (Business-type function overloads):** `round`, `min`, `max`, `abs` extended to `money` and `quantity` with `QualifierMatch.Same`. `FunctionOverload` gains `QualifierMatch?` field.
+- **Gap 6 (clear dual-target + TypeTarget DU):** `ActionMeta.ApplicableTo` migrates from `TypeKind[]` to `TypeTarget[]`. New DU: `TypeTarget(TypeKind)` base + `ModifiedTypeTarget(TypeKind?, ModifierKind[] RequiredModifiers)` sealed subtype. `clear` targets `[Set, Queue, Stack, ModifiedTypeTarget(null, [Optional])]`.
+- **Gap 7 (ProofRequirement system):** `ParameterMeta(TypeKind)` replaces raw `TypeKind[]` in `FunctionOverload.Parameters` and `BinaryOperationMeta.Lhs/Rhs`. `ProofSubject` DU (`ParamSubject` + `SelfSubject`). `ProofRequirement` DU (`NumericProofRequirement` + `PresenceProofRequirement` + `DimensionProofRequirement`). 8 proof obligations declared. Roslyn analyzer enforces valid subject placements.
+- **Modifier DU:** 5-subtype `ModifierMeta` hierarchy — `FieldModifierMeta`, `StateModifierMeta`, `EventModifierMeta`, `AccessModifierMeta`, `AnchorModifierMeta`. Absorbs 4 bare enums (`StateModifierKind`, `AccessMode`, `EnsureAnchor`, `StateActionAnchor`). Each subtype carries exactly the metadata its consumers need.
+- **FunctionMeta evaluation delegates:** `FunctionDispatch` record with `Func<ReadOnlySpan<object?>, object?> Execute` delegate + `Overload` reference. `FunctionMeta.Dispatches` field. Eliminates parallel switch in evaluator.
+- **TokenMeta cross-references:** `TypeKind?` and `OperatorKind?` optional fields on `TokenMeta` — compile-time-verified bridge from tokens to their semantic catalog entries.
+- **Newman's syntaxReference:** Structured `syntaxReference` JSON object in MCP `precept_language` output — line-oriented grammar, comments, identifiers, string/number literals, whitespace, null-narrowing, conventional declaration ordering.
+
+**Review corpus (retained for reference, not duplicated here):**
+- **frank-catalog-completeness-review:** 10 catalogs confirmed sufficient, no 11th needed. 10 candidate categories evaluated and rejected. Types catalog needs accessor metadata enrichment. Modifiers catalog scope includes event args.
+- **frank-catalog-metadata-pipeline-review:** Pipeline feasibility per stage. Parser: vocabulary tables (~40-50%) migrate to frozen dictionaries; grammar stays hand-written. Type checker: ~80% catalog-driveable. Lexer: ~85% already catalog-driven. Proof engine: obligations catalog-driven, strategies algorithmic. Evaluator: dispatch via catalogs, execution logic procedural. String elimination audit: already string-minimal. Cross-catalog dependency graph acyclic.
+- **frank-catalog-source-of-truth-analysis:** 8 priority-ranked gaps across all 10 catalogs. Type accessors (gap 1) is highest impact — 30+ accessors across all types. Unary operations unrepresentable in binary-only schema. Widening, subsumption, business-type overloads, clear dual-target, dequeue/pop emptiness all identified.
+- **frank-metadata-resolver-architecture:** Dual-layer (declarative + resolver delegate) pattern analysis. Resolvers justified for TypeAccessor and FunctionOverload (generic/polymorphic behavior). 5 of 8 gaps better solved by richer declarative fields. Serialization boundary clean — declarative layer sufficient for all non-compiler consumers.
+- **frank-qualifier-propagation-architecture:** QualifierMatch design validated. Four propagation patterns (Homogeneous ±, Scalar scaling, Dimensional cancellation, Same-type ratio). Qualifier propagation is type-checker logic, not catalog data. `Operations.Resolve` returns `OperationMeta?` not `Type?`. MoneyDivideMoney polymorphism: two OperationKind entries recommended.
+- **frank-typechecker-implementation-plan:** 16-slice implementation plan with dependency graph. 5 new files (~2500 LOC impl), 5 test files. 13 new DiagnosticCodes. Sequential gates at slices 1, 2, 4, 5. Parallelizable groups identified.
+- **george-catalog-metadata-pipeline-review:** Independent feasibility assessment. Lexer: already catalog-driven. Parser: partially feasible (lookup tables yes, productions no). Type checker: biggest win (~60-70% migrates). Graph analyzer: mostly graph-generic. Proof engine: obligations catalog-driven, strategies algorithmic. Evaluator: dispatch feasible, execution logic not.
+- **kramer-catalog-metadata-tooling-review:** 14 hardcoded LS completion lists mapped to catalog replacements. 12 TextMate grammar alternations mapped to catalog derivation. Semantic tokens ~90% catalog-driven. Hover: function signatures from FunctionMeta.Overloads. Drift tests over auto-generation recommended.
+- **newman-catalog-metadata-ai-review:** `precept_language` covers ~40% of AI needs. Critical gaps: no operation legality table, no widening rules, no modifier applicability matrix, no accessor documentation. Serialization: single response, catalog-keyed grouping, `$type` tagged unions. `syntaxReference` for meta-grammar. One-shot complete language, no per-catalog endpoints.
+- **shane-catalog-dq-resolution:** DQ1 (AllowedIn on ConstructMeta), DQ2 (AllowedIn on ActionMeta), DQ3 (DimensionProofRequirement), DQ4 (QualifierAxis + ReturnsQualifier on FixedReturnAccessor).
+- **shane-catalog-gap-resolution-1-4:** TypeAccessor DU, OperationMeta DU, widening rules, modifier subsumption + implied modifiers. Full TypeMeta shape decided.
+- **shane-catalog-gap-resolution-5-6:** Business-type function overloads with QualifierMatch. TypeTarget DU replacing TypeKind[] on ApplicableTo. ActionMeta.ApplicableTo with clear dual-target.
+- **shane-catalog-gap-resolution-7:** ProofRequirement system — ParameterMeta, ProofSubject DU, ProofRequirement DU, 8 proof obligations, Roslyn analyzer enforcement rules.
+- **shane-modifier-du-and-review-synthesis:** 5-subtype Modifier DU absorbing 4 bare enums + 10 consolidated review insights with disposition (5 consensus, 3 pending → decided, 2 already resolved).
+- **soup-nazi-binary-null-context-test-gap:** Binary sub-expression null-context test strategy for Slice 5. OperatorTable unit tests primary surface. Integration uses field+field not field+literal. Typed-context paths deferred to first assignment surface.
+- **soup-nazi-catalog-metadata-test-review:** ~15,500 auto-generated test cases projected. Operations matrix (13,520 cells) is P0. Per-catalog snapshot golden files. Exhaustive matrix before old logic replaced. Cross-catalog referential integrity. Non-negotiable: no catalog without snapshot test.
+- **coordinator-design-doc-mandatory-reads:** Directive — every agent spawn for implementation work MUST include relevant design docs as required reading. Triggered by George implementing OperatorTable without reading catalog-system.md.
+
+---
+
 ### 2026-04-24T00:00:00Z: Decision inbox merge — Precept.Next v2 design review corpus and pre-TypeChecker gate
 **By:** Scribe
 **Status:** Merged, deduplicated, inbox cleared (15 files)

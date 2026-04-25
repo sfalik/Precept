@@ -1,7 +1,7 @@
 # Catalog System
 
-> **Status:** Draft — expanded after catalog completeness design review (2026-04-24)
-> **Implemented in:** `src/Precept.Next/Pipeline/` (Tokens, Diagnostics), `src/Precept.Next/Runtime/` (Faults)
+> **Status:** Draft — updated 2026-04-25 after full team review (10-item metadata-driven design review, owner sign-off)
+> **Implemented in:** `src/Precept/` (Tokens, Diagnostics catalogs exist), remaining catalogs planned
 > **Related:** `docs/compiler/diagnostic-system.md`, `docs/runtime/fault-system.md`, `docs/compiler/pipeline-artifacts-and-consumer-contracts.md`
 
 ## Overview
@@ -137,8 +137,19 @@ public sealed record TokenMeta(
     TokenKind                      Kind,
     string?                        Text,
     IReadOnlyList<TokenCategory>   Categories,
-    string                         Description
+    string                         Description,
+    TypeKind?                      TypeKind     = null,   // non-null for type keywords
+    OperatorKind?                  OperatorKind = null    // non-null for operator tokens
 );
+```
+
+`TypeKind` and `OperatorKind` are optional cross-references that make the Token→Type and Token→Operator bridges compile-time-verified. Every type keyword token (e.g., `TokenKind.StringType`) carries `TypeKind = TypeKind.String`. Every operator token (e.g., `TokenKind.Plus`) carries `OperatorKind = OperatorKind.Plus`. These fields point "down" to other catalogs via enum values (not object references) because Tokens is the foundation catalog — it initializes first and cannot depend on other catalogs' static initializers.
+
+Other catalogs point "up" to Tokens via `TokenMeta` object references (see TypeMeta, OperatorMeta, ModifierMeta, ActionMeta below). This creates a bidirectional typed bridge with no string duplication:
+
+```
+TokenMeta.TypeKind?     → TypeKind       (token → type, by enum)
+TypeMeta.Token          → TokenMeta      (type → token, by object reference)
 ```
 
 An immutable record holding all metadata for a single enum member. The shape varies per catalog — each Meta type carries exactly the fields its consumers need, no more. Shared fields across all catalogs:
@@ -272,7 +283,7 @@ The lexical vocabulary. 90+ members spanning keywords, operators, punctuation, l
 | Part | Type |
 |------|------|
 | Kind enum | `TokenKind` |
-| Meta record | `TokenMeta(Kind, Text?, Categories[], Description)` |
+| Meta record | `TokenMeta(Kind, Text?, Categories[], Description, TypeKind?, OperatorKind?)` |
 | Catalog class | `Tokens` — `GetMeta()`, `All`, `Keywords` (frozen dictionary for lexer lookup) |
 | Output type | `Token` (produced by lexer from scan state, not via `Create()`) |
 
@@ -308,7 +319,7 @@ The type system's family taxonomy. Each member represents a type *family*.
 ```csharp
 public record TypeMeta(
     TypeKind                    Kind,
-    string                      Keyword,
+    TokenMeta                   Token,           // object reference to Tokens catalog entry (e.g., Tokens.GetMeta(TokenKind.StringType))
     string                      Description,
     TypeCategory                Category,
     QualifierShape?             QualifierShape   = null,
@@ -317,6 +328,9 @@ public record TypeMeta(
     ModifierKind[]              ImpliedModifiers = [],
     IReadOnlyList<TypeAccessor> Accessors        = []
 );
+```
+
+The `Token` field holds a direct reference to the `TokenMeta` instance from the Tokens catalog. Consumers access the keyword text via `typeMeta.Token.Text` — no string duplication, no cross-catalog lookup. The Tokens catalog initializes first; all other catalogs reference its instances.
 ```
 
 ##### TypeTrait flags enum
@@ -417,11 +431,21 @@ public sealed record FunctionMeta(
     FunctionKind                    Kind,
     string                          Name,
     string                          Description,
-    IReadOnlyList<FunctionOverload> Overloads
+    IReadOnlyList<FunctionOverload> Overloads,
+    IReadOnlyList<FunctionDispatch> Dispatches   // 1:1 with Overloads
+);
+
+public sealed record FunctionDispatch(
+    FunctionOverload                      Overload,
+    Func<ReadOnlySpan<object?>, object?>  Execute
 );
 ```
 
+`FunctionDispatch` ties each overload to its execution delegate. The evaluator dispatches through `Functions.GetMeta(kind).Dispatches` — selecting the matching overload's `Execute` delegate. No parallel function switch in the evaluator.
+
 Parameters are declared as named statics so `ParamSubject` can reference them by object identity — see Proof Obligations.
+
+Note: `FunctionMeta.Name` stays as a `string` because functions are identifiers (`min`, `round`), not keyword tokens. There is no `TokenKind` for functions.
 
 ##### Business-type overloads and QualifierMatch
 
@@ -438,11 +462,11 @@ Operator symbols — the `+`, `-`, `*`, `/`, `==`, etc. Each member is an operat
 | Part | Type |
 |------|------|
 | Kind enum | `OperatorKind` (~20 members: `Plus`, `Minus`, `Times`, `Divide`, `Equals`, `NotEquals`, `LessThan`, `GreaterThan`, `LessThanOrEqual`, `GreaterThanOrEqual`, `And`, `Or`, `Not`, `Modulo`, ...) |
-| Meta record | `OperatorMeta(Kind, Symbol, Description, Arity, Associativity, Precedence)` |
+| Meta record | `OperatorMeta(Kind, Token, Description, Arity, Associativity, Precedence)` — `Token` is a `TokenMeta` object reference |
 | Catalog class | `Operators` — `GetMeta()`, `All` |
 | Output type | None |
 
-**Consumers:** MCP vocabulary (operator symbols and descriptions), LS hover (operator documentation), TextMate grammar (operator alternations), parser (precedence and associativity).
+**Consumers:** MCP vocabulary (operator symbols via `Token.Text` and descriptions), LS hover (operator documentation), TextMate grammar (operator alternations), parser (precedence and associativity).
 
 **Rationale:** `BinaryOp` and `UnaryOp` are currently bare parser-internal enums. The Operators catalog promotes them to first-class language surface with per-member metadata — symbol text, human-readable description, precedence, associativity. Consumers no longer need hardcoded operator lists.
 
@@ -473,7 +497,8 @@ public sealed record UnaryOperationMeta(
     OperatorKind  Op,
     ParameterMeta Operand,
     TypeKind      Result,
-    string        Description
+    string        Description,
+    Func<object?, object?> Execute
 ) : OperationMeta(Kind, Op, Result, Description);
 
 public sealed record BinaryOperationMeta(
@@ -483,10 +508,13 @@ public sealed record BinaryOperationMeta(
     ParameterMeta  Rhs,
     TypeKind       Result,
     string         Description,
+    Func<object?, object?, object?> Execute,
     QualifierMatch Match             = QualifierMatch.Any,
     ProofRequirement[] ProofRequirements = []
 ) : OperationMeta(Kind, Op, Result, Description);
 ```
+
+`Execute` delegates co-locate execution logic with the operation definition. The evaluator dispatches through `Operations.Resolve(op, lhs, rhs).Execute(lhsValue, rhsValue)` — no parallel arithmetic switch. This eliminates the evaluator's need for its own `switch` on `OperationKind`.
 
 `Operations.All` is `IReadOnlyList<OperationMeta>`. Two internal indexes: `FrozenDictionary<(OperatorKind, TypeKind), UnaryOperationMeta>` keyed by `(Op, Operand.Kind)`, and `FrozenDictionary<(OperatorKind, TypeKind, TypeKind), BinaryOperationMeta[]>` keyed by `(Op, Lhs.Kind, Rhs.Kind)`. The index key uses `ParameterMeta.Kind` for the `TypeKind` component.
 
@@ -623,7 +651,7 @@ The DU also absorbs 4 bare enums (`StateModifierKind`, `AccessMode`, `EnsureAnch
 // ── Base ──────────────────────────────────────────────────
 public abstract record ModifierMeta(
     ModifierKind      Kind,
-    string            Keyword,
+    TokenMeta         Token,         // object reference to Tokens catalog entry
     string            Description,
     ModifierCategory  Category       // Structural, Semantic, Severity
 );
@@ -631,43 +659,44 @@ public abstract record ModifierMeta(
 // ── Field modifiers (15 now, ~19 future) ─────────────────
 public sealed record FieldModifierMeta(
     ModifierKind     Kind,
-    string           Keyword,
+    TokenMeta        Token,
     string           Description,
     ModifierCategory Category,
     TypeTarget[]     ApplicableTo,
     bool             HasValue        = false,
-    ModifierKind[]   Subsumes        = []
-) : ModifierMeta(Kind, Keyword, Description, Category);
+    ModifierKind[]   Subsumes        = [],
+    Func<object?, object?, bool>? Validate = null   // (fieldValue, modifierArg) → valid?
+) : ModifierMeta(Kind, Token, Description, Category);
 
 // ── State modifiers (7 v2) ──────────────────────────────
 public sealed record StateModifierMeta(
     ModifierKind     Kind,
-    string           Keyword,
+    TokenMeta        Token,
     string           Description,
     ModifierCategory Category,
     bool             AllowsOutgoing    = true,   // terminal = false
     bool             RequiresDominator  = false,  // required = true
     bool             PreventsBackEdge   = false   // irreversible = true
-) : ModifierMeta(Kind, Keyword, Description, Category);
+) : ModifierMeta(Kind, Token, Description, Category);
 
 // ── Event modifiers (1 v2, ~9 future) ───────────────────
 public sealed record EventModifierMeta(
     ModifierKind       Kind,
-    string             Keyword,
+    TokenMeta          Token,
     string             Description,
     ModifierCategory   Category,
     GraphAnalysisKind  RequiredAnalysis = GraphAnalysisKind.None
-) : ModifierMeta(Kind, Keyword, Description, Category);
+) : ModifierMeta(Kind, Token, Description, Category);
 
 // ── Access modes (3: write, read, omit) ─────────────────
 public sealed record AccessModifierMeta(
     ModifierKind     Kind,
-    string           Keyword,
+    TokenMeta        Token,
     string           Description,
     ModifierCategory Category,
     bool             IsPresent    = true,    // false = omit (structurally absent)
     bool             IsWritable   = true     // false = read-only
-) : ModifierMeta(Kind, Keyword, Description, Category);
+) : ModifierMeta(Kind, Token, Description, Category);
 // write: IsPresent=true,  IsWritable=true
 // read:  IsPresent=true,  IsWritable=false
 // omit:  IsPresent=false, IsWritable=false
@@ -675,13 +704,15 @@ public sealed record AccessModifierMeta(
 // ── Ensure/action anchors (in, to, from) ────────────────
 public sealed record AnchorModifierMeta(
     ModifierKind     Kind,
-    string           Keyword,
+    TokenMeta        Token,
     string           Description,
     ModifierCategory Category,
     AnchorScope      Scope,          // InState, OnEntry, OnExit
     AnchorTarget     Target          // Ensure, StateAction
-) : ModifierMeta(Kind, Keyword, Description, Category);
+) : ModifierMeta(Kind, Token, Description, Category);
 ```
+
+`Token` replaces the `string Keyword` field — consumers access keyword text via `modifier.Token.Text`. `FieldModifierMeta.Validate` is an optional execution delegate for runtime constraint validation: `nonnegative` → `(value, _) => (decimal)value >= 0`, `minlength` → `(value, arg) => ((string)value).Length >= (int)arg`. Modifiers with no runtime validation (e.g., `ordered` is compile-time only) have `Validate = null`. The runtime boundary iterates a field's modifiers and calls `Validate` on each — no switch on `ModifierKind`.
 
 ##### ModifierCategory
 
@@ -763,7 +794,7 @@ State-machine action verbs — the keywords that appear after `->` in transition
 | Part | Type |
 |------|------|
 | Kind enum | `ActionKind` (8 members — exists in `TypedModel.cs`) |
-| Meta record | `ActionMeta(Kind, Keyword, Description, ApplicableTo TypeTarget[], ValueRequired bool, IntoSupported bool, ProofRequirements[], AllowedIn ConstructKind[])` — see full shape below |
+| Meta record | `ActionMeta(Kind, Token, Description, ApplicableTo TypeTarget[], ValueRequired bool, IntoSupported bool, ProofRequirements[], AllowedIn ConstructKind[])` — `Token` is a `TokenMeta` object reference; see full shape below |
 | Catalog class | `Actions` — `GetMeta()`, `All` |
 | Output type | None |
 
@@ -787,7 +818,7 @@ State-machine action verbs — the keywords that appear after `->` in transition
 ```csharp
 public sealed record ActionMeta(
     ActionKind         Kind,
-    string             Keyword,
+    TokenMeta          Token,             // object reference to Tokens catalog entry
     string             Description,
     TypeTarget[]       ApplicableTo      = [],
     bool               ValueRequired     = false,
@@ -796,6 +827,8 @@ public sealed record ActionMeta(
     ConstructKind[]    AllowedIn         = []
 );
 ```
+
+Consumers access the action keyword text via `action.Token.Text`. Execution delegates on ActionMeta are deferred until the evaluator's working copy API is designed — the delegate signature depends on how mutation is represented.
 
 **Consumers:** MCP vocabulary, LS completions (action verbs after `->` in event bodies), LS hover, parser validation, type checker (target type compatibility per `precept-language-spec.md` §3.8).
 
@@ -1071,23 +1104,58 @@ Currency codes and measurement units are validated at type-check time, but they 
 
 ---
 
+## Syntax Reference
+
+The 10 catalogs cover the language's *vocabulary* exhaustively. The language also has *grammar meta-rules* — singular facts about how source text is structured — that consumers need but that have no per-member enum. These are language-level constants, not catalogs.
+
+`SyntaxReference` is a static class with typed properties, part of the same metadata-driven source of truth:
+
+```csharp
+public static class SyntaxReference
+{
+    public static string GrammarModel       => "line-oriented";
+    public static string CommentSyntax      => "# to end of line";
+    public static string IdentifierRules    => "Starts with letter, alphanumeric + underscore, case-sensitive";
+    public static string StringLiteralRules => "Double-quoted, \\\" escape only, no interpolation";
+    public static string NumberLiteralRules => "Integers (42), decimals (3.14), no hex/scientific/underscore separators";
+    public static string WhitespaceRules    => "Not significant — indentation is cosmetic, line breaks separate declarations";
+    public static string NullNarrowing      => "if Field != null narrows to non-nullable in the then branch";
+    public static IReadOnlyList<string> ConventionalOrder => ["header", "fields", "rules", "states", "ensures", "edits", "events", "eventEnsures", "transitions", "stateActions"];
+}
+```
+
+**Consumers:**
+
+| Consumer | How it reads |
+|----------|-------------|
+| MCP `precept_language` | Serializes to a `syntaxReference` JSON object in the response |
+| Human reference docs | Generates a "Grammar Basics" section from the same properties |
+| LS hover | Tooltip text for identifier tokens, comment tokens, etc. |
+| AI grounding | Reads alongside catalog data for complete language understanding |
+
+This is not a catalog — there is no enum, no `GetMeta()`, no `All`. It is structured metadata about the grammar as a whole, derived from the same codebase. No hand-written docs page that drifts from the implementation.
+
+---
+
 ## Cross-Catalog Derivation
 
 The test of completeness: every cell should trace back to a catalog, never to hardcoded consumer logic.
 
 | Consumer surface | Catalogs read | How |
 |------------------|---------------|-----|
-| **TextMate grammar** | Constructs → Tokens → Types | Construct slot arrays generate patterns; token keywords generate keyword alternations; type keywords generate type alternations |
-| **MCP `precept_language`** | All 10 catalogs' `.All` | Union of all catalog enumerations IS the language spec. MCP tool iterates each and serializes. |
-| **LS completions** | Tokens + Types + Functions + Modifiers + Actions | Context-filtered: keyword position → Tokens; type position → Types; expression → Functions; after type → Modifiers; event body → Actions |
-| **LS hover** | Types + Functions + Operators + Operations | Per-member descriptions from catalog metadata |
+| **TextMate grammar** | Constructs → Tokens → Types | **Generated** from catalog metadata. Construct slot arrays generate patterns; token keywords generate keyword alternations; type keywords via `Types.All` filtered by `Token.Text`. No hand-maintained alternation lists. Tests verify the generator produces correct output. |
+| **MCP `precept_language`** | All 10 catalogs' `.All` + `SyntaxReference` | Union of all catalog enumerations IS the language spec. MCP tool iterates each and serializes. `SyntaxReference` adds grammar meta-rules. |
+| **LS completions** | Tokens + Types + Functions + Modifiers + Actions | **Generated** from catalog metadata. Context-filtered: type position → `Types.All`; expression → `Functions.All`; after type → `Modifiers.All` filtered by `ApplicableTo`; event body → `Actions.All`. No hand-maintained completion lists. |
+| **LS hover** | Types + Functions + Operators + Operations | Per-member descriptions from catalog metadata via `Token.Text` and `Description` |
 | **LS semantic tokens** | Tokens (via `TokenMeta.Categories`) | Token categories map directly to semantic token types |
-| **Type checker validation** | Types + Functions + Operations + Modifiers + Actions | Catalog lookups replace hand-coded validation logic: modifier applicability → `Modifiers.GetMeta().ApplicableTo`; function signatures → `Functions.GetMeta()`; operation legality → `Operations.Resolve()` |
-| **Evaluator dispatch** | Functions + Operations | Evaluation delegates (Functions catalog) and `Operations.Resolve()` |
-| **Reference documentation** | All 8 language definition catalogs | Tables auto-generated from catalog metadata |
-| **AI grounding** | All 10 catalogs | Complete, always-accurate language reference — AI grounded on catalog output cannot hallucinate features |
+| **Type checker validation** | Types + Functions + Operations + Modifiers + Actions | Catalog lookups replace hand-coded validation logic: modifier applicability → `Modifiers.GetMeta().ApplicableTo`; function signatures → `Functions.GetMeta()`; operation legality → `Operations.Resolve()`; type keyword resolution → `Types.All` frozen dictionary keyed by `Token.Kind` |
+| **Parser vocabulary** | Operators + Types + Modifiers + Actions + Constructs | Frozen dictionaries derived from catalogs at startup: `Operators.All` → precedence table; `Types.All` → type keyword mapping; `Modifiers.All` → recognition sets; `Actions.All` → action keywords. No hand-maintained vocabulary tables. |
+| **Evaluator dispatch** | Functions + Operations + Modifiers | `FunctionDispatch.Execute` delegates, `OperationMeta.Execute` delegates, `FieldModifierMeta.Validate` delegates. No parallel dispatch tables. |
+| **Runtime boundary validation** | Modifiers | `FieldModifierMeta.Validate` delegates called per-field at fire/update boundary. No `switch` on `ModifierKind`. |
+| **Reference documentation** | All 8 language definition catalogs + `SyntaxReference` | **Generated** from catalog metadata. Tables, syntax sections, grammar reference all derived from `All` properties. |
+| **AI grounding** | All 10 catalogs + `SyntaxReference` | Complete, always-accurate language reference — AI grounded on catalog output cannot hallucinate features |
 
-No consumer surface maintains its own parallel list. Every fact comes from a catalog `All` property or `GetMeta()` call.
+No consumer surface maintains its own parallel list. Every fact comes from a catalog `All` property, `GetMeta()` call, or `SyntaxReference` property. TextMate grammar, LS completions, and reference documentation are **generated** from catalogs — not hand-maintained. Tests verify the generators produce correct output.
 
 ---
 
@@ -1095,13 +1163,45 @@ No consumer surface maintains its own parallel list. Every fact comes from a cat
 
 These are enabled by the catalog system but not part of the initial implementation:
 
-1. **AI grounding** — catalogs as authoritative LLM context. An AI that reads all 9 `All` properties knows the complete language.
-2. **Error message enrichment** — diagnostics that cross-reference catalog entries (e.g., "did you mean `MoneyType`?" suggestions from `Types.All`).
-3. **Quick fixes / code actions** — LS code actions derived from catalog metadata (e.g., suggest valid modifiers for a type from `Modifiers.All` filtered by `ApplicableTo`).
-4. **Parser validation** — construct slot arrays as test oracle. Generate exhaustive parser test inputs from slot permutations.
-5. **Property-based test generation** — exhaustive type combinations from `Types.All` × `Operations.All` to generate operation coverage.
-6. **Version diffing** — catalog snapshots as changelog. Diff two versions of `All` to produce a human-readable changelog of language surface changes.
-7. **Playground / explorer UI** — all catalog-derived. Browse the language interactively from the catalog data.
+1. **Error message enrichment** — diagnostics that cross-reference catalog entries (e.g., "did you mean `MoneyType`?" suggestions from `Types.All`).
+2. **Quick fixes / code actions** — LS code actions derived from catalog metadata (e.g., suggest valid modifiers for a type from `Modifiers.All` filtered by `ApplicableTo`).
+3. **Parser validation** — construct slot arrays as test oracle. Generate exhaustive parser test inputs from slot permutations.
+4. **Version diffing** — catalog snapshots as changelog. Diff two versions of `All` to produce a human-readable changelog of language surface changes.
+5. **Playground / explorer UI** — all catalog-derived. Browse the language interactively from the catalog data.
+
+---
+
+## Test Strategy
+
+Catalogs are the language specification in machine-readable form. Tests verify that the specification is correct, complete, and that all generated artifacts match.
+
+### Non-negotiable rules
+
+1. **No catalog without snapshot test.** Every catalog's `All` property is snapshotted to a golden file. Any change to the catalog requires explicit snapshot update. This catches unintended metadata changes.
+
+2. **Exhaustive matrix green before old logic deleted.** When a catalog replaces hand-coded logic (e.g., `Operations` replaces `OperatorTable`), the new catalog-driven path must have complete test coverage before the old procedural path is removed. Clean replacement — not parallel old+new.
+
+3. **Property-based test generation from catalogs.** The catalogs ARE the test oracle. Tests are generated from catalog metadata:
+   - Every `(OperatorKind × TypeKind × TypeKind)` combination tested for legality against `Operations.All`
+   - Every `(ModifierKind × TypeKind)` combination tested for applicability against `Modifiers.All`
+   - Every `FunctionOverload` tested with valid and invalid argument types
+   - Every `TypeAccessor` tested for return type correctness
+   - Every cross-catalog reference validated (e.g., every `TypeMeta.Token.TypeKind` equals `TypeMeta.Kind`)
+   - Projected: ~15,500+ auto-generated test cases
+
+4. **Generated artifact tests.** TextMate grammar, LS completions, and MCP vocabulary are generated from catalogs. Tests verify the generators produce correct output — not that hand-maintained copies match. There are no hand-maintained copies to drift.
+
+### Cross-catalog integrity tests
+
+| Invariant | Test |
+|-----------|------|
+| Every type keyword token has `TypeKind` set | `Tokens.All.Where(t => t.Categories.Contains(TypeKeyword)).All(t => t.TypeKind != null)` |
+| Every operator token has `OperatorKind` set | `Tokens.All.Where(t => t.Categories.Contains(Operator)).All(t => t.OperatorKind != null)` |
+| Bidirectional bridge consistency | `Types.All.All(t => Tokens.GetMeta(t.Token.Kind).TypeKind == t.Kind)` |
+| Widening acyclicity | No circular chains in `TypeMeta.WidensTo` |
+| Subsumption acyclicity | No circular chains in `FieldModifierMeta.Subsumes` |
+| `ParamSubject` referential integrity | Every `ParamSubject.Parameter` is reference-equal to a `ParameterMeta` in the containing overload/operation |
+| Proof requirement type validity | `DimensionProofRequirement` only on `BinaryOperationMeta`, etc. (per PRECEPT0006 rules) |
 
 ---
 
@@ -1111,10 +1211,11 @@ As catalogs are implemented, each pipeline stage gets thinner — domain knowled
 
 | Stage | Current state | Catalog impact |
 |-------|--------------|----------------|
-| **Lexer** | Already uses `Tokens.Keywords` for keyword classification | Minimal further impact |
-| **Parser** | Hand-coded declaration dispatch | Construct slots enable validation and test generation, but the parser remains hand-written (recursive descent + Pratt) |
-| **TypeChecker** | Hand-coded modifier validation, function dispatch, operator dispatch | Significant: modifier applicability → `Modifiers.GetMeta().ApplicableTo`, function validation → `Functions.GetMeta()`, operation legality → `Operations.Resolve()` |
-| **GraphAnalyzer** | Hand-coded state reachability, modifier semantics | Moderate: modifier semantics become catalog-informed |
+| **Lexer** | Already uses `Tokens.Keywords` for keyword classification | Minimal further impact. Operator scan priority derivable from `Operators.All` sorted by `Token.Text.Length` descending. |
+| **Parser** | Hand-coded vocabulary tables + recursive descent grammar | Vocabulary tables — operator precedence, type keyword mappings, modifier/action recognition sets (~40–50% of language knowledge decisions) — migrate to catalog-derived frozen dictionaries at startup. Grammar productions stay hand-written. Construct slots enable test generation and LS completions. When a new type, modifier, operator, or action is added to a catalog, the parser adapts automatically — no parser edit needed. |
+| **TypeChecker** | Hand-coded modifier validation, function dispatch, operator dispatch | Significant: modifier applicability → `Modifiers.GetMeta().ApplicableTo`, function validation → `Functions.GetMeta()`, operation legality → `Operations.Resolve()`, type keyword resolution → `Types.All` frozen dictionary. The type checker's `switch` forests shrink to catalog lookups. |
+| **GraphAnalyzer** | Hand-coded state reachability, modifier semantics | Moderate: state modifier structural semantics (`AllowsOutgoing`, `RequiresDominator`, `PreventsBackEdge`) are catalog metadata on `StateModifierMeta`. Graph algorithms (reachability, dominator trees, SCC) remain generic machinery. |
 | **ProofEngine** | Hand-coded proof obligations per operator | Significant: `ProofRequirement[]` on `BinaryOperationMeta`, `FunctionOverload`, `TypeAccessor`, and `ActionMeta` carry all proof obligations as metadata. Proof engine reads catalog entries — no hardcoded obligation lists. |
+| **Evaluator** | Not yet implemented | Significant: function execution → `FunctionDispatch.Execute` delegates in Functions catalog. Operation execution → `Execute` delegates on `UnaryOperationMeta`/`BinaryOperationMeta`. Modifier validation → `FieldModifierMeta.Validate` delegates. Action execution delegates deferred until working copy API designed. The evaluator's core loop (expression tree walking, working copy, atomicity) remains hand-written. |
 
-Pattern: domain knowledge → metadata. Stages → generic machinery that reads catalogs.
+Pattern: domain knowledge → metadata. Stages → generic machinery that reads catalogs. Execution delegates on catalogs eliminate parallel dispatch tables in the evaluator.
