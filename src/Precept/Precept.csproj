@@ -8,7 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Precept.Next.Analyzers\Precept.Next.Analyzers.csproj"
+    <ProjectReference Include="..\Precept.Analyzers\Precept.Analyzers.csproj"
                       OutputItemType="Analyzer"
                       ReferenceOutputAssembly="false" />
   </ItemGroup>

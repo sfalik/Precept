@@ -4,7 +4,7 @@ using Precept.Language;
 using Precept.Pipeline;
 using Xunit;
 
-namespace Precept.Next.Tests;
+namespace Precept.Tests;
 
 public class LexerTests
 {

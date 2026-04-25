@@ -5,7 +5,7 @@ using FluentAssertions;
 using Precept.Language;
 using Xunit;
 
-namespace Precept.Next.Tests;
+namespace Precept.Tests;
 
 public class FaultsTests
 {

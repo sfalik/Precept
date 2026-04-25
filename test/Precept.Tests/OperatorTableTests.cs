@@ -2,7 +2,7 @@ using FluentAssertions;
 using Precept.Pipeline;
 using Xunit;
 
-namespace Precept.Next.Tests;
+namespace Precept.Tests;
 
 public class OperatorTableTests
 {
