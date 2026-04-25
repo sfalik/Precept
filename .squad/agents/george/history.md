@@ -29,6 +29,22 @@
 
 ## Recent Updates
 
+### 2026-04-24 — TypeChecker Slice 2 — Field Registration
+
+Implemented `RegisterFieldDeclaration`, `ResolveTypeRef`, and `ResolveScalarType` inside `CheckSession` in `TypeChecker.cs`. Updated `RegisterDeclarations` to dispatch `FieldDeclaration` nodes.
+
+Key implementation facts:
+- `Token` is a plain `readonly record struct` with no `IsMissing` or `Span` properties. Missing tokens from error recovery have `Length == 0` and `Text == ""`. Use `token.Length == 0` as the missing guard.
+- `SourceSpan` must be constructed from Token fields directly: `new(t.Offset, t.Length, t.Line, t.Column, t.Line, t.Column + Math.Max(t.Length, 1))`. Added `static SpanOf(Token)` helper to `CheckSession`.
+- `IsMissing` is only on `SyntaxNode` subclasses (AST nodes), not on raw `Token` structs.
+- `ResolveTypeRef` uses a switch expression pattern-matching on TypeRef subtype with `{ IsMissing: true }` first (SyntaxNode property works here since TypeRef IS a SyntaxNode).
+- Temporal and business-domain `ScalarTypeKind` values return `ErrorType` as stubs (slices 6/7).
+- `CollectionTypeRef` and `ChoiceTypeRef` return `ErrorType` as stubs (slices 8/10).
+- `ResolvedModifiers` stub: `new ResolvedModifiers(false, false, false, false, false, null, null, null, null, null, null, null)` — 12 params.
+- Duplicate field name uses `_fields.ContainsKey` before adding (not TryAdd) to keep the first declaration as canonical, which matches how the existing symbol infrastructure expects duplicates to be handled.
+
+Next slice (slice 3): State and event registration — same `RegisterDeclarations` switch, adding `StateDeclaration` and `EventDeclaration` cases.
+
 ### 2026-04-24 — Precept.Next code/doc consistency review
 
 Full audit of `src/Precept.Next/Pipeline/` and `src/Precept.Next/Runtime/` against `docs.next/`.

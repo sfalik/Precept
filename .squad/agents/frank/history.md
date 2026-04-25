@@ -13,6 +13,17 @@
 
 ## Recent Updates
 
+### 2026-04-24 — TypeChecker Slice 2 review: Field Registration
+- **Verdict: APPROVED.** No blockers. 3 observations.
+- **G1:** `SpanOf(Token t)` duplicated between `TypeChecker.cs` and `Parser.cs`. Identical logic, correct in both. Future cleanup candidate — if `SourceSpan`'s contract changes the two copies will diverge.
+- **G2:** Most tests use `:` syntax, which produces parse diagnostics. The lexer emits `InvalidCharacter` for `:`, parser error-recovers past it. Tests don't assert `Diagnostics.Should().BeEmpty()` so no false pass — but inputs are subtly broken. `Register_SingleField_NoDiagnosticsEmitted` correctly uses `as` and explains why.
+- **G3:** `emptyMods` constructed once outside the name loop — correct for now. All names in a multi-name declaration share the same instance. When modifier validation lands (slice 5), verify this doesn't need to move inside the loop.
+- **Checklist:** All 9 items ✓ — `RegisterFieldDeclaration` logic, duplicate handling (first wins), `ResolveTypeRef` dispatch, `ResolveScalarType` 5-scalar mapping, `token.Length == 0` missing check, `SpanOf` arg order, `emptyMods` 12-param order, 7 plan test cases covered, design doc alignment.
+
+### 2026-04-24 — TypeChecker Slice 1 review: Foundation Scaffold
+- **Verdict: APPROVED.** No blockers. 4 minor observations.
+- All 7 checklist items ✓: CheckSession struct fields, RegisterDeclarations/CheckDeclarations loops, BuildModel merging parser diagnostics, PreceptName extraction, TypedModel constructor arg order, diagnostic builder initialization, StringComparer.Ordinal on dictionaries.
+
 ### 2026-04-24 — Full design review: docs.next/ architecture lens (type-checker, spec, temporal, business-domain, READMEs)
 - **Verdict: BLOCKED.** Four blockers, all fixable without design changes. B2 requires a design alignment decision.
 - **B1:** Language README (`docs.next/language/README.md`) uses NodaTime C# names (`localdate`, `localtime`, `localdatetime`) instead of DSL surface names (`date`, `time`, `datetime`). Also missing `zoneddatetime`.

@@ -127,13 +127,13 @@ public class TypeCheckerTests
     // ════════════════════════════════════════════════════════════════════════════
 
     [Fact]
-    public void Check_PreceptWithBody_StubLoopsDoNotCrash()
+    public void Check_PreceptWithBody_FieldRegistrationWorks()
     {
-        // Body declarations are parsed but registration is stubbed — collections stay empty.
         var model = CheckSource("precept Order\nfield Amount : number");
 
         model.PreceptName.Should().Be("Order");
-        model.Fields.Should().BeEmpty();
+        model.Fields.Should().ContainKey("Amount");
+        model.Fields["Amount"].Type.Should().BeOfType<NumberType>();
         model.States.Should().BeEmpty();
         model.Events.Should().BeEmpty();
         model.Rules.Should().BeEmpty();
@@ -190,6 +190,135 @@ public class TypeCheckerTests
         model.Diagnostics.Should().NotBeEmpty();
         model.Diagnostics.Should().AllSatisfy(d =>
             d.Stage.Should().Be(DiagnosticStage.Parse));
+    }
+
+    // ════════════════════════════════════════════════════════════════════════════
+    //  Slice 2 — Field registration
+    // ════════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Register_FieldAsString_AppearsInFields()
+    {
+        var model = CheckSource("precept T\nfield Name : string");
+
+        model.Fields.Should().ContainKey("Name");
+        model.Fields["Name"].Type.Should().BeOfType<StringType>();
+    }
+
+    [Theory]
+    [InlineData("integer", typeof(IntegerType))]
+    [InlineData("decimal", typeof(DecimalType))]
+    [InlineData("number",  typeof(NumberType))]
+    [InlineData("boolean", typeof(BooleanType))]
+    public void Register_FieldAsScalarType_ResolvesCorrectType(string typeName, Type expectedType)
+    {
+        var model = CheckSource($"precept T\nfield F as {typeName}");
+
+        model.Fields.Should().ContainKey("F");
+        model.Fields["F"].Type.Should().BeOfType(expectedType);
+    }
+
+    [Fact]
+    public void Register_OptionalField_IsOptionalTrue()
+    {
+        var model = CheckSource("precept T\nfield X : string optional");
+
+        model.Fields["X"].IsOptional.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Register_NonOptionalField_IsOptionalFalse()
+    {
+        var model = CheckSource("precept T\nfield X : string");
+
+        model.Fields["X"].IsOptional.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Register_ComputedField_IsComputedTrue()
+    {
+        var model = CheckSource("precept T\nfield Amount : number\nfield Total : number -> Amount + Amount");
+
+        model.Fields["Total"].IsComputed.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Register_NonComputedField_IsComputedFalse()
+    {
+        var model = CheckSource("precept T\nfield Amount : number");
+
+        model.Fields["Amount"].IsComputed.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Register_DuplicateFieldName_EmitsDiagnostic()
+    {
+        var model = CheckSource("precept T\nfield X : string\nfield X : number");
+
+        model.Diagnostics.Should().ContainSingle(d =>
+            d.Code == nameof(DiagnosticCode.DuplicateFieldName) &&
+            d.Stage == DiagnosticStage.Type &&
+            d.Severity == Severity.Error);
+    }
+
+    [Fact]
+    public void Register_DuplicateFieldName_FirstDeclarationWins()
+    {
+        var model = CheckSource("precept T\nfield X : string\nfield X : number");
+
+        // Second declaration is rejected; first (string) type is preserved.
+        model.Fields.Should().ContainKey("X");
+        model.Fields["X"].Type.Should().BeOfType<StringType>();
+    }
+
+    [Fact]
+    public void Register_MissingFieldName_SkipsRegistration()
+    {
+        // "field : string" → parser error recovery produces a missing name token (Length == 0)
+        // TypeChecker must skip it without crashing and leave Fields empty.
+        var model = CheckSource("precept T\nfield : string");
+
+        model.Fields.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Register_MultipleFields_SameDeclaration()
+    {
+        var model = CheckSource("precept T\nfield A, B : integer");
+
+        model.Fields.Should().ContainKey("A");
+        model.Fields.Should().ContainKey("B");
+        model.Fields["A"].Type.Should().BeOfType<IntegerType>();
+        model.Fields["B"].Type.Should().BeOfType<IntegerType>();
+    }
+
+    [Fact]
+    public void Register_MultipleFieldDeclarations_AllRegistered()
+    {
+        var model = CheckSource("precept T\nfield Name : string\nfield Count : integer\nfield Active : boolean");
+
+        model.Fields.Should().ContainKey("Name");
+        model.Fields.Should().ContainKey("Count");
+        model.Fields.Should().ContainKey("Active");
+        model.Fields.Should().HaveCount(3);
+    }
+
+    [Fact]
+    public void Register_SingleField_NoDiagnosticsEmitted()
+    {
+        // Use "as" keyword (not ":") to avoid lexer InvalidCharacter diagnostics.
+        var model = CheckSource("precept T\nfield Amount as number");
+
+        model.Diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Register_RegularStringField_CaseInsensitiveFalse()
+    {
+        var model = CheckSource("precept T\nfield Name : string");
+
+        var type = model.Fields["Name"].Type.Should().BeOfType<StringType>().Subject;
+        type.CaseInsensitive.Should().BeFalse();
     }
 
     // ════════════════════════════════════════════════════════════════════════════
