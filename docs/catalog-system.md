@@ -137,20 +137,21 @@ public sealed record TokenMeta(
     TokenKind                      Kind,
     string?                        Text,
     IReadOnlyList<TokenCategory>   Categories,
-    string                         Description,
-    TypeKind?                      TypeKind     = null,   // non-null for type keywords
-    OperatorKind?                  OperatorKind = null    // non-null for operator tokens
+    string                         Description
 );
 ```
 
-`TypeKind` and `OperatorKind` are optional cross-references that make the Token→Type and Token→Operator bridges compile-time-verified. Every type keyword token (e.g., `TokenKind.StringType`) carries `TypeKind = TypeKind.String`. Every operator token (e.g., `TokenKind.Plus`) carries `OperatorKind = OperatorKind.Plus`. These fields point "down" to other catalogs via enum values (not object references) because Tokens is the foundation catalog — it initializes first and cannot depend on other catalogs' static initializers.
+`TokenMeta` carries no cross-references to other catalogs. The bridge direction is **unidirectional upward**: downstream catalogs (Types, Operators, Modifiers, Actions) point up to Tokens via `TokenMeta Token` object references. Consumers that need the reverse direction (token → catalog entry) use **derived frozen indexes** built at startup:
 
-Other catalogs point "up" to Tokens via `TokenMeta` object references (see TypeMeta, OperatorMeta, ModifierMeta, ActionMeta below). This creates a bidirectional typed bridge with no string duplication:
+```csharp
+// Derived at startup from the catalog that owns the relationship
+FrozenDictionary<TokenKind, TypeMeta>     TypesByToken     = Types.All.ToFrozenDictionary(t => t.Token.Kind);
+FrozenDictionary<TokenKind, OperatorMeta> OperatorsByToken = Operators.All.ToFrozenDictionary(o => o.Token.Kind);
+```
 
-```
-TokenMeta.TypeKind?     → TypeKind       (token → type, by enum)
-TypeMeta.Token          → TokenMeta      (type → token, by object reference)
-```
+This avoids cross-ref fields on `TokenMeta` that would be inapplicable for most members (only ~25 of 90+ tokens are type keywords, ~16 are operators). It also avoids the dual-use problem — `Set` is both an action and a type, `Min`/`Max` are both modifiers and functions — which would require either multiple nullable fields or a DU wrapper. Derived indexes handle dual-use naturally: each catalog builds its own index from its own `All` property.
+
+The LS never needs token → catalog entry lookups — it works from AST nodes and resolved symbols, which already carry the typed `Kind`. MCP iterates each catalog's `All` directly. The reverse index exists for any consumer that needs it, derived from the source of truth (the downstream catalog's `Token` field).
 
 An immutable record holding all metadata for a single enum member. The shape varies per catalog — each Meta type carries exactly the fields its consumers need, no more. Shared fields across all catalogs:
 
@@ -283,7 +284,7 @@ The lexical vocabulary. 90+ members spanning keywords, operators, punctuation, l
 | Part | Type |
 |------|------|
 | Kind enum | `TokenKind` |
-| Meta record | `TokenMeta(Kind, Text?, Categories[], Description, TypeKind?, OperatorKind?)` |
+| Meta record | `TokenMeta(Kind, Text?, Categories[], Description)` |
 | Catalog class | `Tokens` — `GetMeta()`, `All`, `Keywords` (frozen dictionary for lexer lookup) |
 | Output type | `Token` (produced by lexer from scan state, not via `Create()`) |
 
@@ -1195,9 +1196,9 @@ Catalogs are the language specification in machine-readable form. Tests verify t
 
 | Invariant | Test |
 |-----------|------|
-| Every type keyword token has `TypeKind` set | `Tokens.All.Where(t => t.Categories.Contains(TypeKeyword)).All(t => t.TypeKind != null)` |
-| Every operator token has `OperatorKind` set | `Tokens.All.Where(t => t.Categories.Contains(Operator)).All(t => t.OperatorKind != null)` |
-| Bidirectional bridge consistency | `Types.All.All(t => Tokens.GetMeta(t.Token.Kind).TypeKind == t.Kind)` |
+| Every type has a valid token | `Types.All.All(t => t.Token.Categories.Contains(TokenCategory.Type))` |
+| Every operator has a valid token | `Operators.All.All(o => o.Token.Categories.Contains(TokenCategory.Operator))` |
+| Token→Type index is complete | `Types.All.Select(t => t.Token.Kind).Distinct().Count() == Types.All.Count` (no two types share a token) |
 | Widening acyclicity | No circular chains in `TypeMeta.WidensTo` |
 | Subsumption acyclicity | No circular chains in `FieldModifierMeta.Subsumes` |
 | `ParamSubject` referential integrity | Every `ParamSubject.Parameter` is reference-equal to a `ParameterMeta` in the containing overload/operation |
