@@ -18,6 +18,12 @@
 
 ## Recent Updates
 
+### 2026-04-25 — AI Surface Completeness Review
+- Wrote `.squad/decisions/inbox/newman-catalog-metadata-ai-review.md` assessing all 10 catalogs as AI grounding surface.
+- Current `precept_language` covers ~40% of what AI needs. Critical gaps: no type system metadata (widening, accessors), no operation legality table, no modifier applicability matrix, no syntax reference.
+- Recommended: single-response catalog-keyed serialization, tagged unions for DUs, new `syntaxReference` prose section. No per-catalog endpoints.
+- Prioritized 11 changes across 3 tiers. Types, Operations, and Modifiers catalogs are the bottleneck — MCP serialization is trivial once `All` exists.
+
 ### 2026-04-12 — Squad `squad:copilot` retirement cleanup
 - Tracked the workflow/template/doc blast radius and kept `squad:chore` distinct from the retired coding-agent label.
 

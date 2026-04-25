@@ -13,6 +13,36 @@
 
 ## Recent Updates
 
+### 2026-04-25 — Parser metadata-drivenness reassessment (correcting original review)
+- Shane flagged that my original pipeline review anchored to a pre-existing doc statement ("parser remains hand-written") instead of independently evaluating the v2 parser code. He was right.
+- Re-read the entire v2 parser (1,315 lines) and traced every language-knowledge decision. Found ~40-50% of the parser's language knowledge decisions are vocabulary tables that CAN and SHOULD be catalog-derived: operator precedence, type keyword mappings, modifier recognition sets, action keyword sets, sync-token sets.
+- The grammar productions (declaration parsing, expression Pratt loop, error recovery, dual-use disambiguation) correctly stay hand-written. My original claim that "the parser should NOT become catalog-driven" was overclaimed — the accurate position is "grammar stays hand-written; vocabulary tables become catalog-derived."
+- Key practical impact: for the most common language evolution (new types, modifiers, operators, functions), catalog-driven vocabulary eliminates parser edits entirely.
+- Recommended qualifying the catalog-system.md statement and provided a 5-step implementation plan tied to catalog landing order.
+- Filed at `.squad/decisions/inbox/frank-parser-metadata-reassessment.md`.
+
+### 2026-04-25 — Comprehensive catalog-driven pipeline architecture review
+- Wrote full review to `.squad/decisions/inbox/frank-catalog-metadata-pipeline-review.md` at Shane's request.
+- Assessed all 6 pipeline stages for metadata-drivenness: Lexer ~85%, Type Checker ~80% (biggest win), Proof Engine ~70% obligation discovery, Graph Analyzer partial, Parser correctly hand-written (not catalog-derivable), Evaluator ~60% (future).
+- Found the catalog-system.md design 90% complete for the metadata-driven vision. Three gaps: (1) FunctionMeta needs evaluation delegate shape, (2) TokenMeta should add TypeKind?/OperatorKind? cross-references, (3) Constructs catalog's non-generative relationship to parser needs explicit documentation.
+- String elimination audit: already achieved for all logic paths. No action required.
+- Cross-catalog integrity: dependency graph is acyclic; all references via enum values. No circular dependency risk.
+- Recommended 7-catalog implementation order respecting dependency graph: Types → Operators → Functions/Operations (parallel) → Modifiers/Actions/Constructs (parallel).
+- Key architectural position: parser stays hand-written; Constructs catalog is documentation/validation artifact, not parser-generation artifact. StateModifierKind stays bare (6 members don't justify catalog overhead).
+
+### 2026-04-25 — catalog-system.md: DQ1–DQ4 design question resolutions incorporated
+- **DQ1 — ConstructMeta.AllowedIn:** `ConstructMeta` gains `AllowedIn ConstructKind[] = []`. Empty = precept body level; populated = valid parent construct kinds. LS completions filter context-sensitive suggestions using this field. Full shape block and examples added to §8.
+- **DQ2 — ActionMeta.AllowedIn:** `ActionMeta` gains `AllowedIn ConstructKind[] = []` — same field name and type as `ConstructMeta`, uniform LS context logic. Action table updated with `AllowedIn` column; all eight verbs (`set`, `add`, `remove`, `enqueue`, `dequeue`, `push`, `pop`, `clear`) declare `[ConstructKind.EventDeclaration]`.
+- **DQ3 — DimensionProofRequirement:** New `PeriodDimension { Any, Date, Time }` enum and `DimensionProofRequirement` record added as a third `ProofRequirement` subtype, valid only on `BinaryOperationMeta.ProofRequirements`. Valid-subject table updated to "valid proof requirement types" format. Proof obligation inventory gains two new rows (date±period, time±period). PRECEPT0006 updated to note `DimensionProofRequirement` is only valid on `BinaryOperationMeta`.
+- **DQ4 — QualifierAxis + FixedReturnAccessor.ReturnsQualifier:** New `QualifierAxis` enum (`None`, `Currency`, `Unit`, `Dimension`, `FromCurrency`, `ToCurrency`, `Timezone`) added to §2 Types. `FixedReturnAccessor` gains `QualifierAxis ReturnsQualifier = QualifierAxis.None`. Bullet note added: accessors with `ReturnsQualifier != None` return the qualifier value on that axis; LS hover uses this for "returns the currency of this field."
+
+### 2026-04-25 — catalog-system.md: incorporated all 7 catalog gap resolutions
+- **Gaps 1–4 (Types + Operations + Modifiers):** `TypeMeta` gains `Traits`, `WidensTo`, `ImpliedModifiers`, `Accessors`. New `TypeTrait` flags enum and `TypeAccessor` discriminated union (`FixedReturnAccessor` subtype). `OperationMeta` becomes an abstract DU with `UnaryOperationMeta` and `BinaryOperationMeta` sealed subtypes; two internal indexes replace the single `_index`; `Lhs`/`Rhs`/`Operand` are now `ParameterMeta`. `ModifierMeta` gains `Subsumes ModifierKind[]` and `ApplicableTo` migrates from `TypeKind[]` to `TypeTarget[]`; new subsections for modifier subsumption and implied modifiers.
+- **Gaps 5–6 (Functions + Actions):** `FunctionOverload` and `FunctionMeta` shapes documented with `ParameterMeta[]` parameters and nullable `QualifierMatch?`; business-type overload semantics noted. `ActionMeta.TargetCollectionKind?` replaced by `ApplicableTo TypeTarget[]` with `ProofRequirements[]`. Action table updated to reflect `TypeTarget` entries including `clear`'s dual-target shape.
+- **Gap 6 cross-cut — TypeTarget DU:** New `## Supporting Types` section with `TypeTarget`/`ModifiedTypeTarget` discriminated union and shared `IsApplicable` helper.
+- **Gap 7 — ProofRequirement system:** New `## Proof Obligations` section: `ProofSubject` DU (`ParamSubject`, `SelfSubject`), `ProofRequirement` DU (`NumericProofRequirement`, `PresenceProofRequirement`), valid-subjects-per-catalog table, object-reference safety note, complete proof obligation inventory. `ProofRequirements[]` field added to `TypeAccessor`, `FixedReturnAccessor`, `FunctionOverload`, `BinaryOperationMeta`, `ActionMeta` shapes.
+- **Roslyn layer:** PRECEPT0005 and PRECEPT0006 added to Future Rules table. ProofEngine row in Pipeline Stage Impact updated to reflect catalog-driven obligation model.
+
 ### 2026-04-24 — TypeChecker Slice 4 review: Expression Checking Core + Rule Declarations
 - **Verdict: APPROVED.** No blockers. 3 observations.
 - **G1:** `IsAssignableTo` is defined in this slice but never called. `CheckRuleDeclaration` uses inline `is not BooleanType and not ErrorType` patterns throughout instead of delegating to it. Behaviorally equivalent for all types in play, but the helper is dead code in the slice that introduced it. Will likely be picked up in later slices.

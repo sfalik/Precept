@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using FluentAssertions;
+using Precept.Language;
 using Precept.Pipeline;
 using Xunit;
 

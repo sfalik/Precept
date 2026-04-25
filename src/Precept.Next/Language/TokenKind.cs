@@ -1,4 +1,4 @@
-namespace Precept.Pipeline;
+namespace Precept.Language;
 
 /// <summary>
 /// Every token the lexer can produce. Categories match the spec §1.1 tables.

@@ -95,3 +95,10 @@
 - When editor ranges look wrong, first inspect the upstream diagnostic payload; a language-server mapping bug and a coarse source span can present the same symptom.
 - Honor `EndColumn` when it is present and reserve full-line fallback for diagnostics that are genuinely line-scoped, otherwise tooling precision regresses silently.
 - Focused LS span tests should pin both the precise-range path and the line-level fallback path so later runtime precision work does not get flattened in the editor.
+
+### 2026-04-25 — Catalog metadata tooling impact review
+- Audited `PreceptAnalyzer.cs` (completions), `precept.tmLanguage.json` (grammar), `PreceptSemanticTokensHandler.cs` (semantic tokens), and `PreceptDocumentIntellisense.cs` (hover) against the 10-catalog system design in `docs.next/catalog-system.md`.
+- Found 14 hardcoded completion lists, 12 hand-maintained grammar alternations, and 1 hardcoded function hover dictionary — all replaceable by catalog metadata as catalogs land.
+- Semantic tokens already ~90% catalog-driven via `BuildSemanticTypeMap()`. Hover ~80% catalog-driven (function hover is the gap).
+- Recommended drift tests over grammar auto-generation; incremental per-catalog migration over big-bang rewrite; keeping regex-based context detection until Construct Slot Model matures.
+- Decision inbox: `.squad/decisions/inbox/kramer-catalog-metadata-tooling-review.md`

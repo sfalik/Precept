@@ -1,4 +1,6 @@
-namespace Precept.Pipeline;
+using Precept.Pipeline;
+
+namespace Precept.Language;
 
 public enum DiagnosticStage
 {

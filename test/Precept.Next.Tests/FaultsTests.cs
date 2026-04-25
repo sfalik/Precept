@@ -2,8 +2,7 @@ using System;
 using System.Linq;
 using System.Reflection;
 using FluentAssertions;
-using Precept.Pipeline;
-using Precept.Runtime;
+using Precept.Language;
 using Xunit;
 
 namespace Precept.Next.Tests;

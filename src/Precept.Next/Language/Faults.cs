@@ -1,4 +1,4 @@
-namespace Precept.Runtime;
+namespace Precept.Language;
 
 public sealed record FaultMeta(
     string Code,

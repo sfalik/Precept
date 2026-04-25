@@ -1,4 +1,4 @@
-namespace Precept.Runtime;
+namespace Precept.Language;
 
 // TODO: Stub — shape will be finalized when the evaluator result type is designed.
 // Expected additions: expression context (what was being evaluated), input values that

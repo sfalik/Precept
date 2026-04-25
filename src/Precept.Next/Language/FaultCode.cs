@@ -1,6 +1,4 @@
-using Precept.Pipeline;
-
-namespace Precept.Runtime;
+namespace Precept.Language;
 
 [AttributeUsage(AttributeTargets.Field)]
 public sealed class StaticallyPreventableAttribute(DiagnosticCode code) : Attribute

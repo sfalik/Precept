@@ -15,6 +15,20 @@ Precept is a domain integrity engine for .NET — a DSL runtime that governs how
 
 Key design docs: `docs/philosophy.md` (product philosophy), `docs/PreceptLanguageDesign.md` (DSL semantics), `docs/RuntimeApiDesign.md` (C# API), `docs/McpServerDesign.md` (MCP tool specs), `docs/CatalogInfrastructureDesign.md` (metadata registries). See `docs/` for the full set.
 
+## Metadata-Driven Architecture (Non-Negotiable)
+
+Precept uses a **metadata-driven architecture.** Domain knowledge is declared as structured metadata in catalogs. Pipeline stages are generic machinery that reads it. This is not the traditional compiler model — it is the inverse.
+
+In traditional compilers (Roslyn, GCC, TypeScript), domain knowledge is scattered across pipeline stage implementations and enums are internal classification axes. In Precept, **catalogs are the language specification in machine-readable form.** Pipeline stages, tooling, and consumers derive from catalog metadata — they never maintain parallel copies or encode domain knowledge in their own logic.
+
+When making design decisions, reason from language surface outward:
+
+- **"Is this part of a complete description of Precept?"** If yes, it gets cataloged — regardless of how small the enum is, how internal it looks, or whether existing compilers would treat it as a bare implementation detail.
+- **"Do consumers hardcode per-member knowledge that should be metadata?"** If the type checker, graph analyzer, evaluator, or runtime switches on enum values to apply per-member behavior, that behavior is domain knowledge and belongs in metadata.
+- **"Do members need different metadata shapes?"** Use a discriminated union (abstract record base + sealed subtypes). Each subtype carries exactly the fields its consumers need. Do not use flat records with inapplicable nullable fields — use a DU instead.
+
+The canonical design doc for the catalog system is `docs.next/catalog-system.md`. Read its § Architectural Identity before making decisions about what gets cataloged, what stays bare, or how metadata is shaped.
+
 ## Build & Test
 
 ```bash

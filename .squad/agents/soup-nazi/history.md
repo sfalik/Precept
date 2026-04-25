@@ -1,5 +1,14 @@
 ## Recent Updates
 
+### 2026-04-25 — Catalog-Driven Metadata Test Strategy Review
+
+- Reviewed all 10 catalogs from `docs.next/catalog-system.md` against existing test patterns in `test/Precept.Next.Tests/` (5 files, ~632 tests).
+- Produced comprehensive test strategy: catalog-driven test generation (per-catalog property-based tests, exhaustive combination matrices, drift detection), metadata-driven test oracles (10 oracle patterns), regression risk analysis for OperatorTable migration, and prioritized implementation plan.
+- Key finding: the `Types × Types × Operators` exhaustive matrix (~13,520 cells) is the single highest-value test and must be green BEFORE `OperatorTable` is replaced by `Operations.Resolve()`.
+- Recommended infrastructure: `CatalogSnapshotTestBase<TKind,TMeta>`, golden file per catalog (10 files), cross-catalog referential integrity test class.
+- Estimated ~15,500+ test cases when all 10 catalogs are implemented, vast majority auto-generated from catalog `All` properties.
+- Filed to `.squad/decisions/inbox/soup-nazi-catalog-metadata-test-review.md`.
+
 ### 2026-04-24 — Slice 5: OperatorTable + numeric literal + binary expression tests
 
 - Created `test/Precept.Next.Tests/OperatorTableTests.cs` (39 test cases after Theory expansion).

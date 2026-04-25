@@ -1,4 +1,4 @@
-namespace Precept.Pipeline;
+namespace Precept.Language;
 
 public enum DiagnosticCode
 {

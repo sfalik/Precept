@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Linq;
+using Precept.Language;
 using Precept.Pipeline;
 
 namespace Precept;

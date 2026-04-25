@@ -1,6 +1,7 @@
 using System.Collections.Frozen;
 using System.Collections.Immutable;
 using System.Diagnostics;
+using Precept.Language;
 
 namespace Precept.Pipeline;
 

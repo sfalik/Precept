@@ -29,6 +29,10 @@
 
 ## Recent Updates
 
+### 2026-04-25 — Compiler Feasibility Review: Fully Metadata-Driven Pipeline
+
+Wrote `.squad/decisions/inbox/george-catalog-metadata-pipeline-review.md` — comprehensive per-stage feasibility analysis of making the entire compiler pipeline catalog-metadata-driven. Key findings: lexer is already there; parser lookup tables (binding powers, type maps, modifier/action classification) are clean wins but production bodies must stay hand-written; type checker gets the biggest benefit (~60-70% of language knowledge migrates to catalogs); graph analyzer is already graph-generic; proof engine obligations are catalog-driven but strategies are algorithmic; evaluator dispatch can be catalog-driven via function/operation delegates. Recommended 6 immediate actions, 3 deferrals, and 5 explicit "do not do" items. Core thesis: catalogs own vocabulary, stages own algorithms — making stages "generic" means vocabulary-agnostic, not logic-free.
+
 ### 2026-04-24 — TypeChecker Slice 5 — Numeric literals + scalar arithmetic + OperatorTable
 
 Created `src/Precept.Next/Pipeline/OperatorTable.cs` as a static class with `ResolveBinary` and `CommonNumericType`.

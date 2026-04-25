@@ -1,4 +1,6 @@
-namespace Precept.Pipeline;
+using Precept.Pipeline;
+
+namespace Precept.Language;
 
 public sealed record DiagnosticMeta(
     string          Code,

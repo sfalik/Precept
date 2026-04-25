@@ -1,6 +1,6 @@
 using System.Collections.Frozen;
 
-namespace Precept.Pipeline;
+namespace Precept.Language;
 
 public static class Tokens
 {

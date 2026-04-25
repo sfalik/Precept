@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using Precept.Language;
 
 namespace Precept.Pipeline;
 
@@ -110,7 +111,7 @@ public static class Parser
 
         private void AddDiagnostic(DiagnosticCode code, SourceSpan span, params object?[] args)
         {
-            Diagnostics.Add(Pipeline.Diagnostics.Create(code, span, args));
+            Diagnostics.Add(Language.Diagnostics.Create(code, span, args));
         }
 
         // ── Sync-point recovery ────────────────────────────────────────────────
