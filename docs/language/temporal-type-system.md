@@ -1,7 +1,7 @@
 # Temporal Type System Design — NodaTime-Aligned
 
 > **Status:** Draft
-> **Grounding:** `docs.next/language/precept-language-vision.md` § Type System, language design principles
+> **Grounding:** `docs/language/precept-language-vision.md` § Type System, language design principles
 > **Prototype reference:** `docs/TemporalTypeSystemDesign.md` on `research/nodatime-type-alignment` branch (PR #114)
 > **Related proposals:** [Issue #107](https://github.com/sfalik/Precept/issues/107)
 

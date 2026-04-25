@@ -1,8 +1,6 @@
-# docs.next/ — v2 Clean-Room Design Documentation
+# docs/ — Design Documentation
 
-Design documents for the Precept v2 compiler pipeline and language surface. These are **clean-room** artifacts — they do not reference v1 implementation details.
-
-> **Precept.Next implementation track:** If you are designing or implementing `src/Precept.Next`, start here. `docs.next/` is the authoritative design set for that work. The `docs/` folder remains the legacy/current reference set for the implemented v1 surface, product reference, and historical context.
+Design documents for the Precept compiler pipeline and language surface.
 
 ## Structure
 
@@ -31,6 +29,5 @@ Design documents for the Precept v2 compiler pipeline and language surface. Thes
 
 ## Relationship to Other Docs
 
-- `docs/` — v1 design docs (implemented behavior). `docs.next/` designs the replacement.
 - `research/architecture/compiler/` — 15 external research surveys that ground the design decisions here.
 - `research/language/` — language research, precedent surveys, and proposal rationale.

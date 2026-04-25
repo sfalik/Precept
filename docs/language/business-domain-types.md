@@ -1,7 +1,7 @@
 # Currency, Quantity, Unit-of-Measure, and Price Design
 
 > **Status:** Draft
-> **Grounding:** `docs.next/language/precept-language-vision.md` § Type System, language design principles
+> **Grounding:** `docs/language/precept-language-vision.md` § Type System, language design principles
 > **Prototype reference:** `docs/CurrencyQuantityUomDesign.md` on `research/issue-95-currency-quantity-uom` branch
 > **Related proposals:** [Issue #95](https://github.com/sfalik/Precept/issues/95)
 > **Depends on:** [Temporal Type System Design](temporal-type-system.md) (Issue #107) — establishes `period`, `duration`, `timezone`, the typed constant delimiter, and the `in` syntax pattern this proposal extends. [Issue #115](https://github.com/sfalik/Precept/issues/115) — exact `decimal` arithmetic; context-sensitive literal typing; non-ambiguous inference invariant.

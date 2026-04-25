@@ -3,7 +3,7 @@
 **Date:** 2026-04-21
 **Status:** Pre-design planning artifact — identifies what must be designed, in what order, grounded in what evidence
 **Authors:** Frank (Lead/Architect), George (Runtime Developer)
-**Inputs:** Language Vision (`docs.next/language/precept-language-vision.md`), 15 external research surveys (`research/architecture/compiler/`)
+**Inputs:** Language Vision (`docs/language/precept-language-vision.md`), 15 external research surveys (`research/architecture/compiler/`)
 
 ---
 

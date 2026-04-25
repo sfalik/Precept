@@ -1,7 +1,7 @@
 # Fault System
 
 > **Status:** Stub — runtime design is not yet started
-> **Relates to:** `docs.next/compiler/diagnostic-system.md` (FaultCode → DiagnosticCode chain)
+> **Relates to:** `docs/compiler/diagnostic-system.md` (FaultCode → DiagnosticCode chain)
 > **Implemented in:** `src/Precept.Next/Runtime/`
 
 ## Overview

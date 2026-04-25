@@ -3,7 +3,7 @@
 > **Status:** Draft
 > **Decisions answered:** P1 (AST not CST), P2 (hybrid error recovery — missing nodes + sync-point resync), P3 (production-end detection for statement boundaries), P4 (parser/type-checker boundary at the grammar line), P5 (typed constant interior opaque), P6 (depth-unaware interpolation reassembly), P7 (AST node representation: abstract record base + SourceSpan, grouped intermediate types, IsMissing flag)
 > **Survey references:** compiler-pipeline-architecture-survey
-> **Grounding:** `docs.next/architecture-planning.md` § 2.2, `docs.next/compiler/pipeline-artifacts-and-consumer-contracts.md` § Pipeline Stages
+> **Grounding:** `docs/architecture-planning.md` § 2.2, `docs/compiler/pipeline-artifacts-and-consumer-contracts.md` § Pipeline Stages
 
 ## Overview
 
@@ -1162,15 +1162,15 @@ The parser intentionally does NOT:
 | Topic | Document |
 |-------|----------|
 | Grammar EBNF (v1 baseline) | [docs/PreceptLanguageDesign.md](../../docs/PreceptLanguageDesign.md) § Grammar |
-| Expression precedence (locked) | [docs.next/language/precept-language-spec.md](../language/precept-language-spec.md) § 2.1 |
-| Interpolation token kinds and segment origin | [docs.next/compiler/literal-system.md](../compiler/literal-system.md) § Parser |
+| Expression precedence (locked) | [docs/language/precept-language-spec.md](../language/precept-language-spec.md) § 2.1 |
+| Interpolation token kinds and segment origin | [docs/compiler/literal-system.md](../compiler/literal-system.md) § Parser |
 | `TokenKind` vocabulary (all token kinds) | `src/Precept.Next/Pipeline/TokenKind.cs` |
 | `Token` record struct (span fields) | `src/Precept.Next/Pipeline/Token.cs` |
-| `SyntaxTree` as pipeline artifact, consumer table | [docs.next/compiler/pipeline-artifacts-and-consumer-contracts.md](../compiler/pipeline-artifacts-and-consumer-contracts.md) § Pipeline Stages |
-| `set` disambiguation rationale | [docs.next/compiler/lexer.md](../compiler/lexer.md) § Deliberate Exclusions |
-| Pipeline stage ordering | [docs.next/compiler/pipeline-artifacts-and-consumer-contracts.md](../compiler/pipeline-artifacts-and-consumer-contracts.md) § Pipeline Stages |
-| Diagnostic system | [docs.next/compiler/diagnostic-system.md](../compiler/diagnostic-system.md) |
-| Original architecture planning notes | [docs.next/architecture-planning.md](../architecture-planning.md) § 2.2 |
+| `SyntaxTree` as pipeline artifact, consumer table | [docs/compiler/pipeline-artifacts-and-consumer-contracts.md](../compiler/pipeline-artifacts-and-consumer-contracts.md) § Pipeline Stages |
+| `set` disambiguation rationale | [docs/compiler/lexer.md](../compiler/lexer.md) § Deliberate Exclusions |
+| Pipeline stage ordering | [docs/compiler/pipeline-artifacts-and-consumer-contracts.md](../compiler/pipeline-artifacts-and-consumer-contracts.md) § Pipeline Stages |
+| Diagnostic system | [docs/compiler/diagnostic-system.md](../compiler/diagnostic-system.md) |
+| Original architecture planning notes | [docs/architecture-planning.md](../architecture-planning.md) § 2.2 |
 
 ---
 

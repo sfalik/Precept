@@ -2,7 +2,7 @@
 
 > **Status:** Incremental — grows per compiler stage as design decisions are locked
 > **Scope:** This document specifies the Precept DSL syntax and semantics for the v2 compiler pipeline. Each section is added when the corresponding compiler stage is designed and implemented.
-> **Grounding:** `docs.next/language/precept-language-vision.md` (target language surface), `docs/PreceptLanguageDesign.md` (v1 implemented spec)
+> **Grounding:** `docs/language/precept-language-vision.md` (target language surface), `docs/PreceptLanguageDesign.md` (v1 implemented spec)
 > **Clean room rule:** This spec references the v1 language grammar, keyword inventory, and disambiguation rules. It does NOT import v1 implementation details (Superpower combinators, token attributes, class hierarchies).
 
 ---
@@ -230,7 +230,7 @@ Every token the lexer can produce. Organized by category to match the `TokenKind
 
 **`Token.Offset` and `Token.Length` contract for quoted literals:** `Offset` and `Length` span the full raw source range including opening and closing delimiters. `StringLiteral` for `"hello"` has `Length = 7` (both quotes included). `StringStart` for `"Hello {` spans through the `{`. This allows tools to highlight or replace the exact source text without having to re-infer delimiter positions. `Text` (content-only) and `Offset`/`Length` (raw-source span) are complementary.
 
-See [§1.3 Literal Syntax](#13-literal-syntax) for full rules. See `docs.next/compiler/literal-system.md` for the complete literal system design.
+See [§1.3 Literal Syntax](#13-literal-syntax) for full rules. See `docs/compiler/literal-system.md` for the complete literal system design.
 
 #### Identifiers
 

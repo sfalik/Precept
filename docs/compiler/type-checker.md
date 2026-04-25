@@ -3,7 +3,7 @@
 > **Status:** Draft
 > **Decisions answered:** T1 (TypedModel shape — flat symbol tables + declaration arrays), T2 (annotation strategy — embedded TypedExpression pairs), T3 (error type propagation), T4 (context-dependent literal resolution — uniform, no fallback), T5 (modifier applicability validation), T6 (scope model), T7 (functions and operators via catalog system), T8 (ErrorType singleton), T9 (stateless precept handling — cross-validation)
 > **Survey references:** context-sensitive-literal-typing survey, pipeline architecture survey, compilation-result-type survey
-> **Grounding:** `docs.next/compiler/pipeline-artifacts-and-consumer-contracts.md` (pipeline contract), `docs.next/language/precept-language-spec.md` §3 (type checker stubs), `docs.next/compiler/literal-system.md` (literal resolution contracts), `docs.next/compiler/diagnostic-system.md` (diagnostic infrastructure)
+> **Grounding:** `docs/compiler/pipeline-artifacts-and-consumer-contracts.md` (pipeline contract), `docs/language/precept-language-spec.md` §3 (type checker stubs), `docs/compiler/literal-system.md` (literal resolution contracts), `docs/compiler/diagnostic-system.md` (diagnostic infrastructure)
 
 ---
 

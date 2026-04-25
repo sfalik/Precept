@@ -2,7 +2,7 @@
 
 > **Status:** Draft — expanded after catalog completeness design review (2026-04-24)
 > **Implemented in:** `src/Precept.Next/Pipeline/` (Tokens, Diagnostics), `src/Precept.Next/Runtime/` (Faults)
-> **Related:** `docs.next/compiler/diagnostic-system.md`, `docs.next/runtime/fault-system.md`, `docs.next/compiler/pipeline-artifacts-and-consumer-contracts.md`
+> **Related:** `docs/compiler/diagnostic-system.md`, `docs/runtime/fault-system.md`, `docs/compiler/pipeline-artifacts-and-consumer-contracts.md`
 
 ## Overview
 

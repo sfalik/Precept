@@ -2,7 +2,7 @@
 
 **Date:** 2026-04-22
 **Status:** Pre-design planning artifact — identifies what must be designed, in what order, grounded in what evidence
-**Inputs:** Language Vision (`docs.next/language/precept-language-vision.md`), 15 compiler research surveys (`research/architecture/compiler/`), Runtime Evaluator Architecture Survey (`research/architecture/runtime/runtime-evaluator-architecture-survey.md`)
+**Inputs:** Language Vision (`docs/language/precept-language-vision.md`), 15 compiler research surveys (`research/architecture/compiler/`), Runtime Evaluator Architecture Survey (`research/architecture/runtime/runtime-evaluator-architecture-survey.md`)
 
 ---
 
@@ -520,7 +520,7 @@ Constraints are exposed at three tiers — each backed by `ConstraintDescriptor`
 
 **Provisional (G1/G9):** `ReferencedFields` and `ConstraintViolation.FieldNames` are flat string lists. The prototype carries a typed target hierarchy (field, event-arg, event, state, definition) for rich attribution. When metadata descriptors (D8/R4) are defined, these become typed target lists.
 
-See `docs.next/runtime/runtime-api.md` § Constraint Exposure Model for the full type definitions and tier 2 scope rules.
+See `docs/runtime/runtime-api.md` § Constraint Exposure Model for the full type definitions and tier 2 scope rules.
 
 ### 4.5 Working Copy / Atomicity Mechanism
 
@@ -689,7 +689,7 @@ Fifteen decisions that must be resolved before implementation. D1–D8 cover com
 **Survey grounding:** Compiler-result-to-runtime survey (CEL Program internals, OPA PreparedEvalQuery).
 **Coupling:** Couples to D1 (the compilation result is the construction input) and blocks evaluator design. This is the same specification as R4 — co-designed from both sides.
 
-**R2-derived requirement (binding):** The executable model must carry per-expression arg-dependency sets — an annotation on each expression node indicating which event arguments appear in its subtree. This is computed as a lowering-time tree walk during `Precept.From()`. Without it, the evaluator cannot distinguish field-only guards from arg-dependent guards for progressive inspection. See `docs.next/runtime/result-types.md` § Evaluator Design Requirements.
+**R2-derived requirement (binding):** The executable model must carry per-expression arg-dependency sets — an annotation on each expression node indicating which event arguments appear in its subtree. This is computed as a lowering-time tree walk during `Precept.From()`. Without it, the evaluator cannot distinguish field-only guards from arg-dependent guards for progressive inspection. See `docs/runtime/result-types.md` § Evaluator Design Requirements.
 
 **Metadata-first requirement (binding):** D8/R4 must define typed metadata descriptors (field descriptor, event descriptor, state descriptor, arg descriptor) that replace raw strings throughout the runtime API. The evaluator operates against descriptors, not strings. Descriptors carry the full compiled metadata — name, type, slot index, access modes, constraints, arg-dependency sets — and are the canonical identity for every declared element. All string placeholders in the current `Precept.Next/Runtime/` stubs are provisional gaps pending this decision.
 
@@ -785,25 +785,25 @@ Fifteen design documents need to be written, organized across three locations by
 
 | Phase | Document | Path | Decisions | Primary Survey References |
 |-------|----------|------|-----------|--------------------------|
-| 1 | Pipeline Artifacts & Consumer Contracts | `docs.next/compiler/pipeline-artifacts.md` | D1, D6, D7 | compilation-result-type-survey, language-server-integration-survey, compiler-result-to-runtime-survey |
-| 1 | Diagnostic System | `docs.next/compiler/diagnostic-system.md` | D4 | diagnostic-and-output-design-survey, proof-attribution-witness-design-survey |
-| 1 | Executable Model Contract | `docs.next/executable-model.md` | D8, R4 | CEL Program internals, OPA PreparedEvalQuery, compiler-result-to-runtime-survey |
-| 1 | Result Type Taxonomy | `docs.next/runtime/result-types.md` | R2 | CEL three-value return, XState MachineSnapshot, CUE Value/Bottom |
-| 1* | Literal System | `docs.next/compiler/literal-system.md` | Lexer decision 3 | PR #114 prototype (`docs/LiteralSystemDesign.md`), language vision § Literal System |
-| 2 | Literal Resolution Mechanism | `docs.next/compiler/literal-resolution.md` | D2 | context-sensitive-literal-typing-survey |
-| 2 | Unit/Dimension Algebra | `docs.next/compiler/unit-algebra.md` | D3 | units-of-measure-dimensional-analysis-survey, temporal-type-hierarchy-survey |
-| 2 | Numeric Lane System | `docs.next/compiler/numeric-lanes.md` | — | language vision § Numeric lane system, issue #115, PR #116 |
-| 2 | Temporal Type System | `docs.next/compiler/temporal-types.md` | — | issue #107 (PR #114 prototype), language vision § Temporal types |
-| 2 | Quantity / UOM / Money Types | `docs.next/compiler/quantity-types.md` | — | issue #95, issue #107 § Forward Design, language vision § Type System |
-| 3 | Lexer | `docs.next/compiler/lexer.md` | — | compiler-pipeline-architecture-survey |
-| 3 | Parser | `docs.next/compiler/parser.md` | D6 applied | compiler-pipeline-architecture-survey |
-| 3 | Type Checker | `docs.next/compiler/type-checker.md` | D2, D3 applied | All Phase 2 documents |
-| 3 | Graph Analyzer | `docs.next/compiler/graph-analyzer.md` | — | state-graph-analysis-survey |
-| 4 | Proof Engine | `docs.next/compiler/proof-engine.md` | D5 | proof-engine-interval-arithmetic-survey, proof-attribution-witness-design-survey |
-| 4 | Runtime API | `docs.next/runtime/runtime-api.md` | R2 applied, R3 | XState MachineSnapshot, CEL Activation |
-| 4 | Evaluator | `docs.next/runtime/evaluator.md` | R1, R5 | compiler-result-to-runtime-survey, exact-decimal-arithmetic-survey, dry-run-preview-inspect-api-survey |
-| 4 | Constraint Evaluation | `docs.next/runtime/constraint-evaluation.md` | R6 | OPA deny[msg], CUE Bottom, SPARK proof output, Eiffel blame model |
-| 4 | Fault System | `docs.next/runtime/fault-system.md` (exists) | R7 | SPARK proof-elimination, Dhall totality, CEL error-as-value |
+| 1 | Pipeline Artifacts & Consumer Contracts | `docs/compiler/pipeline-artifacts.md` | D1, D6, D7 | compilation-result-type-survey, language-server-integration-survey, compiler-result-to-runtime-survey |
+| 1 | Diagnostic System | `docs/compiler/diagnostic-system.md` | D4 | diagnostic-and-output-design-survey, proof-attribution-witness-design-survey |
+| 1 | Executable Model Contract | `docs/executable-model.md` | D8, R4 | CEL Program internals, OPA PreparedEvalQuery, compiler-result-to-runtime-survey |
+| 1 | Result Type Taxonomy | `docs/runtime/result-types.md` | R2 | CEL three-value return, XState MachineSnapshot, CUE Value/Bottom |
+| 1* | Literal System | `docs/compiler/literal-system.md` | Lexer decision 3 | PR #114 prototype (`docs/LiteralSystemDesign.md`), language vision § Literal System |
+| 2 | Literal Resolution Mechanism | `docs/compiler/literal-resolution.md` | D2 | context-sensitive-literal-typing-survey |
+| 2 | Unit/Dimension Algebra | `docs/compiler/unit-algebra.md` | D3 | units-of-measure-dimensional-analysis-survey, temporal-type-hierarchy-survey |
+| 2 | Numeric Lane System | `docs/compiler/numeric-lanes.md` | — | language vision § Numeric lane system, issue #115, PR #116 |
+| 2 | Temporal Type System | `docs/compiler/temporal-types.md` | — | issue #107 (PR #114 prototype), language vision § Temporal types |
+| 2 | Quantity / UOM / Money Types | `docs/compiler/quantity-types.md` | — | issue #95, issue #107 § Forward Design, language vision § Type System |
+| 3 | Lexer | `docs/compiler/lexer.md` | — | compiler-pipeline-architecture-survey |
+| 3 | Parser | `docs/compiler/parser.md` | D6 applied | compiler-pipeline-architecture-survey |
+| 3 | Type Checker | `docs/compiler/type-checker.md` | D2, D3 applied | All Phase 2 documents |
+| 3 | Graph Analyzer | `docs/compiler/graph-analyzer.md` | — | state-graph-analysis-survey |
+| 4 | Proof Engine | `docs/compiler/proof-engine.md` | D5 | proof-engine-interval-arithmetic-survey, proof-attribution-witness-design-survey |
+| 4 | Runtime API | `docs/runtime/runtime-api.md` | R2 applied, R3 | XState MachineSnapshot, CEL Activation |
+| 4 | Evaluator | `docs/runtime/evaluator.md` | R1, R5 | compiler-result-to-runtime-survey, exact-decimal-arithmetic-survey, dry-run-preview-inspect-api-survey |
+| 4 | Constraint Evaluation | `docs/runtime/constraint-evaluation.md` | R6 | OPA deny[msg], CUE Bottom, SPARK proof output, Eiffel blame model |
+| 4 | Fault System | `docs/runtime/fault-system.md` (exists) | R7 | SPARK proof-elimination, Dhall totality, CEL error-as-value |
 
 ### Phase 1 — Architecture Foundations (blocks everything)
 

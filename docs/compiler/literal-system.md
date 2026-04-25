@@ -2,7 +2,7 @@
 
 > **Status:** Draft
 > **Decisions answered:** Lexer decision 3 (interpolation decomposition), plus literal-system-wide contracts for all pipeline stages
-> **Grounding:** `docs.next/language/precept-language-vision.md` § Literal System, language design principles
+> **Grounding:** `docs/language/precept-language-vision.md` § Literal System, language design principles
 > **Prototype reference:** `docs/LiteralSystemDesign.md` on `research/nodatime-type-alignment` branch (PR #114)
 
 ## Overview
