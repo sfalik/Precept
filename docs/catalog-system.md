@@ -1,7 +1,7 @@
 # Catalog System
 
 > **Status:** Draft — updated 2026-04-25 after full team review (10-item metadata-driven design review, owner sign-off)
-> **Implemented in:** `src/Precept/` (Tokens, Diagnostics catalogs exist), remaining catalogs planned
+> **Implemented in:** `src/Precept/` — all 10 catalogs implemented
 > **Related:** `docs/compiler/diagnostic-system.md`, `docs/runtime/fault-system.md`, `docs/compiler/pipeline-artifacts-and-consumer-contracts.md`
 
 ## Overview
@@ -290,7 +290,7 @@ The lexical vocabulary. 90+ members spanning keywords, operators, punctuation, l
 
 **Consumers:** MCP vocabulary, LS semantic tokens, LS completions, lexer keyword lookup, TextMate grammar keyword alternations.
 
-#### 2. Types (🔲 Planned)
+#### 2. Types (✅ Implemented)
 
 The type system's family taxonomy. Each member represents a type *family*.
 
@@ -391,7 +391,7 @@ public sealed record FixedReturnAccessor(
 
 Only two widening edges in the language: `integer → [Decimal, Number]`. `decimal → number` is NOT implicit — requires `approximate()`. All other types have `WidensTo = []`.
 
-#### 3. Functions (🔲 Planned — unblocked by Types)
+#### 3. Functions (✅ Implemented)
 
 The built-in function library. 21 functions defined in the language spec (§3.7).
 
@@ -456,7 +456,7 @@ Note: `QualifierMatch` on `FunctionOverload` is `QualifierMatch?` — `null` mea
 
 `ParameterMeta` is shared between `FunctionOverload.Parameters` and `BinaryOperationMeta.Lhs`/`Rhs` — see Proof Obligations for why it uses object references rather than `TypeKind`.
 
-#### 4. Operators (🔲 Planned)
+#### 4. Operators (✅ Implemented)
 
 Operator symbols — the `+`, `-`, `*`, `/`, `==`, etc. Each member is an operator symbol with its own metadata.
 
@@ -471,7 +471,7 @@ Operator symbols — the `+`, `-`, `*`, `/`, `==`, etc. Each member is an operat
 
 **Rationale:** `BinaryOp` and `UnaryOp` are currently bare parser-internal enums. The Operators catalog promotes them to first-class language surface with per-member metadata — symbol text, human-readable description, precedence, associativity. Consumers no longer need hardcoded operator lists.
 
-#### 5. Operations (🔲 Planned)
+#### 5. Operations (✅ Implemented)
 
 Typed operator combinations — each member is one legal `(operator, lhs TypeKind, rhs TypeKind) → result TypeKind` triple. The catalog is the **source of truth** for what the language can do with specific type combinations — every consumer (type checker, doc generation, MCP, LS hover, AI grounding) derives from these entries.
 
@@ -618,7 +618,7 @@ Types without qualifiers (`DecimalType`, `IntegerType`, `DateType`, etc.) always
 
 **Replaces `OperatorTable`:** The existing `OperatorTable.ResolveBinary(BinaryOp, Type, Type) → Type?` is absorbed by `Operations.Resolve`. The `OperatorTable` class becomes redundant once the Operations catalog is implemented.
 
-#### 6. Modifiers (🔲 Planned)
+#### 6. Modifiers (✅ Implemented)
 
 All declaration-attached modifiers across the language surface — field constraints, state lifecycle modifiers, event modifiers, access modes, and ensure/action anchors. The Modifiers catalog uses a **discriminated union with 5 sealed subtypes**, each carrying exactly the metadata its consumers need.
 
@@ -788,7 +788,7 @@ State modifiers that are structural (`terminal`, `required`, `irreversible`) req
 
 Semantic state modifiers (`success`, `warning`, `error`) require no graph analysis — they are intent declarations for tooling and documentation.
 
-#### 7. Actions (🔲 Planned)
+#### 7. Actions (✅ Implemented)
 
 State-machine action verbs — the keywords that appear after `->` in transition rows and state action hooks.
 
@@ -833,7 +833,7 @@ Consumers access the action keyword text via `action.Token.Text`. Execution dele
 
 **Consumers:** MCP vocabulary, LS completions (action verbs after `->` in event bodies), LS hover, parser validation, type checker (target type compatibility per `precept-language-spec.md` §3.8).
 
-#### 8. Constructs (🔲 Planned — slot model)
+#### 8. Constructs (✅ Implemented — slot model deferred)
 
 Grammar forms / declaration shapes. See § Construct Slot Model for the enriched structure.
 
