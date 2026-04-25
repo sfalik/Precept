@@ -1,5 +1,11 @@
 ## Recent Updates
 
+### 2026-04-24 — G7: Faults catalog tests
+
+- Created `test/Precept.Next.Tests/FaultsTests.cs` with 9 test methods (Theory × 8 FaultCode values + 2 standalone Facts = 42 total test cases after expansion).
+- Coverage: GetMeta exhaustiveness, All count, non-empty Code/MessageTemplate, Create factory code+codeName, message formatting, CodeName↔enum identity, StaticallyPreventable attribute presence, linked DiagnosticCode validity, no duplicate DiagnosticCode mappings.
+- No surprising findings — all 8 FaultCode values have attributes and valid linkage.
+
 ### 2026-04-24 — Precept.Next pre-TypeChecker coverage audit
 
 - Audited all files in `test/Precept.Next.Tests/` against `src/Precept.Next/Pipeline/` and `src/Precept.Next/Runtime/`.
@@ -20,6 +26,7 @@
 
 ## Learnings
 
+- 2026-04-24 G7 Faults catalog tests: wrote 9 test methods covering exhaustiveness (GetMeta per code, All count), Create factory (code/codeName/message), CodeName identity (matches enum member name), and FaultCode→DiagnosticCode linkage (attribute presence, valid target, uniqueness). Used reflection for `[StaticallyPreventable]` attribute inspection. All current FaultCode templates are static strings with no format placeholders — format-arg coverage is structural only (string.Format tolerates extra args on placeholder-free templates).
 - 2026-04-24 Precept.Next coverage audit: TypedModel stub shape is a compile-time blocker for TypeChecker tests — the record needs real fields before any model assertion can compile. DiagnosticCode.cs missing type-checker codes is the second compile-time blocker. Both must be resolved before TypeCheckerTests.cs can be written.
 - `Faults.cs` has real testable code (GetMeta, Create, All) but zero tests. This is a pre-existing gap that can be closed at any time without waiting for downstream stubs.
 - `DiagnosticCode.cs` enum + `Diagnostics.GetMeta` switch must stay in sync with the type-checker doc as new codes are added. A drift test (parallel to `CatalogDriftTests` in v1) should be added when TypeChecker is implemented.

@@ -7,6 +7,7 @@ namespace Precept.Pipeline;
 // ════════════════════════════════════════════════════════════════════════════════
 
 public sealed record class TypedModel(
+    string                                     PreceptName,
     ImmutableDictionary<string, FieldSymbol>   Fields,
     ImmutableDictionary<string, StateSymbol>   States,
     ImmutableDictionary<string, EventSymbol>   Events,

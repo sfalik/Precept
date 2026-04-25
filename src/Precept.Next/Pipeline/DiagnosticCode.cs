@@ -56,7 +56,24 @@ public enum DiagnosticCode
     InvalidTypedConstantContent,
     DefaultForwardReference,
 
+    // ── Type (temporal) ──────────────────────────────────
+    InvalidDateValue,
+    InvalidDateFormat,
+    InvalidTimeValue,
+    InvalidInstantFormat,
+    InvalidTimezoneId,
+    UnqualifiedPeriodArithmetic,
+    MissingTemporalUnit,
+    FractionalUnitValue,
+
+    // ── Type (collection safety) ─────────────────────────
+    UnguardedCollectionAccess,
+    UnguardedCollectionMutation,
+    NonOrderableCollectionExtreme,
+    CaseInsensitiveStringOnNonCollection,
+
     // ── Type (business-domain) ───────────────────────────
+    MaxPlacesExceeded,
     QualifierMismatch,
     DimensionCategoryMismatch,
     CrossCurrencyArithmetic,
