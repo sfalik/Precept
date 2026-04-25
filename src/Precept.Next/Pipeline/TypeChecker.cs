@@ -249,10 +249,88 @@ public static class TypeChecker
                 StringLiteralExpression s          => new TypedExpression(s, new StringType(), s.Span),
                 ParenthesizedExpression p          => CheckExpression(p.Inner, expectedType),
                 InterpolatedStringExpression i     => CheckInterpolatedString(i),
+                NumberLiteralExpression n          => CheckNumberLiteral(n, expectedType),
+                BinaryExpression bi                => CheckBinaryExpression(bi, expectedType),
                 // All other expression types → ErrorType stub for later slices
                 _                                  => new TypedExpression(expr, new ErrorType(), expr.Span)
             };
         }
+
+        private TypedExpression CheckNumberLiteral(NumberLiteralExpression expr, ResolvedType? expectedType)
+        {
+            var text = expr.Value.Text;
+
+            // Classify the literal shape
+            bool hasDot        = text.Contains('.');
+            bool hasExponent   = text.Contains('e') || text.Contains('E');
+
+            if (expectedType is null)
+            {
+                _diagnostics.Add(Diagnostics.Create(DiagnosticCode.TypeMismatch, expr.Span,
+                    "numeric type", "cannot determine numeric type from context"));
+                return new TypedExpression(expr, new ErrorType(), expr.Span);
+            }
+
+            // Not a numeric expected type — return ErrorType; caller handles the mismatch report
+            if (expectedType is not (IntegerType or DecimalType or NumberType))
+                return new TypedExpression(expr, new ErrorType(), expr.Span);
+
+            if (hasExponent)
+            {
+                // Scientific notation → valid only for number
+                if (expectedType is not NumberType)
+                {
+                    _diagnostics.Add(Diagnostics.Create(DiagnosticCode.TypeMismatch, expr.Span,
+                        TypeDisplayName(expectedType), "number"));
+                    return new TypedExpression(expr, new ErrorType(), expr.Span);
+                }
+                return new TypedExpression(expr, new NumberType(), expr.Span);
+            }
+
+            if (hasDot)
+            {
+                // Fractional literal → valid for decimal or number, not integer
+                if (expectedType is IntegerType)
+                {
+                    _diagnostics.Add(Diagnostics.Create(DiagnosticCode.TypeMismatch, expr.Span,
+                        "integer", "decimal"));
+                    return new TypedExpression(expr, new ErrorType(), expr.Span);
+                }
+                return new TypedExpression(expr, expectedType, expr.Span);
+            }
+
+            // Whole number literal → valid for integer, decimal, or number
+            return new TypedExpression(expr, expectedType, expr.Span);
+        }
+
+        private TypedExpression CheckBinaryExpression(BinaryExpression expr, ResolvedType? expectedType)
+        {
+            // TODO: propagate peer type as context per type-checker.md §4.2a
+            // (e.g. IntegerField + 42 should resolve 42 as integer from the peer's type)
+            var left  = CheckExpression(expr.Left,  null);
+            var right = CheckExpression(expr.Right, null);
+
+            var resultType = OperatorTable.ResolveBinary(expr.Op, left.Type, right.Type);
+            if (resultType is null)
+            {
+                _diagnostics.Add(Diagnostics.Create(DiagnosticCode.TypeMismatch, expr.Span,
+                    TypeDisplayName(left.Type), BinaryOpDisplayName(expr.Op) + " on " + TypeDisplayName(right.Type)));
+                return new TypedExpression(expr, new ErrorType(), expr.Span);
+            }
+
+            return new TypedExpression(expr, resultType, expr.Span);
+        }
+
+        // TODO(Slice 6): add display names for comparison, logical, and string operators
+        private static string BinaryOpDisplayName(BinaryOp op) => op switch
+        {
+            BinaryOp.Plus    => "+",
+            BinaryOp.Minus   => "-",
+            BinaryOp.Star    => "*",
+            BinaryOp.Slash   => "/",
+            BinaryOp.Percent => "%",
+            _                => op.ToString()
+        };
 
         private TypedExpression CheckIdentifier(IdentifierExpression id)
         {
@@ -280,7 +358,11 @@ public static class TypeChecker
         private static bool IsAssignableTo(ResolvedType source, ResolvedType target)
         {
             if (source is ErrorType || target is ErrorType) return true;
-            return source == target;
+            if (source == target) return true;
+            // Numeric widening: integer → decimal, integer → number
+            if (source is IntegerType && target is DecimalType) return true;
+            if (source is IntegerType && target is NumberType)  return true;
+            return false;
         }
 
         private static string TypeDisplayName(ResolvedType type) => type switch

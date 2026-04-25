@@ -29,6 +29,21 @@
 
 ## Recent Updates
 
+### 2026-04-24 — TypeChecker Slice 5 — Numeric literals + scalar arithmetic + OperatorTable
+
+Created `src/Precept.Next/Pipeline/OperatorTable.cs` as a static class with `ResolveBinary` and `CommonNumericType`.
+
+Key architecture decisions and patterns:
+- `OperatorTable.ResolveBinary` returns `ErrorType` (not `null`) when either operand is `ErrorType` — this suppresses cascading type errors without a separate "already reported" flag.
+- `ResolveAddition` is kept separate from `ResolveArithmetic` so that `string + string → string` is isolated to `+` and cannot accidentally fire for `-`, `*`, `/`, `%`.
+- `CommonNumericType(decimal, number)` returns `null` (not `ErrorType`) — the caller (`ResolveBinary`) only reaches it when neither operand is `ErrorType`, so `null` here correctly signals "incompatible, emit diagnostic".
+- `CheckNumberLiteral` uses `expectedType` to assign a concrete type to the literal, which avoids needing literal-shape inference in the evaluator. When `expectedType` is null, it emits `TypeMismatch` with the message body "cannot determine numeric type from context" (not a missing-value sentinel). This mirrors how `CheckIdentifier` never returns an ambiguous type.
+- Scientific-notation literals (`1e5`) are valid only for `number` — that is the narrowest type that covers arbitrary floating-point magnitude. Rejecting them for `decimal` enforces the precision contract.
+- `CheckBinaryExpression` passes `null` for `expectedType` on both operands — the operator table drives type resolution, not the outer context. This means a binary expression's constituent operands are always resolved independently, which is correct for arithmetic (the result type flows outward, not inward).
+- `IsAssignableTo` widening is strictly one-directional: `integer → decimal`, `integer → number`. `decimal → number` is NOT added (matches the team decision that `decimal op number` is a type error requiring `approximate()`).
+- `BinaryOpDisplayName` uses `op.ToString()` as fallback for non-arithmetic ops rather than throwing — keeps diagnostics legible if OperatorTable scope expands before Slice 6 fills in display names.
+- Zero warnings on build; 579/579 tests pass.
+
 ### 2026-04-24 — TypeChecker Slice 2 — Field Registration
 
 Implemented `RegisterFieldDeclaration`, `ResolveTypeRef`, and `ResolveScalarType` inside `CheckSession` in `TypeChecker.cs`. Updated `RegisterDeclarations` to dispatch `FieldDeclaration` nodes.

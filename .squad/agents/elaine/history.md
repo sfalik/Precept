@@ -40,3 +40,60 @@
 - Nits: type-checker Overview has a mild structural redundancy (public surface described twice), and the top-level README doesn't mention the runtime/ folder's reading-order dependency on compiler docs.
 - The folder structure (compiler/, language/, runtime/) is intuitive and maps well to consumer mental models.
 - No blockers found. All navigation paths terminate at real files. The type-checker doc is implementable as a standalone blueprint.
+
+### 2026-04-24 — G3 operator diagnostic message evaluation
+
+**Context:** TypeChecker emits `TypeMismatch` when `OperatorTable.ResolveBinary` returns null for incompatible operand types. Frank flagged the message framing as unnatural for binary operator errors.
+
+**Current message (via `TypeMismatch` template):**
+- Template: `"Expected a {0} value here, but got '{1}'"`
+- For `decimal * number`: `"Expected a decimal value here, but got '* on number'"`
+- The "expected/found" frame assumes one side is the ground truth and the other is the violator. That assumption holds for assignment-style errors (rule condition must be boolean) but breaks for binary operators where *neither operand is wrong individually* — the *combination* is wrong.
+
+**Evaluation — two audiences:**
+
+1. **DSL authors in VS Code squiggles:**
+   - Current: "Expected a decimal value here, but got '* on number'" — confusing. The author didn't "expect decimal." They wrote `D * N` and don't understand why the pair is rejected. The message privileges the left operand as "expected" arbitrarily.
+   - Frank's form: "'decimal' and 'number' are incompatible for '*'" — directly names both operands and the operation. The author knows exactly what's wrong: these two types can't be multiplied.
+
+2. **AI agents via MCP `precept_compile`:**
+   - Current: Parseable but semantically misleading. An agent seeing "Expected decimal, got * on number" might try to fix the right operand to be decimal, which doesn't solve the cross-lane problem (decimal × decimal still requires explicit bridging awareness).
+   - Frank's form: Unambiguous. An agent can extract left type, right type, and operator from a predictable structure and reason about the fix (bridge function).
+
+**Recommendation: New diagnostic code `OperatorTypeMismatch`.**
+
+Rationale for a new code rather than reusing `TypeMismatch`:
+- The failure mode is structurally different. `TypeMismatch` is "this position expects type X, you gave type Y" — a single-target error. Operator type errors are "these two types are incompatible for this operation" — a *relational* error between two operands.
+- The `FaultCode.TypeMismatch` → `DiagnosticCode.TypeMismatch` chain in the runtime covers general type mismatches. Operator type mismatches at runtime are the *same* fault (wrong types for an operator), so `FaultCode.TypeMismatch` should map to *both* `DiagnosticCode.TypeMismatch` and `DiagnosticCode.OperatorTypeMismatch` via the `[StaticallyPreventable]` attribute. However, `[StaticallyPreventable]` currently takes a single `DiagnosticCode`. This is a design constraint worth flagging — the attribute may need to accept multiple codes, or `FaultCode.TypeMismatch` may need splitting.
+- The message template takes different parameters (left type, right type, operator) vs. (expected type, found type). Sharing a template forces one of the two call sites to abuse the parameter semantics.
+- Separating the codes makes MCP `precept_language` enumeration more precise — agents see "operator type mismatch" as a distinct rule, which it is.
+
+**Recommended message template:**
+
+```
+"'{0}' and '{1}' are incompatible for '{2}'"
+```
+
+Parameters: `{0}` = left type display name, `{1}` = right type display name, `{2}` = operator symbol.
+
+Examples:
+- `decimal * number` → `"'decimal' and 'number' are incompatible for '*'"`
+- `boolean + boolean` → `"'boolean' and 'boolean' are incompatible for '+'"`
+- `string - integer` → `"'string' and 'integer' are incompatible for '-'"`
+
+**Teachable enhancement (future):** For the specific `decimal × number` cross-lane case, the type-checker design doc says the message should suggest bridge functions. The template above is the base; an enhanced version for numeric cross-lane specifically could append: `" — use approximate() to convert decimal to number, or round() to convert number to decimal"`. This could be a second diagnostic code (`NumericLaneCrossing`) or conditional message construction within `OperatorTypeMismatch`. Recommend deferring the teachable suffix to the implementation PR — the base template is the priority.
+
+**Consistency assessment:**
+- The `CrossCurrencyArithmetic` diagnostic already uses a relational framing: `"Cannot combine '{0}' ({1}) with '{2}' ({3}) — different currencies"`. This confirms the project already has precedent for "these two things are incompatible" over "expected X, got Y" for binary operation errors.
+- The recommended template follows the same pattern but is shorter — appropriate for the more common base-type mismatch case.
+
+**Ripple effects of adding `OperatorTypeMismatch`:**
+- `DiagnosticCode` enum: add member
+- `Diagnostics.GetMeta`: add switch arm (enforced by exhaustiveness)
+- `TypeChecker.CheckBinaryExpression`: change `DiagnosticCode.TypeMismatch` → `DiagnosticCode.OperatorTypeMismatch` with new args
+- `FaultCode.TypeMismatch` `[StaticallyPreventable]` linkage: needs design decision (see above)
+- Catalog tests: add test for new code
+- `diagnostic-system.md`: add to registry listing
+- Existing tests: update `Check_BinaryArithmetic_DecimalTimesNumber_EmitsTypeMismatch` and `Check_BinaryArithmetic_BooleanPlusBoolean_EmitsTypeMismatch` to assert on new code
+
+**Verdict:** Recommend the change. The current framing actively misleads both audiences. The fix is clean, follows existing project precedent (`CrossCurrencyArithmetic`), and the ripple is well-scoped.

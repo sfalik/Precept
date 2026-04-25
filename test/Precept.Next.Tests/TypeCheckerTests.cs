@@ -790,6 +790,181 @@ public class TypeCheckerTests
     }
 
     // ════════════════════════════════════════════════════════════════════════════
+    //  Slice 5 — Numeric literals + binary expressions
+    // ════════════════════════════════════════════════════════════════════════════
+
+    // ── Number literal dispatch (null context via binary sub-expression) ───────
+
+    [Fact]
+    public void Check_NumberLiteral_InBinarySubExpression_NullContext_EmitsCannotDetermineTypeMismatch()
+    {
+        // Both operands in a binary expression receive null expectedType.
+        // Each number literal emits TypeMismatch("numeric type", "cannot determine numeric type from context").
+        var model = CheckSource("precept T\nrule 42 + 99 because \"msg\"");
+
+        // 2 TypeMismatch (one per literal); ErrorType propagates — no cascade from condition.
+        model.Diagnostics.Should().HaveCount(2);
+        model.Diagnostics.Should().AllSatisfy(d => d.Code.Should().Be(nameof(DiagnosticCode.TypeMismatch)));
+        model.Diagnostics[0].Message.Should().Contain("cannot determine numeric type from context");
+    }
+
+    [Fact]
+    public void Check_NumberLiteral_InIntegerContext_ResolvesAsInteger()
+    {
+        // Integer field on the left; the literal on the right receives null context → TypeMismatch.
+        // OperatorTable(Plus, IntegerType, ErrorType) → ErrorType; condition is assignable → no cascade.
+        // Verifies the number literal dispatch arm is reached and null-context path fires exactly once.
+        var model = CheckSource("precept T\nfield X as integer\nrule X + 42 because \"msg\"");
+
+        model.Diagnostics.Should().ContainSingle(d =>
+            d.Code == nameof(DiagnosticCode.TypeMismatch));
+        model.Diagnostics.Single(d => d.Code == nameof(DiagnosticCode.TypeMismatch))
+            .Message.Should().Contain("cannot determine numeric type from context");
+    }
+
+    [Fact]
+    public void Check_NumberLiteral_FractionalInIntegerContext_EmitsTypeMismatch()
+    {
+        // Fractional literal beside an integer field; literal receives null context → TypeMismatch.
+        // (Fractional-vs-integer type enforcement — e.g. "integer" expected / "decimal" found —
+        // requires a typed assignment surface and is covered directly in OperatorTableTests.)
+        var model = CheckSource("precept T\nfield X as integer\nrule X + 3.14 because \"msg\"");
+
+        model.Diagnostics.Should().ContainSingle(d =>
+            d.Code == nameof(DiagnosticCode.TypeMismatch));
+        model.Diagnostics.Single(d => d.Code == nameof(DiagnosticCode.TypeMismatch))
+            .Message.Should().Contain("cannot determine numeric type from context");
+    }
+
+    [Fact]
+    public void Check_NumberLiteral_ScientificInDecimalContext_EmitsTypeMismatch()
+    {
+        // Scientific-notation literal beside a decimal field; literal receives null context → TypeMismatch.
+        var model = CheckSource("precept T\nfield D as decimal\nrule D + 1.5e3 because \"msg\"");
+
+        model.Diagnostics.Should().ContainSingle(d =>
+            d.Code == nameof(DiagnosticCode.TypeMismatch));
+        model.Diagnostics.Single(d => d.Code == nameof(DiagnosticCode.TypeMismatch))
+            .Message.Should().Contain("cannot determine numeric type from context");
+    }
+
+    // ── Binary arithmetic resolution (field operands avoid the null-context limit) ───
+
+    [Fact]
+    public void Check_BinaryArithmetic_IntegerPlusInteger_ResolvesInteger()
+    {
+        var model = CheckSource("precept T\nfield A as integer\nfield B as integer\nrule A + B because \"msg\"");
+
+        // Arithmetic resolves to IntegerType; TypeMismatch is "boolean" expected / "integer" found.
+        model.Rules[0].Condition.Type.Should().BeOfType<IntegerType>();
+        model.Diagnostics.Should().ContainSingle(d =>
+            d.Code == nameof(DiagnosticCode.TypeMismatch) &&
+            d.Stage == DiagnosticStage.Type);
+    }
+
+    [Fact]
+    public void Check_BinaryArithmetic_IntegerPlusDecimal_WidensToDecimal()
+    {
+        // integer + decimal → DecimalType (widening via CommonNumericType).
+        var model = CheckSource("precept T\nfield A as integer\nfield B as decimal\nrule A + B because \"msg\"");
+
+        model.Rules[0].Condition.Type.Should().BeOfType<DecimalType>();
+        model.Diagnostics.Should().ContainSingle(d =>
+            d.Code == nameof(DiagnosticCode.TypeMismatch) &&
+            d.Stage == DiagnosticStage.Type);
+    }
+
+    [Fact]
+    public void Check_BinaryArithmetic_IntegerPlusNumber_WidensToNumber()
+    {
+        // integer + number → NumberType (widening via CommonNumericType).
+        var model = CheckSource("precept T\nfield A as integer\nfield N as number\nrule A + N because \"msg\"");
+
+        model.Rules[0].Condition.Type.Should().BeOfType<NumberType>();
+        model.Diagnostics.Should().ContainSingle(d =>
+            d.Code == nameof(DiagnosticCode.TypeMismatch) &&
+            d.Stage == DiagnosticStage.Type);
+    }
+
+    [Fact]
+    public void Check_BinaryArithmetic_DecimalTimesNumber_EmitsTypeMismatch()
+    {
+        // decimal × number → OperatorTable returns null → TypeMismatch from the operator.
+        // ErrorType is returned; condition is assignable (ErrorType) → no cascade.
+        var model = CheckSource("precept T\nfield D as decimal\nfield N as number\nrule D * N because \"msg\"");
+
+        model.Rules[0].Condition.Type.Should().BeOfType<ErrorType>();
+        model.Diagnostics.Should().ContainSingle(d =>
+            d.Code == nameof(DiagnosticCode.TypeMismatch) &&
+            d.Stage == DiagnosticStage.Type);
+    }
+
+    [Fact]
+    public void Check_BinaryArithmetic_StringPlusString_Concatenation()
+    {
+        // string + string → StringType; TypeMismatch for condition ("boolean" expected, "string" found).
+        var model = CheckSource("precept T\nfield S as string\nrule S + S because \"msg\"");
+
+        model.Rules[0].Condition.Type.Should().BeOfType<StringType>();
+        var diag = model.Diagnostics.Single(d => d.Code == nameof(DiagnosticCode.TypeMismatch));
+        diag.Message.Should().Contain("boolean");
+        diag.Message.Should().Contain("string");
+    }
+
+    [Fact]
+    public void Check_BinaryArithmetic_BooleanPlusBoolean_EmitsTypeMismatch()
+    {
+        // bool + bool → OperatorTable returns null → TypeMismatch from operator; ErrorType for condition → no cascade.
+        var model = CheckSource("precept T\nfield B as boolean\nrule B + B because \"msg\"");
+
+        model.Rules[0].Condition.Type.Should().BeOfType<ErrorType>();
+        model.Diagnostics.Should().ContainSingle(d =>
+            d.Code == nameof(DiagnosticCode.TypeMismatch) &&
+            d.Stage == DiagnosticStage.Type);
+    }
+
+    [Fact]
+    public void Check_BinaryArithmetic_ErrorType_SuppressesCascade()
+    {
+        // UndeclaredField → ErrorType left; OperatorTable(ErrorType, bool) → ErrorType propagation.
+        // Condition is ErrorType → assignable to boolean → no TypeMismatch cascade.
+        var model = CheckSource("precept T\nfield Known as boolean\nrule Unknown + Known because \"msg\"");
+
+        model.Diagnostics.Should().ContainSingle(d =>
+            d.Code == nameof(DiagnosticCode.UndeclaredField));
+        model.Diagnostics.Should().NotContain(d =>
+            d.Code == nameof(DiagnosticCode.TypeMismatch));
+    }
+
+    // ── IsAssignableTo widening + number field resolution ─────────────────────
+
+    [Fact]
+    public void Check_IsAssignableTo_IntegerToDecimal_Widens()
+    {
+        // integer + decimal → widening to DecimalType via CommonNumericType.
+        // One diagnostic: TypeMismatch (decimal is not boolean for condition).
+        var model = CheckSource("precept T\nfield I as integer\nfield D as decimal\nrule I + D because \"msg\"");
+
+        model.Rules[0].Condition.Type.Should().BeOfType<DecimalType>();
+        model.Diagnostics.Should().ContainSingle(d =>
+            d.Code == nameof(DiagnosticCode.TypeMismatch) &&
+            d.Stage == DiagnosticStage.Type);
+    }
+
+    [Fact]
+    public void Check_Rule_WithNumberField_TypeChecksCorrectly()
+    {
+        // number field used as rule condition resolves to NumberType; TypeMismatch (not boolean).
+        var model = CheckSource("precept T\nfield N as number\nrule N because \"msg\"");
+
+        model.Fields["N"].Type.Should().BeOfType<NumberType>();
+        model.Rules[0].Condition.Type.Should().BeOfType<NumberType>();
+        model.Diagnostics.Should().ContainSingle(d =>
+            d.Code == nameof(DiagnosticCode.TypeMismatch) &&
+            d.Stage == DiagnosticStage.Type);
+    }
+
+    // ════════════════════════════════════════════════════════════════════════════
     //  TheoryData helpers
     // ════════════════════════════════════════════════════════════════════════════
 
