@@ -580,6 +580,216 @@ public class TypeCheckerTests
     }
 
     // ════════════════════════════════════════════════════════════════════════════
+    //  Slice 4 — Expression checking core + rule declarations
+    // ════════════════════════════════════════════════════════════════════════════
+
+    // ── CheckRuleDeclaration ──────────────────────────────────────────────────
+
+    [Fact]
+    public void Check_Rule_BooleanCondition_ProducesResolvedRule()
+    {
+        var model = CheckSource("precept T\nrule true because \"ok\"");
+
+        model.Rules.Should().HaveCount(1);
+        model.Rules[0].Condition.Type.Should().BeOfType<BooleanType>();
+        model.Diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_Rule_IdentifierResolves_ToFieldType()
+    {
+        var model = CheckSource("precept T\nfield X as boolean\nrule X because \"msg\"");
+
+        model.Rules.Should().HaveCount(1);
+        model.Rules[0].Condition.Type.Should().BeOfType<BooleanType>();
+        model.Diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_Rule_UndeclaredField_EmitsDiagnostic()
+    {
+        var model = CheckSource("precept T\nrule Unknown because \"msg\"");
+
+        model.Diagnostics.Should().ContainSingle(d =>
+            d.Code == nameof(DiagnosticCode.UndeclaredField) &&
+            d.Stage == DiagnosticStage.Type &&
+            d.Severity == Severity.Error);
+    }
+
+    [Fact]
+    public void Check_Rule_ErrorType_SuppressesCascade()
+    {
+        // UndeclaredField produces ErrorType on the condition; no TypeMismatch must be emitted.
+        var model = CheckSource("precept T\nrule Unknown because \"msg\"");
+
+        model.Diagnostics.Should().HaveCount(1);
+        model.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.TypeMismatch));
+    }
+
+    [Fact]
+    public void Check_Rule_NonBooleanCondition_EmitsTypeMismatch()
+    {
+        var model = CheckSource("precept T\nrule \"hello\" because \"msg\"");
+
+        model.Diagnostics.Should().ContainSingle(d =>
+            d.Code == nameof(DiagnosticCode.TypeMismatch) &&
+            d.Stage == DiagnosticStage.Type &&
+            d.Severity == Severity.Error);
+    }
+
+    [Fact]
+    public void Check_Rule_NonStringMessage_EmitsTypeMismatch()
+    {
+        var model = CheckSource("precept T\nrule true because true");
+
+        model.Diagnostics.Should().ContainSingle(d =>
+            d.Code == nameof(DiagnosticCode.TypeMismatch) &&
+            d.Stage == DiagnosticStage.Type &&
+            d.Severity == Severity.Error);
+    }
+
+    [Fact]
+    public void Check_Rule_WithGuard_ChecksGuardAsBoolean()
+    {
+        var model = CheckSource("precept T\nfield Active as boolean\nrule true when Active because \"msg\"");
+
+        model.Rules[0].Guard.Should().NotBeNull();
+        model.Rules[0].Guard!.Type.Should().BeOfType<BooleanType>();
+        model.Diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_Rule_InterpolatedMessage_AcceptsString()
+    {
+        // String field in interpolation is valid — no InvalidInterpolationCoercion, no TypeMismatch.
+        var model = CheckSource("precept T\nfield X as string\nrule true because \"value is {X}\"");
+
+        model.Diagnostics.Should().BeEmpty();
+        model.Rules[0].Message.Type.Should().BeOfType<StringType>();
+    }
+
+    [Fact]
+    public void Check_IsMissing_Expression_ReturnsErrorType()
+    {
+        // "rule because ..." — condition is missing; parser emits ExpectedToken (parse stage).
+        // TypeChecker returns ErrorType for the missing condition and does NOT emit TypeMismatch.
+        var model = CheckSource("precept T\nrule because \"ok\"");
+
+        model.Diagnostics.Should().NotContain(d =>
+            d.Code == nameof(DiagnosticCode.TypeMismatch) &&
+            d.Stage == DiagnosticStage.Type);
+        model.Rules.Should().HaveCount(1);
+        model.Rules[0].Condition.Type.Should().BeOfType<ErrorType>();
+    }
+
+    // ── Expression type resolution ────────────────────────────────────────────
+
+    [Fact]
+    public void Check_BooleanLiteralExpression_ResolvesToBooleanType()
+    {
+        var model = CheckSource("precept T\nrule true because \"ok\"");
+
+        model.Rules[0].Condition.Type.Should().BeOfType<BooleanType>();
+    }
+
+    [Fact]
+    public void Check_StringLiteralExpression_ResolvesToStringType()
+    {
+        var model = CheckSource("precept T\nrule true because \"ok\"");
+
+        model.Rules[0].Message.Type.Should().BeOfType<StringType>();
+    }
+
+    [Fact]
+    public void Check_ParenthesizedExpression_PreservesInnerType()
+    {
+        // (true) must resolve to BooleanType — the parens are transparent to the type.
+        var model = CheckSource("precept T\nrule (true) because \"ok\"");
+
+        model.Rules[0].Condition.Type.Should().BeOfType<BooleanType>();
+        model.Diagnostics.Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData("string",  typeof(StringType))]
+    [InlineData("integer", typeof(IntegerType))]
+    [InlineData("decimal", typeof(DecimalType))]
+    [InlineData("number",  typeof(NumberType))]
+    public void Check_IdentifierExpression_ResolvesToDeclaredFieldType(string typeName, Type expectedCSharpType)
+    {
+        // Identifier in condition context resolves to the declared field type.
+        // Non-boolean scalars also fire TypeMismatch in the condition — but the type IS resolved.
+        var model = CheckSource($"precept T\nfield F as {typeName}\nrule F because \"msg\"");
+
+        model.Rules[0].Condition.Type.Should().BeOfType(expectedCSharpType);
+        model.Diagnostics.Should().ContainSingle(d =>
+            d.Code == nameof(DiagnosticCode.TypeMismatch) &&
+            d.Stage == DiagnosticStage.Type);
+    }
+
+    // ── Rule shape assertions ─────────────────────────────────────────────────
+
+    [Fact]
+    public void Check_Rule_WithNoGuard_GuardIsNull()
+    {
+        var model = CheckSource("precept T\nrule true because \"ok\"");
+
+        model.Rules[0].Guard.Should().BeNull();
+    }
+
+    [Fact]
+    public void Check_Rule_ResolvedRule_HasCorrectTypedExpressions()
+    {
+        var model = CheckSource("precept T\nrule true because \"ok\"");
+
+        model.Rules[0].Condition.Type.Should().BeOfType<BooleanType>();
+        model.Rules[0].Message.Type.Should().BeOfType<StringType>();
+        model.Rules[0].Guard.Should().BeNull();
+    }
+
+    [Fact]
+    public void Check_MultipleRules_AllRegistered()
+    {
+        var model = CheckSource("precept T\nrule true because \"first\"\nrule true because \"second\"");
+
+        model.Rules.Should().HaveCount(2);
+        model.Diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_Rule_NonBooleanGuard_EmitsTypeMismatch()
+    {
+        // Guard must be boolean; using a string field fires TypeMismatch.
+        var model = CheckSource("precept T\nfield Label as string\nrule true when Label because \"msg\"");
+
+        model.Diagnostics.Should().ContainSingle(d =>
+            d.Code == nameof(DiagnosticCode.TypeMismatch) &&
+            d.Stage == DiagnosticStage.Type);
+    }
+
+    // ── Diagnostic message content ────────────────────────────────────────────
+
+    [Fact]
+    public void Check_UndeclaredField_DiagnosticMessage_ContainsFieldName()
+    {
+        var model = CheckSource("precept T\nrule Unknown because \"msg\"");
+
+        var diag = model.Diagnostics.Single(d => d.Code == nameof(DiagnosticCode.UndeclaredField));
+        diag.Message.Should().Contain("Unknown");
+    }
+
+    [Fact]
+    public void Check_TypeMismatch_OnCondition_DiagnosticMessage_ContainsExpectedAndActualType()
+    {
+        // "hello" is StringType, condition expects boolean — message should name both types.
+        var model = CheckSource("precept T\nrule \"hello\" because \"msg\"");
+
+        var diag = model.Diagnostics.Single(d => d.Code == nameof(DiagnosticCode.TypeMismatch));
+        diag.Message.Should().Contain("boolean");
+        diag.Message.Should().Contain("string");
+    }
+
+    // ════════════════════════════════════════════════════════════════════════════
     //  TheoryData helpers
     // ════════════════════════════════════════════════════════════════════════════
 

@@ -13,6 +13,13 @@
 
 ## Recent Updates
 
+### 2026-04-24 — TypeChecker Slice 4 review: Expression Checking Core + Rule Declarations
+- **Verdict: APPROVED.** No blockers. 3 observations.
+- **G1:** `IsAssignableTo` is defined in this slice but never called. `CheckRuleDeclaration` uses inline `is not BooleanType and not ErrorType` patterns throughout instead of delegating to it. Behaviorally equivalent for all types in play, but the helper is dead code in the slice that introduced it. Will likely be picked up in later slices.
+- **G2:** `expectedType` parameter on `CheckExpression` is propagated through `ParenthesizedExpression` recursion but otherwise unused in the switch body. Bottom-up inference design is correct — callers check the returned type — but the parameter name implies bidirectional intent not yet implemented. Consider a comment or `_` discard if it's reserved for future slices.
+- **G3:** `InvalidInterpolationCoercion` branch in `CheckInterpolatedString` has no test. `CollectionTypeRef` stubs to `ErrorType` until slice 8, so the branch is currently unreachable. Not a defect, but flag for a regression anchor when slice 8 lands.
+- **Checklist:** All 10 items ✓ — `IsMissing` first, 5 dispatch cases + `_` fallback, `TryGetValue` field lookup, `UndeclaredField` with name arg, ErrorType on miss, segments iterated, collection rejection implemented, `IsAssignableTo` correct (unused — G1), `TypeDisplayName` covers all 5 scalars + ErrorType + 3 collection forms + fallback, condition/guard/message all checked with correct TypeMismatch args, ErrorType cascade suppressed, `_rules.Add` present, `RuleDeclaration` wired in `CheckDeclarations`, 9+ plan cases tested plus shape/message extras.
+
 ### 2026-04-24 — TypeChecker Slice 3 review: State + Event Registration
 - **Verdict: APPROVED.** No blockers. 1 observation.
 - **G1:** Duplicate-state + initial interaction: if a state entry is a duplicate AND has `IsInitial`, the initial check runs outside the `else` branch, so a rejected duplicate can still set `_initialState` (if no prior initial exists) or emit `MultipleInitialStates("Foo", "Foo")`. This is defensible error-recovery behavior but not tested. Not a blocker — it only fires in already-broken input.

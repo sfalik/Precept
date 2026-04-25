@@ -257,6 +257,37 @@ All 5 extracted partial files already had header comments from their respective 
 - Minor opportunity: distribute helpers closer to consumers if Helpers.cs grows. Not blocking.
 - Output: research/architecture/typechecker-implementation-patterns-george.md
 
+### 2026-04-24 — Precept.Next TypeChecker Slice 4: Expression Checking Core + Rule Declarations
+
+Implemented `CheckExpression`, `CheckIdentifier`, `CheckInterpolatedString`, `CheckRuleDeclaration`, `IsAssignableTo`, and `TypeDisplayName` in `TypeChecker.cs`. Updated `CheckDeclarations` to dispatch `RuleDeclaration`.
+
+**What was implemented:**
+- `CheckExpression(Expression expr, ResolvedType? expectedType)` — dispatch switch: `IsMissing` → `ErrorType`; `IdentifierExpression` → `CheckIdentifier`; `BooleanLiteralExpression` → `BooleanType`; `StringLiteralExpression` → `StringType`; `ParenthesizedExpression` → recurse with `p.Inner`; `InterpolatedStringExpression` → `CheckInterpolatedString`; all other expression types → `ErrorType` stub for later slices.
+- `CheckIdentifier(IdentifierExpression id)` — looks up `id.Name.Text` in `_fields`; found → typed result; not found → emit `UndeclaredField(fieldName)` and return `ErrorType`.
+- `CheckInterpolatedString(InterpolatedStringExpression expr)` — iterates `expr.Segments`; for each `ExpressionSegment`, checks the inner expression and emits `InvalidInterpolationCoercion` if result type is `SetType | QueueType | StackType`; always returns `StringType`.
+- `CheckRuleDeclaration(RuleDeclaration decl)` — checks condition (expects `BooleanType`), optional guard (expects `BooleanType`), message (expects `StringType`); emits `TypeMismatch(expectedName, actualName)` on violation; appends `ResolvedRule` to `_rules`. ErrorType suppresses cascade (no diagnostic emitted if type is `ErrorType`).
+- `IsAssignableTo(ResolvedType, ResolvedType)` — ErrorType on either side returns `true` (cascade suppression); otherwise record equality.
+- `TypeDisplayName(ResolvedType)` — maps all scalar types by name; collection types produce `set<T>`/`queue<T>`/`stack<T>` with recursive inner type; fallback is `type.GetType().Name`.
+- `CheckDeclarations` updated: `RuleDeclaration rd` case dispatches to `CheckRuleDeclaration`.
+
+**Patterns used:**
+- `expectedType` is passed through `CheckExpression` for future coercion use but enforcement happens exclusively at call sites (`CheckRuleDeclaration`). No double-reporting.
+- `ErrorType` suppression: condition `is not BooleanType and not ErrorType` (C# pattern conjunction). Same pattern for `StringType` on message.
+- Collection type check in interpolation: `typed.Type is SetType or QueueType or StackType` (pattern disjunction).
+- `TypeDisplayName` includes recursive collection display for diagnostic quality even though collection types don't yet appear through `CheckExpression` (stubs). Safe to call on any `ResolvedType`.
+
+**Key discoveries:**
+- `_fields` dictionary is fully populated by `RegisterDeclarations` before `CheckDeclarations` runs — identifier lookup is safe.
+- `ParenthesizedExpression` strips parens transparently, passing `expectedType` through to preserve context.
+- `BooleanLiteralExpression.Value` and `StringLiteralExpression.Value` are not used — only the node type matters for typing.
+- `InterpolatedStringExpression.Segments` is `ImmutableArray<InterpolationSegment>` — `TextSegment` requires no action; only `ExpressionSegment.Inner` needs checking.
+
+**For Slice 5 (numeric widening + binary/unary expressions):**
+- `IsAssignableTo` is the intended extension point for widening: `IntegerType → NumberType`, `DecimalType → NumberType`, etc.
+- `CheckExpression` `_` stub catches `BinaryExpression`, `UnaryExpression`, `NumberLiteralExpression`, `MemberAccessExpression`, etc. — all wired as `ErrorType` until their slices land.
+- `TypeDisplayName` switch can be extended inline — no structural change needed.
+- Build: 0 errors, 0 warnings (`dotnet build src/Precept.Next/Precept.Next.csproj`).
+
 ### 2026-04-24 — Precept.Next TypeChecker Slice 3: State + Event Registration
 
 Implemented `RegisterStateDeclaration` and `RegisterEventDeclaration` inside `CheckSession`, and updated `RegisterDeclarations` to dispatch to them.

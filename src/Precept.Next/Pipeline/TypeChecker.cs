@@ -205,9 +205,97 @@ public static class TypeChecker
         {
             foreach (var decl in _tree.Root.Body)
             {
-                // Pass 2: type-check declarations — implemented in slice 4+
+                switch (decl)
+                {
+                    case RuleDeclaration rd:
+                        CheckRuleDeclaration(rd);
+                        break;
+                    // Pass 2: other declarations — implemented in later slices
+                }
             }
         }
+
+        private void CheckRuleDeclaration(RuleDeclaration decl)
+        {
+            var condition = CheckExpression(decl.Condition, new BooleanType());
+
+            if (!IsAssignableTo(condition.Type, new BooleanType()))
+                _diagnostics.Add(Diagnostics.Create(DiagnosticCode.TypeMismatch, condition.Span, "boolean", TypeDisplayName(condition.Type)));
+
+            TypedExpression? guard = null;
+            if (decl.Guard is not null)
+            {
+                guard = CheckExpression(decl.Guard, new BooleanType());
+                if (!IsAssignableTo(guard.Type, new BooleanType()))
+                    _diagnostics.Add(Diagnostics.Create(DiagnosticCode.TypeMismatch, guard.Span, "boolean", TypeDisplayName(guard.Type)));
+            }
+
+            var message = CheckExpression(decl.Message, new StringType());
+            if (!IsAssignableTo(message.Type, new StringType()))
+                _diagnostics.Add(Diagnostics.Create(DiagnosticCode.TypeMismatch, message.Span, "string", TypeDisplayName(message.Type)));
+
+            _rules.Add(new ResolvedRule(condition, guard, message, decl.Span));
+        }
+
+        private TypedExpression CheckExpression(Expression expr, ResolvedType? expectedType)
+        {
+            if (expr.IsMissing)
+                return new TypedExpression(expr, new ErrorType(), expr.Span);
+
+            return expr switch
+            {
+                IdentifierExpression id            => CheckIdentifier(id),
+                BooleanLiteralExpression b         => new TypedExpression(b, new BooleanType(), b.Span),
+                StringLiteralExpression s          => new TypedExpression(s, new StringType(), s.Span),
+                ParenthesizedExpression p          => CheckExpression(p.Inner, expectedType),
+                InterpolatedStringExpression i     => CheckInterpolatedString(i),
+                // All other expression types → ErrorType stub for later slices
+                _                                  => new TypedExpression(expr, new ErrorType(), expr.Span)
+            };
+        }
+
+        private TypedExpression CheckIdentifier(IdentifierExpression id)
+        {
+            if (_fields.TryGetValue(id.Name.Text, out var field))
+                return new TypedExpression(id, field.Type, id.Span);
+
+            _diagnostics.Add(Diagnostics.Create(DiagnosticCode.UndeclaredField, id.Span, id.Name.Text));
+            return new TypedExpression(id, new ErrorType(), id.Span);
+        }
+
+        private TypedExpression CheckInterpolatedString(InterpolatedStringExpression expr)
+        {
+            foreach (var segment in expr.Segments)
+            {
+                if (segment is ExpressionSegment es)
+                {
+                    var typed = CheckExpression(es.Inner, null);
+                    if (typed.Type is SetType or QueueType or StackType)
+                        _diagnostics.Add(Diagnostics.Create(DiagnosticCode.InvalidInterpolationCoercion, typed.Span, TypeDisplayName(typed.Type)));
+                }
+            }
+            return new TypedExpression(expr, new StringType(), expr.Span);
+        }
+
+        private static bool IsAssignableTo(ResolvedType source, ResolvedType target)
+        {
+            if (source is ErrorType || target is ErrorType) return true;
+            return source == target;
+        }
+
+        private static string TypeDisplayName(ResolvedType type) => type switch
+        {
+            StringType    => "string",
+            BooleanType   => "boolean",
+            IntegerType   => "integer",
+            DecimalType   => "decimal",
+            NumberType    => "number",
+            ErrorType     => "error",
+            SetType st    => $"set<{TypeDisplayName(st.ElementType)}>",
+            QueueType qt  => $"queue<{TypeDisplayName(qt.ElementType)}>",
+            StackType st  => $"stack<{TypeDisplayName(st.ElementType)}>",
+            _             => type.GetType().Name
+        };
 
         public TypedModel BuildModel()
         {
