@@ -52,9 +52,18 @@ public static class TypeChecker
                     case FieldDeclaration fd:
                         RegisterFieldDeclaration(fd);
                         break;
-                    // Pass 1: state + event registration — slice 3
+                    case StateDeclaration sd:
+                        RegisterStateDeclaration(sd);
+                        break;
+                    case EventDeclaration ed:
+                        RegisterEventDeclaration(ed);
+                        break;
                 }
             }
+
+            // Post-registration: check initial state
+            if (_states.Count > 0 && _initialState == null)
+                _diagnostics.Add(Diagnostics.Create(DiagnosticCode.NoInitialState, _tree.Root.Span));
         }
 
         private void RegisterFieldDeclaration(FieldDeclaration decl)
@@ -88,6 +97,85 @@ public static class TypeChecker
                 {
                     _fields.Add(token.Text, symbol);
                 }
+            }
+        }
+
+        private void RegisterStateDeclaration(StateDeclaration decl)
+        {
+            foreach (var entry in decl.Entries)
+            {
+                if (entry.Name.Length == 0) continue;
+
+                var span   = SpanOf(entry.Name);
+                var symbol = new StateSymbol(
+                    Name:      entry.Name.Text,
+                    IsInitial: entry.IsInitial,
+                    Modifiers: entry.Modifiers,
+                    Span:      span
+                );
+
+                if (_states.ContainsKey(entry.Name.Text))
+                {
+                    _diagnostics.Add(Diagnostics.Create(DiagnosticCode.DuplicateStateName, span, entry.Name.Text));
+                }
+                else
+                {
+                    _states.Add(entry.Name.Text, symbol);
+
+                    if (entry.IsInitial)
+                    {
+                        if (_initialState is not null)
+                            _diagnostics.Add(Diagnostics.Create(DiagnosticCode.MultipleInitialStates, span, _initialState, entry.Name.Text));
+                        else
+                            _initialState = entry.Name.Text;
+                    }
+                }
+            }
+        }
+
+        private void RegisterEventDeclaration(EventDeclaration decl)
+        {
+            var emptyMods = new ResolvedModifiers(false, false, false, false, false, null, null, null, null, null, null, null);
+
+            foreach (var token in decl.Names)
+            {
+                if (token.Length == 0) continue;
+
+                var argsBuilder = ImmutableDictionary.CreateBuilder<string, ArgSymbol>(StringComparer.Ordinal);
+
+                foreach (var arg in decl.Args)
+                {
+                    if (arg.Name.Length == 0) continue;
+
+                    var resolvedType = ResolveTypeRef(arg.Type);
+                    var isOptional   = arg.Modifiers.Any(m => m is OptionalModifier);
+                    var argSymbol    = new ArgSymbol(
+                        Name:         arg.Name.Text,
+                        Type:         resolvedType,
+                        IsOptional:   isOptional,
+                        Modifiers:    emptyMods,
+                        DefaultValue: null,
+                        Span:         SpanOf(arg.Name)
+                    );
+
+                    if (argsBuilder.ContainsKey(arg.Name.Text))
+                        _diagnostics.Add(Diagnostics.Create(DiagnosticCode.DuplicateArgName, SpanOf(arg.Name), arg.Name.Text, token.Text));
+                    else
+                        argsBuilder.Add(arg.Name.Text, argSymbol);
+                }
+
+                var span        = SpanOf(token);
+                var eventSymbol = new EventSymbol(
+                    Name:      token.Text,
+                    Args:      argsBuilder.ToImmutable(),
+                    IsInitial: decl.IsInitial,
+                    Span:      span
+                );
+
+                if (_events.ContainsKey(token.Text))
+                    _diagnostics.Add(Diagnostics.Create(DiagnosticCode.DuplicateEventName, span, token.Text));
+                else
+                    _events.Add(token.Text, eventSymbol);
             }
         }
 

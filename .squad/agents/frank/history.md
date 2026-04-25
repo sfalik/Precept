@@ -13,6 +13,11 @@
 
 ## Recent Updates
 
+### 2026-04-24 — TypeChecker Slice 3 review: State + Event Registration
+- **Verdict: APPROVED.** No blockers. 1 observation.
+- **G1:** Duplicate-state + initial interaction: if a state entry is a duplicate AND has `IsInitial`, the initial check runs outside the `else` branch, so a rejected duplicate can still set `_initialState` (if no prior initial exists) or emit `MultipleInitialStates("Foo", "Foo")`. This is defensible error-recovery behavior but not tested. Not a blocker — it only fires in already-broken input.
+- **Checklist:** All 9 items ✓ — `RegisterStateDeclaration` iterates `Entries`, skips `Length==0`, builds `StateSymbol` with correct 4 params, first-initial-wins tracking, post-loop `NoInitialState` guard placed correctly after foreach, `RegisterEventDeclaration` iterates `Names` (multi-event), args rebuilt per event name from shared `decl.Args`, `DuplicateArgName` args `(argName, eventName)` match template `{0}`/`{1}`, `MultipleInitialStates` args `(firstInitial, secondInitial)` correct, test suite far exceeds 9 plan cases (27 tests), design doc alignment solid.
+
 ### 2026-04-24 — TypeChecker Slice 2 review: Field Registration
 - **Verdict: APPROVED.** No blockers. 3 observations.
 - **G1:** `SpanOf(Token t)` duplicated between `TypeChecker.cs` and `Parser.cs`. Identical logic, correct in both. Future cleanup candidate — if `SourceSpan`'s contract changes the two copies will diverge.

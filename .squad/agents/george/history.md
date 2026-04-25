@@ -256,3 +256,26 @@ All 5 extracted partial files already had header comments from their respective 
 - Verdict: KEEP AS-IS. Our 6-file split, naming, and switch-on-NodeKind dispatch all match Roslyn precedent. Static-partial is justified by stateless model.
 - Minor opportunity: distribute helpers closer to consumers if Helpers.cs grows. Not blocking.
 - Output: research/architecture/typechecker-implementation-patterns-george.md
+
+### 2026-04-24 — Precept.Next TypeChecker Slice 3: State + Event Registration
+
+Implemented `RegisterStateDeclaration` and `RegisterEventDeclaration` inside `CheckSession`, and updated `RegisterDeclarations` to dispatch to them.
+
+**What was implemented:**
+- `RegisterStateDeclaration(StateDeclaration decl)`: iterates `decl.Entries`, skips zero-length names, builds `StateSymbol`, adds to `_states` (first-wins on duplicate → `DuplicateStateName` diagnostic), and tracks `_initialState` (first-wins → `MultipleInitialStates` on conflict).
+- `RegisterEventDeclaration(EventDeclaration decl)`: iterates `decl.Names`, builds per-event `ImmutableDictionary<string, ArgSymbol>` from `decl.Args` with `DuplicateArgName` on collision, creates `EventSymbol`, adds to `_events` (first-wins → `DuplicateEventName`). `emptyMods` instantiated once per outer event call since arg modifiers are uniform stubs.
+- Post-registration `NoInitialState` check: emitted against `_tree.Root.Span` when `_states.Count > 0 && _initialState == null`.
+- `RegisterDeclarations` switch updated with `StateDeclaration` and `EventDeclaration` cases.
+
+**Patterns used:** Same first-wins + diagnostic-on-duplicate pattern as `RegisterFieldDeclaration`. `SpanOf(Token)` and `ResolveTypeRef` reused unchanged from Slice 2.
+
+**Key discoveries:**
+- `emptyMods` in `RegisterEventDeclaration` is a fresh instance per method call, not shared with the field method — consistent with existing field pattern.
+- `DuplicateArgName` args are `(argName, eventName)` in that order per the diagnostic template.
+- `MultipleInitialStates` args are `(firstInitial, secondInitial)` — first-wins for the state map, but both names reported.
+- Post-registration check uses `_tree.Root.Span` as the diagnostic span (whole precept) since there is no single "missing" token to point at.
+
+**For Slice 4 (CheckDeclarations pass):**
+- `_states`, `_events`, and `_fields` are all fully populated after `RegisterDeclarations` completes — safe to cross-reference.
+- `_initialState` is `null` if no states (stateless precept) or if `NoInitialState` was emitted — callers should treat `null` as valid-but-stateless.
+- Build: 0 errors, 0 warnings (`dotnet build src/Precept.Next/Precept.Next.csproj`).

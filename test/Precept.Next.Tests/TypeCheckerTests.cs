@@ -322,6 +322,264 @@ public class TypeCheckerTests
     }
 
     // ════════════════════════════════════════════════════════════════════════════
+    //  Slice 3 — State + event registration
+    // ════════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Register_States_AppearsInStatesDict()
+    {
+        var model = CheckSource("precept T\nstate Draft initial");
+
+        model.States.Should().ContainKey("Draft");
+    }
+
+    [Fact]
+    public void Register_InitialState_SetsInitialState()
+    {
+        var model = CheckSource("precept T\nstate Draft initial");
+
+        model.InitialState.Should().Be("Draft");
+    }
+
+    [Fact]
+    public void Register_MultipleInitialStates_EmitsDiagnostic()
+    {
+        var model = CheckSource("precept T\nstate Draft initial, Active initial");
+
+        model.Diagnostics.Should().ContainSingle(d =>
+            d.Code == nameof(DiagnosticCode.MultipleInitialStates) &&
+            d.Stage == DiagnosticStage.Type &&
+            d.Severity == Severity.Error);
+    }
+
+    [Fact]
+    public void Register_MultipleInitialStates_MessageContainsBothStateNames()
+    {
+        var model = CheckSource("precept T\nstate Draft initial, Active initial");
+
+        var diag = model.Diagnostics.Single(d => d.Code == nameof(DiagnosticCode.MultipleInitialStates));
+        diag.Message.Should().Contain("Draft");
+        diag.Message.Should().Contain("Active");
+    }
+
+    [Fact]
+    public void Register_StatesButNoInitial_EmitsDiagnostic()
+    {
+        var model = CheckSource("precept T\nstate Open, Closed");
+
+        model.Diagnostics.Should().ContainSingle(d =>
+            d.Code == nameof(DiagnosticCode.NoInitialState) &&
+            d.Stage == DiagnosticStage.Type &&
+            d.Severity == Severity.Error);
+    }
+
+    [Fact]
+    public void Register_NoStates_NoInitialStateDiagnostic()
+    {
+        // Stateless precept — no states declared at all → no NoInitialState diagnostic.
+        var model = CheckSource("precept T\nfield Amount as number");
+
+        model.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.NoInitialState));
+    }
+
+    [Fact]
+    public void Register_DuplicateStateName_EmitsDiagnostic()
+    {
+        var model = CheckSource("precept T\nstate Open initial\nstate Open");
+
+        model.Diagnostics.Should().ContainSingle(d =>
+            d.Code == nameof(DiagnosticCode.DuplicateStateName) &&
+            d.Stage == DiagnosticStage.Type &&
+            d.Severity == Severity.Error);
+    }
+
+    [Fact]
+    public void Register_DuplicateStateName_FirstDeclarationWins()
+    {
+        var model = CheckSource("precept T\nstate Open initial\nstate Open");
+
+        // Duplicate is rejected; only one entry for "Open".
+        model.States.Should().ContainKey("Open");
+        model.States.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public void Register_MultipleStatesInOneDeclaration_AllRegistered()
+    {
+        var model = CheckSource("precept T\nstate Draft initial, Review, Approved, Rejected");
+
+        model.States.Should().ContainKey("Draft");
+        model.States.Should().ContainKey("Review");
+        model.States.Should().ContainKey("Approved");
+        model.States.Should().ContainKey("Rejected");
+        model.States.Should().HaveCount(4);
+    }
+
+    [Fact]
+    public void Register_StateIsInitial_IsInitialTrueOnSymbol()
+    {
+        var model = CheckSource("precept T\nstate Draft initial, Review");
+
+        model.States["Draft"].IsInitial.Should().BeTrue();
+        model.States["Review"].IsInitial.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Register_StateWithTerminalModifier_ModifierPropagatedToSymbol()
+    {
+        var model = CheckSource("precept T\nstate Open initial, Closed terminal");
+
+        model.States["Closed"].Modifiers.Should().Contain(StateModifierKind.Terminal);
+    }
+
+    [Fact]
+    public void Register_StateWithNoModifiers_ModifiersEmpty()
+    {
+        var model = CheckSource("precept T\nstate Open initial");
+
+        model.States["Open"].Modifiers.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Register_EventWithArgs_ArgsPopulated()
+    {
+        var model = CheckSource("precept T\nstate Draft initial\nevent Submit(Amount as decimal, Note as string)");
+
+        model.Events.Should().ContainKey("Submit");
+        model.Events["Submit"].Args.Should().ContainKey("Amount");
+        model.Events["Submit"].Args["Amount"].Type.Should().BeOfType<DecimalType>();
+        model.Events["Submit"].Args.Should().ContainKey("Note");
+        model.Events["Submit"].Args["Note"].Type.Should().BeOfType<StringType>();
+    }
+
+    [Fact]
+    public void Register_EventWithNoArgs_ArgsEmpty()
+    {
+        var model = CheckSource("precept T\nstate Draft initial\nevent Cancel");
+
+        model.Events.Should().ContainKey("Cancel");
+        model.Events["Cancel"].Args.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Register_EventIsInitial_IsInitialTrueOnSymbol()
+    {
+        var model = CheckSource("precept T\nstate Draft initial\nevent Start initial");
+
+        model.Events["Start"].IsInitial.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Register_EventIsNotInitial_IsInitialFalseOnSymbol()
+    {
+        var model = CheckSource("precept T\nstate Draft initial\nevent Cancel");
+
+        model.Events["Cancel"].IsInitial.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Register_DuplicateEventName_EmitsDiagnostic()
+    {
+        var model = CheckSource("precept T\nstate Draft initial\nevent Submit\nevent Submit");
+
+        model.Diagnostics.Should().ContainSingle(d =>
+            d.Code == nameof(DiagnosticCode.DuplicateEventName) &&
+            d.Stage == DiagnosticStage.Type &&
+            d.Severity == Severity.Error);
+    }
+
+    [Fact]
+    public void Register_DuplicateEventName_FirstDeclarationWins()
+    {
+        var model = CheckSource("precept T\nstate Draft initial\nevent Submit\nevent Submit");
+
+        model.Events.Should().ContainKey("Submit");
+        model.Events.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public void Register_MultipleEventsInOneDeclaration_AllRegistered()
+    {
+        var model = CheckSource("precept T\nstate Draft initial\nevent Approve, Reject");
+
+        model.Events.Should().ContainKey("Approve");
+        model.Events.Should().ContainKey("Reject");
+        model.Events.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public void Register_DuplicateArgName_EmitsDiagnostic()
+    {
+        var model = CheckSource("precept T\nstate Draft initial\nevent Submit(Amount as decimal, Amount as string)");
+
+        model.Diagnostics.Should().ContainSingle(d =>
+            d.Code == nameof(DiagnosticCode.DuplicateArgName) &&
+            d.Stage == DiagnosticStage.Type &&
+            d.Severity == Severity.Error);
+    }
+
+    [Fact]
+    public void Register_DuplicateArgName_MessageContainsArgNameAndEventName()
+    {
+        var model = CheckSource("precept T\nstate Draft initial\nevent Submit(Amount as decimal, Amount as string)");
+
+        var diag = model.Diagnostics.Single(d => d.Code == nameof(DiagnosticCode.DuplicateArgName));
+        diag.Message.Should().Contain("Amount");
+        diag.Message.Should().Contain("Submit");
+    }
+
+    [Fact]
+    public void Register_DuplicateArgName_FirstArgWins()
+    {
+        var model = CheckSource("precept T\nstate Draft initial\nevent Submit(Amount as decimal, Amount as string)");
+
+        // First declaration (decimal) is preserved; second is rejected.
+        model.Events["Submit"].Args["Amount"].Type.Should().BeOfType<DecimalType>();
+    }
+
+    [Fact]
+    public void Register_ArgWithOptional_IsOptionalTrue()
+    {
+        var model = CheckSource("precept T\nstate Draft initial\nevent Submit(Note as string optional)");
+
+        model.Events["Submit"].Args["Note"].IsOptional.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Register_ArgWithoutOptional_IsOptionalFalse()
+    {
+        var model = CheckSource("precept T\nstate Draft initial\nevent Submit(Amount as decimal)");
+
+        model.Events["Submit"].Args["Amount"].IsOptional.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Register_MultipleEventsInOneDeclaration_SharedArgsAppliedToEach()
+    {
+        // When multiple names share one event declaration, each gets the same args.
+        var model = CheckSource("precept T\nstate Draft initial\nevent Approve, Reject(Reason as string)");
+
+        model.Events["Approve"].Args.Should().ContainKey("Reason");
+        model.Events["Reject"].Args.Should().ContainKey("Reason");
+    }
+
+    [Fact]
+    public void Register_SingleState_NoDiagnosticsEmitted()
+    {
+        var model = CheckSource("precept T\nstate Open initial");
+
+        model.Diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Register_SingleEvent_NoDiagnosticsEmitted()
+    {
+        var model = CheckSource("precept T\nstate Draft initial\nevent Submit");
+
+        model.Diagnostics.Should().BeEmpty();
+    }
+
+    // ════════════════════════════════════════════════════════════════════════════
     //  TheoryData helpers
     // ════════════════════════════════════════════════════════════════════════════
 
