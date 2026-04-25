@@ -84,24 +84,6 @@
       }
     ],
 
-    "configuration": {
-      "title": "Precept Preview",
-      "properties": {
-        "precept.preview.layoutMode": {
-          "type": "string",
-          "enum": [
-            "spacious",
-            "balanced",
-            "compact",
-            "orthogonal",
-            "top-down"
-          ],
-          "default": "balanced",
-          "markdownDescription": "Layout preset for Inspector Preview graph rendering. `balanced` (default) is readability-first with compacted bounds; `spacious` opens larger gaps; `compact` reduces spacing further; `orthogonal` uses right-angle routing; `top-down` stacks layers vertically."
-        }
-      }
-    },
-
     "semanticTokenTypes": [
       { "id": "preceptComment",         "description": "Precept comment" },
       { "id": "preceptKeywordSemantic", "description": "Precept behavioral structure keyword" },
@@ -244,7 +226,6 @@
     "vscode:prepublish": "npm run compile && dotnet publish ../../tools/Precept.LanguageServer/Precept.LanguageServer.csproj -c Release -o ./server --no-self-contained"
   },
   "dependencies": {
-    "elkjs": "^0.11.0",
     "vscode-languageclient": "^9.0.1"
   },
   "devDependencies": {
