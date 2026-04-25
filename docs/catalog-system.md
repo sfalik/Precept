@@ -393,11 +393,11 @@ Only two widening edges in the language: `integer → [Decimal, Number]`. `decim
 
 #### 3. Functions (🔲 Planned — unblocked by Types)
 
-The built-in function library. 22 functions defined in the language spec (§3.7).
+The built-in function library. 21 functions defined in the language spec (§3.7).
 
 | Part | Type |
 |------|------|
-| Kind enum | `FunctionKind` (22 members) |
+| Kind enum | `FunctionKind` (21 members) |
 | Meta record | `FunctionMeta(Kind, Name, Description, Overloads[])` — `FunctionOverload` uses `ParameterMeta[]` (see below) |
 | Catalog class | `Functions` — `GetMeta()`, `All`, evaluation delegate per function |
 | Output type | None — functions are evaluated inline |
@@ -624,7 +624,7 @@ All declaration-attached modifiers across the language surface — field constra
 
 | Part | Type |
 |------|------|
-| Kind enum | `ModifierKind` (~29 members across 5 subtypes) |
+| Kind enum | `ModifierKind` (28 members across 5 subtypes) |
 | Meta record | `ModifierMeta` — abstract DU base with `FieldModifierMeta`, `StateModifierMeta`, `EventModifierMeta`, `AccessModifierMeta`, `AnchorModifierMeta` sealed subtypes (see below) |
 | Supporting enums | `ModifierCategory`, `GraphAnalysisKind`, `AnchorScope`, `AnchorTarget` |
 | Catalog class | `Modifiers` — `GetMeta()`, `All` |
@@ -634,9 +634,9 @@ All declaration-attached modifiers across the language surface — field constra
 
 | Subtype | Members | Count |
 |---------|---------|-------|
-| `FieldModifierMeta` | `optional`, `nullable`, `default`, `nonnegative`, `positive`, `nonzero`, `notempty`, `min`, `max`, `minlength`, `maxlength`, `mincount`, `maxcount`, `maxplaces`, `ordered` | 15 |
+| `FieldModifierMeta` | `optional`, `default`, `nonnegative`, `positive`, `nonzero`, `notempty`, `min`, `max`, `minlength`, `maxlength`, `mincount`, `maxcount`, `maxplaces`, `ordered` | 14 |
 | `StateModifierMeta` | `initial` (state), `terminal`, `required`, `irreversible`, `success`, `warning`, `error` | 7 |
-| `EventModifierMeta` | `initial` (event) | 1 (+ 8 future: `entry`, `advancing`, `settling`, `completing`, `absorbing`, `guarded`, `isolated`, `universal`) |
+| `EventModifierMeta` | `initial` (event) | 1 |
 | `AccessModifierMeta` | `write`, `read`, `omit` | 3 |
 | `AnchorModifierMeta` | `in`, `to`, `from` | 3 (with `AnchorTarget` disambiguating ensure vs state-action) |
 
@@ -657,7 +657,7 @@ public abstract record ModifierMeta(
     ModifierCategory  Category       // Structural, Semantic, Severity
 );
 
-// ── Field modifiers (15 now, ~19 future) ─────────────────
+// ── Field modifiers (14) ─────────────────────────────────
 public sealed record FieldModifierMeta(
     ModifierKind     Kind,
     TokenMeta        Token,
@@ -680,7 +680,7 @@ public sealed record StateModifierMeta(
     bool             PreventsBackEdge   = false   // irreversible = true
 ) : ModifierMeta(Kind, Token, Description, Category);
 
-// ── Event modifiers (1 v2, ~9 future) ───────────────────
+// ── Event modifiers (1) ─────────────────────────────────
 public sealed record EventModifierMeta(
     ModifierKind       Kind,
     TokenMeta          Token,
