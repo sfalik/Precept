@@ -22,7 +22,7 @@ public static class SyntaxReference
     public static string StringLiteralRules => "Double-quoted strings with {expr} interpolation and \\, \\n, \\t, \\\", {{, }} escapes; single-quoted typed constants ('value') for date, time, instant, duration, period, timezone, zoneddatetime, datetime literals";
     public static string NumberLiteralRules => "Integers (42), decimals (3.14), exponent notation (1.5e2, 1e-5); no hex/underscore separators";
     public static string WhitespaceRules    => "Not significant — indentation is cosmetic, line breaks separate declarations";
-    public static string NullNarrowing      => "if Field != null narrows to non-nullable in the then branch";
+    public static string NullNarrowing      => "if Field is set narrows to non-nullable in the then branch";
 
     /// <summary>
     /// Rules for typed constant literals — single-quoted values that represent domain-constrained identifiers
@@ -173,8 +173,8 @@ public static class SyntaxReference
         "ensures",
         "accessModes",
         "events",
-        "eventEnsures",
+        "event ensures",
         "transitions",
-        "stateActions",
+        "state actions",
     ];
 }

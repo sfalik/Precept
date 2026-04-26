@@ -106,11 +106,12 @@ public class TokensTests
     [Theory]
     [InlineData(TokenKind.Min)]
     [InlineData(TokenKind.Max)]
-    public void GetMeta_MinAndMax_HaveBothConstraintAndControlCategories(TokenKind kind)
+    public void GetMeta_MinAndMax_HaveConstraintCategory(TokenKind kind)
     {
         var meta = Tokens.GetMeta(kind);
         meta.Categories.Should().Contain(TokenCategory.Constraint);
-        meta.Categories.Should().Contain(TokenCategory.Control);
+        meta.Categories.Should().NotContain(TokenCategory.Control,
+            "min/max are constraint keywords — their function usage is cataloged in FunctionKind, not TokenCategory");
     }
 
     // ── Keywords dictionary ─────────────────────────────────────────────────────

@@ -68,7 +68,7 @@ public class SyntaxReferenceTests
     [Fact]
     public void ConventionalOrder_EndsWithStateActions()
     {
-        SyntaxReference.ConventionalOrder[^1].Should().Be("stateActions");
+        SyntaxReference.ConventionalOrder[^1].Should().Be("state actions");
     }
 
     [Fact]

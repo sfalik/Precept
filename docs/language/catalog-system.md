@@ -1120,8 +1120,8 @@ public static class SyntaxReference
     public static string StringLiteralRules => "Double-quoted, \\\" escape only, no interpolation";
     public static string NumberLiteralRules => "Integers (42), decimals (3.14), no hex/scientific/underscore separators";
     public static string WhitespaceRules    => "Not significant — indentation is cosmetic, line breaks separate declarations";
-    public static string NullNarrowing      => "if Field != null narrows to non-nullable in the then branch";
-    public static IReadOnlyList<string> ConventionalOrder => ["header", "fields", "rules", "states", "ensures", "edits", "events", "eventEnsures", "transitions", "stateActions"];
+    public static string NullNarrowing      => "if Field is set narrows to non-nullable in the then branch";
+    public static IReadOnlyList<string> ConventionalOrder => ["header", "fields", "rules", "states", "ensures", "accessModes", "events", "event ensures", "transitions", "state actions"];
 }
 ```
 

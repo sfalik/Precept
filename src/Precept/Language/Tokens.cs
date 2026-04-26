@@ -24,7 +24,6 @@ public static class Tokens
 
     // Dual-use tokens
     private static readonly TokenCategory[] Cat_ActType = [TokenCategory.Action, TokenCategory.Type];
-    private static readonly TokenCategory[] Cat_CnsCtrl = [TokenCategory.Constraint, TokenCategory.Control];
 
     public static TokenMeta GetMeta(TokenKind kind) => kind switch
     {
@@ -153,9 +152,9 @@ public static class Tokens
             TextMateScope: "keyword.other.constraint.precept", SemanticTokenType: "decorator"),
         TokenKind.Notempty    => new(kind, "notempty",     Cat_Cns, "String constraint: non-empty",
             TextMateScope: "keyword.other.constraint.precept", SemanticTokenType: "decorator"),
-        TokenKind.Min         => new(kind, "min",         Cat_CnsCtrl, "Numeric minimum constraint / built-in function",
+        TokenKind.Min         => new(kind, "min",         Cat_Cns, "Numeric minimum value constraint",
             TextMateScope: "keyword.other.constraint.precept", SemanticTokenType: "decorator"),
-        TokenKind.Max         => new(kind, "max",         Cat_CnsCtrl, "Numeric maximum constraint / built-in function",
+        TokenKind.Max         => new(kind, "max",         Cat_Cns, "Numeric maximum value constraint",
             TextMateScope: "keyword.other.constraint.precept", SemanticTokenType: "decorator"),
         TokenKind.Minlength   => new(kind, "minlength",   Cat_Cns, "String minimum length constraint",
             TextMateScope: "keyword.other.constraint.precept", SemanticTokenType: "decorator"),
