@@ -103,4 +103,43 @@ public class SyntaxReferenceTests
         var transitionsIdx = order.ToList().IndexOf("transitions");
         eventsIdx.Should().BeLessThan(transitionsIdx);
     }
+
+    // X20 — all 10 section names are specific known values, in order
+    [Fact]
+    public void ConventionalOrder_ContainsAllKnownSections_InOrder()
+    {
+        var expected = new[]
+        {
+            "header", "fields", "rules", "states", "ensures",
+            "accessModes", "events", "event ensures", "transitions", "state actions",
+        };
+        SyntaxReference.ConventionalOrder.Should().BeEquivalentTo(
+            expected,
+            options => options.WithStrictOrdering(),
+            "all 10 section names must match exactly and be in canonical order");
+    }
+
+    // X18 ── Content quality tests ──────────────────────────────────────────────
+
+    [Fact]
+    public void TypedConstantRules_MentionsSingleQuotes()
+    {
+        SyntaxReference.TypedConstantRules.Should().Contain("'",
+            "typed constants use single-quote delimiters");
+    }
+
+    [Fact]
+    public void StringLiteralRules_MentionsInterpolationBrace()
+    {
+        SyntaxReference.StringLiteralRules.Should().Contain("{",
+            "string literals support {expr} interpolation syntax");
+    }
+
+    // NullNarrowing was updated in N2 nit to use v2 'is set' syntax (not '!= null').
+    [Fact]
+    public void NullNarrowing_MentionsIsSet()
+    {
+        SyntaxReference.NullNarrowing.Should().Contain("is set",
+            "v2 null narrowing uses 'is set' / 'is not set', not '!= null'");
+    }
 }

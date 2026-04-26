@@ -100,6 +100,41 @@ public class FaultsTests
         duplicates.Should().BeEmpty("each FaultCode should map to a unique DiagnosticCode");
     }
 
+    // X11 ── Fault templates: placeholders are formatted correctly ──────────────
+
+    [Fact]
+    public void FaultCodeTemplates_WithPlaceholders_FormatSuccessfully()
+    {
+        // For each FaultCode template that contains format placeholders, verify that
+        // Create() with enough args produces a message that does NOT contain the raw placeholder.
+        foreach (var code in Enum.GetValues<FaultCode>())
+        {
+            var template = Faults.GetMeta(code).MessageTemplate;
+            if (!template.Contains("{0}"))
+                continue; // static template — no formatting needed
+
+            // Supply 4 dummy args — string.Format ignores extra positional args
+            var fault = Faults.Create(code, "arg0", "arg1", "arg2", "arg3");
+            fault.Message.Should().NotContain("{0}",
+                $"FaultCode.{code} template should format its placeholders when args are supplied");
+        }
+    }
+
+    [Fact]
+    public void FaultCodeTemplates_WithoutPlaceholders_ReturnTemplateDirectly()
+    {
+        foreach (var code in Enum.GetValues<FaultCode>())
+        {
+            var template = Faults.GetMeta(code).MessageTemplate;
+            if (template.Contains("{0}"))
+                continue; // has placeholders — covered by the formatting test
+
+            var fault = Faults.Create(code);
+            fault.Message.Should().Be(template,
+                $"FaultCode.{code} has no placeholders — message should equal the template exactly");
+        }
+    }
+
     // ── Helpers ─────────────────────────────────────────────────────────────────
 
     public static TheoryData<FaultCode> AllFaultCodes()

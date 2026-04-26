@@ -489,6 +489,13 @@ public class OperationsTests
     [InlineData(OperatorKind.Plus, TypeKind.Date, TypeKind.Duration)]      // Date + duration not supported
     [InlineData(OperatorKind.Plus, TypeKind.Instant, TypeKind.Period)]     // Instant + period not supported
     [InlineData(OperatorKind.Times, TypeKind.Period, TypeKind.Integer)]    // Period * integer not supported
+    // X21 — additional temporal spec constraints
+    [InlineData(OperatorKind.Plus, TypeKind.Duration, TypeKind.Period)]    // Duration + period: no mixed-temporal addition
+    [InlineData(OperatorKind.Plus, TypeKind.Period, TypeKind.Duration)]    // Period + duration: no mixed-temporal addition
+    [InlineData(OperatorKind.Plus, TypeKind.Date, TypeKind.Integer)]       // Date + integer: integers are not durations
+    [InlineData(OperatorKind.Plus, TypeKind.Time, TypeKind.Integer)]       // Time + integer: integers are not durations
+    [InlineData(OperatorKind.Times, TypeKind.Duration, TypeKind.Duration)] // Duration * duration: dimensionally unsound
+    [InlineData(OperatorKind.Times, TypeKind.Period, TypeKind.Period)]     // Period * period: dimensionally unsound
     public void SpecConstraint_OperationMustNotExist(
         OperatorKind op, TypeKind lhs, TypeKind rhs)
     {

@@ -393,4 +393,25 @@ public class ModifiersTests
     {
         Enum.GetValues<AnchorTarget>().Should().HaveCount(2);
     }
+
+    // X15 ── Cross-catalog: ApplicableTo references valid TypeKinds ────────────
+
+    [Fact]
+    public void FieldModifiers_ApplicableTo_ReferencesOnlyValidTypeKinds()
+    {
+        // Empty ApplicableTo means "applies to all types" — skip cross-check for those.
+        // Every non-empty TypeTarget.Kind must be findable via Types.GetMeta without throwing.
+        foreach (var meta in Modifiers.All.OfType<FieldModifierMeta>())
+        {
+            foreach (var target in meta.ApplicableTo)
+            {
+                if (target.Kind.HasValue)
+                {
+                    var typeMeta = Types.GetMeta(target.Kind.Value);
+                    typeMeta.Kind.Should().Be(target.Kind.Value,
+                        $"{meta.Kind}.ApplicableTo references TypeKind.{target.Kind.Value} which is not in Types.All");
+                }
+            }
+        }
+    }
 }

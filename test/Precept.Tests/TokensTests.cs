@@ -293,6 +293,45 @@ public class TokensTests
             $"{kind} is a string token");
     }
 
+    // ── Ordering invariants ────────────────────────────────────────────────────────
+
+    // X12
+    [Fact]
+    public void All_IsInAscendingOrder()
+    {
+        var kinds = Tokens.All.Select(m => (int)m.Kind).ToList();
+        kinds.Should().BeInAscendingOrder("Tokens.All should be ordered by TokenKind value");
+    }
+
+    // ── Boundary category tests ──────────────────────────────────────────────────
+
+    // X16
+    [Fact]
+    public void Tilde_IsOperator_NotType()
+    {
+        var meta = Tokens.GetMeta(TokenKind.Tilde);
+        meta.Categories.Should().Contain(TokenCategory.Operator,
+            "Tilde '~' is the case-insensitive collection inner-type prefix operator");
+        meta.Categories.Should().NotContain(TokenCategory.Type,
+            "Tilde is not a type keyword");
+    }
+
+    // X17
+    [Fact]
+    public void Arrow_IsStructural_NotExpressionOperator()
+    {
+        // Arrow '->' is an action-chain separator, not an expression operator.
+        // It must not be categorized as Operator so consumers building operator
+        // tables never include it by mistake.
+        var meta = Tokens.GetMeta(TokenKind.Arrow);
+        meta.Categories.Should().Contain(TokenCategory.Structural,
+            "Arrow '->' is a structural separator");
+        meta.Categories.Should().NotContain(TokenCategory.Operator,
+            "Arrow is not an expression operator");
+        meta.Categories.Should().NotContain(TokenCategory.Punctuation,
+            "Arrow is not punctuation — it is structural");
+    }
+
     // ── Helpers ─────────────────────────────────────────────────────────────────
 
     public static TheoryData<TokenKind> AllTokenKinds()

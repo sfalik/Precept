@@ -260,4 +260,28 @@ public class OperatorsTests
             found!.Kind.Should().Be(meta.Kind);
         }
     }
+
+    // ── Ordering invariants ──────────────────────────────────────────────────────
+
+    // X13
+    [Fact]
+    public void All_IsInAscendingOrder()
+    {
+        var kinds = Operators.All.Select(m => (int)m.Kind).ToList();
+        kinds.Should().BeInAscendingOrder("Operators.All should be ordered by OperatorKind value");
+    }
+
+    // ── Boundary: Arrow is not an expression operator ───────────────────────────────
+
+    // X17
+    [Fact]
+    public void ByToken_DoesNotContainArrow()
+    {
+        // Arrow '->' is a structural action-chain separator, not an expression operator.
+        // It must not appear in the Operators ByToken index under any Arity.
+        var arrowInBinary = Operators.ByToken.ContainsKey((TokenKind.Arrow, Arity.Binary));
+        var arrowInUnary  = Operators.ByToken.ContainsKey((TokenKind.Arrow, Arity.Unary));
+        arrowInBinary.Should().BeFalse("Arrow '->' is not a binary expression operator");
+        arrowInUnary.Should().BeFalse("Arrow '->' is not a unary expression operator");
+    }
 }

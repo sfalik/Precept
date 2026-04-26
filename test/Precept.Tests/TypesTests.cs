@@ -501,4 +501,31 @@ public class TypesTests
         Types.GetMeta(typeKind).ImpliedModifiers.Should().BeEmpty(
             $"{typeKind} is not an identity type and should carry no implied modifiers");
     }
+
+    // X14 ── Instant lacks calendar component accessors ───────────────────────
+    // Per temporal spec D12: instant is a UTC point in time.
+    // Calendar component accessors (year/month/day/date/time) are NOT available
+    // directly on instant — use .inZone(tz) to get a ZonedDateTime first.
+
+    [Theory]
+    [InlineData("year")]
+    [InlineData("month")]
+    [InlineData("day")]
+    [InlineData("date")]
+    [InlineData("time")]
+    public void Instant_LacksComponentAccessor(string accessorName)
+    {
+        var meta = Types.GetMeta(TypeKind.Instant);
+        meta.Accessors.Should().NotContain(a => a.Name == accessorName,
+            $"instant does not expose .{accessorName} directly — use .inZone(tz) to get a ZonedDateTime first");
+    }
+
+    [Fact]
+    public void Instant_HasExactlyOneAccessor_InZone()
+    {
+        var meta = Types.GetMeta(TypeKind.Instant);
+        meta.Accessors.Should().HaveCount(1,
+            "instant exposes only .inZone(timezone) — no component accessors");
+        meta.Accessors![0].Name.Should().Be("inZone");
+    }
 }

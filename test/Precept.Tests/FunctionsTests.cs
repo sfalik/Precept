@@ -92,7 +92,10 @@ public class FunctionsTests
     [Fact]
     public void ByName_RoundMapsToTwoEntries()
     {
-        // Round and RoundPlaces are separate FunctionKind members with the same Name
+        // DUAL-USE: Round and RoundPlaces both carry Name="round".
+        // round(value) → integer (FunctionKind.Round, banker's rounding).
+        // round(value, places) → decimal (FunctionKind.RoundPlaces, explicit precision bridge).
+        // Sharing the surface name is intentional — dispatch is resolved by overload shape at call sites.
         Functions.ByName["round"].Should().HaveCount(2);
         Functions.ByName["round"].Select(m => m.Kind)
             .Should().BeEquivalentTo([FunctionKind.Round, FunctionKind.RoundPlaces]);
@@ -489,6 +492,36 @@ public class FunctionsTests
             overload.ProofRequirements.Should().HaveCount(1,
                 $"sqrt overload for {overload.Parameters[0].Kind} must have exactly 1 proof requirement");
         }
+    }
+
+    // X19 ── Name matches known surface strings ────────────────────────────────
+
+    [Theory]
+    [InlineData(FunctionKind.Min,          "min")]
+    [InlineData(FunctionKind.Max,          "max")]
+    [InlineData(FunctionKind.Abs,          "abs")]
+    [InlineData(FunctionKind.Clamp,        "clamp")]
+    [InlineData(FunctionKind.Floor,        "floor")]
+    [InlineData(FunctionKind.Ceil,         "ceil")]
+    [InlineData(FunctionKind.Truncate,     "truncate")]
+    [InlineData(FunctionKind.Round,        "round")]
+    [InlineData(FunctionKind.RoundPlaces,  "round")]   // DUAL-USE: shares "round" name — see ByName_RoundMapsToTwoEntries
+    [InlineData(FunctionKind.Approximate,  "approximate")]
+    [InlineData(FunctionKind.Pow,          "pow")]
+    [InlineData(FunctionKind.Sqrt,         "sqrt")]
+    [InlineData(FunctionKind.Trim,         "trim")]
+    [InlineData(FunctionKind.StartsWith,   "startsWith")]  // camelCase exception: not "startswith"
+    [InlineData(FunctionKind.EndsWith,     "endsWith")]    // camelCase exception: not "endswith"
+    [InlineData(FunctionKind.ToLower,      "toLower")]     // camelCase exception: not "tolower"
+    [InlineData(FunctionKind.ToUpper,      "toUpper")]     // camelCase exception: not "toupper"
+    [InlineData(FunctionKind.Left,         "left")]
+    [InlineData(FunctionKind.Right,        "right")]
+    [InlineData(FunctionKind.Mid,          "mid")]
+    [InlineData(FunctionKind.Now,          "now")]
+    public void Name_MatchesKnownSurfaceString(FunctionKind kind, string expectedName)
+    {
+        Functions.GetMeta(kind).Name.Should().Be(expectedName,
+            $"{kind} should have DSL surface name '{expectedName}'");
     }
 
     // M10 ── ParameterMeta.Name ────────────────────────────────────────────────
