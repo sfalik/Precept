@@ -86,14 +86,14 @@ public sealed record ModifiedTypeTarget : TypeTarget
 /// </summary>
 public abstract record ModifierMeta(
     ModifierKind Kind,
-    TokenKind Token,
+    TokenMeta Token,
     string Description,
     ModifierCategory Category);
 
 /// <summary>Field constraint modifiers (14 members: optional, ordered, nonnegative, …, maxplaces).</summary>
 public sealed record FieldModifierMeta(
     ModifierKind Kind,
-    TokenKind Token,
+    TokenMeta Token,
     string Description,
     ModifierCategory Category,
     TypeTarget[] ApplicableTo,
@@ -108,7 +108,7 @@ public sealed record FieldModifierMeta(
 /// <summary>State lifecycle modifiers (7 members: initial, terminal, required, irreversible, success, warning, error).</summary>
 public sealed record StateModifierMeta(
     ModifierKind Kind,
-    TokenKind Token,
+    TokenMeta Token,
     string Description,
     ModifierCategory Category,
     bool AllowsOutgoing = true,
@@ -119,7 +119,7 @@ public sealed record StateModifierMeta(
 /// <summary>Event modifiers (1 v2 member: initial event).</summary>
 public sealed record EventModifierMeta(
     ModifierKind Kind,
-    TokenKind Token,
+    TokenMeta Token,
     string Description,
     ModifierCategory Category,
     GraphAnalysisKind RequiredAnalysis = GraphAnalysisKind.None)
@@ -128,7 +128,7 @@ public sealed record EventModifierMeta(
 /// <summary>Access mode modifiers (3 members: write, read, omit).</summary>
 public sealed record AccessModifierMeta(
     ModifierKind Kind,
-    TokenKind Token,
+    TokenMeta Token,
     string Description,
     ModifierCategory Category,
     bool IsPresent = true,
@@ -138,8 +138,9 @@ public sealed record AccessModifierMeta(
 /// <summary>Ensure/action anchor modifiers (3 members: in, to, from).</summary>
 public sealed record AnchorModifierMeta(
     ModifierKind Kind,
-    TokenKind Token,
+    TokenMeta Token,
     string Description,
     ModifierCategory Category,
-    AnchorScope Scope)
+    AnchorScope Scope,
+    AnchorTarget Target = AnchorTarget.Ensure)
     : ModifierMeta(Kind, Token, Description, Category);

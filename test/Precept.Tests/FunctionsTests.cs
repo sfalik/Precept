@@ -445,4 +445,19 @@ public class FunctionsTests
             .Count(o => o.Match == QualifierMatch.Same);
         count.Should().Be(10);
     }
+
+    // ── ProofRequirements ─ default empty ────────────────────────────────────────
+
+    [Fact]
+    public void AllOverloads_ProofRequirements_IsNotNull()
+    {
+        foreach (var fn in Functions.All)
+        {
+            foreach (var overload in fn.Overloads)
+            {
+                overload.ProofRequirements.Should().NotBeNull(
+                    $"{fn.Name} overload ProofRequirements should default to empty");
+            }
+        }
+    }
 }

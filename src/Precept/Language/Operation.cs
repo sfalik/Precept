@@ -45,5 +45,10 @@ public sealed record BinaryOperationMeta(
     TypeKind Result,
     string Description,
     bool Commutative = false,
-    QualifierMatch Match = QualifierMatch.Any)
-    : OperationMeta(Kind, Op, Result, Description);
+    QualifierMatch Match = QualifierMatch.Any,
+    ProofRequirement[]? ProofRequirements = null)
+    : OperationMeta(Kind, Op, Result, Description)
+{
+    /// <summary>Proof obligations the type checker must verify at call sites.</summary>
+    public ProofRequirement[] ProofRequirements { get; } = ProofRequirements ?? [];
+}

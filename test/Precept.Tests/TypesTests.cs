@@ -413,4 +413,40 @@ public class TypesTests
         }
         return data;
     }
+
+    // ── ImpliedModifiers — default empty for most types ─────────────────────────
+
+    [Fact]
+    public void AllTypes_ImpliedModifiers_IsNotNull()
+    {
+        foreach (var meta in Types.All)
+        {
+            meta.ImpliedModifiers.Should().NotBeNull(
+                $"{meta.Kind} ImpliedModifiers should default to empty, not null");
+        }
+    }
+
+    [Fact]
+    public void MostTypes_ImpliedModifiers_AreEmpty()
+    {
+        // Most types have no implied modifiers — only currency and unitofmeasure do
+        var withImplied = Types.All.Where(m => m.ImpliedModifiers.Length > 0).ToList();
+        withImplied.Should().HaveCountLessThanOrEqualTo(2,
+            "at most currency and unitofmeasure have implied modifiers");
+    }
+
+    // ── ProofRequirements — accessor default ────────────────────────────────────
+
+    [Fact]
+    public void AllAccessors_ProofRequirements_IsNotNull()
+    {
+        foreach (var meta in Types.All)
+        {
+            foreach (var acc in meta.Accessors)
+            {
+                acc.ProofRequirements.Should().NotBeNull(
+                    $"{meta.Kind}.{acc.Name} ProofRequirements should default to empty");
+            }
+        }
+    }
 }

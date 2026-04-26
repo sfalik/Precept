@@ -2,13 +2,21 @@ namespace Precept.Language;
 
 /// <summary>
 /// Metadata for a state-machine action verb.
-/// <c>ProofRequirements</c> and <c>AllowedIn</c> are deferred until
-/// those types are implemented.
+/// <c>Token</c> is a <see cref="TokenMeta"/> object reference from the Tokens catalog.
 /// </summary>
 public sealed record ActionMeta(
     ActionKind   Kind,
-    TokenKind    Token,
+    TokenMeta    Token,
     string       Description,
     TypeTarget[] ApplicableTo,
     bool         ValueRequired = false,
-    bool         IntoSupported = false);
+    bool         IntoSupported = false,
+    ProofRequirement[]? ProofRequirements = null,
+    ConstructKind[]?    AllowedIn         = null)
+{
+    /// <summary>Proof obligations the type checker must verify at call sites.</summary>
+    public ProofRequirement[] ProofRequirements { get; } = ProofRequirements ?? [];
+
+    /// <summary>Construct kinds where this action may appear.</summary>
+    public ConstructKind[] AllowedIn { get; } = AllowedIn ?? [];
+}

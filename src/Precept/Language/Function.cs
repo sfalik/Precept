@@ -7,7 +7,12 @@ namespace Precept.Language;
 public sealed record FunctionOverload(
     IReadOnlyList<ParameterMeta> Parameters,
     TypeKind ReturnType,
-    QualifierMatch? Match = null);
+    QualifierMatch? Match = null,
+    ProofRequirement[]? ProofRequirements = null)
+{
+    /// <summary>Proof obligations the type checker must verify at call sites.</summary>
+    public ProofRequirement[] ProofRequirements { get; } = ProofRequirements ?? [];
+}
 
 /// <summary>
 /// Metadata for a built-in function. Each <see cref="FunctionKind"/> maps to exactly one

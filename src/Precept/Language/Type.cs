@@ -66,8 +66,13 @@ public record TypeAccessor(
     string    Name,
     string    Description,
     TypeKind? ParameterType  = null,
-    TypeTrait RequiredTraits = TypeTrait.None
-);
+    TypeTrait RequiredTraits = TypeTrait.None,
+    ProofRequirement[]? ProofRequirements = null
+)
+{
+    /// <summary>Proof obligations the type checker must verify at call sites.</summary>
+    public ProofRequirement[] ProofRequirements { get; } = ProofRequirements ?? [];
+}
 
 /// <summary>
 /// An accessor with a fixed return type (e.g., <c>.count → integer</c>,
@@ -80,8 +85,9 @@ public sealed record FixedReturnAccessor(
     string        Description,
     TypeKind?     ParameterType    = null,
     TypeTrait     RequiredTraits   = TypeTrait.None,
+    ProofRequirement[]? ProofRequirements = null,
     QualifierAxis ReturnsQualifier = QualifierAxis.None
-) : TypeAccessor(Name, Description, ParameterType, RequiredTraits);
+) : TypeAccessor(Name, Description, ParameterType, RequiredTraits, ProofRequirements);
 
 // ── TypeMeta ───────────────────────────────────────────────────────────────────
 
@@ -99,11 +105,15 @@ public record TypeMeta(
     QualifierShape?              QualifierShape   = null,
     TypeTrait                    Traits           = TypeTrait.None,
     IReadOnlyList<TypeKind>?     WidensTo         = null,
+    ModifierKind[]?              ImpliedModifiers = null,
     IReadOnlyList<TypeAccessor>? Accessors        = null
 )
 {
     /// <summary>Lossless implicit widening targets. Empty for most types.</summary>
     public IReadOnlyList<TypeKind> WidensTo { get; } = WidensTo ?? Array.Empty<TypeKind>();
+
+    /// <summary>Modifiers intrinsically carried by this type (e.g., currency → notempty).</summary>
+    public ModifierKind[] ImpliedModifiers { get; } = ImpliedModifiers ?? [];
 
     /// <summary>Member accessors available on this type.</summary>
     public IReadOnlyList<TypeAccessor> Accessors { get; } = Accessors ?? Array.Empty<TypeAccessor>();

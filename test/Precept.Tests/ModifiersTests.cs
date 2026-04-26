@@ -76,16 +76,15 @@ public class ModifiersTests
         Modifiers.All.OfType<AnchorModifierMeta>().Should().HaveCount(3);
     }
 
-    // ── All entries reference valid TokenKinds ──────────────────────────────────
+    // ── All entries reference valid TokenMeta instances ─────────────────────────
 
     [Fact]
-    public void AllEntries_ReferenceValidTokenKinds()
+    public void AllEntries_HaveValidTokenMeta()
     {
-        var validTokens = new HashSet<TokenKind>(Enum.GetValues<TokenKind>());
         foreach (var meta in Modifiers.All)
         {
-            validTokens.Should().Contain(meta.Token,
-                $"{meta.Kind} references invalid TokenKind {meta.Token}");
+            meta.Token.Should().NotBeNull($"{meta.Kind} must have a Token");
+            meta.Token.Kind.Should().BeDefined($"{meta.Kind} references invalid TokenKind");
         }
     }
 
@@ -308,12 +307,12 @@ public class ModifiersTests
     // ── initial keyword resolution ──────────────────────────────────────────────
 
     [Fact]
-    public void InitialState_AndInitialEvent_ShareSameTokenKind()
+    public void InitialState_AndInitialEvent_ShareSameTokenMeta()
     {
         var stateMeta = Modifiers.GetMeta(ModifierKind.InitialState);
         var eventMeta = Modifiers.GetMeta(ModifierKind.InitialEvent);
-        stateMeta.Token.Should().Be(TokenKind.Initial);
-        eventMeta.Token.Should().Be(TokenKind.Initial);
+        stateMeta.Token.Kind.Should().Be(TokenKind.Initial);
+        eventMeta.Token.Kind.Should().Be(TokenKind.Initial);
     }
 
     [Fact]
@@ -362,5 +361,36 @@ public class ModifiersTests
         Modifiers.All.OfType<FieldModifierMeta>()
             .All(m => m.Category == ModifierCategory.Structural)
             .Should().BeTrue("all field modifiers are compile-time structural constraints");
+    }
+
+    // ── Token is object reference to Tokens catalog ─────────────────────────────
+
+    [Fact]
+    public void AllEntries_TokenMatchesTokensCatalog()
+    {
+        foreach (var meta in Modifiers.All)
+        {
+            var expected = Tokens.GetMeta(meta.Token.Kind);
+            meta.Token.Should().Be(expected,
+                $"{meta.Kind} Token should match the Tokens catalog entry");
+        }
+    }
+
+    // ── Anchor modifiers carry AnchorTarget ─────────────────────────────────────
+
+    [Fact]
+    public void AnchorModifiers_DefaultToEnsureTarget()
+    {
+        foreach (var anchor in Modifiers.All.OfType<AnchorModifierMeta>())
+        {
+            anchor.Target.Should().Be(AnchorTarget.Ensure,
+                $"{anchor.Kind} should default to AnchorTarget.Ensure");
+        }
+    }
+
+    [Fact]
+    public void AnchorTarget_HasTwoValues()
+    {
+        Enum.GetValues<AnchorTarget>().Should().HaveCount(2);
     }
 }

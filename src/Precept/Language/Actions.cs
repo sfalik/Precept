@@ -25,50 +25,56 @@ public static class Actions
     ];
 
     // ════════════════════════════════════════════════════════════════════════════
+    //  Shared AllowedIn arrays
+    // ════════════════════════════════════════════════════════════════════════════
+
+    private static readonly ConstructKind[] EventBodyOnly = [ConstructKind.EventDeclaration];
+
+    // ════════════════════════════════════════════════════════════════════════════
     //  GetMeta — exhaustive switch
     // ════════════════════════════════════════════════════════════════════════════
 
     public static ActionMeta GetMeta(ActionKind kind) => kind switch
     {
         ActionKind.Set => new(
-            kind, TokenKind.Set,
+            kind, Tokens.GetMeta(TokenKind.Set),
             "Assign a value to a scalar field",
-            AnyType, ValueRequired: true),
+            AnyType, ValueRequired: true, AllowedIn: EventBodyOnly),
 
         ActionKind.Add => new(
-            kind, TokenKind.Add,
+            kind, Tokens.GetMeta(TokenKind.Add),
             "Add an element to a set",
-            SetOnly, ValueRequired: true),
+            SetOnly, ValueRequired: true, AllowedIn: EventBodyOnly),
 
         ActionKind.Remove => new(
-            kind, TokenKind.Remove,
+            kind, Tokens.GetMeta(TokenKind.Remove),
             "Remove an element from a set",
-            SetOnly, ValueRequired: true),
+            SetOnly, ValueRequired: true, AllowedIn: EventBodyOnly),
 
         ActionKind.Enqueue => new(
-            kind, TokenKind.Enqueue,
+            kind, Tokens.GetMeta(TokenKind.Enqueue),
             "Enqueue an element onto a queue",
-            QueueOnly, ValueRequired: true),
+            QueueOnly, ValueRequired: true, AllowedIn: EventBodyOnly),
 
         ActionKind.Dequeue => new(
-            kind, TokenKind.Dequeue,
+            kind, Tokens.GetMeta(TokenKind.Dequeue),
             "Dequeue the front element of a queue",
-            QueueOnly, IntoSupported: true),
+            QueueOnly, IntoSupported: true, AllowedIn: EventBodyOnly),
 
         ActionKind.Push => new(
-            kind, TokenKind.Push,
+            kind, Tokens.GetMeta(TokenKind.Push),
             "Push an element onto a stack",
-            StackOnly, ValueRequired: true),
+            StackOnly, ValueRequired: true, AllowedIn: EventBodyOnly),
 
         ActionKind.Pop => new(
-            kind, TokenKind.Pop,
+            kind, Tokens.GetMeta(TokenKind.Pop),
             "Pop the top element of a stack",
-            StackOnly, IntoSupported: true),
+            StackOnly, IntoSupported: true, AllowedIn: EventBodyOnly),
 
         ActionKind.Clear => new(
-            kind, TokenKind.Clear,
+            kind, Tokens.GetMeta(TokenKind.Clear),
             "Clear all elements from a collection or reset an optional field",
-            CollectionsAndOptional),
+            CollectionsAndOptional, AllowedIn: EventBodyOnly),
 
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind,
             $"Unknown ActionKind: {kind}"),

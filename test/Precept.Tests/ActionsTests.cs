@@ -45,16 +45,15 @@ public class ActionsTests
         Actions.All.Should().HaveCount(8);
     }
 
-    // ── All entries reference valid TokenKinds ──────────────────────────────────
+    // ── All entries have valid TokenMeta instances ─────────────────────────────
 
     [Fact]
-    public void AllEntries_ReferenceValidTokenKinds()
+    public void AllEntries_HaveValidTokenMeta()
     {
-        var validTokens = new HashSet<TokenKind>(Enum.GetValues<TokenKind>());
         foreach (var meta in Actions.All)
         {
-            validTokens.Should().Contain(meta.Token,
-                $"{meta.Kind} references invalid TokenKind {meta.Token}");
+            meta.Token.Should().NotBeNull($"{meta.Kind} must have a Token");
+            meta.Token.Kind.Should().BeDefined($"{meta.Kind} references invalid TokenKind");
         }
     }
 
@@ -194,7 +193,7 @@ public class ActionsTests
     [InlineData(ActionKind.Clear, TokenKind.Clear)]
     public void TokenMapping_IsCorrect(ActionKind kind, TokenKind expectedToken)
     {
-        Actions.GetMeta(kind).Token.Should().Be(expectedToken);
+        Actions.GetMeta(kind).Token.Kind.Should().Be(expectedToken);
     }
 
     // ── Grouping invariants ─────────────────────────────────────────────────────
@@ -220,5 +219,52 @@ public class ActionsTests
             .ToList();
         neither.Should().HaveCount(1);
         neither[0].Kind.Should().Be(ActionKind.Clear);
+    }
+
+    // ── Token is object reference to Tokens catalog ─────────────────────────────
+
+    [Fact]
+    public void AllEntries_TokenMatchesTokensCatalog()
+    {
+        foreach (var meta in Actions.All)
+        {
+            var expected = Tokens.GetMeta(meta.Token.Kind);
+            meta.Token.Should().Be(expected,
+                $"{meta.Kind} Token should be the same object instance from Tokens catalog");
+        }
+    }
+
+    // ── AllowedIn — all actions currently allowed in EventDeclaration ────────────
+
+    [Fact]
+    public void AllActions_AllowedInEventDeclaration()
+    {
+        foreach (var meta in Actions.All)
+        {
+            meta.AllowedIn.Should().Contain(ConstructKind.EventDeclaration,
+                $"{meta.Kind} should be allowed in event declarations");
+        }
+    }
+
+    [Fact]
+    public void AllActions_AllowedIn_IsNotEmpty()
+    {
+        foreach (var meta in Actions.All)
+        {
+            meta.AllowedIn.Should().NotBeEmpty(
+                $"{meta.Kind} must declare where it is allowed");
+        }
+    }
+
+    // ── ProofRequirements — default empty ───────────────────────────────────────
+
+    [Fact]
+    public void AllActions_ProofRequirements_DefaultEmpty()
+    {
+        foreach (var meta in Actions.All)
+        {
+            meta.ProofRequirements.Should().BeEmpty(
+                $"{meta.Kind} has no proof requirements by default");
+        }
     }
 }

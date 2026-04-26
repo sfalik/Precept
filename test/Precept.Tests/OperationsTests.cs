@@ -770,4 +770,16 @@ public class OperationsTests
         Operations.FindCandidates(OperatorKind.LessThan, TypeKind.ExchangeRate, TypeKind.ExchangeRate)
             .Length.Should().Be(0);
     }
+
+    // ── ProofRequirements ─ default empty ────────────────────────────────────────
+
+    [Fact]
+    public void AllBinaryOperations_ProofRequirements_IsNotNull()
+    {
+        foreach (var op in Operations.All.OfType<BinaryOperationMeta>())
+        {
+            op.ProofRequirements.Should().NotBeNull(
+                $"{op.Kind} ProofRequirements should default to empty");
+        }
+    }
 }
