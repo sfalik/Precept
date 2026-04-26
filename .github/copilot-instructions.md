@@ -13,7 +13,7 @@ Precept is a domain integrity engine for .NET — a DSL runtime that governs how
 | Copilot plugin | `tools/Precept.Plugin/` | Agent definition + 2 skills + MCP launcher |
 | Sample files | `samples/` | 20 `.precept` files — canonical DSL usage examples |
 
-Key design docs: `docs/philosophy.md` (product philosophy), `docs/language/precept-language-spec.md` (DSL semantics), `docs/runtime/runtime-api.md` (C# API), `docs/catalog-system.md` (metadata registries). See `docs/` for the full set.
+Key design docs: `docs/philosophy.md` (product philosophy), `docs/language/precept-language-spec.md` (DSL semantics), `docs/runtime/runtime-api.md` (C# API), `docs/language/catalog-system.md` (metadata registries). See `docs/` for the full set.
 
 ## Metadata-Driven Architecture (Non-Negotiable)
 
@@ -27,7 +27,7 @@ When making design decisions, reason from language surface outward:
 - **"Do consumers hardcode per-member knowledge that should be metadata?"** If the type checker, graph analyzer, evaluator, or runtime switches on enum values to apply per-member behavior, that behavior is domain knowledge and belongs in metadata.
 - **"Do members need different metadata shapes?"** Use a discriminated union (abstract record base + sealed subtypes). Each subtype carries exactly the fields its consumers need. Do not use flat records with inapplicable nullable fields — use a DU instead.
 
-The canonical design doc for the catalog system is `docs/catalog-system.md`. Read its § Architectural Identity before making decisions about what gets cataloged, what stays bare, or how metadata is shaped.
+The canonical design doc for the catalog system is `docs/language/catalog-system.md`. Read its § Architectural Identity before making decisions about what gets cataloged, what stays bare, or how metadata is shaped.
 
 ## Build & Test
 
@@ -145,7 +145,7 @@ When making language surface changes:
 - **Do not hand-edit `tmLanguage.json`.** It is a build output. The grammar generator reads the `Tokens`, `Types`, and `Constructs` catalogs and emits the file.
 - **Do not maintain parallel keyword lists** in tooling code. If a consumer switches on catalog members or hardcodes per-member behavior, that behavior belongs in catalog metadata instead.
 
-See `docs/catalog-system.md` — specifically § Architectural Identity and the consumer table — for which catalogs drive which artifacts.
+See `docs/language/catalog-system.md` — specifically § Architectural Identity and the consumer table — for which catalogs drive which artifacts.
 
 ## MCP Tool Sync
 

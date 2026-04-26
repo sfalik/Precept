@@ -1134,7 +1134,7 @@ See Architecture § Two-pass processing above. Two clean passes — registration
 
 ### T7 — Built-in functions and operators as catalog system
 
-**Chosen:** Functions and operators are validated via the catalog system pattern defined in [catalog-system.md](../catalog-system.md). Each uses a `Kind` enum (`FunctionKind`, `OperatorKind`) with `[Meta]` attributes, a `GetMeta()` method (exhaustive switch, CS8509-enforced), an `All` property, and a `Create()` factory. The type checker calls `FunctionCatalog.GetMeta(kind)` to retrieve parameter types and return types. No registration mechanism, no user-defined functions, no extension point.
+**Chosen:** Functions and operators are validated via the catalog system pattern defined in [catalog-system.md](../language/catalog-system.md). Each uses a `Kind` enum (`FunctionKind`, `OperatorKind`) with `[Meta]` attributes, a `GetMeta()` method (exhaustive switch, CS8509-enforced), an `All` property, and a `Create()` factory. The type checker calls `FunctionCatalog.GetMeta(kind)` to retrieve parameter types and return types. No registration mechanism, no user-defined functions, no extension point.
 
 **Rationale:** The catalog pattern is already established for `DiagnosticCode`, `TokenCategory`, and `ConstructKind`. Functions and operators follow the same shape — a closed, enumerable set known at compile time. The exhaustive switch ensures the compiler catches missing cases when a new function or operator is added. This is the single source of truth for both the type checker (type signatures) and the evaluator (runtime dispatch).
 

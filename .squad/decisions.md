@@ -10,7 +10,7 @@
 **By:** Scribe
 **Status:** Merged from 17 inbox files (6 reviews + 5 owner gap resolutions + 6 recommendations)
 
-**Context:** Full team review of `docs/catalog-system.md` — the metadata-driven catalog architecture design doc. Reviews by Frank (architecture + completeness + pipeline + source-of-truth), George (pipeline feasibility), Kramer (tooling), Newman (AI/MCP), Soup Nazi (testing). Owner (Shane) dispositioned all gaps and design questions.
+**Context:** Full team review of `docs/language/catalog-system.md` — the metadata-driven catalog architecture design doc. Reviews by Frank (architecture + completeness + pipeline + source-of-truth), George (pipeline feasibility), Kramer (tooling), Newman (AI/MCP), Soup Nazi (testing). Owner (Shane) dispositioned all gaps and design questions.
 
 **Key owner decisions (Shane sign-off, anti-AI-bias lens):**
 - **DQ1–DQ2:** `AllowedIn ConstructKind[]` added to both `ConstructMeta` and `ActionMeta` — uniform nesting/context pattern across both catalogs. LS completions filter by parent construct kind.

@@ -15,7 +15,7 @@ Design documents for the Precept compiler pipeline and language surface.
 | Document | Purpose | Status |
 |----------|---------|--------|
 | [architecture-planning.md](architecture-planning.md) | Master architecture plan — identifies what must be designed, in what order, grounded in research evidence | Planning |
-| [catalog-system.md](catalog-system.md) | Catalog pattern for closed enum registries (tokens, diagnostics, faults, functions, operators) with `[Meta]` attributes and exhaustive switches | Draft |
+| [catalog-system.md](language/catalog-system.md) | Catalog pattern for closed enum registries (tokens, diagnostics, faults, functions, operators) with `[Meta]` attributes and exhaustive switches | Draft |
 | [compiler-architecture-proposal.md](compiler-architecture-proposal.md) | Initial compiler design proposal — predates the architecture plan | Superseded by `architecture-planning.md` |
 
 ## Reading Order
@@ -24,7 +24,7 @@ Design documents for the Precept compiler pipeline and language surface.
 2. **Pipeline overview:** [compiler/pipeline-artifacts-and-consumer-contracts.md](compiler/pipeline-artifacts-and-consumer-contracts.md) — how stages connect
 3. **Stage docs** (in pipeline order): [compiler/lexer.md](compiler/lexer.md) → [compiler/parser.md](compiler/parser.md) → [compiler/type-checker.md](compiler/type-checker.md)
 4. **Language surface:** [language/precept-language-spec.md](language/precept-language-spec.md) — grows per stage as decisions lock
-5. **Cross-cutting:** [catalog-system.md](catalog-system.md), [compiler/diagnostic-system.md](compiler/diagnostic-system.md), [compiler/literal-system.md](compiler/literal-system.md)
+5. **Cross-cutting:** [catalog-system.md](language/catalog-system.md), [compiler/diagnostic-system.md](compiler/diagnostic-system.md), [compiler/literal-system.md](compiler/literal-system.md)
 6. **Runtime:** [runtime/runtime-api.md](runtime/runtime-api.md) — how the compiler's output is consumed at runtime (result types, fault system, fire/update API). Assumes familiarity with the compiler pipeline (steps 2–3) — read those first.
 
 ## Relationship to Other Docs
