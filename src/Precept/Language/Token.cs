@@ -1,3 +1,5 @@
+using Precept.Pipeline;
+
 namespace Precept.Language;
 
 /// <summary>
@@ -70,15 +72,8 @@ public sealed record TokenMeta(
 /// For <see cref="TokenKind.Comment"/>, the full text including the leading <c>#</c>.
 /// For <see cref="TokenKind.NewLine"/> and <see cref="TokenKind.EndOfSource"/>, an empty string.
 /// </param>
-/// <param name="Line">1-based line number of the token's first character.</param>
-/// <param name="Column">1-based column number of the token's first character.</param>
-/// <param name="Offset">0-based character offset from the start of the source string.</param>
-/// <param name="Length">Number of characters in the source text spanned by this token (including delimiters for quoted literals).</param>
+/// <param name="Span">Source location span covering the token's full extent in the original source text.</param>
 public readonly record struct Token(
     TokenKind   Kind,
     string      Text,
-    int         Line,
-    int         Column,
-    int         Offset,
-    int         Length
-);
+    SourceSpan  Span);

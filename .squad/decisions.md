@@ -6,6 +6,37 @@
 
 ---
 
+### 2026-04-26T00:00:00Z: Catalog completeness, consumer drift, and analyzer sprint merge
+**By:** Scribe
+**Status:** Merged, deduplicated, inbox cleared (7 files)
+
+**Merged sources:** `frank-catalog-audit-findings`, `george-analyzer-expansion`, `george-lexer-scan-tables`, `soup-nazi-catalog-review-2`, `soup-nazi-catalog-baseline-tests`, `soup-nazi-analyzers-complete`, `soup-nazi-precept0007-proposal`, plus the coordinator's consolidated action list.
+
+**Catalog audit outcome (Frank + George):**
+- Surfaces are complete: the type catalog covers all surfaced language types. Frank's spec/design pass found 26 of 26 surfaced types represented; George's code-level inventory confirmed no missing surfaced type entries.
+- `Period` is a real cross-catalog correctness bug, not a completeness gap. The spec and operations catalog permit equality, but `Types.cs` does not mark `Period` as `EqualityComparable`.
+- `Quantity` qualifier modeling remains an open Shane decision. The current `QualifierShape` model expresses conjunctive qualifier slots well, but the language surface allows `quantity in 'kg'` OR `quantity of 'length'`, which is an alternative shape rather than a simple slot list.
+- `TypeMeta.UsageExample` is still null across the catalog. This is not a correctness issue, but it keeps hover and MCP grounding thin.
+
+**Doc-sync findings for `docs/catalog-system.md`:**
+- The document must reflect `TypeTrait.EqualityComparable`.
+- The documented `TypeMeta` full shape must include `DisplayName`, `HoverDescription`, and `UsageExample`.
+- `QualifierAxis` documentation must include the temporal-dimension axis.
+- `TypeMeta.Token` must stay nullable (`TokenMeta?`) for internal/sentinel types.
+- The documented orderable set is stale: `zoneddatetime` should not be listed as orderable, and `price` should be.
+
+**Consumer drift and enforcement status:**
+- Consumer drift, not catalog structure, is now the dominant problem. George confirmed 14 hardcoded language-server completion lists still bypass the catalog contract.
+- Lexer operator/punctuation scan tables now derive from `Tokens.All`, removing a parallel vocabulary table from `Lexer.cs` while preserving the hand-written scanner.
+- Soup Nazi's catalog baseline pass added dedicated Tokens and Diagnostics catalog tests; all new tests were green.
+- Soup Nazi's earlier finding that PRECEPT0005/PRECEPT0006 were missing is now superseded: both analyzers are implemented and green.
+- PRECEPT0005 immediately caught a real production bug: the `sqrt` overload proof requirements referenced different `ParameterMeta` instances than the overload parameter list. The fix introduced dedicated named sqrt parameters shared by both `Parameters` and `ProofRequirements`.
+- PRECEPT0007 remains a follow-up proposal: flag `Enum.GetValues<CatalogEnum>()` outside the owning catalog `All` getter. There are zero current source violations; test projects remain exempt.
+
+**Backlog concentration after deduplication:**
+- The consolidated review's correctness and metadata-gap items are recorded as completed in the source/design pass.
+- Remaining work is concentrated in tooling-generation drift, broader analyzer expansion (PRECEPT0007-PRECEPT0014), snapshot/golden catalog tests, and generated matrix coverage.
+
 ### 2026-04-25T12:00:00Z: Full catalog-system review — 10-item metadata-driven design review (owner sign-off)
 **By:** Scribe
 **Status:** Merged from 17 inbox files (6 reviews + 5 owner gap resolutions + 6 recommendations)

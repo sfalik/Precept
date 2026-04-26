@@ -45,6 +45,22 @@
 
 ## Recent Updates
 
+### 2026-04-26 — Cross-agent sync: spec audit implications for runtime/tooling consumers
+- Frank's type audit confirmed there are no missing surfaced types, but it surfaced one real consumer-facing metadata defect: `Period` should carry `TypeTrait.EqualityComparable` because the spec and operations catalog both permit equality.
+- Frank also reinforced that catalog completeness is no longer the blocker. The remaining leverage is in consumer derivation and doc sync: keep treating the hardcoded language-server completion lists and stale `docs/catalog-system.md` type-shape documentation as active follow-up work.
+
+### 2026-04-26 — Catalog Inventory + Roslyn Analyzer Expansion Investigation
+
+Full code-level audit of all 10 catalogs in `src/Precept/Language/`. Key findings:
+- 32 TypeKind members across 5 categories; all have GetMeta entries. Metadata is thorough — only `UsageExample` is universally null (by design, field exists but is not yet populated).
+- `Period` type is missing `Traits` entirely, but `OperationKind.PeriodEqualsPeriod` exists in Operations catalog — structural inconsistency. Period should carry `EqualityComparable`.
+- `Price` is the only compound type without a `DisplayName` (all others have multi-word display names).
+- `TokenMeta.ValidAfter` is declared but populated as null on all ~160 token entries — designed feature never adopted.
+- TypeChecker is still `throw new NotImplementedException()` — zero catalog consumption possible to audit there yet.
+- LS completions confirmed to have 14 hardcoded lists that should be catalog-driven.
+- 8 new analyzers proposed (PRECEPT0007–PRECEPT0014). PRECEPT0007 (GetMeta exhaustiveness) and PRECEPT0011 (DiagnosticCode completeness) are highest priority — prevent runtime throws from catalog drift. All are feasible using patterns from existing PRECEPT0005/0006 analyzers.
+- Full findings written to `.squad/decisions/inbox/george-analyzer-expansion.md`.
+
 ### 2026-04-25 — Compiler Feasibility Review: Fully Metadata-Driven Pipeline
 
 Wrote `.squad/decisions/inbox/george-catalog-metadata-pipeline-review.md` — comprehensive per-stage feasibility analysis of making the entire compiler pipeline catalog-metadata-driven. Key findings: lexer is already there; parser lookup tables (binding powers, type maps, modifier/action classification) are clean wins but production bodies must stay hand-written; type checker gets the biggest benefit (~60-70% of language knowledge migrates to catalogs); graph analyzer is already graph-generic; proof engine obligations are catalog-driven but strategies are algorithmic; evaluator dispatch can be catalog-driven via function/operation delegates. Recommended 6 immediate actions, 3 deferrals, and 5 explicit "do not do" items. Core thesis: catalogs own vocabulary, stages own algorithms — making stages "generic" means vocabulary-agnostic, not logic-free.

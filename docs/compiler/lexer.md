@@ -7,9 +7,16 @@ The lexer is the first stage of the Precept compilation pipeline. It transforms 
 Every token the lexer emits carries its kind, text, and precise source location:
 
 ```csharp
-public readonly record struct Token(
-    TokenKind Kind, string Text, int Line, int Column, int Offset, int Length);
+public readonly record struct Token(TokenKind Kind, string Text, SourceSpan Span)
+{
+    public int Line => Span.StartLine;
+    public int Column => Span.StartColumn;
+    public int Offset => Span.Offset;
+    public int Length => Span.Length;
+}
 ```
+
+The `SourceSpan` carries both coordinate systems (offset/length for source slicing, line/column for LSP positions) as a single value. The convenience forwarding properties (`Line`, `Column`, `Offset`, `Length`) preserve the flat-field API that downstream consumers expect.
 
 The lexer's output is a `TokenStream` — an immutable, indexable sequence of tokens that the parser, type checker, and tooling all read from. The lexer runs once per source text and produces the complete stream before any downstream stage begins.
 

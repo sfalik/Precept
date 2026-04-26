@@ -13,6 +13,19 @@
 
 ## Recent Updates
 
+### 2026-04-26 — Comprehensive cross-catalog invariant analysis for Roslyn analyzer infrastructure
+- Exhaustive source-level read of all 10 catalogs and all metadata record types.
+- Identified 37 cross-catalog invariants (X01–X37), 16 intra-catalog structural invariants (S01–S16), and 7 out-of-scope invariants (N01–N07).
+- Key architectural insight: the dependency graph is acyclic — Tokens is a leaf, Types is the hub, Operations is the heaviest consumer (~150 arms referencing Types+Operators).
+- Hardest invariant class: trait↔operation completeness (X14–X17). Requires dual-switch walking — reading both Types.GetMeta and Operations.GetMeta, building a type→trait map, then cross-checking operation coverage. This drove the API surface recommendation.
+- Recommended 11 analyzer groups (PRECEPT0008–PRECEPT0018) plus PRECEPT0007 (exhaustiveness). Each group walks one switch (except PRECEPT0010 which walks two).
+- Infrastructure API needs 4 helpers: GetMetaSwitchWalker, EnumValueResolver, CrossCatalogChecker, ConstructorArgReader. These 4 cover all 53 checkable invariants.
+- Filed full analysis at `.squad/decisions/inbox/frank-cross-catalog-invariants.md`.
+
+### 2026-04-26 — Cross-agent sync: analyzer hardening and consumer drift follow-up
+- George's catalog inventory confirmed the surfaced type catalog is structurally complete but highlighted the remaining implementation-facing drift: 14 hardcoded language-server completion lists still bypass catalog metadata.
+- George also proposed 8 analyzer follow-ups (PRECEPT0007-PRECEPT0014). Highest-value candidates are exhaustive `GetMeta` coverage, type/token category integrity, modifier DU subtype correctness, and non-empty overload/applicability invariants.
+
 ### 2026-04-25 — Deep parser/lexer architecture analysis for catalog-driven improvements
 - Comprehensive source-level analysis of `Pipeline/Lexer.cs` (~850 LOC) and `Pipeline/Parser.cs` (~1,350 LOC).
 - Identified 10 vocabulary tables in the parser that should become catalog-derived frozen dictionaries: operator precedence, type keyword mapping, 3 modifier recognition sets, action keyword set, sync token set, display names, state modifier mapping, field modifier dispatch.
@@ -280,6 +293,15 @@
 - **Compiler.cs pipeline order matches docs exactly.** CompilationResult shape matches docs exactly. Both are clean.
 
 ## Learnings
+
+### 2026-04-26 — Full catalog vs. language spec audit (Types)
+- **26/26 types fully represented.** Zero orphans, zero missing members across all 5 categories (Scalar, Temporal, Business-Domain, Collection, Special).
+- **Period missing EqualityComparable trait** (T1) — only code-level fix needed. Every other equality-supporting type has the trait.
+- **Quantity QualifierShape incomplete** (B1) — the `in 'unit'` alternative is absent; QualifierShape list model doesn't express disjunctive (XOR) qualifier patterns. Design question for Shane.
+- **catalog-system.md has 5 stale entries:** TypeTrait missing EqualityComparable, TypeMeta shape missing 3 fields (DisplayName, HoverDescription, UsageExample), QualifierAxis missing TemporalDimension, Token nullability wrong, orderable list wrong (includes zoneddatetime, omits price).
+- **UsageExample null on all 26 types** — enrichment opportunity, not blocking.
+- **Functions catalog is complete** — all 21 spec functions present with correct business-domain overloads.
+- **Token vocabulary is complete** — all spec tokens present with TextMateScope and SemanticTokenType.
 
 ### 2026-04-25 — Catalog I-items batch (I8, I9, I12, I23, I26, I32, I35)
 - **`init` property on abstract record base:** For optional metadata (e.g., `MutuallyExclusiveWith`), use `init` property with empty-array default. Keeps all construction code unchanged; callers set only where meaningful.

@@ -16,7 +16,7 @@ public static class Lexer
         if (source.Length > MaxSourceLength)
         {
             return new TokenStream(
-                ImmutableArray.Create(new Token(TokenKind.EndOfSource, "", 1, 1, 0, 0)),
+                ImmutableArray.Create(new Token(TokenKind.EndOfSource, "", new SourceSpan(0, 0, 1, 1, 1, 1))),
                 ImmutableArray.Create(Diagnostics.Create(
                     DiagnosticCode.InputTooLarge,
                     new SourceSpan(0, 0, 1, 1, 1, 1))));
@@ -184,7 +184,7 @@ public static class Lexer
                 _diagnostics.Add(Diagnostics.Create(code, span));
             }
 
-            _tokens.Add(new Token(TokenKind.EndOfSource, "", _line, _column, _offset, 0));
+            _tokens.Add(new Token(TokenKind.EndOfSource, "", new SourceSpan(_offset, 0, _line, _column, _line, _column)));
             return new TokenStream(_tokens.ToImmutable(), _diagnostics.ToImmutable());
         }
 
@@ -441,7 +441,7 @@ public static class Lexer
                     Advance(); // consume '{'
                     hadInterpolation = true;
                     var kind = segmentIndex == 0 ? TokenKind.StringStart : TokenKind.StringMiddle;
-                    _tokens.Add(new Token(kind, ContentToString(), startLine, startCol, startOff, _offset - startOff));
+                    _tokens.Add(new Token(kind, ContentToString(), new SourceSpan(startOff, _offset - startOff, startLine, startCol, _line, _column)));
                     _modeStack[_modeDepth - 1].SegmentIndex = segmentIndex + 1;
 
                     if (_modeDepth >= MaxModeStackDepth)
@@ -477,7 +477,7 @@ public static class Lexer
             if (isFinal)
             {
                 var kind = hadInterpolation ? TokenKind.StringEnd : TokenKind.StringLiteral;
-                _tokens.Add(new Token(kind, text, startLine, startCol, startOff, length));
+                _tokens.Add(new Token(kind, text, new SourceSpan(startOff, length, startLine, startCol, _line, _column)));
             }
             else
             {
@@ -485,7 +485,7 @@ public static class Lexer
                 var kind = hadInterpolation
                     ? (segmentIndex == 0 ? TokenKind.StringStart : TokenKind.StringMiddle)
                     : TokenKind.StringLiteral;
-                _tokens.Add(new Token(kind, text, startLine, startCol, startOff, length));
+                _tokens.Add(new Token(kind, text, new SourceSpan(startOff, length, startLine, startCol, _line, _column)));
             }
         }
 
@@ -592,7 +592,7 @@ public static class Lexer
                     Advance(); // consume '{'
                     hadInterpolation = true;
                     var kind = segmentIndex == 0 ? TokenKind.TypedConstantStart : TokenKind.TypedConstantMiddle;
-                    _tokens.Add(new Token(kind, ContentToString(), startLine, startCol, startOff, _offset - startOff));
+                    _tokens.Add(new Token(kind, ContentToString(), new SourceSpan(startOff, _offset - startOff, startLine, startCol, _line, _column)));
                     _modeStack[_modeDepth - 1].SegmentIndex = segmentIndex + 1;
 
                     if (_modeDepth >= MaxModeStackDepth)
@@ -628,14 +628,14 @@ public static class Lexer
             if (isFinal)
             {
                 var kind = hadInterpolation ? TokenKind.TypedConstantEnd : TokenKind.TypedConstant;
-                _tokens.Add(new Token(kind, text, startLine, startCol, startOff, length));
+                _tokens.Add(new Token(kind, text, new SourceSpan(startOff, length, startLine, startCol, _line, _column)));
             }
             else
             {
                 var kind = hadInterpolation
                     ? (segmentIndex == 0 ? TokenKind.TypedConstantStart : TokenKind.TypedConstantMiddle)
                     : TokenKind.TypedConstant;
-                _tokens.Add(new Token(kind, text, startLine, startCol, startOff, length));
+                _tokens.Add(new Token(kind, text, new SourceSpan(startOff, length, startLine, startCol, _line, _column)));
             }
         }
 
@@ -668,7 +668,7 @@ public static class Lexer
             int startLine = _line, startCol = _column, startOff = _offset;
             for (int i = 0; i < length; i++)
                 Advance();
-            _tokens.Add(new Token(TokenKind.NewLine, "", startLine, startCol, startOff, length));
+            _tokens.Add(new Token(TokenKind.NewLine, "", new SourceSpan(startOff, length, startLine, startCol, _line, _column)));
             _line++;
             _column = 1;
         }
@@ -679,7 +679,7 @@ public static class Lexer
             while (!IsAtEnd && Current != '\n' && Current != '\r')
                 Advance();
             int len = _offset - startOff;
-            _tokens.Add(new Token(TokenKind.Comment, _source.AsSpan(startOff, len).ToString(), startLine, startCol, startOff, len));
+            _tokens.Add(new Token(TokenKind.Comment, _source.AsSpan(startOff, len).ToString(), new SourceSpan(startOff, len, startLine, startCol, _line, _column)));
         }
 
         private void ScanWord()
@@ -691,7 +691,7 @@ public static class Lexer
             int len = _offset - startOff;
             var span = _source.AsSpan(startOff, len);
             var kind = _keywordLookup.TryGetValue(span, out var kw) ? kw : TokenKind.Identifier;
-            _tokens.Add(new Token(kind, span.ToString(), startLine, startCol, startOff, len));
+            _tokens.Add(new Token(kind, span.ToString(), new SourceSpan(startOff, len, startLine, startCol, _line, _column)));
         }
 
         private void ScanNumber()
@@ -727,7 +727,7 @@ public static class Lexer
             }
 
             int len = _offset - startOff;
-            _tokens.Add(new Token(TokenKind.NumberLiteral, _source.AsSpan(startOff, len).ToString(), startLine, startCol, startOff, len));
+            _tokens.Add(new Token(TokenKind.NumberLiteral, _source.AsSpan(startOff, len).ToString(), new SourceSpan(startOff, len, startLine, startCol, _line, _column)));
         }
 
         private bool TryScanOperator()
@@ -741,7 +741,7 @@ public static class Lexer
                 {
                     Advance();
                     Advance();
-                    _tokens.Add(new Token(two.Kind, two.Text, startLine, startCol, startOff, 2));
+                    _tokens.Add(new Token(two.Kind, two.Text, new SourceSpan(startOff, 2, startLine, startCol, _line, _column)));
                     return true;
                 }
             }
@@ -749,7 +749,7 @@ public static class Lexer
             if (Tokens.SingleCharOperators.TryGetValue(c, out var one))
             {
                 Advance();
-                _tokens.Add(new Token(one.Kind, one.Text, startLine, startCol, startOff, 1));
+                _tokens.Add(new Token(one.Kind, one.Text, new SourceSpan(startOff, 1, startLine, startCol, _line, _column)));
                 return true;
             }
 
@@ -762,7 +762,7 @@ public static class Lexer
             {
                 int startLine = _line, startCol = _column, startOff = _offset;
                 Advance();
-                _tokens.Add(new Token(punc.Kind, punc.Text, startLine, startCol, startOff, 1));
+                _tokens.Add(new Token(punc.Kind, punc.Text, new SourceSpan(startOff, 1, startLine, startCol, _line, _column)));
                 return true;
             }
 

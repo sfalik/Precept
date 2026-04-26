@@ -196,6 +196,7 @@ public static class Types
             kind, Tokens.GetMeta(TokenKind.PeriodType),
             "Calendar-relative duration (years/months/days)",
             TypeCategory.Temporal,
+            Traits: TypeTrait.EqualityComparable,
             QualifierShape: QS_TemporalDimension,
             Accessors:
             [

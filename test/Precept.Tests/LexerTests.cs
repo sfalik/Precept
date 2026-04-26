@@ -15,7 +15,7 @@ public class LexerTests
         var stream = Lexer.Lex("\"hello\"");
 
         stream.Tokens.Should().HaveCount(2);
-        stream.Tokens[0].Should().Be(new Token(TokenKind.StringLiteral, "hello", 1, 1, 0, 7));
+        stream.Tokens[0].Should().Be(new Token(TokenKind.StringLiteral, "hello", new SourceSpan(0, 7, 1, 1, 1, 8)));
         stream.Tokens[1].Kind.Should().Be(TokenKind.EndOfSource);
         stream.Diagnostics.Should().BeEmpty();
     }
@@ -26,12 +26,12 @@ public class LexerTests
         var stream = Lexer.Lex("\"a {B} c {D} e\"");
 
         stream.Tokens.Should().Equal(
-            new Token(TokenKind.StringStart, "a ", 1, 1, 0, 4),
-            new Token(TokenKind.Identifier, "B", 1, 5, 4, 1),
-            new Token(TokenKind.StringMiddle, " c ", 1, 6, 5, 5),
-            new Token(TokenKind.Identifier, "D", 1, 11, 10, 1),
-            new Token(TokenKind.StringEnd, " e", 1, 12, 11, 4),
-            new Token(TokenKind.EndOfSource, string.Empty, 1, 16, 15, 0));
+            new Token(TokenKind.StringStart, "a ", new SourceSpan(0, 4, 1, 1, 1, 5)),
+            new Token(TokenKind.Identifier, "B", new SourceSpan(4, 1, 1, 5, 1, 6)),
+            new Token(TokenKind.StringMiddle, " c ", new SourceSpan(5, 5, 1, 6, 1, 11)),
+            new Token(TokenKind.Identifier, "D", new SourceSpan(10, 1, 1, 11, 1, 12)),
+            new Token(TokenKind.StringEnd, " e", new SourceSpan(11, 4, 1, 12, 1, 16)),
+            new Token(TokenKind.EndOfSource, string.Empty, new SourceSpan(15, 0, 1, 16, 1, 16)));
 
         stream.Diagnostics.Should().BeEmpty();
     }
@@ -42,9 +42,9 @@ public class LexerTests
         var stream = Lexer.Lex("\"{}\"");
 
         stream.Tokens.Should().Equal(
-            new Token(TokenKind.StringStart, string.Empty, 1, 1, 0, 2),
-            new Token(TokenKind.StringEnd, string.Empty, 1, 3, 2, 2),
-            new Token(TokenKind.EndOfSource, string.Empty, 1, 5, 4, 0));
+            new Token(TokenKind.StringStart, string.Empty, new SourceSpan(0, 2, 1, 1, 1, 3)),
+            new Token(TokenKind.StringEnd, string.Empty, new SourceSpan(2, 2, 1, 3, 1, 5)),
+            new Token(TokenKind.EndOfSource, string.Empty, new SourceSpan(4, 0, 1, 5, 1, 5)));
 
         stream.Diagnostics.Should().BeEmpty();
     }
@@ -55,10 +55,10 @@ public class LexerTests
         var stream = Lexer.Lex("\"a {\"x\"} b\"");
 
         stream.Tokens.Should().Equal(
-            new Token(TokenKind.StringStart, "a ", 1, 1, 0, 4),
-            new Token(TokenKind.StringLiteral, "x", 1, 5, 4, 3),
-            new Token(TokenKind.StringEnd, " b", 1, 8, 7, 4),
-            new Token(TokenKind.EndOfSource, string.Empty, 1, 12, 11, 0));
+            new Token(TokenKind.StringStart, "a ", new SourceSpan(0, 4, 1, 1, 1, 5)),
+            new Token(TokenKind.StringLiteral, "x", new SourceSpan(4, 3, 1, 5, 1, 8)),
+            new Token(TokenKind.StringEnd, " b", new SourceSpan(7, 4, 1, 8, 1, 12)),
+            new Token(TokenKind.EndOfSource, string.Empty, new SourceSpan(11, 0, 1, 12, 1, 12)));
 
         stream.Diagnostics.Should().BeEmpty();
     }
@@ -69,8 +69,8 @@ public class LexerTests
         var stream = Lexer.Lex("\"a\\\"b\\\\c\\nd\\te{{f}}\"");
 
         stream.Tokens.Should().Equal(
-            new Token(TokenKind.StringLiteral, "a\"b\\c\nd\te{f}", 1, 1, 0, 20),
-            new Token(TokenKind.EndOfSource, string.Empty, 1, 21, 20, 0));
+            new Token(TokenKind.StringLiteral, "a\"b\\c\nd\te{f}", new SourceSpan(0, 20, 1, 1, 1, 21)),
+            new Token(TokenKind.EndOfSource, string.Empty, new SourceSpan(20, 0, 1, 21, 1, 21)));
 
         stream.Diagnostics.Should().BeEmpty();
     }
@@ -82,8 +82,8 @@ public class LexerTests
         var stream = Lexer.Lex($"\"{text}\"");
 
         stream.Tokens.Should().Equal(
-            new Token(TokenKind.StringLiteral, text, 1, 1, 0, 202),
-            new Token(TokenKind.EndOfSource, string.Empty, 1, 203, 202, 0));
+            new Token(TokenKind.StringLiteral, text, new SourceSpan(0, 202, 1, 1, 1, 203)),
+            new Token(TokenKind.EndOfSource, string.Empty, new SourceSpan(202, 0, 1, 203, 1, 203)));
 
         stream.Diagnostics.Should().BeEmpty();
     }
@@ -94,7 +94,7 @@ public class LexerTests
         var stream = Lexer.Lex("'2026-06-01'");
 
         stream.Tokens.Should().HaveCount(2);
-        stream.Tokens[0].Should().Be(new Token(TokenKind.TypedConstant, "2026-06-01", 1, 1, 0, 12));
+        stream.Tokens[0].Should().Be(new Token(TokenKind.TypedConstant, "2026-06-01", new SourceSpan(0, 12, 1, 1, 1, 13)));
         stream.Tokens[1].Kind.Should().Be(TokenKind.EndOfSource);
         stream.Diagnostics.Should().BeEmpty();
     }
@@ -105,10 +105,10 @@ public class LexerTests
         var stream = Lexer.Lex("'{GraceDays} days'");
 
         stream.Tokens.Should().Equal(
-            new Token(TokenKind.TypedConstantStart, string.Empty, 1, 1, 0, 2),
-            new Token(TokenKind.Identifier, "GraceDays", 1, 3, 2, 9),
-            new Token(TokenKind.TypedConstantEnd, " days", 1, 12, 11, 7),
-            new Token(TokenKind.EndOfSource, string.Empty, 1, 19, 18, 0));
+            new Token(TokenKind.TypedConstantStart, string.Empty, new SourceSpan(0, 2, 1, 1, 1, 3)),
+            new Token(TokenKind.Identifier, "GraceDays", new SourceSpan(2, 9, 1, 3, 1, 12)),
+            new Token(TokenKind.TypedConstantEnd, " days", new SourceSpan(11, 7, 1, 12, 1, 19)),
+            new Token(TokenKind.EndOfSource, string.Empty, new SourceSpan(18, 0, 1, 19, 1, 19)));
 
         stream.Diagnostics.Should().BeEmpty();
     }
@@ -119,8 +119,8 @@ public class LexerTests
         var stream = Lexer.Lex("'a\\'b\\\\c{{d}}'");
 
         stream.Tokens.Should().Equal(
-            new Token(TokenKind.TypedConstant, "a'b\\c{d}", 1, 1, 0, 14),
-            new Token(TokenKind.EndOfSource, string.Empty, 1, 15, 14, 0));
+            new Token(TokenKind.TypedConstant, "a'b\\c{d}", new SourceSpan(0, 14, 1, 1, 1, 15)),
+            new Token(TokenKind.EndOfSource, string.Empty, new SourceSpan(14, 0, 1, 15, 1, 15)));
 
         stream.Diagnostics.Should().BeEmpty();
     }
@@ -131,11 +131,11 @@ public class LexerTests
         var stream = Lexer.Lex("1 2.5 3e+4 6E-2");
 
         stream.Tokens.Should().Equal(
-            new Token(TokenKind.NumberLiteral, "1", 1, 1, 0, 1),
-            new Token(TokenKind.NumberLiteral, "2.5", 1, 3, 2, 3),
-            new Token(TokenKind.NumberLiteral, "3e+4", 1, 7, 6, 4),
-            new Token(TokenKind.NumberLiteral, "6E-2", 1, 12, 11, 4),
-            new Token(TokenKind.EndOfSource, string.Empty, 1, 16, 15, 0));
+            new Token(TokenKind.NumberLiteral, "1", new SourceSpan(0, 1, 1, 1, 1, 2)),
+            new Token(TokenKind.NumberLiteral, "2.5", new SourceSpan(2, 3, 1, 3, 1, 6)),
+            new Token(TokenKind.NumberLiteral, "3e+4", new SourceSpan(6, 4, 1, 7, 1, 11)),
+            new Token(TokenKind.NumberLiteral, "6E-2", new SourceSpan(11, 4, 1, 12, 1, 16)),
+            new Token(TokenKind.EndOfSource, string.Empty, new SourceSpan(15, 0, 1, 16, 1, 16)));
 
         stream.Diagnostics.Should().BeEmpty();
     }
@@ -178,12 +178,12 @@ public class LexerTests
         var stream = Lexer.Lex("field A # note\r\nstate");
 
         stream.Tokens.Should().Equal(
-            new Token(TokenKind.Field, "field", 1, 1, 0, 5),
-            new Token(TokenKind.Identifier, "A", 1, 7, 6, 1),
-            new Token(TokenKind.Comment, "# note", 1, 9, 8, 6),
-            new Token(TokenKind.NewLine, string.Empty, 1, 15, 14, 2),
-            new Token(TokenKind.State, "state", 2, 1, 16, 5),
-            new Token(TokenKind.EndOfSource, string.Empty, 2, 6, 21, 0));
+            new Token(TokenKind.Field, "field", new SourceSpan(0, 5, 1, 1, 1, 6)),
+            new Token(TokenKind.Identifier, "A", new SourceSpan(6, 1, 1, 7, 1, 8)),
+            new Token(TokenKind.Comment, "# note", new SourceSpan(8, 6, 1, 9, 1, 15)),
+            new Token(TokenKind.NewLine, string.Empty, new SourceSpan(14, 2, 1, 15, 1, 17)),
+            new Token(TokenKind.State, "state", new SourceSpan(16, 5, 2, 1, 2, 6)),
+            new Token(TokenKind.EndOfSource, string.Empty, new SourceSpan(21, 0, 2, 6, 2, 6)));
 
         stream.Diagnostics.Should().BeEmpty();
     }
@@ -194,10 +194,10 @@ public class LexerTests
         var stream = Lexer.Lex("field A # note");
 
         stream.Tokens.Should().Equal(
-            new Token(TokenKind.Field, "field", 1, 1, 0, 5),
-            new Token(TokenKind.Identifier, "A", 1, 7, 6, 1),
-            new Token(TokenKind.Comment, "# note", 1, 9, 8, 6),
-            new Token(TokenKind.EndOfSource, string.Empty, 1, 15, 14, 0));
+            new Token(TokenKind.Field, "field", new SourceSpan(0, 5, 1, 1, 1, 6)),
+            new Token(TokenKind.Identifier, "A", new SourceSpan(6, 1, 1, 7, 1, 8)),
+            new Token(TokenKind.Comment, "# note", new SourceSpan(8, 6, 1, 9, 1, 15)),
+            new Token(TokenKind.EndOfSource, string.Empty, new SourceSpan(14, 0, 1, 15, 1, 15)));
 
         stream.Diagnostics.Should().BeEmpty();
     }
@@ -208,10 +208,10 @@ public class LexerTests
         var stream = Lexer.Lex("field\rstate");
 
         stream.Tokens.Should().Equal(
-            new Token(TokenKind.Field, "field", 1, 1, 0, 5),
-            new Token(TokenKind.NewLine, string.Empty, 1, 6, 5, 1),
-            new Token(TokenKind.State, "state", 2, 1, 6, 5),
-            new Token(TokenKind.EndOfSource, string.Empty, 2, 6, 11, 0));
+            new Token(TokenKind.Field, "field", new SourceSpan(0, 5, 1, 1, 1, 6)),
+            new Token(TokenKind.NewLine, string.Empty, new SourceSpan(5, 1, 1, 6, 1, 7)),
+            new Token(TokenKind.State, "state", new SourceSpan(6, 5, 2, 1, 2, 6)),
+            new Token(TokenKind.EndOfSource, string.Empty, new SourceSpan(11, 0, 2, 6, 2, 6)));
 
         stream.Diagnostics.Should().BeEmpty();
     }
@@ -247,11 +247,11 @@ public class LexerTests
         var stream = Lexer.Lex("Alpha_1 Beta2 set_value notemptyValue");
 
         stream.Tokens.Should().Equal(
-            new Token(TokenKind.Identifier, "Alpha_1", 1, 1, 0, 7),
-            new Token(TokenKind.Identifier, "Beta2", 1, 9, 8, 5),
-            new Token(TokenKind.Identifier, "set_value", 1, 15, 14, 9),
-            new Token(TokenKind.Identifier, "notemptyValue", 1, 25, 24, 13),
-            new Token(TokenKind.EndOfSource, string.Empty, 1, 38, 37, 0));
+            new Token(TokenKind.Identifier, "Alpha_1", new SourceSpan(0, 7, 1, 1, 1, 8)),
+            new Token(TokenKind.Identifier, "Beta2", new SourceSpan(8, 5, 1, 9, 1, 14)),
+            new Token(TokenKind.Identifier, "set_value", new SourceSpan(14, 9, 1, 15, 1, 24)),
+            new Token(TokenKind.Identifier, "notemptyValue", new SourceSpan(24, 13, 1, 25, 1, 38)),
+            new Token(TokenKind.EndOfSource, string.Empty, new SourceSpan(37, 0, 1, 38, 1, 38)));
 
         stream.Diagnostics.Should().BeEmpty();
     }
@@ -263,8 +263,8 @@ public class LexerTests
 
         stream.Diagnostics.Select(d => d.Code).Should().Equal(nameof(DiagnosticCode.InvalidCharacter));
         stream.Tokens.Should().Equal(
-            new Token(TokenKind.Identifier, "hidden", 1, 2, 1, 6),
-            new Token(TokenKind.EndOfSource, string.Empty, 1, 8, 7, 0));
+            new Token(TokenKind.Identifier, "hidden", new SourceSpan(1, 6, 1, 2, 1, 8)),
+            new Token(TokenKind.EndOfSource, string.Empty, new SourceSpan(7, 0, 1, 8, 1, 8)));
     }
 
     [Fact]
@@ -272,7 +272,7 @@ public class LexerTests
     {
         var stream = Lexer.Lex(new string('a', 65_537));
 
-        stream.Tokens.Should().Equal(new Token(TokenKind.EndOfSource, string.Empty, 1, 1, 0, 0));
+        stream.Tokens.Should().Equal(new Token(TokenKind.EndOfSource, string.Empty, new SourceSpan(0, 0, 1, 1, 1, 1)));
         stream.Diagnostics.Should().ContainSingle();
         stream.Diagnostics[0].Code.Should().Be(nameof(DiagnosticCode.InputTooLarge));
         stream.Diagnostics[0].Stage.Should().Be(DiagnosticStage.Lex);
@@ -285,8 +285,8 @@ public class LexerTests
         var stream = Lexer.Lex(source);
 
         stream.Tokens.Should().Equal(
-            new Token(TokenKind.Identifier, source, 1, 1, 0, 65_536),
-            new Token(TokenKind.EndOfSource, string.Empty, 1, 65_537, 65_536, 0));
+            new Token(TokenKind.Identifier, source, new SourceSpan(0, 65_536, 1, 1, 1, 65_537)),
+            new Token(TokenKind.EndOfSource, string.Empty, new SourceSpan(65_536, 0, 1, 65_537, 1, 65_537)));
 
         stream.Diagnostics.Should().BeEmpty();
     }
@@ -300,7 +300,7 @@ public class LexerTests
         stream.Diagnostics[0].Code.Should().Be(nameof(DiagnosticCode.InvalidCharacter));
         stream.Diagnostics[0].Message.Should().Contain("\\u0001");
         stream.Tokens.Should().Equal(
-            new Token(TokenKind.EndOfSource, string.Empty, 1, 2, 1, 0));
+            new Token(TokenKind.EndOfSource, string.Empty, new SourceSpan(1, 0, 1, 2, 1, 2)));
     }
 
     [Fact]
@@ -312,7 +312,7 @@ public class LexerTests
         stream.Diagnostics[0].Code.Should().Be(nameof(DiagnosticCode.InvalidCharacter));
         stream.Diagnostics[0].Message.Should().Contain("\\u200B");
         stream.Tokens.Should().Equal(
-            new Token(TokenKind.EndOfSource, string.Empty, 1, 2, 1, 0));
+            new Token(TokenKind.EndOfSource, string.Empty, new SourceSpan(1, 0, 1, 2, 1, 2)));
     }
 
     [Fact]
@@ -321,8 +321,8 @@ public class LexerTests
         var stream = Lexer.Lex("\"a\\qb\"");
 
         stream.Tokens.Should().Equal(
-            new Token(TokenKind.StringLiteral, "ab", 1, 1, 0, 6),
-            new Token(TokenKind.EndOfSource, string.Empty, 1, 7, 6, 0));
+            new Token(TokenKind.StringLiteral, "ab", new SourceSpan(0, 6, 1, 1, 1, 7)),
+            new Token(TokenKind.EndOfSource, string.Empty, new SourceSpan(6, 0, 1, 7, 1, 7)));
 
         stream.Diagnostics.Should().ContainSingle();
         stream.Diagnostics[0].Code.Should().Be(nameof(DiagnosticCode.UnrecognizedStringEscape));
@@ -335,8 +335,8 @@ public class LexerTests
         var stream = Lexer.Lex("'a\\qb'");
 
         stream.Tokens.Should().Equal(
-            new Token(TokenKind.TypedConstant, "ab", 1, 1, 0, 6),
-            new Token(TokenKind.EndOfSource, string.Empty, 1, 7, 6, 0));
+            new Token(TokenKind.TypedConstant, "ab", new SourceSpan(0, 6, 1, 1, 1, 7)),
+            new Token(TokenKind.EndOfSource, string.Empty, new SourceSpan(6, 0, 1, 7, 1, 7)));
 
         stream.Diagnostics.Should().ContainSingle();
         stream.Diagnostics[0].Code.Should().Be(nameof(DiagnosticCode.UnrecognizedTypedConstantEscape));
@@ -349,8 +349,8 @@ public class LexerTests
         var stream = Lexer.Lex("\"abc");
 
         stream.Tokens.Should().Equal(
-            new Token(TokenKind.StringLiteral, "abc", 1, 1, 0, 4),
-            new Token(TokenKind.EndOfSource, string.Empty, 1, 5, 4, 0));
+            new Token(TokenKind.StringLiteral, "abc", new SourceSpan(0, 4, 1, 1, 1, 5)),
+            new Token(TokenKind.EndOfSource, string.Empty, new SourceSpan(4, 0, 1, 5, 1, 5)));
 
         stream.Diagnostics.Select(d => d.Code).Should().Equal(nameof(DiagnosticCode.UnterminatedStringLiteral));
     }
@@ -361,8 +361,8 @@ public class LexerTests
         var stream = Lexer.Lex("'abc");
 
         stream.Tokens.Should().Equal(
-            new Token(TokenKind.TypedConstant, "abc", 1, 1, 0, 4),
-            new Token(TokenKind.EndOfSource, string.Empty, 1, 5, 4, 0));
+            new Token(TokenKind.TypedConstant, "abc", new SourceSpan(0, 4, 1, 1, 1, 5)),
+            new Token(TokenKind.EndOfSource, string.Empty, new SourceSpan(4, 0, 1, 5, 1, 5)));
 
         stream.Diagnostics.Select(d => d.Code).Should().Equal(nameof(DiagnosticCode.UnterminatedTypedConstant));
     }
@@ -373,12 +373,12 @@ public class LexerTests
         var stream = Lexer.Lex("'a {B} c {D} e'");
 
         stream.Tokens.Should().Equal(
-            new Token(TokenKind.TypedConstantStart, "a ", 1, 1, 0, 4),
-            new Token(TokenKind.Identifier, "B", 1, 5, 4, 1),
-            new Token(TokenKind.TypedConstantMiddle, " c ", 1, 6, 5, 5),
-            new Token(TokenKind.Identifier, "D", 1, 11, 10, 1),
-            new Token(TokenKind.TypedConstantEnd, " e", 1, 12, 11, 4),
-            new Token(TokenKind.EndOfSource, string.Empty, 1, 16, 15, 0));
+            new Token(TokenKind.TypedConstantStart, "a ", new SourceSpan(0, 4, 1, 1, 1, 5)),
+            new Token(TokenKind.Identifier, "B", new SourceSpan(4, 1, 1, 5, 1, 6)),
+            new Token(TokenKind.TypedConstantMiddle, " c ", new SourceSpan(5, 5, 1, 6, 1, 11)),
+            new Token(TokenKind.Identifier, "D", new SourceSpan(10, 1, 1, 11, 1, 12)),
+            new Token(TokenKind.TypedConstantEnd, " e", new SourceSpan(11, 4, 1, 12, 1, 16)),
+            new Token(TokenKind.EndOfSource, string.Empty, new SourceSpan(15, 0, 1, 16, 1, 16)));
 
         stream.Diagnostics.Should().BeEmpty();
     }
@@ -389,14 +389,14 @@ public class LexerTests
         var stream = Lexer.Lex("1.foo 2e+ Bar");
 
         stream.Tokens.Should().Equal(
-            new Token(TokenKind.NumberLiteral, "1", 1, 1, 0, 1),
-            new Token(TokenKind.Dot, ".", 1, 2, 1, 1),
-            new Token(TokenKind.Identifier, "foo", 1, 3, 2, 3),
-            new Token(TokenKind.NumberLiteral, "2", 1, 7, 6, 1),
-            new Token(TokenKind.Identifier, "e", 1, 8, 7, 1),
-            new Token(TokenKind.Plus, "+", 1, 9, 8, 1),
-            new Token(TokenKind.Identifier, "Bar", 1, 11, 10, 3),
-            new Token(TokenKind.EndOfSource, string.Empty, 1, 14, 13, 0));
+            new Token(TokenKind.NumberLiteral, "1", new SourceSpan(0, 1, 1, 1, 1, 2)),
+            new Token(TokenKind.Dot, ".", new SourceSpan(1, 1, 1, 2, 1, 3)),
+            new Token(TokenKind.Identifier, "foo", new SourceSpan(2, 3, 1, 3, 1, 6)),
+            new Token(TokenKind.NumberLiteral, "2", new SourceSpan(6, 1, 1, 7, 1, 8)),
+            new Token(TokenKind.Identifier, "e", new SourceSpan(7, 1, 1, 8, 1, 9)),
+            new Token(TokenKind.Plus, "+", new SourceSpan(8, 1, 1, 9, 1, 10)),
+            new Token(TokenKind.Identifier, "Bar", new SourceSpan(10, 3, 1, 11, 1, 14)),
+            new Token(TokenKind.EndOfSource, string.Empty, new SourceSpan(13, 0, 1, 14, 1, 14)));
 
         stream.Diagnostics.Should().BeEmpty();
     }
@@ -407,7 +407,7 @@ public class LexerTests
         var stream = Lexer.Lex("\"\\\n");
 
         stream.Tokens.Should().HaveCount(3);
-        stream.Tokens[0].Should().Be(new Token(TokenKind.StringLiteral, string.Empty, 1, 1, 0, 2));
+        stream.Tokens[0].Should().Be(new Token(TokenKind.StringLiteral, string.Empty, new SourceSpan(0, 2, 1, 1, 1, 3)));
         stream.Tokens[1].Kind.Should().Be(TokenKind.NewLine);
         stream.Tokens[2].Kind.Should().Be(TokenKind.EndOfSource);
 
@@ -510,8 +510,8 @@ public class LexerTests
         var stream = Lexer.Lex("'\\");
 
         stream.Tokens.Should().HaveCount(2);
-        stream.Tokens[0].Should().Be(new Token(TokenKind.TypedConstant, string.Empty, 1, 1, 0, 2));
-        stream.Tokens[1].Should().Be(new Token(TokenKind.EndOfSource, string.Empty, 1, 3, 2, 0));
+        stream.Tokens[0].Should().Be(new Token(TokenKind.TypedConstant, string.Empty, new SourceSpan(0, 2, 1, 1, 1, 3)));
+        stream.Tokens[1].Should().Be(new Token(TokenKind.EndOfSource, string.Empty, new SourceSpan(2, 0, 1, 3, 1, 3)));
 
         stream.Diagnostics.Select(d => d.Code).Should().Equal(
             nameof(DiagnosticCode.UnrecognizedTypedConstantEscape),
@@ -524,7 +524,7 @@ public class LexerTests
         var stream = Lexer.Lex("'\\\n");
 
         stream.Tokens.Should().HaveCount(3);
-        stream.Tokens[0].Should().Be(new Token(TokenKind.TypedConstant, string.Empty, 1, 1, 0, 2));
+        stream.Tokens[0].Should().Be(new Token(TokenKind.TypedConstant, string.Empty, new SourceSpan(0, 2, 1, 1, 1, 3)));
         stream.Tokens[1].Kind.Should().Be(TokenKind.NewLine);
         stream.Tokens[2].Kind.Should().Be(TokenKind.EndOfSource);
 
@@ -539,8 +539,8 @@ public class LexerTests
         var stream = Lexer.Lex("\"a}b\"");
 
         stream.Tokens.Should().Equal(
-            new Token(TokenKind.StringLiteral, "a}b", 1, 1, 0, 5),
-            new Token(TokenKind.EndOfSource, string.Empty, 1, 6, 5, 0));
+            new Token(TokenKind.StringLiteral, "a}b", new SourceSpan(0, 5, 1, 1, 1, 6)),
+            new Token(TokenKind.EndOfSource, string.Empty, new SourceSpan(5, 0, 1, 6, 1, 6)));
 
         stream.Diagnostics.Select(d => d.Code).Should().Equal(nameof(DiagnosticCode.UnescapedBraceInLiteral));
     }
@@ -551,8 +551,8 @@ public class LexerTests
         var stream = Lexer.Lex("'a}b'");
 
         stream.Tokens.Should().Equal(
-            new Token(TokenKind.TypedConstant, "a}b", 1, 1, 0, 5),
-            new Token(TokenKind.EndOfSource, string.Empty, 1, 6, 5, 0));
+            new Token(TokenKind.TypedConstant, "a}b", new SourceSpan(0, 5, 1, 1, 1, 6)),
+            new Token(TokenKind.EndOfSource, string.Empty, new SourceSpan(5, 0, 1, 6, 1, 6)));
 
         stream.Diagnostics.Select(d => d.Code).Should().Equal(nameof(DiagnosticCode.UnescapedBraceInLiteral));
     }
@@ -587,7 +587,7 @@ public class LexerTests
         var stream = Lexer.Lex("@");
 
         stream.Tokens.Should().Equal(
-            new Token(TokenKind.EndOfSource, string.Empty, 1, 2, 1, 0));
+            new Token(TokenKind.EndOfSource, string.Empty, new SourceSpan(1, 0, 1, 2, 1, 2)));
 
         stream.Diagnostics.Select(d => d.Code).Should().Equal(nameof(DiagnosticCode.InvalidCharacter));
     }
@@ -602,8 +602,8 @@ public class LexerTests
         var stream = Lexer.Lex("~=");
 
         stream.Tokens.Should().Equal(
-            new Token(TokenKind.CaseInsensitiveEquals, "~=", 1, 1, 0, 2),
-            new Token(TokenKind.EndOfSource, string.Empty, 1, 3, 2, 0));
+            new Token(TokenKind.CaseInsensitiveEquals, "~=", new SourceSpan(0, 2, 1, 1, 1, 3)),
+            new Token(TokenKind.EndOfSource, string.Empty, new SourceSpan(2, 0, 1, 3, 1, 3)));
 
         stream.Diagnostics.Should().BeEmpty();
     }
@@ -614,8 +614,8 @@ public class LexerTests
         var stream = Lexer.Lex("!~");
 
         stream.Tokens.Should().Equal(
-            new Token(TokenKind.CaseInsensitiveNotEquals, "!~", 1, 1, 0, 2),
-            new Token(TokenKind.EndOfSource, string.Empty, 1, 3, 2, 0));
+            new Token(TokenKind.CaseInsensitiveNotEquals, "!~", new SourceSpan(0, 2, 1, 1, 1, 3)),
+            new Token(TokenKind.EndOfSource, string.Empty, new SourceSpan(2, 0, 1, 3, 1, 3)));
 
         stream.Diagnostics.Should().BeEmpty();
     }
@@ -795,7 +795,7 @@ public class LexerTests
         var expectedKind = Enum.Parse<TokenKind>(kindName);
         var stream = Lexer.Lex(source);
 
-        stream.Tokens[0].Should().Be(new Token(expectedKind, expectedText, 1, 1, 0, expectedLength));
+        stream.Tokens[0].Should().Be(new Token(expectedKind, expectedText, new SourceSpan(0, expectedLength, 1, 1, 1, 1 + expectedLength)));
         stream.Tokens[1].Kind.Should().Be(TokenKind.EndOfSource);
         stream.Diagnostics.Should().BeEmpty();
     }
@@ -812,7 +812,7 @@ public class LexerTests
         var expectedKind = Enum.Parse<TokenKind>(kindName);
         var stream = Lexer.Lex(source);
 
-        stream.Tokens[0].Should().Be(new Token(expectedKind, source, 1, 1, 0, 1));
+        stream.Tokens[0].Should().Be(new Token(expectedKind, source, new SourceSpan(0, 1, 1, 1, 1, 2)));
         stream.Tokens[1].Kind.Should().Be(TokenKind.EndOfSource);
         stream.Diagnostics.Should().BeEmpty();
     }
@@ -897,10 +897,10 @@ public class LexerTests
         var stream = Lexer.Lex("field\nstate");
 
         stream.Tokens.Should().Equal(
-            new Token(TokenKind.Field, "field", 1, 1, 0, 5),
-            new Token(TokenKind.NewLine, string.Empty, 1, 6, 5, 1),
-            new Token(TokenKind.State, "state", 2, 1, 6, 5),
-            new Token(TokenKind.EndOfSource, string.Empty, 2, 6, 11, 0));
+            new Token(TokenKind.Field, "field", new SourceSpan(0, 5, 1, 1, 1, 6)),
+            new Token(TokenKind.NewLine, string.Empty, new SourceSpan(5, 1, 1, 6, 1, 7)),
+            new Token(TokenKind.State, "state", new SourceSpan(6, 5, 2, 1, 2, 6)),
+            new Token(TokenKind.EndOfSource, string.Empty, new SourceSpan(11, 0, 2, 6, 2, 6)));
 
         stream.Diagnostics.Should().BeEmpty();
     }
@@ -911,7 +911,7 @@ public class LexerTests
         var stream = Lexer.Lex("");
 
         stream.Tokens.Should().Equal(
-            new Token(TokenKind.EndOfSource, string.Empty, 1, 1, 0, 0));
+            new Token(TokenKind.EndOfSource, string.Empty, new SourceSpan(0, 0, 1, 1, 1, 1)));
 
         stream.Diagnostics.Should().BeEmpty();
     }
@@ -922,7 +922,7 @@ public class LexerTests
         var stream = Lexer.Lex("   \t  ");
 
         stream.Tokens.Should().Equal(
-            new Token(TokenKind.EndOfSource, string.Empty, 1, 7, 6, 0));
+            new Token(TokenKind.EndOfSource, string.Empty, new SourceSpan(6, 0, 1, 7, 1, 7)));
 
         stream.Diagnostics.Should().BeEmpty();
     }
