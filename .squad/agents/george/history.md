@@ -45,6 +45,21 @@
 
 ## Recent Updates
 
+### 2026-04-26 — Cross-catalog Analyzer Helper API Design
+
+Full code-level audit of all 6 existing analyzers (PRECEPT0001–0006) and all 10 catalog GetMeta methods. Key findings:
+
+- All 10 catalogs use the identical structural pattern: expression-bodied `GetMeta(XKind) => kind switch { XKind.Member => new(...), ... }`. Only `Diagnostics.cs`, `Tokens.cs`, and `Faults.cs` use positional args; the rest use named args for optional fields.
+- **Object initializer gotcha**: `Modifiers.cs` sets `MutuallyExclusiveWith` via `{ MutuallyExclusiveWith = [...] }` object initializer syntax, NOT as a constructor argument. This appears in `IObjectCreationOperation.Initializer`, not in `.Arguments`. Two entries use this pattern. Helpers must cover both.
+- **Spread elements**: `Types.cs` uses `..DateComponentAccessors` in collection expressions. Spread appears as `ISpreadOperation` in the child operations and cannot be enumerated by the basic helper. All helpers that enumerate collection elements must guard with `CollectionHasSpread`.
+- **Shared static ParameterMeta statics**: In `Operations.cs`, `PInteger`, `PMoney` etc. are private static fields. When a `BinaryOperationMeta.Lhs` references `PInteger`, it appears as `IFieldReferenceOperation`. Following to the ParameterMeta constructor requires `FollowFieldInitializer` — a two-hop: field symbol → syntax declaration → GetOperation on initializer.
+- **Flags enum constant folding**: `TypeTrait.Orderable | TypeTrait.EqualityComparable` has a foldable `IOperation.ConstantValue` at compile time. `FlagsEnumContains` should check ConstantValue first (works for all catalog cases), then fall back to tree walk.
+- **Cross-method analysis**: `RegisterCompilationStartAction` + nested `RegisterOperationAction` + `RegisterCompilationEndAction` is the correct Roslyn pattern. The accumulator must be thread-safe (`ConcurrentBag<T>`). Locations must be captured during accumulation, not during end-reporting.
+- Proposed `CatalogAnalysisHelpers.cs` at ~215 LOC with 11 methods covering: namespace guards, conversion unwrapping, switch arm enumeration, enum field resolution, named arg extraction, object initializer assignment extraction, collection element enumeration, flags enum check, and field initializer following.
+- Refactoring PRECEPT0005/0006 to use shared helpers eliminates ~20 duplicate lines (UnwrapConversions, IsInNamespace).
+- LOC estimates: PRECEPT0011/0012 (completeness checks) ~75–90 LOC each; PRECEPT0010 (Traits × Operations cross-catalog) ~180 LOC; helpers file ~215 LOC.
+- Cross-catalog static sharing does not exist in the codebase today — each catalog has its own private ParameterMeta statics. No helper needed for that pattern.
+
 ### 2026-04-26 — Cross-agent sync: spec audit implications for runtime/tooling consumers
 - Frank's type audit confirmed there are no missing surfaced types, but it surfaced one real consumer-facing metadata defect: `Period` should carry `TypeTrait.EqualityComparable` because the spec and operations catalog both permit equality.
 - Frank also reinforced that catalog completeness is no longer the blocker. The remaining leverage is in consumer derivation and doc sync: keep treating the hardcoded language-server completion lists and stale `docs/catalog-system.md` type-shape documentation as active follow-up work.

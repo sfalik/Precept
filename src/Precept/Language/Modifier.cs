@@ -90,14 +90,15 @@ public abstract record ModifierMeta(
     ModifierKind Kind,
     TokenMeta Token,
     string Description,
-    ModifierCategory Category)
+    ModifierCategory Category,
+    ModifierKind[]? MutuallyExclusiveWith = null)
 {
     /// <summary>
     /// Modifiers that are mutually exclusive with this one — at most one member
     /// of the group may appear on a declaration. Empty for most modifiers.
     /// Declared in the catalog; consumers (type checker, LS) must not hardcode groups.
     /// </summary>
-    public ModifierKind[] MutuallyExclusiveWith { get; init; } = [];
+    public ModifierKind[] MutuallyExclusiveWith { get; } = MutuallyExclusiveWith ?? [];
 }
 
 /// <summary>Field constraint modifiers (14 members: optional, ordered, nonnegative, …, maxplaces).</summary>
@@ -111,8 +112,9 @@ public sealed record FieldModifierMeta(
     ModifierKind[] Subsumes = default!,
     string? HoverDescription = null,
     string? UsageExample = null,
-    string? SnippetTemplate = null)
-    : ModifierMeta(Kind, Token, Description, Category)
+    string? SnippetTemplate = null,
+    ModifierKind[]? MutuallyExclusiveWith = null)
+    : ModifierMeta(Kind, Token, Description, Category, MutuallyExclusiveWith)
 {
     /// <summary>Modifiers this one makes redundant. Empty for most.</summary>
     public ModifierKind[] Subsumes { get; init; } = Subsumes ?? [];
@@ -126,8 +128,9 @@ public sealed record StateModifierMeta(
     ModifierCategory Category,
     bool AllowsOutgoing = true,
     bool RequiresDominator = false,
-    bool PreventsBackEdge = false)
-    : ModifierMeta(Kind, Token, Description, Category);
+    bool PreventsBackEdge = false,
+    ModifierKind[]? MutuallyExclusiveWith = null)
+    : ModifierMeta(Kind, Token, Description, Category, MutuallyExclusiveWith);
 
 /// <summary>Event modifiers (1 v2 member: initial event).</summary>
 public sealed record EventModifierMeta(
@@ -145,8 +148,9 @@ public sealed record AccessModifierMeta(
     string Description,
     ModifierCategory Category,
     bool IsPresent = true,
-    bool IsWritable = true)
-    : ModifierMeta(Kind, Token, Description, Category);
+    bool IsWritable = true,
+    ModifierKind[]? MutuallyExclusiveWith = null)
+    : ModifierMeta(Kind, Token, Description, Category, MutuallyExclusiveWith);
 
 /// <summary>Ensure/action anchor modifiers (3 members: in, to, from).</summary>
 public sealed record AnchorModifierMeta(

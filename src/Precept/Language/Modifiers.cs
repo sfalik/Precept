@@ -50,16 +50,16 @@ public static class Modifiers
             kind, Tokens.GetMeta(TokenKind.Nonnegative),
             "Value ≥ 0",
             ModifierCategory.Structural, NumericTypes,
-            HoverDescription: "The field's value must be zero or greater. Enforced on every assignment.")
-            { MutuallyExclusiveWith = [ModifierKind.Positive] },
+            HoverDescription: "The field's value must be zero or greater. Enforced on every assignment.",
+            MutuallyExclusiveWith: [ModifierKind.Positive]),
 
         ModifierKind.Positive => new FieldModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Positive),
             "Value > 0",
             ModifierCategory.Structural, NumericTypes,
             Subsumes: [ModifierKind.Nonnegative, ModifierKind.Nonzero],
-            HoverDescription: "The field's value must be strictly greater than zero. Implies nonnegative and nonzero.")
-            { MutuallyExclusiveWith = [ModifierKind.Nonnegative] },
+            HoverDescription: "The field's value must be strictly greater than zero. Implies nonnegative and nonzero.",
+            MutuallyExclusiveWith: [ModifierKind.Nonnegative]),
 
         ModifierKind.Nonzero => new FieldModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Nonzero),
@@ -145,20 +145,20 @@ public static class Modifiers
         ModifierKind.Success => new StateModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Success),
             "Success outcome state",
-            ModifierCategory.Semantic)
-        { MutuallyExclusiveWith = [ModifierKind.Warning, ModifierKind.Error] },
+            ModifierCategory.Semantic,
+            MutuallyExclusiveWith: [ModifierKind.Warning, ModifierKind.Error]),
 
         ModifierKind.Warning => new StateModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Warning),
             "Warning outcome state",
-            ModifierCategory.Semantic)
-        { MutuallyExclusiveWith = [ModifierKind.Success, ModifierKind.Error] },
+            ModifierCategory.Semantic,
+            MutuallyExclusiveWith: [ModifierKind.Success, ModifierKind.Error]),
 
         ModifierKind.Error => new StateModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Error),
             "Error outcome state",
-            ModifierCategory.Semantic)
-        { MutuallyExclusiveWith = [ModifierKind.Success, ModifierKind.Warning] },
+            ModifierCategory.Semantic,
+            MutuallyExclusiveWith: [ModifierKind.Success, ModifierKind.Warning]),
 
         // ── Event modifiers ─────────────────────────────────────────────────────
         ModifierKind.InitialEvent => new EventModifierMeta(
@@ -170,20 +170,20 @@ public static class Modifiers
         ModifierKind.Write => new AccessModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Write),
             "Field is present and writable",
-            ModifierCategory.Structural, IsPresent: true, IsWritable: true)
-        { MutuallyExclusiveWith = [ModifierKind.Read, ModifierKind.Omit] },
+            ModifierCategory.Structural, IsPresent: true, IsWritable: true,
+            MutuallyExclusiveWith: [ModifierKind.Read, ModifierKind.Omit]),
 
         ModifierKind.Read => new AccessModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Read),
             "Field is present and read-only",
-            ModifierCategory.Structural, IsPresent: true, IsWritable: false)
-        { MutuallyExclusiveWith = [ModifierKind.Write, ModifierKind.Omit] },
+            ModifierCategory.Structural, IsPresent: true, IsWritable: false,
+            MutuallyExclusiveWith: [ModifierKind.Write, ModifierKind.Omit]),
 
         ModifierKind.Omit => new AccessModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Omit),
             "Field is structurally absent",
-            ModifierCategory.Structural, IsPresent: false, IsWritable: false)
-        { MutuallyExclusiveWith = [ModifierKind.Write, ModifierKind.Read] },
+            ModifierCategory.Structural, IsPresent: false, IsWritable: false,
+            MutuallyExclusiveWith: [ModifierKind.Write, ModifierKind.Read]),
 
         // ── Anchor modifiers ────────────────────────────────────────────────────
         ModifierKind.In => new AnchorModifierMeta(
