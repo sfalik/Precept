@@ -733,78 +733,36 @@ public static class Lexer
         private bool TryScanOperator()
         {
             var c = Current;
-            char next = PeekNext;
             int startLine = _line, startCol = _column, startOff = _offset;
 
-            // Multi-char operators (scan order per §1.5)
-            if (c == '-' && next == '>')
-                return EmitOperator(TokenKind.Arrow, "->", startLine, startCol, startOff);
-            if (c == '!' && next == '~')
-                return EmitOperator(TokenKind.CaseInsensitiveNotEquals, "!~", startLine, startCol, startOff);
-            if (c == '~' && next == '=')
-                return EmitOperator(TokenKind.CaseInsensitiveEquals, "~=", startLine, startCol, startOff);
-            if (c == '=' && next == '=')
-                return EmitOperator(TokenKind.DoubleEquals, "==", startLine, startCol, startOff);
-            if (c == '!' && next == '=')
-                return EmitOperator(TokenKind.NotEquals, "!=", startLine, startCol, startOff);
-            if (c == '>' && next == '=')
-                return EmitOperator(TokenKind.GreaterThanOrEqual, ">=", startLine, startCol, startOff);
-            if (c == '<' && next == '=')
-                return EmitOperator(TokenKind.LessThanOrEqual, "<=", startLine, startCol, startOff);
-
-            // Single-char operators
-            var singleKind = c switch
+            if (Tokens.TwoCharOperatorStarters.Contains(c))
             {
-                '=' => TokenKind.Assign,
-                '>' => TokenKind.GreaterThan,
-                '<' => TokenKind.LessThan,
-                '+' => TokenKind.Plus,
-                '-' => TokenKind.Minus,
-                '*' => TokenKind.Star,
-                '/' => TokenKind.Slash,
-                '%' => TokenKind.Percent,
-                '~' => TokenKind.Tilde,
-                _ => (TokenKind?)null,
-            };
+                if (Tokens.TwoCharOperators.TryGetValue((c, PeekNext), out var two))
+                {
+                    Advance();
+                    Advance();
+                    _tokens.Add(new Token(two.Kind, two.Text, startLine, startCol, startOff, 2));
+                    return true;
+                }
+            }
 
-            if (singleKind is { } sk)
+            if (Tokens.SingleCharOperators.TryGetValue(c, out var one))
             {
                 Advance();
-                _tokens.Add(new Token(sk, c.ToString(), startLine, startCol, startOff, 1));
+                _tokens.Add(new Token(one.Kind, one.Text, startLine, startCol, startOff, 1));
                 return true;
             }
 
             return false;
         }
 
-        private bool EmitOperator(TokenKind kind, string text, int line, int col, int offset)
-        {
-            Advance();
-            Advance();
-            _tokens.Add(new Token(kind, text, line, col, offset, 2));
-            return true;
-        }
-
         private bool TryScanPunctuation()
         {
-            var c = Current;
-
-            var kind = c switch
-            {
-                '.' => TokenKind.Dot,
-                ',' => TokenKind.Comma,
-                '(' => TokenKind.LeftParen,
-                ')' => TokenKind.RightParen,
-                '[' => TokenKind.LeftBracket,
-                ']' => TokenKind.RightBracket,
-                _ => (TokenKind?)null,
-            };
-
-            if (kind is { } k)
+            if (Tokens.PunctuationChars.TryGetValue(Current, out var punc))
             {
                 int startLine = _line, startCol = _column, startOff = _offset;
                 Advance();
-                _tokens.Add(new Token(k, c.ToString(), startLine, startCol, startOff, 1));
+                _tokens.Add(new Token(punc.Kind, punc.Text, startLine, startCol, startOff, 1));
                 return true;
             }
 

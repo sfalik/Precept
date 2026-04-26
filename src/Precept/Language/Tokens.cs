@@ -334,4 +334,54 @@ public static class Tokens
                     or TokenCategory.Literal))
             .DistinctBy(m => m.Text)
             .ToFrozenDictionary(m => m.Text!, m => m.Kind);
+
+    /// <summary>
+    /// Two-character operator table. Keys are <c>(first char, second char)</c> tuples;
+    /// values are <c>(TokenKind, text)</c> pairs. Derived from <see cref="All"/> entries
+    /// whose <c>Text</c> is exactly two characters and whose categories include
+    /// <see cref="TokenCategory.Operator"/> or <see cref="TokenCategory.Structural"/>.
+    /// Used by the lexer to resolve multi-character operators in a single table lookup
+    /// (maximal-munch guarantee).
+    /// </summary>
+    public static FrozenDictionary<(char, char), (TokenKind Kind, string Text)> TwoCharOperators { get; } =
+        All
+            .Where(m => m.Text is { Length: 2 } && m.Categories.Any(c =>
+                c is TokenCategory.Operator or TokenCategory.Structural))
+            .ToFrozenDictionary(m => (m.Text![0], m.Text[1]), m => (m.Kind, m.Text!));
+
+    /// <summary>
+    /// Single-character operator table. Keys are the operator character; values are
+    /// <c>(TokenKind, text)</c> pairs. Derived from <see cref="All"/> entries whose
+    /// <c>Text</c> is exactly one character and whose categories include
+    /// <see cref="TokenCategory.Operator"/>.
+    /// Used by the lexer after the two-char guard fails.
+    /// </summary>
+    public static FrozenDictionary<char, (TokenKind Kind, string Text)> SingleCharOperators { get; } =
+        All
+            .Where(m => m.Text is { Length: 1 } && m.Categories.Any(c =>
+                c is TokenCategory.Operator))
+            .ToFrozenDictionary(m => m.Text![0], m => (m.Kind, m.Text!));
+
+    /// <summary>
+    /// Punctuation character table. Keys are the punctuation character; values are
+    /// <c>(TokenKind, text)</c> pairs. Derived from <see cref="All"/> entries whose
+    /// <c>Text</c> is exactly one character and whose categories include
+    /// <see cref="TokenCategory.Punctuation"/>.
+    /// Delimiter characters (<c>{</c>, <c>}</c>, <c>"</c>, <c>'</c>) are absent —
+    /// they have dedicated mode-transition handling in <c>ScanToken</c> and are never
+    /// emitted as punctuation tokens.
+    /// </summary>
+    public static FrozenDictionary<char, (TokenKind Kind, string Text)> PunctuationChars { get; } =
+        All
+            .Where(m => m.Text is { Length: 1 } && m.Categories.Any(c =>
+                c is TokenCategory.Punctuation))
+            .ToFrozenDictionary(m => m.Text![0], m => (m.Kind, m.Text!));
+
+    /// <summary>
+    /// Set of characters that can begin a two-character operator. Used as a fast guard
+    /// in <c>TryScanOperator</c> before attempting a tuple lookup into
+    /// <see cref="TwoCharOperators"/>, avoiding a tuple allocation on every non-starter.
+    /// </summary>
+    public static FrozenSet<char> TwoCharOperatorStarters { get; } =
+        TwoCharOperators.Keys.Select(k => k.Item1).ToFrozenSet();
 }
