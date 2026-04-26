@@ -754,16 +754,36 @@ public static class Operations
             "Choice inequality (same set required)"),
         OperationKind.ChoiceLessThanChoice => new BinaryOperationMeta(
             kind, OperatorKind.LessThan, PChoice, PChoice, TypeKind.Boolean,
-            "Choice less-than (ordinal, ordered + same set required)"),
+            "Choice less-than (ordinal, ordered + same set required)",
+            ProofRequirements:
+            [
+                new ModifierRequirement(new ParamSubject(PChoice), ModifierKind.Ordered,
+                    "Both choice operands must be declared ordered"),
+            ]),
         OperationKind.ChoiceGreaterThanChoice => new BinaryOperationMeta(
             kind, OperatorKind.GreaterThan, PChoice, PChoice, TypeKind.Boolean,
-            "Choice greater-than (ordinal, ordered + same set required)"),
+            "Choice greater-than (ordinal, ordered + same set required)",
+            ProofRequirements:
+            [
+                new ModifierRequirement(new ParamSubject(PChoice), ModifierKind.Ordered,
+                    "Both choice operands must be declared ordered"),
+            ]),
         OperationKind.ChoiceLessThanOrEqualChoice => new BinaryOperationMeta(
             kind, OperatorKind.LessThanOrEqual, PChoice, PChoice, TypeKind.Boolean,
-            "Choice less-than-or-equal (ordinal, ordered + same set required)"),
+            "Choice less-than-or-equal (ordinal, ordered + same set required)",
+            ProofRequirements:
+            [
+                new ModifierRequirement(new ParamSubject(PChoice), ModifierKind.Ordered,
+                    "Both choice operands must be declared ordered"),
+            ]),
         OperationKind.ChoiceGreaterThanOrEqualChoice => new BinaryOperationMeta(
             kind, OperatorKind.GreaterThanOrEqual, PChoice, PChoice, TypeKind.Boolean,
-            "Choice greater-than-or-equal (ordinal, ordered + same set required)"),
+            "Choice greater-than-or-equal (ordinal, ordered + same set required)",
+            ProofRequirements:
+            [
+                new ModifierRequirement(new ParamSubject(PChoice), ModifierKind.Ordered,
+                    "Both choice operands must be declared ordered"),
+            ]),
 
         // ── Orderable same-type: date ───────────────────────────────
         OperationKind.DateEqualsDate => new BinaryOperationMeta(

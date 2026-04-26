@@ -624,6 +624,35 @@ public class OperationsTests
             $"{kind} requires a time-level period operand");
     }
 
+    // I33 ── Choice ordering modifier proof requirements ──────────────────────
+
+    [Theory]
+    [InlineData(OperationKind.ChoiceLessThanChoice)]
+    [InlineData(OperationKind.ChoiceGreaterThanChoice)]
+    [InlineData(OperationKind.ChoiceLessThanOrEqualChoice)]
+    [InlineData(OperationKind.ChoiceGreaterThanOrEqualChoice)]
+    public void ChoiceOrderingOps_RequireOrderedModifier(OperationKind kind)
+    {
+        var meta = (BinaryOperationMeta)Operations.GetMeta(kind);
+        meta.ProofRequirements.Should().HaveCount(1, $"{kind} operands must be declared ordered");
+        var req = meta.ProofRequirements[0].Should().BeOfType<ModifierRequirement>().Subject;
+        req.Required.Should().Be(ModifierKind.Ordered,
+            $"{kind} requires ordered choice operands");
+        req.Subject.Should().BeOfType<ParamSubject>()
+            .Which.Parameter.Kind.Should().Be(TypeKind.Choice,
+            $"{kind} modifier requirement targets the choice parameter");
+    }
+
+    [Theory]
+    [InlineData(OperationKind.ChoiceEqualsChoice)]
+    [InlineData(OperationKind.ChoiceNotEqualsChoice)]
+    public void ChoiceEqualityOps_HaveNoModifierRequirement(OperationKind kind)
+    {
+        var meta = (BinaryOperationMeta)Operations.GetMeta(kind);
+        meta.ProofRequirements.Should().BeEmpty(
+            $"{kind} equality does not require ordered — works on any choice field");
+    }
+
     // ── Comparison: all produce Boolean ──────────────────────────────────────────
 
     [Fact]

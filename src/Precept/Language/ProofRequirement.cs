@@ -89,3 +89,18 @@ public sealed record QualifierCompatibilityProofRequirement(
     QualifierAxis Axis,
     string        Description
 ) : ProofRequirement(LeftSubject, Description);
+
+/// <summary>
+/// Modifier proof: the operand(s) matching <see cref="Subject"/> must have
+/// the specified modifier declared on their field. Used to enforce that
+/// operations requiring a field-level attribute (e.g. <c>ordered</c> for
+/// choice ordinal comparison) are only applied to appropriately declared fields.
+/// When both operands share the same <see cref="ParameterMeta"/> reference
+/// (as with choice ordering operations), the requirement applies to all
+/// matching operand positions.
+/// </summary>
+public sealed record ModifierRequirement(
+    ProofSubject Subject,
+    ModifierKind Required,
+    string       Description
+) : ProofRequirement(Subject, Description);
