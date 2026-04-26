@@ -880,7 +880,7 @@ Grammar forms / declaration shapes. See § Construct Slot Model for the enriched
 
 **Members (from `precept-language-spec.md` §2.2 top-level dispatch):**
 
-`PreceptHeader`, `FieldDeclaration`, `StateDeclaration`, `EventDeclaration`, `RuleDeclaration`, `TransitionRow`, `StateEnsure`, `EventEnsure`, `AccessMode`, `StateAction`, `StatelessHook`
+`PreceptHeader`, `FieldDeclaration`, `StateDeclaration`, `EventDeclaration`, `RuleDeclaration`, `TransitionRow`, `StateEnsure`, `EventEnsure`, `AccessMode`, `StateAction`, `EventHandler`
 
 **Consumers:** MCP vocabulary (grammar reference), LS completions (context-sensitive construct suggestions), TextMate grammar (derivable from slot arrays), reference documentation, parser validation tests.
 

@@ -41,5 +41,5 @@ public enum ConstructKind
 
     // ── Stateless ───────────────────────────────────────────────────
     /// <summary><c>on Event -> Actions</c> (no state machine)</summary>
-    StatelessHook,
+    EventHandler,
 }

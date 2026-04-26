@@ -559,7 +559,7 @@ After the `precept <Name>` header, the parser enters a loop that dispatches on t
 | `in` | `StateEnsureDeclaration` or `AccessModeDeclaration` |
 | `to` | `StateEnsureDeclaration` or `StateActionDeclaration` |
 | `from` | `TransitionRowDeclaration`, `StateEnsureDeclaration`, or `StateActionDeclaration` |
-| `on` | `EventEnsureDeclaration` or `StatelessEventHookDeclaration` |
+| `on` | `EventEnsureDeclaration` or `EventHandlerDeclaration` |
 | `EndOfSource` | exit loop |
 | _anything else_ | diagnostic + sync-point resync |
 
@@ -868,7 +868,7 @@ All names are registered in the first pass. The checking pass validates every re
 | Duplicate event arg | Two args in the same event have the same name | `DuplicateArgName` |
 | Undeclared field reference | `IdentifierExpression` in expression context does not match a field name (or in-scope event arg) | `UndeclaredField` |
 | Undeclared state reference | State name in `from`/`to`/`in` target or `transition` outcome does not match a declared state | `UndeclaredState` |
-| Undeclared event reference | Event name in `from ... on`, `on` ensure, or stateless hook does not match a declared event | `UndeclaredEvent` |
+| Undeclared event reference | Event name in `from ... on`, `on` ensure, or event handler does not match a declared event | `UndeclaredEvent` |
 | Multiple initial states | More than one state entry has `initial` | `MultipleInitialStates` |
 | No initial state | Stateful precept (has states) but none is marked `initial` | `NoInitialState` |
 
@@ -889,7 +889,7 @@ Fields, states, and events are all declared at the top level. They are visible e
 | Transition row guard | All field names + current event's args (via `EventName.ArgName`) |
 | Transition row actions (RHS of `set`, value of `add`/`enqueue`/`push`) | All field names + current event's args |
 | State action guard / actions | All field names |
-| Stateless event hook actions | All field names + current event's args |
+| Event handler actions | All field names + current event's args |
 | Default value expression | Field names declared **before** this field (no self-reference, no forward reference) |
 | Computed expression (`field X as T -> Expr`) | All field names except those that would form a dependency cycle (no self-reference, no mutual cycles) |
 | Modifier value expressions (`min N`, `max N`, etc.) | Only literal values — no field references |
@@ -900,7 +900,7 @@ Event args are accessed via dotted notation: `EventName.ArgName`. The type check
 
 1. Checking if the object of a `MemberAccessExpression` is an `IdentifierExpression` that matches a declared event name.
 2. If so, the member is resolved against the event's arg declarations.
-3. Event arg access is only valid in contexts where an event is in scope (transition rows, event ensures, stateless hooks).
+3. Event arg access is only valid in contexts where an event is in scope (transition rows, event ensures, event handlers).
 
 ### 3.6 Expression Typing Rules
 
@@ -1179,7 +1179,7 @@ Type errors: applying a set operation to a non-set field, a queue operation to a
 
 #### Stateless/stateful cross-validation
 
-A precept that contains both `StatelessEventHookDeclaration` nodes (`on Event -> actions`) and any `state` declarations is an error. In a stateful precept, stateless hooks are redundant with `from any on Event -> no transition` followed by rules. Mixing the two creates ambiguity about execution order.
+A precept that contains both `EventHandlerDeclaration` nodes (`on Event -> actions`) and any `state` declarations is an error. In a stateful precept, event handlers are redundant with `from any on Event -> no transition` followed by rules. Mixing the two creates ambiguity about execution order.
 
 A stateless precept (no states, no `from`, no transitions) that uses only event hooks is valid.
 
@@ -1250,12 +1250,12 @@ The type checker emits diagnostics for root causes only. When `ErrorType` is flo
 | `CollectionOperationOnScalar` | Error | "'{0}' is a {1} operation, but '{2}' is not a {1}" | add/remove on non-set, etc. |
 | `ScalarOperationOnCollection` | Error | "'{0}' cannot be used with collection field '{1}'" | set = on collection field |
 | `IsSetOnNonOptional` | Error | "'{0}' always has a value — 'is set' only works on optional fields" | is set / is not set on required field |
-| `EventArgOutOfScope` | Error | "Event '{0}' arguments are not accessible here" | Event.Arg access outside transition/ensure/hook |
+| `EventArgOutOfScope` | Error | "Event '{0}' arguments are not accessible here" | Event.Arg access outside transition/ensure/stateless event |
 | `InvalidInterpolationCoercion` | Error | "A {0} value cannot appear inside a text interpolation" | Collection in `{...}` inside string |
 | `UnresolvedTypedConstant` | Error | "Cannot determine the type of '{0}' — the content does not match any known value pattern" | Typed constant shape doesn't match any family |
 | `AmbiguousTypedConstant` | Error | "'{0}' could be a {1} or {2} — add context to disambiguate" | Multi-member family, no context to narrow |
 | `DefaultForwardReference` | Error | "Default value for '{0}' cannot reference '{1}', which is declared later" | Field default references later field |
-| `StatelessHookInStatefulPrecept` | Error | "Stateless event hooks cannot appear in a precept with state declarations" | `on Event ->` mixed with `state` declarations |
+| `EventHandlerInStatefulPrecept` | Error | "Event handlers cannot appear in a precept with state declarations" | `on Event ->` mixed with `state` declarations |
 
 ---
 

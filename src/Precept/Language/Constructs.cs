@@ -124,9 +124,9 @@ public static class Constructs
             [SlotEventTarget, SlotEnsureClause],
             TokenKind.On),
 
-        ConstructKind.StatelessHook => new(
+        ConstructKind.EventHandler => new(
             kind,
-            "stateless event hook",
+            "event handler",
             "Event handler with actions but no state transitions (stateless precepts)",
             "on UpdateName -> set name = newName",
             [],

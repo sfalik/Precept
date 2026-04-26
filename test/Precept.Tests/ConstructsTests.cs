@@ -56,7 +56,7 @@ public class ConstructsTests
     [InlineData(ConstructKind.EventDeclaration)]
     [InlineData(ConstructKind.RuleDeclaration)]
     [InlineData(ConstructKind.TransitionRow)]
-    [InlineData(ConstructKind.StatelessHook)]
+    [InlineData(ConstructKind.EventHandler)]
     public void TopLevelConstructs_HaveEmptyAllowedIn(ConstructKind kind)
     {
         Constructs.GetMeta(kind).AllowedIn.Should().BeEmpty(

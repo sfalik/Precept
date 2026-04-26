@@ -23,7 +23,7 @@ This matches the pipeline pattern used by all five stages: `Lexer.Lex`, `Parser.
 
 The parser handles three families of input:
 
-- **Declarations** — precept header, field, state, event, rule, transition row, state ensure, event ensure, state action, access mode, stateless hook
+- **Declarations** — precept header, field, state, event, rule, transition row, state ensure, event ensure, state action, access mode, event handler
 - **Expressions** — arithmetic, comparison, logical, member access, function calls, conditionals, literals, interpolated strings and typed constants
 - **Error recovery** — missing-node insertion for expected tokens, sync-point resync for structurally lost positions
 
@@ -43,7 +43,7 @@ Consider the `TransitionRow` construct. Its catalog entry declares `LeadingToken
 
 ### Preposition-First Grammar
 
-The four preposition keywords (`in`, `to`, `from`, `on`) are the parser's primary structural signal for scoped declarations. After the precept header and the declaration keywords (`field`, `state`, `event`, `rule`), every remaining production begins with a preposition. The parser reads the preposition, parses the state or event target, then looks ahead one token to select the specific production: ensure, access mode, action, transition, or stateless hook.
+The four preposition keywords (`in`, `to`, `from`, `on`) are the parser's primary structural signal for scoped declarations. After the precept header and the declaration keywords (`field`, `state`, `event`, `rule`), every remaining production begins with a preposition. The parser reads the preposition, parses the state or event target, then looks ahead one token to select the specific production: ensure, access mode, action, transition, or event handler.
 
 A flat, line-oriented grammar with no block delimiters needs an unambiguous structural signal at the start of each line. Prepositions are the natural English equivalent of a block opener — they scope the line to a state or event context without requiring braces or indentation.
 
@@ -185,7 +185,7 @@ The four preposition-scoped methods parse a state or event target, then look ahe
 | Lookahead after event target | Production | `ConstructKind` |
 |------------------------------|-----------|-----------------|
 | `Ensure` | `ParseEventEnsure()` | `EventEnsure` |
-| `Arrow` | `ParseStatelessHook()` | `StatelessHook` |
+| `Arrow` | `ParseEventHandler()` | `EventHandler` |
 | `When` *(then re-check)* | consume guard, re-dispatch | *(same as above)* |
 
 The `When` case is the only two-step lookahead: the preposition method consumes the `when` guard expression, then re-inspects the next token to select the production. This is still bounded — the guard is parsed as a normal expression (Pratt parser stops at `ensure`, `->`, or a newline), and the next token is inspected exactly once.
@@ -315,7 +315,7 @@ The action chain is a loop that consumes `->` followed by an action keyword. Eac
 | `pop` | `pop Identifier (into Identifier)?` | stack pop |
 | `clear` | `clear Identifier` | collection clear |
 
-The loop breaks when the token after `->` is an outcome keyword (`transition`, `no`, `reject`). For stateless hooks and state actions, the loop breaks at newline or `EndOfSource` — there is no outcome.
+The loop breaks when the token after `->` is an outcome keyword (`transition`, `no`, `reject`). For event handlers and state actions, the loop breaks at newline or `EndOfSource` — there is no outcome.
 
 ### SourceSpan Contract
 
@@ -369,9 +369,9 @@ The 11 `ConstructKind` values map to exactly 11 parse productions:
 | `AccessMode` | `ParseAccessMode()` | `In` or `Write`/`Read`/`Omit` |
 | `StateAction` | `ParseStateAction()` | `To` or `From` |
 | `EventEnsure` | `ParseEventEnsure()` | `On` |
-| `StatelessHook` | `ParseStatelessHook()` | `On` |
+| `EventHandler` | `ParseEventHandler()` | `On` |
 
-Constructs with shared leading tokens (`In` → `StateEnsure` or `AccessMode`; `On` → `EventEnsure` or `StatelessHook`) are resolved by the preposition disambiguation logic described above. The parser knows which production to select after parsing the target and one lookahead token — no ambiguity reaches the production method itself.
+Constructs with shared leading tokens (`In` → `StateEnsure` or `AccessMode`; `On` → `EventEnsure` or `EventHandler`) are resolved by the preposition disambiguation logic described above. The parser knows which production to select after parsing the target and one lookahead token — no ambiguity reaches the production method itself.
 
 Note that `From` leads to three possible productions (`TransitionRow`, `StateEnsure`, `StateAction`), and `To` leads to two (`StateEnsure`, `StateAction`). The preposition disambiguation tables above capture the full resolution logic.
 
@@ -673,19 +673,19 @@ public sealed record EventEnsureNode(
 on Submit ensure Amount > 0 because "Claim amounts must be positive"
 ```
 
-### StatelessHook
+### EventHandler
 
 ```
-on Identifier ("->" ActionStatement)*
+on Identifier ("->” ActionStatement)*
 ```
 
 ```csharp
-public sealed record StatelessHookNode(
+public sealed record EventHandlerNode(
     SourceSpan Span,
     Token EventName,
     ImmutableArray<Statement> Actions,
     bool IsMissing = false)
-    : Declaration(Span, ConstructKind.StatelessHook, IsMissing);
+    : Declaration(Span, ConstructKind.EventHandler, IsMissing);
 ```
 
 ```precept
