@@ -260,10 +260,10 @@ public class ModifiersTests
     // ── Event modifiers ─────────────────────────────────────────────────────────
 
     [Fact]
-    public void InitialEvent_NoGraphAnalysis()
+    public void InitialEvent_RequiresInitialEventCompatibilityAnalysis()
     {
         var meta = (EventModifierMeta)Modifiers.GetMeta(ModifierKind.InitialEvent);
-        meta.RequiredAnalysis.Should().Be(GraphAnalysisKind.None);
+        meta.RequiredAnalysis.Should().Be(GraphAnalysisKind.InitialEventCompatibility);
     }
 
     // ── Access modifiers ────────────────────────────────────────────────────────

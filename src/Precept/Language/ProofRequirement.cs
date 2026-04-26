@@ -76,3 +76,16 @@ public sealed record DimensionProofRequirement(
     PeriodDimension RequiredDimension,
     string          Description
 ) : ProofRequirement(Subject, Description);
+
+/// <summary>
+/// Qualifier compatibility proof: two operands in a binary operation must have
+/// matching qualifier values on the specified axis. Used for dimensional
+/// homogeneity checks — e.g., <c>quantity of 'kg'</c> cannot be added to
+/// <c>quantity of 'miles'</c>.
+/// </summary>
+public sealed record QualifierCompatibilityProofRequirement(
+    ProofSubject  LeftSubject,
+    ProofSubject  RightSubject,
+    QualifierAxis Axis,
+    string        Description
+) : ProofRequirement(LeftSubject, Description);

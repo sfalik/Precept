@@ -372,6 +372,14 @@ public static class Operations
             kind, OperatorKind.Minus, PZonedDateTime, PDuration, TypeKind.ZonedDateTime,
             "ZonedDateTime − duration → zoneddatetime (timeline arithmetic)"),
 
+        OperationKind.ZonedDateTimePlusPeriod => new BinaryOperationMeta(
+            kind, OperatorKind.Plus, PZonedDateTime, PPeriod, TypeKind.ZonedDateTime,
+            "ZonedDateTime + period → zoneddatetime (calendar arithmetic — accepts all components)"),
+
+        OperationKind.ZonedDateTimeMinusPeriod => new BinaryOperationMeta(
+            kind, OperatorKind.Minus, PZonedDateTime, PPeriod, TypeKind.ZonedDateTime,
+            "ZonedDateTime − period → zoneddatetime (calendar arithmetic — accepts all components)"),
+
         OperationKind.ZonedDateTimeMinusZonedDateTime => new BinaryOperationMeta(
             kind, OperatorKind.Minus, PZonedDateTime, PZonedDateTime, TypeKind.Duration,
             "ZonedDateTime − zoneddatetime → duration (instant subtraction)"),
@@ -461,11 +469,21 @@ public static class Operations
         // ── Business: quantity ──────────────────────────────────────
         OperationKind.QuantityPlusQuantity => new BinaryOperationMeta(
             kind, OperatorKind.Plus, PQuantity, PQuantity, TypeKind.Quantity,
-            "Quantity + quantity → quantity (same dimension required)"),
+            "Quantity + quantity → quantity (same dimension required)",
+            ProofRequirements:
+            [
+                new QualifierCompatibilityProofRequirement(new ParamSubject(PQuantity), new ParamSubject(PQuantity), QualifierAxis.Unit,
+                    "Operands must have matching unit qualifiers"),
+            ]),
 
         OperationKind.QuantityMinusQuantity => new BinaryOperationMeta(
             kind, OperatorKind.Minus, PQuantity, PQuantity, TypeKind.Quantity,
-            "Quantity − quantity → quantity (same dimension required)"),
+            "Quantity − quantity → quantity (same dimension required)",
+            ProofRequirements:
+            [
+                new QualifierCompatibilityProofRequirement(new ParamSubject(PQuantity), new ParamSubject(PQuantity), QualifierAxis.Unit,
+                    "Operands must have matching unit qualifiers"),
+            ]),
 
         OperationKind.QuantityTimesDecimal => new BinaryOperationMeta(
             kind, OperatorKind.Times, PQuantity, PDecimal, TypeKind.Quantity,
@@ -533,11 +551,25 @@ public static class Operations
         // ── Business: price ─────────────────────────────────────────
         OperationKind.PricePlusPrice => new BinaryOperationMeta(
             kind, OperatorKind.Plus, PPrice, PPrice, TypeKind.Price,
-            "Price + price → price (same currency and unit required)"),
+            "Price + price → price (same currency and unit required)",
+            ProofRequirements:
+            [
+                new QualifierCompatibilityProofRequirement(new ParamSubject(PPrice), new ParamSubject(PPrice), QualifierAxis.Unit,
+                    "Operands must have matching unit qualifiers"),
+                new QualifierCompatibilityProofRequirement(new ParamSubject(PPrice), new ParamSubject(PPrice), QualifierAxis.Currency,
+                    "Operands must have matching currency qualifiers"),
+            ]),
 
         OperationKind.PriceMinusPrice => new BinaryOperationMeta(
             kind, OperatorKind.Minus, PPrice, PPrice, TypeKind.Price,
-            "Price − price → price (same currency and unit required)"),
+            "Price − price → price (same currency and unit required)",
+            ProofRequirements:
+            [
+                new QualifierCompatibilityProofRequirement(new ParamSubject(PPrice), new ParamSubject(PPrice), QualifierAxis.Unit,
+                    "Operands must have matching unit qualifiers"),
+                new QualifierCompatibilityProofRequirement(new ParamSubject(PPrice), new ParamSubject(PPrice), QualifierAxis.Currency,
+                    "Operands must have matching currency qualifiers"),
+            ]),
 
         OperationKind.PriceTimesQuantity => new BinaryOperationMeta(
             kind, OperatorKind.Times, PPrice, PQuantity, TypeKind.Money,
@@ -863,53 +895,125 @@ public static class Operations
         OperationKind.QuantityEqualsQuantity => new BinaryOperationMeta(
             kind, OperatorKind.Equals, PQuantity, PQuantity, TypeKind.Boolean,
             "Quantity equality (same dimension required)",
-            Match: QualifierMatch.Same),
+            Match: QualifierMatch.Same,
+            ProofRequirements:
+            [
+                new QualifierCompatibilityProofRequirement(new ParamSubject(PQuantity), new ParamSubject(PQuantity), QualifierAxis.Unit,
+                    "Operands must have matching unit qualifiers"),
+            ]),
         OperationKind.QuantityNotEqualsQuantity => new BinaryOperationMeta(
             kind, OperatorKind.NotEquals, PQuantity, PQuantity, TypeKind.Boolean,
             "Quantity inequality (same dimension required)",
-            Match: QualifierMatch.Same),
+            Match: QualifierMatch.Same,
+            ProofRequirements:
+            [
+                new QualifierCompatibilityProofRequirement(new ParamSubject(PQuantity), new ParamSubject(PQuantity), QualifierAxis.Unit,
+                    "Operands must have matching unit qualifiers"),
+            ]),
         OperationKind.QuantityLessThanQuantity => new BinaryOperationMeta(
             kind, OperatorKind.LessThan, PQuantity, PQuantity, TypeKind.Boolean,
             "Quantity less-than (same dimension required)",
-            Match: QualifierMatch.Same),
+            Match: QualifierMatch.Same,
+            ProofRequirements:
+            [
+                new QualifierCompatibilityProofRequirement(new ParamSubject(PQuantity), new ParamSubject(PQuantity), QualifierAxis.Unit,
+                    "Operands must have matching unit qualifiers"),
+            ]),
         OperationKind.QuantityGreaterThanQuantity => new BinaryOperationMeta(
             kind, OperatorKind.GreaterThan, PQuantity, PQuantity, TypeKind.Boolean,
             "Quantity greater-than (same dimension required)",
-            Match: QualifierMatch.Same),
+            Match: QualifierMatch.Same,
+            ProofRequirements:
+            [
+                new QualifierCompatibilityProofRequirement(new ParamSubject(PQuantity), new ParamSubject(PQuantity), QualifierAxis.Unit,
+                    "Operands must have matching unit qualifiers"),
+            ]),
         OperationKind.QuantityLessThanOrEqualQuantity => new BinaryOperationMeta(
             kind, OperatorKind.LessThanOrEqual, PQuantity, PQuantity, TypeKind.Boolean,
             "Quantity less-than-or-equal (same dimension required)",
-            Match: QualifierMatch.Same),
+            Match: QualifierMatch.Same,
+            ProofRequirements:
+            [
+                new QualifierCompatibilityProofRequirement(new ParamSubject(PQuantity), new ParamSubject(PQuantity), QualifierAxis.Unit,
+                    "Operands must have matching unit qualifiers"),
+            ]),
         OperationKind.QuantityGreaterThanOrEqualQuantity => new BinaryOperationMeta(
             kind, OperatorKind.GreaterThanOrEqual, PQuantity, PQuantity, TypeKind.Boolean,
             "Quantity greater-than-or-equal (same dimension required)",
-            Match: QualifierMatch.Same),
+            Match: QualifierMatch.Same,
+            ProofRequirements:
+            [
+                new QualifierCompatibilityProofRequirement(new ParamSubject(PQuantity), new ParamSubject(PQuantity), QualifierAxis.Unit,
+                    "Operands must have matching unit qualifiers"),
+            ]),
 
         // ── Orderable same-type: price (same currency + unit required)
         OperationKind.PriceEqualsPrice => new BinaryOperationMeta(
             kind, OperatorKind.Equals, PPrice, PPrice, TypeKind.Boolean,
             "Price equality (same currency and unit required)",
-            Match: QualifierMatch.Same),
+            Match: QualifierMatch.Same,
+            ProofRequirements:
+            [
+                new QualifierCompatibilityProofRequirement(new ParamSubject(PPrice), new ParamSubject(PPrice), QualifierAxis.Unit,
+                    "Operands must have matching unit qualifiers"),
+                new QualifierCompatibilityProofRequirement(new ParamSubject(PPrice), new ParamSubject(PPrice), QualifierAxis.Currency,
+                    "Operands must have matching currency qualifiers"),
+            ]),
         OperationKind.PriceNotEqualsPrice => new BinaryOperationMeta(
             kind, OperatorKind.NotEquals, PPrice, PPrice, TypeKind.Boolean,
             "Price inequality (same currency and unit required)",
-            Match: QualifierMatch.Same),
+            Match: QualifierMatch.Same,
+            ProofRequirements:
+            [
+                new QualifierCompatibilityProofRequirement(new ParamSubject(PPrice), new ParamSubject(PPrice), QualifierAxis.Unit,
+                    "Operands must have matching unit qualifiers"),
+                new QualifierCompatibilityProofRequirement(new ParamSubject(PPrice), new ParamSubject(PPrice), QualifierAxis.Currency,
+                    "Operands must have matching currency qualifiers"),
+            ]),
         OperationKind.PriceLessThanPrice => new BinaryOperationMeta(
             kind, OperatorKind.LessThan, PPrice, PPrice, TypeKind.Boolean,
             "Price less-than (same currency and unit required)",
-            Match: QualifierMatch.Same),
+            Match: QualifierMatch.Same,
+            ProofRequirements:
+            [
+                new QualifierCompatibilityProofRequirement(new ParamSubject(PPrice), new ParamSubject(PPrice), QualifierAxis.Unit,
+                    "Operands must have matching unit qualifiers"),
+                new QualifierCompatibilityProofRequirement(new ParamSubject(PPrice), new ParamSubject(PPrice), QualifierAxis.Currency,
+                    "Operands must have matching currency qualifiers"),
+            ]),
         OperationKind.PriceGreaterThanPrice => new BinaryOperationMeta(
             kind, OperatorKind.GreaterThan, PPrice, PPrice, TypeKind.Boolean,
             "Price greater-than (same currency and unit required)",
-            Match: QualifierMatch.Same),
+            Match: QualifierMatch.Same,
+            ProofRequirements:
+            [
+                new QualifierCompatibilityProofRequirement(new ParamSubject(PPrice), new ParamSubject(PPrice), QualifierAxis.Unit,
+                    "Operands must have matching unit qualifiers"),
+                new QualifierCompatibilityProofRequirement(new ParamSubject(PPrice), new ParamSubject(PPrice), QualifierAxis.Currency,
+                    "Operands must have matching currency qualifiers"),
+            ]),
         OperationKind.PriceLessThanOrEqualPrice => new BinaryOperationMeta(
             kind, OperatorKind.LessThanOrEqual, PPrice, PPrice, TypeKind.Boolean,
             "Price less-than-or-equal (same currency and unit required)",
-            Match: QualifierMatch.Same),
+            Match: QualifierMatch.Same,
+            ProofRequirements:
+            [
+                new QualifierCompatibilityProofRequirement(new ParamSubject(PPrice), new ParamSubject(PPrice), QualifierAxis.Unit,
+                    "Operands must have matching unit qualifiers"),
+                new QualifierCompatibilityProofRequirement(new ParamSubject(PPrice), new ParamSubject(PPrice), QualifierAxis.Currency,
+                    "Operands must have matching currency qualifiers"),
+            ]),
         OperationKind.PriceGreaterThanOrEqualPrice => new BinaryOperationMeta(
             kind, OperatorKind.GreaterThanOrEqual, PPrice, PPrice, TypeKind.Boolean,
             "Price greater-than-or-equal (same currency and unit required)",
-            Match: QualifierMatch.Same),
+            Match: QualifierMatch.Same,
+            ProofRequirements:
+            [
+                new QualifierCompatibilityProofRequirement(new ParamSubject(PPrice), new ParamSubject(PPrice), QualifierAxis.Unit,
+                    "Operands must have matching unit qualifiers"),
+                new QualifierCompatibilityProofRequirement(new ParamSubject(PPrice), new ParamSubject(PPrice), QualifierAxis.Currency,
+                    "Operands must have matching currency qualifiers"),
+            ]),
 
         // ── Widening comparison: integer ↔ decimal ──────────────────
         OperationKind.IntegerEqualsDecimal => new BinaryOperationMeta(

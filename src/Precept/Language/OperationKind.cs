@@ -77,7 +77,6 @@ public enum OperationKind
     DurationMinusDuration,
     DurationTimesInteger,
     DurationTimesNumber,
-    DurationTimesDecimal,
     DurationDivideInteger,
     DurationDivideNumber,
     DurationDivideDuration,
