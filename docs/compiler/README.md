@@ -12,19 +12,19 @@ The compiler is a linear five-stage pipeline. Read the stage docs in this order:
 Source string → Lexer.Lex → TokenStream → Parser.Parse → SyntaxTree → TypeChecker.Check → TypedModel → GraphAnalyzer.Analyze → GraphResult → ProofEngine.Prove → ProofModel
 ```
 
-| Stage | Document | Key decisions | Status |
-|-------|----------|---------------|--------|
-| 1. Lexer | [lexer.md](lexer.md) | L1–L10, R1–R5, D1 | Draft |
-| 2. Parser | [parser.md](parser.md) | P1–P7 | Draft |
-| 3. Type Checker | [type-checker.md](type-checker.md) | T1–T9 | Draft |
-| 4. Graph Analyzer | _(not yet written)_ | — | Planned |
-| 5. Proof Engine | _(not yet written)_ | — | Planned |
+| Stage | Document | Status |
+|-------|----------|--------|
+| 1. Lexer | [lexer.md](lexer.md) | Draft |
+| 2. Parser | _(pending clean-room redesign)_ | Planned |
+| 3. Type Checker | _(pending clean-room redesign)_ | Planned |
+| 4. Graph Analyzer | _(not yet written)_ | Planned |
+| 5. Proof Engine | _(not yet written)_ | Planned |
 
 ## Cross-Cutting Infrastructure
 
 | Document | Purpose | Status |
 |----------|---------|--------|
-| [pipeline-artifacts-and-consumer-contracts.md](pipeline-artifacts-and-consumer-contracts.md) | How pipeline stages connect — artifact types, consumer contracts, LS integration strategy | Draft |
+| [compiler-and-runtime-design.md](../compiler-and-runtime-design.md) | How pipeline stages connect — artifact types, consumer contracts, LS integration strategy | Draft |
 | [diagnostic-system.md](diagnostic-system.md) | Diagnostic codes, severity, message templates, audience model, stage attribution | Draft |
 | [literal-system.md](literal-system.md) | How literals flow through every pipeline stage — lexer segmentation, parser assembly, type-checker resolution, evaluator materialization | Draft |
 | _(tooling-surface.md — not yet written)_ | Syntax highlighting category system, TextMate scope policy for v2 tokens (`~`, `~=`, `!~`, single-quoted typed constants), semantic token two-pass design | Planned |

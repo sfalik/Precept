@@ -18,7 +18,7 @@ Design documents for the Precept v2 runtime — the boundary between compiled pr
 
 ## Relationship to Other Docs
 
-- `docs/architecture-planning.md` §4 — runtime architecture decisions (R1–R5, D8)
+- `docs/compiler-and-runtime-design.md` — pipeline, artifacts, runtime surfaces
 - `docs/compiler/` — the compiler pipeline whose output the runtime consumes
 - `research/architecture/runtime/` — 10-system evaluator architecture survey grounding these designs
 - `docs/RuntimeApiDesign.md` — v1 runtime API design. This folder designs the v2 replacement.

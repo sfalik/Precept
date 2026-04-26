@@ -3,7 +3,7 @@
 > **Status:** Draft
 > **Decisions answered:** L1 (hand-written vs. generated), L2 (static pure function), L3 (Scanner struct isolation), L4 (mode stack for interpolation), L5 (array-backed stack), L6 (ModeState segment origin fields), L7 (keyword lookup strategy), L8 (content buffer allocation), L9 (security size limit), L10 (token span contract), R1 (EOF cleanup), R2 (newline in Interpolation mode), R3 (no synthetic closing tokens), R4 (escape recovery), R5 (lone `}` in literal), D1 (diagnostic audience)
 > **Survey references:** compiler-pipeline-architecture-survey
-> **Grounding:** `docs/architecture-planning.md` § 2.1, `docs/compiler/pipeline-artifacts-and-consumer-contracts.md` § Pipeline Stages
+> **Grounding:** `docs/compiler-and-runtime-design.md` § Compiler Pipeline
 
 ## Overview
 
@@ -342,12 +342,11 @@ The lexer intentionally does NOT:
 | Topic | Document |
 |-------|----------|
 | String/typed constant segmentation, escape tables, mode stack modes | [docs/compiler/literal-system.md](../compiler/literal-system.md) § Pipeline Stage Contracts → Lexer |
-| `TokenStream` shape and consumer contracts | [docs/compiler/pipeline-artifacts-and-consumer-contracts.md](../compiler/pipeline-artifacts-and-consumer-contracts.md) § Pipeline Stages |
+| `TokenStream` shape and consumer contracts | [docs/compiler-and-runtime-design.md](../compiler-and-runtime-design.md) § Compiler Pipeline |
 | Diagnostic codes, messages, and attribution | [docs/compiler/diagnostic-system.md](../compiler/diagnostic-system.md) |
 | All lexer diagnostic codes | [docs/language/precept-language-spec.md](../language/precept-language-spec.md) § 1.8 |
 | `set` disambiguation | [docs/language/precept-language-spec.md](../language/precept-language-spec.md) § 1.7 |
-| Pipeline stage ordering, artifact types | [docs/compiler/pipeline-artifacts-and-consumer-contracts.md](../compiler/pipeline-artifacts-and-consumer-contracts.md) |
-| Original architecture planning notes | [docs/architecture-planning.md](../architecture-planning.md) § 2.1 |
+| Pipeline stage ordering, artifact types | [docs/compiler-and-runtime-design.md](../compiler-and-runtime-design.md) |
 
 ---
 

@@ -1,8 +1,8 @@
 # Result Type Taxonomy
 
-> **Status:** Design — approved in architecture-planning §4.3, pending implementation
+> **Status:** Design — pending implementation
 > **Decision:** R2
-> **Relates to:** `architecture-planning.md` §4.3, §4.7; `fault-system.md`; `executable-model.md` (D8/R4)
+> **Relates to:** `compiler-and-runtime-design.md`; `fault-system.md`; `executable-model.md` (D8/R4)
 > **Implemented in:** `src/Precept.Next/Runtime/` (future)
 
 ## Overview

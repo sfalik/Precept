@@ -2,7 +2,7 @@
 
 > **Status:** Design — public surface approved, entity internals (R3) pending
 > **Decisions:** R1 ✅, R2 ✅, R5 ✅; R3 (entity representation) open; D8/R4 (executable model contract) open
-> **Relates to:** `architecture-planning.md` §4.2, §4.7; `result-types.md`; `fault-system.md`; `executable-model.md` (D8/R4, future)
+> **Relates to:** `compiler-and-runtime-design.md`; `result-types.md`; `fault-system.md`; `executable-model.md` (D8/R4, future)
 > **Implemented in:** `src/Precept.Next/Runtime/`
 
 ## Overview
