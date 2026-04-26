@@ -176,7 +176,7 @@ public class ActionsTests
         var meta = Actions.GetMeta(ActionKind.Clear);
         var modified = meta.ApplicableTo.OfType<ModifiedTypeTarget>().ToList();
         modified.Should().HaveCount(1);
-        modified[0].TypeKindOrNull.Should().BeNull("null = any type");
+        modified[0].Kind.Should().BeNull("null = any type");
         modified[0].RequiredModifiers.Should().BeEquivalentTo([ModifierKind.Optional]);
     }
 

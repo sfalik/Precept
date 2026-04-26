@@ -56,25 +56,22 @@ public enum AnchorTarget
 // ════════════════════════════════════════════════════════════════════════════════
 
 /// <summary>
-/// Declares type applicability for a modifier or action. <c>TypeTarget(Kind)</c>
-/// matches fields of the given type. See <see cref="ModifiedTypeTarget"/> for
-/// modifier-conditioned matching.
+/// Declares type applicability for a modifier or action.
+/// <c>Kind = null</c> means "any type." Used in applicability arrays with OR semantics.
 /// </summary>
-public record TypeTarget(TypeKind Kind);
+public record TypeTarget(TypeKind? Kind);
 
 /// <summary>
 /// Matches a field that has the given type AND all listed modifiers.
-/// <c>TypeKind = null</c> means "any type." Used in applicability arrays with OR semantics.
+/// <c>Kind = null</c> means "any type."
 /// </summary>
 public sealed record ModifiedTypeTarget : TypeTarget
 {
-    public TypeKind? TypeKindOrNull { get; }
     public ModifierKind[] RequiredModifiers { get; }
 
     public ModifiedTypeTarget(TypeKind? typeKind, ModifierKind[] requiredModifiers)
-        : base(typeKind ?? TypeKind.Error)
+        : base(typeKind)
     {
-        TypeKindOrNull = typeKind;
         RequiredModifiers = requiredModifiers;
     }
 }

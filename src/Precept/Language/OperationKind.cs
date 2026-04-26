@@ -77,17 +77,20 @@ public enum OperationKind
     DurationMinusDuration,
     DurationTimesInteger,
     DurationTimesNumber,
+    DurationTimesDecimal,
     DurationDivideInteger,
     DurationDivideNumber,
     DurationDivideDuration,
 
     // ── Temporal: period ────────────────────────────────────────────
     PeriodPlusPeriod,
-    PeriodMinusPeriod,
-
+    PeriodMinusPeriod,    PeriodTimesInteger,
+    PeriodDivideInteger,
     // ── Temporal: zoneddatetime ─────────────────────────────────────
     ZonedDateTimePlusDuration,
     ZonedDateTimeMinusDuration,
+    ZonedDateTimePlusPeriod,
+    ZonedDateTimeMinusPeriod,
     ZonedDateTimeMinusZonedDateTime,
 
     // ── Temporal: datetime ──────────────────────────────────────────
