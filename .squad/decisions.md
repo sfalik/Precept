@@ -6,6 +6,32 @@
 
 ---
 
+### 2026-04-27T00:00:00Z: MCP dual-surface operating model canonicalized
+**By:** Scribe
+**Status:** Merged, deduplicated, inbox cleared (4 files)
+
+**Merged sources:** `frank-mcp-operating-model`, `newman-mcp-dual-surface`, `soup-nazi-mcp-validation`, `copilot-directive-2026-04-26T11-13-50-367-04-00`.
+
+- Repo-root `.mcp.json` is the Copilot CLI repo-local surface; `.vscode/mcp.json` remains the VS Code/workspace-local surface; `tools/Precept.Plugin/.mcp.json` remains the shipped/distribution payload.
+- The authoritative repo-local development behavior stays source-first via `node tools/scripts/start-precept-mcp.js`. Client-specific files are projections/adapters, not separate contracts.
+- The `github` MCP entry is intentionally **not** mirrored into repo-root `.mcp.json`; Copilot CLI provides GitHub MCP natively.
+- Directly related docs were updated in the same change (`CONTRIBUTING.md`, `.github/copilot-instructions.md`, `tools/Precept.Plugin/README.md`, `.squad/skills/architecture/SKILL.md`), and the stale `docs/ArtifactOperatingModelDesign.md` reference is retired in favor of `tools/Precept.Plugin/README.md`.
+- Validation rerun passed: all three MCP config surfaces parse cleanly, schemas stay separated (`mcpServers` for CLI/plugin, `servers` for VS Code), and no directly related stale live reference remains.
+- Team pattern locked: dual-surface config work is only considered landed when the config artifact and at least one directly related doc land together.
+
+### 2026-04-26T15:48:53Z: Analyzer expansion plan and catalog conventions canonicalized
+**By:** Scribe
+**Status:** Merged, deduplicated, inbox cleared (10 files)
+
+**Merged sources:** `coordinator-analyzer-implementation-plan`, `coordinator-analyzer-queue-priority`, `coordinator-catalog-audit-findings`, `coordinator-catalog-conventions`, `coordinator-post-infra-analyzer-analysis`, `copilot-directive-2026-04-26T-catalog-lexer`, `frank-cross-catalog-invariants`, `george-cross-catalog-api-design`, `soup-nazi-analyzer-test-infra`, `soup-nazi-analyzer-test-plan`.
+
+- The April 26 catalog audit now splits cleanly into **fixed now** vs **follow-up work**. Fixed in-session: `Period` gained `EqualityComparable`; qualifier modeling now reflects the full `in`/`of` system with exclusivity rules; `DisplayName` is required/populated for surfaced types; `UsageExample` is populated for surfaced types. Deferred follow-up: `TokenMeta.ValidAfter`, catalog-driven language-server completions, and the rest of the analyzer sweep.
+- Canonical analyzer scope is 53 statically checkable invariants (37 cross-catalog, 16 intra-catalog) across 11 analyzers `PRECEPT0007`–`PRECEPT0017`; `PRECEPT0018` is dropped because Tokens is a leaf and exhaustiveness is already covered by `PRECEPT0007`.
+- Shared analyzer infrastructure is now the center of gravity: `CatalogAnalysisHelpers.cs` plus a multi-source `AnalyzerTestHelper` overload. Test stubs stay minimal, avoid Frozen/Immutable BCL dependencies, and identify catalogs by class name rather than file path.
+- Constructor parameters are the canonical way to express optional catalog metadata. `init`-only metadata properties on catalog records are now explicitly rejected because they create a second analyzer extraction path.
+- Queue/order dedupe: the earlier simple-patterns-first plan is superseded by Shane's later directive to front-load the trait↔operation consistency path because it builds reusable switch-walker and enum-resolution infrastructure for the rest of the analyzer suite.
+- Soup Nazi's test-plan bar stands: helper tests plus analyzer suites total about 298 cases, with the accepted blind spot limited to spread elements inside shared static arrays and guarded by declaration-site validation/regression anchors.
+- Owner directive stands: lexer token classification must converge on fully catalog-driven behavior; implementation tactics may vary, but the architectural target is no-exceptions catalog authority.
 ### 2026-04-26T00:00:00Z: Catalog completeness, consumer drift, and analyzer sprint merge
 **By:** Scribe
 **Status:** Merged, deduplicated, inbox cleared (7 files)
@@ -11315,4 +11341,5 @@ Merged `compiler-architecture-proposal.md` and `runtime-architecture-proposal.md
 **Status:** Standing decision
 
 Shane challenged the initial placement of R3 (immutability guarantees). Resolution: immutability is a public API contract, not an evaluator implementation detail. R3 documentation belongs in `docs.next/runtime/runtime-api.md`, not `docs.next/runtime/evaluator.md`.
+
 

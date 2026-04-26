@@ -44,7 +44,7 @@ This skill governs how agents work with the **architecture design corpus** — t
 | Source | Path | When to read |
 |--------|------|-------------|
 | Product philosophy | `docs/philosophy.md` | Any change touching core guarantees |
-| Artifact operating model | `docs/ArtifactOperatingModelDesign.md` | Changes to how artifacts are structured or distributed |
+| Artifact operating model | `tools/Precept.Plugin/README.md` | Changes to how artifacts are structured or distributed |
 | Project history | `docs/HowWeGotHere.md` | Understanding prior architectural decisions |
 
 ## Using Research in Work
