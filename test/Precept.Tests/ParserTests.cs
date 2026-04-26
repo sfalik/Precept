@@ -1034,6 +1034,32 @@ from Draft on Start
         scalar.Qualifier!.Kind.Should().Be(TypeQualifierKind.Of);
     }
 
+    [Fact]
+    public void Decl_PriceWithBothQualifiers_ParsesBothQualifiers()
+    {
+        var decl = ParseDecl("field R as price in 'USD' of 'mass'");
+        var field = decl.Should().BeOfType<FieldDeclaration>().Subject;
+        var scalar = field.Type.Should().BeOfType<ScalarTypeRef>().Subject;
+        scalar.Kind.Should().Be(ScalarTypeKind.Price);
+        scalar.Qualifier.Should().NotBeNull();
+        scalar.Qualifier!.Kind.Should().Be(TypeQualifierKind.In);
+        scalar.SecondQualifier.Should().NotBeNull();
+        scalar.SecondQualifier!.Kind.Should().Be(TypeQualifierKind.Of);
+    }
+
+    [Fact]
+    public void Decl_NonPriceWithBothQualifiers_ParseesBothQualifiers()
+    {
+        // Semantic rejection (MutuallyExclusiveQualifiers) happens at Type stage, not Parse.
+        // The parser captures both qualifiers regardless of type.
+        var decl = ParseDecl("field Q as quantity in 'USD' of 'mass'");
+        var field = decl.Should().BeOfType<FieldDeclaration>().Subject;
+        var scalar = field.Type.Should().BeOfType<ScalarTypeRef>().Subject;
+        scalar.Kind.Should().Be(ScalarTypeKind.Quantity);
+        scalar.Qualifier.Should().NotBeNull();
+        scalar.SecondQualifier.Should().NotBeNull();
+    }
+
     // ════════════════════════════════════════════════════════════════════════════
     //  B8: Field modifier coverage
     // ════════════════════════════════════════════════════════════════════════════

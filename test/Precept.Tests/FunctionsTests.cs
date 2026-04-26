@@ -460,4 +460,83 @@ public class FunctionsTests
             }
         }
     }
+
+    // M2 ── Sqrt proof requirements ────────────────────────────────────────────
+
+    [Theory]
+    [InlineData(0)] // integer overload
+    [InlineData(1)] // decimal overload
+    [InlineData(2)] // number overload
+    public void Sqrt_AllOverloads_HaveNonNegativeRequirement(int overloadIndex)
+    {
+        var meta = Functions.GetMeta(FunctionKind.Sqrt);
+        var overload = meta.Overloads[overloadIndex];
+        overload.ProofRequirements.Should().HaveCount(1,
+            $"sqrt overload[{overloadIndex}] operand must be proven >= 0");
+        var req = overload.ProofRequirements[0].Should().BeOfType<NumericProofRequirement>().Subject;
+        req.Comparison.Should().Be(OperatorKind.GreaterThanOrEqual,
+            $"sqrt overload[{overloadIndex}] requires operand >= 0");
+        req.Threshold.Should().Be(0);
+    }
+
+    [Fact]
+    public void Sqrt_RequirementCount_IsOnePerOverload()
+    {
+        var meta = Functions.GetMeta(FunctionKind.Sqrt);
+        meta.Overloads.Should().HaveCount(3, "sqrt has 3 overloads");
+        foreach (var overload in meta.Overloads)
+        {
+            overload.ProofRequirements.Should().HaveCount(1,
+                $"sqrt overload for {overload.Parameters[0].Kind} must have exactly 1 proof requirement");
+        }
+    }
+
+    // M10 ── ParameterMeta.Name ────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData(FunctionKind.Clamp)]
+    [InlineData(FunctionKind.Mid)]
+    public void MultiParamFunctions_HaveNamedParameters(FunctionKind kind)
+    {
+        var meta = Functions.GetMeta(kind);
+        foreach (var overload in meta.Overloads)
+        {
+            foreach (var param in overload.Parameters)
+            {
+                param.Name.Should().NotBeNullOrEmpty(
+                    $"{kind} parameter should have a non-null Name");
+            }
+        }
+    }
+
+    [Fact]
+    public void Clamp_ParameterNames_Are_Value_Lo_Hi()
+    {
+        var meta = Functions.GetMeta(FunctionKind.Clamp);
+        var intOverload = meta.Overloads.First(o =>
+            o.Parameters[0].Kind == TypeKind.Integer && o.Match == null);
+        intOverload.Parameters[0].Name.Should().Be("value");
+        intOverload.Parameters[1].Name.Should().Be("lo");
+        intOverload.Parameters[2].Name.Should().Be("hi");
+    }
+
+    [Fact]
+    public void Left_ParameterNames_Are_Str_N()
+    {
+        var meta = Functions.GetMeta(FunctionKind.Left);
+        var overload = meta.Overloads[0];
+        overload.Parameters[0].Name.Should().Be("str");
+        overload.Parameters[1].Name.Should().Be("n");
+    }
+
+    [Fact]
+    public void Sqrt_ParameterNames_Are_Value()
+    {
+        var meta = Functions.GetMeta(FunctionKind.Sqrt);
+        foreach (var overload in meta.Overloads)
+        {
+            overload.Parameters[0].Name.Should().Be("value",
+                $"sqrt({overload.Parameters[0].Kind}) parameter should be named 'value'");
+        }
+    }
 }

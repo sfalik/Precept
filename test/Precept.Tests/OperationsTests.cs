@@ -9,7 +9,7 @@ namespace Precept.Tests;
 
 /// <summary>
 /// Tests for the Operations catalog: exhaustiveness, DU shape, indexes,
-/// commutativity, qualifier dispatch, and spec-faithful operation entries.
+/// bidirectional lookup, qualifier dispatch, and spec-faithful operation entries.
 /// </summary>
 public class OperationsTests
 {
@@ -117,7 +117,7 @@ public class OperationsTests
         meta.Lhs.Kind.Should().Be(type);
         meta.Rhs.Kind.Should().Be(type);
         meta.Result.Should().Be(type);
-        meta.Commutative.Should().BeFalse("same-type ops don't need commutativity");
+        meta.BidirectionalLookup.Should().BeFalse("same-type ops don't need bidirectional lookup");
         meta.Match.Should().Be(QualifierMatch.Any);
     }
 
@@ -141,7 +141,7 @@ public class OperationsTests
         meta.Op.Should().Be(op);
         meta.Lhs.Kind.Should().Be(TypeKind.Integer);
         meta.Result.Should().Be(resultType);
-        meta.Commutative.Should().BeTrue("widening applies in both operand orders");
+        meta.BidirectionalLookup.Should().BeTrue("widening applies in both operand orders");
     }
 
     // ── Binary: string ──────────────────────────────────────────────────────────
@@ -154,7 +154,7 @@ public class OperationsTests
         meta.Lhs.Kind.Should().Be(TypeKind.String);
         meta.Rhs.Kind.Should().Be(TypeKind.String);
         meta.Result.Should().Be(TypeKind.String);
-        meta.Commutative.Should().BeFalse("string concatenation is order-dependent");
+        meta.BidirectionalLookup.Should().BeFalse("string concatenation is order-dependent");
     }
 
     // ── Binary: temporal spot checks ────────────────────────────────────────────
@@ -181,14 +181,14 @@ public class OperationsTests
     }
 
     [Fact]
-    public void DatePlusTime_IsCommutative()
+    public void DatePlusTime_IsBidirectionalLookup()
     {
         var meta = (BinaryOperationMeta)Operations.GetMeta(OperationKind.DatePlusTime);
         meta.Op.Should().Be(OperatorKind.Plus);
         meta.Lhs.Kind.Should().Be(TypeKind.Date);
         meta.Rhs.Kind.Should().Be(TypeKind.Time);
         meta.Result.Should().Be(TypeKind.DateTime);
-        meta.Commutative.Should().BeTrue("date + time = time + date (spec Decision #25)");
+        meta.BidirectionalLookup.Should().BeTrue("date + time = time + date (spec Decision #25)");
     }
 
     [Theory]
@@ -202,19 +202,19 @@ public class OperationsTests
         meta.Lhs.Kind.Should().Be(TypeKind.Duration);
         meta.Rhs.Kind.Should().Be(scalarType);
         meta.Result.Should().Be(TypeKind.Duration);
-        meta.Commutative.Should().BeTrue("NodaTime supports both operand orders");
+        meta.BidirectionalLookup.Should().BeTrue("NodaTime supports both operand orders");
     }
 
     // ── Binary: business-domain spot checks ─────────────────────────────────────
 
     [Fact]
-    public void MoneyTimesDecimal_IsCommutative()
+    public void MoneyTimesDecimal_IsBidirectionalLookup()
     {
         var meta = (BinaryOperationMeta)Operations.GetMeta(OperationKind.MoneyTimesDecimal);
         meta.Lhs.Kind.Should().Be(TypeKind.Money);
         meta.Rhs.Kind.Should().Be(TypeKind.Decimal);
         meta.Result.Should().Be(TypeKind.Money);
-        meta.Commutative.Should().BeTrue();
+        meta.BidirectionalLookup.Should().BeTrue();
     }
 
     [Theory]
@@ -243,7 +243,7 @@ public class OperationsTests
         meta.Lhs.Kind.Should().Be(TypeKind.Price);
         meta.Rhs.Kind.Should().Be(multiplierType);
         meta.Result.Should().Be(resultType);
-        meta.Commutative.Should().BeTrue();
+        meta.BidirectionalLookup.Should().BeTrue();
     }
 
     [Fact]
@@ -254,7 +254,7 @@ public class OperationsTests
         meta.Lhs.Kind.Should().Be(TypeKind.ExchangeRate);
         meta.Rhs.Kind.Should().Be(TypeKind.Money);
         meta.Result.Should().Be(TypeKind.Money);
-        meta.Commutative.Should().BeTrue();
+        meta.BidirectionalLookup.Should().BeTrue();
     }
 
     // ── QualifierMatch entries ───────────────────────────────────────────────────
@@ -303,28 +303,28 @@ public class OperationsTests
         nonAny.Should().Contain(m => m.Kind == OperationKind.QuantityDivideQuantityCrossDimension);
     }
 
-    // ── Commutativity ───────────────────────────────────────────────────────────
+    // ── Bidirectional lookup ────────────────────────────────────────────────────
 
     [Fact]
-    public void Commutative_AllMarkedEntriesHaveDifferentOperandTypes()
+    public void BidirectionalLookup_AllMarkedEntriesHaveDifferentOperandTypes()
     {
-        // Commutative flag only makes sense when Lhs and Rhs differ.
+        // BidirectionalLookup flag only makes sense when Lhs and Rhs differ.
         // Same-type operations (integer+integer) don't need it.
-        var commutative = Operations.All
+        var bidirectional = Operations.All
             .OfType<BinaryOperationMeta>()
-            .Where(m => m.Commutative);
+            .Where(m => m.BidirectionalLookup);
 
-        foreach (var meta in commutative)
+        foreach (var meta in bidirectional)
         {
             meta.Lhs.Kind.Should().NotBe(meta.Rhs.Kind,
-                $"{meta.Kind} is marked commutative but has identical operand types");
+                $"{meta.Kind} is marked BidirectionalLookup but has identical operand types");
         }
     }
 
     [Fact]
-    public void Commutative_Count()
+    public void BidirectionalLookup_Count()
     {
-        // All commutative entries:
+        // All bidirectional-lookup entries:
         // Arithmetic widening: 10 (5 integer/decimal + 5 integer/number)
         // Temporal: DatePlusTime, DurationTimesInteger, DurationTimesNumber = 3
         // Business: MoneyTimesDecimal, QuantityTimesDecimal,
@@ -335,7 +335,7 @@ public class OperationsTests
         // Total: 35
         Operations.All
             .OfType<BinaryOperationMeta>()
-            .Count(m => m.Commutative)
+            .Count(m => m.BidirectionalLookup)
             .Should().Be(35);
     }
 
@@ -389,7 +389,7 @@ public class OperationsTests
         candidates.Length.Should().Be(expectedCount);
     }
 
-    // ── Binary index: commutative reverse lookups ───────────────────────────────
+    // ── Binary index: bidirectional reverse lookups ──────────────────────────────
 
     [Theory]
     [InlineData(OperatorKind.Plus, TypeKind.Time, TypeKind.Date)]       // time + date
@@ -405,16 +405,16 @@ public class OperationsTests
     [InlineData(OperatorKind.Times, TypeKind.Money, TypeKind.ExchangeRate)] // money * exchangerate
     [InlineData(OperatorKind.Times, TypeKind.Decimal, TypeKind.ExchangeRate)] // decimal * exchangerate
     [InlineData(OperatorKind.Times, TypeKind.Decimal, TypeKind.Price)]  // decimal * price
-    public void BinaryIndex_CommutativeReverseIsIndexed(
+    public void BinaryIndex_BidirectionalReverseIsIndexed(
         OperatorKind op, TypeKind lhs, TypeKind rhs)
     {
         var candidates = Operations.FindCandidates(op, lhs, rhs);
         candidates.Length.Should().BeGreaterThan(0,
-            $"Reverse lookup ({op}, {lhs}, {rhs}) should be indexed for commutative entry");
+            $"Reverse lookup ({op}, {lhs}, {rhs}) should be indexed for bidirectional-lookup entry");
     }
 
     [Fact]
-    public void BinaryIndex_NonCommutative_ReverseNotIndexed()
+    public void BinaryIndex_NonBidirectional_ReverseNotIndexed()
     {
         // date - period exists but period - date does not
         Operations.FindCandidates(OperatorKind.Minus, TypeKind.Period, TypeKind.Date)
@@ -545,15 +545,83 @@ public class OperationsTests
     [Fact]
     public void Binary_Count()
     {
-        // 83 arithmetic + 108 comparison = 191 binary
-        Operations.All.OfType<BinaryOperationMeta>().Should().HaveCount(191);
+        // 83 arithmetic + 104 comparison = 187 binary
+        Operations.All.OfType<BinaryOperationMeta>().Should().HaveCount(187);
     }
 
     [Fact]
     public void Total_Count()
     {
-        // 9 unary + 191 binary = 200 total
-        Operations.All.Should().HaveCount(200);
+        // 9 unary + 187 binary = 196 total
+        Operations.All.Should().HaveCount(196);
+    }
+
+    // ── Proof Requirements ──────────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData(OperationKind.IntegerDivideInteger)]
+    [InlineData(OperationKind.DecimalDivideDecimal)]
+    [InlineData(OperationKind.NumberDivideNumber)]
+    [InlineData(OperationKind.IntegerDivideDecimal)]
+    [InlineData(OperationKind.IntegerDivideNumber)]
+    public void Division_HasNonZeroDivisorRequirement(OperationKind kind)
+    {
+        var meta = (BinaryOperationMeta)Operations.GetMeta(kind);
+        meta.ProofRequirements.Should().HaveCount(1, $"{kind} divisor must be proven != 0");
+        var req = meta.ProofRequirements[0].Should().BeOfType<NumericProofRequirement>().Subject;
+        req.Comparison.Should().Be(OperatorKind.NotEquals, $"{kind} divisor must be != 0");
+        req.Threshold.Should().Be(0);
+    }
+
+    [Theory]
+    [InlineData(OperationKind.IntegerModuloInteger)]
+    [InlineData(OperationKind.DecimalModuloDecimal)]
+    [InlineData(OperationKind.NumberModuloNumber)]
+    [InlineData(OperationKind.IntegerModuloDecimal)]
+    [InlineData(OperationKind.IntegerModuloNumber)]
+    public void Modulo_HasNonZeroDivisorRequirement(OperationKind kind)
+    {
+        var meta = (BinaryOperationMeta)Operations.GetMeta(kind);
+        meta.ProofRequirements.Should().HaveCount(1, $"{kind} divisor must be proven != 0");
+        var req = meta.ProofRequirements[0].Should().BeOfType<NumericProofRequirement>().Subject;
+        req.Comparison.Should().Be(OperatorKind.NotEquals, $"{kind} divisor must be != 0");
+        req.Threshold.Should().Be(0);
+    }
+
+    [Fact]
+    public void Division_ProofSubject_ReferencesRhsType()
+    {
+        var meta = (BinaryOperationMeta)Operations.GetMeta(OperationKind.IntegerDivideDecimal);
+        var req = meta.ProofRequirements[0].Should().BeOfType<NumericProofRequirement>().Subject;
+        var subject = req.Subject.Should().BeOfType<ParamSubject>().Subject;
+        subject.Parameter.Kind.Should().Be(TypeKind.Decimal,
+            "divisor for integer / decimal is the decimal RHS");
+    }
+
+    // M5 ── Temporal period proof requirements ────────────────────────────────
+
+    [Theory]
+    [InlineData(OperationKind.DatePlusPeriod)]
+    [InlineData(OperationKind.DateMinusPeriod)]
+    public void DatePeriodOps_RequireDateDimension(OperationKind kind)
+    {
+        var meta = (BinaryOperationMeta)Operations.GetMeta(kind);
+        meta.ProofRequirements.Should().HaveCount(1, $"{kind} period must have date dimension");
+        var req = meta.ProofRequirements[0].Should().BeOfType<DimensionProofRequirement>().Subject;
+        req.RequiredDimension.Should().Be(PeriodDimension.Date,
+            $"{kind} requires a date-level period operand");
+    }
+
+    [Theory]
+    [InlineData(OperationKind.TimePlusPeriod)]
+    [InlineData(OperationKind.TimeMinusPeriod)]
+    public void TimePeriodOps_RequireTimeDimension(OperationKind kind)
+    {
+        var meta = (BinaryOperationMeta)Operations.GetMeta(kind);
+        meta.ProofRequirements.Should().HaveCount(1, $"{kind} period must have time dimension");
+        var req = meta.ProofRequirements[0].Should().BeOfType<DimensionProofRequirement>().Subject;
+        req.RequiredDimension.Should().Be(PeriodDimension.Time,
+            $"{kind} requires a time-level period operand");
     }
 
     // ── Comparison: all produce Boolean ──────────────────────────────────────────
@@ -583,7 +651,7 @@ public class OperationsTests
     [Fact]
     public void Comparison_EntryCount()
     {
-        // 16 equality-only + 78 orderable + 12 widening + 2 case-insensitive = 108
+        // 18 equality-only + 72 orderable + 12 widening + 2 case-insensitive = 104
         var comparisonOps = new HashSet<OperatorKind>
         {
             OperatorKind.Equals, OperatorKind.NotEquals,
@@ -595,7 +663,7 @@ public class OperationsTests
         Operations.All
             .OfType<BinaryOperationMeta>()
             .Count(m => comparisonOps.Contains(m.Op))
-            .Should().Be(108);
+            .Should().Be(104);
     }
 
     // ── Comparison: equality-only types ──────────────────────────────────────────
@@ -609,6 +677,7 @@ public class OperationsTests
     [InlineData(TypeKind.UnitOfMeasure)]
     [InlineData(TypeKind.Dimension)]
     [InlineData(TypeKind.ExchangeRate)]
+    [InlineData(TypeKind.String)]
     public void EqualityOnly_SupportsEqualsAndNotEquals(TypeKind type)
     {
         Operations.FindCandidates(OperatorKind.Equals, type, type)
@@ -626,6 +695,7 @@ public class OperationsTests
     [InlineData(TypeKind.UnitOfMeasure)]
     [InlineData(TypeKind.Dimension)]
     [InlineData(TypeKind.ExchangeRate)]
+    [InlineData(TypeKind.String)]
     public void EqualityOnly_DoesNotSupportOrdering(TypeKind type)
     {
         Operations.FindCandidates(OperatorKind.LessThan, type, type)
@@ -640,7 +710,6 @@ public class OperationsTests
     [InlineData(TypeKind.Integer)]
     [InlineData(TypeKind.Decimal)]
     [InlineData(TypeKind.Number)]
-    [InlineData(TypeKind.String)]
     [InlineData(TypeKind.Choice)]
     [InlineData(TypeKind.Date)]
     [InlineData(TypeKind.Time)]
@@ -689,7 +758,7 @@ public class OperationsTests
         // Canonical: integer op decimal
         Operations.FindCandidates(op, TypeKind.Integer, TypeKind.Decimal)
             .Length.Should().BeGreaterThan(0);
-        // Reverse: decimal op integer (commutative index)
+        // Reverse: decimal op integer (bidirectional-lookup index)
         Operations.FindCandidates(op, TypeKind.Decimal, TypeKind.Integer)
             .Length.Should().BeGreaterThan(0);
     }

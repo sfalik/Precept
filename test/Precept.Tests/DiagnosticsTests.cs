@@ -148,7 +148,6 @@ public class DiagnosticsTests
         DiagnosticCode.UnexpectedKeyword,
         DiagnosticCode.NonAssociativeComparison,
         DiagnosticCode.InvalidCallTarget,
-        DiagnosticCode.MutuallyExclusiveQualifiers,
     };
 
     public static TheoryData<DiagnosticCode> TypeCodes => new()
@@ -215,6 +214,7 @@ public class DiagnosticsTests
         DiagnosticCode.InvalidUnitString,
         DiagnosticCode.InvalidCurrencyCode,
         DiagnosticCode.InvalidDimensionString,
+        DiagnosticCode.MutuallyExclusiveQualifiers,
     };
 
     public static TheoryData<DiagnosticCode> GraphCodes => new()

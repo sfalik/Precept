@@ -787,9 +787,12 @@ public static class Parser
                 TypeQualifier? qualifier = null;
                 if (Current.Kind is TokenKind.In or TokenKind.Of)
                     qualifier = ParseTypeQualifier();
+                TypeQualifier? secondQualifier = null;
+                if (qualifier != null && Current.Kind is TokenKind.In or TokenKind.Of)
+                    secondQualifier = ParseTypeQualifier();
                 return new ScalarTypeRef(
                     SourceSpan.Covering(SpanOf(start), LastSpan()),
-                    kind.Value, qualifier);
+                    kind.Value, qualifier, SecondQualifier: secondQualifier);
             }
 
             // Missing type

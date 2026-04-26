@@ -94,11 +94,21 @@ public static class Operations
 
         OperationKind.IntegerDivideInteger => new BinaryOperationMeta(
             kind, OperatorKind.Divide, PInteger, PInteger, TypeKind.Integer,
-            "Integer division (truncating)"),
+            "Integer division (truncating)",
+            ProofRequirements:
+            [
+                new NumericProofRequirement(new ParamSubject(PInteger), OperatorKind.NotEquals, 0m,
+                    "Divisor must be non-zero"),
+            ]),
 
         OperationKind.IntegerModuloInteger => new BinaryOperationMeta(
             kind, OperatorKind.Modulo, PInteger, PInteger, TypeKind.Integer,
-            "Integer modulo"),
+            "Integer modulo",
+            ProofRequirements:
+            [
+                new NumericProofRequirement(new ParamSubject(PInteger), OperatorKind.NotEquals, 0m,
+                    "Divisor must be non-zero"),
+            ]),
 
         // ── Scalar: decimal ────────────────────────────────────────
         OperationKind.DecimalPlusDecimal => new BinaryOperationMeta(
@@ -115,11 +125,21 @@ public static class Operations
 
         OperationKind.DecimalDivideDecimal => new BinaryOperationMeta(
             kind, OperatorKind.Divide, PDecimal, PDecimal, TypeKind.Decimal,
-            "Decimal division"),
+            "Decimal division",
+            ProofRequirements:
+            [
+                new NumericProofRequirement(new ParamSubject(PDecimal), OperatorKind.NotEquals, 0m,
+                    "Divisor must be non-zero"),
+            ]),
 
         OperationKind.DecimalModuloDecimal => new BinaryOperationMeta(
             kind, OperatorKind.Modulo, PDecimal, PDecimal, TypeKind.Decimal,
-            "Decimal modulo"),
+            "Decimal modulo",
+            ProofRequirements:
+            [
+                new NumericProofRequirement(new ParamSubject(PDecimal), OperatorKind.NotEquals, 0m,
+                    "Divisor must be non-zero"),
+            ]),
 
         // ── Scalar: number ─────────────────────────────────────────
         OperationKind.NumberPlusNumber => new BinaryOperationMeta(
@@ -136,53 +156,83 @@ public static class Operations
 
         OperationKind.NumberDivideNumber => new BinaryOperationMeta(
             kind, OperatorKind.Divide, PNumber, PNumber, TypeKind.Number,
-            "Number division (IEEE 754)"),
+            "Number division (IEEE 754)",
+            ProofRequirements:
+            [
+                new NumericProofRequirement(new ParamSubject(PNumber), OperatorKind.NotEquals, 0m,
+                    "Divisor must be non-zero"),
+            ]),
 
         OperationKind.NumberModuloNumber => new BinaryOperationMeta(
             kind, OperatorKind.Modulo, PNumber, PNumber, TypeKind.Number,
-            "Number modulo (IEEE 754)"),
+            "Number modulo (IEEE 754)",
+            ProofRequirements:
+            [
+                new NumericProofRequirement(new ParamSubject(PNumber), OperatorKind.NotEquals, 0m,
+                    "Divisor must be non-zero"),
+            ]),
 
         // ── Scalar: widening integer → decimal ─────────────────────
         OperationKind.IntegerPlusDecimal => new BinaryOperationMeta(
             kind, OperatorKind.Plus, PInteger, PDecimal, TypeKind.Decimal,
-            "Integer + decimal (widens to decimal)", Commutative: true),
+            "Integer + decimal (widens to decimal)", BidirectionalLookup: true),
 
         OperationKind.IntegerMinusDecimal => new BinaryOperationMeta(
             kind, OperatorKind.Minus, PInteger, PDecimal, TypeKind.Decimal,
-            "Integer − decimal (widens to decimal)", Commutative: true),
+            "Integer − decimal (widens to decimal)", BidirectionalLookup: true),
 
         OperationKind.IntegerTimesDecimal => new BinaryOperationMeta(
             kind, OperatorKind.Times, PInteger, PDecimal, TypeKind.Decimal,
-            "Integer × decimal (widens to decimal)", Commutative: true),
+            "Integer × decimal (widens to decimal)", BidirectionalLookup: true),
 
         OperationKind.IntegerDivideDecimal => new BinaryOperationMeta(
             kind, OperatorKind.Divide, PInteger, PDecimal, TypeKind.Decimal,
-            "Integer ÷ decimal (widens to decimal)", Commutative: true),
+            "Integer ÷ decimal (widens to decimal)", BidirectionalLookup: true,
+            ProofRequirements:
+            [
+                new NumericProofRequirement(new ParamSubject(PDecimal), OperatorKind.NotEquals, 0m,
+                    "Divisor must be non-zero"),
+            ]),
 
         OperationKind.IntegerModuloDecimal => new BinaryOperationMeta(
             kind, OperatorKind.Modulo, PInteger, PDecimal, TypeKind.Decimal,
-            "Integer % decimal (widens to decimal)", Commutative: true),
+            "Integer % decimal (widens to decimal)", BidirectionalLookup: true,
+            ProofRequirements:
+            [
+                new NumericProofRequirement(new ParamSubject(PDecimal), OperatorKind.NotEquals, 0m,
+                    "Divisor must be non-zero"),
+            ]),
 
         // ── Scalar: widening integer → number ──────────────────────
         OperationKind.IntegerPlusNumber => new BinaryOperationMeta(
             kind, OperatorKind.Plus, PInteger, PNumber, TypeKind.Number,
-            "Integer + number (widens to number)", Commutative: true),
+            "Integer + number (widens to number)", BidirectionalLookup: true),
 
         OperationKind.IntegerMinusNumber => new BinaryOperationMeta(
             kind, OperatorKind.Minus, PInteger, PNumber, TypeKind.Number,
-            "Integer − number (widens to number)", Commutative: true),
+            "Integer − number (widens to number)", BidirectionalLookup: true),
 
         OperationKind.IntegerTimesNumber => new BinaryOperationMeta(
             kind, OperatorKind.Times, PInteger, PNumber, TypeKind.Number,
-            "Integer × number (widens to number)", Commutative: true),
+            "Integer × number (widens to number)", BidirectionalLookup: true),
 
         OperationKind.IntegerDivideNumber => new BinaryOperationMeta(
             kind, OperatorKind.Divide, PInteger, PNumber, TypeKind.Number,
-            "Integer ÷ number (widens to number)", Commutative: true),
+            "Integer ÷ number (widens to number)", BidirectionalLookup: true,
+            ProofRequirements:
+            [
+                new NumericProofRequirement(new ParamSubject(PNumber), OperatorKind.NotEquals, 0m,
+                    "Divisor must be non-zero"),
+            ]),
 
         OperationKind.IntegerModuloNumber => new BinaryOperationMeta(
             kind, OperatorKind.Modulo, PInteger, PNumber, TypeKind.Number,
-            "Integer % number (widens to number)", Commutative: true),
+            "Integer % number (widens to number)", BidirectionalLookup: true,
+            ProofRequirements:
+            [
+                new NumericProofRequirement(new ParamSubject(PNumber), OperatorKind.NotEquals, 0m,
+                    "Divisor must be non-zero"),
+            ]),
 
         // ── String ─────────────────────────────────────────────────
         OperationKind.StringPlusString => new BinaryOperationMeta(
@@ -192,11 +242,21 @@ public static class Operations
         // ── Temporal: date ──────────────────────────────────────────
         OperationKind.DatePlusPeriod => new BinaryOperationMeta(
             kind, OperatorKind.Plus, PDate, PPeriod, TypeKind.Date,
-            "Date + period → date (calendar arithmetic)"),
+            "Date + period → date (calendar arithmetic)",
+            ProofRequirements:
+            [
+                new DimensionProofRequirement(new ParamSubject(PPeriod), PeriodDimension.Date,
+                    "Period must be a date-level period (year, month, or day)"),
+            ]),
 
         OperationKind.DateMinusPeriod => new BinaryOperationMeta(
             kind, OperatorKind.Minus, PDate, PPeriod, TypeKind.Date,
-            "Date − period → date (calendar arithmetic)"),
+            "Date − period → date (calendar arithmetic)",
+            ProofRequirements:
+            [
+                new DimensionProofRequirement(new ParamSubject(PPeriod), PeriodDimension.Date,
+                    "Period must be a date-level period (year, month, or day)"),
+            ]),
 
         OperationKind.DateMinusDate => new BinaryOperationMeta(
             kind, OperatorKind.Minus, PDate, PDate, TypeKind.Period,
@@ -204,16 +264,26 @@ public static class Operations
 
         OperationKind.DatePlusTime => new BinaryOperationMeta(
             kind, OperatorKind.Plus, PDate, PTime, TypeKind.DateTime,
-            "Date + time → datetime (composition)", Commutative: true),
+            "Date + time → datetime (composition)", BidirectionalLookup: true),
 
         // ── Temporal: time ──────────────────────────────────────────
         OperationKind.TimePlusPeriod => new BinaryOperationMeta(
             kind, OperatorKind.Plus, PTime, PPeriod, TypeKind.Time,
-            "Time + period → time (requires period of 'time')"),
+            "Time + period → time (requires period of 'time')",
+            ProofRequirements:
+            [
+                new DimensionProofRequirement(new ParamSubject(PPeriod), PeriodDimension.Time,
+                    "Period must be a time-level period (hour, minute, or second)"),
+            ]),
 
         OperationKind.TimeMinusPeriod => new BinaryOperationMeta(
             kind, OperatorKind.Minus, PTime, PPeriod, TypeKind.Time,
-            "Time − period → time (requires period of 'time')"),
+            "Time − period → time (requires period of 'time')",
+            ProofRequirements:
+            [
+                new DimensionProofRequirement(new ParamSubject(PPeriod), PeriodDimension.Time,
+                    "Period must be a time-level period (hour, minute, or second)"),
+            ]),
 
         OperationKind.TimePlusDuration => new BinaryOperationMeta(
             kind, OperatorKind.Plus, PTime, PDuration, TypeKind.Time,
@@ -251,23 +321,38 @@ public static class Operations
 
         OperationKind.DurationTimesInteger => new BinaryOperationMeta(
             kind, OperatorKind.Times, PDuration, PInteger, TypeKind.Duration,
-            "Duration × integer → duration (scaling)", Commutative: true),
+            "Duration × integer → duration (scaling)", BidirectionalLookup: true),
 
         OperationKind.DurationTimesNumber => new BinaryOperationMeta(
             kind, OperatorKind.Times, PDuration, PNumber, TypeKind.Duration,
-            "Duration × number → duration (scaling)", Commutative: true),
+            "Duration × number → duration (scaling)", BidirectionalLookup: true),
 
         OperationKind.DurationDivideInteger => new BinaryOperationMeta(
             kind, OperatorKind.Divide, PDuration, PInteger, TypeKind.Duration,
-            "Duration ÷ integer → duration (scaling)"),
+            "Duration ÷ integer → duration (scaling)",
+            ProofRequirements:
+            [
+                new NumericProofRequirement(new ParamSubject(PInteger), OperatorKind.NotEquals, 0m,
+                    "Divisor must be non-zero"),
+            ]),
 
         OperationKind.DurationDivideNumber => new BinaryOperationMeta(
             kind, OperatorKind.Divide, PDuration, PNumber, TypeKind.Duration,
-            "Duration ÷ number → duration (scaling)"),
+            "Duration ÷ number → duration (scaling)",
+            ProofRequirements:
+            [
+                new NumericProofRequirement(new ParamSubject(PNumber), OperatorKind.NotEquals, 0m,
+                    "Divisor must be non-zero"),
+            ]),
 
         OperationKind.DurationDivideDuration => new BinaryOperationMeta(
             kind, OperatorKind.Divide, PDuration, PDuration, TypeKind.Number,
-            "Duration ÷ duration → number (ratio)"),
+            "Duration ÷ duration → number (ratio)",
+            ProofRequirements:
+            [
+                new NumericProofRequirement(new ParamSubject(PDuration), OperatorKind.NotEquals, 0m,
+                    "Divisor must be non-zero"),
+            ]),
 
         // ── Temporal: period ────────────────────────────────────────
         OperationKind.PeriodPlusPeriod => new BinaryOperationMeta(
@@ -315,33 +400,63 @@ public static class Operations
 
         OperationKind.MoneyTimesDecimal => new BinaryOperationMeta(
             kind, OperatorKind.Times, PMoney, PDecimal, TypeKind.Money,
-            "Money × decimal → money (scaling)", Commutative: true),
+            "Money × decimal → money (scaling)", BidirectionalLookup: true),
 
         OperationKind.MoneyDivideDecimal => new BinaryOperationMeta(
             kind, OperatorKind.Divide, PMoney, PDecimal, TypeKind.Money,
-            "Money ÷ decimal → money (scaling)"),
+            "Money ÷ decimal → money (scaling)",
+            ProofRequirements:
+            [
+                new NumericProofRequirement(new ParamSubject(PDecimal), OperatorKind.NotEquals, 0m,
+                    "Divisor must be non-zero"),
+            ]),
 
         OperationKind.MoneyDivideMoneySameCurrency => new BinaryOperationMeta(
             kind, OperatorKind.Divide, PMoney, PMoney, TypeKind.Decimal,
             "Money ÷ money (same currency) → decimal (dimensionless ratio)",
-            Match: QualifierMatch.Same),
+            Match: QualifierMatch.Same,
+            ProofRequirements:
+            [
+                new NumericProofRequirement(new ParamSubject(PMoney), OperatorKind.NotEquals, 0m,
+                    "Divisor must be non-zero"),
+            ]),
 
         OperationKind.MoneyDivideMoneyCrossCurrency => new BinaryOperationMeta(
             kind, OperatorKind.Divide, PMoney, PMoney, TypeKind.ExchangeRate,
             "Money ÷ money (different currencies) → exchangerate",
-            Match: QualifierMatch.Different),
+            Match: QualifierMatch.Different,
+            ProofRequirements:
+            [
+                new NumericProofRequirement(new ParamSubject(PMoney), OperatorKind.NotEquals, 0m,
+                    "Divisor must be non-zero"),
+            ]),
 
         OperationKind.MoneyDivideQuantity => new BinaryOperationMeta(
             kind, OperatorKind.Divide, PMoney, PQuantity, TypeKind.Price,
-            "Money ÷ quantity → price"),
+            "Money ÷ quantity → price",
+            ProofRequirements:
+            [
+                new NumericProofRequirement(new ParamSubject(PQuantity), OperatorKind.NotEquals, 0m,
+                    "Divisor must be non-zero"),
+            ]),
 
         OperationKind.MoneyDividePeriod => new BinaryOperationMeta(
             kind, OperatorKind.Divide, PMoney, PPeriod, TypeKind.Price,
-            "Money ÷ period → price (time-based price derivation)"),
+            "Money ÷ period → price (time-based price derivation)",
+            ProofRequirements:
+            [
+                new NumericProofRequirement(new ParamSubject(PPeriod), OperatorKind.NotEquals, 0m,
+                    "Divisor must be non-zero"),
+            ]),
 
         OperationKind.MoneyDivideDuration => new BinaryOperationMeta(
             kind, OperatorKind.Divide, PMoney, PDuration, TypeKind.Price,
-            "Money ÷ duration → price (hours/minutes/seconds denominators)"),
+            "Money ÷ duration → price (hours/minutes/seconds denominators)",
+            ProofRequirements:
+            [
+                new NumericProofRequirement(new ParamSubject(PDuration), OperatorKind.NotEquals, 0m,
+                    "Divisor must be non-zero"),
+            ]),
 
         // ── Business: quantity ──────────────────────────────────────
         OperationKind.QuantityPlusQuantity => new BinaryOperationMeta(
@@ -354,29 +469,54 @@ public static class Operations
 
         OperationKind.QuantityTimesDecimal => new BinaryOperationMeta(
             kind, OperatorKind.Times, PQuantity, PDecimal, TypeKind.Quantity,
-            "Quantity × decimal → quantity (scaling)", Commutative: true),
+            "Quantity × decimal → quantity (scaling)", BidirectionalLookup: true),
 
         OperationKind.QuantityDivideDecimal => new BinaryOperationMeta(
             kind, OperatorKind.Divide, PQuantity, PDecimal, TypeKind.Quantity,
-            "Quantity ÷ decimal → quantity (scaling)"),
+            "Quantity ÷ decimal → quantity (scaling)",
+            ProofRequirements:
+            [
+                new NumericProofRequirement(new ParamSubject(PDecimal), OperatorKind.NotEquals, 0m,
+                    "Divisor must be non-zero"),
+            ]),
 
         OperationKind.QuantityDivideQuantitySameDimension => new BinaryOperationMeta(
             kind, OperatorKind.Divide, PQuantity, PQuantity, TypeKind.Decimal,
             "Quantity ÷ quantity (same dimension) → decimal (dimensionless ratio)",
-            Match: QualifierMatch.Same),
+            Match: QualifierMatch.Same,
+            ProofRequirements:
+            [
+                new NumericProofRequirement(new ParamSubject(PQuantity), OperatorKind.NotEquals, 0m,
+                    "Divisor must be non-zero"),
+            ]),
 
         OperationKind.QuantityDivideQuantityCrossDimension => new BinaryOperationMeta(
             kind, OperatorKind.Divide, PQuantity, PQuantity, TypeKind.Quantity,
             "Quantity ÷ quantity (different dimensions) → compound quantity",
-            Match: QualifierMatch.Different),
+            Match: QualifierMatch.Different,
+            ProofRequirements:
+            [
+                new NumericProofRequirement(new ParamSubject(PQuantity), OperatorKind.NotEquals, 0m,
+                    "Divisor must be non-zero"),
+            ]),
 
         OperationKind.QuantityDividePeriod => new BinaryOperationMeta(
             kind, OperatorKind.Divide, PQuantity, PPeriod, TypeKind.Quantity,
-            "Quantity ÷ period → compound quantity (time-denominator rate)"),
+            "Quantity ÷ period → compound quantity (time-denominator rate)",
+            ProofRequirements:
+            [
+                new NumericProofRequirement(new ParamSubject(PPeriod), OperatorKind.NotEquals, 0m,
+                    "Divisor must be non-zero"),
+            ]),
 
         OperationKind.QuantityDivideDuration => new BinaryOperationMeta(
             kind, OperatorKind.Divide, PQuantity, PDuration, TypeKind.Quantity,
-            "Quantity ÷ duration → compound quantity (hours/min/sec denominators)"),
+            "Quantity ÷ duration → compound quantity (hours/min/sec denominators)",
+            ProofRequirements:
+            [
+                new NumericProofRequirement(new ParamSubject(PDuration), OperatorKind.NotEquals, 0m,
+                    "Divisor must be non-zero"),
+            ]),
 
         OperationKind.QuantityTimesQuantity => new BinaryOperationMeta(
             kind, OperatorKind.Times, PQuantity, PQuantity, TypeKind.Quantity,
@@ -384,11 +524,11 @@ public static class Operations
 
         OperationKind.QuantityTimesPeriod => new BinaryOperationMeta(
             kind, OperatorKind.Times, PQuantity, PPeriod, TypeKind.Quantity,
-            "Quantity × period → quantity (time-denominator cancellation)", Commutative: true),
+            "Quantity × period → quantity (time-denominator cancellation)", BidirectionalLookup: true),
 
         OperationKind.QuantityTimesDuration => new BinaryOperationMeta(
             kind, OperatorKind.Times, PQuantity, PDuration, TypeKind.Quantity,
-            "Quantity × duration → quantity (time-denominator cancellation)", Commutative: true),
+            "Quantity × duration → quantity (time-denominator cancellation)", BidirectionalLookup: true),
 
         // ── Business: price ─────────────────────────────────────────
         OperationKind.PricePlusPrice => new BinaryOperationMeta(
@@ -401,36 +541,46 @@ public static class Operations
 
         OperationKind.PriceTimesQuantity => new BinaryOperationMeta(
             kind, OperatorKind.Times, PPrice, PQuantity, TypeKind.Money,
-            "Price × quantity → money (dimensional cancellation)", Commutative: true),
+            "Price × quantity → money (dimensional cancellation)", BidirectionalLookup: true),
 
         OperationKind.PriceTimesPeriod => new BinaryOperationMeta(
             kind, OperatorKind.Times, PPrice, PPeriod, TypeKind.Money,
-            "Price × period → money (time-denominator cancellation)", Commutative: true),
+            "Price × period → money (time-denominator cancellation)", BidirectionalLookup: true),
 
         OperationKind.PriceTimesDuration => new BinaryOperationMeta(
             kind, OperatorKind.Times, PPrice, PDuration, TypeKind.Money,
-            "Price × duration → money (hours/min/sec cancellation)", Commutative: true),
+            "Price × duration → money (hours/min/sec cancellation)", BidirectionalLookup: true),
 
         OperationKind.PriceTimesDecimal => new BinaryOperationMeta(
             kind, OperatorKind.Times, PPrice, PDecimal, TypeKind.Price,
-            "Price × decimal → price (scaling)", Commutative: true),
+            "Price × decimal → price (scaling)", BidirectionalLookup: true),
 
         OperationKind.PriceDivideDecimal => new BinaryOperationMeta(
             kind, OperatorKind.Divide, PPrice, PDecimal, TypeKind.Price,
-            "Price ÷ decimal → price (scaling)"),
+            "Price ÷ decimal → price (scaling)",
+            ProofRequirements:
+            [
+                new NumericProofRequirement(new ParamSubject(PDecimal), OperatorKind.NotEquals, 0m,
+                    "Divisor must be non-zero"),
+            ]),
 
         // ── Business: exchangerate ──────────────────────────────────
         OperationKind.ExchangeRateTimesMoney => new BinaryOperationMeta(
             kind, OperatorKind.Times, PExchangeRate, PMoney, TypeKind.Money,
-            "ExchangeRate × money → money (currency conversion)", Commutative: true),
+            "ExchangeRate × money → money (currency conversion)", BidirectionalLookup: true),
 
         OperationKind.ExchangeRateTimesDecimal => new BinaryOperationMeta(
             kind, OperatorKind.Times, PExchangeRate, PDecimal, TypeKind.ExchangeRate,
-            "ExchangeRate × decimal → exchangerate (scaling)", Commutative: true),
+            "ExchangeRate × decimal → exchangerate (scaling)", BidirectionalLookup: true),
 
         OperationKind.ExchangeRateDivideDecimal => new BinaryOperationMeta(
             kind, OperatorKind.Divide, PExchangeRate, PDecimal, TypeKind.ExchangeRate,
-            "ExchangeRate ÷ decimal → exchangerate (scaling)"),
+            "ExchangeRate ÷ decimal → exchangerate (scaling)",
+            ProofRequirements:
+            [
+                new NumericProofRequirement(new ParamSubject(PDecimal), OperatorKind.NotEquals, 0m,
+                    "Divisor must be non-zero"),
+            ]),
 
         // ════════════════════════════════════════════════════════════
         //  Comparison operations (result is always Boolean)
@@ -460,7 +610,7 @@ public static class Operations
 
         OperationKind.ZonedDateTimeEqualsZonedDateTime => new BinaryOperationMeta(
             kind, OperatorKind.Equals, PZonedDateTime, PZonedDateTime, TypeKind.Boolean,
-            "ZonedDateTime equality (instant + calendar + zone)"),
+            "ZonedDateTime equality (multi-dimensional: instant, then local datetime, then zone ID)"),
         OperationKind.ZonedDateTimeNotEqualsZonedDateTime => new BinaryOperationMeta(
             kind, OperatorKind.NotEquals, PZonedDateTime, PZonedDateTime, TypeKind.Boolean,
             "ZonedDateTime inequality"),
@@ -562,18 +712,6 @@ public static class Operations
         OperationKind.StringNotEqualsString => new BinaryOperationMeta(
             kind, OperatorKind.NotEquals, PString, PString, TypeKind.Boolean,
             "String inequality"),
-        OperationKind.StringLessThanString => new BinaryOperationMeta(
-            kind, OperatorKind.LessThan, PString, PString, TypeKind.Boolean,
-            "String less-than (lexicographic)"),
-        OperationKind.StringGreaterThanString => new BinaryOperationMeta(
-            kind, OperatorKind.GreaterThan, PString, PString, TypeKind.Boolean,
-            "String greater-than (lexicographic)"),
-        OperationKind.StringLessThanOrEqualString => new BinaryOperationMeta(
-            kind, OperatorKind.LessThanOrEqual, PString, PString, TypeKind.Boolean,
-            "String less-than-or-equal (lexicographic)"),
-        OperationKind.StringGreaterThanOrEqualString => new BinaryOperationMeta(
-            kind, OperatorKind.GreaterThanOrEqual, PString, PString, TypeKind.Boolean,
-            "String greater-than-or-equal (lexicographic)"),
 
         // ── Orderable same-type: choice ─────────────────────────────
         OperationKind.ChoiceEqualsChoice => new BinaryOperationMeta(
@@ -776,42 +914,42 @@ public static class Operations
         // ── Widening comparison: integer ↔ decimal ──────────────────
         OperationKind.IntegerEqualsDecimal => new BinaryOperationMeta(
             kind, OperatorKind.Equals, PInteger, PDecimal, TypeKind.Boolean,
-            "Integer == decimal (widens to decimal)", Commutative: true),
+            "Integer == decimal (widens to decimal)", BidirectionalLookup: true),
         OperationKind.IntegerNotEqualsDecimal => new BinaryOperationMeta(
             kind, OperatorKind.NotEquals, PInteger, PDecimal, TypeKind.Boolean,
-            "Integer != decimal (widens to decimal)", Commutative: true),
+            "Integer != decimal (widens to decimal)", BidirectionalLookup: true),
         OperationKind.IntegerLessThanDecimal => new BinaryOperationMeta(
             kind, OperatorKind.LessThan, PInteger, PDecimal, TypeKind.Boolean,
-            "Integer < decimal (widens to decimal)", Commutative: true),
+            "Integer < decimal (widens to decimal)", BidirectionalLookup: true),
         OperationKind.IntegerGreaterThanDecimal => new BinaryOperationMeta(
             kind, OperatorKind.GreaterThan, PInteger, PDecimal, TypeKind.Boolean,
-            "Integer > decimal (widens to decimal)", Commutative: true),
+            "Integer > decimal (widens to decimal)", BidirectionalLookup: true),
         OperationKind.IntegerLessThanOrEqualDecimal => new BinaryOperationMeta(
             kind, OperatorKind.LessThanOrEqual, PInteger, PDecimal, TypeKind.Boolean,
-            "Integer <= decimal (widens to decimal)", Commutative: true),
+            "Integer <= decimal (widens to decimal)", BidirectionalLookup: true),
         OperationKind.IntegerGreaterThanOrEqualDecimal => new BinaryOperationMeta(
             kind, OperatorKind.GreaterThanOrEqual, PInteger, PDecimal, TypeKind.Boolean,
-            "Integer >= decimal (widens to decimal)", Commutative: true),
+            "Integer >= decimal (widens to decimal)", BidirectionalLookup: true),
 
         // ── Widening comparison: integer ↔ number ───────────────────
         OperationKind.IntegerEqualsNumber => new BinaryOperationMeta(
             kind, OperatorKind.Equals, PInteger, PNumber, TypeKind.Boolean,
-            "Integer == number (widens to number)", Commutative: true),
+            "Integer == number (widens to number)", BidirectionalLookup: true),
         OperationKind.IntegerNotEqualsNumber => new BinaryOperationMeta(
             kind, OperatorKind.NotEquals, PInteger, PNumber, TypeKind.Boolean,
-            "Integer != number (widens to number)", Commutative: true),
+            "Integer != number (widens to number)", BidirectionalLookup: true),
         OperationKind.IntegerLessThanNumber => new BinaryOperationMeta(
             kind, OperatorKind.LessThan, PInteger, PNumber, TypeKind.Boolean,
-            "Integer < number (widens to number)", Commutative: true),
+            "Integer < number (widens to number)", BidirectionalLookup: true),
         OperationKind.IntegerGreaterThanNumber => new BinaryOperationMeta(
             kind, OperatorKind.GreaterThan, PInteger, PNumber, TypeKind.Boolean,
-            "Integer > number (widens to number)", Commutative: true),
+            "Integer > number (widens to number)", BidirectionalLookup: true),
         OperationKind.IntegerLessThanOrEqualNumber => new BinaryOperationMeta(
             kind, OperatorKind.LessThanOrEqual, PInteger, PNumber, TypeKind.Boolean,
-            "Integer <= number (widens to number)", Commutative: true),
+            "Integer <= number (widens to number)", BidirectionalLookup: true),
         OperationKind.IntegerGreaterThanOrEqualNumber => new BinaryOperationMeta(
             kind, OperatorKind.GreaterThanOrEqual, PInteger, PNumber, TypeKind.Boolean,
-            "Integer >= number (widens to number)", Commutative: true),
+            "Integer >= number (widens to number)", BidirectionalLookup: true),
 
         // ── Case-insensitive: string only ───────────────────────────
         OperationKind.StringCaseInsensitiveEqualsString => new BinaryOperationMeta(
@@ -843,7 +981,7 @@ public static class Operations
 
     /// <summary>
     /// Binary index: (Op, Lhs.Kind, Rhs.Kind) → BinaryOperationMeta[].
-    /// For commutative entries, both (Lhs, Rhs) and (Rhs, Lhs) orderings are indexed.
+    /// For bidirectional-lookup entries, both (Lhs, Rhs) and (Rhs, Lhs) orderings are indexed.
     /// Multi-entry groups occur when QualifierMatch disambiguates (money/money, quantity/quantity).
     /// </summary>
     public static FrozenDictionary<(OperatorKind, TypeKind, TypeKind), BinaryOperationMeta[]> BinaryIndex { get; } =
@@ -860,8 +998,8 @@ public static class Operations
             var canonical = (meta.Op, meta.Lhs.Kind, meta.Rhs.Kind);
             pairs.Add((canonical, meta));
 
-            // For commutative entries with different operand types, also index the reverse.
-            if (meta.Commutative && meta.Lhs.Kind != meta.Rhs.Kind)
+            // For bidirectional-lookup entries with different operand types, also index the reverse.
+            if (meta.BidirectionalLookup && meta.Lhs.Kind != meta.Rhs.Kind)
             {
                 var reverse = (meta.Op, meta.Rhs.Kind, meta.Lhs.Kind);
                 pairs.Add((reverse, meta));

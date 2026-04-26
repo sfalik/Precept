@@ -20,7 +20,7 @@ public class ConstructsTests
             meta.Kind.Should().Be(kind);
             meta.Name.Should().NotBeNullOrEmpty($"{kind} must have a name");
             meta.Description.Should().NotBeNullOrEmpty($"{kind} must have a description");
-            meta.Example.Should().NotBeNullOrEmpty($"{kind} must have an example");
+            meta.UsageExample.Should().NotBeNullOrEmpty($"{kind} must have an example");
         }
     }
 
@@ -156,5 +156,48 @@ public class ConstructsTests
     {
         var names = Constructs.All.Select(c => c.Name).ToList();
         names.Should().OnlyHaveUniqueItems();
+    }
+
+    // M9 ── ConstructMeta.Slots ──────────────────────────────────────────────
+
+    [Fact]
+    public void AllConstructs_HaveSlots()
+    {
+        foreach (var meta in Constructs.All)
+        {
+            meta.Slots.Should().NotBeEmpty(
+                $"{meta.Kind} must have at least one slot");
+        }
+    }
+
+    [Theory]
+    [InlineData(ConstructKind.FieldDeclaration)]
+    [InlineData(ConstructKind.StateDeclaration)]
+    [InlineData(ConstructKind.EventDeclaration)]
+    [InlineData(ConstructKind.TransitionRow)]
+    public void KeyConstructs_HaveMinimumSlotCount(ConstructKind kind)
+    {
+        Constructs.GetMeta(kind).Slots.Should().HaveCountGreaterThanOrEqualTo(2,
+            $"{kind} is a complex construct and needs at least 2 slots");
+    }
+
+    [Fact]
+    public void TransitionRow_HasGuardClauseAndActionChainAsOptional()
+    {
+        var slots = Constructs.GetMeta(ConstructKind.TransitionRow).Slots;
+
+        var guardSlot = slots.Should().ContainSingle(s => s.Kind == ConstructSlotKind.GuardClause).Subject;
+        guardSlot.IsRequired.Should().BeFalse("guards are optional in transition rows");
+
+        var actionSlot = slots.Should().ContainSingle(s => s.Kind == ConstructSlotKind.ActionChain).Subject;
+        actionSlot.IsRequired.Should().BeFalse("action chains are optional in transition rows");
+    }
+
+    [Fact]
+    public void TransitionRow_HasRequiredOutcomeSlot()
+    {
+        var slots = Constructs.GetMeta(ConstructKind.TransitionRow).Slots;
+        var outcomeSlot = slots.Should().ContainSingle(s => s.Kind == ConstructSlotKind.Outcome).Subject;
+        outcomeSlot.IsRequired.Should().BeTrue("every transition row must specify an outcome");
     }
 }

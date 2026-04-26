@@ -1,7 +1,7 @@
 namespace Precept.Language;
 
 /// <summary>Describes a single operand slot in an operation.</summary>
-public record ParameterMeta(TypeKind Kind);
+public record ParameterMeta(TypeKind Kind, string? Name = null);
 
 /// <summary>
 /// Qualifier matching mode for operations whose result type depends on
@@ -44,7 +44,7 @@ public sealed record BinaryOperationMeta(
     ParameterMeta Rhs,
     TypeKind Result,
     string Description,
-    bool Commutative = false,
+    bool BidirectionalLookup = false,
     QualifierMatch Match = QualifierMatch.Any,
     ProofRequirement[]? ProofRequirements = null)
     : OperationMeta(Kind, Op, Result, Description)

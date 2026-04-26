@@ -85,6 +85,10 @@ public enum DiagnosticCode
     InvalidCurrencyCode,
     InvalidDimensionString,
 
+    // ── Runtime / value safety ────────────────────────────
+    NumericOverflow,
+    OutOfRange,
+
     // ── Graph ────────────────────────────────────────────
     UnreachableState,
     UnhandledEvent,

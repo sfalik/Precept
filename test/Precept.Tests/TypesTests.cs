@@ -429,10 +429,10 @@ public class TypesTests
     [Fact]
     public void MostTypes_ImpliedModifiers_AreEmpty()
     {
-        // Most types have no implied modifiers — only currency and unitofmeasure do
+        // Only the 4 identity types (Currency, UnitOfMeasure, Dimension, Timezone) carry Notempty
         var withImplied = Types.All.Where(m => m.ImpliedModifiers.Length > 0).ToList();
-        withImplied.Should().HaveCountLessThanOrEqualTo(2,
-            "at most currency and unitofmeasure have implied modifiers");
+        withImplied.Should().HaveCountLessThanOrEqualTo(4,
+            "only the identity types have implied modifiers");
     }
 
     // ── ProofRequirements — accessor default ────────────────────────────────────
@@ -448,5 +448,57 @@ public class TypesTests
                     $"{meta.Kind}.{acc.Name} ProofRequirements should default to empty");
             }
         }
+    }
+
+    // M3 ── Collection accessor proof requirements ────────────────────────────
+
+    [Theory]
+    [InlineData(TypeKind.Set, "min")]
+    [InlineData(TypeKind.Set, "max")]
+    [InlineData(TypeKind.Queue, "peek")]
+    [InlineData(TypeKind.Stack, "peek")]
+    public void CollectionAccessor_RequiresNonEmptyCollection(TypeKind typeKind, string accessorName)
+    {
+        var accessor = Types.GetMeta(typeKind).Accessors.Single(a => a.Name == accessorName);
+        accessor.ProofRequirements.Should().HaveCount(1,
+            $"{typeKind}.{accessorName} requires a non-empty collection");
+        var req = accessor.ProofRequirements[0].Should().BeOfType<NumericProofRequirement>().Subject;
+        req.Comparison.Should().Be(OperatorKind.GreaterThan,
+            $"{typeKind}.{accessorName} requires count > 0");
+        req.Threshold.Should().Be(0);
+    }
+
+    [Fact]
+    public void CollectionCount_HasNoProofRequirements()
+    {
+        foreach (var kind in new[] { TypeKind.Set, TypeKind.Queue, TypeKind.Stack })
+        {
+            var accessor = Types.GetMeta(kind).Accessors.Single(a => a.Name == "count");
+            accessor.ProofRequirements.Should().BeEmpty(
+                $"{kind}.count is always safe — no proof required");
+        }
+    }
+
+    // M6 ── ImpliedModifiers ─────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData(TypeKind.Currency)]
+    [InlineData(TypeKind.UnitOfMeasure)]
+    [InlineData(TypeKind.Dimension)]
+    [InlineData(TypeKind.Timezone)]
+    public void IdentityTypes_HaveNotemptyImpliedModifier(TypeKind typeKind)
+    {
+        Types.GetMeta(typeKind).ImpliedModifiers.Should().Contain(ModifierKind.Notempty,
+            $"{typeKind} is an identity type and must carry the notempty implied modifier");
+    }
+
+    [Theory]
+    [InlineData(TypeKind.Integer)]
+    [InlineData(TypeKind.String)]
+    [InlineData(TypeKind.Money)]
+    public void NonIdentityTypes_HaveNoImpliedModifiers(TypeKind typeKind)
+    {
+        Types.GetMeta(typeKind).ImpliedModifiers.Should().BeEmpty(
+            $"{typeKind} is not an identity type and should carry no implied modifiers");
     }
 }

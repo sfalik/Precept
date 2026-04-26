@@ -1,6 +1,17 @@
 namespace Precept.Language;
 
 /// <summary>
+/// Grouping of functions by semantic domain. Used by completions and MCP vocabulary
+/// to present functions in contextually organized groups.
+/// </summary>
+public enum FunctionCategory
+{
+    Numeric,
+    String,
+    Temporal,
+}
+
+/// <summary>
 /// A single typed overload for a built-in function.
 /// Parameters are <see cref="ParameterMeta"/> instances (shared with the Operations catalog).
 /// </summary>
@@ -22,4 +33,8 @@ public sealed record FunctionMeta(
     FunctionKind Kind,
     string Name,
     string Description,
-    IReadOnlyList<FunctionOverload> Overloads);
+    IReadOnlyList<FunctionOverload> Overloads,
+    FunctionCategory Category,
+    string? UsageExample = null,
+    string? SnippetTemplate = null,
+    string? HoverDescription = null);

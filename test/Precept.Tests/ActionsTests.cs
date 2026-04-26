@@ -234,7 +234,7 @@ public class ActionsTests
         }
     }
 
-    // ── AllowedIn — all actions currently allowed in EventDeclaration ────────────
+    // ── AllowedIn — all actions allowed in EventDeclaration, StateAction, and TransitionRow ──
 
     [Fact]
     public void AllActions_AllowedInEventDeclaration()
@@ -243,6 +243,36 @@ public class ActionsTests
         {
             meta.AllowedIn.Should().Contain(ConstructKind.EventDeclaration,
                 $"{meta.Kind} should be allowed in event declarations");
+        }
+    }
+
+    [Fact]
+    public void AllActions_AllowedInStateAction()
+    {
+        foreach (var meta in Actions.All)
+        {
+            meta.AllowedIn.Should().Contain(ConstructKind.StateAction,
+                $"{meta.Kind} should be allowed in state action hooks");
+        }
+    }
+
+    [Fact]
+    public void AllActions_AllowedInTransitionRow()
+    {
+        foreach (var meta in Actions.All)
+        {
+            meta.AllowedIn.Should().Contain(ConstructKind.TransitionRow,
+                $"{meta.Kind} should be allowed in transition rows");
+        }
+    }
+
+    [Fact]
+    public void AllActions_AllowedIn_HasThreeContexts()
+    {
+        foreach (var meta in Actions.All)
+        {
+            meta.AllowedIn.Should().HaveCount(3,
+                $"{meta.Kind} should be allowed in exactly 3 construct contexts");
         }
     }
 
@@ -261,10 +291,43 @@ public class ActionsTests
     [Fact]
     public void AllActions_ProofRequirements_DefaultEmpty()
     {
-        foreach (var meta in Actions.All)
+        // Dequeue and Pop carry non-empty proof requirements (M4); all others default to empty
+        var actionsWithRequirements = new HashSet<ActionKind> { ActionKind.Dequeue, ActionKind.Pop };
+        foreach (var meta in Actions.All.Where(a => !actionsWithRequirements.Contains(a.Kind)))
         {
             meta.ProofRequirements.Should().BeEmpty(
                 $"{meta.Kind} has no proof requirements by default");
+        }
+    }
+
+    // M4 ── Mutating collection action proof requirements ─────────────────────
+
+    [Theory]
+    [InlineData(ActionKind.Dequeue)]
+    [InlineData(ActionKind.Pop)]
+    public void MutatingCollectionActions_RequireNonEmptyCollection(ActionKind kind)
+    {
+        var meta = Actions.GetMeta(kind);
+        meta.ProofRequirements.Should().HaveCount(1,
+            $"{kind} requires the collection to be non-empty");
+        var req = meta.ProofRequirements[0].Should().BeOfType<NumericProofRequirement>().Subject;
+        req.Comparison.Should().Be(OperatorKind.GreaterThan,
+            $"{kind} requires count > 0");
+        req.Threshold.Should().Be(0);
+    }
+
+    [Fact]
+    public void NonMutatingActions_HaveNoProofRequirements()
+    {
+        var nonMutating = new[]
+        {
+            ActionKind.Set, ActionKind.Add, ActionKind.Remove,
+            ActionKind.Enqueue, ActionKind.Push, ActionKind.Clear,
+        };
+        foreach (var kind in nonMutating)
+        {
+            Actions.GetMeta(kind).ProofRequirements.Should().BeEmpty(
+                $"{kind} does not mutate a collection in a way requiring non-empty proof");
         }
     }
 }

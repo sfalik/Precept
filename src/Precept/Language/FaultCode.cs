@@ -31,4 +31,19 @@ public enum FaultCode
 
     [StaticallyPreventable(DiagnosticCode.FunctionArgConstraintViolation)]
     FunctionArgConstraintViolation,
+
+    [StaticallyPreventable(DiagnosticCode.UnguardedCollectionAccess)]
+    CollectionEmptyOnAccess,
+
+    [StaticallyPreventable(DiagnosticCode.UnguardedCollectionMutation)]
+    CollectionEmptyOnMutation,
+
+    [StaticallyPreventable(DiagnosticCode.QualifierMismatch)]
+    QualifierMismatch,
+
+    [StaticallyPreventable(DiagnosticCode.NumericOverflow)]
+    NumericOverflow,
+
+    [StaticallyPreventable(DiagnosticCode.OutOfRange)]
+    OutOfRange,
 }

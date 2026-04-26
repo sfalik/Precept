@@ -34,7 +34,25 @@ public sealed record TokenMeta(
     TokenKind                      Kind,
     string?                        Text,        // keyword/operator text (null for synthetic tokens like Identifier, NumberLiteral)
     IReadOnlyList<TokenCategory>   Categories,
-    string                         Description
+    string                         Description,
+    /// <summary>
+    /// TextMate grammar scope assigned to this token. Used by the grammar generator
+    /// to emit scope rules from catalog metadata rather than hardcoding scopes in tmLanguage.json.
+    /// Null for structural/synthetic tokens that carry no scope (EndOfSource, NewLine).
+    /// </summary>
+    string?                        TextMateScope,
+    /// <summary>
+    /// LSP semantic token type for this token. Used by the language server semantic token provider.
+    /// Null for structural tokens that have no tooling representation (EndOfSource, NewLine).
+    /// </summary>
+    string?                        SemanticTokenType,
+    /// <summary>
+    /// Token kinds that may immediately precede this token in a valid program. Null means
+    /// unbounded context — the token may appear after any token. Populated for tokens where
+    /// context-sensitive completions are valuable. Use this metadata to filter completion
+    /// candidates without full parse-state analysis.
+    /// </summary>
+    TokenKind[]?                   ValidAfter = null
 );
 
 /// <summary>

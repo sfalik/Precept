@@ -12,7 +12,10 @@ public sealed record ActionMeta(
     bool         ValueRequired = false,
     bool         IntoSupported = false,
     ProofRequirement[]? ProofRequirements = null,
-    ConstructKind[]?    AllowedIn         = null)
+    ConstructKind[]?    AllowedIn         = null,
+    string?      HoverDescription = null,
+    string?      UsageExample     = null,
+    string?      SnippetTemplate  = null)
 {
     /// <summary>Proof obligations the type checker must verify at call sites.</summary>
     public ProofRequirement[] ProofRequirements { get; } = ProofRequirements ?? [];

@@ -13,6 +13,17 @@
 
 ## Recent Updates
 
+### 2026-04-25 — Deep parser/lexer architecture analysis for catalog-driven improvements
+- Comprehensive source-level analysis of `Pipeline/Lexer.cs` (~850 LOC) and `Pipeline/Parser.cs` (~1,350 LOC).
+- Identified 10 vocabulary tables in the parser that should become catalog-derived frozen dictionaries: operator precedence, type keyword mapping, 3 modifier recognition sets, action keyword set, sync token set, display names, state modifier mapping, field modifier dispatch.
+- Grammar productions (~50-60% of parser code) correctly stay hand-written — no catalog derivation.
+- Confirmed M7 (TextMateScope), M8 (SemanticTokenType), I27 (ConstructSlotKind), and core M9 (slot model) are already implemented — action list overstated these as gaps.
+- Confirmed I18 (LeadingToken on ConstructMeta) and I19 (Arrow category) are real gaps.
+- Confirmed I24 (no TokenKind.With exists anywhere in codebase).
+- Lexer is ~85% catalog-driven. Operator/punctuation char-matching is the remaining 15% but should stay hand-written for performance.
+- P1-P4 (highest value refactors) have zero blocking dependencies — all needed catalogs already exist.
+- Filed full analysis at `.squad/decisions/inbox/frank-parser-catalog-analysis.md`.
+
 ### 2026-04-25 — Parser metadata-drivenness reassessment (correcting original review)
 - Shane flagged that my original pipeline review anchored to a pre-existing doc statement ("parser remains hand-written") instead of independently evaluating the v2 parser code. He was right.
 - Re-read the entire v2 parser (1,315 lines) and traced every language-knowledge decision. Found ~40-50% of the parser's language knowledge decisions are vocabulary tables that CAN and SHOULD be catalog-derived: operator precedence, type keyword mappings, modifier recognition sets, action keyword sets, sync-token sets.
@@ -88,6 +99,15 @@
 - Full review filed at `.squad/decisions/inbox/frank-v2-ast-review.md`.
 
 ## Learnings
+
+### 2026-04-25 — Type checker catalog-driven analysis (clean-room)
+- v2 type checker is ~390 LOC + ~90 LOC OperatorTable. 14 of 22 methods are correctly hand-written structural machinery. 8 methods hardcode domain knowledge that should be catalog-derived.
+- **OperatorTable is the biggest win.** The entire 90-LOC `OperatorTable.cs` is a legacy bridge — `Operations.FindCandidates()` and `Operations.FindUnary()` already provide O(1) frozen dictionary lookups for all 130+ operation combinations, with bidirectional support, qualifier disambiguation, and proof requirements. Delete and replace wholesale.
+- **ResolvedType needs a `Kind` property.** Every catalog lookup starting from a `ResolvedType` currently requires pattern-matching. Adding `abstract TypeKind Kind` to `ResolvedType` (~25 one-line overrides) is the critical-path enabler for all catalog integrations. Without it, every refactor has an extraction tax.
+- **`IsAssignableTo` widening rules duplicate `TypeMeta.WidensTo`.** Two `if` chains hardcode `integer→decimal` and `integer→number`. The catalog already declares these. Wire before temporal/business-domain types land to avoid a growing `if` forest.
+- **`TypeDisplayName` and `BinaryOpDisplayName` are vocabulary tables.** Both are switches mapping types/ops to strings. Both have exact catalog equivalents (`TypeMeta.Token.Symbol`, `OperatorMeta.Token.Symbol`). Both will grow as types/ops are added. Catalog-drive them to eliminate maintenance.
+- **`ResolveScalarType` is the deferred high-impact item.** Today it's a 5-arm switch (stubs temporal/business to ErrorType). When those types land, it becomes 25 arms with qualifier extraction. Wire to `Types.GetMeta()` at that point — the qualifier shape validation and type construction become catalog-informed.
+- **Structural code stays structural.** AST dispatch (expression switch, declaration loop), symbol-table population, error recovery (IsMissing, ErrorType propagation), literal shape analysis (dot/exponent), and model assembly are all generic machinery — no catalog derivation warranted.
 
 - **Method-style accessors are a language decision, not just a parser gap.** If `.inZone(tz)` is the only case, a prefix-function redesign is defensible. If the language ever needs more (`.format(pattern)`, `.withZone(tz)`), method-call Led support is the correct investment. The decision should be made now, not deferred.
 - **Action chain format must be consistent across all declaration types.** Transition rows, stateless hooks, and state actions all contain action chains. The parser grammar mapping must use one mechanism, not different ones per declaration form.
@@ -260,6 +280,17 @@
 - **Compiler.cs pipeline order matches docs exactly.** CompilationResult shape matches docs exactly. Both are clean.
 
 ## Learnings
+
+### 2026-04-25 — Catalog I-items batch (I8, I9, I12, I23, I26, I32, I35)
+- **`init` property on abstract record base:** For optional metadata (e.g., `MutuallyExclusiveWith`), use `init` property with empty-array default. Keeps all construction code unchanged; callers set only where meaningful.
+- **Cross-cutting fields on base, not DU subtypes:** Consumers need uniform access across modifier kinds without casting.
+- **`QualifierAxis` precision:** Period's temporal dimension specifier (`TemporalDimension`) is not a UCUM unit (`Unit`). Must be distinct enum values.
+- **`GraphAnalysisKind` drives analyzer dispatch:** Catalog specifies what to check; analyzer dispatches on enum. No analyzer code encodes per-modifier knowledge.
+- **`TypeKind.Error` as sentinel:** Making `TypeTarget.Kind` nullable is the correct fix, but it's a breaking change requiring full consumer audit.
+- **Rename tax vs doc comment:** `AllowedIn` is accurate; semantic clarification via doc comment beats a rename touching all consumers.
+- **Binary proof requirements need two subjects:** Unary `DimensionProofRequirement` is wrong shape for UCUM dimensional homogeneity (two operands must match).
+
+
 
 - **A doc guarantee about non-nullability is worthless if the type signature allows null.** "Always non-null" in prose and `T?` in code is a hard contradiction. The type system is the contract; prose is commentary on it. Fix the type; don't rely on the comment.
 - **SourceSpan/SourceRange coordinate model must be decided at architecture time, not deferred.** AST offset/length and diagnostic line/column are different coordinate systems. If stages emit diagnostics, the bridge must be designed and accessible before the first stage is implemented. Token carries both — don't discard line/column at parse time if downstream stages need it.

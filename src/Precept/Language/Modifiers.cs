@@ -37,73 +37,89 @@ public static class Modifiers
         ModifierKind.Optional => new FieldModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Optional),
             "Field is nullable; use is set / is not set for presence",
-            ModifierCategory.Structural, AnyType),
+            ModifierCategory.Structural, AnyType,
+            HoverDescription: "The field may have no value. Use 'is set' and 'is not set' to test for presence. Absent values appear as null in the API."),
 
         ModifierKind.Ordered => new FieldModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Ordered),
             "Choice field supports ordinal comparison",
-            ModifierCategory.Structural, ChoiceOnly),
+            ModifierCategory.Structural, ChoiceOnly,
+            HoverDescription: "Enables comparison operators (< > <= >=) on a choice field, ordered by declaration sequence."),
 
         ModifierKind.Nonnegative => new FieldModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Nonnegative),
             "Value ≥ 0",
-            ModifierCategory.Structural, NumericTypes),
+            ModifierCategory.Structural, NumericTypes,
+            HoverDescription: "The field's value must be zero or greater. Enforced on every assignment.")
+            { MutuallyExclusiveWith = [ModifierKind.Positive] },
 
         ModifierKind.Positive => new FieldModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Positive),
             "Value > 0",
             ModifierCategory.Structural, NumericTypes,
-            Subsumes: [ModifierKind.Nonnegative, ModifierKind.Nonzero]),
+            Subsumes: [ModifierKind.Nonnegative, ModifierKind.Nonzero],
+            HoverDescription: "The field's value must be strictly greater than zero. Implies nonnegative and nonzero.")
+            { MutuallyExclusiveWith = [ModifierKind.Nonnegative] },
 
         ModifierKind.Nonzero => new FieldModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Nonzero),
             "Value ≠ 0",
-            ModifierCategory.Structural, NumericTypes),
+            ModifierCategory.Structural, NumericTypes,
+            HoverDescription: "The field's value must not be zero. Allows negative values."),
 
         ModifierKind.Notempty => new FieldModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Notempty),
             "String is non-empty",
-            ModifierCategory.Structural, StringOnly),
+            ModifierCategory.Structural, StringOnly,
+            HoverDescription: "The text field must not be an empty string. A field with notempty always has visible content."),
 
         ModifierKind.Default => new FieldModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Default),
             "Default value expression",
-            ModifierCategory.Structural, AnyType, HasValue: true),
+            ModifierCategory.Structural, AnyType, HasValue: true,
+            HoverDescription: "Provides the initial value for the field when the precept is first created."),
 
         ModifierKind.Min => new FieldModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Min),
             "Minimum value",
-            ModifierCategory.Structural, NumericTypes, HasValue: true),
+            ModifierCategory.Structural, NumericTypes, HasValue: true,
+            HoverDescription: "The field's value must be at least this minimum. Enforced on every assignment."),
 
         ModifierKind.Max => new FieldModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Max),
             "Maximum value",
-            ModifierCategory.Structural, NumericTypes, HasValue: true),
+            ModifierCategory.Structural, NumericTypes, HasValue: true,
+            HoverDescription: "The field's value must be at most this maximum. Enforced on every assignment."),
 
         ModifierKind.Minlength => new FieldModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Minlength),
             "Minimum string length",
-            ModifierCategory.Structural, StringOnly, HasValue: true),
+            ModifierCategory.Structural, StringOnly, HasValue: true,
+            HoverDescription: "The text field must have at least this many characters."),
 
         ModifierKind.Maxlength => new FieldModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Maxlength),
             "Maximum string length",
-            ModifierCategory.Structural, StringOnly, HasValue: true),
+            ModifierCategory.Structural, StringOnly, HasValue: true,
+            HoverDescription: "The text field must have at most this many characters."),
 
         ModifierKind.Mincount => new FieldModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Mincount),
             "Minimum collection count",
-            ModifierCategory.Structural, CollectionTypes, HasValue: true),
+            ModifierCategory.Structural, CollectionTypes, HasValue: true,
+            HoverDescription: "The collection must have at least this many elements."),
 
         ModifierKind.Maxcount => new FieldModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Maxcount),
             "Maximum collection count",
-            ModifierCategory.Structural, CollectionTypes, HasValue: true),
+            ModifierCategory.Structural, CollectionTypes, HasValue: true,
+            HoverDescription: "The collection must have at most this many elements."),
 
         ModifierKind.Maxplaces => new FieldModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Maxplaces),
             "Maximum decimal places",
-            ModifierCategory.Structural, DecimalOnly, HasValue: true),
+            ModifierCategory.Structural, DecimalOnly, HasValue: true,
+            HoverDescription: "The decimal field must have at most this many digits after the decimal point."),
 
         // ── State modifiers ─────────────────────────────────────────────────────
         ModifierKind.InitialState => new StateModifierMeta(
@@ -129,39 +145,45 @@ public static class Modifiers
         ModifierKind.Success => new StateModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Success),
             "Success outcome state",
-            ModifierCategory.Semantic),
+            ModifierCategory.Semantic)
+        { MutuallyExclusiveWith = [ModifierKind.Warning, ModifierKind.Error] },
 
         ModifierKind.Warning => new StateModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Warning),
             "Warning outcome state",
-            ModifierCategory.Semantic),
+            ModifierCategory.Semantic)
+        { MutuallyExclusiveWith = [ModifierKind.Success, ModifierKind.Error] },
 
         ModifierKind.Error => new StateModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Error),
             "Error outcome state",
-            ModifierCategory.Semantic),
+            ModifierCategory.Semantic)
+        { MutuallyExclusiveWith = [ModifierKind.Success, ModifierKind.Warning] },
 
         // ── Event modifiers ─────────────────────────────────────────────────────
         ModifierKind.InitialEvent => new EventModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Initial),
             "Auto-fire entry point event",
-            ModifierCategory.Structural, GraphAnalysisKind.None),
+            ModifierCategory.Structural, GraphAnalysisKind.InitialEventCompatibility),
 
         // ── Access modifiers ────────────────────────────────────────────────────
         ModifierKind.Write => new AccessModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Write),
             "Field is present and writable",
-            ModifierCategory.Structural, IsPresent: true, IsWritable: true),
+            ModifierCategory.Structural, IsPresent: true, IsWritable: true)
+        { MutuallyExclusiveWith = [ModifierKind.Read, ModifierKind.Omit] },
 
         ModifierKind.Read => new AccessModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Read),
             "Field is present and read-only",
-            ModifierCategory.Structural, IsPresent: true, IsWritable: false),
+            ModifierCategory.Structural, IsPresent: true, IsWritable: false)
+        { MutuallyExclusiveWith = [ModifierKind.Write, ModifierKind.Omit] },
 
         ModifierKind.Omit => new AccessModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Omit),
             "Field is structurally absent",
-            ModifierCategory.Structural, IsPresent: false, IsWritable: false),
+            ModifierCategory.Structural, IsPresent: false, IsWritable: false)
+        { MutuallyExclusiveWith = [ModifierKind.Write, ModifierKind.Read] },
 
         // ── Anchor modifiers ────────────────────────────────────────────────────
         ModifierKind.In => new AnchorModifierMeta(

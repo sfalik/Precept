@@ -3,6 +3,18 @@ namespace Precept.Language;
 /// <summary>Unary or binary.</summary>
 public enum Arity { Unary, Binary }
 
+/// <summary>
+/// Broad operator family — used by the grammar generator, LS semantic tokens,
+/// and MCP vocabulary to assign different scopes to operator groups.
+/// </summary>
+public enum OperatorFamily
+{
+    Arithmetic,
+    Comparison,
+    Logical,
+    Membership,
+}
+
 /// <summary>Binding direction for the Pratt parser.</summary>
 public enum Associativity { Left, Right, NonAssociative }
 
@@ -17,4 +29,8 @@ public record OperatorMeta(
     string Description,
     Arity Arity,
     Associativity Associativity,
-    int Precedence);
+    int Precedence,
+    OperatorFamily Family,
+    bool IsKeywordOperator = false,
+    string? HoverDescription = null,
+    string? UsageExample = null);

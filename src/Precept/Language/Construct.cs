@@ -2,12 +2,23 @@ namespace Precept.Language;
 
 /// <summary>
 /// Metadata for a grammar construct / declaration shape.
-/// <c>Variants</c> and <c>ConstructSlot</c> arrays are deferred until
-/// the grammar-generation plumbing is implemented.
 /// </summary>
 public sealed record ConstructMeta(
-    ConstructKind   Kind,
-    string          Name,
-    string          Description,
-    string          Example,
-    ConstructKind[] AllowedIn);
+    ConstructKind                Kind,
+    string                       Name,
+    string                       Description,
+    string                       UsageExample,
+    /// <summary>
+    /// Semantic contexts in which this construct is valid. Empty = valid at the top level.
+    /// This describes <em>semantic</em> scoping (e.g., <c>state ensure</c> is only valid
+    /// after a <c>state</c> declaration) — not syntactic indentation or block nesting.
+    /// In Precept's flat line-oriented layout, "nesting" is always semantic, never visual.
+    /// </summary>
+    ConstructKind[]              AllowedIn,
+    IReadOnlyList<ConstructSlot> Slots,
+    TokenKind                    LeadingToken,
+    string?                      SnippetTemplate = null)
+{
+    /// <summary>Slot sequence for this construct's declaration shape.</summary>
+    public IReadOnlyList<ConstructSlot> Slots { get; } = Slots;
+}

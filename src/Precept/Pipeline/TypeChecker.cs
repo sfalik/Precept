@@ -186,11 +186,18 @@ public static class TypeChecker
         private ResolvedType ResolveTypeRef(TypeRef typeRef) => typeRef switch
         {
             { IsMissing: true }              => new ErrorType(),
-            ScalarTypeRef s                  => ResolveScalarType(s.Kind, s.Qualifier, s.CaseInsensitive),
+            ScalarTypeRef s                  => ResolveScalarTypeChecked(s),
             CollectionTypeRef                => new ErrorType(),   // stub — slice 8
             ChoiceTypeRef                    => new ErrorType(),   // stub — slice 10
             _                                => new ErrorType()
         };
+
+        private ResolvedType ResolveScalarTypeChecked(ScalarTypeRef s)
+        {
+            if (s.SecondQualifier is not null && s.Kind != ScalarTypeKind.Price)
+                _diagnostics.Add(Diagnostics.Create(DiagnosticCode.MutuallyExclusiveQualifiers, s.SecondQualifier.Span));
+            return ResolveScalarType(s.Kind, s.Qualifier, s.CaseInsensitive);
+        }
 
         private static ResolvedType ResolveScalarType(ScalarTypeKind kind, TypeQualifier? qualifier, bool caseInsensitive) => kind switch
         {

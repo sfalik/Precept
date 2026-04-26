@@ -22,8 +22,9 @@ public enum TypeCategory
 [Flags]
 public enum TypeTrait
 {
-    None      = 0,
-    Orderable = 1 << 0,
+    None              = 0,
+    Orderable         = 1 << 0,
+    EqualityComparable = 1 << 1,
 }
 
 // ── QualifierAxis ──────────────────────────────────────────────────────────────
@@ -41,6 +42,8 @@ public enum QualifierAxis
     FromCurrency,
     ToCurrency,
     Timezone,
+    /// <summary>Temporal dimension specifier for <c>period of 'date'</c> / <c>period of 'time'</c>. Distinct from <see cref="Unit"/> (UCUM unit-of-measure).</summary>
+    TemporalDimension,
 }
 
 // ── QualifierShape ─────────────────────────────────────────────────────────────
@@ -106,7 +109,10 @@ public record TypeMeta(
     TypeTrait                    Traits           = TypeTrait.None,
     IReadOnlyList<TypeKind>?     WidensTo         = null,
     ModifierKind[]?              ImpliedModifiers = null,
-    IReadOnlyList<TypeAccessor>? Accessors        = null
+    IReadOnlyList<TypeAccessor>? Accessors        = null,
+    string?                      DisplayName      = null,
+    string?                      HoverDescription = null,
+    string?                      UsageExample     = null
 )
 {
     /// <summary>Lossless implicit widening targets. Empty for most types.</summary>

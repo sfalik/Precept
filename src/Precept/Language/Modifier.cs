@@ -26,6 +26,11 @@ public enum GraphAnalysisKind
     IncomingEdge,
     OutcomeType,
     Reachability,
+    /// <summary>
+    /// Initial event compatibility: every transition triggered by the initial event
+    /// must target the state marked <c>initial</c>.
+    /// </summary>
+    InitialEventCompatibility,
 }
 
 /// <summary>Scope of an anchor modifier (in, to, from).</summary>
@@ -88,7 +93,15 @@ public abstract record ModifierMeta(
     ModifierKind Kind,
     TokenMeta Token,
     string Description,
-    ModifierCategory Category);
+    ModifierCategory Category)
+{
+    /// <summary>
+    /// Modifiers that are mutually exclusive with this one — at most one member
+    /// of the group may appear on a declaration. Empty for most modifiers.
+    /// Declared in the catalog; consumers (type checker, LS) must not hardcode groups.
+    /// </summary>
+    public ModifierKind[] MutuallyExclusiveWith { get; init; } = [];
+}
 
 /// <summary>Field constraint modifiers (14 members: optional, ordered, nonnegative, …, maxplaces).</summary>
 public sealed record FieldModifierMeta(
@@ -98,7 +111,10 @@ public sealed record FieldModifierMeta(
     ModifierCategory Category,
     TypeTarget[] ApplicableTo,
     bool HasValue = false,
-    ModifierKind[] Subsumes = default!)
+    ModifierKind[] Subsumes = default!,
+    string? HoverDescription = null,
+    string? UsageExample = null,
+    string? SnippetTemplate = null)
     : ModifierMeta(Kind, Token, Description, Category)
 {
     /// <summary>Modifiers this one makes redundant. Empty for most.</summary>

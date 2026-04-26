@@ -6,6 +6,12 @@
 
 ## Learnings
 
+- The v2 type checker is ~15% catalog-driven today. Diagnostics are fully catalog-driven (gold standard via `Diagnostics.Create()`). Everything else — type resolution, operator resolution, modifier validation, widening rules, display names — is hardcoded.
+- `OperatorTable.cs` is a complete parallel implementation of `Operations.FindCandidates()`. It covers 9 of 100+ binary operation type pairs. Replacing it is the single highest-value refactor for catalog alignment.
+- 8 enum bridge gaps exist between parser enums (`ScalarTypeKind`, `BinaryOp`, `StateModifierKind`, etc.) and catalog enums (`TypeKind`, `OperatorKind`, `ModifierKind`). These bridges are the primary bottleneck for making the type checker catalog-driven. Design decision needed: shared enums vs. bridge functions.
+- `IsAssignableTo` widening and `CommonNumericType` widening both hardcode `integer → decimal` and `integer → number`. Both are replaceable by `Types.GetMeta(kind).WidensTo` which already contains the exact same data.
+- `ResolveScalarType` has a 17-type catch-all returning `ErrorType` for all temporal and business-domain types. The `ResolvedType` hierarchy already has the right subtypes with qualifier fields — the gap is purely in the mapping function.
+- TypeCheckerTests.cs has ~83 tests covering the implemented 30% of functionality. Zero tests exist for modifier validation, temporal/business types, collection types, function calls, unary expressions, comparison/logical operators, member access, action validation, or transition/ensure checking.
 - Runtime/design gaps should be separated cleanly from philosophy decisions; product-identity calls belong to Shane.
 - Recompute-style features succeed when insertion points are explicit across Fire, Update, and Inspect.
 - Documentation must describe implemented pipeline stages exactly, especially around editability, hooks, and validation order.
@@ -26,6 +32,16 @@
 - v2 design review lesson: type qualifiers must be first-class in `ResolvedType` or the checker/runtime/MCP contract collapses as soon as `in`/`of` become semantic, especially for `period`, `price`, and `exchangerate`.
 - Literal-family docs must stay unified. Once typed constants span temporal plus business-domain identities, a partial matcher table is worse than no table because the admission-rule guarantee depends on one authoritative ordering.
 - Numeric-lane bridge rules have to be identical across the checker blueprint, language spec, and function catalog. If one doc allows `decimal op number` widening while another requires explicit bridges, implementation and tests drift immediately.
+- M1/M5: `ProofRequirements` is a named arg on `BinaryOperationMeta`. For `BidirectionalLookup: true` entries, append `ProofRequirements:` after the existing named args. For `Match:` entries, `ProofRequirements:` comes after `Match:`. Always reference the exact shared `ParameterMeta` instance (PDecimal, PMoney, etc.) that matches the RHS type in the description.
+- M3/M4: For collection-mutation proof requirements, define `CollectionCountAccessor` / `CollectionCount` as a shared static `FixedReturnAccessor` and use it in both the accessor arrays and the `SelfSubject(...)` refs — reference equality is required for PRECEPT0005 (not yet enforced, but will be).
+- M10: `ParameterMeta` now has `Name = null` as default. Shared instances at the top of Functions.cs and Operations.cs stay unnamed. Named instances are created inline (`new(TypeKind.X, "name")`) for specific function overloads. For functions that ALSO have ProofRequirements (sqrt), the ProofRequirements `ParamSubject` still references the shared unnamed instances until PRECEPT0005 enforcement forces alignment.
+- Existing tests that say "all X are empty by default" must be updated when catalog metadata is populated. Pattern: add a `HashSet` exclusion for the newly-non-empty members, update count assertions for sets that grew.
+- Parser is 0% directly catalog-driven — all 14 vocabulary tables are inline switches/is-checks with no runtime reference to any catalog `.All`, `.GetMeta()`, or `.ByToken` member. Lexer is ~85% catalog-driven via `Tokens.Keywords`.
+- Frank identified 10 vocabulary tables in the parser; actual count is 14 — he missed Led() BinaryOp mapping, prefix binding powers, IsComparisonOp, and AccessMode mapping.
+- The parser defines a parallel AST-enum taxonomy (ScalarTypeKind, BinaryOp, StateModifierKind, AccessMode, etc.) that mirrors catalog enums (TypeKind, OperatorKind, ModifierKind) without referencing them. This bridge gap is the real bottleneck for catalog-driven parser refactoring — recognition sets are trivial, but mapping tables require a bridge design decision.
+- Binding power is hardcoded in THREE parser locations: LeftBindingPower() for lbp, Led() MakeBinary/MakeComparison for rbp, and NudNot/NudNegate for prefix bp. All three are derivable from Operators.All Precedence + Associativity.
+- Pure refactors (recognition sets → FrozenSet from catalog) can ship independently of bridge decisions. 6 methods, ~30 lines → 6 static readonly fields. Zero behavior change.
+- Lexer TryScanOperator/TryScanPunctuation (~60 lines) should stay hand-written — performance-critical character-level scanning that runs on every character. The operator set is small (17 entries) and stable.
 
 ## Recent Updates
 

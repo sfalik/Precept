@@ -186,10 +186,6 @@ public enum OperationKind
 
     StringEqualsString,
     StringNotEqualsString,
-    StringLessThanString,
-    StringGreaterThanString,
-    StringLessThanOrEqualString,
-    StringGreaterThanOrEqualString,
 
     ChoiceEqualsChoice,
     ChoiceNotEqualsChoice,
