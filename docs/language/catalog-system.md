@@ -319,20 +319,24 @@ The type system's family taxonomy. Each member represents a type *family*.
 
 ```csharp
 public record TypeMeta(
-    TypeKind                    Kind,
-    TokenMeta                   Token,           // object reference to Tokens catalog entry (e.g., Tokens.GetMeta(TokenKind.StringType))
-    string                      Description,
-    TypeCategory                Category,
-    QualifierShape?             QualifierShape   = null,
-    TypeTrait                   Traits           = TypeTrait.None,
-    IReadOnlyList<TypeKind>     WidensTo         = [],
-    ModifierKind[]              ImpliedModifiers = [],
-    IReadOnlyList<TypeAccessor> Accessors        = []
+    TypeKind                     Kind,
+    TokenMeta?                   Token,           // object reference to Tokens catalog entry; null for special types (Error, StateRef)
+    string                       Description,
+    TypeCategory                 Category,
+    string                       DisplayName,     // required — human-readable type name (e.g., "zoned date-time", "money")
+    QualifierShape?              QualifierShape   = null,
+    TypeTrait                    Traits           = TypeTrait.None,
+    IReadOnlyList<TypeKind>?     WidensTo         = null,
+    ModifierKind[]?              ImpliedModifiers = null,
+    IReadOnlyList<TypeAccessor>? Accessors        = null,
+    string?                      HoverDescription = null,
+    string?                      UsageExample     = null
 );
 ```
 
-The `Token` field holds a direct reference to the `TokenMeta` instance from the Tokens catalog. Consumers access the keyword text via `typeMeta.Token.Text` — no string duplication, no cross-catalog lookup. The Tokens catalog initializes first; all other catalogs reference its instances.
-```
+The `Token` field holds a direct reference to the `TokenMeta` instance from the Tokens catalog (nullable for special types like `Error` and `StateRef` that have no surface keyword). Consumers access the keyword text via `typeMeta.Token.Text` — no string duplication, no cross-catalog lookup. The Tokens catalog initializes first; all other catalogs reference its instances.
+
+`DisplayName` is required — every type must have a human-readable name. Single-word types use their keyword (e.g., `"money"`); multi-word types use the human form (e.g., `"zoned date-time"`, `"unit of measure"`). Omitting it is a compile error.
 
 ##### TypeTrait flags enum
 
@@ -340,12 +344,15 @@ The `Token` field holds a direct reference to the `TokenMeta` instance from the 
 [Flags]
 public enum TypeTrait
 {
-    None      = 0,
-    Orderable = 1 << 0
+    None               = 0,
+    Orderable          = 1 << 0,
+    EqualityComparable = 1 << 1,
 }
 ```
 
-Orderable types: `integer`, `decimal`, `number`, `date`, `time`, `instant`, `duration`, `datetime`, `zoneddatetime`, `money`, `quantity`. `period` is NOT orderable (ambiguous calendar arithmetic). `choice` is NOT orderable at the type level — orderable is field-level via the `ordered` modifier.
+Orderable types: `integer`, `decimal`, `number`, `date`, `time`, `instant`, `duration`, `datetime`, `money`, `quantity`, `price`. `period` is NOT orderable (ambiguous calendar arithmetic). `zoneddatetime` is NOT orderable (timezone-dependent comparison). `choice` is NOT orderable at the type level — orderable is field-level via the `ordered` modifier.
+
+EqualityComparable types: all surfaced types except collections. The `EqualityComparable` trait is set on every type that supports `==` and `!=` operations in the Operations catalog.
 
 ##### TypeAccessor discriminated union
 
@@ -366,8 +373,34 @@ public enum QualifierAxis
     Dimension,
     FromCurrency,
     ToCurrency,
-    Timezone
+    Timezone,
+    TemporalDimension,  // period of 'date' / period of 'time' (category)
+    TemporalUnit,       // period in 'days' / period in 'months' (specific unit)
 }
+```
+
+##### QualifierShape — the in/of qualification system
+
+```csharp
+public sealed record QualifierSlot(TokenKind Preposition, QualifierAxis Axis);
+
+public sealed record QualifierShape(
+    IReadOnlyList<QualifierSlot> Slots,
+    bool InOfExclusive = false
+);
+```
+
+`QualifierShape` defines which qualifiers a type accepts. Each `QualifierSlot` pairs a preposition keyword (`in`, `of`, `to`) with a semantic axis. `InOfExclusive` declares whether `in` and `of` are mutually exclusive (only one can appear) or can coexist.
+
+Shared shapes in the Types catalog:
+
+| Shape | Slots | InOfExclusive | Used by |
+|-------|-------|---------------|----------|
+| `QS_Currency` | `In(Currency)` | n/a (single slot) | `money` |
+| `QS_UnitOrDimension` | `In(Unit)`, `Of(Dimension)` | true | `quantity` |
+| `QS_TemporalUnitOrDimension` | `In(TemporalUnit)`, `Of(TemporalDimension)` | true | `period` |
+| `QS_CurrencyAndDimension` | `In(Currency)`, `Of(Dimension)` | false | `price` |
+| `QS_ExchangeRate` | `In(FromCurrency)`, `To(ToCurrency)` | n/a | `exchangerate` |
 
 public sealed record FixedReturnAccessor(
     string    Name,
