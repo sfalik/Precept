@@ -1,19 +1,43 @@
 # Lexer
 
-> **Status:** Draft
-> **Decisions answered:** L1 (hand-written vs. generated), L2 (static pure function), L3 (Scanner struct isolation), L4 (mode stack for interpolation), L5 (array-backed stack), L6 (ModeState segment origin fields), L7 (keyword lookup strategy), L8 (content buffer allocation), L9 (security size limit), L10 (token span contract), R1 (EOF cleanup), R2 (newline in Interpolation mode), R3 (no synthetic closing tokens), R4 (escape recovery), R5 (lone `}` in literal), D1 (diagnostic audience)
-> **Survey references:** compiler-pipeline-architecture-survey
-> **Grounding:** `docs/compiler-and-runtime-design.md` § Compiler Pipeline
-
 ## Overview
 
-The lexer is the first stage of the Precept compiler pipeline. It transforms a raw source string into a `TokenStream` — an ordered, immutable sequence of `Token` values, each carrying kind, text content, source position, and byte span.
+The lexer is the first stage of the Precept compilation pipeline. It transforms raw source text into a flat sequence of `Token` values — the atomic units that every downstream stage consumes. The lexer has no knowledge of grammar, scoping, or semantics; it recognizes character patterns and classifies them using metadata from the Tokens catalog.
+
+Every token the lexer emits carries its kind, text, and precise source location:
+
+```csharp
+public readonly record struct Token(
+    TokenKind Kind, string Text, int Line, int Column, int Offset, int Length);
+```
+
+The lexer's output is a `TokenStream` — an immutable, indexable sequence of tokens that the parser, type checker, and tooling all read from. The lexer runs once per source text and produces the complete stream before any downstream stage begins.
+
+---
+
+## Architectural Principles
+
+### The Lexer Is Generic Machinery
+
+The lexer is a character-pattern scanner. It does not encode domain knowledge — it reads domain knowledge from catalogs. When a new keyword, operator, or punctuation token is added to the Tokens catalog, the lexer recognizes it without code changes. When the Diagnostics catalog gains a new lex-stage code, the lexer can emit it without new switch branches.
+
+### Catalog as Source of Truth
+
+The Tokens catalog (`Tokens.All`) is the exhaustive inventory of every token the lexer can produce. Each entry carries `TokenKind`, surface text (for keywords/operators/punctuation), categories, description, `TextMateScope`, `SemanticTokenType`, and `ValidAfter`. The lexer derives its keyword lookup table and (in the target architecture) its operator and punctuation scan tables from this catalog. It does not maintain parallel lists.
+
+### No Parallel Copies
+
+If the lexer switches on token kinds to apply per-token behavior, that behavior belongs in catalog metadata — not in lexer code. The target architecture replaces the current hardcoded `TryScanOperator`/`TryScanPunctuation` if/else chains with catalog-derived lookup tables, so that adding a new operator or punctuation token requires only a catalog entry.
+
+---
+
+## Input and Output
 
 ```
 string source  →  Lexer.Lex  →  TokenStream
 ```
 
-The lexer's job is pure character-to-token conversion. It has no knowledge of grammar, types, or semantics. Its output is consumed directly by `Parser.Parse`.
+`Lexer.Lex(string source)` is a static pure function. No instance, no DI, no configuration. This matches the pipeline pattern used by all five stages (`Lexer.Lex`, `Parser.Parse`, `TypeChecker.Check`, `GraphAnalyzer.Analyze`, `ProofEngine.Prove`). Tests call the method directly and assert on the output.
 
 The lexer handles three families of input:
 
@@ -21,43 +45,46 @@ The lexer handles three families of input:
 - **String literals** — `"..."` with `\"`, `\\`, `\n`, `\t` escapes and `{expr}` interpolation
 - **Typed constant literals** — `'...'` with `\'`, `\\` escapes and `{expr}` interpolation
 
-Typed constant content is opaque to the lexer. The lexer marks the boundaries (`TypedConstant`, `TypedConstantStart`, `TypedConstantMiddle`, `TypedConstantEnd`) but does not interpret what's inside. Type resolution (context-born) and content validation happen in the type checker.
+Typed constant content is opaque to the lexer. The lexer marks the boundaries (`TypedConstant`, `TypedConstantStart`, `TypedConstantMiddle`, `TypedConstantEnd`) but does not interpret what's inside. Type resolution and content validation happen in the type checker.
 
 The `TokenStream` is the `CompilationResult.Tokens` field — it is part of the tooling surface and queryable by the language server for span-based operations.
 
 ---
 
-## Design Principles
+## Catalog Integration
 
-### Right-sized for Precept's scale
+### Keywords
 
-The lexer is hand-written. The keyword set is bounded and stable. A parser-generator (ANTLR, FsLex, Superpower) adds a dependency, a build step, a generator grammar to maintain, and indirection that costs more in complexity than it saves in effort. A hand-written lexer for this grammar is roughly 700 lines, is directly readable, and gives full control over diagnostic quality and recovery behavior. The architecture planning notes this explicitly: "A parser-generator adds complexity for little gain."
+Keywords are stored in `Tokens.Keywords`, a `FrozenDictionary<string, TokenKind>` derived from `Tokens.All` at startup. The filter selects entries whose categories include keyword-bearing categories (Declaration, Preposition, Control, Action, Outcome, AccessMode, LogicalOperator, Membership, Quantifier, StateModifier, Constraint, Type, Literal). `SetType` is explicitly excluded — `set` always emits as `TokenKind.Set`; the parser disambiguates contextually.
 
-Rejected alternative: _ANTLR 4_ — surveyed and dismissed. The generated lexer would be larger, less readable, and would remove the ability to write per-code diagnostics with custom messages for the domain-author audience.
+At scan time, after reading a word:
 
-### Same input always produces same output
+```csharp
+_keywordLookup = Tokens.Keywords.GetAlternateLookup<ReadOnlySpan<char>>();
+var kind = _keywordLookup.TryGetValue(span, out var kw) ? kw : TokenKind.Identifier;
+```
 
-The lexer is a static class with a single public method: `Lexer.Lex(string source) → TokenStream`. No instance, no DI, no configuration, no substitution point. This matches the pipeline pattern used by all five stages (`Lexer.Lex`, `Parser.Parse`, `TypeChecker.Check`, `GraphAnalyzer.Analyze`, `ProofEngine.Prove`). Tests call the method directly and assert on the output — no mocking, no setup, no teardown.
+`GetAlternateLookup<ReadOnlySpan<char>>()` accepts a span directly, avoiding a `new string(...)` allocation for every identifier candidate. `FrozenDictionary` uses a perfect hash at construction time.
 
-### Never stop scanning
+### Operators
 
-The lexer always runs to EOF, even after encountering errors. It accumulates all diagnostics in a single pass. This is the pipeline's Model A (resilient) contract: every stage produces a degraded-but-complete artifact on bad input. Short-circuiting on the first error would produce incomplete `TokenStream` artifacts and deny the parser (and LS) the token context they need to continue.
+The current implementation uses hardcoded if/else chains (`TryScanOperator`) for multi-character operators (`->`, `!~`, `~=`, `==`, `!=`, `>=`, `<=`) and a switch expression for single-character operators (`=`, `>`, `<`, `+`, `-`, `*`, `/`, `%`, `~`). The Tokens catalog already carries the surface text and categories for every operator — the target architecture replaces these chains with catalog-derived lookup tables.
 
-### Separation of concerns at the stage boundary
+### Punctuation
 
-The lexer resolves nothing beyond tokenization:
-- It does not resolve identifier types — that is the type checker's job
-- It does not validate typed constant content — that is the type checker's job
-- It does not manage state graph structure — that is the graph analyzer's job
-- It does not synthesize `SetType` — `set` always emits as `TokenKind.Set`; the parser disambiguates contextually
+The current implementation uses a hardcoded switch expression (`TryScanPunctuation`) for `.`, `,`, `(`, `)`, `[`, `]`. As with operators, the catalog carries the metadata; the target architecture derives the scan table.
+
+### Diagnostics
+
+The lexer emits diagnostics via `Diagnostics.Create(DiagnosticCode, SourceSpan)`. The Diagnostics catalog owns the message templates — the lexer passes codes, not strings. All lex-stage codes: `InputTooLarge`, `UnterminatedStringLiteral`, `UnterminatedTypedConstant`, `UnterminatedInterpolation`, `InvalidCharacter`, `UnrecognizedStringEscape`, `UnrecognizedTypedConstantEscape`, `UnescapedBraceInLiteral`.
 
 ---
 
-## Architecture
+## Scan Strategy
 
-### Static class + private Scanner struct
+### Main Loop
 
-The public surface is a static class `Lexer` with a single method `Lex`. All mutable scanning state lives in a private `Scanner` struct instantiated inside `Lex()` and discarded after:
+All mutable scanning state lives in a private `Scanner` struct instantiated inside `Lex()` and discarded after:
 
 ```csharp
 public static TokenStream Lex(string source)
@@ -68,212 +95,159 @@ public static TokenStream Lex(string source)
 }
 ```
 
-This design keeps the public surface allocation-free — `Lexer` has no fields. The `Scanner` struct is stack-allocated (up to the runtime's threshold for struct-on-stack promotion) and carries all per-scan state. The only heap allocations per scan are the `ImmutableArray.Builder` instances and the final `TokenStream` output.
+`Scanner` is stack-allocated. The only heap allocations per scan are the `ImmutableArray.Builder` instances and the final `TokenStream` output.
 
-Rejected alternative: _instance class `Lexer`_ — adds a constructor, instance fields, and a lifecycle to manage with no benefit. No caller needs to configure or reuse a lexer instance.
+`ScanAll()` dispatches on the current mode. In `Normal` mode, the main loop tries in order: whitespace/newline, comment (`#`), identifier/keyword, number, string literal (`"`), typed constant (`'`), operator, punctuation, then falls through to `InvalidCharacter`. Each branch either emits a token or a diagnostic, advances position, and returns to the loop.
 
-### Mode stack for interpolation
+### Interpolation Mode Stack
 
-Interpolation creates a nesting problem: a `{expr}` inside `"..."` or `'...'` re-enters Normal/Interpolation scanning, which may itself encounter a new `"..."` or `'...'`. Precept uses the same delimiters at every nesting level — there is no alternate-quote syntax.
-
-The solution is a mode stack with four modes:
+Interpolation creates a nesting problem: `{expr}` inside `"..."` or `'...'` re-enters Normal-like scanning, which may encounter new literals. The solution is a mode stack with four modes:
 
 | Mode | Description |
 |------|-------------|
 | `Normal` | Top-level scanning — keywords, identifiers, operators, punctuation |
-| `String` | Inside `"..."` — accumulates literal characters, handles `\"`, `{`, `}` |
-| `TypedConstant` | Inside `'...'` — accumulates literal characters, handles `\'`, `{`, `}` |
+| `String` | Inside `"..."` — accumulates literal characters, handles escapes and `{`/`}` |
+| `TypedConstant` | Inside `'...'` — accumulates literal characters, handles escapes and `{`/`}` |
 | `Interpolation` | Inside `{...}` inside a literal — scans as Normal, ends at matching `}` |
 
-Push/pop rules:
-- Normal can push String (on `"`) or TypedConstant (on `'`)
-- String or TypedConstant can push Interpolation (on `{`, after `{{` is ruled out)
-- Interpolation can push String or TypedConstant (nested literals inside interpolated expressions)
-- Interpolation pops on `}`; String pops on `"` or newline/EOF; TypedConstant pops on `'` or newline/EOF
-- Normal is always at depth 0 and is never popped
+The stack is a fixed-size `ModeState[8]` with a depth counter — no `Stack<T>` heap allocation. Maximum nesting of 8 supports 4 full nesting levels (string → interpolation → typed constant → interpolation), well beyond realistic use. When the depth limit is reached, the lexer emits `UnterminatedInterpolation` and recovers.
 
-This enables `"text {SomeField} more {'unit value'} end"` — a string interpolation that contains a typed constant — without requiring alternate delimiter syntax.
+Each stack entry is a `ModeState` struct carrying the mode, segment index, and the source position of the delimiter that began the current segment. This ensures correct span attribution for `StringStart`/`StringMiddle`/`TypedConstantStart`/`TypedConstantMiddle` tokens.
 
-### Array-backed mode stack — no heap allocation
+---
 
-The mode stack is a fixed-size `ModeState[]` with a depth counter `_modeDepth`, not a `Stack<T>`. Maximum depth is `MaxModeStackDepth = 8`. The array is allocated once with the `Scanner` struct and reused for all push/pop operations.
+## Keyword and Identifier Recognition
 
-`Stack<T>` would require a heap-allocated object per scan with internal array resizing. The fixed array approach avoids this entirely. A stack depth of 8 supports 4 nesting levels (string → interpolation → typed constant → interpolation), which is far beyond any realistic authoring scenario.
+The lexer reads a word (letters, digits, `_`), then checks `Tokens.Keywords` for a match. If found, the token kind is the keyword's `TokenKind`; otherwise it is `TokenKind.Identifier`.
 
-When the depth limit is reached, the lexer emits `UnterminatedInterpolation` and calls `RecoverFromUnterminatedInterpolation()` — it scans forward for `}` on the current line to resume in the enclosing literal mode, or pops the enclosing mode if no `}` is found before the line break. This avoids a double-diagnostic cascade at the depth boundary.
+`set` always emits as `TokenKind.Set` — it is present in `Keywords`. The parser determines from context whether `set` introduces a `set<T>` type annotation or a `set` action. `SetType` is excluded from the keyword dictionary entirely.
 
-### `ModeState` struct — segment origin fields
+`min` and `max` always emit as their respective keyword `TokenKind` values. Their dual-use role (constraint keyword vs. aggregation function) is resolved by the parser based on syntactic context.
 
-Each stack entry is a `ModeState` struct:
+---
 
-```csharp
-private struct ModeState
-{
-    public LexerMode Mode;
-    public int SegmentIndex;
-    public int SegStartOffset;
-    public int SegStartLine;
-    public int SegStartColumn;
-}
+## Operator and Punctuation Recognition
+
+### Operators
+
+Scan order matters: multi-character operators are checked before single-character to prevent false matches (e.g., `>=` must not scan as `>` then `=`).
+
+**Current implementation:** Hardcoded if/else chain for multi-char, switch for single-char.
+
+**Target architecture:** A catalog-derived scan table populated at static init from `Tokens.All` entries with `TokenCategory.Operator` or `TokenCategory.Comparison`. Multi-char entries sorted by length descending. The scan method becomes a table lookup instead of per-operator code paths.
+
+### Punctuation
+
+**Current implementation:** Hardcoded switch expression for six punctuation characters.
+
+**Target architecture:** A catalog-derived lookup (`char → TokenKind`) populated from `Tokens.All` entries with `TokenCategory.Punctuation` (excluding `{`, `}`, `"`, `'` which have dedicated mode-transition handling).
+
+---
+
+## Literal Scanning
+
+### String Literals
+
+A `"` in Normal or Interpolation mode pushes `String` mode. The scanner accumulates characters into a reusable `char[]` content buffer. Recognized escapes (`\"`, `\\`, `\n`, `\t`) are decoded. `{` (not `{{`) pushes `Interpolation` mode and emits `StringStart` or `StringMiddle`. `}` returns control to the enclosing interpolation. The closing `"` pops String mode and emits `StringLiteral` (no interpolation) or `StringEnd`.
+
+### Typed Constant Literals
+
+A `'` in Normal or Interpolation mode pushes `TypedConstant` mode. Same structural pattern as strings, with `'` delimiters and only `\'`, `\\` as recognized escapes. Content is opaque — the lexer does not validate unit names, date formats, or currency codes. The type checker handles that.
+
+### Token.Text for Quoted Literals
+
+`Token.Text` carries the **decoded content** — escape sequences resolved, delimiters excluded. `Token.Offset` + `Token.Length` spans the full source extent including delimiters. This means `Token.Length != Token.Text.Length` for quoted literals.
+
+---
+
+## Number Literals
+
+The lexer scans digits, optional decimal point, optional exponent (`e`/`E` with optional `+`/`-`). All numeric tokens emit as `TokenKind.NumberLiteral` with `Token.Text` carrying the raw digit characters. Numeric interpretation (integer vs. decimal, range validation) is the type checker's responsibility.
+
+---
+
+## Comments and Whitespace
+
+### Comments
+
+`#` begins a line comment. The lexer scans to the end of the line and emits `TokenKind.Comment` with `Token.Text` carrying the content after `#` (excluding the `#` itself). The newline is left unconsumed for the next iteration.
+
+### Whitespace
+
+Spaces and tabs are consumed silently. No trivia tokens are emitted. Precept has no formatting/refactoring requirements that need whitespace round-trip fidelity.
+
+### Newlines
+
+`\n` and `\r\n` emit `TokenKind.NewLine`. Newlines are structurally significant to the grammar (statement termination) and must be preserved as tokens for the parser.
+
+---
+
+## Dual-Use Token Strategy
+
+### set / SetType
+
+`set` always emits as `TokenKind.Set`. The parser determines from syntactic context whether it introduces a `set<T>` type annotation (field declaration) or a `set` action (event body). `SetType` is excluded from `Tokens.Keywords` — it exists only as a synthetic kind the parser produces.
+
+```precept
+field Tags : set<string>       # set → TokenKind.Set; parser sees set<T> type context → SetType
+set Status to "active"          # set → TokenKind.Set; parser sees assignment context → set action
+when Status is set              # set → TokenKind.Set; parser sees guard context → null-narrowing
+when Status is not set           # set → TokenKind.Set; parser sees negated guard → null-narrowing
 ```
 
-The `SegStart*` fields record the source position of the delimiter that began the current segment:
-- On the first segment: the position of the opening `"` or `'`
-- On subsequent segments (after an interpolation closes): the position of the `}`
+### min / max
 
-This is a **design review blocker that was fixed** (B1): the original implementation did not store delimiter position on the mode state. Spans on `StringStart`/`StringMiddle`/`TypedConstantStart`/`TypedConstantMiddle` tokens were computed from the wrong origin, producing incorrect span attribution for language server hover and diagnostics. Storing the segment start position explicitly on the `ModeState` fixes this structurally — the position is updated when a `}` closes an interpolation and the enclosing mode resumes.
+`min` and `max` each have one `TokenKind` entry. Their dual role as constraint keywords and aggregation functions is resolved by the parser based on syntactic context. The Tokens catalog classifies them as `TokenCategory.Constraint` only — not `TokenCategory.Function` — because the lexer emits them; the parser interprets them.
 
-`SegmentIndex` tracks which segment within the literal we are on (0 for the first segment, 1 for the segment after the first `{...}`, etc.). This determines whether to emit `StringLiteral` vs. `StringStart`/`StringMiddle`/`StringEnd` — the distinction the parser needs to reconstruct interpolated literal AST nodes.
-
-### Keyword recognition — `FrozenDictionary` with span lookup
-
-Keywords are stored in `Tokens.Keywords`, a `FrozenDictionary<string, TokenKind>` populated at startup. At scan time, after reading a word, keyword lookup uses:
-
-```csharp
-_keywordLookup = Tokens.Keywords.GetAlternateLookup<ReadOnlySpan<char>>();
-// ...
-var kind = _keywordLookup.TryGetValue(span, out var kw) ? kw : TokenKind.Identifier;
+```precept
+field Score : integer min 0 max 100    # min/max → constraint keywords (field bounds)
+computed Total = max(LineAmount)        # max → aggregation function (expression context)
 ```
 
-The `GetAlternateLookup<ReadOnlySpan<char>>()` method returns a handle that accepts a `ReadOnlySpan<char>` directly, avoiding the `new string(...)` allocation for every identifier candidate that turns out not to be a keyword. `FrozenDictionary` was specifically designed for read-only, high-frequency lookup — it uses a perfect hash at construction time.
+---
 
-`Tokens.Keywords` **explicitly excludes `SetType`** — `set` always maps to `TokenKind.Set` regardless of context. The parser determines from surrounding context whether `set` introduces a `set<T>` type annotation (inside a field declaration) or a `set` action keyword (inside an event body). Trying to resolve this ambiguity in the lexer would require look-ahead that belongs to the parser's job.
+## Error Handling and Recovery
 
-### Content buffer — reusable `char[]`
+### Error Conditions
 
-Quoted literal content is accumulated in `_contentBuffer`, a `char[]` field on the `Scanner` struct:
+The lexer always scans to EOF, accumulating all diagnostics. No exception is thrown; no scanning is abandoned.
 
-```csharp
-private char[] _contentBuffer;
-private int _contentLength;
-```
+| Error condition | Diagnostic code | Recovery action |
+|---|---|---|
+| Source exceeds 64KB | `InputTooLarge` | Immediate return: `EndOfSource` + diagnostic |
+| `"` unclosed at EOF or newline | `UnterminatedStringLiteral` | Pop String mode, flush content buffer |
+| `'` unclosed at EOF or newline | `UnterminatedTypedConstant` | Pop TypedConstant mode, flush content buffer |
+| `{` unclosed at EOF or newline | `UnterminatedInterpolation` | Pop Interpolation mode, resume enclosing literal |
+| `\X` unrecognized escape | `UnrecognizedStringEscape` / `UnrecognizedTypedConstantEscape` | Skip `\X`, continue scanning |
+| Lone `}` in literal | `UnescapedBraceInLiteral` | Preserve in `Text`, continue |
+| Unrecognized character | `InvalidCharacter` | Skip character, continue |
 
-Each segment begins with `ResetContent()` (sets `_contentLength = 0`). Characters are appended with `AppendContent(char c)`, which grows the buffer by doubling if needed. The token's `Text` field is produced by `new string(_contentBuffer.AsSpan(0, _contentLength))` only at the moment the token is emitted.
+### Recovery Strategy
 
-This avoids building intermediate strings or `StringBuilder` objects for every character during scanning. The buffer lives on the Scanner struct and is reused across all segments in the scan. The only string allocation per segment is the final `Text` value.
+- **Newline in interpolation**: Emits `UnterminatedInterpolation`, pops back to enclosing literal mode, leaves newline unconsumed for that mode's own unterminated diagnostic.
+- **No synthetic closing tokens**: Missing `StringEnd`/`TypedConstantEnd` is a structural signal. The parser handles it — no fake tokens.
+- **Escape recovery guard**: After `\`, if the next character is a newline or EOF, the lexer does not double-advance. The newline triggers the unterminated-literal diagnostic.
+- **Lone `}` preservation**: Content is not altered — the author sees their own text in error messages.
 
-Rejected alternative: _`StringBuilder`_ — allocates a managed object per segment, requires clearing between segments, and produces allocations proportional to segment count rather than a single reused buffer.
+### Diagnostic Catalog Integration
+
+All diagnostic messages are written for the **domain author** — a business analyst or domain expert, not a .NET developer. The lexer passes `DiagnosticCode` values to `Diagnostics.Create()`; the Diagnostics catalog owns the message templates. Diagnostic vocabulary is deliberately non-compiler: "Text value opened with `"` is missing its closing quote" rather than "Unterminated string literal."
 
 ---
 
 ## Security
 
-### 65,536-character source length limit
+### Source Size Limit
 
 ```csharp
 private const int MaxSourceLength = 65_536;
 ```
 
-This is a **security guardrail**, not a language expressiveness rule. When source exceeds the limit, the lexer returns immediately:
+A 64KB limit is 10–13× the largest realistic Precept file. Input beyond this is almost certainly adversarial. The check is the first thing `Lex()` does — no allocation, no scanning, immediate return with `InputTooLarge`.
 
-```csharp
-if (source.Length > MaxSourceLength)
-{
-    return new TokenStream(
-        ImmutableArray.Create(new Token(TokenKind.EndOfSource, "", 1, 1, 0, 0)),
-        ImmutableArray.Create(Diagnostics.Create(
-            DiagnosticCode.InputTooLarge,
-            new SourceSpan(0, 0, 1, 1, 1, 1))));
-}
-```
+### Bounded Work Guarantee
 
-The returned `TokenStream` contains only `EndOfSource` and the `InputTooLarge` diagnostic. No partial tokenization is emitted. The pipeline continues with this degenerate stream — the parser will produce an empty tree, the type checker will find nothing to check, and the result is a clean `CompilationResult` with one diagnostic.
-
-**Why 64KB:** A typical Precept file is under 200 lines (~5KB). 64KB is 10–13× the largest realistic file. Any input larger than 64KB is almost certainly adversarial — a fuzzing payload, a mistaken file attachment, or malicious input submitted through a network-exposed MCP tool endpoint. Bounding the work here bounds lexer time and memory usage without constraining legitimate use.
-
-**Why not enforce this as a parse or type error:** Lexer-level enforcement prevents the lexer itself from being used as a denial-of-service vector. The check is the first thing `Lex()` does — no allocation, no scanning, immediate return.
-
----
-
-## Error Recovery
-
-The lexer uses a **continue-to-EOF** recovery model. Every error emits a diagnostic and advances state enough to continue scanning. No exception is thrown; no scanning is abandoned.
-
-### EOF with open modes
-
-When `ScanAll()` returns control to `Build()`, the method walks the mode stack from innermost to outermost (depths `_modeDepth - 1` down to 1), emitting one unterminated diagnostic per open mode:
-
-| Open mode at EOF | Diagnostic code |
-|------------------|----------------|
-| `Interpolation` | `UnterminatedInterpolation` |
-| `String` | `UnterminatedStringLiteral` |
-| `TypedConstant` | `UnterminatedTypedConstant` |
-
-The segment origin stored on each `ModeState` provides the span: from the delimiter that opened the segment to the current (EOF) position. Any accumulated content in the buffer has already been flushed as a token before `Build()` is called (the content scanners flush on newline/EOF).
-
-### Newline in Interpolation mode
-
-A newline inside an interpolation (`{...}` inside `"..."` or `'...'`) emits `UnterminatedInterpolation` and pops back to the enclosing literal mode, leaving the newline **unconsumed**:
-
-```csharp
-if ((c == '\n' || c == '\r') && CurrentMode == LexerMode.Interpolation)
-{
-    // emit UnterminatedInterpolation with span from { to here
-    PopMode(); // back to String or TypedConstant — newline left unconsumed
-    return;
-}
-```
-
-On the next iteration, the enclosing literal mode's content scanner sees the newline and emits its own `UnterminatedStringLiteral` or `UnterminatedTypedConstant`. This produces two diagnostics for one logical problem — each is structurally precise about the mode that was unclosed. The parser receives clean, correctly attributed diagnostic information for both the interpolation and the containing literal.
-
-### No synthetic closing tokens
-
-When an interpolated literal is unterminated, the lexer does **not** emit synthetic `StringEnd` or `TypedConstantEnd` tokens. The parser receives `StringStart`/`StringMiddle` (or `TypedConstantStart`/`TypedConstantMiddle`) without a matching `End`. This was a deliberate team decision: synthetic closing tokens create a false structural impression that can mislead downstream error recovery. The parser is responsible for handling the missing `End` as a structural error in its own recovery logic.
-
-### Escape recovery
-
-Unrecognized escape sequences (`\X` where `X` is not a known escape character) emit a diagnostic and skip forward:
-
-```csharp
-if (c == '\\')
-{
-    // emit UnrecognizedStringEscape or UnrecognizedTypedConstantEscape
-    Advance(); // skip \
-    if (!IsAtEnd && Current != '\n' && Current != '\r')
-        Advance(); // skip the unrecognized char — but not if it's a line break
-    continue;
-}
-```
-
-The guard `!= '\n' && != '\r'` is a **critical recovery detail**: if the char after `\` is a newline or EOF, the lexer must not double-advance past it. The newline is the trigger for the unterminated-literal diagnostic on the next character check. Consuming it here would skip the unterminated diagnostic entirely, producing a scan that appears to succeed while silently dropping the error.
-
-Known string escapes: `\"`, `\\`, `\n`, `\t`.
-Known typed constant escapes: `\'`, `\\`.
-(`\n` and `\t` are valid in strings but not typed constants — typed constant content is positional and whitespace-significant to the content validator.)
-
-### Lone `}` in literal
-
-A `}` that is not part of `}}` (escaped brace) inside a string or typed constant emits `UnescapedBraceInLiteral`. The character is **preserved in the segment's `Text`**:
-
-```csharp
-_diagnostics.Add(Diagnostics.Create(DiagnosticCode.UnescapedBraceInLiteral, ...));
-AppendContent(c); // preserve in segment text for recovery
-Advance();
-```
-
-Dropping the character would alter the semantic content the author wrote, making the diagnostic harder to act on. Preserving it means the domain author sees their own text reflected back in error messages and previews.
-
----
-
-## Diagnostic Audience
-
-All lexer diagnostic messages are written for the **domain author** persona — a business analyst or domain expert who understands the business process being modeled, not a .NET developer. Messages use plain language that describes the problem and implies the fix.
-
-Examples:
-
-| Code | Message (domain-author voice) |
-|------|-------------------------------|
-| `UnterminatedStringLiteral` | `Text value opened with " is missing its closing quote` |
-| `UnterminatedTypedConstant` | `Typed value opened with ' is missing its closing quote` |
-| `UnterminatedInterpolation` | `Interpolated expression opened with { is missing its closing }` |
-| `UnrecognizedStringEscape` | `\X is not a recognized escape sequence inside a text value. Use \" for a quote, \\\\ for a backslash, \\n for a newline, \\t for a tab, or {{ for a literal {` |
-| `UnrecognizedTypedConstantEscape` | `\X is not a recognized escape sequence inside a typed value. Use \\' for a quote or \\\\ for a backslash` |
-| `UnescapedBraceInLiteral` | `A lone } inside a text or typed value must be written as }}` |
-| `InputTooLarge` | `Source file exceeds the maximum supported size` |
-
-The `InvalidCharacter` case was not split into multiple codes for the top-level scanner, but the literal-interior codes (`UnrecognizedStringEscape`, `UnrecognizedTypedConstantEscape`, `UnescapedBraceInLiteral`) were explicitly separated because each represents a structurally distinct authoring mistake that calls for a different correction.
-
-Diagnostic vocabulary is deliberately separate from compiler vocabulary. "Unterminated string literal" is meaningful to a compiler developer; "Text value opened with `"` is missing its closing quote" is meaningful to an author who has never written a compiler.
+The lexer advances at least one character per loop iteration. Combined with the source size limit, this guarantees bounded execution time and memory usage regardless of input content.
 
 ---
 
@@ -284,69 +258,50 @@ Diagnostic vocabulary is deliberately separate from compiler vocabulary. "Unterm
 | Token kind | Span coverage |
 |------------|---------------|
 | `StringLiteral` | Opening `"` through closing `"` (inclusive) |
-| `StringStart` | Opening `"` through and including the `{` that started the interpolation |
-| `StringMiddle` | The `}` that ended the previous interpolation through and including the `{` that started the next |
-| `StringEnd` | The `}` that ended the last interpolation through closing `"` (inclusive) |
+| `StringStart` | Opening `"` through and including the `{` |
+| `StringMiddle` | The `}` through and including the next `{` |
+| `StringEnd` | The `}` through closing `"` (inclusive) |
 | `TypedConstant` | Opening `'` through closing `'` (inclusive) |
-| `TypedConstantStart/Middle/End` | Same rules as String variants, with `'` delimiters |
+| `TypedConstantStart/Middle/End` | Same rules as string variants, with `'` delimiters |
 | `NumberLiteral` | All numeric characters including decimal point and exponent |
 | Keywords, identifiers | The word characters only |
 | Operators, punctuation | The operator characters |
 | `NewLine` | The `\n` or `\r\n` characters |
 | `Comment` | From `#` through the last character before the line break |
 
-The `Text` field carries the **decoded content** for quoted literals (escape sequences are resolved, delimiter characters are excluded from `Text` but included in the span). This means `Token.Length` is not `Token.Text.Length` for quoted literals. Consumers that need the original source characters for any reason should use `source.Substring(token.Offset, token.Length)`.
+---
+
+## Downstream Consumer Impact
+
+### Grammar Generation
+
+The TextMate grammar (`tools/Precept.VsCode/syntaxes/precept.tmLanguage.json`) is generated from catalog metadata. Each `TokenMeta.TextMateScope` value drives grammar pattern emission. When a token is added to the catalog with a `TextMateScope`, it appears in syntax highlighting without grammar edits.
+
+### Language Server Semantic Tokens
+
+`TokenMeta.SemanticTokenType` drives semantic token classification. The language server maps each token's catalog-declared type to LSP semantic token types. No per-token switch in the language server.
+
+### Completions
+
+Keyword completions are derived from `Tokens.All`. `TokenMeta.ValidAfter` controls which completions appear after which tokens — the language server reads this metadata, not a hardcoded completion table.
+
+### MCP Language Tool
+
+The `precept_language` MCP tool serializes the Tokens catalog (among others) as part of its vocabulary output. The tool reads catalog entries directly — it has no parallel keyword list.
 
 ---
 
-## Design Decisions
+## What Stays Hand-Written
 
-Decision rationales are discussed inline in the sections where they arise. This catalog provides a single auditable index.
+Not everything should be catalog-driven. The following remain hand-written because they are lexer-internal mechanics, not domain knowledge:
 
-| ID | Decision | Section |
-|---|---|---|
-| L1 | Hand-written lexer — no parser-generator dependency | Design Principles § Right-sized for Precept's scale |
-| L2 | Static pure function — `Lexer.Lex(string) → TokenStream`, no instance | Design Principles § Same input always produces same output |
-| L3 | `Scanner` struct isolation — all mutable state stack-allocated, discarded after `Lex()` | Architecture § Static class + private Scanner struct |
-| L4 | Mode stack for interpolation — four modes (Normal, String, TypedConstant, Interpolation) with push/pop | Architecture § Mode stack for interpolation |
-| L5 | Array-backed mode stack — fixed `ModeState[8]`, no `Stack<T>` heap allocation | Architecture § Array-backed mode stack |
-| L6 | `ModeState` segment origin fields — stores delimiter position for correct span attribution | Architecture § `ModeState` struct |
-| L7 | `FrozenDictionary` keyword lookup with `ReadOnlySpan<char>` — zero-allocation per-word check | Architecture § Keyword recognition |
-| L8 | Reusable `char[]` content buffer — single buffer across all segments, no `StringBuilder` | Architecture § Content buffer |
-| L9 | 64KB source length limit — security guardrail, immediate return before scanning | Security |
-| L10 | Token span contract — `Offset + Length` spans full source extent including delimiters | Token Span Contract |
-| R1 | EOF cleanup — walk mode stack innermost-to-outermost, one diagnostic per open mode | Error Recovery § EOF with open modes |
-| R2 | Newline in Interpolation pops mode, leaves newline unconsumed for enclosing literal | Error Recovery § Newline in Interpolation mode |
-| R3 | No synthetic closing tokens — missing `End` is a structural signal for the parser | Error Recovery § No synthetic closing tokens |
-| R4 | Escape recovery — skip `\X`, guard against consuming line breaks | Error Recovery § Escape recovery |
-| R5 | Lone `}` preserved in segment text with diagnostic — content not altered | Error Recovery § Lone `}` in literal |
-| D1 | Diagnostic audience is the domain author — plain language, no compiler jargon | Diagnostic Audience |
+- **Mode stack push/pop logic** — structural scanning behavior for interpolation nesting
+- **Content buffer accumulation** — character-by-character scanning with escape resolution
+- **Number literal scanning** — digit/dot/exponent pattern recognition
+- **Comment and whitespace scanning** — simple character-class checks
+- **Error recovery logic** — how to advance state after each error condition
 
----
-
-## Deliberate Exclusions
-
-The lexer intentionally does NOT:
-
-- **Resolve types.** Typed constant content (`'30 days'`) is opaque — the lexer marks the boundaries but does not parse or validate the interior. Type resolution is the type checker's responsibility.
-- **Validate typed constant content.** Words like `days`, `hours`, `USD` are not keywords — they are content. The lexer does not know the unit vocabulary; the type checker does.
-- **Manage indentation.** Precept has no indentation significance. The lexer emits `NewLine` tokens and discards leading whitespace per-line. Indentation-sensitive parsing is not a design goal.
-- **Synthesize `SetType`.** `set` always emits as `TokenKind.Set`. The parser determines from context whether it introduces a `set<T>` type annotation or a `set` action. This distinction requires knowing whether the `set` appears in a field declaration context or an event body — knowledge the parser has but the lexer does not.
-- **Short-circuit on errors.** The lexer always scans to EOF to produce maximal diagnostics. Partial token streams are valid `TokenStream` values and do not cause downstream failures.
-- **Preserve trivia.** Whitespace (spaces, tabs) is consumed silently — no trivia tokens are emitted. Comments are emitted as `Comment` tokens. This is a deliberate right-sizing: Precept has no formatting/refactoring requirements that need whitespace round-trip fidelity.
-
----
-
-## Cross-References
-
-| Topic | Document |
-|-------|----------|
-| String/typed constant segmentation, escape tables, mode stack modes | [docs/compiler/literal-system.md](../compiler/literal-system.md) § Pipeline Stage Contracts → Lexer |
-| `TokenStream` shape and consumer contracts | [docs/compiler-and-runtime-design.md](../compiler-and-runtime-design.md) § Compiler Pipeline |
-| Diagnostic codes, messages, and attribution | [docs/compiler/diagnostic-system.md](../compiler/diagnostic-system.md) |
-| All lexer diagnostic codes | [docs/language/precept-language-spec.md](../language/precept-language-spec.md) § 1.8 |
-| `set` disambiguation | [docs/language/precept-language-spec.md](../language/precept-language-spec.md) § 1.7 |
-| Pipeline stage ordering, artifact types | [docs/compiler-and-runtime-design.md](../compiler-and-runtime-design.md) |
+These are the lexer's implementation, not its vocabulary. They change when the scanning algorithm changes, not when the language surface changes.
 
 ---
 
@@ -354,10 +309,22 @@ The lexer intentionally does NOT:
 
 | File | Purpose |
 |------|---------|
-| `src/Precept.Next/Pipeline/Lexer.cs` | Lexer implementation — `Lexer` static class, `Scanner` struct, `ModeState` struct, `LexerMode` enum (~730 lines) |
-| `src/Precept.Next/Pipeline/TokenKind.cs` | `TokenKind` enum — all token kind values |
-| `src/Precept.Next/Pipeline/Token.cs` | `Token` record struct — kind, text, line, column, offset, length |
-| `src/Precept.Next/Pipeline/Tokens.cs` | `Tokens.Keywords` — `FrozenDictionary<string, TokenKind>` keyword catalog |
-| `src/Precept.Next/Pipeline/TokenStream.cs` | `TokenStream` — lexer output type (immutable tokens + diagnostics) |
-| `src/Precept.Next/Pipeline/DiagnosticCode.cs` | `DiagnosticCode` enum — Lex-stage codes: `InputTooLarge`, `UnterminatedStringLiteral`, `UnterminatedTypedConstant`, `UnterminatedInterpolation`, `InvalidCharacter`, `UnrecognizedStringEscape`, `UnrecognizedTypedConstantEscape`, `UnescapedBraceInLiteral` |
-| `src/Precept.Next/Pipeline/Diagnostics.cs` | `Diagnostics.Create` — diagnostic message factory (domain-author messages) |
+| `src/Precept/Pipeline/Lexer.cs` | Lexer implementation — `Lexer` static class, `Scanner` struct, `ModeState` struct, `LexerMode` enum (~815 lines) |
+| `src/Precept/Language/TokenKind.cs` | `TokenKind` enum — all token kind values |
+| `src/Precept/Language/Token.cs` | `Token` record struct — kind, text, line, column, offset, length; `TokenMeta` record with catalog metadata |
+| `src/Precept/Language/Tokens.cs` | `Tokens.All` — exhaustive token catalog; `Tokens.Keywords` — `FrozenDictionary<string, TokenKind>` |
+| `src/Precept/Pipeline/TokenStream.cs` | `TokenStream` — lexer output type (immutable tokens + diagnostics) |
+| `src/Precept/Language/Diagnostics.cs` | `Diagnostics.Create` — diagnostic message factory (domain-author messages) |
+| `src/Precept/Language/DiagnosticCode.cs` | `DiagnosticCode` enum — includes all lex-stage codes |
+
+---
+
+## Cross-References
+
+| Topic | Document |
+|-------|----------|
+| String/typed constant segmentation, escape tables, mode stack modes | [docs/compiler/literal-system.md](literal-system.md) |
+| Diagnostic codes, messages, and attribution | [docs/compiler/diagnostic-system.md](diagnostic-system.md) |
+| Catalog system architecture | [docs/language/catalog-system.md](../language/catalog-system.md) |
+| Pipeline stage ordering, artifact types | [docs/compiler-and-runtime-design.md](../compiler-and-runtime-design.md) |
+| `set` disambiguation | [docs/language/precept-language-spec.md](../language/precept-language-spec.md) § 1.7 |
