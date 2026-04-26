@@ -545,15 +545,15 @@ public class OperationsTests
     [Fact]
     public void Binary_Count()
     {
-        // 83 arithmetic + 104 comparison = 187 binary
-        Operations.All.OfType<BinaryOperationMeta>().Should().HaveCount(187);
+        // 85 arithmetic + 104 comparison = 189 binary (O1: +ZonedDateTimePlusPeriod, +ZonedDateTimeMinusPeriod)
+        Operations.All.OfType<BinaryOperationMeta>().Should().HaveCount(189);
     }
 
     [Fact]
     public void Total_Count()
     {
-        // 9 unary + 187 binary = 196 total
-        Operations.All.Should().HaveCount(196);
+        // 9 unary + 189 binary = 198 total
+        Operations.All.Should().HaveCount(198);
     }
 
     // ── Proof Requirements ──────────────────────────────────────────────────────

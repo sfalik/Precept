@@ -83,8 +83,8 @@ public enum OperationKind
 
     // ── Temporal: period ────────────────────────────────────────────
     PeriodPlusPeriod,
-    PeriodMinusPeriod,    PeriodTimesInteger,
-    PeriodDivideInteger,
+    PeriodMinusPeriod,
+
     // ── Temporal: zoneddatetime ─────────────────────────────────────
     ZonedDateTimePlusDuration,
     ZonedDateTimeMinusDuration,

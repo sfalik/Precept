@@ -167,12 +167,12 @@ public class TypesTests
     }
 
     [Fact]
-    public void GetMeta_Period_HasUnitQualifier()
+    public void GetMeta_Period_HasTemporalDimensionQualifier()
     {
         var meta = Types.GetMeta(TypeKind.Period);
         meta.QualifierShape.Should().NotBeNull();
         meta.QualifierShape!.Slots.Should().ContainSingle()
-            .Which.Should().BeEquivalentTo(new QualifierSlot(TokenKind.Of, QualifierAxis.Unit));
+            .Which.Should().BeEquivalentTo(new QualifierSlot(TokenKind.Of, QualifierAxis.TemporalDimension));
     }
 
     [Fact]

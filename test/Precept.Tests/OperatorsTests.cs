@@ -142,7 +142,6 @@ public class OperatorsTests
     [InlineData(OperatorKind.Times)]
     [InlineData(OperatorKind.Divide)]
     [InlineData(OperatorKind.Modulo)]
-    [InlineData(OperatorKind.Contains)]
     public void GetMeta_LeftAssociativeOperators(OperatorKind kind)
     {
         Operators.GetMeta(kind).Associativity.Should().Be(Associativity.Left);
@@ -165,6 +164,7 @@ public class OperatorsTests
     [InlineData(OperatorKind.GreaterThan)]
     [InlineData(OperatorKind.LessThanOrEqual)]
     [InlineData(OperatorKind.GreaterThanOrEqual)]
+    [InlineData(OperatorKind.Contains)]
     public void GetMeta_NonAssociativeOperators(OperatorKind kind)
     {
         Operators.GetMeta(kind).Associativity.Should().Be(Associativity.NonAssociative);
