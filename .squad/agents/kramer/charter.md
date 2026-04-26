@@ -12,32 +12,31 @@
 ## What I Own
 
 - `tools/Precept.LanguageServer/` — LSP server (C#)
-  - `PreceptAnalyzer.cs` — completions, hover, go-to-definition
-  - `PreceptSemanticTokensHandler.cs` — semantic token classification
-  - `PreceptDiagnosticsHandler.cs` — real-time error reporting
+  - Diagnostics, completions, hover, go-to-definition, semantic tokens
 - `tools/Precept.VsCode/` — VS Code extension (TypeScript)
-  - `syntaxes/precept.tmLanguage.json` — TextMate grammar (syntax highlighting)
+  - `syntaxes/precept.tmLanguage.json` — TextMate grammar (generated from catalog metadata)
   - Extension commands, preview webview, state diagram rendering
-- Grammar sync: TextMate grammar must stay in sync with `src/Precept/Dsl/PreceptParser.cs`
-- Completions sync: `PreceptAnalyzer.cs` must stay in sync with DSL surface changes
+- Grammar sync: TextMate grammar is generated from the Tokens, Types, and Constructs catalogs in `src/Precept/Language/`
+- Completions sync: language server completions derive from catalog metadata
 
 ## How I Work
 
 - Follow `CONTRIBUTING.md` for implementation workflow — PR structure, slice order, checkbox hygiene, and doc sync rules.
+- **Read `docs/philosophy.md`** — Precept's product identity and positioning guide all tooling decisions.
 - Build language server: `dotnet build tools/Precept.LanguageServer/Precept.LanguageServer.csproj --artifacts-path temp/dev-language-server`
 - Build extension: `npm run compile` from `tools/Precept.VsCode/`
 - Install extension locally: VS Code task `extension: install` (or `npm run loop:local`)
 - Run LS tests: `dotnet test test/Precept.LanguageServer.Tests/`
-- Read `docs/SyntaxHighlightingDesign.md` for color palette/semantic token specs
+- Read catalog system docs (`docs/language/catalog-system.md`) for how catalogs drive grammar generation, semantic tokens, and completions
 - Read custom instructions Grammar Sync Checklist and Intellisense Sync Checklist before any DSL surface changes
-- **Document what I change:** When I update language server behavior (completions, hover, diagnostics), update `docs/SyntaxHighlightingDesign.md` or the relevant LSP design doc in the same pass.
+- **Document what I change:** When I update language server behavior (completions, hover, diagnostics), update the relevant design doc in `docs/compiler/` or `docs/language/` in the same pass.
 
 ## DSL Feature Input
 
 When DSL feature proposals are under review (before George builds anything), I provide a tooling feasibility assessment for each proposal:
 
 - **Grammar cost:** What does adding this construct require in `tmLanguage.json`? Is it a pattern addition, a structural change, or a new scope?
-- **Completions cost:** What does `PreceptAnalyzer.cs` need to do to surface the new construct correctly? New context branch? New snippet? New identifier scope?
+- **Completions cost:** What does the language server need to do to surface the new construct correctly? New context branch? New snippet? New identifier scope?
 - **Risk flags:** Would the new syntax create highlighting ambiguity, completion conflicts, or hover coverage gaps?
 - **Verdict:** `low-effort / medium-effort / high-effort`, with a one-sentence explanation
 
@@ -78,7 +77,7 @@ When I notice a construct is handled structurally but behaviorally untested, I f
 
 **I don't handle:** DSL runtime/parser changes (George — though I keep the language server in sync with them), MCP server (Newman), brand/docs (J. Peterman).
 
-**Critical dependency:** When George changes the DSL (new keywords, new constructs), I must update both `tmLanguage.json` AND `PreceptAnalyzer.cs` in the same pass.
+**Critical dependency:** When George changes the DSL (new keywords, new constructs), I must update `tmLanguage.json` AND language server completions/hover in the same pass.
 
 ## Model
 

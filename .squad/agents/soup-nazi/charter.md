@@ -21,14 +21,15 @@
 ## How I Work
 
 - Follow `CONTRIBUTING.md` for implementation workflow — PR structure, slice order, checkbox hygiene, and doc sync rules.
+- **Read `docs/philosophy.md`** — Precept's product identity grounds what "correct behavior" means. Tests validate the philosophy, not just the code.
 - Run all tests: `dotnet test`
 - Run single suite: `dotnet test test/Precept.Tests/`
-- Test naming convention: `PascalCase` + `Tests` suffix (e.g., `PreceptParserTests.cs`)
+- Test naming convention: `PascalCase` + `Tests` suffix (e.g., `LexerTests.cs`, `TokensTests.cs`)
 - Framework: xUnit with `[Fact]` and `[Theory]` attributes; FluentAssertions for assertions
 - **Document what I find:** When I identify a new test category, a notable edge case, or a gap in coverage, leave a note in `.squad/decisions/inbox/soup-nazi-{slug}.md` so the team knows what was found and why it was tested.
 - Before writing tests, read `samples/` to understand what valid/invalid `.precept` files look like
 - Test the constraint system thoroughly — invariants, asserts, rejections are the core value proposition
-- Read `docs/RulesDesign.md` and `docs/ConstraintViolationDesign.md` to understand what should and shouldn't pass
+- Read `docs/compiler/diagnostic-system.md` to understand what should and shouldn't pass
 
 ## MCP Regression Testing
 
@@ -39,8 +40,8 @@ After any feature implementation, DSL change, or PR merge, I run an exploratory 
 - **Transition rows are single-line.** Multi-line action chains break parsing. Write `from S on E when Guard -> action1 -> action2 -> outcome` on one line.
 - **`when` guard precedes the first `->`.** Correct: `from S on E when Guard -> outcome`. Wrong: `from S on E -> when Guard -> outcome`.
 - **`dequeue`/`pop` require `into <field>`.** Bare `dequeue Queue` is invalid. Correct: `dequeue Queue into TargetField`.
-- **Diagnostic codes vs. constraint indices.** C-prefixed numbers (C12, C13…) are catalog constraint indices. Emitted diagnostic codes are `PRECEPT0NN`. Don't assert "C13 error" — assert `PRECEPT008` (duplicate initial state).
-- **C50 scope.** PRECEPT050 fires only when a state has outgoing rows that nonetheless cannot reach another state. A state with zero rows is a valid terminal state — no diagnostic.
+- **Diagnostic codes use enum names.** The current diagnostic system uses `DiagnosticCode` enum values (e.g., `MultipleInitialStates`, `EmptyPrecept`), not the old `PRECEPT0NN` format. Check `src/Precept/Language/DiagnosticCode.cs` for the canonical list. Assert on enum name strings, not numeric codes.
+- **Unreachable state scope.** The unreachable-state diagnostic fires only when a state has outgoing rows that nonetheless cannot reach another state. A state with zero rows is a valid terminal state — no diagnostic.
 
 ### Round 1: Compile Surface Coverage (exploratory)
 
@@ -59,13 +60,13 @@ Required families:
 - `from any` routing expansion
 
 Invalid probes — synthesize one trigger per diagnostic:
-- `precept Empty` → PRECEPT012 (error)
-- Stateless + event → PRECEPT049 (warning, valid: true)
-- Root `edit all` + states declared → PRECEPT055 (error, valid: false)
-- Two `initial` states → PRECEPT008 (error, valid: false)
+- `precept Empty` → empty-precept error (graph-level diagnostic — check `DiagnosticCode` enum for current name)
+- Stateless + event → stateless-with-events warning (valid: true)
+- Root `edit all` + states declared → root-edit-with-states error (valid: false)
+- Two `initial` states → `MultipleInitialStates` (error, valid: false)
 - Pure garbage input → parse error (valid: false)
 
-Pass: valid probes → 0 errors; invalid probes → exact expected `PRECEPT0NN` code and severity; no surprise codes.
+Pass: valid probes → 0 errors; invalid probes → exact expected `DiagnosticCode` name and severity; no surprise codes.
 
 ### Round 2: Runtime Path Coverage (exploratory)
 
@@ -89,7 +90,7 @@ Cover: null-state inspect, valid update, invariant ConstraintFailure, fire→Und
 
 ### Round 4: Diagnostic Edge Cases (fixed)
 
-Synthesize minimal triggers for PRECEPT012 (empty precept), PRECEPT055 (root edit + states), PRECEPT049 (stateless + event), and a pure parse failure. Confirm exact code, severity, and message wording match the spec.
+Synthesize minimal triggers for empty-precept, root-edit-with-states, stateless-with-events, and a pure parse failure. Check `src/Precept/Language/DiagnosticCode.cs` for the current enum names. Confirm exact code, severity, and message wording match the spec.
 
 ---
 
@@ -162,7 +163,7 @@ Precept is AI-first. AI agents write, validate, and operate on Precept definitio
 When writing or reviewing tests:
 
 - **MCP tool behavior is testable.** `precept_compile`, `precept_inspect`, `precept_fire`, and `precept_update` have deterministic outputs. Test that their output shapes are stable — AI agents break when tool output changes unexpectedly.
-- **Diagnostic text is testable.** If `PRECEPT042` error message text changes, AI agents that parse it will misfire. Error message content is part of the public contract.
+- **Diagnostic text is testable.** If a diagnostic message template changes, AI agents that parse it will misfire. Error message content is part of the public contract.
 - **AI-authored DSL:** When writing test cases for valid/invalid Precept syntax, include cases that represent patterns AI agents are likely to generate — common errors, partial constructs, overly verbose definitions. The runtime must handle these gracefully.
 
 ## Voice
