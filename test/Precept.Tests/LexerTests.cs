@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using FluentAssertions;
 using Precept.Language;
@@ -764,6 +765,164 @@ public class LexerTests
             TokenKind.Tilde,
             TokenKind.IntegerType,
             TokenKind.EndOfSource);
+
+        stream.Diagnostics.Should().BeEmpty();
+    }
+
+    // ════════════════════════════════════════════════════════════════════════════
+    //  Operator and punctuation: individual token verification (B2)
+    // ════════════════════════════════════════════════════════════════════════════
+
+    [Theory]
+    [InlineData("->", "Arrow", "->", 2)]
+    [InlineData("!~", "CaseInsensitiveNotEquals", "!~", 2)]
+    [InlineData("~=", "CaseInsensitiveEquals", "~=", 2)]
+    [InlineData("==", "DoubleEquals", "==", 2)]
+    [InlineData("!=", "NotEquals", "!=", 2)]
+    [InlineData(">=", "GreaterThanOrEqual", ">=", 2)]
+    [InlineData("<=", "LessThanOrEqual", "<=", 2)]
+    [InlineData("=", "Assign", "=", 1)]
+    [InlineData(">", "GreaterThan", ">", 1)]
+    [InlineData("<", "LessThan", "<", 1)]
+    [InlineData("+", "Plus", "+", 1)]
+    [InlineData("-", "Minus", "-", 1)]
+    [InlineData("*", "Star", "*", 1)]
+    [InlineData("/", "Slash", "/", 1)]
+    [InlineData("%", "Percent", "%", 1)]
+    [InlineData("~", "Tilde", "~", 1)]
+    public void Lex_Operator_ProducesExpectedKindTextOffsetAndLength(string source, string kindName, string expectedText, int expectedLength)
+    {
+        var expectedKind = Enum.Parse<TokenKind>(kindName);
+        var stream = Lexer.Lex(source);
+
+        stream.Tokens[0].Should().Be(new Token(expectedKind, expectedText, 1, 1, 0, expectedLength));
+        stream.Tokens[1].Kind.Should().Be(TokenKind.EndOfSource);
+        stream.Diagnostics.Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData(".", "Dot")]
+    [InlineData(",", "Comma")]
+    [InlineData("(", "LeftParen")]
+    [InlineData(")", "RightParen")]
+    [InlineData("[", "LeftBracket")]
+    [InlineData("]", "RightBracket")]
+    public void Lex_Punctuation_ProducesExpectedKindTextAndOffset(string source, string kindName)
+    {
+        var expectedKind = Enum.Parse<TokenKind>(kindName);
+        var stream = Lexer.Lex(source);
+
+        stream.Tokens[0].Should().Be(new Token(expectedKind, source, 1, 1, 0, 1));
+        stream.Tokens[1].Kind.Should().Be(TokenKind.EndOfSource);
+        stream.Diagnostics.Should().BeEmpty();
+    }
+
+    // ════════════════════════════════════════════════════════════════════════════
+    //  Maximal-munch boundary tests (G1)
+    // ════════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Lex_Arrow_IsNotScannedAsMinusThenGreaterThan()
+    {
+        var stream = Lexer.Lex("->x");
+
+        stream.Tokens.Select(t => t.Kind).Should().Equal(
+            TokenKind.Arrow,
+            TokenKind.Identifier,
+            TokenKind.EndOfSource);
+    }
+
+    [Fact]
+    public void Lex_GreaterThanOrEqual_IsNotScannedAsGreaterThanThenAssign()
+    {
+        var stream = Lexer.Lex(">=1");
+
+        stream.Tokens.Select(t => t.Kind).Should().Equal(
+            TokenKind.GreaterThanOrEqual,
+            TokenKind.NumberLiteral,
+            TokenKind.EndOfSource);
+    }
+
+    [Fact]
+    public void Lex_LessThanOrEqual_IsNotScannedAsLessThanThenAssign()
+    {
+        var stream = Lexer.Lex("<=1");
+
+        stream.Tokens.Select(t => t.Kind).Should().Equal(
+            TokenKind.LessThanOrEqual,
+            TokenKind.NumberLiteral,
+            TokenKind.EndOfSource);
+    }
+
+    [Fact]
+    public void Lex_DoubleEquals_IsNotScannedAsTwoAssigns()
+    {
+        var stream = Lexer.Lex("==1");
+
+        stream.Tokens.Select(t => t.Kind).Should().Equal(
+            TokenKind.DoubleEquals,
+            TokenKind.NumberLiteral,
+            TokenKind.EndOfSource);
+    }
+
+    // ════════════════════════════════════════════════════════════════════════════
+    //  Dual-use keyword tests (G2)
+    // ════════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Lex_Min_AlwaysEmitsAsKeyword()
+    {
+        var stream = Lexer.Lex("min");
+
+        stream.Tokens[0].Kind.Should().Be(TokenKind.Min);
+        stream.Tokens[0].Text.Should().Be("min");
+    }
+
+    [Fact]
+    public void Lex_Max_AlwaysEmitsAsKeyword()
+    {
+        var stream = Lexer.Lex("max");
+
+        stream.Tokens[0].Kind.Should().Be(TokenKind.Max);
+        stream.Tokens[0].Text.Should().Be("max");
+    }
+
+    // ════════════════════════════════════════════════════════════════════════════
+    //  Newline and whitespace edge cases (G4)
+    // ════════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Lex_BareLineFeedNewLine_ProducesSingleCharacterNewLineToken()
+    {
+        var stream = Lexer.Lex("field\nstate");
+
+        stream.Tokens.Should().Equal(
+            new Token(TokenKind.Field, "field", 1, 1, 0, 5),
+            new Token(TokenKind.NewLine, string.Empty, 1, 6, 5, 1),
+            new Token(TokenKind.State, "state", 2, 1, 6, 5),
+            new Token(TokenKind.EndOfSource, string.Empty, 2, 6, 11, 0));
+
+        stream.Diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Lex_EmptySource_ProducesOnlyEndOfSource()
+    {
+        var stream = Lexer.Lex("");
+
+        stream.Tokens.Should().Equal(
+            new Token(TokenKind.EndOfSource, string.Empty, 1, 1, 0, 0));
+
+        stream.Diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Lex_WhitespaceOnlySource_ProducesOnlyEndOfSource()
+    {
+        var stream = Lexer.Lex("   \t  ");
+
+        stream.Tokens.Should().Equal(
+            new Token(TokenKind.EndOfSource, string.Empty, 1, 7, 6, 0));
 
         stream.Diagnostics.Should().BeEmpty();
     }
