@@ -3,33 +3,33 @@ precept SubscriptionCancellationRetention
 # Retention teams often make one last save attempt before a subscription is closed.
 # This sample is intentionally compact but still shows realistic in-place mutations.
 
-field SubscriberName as string nullable
-field PlanName as string nullable
+field SubscriberName as string optional
+field PlanName as string optional
 field MonthlyPrice as number default 0 nonnegative
 field SaveOfferAccepted as boolean default false
 field RetentionDiscount as number default 0 nonnegative max 100
-field CancellationReason as string nullable
-field LastAgentNote as string nullable
+field CancellationReason as string optional
+field LastAgentNote as string optional
 
 state Active initial
 state RetentionReview
 state Cancelled
 
-in RetentionReview edit LastAgentNote
+in RetentionReview write LastAgentNote
 
-event RequestCancellation with
+event RequestCancellation(
     Name as string notempty,
     Plan as string notempty,
     Price as number,
-    Reason as string notempty
-on RequestCancellation ensure Price >= 0 because "The plan price cannot be negative"
+    Reason as string notempty)
+on RequestCancellation ensure RequestCancellation.Price >= 0 because "The plan price cannot be negative"
 
-event MakeSaveOffer with DiscountPercent as number default 10
-on MakeSaveOffer ensure DiscountPercent > 0 because "Save offers must include a positive discount"
-on MakeSaveOffer ensure DiscountPercent <= 100 because "Save offers cannot exceed 100 percent"
+event MakeSaveOffer(DiscountPercent as number default 10)
+on MakeSaveOffer ensure MakeSaveOffer.DiscountPercent > 0 because "Save offers must include a positive discount"
+on MakeSaveOffer ensure MakeSaveOffer.DiscountPercent <= 100 because "Save offers cannot exceed 100 percent"
 
 event AcceptOffer
-event DeclineOffer with Note as string nullable default null notempty
+event DeclineOffer(Note as string optional notempty)
 
 from Active on RequestCancellation
     -> set SubscriberName = RequestCancellation.Name
@@ -48,7 +48,7 @@ from RetentionReview on MakeSaveOffer
 
 from RetentionReview on AcceptOffer
     -> set SaveOfferAccepted = true
-    -> set CancellationReason = null
+    -> clear CancellationReason
     -> transition Active
 from RetentionReview on DeclineOffer
     -> set LastAgentNote = DeclineOffer.Note

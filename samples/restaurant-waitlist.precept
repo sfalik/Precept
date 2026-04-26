@@ -3,8 +3,8 @@ precept RestaurantWaitlist
 # A front-desk waitlist with one active call at a time.
 # This sample stays compact while still showing queue.peek and from any rows.
 
-field CurrentParty as string nullable
-field LastCalledParty as string nullable
+field CurrentParty as string optional
+field LastCalledParty as string optional
 field EstimatedWaitMinutes as number default 0 nonnegative
 field WalkInOpen as boolean default true
 field PartyQueue as queue of string
@@ -13,9 +13,9 @@ state Accepting initial
 state Seating
 state Closed
 
-in Seating ensure CurrentParty != null because "The seating state must know which party is being seated"
+in Seating ensure CurrentParty is set because "The seating state must know which party is being seated"
 
-event JoinWaitlist with PartyName as string notempty
+event JoinWaitlist(PartyName as string notempty)
 event SeatNextParty
 event MarkSeated
 event CloseService
@@ -35,7 +35,7 @@ from Accepting on SeatNextParty
     -> reject "No party is currently waiting"
 
 from Seating on MarkSeated
-    -> set CurrentParty = null
+    -> clear CurrentParty
     -> set EstimatedWaitMinutes = PartyQueue.count * 10
     -> transition Accepting
 

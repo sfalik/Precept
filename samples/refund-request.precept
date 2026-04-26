@@ -1,15 +1,15 @@
 precept RefundRequest
 
 # A customer refund request with a straightforward review and fulfillment path.
-# The example highlights nullable fields, guarded approvals, and a return step.
+# The example highlights optional fields, guarded approvals, and a return step.
 
-field OrderId as string nullable
-field CustomerEmail as string nullable
-field ReasonText as string nullable
+field OrderId as string optional
+field CustomerEmail as string optional
+field ReasonText as string optional
 field RequestedAmount as number default 0 nonnegative
 field ApprovedAmount as number default 0 nonnegative
 field ReturnReceived as boolean default false
-field DecisionNote as string nullable
+field DecisionNote as string optional
 rule ApprovedAmount <= RequestedAmount because "Approved amount cannot exceed the request"
 
 state Draft initial
@@ -18,23 +18,23 @@ state AwaitingReturn
 state Refunded
 state Declined
 
-in Submitted edit ReasonText
+in Submitted write ReasonText
 in AwaitingReturn ensure ApprovedAmount > 0 because "A waiting return must already have an approved amount"
 in Refunded ensure ReturnReceived because "A refunded request must have the item marked as returned"
 
-event Submit with
+event Submit(
     OrderNumber as string notempty,
     Email as string notempty,
     Amount as number,
-    Reason as string notempty
-on Submit ensure Amount > 0 because "The refund amount must be positive"
+    Reason as string notempty)
+on Submit ensure Submit.Amount > 0 because "The refund amount must be positive"
 
-event Approve with Amount as number, Note as string nullable default null notempty
-on Approve ensure Amount > 0 because "The approved amount must be positive"
+event Approve(Amount as number, Note as string optional notempty)
+on Approve ensure Approve.Amount > 0 because "The approved amount must be positive"
 
-event Decline with Note as string notempty
+event Decline(Note as string notempty)
 event MarkReturnReceived
-event Cancel with Reason as string nullable default null notempty
+event Cancel(Reason as string optional notempty)
 
 from Draft on Submit
     -> set OrderId = Submit.OrderNumber

@@ -3,16 +3,16 @@ precept MaintenanceWorkOrder
 # A facilities work order from intake through scheduling and completion.
 # This sample introduces stronger guard logic and a from-state ensure.
 
-field RequesterName as string nullable
-field Location as string nullable
-field IssueSummary as string nullable
-field AssignedTechnician as string nullable
+field RequesterName as string optional
+field Location as string optional
+field IssueSummary as string optional
+field AssignedTechnician as string optional
 field EstimatedHours as number default 0 nonnegative
 field ActualHours as number default 0 nonnegative
 field Urgent as boolean default false
 field PartsApproved as boolean default false
-field CompletionNote as string nullable
-field CancellationReason as string nullable
+field CompletionNote as string optional
+field CancellationReason as string optional
 
 state Draft initial
 state Open
@@ -21,28 +21,28 @@ state InProgress
 state Completed
 state Cancelled
 
-in Draft edit Location, IssueSummary, Urgent
-in Scheduled ensure AssignedTechnician != null because "Scheduled work must have an assigned technician"
-in Completed ensure CompletionNote != null because "Completed work orders need a completion note"
+in Draft write Location, IssueSummary, Urgent
+in Scheduled ensure AssignedTechnician is set because "Scheduled work must have an assigned technician"
+in Completed ensure CompletionNote is set because "Completed work orders need a completion note"
 
 # Leaving active work still requires a technician on record.
-from InProgress ensure AssignedTechnician != null because "Active work cannot finish without a technician"
+from InProgress ensure AssignedTechnician is set because "Active work cannot finish without a technician"
 
-event Submit with
+event Submit(
     Requester as string notempty,
     WorkLocation as string notempty,
     Summary as string notempty,
-    IsUrgent as boolean default false
-event Assign with Technician as string notempty, Estimate as number
-on Assign ensure Estimate > 0 because "Estimated hours must be positive"
+    IsUrgent as boolean default false)
+event Assign(Technician as string notempty, Estimate as number)
+on Assign ensure Assign.Estimate > 0 because "Estimated hours must be positive"
 
 event ApproveParts
 event StartWork
-event RecordProgress with Hours as number
-on RecordProgress ensure Hours > 0 because "Progress entries must be positive"
+event RecordProgress(Hours as number)
+on RecordProgress ensure RecordProgress.Hours > 0 because "Progress entries must be positive"
 
-event Complete with Note as string notempty
-event Cancel with Reason as string nullable default null notempty
+event Complete(Note as string notempty)
+event Cancel(Reason as string optional notempty)
 
 from Draft on Submit
     -> set RequesterName = Submit.Requester

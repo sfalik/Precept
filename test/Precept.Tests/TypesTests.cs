@@ -158,31 +158,36 @@ public class TypesTests
     }
 
     [Fact]
-    public void GetMeta_Quantity_HasUnitQualifier()
+    public void GetMeta_Quantity_HasUnitAndDimensionQualifiers()
     {
         var meta = Types.GetMeta(TypeKind.Quantity);
         meta.QualifierShape.Should().NotBeNull();
-        meta.QualifierShape!.Slots.Should().ContainSingle()
-            .Which.Should().BeEquivalentTo(new QualifierSlot(TokenKind.Of, QualifierAxis.Unit));
+        meta.QualifierShape!.InOfExclusive.Should().BeTrue();
+        meta.QualifierShape.Slots.Should().HaveCount(2);
+        meta.QualifierShape.Slots[0].Should().Be(new QualifierSlot(TokenKind.In, QualifierAxis.Unit));
+        meta.QualifierShape.Slots[1].Should().Be(new QualifierSlot(TokenKind.Of, QualifierAxis.Dimension));
     }
 
     [Fact]
-    public void GetMeta_Period_HasTemporalDimensionQualifier()
+    public void GetMeta_Period_HasTemporalUnitAndDimensionQualifiers()
     {
         var meta = Types.GetMeta(TypeKind.Period);
         meta.QualifierShape.Should().NotBeNull();
-        meta.QualifierShape!.Slots.Should().ContainSingle()
-            .Which.Should().BeEquivalentTo(new QualifierSlot(TokenKind.Of, QualifierAxis.TemporalDimension));
+        meta.QualifierShape!.InOfExclusive.Should().BeTrue();
+        meta.QualifierShape.Slots.Should().HaveCount(2);
+        meta.QualifierShape.Slots[0].Should().Be(new QualifierSlot(TokenKind.In, QualifierAxis.TemporalUnit));
+        meta.QualifierShape.Slots[1].Should().Be(new QualifierSlot(TokenKind.Of, QualifierAxis.TemporalDimension));
     }
 
     [Fact]
-    public void GetMeta_Price_HasCurrencyAndUnitQualifiers()
+    public void GetMeta_Price_HasCurrencyAndDimensionQualifiers()
     {
         var meta = Types.GetMeta(TypeKind.Price);
         meta.QualifierShape.Should().NotBeNull();
-        meta.QualifierShape!.Slots.Should().HaveCount(2);
+        meta.QualifierShape!.InOfExclusive.Should().BeFalse();
+        meta.QualifierShape.Slots.Should().HaveCount(2);
         meta.QualifierShape.Slots[0].Should().Be(new QualifierSlot(TokenKind.In, QualifierAxis.Currency));
-        meta.QualifierShape.Slots[1].Should().Be(new QualifierSlot(TokenKind.Of, QualifierAxis.Unit));
+        meta.QualifierShape.Slots[1].Should().Be(new QualifierSlot(TokenKind.Of, QualifierAxis.Dimension));
     }
 
     [Fact]

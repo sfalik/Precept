@@ -54,7 +54,7 @@ Required families:
 - All 3 state assert prepositions (`in`, `to`, `from`)
 - All 3 transition outcome types on one event (guarded transition, no transition, reject)
 - Collection reads in guards and invariants (`.count`, arg access `Event.ArgName`)
-- Edit — all forms: `in State edit Field`, `in any edit Field`, `edit all` (stateless), `edit F1, F2` (stateless)
+- Write — all forms: `in State write Field`, `in any write Field`, `write all` (stateless), `write F1, F2` (stateless)
 - Event args: required and nullable, with `on Event assert` form
 - Cross-field invariant + nullable narrowing invariant
 - `from any` routing expansion
@@ -62,7 +62,7 @@ Required families:
 Invalid probes — synthesize one trigger per diagnostic:
 - `precept Empty` → empty-precept error (graph-level diagnostic — check `DiagnosticCode` enum for current name)
 - Stateless + event → stateless-with-events warning (valid: true)
-- Root `edit all` + states declared → root-edit-with-states error (valid: false)
+- Root `write all` + states declared → root-write-with-states error (valid: false)
 - Two `initial` states → `MultipleInitialStates` (error, valid: false)
 - Pure garbage input → parse error (valid: false)
 
@@ -77,7 +77,7 @@ All 7 outcome kinds required every run:
 - `NoTransition` — a `no transition` outcome with possible mutation
 - `Rejected` — a `reject` outcome
 - `ConstraintFailure` — an invariant violation rolled back
-- `UneditableField` — update attempt on a field not in the edit block
+- `UneditableField` — update attempt on a field not in the write block
 - `Update` — a successful `precept_update` mutation
 - `Undefined` — an event fired from a state with no matching row
 
@@ -85,12 +85,12 @@ Pass: every outcome exercised exactly, data mutations consistent with DSL, no un
 
 ### Round 3: Stateless End-to-End (fixed)
 
-Use synthesized `customer-profile` (edit all) and `fee-schedule` (edit specific fields) shapes or equivalent.
+Use synthesized `customer-profile` (write all) and `fee-schedule` (write specific fields) shapes or equivalent.
 Cover: null-state inspect, valid update, invariant ConstraintFailure, fire→Undefined, UneditableField on locked field.
 
 ### Round 4: Diagnostic Edge Cases (fixed)
 
-Synthesize minimal triggers for empty-precept, root-edit-with-states, stateless-with-events, and a pure parse failure. Check `src/Precept/Language/DiagnosticCode.cs` for the current enum names. Confirm exact code, severity, and message wording match the spec.
+Synthesize minimal triggers for empty-precept, root-write-with-states, stateless-with-events, and a pure parse failure. Check `src/Precept/Language/DiagnosticCode.cs` for the current enum names. Confirm exact code, severity, and message wording match the spec.
 
 ---
 

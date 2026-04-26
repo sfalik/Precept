@@ -42,8 +42,10 @@ public enum QualifierAxis
     FromCurrency,
     ToCurrency,
     Timezone,
-    /// <summary>Temporal dimension specifier for <c>period of 'date'</c> / <c>period of 'time'</c>. Distinct from <see cref="Unit"/> (UCUM unit-of-measure).</summary>
+    /// <summary>Temporal dimension category for <c>period of 'date'</c> / <c>period of 'time'</c>. Distinct from <see cref="TemporalUnit"/>.</summary>
     TemporalDimension,
+    /// <summary>Specific temporal unit basis for <c>period in 'days'</c> / <c>period in 'months'</c>. Distinct from <see cref="TemporalDimension"/> (category).</summary>
+    TemporalUnit,
 }
 
 // ── QualifierShape ─────────────────────────────────────────────────────────────
@@ -55,9 +57,13 @@ public enum QualifierAxis
 public sealed record QualifierSlot(TokenKind Preposition, QualifierAxis Axis);
 
 /// <summary>
-/// The qualifier shape a type accepts. Null on types with no qualifiers.
+/// The qualifier shape a type accepts. Lists all possible qualifier slots.
+/// When <see cref="InOfExclusive"/> is true, the <c>in</c> and <c>of</c> prepositions
+/// are mutually exclusive — a field may carry at most one. When false (e.g., <c>price</c>),
+/// both may appear on the same declaration.
+/// Null on types with no qualifiers.
 /// </summary>
-public sealed record QualifierShape(IReadOnlyList<QualifierSlot> Slots);
+public sealed record QualifierShape(IReadOnlyList<QualifierSlot> Slots, bool InOfExclusive = false);
 
 // ── TypeAccessor DU ────────────────────────────────────────────────────────────
 
@@ -105,12 +111,12 @@ public record TypeMeta(
     TokenMeta?                   Token,
     string                       Description,
     TypeCategory                 Category,
+    string                       DisplayName,
     QualifierShape?              QualifierShape   = null,
     TypeTrait                    Traits           = TypeTrait.None,
     IReadOnlyList<TypeKind>?     WidensTo         = null,
     ModifierKind[]?              ImpliedModifiers = null,
     IReadOnlyList<TypeAccessor>? Accessors        = null,
-    string?                      DisplayName      = null,
     string?                      HoverDescription = null,
     string?                      UsageExample     = null
 )

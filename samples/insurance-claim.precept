@@ -4,11 +4,11 @@ precept InsuranceClaim
 # This example keeps that back-and-forth in one readable file.
 # Built-in functions (min, trim) keep the logic clear.
 
-field ClaimantName as string nullable
+field ClaimantName as string optional
 field ClaimAmount as decimal default 0 nonnegative maxplaces 2
 field ApprovedAmount as decimal default 0 nonnegative maxplaces 2
-field AdjusterName as string nullable
-field DecisionNote as string nullable maxlength 500
+field AdjusterName as string optional
+field DecisionNote as string optional maxlength 500
 field PoliceReportRequired as boolean default false
 field FraudFlag as boolean default false
 field MissingDocuments as set of string
@@ -22,25 +22,25 @@ state Approved
 state Denied
 state Paid
 
-in UnderReview edit FraudFlag
-in UnderReview when not FraudFlag edit AdjusterName
+in UnderReview write FraudFlag
+in UnderReview when not FraudFlag write AdjusterName
 in Approved ensure ApprovedAmount > 0 because "Approved claims must specify a payout amount"
-in Approved ensure DecisionNote != null when FraudFlag because "Fraud-flagged approvals require a decision note"
+in Approved ensure DecisionNote is set when FraudFlag because "Fraud-flagged approvals require a decision note"
 
-event Submit with
+event Submit(
     Claimant as string notempty,
     Amount as decimal,
-    RequiresPoliceReport as boolean default false
-on Submit ensure Amount > 0 because "Claim amounts must be positive"
-on Submit ensure Amount <= 100000 when RequiresPoliceReport because "Police-report claims are capped at $100,000"
+    RequiresPoliceReport as boolean default false)
+on Submit ensure Submit.Amount > 0 because "Claim amounts must be positive"
+on Submit ensure Submit.Amount <= 100000 when Submit.RequiresPoliceReport because "Police-report claims are capped at $100,000"
 
-event RequestDocument with Name as string notempty
-event ReceiveDocument with Name as string notempty
-event AssignAdjuster with Name as string notempty
-event Approve with Amount as decimal, Note as string nullable default null notempty
-on Approve ensure Amount > 0 because "Approved claim amounts must be positive"
+event RequestDocument(Name as string notempty)
+event ReceiveDocument(Name as string notempty)
+event AssignAdjuster(Name as string notempty)
+event Approve(Amount as decimal, Note as string optional notempty)
+on Approve ensure Approve.Amount > 0 because "Approved claim amounts must be positive"
 
-event Deny with Note as string notempty
+event Deny(Note as string notempty)
 event PayClaim
 
 from Draft on Submit

@@ -3,10 +3,10 @@ precept BuildingAccessBadgeRequest
 # A practical approval workflow that uses a numeric set for requested floors.
 # The sample demonstrates add/remove, contains, .min, .max, and editable fields.
 
-field EmployeeName as string nullable
-field Department as string nullable
-field AccessReason as string nullable maxlength 200
-field ReviewerNote as string nullable
+field EmployeeName as string optional
+field Department as string optional
+field AccessReason as string optional maxlength 200
+field ReviewerNote as string optional
 field LowestRequestedFloor as number default 0
 field HighestRequestedFloor as number default 0
 field BadgePrinted as boolean default false
@@ -21,7 +21,7 @@ state Issued
 state Rejected
 
 # Requesters can revise the request while it is still being prepared.
-in Draft edit EmployeeName, Department, AccessReason, RequestedFloors
+in Draft write EmployeeName, Department, AccessReason, RequestedFloors
 
 in Approved ensure LowestRequestedFloor > 0 because "Approved badges must grant at least one floor"
 in Approved ensure HighestRequestedFloor >= LowestRequestedFloor because "Approved floor bounds must stay ordered"
@@ -29,15 +29,15 @@ in Issued ensure BadgePrinted because "Issued badges must be printed"
 
 to Approved -> set BadgePrinted = false
 
-event AddFloor with Floor as number
-on AddFloor ensure Floor > 0 because "Floors must be positive"
+event AddFloor(Floor as number)
+on AddFloor ensure AddFloor.Floor > 0 because "Floors must be positive"
 
-event RemoveFloor with Floor as number
-on RemoveFloor ensure Floor > 0 because "Floors must be positive"
+event RemoveFloor(Floor as number)
+on RemoveFloor ensure RemoveFloor.Floor > 0 because "Floors must be positive"
 
 event Submit
-event Approve with Note as string nullable default null notempty
-event Reject with Reason as string notempty
+event Approve(Note as string optional notempty)
+event Reject(Reason as string notempty)
 event PrintBadge
 
 from Draft on AddFloor
@@ -49,7 +49,7 @@ from Draft on RemoveFloor when RequestedFloors contains RemoveFloor.Floor
 from Draft on RemoveFloor
     -> reject "That floor is not currently requested"
 
-from Draft on Submit when EmployeeName != null and Department != null and AccessReason != null and AccessReason.length >= 5 and RequestedFloors.count > 0
+from Draft on Submit when EmployeeName is set and Department is set and AccessReason is set and AccessReason.length >= 5 and RequestedFloors.count > 0
     -> set LowestRequestedFloor = RequestedFloors.min
     -> set HighestRequestedFloor = RequestedFloors.max
     -> transition Submitted

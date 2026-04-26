@@ -8,13 +8,13 @@ precept CustomerProfile
 # but no states, no events, and no transitions. Use it to represent domain objects
 # that evolve through direct field edits rather than state-machine transitions.
 
-field Name as string nullable
-field Email as string nullable
-field Phone as string nullable
+field Name as string optional
+field Email as string optional
+field Phone as string optional
 field PreferredContactMethod as choice("email","phone","sms") default "email"
 field MarketingOptIn as boolean default false
 
-rule MarketingOptIn == false or Email != null because "Marketing opt-in requires an email address"
+rule MarketingOptIn == false or Email is set because "Marketing opt-in requires an email address"
 
 # All fields are editable — a customer profile can be fully updated at any time.
-edit all
+write all

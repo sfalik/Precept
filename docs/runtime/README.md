@@ -1,6 +1,6 @@
 # runtime/ — Runtime API and Fault System Design
 
-Design documents for the Precept v2 runtime — the boundary between compiled precepts and host applications.
+Design documents for the Precept runtime — the boundary between compiled precepts and host applications.
 
 ## Documents
 
@@ -21,4 +21,4 @@ Design documents for the Precept v2 runtime — the boundary between compiled pr
 - `docs/compiler-and-runtime-design.md` — pipeline, artifacts, runtime surfaces
 - `docs/compiler/` — the compiler pipeline whose output the runtime consumes
 - `research/architecture/runtime/` — 10-system evaluator architecture survey grounding these designs
-- `docs/RuntimeApiDesign.md` — v1 runtime API design. This folder designs the v2 replacement.
+- `docs/RuntimeApiDesign.md` — earlier runtime API design notes. This folder contains the current design.

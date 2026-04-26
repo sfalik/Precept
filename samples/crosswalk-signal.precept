@@ -14,7 +14,7 @@ state FlashingDontWalk
 
 in Walk ensure CountdownSeconds > 0 because "Walk phase requires a positive countdown"
 
-in DontWalk edit RequestPending
+in DontWalk write RequestPending
 
 event PedestrianRequest
 event Advance

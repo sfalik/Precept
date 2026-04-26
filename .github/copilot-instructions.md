@@ -137,7 +137,7 @@ Keep updates focused and factual. If uncertain whether a claim is implemented, v
 
 ## Language Surface Propagation (Non-Negotiable)
 
-In v2, the TextMate grammar (`tools/Precept.VsCode/syntaxes/precept.tmLanguage.json`), completions, semantic tokens, and MCP vocabulary are **generated from catalog metadata** — they are not hand-edited. The catalog is the single source of truth.
+The TextMate grammar (`tools/Precept.VsCode/syntaxes/precept.tmLanguage.json`), completions, semantic tokens, and MCP vocabulary are **generated from catalog metadata** — they are not hand-edited. The catalog is the single source of truth.
 
 When making language surface changes:
 

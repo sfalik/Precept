@@ -3,12 +3,12 @@ precept HiringPipeline
 # Hiring is a good fit for Precept because the state flow is clear but the details still matter.
 # The interview loop uses a set of pending interviewers to track who still owes feedback.
 
-field CandidateName as string nullable maxlength 100
-field RoleName as string nullable
-field RecruiterName as string nullable
+field CandidateName as string optional maxlength 100
+field RoleName as string optional
+field RecruiterName as string optional
 field FeedbackCount as integer default 0 nonnegative
 field OfferAmount as number default 0 nonnegative
-field FinalNote as string nullable maxlength 500
+field FinalNote as string optional maxlength 500
 field PendingInterviewers as set of string
 
 state Draft initial
@@ -22,16 +22,16 @@ state Rejected
 in InterviewLoop ensure PendingInterviewers.count > 0 because "Interview loops require at least one pending interviewer"
 in Hired ensure OfferAmount > 0 because "Hired candidates must have an offer amount"
 
-event SubmitApplication with
+event SubmitApplication(
     Candidate as string notempty,
     Role as string notempty,
-    Recruiter as string notempty
-event AddInterviewer with Name as string notempty
+    Recruiter as string notempty)
+event AddInterviewer(Name as string notempty)
 event PassScreen
-event RecordInterviewFeedback with Interviewer as string notempty
-event ExtendOffer with Amount as number positive
+event RecordInterviewFeedback(Interviewer as string notempty)
+event ExtendOffer(Amount as number positive)
 event AcceptOffer
-event RejectCandidate with Note as string notempty
+event RejectCandidate(Note as string notempty)
 
 from Draft on SubmitApplication
     -> set CandidateName = SubmitApplication.Candidate

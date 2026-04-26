@@ -24,14 +24,24 @@ public static class Types
     // ── Shared qualifier shapes ─────────────────────────────────────────────────
 
     private static readonly QualifierShape QS_Currency         = new([new(TokenKind.In, QualifierAxis.Currency)]);
-    private static readonly QualifierShape QS_Unit             = new([new(TokenKind.Of, QualifierAxis.Unit)]);
-    private static readonly QualifierShape QS_TemporalDimension = new([new(TokenKind.Of, QualifierAxis.TemporalDimension)]);
 
-    private static readonly QualifierShape QS_CurrencyUnit = new(
+    private static readonly QualifierShape QS_UnitOrDimension = new(
+    [
+        new(TokenKind.In, QualifierAxis.Unit),
+        new(TokenKind.Of, QualifierAxis.Dimension),
+    ], InOfExclusive: true);
+
+    private static readonly QualifierShape QS_TemporalUnitOrDimension = new(
+    [
+        new(TokenKind.In, QualifierAxis.TemporalUnit),
+        new(TokenKind.Of, QualifierAxis.TemporalDimension),
+    ], InOfExclusive: true);
+
+    private static readonly QualifierShape QS_CurrencyAndDimension = new(
     [
         new(TokenKind.In, QualifierAxis.Currency),
-        new(TokenKind.Of, QualifierAxis.Unit),
-    ]);
+        new(TokenKind.Of, QualifierAxis.Dimension),
+    ], InOfExclusive: false);
 
     private static readonly QualifierShape QS_ExchangeRate = new(
     [
@@ -102,7 +112,9 @@ public static class Types
             TypeCategory.Scalar,
             Traits: TypeTrait.EqualityComparable,
             Accessors: [new FixedReturnAccessor("length", TypeKind.Integer, "Character count")],
-            HoverDescription: "A variable-length text value. Use double quotes for literal text and {Field} for interpolated values."
+            DisplayName: "string",
+            HoverDescription: "A variable-length text value. Use double quotes for literal text and {Field} for interpolated values.",
+            UsageExample: "field CandidateName as string optional maxlength 100"
         ),
 
         TypeKind.Boolean => new(
@@ -110,7 +122,9 @@ public static class Types
             "True or false",
             TypeCategory.Scalar,
             Traits: TypeTrait.EqualityComparable,
-            HoverDescription: "A true or false value. Used for flags, toggles, and condition results."
+            DisplayName: "boolean",
+            HoverDescription: "A true or false value. Used for flags, toggles, and condition results.",
+            UsageExample: "field DepositPaid as boolean default false"
         ),
 
         TypeKind.Integer => new(
@@ -119,7 +133,9 @@ public static class Types
             TypeCategory.Scalar,
             Traits: TypeTrait.Orderable | TypeTrait.EqualityComparable,
             WidensTo: IntegerWidens,
-            HoverDescription: "A whole number with arbitrary precision. Use for counts, identifiers, and exact discrete values."
+            DisplayName: "integer",
+            HoverDescription: "A whole number with arbitrary precision. Use for counts, identifiers, and exact discrete values.",
+            UsageExample: "field ReopenCount as integer default 0 nonnegative"
         ),
 
         TypeKind.Decimal => new(
@@ -127,7 +143,9 @@ public static class Types
             "Fixed-point decimal number",
             TypeCategory.Scalar,
             Traits: TypeTrait.Orderable | TypeTrait.EqualityComparable,
-            HoverDescription: "A fixed-point decimal number. Preserves exact fractional precision — use for financial amounts and percentages."
+            DisplayName: "decimal",
+            HoverDescription: "A fixed-point decimal number. Preserves exact fractional precision — use for financial amounts and percentages.",
+            UsageExample: "field TaxRate as decimal default 0.1 nonnegative maxplaces 4"
         ),
 
         TypeKind.Number => new(
@@ -135,7 +153,9 @@ public static class Types
             "Floating-point number",
             TypeCategory.Scalar,
             Traits: TypeTrait.Orderable | TypeTrait.EqualityComparable,
-            HoverDescription: "A floating-point number. Loses precision in exchange for flexibility. Use approximate() or round() to bridge back to decimal."
+            DisplayName: "number",
+            HoverDescription: "A floating-point number. Loses precision in exchange for flexibility. Use approximate() or round() to bridge back to decimal.",
+            UsageExample: "field CreditScore as number default 0 nonnegative"
         ),
 
         TypeKind.Choice => new(
@@ -143,7 +163,9 @@ public static class Types
             "Enumerated string set",
             TypeCategory.Scalar,
             Traits: TypeTrait.EqualityComparable,
-            HoverDescription: "A field restricted to a declared set of string values. Add the 'ordered' modifier to enable comparison operators between choice values."
+            DisplayName: "choice",
+            HoverDescription: "A field restricted to a declared set of string values. Add the 'ordered' modifier to enable comparison operators between choice values.",
+            UsageExample: "field Priority as choice(\"Low\",\"Medium\",\"High\",\"Critical\") default \"Low\""
         ),
 
         // ── Temporal ───────────────────────────────────────────────────
@@ -153,7 +175,9 @@ public static class Types
             TypeCategory.Temporal,
             Traits: TypeTrait.Orderable | TypeTrait.EqualityComparable,
             Accessors: DateComponentAccessors,
-            HoverDescription: "A calendar date (year-month-day) with no time component. Supports .year, .month, .day, and .dayOfWeek accessors."
+            DisplayName: "date",
+            HoverDescription: "A calendar date (year-month-day) with no time component. Supports .year, .month, .day, and .dayOfWeek accessors.",
+            UsageExample: "field DueDate as date default '2026-06-01'"
         ),
 
         TypeKind.Time => new(
@@ -162,7 +186,9 @@ public static class Types
             TypeCategory.Temporal,
             Traits: TypeTrait.Orderable | TypeTrait.EqualityComparable,
             Accessors: TimeComponentAccessors,
-            HoverDescription: "A time of day (hour-minute-second) with no date or timezone. Supports .hour, .minute, and .second accessors."
+            DisplayName: "time",
+            HoverDescription: "A time of day (hour-minute-second) with no date or timezone. Supports .hour, .minute, and .second accessors.",
+            UsageExample: "field AppointmentTime as time default '09:00:00'"
         ),
 
         TypeKind.Instant => new(
@@ -174,7 +200,9 @@ public static class Types
             [
                 new FixedReturnAccessor("inZone", TypeKind.ZonedDateTime, "Convert to zoned datetime", ParameterType: TypeKind.Timezone),
             ],
-            HoverDescription: "An exact UTC point in time. Use .inZone(timezone) to convert to a zoned date-time for local display."
+            DisplayName: "instant",
+            HoverDescription: "An exact UTC point in time. Use .inZone(timezone) to convert to a zoned date-time for local display.",
+            UsageExample: "field FiledAt as instant optional"
         ),
 
         TypeKind.Duration => new(
@@ -189,7 +217,9 @@ public static class Types
                 new FixedReturnAccessor("totalMinutes", TypeKind.Number, "Total minutes (fractional)"),
                 new FixedReturnAccessor("totalSeconds", TypeKind.Number, "Total seconds (fractional)"),
             ],
-            HoverDescription: "An exact elapsed time measured in hours, minutes, and seconds. Use when the length of a gap needs to be precise."
+            DisplayName: "duration",
+            HoverDescription: "An exact elapsed time measured in hours, minutes, and seconds. Use when the length of a gap needs to be precise.",
+            UsageExample: "field SlaLimit as duration default '72 hours'"
         ),
 
         TypeKind.Period => new(
@@ -197,7 +227,7 @@ public static class Types
             "Calendar-relative duration (years/months/days)",
             TypeCategory.Temporal,
             Traits: TypeTrait.EqualityComparable,
-            QualifierShape: QS_TemporalDimension,
+            QualifierShape: QS_TemporalUnitOrDimension,
             Accessors:
             [
                 new FixedReturnAccessor("years",   TypeKind.Integer, "Years component"),
@@ -212,7 +242,9 @@ public static class Types
                 new FixedReturnAccessor("basis",     TypeKind.String,    "Period basis unit name"),
                 new FixedReturnAccessor("dimension", TypeKind.Dimension, "Dimension family of the unit"),
             ],
-            HoverDescription: "A calendar-relative duration measured in years, months, and days. Use for business deadlines and date offsets."
+            DisplayName: "period",
+            HoverDescription: "A calendar-relative duration measured in years, months, and days. Use for business deadlines and date offsets.",
+            UsageExample: "field GracePeriod as period default '30 days'"
         ),
 
         TypeKind.Timezone => new(
@@ -221,7 +253,9 @@ public static class Types
             TypeCategory.Temporal,
             Traits: TypeTrait.EqualityComparable,
             ImpliedModifiers: [ModifierKind.Notempty],
-            HoverDescription: "An IANA timezone identifier such as 'America/New_York'. Carries notempty implicitly — empty timezone is not meaningful."
+            DisplayName: "timezone",
+            HoverDescription: "An IANA timezone identifier such as 'America/New_York'. Carries notempty implicitly — empty timezone is not meaningful.",
+            UsageExample: "field ClinicTimezone as timezone default 'America/New_York'"
         ),
 
         TypeKind.ZonedDateTime => new(
@@ -240,7 +274,8 @@ public static class Types
                 ..TimeComponentAccessors,
             ],
             DisplayName: "zoned date-time",
-            HoverDescription: "A date and time pinned to a specific timezone. Exposes .instant, .date, .time, and all calendar component accessors."
+            HoverDescription: "A date and time pinned to a specific timezone. Exposes .instant, .date, .time, and all calendar component accessors.",
+            UsageExample: "field IncidentContext as zoneddatetime"
         ),
 
         TypeKind.DateTime => new(
@@ -257,7 +292,8 @@ public static class Types
                 ..TimeComponentAccessors,
             ],
             DisplayName: "date-time",
-            HoverDescription: "A date and time without a timezone. Use when timezone context is handled externally or is not relevant."
+            HoverDescription: "A date and time without a timezone. Use when timezone context is handled externally or is not relevant.",
+            UsageExample: "field ScheduledFor as datetime default '2026-04-13T09:00:00'"
         ),
 
         // ── Business-Domain ────────────────────────────────────────────
@@ -272,7 +308,9 @@ public static class Types
                 new FixedReturnAccessor("amount",   TypeKind.Decimal,  "Numeric amount"),
                 new FixedReturnAccessor("currency", TypeKind.Currency, "Currency identifier", ReturnsQualifier: QualifierAxis.Currency),
             ],
-            HoverDescription: "A monetary amount bound to a currency. Use 'in USD' to pin currency. Arithmetic enforces same-currency rules."
+            DisplayName: "money",
+            HoverDescription: "A monetary amount bound to a currency. Use 'in USD' to pin currency. Arithmetic enforces same-currency rules.",
+            UsageExample: "field TotalCost as money in 'USD'"
         ),
 
         TypeKind.Currency => new(
@@ -281,14 +319,16 @@ public static class Types
             TypeCategory.BusinessDomain,
             Traits: TypeTrait.EqualityComparable,
             ImpliedModifiers: [ModifierKind.Notempty],
-            HoverDescription: "An ISO 4217 currency code identifier such as 'USD' or 'EUR'. Carries notempty implicitly."
+            DisplayName: "currency",
+            HoverDescription: "An ISO 4217 currency code identifier such as 'USD' or 'EUR'. Carries notempty implicitly.",
+            UsageExample: "field BaseCurrency as currency default 'USD'"
         ),
 
         TypeKind.Quantity => new(
             kind, Tokens.GetMeta(TokenKind.QuantityType),
             "Measured amount with unit",
             TypeCategory.BusinessDomain,
-            QualifierShape: QS_Unit,
+            QualifierShape: QS_UnitOrDimension,
             Traits: TypeTrait.Orderable | TypeTrait.EqualityComparable,
             Accessors:
             [
@@ -296,7 +336,9 @@ public static class Types
                 new FixedReturnAccessor("unit",      TypeKind.UnitOfMeasure, "Unit of measure", ReturnsQualifier: QualifierAxis.Unit),
                 new FixedReturnAccessor("dimension", TypeKind.Dimension,     "Dimension family"),
             ],
-            HoverDescription: "A measured amount bound to a unit of measure. Use 'of kg' to pin units. Arithmetic enforces same-dimension rules."
+            DisplayName: "quantity",
+            HoverDescription: "A measured amount bound to a unit of measure. Use 'in kg' to pin units or 'of length' to constrain by dimension. Arithmetic enforces same-dimension rules.",
+            UsageExample: "field Weight as quantity in 'kg'"
         ),
 
         TypeKind.UnitOfMeasure => new(
@@ -310,7 +352,8 @@ public static class Types
                 new FixedReturnAccessor("dimension", TypeKind.Dimension, "Dimension family of this unit"),
             ],
             DisplayName: "unit of measure",
-            HoverDescription: "A unit-of-measure identifier such as 'kg' or 'miles'. Carries notempty implicitly. Use .dimension to read the unit's dimension family."
+            HoverDescription: "A unit-of-measure identifier such as 'kg' or 'miles'. Carries notempty implicitly. Use .dimension to read the unit's dimension family.",
+            UsageExample: "field StockingUom as unitofmeasure default 'each'"
         ),
 
         TypeKind.Dimension => new(
@@ -319,14 +362,16 @@ public static class Types
             TypeCategory.BusinessDomain,
             Traits: TypeTrait.EqualityComparable,
             ImpliedModifiers: [ModifierKind.Notempty],
-            HoverDescription: "A dimension family identifier such as 'length' or 'mass'. Used to enforce dimensional consistency in quantity arithmetic."
+            DisplayName: "dimension",
+            HoverDescription: "A dimension family identifier such as 'length' or 'mass'. Used to enforce dimensional consistency in quantity arithmetic.",
+            UsageExample: "field MeasuredDimension as dimension default 'mass'"
         ),
 
         TypeKind.Price => new(
             kind, Tokens.GetMeta(TokenKind.PriceType),
             "Price: monetary amount per unit",
             TypeCategory.BusinessDomain,
-            QualifierShape: QS_CurrencyUnit,
+            QualifierShape: QS_CurrencyAndDimension,
             Traits: TypeTrait.Orderable | TypeTrait.EqualityComparable,
             Accessors:
             [
@@ -335,7 +380,9 @@ public static class Types
                 new FixedReturnAccessor("unit",      TypeKind.UnitOfMeasure, "Unit of measure", ReturnsQualifier: QualifierAxis.Unit),
                 new FixedReturnAccessor("dimension", TypeKind.Dimension,     "Dimension family"),
             ],
-            HoverDescription: "A monetary amount per unit — combines currency and unit qualifiers. Use 'in USD of kg' for a price per kilogram in dollars."
+            DisplayName: "price",
+            HoverDescription: "A monetary amount per unit — combines currency and dimension qualifiers. Use 'in USD/kg' for a specific price, or 'in USD of mass' for currency-pinned with dimension category.",
+            UsageExample: "field UnitPrice as price in 'USD/each'"
         ),
 
         TypeKind.ExchangeRate => new(
@@ -351,7 +398,8 @@ public static class Types
                 new FixedReturnAccessor("to",     TypeKind.Currency, "Target currency", ReturnsQualifier: QualifierAxis.ToCurrency),
             ],
             DisplayName: "exchange rate",
-            HoverDescription: "A currency exchange rate from one currency to another. Use 'in USD to EUR' to declare the conversion direction."
+            HoverDescription: "A currency exchange rate from one currency to another. Use 'in USD to EUR' to declare the conversion direction.",
+            UsageExample: "field FxRate as exchangerate in 'USD' to 'EUR'"
         ),
 
         // ── Collection ─────────────────────────────────────────────────
@@ -360,7 +408,9 @@ public static class Types
             "Unordered collection with unique elements",
             TypeCategory.Collection,
             Accessors: SetAccessors,
-            HoverDescription: "An unordered collection of unique elements. Use add and remove actions. Supports .count, .min, and .max accessors."
+            DisplayName: "set",
+            HoverDescription: "An unordered collection of unique elements. Use add and remove actions. Supports .count, .min, and .max accessors.",
+            UsageExample: "field PendingInterviewers as set of string"
         ),
 
         TypeKind.Queue => new(
@@ -368,7 +418,9 @@ public static class Types
             "First-in first-out collection",
             TypeCategory.Collection,
             Accessors: QueueAccessors,
-            HoverDescription: "A first-in first-out collection. Use enqueue and dequeue actions. Supports .count and .peek accessors."
+            DisplayName: "queue",
+            HoverDescription: "A first-in first-out collection. Use enqueue and dequeue actions. Supports .count and .peek accessors.",
+            UsageExample: "field AgentQueue as queue of string"
         ),
 
         TypeKind.Stack => new(
@@ -376,20 +428,24 @@ public static class Types
             "Last-in first-out collection",
             TypeCategory.Collection,
             Accessors: StackAccessors,
-            HoverDescription: "A last-in first-out collection. Use push and pop actions. Supports .count and .peek accessors."
+            DisplayName: "stack",
+            HoverDescription: "A last-in first-out collection. Use push and pop actions. Supports .count and .peek accessors.",
+            UsageExample: "field RepairSteps as stack of string"
         ),
 
         // ── Special ────────────────────────────────────────────────────
         TypeKind.Error => new(
             kind, null,
             "Error type — suppresses cascading diagnostics",
-            TypeCategory.Special
+            TypeCategory.Special,
+            DisplayName: "error"
         ),
 
         TypeKind.StateRef => new(
             kind, null,
             "State name reference in transition/ensure targets",
-            TypeCategory.Special
+            TypeCategory.Special,
+            DisplayName: "state reference"
         ),
 
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, $"No metadata for TypeKind.{kind}"),

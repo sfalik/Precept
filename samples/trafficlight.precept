@@ -7,7 +7,7 @@ precept TrafficLight
 field VehiclesWaiting as number default 0 nonnegative
 field CycleCount as number default 0 nonnegative
 field LeftTurnQueued as boolean default false
-field EmergencyReason as string nullable
+field EmergencyReason as string optional
 
 state Red initial
 state FlashingGreen
@@ -15,12 +15,12 @@ state Green
 state Yellow
 state FlashingRed
 
-in Red edit VehiclesWaiting, LeftTurnQueued
+in Red write VehiclesWaiting, LeftTurnQueued
 
 event Advance
-event Emergency with AuthorizedBy as string notempty, Reason as string notempty
-event VehiclesArrive with Count as number default 5
-on VehiclesArrive ensure Count > 0 because "Vehicle count must be positive"
+event Emergency(AuthorizedBy as string notempty, Reason as string notempty)
+event VehiclesArrive(Count as number default 5)
+on VehiclesArrive ensure VehiclesArrive.Count > 0 because "Vehicle count must be positive"
 
 event LeftTurnRequest
 event ClearEmergency
@@ -61,5 +61,5 @@ from FlashingRed on Advance
     -> set CycleCount = CycleCount + 1
     -> no transition
 from FlashingRed on ClearEmergency
-    -> set EmergencyReason = null
+    -> clear EmergencyReason
     -> transition Red

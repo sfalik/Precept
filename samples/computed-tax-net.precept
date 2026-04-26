@@ -7,7 +7,7 @@ precept ComputedTaxNet
 field Subtotal as number default 120 positive
 field TaxRate as number default 0.08 min 0 max 0.99
 
-field Tax as number -> Subtotal * TaxRate nonnegative
-field Net as number -> Subtotal - Tax positive
+field Tax as number nonnegative -> Subtotal * TaxRate
+field Net as number positive -> Subtotal - Tax
 
-edit Subtotal, TaxRate
+write Subtotal, TaxRate

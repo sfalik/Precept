@@ -15,4 +15,4 @@ field MinimumCharge as decimal default 0 nonnegative maxplaces 2
 field CurrencyCode as string default "USD"
 
 # Only pricing levers are editable; TaxRate and CurrencyCode are locked.
-edit BaseFee, DiscountPercent, MinimumCharge
+write BaseFee, DiscountPercent, MinimumCharge

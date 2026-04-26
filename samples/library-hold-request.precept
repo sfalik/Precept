@@ -3,11 +3,11 @@ precept LibraryHoldRequest
 # This sample demonstrates queue and stack collections in a familiar library flow.
 # A book can circulate normally, accumulate holds, and promote the next patron.
 
-field BookTitle as string nullable
-field CurrentBorrower as string nullable
-field PromotedPatron as string nullable
-field ReadyPatron as string nullable
-field PickupCode as string nullable
+field BookTitle as string optional
+field CurrentBorrower as string optional
+field PromotedPatron as string optional
+field ReadyPatron as string optional
+field PickupCode as string optional
 field PickupExpiryDay as number default 0 nonnegative
 field CurrentDay as number default 0 nonnegative
 field HoldQueue as queue of string
@@ -17,22 +17,22 @@ state OnShelf initial
 state CheckedOut
 state HoldReady
 
-in HoldReady ensure ReadyPatron != null because "A ready hold must name the patron"
-in HoldReady ensure PickupCode != null because "A ready hold must have a pickup code"
+in HoldReady ensure ReadyPatron is set because "A ready hold must name the patron"
+in HoldReady ensure PickupCode is set because "A ready hold must have a pickup code"
 
 # Entering HoldReady sets the temporary pickup details for the promoted patron.
 to HoldReady -> set ReadyPatron = PromotedPatron -> set PickupCode = "READY" -> set PickupExpiryDay = CurrentDay + 3
 
 # Leaving HoldReady clears the temporary handoff fields.
-from HoldReady -> set PromotedPatron = null -> set ReadyPatron = null -> set PickupCode = null
+from HoldReady -> clear PromotedPatron -> clear ReadyPatron -> clear PickupCode
 
-event Checkout with PatronId as string notempty
+event Checkout(PatronId as string notempty)
 event ReturnBook
-event PlaceHold with PatronId as string notempty
+event PlaceHold(PatronId as string notempty)
 event ProcessNextHold
-event CollectHold with PatronId as string notempty
-event AdvanceDay with DayNumber as number
-on AdvanceDay ensure DayNumber >= 0 because "The day counter cannot be negative"
+event CollectHold(PatronId as string notempty)
+event AdvanceDay(DayNumber as number)
+on AdvanceDay ensure AdvanceDay.DayNumber >= 0 because "The day counter cannot be negative"
 
 from OnShelf on Checkout
     -> set CurrentBorrower = Checkout.PatronId
@@ -50,10 +50,10 @@ from CheckedOut on PlaceHold
     -> no transition
 from CheckedOut on ReturnBook when HoldQueue.count > 0
     -> dequeue HoldQueue into PromotedPatron
-    -> set CurrentBorrower = null
+    -> clear CurrentBorrower
     -> transition HoldReady
 from CheckedOut on ReturnBook
-    -> set CurrentBorrower = null
+    -> clear CurrentBorrower
     -> transition OnShelf
 
 from OnShelf on ProcessNextHold when HoldQueue.count > 0

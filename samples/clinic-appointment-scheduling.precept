@@ -3,14 +3,14 @@ precept ClinicAppointmentScheduling
 # Appointment slots are kept intentionally simple: a day number and minute-of-day.
 # The event ensures show that modulo checks belong on event arguments, not fields.
 
-field PatientName as string nullable
+field PatientName as string optional
 field ScheduledDay as number default 0 nonnegative
 field ScheduledMinute as number default 0 nonnegative
-field ConfirmationCode as string nullable
+field ConfirmationCode as string optional
 field ReminderSent as boolean default false
-field CheckInNote as string nullable
+field CheckInNote as string optional
 field VisitCompleted as boolean default false
-field CancellationReason as string nullable
+field CancellationReason as string optional
 
 state Draft initial
 state Scheduled
@@ -18,26 +18,26 @@ state CheckedIn
 state Completed
 state Cancelled
 
-in Scheduled edit ScheduledDay, ScheduledMinute
-in Scheduled ensure ConfirmationCode != null because "Scheduled appointments need a confirmation code"
+in Scheduled write ScheduledDay, ScheduledMinute
+in Scheduled ensure ConfirmationCode is set because "Scheduled appointments need a confirmation code"
 in Completed ensure VisitCompleted because "Completed visits must be marked complete"
 
 to Scheduled -> set ConfirmationCode = "CONFIRMED" -> set ReminderSent = false
 
-event Schedule with Name as string notempty, DayNumber as number, MinuteOfDay as number
-on Schedule ensure DayNumber >= 0 because "The scheduled day cannot be negative"
-on Schedule ensure MinuteOfDay >= 0 because "The scheduled minute cannot be negative"
-on Schedule ensure MinuteOfDay % 15 == 0 because "Appointments must start on a 15-minute boundary"
+event Schedule(Name as string notempty, DayNumber as number, MinuteOfDay as number)
+on Schedule ensure Schedule.DayNumber >= 0 because "The scheduled day cannot be negative"
+on Schedule ensure Schedule.MinuteOfDay >= 0 because "The scheduled minute cannot be negative"
+on Schedule ensure Schedule.MinuteOfDay % 15 == 0 because "Appointments must start on a 15-minute boundary"
 
-event Reschedule with DayNumber as number, MinuteOfDay as number
-on Reschedule ensure DayNumber >= 0 because "The scheduled day cannot be negative"
-on Reschedule ensure MinuteOfDay >= 0 because "The scheduled minute cannot be negative"
-on Reschedule ensure MinuteOfDay % 15 == 0 because "Appointments must start on a 15-minute boundary"
+event Reschedule(DayNumber as number, MinuteOfDay as number)
+on Reschedule ensure Reschedule.DayNumber >= 0 because "The scheduled day cannot be negative"
+on Reschedule ensure Reschedule.MinuteOfDay >= 0 because "The scheduled minute cannot be negative"
+on Reschedule ensure Reschedule.MinuteOfDay % 15 == 0 because "Appointments must start on a 15-minute boundary"
 
 event SendReminder
-event CheckIn with Note as string nullable default null notempty
+event CheckIn(Note as string optional notempty)
 event CompleteVisit
-event Cancel with Reason as string nullable default null notempty
+event Cancel(Reason as string optional notempty)
 
 from Draft on Schedule
     -> set PatientName = Schedule.Name

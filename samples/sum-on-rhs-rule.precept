@@ -20,4 +20,4 @@ rule Total > Tax + Fee because "Total must exceed combined tax and fee"
 # Net is provably positive: the proof engine reads Total - Tax - Fee > 0 from the rule.
 field Net as number -> Total - Tax - Fee positive
 
-edit Total, Tax, Fee
+write Total, Tax, Fee

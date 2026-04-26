@@ -669,7 +669,7 @@ public sealed record FieldModifierMeta(
     Func<object?, object?, bool>? Validate = null   // (fieldValue, modifierArg) → valid?
 ) : ModifierMeta(Kind, Token, Description, Category);
 
-// ── State modifiers (7 v2) ──────────────────────────────
+// ── State modifiers (7) ─────────────────────────────────
 public sealed record StateModifierMeta(
     ModifierKind     Kind,
     TokenMeta        Token,
@@ -747,7 +747,7 @@ public enum GraphAnalysisKind { None, IncomingEdge, OutcomeType, Reachability }
 | `isolated` | `IncomingEdge` | Event fires from exactly one state |
 | `universal` | `Reachability` | Event fires from every reachable non-terminal state |
 
-Future event modifiers are deferred beyond v2 but the `GraphAnalysisKind` enum is shaped to accommodate them.
+Future event modifiers are deferred but the `GraphAnalysisKind` enum is shaped to accommodate them.
 
 ##### AnchorScope and AnchorTarget
 

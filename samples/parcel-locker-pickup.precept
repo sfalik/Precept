@@ -3,13 +3,13 @@ precept ParcelLockerPickup
 # This sample models a single locker bay from loading through pickup or return.
 # It introduces a stack-based reminder log and a few realistic timed guards.
 
-field LockerId as string nullable
-field RecipientName as string nullable
-field PickupCode as string nullable
+field LockerId as string optional
+field RecipientName as string optional
+field PickupCode as string optional
 field ReminderCount as number default 0 nonnegative
 field CurrentDay as number default 0 nonnegative
 field LastReminderDay as number default 0 nonnegative
-field LastReminderNote as string nullable
+field LastReminderNote as string optional
 field ReminderLog as stack of string
 
 state Empty initial
@@ -17,20 +17,20 @@ state AwaitingPickup
 state PickedUp
 state Returned
 
-in AwaitingPickup ensure RecipientName != null because "Loaded lockers must identify the recipient"
-in AwaitingPickup ensure PickupCode != null because "Loaded lockers must store a pickup code"
+in AwaitingPickup ensure RecipientName is set because "Loaded lockers must identify the recipient"
+in AwaitingPickup ensure PickupCode is set because "Loaded lockers must store a pickup code"
 
 to PickedUp -> clear ReminderLog
 to Returned -> clear ReminderLog
 
-event LoadParcel with
+event LoadParcel(
     Locker as string notempty,
     Recipient as string notempty,
-    Code as string notempty
-event SendReminder with Note as string notempty
-event PickUp with Code as string notempty
-event AdvanceDay with DayNumber as number
-on AdvanceDay ensure DayNumber >= 0 because "Days cannot be negative"
+    Code as string notempty)
+event SendReminder(Note as string notempty)
+event PickUp(Code as string notempty)
+event AdvanceDay(DayNumber as number)
+on AdvanceDay ensure AdvanceDay.DayNumber >= 0 because "Days cannot be negative"
 
 event ReturnParcel
 

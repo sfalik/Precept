@@ -50,7 +50,7 @@ A flat, line-oriented grammar with no block delimiters needs an unambiguous stru
 The insurance-claim sample illustrates the pattern. Every line after the header declarations begins with `from`, `in`, or `on`:
 
 ```precept
-in UnderReview edit FraudFlag
+in UnderReview write FraudFlag
 in Approved ensure ApprovedAmount > 0 because "Approved claims must specify a payout amount"
 on Submit ensure Amount > 0 because "Claim amounts must be positive"
 from Draft on Submit -> set ClaimantName = Submit.Claimant -> transition Submitted
@@ -613,7 +613,7 @@ in Approved ensure ApprovedAmount > 0 because "Approved claims must specify a pa
 
 ```
 (in StateTarget ("when" BoolExpr)?)? AccessKeyword FieldTarget
-AccessKeyword := write | read | omit | edit
+AccessKeyword := write | read | omit
 ```
 
 ```csharp
@@ -628,7 +628,7 @@ public sealed record AccessModeNode(
 ```
 
 ```precept
-in UnderReview edit FraudFlag
+in UnderReview write FraudFlag
 ```
 
 ### StateAction

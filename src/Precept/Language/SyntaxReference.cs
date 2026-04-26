@@ -22,7 +22,7 @@ public static class SyntaxReference
     public static string StringLiteralRules => "Double-quoted strings with {expr} interpolation and \\, \\n, \\t, \\\", {{, }} escapes; single-quoted typed constants ('value') for date, time, instant, duration, period, timezone, zoneddatetime, datetime literals";
     public static string NumberLiteralRules => "Integers (42), decimals (3.14), exponent notation (1.5e2, 1e-5); no hex/underscore separators";
     public static string WhitespaceRules    => "Not significant — indentation is cosmetic, line breaks separate declarations";
-    public static string NullNarrowing      => "if Field is set narrows to non-nullable in the then branch";
+    public static string NullNarrowing      => "if Field is set narrows to guaranteed-present in the then branch";
 
     /// <summary>
     /// Rules for typed constant literals — single-quoted values that represent domain-constrained identifiers
@@ -36,13 +36,13 @@ public static class SyntaxReference
         Contexts where typed constants appear:
         - Currency qualifiers:   money in 'USD', price in 'EUR' of 'kg'
         - Unit modifiers:        quantity of 'kg', price in 'USD' of 'miles'
-        - Dimension assertions:  period of 'days', quantity where dimension is 'length'
+        - Dimension assertions:  period of 'days', quantity of 'length'
         - Timezone identifiers:  timezone field default 'America/New_York'
-        - Date literals:         field default 'date:2024-01-15'
-        - Time literals:         field default 'time:14:30:00'
-        - Instant literals:      field default 'instant:2024-01-15T14:30:00Z'
-        - Period literals:       field default 'period:P1Y2M'
-        - Duration literals:     field default 'duration:PT4H30M'
+        - Date literals:         field default '2024-01-15'
+        - Time literals:         field default '14:30:00'
+        - Instant literals:      field default '2024-01-15T14:30:00Z'
+        - Period literals:       field default '1 year + 2 months'
+        - Duration literals:     field default '4 hours + 30 minutes'
 
         Escape sequences in typed constants: \' (quote), \\ (backslash).
 
@@ -76,8 +76,8 @@ public static class SyntaxReference
           Chained:         — e.g., Instant.inZone(tz).date.year
 
         Null guard narrowing:
-          if Field != null then Field.accessor else default
-          Inside the 'then' branch, Field is narrowed to non-nullable.
+          if Field is set then Field.accessor else default
+          Inside the 'then' branch, Field is narrowed to guaranteed-present.
 
         Operators bind tighter than 'if/then/else'. Wrap in parentheses to override:
           if (a + b) > 10 then "high" else "low"
@@ -89,11 +89,12 @@ public static class SyntaxReference
     /// </summary>
     public static IReadOnlyList<string> PrecedenceTable { get; } =
     [
+        "80  . (               — member access, function call",
         "65  (unary -)         — arithmetic negation",
         "60  * / %             — multiplication, division, modulo",
         "50  + -               — addition, subtraction",
-        "40  contains          — collection membership",
-        "30  == != ~= ~!= < > <= >=  — comparison (all non-associative: cannot be chained)",
+        "40  contains is       — collection membership, type/null test",
+        "30  == != ~= !~ < > <= >=  — comparison (all non-associative: cannot be chained)",
         "25  not               — logical negation",
         "20  and               — logical conjunction",
         "10  or                — logical disjunction",
@@ -151,8 +152,8 @@ public static class SyntaxReference
             """),
 
         new(
-            "Stateless edit-only precept",
-            "A precept with no lifecycle states or events. Defines structural constraints on a data object and declares which fields the host application may edit.",
+            "Stateless write-only precept",
+            "A precept with no lifecycle states or events. Defines structural constraints on a data object and declares which fields the host application may write.",
             """
             precept FeeSchedule
 
@@ -160,7 +161,7 @@ public static class SyntaxReference
             field DiscountPercent as decimal default 0 nonnegative max 100 maxplaces 2
             field TaxRate as decimal default 0.1 nonnegative maxplaces 4
 
-            edit BaseFee, DiscountPercent
+            write BaseFee, DiscountPercent
             """),
     ];
 

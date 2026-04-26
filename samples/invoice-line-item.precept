@@ -6,7 +6,7 @@ precept InvoiceLineItem
 # This sample demonstrates computed fields in a data-only precept — there are
 # no lifecycle states or events, just structural constraints and derived math.
 
-field Description as string nullable
+field Description as string optional
 field UnitPrice as number default 0 nonnegative
 field Quantity as number default 1 min 1
 field DiscountPercent as number default 0 nonnegative max 100
@@ -20,4 +20,4 @@ field TaxAmount as number -> TaxableAmount * TaxRate / 100
 field LineTotal as number -> TaxableAmount + TaxAmount nonnegative
 
 # Only source fields are editable; derived totals are locked.
-edit Description, UnitPrice, Quantity, DiscountPercent
+write Description, UnitPrice, Quantity, DiscountPercent

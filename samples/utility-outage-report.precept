@@ -3,12 +3,12 @@ precept UtilityOutageReport
 # Operations teams verify outage reports, assemble the affected area, and then dispatch the next available crew.
 # The workflow uses both a set of affected blocks and a shared crew queue.
 
-field ReporterName as string nullable
-field RegionName as string nullable
+field ReporterName as string optional
+field RegionName as string optional
 field EstimatedCustomers as number default 0 nonnegative
 field Verified as boolean default false
-field AssignedCrew as string nullable
-field RestorationNote as string nullable
+field AssignedCrew as string optional
+field RestorationNote as string optional
 field DispatchRound as number default 0 nonnegative
 field AffectedBlocks as set of string
 field CrewQueue as queue of string
@@ -19,18 +19,18 @@ state Dispatched
 state Restored
 state Closed
 
-in VerifiedState edit EstimatedCustomers
-in Dispatched ensure AssignedCrew != null because "Dispatched outages must name a crew"
+in VerifiedState write EstimatedCustomers
+in Dispatched ensure AssignedCrew is set because "Dispatched outages must name a crew"
 
-event FileReport with Reporter as string notempty, Region as string notempty, Customers as number
-on FileReport ensure Customers >= 0 because "Estimated customers cannot be negative"
+event FileReport(Reporter as string notempty, Region as string notempty, Customers as number)
+on FileReport ensure FileReport.Customers >= 0 because "Estimated customers cannot be negative"
 
-event AddBlock with BlockName as string notempty
-event RemoveBlock with BlockName as string notempty
-event RegisterCrew with CrewName as string notempty
+event AddBlock(BlockName as string notempty)
+event RemoveBlock(BlockName as string notempty)
+event RegisterCrew(CrewName as string notempty)
 event VerifyReport
 event DispatchCrew
-event MarkRestored with Note as string notempty
+event MarkRestored(Note as string notempty)
 event CloseIncident
 
 from Reported on FileReport
