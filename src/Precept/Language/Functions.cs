@@ -26,6 +26,12 @@ public static class Functions
     private static readonly ParameterMeta PDuration = new(TypeKind.Duration);
     private static readonly ParameterMeta PDateTime = new(TypeKind.DateTime);
 
+    // Named parameters for overloads that carry a proof requirement — the same instance
+    // must appear in both Parameters and ParamSubject to satisfy reference-equality (PRECEPT0005).
+    private static readonly ParameterMeta PSqrtInteger = new(TypeKind.Integer, "value");
+    private static readonly ParameterMeta PSqrtDecimal = new(TypeKind.Decimal, "value");
+    private static readonly ParameterMeta PSqrtNumber  = new(TypeKind.Number,  "value");
+
     // ════════════════════════════════════════════════════════════════════════════
     //  GetMeta — exhaustive switch
     // ════════════════════════════════════════════════════════════════════════════
@@ -170,22 +176,22 @@ public static class Functions
         FunctionKind.Sqrt => new(kind, "sqrt",
             "Square root → number (proof engine checks non-negativity)",
         [
-            new([new(TypeKind.Integer, "value")], TypeKind.Number,
+            new([PSqrtInteger], TypeKind.Number,
                 ProofRequirements:
                 [
-                    new NumericProofRequirement(new ParamSubject(PInteger), OperatorKind.GreaterThanOrEqual, 0m,
+                    new NumericProofRequirement(new ParamSubject(PSqrtInteger), OperatorKind.GreaterThanOrEqual, 0m,
                         "Argument must be non-negative"),
                 ]),
-            new([new(TypeKind.Decimal, "value")], TypeKind.Number,
+            new([PSqrtDecimal], TypeKind.Number,
                 ProofRequirements:
                 [
-                    new NumericProofRequirement(new ParamSubject(PDecimal), OperatorKind.GreaterThanOrEqual, 0m,
+                    new NumericProofRequirement(new ParamSubject(PSqrtDecimal), OperatorKind.GreaterThanOrEqual, 0m,
                         "Argument must be non-negative"),
                 ]),
-            new([new(TypeKind.Number, "value")], TypeKind.Number,
+            new([PSqrtNumber], TypeKind.Number,
                 ProofRequirements:
                 [
-                    new NumericProofRequirement(new ParamSubject(PNumber), OperatorKind.GreaterThanOrEqual, 0m,
+                    new NumericProofRequirement(new ParamSubject(PSqrtNumber), OperatorKind.GreaterThanOrEqual, 0m,
                         "Argument must be non-negative"),
                 ]),
         ],

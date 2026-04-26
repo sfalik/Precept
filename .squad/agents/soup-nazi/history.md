@@ -1,5 +1,20 @@
 ## Recent Updates
 
+### 2026-04-26 — PRECEPT0005, PRECEPT0006, PRECEPT0007 proposal
+
+**PRECEPT0005 (ParamSubject must reference owning-overload parameter):**
+- Implemented `Precept0005ParamSubjectMustReferenceOwningParameter.cs`. Registers on `IObjectCreationOperation` for `Precept.Language.ParamSubject`. Walks `IOperation.Parent` to find the enclosing `BinaryOperationMeta`, `UnaryOperationMeta`, or `FunctionOverload` creation. Recursively collects `ParameterMeta`-typed symbol references from that creation (excluding the `ProofRequirements` subtree via `arg.Parameter?.Name == "ProofRequirements"` skip). Flags if the arg symbol is absent, inline, or not in the parameter set. 7 tests in `Precept0005Tests.cs`.
+- **Production bug caught and fixed:** `Functions.cs` sqrt overloads used anonymous inline `new(TypeKind.Integer, "value")` in Parameters but referenced the class-level `PInteger` field in `ParamSubject` — different instances, violating reference-equality. Fixed by adding `PSqrtInteger/PSqrtDecimal/PSqrtNumber` fields with `Name = "value"` and using them in both positions. The `Sqrt_ParameterNames_Are_Value` test was preserved.
+- **Key implementation lesson:** IOperation recursive walk must NOT return early when `op.Type?.Name == "ParameterMeta"` and `GetReferencedSymbol` returns null (e.g. implicit conversion wrappers). Fall through to recurse into children. Only stop when a named symbol is actually found.
+
+**PRECEPT0006 (ProofSubject type/placement validity):**
+- Implemented `Precept0006ProofSubjectPlacementIsValid.cs`. Rule 1: `PresenceProofRequirement` must use `SelfSubject` not `ParamSubject`. Rule 2: `SelfSubject(non-null accessor)` in non-Presence proof types is flagged only when inside `BinaryOperationMeta`/`UnaryOperationMeta`/`FunctionOverload` context — `TypeAccessor.ProofRequirements` is explicitly excluded because `Types.cs` legitimately uses `SelfSubject(CollectionCountAccessor)` in `NumericProofRequirement` to assert "count > 0". 6 tests in `Precept0006Tests.cs`.
+
+**PRECEPT0007 (Enum.GetValues outside catalog All):**
+- Proposed in `.squad/decisions/inbox/soup-nazi-precept0007-proposal.md`. Zero current violations (all 10 src/ uses are in All getters; all test/ uses are legitimate). Deferred pending decision: hardcode enum name set vs `[CatalogEnum]` attribute approach (attribute recommended to avoid drift).
+
+**Final counts:** Precept.Analyzers.Tests: 37 passing (+17). Precept.Tests: 1682 passing (0 regression).
+
 ### 2026-04-25 — Catalog-Driven Metadata Test Strategy Review
 
 - Reviewed all 10 catalogs from `docs.next/catalog-system.md` against existing test patterns in `test/Precept.Next.Tests/` (5 files, ~632 tests).
