@@ -147,7 +147,7 @@ flowchart LR
     classDef artifact fill:#fef3c7,stroke:#f59e0b,color:#78350f
 
     SRC([source text]):::input
-    CAT([Tokens · Diagnostics\ncatalogs]):::input
+    CAT(["Tokens · Diagnostics<br/>catalogs"]):::input
     LEX(Lexer):::stage
     OUT[TokenStream]:::artifact
 
@@ -181,7 +181,7 @@ flowchart LR
     classDef artifact fill:#fef3c7,stroke:#f59e0b,color:#78350f
 
     TS[TokenStream]:::artifact
-    CAT([Constructs · Tokens\nOperators · Diagnostics\ncatalogs]):::input
+    CAT(["Constructs · Tokens<br/>Operators · Diagnostics<br/>catalogs"]):::input
     PAR(Parser):::stage
     OUT[SyntaxTree]:::artifact
 
@@ -218,17 +218,29 @@ Malformed input is represented as `MissingNode` for required slots that could no
 
 ### Node inventory
 
-The parser produces one syntax node type per `ConstructKind`, with child nodes corresponding to `ConstructSlot` entries from the `Constructs` catalog. The root is `PreceptSyntax`, containing declaration nodes:
+The parser produces one syntax node type per `ConstructKind`, with child nodes corresponding to `ConstructSlot` entries from the `Constructs` catalog. The containment hierarchy:
 
-- `FieldDeclarationSyntax` — field name, type reference, modifiers, default/computed expression
-- `StateBlockSyntax` — state name, modifiers, nested state-scoped declarations
-- `EventDeclarationSyntax` — event name, modifiers, arg declarations
-- `TransitionRowSyntax` — anchor (`from`/`to`/`in`/`on`), state/event references, guard, action chain
-- `RuleDeclarationSyntax` — guard (optional), ensure expression, because clause
-- `EnsureDeclarationSyntax` — state/event-scoped constraint with because clause
-- `AccessDeclarationSyntax` — edit/readonly declarations per field per state
+```
+PreceptSyntax  (root — owns every declaration)
+├── FieldDeclarationSyntax       field name, type reference, modifiers, default/computed expression
+├── StateBlockSyntax             state name, modifiers
+│   ├── EnsureDeclarationSyntax      state-scoped constraint with because clause
+│   └── AccessDeclarationSyntax      edit/readonly declarations per field
+├── EventDeclarationSyntax       event name, modifiers, arg declarations
+├── TransitionRowSyntax          anchor (from/to/in/on), state/event refs, guard, action chain
+├── RuleDeclarationSyntax        guard (optional), ensure expression, because clause
+├── EnsureDeclarationSyntax      event-scoped constraint with because clause
+├── AccessDeclarationSyntax      edit/readonly declarations per field per state
+│
+├── MissingNode                  required slot that could not be parsed (carries expected ConstructSlot + span)
+└── SkippedTokens                trivia: tokens not incorporated into any construct
+```
 
-Expression nodes: `BinaryExpressionSyntax`, `UnaryExpressionSyntax`, `LiteralExpressionSyntax`, `FieldReferenceSyntax`, `EventArgReferenceSyntax`, `FunctionCallSyntax`, `IfThenElseSyntax`, `MemberAccessSyntax`, `IsSetExpressionSyntax`, `ContainsExpressionSyntax`.
+**Recovery shape.** `MissingNode` and `SkippedTokens` are first-class tree citizens, not out-of-band error records. A malformed `field` declaration appears as a `FieldDeclarationSyntax` with `MissingNode` children in unfilled slots and `SkippedTokens` trivia attached to the nearest valid node. The tree always accounts for every character of source text.
+
+**Expression nodes** (appear only inside declaration slots — guards, action RHS, ensure clauses, computed fields, because clauses):
+
+`BinaryExpressionSyntax` · `UnaryExpressionSyntax` · `LiteralExpressionSyntax` · `FieldReferenceSyntax` · `EventArgReferenceSyntax` · `FunctionCallSyntax` · `IfThenElseSyntax` · `MemberAccessSyntax` · `IsSetExpressionSyntax` · `ContainsExpressionSyntax`
 
 ### Catalog-to-grammar mapping
 
@@ -266,7 +278,7 @@ flowchart LR
     classDef artifact fill:#fef3c7,stroke:#f59e0b,color:#78350f
 
     ST[SyntaxTree]:::artifact
-    CAT([Types · Functions · Operators\nOperations · Modifiers · Actions\nConstructs · Diagnostics\ncatalogs]):::input
+    CAT(["Types · Functions · Operators<br/>Operations · Modifiers · Actions<br/>Constructs · Diagnostics<br/>catalogs"]):::input
     TC(Type Checker):::stage
     OUT[TypedModel]:::artifact
 
@@ -299,14 +311,42 @@ The back-pointer is a navigation convenience for LS features and diagnostic rend
 
 ### TypedModel inventory
 
-The semantic inventory holds:
+The semantic inventory is organized by role, not by source position. Each entry carries a back-pointer (→ syntax) to its originating syntax node for diagnostics and LS navigation — but downstream stages consume the semantic columns, not the pointer.
 
-- **Declaration symbols** — stable semantic identities for fields, states, events, args, and constraint-bearing declarations, each with a back-pointer to the originating syntax node for diagnostics and navigation.
-- **Reference bindings** — every semantic identifier/expression site binds directly to a symbol, overload, accessor, operator, or action identity.
-- **Normalized declarations** — rules, ensures, transition rows, access declarations, state hooks, and stateless hooks in inventories shaped for analysis and lowering, not parser nesting.
-- **Typed expressions** — resolved result type plus resolved operation/function/accessor identity and semantic subjects, with a back-pointer to the originating expression syntax node.
-- **Typed actions** — semantic action families that resolve to one of three named shapes (see below) with catalog-defined operand and binding contracts.
-- **Dependency facts** — computed-field dependencies, arg dependencies, referenced-field sets, and semantic edge data required by graph/proof/lowering.
+**Symbols** — stable semantic identities
+
+| Symbol | Key | Semantic content | → syntax |
+|---|---|---|---|
+| `TypedField` | field name | `TypeKind`, modifiers, default/computed expression | `FieldDeclarationSyntax` |
+| `TypedState` | state name | modifier set (initial, terminal, required, …) | `StateBlockSyntax` |
+| `TypedEvent` | event name | modifier set, arg symbols | `EventDeclarationSyntax` |
+| `TypedArg` | event + arg name | `TypeKind`, optionality, default expression | arg syntax node |
+
+**Bindings** — every reference site resolved to its target
+
+| Binding site | Resolves to |
+|---|---|
+| identifier in expression | field symbol, arg symbol, or function overload |
+| operator in expression | `OperationKind` (from `Operations` catalog) |
+| type reference | `TypeKind` + `TypeAccessor` |
+| action verb | `ActionMeta` shape (base / input / binding) |
+
+**Normalized declarations** — inventories shaped for analysis, not parser nesting
+
+| Inventory | Keyed by | Content |
+|---|---|---|
+| Transition rows | (source state, event, target state) | guard, action chain, typed expressions |
+| Rules | constraint identity | guard, ensure expression, because clause |
+| Ensures | (scope anchor, constraint identity) | `in`/`to`/`from`/`on`-scoped constraints |
+| Access declarations | (state, field) | edit / readonly mode |
+| State hooks | state identity | hook entries |
+| Stateless hooks | — | hook entries |
+
+**Typed expressions** — resolved result type, resolved operation/function/accessor identity, semantic subjects, with → syntax back-pointer.
+
+**Typed actions** — resolve to one of three shapes: `TypedAction` (no operand), `TypedInputAction` (carries `InputExpression`), `TypedBindingAction` (carries `Binding`).
+
+**Dependency facts** — computed-field dependencies, arg dependencies, referenced-field sets, and semantic edge data required by graph/proof/lowering.
 
 ### Anti-mirroring rules
 
@@ -368,7 +408,7 @@ flowchart LR
     classDef artifact fill:#fef3c7,stroke:#f59e0b,color:#78350f
 
     TM[TypedModel]:::artifact
-    CAT([Modifiers · Actions\nDiagnostics\ncatalogs]):::input
+    CAT(["Modifiers · Actions<br/>Diagnostics<br/>catalogs"]):::input
     GA(Graph Analyzer):::stage
     OUT[GraphResult]:::artifact
 
@@ -387,15 +427,33 @@ flowchart LR
 
 ### GraphResult inventory
 
-- **`ReachabilitySet`** — partitions all states into reachable, unreachable, and terminal sets relative to the initial state.
-- **`TransitionAdjacency`** — state → events → target states topology map; the directed edge set of the lifecycle graph.
-- **`PredecessorIndex`** — state → set of states that have a direct transition into it.
-- **`SuccessorIndex`** — state → set of states reachable via a single outgoing transition.
-- **`DominanceFact`** — records that a required-state modifier mandates all paths to a terminal state pass through the required state.
-- **`TerminalOutgoingViolation`** — flags a terminal state that has outgoing transitions, violating structural soundness.
-- **`IrreversibleBackEdgeViolation`** — flags a transition that re-enters an irreversible state from a downstream state.
-- **`EventCoverageEntry`** — per-state inventory of which events have declared transition rows and which do not.
-- **`ProofForwardingFact`** — graph-derived facts (reachability gaps, dominance violations, structural defects) forwarded to the proof engine as obligation inputs.
+The artifact is **topology** (the directed edge set) plus **derived facts** (structural properties computed from that topology).
+
+**Topology — adjacency and navigation indexes**
+
+| Structure | Shape | Purpose |
+|---|---|---|
+| `TransitionAdjacency` | state → { event → target states } | directed edge set of the lifecycle graph |
+| `PredecessorIndex` | state → { predecessor states } | reverse-edge lookup |
+| `SuccessorIndex` | state → { successor states } | forward-edge lookup |
+| `ReachabilitySet` | reachable / unreachable / terminal partitions | state partitioning relative to initial state |
+
+Example adjacency (from a three-state lifecycle):
+```
+Draft   ──Submit──▶  Review
+Review  ──Approve──▶ Approved  (terminal)
+Review  ──Reject───▶ Draft
+```
+
+**Derived facts — structural verdicts and proof inputs**
+
+| Fact | What it captures |
+|---|---|
+| `DominanceFact` | required-state modifier mandates all paths to terminal pass through it |
+| `TerminalOutgoingViolation` | terminal state has outgoing transitions — structural defect |
+| `IrreversibleBackEdgeViolation` | transition re-enters an irreversible state from downstream |
+| `EventCoverageEntry` | per-state inventory: which events have declared rows, which do not |
+| `ProofForwardingFact` | reachability gaps, dominance violations, structural defects forwarded to proof engine |
 
 **Implementation status:** `GraphAnalyzer.Analyze` is stubbed.
 
@@ -414,8 +472,8 @@ flowchart LR
     classDef stage fill:#ede9fe,stroke:#a78bfa,color:#3b1f7e
     classDef artifact fill:#fef3c7,stroke:#f59e0b,color:#78350f
 
-    TM[TypedModel +\nGraphResult]:::artifact
-    CAT([Operations · Functions\nTypes · Diagnostics · Faults\ncatalogs]):::input
+    TM["TypedModel +<br/>GraphResult"]:::artifact
+    CAT(["Operations · Functions<br/>Types · Diagnostics · Faults<br/>catalogs"]):::input
     PE(Proof Engine):::stage
     OUT[ProofModel]:::artifact
 
@@ -432,11 +490,17 @@ flowchart LR
 
 ### ProofModel inventory
 
-- **`ProofObligation`** — a single provable claim: carries semantic site reference, originating `ProofRequirement` (from catalog metadata), strategy used for discharge, disposition (`proved` or `unresolvable`), and `DiagnosticCode` reference if unresolvable.
-- **`FaultSiteLink`** — links an unresolvable `ProofObligation` to its corresponding `FaultSiteDescriptor`, threading the proof/fault chain so lowering can plant runtime backstops.
-- **`ConstraintInfluenceEntry`** — maps a constraint to its contributing fields and expression-text excerpts; lowering reads these to build the runtime `ConstraintInfluenceMap`.
-- **`InitialStateSatisfiabilityResult`** — per-field/constraint-pair verdict on whether default values satisfy initial-state constraints, with diagnostic reference if unsatisfiable.
-- **`ObligationCoverageRecord`** — tracks which proof strategy discharged each obligation, providing an auditable coverage map across the strategy set.
+The artifact is an **obligation ledger** — every provable claim the compiler must discharge, with its verdict, strategy, and downstream linkage.
+
+| Obligation entry | Columns |
+|---|---|
+| `ProofObligation` | semantic site · originating `ProofRequirement` · **disposition** (`proved` · `unresolvable`) · strategy used · `DiagnosticCode` if unresolvable |
+| `FaultSiteLink` | obligation → `FaultSiteDescriptor` (threads the proof/fault chain so lowering can plant runtime backstops) |
+| `ConstraintInfluenceEntry` | constraint → contributing fields + expression-text excerpts (lowering reads these to build `ConstraintInfluenceMap`) |
+| `InitialStateSatisfiabilityResult` | (field, constraint) → satisfiable / unsatisfiable + diagnostic reference |
+| `ObligationCoverageRecord` | obligation → discharging strategy (auditable coverage map across the strategy set) |
+
+Each row in the ledger resolves to an explicit **disposition**, not a binary pass/fail. The disposition is the proof engine's primary output — `proved` means no runtime check needed; `unresolvable` means the compiler emits a diagnostic and the author must fix the source.
 
 ### Proof strategy set
 
@@ -501,7 +565,7 @@ flowchart LR
     TM[TypedModel]:::artifact
     GR[GraphResult]:::artifact
     PM[ProofModel]:::artifact
-    SNAP(Compilation\nSnapshot):::stage
+    SNAP("Compilation<br/>Snapshot"):::stage
     OUT[CompilationResult]:::artifact
 
     SRC --> SNAP
@@ -547,7 +611,7 @@ flowchart LR
     classDef artifact fill:#fef3c7,stroke:#f59e0b,color:#78350f
 
     CR[CompilationResult]:::artifact
-    LOW(Lowering\n— Precept.From —):::stage
+    LOW("Lowering<br/>— Precept.From —"):::stage
     OUT[Precept]:::artifact
 
     CR -->|"only when !HasErrors"| LOW
@@ -562,18 +626,42 @@ flowchart LR
 
 ### Lowered model inventory
 
-- **`FieldDescriptor`** — field name, `TypeKind`, slot index, modifiers, default-value expression, source origin.
-- **`StateDescriptor`** — state name, terminal flag, modifier set (initial, required, irreversible, success, warning, error), available events.
-- **`EventDescriptor`** — event name, modifier set, arg descriptors, source origin.
-- **`ArgDescriptor`** — arg name, `TypeKind`, optionality, default expression, source origin.
-- **`TransitionDispatchIndex`** — state × event → target state + lowered action plan; the routing table the evaluator and inspection surfaces consume directly.
-- **`ConstraintPlanIndex`** — constraint plans organized by activation anchor (`always`, `in state`, `to state`, `from state`, `on event`) into precomputed dispatch buckets.
-- **`ConstraintDescriptor`** — expression text, source line, guard metadata, `ConstraintActivation` anchor, because text, scope targets.
-- **`ConstraintInfluenceMap`** — constraint → contributing fields with expression-text excerpts; enables "which field change would fix this?" without reverse-engineering.
-- **`FaultSiteDescriptor`** — defense-in-depth backstop keyed by site identity, linked to `FaultCode` and the prevention `DiagnosticCode`.
-- **`SlotLayout`** — field → slot index mapping that addresses the flat evaluation plan's register file.
-- **`ReachabilityIndex`** — state → set of states reachable from it; enables structural navigation without re-running the compiler.
-- **`ExecutionPlan`** — lowered flat action sequences: slot-addressed opcodes with field-slot references, literal constants, operation codes, and result slots.
+The executable model is organized as **descriptor tables** (identity), **dispatch indexes** (routing), and **execution plans** (action). Every runtime lookup is an index hit — no scanning, no filtering.
+
+**Descriptor tables** — the runtime face of declarations
+
+| Descriptor | Key | Content |
+|---|---|---|
+| `FieldDescriptor` | field name | `TypeKind`, slot index, modifiers, default-value expression |
+| `StateDescriptor` | state name | terminal flag, modifier set, available events |
+| `EventDescriptor` | event name | modifier set, arg descriptors |
+| `ArgDescriptor` | event + arg name | `TypeKind`, optionality, default expression |
+| `ConstraintDescriptor` | constraint identity | expression text, `ConstraintActivation` anchor, because text, scope targets |
+| `FaultSiteDescriptor` | site identity | `FaultCode`, prevention `DiagnosticCode` (defense-in-depth only) |
+
+**Dispatch indexes** — precomputed routing for the evaluator
+
+| Index | Key → Value |
+|---|---|
+| `TransitionDispatchIndex` | (state, event) → target state + lowered action plan |
+| `ConstraintPlanIndex` | activation anchor → precomputed constraint-plan bucket |
+| `SlotLayout` | field → slot index (addresses the flat plan's register file) |
+| `ReachabilityIndex` | state → set of reachable states |
+| `ConstraintInfluenceMap` | constraint → contributing fields + expression-text excerpts |
+
+**Execution plans** — lowered flat action sequences
+
+| Element | Description |
+|---|---|
+| `ExecutionPlan` | slot-addressed opcodes with field-slot refs, literal constants, operation codes, result slots |
+
+Flat-plan sketch (a `set Amount to arg.NewAmount` action in a transition):
+```
+LOAD_ARG   arg.NewAmount  → r0       # read event arg into scratch slot
+STORE_SLOT r0             → slot[2]  # write to Amount's field slot
+```
+
+The evaluator walks the plan array — no recursive dispatch, no semantic reasoning at runtime.
 
 ### Lowered executable-model contract
 
@@ -651,7 +739,7 @@ flowchart TD
     CREATE(Create):::runtime
     RESTORE(Restore):::runtime
     EVAL(Evaluator):::runtime
-    STRUCT(Structural\nqueries):::runtime
+    STRUCT("Structural<br/>queries"):::runtime
 
     P --> CREATE
     P --> RESTORE
