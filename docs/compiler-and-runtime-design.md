@@ -3,7 +3,7 @@
 > **Status:** Approved working architecture
 > **Audience:** compiler, runtime, language-server, MCP, and documentation authors
 
-**How to read this document.** Sections 1–3 establish what Precept promises, its architectural approach (catalog-driven, purpose-built, unified pipeline), and the end-to-end pipeline overview — read these first for the design's spine. Sections 4–5 cover Lexer and Parser. Sections 6–10 are the per-stage contracts (Type Checker through Precept Builder), each opening with how that stage serves the structural guarantee; read them in order for the compilation story, or jump to a specific stage when doing component work. Section 6 (Type Checker) also defines the `SemanticIndex` artifact — its flat semantic-inventory shape, syntax-node back-pointers, and the anti-mirroring rules that keep downstream consumers independent of source structure. Sections 11–15 cover the runtime surface and tooling integration (TextMate grammar generation, MCP, language server) — these are the consumer-facing contracts that tie compilation output to real product surfaces.
+**How to read this document.** Sections 1–3 establish what Precept promises, its architectural approach (catalog-driven, purpose-built, unified pipeline), and the end-to-end pipeline overview — read these first for the design's spine. Sections 4–5 cover Lexer and Parser. Sections 6–10 are the per-stage contracts (Type Checker through Precept Builder), each opening with how that stage serves the structural guarantee; read them in order for the compilation story, or jump to a specific stage when doing component work. Section 6 (Type Checker) also defines the `SemanticIndex` artifact — its flat semantic-inventory shape, syntax-node back-pointers, and the anti-mirroring rules that keep downstream consumers independent of source structure. Section 11 covers the runtime surface and operations. Section 12 covers type and immutability strategy — a cross-cutting architectural concern that governs every artifact in the pipeline; it is placed here because it is most meaningful after seeing the full compilation and runtime picture. Sections 13–15 cover tooling integration (TextMate grammar generation, MCP, language server) — the consumer-facing contracts that tie compilation output to real product surfaces.
 
 ## 1. What Precept promises
 
@@ -25,7 +25,7 @@ This inverts the traditional compiler model. In general-purpose compilers (Rosly
 
 The twelve catalogs fall into two groups:
 
-**Language definition** — what the language IS: `Tokens` (lexical vocabulary), `Types` (type system families), `Functions` (built-in function library), `Operators` (operator symbols with precedence/associativity/arity), `Operations` (typed operator combinations — which `(op, lhs, rhs)` triples are legal), `Modifiers` (declaration-attached modifiers as a discriminated union with five subtypes), `Actions` (state-machine action verbs), `Constructs` (grammar forms and declaration shapes), `Constraints` (constraint kinds and activation anchor metadata), `ProofRequirements` (proof obligation kinds and qualifier compatibility metadata).
+**Language definition** — what the language IS: `Tokens` (lexical vocabulary), `Types` (type system families), `Functions` (built-in function library), `Operators` (operator symbols with precedence/associativity/arity), `Operations` (typed operator combinations — which `(op, lhs, rhs)` triples are legal; `BidirectionalLookup` entries declare commutative operations once so `money * decimal` and `decimal * money` resolve to the same entry without duplicate definitions), `Modifiers` (declaration-attached modifiers as a discriminated union with five subtypes), `Actions` (state-machine action verbs), `Constructs` (grammar forms and declaration shapes), `Constraints` (constraint kinds and activation anchor metadata), `ProofRequirements` (proof obligation kinds and qualifier compatibility metadata).
 
 **Failure modes** — how it reports problems: `Diagnostics` (compile-time rules), `Faults` (runtime failure modes). The diagnostic-and-output-design survey confirms that Precept's catalog-based separation of diagnostic rule definition (`DiagnosticCode` in the `Diagnostics` catalog) from diagnostic instance (`Diagnostic` with source location, severity, and message arguments) follows the Roslyn pattern (`DiagnosticDescriptor` / `Diagnostic`) — the most explicit rule-vs-instance separation in the surveyed systems. TypeScript uses a similar `DiagnosticMessage` / `Diagnostic` split. The survey also reveals a severity-level divide: all surveyed DSL-scale systems (CEL, OPA/Rego, CUE, Dhall, Jsonnet, Pkl, Starlark) have error-only diagnostics — no warnings, no hints. Only general-purpose compilers (Roslyn, TypeScript, Rust, Swift) define 4+ severity levels. Precept's `Diagnostics` catalog defines severity levels beyond error, which is an intentional choice above DSL-scale norms, driven by the authoring-surface ambition of the language server and MCP tools.
 
@@ -34,7 +34,7 @@ Their union IS the language specification in machine-readable form. No consumer 
 The architectural principle: **if something is domain knowledge, it is metadata; if it is metadata, it has a declared shape; if shapes vary by kind, the shape is a discriminated union.** Pipeline stages, tooling, and consumers derive from the metadata — they never encode language knowledge in their own logic. See `docs/language/catalog-system.md` for the full catalog system design.
 
 > **Precept Innovations**
-> - **Catalog-as-spec inversion.** Traditional compilers scatter language knowledge across pipeline implementations. Precept externalizes the entire language specification as twelve machine-readable catalogs — their union IS the spec, and every consumer derives from them. No other DSL tooling in this category has this property.
+> - **Catalog-as-spec inversion.** Traditional compilers scatter language knowledge across pipeline implementations — adding a feature means touching dozens of files and hoping every consumer gets updated. Precept externalizes the entire language specification as twelve machine-readable catalogs; their union IS the spec. Without this, grammar, completions, hover, and MCP vocabulary would drift independently and require manual synchronization on every language change.
 > - **Single-act feature propagation.** Adding a language feature is one enum member with an exhaustive metadata switch. The C# compiler refuses to build if metadata is missing, and propagation to grammar, completions, hover, MCP vocabulary, and semantic tokens is automatic.
 > - **Grammar generation from catalogs.** The TextMate grammar, LS completions, and MCP vocabulary are generated artifacts, not hand-edited — they cannot drift from the language specification because they ARE the specification, projected to different surfaces.
 
@@ -135,7 +135,7 @@ flowchart TD
     style c5 fill:#f8fafc,stroke:#cbd5e1
 ```
 
-At the public surface, the compiler/runtime boundary is intentionally narrow. Internal contributors should read the system from that boundary inward, because it shows where analysis ends and executable behavior begins.
+The first thing to notice is the boundary itself — one call produces one aggregate. This makes the compiler/runtime divide explicit and auditable.
 
 ```csharp
 Compilation compilation = Compiler.Compile(source);
@@ -143,7 +143,7 @@ Compilation compilation = Compiler.Compile(source);
 
 `Compiler.Compile(source)` is the full compile pipeline entry point. It exists to turn author-owned `.precept` text into a stable compile-time aggregate that preserves everything the downstream system needs: stage outputs, diagnostics, and a single `HasErrors` summary. That separation matters because later steps should consume prior analysis, not repeat it. The compiler's job is to concentrate compile-time knowledge into one object that can be inspected, validated, and then handed to runtime construction.
 
-To see what that call actually does, zoom in on the compiler itself.
+To see what that call actually does, zoom in on the compiler itself. Notice what is NOT here — no incremental invalidation, no partial-result short-circuit, no stage-level error barrier. The pipeline runs to completion regardless of errors, because authoring surfaces need everything it produces.
 
 ```csharp
 // Inside Compiler.Compile
@@ -187,20 +187,7 @@ Precept     precept     = Precept.From(compilation);        // requires !HasErro
 
 ### Artifact inventory
 
-| Artifact | Owner | Classification |
-|---|---|---|
-| `TokenStream` | Lexer | compile-time |
-| `SyntaxTree` | Parser | compile-time |
-| `SemanticIndex` | TypeChecker | compile-time |
-| `StateGraph` | GraphAnalyzer | compile-time |
-| `ProofLedger` | ProofEngine | compile-time |
-| `Compilation` | Compiler | compile-time aggregate |
-| Descriptor tables, slot layout, dispatch indexes, constraint-plan indexes, fault-site backstops | `Precept Builder` (`Precept.From`) | runtime |
-| `Precept` | `Precept Builder` (`Precept.From`) | runtime executable model |
-| `Version` | runtime operations | runtime entity snapshot |
-| `EventOutcome`, `UpdateOutcome`, `RestoreOutcome` | Evaluator | runtime results |
-| `ConstraintResult`, `ConstraintViolation` | Evaluator | runtime results |
-| `Fault` | Evaluator | runtime backstop (impossible-path only) |
+The artifact inventory — what each stage produces and how artifacts are classified — is covered in §9 alongside the Compilation snapshot that aggregates them.
 
 ### What crosses into the executable model
 
@@ -216,9 +203,11 @@ Precept     precept     = Precept.From(compilation);        // requires !HasErro
 - **Structured violation shapes** — `ConstraintViolation` carries failing constraint descriptor, evaluated field values, guard context, and failing sub-expression.
 - **Fault-site backstops** — `FaultSite` descriptors linked to `FaultCode` and the compiler-owned prevention `DiagnosticCode`.
 
-`SyntaxTree`, `TokenStream`, parser recovery, and the `ProofLedger` artifact don't cross — nothing at runtime needs them. The compiler-result-to-runtime survey confirms a spectrum of severance approaches: CEL's `Program` retains AST node IDs (`Interpretable.ID()`) for cost tracking and `EvalState` observation, maintaining a back-reference to the checked AST; Dhall discards all compile artifacts after decoding — the normalized `Expr Src Void` is consumed by the `Decoder` and the host-language value carries no back-reference; Pkl's `Evaluator` merges parse, type-check, and evaluation into a single call with no separate compile artifact at all. Precept's build step sits in the middle — it carries analysis knowledge forward in runtime-native shapes (descriptors, plans, indexes) while severing all structural references to compile-time artifacts.
+The complete severance contract — what crosses into the executable model and what does not — is defined in §10.
 
 Once the executable model exists, runtime operations work entirely on runtime objects.
+
+Notice the shape of progression: every operation produces a new immutable `Version` — the caller extracts results from the outcome and passes the new snapshot forward. There is no accumulated mutable state.
 
 ```csharp
 EventOutcome created = precept.Create(args);                // Applied or Transitioned
@@ -280,7 +269,11 @@ TokenStream
 | **Catalog role** | `TokenKind` comes from `Tokens.GetMeta(...)` / `Tokens.Keywords`. Token categories, TextMate scope, semantic token type, and completion hints derive from `TokenMeta`. |
 | **Consumers** | Parser, `Compilation`, LS lexical tokenization and grammar tooling |
 
-**How it serves the guarantee:** The lexer ensures that every character of source text is accounted for and classified according to catalog-defined vocabulary. No ambiguity in token identity propagates downstream.
+### Completion filtering via `ValidAfter`
+
+The language server's completion logic uses `TokenMeta.ValidAfter` to filter candidates: for each `TokenKind` that is a completion candidate, its `ValidAfter` array declares which preceding token kinds make it legal in context. A completion candidate is only offered if the token immediately preceding the cursor appears in the candidate's `ValidAfter` set. This is catalog-declared positional grammar — the LS does not hardcode which completions follow which keywords; it reads the constraint from the metadata.
+
+**How it serves the guarantee:**The lexer ensures that every character of source text is accounted for and classified according to catalog-defined vocabulary. No ambiguity in token identity propagates downstream.
 
 > **Precept Innovations**
 > - **Catalog-driven token recognition.** `TokenKind` derives from catalog metadata, not a parallel enum. The lexer is a vocabulary consumer — adding a keyword to the `Tokens` catalog automatically makes it lexable, highlightable, and completable.
@@ -358,7 +351,7 @@ PreceptSyntax  (root — owns every declaration)
 
 ### Catalog-to-grammar mapping
 
-Catalog metadata factors into parsing decisions at specific points. The parser uses `Constructs.GetMeta()` to determine legal declaration forms — each `ConstructKind` defines the expected slot sequence, and the parser validates that slots appear in the declared order with declared optionality. The parser uses `Operators.GetMeta()` for expression parsing — operator precedence and associativity come from catalog metadata, not a hardcoded table. Keyword recognition is inherited from the lexer's catalog-driven `TokenKind` assignments; the parser dispatches on `TokenKind`, not on string comparison.
+Catalog metadata factors into parsing decisions at specific points. The parser uses `Constructs.GetMeta()` to determine legal declaration forms — each `ConstructKind` defines the expected slot sequence via `ConstructSlot` entries, each carrying whether the slot is required or optional and its expected position. The parser validates that slots appear in the declared order with declared optionality. Slot validation is catalog-driven: there is no per-construct parser logic that hardcodes what a `field` declaration requires vs. what a `from` row requires. Add a new required slot to a `ConstructKind` in the catalog, and the parser diagnoses all existing declarations that are missing it. The parser uses `Operators.GetMeta()` for expression parsing — operator precedence and associativity come from catalog metadata, not a hardcoded table. Keyword recognition is inherited from the lexer's catalog-driven `TokenKind` assignments; the parser dispatches on `TokenKind`, not on string comparison.
 
 ### Right-sized parser patterns
 
@@ -473,6 +466,8 @@ SemanticIndex                              ◄ flat inventory, not a tree
 | type reference | `TypeKind` + `TypeAccessor` |
 | action verb | `ActionMeta` shape (base / input / binding) |
 
+`TypeAccessor` is a discriminated union — its subtypes carry different proof obligation metadata. Accessing `.peek` on a queue-typed field resolves to a `TypeAccessor` subtype that carries a `ProofRequirement` for non-emptiness: the proof engine must establish that the collection is non-empty before the access is safe. The accessor shape — not the type checker — owns this obligation declaration. This means new container operations get proof obligations by updating catalog metadata, not by modifying checker logic.
+
 **Normalized declarations** — inventories shaped for analysis, not parser nesting
 
 | Inventory | Keyed by | Content |
@@ -501,7 +496,7 @@ These rules constrain the `SemanticIndex` shape. They are architectural constrai
 
 ### Right-sized type checking: generic resolution passes
 
-The type checker should NOT have a `CheckFieldDeclaration()`, `CheckTransitionRow()`, `CheckRuleDeclaration()` method per construct kind. The surveyed DSL-scale type checkers confirm the right pattern for this scale: CEL's checker walks the AST once, resolving types against its `Env` environment with overload dispatch from a centralized function registry; OPA's type checker (`ast/check.go`) makes a single pass over rules against a `TypeEnv`. The correct model for Precept is the same — generic resolution passes that read construct metadata from catalogs. Catalog-resolvable checks are generic passes; only construct-specific structural validation that genuinely differs by kind (field declarations vs. transition rows have different type-checking needs) warrants per-kind methods. The type checker builds semantic symbol tables and binding indexes — a symbol-table-driven approach — not a parallel tree that mirrors `SyntaxTree` with type annotations added.
+The type checker should NOT have a `CheckFieldDeclaration()`, `CheckTransitionRow()`, `CheckRuleDeclaration()` method per construct kind. The surveyed DSL-scale type checkers confirm the right pattern for this scale: CEL's checker walks the AST once, resolving types against its `Env` environment with overload dispatch from a centralized function registry; OPA's type checker (`ast/check.go`) makes a single pass over rules against a `TypeEnv`. The correct model for Precept is the same — generic resolution passes that read construct metadata from catalogs. Catalog-resolvable checks are generic passes; only construct-specific structural validation that genuinely differs by kind (field declarations vs. transition rows have different type-checking needs) warrants per-kind methods. The type checker builds semantic symbol tables and binding indexes — a symbol-table-driven approach — not a parallel tree that mirrors `SyntaxTree` with type annotations added. Type widening rules and implied modifiers are catalog-declared: `TypeMeta.WidensTo` lists the types a given type automatically widens to (e.g., `integer` widens to `number`; `money` widens to a notempty context), and `TypeMeta.ImpliedModifiers` lists modifiers a type carries by virtue of its kind (e.g., `money` implies `notempty`). The type checker reads these from catalog metadata — there are no hardcoded widening chains or modifier-implication switches in the checker logic.
 
 ### Typed action family — three shapes only
 
@@ -626,7 +621,7 @@ Review  ──Reject───▶ Draft
 
 > **Precept Innovations**
 > - **Reachability as a first-class design artifact.** Graph analysis produces reachable/unreachable state sets, structural validity facts, and runtime indexes — not just a pass/fail check. These facts flow into proof obligations and runtime precomputation.
-> - **Lifecycle soundness as a compile-time guarantee.** Unreachable states, terminal outgoing-edge violations, required-state dominance violations, and irreversible back-edges are all caught before any instance exists. No state machine library in this category provides this level of static lifecycle verification.
+> - **Lifecycle soundness as a compile-time guarantee.** Unreachable states, terminal outgoing-edge violations, required-state dominance violations, and irreversible back-edges are all caught before any instance exists. Without this analysis stage, these defects would surface as runtime surprises — an entity that can never reach a terminal state, a transition that violates an irreversibility promise — with no static signal to the author.
 > - **Structural cycle and dominance detection.** The graph analyzer reasons about structural properties (dominance, predecessor/successor relationships, event coverage per state) that would otherwise require runtime observation to discover.
 
 ## 8. Proof Engine
@@ -730,7 +725,9 @@ catalog metadata → ProofRequirement → ProofObligation → DiagnosticCode →
 `FaultSiteDescriptor` is the runtime face of an impossible path that a correct program never reaches.
 
 > **Precept Innovations**
-> - **Compile-time satisfiability checking.** The proof engine guarantees that initial-state configurations are satisfiable at compile time — no validator, state machine library, or rules engine in this category provides this. It is the proof engine's signature contribution.
+> - **Catalog-declared proof obligations.** Proof obligations originate in catalog metadata (`BinaryOperationMeta.ProofRequirements`, `FunctionOverload.ProofRequirements`, `TypeAccessor.ProofRequirements`) — not in hardcoded obligation lists in the proof engine. The proof engine is a generic obligation-discharger, not a domain-knowledge owner. Adding a new operation to the catalog automatically adds its proof obligations to the discharge queue.
+> - **Build-time fault/diagnostic chain integrity.** Every `FaultCode` member carries `[StaticallyPreventable(DiagnosticCode.X)]` — a C# attribute declaring which diagnostic code is responsible for preventing that fault at compile time. Roslyn analyzers PRECEPT0001 and PRECEPT0002 verify at build time that every `FaultCode` has this attribute and that the referenced `DiagnosticCode` exists. If the linkage is broken — a new fault code added without a prevention diagnostic, or the diagnostic renamed — the project fails to build. The proof/fault chain is a compile-time invariant, not a convention.
+> - **Compile-time satisfiability checking.** The proof engine guarantees that initial-state configurations are satisfiable at compile time. Without this, an author can write contradictory defaults and constraints (e.g., `default 0` with `ensure X > 5`) and not discover the contradiction until a `Create` call fails at runtime. It is the proof engine's signature contribution.
 > - **`ConstraintInfluenceMap`.** The Precept Builder can produce a precomputed map from constraints to contributing fields (with expression-text excerpts). This makes AI inspection structurally superior — an agent can answer "which field change would satisfy this constraint?" without reverse-engineering expressions. This is a structural differentiator for the MCP surface.
 > - **Structured "why not" explanations.** Constraint violations carry structured explanation depth — the failing expression, evaluated field values, guard context, and failing sub-expression — not just a boolean status. This transforms MCP tools from status reporters to causal reasoning engines.
 > - **Bounded, non-extensible strategy set.** Four strategies only, each a simple predicate function — not a general solver framework. This makes the proof engine predictable, auditable, and implementable without external dependencies.
@@ -767,9 +764,26 @@ flowchart LR
 |---|---|
 | **Consumers** | LS, MCP `precept_compile`, `Precept.From` |
 
+### Artifact inventory
+
+| Artifact | Owner | Classification |
+|---|---|---|
+| `TokenStream` | Lexer | compile-time |
+| `SyntaxTree` | Parser | compile-time |
+| `SemanticIndex` | TypeChecker | compile-time |
+| `StateGraph` | GraphAnalyzer | compile-time |
+| `ProofLedger` | ProofEngine | compile-time |
+| `Compilation` | Compiler | compile-time aggregate |
+| Descriptor tables, slot layout, dispatch indexes, constraint-plan indexes, fault-site backstops | `Precept Builder` (`Precept.From`) | runtime |
+| `Precept` | `Precept Builder` (`Precept.From`) | runtime executable model |
+| `Version` | runtime operations | runtime entity snapshot |
+| `EventOutcome`, `UpdateOutcome`, `RestoreOutcome` | Evaluator | runtime results |
+| `ConstraintResult`, `ConstraintViolation` | Evaluator | runtime results |
+| `Fault` | Evaluator | runtime backstop (impossible-path only) |
+
 ### Incremental compilation model
 
-Given the 64KB ceiling on `.precept` definition size, **re-run everything on change** is the intended compilation model. A keystroke re-lexes, re-parses, re-typechecks, re-analyzes, and re-proves the entire file. There is no incremental invalidation boundary. The size ceiling is the performance argument: at 64KB, full recompilation is fast enough for keystroke-level responsiveness without the complexity of incremental pipelines.
+**Re-run everything on change** is the intended compilation model — no incremental invalidation boundary, no partial-pipeline short-circuits. The rationale and surveyed evidence are in §12.
 
 ### Contract digest hash
 
@@ -780,7 +794,7 @@ Given the 64KB ceiling on `.precept` definition size, **re-run everything on cha
 When a `.precept` file changes (field added, state renamed, constraint tightened), persisted `Version` instances compiled against the old definition may fail `Restore` under the new definition's constraints. **This is a known gap — definition migration is out of scope for v1.** The contract digest hash provides change detection; a structural diff API provides change enumeration; but automated migration is deferred. Host applications that need to handle definition evolution must manage the migration externally. The gap is acknowledged so downstream design does not assume migration exists.
 
 > **Precept Innovations**
-> - **Contract digest hash.** A deterministic semantic hash enables definition-change detection without source diffing — no other DSL runtime provides this. It grounds deployment safety and the future migration story.
+> - **Contract digest hash.** A deterministic semantic hash enables definition-change detection without source diffing. Without it, host applications would need to compare source text (fragile — comments and whitespace cause false positives) or track file modification times (wrong — doesn't detect semantic equivalence). It grounds deployment safety and the future migration story.
 > - **Always-available analysis snapshot.** `Compilation` is produced even from broken input — authoring surfaces always have diagnostics, partial structure, and whatever analysis succeeded. This is not error tolerance; it is progressive intelligence.
 > - **Full-pipeline re-run as the correct model.** The 64KB ceiling makes incremental compilation unnecessary, eliminating an entire class of invalidation bugs that plague larger language tooling.
 
@@ -925,13 +939,30 @@ Host applications must persist and hand back to `Restore` the following: the cur
 The stable runtime contract is descriptor-backed. Current public stubs still expose string placeholders and string-selected entry points. Those strings are provisional implementation placeholders, not the architectural end state.
 
 > **Precept Innovations**
-> - **Flat evaluation plans with slot-addressed opcodes.** Expressions are not tree-walked — they are precomputed into flat, cache-friendly execution plans with field-slot references and operation codes. This makes evaluation predictable-time and trivially inspectable. No other DSL runtime in this category commits to flat evaluation.
+> - **Flat evaluation plans with slot-addressed opcodes.** Expressions are not tree-walked — they are precomputed into flat, cache-friendly execution plans with field-slot references and operation codes. Without this, the evaluator would need to walk expression trees at runtime and re-resolve operation kinds and field names on every operation. Flat plans make evaluation predictable-time and the execution trace trivially inspectable.
 > - **Dispatch-optimized constraint indexes.** Constraints are grouped by activation anchor into precomputed buckets — the evaluator never scans or filters at dispatch time. Five anchor families, four activation indexes, built once during the Precept Builder stage.
 > - **`ConstraintInfluenceMap` as a built artifact.** The dependency from constraints to contributing fields, with expression-text excerpts, becomes a first-class runtime artifact — enabling AI agents to reason causally about constraint satisfaction.
 
 ## 11. Runtime surface and operations
 
 Once a valid `Precept` exists, four operations govern entity lifecycle. The evaluator is a shared plan executor — it consumes only executable artifacts and executes prebuilt plans. Execution semantics are fully determined at build time.
+
+```mermaid
+flowchart LR
+    classDef runtime fill:#d1fae5,stroke:#34d399,color:#064e3b
+    classDef input   fill:#dbeafe,stroke:#60a5fa,color:#1e3a5f
+    classDef out     fill:#fef9c3,stroke:#f59e0b,color:#78350f
+
+    PR(Precept):::runtime
+    V1(Version):::runtime
+    EV(Evaluator):::runtime
+    V2(Version'):::runtime
+
+    PR -->|"Create / Restore"| V1
+    V1 -->|"Fire / Update"| EV
+    EV -->|"outcome"| V2
+    V2 -->|"Fire / Update"| EV
+```
 
 ```mermaid
 flowchart TD
@@ -1009,7 +1040,7 @@ Fire is the core state-machine operation. Routing, action execution, transition,
 |---|---|
 | **Output** | `EventOutcome` — `Transitioned`, `Applied`, `Rejected`, `InvalidArgs`, `EventConstraintsFailed`, `Unmatched`, provisional `UndefinedEvent`. `EventInspection` / `RowInspection` for inspect. |
 
-Constraint identity survives into `ConstraintResult` and `ConstraintViolation` through `ConstraintDescriptor`. Routing uses descriptor-backed row identity. The runtime API survey highlights a gap in every surveyed state machine runtime: XState's `snapshot.can(event)` returns a boolean with no distinction between "no transition defined for this event" and "a transition is defined but its guard returned false" — both result in `false`. After `actor.send(event)`, if nothing changed, the snapshot is simply identical to the pre-send snapshot with no error or rejection signal. Erlang gen_statem's `keep_state_and_data` signals "handled, no change" but provides no guard/routing discrimination to the caller. Precept structurally distinguishes `Unmatched` (no row matched the state × event combination) from `Rejected` or `EventConstraintsFailed` (rows matched but guard or constraint evaluation prevented the transition) — giving callers and AI agents precise causal information about why an event did not produce a transition.
+Constraint identity survives into `ConstraintResult` and `ConstraintViolation` through `ConstraintDescriptor`. Routing uses descriptor-backed row identity. Precept structurally distinguishes `Unmatched` (no row matched the state × event combination) from `Rejected` or `EventConstraintsFailed` (rows matched but guard or constraint evaluation prevented the transition) — a distinction most state machine runtimes cannot make at the type level, leaving callers to infer why an event did not produce a transition.
 
 ### Update
 
@@ -1054,7 +1085,7 @@ The structural guarantee means that a valid executable model communicates entire
 
 `EventInspection` provides the reduced event-level landscape. `RowInspection` provides per-row prospect, effect, snapshots, and constraints. `UpdateInspection` provides hypothetical field state plus the resulting event landscape. `ConstraintResult` carries evaluation status referencing `ConstraintDescriptor`. `FieldSnapshot` captures resolved or unresolved field value in hypothetical state.
 
-Inspection shares the same prebuilt plans as commit. It is not a second evaluator. The surveyed systems confirm the value of preview/inspect patterns but differ in depth: Terraform `plan` previews infrastructure changes before apply; XState v5's `machine.transition()` computes the next state without side effects; OPA's partial evaluation pre-computes policy results with unknown inputs; Temporal's update validators run validation logic before committing workflow state. The runtime API survey adds further detail: XState v5 exposes pure transition functions — `transition(machine, snapshot, event)` returns `[nextSnapshot, actionsToExecute]` without executing actions or mutating actor state, and `getNextTransitions(snapshot)` enumerates enabled transitions without firing any event. These are the closest surveyed precedent for Precept's event-availability index and `InspectFire`. However, XState's inspection depth stops at "would this event cause a change?" (boolean) — it does not preview constraint evaluation, per-row prospects, or structured outcomes. Precept's inspection goes further — it previews every possible transition from any state with full constraint evaluation and per-row structured outcomes, using the same prebuilt execution plans as the commit path.
+Inspection shares the same prebuilt plans as commit — it is not a second evaluator. The inspection surface previews every possible transition from any state with full constraint evaluation and per-row structured outcomes. The same prebuilt execution plans execute in report mode rather than enforce mode.
 
 ### Constraint query contract
 
@@ -1063,6 +1094,8 @@ Three tiers, additive in specificity:
 - **Definition** — `Precept.Constraints`: every declared `ConstraintDescriptor` in the definition. Always available from the executable model.
 - **Applicable** — `Version.ApplicableConstraints`: the zero-cost subset active for the current state and context. Available from any live `Version`. (This is a runtime convenience for API consumers, not an evaluation necessity — the evaluator always uses activation indexes directly.)
 - **Evaluated** — `ConstraintResult` / `ConstraintViolation`: what was actually checked during a specific operation. Embedded in outcome and inspection results only.
+
+`ConstraintDescriptor.ConstraintKind` carries the scope identity of each constraint: `Invariant` (always active), `StateResident` (active while in a state), `StateEntry` (active on entering a state), `StateExit` (active on exiting a state), or `EventPrecondition` (active for a specific event). Consumers pattern-match on `ConstraintKind` to determine which constraints apply to a given operation — no string parsing, no switch on anchor syntax.
 
 ### Structured "why not" violation explanations
 
@@ -1101,7 +1134,7 @@ The language server calls `Compiler.Compile(source)` directly — same process, 
 
 ## 13. TextMate grammar generation
 
-The TextMate grammar (`tools/Precept.VsCode/syntaxes/precept.tmLanguage.json`) is a **generated artifact**, not a hand-edited file. The grammar generator reads catalog metadata and emits the complete grammar — keyword patterns, operator patterns, type name patterns, declaration-level patterns, and block delimiters. This means the grammar is always in sync with the language specification: no drift between syntax highlighting and actual grammar is possible.
+The TextMate grammar (`tools/Precept.VsCode/syntaxes/precept.tmLanguage.json`) is a **generated artifact**, not a hand-edited file. This matters for contributors because it means the language surface cannot drift from the specification — if the grammar disagrees with what the parser accepts, the discrepancy is in the catalog, not in a grammar file that needs manual synchronization. The grammar generator reads catalog metadata and emits the complete grammar — keyword patterns, operator patterns, type name patterns, declaration-level patterns, and block delimiters. This means the grammar is always in sync with the language specification: no drift between syntax highlighting and actual grammar is possible.
 
 ### Catalog contributions to the grammar
 
@@ -1119,7 +1152,7 @@ The same catalog metadata drives LS completions, LS hover content, LS semantic t
 Do NOT add patterns directly to `tmLanguage.json`. Add the language element to the appropriate catalog, and let the grammar generator pick it up. Hand-editing the grammar file creates drift between the grammar and the language specification — the exact problem the catalog-driven architecture is designed to prevent.
 
 > **Precept Innovations**
-> - **Single source of truth for language surface.** Grammar, completions, hover, semantic tokens, and MCP vocabulary are all derived from the same catalog definitions. No other DSL tooling in this category has this level of surface coherence — most maintain separate grammar files, completion lists, and documentation that drift independently.
+> - **Single source of truth for language surface.** Grammar, completions, hover, semantic tokens, and MCP vocabulary are all derived from the same catalog definitions. Without this, each surface would maintain its own keyword list and drift independently — a grammar that highlights syntax the parser rejects, completions that suggest constructs the type checker doesn't recognize.
 > - **Grammar generation, not grammar authoring.** The TextMate grammar is a build output. Syntax highlighting correctness is a property of catalog completeness, not of grammar maintenance. A new keyword highlights correctly the moment its catalog entry is added.
 > - **Zero-drift guarantee.** Because the grammar is generated from the same metadata the parser and type checker consume, it is structurally impossible for syntax highlighting to disagree with actual parse behavior.
 
@@ -1155,13 +1188,13 @@ The `ConstraintInfluenceMap` (§8 innovation) would make MCP tools causal reason
 
 > **Precept Innovations**
 > - **MCP vocabulary from catalogs.** The `precept_language` vocabulary is generated from the same catalogs that drive grammar and completions. A developer (human or AI) who knows the MCP vocabulary already knows the language surface — no redundancy, no drift.
-> - **Inspection as a first-class MCP operation.** `precept_inspect` provides read-only preview of every possible transition from any state — with full constraint evaluation, per-row prospects, and structured outcomes. No other MCP tool in any category provides this depth of preview.
+> - **Inspection as a first-class MCP operation.** `precept_inspect` provides read-only preview of every possible transition from any state — with full constraint evaluation, per-row prospects, and structured outcomes. Without inspection, AI agents would need to speculatively fire events and observe outcomes to determine what the lifecycle allows, rather than querying the full action landscape before committing.
 > - **Causal reasoning in tool output.** Structured "why not" explanations in fire/update results transform MCP from status reporting to causal reasoning — an AI agent can explain failures without access to source code.
 > - **AI-first, not AI-adapted.** The MCP surface was designed alongside the core API, not retrofitted. Structured outcomes, deterministic shapes, and complete vocabulary exposure are architectural requirements, not afterthoughts.
 
 ## 15. Language-server integration
 
-The language server consumes pipeline artifacts by responsibility. Each LS feature reads from exactly the artifact that owns the information it needs.
+The language server consumes pipeline artifacts by responsibility — each LS feature reads from exactly the artifact that owns the information it needs, and nothing else. For contributors building LS features, this means: reach for the right artifact first. Using the wrong artifact does not just produce incorrect behavior — it creates coupling to structural concerns the feature should not depend on.
 
 **Lexical classification** (keyword, operator, punctuation, literal, comment) — reads `TokenStream` + `TokenMeta`. Not `SyntaxTree`, not `SemanticIndex`.
 
