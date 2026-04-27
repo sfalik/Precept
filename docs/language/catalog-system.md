@@ -163,6 +163,47 @@ An immutable record holding all metadata for a single enum member. The shape var
 
 Domain-specific fields are added as needed. `TokenMeta` has `Categories` and nullable `Text`. `DiagnosticMeta` has `Stage` and `Severity`. `FaultMeta` has only `Code` and `MessageTemplate`. The meta type is right-sized for its consumers.
 
+### Meta record shape: flat record vs discriminated union
+
+When all catalog members share the same metadata shape, the meta type is a **flat sealed record**. When members fall into groups with genuinely different fields, the meta type is a **discriminated union** — an abstract record base with sealed subtypes.
+
+**DU with different fields** — the subtype carries fields that only make sense for that group. `ModifierMeta` and `OperationMeta` use this pattern:
+
+```csharp
+// FieldModifierMeta carries ApplicableTo, Subsumes — inapplicable to StateModifierMeta
+public sealed record FieldModifierMeta(..., TypeTarget[] ApplicableTo, ...) : ModifierMeta(...);
+// StateModifierMeta carries AllowsOutgoing, RequiresDominator — inapplicable to FieldModifierMeta
+public sealed record StateModifierMeta(..., bool AllowsOutgoing, ...) : ModifierMeta(...);
+```
+
+**DU as identity** — subtypes carry no unique fields, but the type IS the semantic signal. `ConstraintMeta` and `ProofRequirementMeta` use this pattern. Consumers pattern-match exhaustively; the compiler catches unhandled cases when new members are added:
+
+```csharp
+public abstract record ConstraintMeta(ConstraintKind Kind, string Description)
+{
+    public sealed record Invariant()        : ConstraintMeta(...);
+    public abstract record StateAnchored(ConstraintKind Kind, string Description) : ConstraintMeta(Kind, Description);
+    public sealed record StateResident()    : StateAnchored(...);
+    // ...
+}
+
+// Consumer: type IS the signal — no field check needed
+var plan = meta switch
+{
+    ConstraintMeta.Invariant         => alwaysBucket,
+    ConstraintMeta.StateAnchored     => stateBucket,  // matches all three state kinds
+    ConstraintMeta.EventPrecondition => eventBucket,
+};
+```
+
+This is **not** an enum in disguise. The DU provides:
+1. **Compile-time exhaustiveness** — a new enum member without a matching subtype is a build error at every pattern-match site
+2. **Type IS the semantic signal** — `meta is StateAnchored` is structurally safer than `meta.Scope == ConstraintScope.State`; no field value can be misassigned
+3. **Hierarchy encodes grouping** — the intermediate `StateAnchored` abstract layer expresses that three kinds share a scope axis without needing an extra `ConstraintScope` enum field
+4. **Extensibility** — adding a field to one subtype later is non-breaking; flat records require all-member changes
+
+The rule: if you find yourself adding a `ScopeKind`, `SubjectArity`, or similar classification field whose values map 1:1 to subsets of enum members, that field is a sign the meta should be a DU instead.
+
 ### 3. Static catalog class — the exhaustive switch
 
 ```csharp
@@ -275,7 +316,7 @@ When the Functions and Operators catalogs land, they will likely need dispatch-e
 
 ### Language Definition Catalogs
 
-These seven catalogs describe what the Precept language IS.
+These nine catalogs describe what the Precept language IS.
 
 #### 1. Tokens (✅ Implemented)
 
@@ -899,9 +940,72 @@ public sealed record ConstructMeta(
 
 `AllowedIn` declares where a construct can appear: empty means the construct is valid at precept body level (top-level declarations); populated means the construct is only valid nested inside one of the listed parent construct kinds. Examples: `FieldDeclaration`, `StateDeclaration`, `RuleDeclaration`, `TransitionRow` have `AllowedIn: []`; `StateEnsure` and `AccessMode` have `AllowedIn: [ConstructKind.StateDeclaration]`; `EventEnsure` has `AllowedIn: [ConstructKind.EventDeclaration]`. LS completions use this to filter context-sensitive suggestions: "which constructs have the current cursor's parent construct kind in their `AllowedIn`?"
 
+#### 9. Constraints (✅ Implemented)
+
+The five constraint declaration forms. Each form has a distinct activation shape: invariants are always active; state-anchored constraints activate on state entry, residency, or exit; event preconditions fire before an event executes.
+
+| Part | Type |
+|------|------|
+| Kind enum | `ConstraintKind` (5 members: `Invariant`, `StateResident`, `StateEntry`, `StateExit`, `EventPrecondition`) |
+| Meta record | `ConstraintMeta` — DU as identity (see below) |
+| Catalog class | `Constraints` — `GetMeta()`, `All` |
+| Output type | `ConstraintDescriptor` (in `Precept.Runtime`) — instance carrying `Kind`, `ScopeTarget`, `ExpressionText`, `Because`, `ReferencedFields`, `HasGuard`, `SourceLine` |
+
+**Meta shape — DU as identity:**
+
+```csharp
+public abstract record ConstraintMeta(ConstraintKind Kind, string Description)
+{
+    public sealed record Invariant()         : ConstraintMeta(ConstraintKind.Invariant, ...);
+
+    // Abstract intermediate — groups the three state-anchored kinds
+    public abstract record StateAnchored(ConstraintKind Kind, string Description)
+        : ConstraintMeta(Kind, Description);
+    public sealed record StateResident()     : StateAnchored(ConstraintKind.StateResident, ...);
+    public sealed record StateEntry()        : StateAnchored(ConstraintKind.StateEntry, ...);
+    public sealed record StateExit()         : StateAnchored(ConstraintKind.StateExit, ...);
+
+    public sealed record EventPrecondition() : ConstraintMeta(ConstraintKind.EventPrecondition, ...);
+}
+```
+
+The `StateAnchored` intermediate layer allows consumers to check `meta is ConstraintMeta.StateAnchored` for any state-scoped constraint without individually testing three kinds.
+
+**Consumers:** plan router (constraint bucket assignment), evaluator (activation timing), MCP vocabulary, LS hover.
+
+#### 10. ProofRequirements (✅ Implemented)
+
+The five proof obligation kinds that catalog entries can declare. Used by the proof engine to determine what must be proven before an operation, function, accessor, or action can execute.
+
+| Part | Type |
+|------|------|
+| Kind enum | `ProofRequirementKind` (5 members: `Numeric`, `Presence`, `Dimension`, `Modifier`, `QualifierCompatibility`) |
+| Meta record | `ProofRequirementMeta` — DU as identity (see below) |
+| Catalog class | `ProofRequirements` — `GetMeta()`, `All` |
+| Instance values | `ProofRequirement` abstract record + 5 sealed subtypes — per-use obligation instances carried in `ActionMeta.ProofRequirements`, `FunctionOverload.ProofRequirements`, etc. |
+
+**Meta shape — DU as identity:**
+
+```csharp
+public abstract record ProofRequirementMeta(ProofRequirementKind Kind, string Description)
+{
+    public sealed record Numeric()                : ProofRequirementMeta(...);
+    public sealed record Presence()               : ProofRequirementMeta(...);
+    public sealed record Dimension()              : ProofRequirementMeta(...);
+    public sealed record Modifier()               : ProofRequirementMeta(...);
+    public sealed record QualifierCompatibility() : ProofRequirementMeta(...);  // dual-subject
+}
+```
+
+`QualifierCompatibility` is the only dual-subject kind — its obligation instances carry both `LeftSubject` and `RightSubject`. Consumers can check `meta is ProofRequirementMeta.QualifierCompatibility` rather than inspecting a `SubjectArity` field.
+
+**Instance vs meta separation:** The `ProofRequirementMeta` DU describes the KIND statically (`ProofRequirements.All` enumerates them). The `ProofRequirement` instance record hierarchy carries per-use data — specific subjects, thresholds, comparisons — and lives in the catalog entries that declare obligations (`ActionMeta.ProofRequirements`, `FunctionOverload.ProofRequirements`, etc.). The base `ProofRequirement` record carries `Kind` (catalog membership) and `Description`; subtypes carry kind-specific subjects.
+
+**Consumers:** proof engine (obligation dispatch), type checker, Roslyn analyzers (PRECEPT0005/0006), MCP vocabulary.
+
 ### Failure Mode Catalogs
 
-#### 9. Diagnostics (✅ Implemented)
+#### 11. Diagnostics (✅ Implemented)
 
 Compile-time rules — every error and warning the pipeline can produce. Currently 60+ members across Lex, Parse, Type, Graph, and Proof stages.
 
@@ -914,7 +1018,7 @@ Compile-time rules — every error and warning the pipeline can produce. Current
 
 **Consumers:** MCP constraints, LS diagnostic codes, drift tests.
 
-#### 10. Faults (✅ Implemented)
+#### 12. Faults (✅ Implemented)
 
 Runtime failure modes — every fault the evaluator can produce. Currently 8 members.
 

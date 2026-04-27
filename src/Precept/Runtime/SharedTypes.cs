@@ -1,3 +1,5 @@
+using Precept.Language;
+
 namespace Precept.Runtime;
 
 // ─── Shared types used across commit and inspection surfaces ────────
@@ -45,25 +47,6 @@ public sealed record ArgInfo(
 //            the target state is known from row matching.
 //   Tier 3: ConstraintResult / ConstraintViolation — evaluation outcomes referencing descriptors
 
-/// <summary>The kind of constraint declaration.</summary>
-public enum ConstraintKind
-{
-    /// <summary>Global data truth — <c>rule</c> declaration.</summary>
-    Rule,
-
-    /// <summary>State residency truth — <c>in &lt;State&gt; ensure</c>.</summary>
-    StateEnsureIn,
-
-    /// <summary>State entry truth — <c>to &lt;State&gt; ensure</c>.</summary>
-    StateEnsureTo,
-
-    /// <summary>State exit truth — <c>from &lt;State&gt; ensure</c>.</summary>
-    StateEnsureFrom,
-
-    /// <summary>Event-argument truth — <c>on &lt;Event&gt; ensure</c>.</summary>
-    EventEnsure,
-}
-
 /// <summary>
 /// Metadata descriptor for a declared constraint. Created during
 /// <see cref="Precept.From"/> and owned by the executable model.
@@ -85,7 +68,7 @@ public enum ConstraintKind
 /// </remarks>
 public sealed record ConstraintDescriptor(
     ConstraintKind Kind,
-    string? ScopeTarget,                        // state name (for state ensures) or event name (for event ensures); null for rules
+    string? ScopeTarget,                        // state name (for state ensures) or event name (for event ensures); null for invariants
     string ExpressionText,                      // the source expression text — enables side-by-side display with the precept source
     string Because,                             // the mandatory rationale — the `because` clause text
     IReadOnlyList<string> ReferencedFields,     // TODO D8/R4: field descriptors — semantic subjects

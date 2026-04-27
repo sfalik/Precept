@@ -134,19 +134,36 @@ public class ProofRequirementTests
     // ── DU completeness ─────────────────────────────────────────────────────────
 
     [Fact]
-    public void ThreeProofRequirementSubtypes()
+    public void FiveProofRequirementSubtypes()
     {
-        // Verify the three concrete subtypes exist and are distinct
-        ProofRequirement numeric = new NumericProofRequirement(
+        // Verify all five concrete subtypes exist and are distinct
+        ProofRequirement numeric  = new NumericProofRequirement(
             new ParamSubject(TestParam), OperatorKind.GreaterThan, 0m, "test");
         ProofRequirement presence = new PresenceProofRequirement(
             new SelfSubject(), "test");
         ProofRequirement dimension = new DimensionProofRequirement(
             new ParamSubject(TestParam), PeriodDimension.Any, "test");
+        ProofRequirement qualifierCompat = new QualifierCompatibilityProofRequirement(
+            new ParamSubject(TestParam), new ParamSubject(TestParam),
+            QualifierAxis.Currency, "test");
+        ProofRequirement modifier = new ModifierRequirement(
+            new ParamSubject(TestParam), ModifierKind.Ordered, "test");
 
         numeric.Should().BeOfType<NumericProofRequirement>();
         presence.Should().BeOfType<PresenceProofRequirement>();
         dimension.Should().BeOfType<DimensionProofRequirement>();
+        qualifierCompat.Should().BeOfType<QualifierCompatibilityProofRequirement>();
+        modifier.Should().BeOfType<ModifierRequirement>();
+    }
+
+    // ── Kind property on base ───────────────────────────────────────────────────
+
+    [Fact]
+    public void BaseKind_IsAccessibleWithoutPatternMatch()
+    {
+        ProofRequirement req = new NumericProofRequirement(
+            new ParamSubject(TestParam), OperatorKind.GreaterThan, 0m, "test");
+        req.Kind.Should().Be(ProofRequirementKind.Numeric);
     }
 
     [Fact]

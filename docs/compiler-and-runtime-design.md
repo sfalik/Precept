@@ -211,7 +211,7 @@ Precept     precept     = Precept.From(compilation);        // requires !HasErro
 - **Event availability index** — valid events per state. Enables "what can I do from here?" queries for MCP, AI agents, and UI consumers.
 - **Reachability index** — states reachable from a given state. Enables structural navigation without re-running the compiler.
 - **Pathfinding residue** — enough topology for shortest-path navigation from current state to a target. The graph analog of `ConstraintInfluenceMap` — causal reasoning over lifecycle structure.
-- **`ConstraintDescriptor`** — expression text, source lines, scope targets, guard metadata, `ConstraintActivation` anchor.
+- **`ConstraintDescriptor`** — expression text, source lines, scope targets, guard metadata, `ConstraintKind` anchor.
 - **`ConstraintInfluenceMap`** — constraint → contributing fields with expression-text excerpts. Enables "which field change would fix this?" without reverse-engineering.
 - **Structured violation shapes** — `ConstraintViolation` carries failing constraint descriptor, evaluated field values, guard context, and failing sub-expression.
 - **Fault-site backstops** — `FaultSite` descriptors linked to `FaultCode` and the compiler-owned prevention `DiagnosticCode`.
@@ -275,9 +275,8 @@ TokenStream
 └── Token[n]   … ordered flat token sequence
 ```
 
-| | |
+| **Output** | `TokenStream` — `ImmutableArray<Token>` (each: `Kind`, `Text`, `Span` (`SourceSpan`)) plus lex-phase diagnostics |
 |---|---|
-| **Output** | `TokenStream` — `ImmutableArray<Token>` (each: `TokenKind`, `Text`, `SourceSpan`) plus lex-phase diagnostics |
 | **Catalog role** | `TokenKind` comes from `Tokens.GetMeta(...)` / `Tokens.Keywords`. Token categories, TextMate scope, semantic token type, and completion hints derive from `TokenMeta`. |
 | **Consumers** | Parser, `Compilation`, LS lexical tokenization and grammar tooling |
 
@@ -310,9 +309,8 @@ flowchart LR
     PAR --> OUT
 ```
 
-| | |
-|---|---|
 | **Output** | `SyntaxTree` — `PreceptSyntax Root` with source-faithful declaration/expression nodes, missing-node representation, and span ownership; plus parse-phase diagnostics. (Current shape: diagnostics-only stub.) |
+|---|---|
 | **Catalog role** | The parser stamps syntax-level identities as soon as syntax alone can know them: construct kind, anchor keyword, action keyword, operator token, literal segment form. |
 | **Consumers** | TypeChecker, LS syntax-facing features (outline, folding, recovery-aware local context) |
 
@@ -408,9 +406,8 @@ flowchart LR
     TC --> OUT
 ```
 
-| | |
-|---|---|
 | **Output** | `SemanticIndex` — semantic symbol tables and binding indexes, normalized declaration inventories, typed expressions and actions, dependency facts, and syntax-node back-pointers, plus diagnostics. (Current shape: diagnostics-only stub.) |
+|---|---|
 | **Catalog role** | First stage to resolve `TypeKind`, `FunctionKind`, `OperatorKind`, `OperationKind`, `ModifierMeta`, `ActionMeta`, `FunctionOverload`, `TypeAccessor`, and attached `ProofRequirement` records into semantic identity. |
 | **Consumers** | GraphAnalyzer, ProofEngine, LS semantic tooling, MCP compile output, Precept Builder |
 
@@ -518,7 +515,7 @@ The type checker should NOT have a `CheckFieldDeclaration()`, `CheckTransitionRo
 
 Actions in the typed model resolve to exactly one of three semantic shapes:
 
-- **`TypedAction`** (base) — verbs like `clear`, `reset`. No operand; value ownership is internal.
+- **`TypedAction`** (base) — verbs like `clear`. No operand; value ownership is internal.
 - **`TypedInputAction`** (operand-bearing) — verbs like `set`, `add`, `remove`, `enqueue`, `push`. Carries `InputExpression: TypedExpression`.
 - **`TypedBindingAction`** (binding) — verbs like `dequeue`, `pop`. Carries `Binding: TypedBinding`.
 
@@ -530,7 +527,7 @@ Field naming discipline:
 |---|---|
 | `InputExpression` | `Value`, `Input` |
 | `Binding` | `IntoTarget` |
-| `ConstraintActivation` | `EnsureBucketType` |
+| `ConstraintKind` | `EnsureBucketType` |
 | `FaultSite` | `RuntimeCheckLocation` |
 
 The Precept Builder produces the matching executable family: `ExecutableAction`, `ExecutableInputAction`, `ExecutableBindingAction`. Same naming discipline.
@@ -539,13 +536,13 @@ The Precept Builder produces the matching executable family: `ExecutableAction`,
 
 | Stage | Kinds assigned |
 |---|---|
-| Parser | `ConstructKind`, `ActionKind`, `OperatorKind`, `TypeKind` on `TypeRef` nodes, `ModifierKind` |
+| Parser | `ConstructKind`, `ActionKind`, `OperatorKind`, `TypeKind` on `TypeRef` nodes, `ModifierKind`, `ConstraintKind` |
 | Type checker | `OperationKind`, `FunctionKind`, resolved `TypeAccessor`, resolved result `TypeKind` on typed expressions |
 
 The parser stamps everything that syntax alone can determine. The type checker stamps everything that requires name, type, or overload resolution. A kind that requires name resolution does not appear in `SyntaxTree`; a kind that syntax alone determines does not wait for the type checker.
 
 > **Precept Innovations**
-> - **Catalog-driven resolution passes.** Type checking resolves against catalog metadata (`Operations`, `Functions`, `Types`, `Modifiers`, `Actions`) rather than encoding per-construct behavior in checker logic. Adding a new operation or function to the catalog automatically makes it resolvable — no checker code changes required.
+> - **Catalog-driven resolution passes.** Type checking resolves against catalog metadata (`Operations`, `Functions`, `Types`, `Modifiers`, `Actions`, `Constraints`, `ProofRequirements`) rather than encoding per-construct behavior in checker logic. Adding a new operation or function to the catalog automatically makes it resolvable — no checker code changes required.
 > - **Flat semantic inventory, not annotated syntax.** The `SemanticIndex` is a flat inventory of symbols, bindings, and normalized declarations — not an AST with types bolted on. The shape is driven by what graph analysis, proof, the Precept Builder, and the LS need, not by what the parser produces. The anti-mirroring rules enforce this structurally.
 > - **Syntax-node back-pointers with consumer discipline.** Semantic entries hold direct references to originating syntax nodes — cheap LS navigation without span correlation. But downstream stages (graph, proof, the Precept Builder) consume only the semantic inventories, never the syntax structure behind the pointers. The back-pointer is a navigation convenience, not a structural dependency.
 > - **Three-shape typed action family.** Actions resolve to exactly one of three semantic shapes (`TypedAction`, `TypedInputAction`, `TypedBindingAction`), enforced by the DU pattern. A flat shape with optional nullable fields is prohibited — the type system prevents invalid action representations.
@@ -571,9 +568,8 @@ flowchart LR
     GA --> OUT
 ```
 
-| | |
-|---|---|
 | **Output** | `StateGraph` — graph facts keyed by semantic identities, plus diagnostics. (Current shape: diagnostics-only stub.) |
+|---|---|
 | **Catalog role** | State semantics (`initial`, `terminal`, `required`, `irreversible`, `success`, `warning`, `error`) come from modifier metadata already resolved by the type checker; the analyzer must not reinterpret raw syntax. |
 | **Consumers** | ProofEngine, `Precept.From`, LS structural diagnostics, runtime structural precomputation |
 
@@ -664,9 +660,8 @@ flowchart LR
     PE --> OUT
 ```
 
-| | |
-|---|---|
 | **Output** | `ProofLedger` — obligations and evidence, dispositions and preventable-fault links, diagnostics with semantic site attribution. (Current shape: diagnostics-only stub.) |
+|---|---|
 | **Catalog role** | Proof obligations originate in metadata: `BinaryOperationMeta.ProofRequirements`, `FunctionOverload.ProofRequirements`, `TypeAccessor.ProofRequirements`, and action metadata. `FaultCode` ↔ `DiagnosticCode` linkage is catalog-owned. |
 | **Consumers** | `Compilation`, LS/MCP proof reporting, Precept Builder fault backstops |
 
@@ -780,9 +775,8 @@ flowchart LR
     SNAP --> OUT
 ```
 
-| | |
+| **Output** | `Compilation` — `TokenStream Tokens`, `SyntaxTree SyntaxTree`, `SemanticIndex Semantics`, `StateGraph Graph`, `ProofLedger Proof`, `ImmutableArray<Diagnostic> Diagnostics`, `bool HasErrors` |
 |---|---|
-| **Output** | `Compilation` — `TokenStream Tokens`, `SyntaxTree SyntaxTree`, `SemanticIndex Semantic`, `StateGraph Graph`, `ProofLedger Proof`, `ImmutableArray<Diagnostic> Diagnostics`, `bool HasErrors` |
 | **Consumers** | LS, MCP `precept_compile`, `Precept.From` |
 
 ### Incremental compilation model
@@ -797,7 +791,7 @@ Given the 64KB ceiling on `.precept` definition size, **re-run everything on cha
 
 When a `.precept` file changes (field added, state renamed, constraint tightened), persisted `Version` instances compiled against the old definition may fail `Restore` under the new definition's constraints. **This is a known gap — definition migration is out of scope for v1.** The contract digest hash provides change detection; a structural diff API provides change enumeration; but automated migration is deferred. Host applications that need to handle definition evolution must manage the migration externally. The gap is acknowledged so downstream design does not assume migration exists.
 
-**Implementation status:** The wiring exists and merges diagnostics correctly, but four of the five stages are still hollow.
+**Implementation status:** The wiring is structurally correct, but unreachable today — `Parser.Parse`, `TypeChecker.Check`, `GraphAnalyzer.Analyze`, and `ProofEngine.Prove` all throw `NotImplementedException`, so `Compiler.Compile` crashes at the first unimplemented stage before the diagnostic merge runs.
 
 > **Precept Innovations**
 > - **Contract digest hash.** A deterministic semantic hash enables definition-change detection without source diffing — no other DSL runtime provides this. It grounds deployment safety and the future migration story.
@@ -822,9 +816,8 @@ flowchart LR
     LOW --> OUT
 ```
 
-| | |
-|---|---|
 | **Output** | `Precept` — sealed executable model: descriptor tables and slot layout, dispatch indexes, prebuilt execution plans, constraint-plan indexes, reachability/topology indexes, inspection metadata, fault-site backstops |
+|---|---|
 | **Catalog role** | Catalog metadata reaches runtime only in built semantic form: descriptor identity, resolved operation/function/action identity, constraint descriptors, and proof-owned fault-site residue. The Precept Builder reads catalog metadata transitively through already-resolved model identities — it does not perform fresh catalog lookups for classification. |
 | **Consumers** | `Precept.Create`, `Precept.Restore`, `Version` operations, MCP runtime tools, host applications |
 
@@ -864,7 +857,7 @@ Precept                                 ◄ sealed dispatch map
 | `StateDescriptor` | state name | terminal flag, modifier set, available events |
 | `EventDescriptor` | event name | modifier set, arg descriptors |
 | `ArgDescriptor` | event + arg name | `TypeKind`, optionality, default expression |
-| `ConstraintDescriptor` | constraint identity | expression text, `ConstraintActivation` anchor, because text, scope targets |
+| `ConstraintDescriptor` | constraint identity | expression text, `ConstraintKind` anchor, because text, scope targets |
 | `FaultSiteDescriptor` | site identity | `FaultCode`, prevention `DiagnosticCode` (defense-in-depth only) |
 
 **Dispatch indexes** — precomputed routing for the evaluator
@@ -914,7 +907,7 @@ The descriptor types referenced throughout this document are first-class sealed 
 - **`StateDescriptor`** — state name, modifier set (initial, terminal, required, irreversible, success, warning, error), source origin.
 - **`EventDescriptor`** — event name, modifier set (initial, forbidden, etc.), arg descriptors, source origin.
 - **`ArgDescriptor`** — arg name, `TypeKind`, optionality, default expression, source origin.
-- **`ConstraintDescriptor`** — constraint kind (rule/ensure), anchor family, expression text, because text, guard context, source lines, scope targets, `ConstraintActivation`.
+- **`ConstraintDescriptor`** — constraint kind (rule/ensure), anchor family, expression text, because text, guard context, source lines, scope targets, `ConstraintKind` anchor.
 
 These are the runtime face of declarations. Every runtime API surface routes through descriptor identity.
 
@@ -931,11 +924,11 @@ The runtime model is organized for execution, not for semantic analysis. Constra
 The five constraint-plan families (`always`, `in`, `to`, `from`, `on`) are accessed through four precomputed activation indexes, built once during the Precept Builder stage and keyed to descriptor identity:
 
 - **Always index** (global) — rules and ensures with no state or event anchor; active on every operation.
-- **State activation index** (`StateDescriptor`, `ConstraintActivation`) — `InState`, `FromState`, and `ToState` anchors.
+- **State activation index** (`StateDescriptor`, `ConstraintKind`) — `StateResident`, `StateEntry`, and `StateExit` anchors.
 - **Event activation index** (`EventDescriptor`) — `on Event ensure` anchors.
 - **Event availability index** (`StateDescriptor?`, `EventDescriptor`) — available-event scope; null state key for stateless precepts.
 
-The `ConstraintActivation` discriminant distinguishes whether a constraint binds to the current state, the source state, or the target state of a transition. Callers look up a prebuilt bucket, not compute activation at dispatch time. **`ConstraintActivation` should be cataloged** — it is language-surface knowledge that consumers (type checker, Precept Builder, evaluator, MCP, LS) need as structured metadata, not an internal implementation enum.
+The `ConstraintKind` discriminant distinguishes whether a constraint binds to the current state, the source state, or the target state of a transition. Callers look up a prebuilt bucket, not compute activation at dispatch time. `ConstraintKind` is cataloged in `Constraints` — its five members (`Invariant`, `StateResident`, `StateEntry`, `StateExit`, `EventPrecondition`) are described by the `ConstraintMeta` DU, with the `StateAnchored` intermediate layer grouping the three state-scoped kinds.
 
 ### `Version` serialization contract
 
@@ -984,9 +977,8 @@ flowchart TD
 
 ### Evaluator
 
-| | |
-|---|---|
 | **Input** | `Precept`, `Version`, descriptor-keyed arguments or patches, prebuilt execution plans, constraint-plan indexes, fault-site backstops |
+|---|---|
 | **Output** | `EventOutcome`, `UpdateOutcome`, `RestoreOutcome` (commit); `EventInspection`, `UpdateInspection`, `RowInspection` (inspect); `Fault` (impossible-path only) |
 
 Valid executable models do not produce in-domain runtime errors. Expected runtime behavior is expressed as structured outcomes and inspections. `Fault` is reserved for defense-in-depth classification of impossible-path engine invariant breaches.
@@ -1015,27 +1007,24 @@ Inspection and commit paths execute the same prebuilt plans. Disposition alone d
 
 Create constructs the first valid `Version`, optionally by atomically firing the declared initial event. Creation with an initial event reuses the full fire-path execution — not a separate code path — so initial-event constraints, actions, and transitions apply identically.
 
-| | |
-|---|---|
 | **Input** | `Precept`; prebuilt defaults, `InitialState`, `InitialEvent`, arg descriptors, fire-path runtime plans |
+|---|---|
 | **Output** | `EventOutcome` (commit) or `EventInspection` (inspect). Success yields `Applied(Version)` or `Transitioned(Version)`. |
 
 ### Restore
 
 Restore reconstitutes persisted data under the current definition. It validates rather than trusts — it runs constraint evaluation but intentionally bypasses access-mode restrictions, because persisted data represents a prior valid state, not an active field edit. **Restore recomputes computed fields BEFORE constraint evaluation, not after** — persisted data may include stale computed-field values, and constraints must evaluate against recomputed results. The compiler-result-to-runtime survey shows that XState v5 provides the closest precedent for state reconstitution: `createActor(machine, { snapshot: JSON.parse(persistedSnapshot) })` restores a previously serialized snapshot. However, XState performs no constraint re-evaluation on restore — it trusts the persisted snapshot shape. Precept's `Restore` deliberately does not trust: it re-validates against the current definition's constraints, catching both stale computed values and definition-evolution mismatches.
 
-| | |
-|---|---|
 | **Input** | `Precept`; caller-supplied persisted state and fields; descriptor tables, slot validation, recomputation, restore constraint plans |
+|---|---|
 | **Output** | `RestoreOutcome` — `Restored(Version)`, `RestoreConstraintsFailed(IReadOnlyList<ConstraintViolation>)`, or `RestoreInvalidInput(string Reason)` |
 
 ### Fire
 
 Fire is the core state-machine operation. Routing, action execution, transition, recomputation, and constraint evaluation are a single atomic pipeline — not composable steps callers assemble — because partial execution would violate the determinism guarantee.
 
-| | |
-|---|---|
 | **Input** | `Version`; event/arg descriptors, row dispatch tables; prebuilt action plans, recomputation index; anchor-plan indexes, fault sites |
+|---|---|
 | **Output** | `EventOutcome` — `Transitioned`, `Applied`, `Rejected`, `InvalidArgs`, `EventConstraintsFailed`, `Unmatched`, provisional `UndefinedEvent`. `EventInspection` / `RowInspection` for inspect. |
 
 Constraint identity survives into `ConstraintResult` and `ConstraintViolation` through `ConstraintDescriptor`. Routing uses descriptor-backed row identity. The runtime API survey highlights a gap in every surveyed state machine runtime: XState's `snapshot.can(event)` returns a boolean with no distinction between "no transition defined for this event" and "a transition is defined but its guard returned false" — both result in `false`. After `actor.send(event)`, if nothing changed, the snapshot is simply identical to the pre-send snapshot with no error or rejection signal. Erlang gen_statem's `keep_state_and_data` signals "handled, no change" but provides no guard/routing discrimination to the caller. Precept structurally distinguishes `Unmatched` (no row matched the state × event combination) from `Rejected` or `EventConstraintsFailed` (rows matched but guard or constraint evaluation prevented the transition) — giving callers and AI agents precise causal information about why an event did not produce a transition.
@@ -1044,9 +1033,8 @@ Constraint identity survives into `ConstraintResult` and `ConstraintViolation` t
 
 Update governs direct field edits under access-mode declarations and constraint evaluation. `InspectUpdate` additionally evaluates the event landscape over the hypothetical post-patch state. `Update` exists because Precept is not a state machine runtime — it is a domain integrity engine that owns the data layer alongside the lifecycle layer. Fields have access-mode declarations per state, always-constraints, recomputed dependencies, and structured outcomes for denied or constrained writes. A pure event/transition mechanism would leave direct field edits ungoverned; `Update` closes that gap without routing every data change through an event.
 
-| | |
-|---|---|
 | **Input** | `Version`; field descriptors, per-state access facts; recomputation dependencies; `always`/`in` constraint plans, event-prospect evaluation |
+|---|---|
 | **Output** | `UpdateOutcome` — `FieldWriteCommitted`, `UpdateConstraintsFailed`, `AccessDenied`, `InvalidInput`. `UpdateInspection` for inspect. |
 
 ### Structured outcomes
@@ -1058,7 +1046,8 @@ The structural guarantee means that a valid executable model communicates entire
 **Runtime outcomes** — produced by runtime operations. Expected success, domain rejection, or boundary-validation results. These are normal, in-domain behavior:
 - Business outcomes: `Rejected`, `EventConstraintsFailed`, `UpdateConstraintsFailed`, `RestoreConstraintsFailed`
 - Routing/availability: `Unmatched`, current provisional `UndefinedEvent`
-- Boundary validation: `InvalidArgs`, `InvalidInput`, `RestoreInvalidInput`, `AccessDenied`
+- Boundary validation: `InvalidArgs`, `InvalidInput`, `RestoreInvalidInput`
+- Access enforcement: `AccessDenied`
 
 **Faults** — produced only by the evaluator backstop. Impossible-path engine invariant breaches. Every `FaultCode` has a compiler-owned diagnostic counterpart (the prevention rule that should have blocked the site). But many diagnostics have no fault counterpart, and many runtime outcomes are intentionally modeled as normal results, not faults.
 
@@ -1118,7 +1107,7 @@ The multi-span attribution pattern from the Rust borrow checker provides relevan
 
 All compile-time and runtime types in Precept are deeply immutable. This is not a style preference — it is a correctness requirement imposed by the language server's concurrency model. On every document edit, the LS runs the full pipeline and atomically swaps the held `Compilation` reference via `Interlocked.Exchange`. A handler thread that read the old reference before the swap must see a fully consistent snapshot, with no possibility of torn state. Deep immutability — `ImmutableArray<T>` and `ImmutableDictionary<TK,TV>` for all collections, `init`-only properties on all record types, no mutable types exposed — is what makes this guarantee structural rather than convention-dependent. The compilation-result-type survey reveals that immutability is not the DSL-scale consensus: OPA's `ast.Compiler` is mutated during compilation, Kotlin K2's FIR tree is mutated in phases, Swift's `ASTContext` is mutated by the type checker, Go's `types.Info` is caller-allocated mutable maps, and Dafny/Boogie mutate their program representations in place. Only CEL (`Ast`), Dhall, CUE (`cue.Value`), and Pkl (`PObject`) produce immutable compilation results. Precept's immutable `Compilation` is a deliberate, LS-driven choice — not inherited consensus.
 
-The choice of C# type kind for each artifact follows from its role. Stage artifacts (`TokenStream`, `SyntaxTree`, `SemanticIndex`, `StateGraph`, `ProofLedger`) and `Compilation` are `sealed record class` — immutable snapshots with value equality, making test assertions direct structural comparisons rather than field-by-field checks. `Diagnostic` is `readonly record struct` — small, value-typed, and zero-allocation when stored in collections, reflecting its high-volume, short-lived role. `Precept` is `sealed class`, not a record — it has factory methods (`From`) and carries behavior, making it a behavior-bearing object rather than a data bag. `Version` is `sealed record class` — an immutable entity snapshot with value equality, consistent with its role as the atomic unit of state that operations return. There are no interfaces and no abstract classes: each type has exactly one implementation. Interfaces are added only when a second implementation appears or a consumer requires substitution — never speculatively.
+The choice of C# type kind for each artifact follows from its role. Stage artifacts (`TokenStream`, `SyntaxTree`, `SemanticIndex`, `StateGraph`, `ProofLedger`) and `Compilation` are `sealed record class` — immutable snapshots with value equality, making test assertions direct structural comparisons rather than field-by-field checks. `Diagnostic` is `readonly record struct` — small, value-typed, and zero-allocation when stored in collections, reflecting its high-volume, short-lived role. `Precept` is `sealed class`, not a record — it has factory methods (`From`) and carries behavior, making it a behavior-bearing object rather than a data bag. `Version` is `sealed record class` — an immutable entity snapshot with value equality, consistent with its role as the atomic unit of state that operations return. There are no standalone interfaces or abstract classes serving as abstraction boundaries: each concrete type has exactly one implementation. Abstract records serve only as discriminated union bases (`EventOutcome`, `UpdateOutcome`, `RestoreOutcome`, etc.) — not as open extension points. Interfaces are added only when a second implementation appears or a consumer requires substitution — never speculatively.
 
 On every document edit, the language server runs the full pipeline (`Compiler.Compile(source)`) and atomically replaces its held `Compilation` reference. Incremental compilation infrastructure — Roslyn's red-green trees, rust-analyzer's salsa database — solves a problem that does not exist at Precept's DSL scale, where the full pipeline runs in microseconds. The surveyed DSL-scale systems uniformly confirm this: OPA/Regal recompiles the full module set on single-file edits; Dhall's LSP runs the full pipeline (parse → resolve → type check) on each save; Jsonnet's language server re-parses and re-evaluates on each change; CEL compiles single expressions in one call with no incremental infrastructure. None of these systems has found incremental recompilation necessary at their scale. The swap is safe for concurrent LSP requests because `Compilation` is fully immutable — no locks are needed beyond `Interlocked.Exchange` on the reference itself.
 
