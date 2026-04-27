@@ -156,10 +156,17 @@ flowchart LR
     classDef artifact fill:#fef3c7,stroke:#d97706,color:#78350f
 ```
 
-**Takes in:** `string source`; catalogs: `Tokens`, `Diagnostics`.
-**Produces:** `TokenStream(ImmutableArray<Token> Tokens, ImmutableArray<Diagnostic> Diagnostics)` where `Token` is `Token(TokenKind Kind, string Text, SourceSpan Span)`.
-**Catalog entry:** `TokenKind` comes directly from `Tokens.GetMeta(...)` / `Tokens.Keywords`; token categories, TextMate scope, semantic token type, and completion hints remain derivable from `TokenMeta`.
-**Consumed by:** Parser, `CompilationResult`, LS lexical tokenization and grammar tooling.
+**Takes in:**
+- `string source`
+- Catalogs: `Tokens`, `Diagnostics`
+
+**Produces:** `TokenStream`
+- `ImmutableArray<Token>` — each token carries `TokenKind Kind`, `string Text`, and `SourceSpan Span`
+- `ImmutableArray<Diagnostic>` — lex-phase diagnostics
+
+**Catalog entry:** `TokenKind` comes directly from `Tokens.GetMeta(...)` / `Tokens.Keywords`. Token categories, TextMate scope, semantic token type, and completion hints remain derivable from `TokenMeta`.
+
+**Consumed by:** Parser, `CompilationResult`, LS lexical tokenization and grammar tooling
 
 **How it serves the guarantee:** The lexer ensures that every character of source text is accounted for and classified according to catalog-defined vocabulary. No ambiguity in token identity propagates downstream.
 
@@ -189,10 +196,18 @@ flowchart LR
     classDef artifact fill:#fef3c7,stroke:#d97706,color:#78350f
 ```
 
-**Takes in:**`TokenStream`; catalogs: `Constructs`, `Tokens`, `Operators`, `Diagnostics`.
-**Produces:** `SyntaxTree(PreceptSyntax Root, ImmutableArray<Diagnostic> Diagnostics)` with source-faithful declaration and expression nodes, missing-node representation, and span ownership. (Current shape: diagnostics-only stub.)
+**Takes in:**
+- `TokenStream`
+- Catalogs: `Constructs`, `Tokens`, `Operators`, `Diagnostics`
+
+**Produces:** `SyntaxTree`
+- `PreceptSyntax Root` — source-faithful declaration and expression nodes with missing-node representation and span ownership
+- `ImmutableArray<Diagnostic>` — parse-phase diagnostics
+- (Current shape: diagnostics-only stub.)
+
 **Catalog entry:** The parser stamps syntax-level identities as soon as syntax alone can know them: construct kind, anchor keyword, action keyword, operator token, literal segment form.
-**Consumed by:** TypeChecker, LS syntax-facing features (outline, folding, recovery-aware local context).
+
+**Consumed by:** TypeChecker, LS syntax-facing features (outline, folding, recovery-aware local context)
 
 **How it serves the guarantee:** Structural fidelity means the type checker and downstream stages work from a faithful representation of the author's intent, including malformed programs — authoring tools can diagnose problems precisely because the structure is preserved, not discarded on error.
 
@@ -297,10 +312,18 @@ flowchart LR
     classDef artifact fill:#fef3c7,stroke:#d97706,color:#78350f
 ```
 
-**Takes in:**`SyntaxTree`; catalogs: `Types`, `Functions`, `Operators`, `Operations`, `Modifiers`, `Actions`, `Constructs`, `Diagnostics`.
-**Produces:** Semantic symbol tables, binding indexes, normalized declaration inventories, typed expressions/actions, dependency facts, source-origin handles, and diagnostics. (Current shape: diagnostics-only stub.)
+**Takes in:** `SyntaxTree`; catalogs: `Types`, `Functions`, `Operators`, `Operations`, `Modifiers`, `Actions`, `Constructs`, `Diagnostics`
+
+**Produces:** Semantic model artifacts (current shape: diagnostics-only stub)
+- Semantic symbol tables and binding indexes
+- Normalized declaration inventories
+- Typed expressions and actions
+- Dependency facts and source-origin handles
+- Diagnostics
+
 **Catalog entry:** This is the first stage that resolves `TypeKind`, `FunctionKind`, `OperatorKind`, `OperationKind`, `ModifierMeta`, `ActionMeta`, `FunctionOverload`, `TypeAccessor`, and attached `ProofRequirement` records into semantic identity.
-**Consumed by:** GraphAnalyzer, ProofEngine, LS semantic tooling, MCP compile output, lowering.
+
+**Consumed by:** GraphAnalyzer, ProofEngine, LS semantic tooling, MCP compile output, lowering
 
 **How it serves the guarantee:** The type checker catches semantic defects — type mismatches, illegal operations, invalid modifier combinations, unresolved references — before the program reaches graph analysis or runtime. Every expression and declaration that passes type checking has a resolved, catalog-backed semantic identity. This is where the structural guarantee begins to take shape: if it type-checks, its operations are legal.
 
@@ -365,10 +388,13 @@ flowchart LR
     classDef artifact fill:#fef3c7,stroke:#d97706,color:#78350f
 ```
 
-**Takes in:**`TypedModel`; catalogs: `Modifiers`, `Actions`, `Diagnostics`.
-**Produces:** Graph facts keyed by semantic identities plus diagnostics. (Current shape: diagnostics-only stub.)
+**Takes in:** `TypedModel`; catalogs: `Modifiers`, `Actions`, `Diagnostics`
+
+**Produces:** Graph facts keyed by semantic identities, plus diagnostics (current shape: diagnostics-only stub)
+
 **Catalog entry:** State semantics (`initial`, `terminal`, `required`, `irreversible`, `success`, `warning`, `error`) come from modifier metadata already resolved by the type checker; the analyzer must not reinterpret raw syntax.
-**Consumed by:** ProofEngine, `Precept.From`, LS structural diagnostics, runtime structural precomputation.
+
+**Consumed by:** ProofEngine, `Precept.From`, LS structural diagnostics, runtime structural precomputation
 
 **How it serves the guarantee:** The graph analyzer detects lifecycle defects — unreachable states, terminal states with outgoing edges, required-state dominance violations, irreversible back-edges — that would make the state machine unsound. These are structural problems in the contract itself, caught before any instance exists.
 
@@ -406,10 +432,16 @@ flowchart LR
     classDef artifact fill:#fef3c7,stroke:#d97706,color:#78350f
 ```
 
-**Takes in:**`TypedModel`, `GraphResult`; catalogs: `Operations`, `Functions`, `Types`, `Diagnostics`, `Faults`.
-**Produces:** Obligations, evidence, dispositions, preventable-fault links, diagnostics, and semantic site attribution. (Current shape: diagnostics-only stub.)
+**Takes in:** `TypedModel`, `GraphResult`; catalogs: `Operations`, `Functions`, `Types`, `Diagnostics`, `Faults`
+
+**Produces:** Proof model artifacts (current shape: diagnostics-only stub)
+- Obligations and evidence
+- Dispositions and preventable-fault links
+- Diagnostics and semantic site attribution
+
 **Catalog entry:** Proof obligations originate in metadata: `BinaryOperationMeta.ProofRequirements`, `FunctionOverload.ProofRequirements`, `TypeAccessor.ProofRequirements`, and action metadata. `FaultCode` ↔ `DiagnosticCode` linkage remains catalog-owned as a prevention/backstop relationship.
-**Consumed by:** `CompilationResult`, LS/MCP proof reporting, lowering of fault residue into runtime backstops.
+
+**Consumed by:** `CompilationResult`, LS/MCP proof reporting, lowering of fault residue into runtime backstops
 
 ### Proof strategy set
 
@@ -480,9 +512,18 @@ flowchart LR
     classDef artifact fill:#fef3c7,stroke:#d97706,color:#78350f
 ```
 
-**Takes in:** Raw source + the five pipeline stages.
-**Produces:** `CompilationResult(TokenStream Tokens, SyntaxTree SyntaxTree, TypedModel Model, GraphResult Graph, ProofModel Proof, ImmutableArray<Diagnostic> Diagnostics, bool HasErrors)`.
-**Consumed by:** LS, MCP `precept_compile`, `Precept.From`.
+**Takes in:** Raw source + the five pipeline stages
+
+**Produces:** `CompilationResult`
+- `TokenStream Tokens`
+- `SyntaxTree SyntaxTree`
+- `TypedModel Model`
+- `GraphResult Graph`
+- `ProofModel Proof`
+- `ImmutableArray<Diagnostic> Diagnostics`
+- `bool HasErrors`
+
+**Consumed by:** LS, MCP `precept_compile`, `Precept.From`
 
 ### Incremental compilation model
 
@@ -521,10 +562,20 @@ flowchart LR
     classDef artifact fill:#fef3c7,stroke:#d97706,color:#78350f
 ```
 
-**Takes in:**Error-free `CompilationResult`; semantic inputs come from `TypedModel`, `GraphResult`, and proof residue from `ProofModel`. Lowering reads catalog metadata transitively through already-resolved model identities (e.g., for default-value computation, constraint text extraction, fault-site descriptor construction), but does not perform fresh catalog lookups for classification purposes.
-**Produces:** `Precept` as a sealed executable model owning descriptor tables, slot layout, dispatch indexes, lowered execution plans, explicit constraint-plan indexes, reachability and topology indexes, inspection metadata, and fault-site backstops.
+**Takes in:** Error-free `CompilationResult`; semantic inputs from `TypedModel`, `GraphResult`, and proof residue from `ProofModel`. Lowering reads catalog metadata transitively through already-resolved model identities (e.g., for default-value computation, constraint text extraction, fault-site descriptor construction), but does not perform fresh catalog lookups for classification purposes.
+
+**Produces:** `Precept` as a sealed executable model
+- Descriptor tables and slot layout
+- Dispatch indexes
+- Lowered execution plans
+- Explicit constraint-plan indexes
+- Reachability and topology indexes
+- Inspection metadata
+- Fault-site backstops
+
 **Catalog entry:** Catalog metadata reaches runtime only in lowered semantic form: descriptor identity, resolved operation/function/action identity, constraint descriptors, and proof-owned fault-site residue.
-**Consumed by:** `Precept.Create`, `Precept.Restore`, `Version` operations, MCP runtime tools, host applications.
+
+**Consumed by:** `Precept.Create`, `Precept.Restore`, `Version` operations, MCP runtime tools, host applications
 
 ### Lowered executable-model contract
 
@@ -620,8 +671,12 @@ flowchart TD
 
 ### Evaluator
 
-**Takes in:** `Precept`, `Version`, descriptor-keyed arguments or patches, lowered execution plans, explicit constraint-plan indexes, fault-site backstops.
-**Produces:** `EventOutcome`, `UpdateOutcome`, `RestoreOutcome`, `EventInspection`, `UpdateInspection`, `RowInspection`; impossible-path breaches classify as `Fault`.
+**Takes in:** `Precept`, `Version`, descriptor-keyed arguments or patches, lowered execution plans, explicit constraint-plan indexes, fault-site backstops
+
+**Produces:** Runtime outcomes and inspections
+- `EventOutcome`, `UpdateOutcome`, `RestoreOutcome` — commit-path results
+- `EventInspection`, `UpdateInspection`, `RowInspection` — inspect-path results
+- Impossible-path breaches classify as `Fault`
 
 Valid executable models do not produce in-domain runtime errors. Expected runtime behavior is expressed as structured outcomes and inspections. `Fault` is reserved for defense-in-depth classification of impossible-path engine invariant breaches.
 
@@ -649,21 +704,28 @@ Inspection and commit paths execute the same lowered plans. Disposition alone di
 
 Create constructs the first valid `Version`, optionally by atomically firing the declared initial event. Creation with an initial event reuses the full fire-path execution — not a separate code path — so initial-event constraints, actions, and transitions apply identically.
 
-**Takes in:** `Precept`; lowered defaults, `InitialState`, `InitialEvent`, arg descriptors, fire-path runtime plans.
+**Takes in:** `Precept`; lowered defaults, `InitialState`, `InitialEvent`, arg descriptors, fire-path runtime plans
+
 **Produces:** `EventOutcome` (commit) or `EventInspection` (inspect). Success yields `Applied(Version)` or `Transitioned(Version)`.
 
 ### Restore
 
 Restore reconstitutes persisted data under the current definition. It validates rather than trusts — it runs constraint evaluation but intentionally bypasses access-mode restrictions, because persisted data represents a prior valid state, not an active field edit. **Restore recomputes computed fields BEFORE constraint evaluation, not after** — persisted data may include stale computed-field values, and constraints must evaluate against recomputed results.
 
-**Takes in:** `Precept`; caller-supplied persisted state and fields; lowered descriptors, slot validation, recomputation, restore constraint plans.
-**Produces:** `RestoreOutcome` — `Restored(Version)`, `RestoreConstraintsFailed(IReadOnlyList<ConstraintViolation>)`, or `RestoreInvalidInput(string Reason)`.
+**Takes in:** `Precept`; caller-supplied persisted state and fields; lowered descriptors, slot validation, recomputation, restore constraint plans
+
+**Produces:** `RestoreOutcome` — `Restored(Version)`, `RestoreConstraintsFailed(IReadOnlyList<ConstraintViolation>)`, or `RestoreInvalidInput(string Reason)`
 
 ### Fire
 
 Fire is the core state-machine operation. Routing, action execution, transition, recomputation, and constraint evaluation are a single atomic pipeline — not composable steps callers assemble — because partial execution would violate the determinism guarantee.
 
-**Takes in:** `Version`; event descriptors, arg descriptors, row dispatch tables, lowered action plans, recomputation index, anchor-plan indexes, fault sites.
+**Takes in:**
+- `Version`
+- Event descriptors, arg descriptors, row dispatch tables
+- Lowered action plans, recomputation index
+- Anchor-plan indexes, fault sites
+
 **Produces:** `EventOutcome` — `Transitioned`, `Applied`, `Rejected`, `InvalidArgs`, `EventConstraintsFailed`, `Unmatched`, current provisional `UndefinedEvent`. `EventInspection` / `RowInspection` for inspect.
 
 Constraint identity survives into `ConstraintResult` and `ConstraintViolation` through `ConstraintDescriptor`. Routing uses descriptor-backed row identity.
@@ -672,7 +734,12 @@ Constraint identity survives into `ConstraintResult` and `ConstraintViolation` t
 
 Update governs direct field edits under access-mode declarations and constraint evaluation. `InspectUpdate` additionally evaluates the event landscape over the hypothetical post-patch state.
 
-**Takes in:** `Version`; field descriptors, per-state access facts, recomputation dependencies, `always`/`in` constraint plans, event-prospect evaluation.
+**Takes in:**
+- `Version`
+- Field descriptors, per-state access facts
+- Recomputation dependencies
+- `always`/`in` constraint plans, event-prospect evaluation
+
 **Produces:** `UpdateOutcome` — `FieldWriteCommitted`, `UpdateConstraintsFailed`, `AccessDenied`, `InvalidInput`. `UpdateInspection` for inspect.
 
 ### Structured outcomes
