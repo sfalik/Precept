@@ -55,6 +55,8 @@ function normalizeEol(content) {
   return content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 }
 
+function slugify(text) { return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); }
+
 function parseRoutingRules(routingMd) {
   const table = parseTableSection(routingMd, /^##\s*work\s*type\s*(?:→|->)\s*agent\b/i);
   if (!table) return [];
@@ -124,7 +126,7 @@ function parseRoster(teamMd) {
     members.push({
       name,
       role,
-      label: `squad:${name.toLowerCase()}`,
+      label: `squad:${slugify(name)}`,
     });
   }
 
@@ -481,7 +483,7 @@ function issueHasLabel(issue, labelName) {
   });
 }
 
-function needsTriage(issue, memberLabels) {
+function isUntriagedIssue(issue, memberLabels) {
   if (issue.pull_request) return false;
   if (!issueHasLabel(issue, 'squad')) return false;
   return !memberLabels.some((label) => issueHasLabel(issue, label));
@@ -506,10 +508,10 @@ async function main() {
   const openSquadIssues = await fetchSquadIssues(owner, repo, token);
 
   const memberLabels = roster.map((member) => member.label);
-  const triageQueue = openSquadIssues.filter((issue) => needsTriage(issue, memberLabels));
+  const untriaged = openSquadIssues.filter((issue) => isUntriagedIssue(issue, memberLabels));
 
   const results = [];
-  for (const issue of triageQueue) {
+  for (const issue of untriaged) {
     const decision = triageIssue(
       {
         number: issue.number,

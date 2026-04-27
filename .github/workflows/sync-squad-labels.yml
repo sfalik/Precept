@@ -48,8 +48,7 @@ jobs:
               }
               if (inMembersTable && line.startsWith('|') && !line.includes('---') && !line.includes('Name')) {
                 const cells = line.split('|').map(c => c.trim()).filter(Boolean);
-                // Exclude Scribe (silent logger) and Ralph (not a work-pickup member; label would collide with retired squad:ralph)
-                if (cells.length >= 2 && cells[0] !== 'Scribe' && cells[0] !== 'Ralph') {
+                if (cells.length >= 2 && cells[0] !== 'Scribe') {
                   members.push({
                     name: cells[0],
                     role: cells[1]
@@ -60,9 +59,13 @@ jobs:
 
             core.info(`Found ${members.length} squad members: ${members.map(m => m.name).join(', ')}`);
 
+            // Check if @copilot is on the team
+            const hasCopilot = content.includes('🤖 Coding Agent');
+
             // Define label color palette for squad labels
             const SQUAD_COLOR = '9B8FCC';
             const MEMBER_COLOR = '9B8FCC';
+            const COPILOT_COLOR = '10b981';
 
             // Define exception and release labels (static)
             const EXCEPTION_LABELS = [
@@ -104,6 +107,8 @@ jobs:
               { name: 'priority:p2', color: 'FBCA04', description: 'Next sprint' }
             ];
 
+            function slugify(t) { return t.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); }
+
             // Ensure the base "squad" triage label exists
             const labels = [
               { name: 'squad', color: SQUAD_COLOR, description: 'Squad triage inbox — Lead will assign to a member' }
@@ -111,9 +116,18 @@ jobs:
 
             for (const member of members) {
               labels.push({
-                name: `squad:${member.name.toLowerCase()}`,
+                name: `squad:${slugify(member.name)}`,
                 color: MEMBER_COLOR,
                 description: `Assigned to ${member.name} (${member.role})`
+              });
+            }
+
+            // Add @copilot label if coding agent is on the team
+            if (hasCopilot) {
+              labels.push({
+                name: 'squad:copilot',
+                color: COPILOT_COLOR,
+                description: 'Assigned to @copilot (Coding Agent) for autonomous work'
               });
             }
 
@@ -124,8 +138,6 @@ jobs:
             labels.push(...SQUAD_WORK_LABELS);
             labels.push(...PRIORITY_LABELS);
             labels.push(...SIGNAL_LABELS);
-
-            const RETIRED_LABELS = ['go:yes', 'go:no', 'go:needs-research', 'squad:untriaged', 'needs-decision', 'decided', 'squad:copilot', 'squad:ralph'];
 
             // Sync labels (create or update)
             for (const label of labels) {
@@ -160,6 +172,8 @@ jobs:
                 }
               }
             }
+
+            const RETIRED_LABELS = ['go:yes', 'go:no', 'go:needs-research', 'squad:untriaged', 'needs-decision', 'decided', 'squad:copilot', 'squad:ralph'];
 
             for (const labelName of RETIRED_LABELS) {
               try {

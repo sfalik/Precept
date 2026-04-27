@@ -7,10 +7,6 @@ name: Squad Heartbeat (Ralph)
 # Run 'squad upgrade' to sync installed copies from source templates.
 
 on:
-  schedule:
-    # Every 30 minutes — adjust via cron expression as needed
-    - cron: '*/30 * * * *'
-
   # React to completed work or new squad work
   issues:
     types: [closed, labeled]
@@ -64,7 +60,7 @@ jobs:
             
             const results = JSON.parse(fs.readFileSync(path, 'utf8'));
             if (results.length === 0) {
-              core.info('📋 Board is clear — Ralph found no backlog issues awaiting triage');
+              core.info('📋 Board is clear — Ralph found no untriaged issues');
               return;
             }
             
