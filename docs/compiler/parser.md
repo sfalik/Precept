@@ -7,7 +7,7 @@
 | Property | Value |
 |---|---|
 | Doc maturity | Full |
-| Implementation state | Implemented |
+| Implementation state | Stub — `Parse()` throws `NotImplementedException` |
 | Source | `src/Precept/Pipeline/Parser.cs`, `src/Precept/Pipeline/SyntaxNodes.cs` |
 | Upstream | Lexer (`TokenStream`) |
 | Downstream | TypeChecker, LS syntax features, MCP `precept_compile` |
