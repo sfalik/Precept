@@ -6,11 +6,11 @@
 
 ## Overview
 
-The catalog system is the **authoritative machine-readable definition of the Precept language.** Ten catalogs — eight describing what the language IS, two describing how it reports failures — form a closed, compiler-enforced registry. This document defines the catalog pattern, the ten-catalog inventory, their shapes, cross-catalog derivation relationships, and future opportunities.
+The catalog system is the **authoritative machine-readable definition of the Precept language.** Twelve catalogs — ten describing what the language IS, two describing how it reports failures — form a closed, compiler-enforced registry. This document defines the catalog pattern, the twelve-catalog inventory, their shapes, cross-catalog derivation relationships, and future opportunities.
 
 ## Vision: Metadata for the Entire Language
 
-Every aspect of Precept — its keywords, types, functions, operators, operations, modifiers, actions, grammar forms, diagnostics, and faults — is defined as structured metadata in a static, compiler-enforced catalog. Ten catalogs cover the complete language surface. Their union IS the language specification in machine-readable form.
+Every aspect of Precept — its keywords, types, functions, operators, operations, modifiers, actions, grammar forms, constraints, proof requirements, diagnostics, and faults — is defined as structured metadata in a static, compiler-enforced catalog. Twelve catalogs cover the complete language surface. Their union IS the language specification in machine-readable form.
 
 Every consumer reads from these catalogs:
 
@@ -33,7 +33,7 @@ No consumer maintains its own parallel copy. Adding a language feature to an enu
 
 The test: **if I enumerated every catalog's `All` property, would I have a complete description of Precept?** The catalogs needed are those whose union covers the entire language surface.
 
-Ten catalogs in two groups.
+Twelve catalogs in two groups.
 
 **Language Definition (what the language IS):**
 
@@ -47,15 +47,17 @@ Ten catalogs in two groups.
 | 6 | **Modifiers** | Declaration-attached modifiers — field constraints, state lifecycle, event modifiers, access modes, anchors (DU with 5 subtypes) |
 | 7 | **Actions** | State-machine action verbs |
 | 8 | **Constructs** | Grammar forms / declaration shapes |
+| 9 | **Constraints** | Constraint declaration forms — invariant, state-anchored, event precondition (DU as identity) |
+| 10 | **ProofRequirements** | Proof obligation kinds — numeric, presence, dimension, modifier, qualifier compatibility (DU as identity) |
 
 **Failure Modes (how it tells you what's wrong):**
 
 | # | Catalog | What it covers |
 |---|---------|----------------|
-| 9 | **Diagnostics** | Compile-time rules |
-| 10 | **Faults** | Runtime failure modes |
+| 11 | **Diagnostics** | Compile-time rules |
+| 12 | **Faults** | Runtime failure modes |
 
-If an eleventh aspect of the language emerges that isn't covered by these ten, it needs a catalog. The system is complete when the catalogs are.
+If a thirteenth aspect of the language emerges that isn't covered by these twelve, it needs a catalog. The system is complete when the catalogs are.
 
 ### Enums that remain bare
 
@@ -86,7 +88,7 @@ This inverts the traditional compiler model:
 | What tests verify | Implementation behavior | Metadata completeness and correctness |
 | What consumers read | Their own parallel copies | The single source of truth |
 
-The ten catalogs are expressions of this principle — not the principle itself. The principle is: **if something is domain knowledge, it is metadata; if it is metadata, it has a declared shape; if shapes vary by kind, the shape is a discriminated union.** Pipeline stages, tooling, and consumers derive from the metadata — they never maintain parallel copies or encode domain knowledge in their own logic.
+The twelve catalogs are expressions of this principle — not the principle itself. The principle is: **if something is domain knowledge, it is metadata; if it is metadata, it has a declared shape; if shapes vary by kind, the shape is a discriminated union.** Pipeline stages, tooling, and consumers derive from the metadata — they never maintain parallel copies or encode domain knowledge in their own logic.
 
 ### The decision framework
 
@@ -109,7 +111,7 @@ The exhaustive switch is the enforcement — the C# compiler refuses to build if
 
 ### Derive, never duplicate
 
-The ten catalogs cover vocabulary, types, functions, operators, operations, modifiers, actions, grammar constructs, compile-time rules, and runtime failure modes. Their union is the language. Every downstream artifact — grammar, completions, hover, MCP output, documentation — derives from catalog metadata. No consumer maintains a parallel copy. Adding a language feature to an enum is the single atomic act that propagates it to every surface.
+The twelve catalogs cover vocabulary, types, functions, operators, operations, modifiers, actions, grammar constructs, constraints, proof requirements, compile-time rules, and runtime failure modes. Their union is the language. Every downstream artifact — grammar, completions, hover, MCP output, documentation — derives from catalog metadata. No consumer maintains a parallel copy. Adding a language feature to an enum is the single atomic act that propagates it to every surface.
 
 ## Pattern Definition
 
@@ -268,7 +270,7 @@ The trade-off: the switch is more verbose than attributes. At Precept's scale (5
 
 ## Roslyn Enforcement Layer
 
-The exhaustive switch enforces **catalog completeness** — every enum member must have metadata. Two of the nine catalogs — Diagnostics and Faults — also produce output values (`Diagnostic`, `Fault`) with string fields derived from metadata via `nameof()` in the switch. If code bypasses the `Create()` factory for these types, it introduces arbitrary strings that escape the registry. Roslyn analyzers enforce this **construction discipline** for the catalogs that need it.
+The exhaustive switch enforces **catalog completeness** — every enum member must have metadata. Two of the eleven catalogs — Diagnostics and Faults — also produce output values (`Diagnostic`, `Fault`) with string fields derived from metadata via `nameof()` in the switch. If code bypasses the `Create()` factory for these types, it introduces arbitrary strings that escape the registry. Roslyn analyzers enforce this **construction discipline** for the catalogs that need it.
 
 ### Implemented Rules
 
@@ -288,7 +290,7 @@ All four are `DiagnosticSeverity.Error` with `isEnabledByDefault: true`. Combine
 | **Compiler** | CS8509 (exhaustive switch) | Every enum member has a metadata entry | All 12 catalogs |
 | **Roslyn** | PRECEPT0001–PRECEPT0004 | Output values go through the factory; cross-catalog linkage is present | Diagnostics and Faults only |
 
-Most catalogs (Tokens, Types, Functions, Operators, Operations, Modifiers, Actions, Constructs) have no output type with metadata-derived strings — `GetMeta()` and `All` are their entire surface. The compiler layer alone covers them. The Roslyn layer is specific to the two failure-mode catalogs whose output types carry strings that must stay within the registry.
+Most catalogs (Tokens, Types, Functions, Operators, Operations, Modifiers, Actions, Constructs, Constraints, ProofRequirements) have no output type with metadata-derived strings — `GetMeta()` and `All` are their entire surface. The compiler layer alone covers them. The Roslyn layer is specific to the two failure-mode catalogs whose output types carry strings that must stay within the registry.
 
 ### Future Rules
 
@@ -316,7 +318,7 @@ When the Functions and Operators catalogs land, they will likely need dispatch-e
 
 ### Language Definition Catalogs
 
-These nine catalogs describe what the Precept language IS.
+These ten catalogs describe what the Precept language IS.
 
 #### 1. Tokens (✅ Implemented)
 
