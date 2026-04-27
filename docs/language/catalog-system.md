@@ -22,7 +22,7 @@ Every consumer reads from these catalogs:
 | LS hover | Type documentation, function signatures, operator descriptions |
 | LS semantic tokens | Token categories |
 | Type checker | Modifier applicability, function signatures, operation legality |
-| AI grounding | All 10 catalogs — complete language knowledge |
+| AI grounding | All 12 catalogs — complete language knowledge |
 | Reference docs | All 8 language definition catalogs |
 
 No consumer maintains its own parallel copy. Adding a language feature to an enum is the single atomic act that propagates it to every surface. The compiler refuses to build if any member is missing metadata.
@@ -285,7 +285,7 @@ All four are `DiagnosticSeverity.Error` with `isEnabledByDefault: true`. Combine
 
 | Layer | Mechanism | What it enforces | Scope |
 |-------|-----------|-----------------|-------|
-| **Compiler** | CS8509 (exhaustive switch) | Every enum member has a metadata entry | All 10 catalogs |
+| **Compiler** | CS8509 (exhaustive switch) | Every enum member has a metadata entry | All 12 catalogs |
 | **Roslyn** | PRECEPT0001–PRECEPT0004 | Output values go through the factory; cross-catalog linkage is present | Diagnostics and Faults only |
 
 Most catalogs (Tokens, Types, Functions, Operators, Operations, Modifiers, Actions, Constructs) have no output type with metadata-derived strings — `GetMeta()` and `All` are their entire surface. The compiler layer alone covers them. The Roslyn layer is specific to the two failure-mode catalogs whose output types carry strings that must stay within the registry.
@@ -325,7 +325,7 @@ The lexical vocabulary. 90+ members spanning keywords, operators, punctuation, l
 | Part | Type |
 |------|------|
 | Kind enum | `TokenKind` |
-| Meta record | `TokenMeta(Kind, Text?, Categories[], Description)` |
+| Meta record | `TokenMeta(Kind, Text?, Categories[], Description, TextMateScope?, SemanticTokenType?, ValidAfter[]?)` |
 | Catalog class | `Tokens` — `GetMeta()`, `All`, `Keywords` (frozen dictionary for lexer lookup) |
 | Output type | `Token` (produced by lexer from scan state, not via `Create()`) |
 
@@ -472,8 +472,8 @@ The built-in function library. 21 functions defined in the language spec (§3.7)
 | Part | Type |
 |------|------|
 | Kind enum | `FunctionKind` (21 members) |
-| Meta record | `FunctionMeta(Kind, Name, Description, Overloads[])` — `FunctionOverload` uses `ParameterMeta[]` (see below) |
-| Catalog class | `Functions` — `GetMeta()`, `All`, evaluation delegate per function |
+| Meta record | `FunctionMeta(Kind, Name, Description, Overloads[], Category, UsageExample?, SnippetTemplate?, HoverDescription?)` — `FunctionOverload` uses `ParameterMeta[]` (see below) |
+| Catalog class | `Functions` — `GetMeta()`, `All` |
 | Output type | None — functions are evaluated inline |
 
 **Members (from `precept-language-spec.md` §3.7):**
@@ -493,7 +493,7 @@ The built-in function library. 21 functions defined in the language spec (§3.7)
 ##### ParameterMeta and FunctionOverload shapes
 
 ```csharp
-public sealed record ParameterMeta(TypeKind Kind);
+public sealed record ParameterMeta(TypeKind Kind, string? Name = null);
 
 public sealed record FunctionOverload(
     IReadOnlyList<ParameterMeta> Parameters,
@@ -507,20 +507,16 @@ public sealed record FunctionMeta(
     string                          Name,
     string                          Description,
     IReadOnlyList<FunctionOverload> Overloads,
-    IReadOnlyList<FunctionDispatch> Dispatches   // 1:1 with Overloads
-);
-
-public sealed record FunctionDispatch(
-    FunctionOverload                      Overload,
-    Func<ReadOnlySpan<object?>, object?>  Execute
+    FunctionCategory                Category,
+    string?                         UsageExample     = null,
+    string?                         SnippetTemplate  = null,
+    string?                         HoverDescription = null
 );
 ```
 
-`FunctionDispatch` ties each overload to its execution delegate. The evaluator dispatches through `Functions.GetMeta(kind).Dispatches` — selecting the matching overload's `Execute` delegate. No parallel function switch in the evaluator.
-
 Parameters are declared as named statics so `ParamSubject` can reference them by object identity — see Proof Obligations.
 
-Note: `FunctionMeta.Name` stays as a `string` because functions are identifiers (`min`, `round`), not keyword tokens. There is no `TokenKind` for functions.
+Note: `FunctionMeta.Name` stays as a `string` because functions are identifiers (`min`, `round`), not keyword tokens. There is no `TokenKind` for functions. `FunctionCategory` groups functions by semantic domain (`Numeric`, `String`, `Temporal`) for completions and MCP vocabulary presentation.
 
 ##### Business-type overloads and QualifierMatch
 
@@ -536,8 +532,9 @@ Operator symbols — the `+`, `-`, `*`, `/`, `==`, etc. Each member is an operat
 
 | Part | Type |
 |------|------|
-| Kind enum | `OperatorKind` (~20 members: `Plus`, `Minus`, `Times`, `Divide`, `Equals`, `NotEquals`, `LessThan`, `GreaterThan`, `LessThanOrEqual`, `GreaterThanOrEqual`, `And`, `Or`, `Not`, `Modulo`, ...) |
-| Meta record | `OperatorMeta(Kind, Token, Description, Arity, Associativity, Precedence)` — `Token` is a `TokenMeta` object reference |
+| Kind enum | `OperatorKind` (18 members: `Or`, `And`, `Not`, `Equals`, `NotEquals`, `CaseInsensitiveEquals`, `CaseInsensitiveNotEquals`, `LessThan`, `GreaterThan`, `LessThanOrEqual`, `GreaterThanOrEqual`, `Contains`, `Plus`, `Minus`, `Times`, `Divide`, `Modulo`, `Negate`) |
+| Meta record | `OperatorMeta(Kind, Token, Description, Arity, Associativity, Precedence, Family, IsKeywordOperator, HoverDescription?, UsageExample?)` — `Token` is a `TokenMeta` object reference |
+| Supporting enums | `Arity { Unary, Binary }`, `OperatorFamily { Arithmetic, Comparison, Logical, Membership }`, `Associativity { Left, Right, NonAssociative }` |
 | Catalog class | `Operators` — `GetMeta()`, `All` |
 | Output type | None |
 
@@ -551,7 +548,7 @@ Typed operator combinations — each member is one legal `(operator, lhs TypeKin
 
 | Part | Type |
 |------|------|
-| Kind enum | `OperationKind` (~40–60 members: `NumberPlusNumber`, `MoneyPlusMoney`, `DatePlusPeriod`, `MoneyTimesDecimal`, `MoneyDivideMoneySameCurrency`, `MoneyDivideMoneyCrossCurrency`, ...) |
+| Kind enum | `OperationKind` (~200 members: `NumberPlusNumber`, `MoneyPlusMoney`, `DatePlusPeriod`, `MoneyTimesDecimal`, `MoneyDivideMoneySameCurrency`, `MoneyDivideMoneyCrossCurrency`, ...) |
 | Meta record | `OperationMeta` — abstract DU with `UnaryOperationMeta` and `BinaryOperationMeta` sealed subtypes (see below) |
 | Discriminator enum | `QualifierMatch { Any, Same, Different }` |
 | Catalog class | `Operations` — `GetMeta()`, `All`, `FindCandidates(OperatorKind, TypeKind, TypeKind) → ReadOnlySpan<BinaryOperationMeta>`, `Resolve(OperatorKind, Type, Type) → OperationMeta?` |
@@ -572,30 +569,29 @@ public sealed record UnaryOperationMeta(
     OperatorKind  Op,
     ParameterMeta Operand,
     TypeKind      Result,
-    string        Description,
-    Func<object?, object?> Execute
+    string        Description
 ) : OperationMeta(Kind, Op, Result, Description);
 
 public sealed record BinaryOperationMeta(
-    OperationKind  Kind,
-    OperatorKind   Op,
-    ParameterMeta  Lhs,
-    ParameterMeta  Rhs,
-    TypeKind       Result,
-    string         Description,
-    Func<object?, object?, object?> Execute,
-    QualifierMatch Match             = QualifierMatch.Any,
-    ProofRequirement[] ProofRequirements = []
+    OperationKind      Kind,
+    OperatorKind       Op,
+    ParameterMeta      Lhs,
+    ParameterMeta      Rhs,
+    TypeKind           Result,
+    string             Description,
+    bool               BidirectionalLookup = false,
+    QualifierMatch     Match               = QualifierMatch.Any,
+    ProofRequirement[] ProofRequirements   = []
 ) : OperationMeta(Kind, Op, Result, Description);
 ```
 
-`Execute` delegates co-locate execution logic with the operation definition. The evaluator dispatches through `Operations.Resolve(op, lhs, rhs).Execute(lhsValue, rhsValue)` — no parallel arithmetic switch. This eliminates the evaluator's need for its own `switch` on `OperationKind`.
+`BidirectionalLookup = true` marks operations where `(op, lhs, rhs)` and `(op, rhs, lhs)` are the same entry — the index registers both key orderings so type-checking commutative operations doesn't require two entries (e.g., `money * decimal` and `decimal * money`).
 
 `Operations.All` is `IReadOnlyList<OperationMeta>`. Two internal indexes: `FrozenDictionary<(OperatorKind, TypeKind), UnaryOperationMeta>` keyed by `(Op, Operand.Kind)`, and `FrozenDictionary<(OperatorKind, TypeKind, TypeKind), BinaryOperationMeta[]>` keyed by `(Op, Lhs.Kind, Rhs.Kind)`. The index key uses `ParameterMeta.Kind` for the `TypeKind` component.
 
 `Lhs`, `Rhs`, and `Operand` are `ParameterMeta` (not `TypeKind`) so `ParamSubject` can hold a direct reference to the instance — see Proof Obligations.
 
-**Unary operations (8 total):** `-integer`, `-decimal`, `-number`, `-money`, `-quantity`, `-price`, `-duration`, `not boolean`. Result type is always the same as the operand type.
+**Unary operations (9 total):** `-integer`, `-decimal`, `-number`, `-money`, `-quantity`, `-price`, `-exchangerate`, `-duration`, `not boolean`. Result type is always the same as the operand type.
 
 ##### QualifierMatch — conditional result types
 
@@ -726,9 +722,10 @@ The DU also absorbs 4 bare enums (`StateModifierKind`, `AccessMode`, `EnsureAnch
 // ── Base ──────────────────────────────────────────────────
 public abstract record ModifierMeta(
     ModifierKind      Kind,
-    TokenMeta         Token,         // object reference to Tokens catalog entry
+    TokenMeta         Token,                       // object reference to Tokens catalog entry
     string            Description,
-    ModifierCategory  Category       // Structural, Semantic, Severity
+    ModifierCategory  Category,                    // Structural, Semantic, Severity
+    ModifierKind[]?   MutuallyExclusiveWith = null // at most one of the group may appear on a declaration
 );
 
 // ── Field modifiers (14) ─────────────────────────────────
@@ -738,10 +735,13 @@ public sealed record FieldModifierMeta(
     string           Description,
     ModifierCategory Category,
     TypeTarget[]     ApplicableTo,
-    bool             HasValue        = false,
-    ModifierKind[]   Subsumes        = [],
-    Func<object?, object?, bool>? Validate = null   // (fieldValue, modifierArg) → valid?
-) : ModifierMeta(Kind, Token, Description, Category);
+    bool             HasValue          = false,
+    ModifierKind[]   Subsumes          = [],
+    string?          HoverDescription  = null,
+    string?          UsageExample      = null,
+    string?          SnippetTemplate   = null,
+    ModifierKind[]?  MutuallyExclusiveWith = null
+) : ModifierMeta(Kind, Token, Description, Category, MutuallyExclusiveWith);
 
 // ── State modifiers (7) ─────────────────────────────────
 public sealed record StateModifierMeta(
@@ -787,7 +787,7 @@ public sealed record AnchorModifierMeta(
 ) : ModifierMeta(Kind, Token, Description, Category);
 ```
 
-`Token` replaces the `string Keyword` field — consumers access keyword text via `modifier.Token.Text`. `FieldModifierMeta.Validate` is an optional execution delegate for runtime constraint validation: `nonnegative` → `(value, _) => (decimal)value >= 0`, `minlength` → `(value, arg) => ((string)value).Length >= (int)arg`. Modifiers with no runtime validation (e.g., `ordered` is compile-time only) have `Validate = null`. The runtime boundary iterates a field's modifiers and calls `Validate` on each — no switch on `ModifierKind`.
+`Token` replaces the `string Keyword` field — consumers access keyword text via `modifier.Token.Text`. `MutuallyExclusiveWith` declares modifier exclusion groups on the base; consumers (type checker, LS) enforce the constraint without hardcoding group membership. Modifiers with no runtime validation (e.g., `ordered` is compile-time only) have no inline delegate — execution is handled by the evaluator's pass over `FieldModifierMeta.ApplicableTo` entries.
 
 ##### ModifierCategory
 
@@ -806,7 +806,7 @@ public enum ModifierCategory { Structural, Semantic, Severity }
 Maps each event modifier to the graph reasoning the compiler must perform:
 
 ```csharp
-public enum GraphAnalysisKind { None, IncomingEdge, OutcomeType, Reachability }
+public enum GraphAnalysisKind { None, IncomingEdge, OutcomeType, Reachability, InitialEventCompatibility }
 ```
 
 | Event modifier | GraphAnalysisKind | What the compiler checks |
@@ -868,12 +868,12 @@ State-machine action verbs — the keywords that appear after `->` in transition
 
 | Part | Type |
 |------|------|
-| Kind enum | `ActionKind` (8 members — exists in `SemanticIndex.cs`) |
+| Kind enum | `ActionKind` (8 members) |
 | Meta record | `ActionMeta(Kind, Token, Description, ApplicableTo TypeTarget[], ValueRequired bool, IntoSupported bool, ProofRequirements[], AllowedIn ConstructKind[])` — `Token` is a `TokenMeta` object reference; see full shape below |
 | Catalog class | `Actions` — `GetMeta()`, `All` |
 | Output type | None |
 
-**Members (from `SemanticIndex.cs` `ActionKind` enum):**
+**Members (from `ActionKind.cs`):**
 
 | Action | ApplicableTo (`TypeTarget[]`) | Value | Into | AllowedIn |
 |--------|-------------------------------|-------|------|----------|
@@ -907,15 +907,15 @@ Consumers access the action keyword text via `action.Token.Text`. Execution dele
 
 **Consumers:** MCP vocabulary, LS completions (action verbs after `->` in event bodies), LS hover, parser validation, type checker (target type compatibility per `precept-language-spec.md` §3.8).
 
-#### 8. Constructs (✅ Implemented — slot model deferred)
+#### 8. Constructs (✅ Implemented)
 
-Grammar forms / declaration shapes. See § Construct Slot Model for the enriched structure.
+Grammar forms / declaration shapes.
 
 | Part | Type |
 |------|------|
-| Kind enum | `ConstructKind` (~12 members) |
-| Meta record | `ConstructMeta(Kind, Name, Description, Variants[], Example, AllowedIn ConstructKind[])` — see full shape below |
-| Supporting types | `ConstructVariant(Name, Slots[])`, `ConstructSlot(SlotKind, Scope, Pattern?, Required, Repeatable)` |
+| Kind enum | `ConstructKind` (11 members) |
+| Meta record | `ConstructMeta(Kind, Name, Description, UsageExample, AllowedIn[], Slots[], LeadingToken, SnippetTemplate?)` — see full shape below |
+| Supporting types | `ConstructSlot(Kind, IsRequired, Description?)`, `ConstructSlotKind` (15-member enum) |
 | Catalog class | `Constructs` — `GetMeta()`, `All` |
 | Output type | None |
 
@@ -929,16 +929,29 @@ Grammar forms / declaration shapes. See § Construct Slot Model for the enriched
 
 ```csharp
 public sealed record ConstructMeta(
-    ConstructKind      Kind,
-    string             Name,
-    string             Description,
-    ConstructVariant[] Variants,
-    string             Example,
-    ConstructKind[]    AllowedIn = []   // empty = precept body level (top-level)
+    ConstructKind                Kind,
+    string                       Name,
+    string                       Description,
+    string                       UsageExample,
+    ConstructKind[]              AllowedIn,           // empty = valid at precept body level (top-level)
+    IReadOnlyList<ConstructSlot> Slots,
+    TokenKind                    LeadingToken,
+    string?                      SnippetTemplate = null
 );
+
+public sealed record ConstructSlot(
+    ConstructSlotKind Kind,
+    bool              IsRequired  = true,
+    string?           Description = null
+);
+
+// 15-member enum: IdentifierList, TypeExpression, ModifierList, StateModifierList,
+// ArgumentList, ComputeExpression, GuardClause, ActionChain, Outcome,
+// StateTarget, EventTarget, EnsureClause, BecauseClause, AccessModeKeyword, FieldTarget
+public enum ConstructSlotKind { ... }
 ```
 
-`AllowedIn` declares where a construct can appear: empty means the construct is valid at precept body level (top-level declarations); populated means the construct is only valid nested inside one of the listed parent construct kinds. Examples: `FieldDeclaration`, `StateDeclaration`, `RuleDeclaration`, `TransitionRow` have `AllowedIn: []`; `StateEnsure` and `AccessMode` have `AllowedIn: [ConstructKind.StateDeclaration]`; `EventEnsure` has `AllowedIn: [ConstructKind.EventDeclaration]`. LS completions use this to filter context-sensitive suggestions: "which constructs have the current cursor's parent construct kind in their `AllowedIn`?"
+`AllowedIn` declares where a construct can appear: empty means the construct is valid at precept body level (top-level declarations); populated means the construct is only valid nested inside one of the listed parent construct kinds. `LeadingToken` identifies the keyword that starts the construct — used by the grammar generator to emit keyword-anchored rules from catalog metadata. LS completions use `AllowedIn` to filter context-sensitive suggestions: "which constructs have the current cursor's parent construct kind in their `AllowedIn`?"
 
 #### 9. Constraints (✅ Implemented)
 
@@ -1007,27 +1020,28 @@ public abstract record ProofRequirementMeta(ProofRequirementKind Kind, string De
 
 #### 11. Diagnostics (✅ Implemented)
 
-Compile-time rules — every error and warning the pipeline can produce. Currently 60+ members across Lex, Parse, Type, Graph, and Proof stages.
+Compile-time rules — every error and warning the pipeline can produce. Currently 78 members across Lex (8), Parse (5), Type (35+16+2), Graph (2), and Proof (3) stages.
 
 | Part | Type |
 |------|------|
 | Kind enum | `DiagnosticCode` |
-| Meta record | `DiagnosticMeta(Code, Stage, Severity, MessageTemplate)` |
+| Meta record | `DiagnosticMeta(Code, Stage, Severity, Category, MessageTemplate)` |
+| Supporting enums | `DiagnosticStage { Lex, Parse, Type, Graph, Proof }`, `Severity { Info, Warning, Error }`, `DiagnosticCategory { Naming, TypeSystem, Temporal, BusinessDomain, Structure, Safety, Proof }` |
 | Catalog class | `Diagnostics` — `GetMeta()`, `All`, `Create()` |
 | Output type | `Diagnostic(Severity, Stage, Code, Message, Span)` |
 
-**Consumers:** MCP constraints, LS diagnostic codes, drift tests.
+`DiagnosticCategory` describes *what* a diagnostic is about, complementing `DiagnosticStage` which describes *when* it fires. Used by the language server for filtering, documentation generation, and AI grounding.
 
 #### 12. Faults (✅ Implemented)
 
-Runtime failure modes — every fault the evaluator can produce. Currently 8 members.
+Runtime failure modes — every fault the evaluator can produce. Currently 13 members. Each `FaultCode` carries a `[StaticallyPreventable(DiagnosticCode)]` attribute linking it to the compile-time rule that should prevent that site.
 
 | Part | Type |
 |------|------|
-| Kind enum | `FaultCode` |
+| Kind enum | `FaultCode` (13 members: `DivisionByZero`, `SqrtOfNegative`, `TypeMismatch`, `UndeclaredField`, `UnexpectedNull`, `InvalidMemberAccess`, `FunctionArityMismatch`, `FunctionArgConstraintViolation`, `CollectionEmptyOnAccess`, `CollectionEmptyOnMutation`, `QualifierMismatch`, `NumericOverflow`, `OutOfRange`) |
 | Meta record | `FaultMeta(Code, MessageTemplate)` |
 | Catalog class | `Faults` — `GetMeta()`, `All`, `Create()` |
-| Output type | `Fault(Code, Message)` |
+| Output type | `Fault(Code, CodeName, Message)` — `CodeName` is the `nameof`-derived stable identity string used for logging and MCP reporting |
 
 **Consumers:** MCP fire/inspect, runtime outcome reporting.
 
@@ -1282,16 +1296,16 @@ The test of completeness: every cell should trace back to a catalog, never to ha
 | Consumer surface | Catalogs read | How |
 |------------------|---------------|-----|
 | **TextMate grammar** | Constructs → Tokens → Types | **Generated** from catalog metadata. Construct slot arrays generate patterns; token keywords generate keyword alternations; type keywords via `Types.All` filtered by `Token.Text`. No hand-maintained alternation lists. Tests verify the generator produces correct output. |
-| **MCP `precept_language`** | All 10 catalogs' `.All` + `SyntaxReference` | Union of all catalog enumerations IS the language spec. MCP tool iterates each and serializes. `SyntaxReference` adds grammar meta-rules. |
+| **MCP `precept_language`** | All 12 catalogs' `.All` + `SyntaxReference` | Union of all catalog enumerations IS the language spec. MCP tool iterates each and serializes. `SyntaxReference` adds grammar meta-rules. |
 | **LS completions** | Tokens + Types + Functions + Modifiers + Actions | **Generated** from catalog metadata. Context-filtered: type position → `Types.All`; expression → `Functions.All`; after type → `Modifiers.All` filtered by `ApplicableTo`; event body → `Actions.All`. No hand-maintained completion lists. |
 | **LS hover** | Types + Functions + Operators + Operations | Per-member descriptions from catalog metadata via `Token.Text` and `Description` |
 | **LS semantic tokens** | Tokens (via `TokenMeta.Categories`) | Token categories map directly to semantic token types |
 | **Type checker validation** | Types + Functions + Operations + Modifiers + Actions | Catalog lookups replace hand-coded validation logic: modifier applicability → `Modifiers.GetMeta().ApplicableTo`; function signatures → `Functions.GetMeta()`; operation legality → `Operations.Resolve()`; type keyword resolution → `Types.All` frozen dictionary keyed by `Token.Kind` |
 | **Parser vocabulary** | Operators + Types + Modifiers + Actions + Constructs | Frozen dictionaries derived from catalogs at startup: `Operators.All` → precedence table; `Types.All` → type keyword mapping; `Modifiers.All` → recognition sets; `Actions.All` → action keywords. No hand-maintained vocabulary tables. |
-| **Evaluator dispatch** | Functions + Operations + Modifiers | `FunctionDispatch.Execute` delegates, `OperationMeta.Execute` delegates, `FieldModifierMeta.Validate` delegates. No parallel dispatch tables. |
-| **Runtime boundary validation** | Modifiers | `FieldModifierMeta.Validate` delegates called per-field at fire/update boundary. No `switch` on `ModifierKind`. |
-| **Reference documentation** | All 8 language definition catalogs + `SyntaxReference` | **Generated** from catalog metadata. Tables, syntax sections, grammar reference all derived from `All` properties. |
-| **AI grounding** | All 10 catalogs + `SyntaxReference` | Complete, always-accurate language reference — AI grounded on catalog output cannot hallucinate features |
+| **Evaluator dispatch** | Functions + Operations | Evaluator dispatches by operation kind and function kind. No parallel dispatch tables. Execution delegate design is deferred pending working copy API design. |
+| **Runtime boundary validation** | Modifiers | `FieldModifierMeta.ApplicableTo` and `HasValue` drive boundary checks. No `switch` on `ModifierKind`. |
+| **Reference documentation** | All 10 language definition catalogs + `SyntaxReference` | **Generated** from catalog metadata. Tables, syntax sections, grammar reference all derived from `All` properties. |
+| **AI grounding** | All 12 catalogs + `SyntaxReference` | Complete, always-accurate language reference — AI grounded on catalog output cannot hallucinate features |
 
 No consumer surface maintains its own parallel list. Every fact comes from a catalog `All` property, `GetMeta()` call, or `SyntaxReference` property. TextMate grammar, LS completions, and reference documentation are **generated** from catalogs — not hand-maintained. Tests verify the generators produce correct output.
 
@@ -1354,6 +1368,6 @@ As catalogs are implemented, each pipeline stage gets thinner — domain knowled
 | **TypeChecker** | Hand-coded modifier validation, function dispatch, operator dispatch | Significant: modifier applicability → `Modifiers.GetMeta().ApplicableTo`, function validation → `Functions.GetMeta()`, operation legality → `Operations.Resolve()`, type keyword resolution → `Types.All` frozen dictionary. The type checker's `switch` forests shrink to catalog lookups. |
 | **GraphAnalyzer** | Hand-coded state reachability, modifier semantics | Moderate: state modifier structural semantics (`AllowsOutgoing`, `RequiresDominator`, `PreventsBackEdge`) are catalog metadata on `StateModifierMeta`. Graph algorithms (reachability, dominator trees, SCC) remain generic machinery. |
 | **ProofEngine** | Hand-coded proof obligations per operator | Significant: `ProofRequirement[]` on `BinaryOperationMeta`, `FunctionOverload`, `TypeAccessor`, and `ActionMeta` carry all proof obligations as metadata. Proof engine reads catalog entries — no hardcoded obligation lists. |
-| **Evaluator** | Not yet implemented | Significant: function execution → `FunctionDispatch.Execute` delegates in Functions catalog. Operation execution → `Execute` delegates on `UnaryOperationMeta`/`BinaryOperationMeta`. Modifier validation → `FieldModifierMeta.Validate` delegates. Action execution delegates deferred until working copy API designed. The evaluator's core loop (expression tree walking, working copy, atomicity) remains hand-written. |
+| **Evaluator** | Not yet implemented | Execution delegate design deferred pending working copy API design. When implemented: operation execution dispatches via `Operations.Resolve()`; function execution dispatches via `Functions.GetMeta()`; modifier boundary validation reads `FieldModifierMeta.ApplicableTo`/`HasValue`. Action execution delegates deferred until working copy API designed. The evaluator's core loop (expression tree walking, working copy, atomicity) remains hand-written. |
 
-Pattern: domain knowledge → metadata. Stages → generic machinery that reads catalogs. Execution delegates on catalogs eliminate parallel dispatch tables in the evaluator.
+Pattern: domain knowledge → metadata. Stages → generic machinery that reads catalogs.
