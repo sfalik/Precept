@@ -20,6 +20,9 @@
 
 ## Recent Updates
 
+### 2026-04-28 — Combined Design v2 doc revision
+- Genre/format and readability conventions applied per Elaine's proposals. All changes logged and inbox decisions merged.
+
 ### 2026-04-27 — Design doc genre analysis (follow-up to readability review)
 - Analyzed the "reference manual vs. design document" genre split for combined-design-v2.
 - Surveyed canonical formats: Roslyn design notes, V8 design docs, LLVM design docs, IETF RFCs, Go proposals, Rust RFCs, C2 wiki pattern language docs.
