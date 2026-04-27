@@ -48,7 +48,7 @@ The system has compilation phases (lexing, parsing, type checking, graph analysi
 
 Two top-level products emerge from this pipeline:
 
-**`CompilationResult`** — the immutable analysis snapshot. Always produced, even from broken input. Authoring surfaces (language server, MCP compile) need the full picture — including syntax errors, unresolved references, and unproven safety obligations — to provide diagnostics, completions, and navigation.
+**`CompilationResult`** — the immutable analysis snapshot. Always produced, even from broken input. Authoring surfaces (language server, MCP compile) need the full picture — including syntax errors, unresolved references, and unproven safety obligations — to provide diagnostics, completions, and navigation. This follows the error-tolerant compilation model established by Roslyn (full syntax trees from broken input) and adopted across the surveyed systems: OPA's compiler collects errors without short-circuiting; CEL's `Compile()` returns `Issues` alongside partial ASTs; Dhall's LSP runs the full pipeline and pushes all diagnostics.
 
 **`Precept`** — the executable runtime model. Produced only from error-free compilations via `Precept.From(compilation)`. This is the sealed model that runtime operations execute against. It carries lowered descriptor tables, execution plans, and constraint indexes — not syntax trees or proof graphs.
 
@@ -214,7 +214,7 @@ What the parser does NOT guarantee: name resolution, type compatibility, overloa
 
 Error recovery is construct-level, not token-level. When the parser encounters a malformed construct, it emits a diagnostic and skips to the next newline-anchored declaration keyword (`field`, `state`, `event`, `rule`, `from`, `in`, `to`, `on`). This is panic-mode recovery with synchronization at declaration boundaries.
 
-Malformed input is represented as `MissingNode` for required slots that could not be parsed and `SkippedTokens` trivia attached to the nearest valid node for tokens that could not be incorporated into any construct. A `MissingNode` carries the expected `ConstructSlot` identity and the span where the parser expected content. The tree always accounts for every character of source text — no input is silently discarded.
+Malformed input is represented as `MissingNode` for required slots that could not be parsed and `SkippedTokens` trivia attached to the nearest valid node for tokens that could not be incorporated into any construct. A `MissingNode` carries the expected `ConstructSlot` identity and the span where the parser expected content. The tree always accounts for every character of source text — no input is silently discarded. This adapts the error-tolerant parsing approach pioneered by Roslyn (missing tokens + skipped tokens trivia) to Precept's simpler grammar shape, where recovery granularity is at the declaration level rather than the statement level.
 
 ### Node inventory
 
@@ -374,7 +374,7 @@ flowchart LR
 | **Catalog role** | State semantics (`initial`, `terminal`, `required`, `irreversible`, `success`, `warning`, `error`) come from modifier metadata already resolved by the type checker; the analyzer must not reinterpret raw syntax. |
 | **Consumers** | ProofEngine, `Precept.From`, LS structural diagnostics, runtime structural precomputation |
 
-**How it serves the guarantee:** The graph analyzer detects lifecycle defects — unreachable states, terminal states with outgoing edges, required-state dominance violations, irreversible back-edges — that would make the state machine unsound. These are structural problems in the contract itself, caught before any instance exists.
+**How it serves the guarantee:** The graph analyzer detects lifecycle defects — unreachable states, terminal states with outgoing edges, required-state dominance violations, irreversible back-edges — that would make the state machine unsound. These are structural problems in the contract itself, caught before any instance exists. The surveyed state-graph analysis systems confirm the value of compile-time structural verification: SPIN/Promela performs reachability and deadlock detection on state models; Alloy Analyzer checks structural properties of relational models; NuSMV/nuXmv performs CTL/LTL model checking for reachability and liveness; XState's `@xstate/graph` computes reachable states and transition paths. Precept's graph analyzer applies these same structural analysis patterns — reachability, dead-state detection, topological validation — at compile time rather than as a separate verification step.
 
 **Proposed `GraphResult` facts:**
 
@@ -425,7 +425,7 @@ The proof engine operates over a bounded, non-extensible strategy set:
 - **Guard-in-path proof** — a guard expression in the control flow statically establishes a sufficient range or type constraint.
 - **Straightforward flow narrowing** — if a guard clause in the same transition row establishes a constraint on a field, that constraint is available as evidence for proof obligations on expressions within that row's action chain. This is type-state narrowing through the immediately enclosing control path, not general dataflow analysis.
 
-Any obligation outside this set is unresolvable by the compiler and emits a `Diagnostic`. New strategies are language changes, not tooling extensions. Each strategy is a simple predicate function, not a solver — literal proof checks a compile-time constant, modifier proof checks a modifier chain, guard-in-path proof checks enclosing guard subsumption, flow narrowing checks immediate control-path type state.
+Any obligation outside this set is unresolvable by the compiler and emits a `Diagnostic`. New strategies are language changes, not tooling extensions. Each strategy is a simple predicate function, not a solver — literal proof checks a compile-time constant, modifier proof checks a modifier chain, guard-in-path proof checks enclosing guard subsumption, flow narrowing checks immediate control-path type state. This bounded approach is a deliberate design decision: the surveyed verification systems (SPARK Ada/GNATprove, Dafny, Liquid Haskell, CBMC) all depend on external SMT solvers (Z3, CVC4/5) or SAT solvers for general proof discharge, introducing significant implementation complexity and non-deterministic verification times. Precept's four-strategy set avoids external solver dependencies entirely — at the cost of proof coverage breadth — which is appropriate for a DSL where the expression language is intentionally constrained and the obligation space is bounded.
 
 **Proof coverage boundary:** The four strategies must be validated against the sample corpus (20 files in `samples/`). If cross-field comparison obligations (e.g., `ApprovedAmount <= RequestedAmount`) cannot be discharged by any of the four strategies, a fifth strategy (e.g., relational pair narrowing) is needed before v1. This is the highest-risk unknown in the proof engine — the value proposition depends on coverage being sufficient for real-world programs.
 
@@ -693,7 +693,7 @@ Update governs direct field edits under access-mode declarations and constraint 
 
 ### Structured outcomes
 
-The structural guarantee means that a valid executable model communicates entirely through structured outcomes. There are three result families, and collapsing them would undermine the guarantee:
+The structural guarantee means that a valid executable model communicates entirely through structured outcomes. There are three result families, and collapsing them would undermine the guarantee. The surveyed systems confirm the value of structured result types: CEL returns a three-value result `(ref.Val, *EvalDetails, error)` distinguishing evaluation results, error values within the type system, and infrastructure failures; OPA returns `ResultSet` with per-expression values and bindings; Eiffel's Design-by-Contract model distinguishes precondition violations from postcondition violations from class invariant violations. Precept's three-family taxonomy (diagnostics, runtime outcomes, faults) extends this pattern to the full lifecycle operation surface:
 
 **Diagnostics** — produced by the compiler pipeline. Authoring-time findings against source. Error diagnostics block `Precept` construction.
 
@@ -725,7 +725,7 @@ The structural guarantee means that a valid executable model communicates entire
 
 `EventInspection` provides the reduced event-level landscape. `RowInspection` provides per-row prospect, effect, snapshots, and constraints. `UpdateInspection` provides hypothetical field state plus the resulting event landscape. `ConstraintResult` carries evaluation status referencing `ConstraintDescriptor`. `FieldSnapshot` captures resolved or unresolved field value in hypothetical state.
 
-Inspection shares the same lowered plans as commit. It is not a second evaluator.
+Inspection shares the same lowered plans as commit. It is not a second evaluator. The surveyed systems confirm the value of preview/inspect patterns but differ in depth: Terraform `plan` previews infrastructure changes before apply; XState v5's `machine.transition()` computes the next state without side effects; OPA's partial evaluation pre-computes policy results with unknown inputs; Temporal's update validators run validation logic before committing workflow state. Precept's inspection goes further — it previews every possible transition from any state with full constraint evaluation and per-row structured outcomes, using the same lowered execution plans as the commit path.
 
 ### Constraint query contract
 
@@ -762,7 +762,7 @@ The choice of C# type kind for each artifact follows from its role. Stage artifa
 
 On every document edit, the language server runs the full pipeline (`Compiler.Compile(source)`) and atomically replaces its held `CompilationResult` reference. Incremental compilation infrastructure — Roslyn's red-green trees, rust-analyzer's salsa database — solves a problem that does not exist at Precept's DSL scale, where the full pipeline runs in microseconds. The surveyed DSL-scale systems uniformly confirm this: OPA/Regal recompiles the full module set on single-file edits; Dhall's LSP runs the full pipeline (parse → resolve → type check) on each save; Jsonnet's language server re-parses and re-evaluates on each change; CEL compiles single expressions in one call with no incremental infrastructure. None of these systems has found incremental recompilation necessary at their scale. The swap is safe for concurrent LSP requests because `CompilationResult` is fully immutable — no locks are needed beyond `Interlocked.Exchange` on the reference itself.
 
-The language server calls `Compiler.Compile(source)` directly — same process, no published NuGet package, no serialization boundary. This is the dominant pattern at DSL scale, where the LS-to-compiler code ratio is 1:3 to 1:10. Single-process integration eliminates serialization overhead, IPC latency, and version-mismatch risk. A separate compiler process or package is warranted only when the compiler is shared across multiple host tools with independent release cycles — a threshold Precept has not reached and may never reach.
+The language server calls `Compiler.Compile(source)` directly — same process, no published NuGet package, no serialization boundary. This is the dominant pattern at DSL scale: Regal imports OPA's parser and compiler as Go libraries in-process; Dhall's LSP lives in the same monorepo and directly calls `Dhall.Parser`, `Dhall.TypeCheck`, and `Dhall.Core`; Jsonnet's language server imports `go-jsonnet` as a library; CUE's LSP is built into the CLI binary itself. The LS-to-compiler code ratio at this scale is 1:3 to 1:10. Single-process integration eliminates serialization overhead, IPC latency, and version-mismatch risk. A separate compiler process or package is warranted only when the compiler is shared across multiple host tools with independent release cycles — a threshold Precept has not reached and may never reach.
 
 > **Precept Innovations**
 > - **Immutability as a correctness property, not just a style preference.** The LS atomic swap pattern depends on deep immutability — it is not optional. This propagates through every artifact type in the system.
