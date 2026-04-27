@@ -376,12 +376,17 @@ flowchart LR
 
 **How it serves the guarantee:** The graph analyzer detects lifecycle defects — unreachable states, terminal states with outgoing edges, required-state dominance violations, irreversible back-edges — that would make the state machine unsound. These are structural problems in the contract itself, caught before any instance exists. The surveyed state-graph analysis systems confirm the value of compile-time structural verification: SPIN/Promela performs reachability and deadlock detection on state models; Alloy Analyzer checks structural properties of relational models; NuSMV/nuXmv performs CTL/LTL model checking for reachability and liveness; XState's `@xstate/graph` computes reachable states and transition paths. Precept's graph analyzer applies these same structural analysis patterns — reachability, dead-state detection, topological validation — at compile time rather than as a separate verification step.
 
-**Proposed `GraphResult` facts:**
+### GraphResult inventory
 
-- **Reachability** — initial state, reachable states, unreachable states.
-- **Topology** — edges, predecessors, successors, event coverage per state.
-- **Structural validity** — terminal outgoing-edge violations, required-state dominance, irreversible back-edge violations.
-- **Runtime indexes** — available events by state, state-scoped routing buckets, target-state facts lowering can reuse.
+- **`ReachabilitySet`** — partitions all states into reachable, unreachable, and terminal sets relative to the initial state.
+- **`TransitionAdjacency`** — state → events → target states topology map; the directed edge set of the lifecycle graph.
+- **`PredecessorIndex`** — state → set of states that have a direct transition into it.
+- **`SuccessorIndex`** — state → set of states reachable via a single outgoing transition.
+- **`DominanceFact`** — records that a required-state modifier mandates all paths to a terminal state pass through the required state.
+- **`TerminalOutgoingViolation`** — flags a terminal state that has outgoing transitions, violating structural soundness.
+- **`IrreversibleBackEdgeViolation`** — flags a transition that re-enters an irreversible state from a downstream state.
+- **`EventCoverageEntry`** — per-state inventory of which events have declared transition rows and which do not.
+- **`ProofForwardingFact`** — graph-derived facts (reachability gaps, dominance violations, structural defects) forwarded to the proof engine as obligation inputs.
 
 **Implementation status:** `GraphAnalyzer.Analyze` is stubbed.
 
@@ -415,6 +420,14 @@ flowchart LR
 | **Output** | `ProofModel` — obligations and evidence, dispositions and preventable-fault links, diagnostics with semantic site attribution. (Current shape: diagnostics-only stub.) |
 | **Catalog role** | Proof obligations originate in metadata: `BinaryOperationMeta.ProofRequirements`, `FunctionOverload.ProofRequirements`, `TypeAccessor.ProofRequirements`, and action metadata. `FaultCode` ↔ `DiagnosticCode` linkage is catalog-owned. |
 | **Consumers** | `CompilationResult`, LS/MCP proof reporting, lowering of fault residue into runtime backstops |
+
+### ProofModel inventory
+
+- **`ProofObligation`** — a single provable claim: carries semantic site reference, originating `ProofRequirement` (from catalog metadata), strategy used for discharge, disposition (`proved` or `unresolvable`), and `DiagnosticCode` reference if unresolvable.
+- **`FaultSiteLink`** — links an unresolvable `ProofObligation` to its corresponding `FaultSiteDescriptor`, threading the proof/fault chain so lowering can plant runtime backstops.
+- **`ConstraintInfluenceEntry`** — maps a constraint to its contributing fields and expression-text excerpts; lowering reads these to build the runtime `ConstraintInfluenceMap`.
+- **`InitialStateSatisfiabilityResult`** — per-field/constraint-pair verdict on whether default values satisfy initial-state constraints, with diagnostic reference if unsatisfiable.
+- **`ObligationCoverageRecord`** — tracks which proof strategy discharged each obligation, providing an auditable coverage map across the strategy set.
 
 ### Proof strategy set
 
@@ -537,6 +550,21 @@ flowchart LR
 | **Output** | `Precept` — sealed executable model: descriptor tables and slot layout, dispatch indexes, lowered execution plans, constraint-plan indexes, reachability/topology indexes, inspection metadata, fault-site backstops |
 | **Catalog role** | Catalog metadata reaches runtime only in lowered semantic form: descriptor identity, resolved operation/function/action identity, constraint descriptors, and proof-owned fault-site residue. Lowering reads catalog metadata transitively through already-resolved model identities — it does not perform fresh catalog lookups for classification. |
 | **Consumers** | `Precept.Create`, `Precept.Restore`, `Version` operations, MCP runtime tools, host applications |
+
+### Lowered model inventory
+
+- **`FieldDescriptor`** — field name, `TypeKind`, slot index, modifiers, default-value expression, source origin.
+- **`StateDescriptor`** — state name, terminal flag, modifier set (initial, required, irreversible, success, warning, error), available events.
+- **`EventDescriptor`** — event name, modifier set, arg descriptors, source origin.
+- **`ArgDescriptor`** — arg name, `TypeKind`, optionality, default expression, source origin.
+- **`TransitionDispatchIndex`** — state × event → target state + lowered action plan; the routing table the evaluator and inspection surfaces consume directly.
+- **`ConstraintPlanIndex`** — constraint plans organized by activation anchor (`always`, `in state`, `to state`, `from state`, `on event`) into precomputed dispatch buckets.
+- **`ConstraintDescriptor`** — expression text, source line, guard metadata, `ConstraintActivation` anchor, because text, scope targets.
+- **`ConstraintInfluenceMap`** — constraint → contributing fields with expression-text excerpts; enables "which field change would fix this?" without reverse-engineering.
+- **`FaultSiteDescriptor`** — defense-in-depth backstop keyed by site identity, linked to `FaultCode` and the prevention `DiagnosticCode`.
+- **`SlotLayout`** — field → slot index mapping that addresses the flat evaluation plan's register file.
+- **`ReachabilityIndex`** — state → set of states reachable from it; enables structural navigation without re-running the compiler.
+- **`ExecutionPlan`** — lowered flat action sequences: slot-addressed opcodes with field-slot references, literal constants, operation codes, and result slots.
 
 ### Lowered executable-model contract
 
