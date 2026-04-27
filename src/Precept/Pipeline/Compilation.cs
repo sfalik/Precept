@@ -3,12 +3,12 @@ using Precept.Language;
 
 namespace Precept.Pipeline;
 
-public sealed record class CompilationResult(
+public sealed record class Compilation(
     TokenStream                Tokens,
     SyntaxTree                 SyntaxTree,
-    TypedModel                 Model,
-    GraphResult                Graph,
-    ProofModel                 Proof,
+    SemanticIndex              Semantics,
+    StateGraph                 Graph,
+    ProofLedger                Proof,
     ImmutableArray<Diagnostic> Diagnostics,
     bool                       HasErrors
 );

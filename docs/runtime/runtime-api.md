@@ -38,11 +38,11 @@ The executable model owns these descriptors. They are created during `Precept.Fr
 ### Compilation → Executable Model
 
 ```csharp
-CompilationResult compilation = Compiler.Compile(source);
+Compilation compilation = Compiler.Compile(source);
 Precept precept = Precept.From(compilation);
 ```
 
-`Precept.From(CompilationResult)` lowers the analysis-oriented typed model into a runtime-optimized executable form. Construction only succeeds when the compilation result has no errors — on broken input, the LS and MCP consume the `CompilationResult` directly.
+`Precept.From(Compilation)` is the Precept Builder stage: it transforms the analysis-oriented compilation into a runtime-optimized executable form. Construction only succeeds when the compilation has no errors — on broken input, the LS and MCP consume the `Compilation` directly.
 
 If construction fails despite an error-free compilation result, that is a compiler bug — not a user-facing condition.
 
@@ -98,7 +98,7 @@ EventOutcome simple = precept.Create();  // always Applied
 public sealed class Precept
 {
     // Construction
-    public static Precept From(CompilationResult compilation);
+    public static Precept From(Compilation compilation);
 
     // Entity creation — mirrors Version's commit/inspect pattern
     public EventOutcome Create(IReadOnlyDictionary<string, object?>? args = null);

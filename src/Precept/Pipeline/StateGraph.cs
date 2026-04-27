@@ -3,6 +3,6 @@ using Precept.Language;
 
 namespace Precept.Pipeline;
 
-public sealed record class TypedModel(
+public sealed record class StateGraph(
     ImmutableArray<Diagnostic> Diagnostics
 );

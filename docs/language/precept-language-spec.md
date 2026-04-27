@@ -763,16 +763,16 @@ These are unambiguous top-level declaration starters. Continuation tokens (`when
 
 ## 3. Type Checker
 
-The type checker transforms a `SyntaxTree` into a `TypedModel` — a flat collection of symbol tables, resolved declarations, and diagnostics. It always produces a result, even on broken input (the pipeline's resilient contract).
+The type checker transforms a `SyntaxTree` into a `SemanticIndex` — a flat collection of symbol tables, resolved declarations, and diagnostics. It always produces a result, even on broken input (the pipeline's resilient contract).
 
 ```
-SyntaxTree  →  TypeChecker.Check  →  TypedModel
+SyntaxTree  →  TypeChecker.Check  →  SemanticIndex
 ```
 
 The public surface is a static method:
 
 ```csharp
-public static TypedModel Check(SyntaxTree tree)
+public static SemanticIndex Check(SyntaxTree tree)
 ```
 
 ### 3.1 Processing Model

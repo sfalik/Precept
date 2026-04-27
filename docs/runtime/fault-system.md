@@ -87,7 +87,7 @@ The current stub carries none of this. The answers depend on what MCP `precept_f
 
 ### Q3 — Fault vs. structural impossibility
 
-When the compiler emits errors, `Precept.From(CompilationResult)` returns null — the evaluator never runs. `Fault` is therefore a defense-in-depth type: it classifies failures that *should never occur* but must be handled if they do (e.g. data loaded from external sources bypassing the compile-time check, or a proof engine gap).
+When the compiler emits errors, `Precept.From(Compilation)` cannot produce a `Precept` — the evaluator never runs. `Fault` is therefore a defense-in-depth type: it classifies failures that *should never occur* but must be handled if they do (e.g. data loaded from external sources bypassing the compile-time check, or a proof engine gap).
 
 This affects how aggressively the evaluator should assert vs. gracefully fault. Decision needed at evaluator design time.
 

@@ -408,7 +408,7 @@ The typed `FaultCode Code` field on `Fault` prevents one bypass — you can't us
         → if divisor interval includes zero:
             Diagnostics.Create(DiagnosticCode.DivisionByZero, range, "rate", "rate has no lower bound")
 
-5. CompilationResult.HasErrors == true → no Precept produced → evaluator never runs
+5. Compilation.HasErrors == true → no Precept produced → evaluator never runs
 ```
 
 ## D4 — Diagnostic Attribution
@@ -432,7 +432,7 @@ If a future consumer needs machine-readable attribution, a single additional fie
 The LS suppresses downstream diagnostics when upstream stages produce errors:
 
 ```csharp
-IEnumerable<Diagnostic> VisibleDiagnostics(CompilationResult result)
+IEnumerable<Diagnostic> VisibleDiagnostics(Compilation result)
 {
     if (result.Diagnostics.Any(d => d.Stage == DiagnosticStage.Lex && d.Severity == Severity.Error))
         return result.Diagnostics.Where(d => d.Stage == DiagnosticStage.Lex);

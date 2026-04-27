@@ -121,3 +121,5 @@
 - **New §12 TextMate grammar generation:** Catalog contributions table (Tokens, Types, Constructs, Operators), anti-pattern (no hand-editing), shared metadata surfaces, zero-drift guarantee innovation.
 - **New §13 MCP integration:** Tool inventory table, thin-wrapper principle, catalog-derived vocabulary, structured outcomes for AI, MCP-as-primary-research-instrument workflow, AI-first design principle, ConstraintInfluenceMap integration.
 - Doc grew from 486 lines to 694 lines. Section numbering: §1–§10 unchanged, new §12 (TextMate), new §13 (MCP), former §12 (LS) renumbered to §14.
+
+- **Doc promotion (2026-04-26):** Promoted `combined-design-v2` to `docs/compiler-and-runtime-design.md`, replacing the short-form doc. Absorbed type strategy rationale (immutability contract, type kind strategy, LS full-recompile model, same-process direct API) as prose in new §12 'Type and immutability strategy' with Innovations callout. C# field-level signatures removed — code is the source of truth. Renumbered §12 TextMate → §13, §13 MCP → §14, §14 LS → §15. Retired `docs/working/combined-design-v2.md`.

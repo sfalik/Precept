@@ -27,7 +27,7 @@ The parser handles three families of input:
 - **Expressions** — arithmetic, comparison, logical, member access, function calls, conditionals, literals, interpolated strings and typed constants
 - **Error recovery** — missing-node insertion for expected tokens, sync-point resync for structurally lost positions
 
-The `SyntaxTree` is the `CompilationResult.Tree` field — it is part of the tooling surface and queryable by the language server for span-based operations (hover, go-to-definition, completions).
+The `SyntaxTree` is the `Compilation.SyntaxTree` field — it is part of the tooling surface and queryable by the language server for span-based operations (hover, go-to-definition, completions).
 
 ---
 
@@ -443,7 +443,7 @@ public sealed record SyntaxTree(
     ImmutableArray<Diagnostic> Diagnostics);
 ```
 
-`Header` is nullable for the case where the source is empty or the `precept` keyword is missing — the parser emits an `ExpectedToken` diagnostic and produces a tree with `Header = null`. `Declarations` is the flat list in source order. `Diagnostics` accumulates every parse-stage diagnostic. This is the `CompilationResult.Tree` field.
+`Header` is nullable for the case where the source is empty or the `precept` keyword is missing — the parser emits an `ExpectedToken` diagnostic and produces a tree with `Header = null`. `Declarations` is the flat list in source order. `Diagnostics` accumulates every parse-stage diagnostic. This is the `Compilation.SyntaxTree` field.
 
 ---
 

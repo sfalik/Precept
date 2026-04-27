@@ -7,27 +7,27 @@ namespace Precept;
 
 public static class Compiler
 {
-    public static CompilationResult Compile(string source)
+    public static Compilation Compile(string source)
     {
-        TokenStream tokens = Lexer.Lex(source);
-        SyntaxTree  tree   = Parser.Parse(tokens);
-        TypedModel  model  = TypeChecker.Check(tree);
-        GraphResult graph  = GraphAnalyzer.Analyze(model);
-        ProofModel  proof  = ProofEngine.Prove(model, graph);
+        TokenStream   tokens    = Lexer.Lex(source);
+        SyntaxTree    tree      = Parser.Parse(tokens);
+        SemanticIndex semantics = TypeChecker.Check(tree);
+        StateGraph    graph     = GraphAnalyzer.Analyze(semantics);
+        ProofLedger   proof     = ProofEngine.Prove(semantics, graph);
 
         ImmutableArray<Diagnostic> diagnostics =
         [
             ..tokens.Diagnostics,
             ..tree.Diagnostics,
-            ..model.Diagnostics,
+            ..semantics.Diagnostics,
             ..graph.Diagnostics,
             ..proof.Diagnostics,
         ];
 
-        return new CompilationResult(
+        return new Compilation(
             Tokens:      tokens,
             SyntaxTree:  tree,
-            Model:       model,
+            Semantics:   semantics,
             Graph:       graph,
             Proof:       proof,
             Diagnostics: diagnostics,

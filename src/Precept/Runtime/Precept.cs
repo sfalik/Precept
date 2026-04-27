@@ -5,7 +5,7 @@ namespace Precept.Runtime;
 
 /// <summary>
 /// The executable model — a sealed, immutable artifact constructed from an
-/// error-free <see cref="CompilationResult"/>. A single instance serves all
+/// error-free <see cref="Compilation"/>. A single instance serves all
 /// entity versions of the same precept definition.
 /// </summary>
 /// <remarks>
@@ -21,7 +21,7 @@ public sealed class Precept
 
     // ── Construction ────────────────────────────────────────────────
 
-    public static Precept From(CompilationResult compilation)
+    public static Precept From(Compilation compilation)
     {
         if (compilation.HasErrors)
             throw new InvalidOperationException("Cannot create a Precept from a compilation with errors.");

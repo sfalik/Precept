@@ -2,5 +2,5 @@ namespace Precept.Pipeline;
 
 public static class ProofEngine
 {
-    public static ProofModel Prove(TypedModel model, GraphResult graph) => throw new NotImplementedException();
+    public static ProofLedger Prove(SemanticIndex semantics, StateGraph graph) => throw new NotImplementedException();
 }

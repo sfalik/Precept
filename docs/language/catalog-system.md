@@ -303,7 +303,7 @@ The type system's family taxonomy. Each member represents a type *family*.
 
 `TypeKind` is the catalog key. `Type` is the type checker's working type — an `abstract record` hierarchy where each sealed variant carries qualifier payloads. `Type.Kind` bridges from one to the other, same as `Token.Kind` bridges `Token` to `TokenKind`. The `abstract Kind` property is compiler-enforced: adding a new `Type` variant without implementing it fails to build.
 
-**Members (1:1 with `Type` variants in `TypedModel.cs`):**
+**Members (1:1 with `Type` variants in `SemanticIndex.cs`):**
 
 | Category | Members |
 |----------|---------|
@@ -827,12 +827,12 @@ State-machine action verbs — the keywords that appear after `->` in transition
 
 | Part | Type |
 |------|------|
-| Kind enum | `ActionKind` (8 members — exists in `TypedModel.cs`) |
+| Kind enum | `ActionKind` (8 members — exists in `SemanticIndex.cs`) |
 | Meta record | `ActionMeta(Kind, Token, Description, ApplicableTo TypeTarget[], ValueRequired bool, IntoSupported bool, ProofRequirements[], AllowedIn ConstructKind[])` — `Token` is a `TokenMeta` object reference; see full shape below |
 | Catalog class | `Actions` — `GetMeta()`, `All` |
 | Output type | None |
 
-**Members (from `TypedModel.cs` `ActionKind` enum):**
+**Members (from `SemanticIndex.cs` `ActionKind` enum):**
 
 | Action | ApplicableTo (`TypeTarget[]`) | Value | Into | AllowedIn |
 |--------|-------------------------------|-------|------|----------|

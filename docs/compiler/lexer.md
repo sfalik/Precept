@@ -54,7 +54,7 @@ The lexer handles three families of input:
 
 Typed constant content is opaque to the lexer. The lexer marks the boundaries (`TypedConstant`, `TypedConstantStart`, `TypedConstantMiddle`, `TypedConstantEnd`) but does not interpret what's inside. Type resolution and content validation happen in the type checker.
 
-The `TokenStream` is the `CompilationResult.Tokens` field — it is part of the tooling surface and queryable by the language server for span-based operations.
+The `TokenStream` is the `Compilation.Tokens` field — it is part of the tooling surface and queryable by the language server for span-based operations.
 
 ---
 

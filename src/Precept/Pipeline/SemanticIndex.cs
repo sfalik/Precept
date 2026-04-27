@@ -3,6 +3,6 @@ using Precept.Language;
 
 namespace Precept.Pipeline;
 
-public sealed record class GraphResult(
+public sealed record class SemanticIndex(
     ImmutableArray<Diagnostic> Diagnostics
 );
