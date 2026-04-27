@@ -116,14 +116,37 @@ Every stage begins from two roots. The `.precept` source text is the author-owne
 
 ### What crosses the lowering boundary
 
-`Precept.From()` selectively lowers analysis knowledge — descriptors, constraint metadata, expression text, source references, execution plans — into runtime-native shapes. What does not cross: syntax trees, token streams, proof graphs, parser recovery, and graph topology as artifacts.
+`Precept.From()` selectively lowers analysis knowledge — descriptors, constraint metadata, expression text, source references, execution plans, and graph-derived topology — into runtime-native shapes. The principle is **type dependency direction**: runtime types hold no references to `CompilationResult`, `TypedModel`, `SyntaxTree`, or `GraphResult`. But *analysis-derived knowledge* from every stage crosses via lowering into runtime-native shapes. The `GraphResult` artifact does not cross — the knowledge it contains does, in lowered form.
 
-The rule is **type dependency direction**: runtime types do not hold references to `CompilationResult`, `TypedModel`, or `SyntaxTree`. But runtime shapes carry analysis-derived knowledge — `ConstraintDescriptor` carries expression text, source lines, scope targets, and guard metadata. That is analysis knowledge in lowered form. Artifacts don't cross; selected knowledge from artifacts crosses in runtime-native shapes.
+**Graph-derived knowledge that crosses (runtime-native shapes):**
+
+- **Transition dispatch index** — from state S, event E → target state T. This IS graph topology, lowered into a routing table the evaluator and inspection surfaces consume directly.
+- **State descriptor table** — all named states with metadata (display name, terminal flag, initial/required/irreversible modifiers, available events). Enables structural queries ("what states exist?", "what modifiers apply?").
+- **Event availability index** — the set of valid events per state. Enables "what can I do from here?" queries for MCP, AI agents, and UI consumers.
+- **Reachability index** — which states are reachable from a given state. Enables structural navigation queries ("how do I reach state X?") without re-running the compiler.
+- **Pathfinding residue** — enough topology for shortest-path or goal-directed navigation from the current state to a target state. The graph analog of `ConstraintInfluenceMap` — causal reasoning over lifecycle structure, not just constraint satisfaction.
+
+**Proof-derived knowledge that crosses:**
+
+- **`ConstraintDescriptor`** — expression text, source lines, scope targets, guard metadata, `ConstraintActivation` anchor.
+- **`ConstraintInfluenceMap`** — dependency from constraints to contributing fields with expression-text excerpts.
+- **Structured violation shapes** — `ConstraintViolation` carries failing constraint descriptor, evaluated field values, guard context, and failing sub-expression.
+- **Fault-site backstops** — `FaultSite` descriptors linked to `FaultCode` and the compiler-owned prevention `DiagnosticCode`.
+
+**What genuinely does not cross — and why:**
+
+- **`SyntaxTree`** — source-structural artifact. No runtime operation needs parse-tree node identity, nesting depth, or span offsets. The language server and tooling are its consumers.
+- **`TokenStream`** — pre-parse artifact. Consumed only by the parser. No runtime or post-compilation surface references individual tokens.
+- **Parser recovery shape** — authoring artifact for error-tolerant editing. Its sole consumer is the language server's progressive intelligence; the runtime operates on error-free models only.
+- **`ProofModel`** — the proof graph structure itself. Runtime needs proof *outcomes* (fault-site backstops, constraint descriptors) but not the proof obligation graph, strategy traces, or satisfiability proofs.
+
+These don't cross because no runtime operation needs them — not because of an architectural prohibition on graph or analysis knowledge reaching the runtime. The prohibition is on *artifact type references*, not on *analysis-derived knowledge*.
 
 > **Precept Innovations**
 > - **Unified pipeline.** Compilation and runtime are sequential stages of one system sharing the same catalog metadata — not two separate systems bolted together. There is no "compile step" followed by a "runtime step" from the user's perspective; the pipeline flows from source text to executable enforcement in one continuous transformation.
 > - **CompilationResult as an always-available intelligence snapshot.** Even broken programs produce a full `CompilationResult` with partial analysis — language server and MCP tools always have something to work with. Traditional compilers stop at the first error boundary; Precept provides progressive intelligence across all stages.
 > - **Lowering as selective transformation.** The boundary between analysis and execution is not a wall — it is a selective transformation that carries exactly the analysis knowledge the runtime needs in runtime-native shapes, while preventing runtime types from depending on compile-time artifacts.
+> - **Graph topology as a first-class runtime artifact.** The `Precept` model carries a full lowered topology — transition dispatch index, state descriptor table, reachability index, pathfinding residue — not just an opaque executor. Runtime consumers (MCP, AI agents, UI) can ask "what states exist?", "what can I do from here?", "how do I reach state X?" These are structural guarantee questions, answerable without re-running the compiler. No other state machine library in this category exposes lifecycle topology as a queryable runtime surface.
 
 ## 4. Lexer
 
@@ -393,7 +416,7 @@ When a `.precept` file changes (field added, state renamed, constraint tightened
 Lowering is the transformation from analysis to execution — and the stage that makes the structural guarantee executable. The evaluator becomes a plan executor that does not reason about semantics at runtime because lowering has already resolved all semantic questions into executable plans. `Precept.From(CompilationResult)` is the sole owner of this transformation — no other code path builds the runtime model. It selectively transforms analysis knowledge into runtime-native shapes rather than copying or referencing compile-time artifacts.
 
 **Takes in:** Error-free `CompilationResult`; semantic inputs come from `TypedModel`, `GraphResult`, and proof residue from `ProofModel`. Lowering reads catalog metadata transitively through already-resolved model identities (e.g., for default-value computation, constraint text extraction, fault-site descriptor construction), but does not perform fresh catalog lookups for classification purposes.
-**Produces:** `Precept` as a sealed executable model owning descriptor tables, slot layout, dispatch indexes, lowered execution plans, explicit constraint-plan indexes, inspection metadata, and fault-site backstops.
+**Produces:** `Precept` as a sealed executable model owning descriptor tables, slot layout, dispatch indexes, lowered execution plans, explicit constraint-plan indexes, reachability and topology indexes, inspection metadata, and fault-site backstops.
 **Catalog entry:** Catalog metadata reaches runtime only in lowered semantic form: descriptor identity, resolved operation/function/action identity, constraint descriptors, and proof-owned fault-site residue.
 **Consumed by:** `Precept.Create`, `Precept.Restore`, `Version` operations, MCP runtime tools, host applications.
 
@@ -404,6 +427,7 @@ Lowering is the transformation from analysis to execution — and the stage that
 | identity | descriptor tables: `FieldDescriptor`, `StateDescriptor`, `EventDescriptor`, `ArgDescriptor`, `ConstraintDescriptor` | every runtime API surface |
 | storage | slot layout, field-to-slot map, default-value plan, omission metadata | create, restore, fire, update |
 | routing | per-state and stateless event-row dispatch indexes, target-state routing metadata | fire and inspect fire |
+| topology | reachability index (state → reachable states), pathfinding residue (goal-directed navigation) | structural queries, MCP, AI navigation, inspect |
 | execution | lowered flat evaluation plans: slot-addressed opcodes with field-slot references, literal constants, operation codes, and result slots — keyed to descriptors and resolved semantic identities | evaluator |
 | recomputation | dependency graph and evaluation order for computed fields | fire, update, restore, inspect |
 | access | per-state field access-mode index and query surface | update and inspect update |
