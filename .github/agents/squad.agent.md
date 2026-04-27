@@ -880,7 +880,7 @@ After each batch of agent work:
 
 ```
 agent_type: "general-purpose"
-model: "gpt-4.1"
+model: "gpt-5.4"
 mode: "background"
 name: "scribe"
 description: "📋 Scribe: Log session & merge decisions"
