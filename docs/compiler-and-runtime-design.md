@@ -142,18 +142,17 @@ The lexer converts raw text into classified tokens with exact spans. It has no s
 
 ```mermaid
 flowchart LR
-    SRC(["source text"]):::input
-    CAT(["Tokens · Diagnostics\ncatalogs"]):::input
-    LEX[["Lexer"]]:::stage
-    OUT["TokenStream"]:::artifact
+    classDef data fill:#f8fafc,stroke:#94a3b8,color:#334155
+    classDef stage fill:#ede9fe,stroke:#7c3aed,stroke-width:3px,color:#3b0764
+
+    SRC(["source text"]):::data
+    CAT(["Tokens · Diagnostics\ncatalogs"]):::data
+    LEX{{"Lexer"}}:::stage
+    OUT(["TokenStream"]):::data
 
     SRC --> LEX
     CAT --> LEX
     LEX --> OUT
-
-    classDef input fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
-    classDef stage fill:#ede9fe,stroke:#7c3aed,color:#3b0764
-    classDef artifact fill:#fef3c7,stroke:#d97706,color:#78350f
 ```
 
 | | |
@@ -176,18 +175,17 @@ The parser builds the source-structural model of the authored program. Its key d
 
 ```mermaid
 flowchart LR
-    TS(["TokenStream"]):::input
-    CAT(["Constructs · Tokens\nOperators · Diagnostics\ncatalogs"]):::input
-    PAR[["Parser"]]:::stage
-    OUT["SyntaxTree"]:::artifact
+    classDef data fill:#f8fafc,stroke:#94a3b8,color:#334155
+    classDef stage fill:#ede9fe,stroke:#7c3aed,stroke-width:3px,color:#3b0764
+
+    TS(["TokenStream"]):::data
+    CAT(["Constructs · Tokens\nOperators · Diagnostics\ncatalogs"]):::data
+    PAR{{"Parser"}}:::stage
+    OUT(["SyntaxTree"]):::data
 
     TS -->|"token stream"| PAR
     CAT --> PAR
     PAR --> OUT
-
-    classDef input fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
-    classDef stage fill:#ede9fe,stroke:#7c3aed,color:#3b0764
-    classDef artifact fill:#fef3c7,stroke:#d97706,color:#78350f
 ```
 
 | | |
@@ -285,18 +283,17 @@ The type checker is the first stage that reasons about semantics. Its key design
 
 ```mermaid
 flowchart LR
-    ST(["SyntaxTree"]):::input
-    CAT(["Types · Functions · Operators\nOperations · Modifiers · Actions\nConstructs · Diagnostics\ncatalogs"]):::input
-    TC[["Type Checker"]]:::stage
-    OUT["TypedModel"]:::artifact
+    classDef data fill:#f8fafc,stroke:#94a3b8,color:#334155
+    classDef stage fill:#ede9fe,stroke:#7c3aed,stroke-width:3px,color:#3b0764
+
+    ST(["SyntaxTree"]):::data
+    CAT(["Types · Functions · Operators\nOperations · Modifiers · Actions\nConstructs · Diagnostics\ncatalogs"]):::data
+    TC{{"Type Checker"}}:::stage
+    OUT(["TypedModel"]):::data
 
     ST -->|"syntax tree"| TC
     CAT --> TC
     TC --> OUT
-
-    classDef input fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
-    classDef stage fill:#ede9fe,stroke:#7c3aed,color:#3b0764
-    classDef artifact fill:#fef3c7,stroke:#d97706,color:#78350f
 ```
 
 | | |
@@ -354,18 +351,17 @@ The graph analyzer derives lifecycle structure from semantic declarations. Its k
 
 ```mermaid
 flowchart LR
-    TM(["TypedModel"]):::input
-    CAT(["Modifiers · Actions\nDiagnostics\ncatalogs"]):::input
-    GA[["Graph Analyzer"]]:::stage
-    OUT["GraphResult"]:::artifact
+    classDef data fill:#f8fafc,stroke:#94a3b8,color:#334155
+    classDef stage fill:#ede9fe,stroke:#7c3aed,stroke-width:3px,color:#3b0764
+
+    TM(["TypedModel"]):::data
+    CAT(["Modifiers · Actions\nDiagnostics\ncatalogs"]):::data
+    GA{{"Graph Analyzer"}}:::stage
+    OUT(["GraphResult"]):::data
 
     TM -->|"semantic declarations"| GA
     CAT --> GA
     GA --> OUT
-
-    classDef input fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
-    classDef stage fill:#ede9fe,stroke:#7c3aed,color:#3b0764
-    classDef artifact fill:#fef3c7,stroke:#d97706,color:#78350f
 ```
 
 | | |
@@ -396,18 +392,17 @@ The proof engine is the last analysis stage before lowering — and the compile-
 
 ```mermaid
 flowchart LR
-    TM(["TypedModel +\nGraphResult"]):::input
-    CAT(["Operations · Functions\nTypes · Diagnostics · Faults\ncatalogs"]):::input
-    PE[["Proof Engine"]]:::stage
-    OUT["ProofModel"]:::artifact
+    classDef data fill:#f8fafc,stroke:#94a3b8,color:#334155
+    classDef stage fill:#ede9fe,stroke:#7c3aed,stroke-width:3px,color:#3b0764
+
+    TM(["TypedModel +\nGraphResult"]):::data
+    CAT(["Operations · Functions\nTypes · Diagnostics · Faults\ncatalogs"]):::data
+    PE{{"Proof Engine"}}:::stage
+    OUT(["ProofModel"]):::data
 
     TM -->|"semantic model + graph facts"| PE
     CAT --> PE
     PE --> OUT
-
-    classDef input fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
-    classDef stage fill:#ede9fe,stroke:#7c3aed,color:#3b0764
-    classDef artifact fill:#fef3c7,stroke:#d97706,color:#78350f
 ```
 
 | | |
@@ -463,14 +458,17 @@ catalog metadata → ProofRequirement → ProofObligation → DiagnosticCode →
 
 ```mermaid
 flowchart LR
-    SRC(["source text"]):::input
-    TS(["TokenStream"]):::input
-    ST(["SyntaxTree"]):::input
-    TM(["TypedModel"]):::input
-    GR(["GraphResult"]):::input
-    PM(["ProofModel"]):::input
-    SNAP[["Compilation\nSnapshot"]]:::stage
-    OUT["CompilationResult"]:::artifact
+    classDef data fill:#f8fafc,stroke:#94a3b8,color:#334155
+    classDef stage fill:#ede9fe,stroke:#7c3aed,stroke-width:3px,color:#3b0764
+
+    SRC(["source text"]):::data
+    TS(["TokenStream"]):::data
+    ST(["SyntaxTree"]):::data
+    TM(["TypedModel"]):::data
+    GR(["GraphResult"]):::data
+    PM(["ProofModel"]):::data
+    SNAP{{"Compilation\nSnapshot"}}:::stage
+    OUT(["CompilationResult"]):::data
 
     SRC --> SNAP
     TS --> SNAP
@@ -479,10 +477,6 @@ flowchart LR
     GR --> SNAP
     PM --> SNAP
     SNAP --> OUT
-
-    classDef input fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
-    classDef stage fill:#ede9fe,stroke:#7c3aed,color:#3b0764
-    classDef artifact fill:#fef3c7,stroke:#d97706,color:#78350f
 ```
 
 | | |
@@ -515,16 +509,15 @@ Lowering is the transformation from analysis to execution — and the stage that
 
 ```mermaid
 flowchart LR
-    CR(["CompilationResult"]):::input
-    LOW[["Lowering\n(Precept.From)"]]:::stage
-    OUT["Precept"]:::artifact
+    classDef data fill:#f8fafc,stroke:#94a3b8,color:#334155
+    classDef stage fill:#ede9fe,stroke:#7c3aed,stroke-width:3px,color:#3b0764
+
+    CR(["CompilationResult"]):::data
+    LOW{{"Lowering\n(Precept.From)"}}:::stage
+    OUT(["Precept"]):::data
 
     CR -->|"only when !HasErrors"| LOW
     LOW --> OUT
-
-    classDef input fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
-    classDef stage fill:#ede9fe,stroke:#7c3aed,color:#3b0764
-    classDef artifact fill:#fef3c7,stroke:#d97706,color:#78350f
 ```
 
 | | |
@@ -600,29 +593,28 @@ Once a valid `Precept` exists, four operations govern entity lifecycle. The eval
 
 ```mermaid
 flowchart TD
-    P(["Precept"]):::input
+    classDef data fill:#f8fafc,stroke:#94a3b8,color:#334155
+    classDef stage fill:#ede9fe,stroke:#7c3aed,stroke-width:3px,color:#3b0764
 
-    CREATE["Create"]:::artifact
-    RESTORE["Restore"]:::artifact
-    EVAL[["Evaluator"]]:::stage
-    STRUCT["Structural\nqueries"]:::artifact
+    P(["Precept"]):::data
+
+    CREATE(["Create"]):::data
+    RESTORE(["Restore"]):::data
+    EVAL{{"Evaluator"}}:::stage
+    STRUCT(["Structural\nqueries"]):::data
 
     P --> CREATE
     P --> RESTORE
     P --> EVAL
     P --> STRUCT
 
-    FIRE["Fire · InspectFire"]:::artifact
-    UPD["Update · InspectUpdate"]:::artifact
-    FAULT["Fault backstops"]:::artifact
+    FIRE(["Fire · InspectFire"]):::data
+    UPD(["Update · InspectUpdate"]):::data
+    FAULT(["Fault backstops"]):::data
 
     EVAL --> FIRE
     EVAL --> UPD
     EVAL --> FAULT
-
-    classDef input fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
-    classDef stage fill:#ede9fe,stroke:#7c3aed,color:#3b0764
-    classDef artifact fill:#fef3c7,stroke:#d97706,color:#78350f
 ```
 
 ### Evaluator
