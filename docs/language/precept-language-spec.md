@@ -1,9 +1,15 @@
 # Precept Language Specification (v2)
 
-> **Status:** Incremental — grows per compiler stage as design decisions are locked
-> **Scope:** This document specifies the Precept DSL syntax and semantics for the v2 compiler pipeline. Each section is added when the corresponding compiler stage is designed and implemented.
-> **Grounding:** `docs/language/precept-language-vision.md` (target language surface), `docs/PreceptLanguageDesign.md` (v1 implemented spec)
-> **Clean room rule:** This spec references the v1 language grammar, keyword inventory, and disambiguation rules. It does NOT import v1 implementation details (Superpower combinators, token attributes, class hierarchies).
+---
+
+## Status
+
+| Property | Value |
+|---|---|
+| Doc maturity | Incremental — grows as each compiler stage is designed and implemented |
+| Implementation state | §1 Lexer complete; §2 Parser complete; §3 Type Checker complete; §4–5 stubs |
+| Grounding | `docs/language/precept-language-vision.md` (target surface) · `docs/PreceptLanguageDesign.md` (v1 spec) |
+| Clean room rule | References v1 grammar and keyword inventory; does not import v1 implementation details |
 
 ---
 
@@ -1268,3 +1274,24 @@ The type checker emits diagnostics for root causes only. When `ErrorType` is flo
 ## 5. Proof Engine
 
 > **Status:** Stub — to be written when the proof engine is designed and implemented.
+
+---
+
+## Open Questions / Implementation Notes
+
+_TBD — open questions will be captured here as later pipeline stages are designed._
+
+---
+
+## Cross-References
+
+| Document | Relationship |
+|---|---|
+| [Compiler and Runtime Design](../compiler-and-runtime-design.md) | Pipeline architecture; stage contracts |
+| [Catalog System](catalog-system.md) | Machine-readable language definition that feeds all pipeline stages |
+| [Lexer](../compiler/lexer.md) | §1 implementation detail |
+| [Parser](../compiler/parser.md) | §2 implementation detail |
+| [Type Checker](../compiler/type-checker.md) | §3 implementation detail |
+| [Graph Analyzer](../compiler/graph-analyzer.md) | §4 implementation detail |
+| [Proof Engine](../compiler/proof-engine.md) | §5 implementation detail |
+| [Language Vision](precept-language-vision.md) | Target language surface — this spec tracks what's implemented |

@@ -1,8 +1,14 @@
 # Catalog System
 
-> **Status:** Draft — updated 2026-04-25 after full team review (10-item metadata-driven design review, owner sign-off)
-> **Implemented in:** `src/Precept/` — all 12 catalogs implemented
-> **Related:** `docs/compiler/diagnostic-system.md`, `docs/runtime/fault-system.md`, `docs/compiler-and-runtime-design.md`
+---
+
+## Status
+
+| Property | Value |
+|---|---|
+| Doc maturity | Draft |
+| Implementation state | Implemented — all 12 catalogs in `src/Precept/`; team review complete (2026-04-25) |
+| Related | `docs/compiler/diagnostic-system.md` · `docs/runtime/fault-system.md` · `docs/compiler-and-runtime-design.md` |
 
 ## Overview
 
@@ -1376,3 +1382,21 @@ As catalogs are implemented, each pipeline stage gets thinner — domain knowled
 | **Evaluator** | Not yet implemented | Execution delegate design deferred pending working copy API design. When implemented: operation execution dispatches via `Operations.Resolve()`; function execution dispatches via `Functions.GetMeta()`; constraint activation timing reads `Constraints.GetMeta()`; modifier boundary validation reads `FieldModifierMeta.ApplicableTo`/`HasValue`. Action execution delegates deferred until working copy API designed. The evaluator's core loop (expression tree walking, working copy, atomicity) remains hand-written. |
 
 Pattern: domain knowledge → metadata. Stages → generic machinery that reads catalogs.
+
+---
+
+## Open Questions / Implementation Notes
+
+_TBD — open questions will be captured here as catalog consumers are implemented._
+
+---
+
+## Cross-References
+
+| Document | Relationship |
+|---|---|
+| [Compiler and Runtime Design](../compiler-and-runtime-design.md) | Architectural grounding — metadata-driven identity established here |
+| [Diagnostic System](../compiler/diagnostic-system.md) | Catalog 11 — `DiagnosticCode` + `DiagnosticMeta` shapes defined there |
+| [Fault System](../runtime/fault-system.md) | Catalog 12 — `FaultCode` + `FaultMeta` shapes; StaticallyPreventable chain |
+| [Language Spec](precept-language-spec.md) | Consumers of catalog metadata for each pipeline stage |
+| [Primitive Types](primitive-types.md) | `Types` catalog is the machine-readable version of primitive type rules |
