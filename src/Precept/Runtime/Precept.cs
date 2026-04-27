@@ -69,27 +69,25 @@ public sealed class Precept
         => throw new NotImplementedException();
 
     // ── Definition-level queries (structural — precomputed) ─────────
-    // TODO D8/R4: These return typed metadata descriptors, not strings.
-    // Each descriptor carries compiled metadata (name, type, slot index,
-    // access modes, constraints, arg-dependency sets, etc.).
 
-    public IReadOnlyList<string> States                                 // TODO D8/R4: state descriptors
+    public IReadOnlyList<StateDescriptor> States
         => throw new NotImplementedException();
 
-    public IReadOnlyList<string> Fields                                 // TODO D8/R4: field descriptors
+    public IReadOnlyList<FieldDescriptor> Fields
         => throw new NotImplementedException();
 
-    public IReadOnlyList<string> Events                                 // TODO D8/R4: event descriptors
+    public IReadOnlyList<EventDescriptor> Events
         => throw new NotImplementedException();
 
-    public string? InitialState                                         // null for stateless
+    /// <summary>The initial state descriptor, or <c>null</c> for stateless precepts.</summary>
+    public StateDescriptor? InitialState
         => throw new NotImplementedException();
 
     /// <summary>
-    /// The initial event name, or <c>null</c> if the precept does not declare one.
+    /// The initial event descriptor, or <c>null</c> if the precept does not declare one.
     /// When non-null, <see cref="Create"/> fires this event atomically.
     /// </summary>
-    public string? InitialEvent                                         // TODO D8/R4: event descriptor
+    public EventDescriptor? InitialEvent
         => throw new NotImplementedException();
 
     public bool IsStateless

@@ -10,11 +10,6 @@ namespace Precept.Runtime;
 /// API surface decided in R5.
 ///
 /// Internal representation (slot array vs. dictionary) is pending R3.
-///
-/// TODO D8/R4: All string parameters (field names, event names) and string-based
-/// return types are provisional. The runtime API will use typed metadata descriptors
-/// from the executable model — not raw strings — once D8/R4 defines those descriptors.
-/// Every string placeholder below is a known gap.
 /// </remarks>
 public sealed record Version
 {
@@ -31,19 +26,19 @@ public sealed record Version
 
     // ── Field access ────────────────────────────────────────────────
 
-    public object? this[string fieldName]                               // TODO D8/R4: field descriptor, not string
-        => throw new NotImplementedException();                         // TODO R3: slot array or dictionary
+    public object? this[string fieldName]                               // TODO R3: slot array or dictionary
+        => throw new NotImplementedException();
 
-    public IReadOnlyList<FieldAccessInfo> FieldAccess                    // TODO D8/R4: field descriptors carry access mode
-        => throw new NotImplementedException();                         // omit = absent from list
+    public IReadOnlyList<FieldAccessInfo> FieldAccess                   // omit = absent from list
+        => throw new NotImplementedException();
 
     // ── Structural queries (precomputed — zero evaluation cost) ─────
 
-    public IReadOnlyList<string> AvailableEvents                        // TODO D8/R4: event descriptors, not strings
+    public IReadOnlyList<EventDescriptor> AvailableEvents
         => throw new NotImplementedException();                         // events with rows in current state
 
-    public IReadOnlyList<ArgInfo> RequiredArgs(string eventName)         // TODO D8/R4: event descriptor param, arg descriptors returned
-        => throw new NotImplementedException();                         // name + type per arg
+    public IReadOnlyList<ArgDescriptor> RequiredArgs(EventDescriptor @event)
+        => throw new NotImplementedException();
 
     // ── Applicable constraints (Tier 2 — filtered for current state) ─
     // Constraints active for this entity's current state:
@@ -53,22 +48,25 @@ public sealed record Version
     //   - Event ensures for available events
     // Precomputed during construction — zero evaluation cost.
 
-    public IReadOnlyList<ConstraintDescriptor> ApplicableConstraints     // TODO D8/R4: backed by executable model scope index
+    public IReadOnlyList<ConstraintDescriptor> ApplicableConstraints
         => throw new NotImplementedException();
 
     // ── Commit ──────────────────────────────────────────────────────
+    // Fire and Update use string-keyed arguments — these remain string-based
+    // until the Evaluator is implemented, as they require descriptor resolution
+    // at dispatch time (R3/R5).
 
-    public EventOutcome Fire(string eventName, IReadOnlyDictionary<string, object?> args)       // TODO D8/R4: descriptor-keyed
+    public EventOutcome Fire(string eventName, IReadOnlyDictionary<string, object?> args)
         => throw new NotImplementedException();
 
-    public UpdateOutcome Update(IReadOnlyDictionary<string, object?> fields)                    // TODO D8/R4: descriptor-keyed
+    public UpdateOutcome Update(IReadOnlyDictionary<string, object?> fields)
         => throw new NotImplementedException();
 
     // ── Inspect ─────────────────────────────────────────────────────
 
-    public EventInspection InspectFire(string eventName, IReadOnlyDictionary<string, object?>? args = null)     // TODO D8/R4: descriptor-keyed
+    public EventInspection InspectFire(string eventName, IReadOnlyDictionary<string, object?>? args = null)
         => throw new NotImplementedException();
 
-    public UpdateInspection InspectUpdate(IReadOnlyDictionary<string, object?>? fields = null)                  // TODO D8/R4: descriptor-keyed
+    public UpdateInspection InspectUpdate(IReadOnlyDictionary<string, object?>? fields = null)
         => throw new NotImplementedException();
 }

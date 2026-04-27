@@ -5,8 +5,8 @@
 | Property | Value |
 |---|---|
 | Doc maturity | Stub |
-| Implementation state | Partial (`ConstraintDescriptor` exists in `SharedTypes.cs`; `FieldDescriptor`, `StateDescriptor`, `EventDescriptor`, `ArgDescriptor`, `FaultSiteDescriptor` are designed but not yet implemented — tracked as D8/R4) |
-| Source | `src/Precept/Runtime/Descriptors.cs` (planned — does not yet exist) |
+| Implementation state | `FieldDescriptor`, `StateDescriptor`, `EventDescriptor`, `ArgDescriptor`, `FaultSiteDescriptor` defined in `Descriptors.cs`; `ConstraintDescriptor` in `SharedTypes.cs`. Builder population pending (R3/R6). |
+| Source | `src/Precept/Runtime/Descriptors.cs`, `src/Precept/Runtime/SharedTypes.cs` |
 | Upstream | Precept Builder (constructs descriptors), SemanticIndex (source shapes) |
 | Downstream | All runtime operations, Precept structural query API, Version API, MCP DTOs |
 
@@ -48,7 +48,7 @@ Descriptors are produced in the Precept Builder's descriptor pass — the first 
 
 ## Component Mechanics
 
-### Designed Descriptor Shapes
+### Descriptor Shapes
 
 ```csharp
 // Field descriptor — carries slot index for evaluator access
@@ -56,7 +56,7 @@ sealed record FieldDescriptor(
     string Name,
     TypeKind Type,
     int SlotIndex,
-    ModifierKind[] Modifiers,
+    IReadOnlyList<ModifierKind> Modifiers,
     string? DefaultExpression,
     bool IsComputed,
     int SourceLine);
@@ -64,13 +64,13 @@ sealed record FieldDescriptor(
 // State descriptor — carries modifier set for dispatch decisions
 sealed record StateDescriptor(
     string Name,
-    ModifierKind[] Modifiers,
+    IReadOnlyList<ModifierKind> Modifiers,
     int SourceLine);
 
 // Event descriptor — carries arg list for arg resolution
 sealed record EventDescriptor(
     string Name,
-    ModifierKind[] Modifiers,
+    IReadOnlyList<ModifierKind> Modifiers,
     IReadOnlyList<ArgDescriptor> Args,
     int SourceLine);
 
@@ -89,24 +89,26 @@ sealed record FaultSiteDescriptor(
     int SourceLine);
 ```
 
-`ConstraintDescriptor` already exists in `SharedTypes.cs`: expression text, `ConstraintKind` anchor, `because` text, guard metadata, source lines, scope targets.
+`ConstraintDescriptor` exists in `SharedTypes.cs`: expression text, `ConstraintKind` anchor, `because` text, guard metadata, source lines, scope targets. `ReferencedFields` is currently a provisional flat string list; a typed target hierarchy (TODO G1/G9) will replace it when the constraint evaluation attribution model is implemented.
 
-### API Surface Updates Required
+### API Surfaces Using Descriptors
 
-When descriptors are implemented, the following API surfaces must be updated:
+All structural query surfaces now return typed descriptors:
 
-- `Precept.States` → `IReadOnlyList<StateDescriptor>` (currently `IReadOnlyList<string>`)
-- `Precept.Fields` → `IReadOnlyList<FieldDescriptor>` (currently `IReadOnlyList<string>`)
-- `Precept.Events` → `IReadOnlyList<EventDescriptor>` (currently `IReadOnlyList<string>`)
-- `Precept.InitialState` → `StateDescriptor?` (currently `string?`)
-- `Precept.InitialEvent` → `EventDescriptor?` (currently `string?`)
-- `Version.AvailableEvents` → `IReadOnlyList<EventDescriptor>` (currently `IReadOnlyList<string>`)
-- `Version.RequiredArgs(EventDescriptor)` → `IReadOnlyList<ArgDescriptor>` (currently string-keyed)
-- `SharedTypes.FieldAccessInfo` — replace `string FieldName` + `string FieldType` with `FieldDescriptor Field`; remove `ArgInfo` (replaced by `ArgDescriptor`)
+- `Precept.States` → `IReadOnlyList<StateDescriptor>`
+- `Precept.Fields` → `IReadOnlyList<FieldDescriptor>`
+- `Precept.Events` → `IReadOnlyList<EventDescriptor>`
+- `Precept.InitialState` → `StateDescriptor?`
+- `Precept.InitialEvent` → `EventDescriptor?`
+- `Version.AvailableEvents` → `IReadOnlyList<EventDescriptor>`
+- `Version.RequiredArgs(EventDescriptor)` → `IReadOnlyList<ArgDescriptor>`
+- `SharedTypes.FieldAccessInfo` → `FieldDescriptor Field` (replaces string name + type)
+
+String-keyed `Fire`, `Update`, `InspectFire`, `InspectUpdate` remain string-keyed until the Evaluator is implemented (R3/R5 work).
 
 ### MCP DTO Updates
 
-MCP DTOs in `tools/Precept.Mcp/Tools/` currently use string representations. When descriptor types are defined, MCP DTOs must be updated to match.
+MCP DTOs in `tools/Precept.Mcp/Tools/` currently use string representations. These will need updating when the evaluator is wired and descriptors are populated by the builder.
 
 ---
 
