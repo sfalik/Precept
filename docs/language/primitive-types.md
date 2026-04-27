@@ -1,8 +1,15 @@
 # Primitive Types
 
-> **Canonical source of truth** for Precept's primitive type system: `string`, `integer`, `decimal`, `number`, `boolean`, and `choice`. Includes numeric lane rules, conversion paths, constraints, and built-in functions.
->
-> **Companion docs:** [Temporal Type System](temporal-type-system.md) · [Business-Domain Types](business-domain-types.md) · [Literal System](../compiler/literal-system.md)
+---
+
+## Status
+
+| Property | Value |
+|---|---|
+| Doc maturity | Full |
+| Implementation state | Designed — type checker implementation pending |
+| Scope | Six primitive types: `string`, `integer`, `decimal`, `number`, `boolean`, `choice`; numeric lanes, conversion rules, built-in functions |
+| Related | [Temporal Type System](temporal-type-system.md) · [Business-Domain Types](business-domain-types.md) · [Literal System](../compiler/literal-system.md) |
 
 ---
 
@@ -515,6 +522,12 @@ A function keeps its `decimal` overload if and only if the mathematical operatio
 
 - **Closed:** `abs`, `min`, `max`, `clamp`, `pow` (integer exponent), `round`, `floor`, `ceil`, `truncate` — these all have `decimal` overloads.
 - **Not closed:** `sqrt`, and future functions (`log`, `sin`, `cos`, `exp`) — these live exclusively in the `number` lane. Authors reach them via `approximate()`.
+
+---
+
+## Open Questions / Implementation Notes
+
+_TBD — open questions will be captured here as the type checker and evaluator implementation progresses._
 
 ---
 

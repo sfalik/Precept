@@ -1,9 +1,16 @@
 # Temporal Type System Design — NodaTime-Aligned
 
-> **Status:** Draft
-> **Grounding:** `docs/language/precept-language-vision.md` § Type System, language design principles
-> **Prototype reference:** `docs/TemporalTypeSystemDesign.md` on `research/nodatime-type-alignment` branch (PR #114)
-> **Related proposals:** [Issue #107](https://github.com/sfalik/Precept/issues/107)
+---
+
+## Status
+
+| Property | Value |
+|---|---|
+| Doc maturity | Draft |
+| Implementation state | Proposal — not yet implemented |
+| Grounding | `docs/language/precept-language-vision.md` § Type System |
+| Prototype | `docs/TemporalTypeSystemDesign.md` on `research/nodatime-type-alignment` branch (PR #114) |
+| Related | [Issue #107](https://github.com/sfalik/Precept/issues/107) · [Primitive Types](primitive-types.md) · [Business-Domain Types](business-domain-types.md) · [Literal System](../compiler/literal-system.md) |
 
 ---
 
@@ -1714,3 +1721,21 @@ No programming language combines entity-scoped unit declarations, type-level enf
 ### Scope boundary
 
 This section is a **forward design note**, not a commitment. It documents why the literal mechanism decisions in this proposal carry more weight than temporal types alone — they establish the language's framework for moving beyond primitives. Temporal types are the gateway: they prove the typed constant delimiter with interpolation, the context-born resolution model, and the zero-constructor discipline. The actual design of future types (UUID, email, currency, physical quantity) belongs in separate proposals when demand warrants it. The temporal decisions should be made with this framework in mind, but should not be over-engineered to serve hypothetical future needs.
+
+---
+
+## Open Questions / Implementation Notes
+
+_TBD — implementation questions will be captured here when this proposal advances._
+
+---
+
+## Cross-References
+
+| Document | Relationship |
+|---|---|
+| [Primitive Types](primitive-types.md) | Temporal types extend the primitive numeric lane model; `duration` scaling uses `number`-lane arithmetic |
+| [Business-Domain Types](business-domain-types.md) | Depends on `period`, `duration`, `timezone`, and the typed constant delimiter established here |
+| [Literal System](../compiler/literal-system.md) | Canonical design for two-door literal model — temporal typed constants are Door 2 inhabitants |
+| [Language Vision](precept-language-vision.md) | Grounding for temporal type surface decisions |
+| [Issue #107](https://github.com/sfalik/Precept/issues/107) | Linked proposal |

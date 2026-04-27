@@ -1,10 +1,17 @@
 # Currency, Quantity, Unit-of-Measure, and Price Design
 
-> **Status:** Draft
-> **Grounding:** `docs/language/precept-language-vision.md` § Type System, language design principles
-> **Prototype reference:** `docs/CurrencyQuantityUomDesign.md` on `research/issue-95-currency-quantity-uom` branch
-> **Related proposals:** [Issue #95](https://github.com/sfalik/Precept/issues/95)
-> **Depends on:** [Temporal Type System Design](temporal-type-system.md) (Issue #107) — establishes `period`, `duration`, `timezone`, the typed constant delimiter, and the `in` syntax pattern this proposal extends. [Issue #115](https://github.com/sfalik/Precept/issues/115) — exact `decimal` arithmetic; context-sensitive literal typing; non-ambiguous inference invariant.
+---
+
+## Status
+
+| Property | Value |
+|---|---|
+| Doc maturity | Draft |
+| Implementation state | Proposal — not yet implemented; depends on temporal type system (Issue #107) |
+| Grounding | `docs/language/precept-language-vision.md` § Type System |
+| Prototype | `docs/CurrencyQuantityUomDesign.md` on `research/issue-95-currency-quantity-uom` branch |
+| Depends on | [Temporal Type System](temporal-type-system.md) (Issue #107) · [Issue #115](https://github.com/sfalik/Precept/issues/115) |
+| Related | [Issue #95](https://github.com/sfalik/Precept/issues/95) · [Temporal Type System](temporal-type-system.md) · [Primitive Types](primitive-types.md) · [Literal System](../compiler/literal-system.md) |
 
 ---
 
@@ -1829,3 +1836,23 @@ This proposal introduces business-domain diagnostic codes in the `DiagnosticCode
 - `Compile` — type checker emits at parse/compile time; caught before fire/run
 - `Runtime boundary` — validated at `precept_fire`/`precept_update` input before the engine runs
 - `Runtime` — evaluated during `set` execution inside the engine
+
+---
+
+## Open Questions / Implementation Notes
+
+_TBD — implementation questions will be captured here when this proposal advances._
+
+---
+
+## Cross-References
+
+| Document | Relationship |
+|---|---|
+| [Temporal Type System](temporal-type-system.md) | Dependency — `period`, `duration`, `timezone`, typed constant delimiter, and `in` syntax established here |
+| [Primitive Types](primitive-types.md) | D12 scalar operand contract; widening ceiling for business-domain types |
+| [Literal System](../compiler/literal-system.md) | Canonical design for two-door literal model — business-domain typed constants are Door 2 inhabitants |
+| [Language Vision](precept-language-vision.md) | Grounding for type surface decisions |
+| [Issue #95](https://github.com/sfalik/Precept/issues/95) | Linked proposal |
+| [Issue #107](https://github.com/sfalik/Precept/issues/107) | Temporal dependency |
+| [Issue #115](https://github.com/sfalik/Precept/issues/115) | Decimal arithmetic dependency |
