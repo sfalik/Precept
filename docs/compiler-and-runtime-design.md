@@ -56,46 +56,134 @@ The relationship is straightforward: analysis builds `Compilation`; the Precept 
 
 ## 3. The pipeline
 
+**End-to-end pipeline** — source and catalogs feed the compile stages; each runtime operation produces a new immutable `Version`:
+
 ```mermaid
 flowchart TD
-    classDef input fill:#dbeafe,stroke:#60a5fa,color:#1e3a5f
-    classDef stage fill:#ede9fe,stroke:#a78bfa,color:#3b1f7e
+    classDef input    fill:#dbeafe,stroke:#60a5fa,color:#1e3a5f
+    classDef catalog  fill:#cffafe,stroke:#22d3ee,color:#164e63
+    classDef stage    fill:#ede9fe,stroke:#a78bfa,color:#3b1f7e
     classDef artifact fill:#fef3c7,stroke:#f59e0b,color:#78350f
-    classDef runtime fill:#d1fae5,stroke:#34d399,color:#064e3b
-    classDef leaf fill:#a7f3d0,stroke:#10b981,color:#064e3b
+    classDef out      fill:#fef9c3,stroke:#f59e0b,color:#78350f
+    classDef runtime  fill:#d1fae5,stroke:#34d399,color:#064e3b
 
-    src([Source text]):::input
-    cat([Catalogs]):::input
+    PR(Precept):::runtime
+    V(Version):::runtime
+    INS(["Inspect()"]):::input
+    SQ([Structural queries]):::input
+    FIR(["Fire()"]):::input
+    UPD(["Update()"]):::input
 
-    subgraph compile [Compile-time pipeline]
+    subgraph COMPILE[Compile pipeline]
         direction LR
-        L(Lexer):::stage --> P(Parser):::stage --> TC(TypeChecker):::stage --> GA(GraphAnalyzer):::stage --> PE(ProofEngine):::stage
+
+        SRC([Source text]):::input
+
+        subgraph c1[ ]
+            direction TB
+            LEX(Lexer):::stage --> TS>"TokenStream"]:::out
+        end
+        subgraph c2[ ]
+            direction TB
+            PAR(Parser):::stage --> ST>"SyntaxTree"]:::out
+        end
+        subgraph c3[ ]
+            direction TB
+            TC(TypeChecker):::stage --> SI>"SemanticIndex"]:::out
+        end
+        subgraph c4[ ]
+            direction TB
+            GA(GraphAnalyzer):::stage --> SG>"StateGraph"]:::out
+        end
+        subgraph c5[ ]
+            direction TB
+            PE(ProofEngine):::stage --> PL>"ProofLedger"]:::out
+        end
+
+        SRC --> c1 --> c2 --> c3 --> c4 --> c5
     end
 
-    src --> compile
-    cat -. feeds all stages .-> compile
+    CR>"Compilation"]:::out
 
-    compile --> CR[Compilation]:::artifact
-    CR -- "only when !HasErrors" --> PF(Precept.From):::artifact
-
-    subgraph runtime [Runtime operations]
-        C(Create):::runtime
-        R(Restore):::runtime
-        E(Evaluator):::runtime
-        SQ(Structural queries):::runtime
+    subgraph CATALOGS[Catalogs]
+        direction LR
+        TOK(Tokens):::catalog ~~~ TYP(Types):::catalog ~~~ FUN(Functions):::catalog ~~~ OPR(Operators):::catalog ~~~ OPN(Operations):::catalog
+        MOD(Modifiers):::catalog ~~~ ACT(Actions):::catalog ~~~ CON(Constructs):::catalog ~~~ DIA(Diagnostics):::catalog ~~~ FLT(Faults):::catalog
     end
 
-    PF --> C
-    PF --> R
-    PF --> E
-    PF --> SQ
+    CATALOGS -. feeds all stages .-> COMPILE
+    COMPILE --> CR
+    CR -- "From()" --> PR
 
-    E --> FI([Fire / InspectFire]):::leaf
-    E --> UI([Update / InspectUpdate]):::leaf
-    E --> FB([Fault backstops]):::leaf
+    subgraph RUNTIME[Runtime]
+        direction TB
+        PR -- "Create()" --> V
+        PR -- "Restore()" --> V
+        V -.-> FIR
+        V -.-> UPD
+        V -.-> INS
+        V -.-> SQ
+    end
+
+    style COMPILE  fill:#ffffff,stroke:#cbd5e1,color:#334155
+    style RUNTIME  fill:#f0fdf4,stroke:#34d399,color:#064e3b
+    style CATALOGS fill:#ecfeff,stroke:#22d3ee,color:#164e63
+    style c1 fill:#f8fafc,stroke:#cbd5e1
+    style c2 fill:#f8fafc,stroke:#cbd5e1
+    style c3 fill:#f8fafc,stroke:#cbd5e1
+    style c4 fill:#f8fafc,stroke:#cbd5e1
+    style c5 fill:#f8fafc,stroke:#cbd5e1
 ```
 
-Every stage begins from two roots. The `.precept` source text is the author-owned program. The catalogs are the language specification. Catalogs enter as early as they are knowable — later stages carry catalog-stamped identity forward, never recreating it from hardcoded switches.
+At the public surface, the compiler/runtime boundary is intentionally narrow. Internal contributors should read the system from that boundary inward, because it shows where analysis ends and executable behavior begins.
+
+```csharp
+Compilation compilation = Compiler.Compile(source);
+```
+
+`Compiler.Compile(source)` is the full compile pipeline entry point. It exists to turn author-owned `.precept` text into a stable compile-time aggregate that preserves everything the downstream system needs: stage outputs, diagnostics, and a single `HasErrors` summary. That separation matters because later steps should consume prior analysis, not repeat it. The compiler's job is to concentrate compile-time knowledge into one object that can be inspected, validated, and then handed to runtime construction.
+
+To see what that call actually does, zoom in on the compiler itself.
+
+```csharp
+// Inside Compiler.Compile
+TokenStream   tokens    = Lexer.Lex(source);
+SyntaxTree    tree      = Parser.Parse(tokens);
+SemanticIndex semantics = TypeChecker.Check(tree);
+StateGraph    graph     = GraphAnalyzer.Analyze(semantics);
+ProofLedger   proof     = ProofEngine.Prove(semantics, graph);
+
+ImmutableArray<Diagnostic> diagnostics =
+[
+    ..tokens.Diagnostics,
+    ..tree.Diagnostics,
+    ..semantics.Diagnostics,
+    ..graph.Diagnostics,
+    ..proof.Diagnostics,
+];
+
+return new Compilation(
+    Tokens:      tokens,
+    SyntaxTree:  tree,
+    Semantics:   semantics,
+    Graph:       graph,
+    Proof:       proof,
+    Diagnostics: diagnostics,
+    HasErrors:   diagnostics.Any(d => d.Severity == Severity.Error)
+);
+```
+
+Every stage starts from two roots. The first root is the `.precept` source text: the program the author wrote. The second root is the catalogs: the language specification that supplies the identities and metadata the compiler must preserve. Those catalogs enter as soon as a stage can know something from them, and later stages carry that catalog-stamped identity forward instead of reconstructing it with hardcoded switches.
+
+The stages produce progressively richer artifacts. Lexing produces a `TokenStream`. Parsing produces a `SyntaxTree`. Type checking produces a `SemanticIndex`. Graph analysis produces a `StateGraph`. Proof analysis produces a `ProofLedger`. `Compilation` is the aggregate over those artifacts plus the merged diagnostic stream and the `HasErrors` summary. It is the compiler's complete output, not a success token.
+
+`Compilation` is the last compile-time aggregate. Execution starts only when that aggregate is transformed into runtime-native structures.
+
+```csharp
+Precept     precept     = Precept.From(compilation);        // requires !HasErrors
+```
+
+`Precept.From()` is the transformation boundary. It takes the knowledge already established by compilation and re-expresses the runtime-relevant parts in executable form. What crosses the boundary is not the compile artifacts themselves, but the information runtime must execute and answer structural questions. What does not cross is equally important: runtime types do not hold references to tokens, syntax trees, parser recovery state, or proof artifacts. The design keeps execution independent from compiler internals while still preserving the results of analysis in shapes the evaluator can use directly.
 
 ### Artifact inventory
 
@@ -116,7 +204,7 @@ Every stage begins from two roots. The `.precept` source text is the author-owne
 
 ### What crosses into the executable model
 
-`Precept.From()` transforms analysis knowledge into runtime-native shapes. Runtime types hold no references to compile-stage artifacts — but the knowledge those artifacts contain crosses in executable form.
+`Precept.From()` transforms analysis knowledge into runtime-native shapes.
 
 - **Transition dispatch index** — state × event → target state. This is graph topology, built into a routing table the evaluator and inspection surfaces consume directly.
 - **State descriptor table** — all named states with metadata (display name, terminal flag, initial/required/irreversible modifiers, available events). Enables structural queries ("what states exist?", "what modifiers apply?").
@@ -130,6 +218,28 @@ Every stage begins from two roots. The `.precept` source text is the author-owne
 
 `SyntaxTree`, `TokenStream`, parser recovery, and the `ProofLedger` artifact don't cross — nothing at runtime needs them. The compiler-result-to-runtime survey confirms a spectrum of severance approaches: CEL's `Program` retains AST node IDs (`Interpretable.ID()`) for cost tracking and `EvalState` observation, maintaining a back-reference to the checked AST; Dhall discards all compile artifacts after decoding — the normalized `Expr Src Void` is consumed by the `Decoder` and the host-language value carries no back-reference; Pkl's `Evaluator` merges parse, type-check, and evaluation into a single call with no separate compile artifact at all. Precept's build step sits in the middle — it carries analysis knowledge forward in runtime-native shapes (descriptors, plans, indexes) while severing all structural references to compile-time artifacts.
 
+Once the executable model exists, runtime operations work entirely on runtime objects.
+
+```csharp
+EventOutcome created = precept.Create(args);                // Applied or Transitioned
+Version version = created switch
+{
+    Applied a      => a.Result,
+    Transitioned t => t.Result,
+    _              => throw new InvalidOperationException()
+};
+
+EventOutcome outcome = version.Fire("Approve", args);       // each Fire → new Version
+Version version2 = outcome switch
+{
+    Applied a      => a.Result,
+    Transitioned t => t.Result,
+    _              => throw new InvalidOperationException()
+};
+```
+
+This closes the loop on the earlier boundary. `precept.Create(args)` produces an `EventOutcome`, from which the caller extracts a `Version` snapshot. `version.Fire("Approve", args)` evaluates against that snapshot and returns another `EventOutcome` and another `Version`. Runtime progression therefore happens by producing explicit results over the executable model built by `Precept.From()`, not by consulting or mutating compiler artifacts.
+
 > **Precept Innovations**
 > - **Unified pipeline.** Compilation and runtime are sequential stages of one system sharing the same catalog metadata — not two separate systems bolted together. There is no "compile step" followed by a "runtime step" from the user's perspective; the pipeline flows from source text to executable enforcement in one continuous transformation.
 > - **Compilation as an always-available intelligence snapshot.** Even broken programs produce a full `Compilation` with partial analysis — language server and MCP tools always have something to work with. Traditional compilers stop at the first error boundary; Precept provides progressive intelligence across all stages.
@@ -142,14 +252,15 @@ The lexer converts raw text into classified tokens with exact spans. It has no s
 
 ```mermaid
 flowchart LR
-    classDef input fill:#dbeafe,stroke:#60a5fa,color:#1e3a5f
-    classDef stage fill:#ede9fe,stroke:#a78bfa,color:#3b1f7e
-    classDef artifact fill:#fef3c7,stroke:#f59e0b,color:#78350f
+    classDef input   fill:#dbeafe,stroke:#60a5fa,color:#1e3a5f
+    classDef catalog fill:#cffafe,stroke:#22d3ee,color:#164e63
+    classDef stage   fill:#ede9fe,stroke:#a78bfa,color:#3b1f7e
+    classDef out     fill:#fef9c3,stroke:#f59e0b,color:#78350f
 
     SRC([source text]):::input
-    CAT(["Tokens · Diagnostics<br/>catalogs"]):::input
+    CAT("Tokens · Diagnostics<br/>catalogs"):::catalog
     LEX(Lexer):::stage
-    OUT[TokenStream]:::artifact
+    OUT>"TokenStream"]:::out
 
     SRC --> LEX
     CAT --> LEX
@@ -184,14 +295,15 @@ The parser builds the source-structural model of the authored program. Its key d
 
 ```mermaid
 flowchart LR
-    classDef input fill:#dbeafe,stroke:#60a5fa,color:#1e3a5f
-    classDef stage fill:#ede9fe,stroke:#a78bfa,color:#3b1f7e
-    classDef artifact fill:#fef3c7,stroke:#f59e0b,color:#78350f
+    classDef input   fill:#dbeafe,stroke:#60a5fa,color:#1e3a5f
+    classDef catalog fill:#cffafe,stroke:#22d3ee,color:#164e63
+    classDef stage   fill:#ede9fe,stroke:#a78bfa,color:#3b1f7e
+    classDef out     fill:#fef9c3,stroke:#f59e0b,color:#78350f
 
-    TS[TokenStream]:::artifact
-    CAT(["Constructs · Tokens<br/>Operators · Diagnostics<br/>catalogs"]):::input
+    TS>"TokenStream"]:::out
+    CAT("Constructs · Tokens<br/>Operators · Diagnostics<br/>catalogs"):::catalog
     PAR(Parser):::stage
-    OUT[SyntaxTree]:::artifact
+    OUT>"SyntaxTree"]:::out
 
     TS -->|"token stream"| PAR
     CAT --> PAR
@@ -281,14 +393,15 @@ The type checker is the first stage that reasons about semantics. Its key design
 
 ```mermaid
 flowchart LR
-    classDef input fill:#dbeafe,stroke:#60a5fa,color:#1e3a5f
-    classDef stage fill:#ede9fe,stroke:#a78bfa,color:#3b1f7e
-    classDef artifact fill:#fef3c7,stroke:#f59e0b,color:#78350f
+    classDef input   fill:#dbeafe,stroke:#60a5fa,color:#1e3a5f
+    classDef catalog fill:#cffafe,stroke:#22d3ee,color:#164e63
+    classDef stage   fill:#ede9fe,stroke:#a78bfa,color:#3b1f7e
+    classDef out     fill:#fef9c3,stroke:#f59e0b,color:#78350f
 
-    ST[SyntaxTree]:::artifact
-    CAT(["Types · Functions · Operators<br/>Operations · Modifiers · Actions<br/>Constructs · Diagnostics<br/>catalogs"]):::input
+    ST>"SyntaxTree"]:::out
+    CAT("Types · Functions · Operators<br/>Operations · Modifiers · Actions<br/>Constructs · Diagnostics<br/>catalogs"):::catalog
     TC(Type Checker):::stage
-    OUT[SemanticIndex]:::artifact
+    OUT>"SemanticIndex"]:::out
 
     ST -->|"syntax tree"| TC
     CAT --> TC
@@ -443,14 +556,15 @@ The graph analyzer derives lifecycle structure from semantic declarations. Its k
 
 ```mermaid
 flowchart LR
-    classDef input fill:#dbeafe,stroke:#60a5fa,color:#1e3a5f
-    classDef stage fill:#ede9fe,stroke:#a78bfa,color:#3b1f7e
-    classDef artifact fill:#fef3c7,stroke:#f59e0b,color:#78350f
+    classDef input   fill:#dbeafe,stroke:#60a5fa,color:#1e3a5f
+    classDef catalog fill:#cffafe,stroke:#22d3ee,color:#164e63
+    classDef stage   fill:#ede9fe,stroke:#a78bfa,color:#3b1f7e
+    classDef out     fill:#fef9c3,stroke:#f59e0b,color:#78350f
 
-    TM[SemanticIndex]:::artifact
-    CAT(["Modifiers · Actions<br/>Diagnostics<br/>catalogs"]):::input
+    TM>"SemanticIndex"]:::out
+    CAT("Modifiers · Actions<br/>Diagnostics<br/>catalogs"):::catalog
     GA(Graph Analyzer):::stage
-    OUT[StateGraph]:::artifact
+    OUT>"StateGraph"]:::out
 
     TM -->|"semantic declarations"| GA
     CAT --> GA
@@ -535,14 +649,15 @@ The proof engine is the last analysis stage before the Precept Builder — and t
 
 ```mermaid
 flowchart LR
-    classDef input fill:#dbeafe,stroke:#60a5fa,color:#1e3a5f
-    classDef stage fill:#ede9fe,stroke:#a78bfa,color:#3b1f7e
-    classDef artifact fill:#fef3c7,stroke:#f59e0b,color:#78350f
+    classDef input   fill:#dbeafe,stroke:#60a5fa,color:#1e3a5f
+    classDef catalog fill:#cffafe,stroke:#22d3ee,color:#164e63
+    classDef stage   fill:#ede9fe,stroke:#a78bfa,color:#3b1f7e
+    classDef out     fill:#fef9c3,stroke:#f59e0b,color:#78350f
 
-    TM["SemanticIndex +<br/>StateGraph"]:::artifact
-    CAT(["Operations · Functions<br/>Types · Diagnostics · Faults<br/>catalogs"]):::input
+    TM>"SemanticIndex + StateGraph"]:::out
+    CAT("Operations · Functions<br/>Types · Diagnostics · Faults<br/>catalogs"):::catalog
     PE(Proof Engine):::stage
-    OUT[ProofLedger]:::artifact
+    OUT>"ProofLedger"]:::out
 
     TM -->|"semantic inventory + graph facts"| PE
     CAT --> PE
@@ -643,18 +758,18 @@ catalog metadata → ProofRequirement → ProofObligation → DiagnosticCode →
 
 ```mermaid
 flowchart LR
-    classDef input fill:#dbeafe,stroke:#60a5fa,color:#1e3a5f
-    classDef stage fill:#ede9fe,stroke:#a78bfa,color:#3b1f7e
-    classDef artifact fill:#fef3c7,stroke:#f59e0b,color:#78350f
+    classDef input   fill:#dbeafe,stroke:#60a5fa,color:#1e3a5f
+    classDef stage   fill:#ede9fe,stroke:#a78bfa,color:#3b1f7e
+    classDef out     fill:#fef9c3,stroke:#f59e0b,color:#78350f
 
     SRC([source text]):::input
-    TS[TokenStream]:::artifact
-    ST[SyntaxTree]:::artifact
-    TM[SemanticIndex]:::artifact
-    GR[StateGraph]:::artifact
-    PM[ProofLedger]:::artifact
+    TS>"TokenStream"]:::out
+    ST>"SyntaxTree"]:::out
+    TM>"SemanticIndex"]:::out
+    GR>"StateGraph"]:::out
+    PM>"ProofLedger"]:::out
     SNAP("Compilation<br/>Snapshot"):::stage
-    OUT[Compilation]:::artifact
+    OUT>"Compilation"]:::out
 
     SRC --> SNAP
     TS --> SNAP
@@ -695,12 +810,13 @@ The Precept Builder is the transformation from analysis to execution — and the
 
 ```mermaid
 flowchart LR
-    classDef stage fill:#ede9fe,stroke:#a78bfa,color:#3b1f7e
-    classDef artifact fill:#fef3c7,stroke:#f59e0b,color:#78350f
+    classDef stage   fill:#ede9fe,stroke:#a78bfa,color:#3b1f7e
+    classDef out     fill:#fef9c3,stroke:#f59e0b,color:#78350f
+    classDef runtime fill:#d1fae5,stroke:#34d399,color:#064e3b
 
-    CR[Compilation]:::artifact
+    CR>"Compilation"]:::out
     LOW("Precept Builder<br/>Precept.From"):::stage
-    OUT[Precept]:::artifact
+    OUT(Precept):::runtime
 
     CR -->|"only when !HasErrors"| LOW
     LOW --> OUT
@@ -842,11 +958,10 @@ Once a valid `Precept` exists, four operations govern entity lifecycle. The eval
 
 ```mermaid
 flowchart TD
-    classDef artifact fill:#fef3c7,stroke:#f59e0b,color:#78350f
+    classDef input   fill:#dbeafe,stroke:#60a5fa,color:#1e3a5f
     classDef runtime fill:#d1fae5,stroke:#34d399,color:#064e3b
-    classDef leaf fill:#a7f3d0,stroke:#10b981,color:#064e3b
 
-    P[Precept]:::artifact
+    P(Precept):::runtime
 
     CREATE(Create):::runtime
     RESTORE(Restore):::runtime
@@ -858,9 +973,9 @@ flowchart TD
     P --> EVAL
     P --> STRUCT
 
-    FIRE([Fire · InspectFire]):::leaf
-    UPD([Update · InspectUpdate]):::leaf
-    FAULT([Fault backstops]):::leaf
+    FIRE(["Fire · InspectFire"]):::input
+    UPD(["Update · InspectUpdate"]):::input
+    FAULT(["Fault backstops"]):::input
 
     EVAL --> FIRE
     EVAL --> UPD
