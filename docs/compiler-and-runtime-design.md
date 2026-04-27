@@ -3,7 +3,7 @@
 > **Status:** Approved working architecture
 > **Audience:** compiler, runtime, language-server, MCP, and documentation authors
 
-**How to read this document.** Sections 1–3 establish what Precept promises, its architectural approach (catalog-driven, purpose-built, unified pipeline), and the end-to-end pipeline overview — read these first for the design's spine. Sections 4–5 cover Lexer and Parser. Sections 6–10 are the per-stage contracts (Type Checker through Precept Builder), each opening with how that stage serves the structural guarantee; read them in order for the compilation story, or jump to a specific stage when doing component work. Section 6 (Type Checker) also defines the `SemanticIndex` artifact — its flat semantic-inventory shape, syntax-node back-pointers, and the anti-mirroring rules that keep downstream consumers independent of source structure. Sections 11–15 cover the runtime surface, tooling integration (TextMate grammar generation, MCP, language server), and Appendix A tracks implementation status — these are the consumer-facing contracts that tie compilation output to real product surfaces.
+**How to read this document.** Sections 1–3 establish what Precept promises, its architectural approach (catalog-driven, purpose-built, unified pipeline), and the end-to-end pipeline overview — read these first for the design's spine. Sections 4–5 cover Lexer and Parser. Sections 6–10 are the per-stage contracts (Type Checker through Precept Builder), each opening with how that stage serves the structural guarantee; read them in order for the compilation story, or jump to a specific stage when doing component work. Section 6 (Type Checker) also defines the `SemanticIndex` artifact — its flat semantic-inventory shape, syntax-node back-pointers, and the anti-mirroring rules that keep downstream consumers independent of source structure. Sections 11–15 cover the runtime surface and tooling integration (TextMate grammar generation, MCP, language server) — these are the consumer-facing contracts that tie compilation output to real product surfaces.
 
 ## 1. What Precept promises
 
@@ -282,8 +282,6 @@ TokenStream
 
 **How it serves the guarantee:** The lexer ensures that every character of source text is accounted for and classified according to catalog-defined vocabulary. No ambiguity in token identity propagates downstream.
 
-**Implementation status:** This is the one materially implemented compiler stage.
-
 > **Precept Innovations**
 > - **Catalog-driven token recognition.** `TokenKind` derives from catalog metadata, not a parallel enum. The lexer is a vocabulary consumer — adding a keyword to the `Tokens` catalog automatically makes it lexable, highlightable, and completable.
 > - **No vocabulary ownership at the lexer level.** Traditional lexers own a hardcoded keyword table. Precept's lexer reads its vocabulary from the same metadata that drives every other consumer.
@@ -309,14 +307,12 @@ flowchart LR
     PAR --> OUT
 ```
 
-| **Output** | `SyntaxTree` — `PreceptSyntax Root` with source-faithful declaration/expression nodes, missing-node representation, and span ownership; plus parse-phase diagnostics. (Current shape: diagnostics-only stub.) |
+| **Output** | `SyntaxTree` — `PreceptSyntax Root` with source-faithful declaration/expression nodes, missing-node representation, and span ownership; plus parse-phase diagnostics. |
 |---|---|
 | **Catalog role** | The parser stamps syntax-level identities as soon as syntax alone can know them: construct kind, anchor keyword, action keyword, operator token, literal segment form. |
 | **Consumers** | TypeChecker, LS syntax-facing features (outline, folding, recovery-aware local context) |
 
 **How it serves the guarantee:** Structural fidelity means the type checker and downstream stages work from a faithful representation of the author's intent, including malformed programs — authoring tools can diagnose problems precisely because the structure is preserved, not discarded on error.
-
-**Implementation status:** `Parser.Parse` is a stub; the contract is designed but not implemented.
 
 ### Parser/TypeChecker contract boundary
 
@@ -378,8 +374,6 @@ Precept's grammar calls for parser patterns scaled to a flat, keyword-anchored, 
 
 `set` appears as both an action keyword (`TokenCategory.Action` — e.g., `set Amount to 100`) and a type keyword (`TokenCategory.Type` — e.g., `field Tags as set of string`). The parser disambiguates by position context: after `->` or in action position = action; after `as`/`of` or in type position = type. This disambiguation is a parser responsibility, not a catalog lookup — the catalog correctly classifies `set` under both categories.
 
-**Implementation status:** `Parser.Parse` is a stub; the contract is designed but not implemented.
-
 > **Precept Innovations**
 > - **Flat, declaration-oriented grammar.** No nesting beyond expression-within-declaration. This makes the grammar trivially parseable, the error recovery model simple and predictable, and the SyntaxTree shape directly useful for tooling without the complexity budget of a general-purpose language parser.
 > - **Precedence from catalog metadata.** Operator precedence and associativity are not hardcoded — they derive from `Operators.GetMeta()`. Changing precedence is a catalog edit, not a parser rewrite.
@@ -406,14 +400,12 @@ flowchart LR
     TC --> OUT
 ```
 
-| **Output** | `SemanticIndex` — semantic symbol tables and binding indexes, normalized declaration inventories, typed expressions and actions, dependency facts, and syntax-node back-pointers, plus diagnostics. (Current shape: diagnostics-only stub.) |
+| **Output** | `SemanticIndex` — semantic symbol tables and binding indexes, normalized declaration inventories, typed expressions and actions, dependency facts, and syntax-node back-pointers, plus diagnostics. |
 |---|---|
 | **Catalog role** | First stage to resolve `TypeKind`, `FunctionKind`, `OperatorKind`, `OperationKind`, `ModifierMeta`, `ActionMeta`, `FunctionOverload`, `TypeAccessor`, and attached `ProofRequirement` records into semantic identity. |
 | **Consumers** | GraphAnalyzer, ProofEngine, LS semantic tooling, MCP compile output, Precept Builder |
 
 **How it serves the guarantee:** The type checker catches semantic defects — type mismatches, illegal operations, invalid modifier combinations, unresolved references — before the program reaches graph analysis or runtime. Every expression and declaration that passes type checking has a resolved, catalog-backed semantic identity. This is where the structural guarantee begins to take shape: if it type-checks, its operations are legal.
-
-**Implementation status:** `TypeChecker.Check` is stubbed; the semantic inventory contract is ahead of implementation.
 
 ### SemanticIndex: flat semantic inventory, not a mirrored tree
 
@@ -568,7 +560,7 @@ flowchart LR
     GA --> OUT
 ```
 
-| **Output** | `StateGraph` — graph facts keyed by semantic identities, plus diagnostics. (Current shape: diagnostics-only stub.) |
+| **Output** | `StateGraph` — graph facts keyed by semantic identities, plus diagnostics. |
 |---|---|
 | **Catalog role** | State semantics (`initial`, `terminal`, `required`, `irreversible`, `success`, `warning`, `error`) come from modifier metadata already resolved by the type checker; the analyzer must not reinterpret raw syntax. |
 | **Consumers** | ProofEngine, `Precept.From`, LS structural diagnostics, runtime structural precomputation |
@@ -632,8 +624,6 @@ Review  ──Reject───▶ Draft
 | `EventCoverageEntry` | per-state inventory: which events have declared rows, which do not |
 | `ProofForwardingFact` | reachability gaps, dominance violations, structural defects forwarded to proof engine |
 
-**Implementation status:** `GraphAnalyzer.Analyze` is stubbed.
-
 > **Precept Innovations**
 > - **Reachability as a first-class design artifact.** Graph analysis produces reachable/unreachable state sets, structural validity facts, and runtime indexes — not just a pass/fail check. These facts flow into proof obligations and runtime precomputation.
 > - **Lifecycle soundness as a compile-time guarantee.** Unreachable states, terminal outgoing-edge violations, required-state dominance violations, and irreversible back-edges are all caught before any instance exists. No state machine library in this category provides this level of static lifecycle verification.
@@ -660,7 +650,7 @@ flowchart LR
     PE --> OUT
 ```
 
-| **Output** | `ProofLedger` — obligations and evidence, dispositions and preventable-fault links, diagnostics with semantic site attribution. (Current shape: diagnostics-only stub.) |
+| **Output** | `ProofLedger` — obligations and evidence, dispositions and preventable-fault links, diagnostics with semantic site attribution. |
 |---|---|
 | **Catalog role** | Proof obligations originate in metadata: `BinaryOperationMeta.ProofRequirements`, `FunctionOverload.ProofRequirements`, `TypeAccessor.ProofRequirements`, and action metadata. `FaultCode` ↔ `DiagnosticCode` linkage is catalog-owned. |
 | **Consumers** | `Compilation`, LS/MCP proof reporting, Precept Builder fault backstops |
@@ -739,8 +729,6 @@ catalog metadata → ProofRequirement → ProofObligation → DiagnosticCode →
 
 `FaultSiteDescriptor` is the runtime face of an impossible path that a correct program never reaches.
 
-**Implementation status:** `ProofEngine.Prove` is stubbed; only the catalog-side proof vocabulary exists today.
-
 > **Precept Innovations**
 > - **Compile-time satisfiability checking.** The proof engine guarantees that initial-state configurations are satisfiable at compile time — no validator, state machine library, or rules engine in this category provides this. It is the proof engine's signature contribution.
 > - **`ConstraintInfluenceMap`.** The Precept Builder can produce a precomputed map from constraints to contributing fields (with expression-text excerpts). This makes AI inspection structurally superior — an agent can answer "which field change would satisfy this constraint?" without reverse-engineering expressions. This is a structural differentiator for the MCP surface.
@@ -790,8 +778,6 @@ Given the 64KB ceiling on `.precept` definition size, **re-run everything on cha
 ### Definition versioning
 
 When a `.precept` file changes (field added, state renamed, constraint tightened), persisted `Version` instances compiled against the old definition may fail `Restore` under the new definition's constraints. **This is a known gap — definition migration is out of scope for v1.** The contract digest hash provides change detection; a structural diff API provides change enumeration; but automated migration is deferred. Host applications that need to handle definition evolution must manage the migration externally. The gap is acknowledged so downstream design does not assume migration exists.
-
-**Implementation status:** The wiring is structurally correct, but unreachable today — `Parser.Parse`, `TypeChecker.Check`, `GraphAnalyzer.Analyze`, and `ProofEngine.Prove` all throw `NotImplementedException`, so `Compiler.Compile` crashes at the first unimplemented stage before the diagnostic merge runs.
 
 > **Precept Innovations**
 > - **Contract digest hash.** A deterministic semantic hash enables definition-change detection without source diffing — no other DSL runtime provides this. It grounds deployment safety and the future migration story.
@@ -938,8 +924,6 @@ Host applications must persist and hand back to `Restore` the following: the cur
 
 The stable runtime contract is descriptor-backed. Current public stubs still expose string placeholders and string-selected entry points. Those strings are provisional implementation placeholders, not the architectural end state.
 
-**Implementation status:** `Precept.From` currently checks `HasErrors` and then throws `NotImplementedException`.
-
 > **Precept Innovations**
 > - **Flat evaluation plans with slot-addressed opcodes.** Expressions are not tree-walked — they are precomputed into flat, cache-friendly execution plans with field-slot references and operation codes. This makes evaluation predictable-time and trivially inspectable. No other DSL runtime in this category commits to flat evaluation.
 > - **Dispatch-optimized constraint indexes.** Constraints are grouped by activation anchor into precomputed buckets — the evaluator never scans or filters at dispatch time. Five anchor families, four activation indexes, built once during the Precept Builder stage.
@@ -982,8 +966,6 @@ flowchart TD
 | **Output** | `EventOutcome`, `UpdateOutcome`, `RestoreOutcome` (commit); `EventInspection`, `UpdateInspection`, `RowInspection` (inspect); `Fault` (impossible-path only) |
 
 Valid executable models do not produce in-domain runtime errors. Expected runtime behavior is expressed as structured outcomes and inspections. `Fault` is reserved for defense-in-depth classification of impossible-path engine invariant breaches.
-
-**Implementation status:** `Evaluator` exists, but every operation body is a stub. `Fail(FaultCode, ...)` already routes through `Faults.Create(...)`.
 
 ### Constraint evaluation matrix
 
@@ -1214,35 +1196,5 @@ Two hard rules: (1) Do not make semantic LS features walk `SyntaxTree` to answer
 | Host application authoring-time validation | `Compilation` |
 | Host application execution | `Precept` + `Version` |
 
-**Current LS reality:** `tools\Precept.LanguageServer\Program.cs` only boots the server and waits for exit. The matrix above is a contract for later implementation.
-
 ---
-
-## Appendix A: Implementation status
-
-*Implementation status changes on a different cadence than architectural decisions. This appendix tracks current reality; the main document tracks the stable contract.*
-
-| Area | Current state | Required state |
-|---|---|---|
-| Lexer | implemented | keep as lexical truth source |
-| Parser | stub | build real `SyntaxTree.Root` and recovery shape |
-| Semantic index | diagnostics-only stub | flat semantic inventory with back-pointers and anti-mirroring contract |
-| State graph | diagnostics-only stub | real topology and runtime indexes |
-| Proof ledger | diagnostics-only stub | obligations, evidence, and preventable-fault links |
-| Precept Builder | error guard + stub | descriptors, plans, and executable indexes |
-| Runtime operations | public shapes, no bodies | full evaluator-driven behavior |
-| Language server | bootstrap only | consume tokens/tree/index/runtime by responsibility |
-| Runtime API identity | string placeholders | descriptor-based public API |
-
-### Implementation action items
-
-1. **Define concrete descriptor types.** `FieldDescriptor`, `StateDescriptor`, `EventDescriptor`, `ArgDescriptor`, and `ConstraintDescriptor` as first-class sealed types — not string aliases. Every runtime API surface routes through descriptor identity.
-
-2. **Define executable constraint anchor shapes.** Each anchor family (`always`, `in`, `to`, `from`, `on`) requires a distinct internal executable shape. A single flat constraint record is prohibited; the evaluation matrix depends on families being separately addressable.
-
-3. **Thread `FaultSiteDescriptor` through evaluator dispatch.** Every backstop site must carry a resolved `FaultSiteDescriptor` linked to its `FaultCode`. Unadorned `Fault` calls with no site context are incomplete.
-
-4. **Update LS and MCP DTOs.** When descriptor types are defined, LS and MCP data-transfer objects must match. Parallel string-keyed shapes are provisional scaffolding.
-
-5. **Add drift tests.** Tests that fail if any consumer maintains a parallel copy of catalog-defined vocabulary. Catalogs are the single source; consumer-local kind tables are an invariant breach.
 

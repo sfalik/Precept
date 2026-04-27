@@ -1,8 +1,6 @@
 # compiler/ — Pipeline Stage Blueprints
 
-Implementation blueprints for each stage of the Precept v2 compiler pipeline. Each doc follows a consistent structure: Overview → Design Principles → Architecture → domain-specific sections → Error Recovery → Consumer Contracts → Deliberate Exclusions → Cross-References → Source Files.
-
-**Design decisions placement:** Each stage doc has a dedicated `## Design Decisions` section that catalogs all decisions as an auditable index. The type checker's section (T1–T9) contains full standalone rationales. The lexer (L1–L10, R1–R5, D1) and parser (P1–P7) sections are catalog tables with cross-references to the inline discussions where the rationale lives. Both forms serve the same purpose: a single place to verify that every decision is documented.
+Implementation blueprints for each stage of the Precept compiler pipeline. Each doc follows the 16-section canonical template: Status → Overview → Responsibilities and Boundaries → Right-Sizing → Inputs and Outputs → Architecture → Component Mechanics → Dependencies and Integration Points → Failure Modes and Recovery → Contracts and Guarantees → Design Rationale and Decisions → Innovation → Open Questions / Implementation Notes → Deliberate Exclusions → Cross-References → Source Files.
 
 ## Pipeline Order
 
@@ -15,10 +13,10 @@ Source string → Lexer.Lex → TokenStream → Parser.Parse → SyntaxTree → 
 | Stage | Document | Status |
 |-------|----------|--------|
 | 1. Lexer | [lexer.md](lexer.md) | Draft |
-| 2. Parser | _(pending clean-room redesign)_ | Planned |
-| 3. Type Checker | _(pending clean-room redesign)_ | Planned |
-| 4. Graph Analyzer | _(not yet written)_ | Planned |
-| 5. Proof Engine | _(not yet written)_ | Planned |
+| 2. Parser | [parser.md](parser.md) | Draft |
+| 3. Type Checker | [type-checker.md](type-checker.md) | Stub |
+| 4. Graph Analyzer | [graph-analyzer.md](graph-analyzer.md) | Stub |
+| 5. Proof Engine | [proof-engine.md](proof-engine.md) | Stub |
 
 ## Cross-Cutting Infrastructure
 
@@ -27,8 +25,8 @@ Source string → Lexer.Lex → TokenStream → Parser.Parse → SyntaxTree → 
 | [compiler-and-runtime-design.md](../compiler-and-runtime-design.md) | How pipeline stages connect — artifact types, consumer contracts, LS integration strategy | Draft |
 | [diagnostic-system.md](diagnostic-system.md) | Diagnostic codes, severity, message templates, audience model, stage attribution | Draft |
 | [literal-system.md](literal-system.md) | How literals flow through every pipeline stage — lexer segmentation, parser assembly, type-checker resolution, evaluator materialization | Draft |
-| _(tooling-surface.md — not yet written)_ | Syntax highlighting category system, TextMate scope policy for v2 tokens (`~`, `~=`, `!~`, single-quoted typed constants), semantic token two-pass design | Planned |
+| [tooling-surface.md](tooling-surface.md) | TextMate grammar generation, semantic token two-pass design, completion filtering | Stub |
 
 ## Source Code
 
-All pipeline stages live under `src/Precept.Next/Pipeline/`. Tests are in `test/Precept.Next.Tests/`.
+All pipeline stages live under `src/Precept/Pipeline/`. Tests are in `test/Precept.Tests/`.
