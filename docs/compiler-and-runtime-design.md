@@ -313,6 +313,38 @@ The back-pointer is a navigation convenience for LS features and diagnostic rend
 
 The semantic inventory is organized by role, not by source position. Each entry carries a back-pointer (→ syntax) to its originating syntax node for diagnostics and LS navigation — but downstream stages consume the semantic columns, not the pointer.
 
+```
+TypedModel                              ◄ flat inventory, not a tree
+│
+├── Symbols ─────────────────────────────────────────────────────
+│   TypedField    "Amount"    number   [required]       → FieldDeclarationSyntax
+│   TypedField    "Status"    string   [computed]        → FieldDeclarationSyntax
+│   TypedState    "Draft"     [initial]                  → StateBlockSyntax
+│   TypedState    "Approved"  [terminal]                 → StateBlockSyntax
+│   TypedEvent    "Submit"    args: [Approver]           → EventDeclarationSyntax
+│   TypedArg      "Approver"  string   [required]        → arg syntax
+│
+├── Bindings ────────────────────────────────────────────────────
+│   expr site  "Amount > 0"   →  OperationKind.GreaterThan(number, number)
+│   field ref  "Amount"       →  TypedField "Amount"
+│   action     "set"          →  ActionMeta (input shape)
+│   type ref   "number"       →  TypeKind.Number + TypeAccessor
+│
+├── Normalized Declarations ─────────────────────────────────────
+│   TransitionRow   (Draft, Submit, Review)    guard + action chain
+│   Rule            constraint-1               ensure Amount > 0
+│   Ensure          (in Draft, constraint-2)   ensure Status == "new"
+│   Access          (Draft, Amount)            edit
+│
+├── Typed Expressions ───────────────────────────────────────────
+│   Amount > 0       →  result: bool   op: GreaterThan   → expr syntax
+│   arg.Approver     →  result: string                    → expr syntax
+│
+└── Dependency Facts ────────────────────────────────────────────
+    computed "Status"  depends-on: [Amount, State]
+    constraint-1       references: [Amount]
+```
+
 **Symbols** — stable semantic identities
 
 | Symbol | Key | Semantic content | → syntax |
@@ -429,6 +461,33 @@ flowchart LR
 
 The artifact is **topology** (the directed edge set) plus **derived facts** (structural properties computed from that topology).
 
+```
+GraphResult                             ◄ graph + derived facts
+│
+│  ┌─────────── Topology ───────────┐
+│  │                                │
+│  │   Draft ──Submit──▶ Review     │
+│  │   Review ──Approve──▶ Approved │
+│  │   Review ──Reject───▶ Draft    │
+│  │                                │
+│  └────────────────────────────────┘
+│
+├── Adjacency            Draft   → { Submit→Review }
+│                        Review  → { Approve→Approved, Reject→Draft }
+├── Predecessor Index    Review  → { Draft }
+│                        Draft   → { Review }
+│                        Approved→ { Review }
+├── Successor Index      Draft   → { Review }
+│                        Review  → { Approved, Draft }
+├── Reachability         reachable: {Draft, Review, Approved}
+│                        unreachable: ∅    terminal: {Approved}
+│
+└── Derived Facts ───────────────────────────────────────
+    DominanceFact          Review dominates path to Approved
+    EventCoverage          Draft: [Submit ✓]  Review: [Approve ✓, Reject ✓]
+    ProofForwardingFact    (none — no structural defects)
+```
+
 **Topology — adjacency and navigation indexes**
 
 | Structure | Shape | Purpose |
@@ -491,6 +550,27 @@ flowchart LR
 ### ProofModel inventory
 
 The artifact is an **obligation ledger** — every provable claim the compiler must discharge, with its verdict, strategy, and downstream linkage.
+
+```
+ProofModel                              ◄ obligation ledger
+│
+│  OBLIGATION                          DISP.        STRATEGY            CHAIN
+│  ─────────────────────────────────── ──────────── ─────────────────── ──────────────────────
+│  Amount > 0  at set Amount           proved       literal proof       ─
+│  Approver is-set  at Submit guard    proved       guard-in-path       ─
+│  ApprovedAmt ≤ RequestedAmt         unresolvable ─                   → DiagnosticCode.E042
+│  initial-state satisfiability        proved       literal proof       ─
+│
+├── Fault-Site Links ────────────────────────────────────────────
+│   E042  →  FaultSiteDescriptor { FaultCode.DivisionOverflow, DiagnosticCode.E042 }
+│
+├── Constraint Influence ────────────────────────────────────────
+│   constraint-1  →  fields: [Amount]        expr: "Amount > 0"
+│   constraint-2  →  fields: [Status]        expr: "Status == \"new\""
+│
+└── Coverage Map ────────────────────────────────────────────────
+    3 proved / 1 unresolvable  — 4 total obligations
+```
 
 | Obligation entry | Columns |
 |---|---|
@@ -627,6 +707,30 @@ flowchart LR
 ### Lowered model inventory
 
 The executable model is organized as **descriptor tables** (identity), **dispatch indexes** (routing), and **execution plans** (action). Every runtime lookup is an index hit — no scanning, no filtering.
+
+```
+Precept                                 ◄ sealed dispatch map
+│
+├── Descriptor Tables ───────────────────────────────────────────
+│   Fields      [0] Amount: number  [1] Status: string  [2] Tags: set
+│   States      Draft [initial]   Review []   Approved [terminal]
+│   Events      Submit { Approver: string }   Reject { Reason: string }
+│   Constraints C1: "Amount > 0" always   C2: "Status=new" in Draft
+│   FaultSites  F1: DivisionOverflow → E042  (defense-in-depth)
+│
+├── Dispatch Indexes ────────────────────────────────────────────
+│   Transition   (Draft, Submit)   → Review  + plan_0
+│                (Review, Approve) → Approved + plan_1
+│                (Review, Reject)  → Draft   + plan_2
+│   Constraints  always → [C1]    in Draft → [C2]    to Approved → [C3]
+│   Slots        Amount → slot[0]   Status → slot[1]   Tags → slot[2]
+│   Reachability Draft → {Review, Approved}   Review → {Approved, Draft}
+│
+└── Execution Plans ─────────────────────────────────────────────
+    plan_0:  LOAD_ARG arg.NewAmount → r0 │ STORE_SLOT r0 → slot[0]
+    plan_1:  LOAD_SLOT slot[0] → r0 │ LOAD_LIT 0 → r1 │ CMP_GT r0 r1 → r2
+    plan_2:  LOAD_ARG arg.Reason → r0 │ STORE_SLOT r0 → slot[1]
+```
 
 **Descriptor tables** — the runtime face of declarations
 
