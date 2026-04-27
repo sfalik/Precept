@@ -156,9 +156,7 @@ flowchart LR
     classDef artifact fill:#fef3c7,stroke:#d97706,color:#78350f
 ```
 
-**Takes in:**
-- `string source`
-- Catalogs: `Tokens`, `Diagnostics`
+**Takes in:** `string source`; catalogs: `Tokens`, `Diagnostics`
 
 **Produces:** `TokenStream`
 - `ImmutableArray<Token>` — each token carries `TokenKind Kind`, `string Text`, and `SourceSpan Span`
@@ -196,9 +194,7 @@ flowchart LR
     classDef artifact fill:#fef3c7,stroke:#d97706,color:#78350f
 ```
 
-**Takes in:**
-- `TokenStream`
-- Catalogs: `Constructs`, `Tokens`, `Operators`, `Diagnostics`
+**Takes in:** `TokenStream`; catalogs: `Constructs`, `Tokens`, `Operators`, `Diagnostics`
 
 **Produces:** `SyntaxTree`
 - `PreceptSyntax Root` — source-faithful declaration and expression nodes with missing-node representation and span ownership
@@ -720,11 +716,7 @@ Restore reconstitutes persisted data under the current definition. It validates 
 
 Fire is the core state-machine operation. Routing, action execution, transition, recomputation, and constraint evaluation are a single atomic pipeline — not composable steps callers assemble — because partial execution would violate the determinism guarantee.
 
-**Takes in:**
-- `Version`
-- Event descriptors, arg descriptors, row dispatch tables
-- Lowered action plans, recomputation index
-- Anchor-plan indexes, fault sites
+**Takes in:** `Version`; event descriptors, arg descriptors, row dispatch tables, lowered action plans, recomputation index, anchor-plan indexes, fault sites
 
 **Produces:** `EventOutcome` — `Transitioned`, `Applied`, `Rejected`, `InvalidArgs`, `EventConstraintsFailed`, `Unmatched`, current provisional `UndefinedEvent`. `EventInspection` / `RowInspection` for inspect.
 
@@ -734,11 +726,7 @@ Constraint identity survives into `ConstraintResult` and `ConstraintViolation` t
 
 Update governs direct field edits under access-mode declarations and constraint evaluation. `InspectUpdate` additionally evaluates the event landscape over the hypothetical post-patch state.
 
-**Takes in:**
-- `Version`
-- Field descriptors, per-state access facts
-- Recomputation dependencies
-- `always`/`in` constraint plans, event-prospect evaluation
+**Takes in:** `Version`; field descriptors, per-state access facts, recomputation dependencies, `always`/`in` constraint plans, event-prospect evaluation
 
 **Produces:** `UpdateOutcome` — `FieldWriteCommitted`, `UpdateConstraintsFailed`, `AccessDenied`, `InvalidInput`. `UpdateInspection` for inspect.
 
