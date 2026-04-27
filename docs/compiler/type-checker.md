@@ -43,13 +43,13 @@ The type checker is the semantic resolution boundary — everything that require
 
 ---
 
-## Architecture
+## Processing Model
 
 Single-pass semantic resolution. Each declaration is resolved in catalog order: fields first (types resolved), states second (modifiers resolved), events and args third, transition rows fourth (guards and action chains resolved), constraints fifth. The `SemanticIndex` is built incrementally and sealed at the end of the pass.
 
 ---
 
-## Component Mechanics
+## Semantic Inventory Design
 
 ### SemanticIndex Flat Inventory Shape
 

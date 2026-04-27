@@ -44,7 +44,7 @@ The proof engine is bounded by design — four strategies only, no external solv
 
 ---
 
-## Architecture
+## Two-Pass Proof Design
 
 The proof engine operates in two passes:
 
@@ -53,7 +53,7 @@ The proof engine operates in two passes:
 
 ---
 
-## Component Mechanics
+## Proof Strategy and Fault Chain
 
 ### Four Proof Strategies
 

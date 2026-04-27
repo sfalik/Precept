@@ -44,7 +44,7 @@ The tooling surface is intentionally thin — a projection layer, not a reasonin
 
 ---
 
-## Architecture
+## Editor Surface Architecture
 
 Two surfaces with different execution times:
 
@@ -58,7 +58,7 @@ Two surfaces with different execution times:
 
 ---
 
-## Component Mechanics
+## Catalog-Driven Editor Projections
 
 ### TextMate Grammar Generation
 

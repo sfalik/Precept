@@ -51,7 +51,7 @@ The evaluator is sized to execution only. No semantic reasoning, no catalog look
 
 ---
 
-## Architecture
+## Execution Model
 
 The evaluator is a shared plan executor — all four operations route through the same constraint evaluation infrastructure. The key design insight: inspection and commit paths execute the SAME prebuilt plans; the only difference is disposition (report vs. enforce).
 
@@ -69,7 +69,7 @@ Fire(event, args):
 
 ---
 
-## Component Mechanics
+## Operation Dispatch and Constraint Mechanics
 
 ### Plan Execution
 

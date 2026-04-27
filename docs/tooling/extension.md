@@ -40,7 +40,7 @@ The extension is a host shell. It wires surfaces together and handles VS Code li
 
 ---
 
-## Architecture
+## Orchestration Architecture
 
 Three activation responsibilities:
 
@@ -50,7 +50,7 @@ Three activation responsibilities:
 
 ---
 
-## Component Mechanics
+## VS Code Integration Points
 
 ### Grammar Registration
 

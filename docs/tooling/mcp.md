@@ -42,7 +42,7 @@ The MCP server is intentionally thin. If a tool method exceeds ~30 lines of non-
 
 ---
 
-## Architecture
+## Tool Architecture
 
 Five tools, each a thin wrapper:
 
@@ -54,7 +54,7 @@ Five tools, each a thin wrapper:
 
 ---
 
-## Component Mechanics
+## Tool Design and Output Format
 
 ### Five Tools
 

@@ -323,7 +323,7 @@ Downstream stages never need the raw source text to emit located diagnostics —
 
 ---
 
-## Component Mechanics
+## AST Node Catalog
 
 ### SourceSpan
 

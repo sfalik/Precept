@@ -42,7 +42,7 @@ The LS is thin — a routing and protocol layer over the compiler and runtime. A
 
 ---
 
-## Architecture
+## In-Process Compilation Model
 
 In-process compilation model: the LS calls `Compiler.Compile(source)` directly in the same process. Full-pipeline recompile on every document change. The resulting `Compilation` is stored atomically and read by concurrent LSP request handlers without locking (deep immutability of `Compilation` enables `Interlocked.Exchange`).
 
@@ -50,7 +50,7 @@ When `!HasErrors`, the LS also holds a `Precept` (built from `Compilation`) for 
 
 ---
 
-## Component Mechanics
+## LSP Feature Routing and Artifact Consumption
 
 ### Consumer Artifact Map
 

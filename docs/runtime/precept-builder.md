@@ -49,7 +49,7 @@ The Precept Builder is the transformation boundary. It is the only code path tha
 
 ---
 
-## Architecture
+## Transformation Passes
 
 Sequential transformation passes — each pass depends on the output of the previous:
 
@@ -62,7 +62,7 @@ Sequential transformation passes — each pass depends on the output of the prev
 
 ---
 
-## Component Mechanics
+## Build-Time Artifact Construction
 
 ### Descriptor Construction
 

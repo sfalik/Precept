@@ -68,7 +68,7 @@ The `TokenStream` is the `Compilation.Tokens` field — it is part of the toolin
 
 ---
 
-## Architecture
+## Catalog-Driven Design
 
 ### The Lexer Is Generic Machinery
 
@@ -84,7 +84,7 @@ If the lexer switches on token kinds to apply per-token behavior, that behavior 
 
 ---
 
-## Component Mechanics
+## Scanning Rules
 
 ### Catalog Integration
 

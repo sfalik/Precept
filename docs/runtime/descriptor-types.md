@@ -40,13 +40,13 @@ Descriptors are data — sealed records with no behavior. They are the bridge be
 
 ---
 
-## Architecture
+## Production Lifecycle
 
 Descriptors are produced in the Precept Builder's descriptor pass — the first transformation pass. Each `TypedField` in the `SemanticIndex` produces one `FieldDescriptor`; each `TypedState` produces one `StateDescriptor`; etc. Descriptors are immutable and shared across all evaluator calls — no per-operation allocation.
 
 ---
 
-## Component Mechanics
+## Descriptor Shapes and Runtime API Integration
 
 ### Descriptor Shapes
 

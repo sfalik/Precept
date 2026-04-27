@@ -43,7 +43,7 @@ The graph analyzer is sized to structural analysis only. It does not evaluate ex
 
 ---
 
-## Architecture
+## Four-Phase Analysis
 
 Graph construction then structural analysis in four phases:
 
@@ -54,7 +54,7 @@ Graph construction then structural analysis in four phases:
 
 ---
 
-## Component Mechanics
+## Structural Analysis Operations
 
 ### Edge Set Construction
 
