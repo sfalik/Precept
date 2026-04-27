@@ -116,31 +116,19 @@ Every stage begins from two roots. The `.precept` source text is the author-owne
 
 ### What crosses the lowering boundary
 
-`Precept.From()` selectively lowers analysis knowledge — descriptors, constraint metadata, expression text, source references, execution plans, and graph-derived topology — into runtime-native shapes. The principle is **type dependency direction**: runtime types hold no references to `CompilationResult`, `TypedModel`, `SyntaxTree`, or `GraphResult`. But *analysis-derived knowledge* from every stage crosses via lowering into runtime-native shapes. The `GraphResult` artifact does not cross — the knowledge it contains does, in lowered form.
+`Precept.From()` lowers analysis knowledge into runtime-native shapes. Runtime types hold no references to compile-stage artifacts — but the knowledge those artifacts contain crosses in lowered form.
 
-**Graph-derived knowledge that crosses (runtime-native shapes):**
-
-- **Transition dispatch index** — from state S, event E → target state T. This IS graph topology, lowered into a routing table the evaluator and inspection surfaces consume directly.
+- **Transition dispatch index** — state × event → target state. This is graph topology, lowered into a routing table the evaluator and inspection surfaces consume directly.
 - **State descriptor table** — all named states with metadata (display name, terminal flag, initial/required/irreversible modifiers, available events). Enables structural queries ("what states exist?", "what modifiers apply?").
-- **Event availability index** — the set of valid events per state. Enables "what can I do from here?" queries for MCP, AI agents, and UI consumers.
-- **Reachability index** — which states are reachable from a given state. Enables structural navigation queries ("how do I reach state X?") without re-running the compiler.
-- **Pathfinding residue** — enough topology for shortest-path or goal-directed navigation from the current state to a target state. The graph analog of `ConstraintInfluenceMap` — causal reasoning over lifecycle structure, not just constraint satisfaction.
-
-**Proof-derived knowledge that crosses:**
-
+- **Event availability index** — valid events per state. Enables "what can I do from here?" queries for MCP, AI agents, and UI consumers.
+- **Reachability index** — states reachable from a given state. Enables structural navigation without re-running the compiler.
+- **Pathfinding residue** — enough topology for shortest-path navigation from current state to a target. The graph analog of `ConstraintInfluenceMap` — causal reasoning over lifecycle structure.
 - **`ConstraintDescriptor`** — expression text, source lines, scope targets, guard metadata, `ConstraintActivation` anchor.
-- **`ConstraintInfluenceMap`** — dependency from constraints to contributing fields with expression-text excerpts.
+- **`ConstraintInfluenceMap`** — constraint → contributing fields with expression-text excerpts. Enables "which field change would fix this?" without reverse-engineering.
 - **Structured violation shapes** — `ConstraintViolation` carries failing constraint descriptor, evaluated field values, guard context, and failing sub-expression.
 - **Fault-site backstops** — `FaultSite` descriptors linked to `FaultCode` and the compiler-owned prevention `DiagnosticCode`.
 
-**What genuinely does not cross — and why:**
-
-- **`SyntaxTree`** — source-structural artifact. No runtime operation needs parse-tree node identity, nesting depth, or span offsets. The language server and tooling are its consumers.
-- **`TokenStream`** — pre-parse artifact. Consumed only by the parser. No runtime or post-compilation surface references individual tokens.
-- **Parser recovery shape** — authoring artifact for error-tolerant editing. Its sole consumer is the language server's progressive intelligence; the runtime operates on error-free models only.
-- **`ProofModel`** — the proof graph structure itself. Runtime needs proof *outcomes* (fault-site backstops, constraint descriptors) but not the proof obligation graph, strategy traces, or satisfiability proofs.
-
-These don't cross because nothing at runtime needs them.
+`SyntaxTree`, `TokenStream`, parser recovery, and the `ProofModel` graph structure don't cross — nothing at runtime needs them.
 
 > **Precept Innovations**
 > - **Unified pipeline.** Compilation and runtime are sequential stages of one system sharing the same catalog metadata — not two separate systems bolted together. There is no "compile step" followed by a "runtime step" from the user's perspective; the pipeline flows from source text to executable enforcement in one continuous transformation.
