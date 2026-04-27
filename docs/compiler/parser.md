@@ -127,7 +127,7 @@ public static class Parser
 | `State` | `ParseStateDeclaration()` | `StateDeclaration` |
 | `Event` | `ParseEventDeclaration()` | `EventDeclaration` |
 | `Rule` | `ParseRuleDeclaration()` | `RuleDeclaration` |
-| `Write`, `Read`, `Omit` | `ParseAccessMode()` | `AccessMode` |
+| `Write` | `ParseAccessMode()` | `AccessMode` |
 | `In` | `ParseInScoped()` | *(disambiguates below)* |
 | `To` | `ParseToScoped()` | *(disambiguates below)* |
 | `From` | `ParseFromScoped()` | *(disambiguates below)* |
@@ -785,7 +785,7 @@ The 11 `ConstructKind` values map to exactly 11 parse productions:
 | `RuleDeclaration` | `ParseRuleDeclaration()` | `Rule` |
 | `TransitionRow` | `ParseTransitionRow()` | `From` |
 | `StateEnsure` | `ParseStateEnsure()` | `In`, `To`, or `From` |
-| `AccessMode` | `ParseAccessMode()` | `In` or `Write`/`Read`/`Omit` |
+| `AccessMode` | `ParseAccessMode()` | `In` or `Write` |
 | `StateAction` | `ParseStateAction()` | `To` or `From` |
 | `EventEnsure` | `ParseEventEnsure()` | `On` |
 | `EventHandler` | `ParseEventHandler()` | `On` |

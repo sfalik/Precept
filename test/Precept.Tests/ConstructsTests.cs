@@ -56,6 +56,7 @@ public class ConstructsTests
     [InlineData(ConstructKind.EventDeclaration)]
     [InlineData(ConstructKind.RuleDeclaration)]
     [InlineData(ConstructKind.TransitionRow)]
+    [InlineData(ConstructKind.AccessMode)]
     [InlineData(ConstructKind.EventHandler)]
     public void TopLevelConstructs_HaveEmptyAllowedIn(ConstructKind kind)
     {
@@ -73,10 +74,10 @@ public class ConstructsTests
     }
 
     [Fact]
-    public void AccessMode_AllowedInStateDeclaration()
+    public void AccessMode_IsTopLevel()
     {
         Constructs.GetMeta(ConstructKind.AccessMode)
-            .AllowedIn.Should().BeEquivalentTo([ConstructKind.StateDeclaration]);
+            .AllowedIn.Should().BeEmpty("AccessMode is a top-level construct — both root-level write and state-scoped 'in' forms appear at precept body level");
     }
 
     [Fact]
@@ -98,20 +99,20 @@ public class ConstructsTests
     [Fact]
     public void TopLevel_Count()
     {
-        Constructs.All.Count(c => c.AllowedIn.Length == 0).Should().Be(7);
+        Constructs.All.Count(c => c.AllowedIn.Length == 0).Should().Be(8);
     }
 
     [Fact]
     public void Nested_Count()
     {
-        Constructs.All.Count(c => c.AllowedIn.Length > 0).Should().Be(4);
+        Constructs.All.Count(c => c.AllowedIn.Length > 0).Should().Be(3);
     }
 
     [Fact]
     public void NestedInState_Count()
     {
         Constructs.All.Count(c => c.AllowedIn.Contains(ConstructKind.StateDeclaration))
-            .Should().Be(3, "StateEnsure, AccessMode, StateAction");
+            .Should().Be(2, "StateEnsure, StateAction");
     }
 
     [Fact]
