@@ -341,6 +341,62 @@ namespace Precept.Language
     }
 
     [Fact]
+    public async Task OrdOps_AllModifierGated_NoDiagnostic()
+    {
+        // All ordering ops have ModifierRequirement proof obligations — trait absence is correct.
+        var source = SharedTypes + @"
+    public sealed record ModifierRequirement();
+
+    public sealed record BinaryOperationMetaEx(
+        OperationKind Kind, OperatorKind Op,
+        ParameterMeta Lhs, ParameterMeta Rhs,
+        TypeKind Result, string Description,
+        ModifierRequirement[] ProofRequirements = null)
+        : OperationMeta(Kind, Op, Result, Description);
+
+    public static class Types
+    {
+        public static TypeMeta GetMeta(TypeKind kind) => kind switch
+        {
+            TypeKind.Integer => new(kind, Tokens.GetMeta(TokenKind.Integer), ""int"",
+                TypeCategory.Scalar, ""integer"",
+                Traits: TypeTrait.EqualityComparable),
+            _ => throw new System.ArgumentOutOfRangeException(nameof(kind)),
+        };
+    }
+
+    public static class Operations
+    {
+        private static readonly ParameterMeta PInteger = new(TypeKind.Integer);
+
+        public static OperationMeta GetMeta(OperationKind kind) => kind switch
+        {
+            OperationKind.IntEqInt => new BinaryOperationMeta(
+                kind, OperatorKind.Equals, PInteger, PInteger, TypeKind.Boolean, ""==""),
+            OperationKind.IntNeInt => new BinaryOperationMeta(
+                kind, OperatorKind.NotEquals, PInteger, PInteger, TypeKind.Boolean, ""!=""),
+            OperationKind.IntLtInt => new BinaryOperationMetaEx(
+                kind, OperatorKind.LessThan, PInteger, PInteger, TypeKind.Boolean, ""<"",
+                ProofRequirements: [new ModifierRequirement()]),
+            OperationKind.IntGtInt => new BinaryOperationMetaEx(
+                kind, OperatorKind.GreaterThan, PInteger, PInteger, TypeKind.Boolean, "">"",
+                ProofRequirements: [new ModifierRequirement()]),
+            OperationKind.IntLteInt => new BinaryOperationMetaEx(
+                kind, OperatorKind.LessThanOrEqual, PInteger, PInteger, TypeKind.Boolean, ""<="",
+                ProofRequirements: [new ModifierRequirement()]),
+            OperationKind.IntGteInt => new BinaryOperationMetaEx(
+                kind, OperatorKind.GreaterThanOrEqual, PInteger, PInteger, TypeKind.Boolean, "">="",
+                ProofRequirements: [new ModifierRequirement()]),
+            _ => throw new System.ArgumentOutOfRangeException(nameof(kind)),
+        };
+    }" + CloseBrace;
+
+        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<PRECEPT0010TraitOperationConsistency>(source);
+        diagnostics.Where(d => d.Id == PRECEPT0010TraitOperationConsistency.DiagnosticId_OrdOpsMissingTrait)
+            .Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task OrdOps_WithTrait_NoDiagnostic()
     {
         // Integer has LT ops AND Orderable trait → OK.
