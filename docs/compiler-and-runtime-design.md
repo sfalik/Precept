@@ -3,7 +3,7 @@
 > **Status:** Approved working architecture
 > **Audience:** compiler, runtime, language-server, MCP, and documentation authors
 
-**How to read this document.** Sections 1–3 establish what Precept promises, its architectural approach (catalog-driven, purpose-built, unified pipeline), and the end-to-end pipeline overview — read these first for the design's spine. Sections 4–5 cover Lexer and Parser. Section 6 is the two-tree architecture — the decision to produce parallel `SyntaxTree` and `TypedModel` artifacts rather than a single annotated syntax tree, and why it matters. Sections 7–11 are the remaining per-stage contracts (Type Checker through Lowering), each opening with how that stage serves the structural guarantee; read them in order for the compilation story, or jump to a specific stage when doing component work. Sections 12–16 cover the runtime surface, tooling integration (TextMate grammar generation, MCP, language server), and Appendix A tracks implementation status — these are the consumer-facing contracts that tie compilation output to real product surfaces.
+**How to read this document.** Sections 1–3 establish what Precept promises, its architectural approach (catalog-driven, purpose-built, unified pipeline), and the end-to-end pipeline overview — read these first for the design's spine. Sections 4–5 cover Lexer and Parser. Section 6 defines the artifact boundaries between `SyntaxTree` and `TypedModel` — what each owns, how the semantic inventory links back to syntax nodes, and the constraints that keep downstream consumers independent of source structure. Sections 7–11 are the remaining per-stage contracts (Type Checker through Lowering), each opening with how that stage serves the structural guarantee; read them in order for the compilation story, or jump to a specific stage when doing component work. Sections 12–16 cover the runtime surface, tooling integration (TextMate grammar generation, MCP, language server), and Appendix A tracks implementation status — these are the consumer-facing contracts that tie compilation output to real product surfaces.
 
 ## 1. What Precept promises
 
@@ -255,80 +255,83 @@ Precept's grammar calls for parser patterns scaled to a flat, keyword-anchored, 
 > - **Precedence from catalog metadata.** Operator precedence and associativity are not hardcoded — they derive from `Operators.GetMeta()`. Changing precedence is a catalog edit, not a parser rewrite.
 > - **One node type per `ConstructKind`.** The node inventory is catalog-derived — each construct in the `Constructs` catalog maps to exactly one syntax node with slots matching `ConstructSlot` entries. The parser shape IS the grammar shape.
 
-## 6. The two-tree architecture
+## 6. SyntaxTree and TypedModel
 
-Precept produces two separate artifact trees from source — `SyntaxTree` and `TypedModel` — rather than a single annotated syntax tree. This is a first-class architectural decision with consequences for every downstream consumer.
+Precept's compilation pipeline produces two artifacts with distinct roles: `SyntaxTree` (source-faithful parse tree) and `TypedModel` (flat semantic inventory). They are not two independent trees — entries in the semantic inventory hold direct back-pointers to their originating syntax nodes. This section defines what each artifact owns, how the back-pointer link works, and the constraints that keep downstream consumers from depending on source structure.
 
-### The decision: parallel trees, not annotated syntax
+### What each artifact owns
 
-Compilers take one of two approaches to representing source-plus-semantics:
+**`SyntaxTree` owns source structure:**
 
-**Annotated syntax** — one tree, with type and semantic information bolted on as annotations. The type checker walks the AST in-place and stamps nodes with resolved types, symbols, and bindings. The result is a single artifact that carries both source structure and semantic meaning. This is simpler to implement: one tree, one walk, one set of node types. But it is harder to reason about — consumers must understand which nodes have been stamped and when, and the tree's shape reflects source structure even where semantic consumers need normalized declarations.
-
-**Parallel trees** — two separate artifacts produced by different pipeline stages. The parser emits a source-faithful `SyntaxTree`; the type checker emits a semantic `TypedModel`. Consumers read from the artifact that owns the information they need. Source-structural tooling reads `SyntaxTree`; semantic tooling reads `TypedModel`. Neither tree is derived from or dependent on the other's shape.
-
-Precept uses parallel trees. The reasons are clean ownership boundaries, independent consumers, and no coupling between source-structural tooling and semantic consumers. The parser owns source fidelity; the type checker owns semantic meaning. A change to recovery shape does not ripple into semantic consumers. A change to type resolution does not ripple into folding or outline. Each artifact can be developed, tested, and evolved independently.
-
-### What each tree owns exclusively
-
-**`SyntaxTree` owns:**
-
-- **Source-faithful structure** — exact authored ordering, token adjacency, span offsets. The tree preserves what the author wrote, including whitespace-adjacent constructs and declaration order as authored.
+- **Source fidelity** — exact authored ordering, token adjacency, span offsets. The tree preserves what the author wrote, including whitespace-adjacent constructs and declaration order as authored.
 - **Recovery shape** — missing nodes, error nodes, skipped-tokens trivia, malformed constructs. The tree accounts for every character of source text, even in broken programs.
-- **Authoring-surface consumers** — parser diagnostics, folding, outline, progressive LS intelligence that operates before semantic resolution is available.
+- **Structural LS consumers** — parser diagnostics, folding, outline, progressive LS intelligence that operates before semantic resolution is available.
 
-**`TypedModel` owns:**
+**`TypedModel` owns semantic meaning:**
 
-- **Semantic meaning** — resolved names, types, overloads, operation identity. Every identifier and expression has a resolved semantic identity backed by catalog metadata.
+- **Resolved identities** — resolved names, types, overloads, operation identity. Every identifier and expression has a resolved semantic identity backed by catalog metadata.
 - **Normalized declarations** — semantic inventories shaped for analysis and lowering, not parser nesting. Rules, `in`/`to`/`from`/`on` ensures, transition rows, access declarations, state hooks, and stateless hooks are organized by semantic role, not by source position.
 - **Semantic consumers** — LS semantic intelligence (hover, go-to-definition, semantic tokens, semantic completions), graph analysis, proof, and lowering.
 
-No overlap. If a consumer needs source structure, it reads `SyntaxTree`. If it needs meaning, it reads `TypedModel`. No consumer reads both for the same information.
+If a consumer needs source structure, it reads `SyntaxTree`. If it needs meaning, it reads `TypedModel`. The ownership boundaries are strict — the semantic inventory is shaped by what its consumers need, not by what the parser produces.
 
-**Example:** For `Approve.Amount <= RequestedAmount`, the syntax tree holds a member-access node over exact tokens and spans — it knows the dot position, the identifier spans, the operator token. The typed model holds a resolved event-arg symbol, a resolved field symbol, a resolved `OperationKind`, and a result type of `boolean` — it knows what the expression means, not where the tokens are.
+**Example:** For `Approve.Amount <= RequestedAmount`, the syntax tree holds a member-access node over exact tokens and spans — it knows the dot position, the identifier spans, the operator token. The typed model holds a resolved event-arg symbol, a resolved field symbol, a resolved `OperationKind`, and a result type of `boolean` — it knows what the expression means, not where the tokens are. The typed entry also holds a direct reference to the originating syntax node, so an LS hover handler can resolve the semantic identity from `TypedModel` and read the source span from the linked syntax node without searching the tree.
 
-### Why this matters at Precept's scale
+### Syntax-node back-pointers
 
-At Precept's DSL scale — flat grammar, shallow trees, 64KB ceiling — the cost of parallel trees is near zero. The `SyntaxTree` is shallow (no deep nesting beyond expression-within-declaration). The `TypedModel` is a flat semantic inventory (declaration symbols, reference bindings, typed expressions). Neither tree requires the complexity budget of a general-purpose language's AST.
+Semantic entries in `TypedModel` hold direct references to their originating `SyntaxTree` nodes. A `TypedField` points to its `FieldDeclarationSyntax`; a `TypedExpression` points to the expression syntax node it was resolved from; a `TypedTransitionRow` points to its `TransitionRowSyntax`. The pointer is a direct object reference — not a span lookup, not an index-based correlation.
 
-The benefit is structural: the LS can provide folding, outline, and error-tolerant hover from `SyntaxTree` without waiting for semantic resolution. Hover, go-to-definition, and semantic completions consume `TypedModel` without caring about source structure. These consumers can be developed and tested independently — a new LS feature that reads `TypedModel` does not need to understand recovery shape, and a parser improvement does not need to be validated against semantic consumers.
+**Why this is the right trade for Precept:**
 
-**What the research found.** The compiler pipeline architecture survey reveals that annotated syntax is the dominant pattern at DSL scale. CEL's type checker produces a `CheckedExpr` that is the original `Expr` protobuf tree plus a `type_map` (node ID → Type) and `reference_map` (node ID → Reference) — the tree structure is unchanged, with semantic information attached via ID-keyed side tables. OPA/Rego's `ast.Compiler` mutates the original `Module` AST in multiple passes — rule indexing, type checking, safety checking, and graph analysis all operate on the same tree. Dhall uses a single `Expr s a` type parameterized through phases — the tree shape is preserved, with the type parameter `a` changing from `Import` to `Void` after import resolution. Pkl produces a "type-annotated AST" — the same `PklNode` hierarchy with `VmType` information added. CUE transforms its `ast.File` into an internal `adt.Vertex` representation, but this is closer to evaluation than to a parallel semantic model.
+- **Same-process language server.** The LS runs in the same process as the compiler. There is no serialization boundary between compilation output and LS consumption — both artifacts live in the same heap. A direct object reference is the simplest, fastest, and most debuggable linking strategy.
+- **Immutable full-snapshot model.** Precept recompiles the entire file on every change (§10). Each compilation produces a fresh, immutable `CompilationResult` containing both `SyntaxTree` and `TypedModel`. The back-pointers never dangle — they always reference nodes within the same compilation snapshot.
+- **Small DSL, bounded cost.** At Precept's scale (flat grammar, shallow trees, 64KB ceiling), the memory cost of holding both artifacts plus cross-references is negligible. There is no reason to introduce indirection layers that would only pay for themselves in large-codebase compilers.
+- **Easier LS evolution.** When an LS feature needs a new piece of source-structural context (e.g., the exact span of a guard clause for a diagnostic underline), the back-pointer makes it immediately available without extending the `TypedModel` contract. This keeps the semantic inventory stable while the LS surface grows.
+- **Malformed-code handling.** In broken programs, recovery nodes in `SyntaxTree` may have no corresponding semantic entry. The back-pointer design handles this naturally: only successfully resolved semantic entries hold pointers. The LS can fall back to `SyntaxTree`-only intelligence for unresolved regions without any correlation logic.
 
-Among general-purpose compilers, the parallel-tree pattern appears in two notable cases: Roslyn produces a `SyntaxTree` (full-fidelity, immutable) and a separate `SemanticModel` that provides symbol/type resolution on demand without modifying the syntax tree. Kotlin K2's FIR (Frontend Intermediate Representation) is a separate tree from the PSI syntax tree, though FIR nodes are mutated in-place during resolution phases. Go's compiler converts its `syntax.File` tree into a separate `ir.Node` IR after type checking.
+**What the back-pointer is NOT.** It is a navigation convenience for LS features and diagnostic rendering — not a license for semantic consumers to depend on syntax structure. The presence of the pointer does not change the ownership boundary: `TypedModel` owns meaning; `SyntaxTree` owns structure.
 
-The honest summary: at DSL scale, most systems blur the boundary — they annotate or mutate a single tree because the grammar is simple enough that the cost of entanglement is low. Precept makes the separation explicit and enforced, accepting a small implementation cost (two tree types instead of one) for clean ownership boundaries that will pay off as the LS and MCP surfaces grow. This is a deliberate over-investment relative to DSL-scale norms, motivated by the same reasoning that drives the catalog-as-spec inversion: structural guarantees are worth more than implementation economy.
+### Downstream consumers and the syntax boundary
 
-### The typed layer must feel like a semantic database
+Graph analysis, proof, and lowering consume the semantic inventories in `TypedModel`. They must not traverse syntax nodes, even though the back-pointers make them reachable. This is a structural constraint, not a suggestion.
 
-A `TypedModel` that mirrors `SyntaxTree` node-for-node with types bolted on is not a `TypedModel` — it is an annotated syntax tree in disguise. The typed layer must be a semantic database of symbols, bindings, and normalized declarations. This is the key implementer guidance: the shape of `TypedModel` is driven by what semantic consumers need, not by what the parser produces.
+The reasoning is consumer independence: if graph analysis walked syntax nodes to extract transition topology, a change to parser recovery shape could break graph analysis. If proof walked syntax to read constraint expressions, adding a new expression node kind would require proof changes. These stages consume normalized semantic declarations — transition rows with resolved state/event identity, typed constraint expressions, dependency-fact sets — and they should continue to work correctly regardless of how the parser evolves.
 
-**Required `TypedModel` inventory:**
+The LS is the primary beneficiary of the back-pointers. Hover reads the semantic identity from `TypedModel` and the source span from the linked syntax node. Go-to-definition reads the declaration symbol from `TypedModel` and the declaration span from the linked syntax node. Semantic tokens read the resolved kind from `TypedModel` and the token range from the linked syntax node. These are precisely the LS patterns where the back-pointer eliminates boilerplate span correlation.
 
-- **Declaration symbols** — stable semantic identities for fields, states, events, args, and constraint-bearing declarations, each with declaration-origin handles for diagnostics and navigation.
+### Required TypedModel inventory
+
+The `TypedModel` is a flat semantic inventory — not a tree, not a mirror of parser structure. Its shape is driven by what semantic consumers need:
+
+- **Declaration symbols** — stable semantic identities for fields, states, events, args, and constraint-bearing declarations, each holding a back-pointer to the originating syntax node for diagnostics and navigation.
 - **Reference bindings** — every semantic identifier/expression site binds directly to a symbol, overload, accessor, operator, or action identity.
 - **Normalized declarations** — rules, `in`/`to`/`from`/`on` ensures, transition rows, access declarations, state hooks, and stateless hooks live in semantic inventories shaped for analysis and lowering, not parser nesting.
-- **Typed expressions** — expression nodes carry resolved result type plus resolved operation/function/accessor identity and semantic subjects.
+- **Typed expressions** — expression entries carry resolved result type plus resolved operation/function/accessor identity and semantic subjects, with a back-pointer to the originating expression syntax node.
 - **Typed actions** — semantic action families resolve to one of three named shapes (see §7 Type Checker) with catalog-defined operand and binding contracts.
 - **Dependency facts** — computed-field dependencies, arg dependencies, referenced-field sets, and semantic edge data required by graph/proof/lowering.
-- **Source-origin handles** — semantic sites keep stable links back to authored source spans/lines for diagnostics, hover, and go-to-definition without inheriting token adjacency.
 
 ### Anti-mirroring rules
 
-These rules constrain the `TypedModel` shape. They belong here — with the two-tree architecture decision — not with the type checker implementation, because they are architectural constraints on the artifact boundary, not algorithmic guidance for the type checker.
+These rules constrain the `TypedModel` shape. They belong here — with the artifact-boundary decision — not with the type checker implementation, because they are architectural constraints on the artifact boundary, not algorithmic guidance for the type checker.
 
-1. **No parser layout inheritance.** `TypedModel` must not preserve parser child layout, missing-node shape, or recovery nullability as its primary contract. The typed model is organized by semantic role, not by source structure.
-2. **Semantic LS features must not walk syntax.** Hover, go-to-definition, semantic tokens, and semantic completions must be satisfiable from `TypedModel` bindings plus source-origin handles. If an LS feature must walk parser structure to answer a semantic question, the typed boundary is underspecified — fix the `TypedModel`, not the LS feature.
-3. **Downstream stages consume semantic inventories.** Graph analysis, proof, and lowering consume normalized semantic inventories, not syntax nodes. If a downstream stage needs to inspect `SyntaxTree`, the `TypedModel` is missing information.
-4. **`SyntaxTree` retains sole ownership of source shape.** Recovery, token grouping, exact authored ordering, and malformed-construct shape belong to `SyntaxTree` exclusively. `TypedModel` carries source-origin handles for navigation, not source structure for reconstruction.
+1. **No parser layout inheritance.** `TypedModel` must not preserve parser child layout, missing-node shape, or recovery nullability as its primary contract. The semantic inventory is organized by semantic role, not by source structure.
+2. **Semantic LS features must not walk syntax.** Hover, go-to-definition, semantic tokens, and semantic completions must be satisfiable from `TypedModel` bindings plus back-pointers to originating syntax nodes. If an LS feature must walk parser structure to answer a semantic question, the `TypedModel` is underspecified — fix the inventory, not the LS feature.
+3. **Downstream stages consume semantic inventories.** Graph analysis, proof, and lowering consume normalized semantic inventories. They must not traverse syntax nodes via back-pointers. If a downstream stage needs source-structural information, the `TypedModel` is missing a semantic fact.
+4. **`SyntaxTree` retains sole ownership of source shape.** Recovery, token grouping, exact authored ordering, and malformed-construct shape belong to `SyntaxTree` exclusively. `TypedModel` entries hold back-pointers for navigation, not syntax fragments for reconstruction.
+
+### Research context
+
+At DSL scale, most systems blur the syntax/semantics boundary — they annotate or mutate a single tree because the grammar is simple enough that the cost of entanglement is low. CEL attaches a `type_map` and `reference_map` via node IDs; OPA/Rego mutates the original AST in multiple passes; Dhall parameterizes a single `Expr` type through phases. Among general-purpose compilers, Roslyn produces a separate `SemanticModel` that provides symbol/type resolution on demand without modifying the syntax tree — the closest precedent for Precept's approach.
+
+Precept makes the separation explicit and enforced, accepting a small implementation cost for clean ownership boundaries between source-structural and semantic consumers. The back-pointer strategy is a pragmatic addition: it gives the LS cheap navigation without compromising the separation that protects downstream stages. This is a deliberate over-investment relative to DSL-scale norms, motivated by the same reasoning that drives the catalog-as-spec inversion — structural guarantees are worth more than implementation economy.
 
 > **Precept Innovations**
-> - **Parallel trees as a first-class design decision.** At DSL scale, the cost of parallel trees is near zero (flat grammar, shallow trees) and the benefit — independent ownership, independent consumers, no coupling between source-structural and semantic tooling — is structural. Most DSL-scale tools blur this boundary; Precept makes it explicit and enforced.
-> - **`TypedModel` as a semantic database.** Not an AST with annotations — a semantic database of symbols, bindings, and normalized declarations. The distinction is enforced by the anti-mirroring rules: if an LS feature must walk syntax nodes to answer a semantic question, the typed boundary is underspecified.
+> - **Flat semantic inventory, not a parallel tree.** `TypedModel` is a flat inventory of symbols, bindings, and normalized declarations — not a second tree that mirrors parser structure. The shape is driven by what graph analysis, proof, lowering, and the LS need, not by what the parser produces. The anti-mirroring rules enforce this structurally.
+> - **Syntax-node back-pointers with consumer discipline.** Semantic entries hold direct references to originating syntax nodes — cheap LS navigation without span correlation. But downstream stages (graph, proof, lowering) consume only the semantic inventories, never the syntax structure behind the pointers. The back-pointer is a navigation convenience, not a structural dependency.
 
 ## 7. Type Checker
 
-The type checker is the first stage that reasons about semantics. Its key design choice: type resolution is a separate pass from parsing — `TypedModel` is a projection of `SyntaxTree`, not an in-place annotation — because tooling and downstream stages need to reason about source structure and semantic meaning independently.
+The type checker is the first stage that reasons about semantics. Its key design choice: type resolution produces a flat semantic inventory (`TypedModel`) rather than annotating syntax nodes in-place — because downstream consumers (graph analysis, proof, lowering) and LS semantic features need normalized declarations and resolved identities, not decorated source structure. Semantic entries hold back-pointers to originating syntax nodes (see §6), but the inventory's shape is driven by consumer needs, not by parser layout.
 
 ```mermaid
 flowchart LR
@@ -348,7 +351,7 @@ flowchart LR
 
 | | |
 |---|---|
-| **Output** | `TypedModel` — semantic symbol tables and binding indexes, normalized declaration inventories, typed expressions and actions, dependency facts and source-origin handles, plus diagnostics. (Current shape: diagnostics-only stub.) |
+| **Output** | `TypedModel` — semantic symbol tables and binding indexes, normalized declaration inventories, typed expressions and actions, dependency facts, and syntax-node back-pointers, plus diagnostics. (Current shape: diagnostics-only stub.) |
 | **Catalog role** | First stage to resolve `TypeKind`, `FunctionKind`, `OperatorKind`, `OperationKind`, `ModifierMeta`, `ActionMeta`, `FunctionOverload`, `TypeAccessor`, and attached `ProofRequirement` records into semantic identity. |
 | **Consumers** | GraphAnalyzer, ProofEngine, LS semantic tooling, MCP compile output, lowering |
 
@@ -392,7 +395,7 @@ The parser stamps everything that syntax alone can determine. The type checker s
 
 > **Precept Innovations**
 > - **Catalog-driven resolution passes.** Type checking resolves against catalog metadata (`Operations`, `Functions`, `Types`, `Modifiers`, `Actions`) rather than encoding per-construct behavior in checker logic. Adding a new operation or function to the catalog automatically makes it resolvable — no checker code changes required.
-> - **Semantic projection, not annotated syntax.** The `TypedModel` is a semantic database of symbols, bindings, and normalized declarations — not an AST with types bolted on. This makes downstream consumers (graph analysis, proof, lowering) independent of source structure.
+> - **Flat semantic inventory, not annotated syntax.** The `TypedModel` is a flat inventory of symbols, bindings, and normalized declarations — not an AST with types bolted on. Semantic entries hold back-pointers to originating syntax nodes for LS navigation, but downstream consumers (graph analysis, proof, lowering) consume only the semantic inventories and remain independent of source structure.
 > - **Three-shape typed action family.** Actions resolve to exactly one of three semantic shapes (`TypedAction`, `TypedInputAction`, `TypedBindingAction`), enforced by the DU pattern. A flat shape with optional nullable fields is prohibited — the type system prevents invalid action representations.
 
 ## 8. Graph Analyzer
@@ -921,19 +924,19 @@ The language server consumes pipeline artifacts by responsibility. Each LS featu
 
 **Diagnostics** — reads merged `CompilationResult.Diagnostics`. Not per-stage polling.
 
-**Semantic tokens for identifiers** — reads `TypedModel` symbol/reference bindings + semantic source-origin spans. Not token categories alone.
+**Semantic tokens for identifiers** — reads `TypedModel` symbol/reference bindings; source spans come from back-pointers to originating syntax nodes (see §6). Not token categories alone.
 
 **Completions** — reads catalogs for candidate inventory, `SyntaxTree` for local parse context, `TypedModel` for scope/binding/expected type. Not `GraphResult` or `ProofModel`.
 
-**Hover** — reads `TypedModel` semantic site + catalog documentation/signatures. Not raw syntax.
+**Hover** — reads `TypedModel` semantic identity + catalog documentation/signatures; source location from the back-pointer to the originating syntax node. Not raw syntax.
 
-**Go-to-definition** — reads `TypedModel` reference binding + declaration-origin handles. Not syntax-tree guessing.
+**Go-to-definition** — reads `TypedModel` reference binding + declaration-origin back-pointer. Not syntax-tree guessing.
 
 **Preview/inspect** — reads lowered `Precept` + runtime inspection, only when `!HasErrors`. Not `CompilationResult` after lowering.
 
 **Graph/proof explanation** — reads `GraphResult` and `ProofModel` when explicitly surfacing unreachable-state or proof information. Not for everyday completion/hover/tokenization.
 
-Two hard rules: (1) Do not make semantic LS features consume `SyntaxTree` because the typed layer is underspecified. (2) Do not make preview/runtime LS features consume `CompilationResult` after lowering succeeds.
+Two hard rules: (1) Do not make semantic LS features walk `SyntaxTree` to answer semantic questions — if the `TypedModel` plus its back-pointers cannot answer the question, the inventory is underspecified (see §6 anti-mirroring rules). (2) Do not make preview/runtime LS features consume `CompilationResult` after lowering succeeds.
 
 ### Consumer artifact map
 
@@ -960,7 +963,7 @@ Two hard rules: (1) Do not make semantic LS features consume `SyntaxTree` becaus
 |---|---|---|
 | Lexer | implemented | keep as lexical truth source |
 | Parser | stub | build real `SyntaxTree.Root` and recovery shape |
-| Typed model | diagnostics-only stub | semantic model with anti-mirroring contract |
+| Typed model | diagnostics-only stub | flat semantic inventory with back-pointers and anti-mirroring contract |
 | Graph | diagnostics-only stub | real topology and runtime indexes |
 | Proof | diagnostics-only stub | obligations, evidence, and preventable-fault links |
 | Lowering | error guard + stub | descriptors, plans, and executable indexes |
