@@ -56,26 +56,43 @@ The relationship is straightforward: analysis builds `CompilationResult`; loweri
 
 ## 3. The pipeline
 
-```text
-source text + catalogs
-        │
-        ▼
-Lexer ─► Parser ─► TypeChecker ─► GraphAnalyzer ─► ProofEngine
-        │            │                │                │
-        └────────────┴────────────────┴────────────────┘
-                             ▼
-                    CompilationResult
-                             │
-                             ▼   (only when !HasErrors)
-                    Precept.From(compilation)
-                             │
-                ┌────────────┼────────────┬───────────────┐
-                ▼            ▼            ▼               ▼
-             Create       Restore      Evaluator      Structural queries
-                                            │
-                           ┌───────────────┼────────────────┐
-                           ▼               ▼                ▼
-                    Fire / InspectFire  Update / InspectUpdate  Fault backstops
+```mermaid
+flowchart TD
+    classDef input fill:#dbeafe,stroke:#60a5fa,color:#1e3a5f
+    classDef stage fill:#ede9fe,stroke:#a78bfa,color:#3b1f7e
+    classDef artifact fill:#fef3c7,stroke:#f59e0b,color:#78350f
+    classDef runtime fill:#d1fae5,stroke:#34d399,color:#064e3b
+    classDef leaf fill:#a7f3d0,stroke:#10b981,color:#064e3b
+
+    src([Source text]):::input
+    cat([Catalogs]):::input
+
+    subgraph compile [Compile-time pipeline]
+        direction LR
+        L(Lexer):::stage --> P(Parser):::stage --> TC(TypeChecker):::stage --> GA(GraphAnalyzer):::stage --> PE(ProofEngine):::stage
+    end
+
+    src --> compile
+    cat -. feeds all stages .-> compile
+
+    compile --> CR[CompilationResult]:::artifact
+    CR -- "only when !HasErrors" --> PF(Precept.From):::artifact
+
+    subgraph runtime [Runtime operations]
+        C(Create):::runtime
+        R(Restore):::runtime
+        E(Evaluator):::runtime
+        SQ(Structural queries):::runtime
+    end
+
+    PF --> C
+    PF --> R
+    PF --> E
+    PF --> SQ
+
+    E --> FI([Fire / InspectFire]):::leaf
+    E --> UI([Update / InspectUpdate]):::leaf
+    E --> FB([Fault backstops]):::leaf
 ```
 
 Every stage begins from two roots. The `.precept` source text is the author-owned program. The catalogs are the language specification. Catalogs enter as early as they are knowable — later stages carry catalog-stamped identity forward, never recreating it from hardcoded switches.
