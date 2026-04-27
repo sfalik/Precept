@@ -140,7 +140,7 @@ Every stage begins from two roots. The `.precept` source text is the author-owne
 - **Parser recovery shape** — authoring artifact for error-tolerant editing. Its sole consumer is the language server's progressive intelligence; the runtime operates on error-free models only.
 - **`ProofModel`** — the proof graph structure itself. Runtime needs proof *outcomes* (fault-site backstops, constraint descriptors) but not the proof obligation graph, strategy traces, or satisfiability proofs.
 
-These don't cross because no runtime operation needs them — not because of an architectural prohibition on graph or analysis knowledge reaching the runtime. The prohibition is on *artifact type references*, not on *analysis-derived knowledge*.
+These don't cross because nothing at runtime needs them.
 
 > **Precept Innovations**
 > - **Unified pipeline.** Compilation and runtime are sequential stages of one system sharing the same catalog metadata — not two separate systems bolted together. There is no "compile step" followed by a "runtime step" from the user's perspective; the pipeline flows from source text to executable enforcement in one continuous transformation.
