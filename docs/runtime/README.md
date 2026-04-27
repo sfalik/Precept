@@ -8,7 +8,7 @@ Design documents for the Precept runtime — the boundary between compiled prece
 |----------|---------|--------|
 | [runtime-api.md](runtime-api.md) | Public runtime API surface — `Precept.From()`, entity representation, event firing, field updates, inspect/preview | Design |
 | [result-types.md](result-types.md) | Result type taxonomy — three type families for representing operation outcomes (success, violation, fault) | Design |
-| [fault-system.md](fault-system.md) | Runtime fault codes and classification — the runtime mirror of the compiler's diagnostic system | Stub |
+| [fault-system.md](fault-system.md) | Runtime fault codes and classification — the runtime mirror of the compiler's diagnostic system | Draft |
 | [precept-builder.md](precept-builder.md) | Precept Builder — compile-to-runtime transformation; descriptor tables, dispatch indexes, execution plans | Stub |
 | [evaluator.md](evaluator.md) | Evaluator — plan executor for all four runtime operations (Create, Fire, Update, Restore) | Stub |
 | [descriptor-types.md](descriptor-types.md) | Descriptor types — first-class runtime identity for all declared program elements | Stub |

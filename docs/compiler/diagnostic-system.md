@@ -1,10 +1,16 @@
 # Diagnostic System
 
-> **Status:** Draft
-> **Decisions answered:** D4 (diagnostic attribution structure)
-> **Survey references:** diagnostic-and-output-design-survey, proof-attribution-witness-design-survey
-> **Prototype reference:** `docs/CatalogInfrastructureDesign.md` (3-tier catalog), `Diagnostics.cs`
-> **Coherence reference:** PR #133 `docs/ArchitecturalCoherenceDesign.md`, `docs/ComponentAlignmentInventory.md`
+## Status
+
+| Property | Value |
+|---|---|
+| Doc maturity | Draft |
+| Implementation state | Implemented |
+| Source | `src/Precept/Language/Diagnostic.cs`, `src/Precept/Language/DiagnosticCode.cs`, `src/Precept/Language/Diagnostics.cs` |
+| Upstream | Lexer, Parser, TypeChecker, GraphAnalyzer, ProofEngine |
+| Downstream | Language Server, MCP (`precept_compile`, `precept_language`), drift tests |
+
+---
 
 ## Overview
 
@@ -15,27 +21,51 @@ The Precept compiler pipeline produces diagnostics at five stages: lexing, parsi
 3. **Diagnostics** — the exhaustive switch that maps codes to metadata
 4. The **FaultCode → DiagnosticCode chain** — the structural guarantee that every runtime failure is prevented at compile time
 
-## Design Principles
+---
 
-### Right-sized for Precept
+## Responsibilities and Boundaries
+
+**OWNS:**
+- The `Diagnostic` output type — `Severity`, `DiagnosticStage`, `Code`, `Message`, `Span`
+- The `DiagnosticCode` enum — the closed, exhaustive set of all diagnostic rule identifiers
+- The `Diagnostics` static class — exhaustive switch mapping every `DiagnosticCode` to `DiagnosticMeta`
+- The `DiagnosticMeta` record — stage, severity, message template, category, fix hint, related codes, fault prevention link
+- The `Severity` and `DiagnosticStage` enums
+- The `DiagnosticCategory` enum — thematic grouping orthogonal to stage
+- The `FaultCode` enum and `[StaticallyPreventable]` attribute — the runtime-to-compiler linkage
+- The `Faults` static class — exhaustive switch mapping every `FaultCode` to `FaultMeta`
+- The `Diagnostics.All` enumeration surface — consumed by MCP and LS without compilation
+
+**Does NOT OWN:**
+- Diagnostic emission sites — each pipeline stage (`Lexer`, `Parser`, `TypeChecker`, `GraphAnalyzer`, `ProofEngine`) owns its calls to `Diagnostics.Create()`
+- LSP-level filtering, range conversion (0-based), and severity mapping — owned by the Language Server
+- Downstream diagnostic suppression logic (upstream-error cascading) — owned by the Language Server
+- MCP serialization format — owned by the MCP tool layer
+- Fix application — Precept has no code-fix providers
+- Roslyn rules PRECEPT0001–PRECEPT0004 — owned by the analyzer project
+
+---
+
+## Right-Sizing
 
 Roslyn's diagnostic system was surveyed as the primary reference. It introduces DiagnosticDescriptor (rule definition), message format templates with argument arrays, effective-vs-default severity overrides, a string→string Properties bag for code-fix providers, and a Category axis orthogonal to pipeline stage. These features serve a general-purpose language with thousands of diagnostic codes, third-party analyzers, localization, and per-line severity configuration. Precept has none of these. A single `.precept` file is typically under 200 lines with 50–100 total diagnostic codes. The system should be as simple as the problem it solves.
 
-### The enumeration surface earns its keep
+---
 
-The prototype already has a diagnostic catalog (`DiagnosticCatalog` + `LanguageConstraint`). The initial draft of this document rejected it as unnecessary Roslyn-ism — the pipeline could just construct flat diagnostics with pre-formatted messages.
+## Inputs and Outputs
 
-That analysis was wrong. The enumeration surface exists because **consumer surfaces need to enumerate all diagnostic rules without compiling anything**:
+**Inputs:**
+- Pipeline stage call sites — each stage calls `Diagnostics.Create(DiagnosticCode, SourceSpan, args...)` to produce located diagnostics
+- `FaultCode` — evaluator failure paths call `Fail(FaultCode)`, linked via `[StaticallyPreventable]` to the corresponding `DiagnosticCode` member
+- `DiagnosticCode` enum members — the closed registry that feeds the exhaustive switch
 
-- **MCP `precept_language`** iterates all rules to tell agents every rule the language enforces (edge E22 in the alignment inventory — zero-drift by construction).
-- **LS diagnostic codes** derive from catalog entries (edge E23).
-- **Drift tests** verify every registered rule has a triggering test (edge E49) and every `SYNC:CONSTRAINT` comment references a valid catalog entry (edges E19–E21).
+**Outputs:**
+- `Diagnostic` value structs collected in `Compilation.Diagnostics` — consumed by the Language Server, MCP `precept_compile`, and downstream callers
+- `DiagnosticMeta` records enumerated by `Diagnostics.All` — consumed by MCP `precept_language` to list all rules without compiling
+- `string Code` derived from `nameof(DiagnosticCode.XYZ)` — used as the LSP `code` field and MCP rule identifier
+- `Fault` output records (from the evaluator) — consumed by MCP `precept_fire` and the preview inspector when a runtime fault occurs
 
-The `ArchitecturalCoherenceDesign.md` (PR #133) frames this as part of the broader architectural coherence problem: authoritative registries → pipeline stages → consumer surfaces. The diagnostic catalog is one of seven authoritative registries. See that document for the full 50-edge alignment map and enforcement hierarchy.
-
-### Prevention applies inward
-
-The product prevents invalid entity configurations. The codebase must prevent invalid component configurations. The `FaultCode → DiagnosticCode` chain (described below) ensures that every way the evaluator can fail at runtime has a corresponding compile-time diagnostic — verified by the C# compiler's switch exhaustiveness and a single Roslyn rule. This is Precept's philosophy applied recursively to its own infrastructure.
+---
 
 ## The Diagnostic Output Type
 
@@ -87,7 +117,9 @@ public enum Severity
 
 Three levels. No `Hidden` (unlike Roslyn) — Precept's diagnostic surface is small enough that every diagnostic is meaningful. No `Fatal` — the pipeline never halts; it always runs to completion (Model A).
 
-## DiagnosticCode Enum — The Registry
+---
+
+## DiagnosticCode Registry
 
 ```csharp
 public enum DiagnosticCode
@@ -147,11 +179,13 @@ public enum DiagnosticCode
 }
 ```
 
-The enum **is** the complete set of diagnostic rules. It is a closed set — you cannot produce a diagnostic that is not a member. Adding a member without completing the catalog chain causes a build failure (see below).
+The enum **is** the complete set of diagnostic rules. It is a closed set — you cannot produce a diagnostic that is not a member. Adding a member without completing the catalog chain causes a build failure (see the FaultCode → DiagnosticCode Chain section below).
 
 Member names are descriptive (`UndeclaredField`, not `PRECEPT201`). The string code emitted to LSP and MCP is derived from the member name via `nameof()` — no numbering scheme, no stage-bucketed ranges. The `DiagnosticStage` field on metadata already carries the stage; encoding it again in the code string is redundant.
 
-## Diagnostics — The Exhaustive Switch
+---
+
+## DiagnosticMeta and the Exhaustive Switch
 
 ```csharp
 public sealed record DiagnosticMeta(
@@ -255,7 +289,9 @@ var constraints = Diagnostics.All
     .ToList();
 ```
 
-## FaultCode — The Runtime-to-Compiler Chain
+---
+
+## FaultCode → DiagnosticCode Chain
 
 Precept's philosophy: no runtime errors. The evaluator must never produce a failure that the compiler could have prevented. The `FaultCode` enum makes this structurally enforceable.
 
@@ -411,21 +447,9 @@ The typed `FaultCode Code` field on `Fault` prevents one bypass — you can't us
 5. Compilation.HasErrors == true → no Precept produced → evaluator never runs
 ```
 
-## D4 — Diagnostic Attribution
+---
 
-### Decision: Attribution Lives in the Message
-
-At Precept's scale, the message string is the attribution. When a diagnostic says `Field 'amount' is not declared`, the consumer knows the field is `amount`. The message template in `Diagnostics` uses `string.Format` placeholders — the pipeline stage fills them with concrete values at the diagnostic site.
-
-This is sufficient because:
-
-- Precept has no code-fix providers that need to programmatically extract the field name.
-- The LS needs the message for display and the range for squiggly placement — it doesn't parse the message.
-- MCP agents read the message as natural language.
-
-If a future consumer needs machine-readable attribution, a single additional field can be added — motivated by a real consumer, not speculative infrastructure.
-
-## LS Consumption
+## Language Server Consumption
 
 ### Diagnostic Suppression
 
@@ -462,45 +486,39 @@ This prevents cascading errors from confusing users — if the file doesn't lex,
 
 MCP `precept_compile` serializes diagnostics to JSON. The flat `Diagnostic` fields map directly. MCP `precept_language` enumerates `Diagnostics.All` to list all rules without compiling.
 
-## Alternatives Considered
+---
 
-### Roslyn DiagnosticDescriptor / Diagnostic separation
+## Design Rationale and Decisions
 
-Roslyn separates rule definition (DiagnosticDescriptor) from rule instance (Diagnostic) to support third-party analyzer registration, message template localization, per-project severity overrides, and IDE-wide catalog enumeration. Rejected: none of these capabilities are needed at DSL scale.
+### The enumeration surface earns its keep
 
-### Attribute-driven enum + reflection
+The prototype already has a diagnostic catalog (`DiagnosticCatalog` + `LanguageConstraint`). The initial draft of this document rejected it as unnecessary Roslyn-ism — the pipeline could just construct flat diagnostics with pre-formatted messages.
 
-The pattern already used in the prototype for `PreceptToken` (`[TokenCategory]`, `[TokenDescription]`, `[TokenSymbol]` → reflection at startup). Works, but a missing attribute is a runtime failure. A Roslyn analyzer can close the gap at build time, but then two layers do related work. The exhaustive switch pattern uses the C# compiler directly — no reflection, no analyzer needed for completeness. One fewer thing that can go wrong.
+That analysis was wrong. The enumeration surface exists because **consumer surfaces need to enumerate all diagnostic rules without compiling anything**:
 
-### DiagnosticRule class with Register() side effects
+- **MCP `precept_language`** iterates all rules to tell agents every rule the language enforces (edge E22 in the alignment inventory — zero-drift by construction).
+- **LS diagnostic codes** derive from catalog entries (edge E23).
+- **Drift tests** verify every registered rule has a triggering test (edge E49) and every `SYNC:CONSTRAINT` comment references a valid catalog entry (edges E19–E21).
 
-A `static readonly DiagnosticRule` field per rule, registered via `Register()` into a list. The prototype's `Diagnostics` uses this pattern. Rejected: registration is a runtime side effect — if someone adds a field but forgets `Register()`, or the static initializer order changes, the registry is silently incomplete. The enum is a closed set by construction.
+The `ArchitecturalCoherenceDesign.md` (PR #133) frames this as part of the broader architectural coherence problem: authoritative registries → pipeline stages → consumer surfaces. The diagnostic catalog is one of seven authoritative registries. See that document for the full 50-edge alignment map and enforcement hierarchy.
 
-### Source generator for catalog derivation
+### Prevention applies inward
 
-Reads attributes on `DiagnosticCode` at compile time and emits the lookup code directly. Eliminates reflection and catches missing attributes as compile errors. Rejected (for now): adds build infrastructure complexity. The exhaustive switch achieves the same completeness guarantee with zero infrastructure — just plain C#. A source generator could be adopted later if the catalog grows large enough to make switch maintenance burdensome.
+The product prevents invalid entity configurations. The codebase must prevent invalid component configurations. The `FaultCode → DiagnosticCode` chain ensures that every way the evaluator can fail at runtime has a corresponding compile-time diagnostic — verified by the C# compiler's switch exhaustiveness and a single Roslyn rule. This is Precept's philosophy applied recursively to its own infrastructure.
 
-### ImmutableDictionary\<string, string\> Properties bag for attribution
+### D4 — Diagnostic Attribution
 
-Roslyn attaches a string→string properties bag for code-fix providers. Rejected: Precept has no code-fix providers. Attribution is in the message string.
+At Precept's scale, the message string is the attribution. When a diagnostic says `Field 'amount' is not declared`, the consumer knows the field is `amount`. The message template in `Diagnostics` uses `string.Format` placeholders — the pipeline stage fills them with concrete values at the diagnostic site.
 
-### Effective severity vs. default severity
+This is sufficient because:
 
-Roslyn allows per-instance severity overrides via `.editorconfig`. Rejected: Precept has no severity configuration mechanism.
+- Precept has no code-fix providers that need to programmatically extract the field name.
+- The LS needs the message for display and the range for squiggly placement — it doesn't parse the message.
+- MCP agents read the message as natural language.
 
-### Per-stage diagnostic types
+If a future consumer needs machine-readable attribution, a single additional field can be added — motivated by a real consumer, not speculative infrastructure.
 
-Rejected: consumers want a single type to iterate and publish.
-
-### Category field orthogonal to stage
-
-Rejected: `DiagnosticStage` is the only classification axis needed at DSL scale.
-
-### PRECEPT-prefixed numeric codes (PRECEPTnnn)
-
-The prototype uses `ToDiagnosticCode()` to produce `PRECEPT`-prefixed numeric strings with stage-bucketed ranges (0xx = Lex, 1xx = Parse, etc.). Rejected: the stage is already carried by `DiagnosticStage` — encoding it in the code string is redundant. Descriptive enum member names (`UndeclaredField`) are more readable than numeric codes (`PRECEPT201`) in every consumer context (LSP, MCP, logs). The string code is derived from the member name via `nameof()`, eliminating an entire numbering scheme to maintain.
-
-## Relationship to Prototype
+### Relationship to Prototype
 
 The prototype's diagnostic system (`DiagnosticCatalog` + `LanguageConstraint` + `ConstraintViolationException`) evolved to mitigate the N-Copy Grammar Sync problem documented in `CatalogInfrastructureDesign.md`. In a codebase without a proper lexer — where 7 components independently recognize keywords through their own regex patterns — centralizing language knowledge as data was the right move.
 
@@ -508,8 +526,60 @@ The new compiler pipeline (Lexer → Parser → TypeChecker → GraphAnalyzer �
 
 The `FaultCode → DiagnosticCode` chain is new — it adds a structural guarantee the prototype does not have: that every evaluator failure mode is covered by a compile-time diagnostic. This is the "prevention applies inward" principle from `ArchitecturalCoherenceDesign.md`.
 
-## Open Questions
+---
+
+## Open Questions / Implementation Notes
 
 - **D5 coupling (proof attribution schema):** If proof results require richer structured output (expression trees, interval ranges, witness values), the proof stage may need a way to link diagnostics to proof-model entries. Deferred until proof engine design.
 - **Related locations:** Roslyn's `AdditionalLocations` lets a diagnostic point at multiple source ranges. Precept may need this for "field declared at line X, constraint at line Y" patterns. Deferred until concrete use cases surface.
 - **Drift test: diagnostic emission coverage.** For every `DiagnosticCode` referenced by a `[StaticallyPreventable]`, verify that at least one call to `Diagnostics.Create()` with that code exists somewhere in the pipeline. This confirms the compile-time diagnostic isn't just registered — it's actually emitted.
+
+---
+
+## Deliberate Exclusions
+
+- **Roslyn DiagnosticDescriptor / Diagnostic separation:** Roslyn separates rule definition (DiagnosticDescriptor) from rule instance (Diagnostic) to support third-party analyzer registration, message template localization, per-project severity overrides, and IDE-wide catalog enumeration. Rejected: none of these capabilities are needed at DSL scale.
+
+- **Attribute-driven enum + reflection:** The pattern used in the prototype for `PreceptToken` (`[TokenCategory]`, `[TokenDescription]`, `[TokenSymbol]` → reflection at startup). Works, but a missing attribute is a runtime failure. A Roslyn analyzer can close the gap at build time, but then two layers do related work. The exhaustive switch pattern uses the C# compiler directly — no reflection, no analyzer needed for completeness. One fewer thing that can go wrong.
+
+- **DiagnosticRule class with Register() side effects:** A `static readonly DiagnosticRule` field per rule, registered via `Register()` into a list. The prototype's `Diagnostics` uses this pattern. Rejected: registration is a runtime side effect — if someone adds a field but forgets `Register()`, or the static initializer order changes, the registry is silently incomplete. The enum is a closed set by construction.
+
+- **Source generator for catalog derivation:** Reads attributes on `DiagnosticCode` at compile time and emits the lookup code directly. Eliminates reflection and catches missing attributes as compile errors. Rejected (for now): adds build infrastructure complexity. The exhaustive switch achieves the same completeness guarantee with zero infrastructure — just plain C#. A source generator could be adopted later if the catalog grows large enough to make switch maintenance burdensome.
+
+- **ImmutableDictionary\<string, string\> Properties bag for attribution:** Roslyn attaches a string→string properties bag for code-fix providers. Rejected: Precept has no code-fix providers. Attribution is in the message string.
+
+- **Effective severity vs. default severity:** Roslyn allows per-instance severity overrides via `.editorconfig`. Rejected: Precept has no severity configuration mechanism.
+
+- **Per-stage diagnostic types:** Rejected: consumers want a single type to iterate and publish.
+
+- **Category field orthogonal to stage:** Rejected: `DiagnosticStage` is the only classification axis needed at DSL scale.
+
+- **PRECEPT-prefixed numeric codes (PRECEPTnnn):** The prototype uses `ToDiagnosticCode()` to produce `PRECEPT`-prefixed numeric strings with stage-bucketed ranges (0xx = Lex, 1xx = Parse, etc.). Rejected: the stage is already carried by `DiagnosticStage` — encoding it in the code string is redundant. Descriptive enum member names (`UndeclaredField`) are more readable than numeric codes (`PRECEPT201`) in every consumer context (LSP, MCP, logs). The string code is derived from the member name via `nameof()`, eliminating an entire numbering scheme to maintain.
+
+---
+
+## Cross-References
+
+| Topic | Document |
+|---|---|
+| Architectural coherence / 50-edge alignment map | `docs/ArchitecturalCoherenceDesign.md` (PR #133) |
+| Component alignment inventory (edges E19–E23, E49) | `docs/ComponentAlignmentInventory.md` |
+| 3-tier catalog prototype context | `docs/CatalogInfrastructureDesign.md` |
+| Decisions answered | D4 (diagnostic attribution structure) |
+| Survey references | `diagnostic-and-output-design-survey`, `proof-attribution-witness-design-survey` |
+| Lexer (Lex-stage diagnostics) | `docs/compiler/lexer.md` |
+| Parser (Parse-stage diagnostics) | `docs/compiler/parser.md` |
+| Type checker (Type-stage diagnostics) | `docs/compiler/type-checker.md` |
+| Graph analyzer (Graph-stage diagnostics) | `docs/compiler/graph-analyzer.md` |
+| Proof engine (Proof-stage diagnostics) | `docs/compiler/proof-engine.md` |
+| LS diagnostic surfacing | `docs/compiler/tooling-surface.md` |
+
+---
+
+## Source Files
+
+| File | Purpose |
+|---|---|
+| `src/Precept/Language/Diagnostic.cs` | `Diagnostic` record struct, `DiagnosticStage`, `Severity`, `DiagnosticCategory` enums |
+| `src/Precept/Language/DiagnosticCode.cs` | `DiagnosticCode` enum — the closed registry of all diagnostic rule identifiers |
+| `src/Precept/Language/Diagnostics.cs` | `DiagnosticMeta` record, `Diagnostics` static class (exhaustive switch + `All` enumeration), `FaultMeta`, `Faults` |

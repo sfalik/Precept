@@ -1,9 +1,20 @@
 # Literal System
 
-> **Status:** Draft
-> **Decisions answered:** Lexer decision 3 (interpolation decomposition), plus literal-system-wide contracts for all pipeline stages
-> **Grounding:** `docs/language/precept-language-vision.md` § Literal System, language design principles
-> **Prototype reference:** `docs/LiteralSystemDesign.md` on `research/nodatime-type-alignment` branch (PR #114)
+## Status
+
+| Property | Value |
+|---|---|
+| Doc maturity | Draft |
+| Implementation state | In design |
+| Source | `src/Precept/` — lexer, parser, type checker, evaluator |
+| Upstream | Language source text; field type declarations; expression context for type inference |
+| Downstream | All pipeline stages (Lexer, Parser, Type Checker, Evaluator); runtime evaluator; diagnostics engine |
+
+**Decisions answered:** Lexer decision 3 (interpolation decomposition), plus literal-system-wide contracts for all pipeline stages  
+**Grounding:** `docs/language/precept-language-vision.md` § Literal System, language design principles  
+**Prototype reference:** `docs/LiteralSystemDesign.md` on `research/nodatime-type-alignment` branch (PR #114)
+
+---
 
 ## Overview
 
@@ -11,7 +22,36 @@ The literal system defines every way a value can appear in Precept source. It is
 
 This document is organized by the contract each pipeline stage needs. Stages reference only the sections relevant to them.
 
-## Quoted Literal Forms
+---
+
+## Responsibilities and Boundaries
+
+**OWNS:** Token segmentation for string and typed constant literals (lexer); lexer mode stack for interpolation nesting; AST node shapes for all literal forms (parser); context-born type resolution for typed constants (type checker); content validation dispatch via `ITypedConstantValidator` (type checker); interpolation reassembly mechanics across both `"..."` and `'...'` forms; string coercion rules for interpolation expressions (evaluator); value materialization for typed constants (evaluator); quantity type resolution tables (duration vs. period by expression context).
+
+**Does NOT OWN:** Business rules on field values — those are constraint modifiers on field declarations; unit restriction enforcement (e.g., "grace period must be in whole days") — constraint system handles it; domain-specific quantity validators — registered by domain modules, not defined here; null semantics — the language has no null, presence is tested with `is set` / `is not set`; non-literal arithmetic and comparison semantics — owned by the type system and evaluator broadly.
+
+---
+
+## Right-Sizing
+
+The literal system is scoped as a **cross-cutting concern** rather than a single pipeline stage because every stage has literal-specific contracts that must be consistent: the lexer segments characters into literal tokens including mode-stacking for interpolation nesting; the parser reassembles segmented tokens into the correct AST node shapes; the type checker resolves types for context-born forms and validates content against the resolved type; the evaluator materializes values and coerces non-string types in interpolation contexts. Splitting these contracts across per-stage documents would hide cross-stage relationships and invite inconsistency. The scope stops at materialized runtime values — how values behave after materialization belongs to the type system and evaluator broadly.
+
+---
+
+## Inputs and Outputs
+
+The literal system is cross-cutting. Each pipeline stage transforms a different representation:
+
+| Stage | Input | Output |
+|---|---|---|
+| **Lexer** | Raw source characters inside `"..."`, `'...'`, `[...]`, and bare token positions | `StringLiteral`, `StringStart/Middle/End`, `TypedConstant`, `TypedConstantStart/Middle/End`, `NumberLiteral`, `True`, `False`, `LeftBracket`, `Comma`, `RightBracket` |
+| **Parser** | Literal token sequences from the lexer | Leaf AST nodes: `StringLiteralNode`, `InterpolatedStringNode`, `TypedConstantNode`, `InterpolatedTypedConstantNode`, `NumericLiteralNode`, `BooleanLiteralNode`, `ListLiteralNode` |
+| **Type Checker** | AST literal nodes + expression context (field type, operator peer, function parameter) | Typed literal nodes with resolved types; compile errors for missing context, failed content validation, or type mismatches |
+| **Evaluator** | Typed literal nodes + resolved types + runtime field values | Materialized CLR values; coerced string segments for interpolation; typed constant instances (NodaTime, Money, Quantity, etc.) |
+
+---
+
+## Two-Door Literal Model
 
 All non-primitive values enter the language through exactly two quoted forms:
 
@@ -421,3 +461,82 @@ Each new domain adds validated string patterns to the typed constant shape match
 | Percentage (future) | `'10 percent'` | `'{Rate} percent'` |
 
 No new keywords, no new grammar, no new doors.
+
+---
+
+## Design Rationale and Decisions
+
+### Two-door model: exactly two quoted forms
+
+The language provides `"..."` for strings and `'...'` for typed constants — no third form. No bare postfix keywords for unit names (avoids keyword collisions with field/event names). No constructor functions or `type(value)` forms (zero constructors in the language). No new literal forms for future domains — they extend `'...'` via content validation. The two-door model ensures the grammar surface is permanently stable across all future quantity domains.
+
+### Context-born resolution replaces shape-first
+
+The original shape-first model determined the type of a typed constant from its content shape (e.g., a date pattern → `date`). This was replaced with context-born resolution: the expected type flows inward from the enclosing expression, and content is then validated against that type. Shape-first required type decisions before the full expression context was available. Content is ambiguous without context — `'30 days'` could be `duration` or `period`. Context-born aligns typed constants with numeric literals, creating a unified top-down inference model with the type checker as the single source of type authority.
+
+### Unit names as validated content, not keywords
+
+Temporal unit names (`days`, `hours`, etc.), currency codes (`USD`, `EUR`), and future domain unit names are validated inside `'...'` — not reserved as language keywords. This ensures field names and event names can freely use these words without grammar collisions and keeps the keyword set stable as new domains ship. New domains add validated patterns, not keywords.
+
+### String coercion is invariant-culture and deterministic
+
+String coercion during interpolation always uses invariant-culture formatting. `{Amount}` always produces `"1234.56"` regardless of runtime locale. This prevents subtle formatting bugs in output messages where the producing system uses one locale and the consuming system uses another.
+
+---
+
+## Innovation
+
+- **Always-on interpolation (no prefix required):** Unlike C# (`$"..."`), Python (`f"..."`), or Kotlin (`"$expr"`), Precept enables interpolation inside all quoted literals without a prefix sigil. This is safe because `{` has no structural meaning in Precept — no code blocks, no object literals, no dict/set syntax. Inside any quoted context, `{` is unambiguously the interpolation trigger. This structural advantage is unique among surveyed languages and flows from Precept's keyword-anchored grammar (Design Principle #5).
+- **Unified context-born resolution:** Typed constants and numeric literals share the same resolution model — context determines the type, content is validated against the type. This unification means there is exactly one way for the type checker to handle all literal forms: propagate expected type inward, check. No special-casing for `'...'` vs. `42`. Any future literal form follows the same two-step contract.
+
+---
+
+## Open Questions / Implementation Notes
+
+1. **`ITypedConstantValidator` registration API:** The registration mechanism is defined as a hook in the type checker. The exact API surface (static registration, startup-time registry, per-compilation context) is not yet settled.
+2. **Interpolated typed constant: validation timing:** The spec states content is validated after interpolation substitution. Whether this validation occurs at compile time (with constant-folded expressions) or at runtime (in the evaluator after substitution) needs explicit decision.
+3. **Structural validation fallback:** When no validator is registered for an expected type, "structural validation is accepted." The definition of structural validation for `'...'` — what exactly is checked — is not yet specified.
+4. **Percentage domain:** Listed in Future Extensibility as `'10 percent'`. The type name, validator shape, and arithmetic semantics are TBD.
+5. **State reference literals:** The content validation table lists `state ref` as a typed constant kind using plain identifiers (`'Open'`, `'UnderReview'`). The mechanics of state reference validation (which state machine provides the context?) are not yet documented here.
+
+---
+
+## Deliberate Exclusions
+
+| Excluded | Reason |
+|---|---|
+| `null` literal | Precept has no null. Optional fields use `is set` / `is not set` for presence testing and `clear` for removal. |
+| Constructor functions / `type(value)` forms | Zero constructors in the language. All values are literals or derived from field values through operations. |
+| Interpolation prefix sigil (`$"..."`, `f"..."`) | Unnecessary given `{` has no structural meaning in Precept. Always-on is safe, simpler, and consistent across both literal forms. |
+| Third literal form for new domains | New quantity domains extend `'...'` via content validation — no new delimiter or grammar form is ever added. |
+| Unit names as language keywords | Avoids keyword collisions with field/event names; keeps the keyword set stable as new domains ship. |
+| `\n`, `\t` inside typed constants | Typed constant content is opaque data (dates, durations, units). String-style whitespace escapes are not valid and emit `UnrecognizedTypedConstantEscape`. |
+| Nested list literals | `[...]` elements must be scalar literals. Nested collections are not valid at the literal level. |
+| List literals in expression positions | List literals are valid only in `default` clauses for collection fields — not in general expressions. |
+
+---
+
+## Cross-References
+
+| Topic | Document |
+|---|---|
+| Product-level literal system vision | `docs/language/precept-language-vision.md` § Literal System |
+| Full DSL semantics reference | `docs/language/precept-language-spec.md` |
+| Prototype with full design exploration (PR #114) | `docs/LiteralSystemDesign.md` on `research/nodatime-type-alignment` branch |
+| Mode stack implementation, complete token kind catalog | `docs/compiler/lexer.md` |
+| AST node shapes for all literal forms | `docs/compiler/parser.md` |
+| `ITypedConstantValidator` registration, context propagation mechanics | `docs/compiler/type-checker.md` |
+| Pipeline stage ordering, artifact types | `docs/compiler-and-runtime-design.md` |
+
+---
+
+## Source Files
+
+The literal system spans multiple pipeline stages in `src/Precept/`:
+
+| Component | Location | Responsibility |
+|---|---|---|
+| Lexer | `src/Precept/Pipeline/Lexer.cs` | Mode stack, literal token kinds, escape handling, interpolation segmentation |
+| Parser | `src/Precept/Parser/` | AST node shapes for all literal forms, interpolation reassembly |
+| Type Checker | `src/Precept/Pipeline/TypeChecker.cs` | Context-born resolution, `ITypedConstantValidator` registry, quantity type tables |
+| Evaluator | `src/Precept/Evaluator/` | Value materialization, string coercion (invariant-culture), typed constant instantiation |

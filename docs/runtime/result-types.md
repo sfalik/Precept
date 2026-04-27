@@ -1,9 +1,14 @@
 # Result Type Taxonomy
 
-> **Status:** Design — pending implementation
-> **Decision:** R2
-> **Relates to:** `compiler-and-runtime-design.md`; `fault-system.md`; `executable-model.md` (D8/R4)
-> **Implemented in:** `src/Precept.Next/Runtime/` (future)
+## Status
+
+| Property | Value |
+|----------|-------|
+| Doc maturity | Design |
+| Implementation state | Pending — not yet implemented |
+| Source | `src/Precept/Runtime/` |
+| Upstream | `compiler-and-runtime-design.md`; `executable-model.md` (D8/R4) |
+| Downstream | `fault-system.md`; `runtime-api.md` |
 
 ## Overview
 
@@ -15,11 +20,42 @@ The runtime uses three type families to represent operation results:
 
 Faults (evaluator-level errors the type checker should have prevented) throw `FaultException` — they are not in the outcome hierarchy. See `fault-system.md`.
 
+## Responsibilities and Boundaries
+
+**OWNS**
+- The sealed result type hierarchies for commit operations: `EventOutcome` (7 variants) and `UpdateOutcome` (4 variants)
+- The inspection type family: `EventInspection`, `UpdateInspection`, `RowInspection`
+- Shared primitives: `FieldSnapshot`, `ConstraintResult`, `ArgInfo`
+- The `Prospect` and `ConstraintStatus` enums and their propagation rules
+- The `Version` API surface (`Fire`, `Update`, `InspectFire`, `InspectUpdate`)
+
+**Does NOT OWN**
+- Fault/exception handling — `FaultException` is defined in `fault-system.md`
+- The executable model or evaluation pipeline implementation — see `executable-model.md`
+- Constraint descriptors and catalog metadata — declared in the DSL catalog
+- DSL parsing and type checking
+
+## Right-Sizing
+
+The result type families are scoped to exactly the operations the `Version` exposes: two commit operations (`Fire`, `Update`) and two inspection counterparts (`InspectFire`, `InspectUpdate`). Each commit operation returns its own sealed hierarchy so callers pattern-match exactly the variants their operation can produce. Inspection operations return an annotated landscape without committing state.
+
+Faults — errors the type checker should have prevented, such as referencing an unknown field — are excluded from the outcome hierarchy and throw `FaultException` instead. This keeps outcome hierarchies to business-meaningful variants and avoids forcing every call site to handle error conditions that are programmer errors.
+
+## Inputs and Outputs
+
+| Direction | Type | Description |
+|-----------|------|-------------|
+| In | `string eventName` | Event to fire |
+| In | `IReadOnlyDictionary<string, object?> args` | Event arguments for `Fire` / `InspectFire` |
+| In | `IReadOnlyDictionary<string, object?> fields` | Field patch for `Update` / `InspectUpdate` |
+| Out | `EventOutcome` | Sealed committed result of `Version.Fire` |
+| Out | `UpdateOutcome` | Sealed committed result of `Version.Update` |
+| Out | `EventInspection` | Annotated landscape from `Version.InspectFire` |
+| Out | `UpdateInspection` | Annotated landscape from `Version.InspectUpdate` |
+
 ---
 
-## Commit Outcome Families
-
-### EventOutcome
+## EventOutcome
 
 Sealed hierarchy. Callers pattern-match; any unhandled variant produces a compiler warning.
 
@@ -48,7 +84,9 @@ public sealed record UndefinedEvent() : EventOutcome;
 
 **`EventConstraintsFailed` scope:** Covers ALL post-fire constraints: global rules, state ensures (`in`/`to`/`from`), AND event ensures. The `Event` prefix disambiguates from `UpdateConstraintsFailed`, not scope-limits to event-level constraints.
 
-### UpdateOutcome
+---
+
+## UpdateOutcome
 
 ```csharp
 public abstract record UpdateOutcome;
@@ -225,7 +263,41 @@ public enum FieldAccessMode { Read, Write }
 
 ---
 
-## Evaluator Design Requirements
+## Design Rationale and Decisions
+
+### Survey Grounding
+
+| System | Relevant finding | How it informs R2 |
+|--------|-----------------|-------------------|
+| Temporal Workflow | `WorkflowResult<T>`, `NonDeterminismException` for system errors | Faults throw (not return). Business outcomes are typed results. |
+| XState v5 | 4 snapshot statuses, `transition()` returns same `State` type | Preview/commit return type parity. Inspection returns same structural depth. |
+| Rust `Result<T,E>` | Exhaustive match required by compiler | Sealed hierarchy with no catch-all — every variant handled. |
+| F# discriminated unions | Exhaustive match, per-case payload | Same pattern in C# via sealed records. |
+| K8s dry-run | Same response type as real operation, `managedFields` annotation | Commit and inspection share structural vocabulary. |
+| Terraform plan | Progressive resolution — known values vs. `(known after apply)` | `FieldSnapshot.IsResolved` and `ConstraintStatus.Unresolvable` follow this pattern. |
+| OPA `deny[msg]` | Collect-all violation set | ConstraintResult lists, not short-circuit. |
+| DDD per-command results | Each command returns its own result type | Two families (EventOutcome, UpdateOutcome), not unified. |
+| gRPC status codes | FAILED_PRECONDITION / INVALID_ARGUMENT / ABORTED | Maps to Rejected / InvalidArgs / Unmatched. |
+
+### Review Feedback Incorporated
+
+This design incorporates findings from three concurrent reviews (2026-04-22):
+
+| Reviewer | Verdict | Key contributions |
+|----------|---------|-------------------|
+| Frank (Architect) | CHANGES_NEEDED → resolved | InvalidArgs variant, Rejected scope documentation, survey citation corrections |
+| George (Runtime) | FEASIBLE_WITH_CAVEATS | FieldSnapshot null ambiguity (→ IsResolved), arg-dependency sets, transitive unresolvability, Kleene logic |
+| Elaine (UX) | UX_CONCERNS | ConstraintResult field attribution, OverallProspect on EventInspection, ArgInfo, IsResolved |
+
+---
+
+## Innovation
+
+No surveyed system has progressive annotation with per-constraint certainty, per-row prospect, and field-level attribution. The inspection model is purpose-built for Precept's progressive evaluation requirement — evaluating pipelines as far as available data allows, annotating each decision point with certainty, and surfacing a complete landscape without requiring complete inputs.
+
+---
+
+## Open Questions / Implementation Notes
 
 These are deferred to the executable model contract (D8/R4) and evaluator design doc, but recorded here as binding requirements from R2:
 
@@ -247,35 +319,7 @@ Guard evaluation under partial args must use Kleene three-value logic. Compariso
 
 ---
 
-## Survey Grounding
-
-| System | Relevant finding | How it informs R2 |
-|--------|-----------------|-------------------|
-| Temporal Workflow | `WorkflowResult<T>`, `NonDeterminismException` for system errors | Faults throw (not return). Business outcomes are typed results. |
-| XState v5 | 4 snapshot statuses, `transition()` returns same `State` type | Preview/commit return type parity. Inspection returns same structural depth. |
-| Rust `Result<T,E>` | Exhaustive match required by compiler | Sealed hierarchy with no catch-all — every variant handled. |
-| F# discriminated unions | Exhaustive match, per-case payload | Same pattern in C# via sealed records. |
-| K8s dry-run | Same response type as real operation, `managedFields` annotation | Commit and inspection share structural vocabulary. |
-| Terraform plan | Progressive resolution — known values vs. `(known after apply)` | `FieldSnapshot.IsResolved` and `ConstraintStatus.Unresolvable` follow this pattern. |
-| OPA `deny[msg]` | Collect-all violation set | ConstraintResult lists, not short-circuit. |
-| DDD per-command results | Each command returns its own result type | Two families (EventOutcome, UpdateOutcome), not unified. |
-| gRPC status codes | FAILED_PRECONDITION / INVALID_ARGUMENT / ABORTED | Maps to Rejected / InvalidArgs / Unmatched. |
-
-No surveyed system has progressive annotation with per-constraint certainty, per-row prospect, and field-level attribution. The inspection model is purpose-built for Precept's progressive evaluation requirement.
-
----
-
-## Review Feedback Incorporated
-
-This design incorporates findings from three concurrent reviews (2026-04-22):
-
-| Reviewer | Verdict | Key contributions |
-|----------|---------|-------------------|
-| Frank (Architect) | CHANGES_NEEDED → resolved | InvalidArgs variant, Rejected scope documentation, survey citation corrections |
-| George (Runtime) | FEASIBLE_WITH_CAVEATS | FieldSnapshot null ambiguity (→ IsResolved), arg-dependency sets, transitive unresolvability, Kleene logic |
-| Elaine (UX) | UX_CONCERNS | ConstraintResult field attribution, OverallProspect on EventInspection, ArgInfo, IsResolved |
-
-### Deferred by design
+## Deliberate Exclusions
 
 | Concern | Disposition |
 |---------|-------------|
@@ -283,3 +327,31 @@ This design incorporates findings from three concurrent reviews (2026-04-22):
 | `Possible` conflating data-insufficient and logically-uncertain (E6) | Three-value Prospect is sufficient. A fourth value (`ArgDependent`) was considered and rejected: the UI already knows which args are missing via `RequiredArgs` and can infer arg-absence from context. A fourth value would complicate pattern matching at every consumer for a signal that's redundant with information already on the Version surface. |
 | `Version.Precept` contract (E7) | Separate design decision. Not part of R2. |
 | Migration distance from prototype (G8) | Full API break acknowledged. Implementation planning concern. |
+
+---
+
+## Cross-References
+
+- `compiler-and-runtime-design.md` — compiler/runtime architecture overview
+- `executable-model.md` (D8/R4) — arg-dependency sets and evaluator contract
+- `fault-system.md` — `FaultException`; evaluator-level faults excluded from outcome hierarchy
+- `runtime-api.md` — full `Version` API spec; § Constraint Exposure Model (three-tier model, Tier 3 = `ConstraintResult.Constraint`)
+
+---
+
+## Source Files
+
+`src/Precept/Runtime/` — stub; not yet implemented. Expected types:
+
+- `EventOutcome.cs` — sealed record hierarchy
+- `UpdateOutcome.cs` — sealed record hierarchy
+- `EventInspection.cs` — inspection result type
+- `UpdateInspection.cs` — inspection result type
+- `RowInspection.cs` — row-level inspection
+- `FieldSnapshot.cs` — shared primitive
+- `ConstraintResult.cs` — shared primitive
+- `ArgInfo.cs` — shared primitive
+- `Prospect.cs` — enum
+- `ConstraintStatus.cs` — enum
+- `RowEffect.cs` — discriminated union
+- `Version.cs` — runtime Version record
