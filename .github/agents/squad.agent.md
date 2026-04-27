@@ -243,7 +243,7 @@ The routing table determines **WHO** handles work. After routing, use Response M
 | Personal agent by name (user addresses a personal agent) | Route to personal agent in consult mode — they advise, project agent executes changes |
 | "Team" or multi-domain question | Spawn 2-3+ relevant agents in parallel, synthesize |
 | Human member management ("add Brady as PM", routes to human) | Follow Human Team Members (see that section) |
-| Issue suitable for @copilot (when @copilot is on the roster) | Check capability profile in team.md, suggest routing to @copilot if it's a good fit |
+| Issue suitable for @copilot (when @copilot is on the roster) | The @copilot coding-agent integration is removed from this repo — route to a squad member instead |
 | Ceremony request ("design meeting", "run a retro") | Run the matching ceremony from `ceremonies.md` (see Ceremonies) |
 | Issues/backlog request ("pull issues", "show backlog", "work on #N") | Follow GitHub Issues Mode (see that section) |
 | PRD intake ("here's the PRD", "read the PRD at X", pastes spec) | Follow PRD Mode (see that section) |
@@ -821,6 +821,14 @@ prompt: |
   
   Do the work. Respond as {Name}.
   
+  For issue-based implementation work, follow CONTRIBUTING.md as the canonical workflow
+  and treat the draft PR as the live execution hub.
+  Keep the PR body in the exact repository format: `## Summary`, `## Linked Issue`
+  with `Closes #N`, `## Why`, and `## Implementation Plan`.
+  Work in vertical slices. After each completed slice or logical group, commit,
+  push, and update the PR-body summary/why/checklist before continuing.
+  Do not create a separate implementation-plan markdown file.
+  
   ⚠️ OUTPUT: Report outcomes in human terms. Never expose tool internals or SQL.
   ⚠️ DATES: When writing dates in any file (decisions, history, logs), use ONLY the CURRENT_DATETIME value above. Never infer or guess the date.
   
@@ -872,7 +880,7 @@ After each batch of agent work:
 
 ```
 agent_type: "general-purpose"
-model: "claude-haiku-4.5"
+model: "gpt-4.1"
 mode: "background"
 name: "scribe"
 description: "📋 Scribe: Log session & merge decisions"
@@ -1045,7 +1053,7 @@ After selecting a universe:
 2. Each agent gets a unique name. No reuse within the same repo unless an agent is explicitly retired and archived.
 3. **Scribe is always "Scribe"** — exempt from casting.
 4. **Ralph is always "Ralph"** — exempt from casting.
-5. **@copilot is always "@copilot"** — exempt from casting. If the user says "add team member copilot" or "add copilot", this is the GitHub Copilot coding agent. Do NOT cast a name — follow the Copilot Coding Agent Member section instead.
+5. **@copilot is always "@copilot"** — exempt from casting. The coding-agent integration is disabled in this repo; if the user asks to add @copilot, explain that it has been removed.
 5. Store the mapping in `.squad/casting/registry.json`.
 5. Record the assignment snapshot in `.squad/casting/history.json`.
 6. Use the allocated name everywhere: charter.md, history.md, team.md, routing.md, spawn prompts.
@@ -1355,16 +1363,7 @@ Humans can join the Squad roster alongside AI agents. They appear in routing, ca
 
 ## Copilot Coding Agent Member
 
-The GitHub Copilot coding agent (`@copilot`) can join the Squad as an autonomous team member. It picks up assigned issues, creates `copilot/*` branches, and opens draft PRs.
-
-**On-demand reference:** Read `.squad/templates/copilot-agent.md` for adding @copilot, comparison table, roster format, capability profile, auto-assign behavior, lead triage, and routing details.
-
-**Core rules (always loaded):**
-- Badge: 🤖 Coding Agent. Always "@copilot" (no casting). No charter — uses `copilot-instructions.md`.
-- NOT spawnable — works via issue assignment, asynchronous.
-- Capability profile (🟢/🟡/🔴) lives in team.md. Lead evaluates issues against it during triage.
-- Auto-assign controlled by `<!-- copilot-auto-assign: true/false -->` in team.md.
-- Non-dependent work continues immediately — @copilot routing does not serialize the team.
+> **This integration is disabled in this repo.** The 'squad:copilot' coding-agent lane has been removed and '@copilot' is not on the team roster.
 
 ### Label Semantics: `squad:chore`
 

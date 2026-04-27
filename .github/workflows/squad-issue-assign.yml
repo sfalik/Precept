@@ -27,6 +27,15 @@ jobs:
             // Extract member name from label (e.g., "squad:ripley" → "ripley")
             const memberName = label.replace('squad:', '').toLowerCase();
 
+            // Skip duplicate comment when Ralph routes a chore issue: Ralph's pickup comment
+            // already explains the assignment — suppress the generic assign-work comment.
+            const hasChoreGate = issue.labels.some(l => l.name === 'squad:chore');
+            const routedByWorkflow = context.actor === 'github-actions[bot]';
+            if (hasChoreGate && routedByWorkflow) {
+              core.info(`Skipping duplicate assignment comment for chore-routed issue #${issue.number}`);
+              return;
+            }
+
             // Read team roster — check .squad/ first, fall back to .ai-team/
             let teamFile = '.squad/team.md';
             if (!fs.existsSync(teamFile)) {
