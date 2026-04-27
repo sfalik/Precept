@@ -674,15 +674,15 @@ in StateTarget ("when" BoolExpr)? (write|read|omit) FieldTarget   ← state-scop
 write FieldTarget                                                   ← root-level
 ```
 
-**D3 per-pair baseline:** For every (field, state) pair without an explicit declaration, the default access mode is `read`. Authors declare only exceptions to readonly — `write` opens a field for editing in that state; `omit` removes it from the state's data shape entirely. No boilerplate is needed for the common case.
+**Read-by-default baseline:** For every (field, state) pair without an explicit declaration, the default access mode is `read`. Authors declare only exceptions to readonly — `write` opens a field for editing in that state; `omit` removes it from the state's data shape entirely. No boilerplate is needed for the common case.
 
-Root-level `write` is valid for stateless precepts only — it declares fields writable with no state restriction. Root-level `read` and `omit` are not valid syntax: `read` is the D3 default (declaring it globally would be redundant), and `omit` globally would make a field structurally absent in every state, rendering its declaration pointless.
+Root-level `write` is valid for stateless precepts only — it declares fields writable with no state restriction. Root-level `read` and `omit` are not valid syntax: `read` is the default (declaring it globally would be redundant), and `omit` globally would make a field structurally absent in every state, rendering its declaration pointless.
 
 State-scoped access modes (`in StateTarget`) support all three verbs. The field target is either `all` or a comma-separated list of field names.
 
 **Composition rules:**
-1. **D3 is the universal per-pair baseline** — undeclared (field, state) pairs default to `read`.
-2. **Explicit declarations override D3** for the specific (field, state) pair only.
+1. **Read by default** — undeclared (field, state) pairs default to `read`.
+2. **Explicit declarations override the default** for the specific (field, state) pair only.
 3. **Guarded `write` is the only guarded access mode** — `read` and `omit` cannot have guards.
 4. **`omit` clears on state entry** — field value resets to default on any transition into an `omit` state (including self-transitions); does NOT apply to `no transition`.
 5. **`set` targeting an `omit` field in the target state** is a compile error; `read`/`write` do not restrict `set`.
