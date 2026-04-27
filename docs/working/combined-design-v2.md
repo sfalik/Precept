@@ -1,61 +1,81 @@
 # Combined Compiler + Runtime Design v2
 
-> **Status:** Shared v2 architecture draft  
+> **Status:** Approved working architecture  
 > **Audience:** compiler, runtime, language-server, MCP, and documentation authors  
 > **Role:** advanced successor to `docs\compiler-and-runtime-design.md`
 
 ## 1. Architectural frame
 
-Precept has two top-level products from one `.precept` source:
+### The problem
 
-1. **`CompilationResult`** — the immutable authoring and tooling snapshot. Always produced, even on broken input.
-2. **`Precept`** — the executable runtime model. Produced only from an error-free `CompilationResult`.
+Precept compiles a `.precept` source file into an executable contract that governs how a business entity's data evolves under declared rules. This creates a structural tension: authoring surfaces need the full analysis picture — including broken programs with syntax errors, unresolved references, and unproven safety obligations — while runtime surfaces need a validated, lowered model that executes deterministically without consulting source structure or proof internals.
 
-That split is structural, not cosmetic. `CompilationResult` exists so authoring surfaces can reason over broken programs without pretending they are executable. `Precept` exists so runtime surfaces can execute a lowered, descriptor-backed model without dragging syntax, proof internals, or parser recovery shape into the evaluator.
+Without an explicit split between these two worlds, two failure modes emerge. Runtime code acquires compile-time dependencies (syntax trees, parser recovery shape, proof graphs), making the evaluator fragile and untestable in isolation. Or authoring tools bypass analysis artifacts and reason directly over the runtime model, losing the ability to report errors, provide completions, or navigate incomplete programs.
 
-| Principle | Meaning here |
-|---|---|
-| Metadata-driven architecture | Catalogs in `src\Precept\Language\` define the language; stages consume metadata and add analysis. |
-| Earliest knowable metadata | A stage stamps catalog identity onto its output as soon as that identity is knowable, then later stages carry it forward. |
-| Distinct artifacts | `SyntaxTree` is not `TypedModel`; `CompilationResult` is not `Precept`; proof is not runtime. |
-| Honest contracts | This document distinguishes stable architectural contract from current implementation reality wherever they differ. |
+This document defines the architecture that prevents both: two top-level products from one source (`CompilationResult` and `Precept`), with an explicit lowering boundary between them, and per-stage contracts that specify what each pipeline stage owns, produces, and who consumes it.
 
-## 2. Canonical artifacts
+### Architectural commitments
 
-| Layer | Artifact | Current shape | Intended role |
+These are the invariants this architecture enforces. A reader who reads only this list understands what the design commits to.
+
+1. `CompilationResult` and `Precept` are distinct artifacts with distinct consumers.
+2. `SyntaxTree` and `TypedModel` are distinct artifacts with distinct jobs.
+3. The `TypedModel` anti-mirroring boundary is enforceable: symbols, bindings, normalized declarations, typed execution forms, dependency facts, and source-origin handles are mandatory inventory.
+4. Graph and proof remain analysis artifacts; lowering alone builds the executable model.
+5. Lowering must preserve distinct executable plan families for `always`, `in`, `to`, `from`, and `on` anchors.
+6. Valid executable models report structured runtime outcomes; `Fault` is reserved for impossible-path invariant breaches.
+7. The LS is a `CompilationResult` consumer first and a runtime consumer second, with exact feature-to-artifact boundaries.
+8. MCP follows the same split.
+9. Descriptor-backed runtime identity is the stable contract; current string placeholders are provisional only.
+10. `TypedModel` is the compiler's resolved semantic contract. The runtime does not depend on `TypedModel` as a type — lowering transforms selected semantic knowledge into runtime-native descriptor and plan shapes. The runtime depends on lowered artifacts, not on compiler artifact types.
+11. Consumers — LS, MCP, evaluator, and tests — must not maintain independent copies of catalog-defined vocabulary. Catalog metadata is the single source. Consumer-local kind tables or parallel keyword lists are an invariant breach and must be caught by drift tests.
+
+### How to read this document
+
+§1–4 describe the design decisions, principles, and artifact inventory. §5 maps each pipeline stage with its contract, inputs, outputs, and design rationale. §6–7 define which artifacts each consumer (language server, MCP, host applications) should read. §8 covers the three runtime result families — diagnostics, outcomes, and faults — and how they relate. Appendix A tracks current implementation status, which changes on a different cadence than the architecture itself.
+
+### Design principles
+
+**Metadata-driven architecture.** Catalogs in `src\Precept\Language\` define the language; pipeline stages consume metadata and add analysis. Stages are generic machinery — they do not encode language knowledge in their own logic.
+
+**Earliest knowable metadata.** A stage stamps catalog identity onto its output as soon as that identity is knowable. Later stages carry it forward; no stage defers an assignment it could make.
+
+**Distinct artifacts.** `SyntaxTree` is not `TypedModel`; `CompilationResult` is not `Precept`; proof is not runtime. Each artifact has exactly one owner and a defined set of consumers.
+
+**Honest contracts.** This document distinguishes stable architectural contract from current implementation reality wherever they differ.
+
+## 2. Canonical artifacts and the lowering boundary
+
+Precept produces two top-level products from one `.precept` source:
+
+1. **`CompilationResult`** — the immutable authoring and tooling snapshot. Always produced, even from broken input — authoring surfaces need the full analysis snapshot regardless of whether the program is valid.
+2. **`Precept`** — the executable runtime model. Produced only from error-free compilations — it carries the lowered executable model that runtime surfaces need for execution and inspection, without syntax trees, proof internals, or parser recovery.
+
+### What crosses the lowering boundary
+
+Analysis artifacts and runtime artifacts serve different lifecycles. `Precept.From()` selectively lowers analysis knowledge — descriptors, constraint metadata, expression text, source references, execution plans — into runtime-native shapes. What does not cross: syntax trees, token streams, proof graphs, parser recovery, and graph topology as artifacts. The criterion for crossing is whether the runtime needs the information for execution or inspection, and whether it can be expressed in a runtime-native shape independent of compile-time artifact lifetimes.
+
+The rule is **type dependency direction**: runtime types do not hold references to `CompilationResult`, `TypedModel`, or `SyntaxTree`. But runtime shapes do carry analysis-derived knowledge — `ConstraintDescriptor` carries expression text, source lines, scope targets, and guard metadata. That is analysis knowledge in lowered form, not a violation of the boundary. Artifacts don't cross; selected knowledge from artifacts crosses in runtime-native shapes.
+
+### Artifact inventory
+
+| Artifact | Layer | Classification | Current shape |
 |---|---|---|---|
-| lexical | `TokenStream` | `TokenStream(ImmutableArray<Token> Tokens, ImmutableArray<Diagnostic> Diagnostics)` | tokenized source + lex diagnostics |
-| syntactic | `SyntaxTree` | `SyntaxTree(ImmutableArray<Diagnostic> Diagnostics)` | parser-owned source structure and recovery shape |
-| semantic | `TypedModel` | `TypedModel(ImmutableArray<Diagnostic> Diagnostics)` | resolved domain meaning |
-| structural analysis | `GraphResult` | `GraphResult(ImmutableArray<Diagnostic> Diagnostics)` | reachability, topology, lifecycle facts |
-| safety proof | `ProofModel` | `ProofModel(ImmutableArray<Diagnostic> Diagnostics)` | proof obligations, evidence, preventable-fault links |
-| whole snapshot | `CompilationResult` | `CompilationResult(Tokens, SyntaxTree, Model, Graph, Proof, Diagnostics, HasErrors)` | immutable whole-pipeline view |
-| lowered executable | `Precept` | sealed class; public API stubbed | runtime-native definition |
-| entity snapshot | `Version` | sealed record; public API stubbed | immutable per-instance state |
-| runtime surfaces | `EventOutcome`, `UpdateOutcome`, `RestoreOutcome`, inspection records, `Fault` | public DUs/records present | runtime result contracts |
-
-**Compile-time vs lowered artifact classification**
-
-The boundary between analysis artifacts and runtime artifacts is a hard line. Nothing from the compile-time half is present in a live `Precept` or `Version`; nothing from the lowered half is present in a `CompilationResult`.
-
-| Artifact | Classification | Where it lives |
-|---|---|---|
-| `TokenStream` | compile-time only | `CompilationResult.Tokens` |
-| `SyntaxTree` | compile-time only | `CompilationResult.SyntaxTree` |
-| `TypedModel` | compile-time only | `CompilationResult.Model` |
-| `GraphResult` | compile-time only | `CompilationResult.Graph` |
-| `ProofModel` | compile-time only | `CompilationResult.Proof` |
-| `CompilationResult` | compile-time only | returned by `Compiler.Compile` |
-| descriptor tables (`FieldDescriptor`, `StateDescriptor`, `EventDescriptor`, `ArgDescriptor`, `ConstraintDescriptor`) | lowered runtime | `Precept` sealed model |
-| slot layout + default-value plan | lowered runtime | `Precept` sealed model |
-| dispatch indexes | lowered runtime | `Precept` sealed model |
-| executable action and expression plans | lowered runtime | `Precept` sealed model |
-| constraint-plan indexes (`always`, `in`, `to`, `from`, `on`) | lowered runtime | `Precept` sealed model |
-| fault-site backstops (`FaultSiteDescriptor`, `FaultCode`) | lowered runtime | `Precept` sealed model |
-| `Version` | runtime instance state | produced by `Precept` operations |
-| `EventOutcome`, `UpdateOutcome`, `RestoreOutcome` | runtime results | returned by `Version` and `Precept` |
-| `ConstraintResult`, `ConstraintViolation` | runtime results | embedded in outcome and inspection records |
-| `Fault` | runtime backstop | evaluator impossible-path defense only |
+| `TokenStream` | lexical | compile-time | `TokenStream(ImmutableArray<Token> Tokens, ImmutableArray<Diagnostic> Diagnostics)` |
+| `SyntaxTree` | syntactic | compile-time | `SyntaxTree(ImmutableArray<Diagnostic> Diagnostics)` |
+| `TypedModel` | semantic | compile-time | `TypedModel(ImmutableArray<Diagnostic> Diagnostics)` |
+| `GraphResult` | structural analysis | compile-time | `GraphResult(ImmutableArray<Diagnostic> Diagnostics)` |
+| `ProofModel` | safety proof | compile-time | `ProofModel(ImmutableArray<Diagnostic> Diagnostics)` |
+| `CompilationResult` | whole snapshot | compile-time | `CompilationResult(Tokens, SyntaxTree, Model, Graph, Proof, Diagnostics, HasErrors)` |
+| descriptor tables | lowered runtime | runtime | `FieldDescriptor`, `StateDescriptor`, `EventDescriptor`, `ArgDescriptor`, `ConstraintDescriptor` in `Precept` sealed model |
+| slot layout, dispatch indexes, action/expression plans | lowered runtime | runtime | lowered execution structures in `Precept` sealed model |
+| constraint-plan indexes | lowered runtime | runtime | `always`, `in`, `to`, `from`, `on` plan families in `Precept` sealed model |
+| fault-site backstops | lowered runtime | runtime | `FaultSiteDescriptor` + `FaultCode` in `Precept` sealed model |
+| `Precept` | executable model | runtime | sealed class; public API stubbed |
+| `Version` | entity snapshot | runtime | sealed record; public API stubbed |
+| `EventOutcome`, `UpdateOutcome`, `RestoreOutcome` | runtime results | runtime | public DUs/records present |
+| `ConstraintResult`, `ConstraintViolation` | runtime results | runtime | embedded in outcome and inspection records |
+| `Fault` | runtime backstop | runtime | evaluator impossible-path defense only |
 
 ## 3. End-to-end chain
 
@@ -75,7 +95,7 @@ Lexer ─► Parser ─► TypeChecker ─► GraphAnalyzer ─► ProofEngine
                 ┌────────────┼────────────┬───────────────┐
                 ▼            ▼            ▼               ▼
              Create       Restore      Evaluator      Structural queries
-                                           │
+                                            │
                            ┌───────────────┼────────────────┐
                            ▼               ▼                ▼
                     Fire / InspectFire  Update / InspectUpdate  Fault backstops
@@ -85,10 +105,9 @@ Lexer ─► Parser ─► TypeChecker ─► GraphAnalyzer ─► ProofEngine
 
 Every stage begins from two roots:
 
-| Root input | Meaning |
-|---|---|
-| `.precept` source text | author-owned program |
-| catalogs | `Tokens`, `Types`, `Functions`, `Operators`, `Operations`, `Modifiers`, `Actions`, `Constructs`, `Diagnostics`, `Faults` |
+**`.precept` source text** — the author-owned program.
+
+**Catalogs** — `Tokens`, `Types`, `Functions`, `Operators`, `Operations`, `Modifiers`, `Actions`, `Constructs`, `Diagnostics`, `Faults`. These are the language specification in machine-readable form.
 
 Catalogs enter as early as they are knowable. Later stages may add resolved meaning, but they must not recreate catalog truth by hardcoded switches when that truth already exists in metadata.
 
@@ -98,25 +117,25 @@ Catalogs enter as early as they are knowable. Later stages may add resolved mean
 
 ### 5.1 Lexer — `Lexer.Lex(string source) -> TokenStream`
 
-| Item | Contract |
-|---|---|
-| purpose | Convert raw text into a flat token stream with exact spans and lex diagnostics. |
-| inputs | previous artifact: none; direct input: `string source`; catalogs: `Tokens`, `Diagnostics`; supporting type: `SourceSpan`. |
-| output shape | **Current + intended:** `TokenStream(ImmutableArray<Token> Tokens, ImmutableArray<Diagnostic> Diagnostics)` where `Token` is `Token(TokenKind Kind, string Text, SourceSpan Span)`. |
-| metadata entry | `TokenKind` comes directly from `Tokens.GetMeta(...)` / `Tokens.Keywords`; token categories, TextMate scope, semantic token type, and completion hints remain derivable from `TokenMeta`. |
-| downstream consumers | `Parser`; `CompilationResult`; LS lexical tokenization and grammar tooling. |
-| current reality | This is the one materially implemented compiler stage. The stage boundary is real, not aspirational. |
+The lexer is the only stage with no semantic opinion — it converts raw text into classified tokens with exact spans. The key decision is that `TokenKind` comes directly from catalog metadata (`Tokens.GetMeta`), not from a parallel enum maintained by the lexer. This makes the lexer a vocabulary consumer, not a vocabulary owner.
+
+**Purpose:** Convert raw text into a flat token stream with exact spans and lex diagnostics.
+**Inputs:** `string source`; catalogs: `Tokens`, `Diagnostics`; supporting type: `SourceSpan`.
+**Output:** `TokenStream(ImmutableArray<Token> Tokens, ImmutableArray<Diagnostic> Diagnostics)` where `Token` is `Token(TokenKind Kind, string Text, SourceSpan Span)`.
+**Metadata entry:** `TokenKind` comes directly from `Tokens.GetMeta(...)` / `Tokens.Keywords`; token categories, TextMate scope, semantic token type, and completion hints remain derivable from `TokenMeta`.
+**Consumers:** `Parser`; `CompilationResult`; LS lexical tokenization and grammar tooling.
+**Current reality:** This is the one materially implemented compiler stage.
 
 ### 5.2 Parser — `Parser.Parse(TokenStream tokens) -> SyntaxTree`
 
-| Item | Contract |
-|---|---|
-| purpose | Convert the flat token stream into the parser-owned structural model of the authored program, including recovery shape. |
-| inputs | previous artifact: `TokenStream`; catalogs: `Constructs`, `Tokens`, `Operators`, `Diagnostics`. |
-| output shape | **Current:** `SyntaxTree(ImmutableArray<Diagnostic> Diagnostics)`. **Proposed:** `SyntaxTree(PreceptSyntax Root, ImmutableArray<Diagnostic> Diagnostics)` with source-faithful declaration and expression nodes, missing-node representation, and span ownership. |
-| metadata entry | The parser stamps syntax-level identities as soon as syntax alone can know them: construct kind, anchor keyword, action keyword, operator token, literal segment form. |
-| downstream consumers | `TypeChecker`; LS syntax-facing features such as outline, folding, and recovery-aware local context. |
-| current reality | `Parser.Parse` is a stub throwing `NotImplementedException`; the parser contract is designed but not implemented. |
+The parser's job is structural fidelity, not semantic meaning. The key decision is that `SyntaxTree` preserves the author's source structure — including recovery shape for broken programs — without resolving names, types, or overloads. This separation exists because tooling needs source-faithful structure (folding, outline, recovery context) independently of semantic resolution.
+
+**Purpose:** Convert the flat token stream into the parser-owned structural model of the authored program, including recovery shape.
+**Inputs:** `TokenStream`; catalogs: `Constructs`, `Tokens`, `Operators`, `Diagnostics`.
+**Output:** **Current:** `SyntaxTree(ImmutableArray<Diagnostic> Diagnostics)`. **Proposed:** `SyntaxTree(PreceptSyntax Root, ImmutableArray<Diagnostic> Diagnostics)` with source-faithful declaration and expression nodes, missing-node representation, and span ownership.
+**Metadata entry:** The parser stamps syntax-level identities as soon as syntax alone can know them: construct kind, anchor keyword, action keyword, operator token, literal segment form.
+**Consumers:** `TypeChecker`; LS syntax-facing features such as outline, folding, and recovery-aware local context.
+**Current reality:** `Parser.Parse` is a stub; the parser contract is designed but not implemented.
 
 ### 5.3 `SyntaxTree` vs `TypedModel` — non-negotiable split
 
@@ -157,18 +176,16 @@ Architectural rule: the typed layer must feel like a semantic database, not an A
 3. `GraphResult`, `ProofModel`, and lowering consume normalized semantic inventories and bindings, not syntax nodes.
 4. `SyntaxTree` remains the sole owner of recovery, token grouping, exact authored ordering, and malformed-construct shape.
 
-That is the enforceable anti-mirroring boundary.
-
 ### 5.4 Type checker — `TypeChecker.Check(SyntaxTree tree) -> TypedModel`
 
-| Item | Contract |
-|---|---|
-| purpose | Resolve names, scopes, types, overloads, modifiers, legal operations, typed actions, semantic subjects, and normalized declarations. |
-| inputs | previous artifact: `SyntaxTree`; catalogs: `Types`, `Functions`, `Operators`, `Operations`, `Modifiers`, `Actions`, `Constructs`, `Diagnostics`. |
-| output shape | **Current:** `TypedModel(ImmutableArray<Diagnostic> Diagnostics)`. **Proposed:** semantic symbol tables, binding indexes, normalized declaration inventories, typed expressions/actions, dependency facts, source-origin handles, and diagnostics. |
-| metadata entry | This is the first stage that resolves `TypeKind`, `FunctionKind`, `OperatorKind`, `OperationKind`, `ModifierMeta`, `ActionMeta`, `FunctionOverload`, `TypeAccessor`, and attached `ProofRequirement` records into semantic identity. |
-| downstream consumers | `GraphAnalyzer`, `ProofEngine`, LS semantic tooling, MCP compile output, lowering. |
-| current reality | `TypeChecker.Check` is stubbed; the semantic model contract is ahead of implementation. |
+The type checker is the first stage that reasons about semantics rather than structure. The key decision is that type resolution is a separate pass from parsing — `TypedModel` is a projection of `SyntaxTree`, not an in-place annotation — because tooling and downstream stages need to reason about source structure and semantic meaning independently.
+
+**Purpose:** Resolve names, scopes, types, overloads, modifiers, legal operations, typed actions, semantic subjects, and normalized declarations.
+**Inputs:** `SyntaxTree`; catalogs: `Types`, `Functions`, `Operators`, `Operations`, `Modifiers`, `Actions`, `Constructs`, `Diagnostics`.
+**Output:** **Current:** `TypedModel(ImmutableArray<Diagnostic> Diagnostics)`. **Proposed:** semantic symbol tables, binding indexes, normalized declaration inventories, typed expressions/actions, dependency facts, source-origin handles, and diagnostics.
+**Metadata entry:** This is the first stage that resolves `TypeKind`, `FunctionKind`, `OperatorKind`, `OperationKind`, `ModifierMeta`, `ActionMeta`, `FunctionOverload`, `TypeAccessor`, and attached `ProofRequirement` records into semantic identity.
+**Consumers:** `GraphAnalyzer`, `ProofEngine`, LS semantic tooling, MCP compile output, lowering.
+**Current reality:** `TypeChecker.Check` is stubbed; the semantic model contract is ahead of implementation.
 
 **Typed action family — three shapes only**
 
@@ -206,14 +223,14 @@ The parser stamps everything that syntax alone can determine. The type checker s
 
 ### 5.5 Graph analyzer — `GraphAnalyzer.Analyze(TypedModel model) -> GraphResult`
 
-| Item | Contract |
-|---|---|
-| purpose | Derive lifecycle structure from the semantic definition: reachability, event availability, dominance-style facts, and runtime-reusable topology. |
-| inputs | previous artifact: `TypedModel`; catalogs: `Modifiers`, `Actions`, `Diagnostics`. |
-| output shape | **Current:** `GraphResult(ImmutableArray<Diagnostic> Diagnostics)`. **Proposed:** graph facts keyed by semantic identities plus diagnostics. |
-| metadata entry | State semantics such as `initial`, `terminal`, `required`, `irreversible`, `success`, `warning`, and `error` come from modifier metadata already resolved by the type checker; the analyzer must not reinterpret raw syntax. |
-| downstream consumers | `ProofEngine`, `Precept.From`, LS structural diagnostics, runtime structural precomputation. |
-| current reality | `GraphAnalyzer.Analyze` is stubbed. |
+The graph analyzer derives lifecycle structure from semantic declarations. The key decision is that graph analysis consumes the resolved `TypedModel` — not syntax — because reachability, dominance, and topology require resolved state/event/transition identity, not source-structural nesting.
+
+**Purpose:** Derive lifecycle structure from the semantic definition: reachability, event availability, dominance-style facts, and runtime-reusable topology.
+**Inputs:** `TypedModel`; catalogs: `Modifiers`, `Actions`, `Diagnostics`.
+**Output:** **Current:** `GraphResult(ImmutableArray<Diagnostic> Diagnostics)`. **Proposed:** graph facts keyed by semantic identities plus diagnostics.
+**Metadata entry:** State semantics such as `initial`, `terminal`, `required`, `irreversible`, `success`, `warning`, and `error` come from modifier metadata already resolved by the type checker; the analyzer must not reinterpret raw syntax.
+**Consumers:** `ProofEngine`, `Precept.From`, LS structural diagnostics, runtime structural precomputation.
+**Current reality:** `GraphAnalyzer.Analyze` is stubbed.
 
 **Proposed `GraphResult` facts**
 
@@ -226,14 +243,14 @@ The parser stamps everything that syntax alone can determine. The type checker s
 
 ### 5.6 Proof engine — `ProofEngine.Prove(TypedModel model, GraphResult graph) -> ProofModel`
 
-| Item | Contract |
-|---|---|
-| purpose | Discharge statically preventable runtime hazards by bounded abstract reasoning over the semantic and graph-resolved program. |
-| inputs | previous artifacts: `TypedModel`, `GraphResult`; catalogs: `Operations`, `Functions`, `Types`, `Diagnostics`, `Faults`. |
-| output shape | **Current:** `ProofModel(ImmutableArray<Diagnostic> Diagnostics)`. **Proposed:** obligations, evidence, dispositions, preventable-fault links, diagnostics, and semantic site attribution. |
-| metadata entry | Proof obligations originate in metadata: `BinaryOperationMeta.ProofRequirements`, `FunctionOverload.ProofRequirements`, `TypeAccessor.ProofRequirements`, and action metadata. `FaultCode` ↔ `DiagnosticCode` linkage remains catalog-owned as a prevention/backstop relationship. |
-| downstream consumers | `CompilationResult`; LS/MCP proof reporting; lowering of fault residue into runtime backstops. |
-| current reality | `ProofEngine.Prove` is stubbed; only the catalog-side proof vocabulary exists today. |
+The proof engine is the last analysis stage before lowering. The key decision is that proof is bounded — four strategies only, no general SMT solver — and that proof stops at analysis. The runtime receives only lowered fault-site residue for defense-in-depth, not the proof graph itself.
+
+**Purpose:** Discharge statically preventable runtime hazards by bounded abstract reasoning over the semantic and graph-resolved program.
+**Inputs:** `TypedModel`, `GraphResult`; catalogs: `Operations`, `Functions`, `Types`, `Diagnostics`, `Faults`.
+**Output:** **Current:** `ProofModel(ImmutableArray<Diagnostic> Diagnostics)`. **Proposed:** obligations, evidence, dispositions, preventable-fault links, diagnostics, and semantic site attribution.
+**Metadata entry:** Proof obligations originate in metadata: `BinaryOperationMeta.ProofRequirements`, `FunctionOverload.ProofRequirements`, `TypeAccessor.ProofRequirements`, and action metadata. `FaultCode` ↔ `DiagnosticCode` linkage remains catalog-owned as a prevention/backstop relationship.
+**Consumers:** `CompilationResult`; LS/MCP proof reporting; lowering of fault residue into runtime backstops.
+**Current reality:** `ProofEngine.Prove` is stubbed; only the catalog-side proof vocabulary exists today.
 
 Boundary rule: proof stops at analysis. It does not build the executable runtime model, and runtime does not receive the whole proof graph — only lowered residue needed for defense-in-depth backstops.
 
@@ -270,25 +287,25 @@ catalog metadata → ProofRequirement → ProofObligation → DiagnosticCode →
 
 ### 5.7 Whole-pipeline snapshot — `Compiler.Compile(string source) -> CompilationResult`
 
-| Item | Contract |
-|---|---|
-| purpose | Produce one immutable snapshot of the full compiler pipeline. |
-| inputs | raw source + the five pipeline stages. |
-| output shape | `CompilationResult(TokenStream Tokens, SyntaxTree SyntaxTree, TypedModel Model, GraphResult Graph, ProofModel Proof, ImmutableArray<Diagnostic> Diagnostics, bool HasErrors)`. |
-| metadata entry | none added here; this is an aggregation boundary, not a reasoning stage. |
-| downstream consumers | LS, MCP `precept_compile`, `Precept.From`. |
-| current reality | This wiring exists and merges diagnostics correctly, but four of the five stages are still hollow. |
+`CompilationResult` is an aggregation boundary, not a reasoning stage. The key decision is that it captures the complete analysis pipeline as one immutable snapshot, so consumers (LS, MCP, lowering) can access any stage's output without re-running the pipeline or managing individual stage artifacts.
+
+**Purpose:** Produce one immutable snapshot of the full compiler pipeline.
+**Inputs:** Raw source + the five pipeline stages.
+**Output:** `CompilationResult(TokenStream Tokens, SyntaxTree SyntaxTree, TypedModel Model, GraphResult Graph, ProofModel Proof, ImmutableArray<Diagnostic> Diagnostics, bool HasErrors)`.
+**Metadata entry:** None added here; this is an aggregation boundary, not a reasoning stage.
+**Consumers:** LS, MCP `precept_compile`, `Precept.From`.
+**Current reality:** This wiring exists and merges diagnostics correctly, but four of the five stages are still hollow.
 
 ### 5.8 Lowering boundary — `Precept.From(CompilationResult compilation) -> Precept`
 
-| Item | Contract |
-|---|---|
-| purpose | Lower the analysis snapshot into the executable runtime model. |
-| inputs | previous artifact: error-free `CompilationResult`; semantic inputs come from `TypedModel`, `GraphResult`, and proof residue from `ProofModel`; catalogs are not re-read ad hoc here. |
-| output shape | `Precept` as a sealed executable model owning descriptor tables, slot layout, dispatch indexes, lowered execution plans, explicit constraint-plan indexes, inspection metadata, and fault-site backstops. |
-| metadata entry | Catalog metadata reaches runtime only in lowered semantic form: descriptor identity, resolved operation/function/action identity, constraint descriptors, and proof-owned fault-site residue. |
-| downstream consumers | `Precept.Create`, `Precept.Restore`, `Version` operations, MCP runtime tools, host applications. |
-| current reality | `Precept.From` currently checks `HasErrors` and then throws `NotImplementedException`. |
+Lowering is the one-way gate between analysis and runtime. The key decision is that `Precept.From()` is the sole owner of this transformation — no other code path builds the runtime model — and that it selectively transforms analysis knowledge into runtime-native shapes rather than copying or referencing compile-time artifacts.
+
+**Purpose:** Lower the analysis snapshot into the executable runtime model.
+**Inputs:** Error-free `CompilationResult`; semantic inputs come from `TypedModel`, `GraphResult`, and proof residue from `ProofModel`; catalogs are not re-read here.
+**Output:** `Precept` as a sealed executable model owning descriptor tables, slot layout, dispatch indexes, lowered execution plans, explicit constraint-plan indexes, inspection metadata, and fault-site backstops.
+**Metadata entry:** Catalog metadata reaches runtime only in lowered semantic form: descriptor identity, resolved operation/function/action identity, constraint descriptors, and proof-owned fault-site residue.
+**Consumers:** `Precept.Create`, `Precept.Restore`, `Version` operations, MCP runtime tools, host applications.
+**Current reality:** `Precept.From` currently checks `HasErrors` and then throws `NotImplementedException`.
 
 **Lowered executable-model contract**
 
@@ -313,7 +330,7 @@ catalog metadata → ProofRequirement → ProofObligation → DiagnosticCode →
 | `Fire` | row dispatch, action plans, recomputation, `always` + `from <current>` + `on <event>` + `to <target>` constraint plans |
 | `Update` | access-mode index, patch validation, recomputation, `always` + `in <current>` constraint plans; `InspectUpdate` additionally runs event-prospect evaluation over the hypothetical state |
 
-The anchor taxonomy is therefore explicit and non-flattened: runtime lowering must preserve `always`, `in`, `to`, `from`, and `on` as distinct executable-plan families.
+The anchor taxonomy is explicit and non-flattened: runtime lowering must preserve `always`, `in`, `to`, `from`, and `on` as distinct executable-plan families.
 
 **Constraint activation indexes**
 
@@ -330,18 +347,18 @@ The `ConstraintActivation` discriminant in the state activation index distinguis
 
 **Stable contract vs provisional current surface**
 
-The stable runtime contract is descriptor-backed. Current public stubs still expose string placeholders and string-selected entry points because D8/R4 is unresolved. Those strings are provisional implementation placeholders, not the architectural end state. Detailed runtime docs that follow from this document must treat descriptor-backed identity as permanent contract and string lookup behavior as current-era compatibility scaffolding only.
+The stable runtime contract is descriptor-backed. Current public stubs still expose string placeholders and string-selected entry points because D8/R4 is unresolved. Those strings are provisional implementation placeholders, not the architectural end state.
 
 ### 5.9 Evaluator — shared runtime executor
 
-| Item | Contract |
-|---|---|
-| purpose | Execute or inspect runtime plans without consulting syntax or raw catalogs. |
-| inputs | `Precept`, `Version`, descriptor-keyed arguments or patches, lowered execution plans, explicit constraint-plan indexes, and fault-site backstops. |
-| output shape | operation-specific results: `EventOutcome`, `UpdateOutcome`, `RestoreOutcome`, `EventInspection`, `UpdateInspection`, `RowInspection`; impossible-path invariant breaches classify as `Fault`. |
-| metadata entry | none newly derived; evaluator consumes lowered metadata only. |
-| downstream consumers | `Precept` and `Version` façades. |
-| current reality | `Evaluator` exists, but every operation body is a stub. `Fail(FaultCode, ...)` already routes through `Faults.Create(...)`. |
+The evaluator consumes only lowered artifacts — no syntax, no catalogs, no compile-time types. The key decision is that it is a plan executor, not a reasoning engine: execution semantics are fully determined at lowering time, and the evaluator simply runs the prebuilt plans. This keeps the runtime testable in isolation.
+
+**Purpose:** Execute or inspect runtime plans without consulting syntax or raw catalogs.
+**Inputs:** `Precept`, `Version`, descriptor-keyed arguments or patches, lowered execution plans, explicit constraint-plan indexes, and fault-site backstops.
+**Output:** Operation-specific results: `EventOutcome`, `UpdateOutcome`, `RestoreOutcome`, `EventInspection`, `UpdateInspection`, `RowInspection`; impossible-path invariant breaches classify as `Fault`.
+**Metadata entry:** None newly derived; evaluator consumes lowered metadata only.
+**Consumers:** `Precept` and `Version` façades.
+**Current reality:** `Evaluator` exists, but every operation body is a stub. `Fail(FaultCode, ...)` already routes through `Faults.Create(...)`.
 
 Runtime rule: valid executable models do not produce in-domain runtime errors. Expected runtime behavior is expressed as structured outcomes and inspections; `Fault` is reserved for defense-in-depth classification of impossible-path engine invariant breaches.
 
@@ -368,47 +385,47 @@ Inspection and commit paths execute the same lowered plans. Disposition alone di
 
 ### 5.10 Create / InspectCreate — `Precept.Create(...)`, `Precept.InspectCreate(...)`
 
-| Item | Contract |
-|---|---|
-| purpose | Construct the first valid `Version`, optionally by atomically firing the declared initial event. |
-| inputs | previous artifact: `Precept`; lowered defaults, `InitialState`, `InitialEvent`, arg descriptors, and the same fire-path runtime plans used by event execution. |
-| output shape | `Create` returns `EventOutcome`; `InspectCreate` returns `EventInspection`. Success yields `Applied(Version)` or `Transitioned(Version)`. |
-| metadata reflection | Default values, initial-event arg contract, field descriptors, and applicable constraint descriptors are consumed directly from the lowered model. |
-| downstream consumers | host applications, onboarding UI, MCP runtime preview patterns. |
-| current reality | Public methods exist and are documented, but both bodies are stubbed. |
+Create is the entity's entry point. The key decision is that creation with an initial event reuses the full fire-path execution — it is not a separate code path — ensuring that initial-event constraints, actions, and transitions apply identically to the creation flow.
+
+**Purpose:** Construct the first valid `Version`, optionally by atomically firing the declared initial event.
+**Inputs:** `Precept`; lowered defaults, `InitialState`, `InitialEvent`, arg descriptors, and the same fire-path runtime plans used by event execution.
+**Output:** `Create` returns `EventOutcome`; `InspectCreate` returns `EventInspection`. Success yields `Applied(Version)` or `Transitioned(Version)`.
+**Metadata reflection:** Default values, initial-event arg contract, field descriptors, and applicable constraint descriptors are consumed directly from the lowered model.
+**Consumers:** Host applications, onboarding UI, MCP runtime preview patterns.
+**Current reality:** Public methods exist and are documented, but both bodies are stubbed.
 
 ### 5.11 Restore — `Precept.Restore(...)`
 
-| Item | Contract |
-|---|---|
-| purpose | Reconstitute persisted entity data under the current definition, validating rather than trusting storage. |
-| inputs | previous artifact: `Precept`; caller-supplied persisted state and fields; lowered descriptors, slot validation, recomputation, and applicable restore constraint plans. |
-| output shape | `RestoreOutcome` with `Restored(Version)`, `RestoreConstraintsFailed(IReadOnlyList<ConstraintViolation>)`, or `RestoreInvalidInput(string Reason)`. |
-| metadata reflection | Uses the same lowered field/state/constraint descriptors as commit paths, but intentionally bypasses access-mode restrictions. |
-| downstream consumers | persistence boundaries, migration tooling later. |
-| current reality | Public DU exists; method body is a stub. |
+Restore reconstitutes persisted data under the current definition. The key decision is that Restore validates rather than trusts — it runs constraint evaluation but intentionally bypasses access-mode restrictions, because persisted data represents a prior valid state, not an active field edit.
+
+**Purpose:** Reconstitute persisted entity data under the current definition, validating rather than trusting storage.
+**Inputs:** `Precept`; caller-supplied persisted state and fields; lowered descriptors, slot validation, recomputation, and applicable restore constraint plans.
+**Output:** `RestoreOutcome` with `Restored(Version)`, `RestoreConstraintsFailed(IReadOnlyList<ConstraintViolation>)`, or `RestoreInvalidInput(string Reason)`.
+**Metadata reflection:** Uses the same lowered field/state/constraint descriptors as commit paths, but intentionally bypasses access-mode restrictions.
+**Consumers:** Persistence boundaries, migration tooling later.
+**Current reality:** Public DU exists; method body is a stub.
 
 ### 5.12 Fire / InspectFire — `Version.Fire(...)`, `Version.InspectFire(...)`
 
-| Item | Contract |
-|---|---|
-| purpose | Execute or preview event routing, action application, transition, recomputation, and constraint evaluation. |
-| inputs | previous artifact: `Version`; event descriptors, arg descriptors, row dispatch tables, lowered action plans, recomputation index, explicit anchor-plan indexes, and fault sites. |
-| output shape | `EventOutcome` (`Transitioned`, `Applied`, `Rejected`, `InvalidArgs`, `EventConstraintsFailed`, `Unmatched`, current provisional `UndefinedEvent`) and `EventInspection` / `RowInspection`. |
-| metadata reflection | Constraint identity survives into `ConstraintResult` and `ConstraintViolation` through `ConstraintDescriptor`. Routing uses descriptor-backed row identity; any remaining event-name string lookup is provisional. |
-| downstream consumers | host applications, MCP `precept_fire`, runtime preview, future LS preview surfaces. |
-| current reality | Public outcome types are implemented; `Version` methods and evaluator bodies are stubbed. String parameters are explicit TODO placeholders pending descriptor-based D8/R4 work. |
+Fire is the core state-machine operation. The key decision is that routing, action execution, transition, recomputation, and constraint evaluation are a single atomic pipeline — not composable steps that callers assemble — because partial execution would violate the determinism guarantee.
+
+**Purpose:** Execute or preview event routing, action application, transition, recomputation, and constraint evaluation.
+**Inputs:** `Version`; event descriptors, arg descriptors, row dispatch tables, lowered action plans, recomputation index, explicit anchor-plan indexes, and fault sites.
+**Output:** `EventOutcome` (`Transitioned`, `Applied`, `Rejected`, `InvalidArgs`, `EventConstraintsFailed`, `Unmatched`, current provisional `UndefinedEvent`) and `EventInspection` / `RowInspection`.
+**Metadata reflection:** Constraint identity survives into `ConstraintResult` and `ConstraintViolation` through `ConstraintDescriptor`. Routing uses descriptor-backed row identity; any remaining event-name string lookup is provisional.
+**Consumers:** Host applications, MCP `precept_fire`, runtime preview, future LS preview surfaces.
+**Current reality:** Public outcome types are implemented; `Version` methods and evaluator bodies are stubbed. String parameters are explicit TODO placeholders pending descriptor-based D8/R4 work.
 
 ### 5.13 Update / InspectUpdate — `Version.Update(...)`, `Version.InspectUpdate(...)`
 
-| Item | Contract |
-|---|---|
-| purpose | Execute or preview direct field edits under access-mode and constraint governance. |
-| inputs | previous artifact: `Version`; field descriptors, per-state access facts, recomputation dependencies, `always` / `in` constraint plans, and event-prospect evaluation over a hypothetical state. |
-| output shape | `UpdateOutcome` (`FieldWriteCommitted`, `UpdateConstraintsFailed`, `AccessDenied`, `InvalidInput`) and `UpdateInspection`. |
-| metadata reflection | Access modes and constraint identity come from lowered descriptors; `UpdateInspection.Events` reuses event inspection against the hypothetical post-patch state. |
-| downstream consumers | application edit flows, MCP `precept_update`, runtime preview. |
-| current reality | Public shapes exist; method bodies are stubbed; string-based field identity remains provisional. |
+Update is the direct-edit operation. The key decision is that field edits are governed by access-mode declarations and constraint evaluation — they are not raw writes — and that `InspectUpdate` additionally evaluates the event landscape over the hypothetical post-patch state.
+
+**Purpose:** Execute or preview direct field edits under access-mode and constraint governance.
+**Inputs:** `Version`; field descriptors, per-state access facts, recomputation dependencies, `always` / `in` constraint plans, and event-prospect evaluation over a hypothetical state.
+**Output:** `UpdateOutcome` (`FieldWriteCommitted`, `UpdateConstraintsFailed`, `AccessDenied`, `InvalidInput`) and `UpdateInspection`.
+**Metadata reflection:** Access modes and constraint identity come from lowered descriptors; `UpdateInspection.Events` reuses event inspection against the hypothetical post-patch state.
+**Consumers:** Application edit flows, MCP `precept_update`, runtime preview.
+**Current reality:** Public shapes exist; method bodies are stubbed; string-based field identity remains provisional.
 
 ---
 
@@ -433,7 +450,7 @@ Two hard rules:
 1. Do not make semantic LS features consume `SyntaxTree` because the typed layer is underspecified.
 2. Do not make preview/runtime LS features consume `CompilationResult` after lowering succeeds.
 
-**Current implementation reality:** `tools\Precept.LanguageServer\Program.cs` only boots the server and waits for exit. The matrix above is therefore a contract for later implementation, not a description of current behavior.
+**Current implementation reality:** `tools\Precept.LanguageServer\Program.cs` only boots the server and waits for exit. The matrix above is a contract for later implementation, not a description of current behavior.
 
 ## 7. Runtime and tooling consumer split
 
@@ -448,9 +465,11 @@ Two hard rules:
 | host application authoring-time validation | `CompilationResult` |
 | host application execution | `Precept` + `Version` |
 
-## 8. Diagnostics, runtime outcomes, and faults
+## 8. Diagnostics, outcomes, and faults
 
-Precept's promise is not that runtime faults are merely classified well. It is that valid executable models do not surface in-domain runtime errors. The three result families therefore have different jobs:
+Precept's promise is not that runtime faults are merely classified well. It is that valid executable models do not surface in-domain runtime errors. The three result families have different jobs, and collapsing them would undermine the guarantee.
+
+### 8.1 The three result families
 
 | Surface | Produced by | Meaning |
 |---|---|---|
@@ -471,9 +490,11 @@ Precept's promise is not that runtime faults are merely classified well. It is t
 | caller input / persisted-data mismatch | descriptor/type contracts exist, but not as source diagnostics for that invocation | `InvalidArgs`, `InvalidInput`, `RestoreInvalidInput`, `AccessDenied` | normal boundary-validation outcome |
 | impossible-path invariant breach | compiler-owned prevention rule exists in catalog metadata | `Fault` only if runtime somehow reaches the site | defense-in-depth backstop; should be unreachable |
 
-### Commit surfaces
+### 8.2 Commit and inspection surfaces
 
-| Operation | Success | Domain outcome | Boundary-validation outcome | engine invariant breach (`Fault`) |
+**Commit outcomes by operation:**
+
+| Operation | Success | Domain outcome | Boundary-validation outcome | Engine invariant breach |
 |---|---|---|---|---|
 | `Create` / `Fire` | `Applied`, `Transitioned` | `Rejected`, `EventConstraintsFailed`, `Unmatched` | `InvalidArgs`, current provisional `UndefinedEvent` | `Fault` |
 | `Update` | `FieldWriteCommitted` | `UpdateConstraintsFailed`, `AccessDenied` | `InvalidInput` | `Fault` |
@@ -481,19 +502,11 @@ Precept's promise is not that runtime faults are merely classified well. It is t
 
 `UndefinedEvent` and other string-selected invalid-input cases are part of the current provisional surface, not a permanent endorsement of string-lookup-era runtime identity. Descriptor-backed APIs may narrow or eliminate some of these branches.
 
-### Inspection surfaces
-
-| Type | Role |
-|---|---|
-| `EventInspection` | reduced event-level landscape |
-| `RowInspection` | per-row prospect, effect, snapshots, constraints |
-| `UpdateInspection` | hypothetical field state + resulting event landscape |
-| `ConstraintResult` | evaluation status referencing `ConstraintDescriptor` |
-| `FieldSnapshot` | resolved or unresolved field value in hypothetical state |
+**Inspection types:** `EventInspection` provides the reduced event-level landscape. `RowInspection` provides per-row prospect, effect, snapshots, and constraints. `UpdateInspection` provides hypothetical field state plus the resulting event landscape. `ConstraintResult` carries evaluation status referencing `ConstraintDescriptor`. `FieldSnapshot` captures resolved or unresolved field value in hypothetical state.
 
 Inspection must share the same lowered plans as commit. It is not a second evaluator.
 
-**Constraint exposure tiers**
+### 8.3 Constraint query contract
 
 Three tiers form the constraint query and inspection contract. Each tier is additive in specificity.
 
@@ -505,7 +518,11 @@ Three tiers form the constraint query and inspection contract. Each tier is addi
 
 The definition tier enumerates the full catalog. The applicable tier narrows to the live context without evaluation. The evaluated tier records actual decisions made during a specific operation execution.
 
-## 9. Current implementation drift snapshot
+---
+
+## Appendix A: Implementation status
+
+*Implementation status changes on a different cadence than architectural decisions. This appendix tracks current reality; the main document tracks the stable contract.*
 
 | Area | Current state | Required state |
 |---|---|---|
@@ -532,17 +549,3 @@ Concrete deliverables that follow from this document's contracts:
 4. **Update LS and MCP DTOs.** When descriptor types are defined, language-server and MCP data-transfer objects must be updated to match the new descriptor contracts. Parallel string-keyed shapes in those surfaces are provisional scaffolding, not permanent architecture.
 
 5. **Add drift tests.** Write tests that fail if any consumer — LS, MCP, evaluator, or test helpers — begins maintaining a parallel copy of catalog-defined vocabulary. Catalogs are the single source; consumer-local kind tables are a maintenance invariant breach, and the test suite should catch it.
-
-## 10. Design assertions locked by this document
-
-1. `CompilationResult` and `Precept` are distinct artifacts with distinct consumers.
-2. `SyntaxTree` and `TypedModel` are distinct artifacts with distinct jobs.
-3. The `TypedModel` anti-mirroring boundary is enforceable: symbols, bindings, normalized declarations, typed execution forms, dependency facts, and source-origin handles are mandatory inventory.
-4. Graph and proof remain analysis artifacts; lowering alone builds the executable model.
-5. Lowering must preserve distinct executable plan families for `always`, `in`, `to`, `from`, and `on` anchors.
-6. Valid executable models report structured runtime outcomes; `Fault` is reserved for impossible-path invariant breaches.
-7. The LS is a `CompilationResult` consumer first and a runtime consumer second, with exact feature-to-artifact boundaries.
-8. MCP follows the same split.
-9. Descriptor-backed runtime identity is the stable contract; current string placeholders are provisional only.
-10. `TypedModel` is the compiler's resolved semantic contract, not the executable runtime contract. Collapsing the two makes the compiler a runtime dependency and violates the lowering boundary.
-11. Consumers — LS, MCP, evaluator, and tests — must not maintain independent copies of catalog-defined vocabulary. Catalog metadata is the single source. Consumer-local kind tables or parallel keyword lists are an invariant breach and must be caught by drift tests.

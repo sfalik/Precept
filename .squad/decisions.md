@@ -6,20 +6,22 @@
 
 ---
 
-### 2026-04-27T00:19:02Z: Combined compiler/runtime v2 architecture canonicalized
-**By:** Scribe
-**Status:** Merged, deduplicated, inbox cleared (17 files)
+### 2026-04-28T00:00:00Z: Combined Design v2 Structural Revision
+**By:** Frank
+**Status:** Applied
 
-**Merged sources:** `syntax-tree-typed-model-boundary`, `george-v2-review`, `george-v2-compiler-runtime`, `george-proof-fault-contract`, `george-combined-final`, `frank-v2-fault-diagnostic-boundary`, `frank-v2-compiler-runtime`, `frank-proof-fault-contract`, `frank-combined-design-v2-contract-hardening`, `frank-combined-design-draft`, `copilot-directive-20260426-191540`, `copilot-directive-20260426-190457`, `copilot-directive-20260426-185930`, `copilot-directive-20260426-185330`, `copilot-directive-2026-04-26T20-04-23-faults-diagnostics`, `copilot-directive-2026-04-26T19-57-38-advanced-design-scope`, `copilot-directive-2026-04-26T19-57-38-04-00`.
+- Applied boundary reassessment: replaced "hard line / nothing crosses" claim with correct type dependency direction rule; clarified what crosses the lowering boundary.
+- Readability/genre fixes: 13 stage-contract tables converted to labeled prose, two artifact tables merged, "How to read this document" added, §8 split, §9 moved to appendix, decision lead-ins added, problem statement added to §1, assertions moved to doc spine.
+- No content dropped; all facts, contracts, and assertions preserved. Comparative tables retained where genuinely comparative.
+- Motivation: Shifted from reference spec to design doc genre, making decisions and rationale explicit and readable.
 
-- `CompilationResult` is the complete five-stage authoring/tooling snapshot, while `Precept` is the lowered executable model. Lowering happens only in `Precept.From(compilation)`, not inside proof and not as a sixth compiler stage.
-- `SyntaxTree` and `TypedModel` are intentionally non-mirroring artifacts: syntax owns source structure, spans, and recovery; the typed layer owns semantic truth, including symbols, bindings, normalized declarations, typed expressions/actions, dependency facts, and source-origin handles.
-- Language-server and MCP authoring consumption is artifact-specific: lexical classification reads `TokenStream`, source-structural UX reads `SyntaxTree`, semantic tokens/completions/hover/definition read `TypedModel`, and preview/inspection only crosses to lowered `Precept` after successful compilation.
-- Lowering is an explicit executable-model contract, not a hand-waved bridge: descriptor-backed identity, slot layout, routing indexes, recomputation order, access-mode indexes, inspection metadata, and distinct executable constraint-plan families for `always`, `in`, `to`, `from`, and `on` anchors are all first-class runtime obligations.
-- Constraint enforcement and fault handling are sibling runtime contracts, not mirrored error channels. Constraint failures remain ordinary runtime/domain outcomes; `Fault` is reserved for impossible-path engine invariant breaches, and every `FaultCode` keeps a compiler-owned prevention counterpart in the diagnostics/proof system.
-- Three semantic action shapes remain canonical across typed and lowered models: base action, operand-bearing action, and binding-shaped action; `pop` and `dequeue` stay binding-shaped even when no capture target is authored.
-- The combined v2 rewrite is the advanced successor to `docs\compiler-and-runtime-design.md`: it must cover compiler and runtime in equal detail and serve as the base contract for later stage-level design documents.
-- George's final concurrence closes top-level architecture repair on this pass. Remaining follow-up is stage-level alignment, especially syncing `docs\runtime\fault-system.md`, preserving the descriptor-backed runtime API direction, and keeping future Frank synthesis/review work on this lane in Opus.
+### 2026-04-28T00:00:00Z: Combined Design v2 Gap Patch Complete
+**By:** Frank
+**Status:** Complete
+
+- Added 10 missing design specifics to combined-design-v2.md: action-shape model, constraint activation indexes, constraint evaluation matrix, constraint exposure tiers, proof strategy enumeration, proof/fault chain formula, earliest-knowable kind assignment, named anti-patterns, compile-time vs lowered artifact table, implementation action items.
+- Locked: three action shapes, precomputed constraint activation, closed proof strategies, explicit proof/fault chain ownership, five implementation action items.
+- No philosophy gaps surfaced; all changes are implementation domain only.
 
 ### 2026-04-27T00:00:00Z: MCP dual-surface operating model canonicalized
 **By:** Scribe
