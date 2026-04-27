@@ -1,7 +1,7 @@
 # Catalog System
 
 > **Status:** Draft — updated 2026-04-25 after full team review (10-item metadata-driven design review, owner sign-off)
-> **Implemented in:** `src/Precept/` — all 10 catalogs implemented
+> **Implemented in:** `src/Precept/` — all 12 catalogs implemented
 > **Related:** `docs/compiler/diagnostic-system.md`, `docs/runtime/fault-system.md`, `docs/compiler-and-runtime-design.md`
 
 ## Overview
@@ -1260,7 +1260,7 @@ Currency codes and measurement units are validated at type-check time, but they 
 
 ## Syntax Reference
 
-The 10 catalogs cover the language's *vocabulary* exhaustively. The language also has *grammar meta-rules* — singular facts about how source text is structured — that consumers need but that have no per-member enum. These are language-level constants, not catalogs.
+The 12 catalogs cover the language's *vocabulary* exhaustively. The language also has *grammar meta-rules* — singular facts about how source text is structured — that consumers need but that have no per-member enum. These are language-level constants, not catalogs.
 
 `SyntaxReference` is a static class with typed properties, part of the same metadata-driven source of truth:
 
@@ -1300,11 +1300,13 @@ The test of completeness: every cell should trace back to a catalog, never to ha
 | **TextMate grammar** | Constructs → Tokens → Types | **Generated** from catalog metadata. Construct slot arrays generate patterns; token keywords generate keyword alternations; type keywords via `Types.All` filtered by `Token.Text`. No hand-maintained alternation lists. Tests verify the generator produces correct output. |
 | **MCP `precept_language`** | All 12 catalogs' `.All` + `SyntaxReference` | Union of all catalog enumerations IS the language spec. MCP tool iterates each and serializes. `SyntaxReference` adds grammar meta-rules. |
 | **LS completions** | Tokens + Types + Functions + Modifiers + Actions | **Generated** from catalog metadata. Context-filtered: type position → `Types.All`; expression → `Functions.All`; after type → `Modifiers.All` filtered by `ApplicableTo`; event body → `Actions.All`. No hand-maintained completion lists. |
-| **LS hover** | Types + Functions + Operators + Operations | Per-member descriptions from catalog metadata via `Token.Text` and `Description` |
+| **LS hover** | Types + Functions + Operators + Operations + Constraints | Per-member descriptions from catalog metadata. `ConstraintMeta.Description` populates hover for `rule`/`ensure` declarations. |
 | **LS semantic tokens** | Tokens (via `TokenMeta.Categories`) | Token categories map directly to semantic token types |
-| **Type checker validation** | Types + Functions + Operations + Modifiers + Actions | Catalog lookups replace hand-coded validation logic: modifier applicability → `Modifiers.GetMeta().ApplicableTo`; function signatures → `Functions.GetMeta()`; operation legality → `Operations.Resolve()`; type keyword resolution → `Types.All` frozen dictionary keyed by `Token.Kind` |
+| **Type checker validation** | Types + Functions + Operations + Modifiers + Actions + ProofRequirements | Catalog lookups replace hand-coded validation logic: modifier applicability → `Modifiers.GetMeta().ApplicableTo`; function signatures → `Functions.GetMeta()`; operation legality → `Operations.Resolve()`; type keyword resolution → `Types.All` frozen dictionary keyed by `Token.Kind`; proof obligation kinds → `ProofRequirements.GetMeta()` |
 | **Parser vocabulary** | Operators + Types + Modifiers + Actions + Constructs | Frozen dictionaries derived from catalogs at startup: `Operators.All` → precedence table; `Types.All` → type keyword mapping; `Modifiers.All` → recognition sets; `Actions.All` → action keywords. No hand-maintained vocabulary tables. |
-| **Evaluator dispatch** | Functions + Operations | Evaluator dispatches by operation kind and function kind. No parallel dispatch tables. Execution delegate design is deferred pending working copy API design. |
+| **Plan router / Precept Builder** | Constraints | `Constraints.GetMeta(kind)` routes each `ConstraintDescriptor` into the correct activation bucket (`always`, `StateResident`, `StateEntry`, `StateExit`, `EventPrecondition`). `ConstraintMeta.StateAnchored` groups all state-scoped kinds without per-member checks. |
+| **Proof engine** | ProofRequirements | `ProofRequirements.GetMeta(kind)` dispatches proof obligation instances by kind. `ProofRequirementMeta.QualifierCompatibility` identifies dual-subject obligations without per-kind conditionals. |
+| **Evaluator dispatch** | Functions + Operations + Constraints | Evaluator dispatches by operation kind and function kind. `Constraints.GetMeta()` drives constraint activation timing — no hardcoded per-kind activation logic. Execution delegate design deferred pending working copy API design. |
 | **Runtime boundary validation** | Modifiers | `FieldModifierMeta.ApplicableTo` and `HasValue` drive boundary checks. No `switch` on `ModifierKind`. |
 | **Reference documentation** | All 10 language definition catalogs + `SyntaxReference` | **Generated** from catalog metadata. Tables, syntax sections, grammar reference all derived from `All` properties. |
 | **AI grounding** | All 12 catalogs + `SyntaxReference` | Complete, always-accurate language reference — AI grounded on catalog output cannot hallucinate features |
@@ -1367,9 +1369,10 @@ As catalogs are implemented, each pipeline stage gets thinner — domain knowled
 |-------|--------------|----------------|
 | **Lexer** | Already uses `Tokens.Keywords` for keyword classification | Minimal further impact. Operator scan priority derivable from `Operators.All` sorted by `Token.Text.Length` descending. |
 | **Parser** | Hand-coded vocabulary tables + recursive descent grammar | Vocabulary tables — operator precedence, type keyword mappings, modifier/action recognition sets (~40–50% of language knowledge decisions) — migrate to catalog-derived frozen dictionaries at startup. Grammar productions stay hand-written. Construct slots enable test generation and LS completions. When a new type, modifier, operator, or action is added to a catalog, the parser adapts automatically — no parser edit needed. |
-| **TypeChecker** | Hand-coded modifier validation, function dispatch, operator dispatch | Significant: modifier applicability → `Modifiers.GetMeta().ApplicableTo`, function validation → `Functions.GetMeta()`, operation legality → `Operations.Resolve()`, type keyword resolution → `Types.All` frozen dictionary. The type checker's `switch` forests shrink to catalog lookups. |
+| **TypeChecker** | Hand-coded modifier validation, function dispatch, operator dispatch | Significant: modifier applicability → `Modifiers.GetMeta().ApplicableTo`, function validation → `Functions.GetMeta()`, operation legality → `Operations.Resolve()`, type keyword resolution → `Types.All` frozen dictionary, proof obligation kinds → `ProofRequirements.GetMeta()`. The type checker's `switch` forests shrink to catalog lookups. |
 | **GraphAnalyzer** | Hand-coded state reachability, modifier semantics | Moderate: state modifier structural semantics (`AllowsOutgoing`, `RequiresDominator`, `PreventsBackEdge`) are catalog metadata on `StateModifierMeta`. Graph algorithms (reachability, dominator trees, SCC) remain generic machinery. |
-| **ProofEngine** | Hand-coded proof obligations per operator | Significant: `ProofRequirement[]` on `BinaryOperationMeta`, `FunctionOverload`, `TypeAccessor`, and `ActionMeta` carry all proof obligations as metadata. Proof engine reads catalog entries — no hardcoded obligation lists. |
-| **Evaluator** | Not yet implemented | Execution delegate design deferred pending working copy API design. When implemented: operation execution dispatches via `Operations.Resolve()`; function execution dispatches via `Functions.GetMeta()`; modifier boundary validation reads `FieldModifierMeta.ApplicableTo`/`HasValue`. Action execution delegates deferred until working copy API designed. The evaluator's core loop (expression tree walking, working copy, atomicity) remains hand-written. |
+| **ProofEngine** | Hand-coded proof obligations per operator | Significant: `ProofRequirement[]` on `BinaryOperationMeta`, `FunctionOverload`, `TypeAccessor`, and `ActionMeta` carry all proof obligations as metadata. `ProofRequirements.GetMeta(kind)` dispatches obligation instances — no hardcoded per-kind obligation lists. |
+| **PreceptBuilder** | Hand-coded constraint bucketing | `Constraints.GetMeta(kind)` routes each `ConstraintDescriptor` into the correct activation bucket. `ConstraintMeta.StateAnchored` groups state-scoped constraints without per-member conditionals. No hardcoded activation-timing switch. |
+| **Evaluator** | Not yet implemented | Execution delegate design deferred pending working copy API design. When implemented: operation execution dispatches via `Operations.Resolve()`; function execution dispatches via `Functions.GetMeta()`; constraint activation timing reads `Constraints.GetMeta()`; modifier boundary validation reads `FieldModifierMeta.ApplicableTo`/`HasValue`. Action execution delegates deferred until working copy API designed. The evaluator's core loop (expression tree walking, working copy, atomicity) remains hand-written. |
 
 Pattern: domain knowledge → metadata. Stages → generic machinery that reads catalogs.

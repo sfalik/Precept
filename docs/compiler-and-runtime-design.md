@@ -19,13 +19,13 @@ Everything in this document — every pipeline stage, every artifact, every runt
 
 ### Catalog-driven design
 
-Precept keeps its language purposely simple. Rather than embedding domain knowledge in pipeline stage implementations (as traditional compilers do), Precept externalizes the entire language definition as structured metadata in ten catalogs. Pipeline stages are generic machinery that reads this metadata.
+Precept keeps its language purposely simple. Rather than embedding domain knowledge in pipeline stage implementations (as traditional compilers do), Precept externalizes the entire language definition as structured metadata in twelve catalogs. Pipeline stages are generic machinery that reads this metadata.
 
 This inverts the traditional compiler model. In general-purpose compilers (Roslyn, GCC, TypeScript), domain knowledge is scattered across pipeline stage implementations — adding a language feature means touching dozens of files. The surveyed DSL-scale systems take a different approach: CEL centralizes its language definition in `Env` declarations, OPA/Rego externalizes rule indexing and type environments in `ast.Compiler`, and CUE's lattice-based evaluation derives behavior from schema declarations. Precept takes this pattern further — adding a language feature means adding an enum member and filling an exhaustive switch. The C# compiler refuses to build if any member lacks metadata, and propagation to every consumer (grammar, completions, hover, MCP, semantic tokens) is automatic.
 
-The ten catalogs fall into two groups:
+The twelve catalogs fall into two groups:
 
-**Language definition** — what the language IS: `Tokens` (lexical vocabulary), `Types` (type system families), `Functions` (built-in function library), `Operators` (operator symbols with precedence/associativity/arity), `Operations` (typed operator combinations — which `(op, lhs, rhs)` triples are legal), `Modifiers` (declaration-attached modifiers as a discriminated union with five subtypes), `Actions` (state-machine action verbs), `Constructs` (grammar forms and declaration shapes).
+**Language definition** — what the language IS: `Tokens` (lexical vocabulary), `Types` (type system families), `Functions` (built-in function library), `Operators` (operator symbols with precedence/associativity/arity), `Operations` (typed operator combinations — which `(op, lhs, rhs)` triples are legal), `Modifiers` (declaration-attached modifiers as a discriminated union with five subtypes), `Actions` (state-machine action verbs), `Constructs` (grammar forms and declaration shapes), `Constraints` (constraint kinds and activation anchor metadata), `ProofRequirements` (proof obligation kinds and qualifier compatibility metadata).
 
 **Failure modes** — how it reports problems: `Diagnostics` (compile-time rules), `Faults` (runtime failure modes). The diagnostic-and-output-design survey confirms that Precept's catalog-based separation of diagnostic rule definition (`DiagnosticCode` in the `Diagnostics` catalog) from diagnostic instance (`Diagnostic` with source location, severity, and message arguments) follows the Roslyn pattern (`DiagnosticDescriptor` / `Diagnostic`) — the most explicit rule-vs-instance separation in the surveyed systems. TypeScript uses a similar `DiagnosticMessage` / `Diagnostic` split. The survey also reveals a severity-level divide: all surveyed DSL-scale systems (CEL, OPA/Rego, CUE, Dhall, Jsonnet, Pkl, Starlark) have error-only diagnostics — no warnings, no hints. Only general-purpose compilers (Roslyn, TypeScript, Rust, Swift) define 4+ severity levels. Precept's `Diagnostics` catalog defines severity levels beyond error, which is an intentional choice above DSL-scale norms, driven by the authoring-surface ambition of the language server and MCP tools.
 
@@ -34,7 +34,7 @@ Their union IS the language specification in machine-readable form. No consumer 
 The architectural principle: **if something is domain knowledge, it is metadata; if it is metadata, it has a declared shape; if shapes vary by kind, the shape is a discriminated union.** Pipeline stages, tooling, and consumers derive from the metadata — they never encode language knowledge in their own logic. See `docs/language/catalog-system.md` for the full catalog system design.
 
 > **Precept Innovations**
-> - **Catalog-as-spec inversion.** Traditional compilers scatter language knowledge across pipeline implementations. Precept externalizes the entire language specification as ten machine-readable catalogs — their union IS the spec, and every consumer derives from them. No other DSL tooling in this category has this property.
+> - **Catalog-as-spec inversion.** Traditional compilers scatter language knowledge across pipeline implementations. Precept externalizes the entire language specification as twelve machine-readable catalogs — their union IS the spec, and every consumer derives from them. No other DSL tooling in this category has this property.
 > - **Single-act feature propagation.** Adding a language feature is one enum member with an exhaustive metadata switch. The C# compiler refuses to build if metadata is missing, and propagation to grammar, completions, hover, MCP vocabulary, and semantic tokens is automatic.
 > - **Grammar generation from catalogs.** The TextMate grammar, LS completions, and MCP vocabulary are generated artifacts, not hand-edited — they cannot drift from the language specification because they ARE the specification, projected to different surfaces.
 
@@ -107,8 +107,8 @@ flowchart TD
 
     subgraph CATALOGS[Catalogs]
         direction LR
-        TOK(Tokens):::catalog ~~~ TYP(Types):::catalog ~~~ FUN(Functions):::catalog ~~~ OPR(Operators):::catalog ~~~ OPN(Operations):::catalog
-        MOD(Modifiers):::catalog ~~~ ACT(Actions):::catalog ~~~ CON(Constructs):::catalog ~~~ DIA(Diagnostics):::catalog ~~~ FLT(Faults):::catalog
+        TOK(Tokens):::catalog ~~~ TYP(Types):::catalog ~~~ FUN(Functions):::catalog ~~~ OPR(Operators):::catalog ~~~ OPN(Operations):::catalog ~~~ MOD(Modifiers):::catalog
+        ACT(Actions):::catalog ~~~ CON(Constructs):::catalog ~~~ CST(Constraints):::catalog ~~~ PRQ(ProofReqs):::catalog ~~~ DIA(Diagnostics):::catalog ~~~ FLT(Faults):::catalog
     end
 
     CATALOGS -. feeds all stages .-> COMPILE
