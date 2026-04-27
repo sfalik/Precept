@@ -1,5 +1,19 @@
 # Parser
 
+---
+
+## Status
+
+| Property | Value |
+|---|---|
+| Doc maturity | Full |
+| Implementation state | Implemented |
+| Source | `src/Precept/Pipeline/Parser.cs`, `src/Precept/Pipeline/SyntaxNodes.cs` |
+| Upstream | Lexer (`TokenStream`) |
+| Downstream | TypeChecker, LS syntax features, MCP `precept_compile` |
+
+---
+
 ## Overview
 
 The parser is the second stage of the Precept compilation pipeline. It transforms the flat `TokenStream` produced by the lexer into a `SyntaxTree` — an abstract syntax tree representing the semantic structure of the precept definition. The parser is a hand-written recursive descent parser with a Pratt expression parser for operator precedence. It produces an AST (not a CST) — comments and whitespace are consumed silently. No information is discarded that downstream stages need; no information is preserved that only a formatter would need.
@@ -31,59 +45,31 @@ The `SyntaxTree` is the `Compilation.SyntaxTree` field — it is part of the too
 
 ---
 
-## Architectural Principles
+## Responsibilities and Boundaries
 
-### The Parser Is Catalog-Driven Dispatch
+**OWNS:** Source-structural representation of authored programs; error recovery shape (`IsMissing` nodes, `SkippedTokens`); `SourceSpan` ownership for every node; disambiguation of dual-use tokens (`set`, `min`, `max`) by syntactic position.
 
-The parser dispatches on `ConstructKind` values, not on ad-hoc token sequences. Each declaration production corresponds to exactly one `ConstructKind`, and the Constructs catalog (`Constructs.All`) is the exhaustive inventory of every declaration shape the parser can produce. When a new construct is added to the catalog, the parser gains a new production — the dispatch table, the slot sequence, and the MCP vocabulary all derive from the same metadata.
+**Does NOT OWN:** Name resolution, type compatibility, overload selection, semantic legality (`AllowedIn` constraint enforcement) — these belong to the TypeChecker. Token classification — the Lexer already classifies all tokens before the parser sees them. Operator precedence is parser-internal (not catalog metadata).
 
-The Constructs catalog carries `LeadingToken`, `Slots`, `AllowedIn`, and `UsageExample` per construct. These are the parser's dispatch key, shape skeleton, semantic scoping rule, and diagnostic example text — read from metadata, not duplicated in parser code.
+---
 
-Consider the `TransitionRow` construct. Its catalog entry declares `LeadingToken = TokenKind.From`, `Slots = [StateTarget, EventTarget, GuardClause, ActionChain, Outcome]`, and `AllowedIn = []` (top-level). The parser reads this shape: dispatch on `From`, parse a state target, parse an event target, optionally parse a guard, loop through an action chain, parse an outcome. If a new slot is added to the construct (say, a `BecauseClause`), the parser gains a new step in the production — but the catalog is the authority that says the step exists.
+## Right-Sizing
 
-### Preposition-First Grammar
+The parser is scoped to structural reconstruction of a flat, line-oriented, keyword-anchored grammar. It does not attempt semantic validation (that belongs to the TypeChecker) and does not produce a CST (that would serve only a formatter, which Precept does not have). The flat declaration list as the primary output shape — not a nested block tree — is a right-sizing decision: Precept's grammar has no deeply-nested block structure, so the complexity budget of a block-scope parser is unnecessary. The three-family split (declarations, expressions, statements) is the minimum needed to give downstream consumers a useful type-level partition without over-specifying the tree shape.
 
-The four preposition keywords (`in`, `to`, `from`, `on`) are the parser's primary structural signal for scoped declarations. After the precept header and the declaration keywords (`field`, `state`, `event`, `rule`), every remaining production begins with a preposition. The parser reads the preposition, parses the state or event target, then looks ahead one token to select the specific production: ensure, access mode, action, transition, or event handler.
+---
 
-A flat, line-oriented grammar with no block delimiters needs an unambiguous structural signal at the start of each line. Prepositions are the natural English equivalent of a block opener — they scope the line to a state or event context without requiring braces or indentation.
+## Inputs and Outputs
 
-The insurance-claim sample illustrates the pattern. Every line after the header declarations begins with `from`, `in`, or `on`:
+**Input:** `TokenStream` — `ImmutableArray<Token>` produced by the Lexer. Each token carries `Kind`, `Text`, and `SourceSpan`.
 
-```precept
-in UnderReview write FraudFlag
-in Approved ensure ApprovedAmount > 0 because "Approved claims must specify a payout amount"
-on Submit ensure Amount > 0 because "Claim amounts must be positive"
-from Draft on Submit -> set ClaimantName = Submit.Claimant -> transition Submitted
-from Submitted on AssignAdjuster -> set AdjusterName = trim(AssignAdjuster.Name) -> transition UnderReview
-```
+**Output:** `SyntaxTree` — `PreceptHeaderNode? Header`, `ImmutableArray<Declaration> Declarations`, `ImmutableArray<Diagnostic> Diagnostics`. Always produced, even from broken input.
 
-Each line's preposition immediately establishes the scope. The parser needs zero lookahead to know which family of production it is entering — it just reads the preposition and proceeds.
-
-### Single-Pass Recursive Descent
-
-The parser makes a single forward pass through the token stream. It never backtracks. Each production consumes the tokens it needs, emits diagnostics for tokens it expected but didn't find, and returns a node. The top-level dispatch loop peeks at the current token, selects a production, and calls it. The production consumes its tokens and returns.
-
-Precept's grammar is LL(1) with a small number of two-token lookaheads (preposition + verb). No production requires unbounded lookahead. A single-pass design bounds memory to the depth of the expression tree and guarantees linear-time parsing. The token stream is immutable and indexable — `Peek(n)` is O(1), so bounded lookahead adds no allocation cost.
-
-### Pratt Expression Parsing
-
-Expressions use a Pratt parser (top-down operator precedence) rather than recursive descent with one function per precedence level. `ParseExpression(int minBp)` parses a complete expression, stopping when it encounters a token whose left-binding power is ≤ `minBp`. This handles unary prefix operators, binary infix operators, member access, function calls, and the `if`/`then`/`else` conditional — all in a single loop with a precedence table.
-
-Precept has 10 precedence levels, prefix operators (`not`, unary `-`), postfix operators (`.`, `(`), and non-associative comparisons. A Pratt parser expresses all of this in ~80 lines of dispatch logic plus a binding-power table. A recursive-descent expression parser would need 10+ mutually recursive methods with identical structure.
-
-### Resilient by Construction
-
-The parser never throws, never returns null, and never produces a partial tree. Every production has a well-defined recovery path: missing tokens produce `IsMissing` nodes with zero-length spans; structurally lost positions scan forward to sync points (declaration-starting keywords). The resulting tree is always traversable by downstream stages.
-
-The language server calls `Parser.Parse` on every keystroke. A parser that fails on incomplete input forces the language server to special-case "no tree" scenarios throughout completions, hover, go-to-definition, and diagnostics. A resilient parser eliminates that entire class of defensive code. The MCP tools (`precept_compile`, `precept_inspect`) also consume the tree directly — they need a structurally coherent tree even when the author is mid-edit.
-
-### Flat Declaration List
-
-The AST is a flat list of declaration nodes. There are no nested block nodes, no scope-introducing braces, and no parent-child relationships in the tree structure. Semantic scoping (`AllowedIn` — e.g., a state ensure is only valid after a state declaration) is a type-checker concern, not a parser concern. The parser produces the flat list; the type checker validates semantic ordering.
-
-Precept is a line-oriented policy language. The author writes declarations top-to-bottom; the runtime reads them the same way. A flat list matches the mental model: each line is a self-contained declaration with its own preposition scope. Nested AST blocks would impose a hierarchical structure that the language surface does not express.
-
-The `AllowedIn` field on `ConstructMeta` captures the semantic scoping that a nesting parser would express structurally. For example, `StateEnsure` has `AllowedIn = [StateDeclaration]` — meaning it is only valid after a state declaration exists. But this is a type-checker validation, not a parsing constraint. The parser emits the flat node; the type checker checks `AllowedIn` against the declared state names.
+| Member | Type | Notes |
+|---|---|---|
+| `Header` | `PreceptHeaderNode?` | null if `precept` keyword is missing or source is empty |
+| `Declarations` | `ImmutableArray<Declaration>` | flat declaration list in source order |
+| `Diagnostics` | `ImmutableArray<Diagnostic>` | parse-phase diagnostics only; merged into `Compilation.Diagnostics` |
 
 ---
 
@@ -337,7 +323,440 @@ Downstream stages never need the raw source text to emit located diagnostics —
 
 ---
 
-## Catalog Integration
+## Component Mechanics
+
+### SourceSpan
+
+Every AST node carries a `SourceSpan` — the dual-coordinate location record defined in [src/Precept/Pipeline/SourceSpan.cs](../../src/Precept/Pipeline/SourceSpan.cs). The implementation is documented in [§ SourceSpan Contract](#sourcespan-contract) above. No changes needed — the parser reads `Token.Span` directly for leaf nodes and creates compound spans via `SourceSpan.Covering(first, last)` for declaration-level nodes. The parser never reconstructs a `SourceSpan` from separate token fields — the lexer provides it.
+
+### SyntaxNode Base and Intermediate Types
+
+```csharp
+public abstract record SyntaxNode(SourceSpan Span, bool IsMissing = false);
+```
+
+All AST nodes inherit from `SyntaxNode`. `Span` covers the full source extent of the node. `IsMissing` is `true` when the parser synthesized the node to fill an expected-but-absent position — downstream stages can inspect this flag to suppress cascading diagnostics on phantom nodes. Records are immutable by default; no `with` copies are expected after construction.
+
+Three abstract intermediates partition the node space for downstream pattern matching:
+
+```csharp
+public abstract record Declaration(SourceSpan Span, ConstructKind Kind, bool IsMissing = false)
+    : SyntaxNode(Span, IsMissing);
+
+public abstract record Statement(SourceSpan Span, bool IsMissing = false)
+    : SyntaxNode(Span, IsMissing);
+
+public abstract record Expression(SourceSpan Span, bool IsMissing = false)
+    : SyntaxNode(Span, IsMissing);
+```
+
+`Declaration` carries a `ConstructKind` so consumers can switch on the catalog identity without downcasting. `Statement` covers action statements inside arrow chains. `Expression` covers the Pratt-parsed expression tree. The type checker, graph analyzer, and language server all switch on these three families.
+
+### SyntaxTree
+
+```csharp
+public sealed record SyntaxTree(
+    PreceptHeaderNode? Header,
+    ImmutableArray<Declaration> Declarations,
+    ImmutableArray<Diagnostic> Diagnostics);
+```
+
+`Header` is nullable for the case where the source is empty or the `precept` keyword is missing — the parser emits an `ExpectedToken` diagnostic and produces a tree with `Header = null`. `Declarations` is the flat list in source order. `Diagnostics` accumulates every parse-stage diagnostic. This is the `Compilation.SyntaxTree` field.
+
+### Declaration Nodes
+
+#### PreceptHeader
+
+```
+precept Identifier
+```
+
+```csharp
+public sealed record PreceptHeaderNode(
+    SourceSpan Span, Token Name, bool IsMissing = false)
+    : Declaration(Span, ConstructKind.PreceptHeader, IsMissing);
+```
+
+```precept
+precept InsuranceClaim
+```
+
+#### FieldDeclaration
+
+```
+field Identifier ("," Identifier)* as TypeRef FieldModifier* ("=" Expr)?
+```
+
+```csharp
+public sealed record FieldDeclarationNode(
+    SourceSpan Span,
+    ImmutableArray<Token> Names,
+    TypeRefNode Type,
+    ImmutableArray<FieldModifierNode> Modifiers,
+    Expression? ComputedExpression,
+    bool IsMissing = false)
+    : Declaration(Span, ConstructKind.FieldDeclaration, IsMissing);
+```
+
+```precept
+field ClaimAmount as decimal default 0 nonnegative maxplaces 2
+```
+
+#### StateDeclaration
+
+```
+state StateEntry ("," StateEntry)*
+StateEntry := Identifier StateModifier*
+StateModifier := initial | terminal | required | irreversible | success | warning | error
+```
+
+```csharp
+public sealed record StateDeclarationNode(
+    SourceSpan Span,
+    ImmutableArray<StateEntryNode> Entries,
+    bool IsMissing = false)
+    : Declaration(Span, ConstructKind.StateDeclaration, IsMissing);
+
+public sealed record StateEntryNode(
+    SourceSpan Span, Token Name,
+    ImmutableArray<Token> Modifiers,
+    bool IsMissing = false)
+    : SyntaxNode(Span, IsMissing);
+```
+
+```precept
+state Draft initial, Submitted, UnderReview, Approved, Denied, Paid
+```
+
+#### EventDeclaration
+
+```
+event Identifier ("," Identifier)* ("with" ArgList)? ("initial")?
+ArgList := ArgDecl ("," ArgDecl)*
+ArgDecl := Identifier as TypeRef FieldModifier*
+```
+
+```csharp
+public sealed record EventDeclarationNode(
+    SourceSpan Span,
+    ImmutableArray<Token> Names,
+    ImmutableArray<ArgumentNode> Arguments,
+    bool IsInitial,
+    bool IsMissing = false)
+    : Declaration(Span, ConstructKind.EventDeclaration, IsMissing);
+
+public sealed record ArgumentNode(
+    SourceSpan Span, Token Name,
+    TypeRefNode Type,
+    ImmutableArray<FieldModifierNode> Modifiers,
+    bool IsMissing = false)
+    : SyntaxNode(Span, IsMissing);
+```
+
+```precept
+event Approve with Amount as decimal, Note as string nullable default null notempty
+```
+
+#### RuleDeclaration
+
+```
+rule BoolExpr ("when" BoolExpr)? because StringExpr
+```
+
+```csharp
+public sealed record RuleDeclarationNode(
+    SourceSpan Span,
+    Expression Condition,
+    Expression? Guard,
+    Expression Message,
+    bool IsMissing = false)
+    : Declaration(Span, ConstructKind.RuleDeclaration, IsMissing);
+```
+
+```precept
+rule ApprovedAmount <= ClaimAmount because "Approved amounts cannot exceed the claim"
+```
+
+#### TransitionRow
+
+```
+from StateTarget on Identifier ("when" BoolExpr)?
+  ("->" ActionStatement)* "->" Outcome
+```
+
+```csharp
+public sealed record TransitionRowNode(
+    SourceSpan Span,
+    StateTargetNode FromState,
+    Token EventName,
+    Expression? Guard,
+    ImmutableArray<Statement> Actions,
+    OutcomeNode Outcome,
+    bool IsMissing = false)
+    : Declaration(Span, ConstructKind.TransitionRow, IsMissing);
+```
+
+```precept
+from UnderReview on Approve when (not PoliceReportRequired or MissingDocuments.count == 0) and Approve.Amount <= ClaimAmount
+    -> set ApprovedAmount = if FraudFlag then min(Approve.Amount, ClaimAmount / 2) else Approve.Amount
+    -> set DecisionNote = Approve.Note
+    -> transition Approved
+```
+
+#### StateEnsure
+
+```
+(in|to|from) StateTarget ("when" BoolExpr)? ensure BoolExpr because StringExpr
+```
+
+```csharp
+public sealed record StateEnsureNode(
+    SourceSpan Span,
+    Token Preposition,
+    StateTargetNode State,
+    Expression? Guard,
+    Expression Condition,
+    Expression Message,
+    bool IsMissing = false)
+    : Declaration(Span, ConstructKind.StateEnsure, IsMissing);
+```
+
+```precept
+in Approved ensure ApprovedAmount > 0 because "Approved claims must specify a payout amount"
+```
+
+#### AccessMode
+
+```
+(in StateTarget ("when" BoolExpr)?)? AccessKeyword FieldTarget
+AccessKeyword := write | read | omit
+```
+
+```csharp
+public sealed record AccessModeNode(
+    SourceSpan Span,
+    StateTargetNode? State,
+    Expression? Guard,
+    Token Mode,
+    FieldTargetNode Field,
+    bool IsMissing = false)
+    : Declaration(Span, ConstructKind.AccessMode, IsMissing);
+```
+
+```precept
+in UnderReview write FraudFlag
+```
+
+#### StateAction
+
+```
+(to|from) StateTarget ("when" BoolExpr)? ("->" ActionStatement)*
+```
+
+```csharp
+public sealed record StateActionNode(
+    SourceSpan Span,
+    Token Preposition,
+    StateTargetNode State,
+    Expression? Guard,
+    ImmutableArray<Statement> Actions,
+    bool IsMissing = false)
+    : Declaration(Span, ConstructKind.StateAction, IsMissing);
+```
+
+```precept
+to Submitted -> set submittedAt = now()
+```
+
+#### EventEnsure
+
+```
+on Identifier ("when" BoolExpr)? ensure BoolExpr because StringExpr
+```
+
+```csharp
+public sealed record EventEnsureNode(
+    SourceSpan Span,
+    Token EventName,
+    Expression? Guard,
+    Expression Condition,
+    Expression Message,
+    bool IsMissing = false)
+    : Declaration(Span, ConstructKind.EventEnsure, IsMissing);
+```
+
+```precept
+on Submit ensure Amount > 0 because "Claim amounts must be positive"
+```
+
+#### EventHandler
+
+```
+on Identifier ("->" ActionStatement)*
+```
+
+```csharp
+public sealed record EventHandlerNode(
+    SourceSpan Span,
+    Token EventName,
+    ImmutableArray<Statement> Actions,
+    bool IsMissing = false)
+    : Declaration(Span, ConstructKind.EventHandler, IsMissing);
+```
+
+```precept
+on UpdateName -> set name = newName
+```
+
+### Action Statement Nodes
+
+Action statements appear inside arrow chains (`-> action -> action -> ...`). Each action keyword maps to a sealed record:
+
+```csharp
+public sealed record SetStatement(
+    SourceSpan Span, Token Field, Expression Value,
+    bool IsMissing = false) : Statement(Span, IsMissing);
+
+public sealed record AddStatement(
+    SourceSpan Span, Token Field, Expression Value,
+    bool IsMissing = false) : Statement(Span, IsMissing);
+
+public sealed record RemoveStatement(
+    SourceSpan Span, Token Field, Expression Value,
+    bool IsMissing = false) : Statement(Span, IsMissing);
+
+public sealed record EnqueueStatement(
+    SourceSpan Span, Token Field, Expression Value,
+    bool IsMissing = false) : Statement(Span, IsMissing);
+
+public sealed record DequeueStatement(
+    SourceSpan Span, Token Field, Token? IntoField,
+    bool IsMissing = false) : Statement(Span, IsMissing);
+
+public sealed record PushStatement(
+    SourceSpan Span, Token Field, Expression Value,
+    bool IsMissing = false) : Statement(Span, IsMissing);
+
+public sealed record PopStatement(
+    SourceSpan Span, Token Field, Token? IntoField,
+    bool IsMissing = false) : Statement(Span, IsMissing);
+
+public sealed record ClearStatement(
+    SourceSpan Span, Token Field,
+    bool IsMissing = false) : Statement(Span, IsMissing);
+```
+
+`set` takes `Field = Value`. `add`, `remove`, `enqueue`, and `push` take `Field Value`. `dequeue` and `pop` take `Field` with an optional `into Field` for destructuring. `clear` takes only `Field`. Examples from the insurance-claim sample:
+
+```precept
+-> set ClaimantName = Submit.Claimant
+-> add MissingDocuments RequestDocument.Name
+-> remove MissingDocuments ReceiveDocument.Name
+```
+
+### Outcome Nodes
+
+Outcomes terminate a transition row's arrow chain. Three shapes:
+
+```csharp
+public abstract record OutcomeNode(SourceSpan Span, bool IsMissing = false)
+    : SyntaxNode(Span, IsMissing);
+
+public sealed record TransitionOutcomeNode(
+    SourceSpan Span, Token TargetState,
+    bool IsMissing = false) : OutcomeNode(Span, IsMissing);
+
+public sealed record NoTransitionOutcomeNode(
+    SourceSpan Span,
+    bool IsMissing = false) : OutcomeNode(Span, IsMissing);
+
+public sealed record RejectOutcomeNode(
+    SourceSpan Span, Expression Message,
+    bool IsMissing = false) : OutcomeNode(Span, IsMissing);
+```
+
+```precept
+-> transition Approved
+-> no transition
+-> reject "Required documents must be complete before a claim can be approved"
+```
+
+The parser recognizes `transition` after `->` to produce `TransitionOutcomeNode`, `no transition` (two tokens) for `NoTransitionOutcomeNode`, and `reject` followed by a string expression for `RejectOutcomeNode`.
+
+### Supporting Types
+
+#### StateTarget
+
+```csharp
+public sealed record StateTargetNode(
+    SourceSpan Span, Token Name, bool IsQuantifier,
+    bool IsMissing = false) : SyntaxNode(Span, IsMissing);
+```
+
+`Name` is either a state identifier or the `any` quantifier keyword. `IsQuantifier` is `true` when the target is `any` rather than a specific state name.
+
+#### FieldTarget
+
+```csharp
+public sealed record FieldTargetNode(
+    SourceSpan Span, ImmutableArray<Token> Names, bool IsAll,
+    bool IsMissing = false) : SyntaxNode(Span, IsMissing);
+```
+
+`IsAll` is `true` when the target is the `all` keyword. Otherwise `Names` contains one or more comma-separated field identifiers.
+
+#### TypeRef Hierarchy
+
+```csharp
+public abstract record TypeRefNode(SourceSpan Span, bool IsMissing = false)
+    : SyntaxNode(Span, IsMissing);
+
+public sealed record ScalarTypeRefNode(
+    SourceSpan Span, Token TypeName, TypeQualifierNode? Qualifier,
+    bool IsMissing = false) : TypeRefNode(Span, IsMissing);
+
+public sealed record CollectionTypeRefNode(
+    SourceSpan Span, Token CollectionKind, Token ElementType,
+    TypeQualifierNode? Qualifier,
+    bool IsMissing = false) : TypeRefNode(Span, IsMissing);
+
+public sealed record ChoiceTypeRefNode(
+    SourceSpan Span, ImmutableArray<Expression> Options,
+    bool IsMissing = false) : TypeRefNode(Span, IsMissing);
+```
+
+`ScalarTypeRefNode` covers `string`, `decimal`, `boolean`, `money`, etc. `CollectionTypeRefNode` covers `set of T`, `queue of T`, `stack of T` — `CollectionKind` is the `Set`/`Queue`/`Stack` token. `ChoiceTypeRefNode` covers `choice("A", "B", "C")`.
+
+#### TypeQualifier
+
+```csharp
+public sealed record TypeQualifierNode(
+    SourceSpan Span, Token Keyword, Expression Value,
+    bool IsMissing = false) : SyntaxNode(Span, IsMissing);
+```
+
+`Keyword` is `In` or `Of` — narrowing the type domain (e.g., `money in 'USD'`, `quantity of 'weight'`).
+
+#### FieldModifier Hierarchy
+
+```csharp
+public abstract record FieldModifierNode(SourceSpan Span, bool IsMissing = false)
+    : SyntaxNode(Span, IsMissing);
+
+public sealed record FlagModifierNode(
+    SourceSpan Span, Token Keyword,
+    bool IsMissing = false) : FieldModifierNode(Span, IsMissing);
+
+public sealed record ValueModifierNode(
+    SourceSpan Span, Token Keyword, Expression Value,
+    bool IsMissing = false) : FieldModifierNode(Span, IsMissing);
+```
+
+Flag modifiers (`optional`, `nonnegative`, `positive`, `nonzero`, `notempty`, `ordered`) carry only the keyword token. Value modifiers (`default`, `min`, `max`, `minlength`, `maxlength`, `mincount`, `maxcount`, `maxplaces`) carry a keyword and an expression value. The DU prevents consumers from accessing a `Value` property on flag-only modifiers.
+
+---
+
+## Dependencies and Integration Points
 
 ### Constructs Catalog
 
@@ -403,450 +822,34 @@ The parser's diagnostic count is deliberately small — four codes for an entire
 
 All four codes are in the `DiagnosticCode` enum under the `// ── Parse ──` section, adjacent to the lexer codes. The diagnostic catalog owns severity (all four are `Error`) and message templates — the parser never constructs message strings directly.
 
-## AST Node Hierarchy
+### Downstream Consumer Impact
 
-### SourceSpan (Existing)
+#### Language Server
 
-Every AST node carries a `SourceSpan` — the dual-coordinate location record defined in [src/Precept/Pipeline/SourceSpan.cs](../../src/Precept/Pipeline/SourceSpan.cs). The implementation is documented in [§ SourceSpan Contract](#sourcespan-contract) above. No changes needed — the parser reads `Token.Span` directly for leaf nodes and creates compound spans via `SourceSpan.Covering(first, last)` for declaration-level nodes. The parser never reconstructs a `SourceSpan` from separate token fields — the lexer provides it.
+The language server calls `Parser.Parse` on every keystroke (debounced). It uses `SyntaxTree.Declarations` for:
 
-### SyntaxNode Base
+- **Hover** — locates the node whose `SourceSpan` contains the cursor, returns the `ConstructKind` name and slot descriptions from the catalog.
+- **Go-to-definition** — locates state/event/field reference nodes, resolves to the declaration node with the matching name.
+- **Diagnostics** — forwards `SyntaxTree.Diagnostics` as LSP diagnostic objects, mapping `SourceSpan` line/column to LSP positions.
+- **Document symbols** — walks the declaration list, emits LSP `DocumentSymbol` entries keyed on `ConstructKind`.
 
-```csharp
-public abstract record SyntaxNode(SourceSpan Span, bool IsMissing = false);
-```
+The resilient-by-construction guarantee means the language server never needs to handle "no tree" — every parse produces a traversable `SyntaxTree`.
 
-All AST nodes inherit from `SyntaxNode`. `Span` covers the full source extent of the node. `IsMissing` is `true` when the parser synthesized the node to fill an expected-but-absent position — downstream stages can inspect this flag to suppress cascading diagnostics on phantom nodes. Records are immutable by default; no `with` copies are expected after construction.
+#### Grammar Generation
 
-### Intermediate Types
+The TextMate grammar is generated from catalog metadata, not from the parser. However, the parser's dispatch table and the grammar's pattern table must agree on which keywords start which productions. The Constructs catalog's `LeadingToken` field is the shared source of truth — both the parser's dispatch and the grammar generator read from it.
 
-Three abstract intermediates partition the node space for downstream pattern matching:
+#### Completions
 
-```csharp
-public abstract record Declaration(SourceSpan Span, ConstructKind Kind, bool IsMissing = false)
-    : SyntaxNode(Span, IsMissing);
+Context-aware completions use the parser's position to determine which `ConstructSlotKind` the cursor is in. The language server calls `Parser.Parse` on the partial text, finds the `IsMissing` node nearest the cursor, reads its slot kind, and offers completions from the catalog metadata for that slot. For example, an `IsMissing` node in the `Outcome` slot position triggers `transition`, `no transition`, and `reject` as completion candidates.
 
-public abstract record Statement(SourceSpan Span, bool IsMissing = false)
-    : SyntaxNode(Span, IsMissing);
+#### MCP Compile Tool
 
-public abstract record Expression(SourceSpan Span, bool IsMissing = false)
-    : SyntaxNode(Span, IsMissing);
-```
-
-`Declaration` carries a `ConstructKind` so consumers can switch on the catalog identity without downcasting. `Statement` covers action statements inside arrow chains. `Expression` covers the Pratt-parsed expression tree. The type checker, graph analyzer, and language server all switch on these three families.
-
-### SyntaxTree
-
-```csharp
-public sealed record SyntaxTree(
-    PreceptHeaderNode? Header,
-    ImmutableArray<Declaration> Declarations,
-    ImmutableArray<Diagnostic> Diagnostics);
-```
-
-`Header` is nullable for the case where the source is empty or the `precept` keyword is missing — the parser emits an `ExpectedToken` diagnostic and produces a tree with `Header = null`. `Declarations` is the flat list in source order. `Diagnostics` accumulates every parse-stage diagnostic. This is the `Compilation.SyntaxTree` field.
+`precept_compile(text)` calls `Parser.Parse` and serializes the `SyntaxTree` as part of its response. The flat declaration list serializes naturally as a JSON array. Each node's `ConstructKind` becomes the `"kind"` field. `IsMissing` nodes are included with an `"isMissing": true` flag so MCP consumers can distinguish real declarations from error-recovery placeholders.
 
 ---
 
-## Declaration Node Catalog
-
-### PreceptHeader
-
-```
-precept Identifier
-```
-
-```csharp
-public sealed record PreceptHeaderNode(
-    SourceSpan Span, Token Name, bool IsMissing = false)
-    : Declaration(Span, ConstructKind.PreceptHeader, IsMissing);
-```
-
-```precept
-precept InsuranceClaim
-```
-
-### FieldDeclaration
-
-```
-field Identifier ("," Identifier)* as TypeRef FieldModifier* ("=" Expr)?
-```
-
-```csharp
-public sealed record FieldDeclarationNode(
-    SourceSpan Span,
-    ImmutableArray<Token> Names,
-    TypeRefNode Type,
-    ImmutableArray<FieldModifierNode> Modifiers,
-    Expression? ComputedExpression,
-    bool IsMissing = false)
-    : Declaration(Span, ConstructKind.FieldDeclaration, IsMissing);
-```
-
-```precept
-field ClaimAmount as decimal default 0 nonnegative maxplaces 2
-```
-
-### StateDeclaration
-
-```
-state StateEntry ("," StateEntry)*
-StateEntry := Identifier StateModifier*
-StateModifier := initial | terminal | required | irreversible | success | warning | error
-```
-
-```csharp
-public sealed record StateDeclarationNode(
-    SourceSpan Span,
-    ImmutableArray<StateEntryNode> Entries,
-    bool IsMissing = false)
-    : Declaration(Span, ConstructKind.StateDeclaration, IsMissing);
-
-public sealed record StateEntryNode(
-    SourceSpan Span, Token Name,
-    ImmutableArray<Token> Modifiers,
-    bool IsMissing = false)
-    : SyntaxNode(Span, IsMissing);
-```
-
-```precept
-state Draft initial, Submitted, UnderReview, Approved, Denied, Paid
-```
-
-### EventDeclaration
-
-```
-event Identifier ("," Identifier)* ("with" ArgList)? ("initial")?
-ArgList := ArgDecl ("," ArgDecl)*
-ArgDecl := Identifier as TypeRef FieldModifier*
-```
-
-```csharp
-public sealed record EventDeclarationNode(
-    SourceSpan Span,
-    ImmutableArray<Token> Names,
-    ImmutableArray<ArgumentNode> Arguments,
-    bool IsInitial,
-    bool IsMissing = false)
-    : Declaration(Span, ConstructKind.EventDeclaration, IsMissing);
-
-public sealed record ArgumentNode(
-    SourceSpan Span, Token Name,
-    TypeRefNode Type,
-    ImmutableArray<FieldModifierNode> Modifiers,
-    bool IsMissing = false)
-    : SyntaxNode(Span, IsMissing);
-```
-
-```precept
-event Approve with Amount as decimal, Note as string nullable default null notempty
-```
-
-### RuleDeclaration
-
-```
-rule BoolExpr ("when" BoolExpr)? because StringExpr
-```
-
-```csharp
-public sealed record RuleDeclarationNode(
-    SourceSpan Span,
-    Expression Condition,
-    Expression? Guard,
-    Expression Message,
-    bool IsMissing = false)
-    : Declaration(Span, ConstructKind.RuleDeclaration, IsMissing);
-```
-
-```precept
-rule ApprovedAmount <= ClaimAmount because "Approved amounts cannot exceed the claim"
-```
-
-### TransitionRow
-
-```
-from StateTarget on Identifier ("when" BoolExpr)?
-  ("->" ActionStatement)* "->" Outcome
-```
-
-```csharp
-public sealed record TransitionRowNode(
-    SourceSpan Span,
-    StateTargetNode FromState,
-    Token EventName,
-    Expression? Guard,
-    ImmutableArray<Statement> Actions,
-    OutcomeNode Outcome,
-    bool IsMissing = false)
-    : Declaration(Span, ConstructKind.TransitionRow, IsMissing);
-```
-
-```precept
-from UnderReview on Approve when (not PoliceReportRequired or MissingDocuments.count == 0) and Approve.Amount <= ClaimAmount
-    -> set ApprovedAmount = if FraudFlag then min(Approve.Amount, ClaimAmount / 2) else Approve.Amount
-    -> set DecisionNote = Approve.Note
-    -> transition Approved
-```
-
-### StateEnsure
-
-```
-(in|to|from) StateTarget ("when" BoolExpr)? ensure BoolExpr because StringExpr
-```
-
-```csharp
-public sealed record StateEnsureNode(
-    SourceSpan Span,
-    Token Preposition,
-    StateTargetNode State,
-    Expression? Guard,
-    Expression Condition,
-    Expression Message,
-    bool IsMissing = false)
-    : Declaration(Span, ConstructKind.StateEnsure, IsMissing);
-```
-
-```precept
-in Approved ensure ApprovedAmount > 0 because "Approved claims must specify a payout amount"
-```
-
-### AccessMode
-
-```
-(in StateTarget ("when" BoolExpr)?)? AccessKeyword FieldTarget
-AccessKeyword := write | read | omit
-```
-
-```csharp
-public sealed record AccessModeNode(
-    SourceSpan Span,
-    StateTargetNode? State,
-    Expression? Guard,
-    Token Mode,
-    FieldTargetNode Field,
-    bool IsMissing = false)
-    : Declaration(Span, ConstructKind.AccessMode, IsMissing);
-```
-
-```precept
-in UnderReview write FraudFlag
-```
-
-### StateAction
-
-```
-(to|from) StateTarget ("when" BoolExpr)? ("->" ActionStatement)*
-```
-
-```csharp
-public sealed record StateActionNode(
-    SourceSpan Span,
-    Token Preposition,
-    StateTargetNode State,
-    Expression? Guard,
-    ImmutableArray<Statement> Actions,
-    bool IsMissing = false)
-    : Declaration(Span, ConstructKind.StateAction, IsMissing);
-```
-
-```precept
-to Submitted -> set submittedAt = now()
-```
-
-### EventEnsure
-
-```
-on Identifier ("when" BoolExpr)? ensure BoolExpr because StringExpr
-```
-
-```csharp
-public sealed record EventEnsureNode(
-    SourceSpan Span,
-    Token EventName,
-    Expression? Guard,
-    Expression Condition,
-    Expression Message,
-    bool IsMissing = false)
-    : Declaration(Span, ConstructKind.EventEnsure, IsMissing);
-```
-
-```precept
-on Submit ensure Amount > 0 because "Claim amounts must be positive"
-```
-
-### EventHandler
-
-```
-on Identifier ("->” ActionStatement)*
-```
-
-```csharp
-public sealed record EventHandlerNode(
-    SourceSpan Span,
-    Token EventName,
-    ImmutableArray<Statement> Actions,
-    bool IsMissing = false)
-    : Declaration(Span, ConstructKind.EventHandler, IsMissing);
-```
-
-```precept
-on UpdateName -> set name = newName
-```
-
----
-
-## Action Statement Nodes
-
-Action statements appear inside arrow chains (`-> action -> action -> ...`). Each action keyword maps to a sealed record:
-
-```csharp
-public sealed record SetStatement(
-    SourceSpan Span, Token Field, Expression Value,
-    bool IsMissing = false) : Statement(Span, IsMissing);
-
-public sealed record AddStatement(
-    SourceSpan Span, Token Field, Expression Value,
-    bool IsMissing = false) : Statement(Span, IsMissing);
-
-public sealed record RemoveStatement(
-    SourceSpan Span, Token Field, Expression Value,
-    bool IsMissing = false) : Statement(Span, IsMissing);
-
-public sealed record EnqueueStatement(
-    SourceSpan Span, Token Field, Expression Value,
-    bool IsMissing = false) : Statement(Span, IsMissing);
-
-public sealed record DequeueStatement(
-    SourceSpan Span, Token Field, Token? IntoField,
-    bool IsMissing = false) : Statement(Span, IsMissing);
-
-public sealed record PushStatement(
-    SourceSpan Span, Token Field, Expression Value,
-    bool IsMissing = false) : Statement(Span, IsMissing);
-
-public sealed record PopStatement(
-    SourceSpan Span, Token Field, Token? IntoField,
-    bool IsMissing = false) : Statement(Span, IsMissing);
-
-public sealed record ClearStatement(
-    SourceSpan Span, Token Field,
-    bool IsMissing = false) : Statement(Span, IsMissing);
-```
-
-`set` takes `Field = Value`. `add`, `remove`, `enqueue`, and `push` take `Field Value`. `dequeue` and `pop` take `Field` with an optional `into Field` for destructuring. `clear` takes only `Field`. Examples from the insurance-claim sample:
-
-```precept
--> set ClaimantName = Submit.Claimant
--> add MissingDocuments RequestDocument.Name
--> remove MissingDocuments ReceiveDocument.Name
-```
-
----
-
-## Outcome Nodes
-
-Outcomes terminate a transition row's arrow chain. Three shapes:
-
-```csharp
-public abstract record OutcomeNode(SourceSpan Span, bool IsMissing = false)
-    : SyntaxNode(Span, IsMissing);
-
-public sealed record TransitionOutcomeNode(
-    SourceSpan Span, Token TargetState,
-    bool IsMissing = false) : OutcomeNode(Span, IsMissing);
-
-public sealed record NoTransitionOutcomeNode(
-    SourceSpan Span,
-    bool IsMissing = false) : OutcomeNode(Span, IsMissing);
-
-public sealed record RejectOutcomeNode(
-    SourceSpan Span, Expression Message,
-    bool IsMissing = false) : OutcomeNode(Span, IsMissing);
-```
-
-```precept
--> transition Approved
--> no transition
--> reject "Required documents must be complete before a claim can be approved"
-```
-
-The parser recognizes `transition` after `->` to produce `TransitionOutcomeNode`, `no transition` (two tokens) for `NoTransitionOutcomeNode`, and `reject` followed by a string expression for `RejectOutcomeNode`.
-
----
-
-## Supporting Types
-
-### StateTarget
-
-```csharp
-public sealed record StateTargetNode(
-    SourceSpan Span, Token Name, bool IsQuantifier,
-    bool IsMissing = false) : SyntaxNode(Span, IsMissing);
-```
-
-`Name` is either a state identifier or the `any` quantifier keyword. `IsQuantifier` is `true` when the target is `any` rather than a specific state name.
-
-### FieldTarget
-
-```csharp
-public sealed record FieldTargetNode(
-    SourceSpan Span, ImmutableArray<Token> Names, bool IsAll,
-    bool IsMissing = false) : SyntaxNode(Span, IsMissing);
-```
-
-`IsAll` is `true` when the target is the `all` keyword. Otherwise `Names` contains one or more comma-separated field identifiers.
-
-### TypeRef Hierarchy
-
-```csharp
-public abstract record TypeRefNode(SourceSpan Span, bool IsMissing = false)
-    : SyntaxNode(Span, IsMissing);
-
-public sealed record ScalarTypeRefNode(
-    SourceSpan Span, Token TypeName, TypeQualifierNode? Qualifier,
-    bool IsMissing = false) : TypeRefNode(Span, IsMissing);
-
-public sealed record CollectionTypeRefNode(
-    SourceSpan Span, Token CollectionKind, Token ElementType,
-    TypeQualifierNode? Qualifier,
-    bool IsMissing = false) : TypeRefNode(Span, IsMissing);
-
-public sealed record ChoiceTypeRefNode(
-    SourceSpan Span, ImmutableArray<Expression> Options,
-    bool IsMissing = false) : TypeRefNode(Span, IsMissing);
-```
-
-`ScalarTypeRefNode` covers `string`, `decimal`, `boolean`, `money`, etc. `CollectionTypeRefNode` covers `set of T`, `queue of T`, `stack of T` — `CollectionKind` is the `Set`/`Queue`/`Stack` token. `ChoiceTypeRefNode` covers `choice("A", "B", "C")`.
-
-### TypeQualifier
-
-```csharp
-public sealed record TypeQualifierNode(
-    SourceSpan Span, Token Keyword, Expression Value,
-    bool IsMissing = false) : SyntaxNode(Span, IsMissing);
-```
-
-`Keyword` is `In` or `Of` — narrowing the type domain (e.g., `money in 'USD'`, `quantity of 'weight'`).
-
-### FieldModifier Hierarchy
-
-```csharp
-public abstract record FieldModifierNode(SourceSpan Span, bool IsMissing = false)
-    : SyntaxNode(Span, IsMissing);
-
-public sealed record FlagModifierNode(
-    SourceSpan Span, Token Keyword,
-    bool IsMissing = false) : FieldModifierNode(Span, IsMissing);
-
-public sealed record ValueModifierNode(
-    SourceSpan Span, Token Keyword, Expression Value,
-    bool IsMissing = false) : FieldModifierNode(Span, IsMissing);
-```
-
-Flag modifiers (`optional`, `nonnegative`, `positive`, `nonzero`, `notempty`, `ordered`) carry only the keyword token. Value modifiers (`default`, `min`, `max`, `minlength`, `maxlength`, `mincount`, `maxcount`, `maxplaces`) carry a keyword and an expression value. The DU prevents consumers from accessing a `Value` property on flag-only modifiers.
-
----
-
-## Error Handling and Recovery
+## Failure Modes and Recovery
 
 ### Missing-Node Insertion
 
@@ -895,7 +898,13 @@ All four parse-stage codes live in the `DiagnosticCode` enum under `// ── Pa
 
 ---
 
-## Security
+## Contracts and Guarantees
+
+- **Always produces a tree.** `Parser.Parse` never returns null, never throws, and always produces a `SyntaxTree`. Downstream stages do not need to handle "no tree" as a result.
+- **Every character is accounted for.** `IsMissing` nodes have zero-length spans at the expected position; `SkippedTokens` spans capture everything between an error and the next sync point. No source character is silently discarded.
+- **`SourceSpan` coverage.** Every node's `Span` covers its full source extent. Declaration-level spans cover from the leading token to the last token in the declaration.
+- **`ConstructKind` identity.** Every `Declaration` node carries a `ConstructKind` from the Constructs catalog — the parser never leaves this field unset.
+- **Flat list in source order.** `Declarations` is in the order the declarations appear in the source. No reordering.
 
 ### Bounded Work Guarantee
 
@@ -903,34 +912,61 @@ The parser consumes at least one token per loop iteration. Every `Advance()` cal
 
 ---
 
-## Downstream Consumer Impact
+## Design Rationale and Decisions
 
-### Language Server
+### The Parser Is Catalog-Driven Dispatch
 
-The language server calls `Parser.Parse` on every keystroke (debounced). It uses `SyntaxTree.Declarations` for:
+The parser dispatches on `ConstructKind` values, not on ad-hoc token sequences. Each declaration production corresponds to exactly one `ConstructKind`, and the Constructs catalog (`Constructs.All`) is the exhaustive inventory of every declaration shape the parser can produce. When a new construct is added to the catalog, the parser gains a new production — the dispatch table, the slot sequence, and the MCP vocabulary all derive from the same metadata.
 
-- **Hover** — locates the node whose `SourceSpan` contains the cursor, returns the `ConstructKind` name and slot descriptions from the catalog.
-- **Go-to-definition** — locates state/event/field reference nodes, resolves to the declaration node with the matching name.
-- **Diagnostics** — forwards `SyntaxTree.Diagnostics` as LSP diagnostic objects, mapping `SourceSpan` line/column to LSP positions.
-- **Document symbols** — walks the declaration list, emits LSP `DocumentSymbol` entries keyed on `ConstructKind`.
+The Constructs catalog carries `LeadingToken`, `Slots`, `AllowedIn`, and `UsageExample` per construct. These are the parser's dispatch key, shape skeleton, semantic scoping rule, and diagnostic example text — read from metadata, not duplicated in parser code.
 
-The resilient-by-construction guarantee means the language server never needs to handle "no tree" — every parse produces a traversable `SyntaxTree`.
+Consider the `TransitionRow` construct. Its catalog entry declares `LeadingToken = TokenKind.From`, `Slots = [StateTarget, EventTarget, GuardClause, ActionChain, Outcome]`, and `AllowedIn = []` (top-level). The parser reads this shape: dispatch on `From`, parse a state target, parse an event target, optionally parse a guard, loop through an action chain, parse an outcome. If a new slot is added to the construct (say, a `BecauseClause`), the parser gains a new step in the production — but the catalog is the authority that says the step exists.
 
-### Grammar Generation
+### Preposition-First Grammar
 
-The TextMate grammar is generated from catalog metadata, not from the parser. However, the parser's dispatch table and the grammar's pattern table must agree on which keywords start which productions. The Constructs catalog's `LeadingToken` field is the shared source of truth — both the parser's dispatch and the grammar generator read from it.
+The four preposition keywords (`in`, `to`, `from`, `on`) are the parser's primary structural signal for scoped declarations. After the precept header and the declaration keywords (`field`, `state`, `event`, `rule`), every remaining production begins with a preposition. The parser reads the preposition, parses the state or event target, then looks ahead one token to select the specific production: ensure, access mode, action, transition, or event handler.
 
-### Completions
+A flat, line-oriented grammar with no block delimiters needs an unambiguous structural signal at the start of each line. Prepositions are the natural English equivalent of a block opener — they scope the line to a state or event context without requiring braces or indentation.
 
-Context-aware completions use the parser's position to determine which `ConstructSlotKind` the cursor is in. The language server calls `Parser.Parse` on the partial text, finds the `IsMissing` node nearest the cursor, reads its slot kind, and offers completions from the catalog metadata for that slot. For example, an `IsMissing` node in the `Outcome` slot position triggers `transition`, `no transition`, and `reject` as completion candidates.
+The insurance-claim sample illustrates the pattern. Every line after the header declarations begins with `from`, `in`, or `on`:
 
-### MCP Compile Tool
+```precept
+in UnderReview write FraudFlag
+in Approved ensure ApprovedAmount > 0 because "Approved claims must specify a payout amount"
+on Submit ensure Amount > 0 because "Claim amounts must be positive"
+from Draft on Submit -> set ClaimantName = Submit.Claimant -> transition Submitted
+from Submitted on AssignAdjuster -> set AdjusterName = trim(AssignAdjuster.Name) -> transition UnderReview
+```
 
-`precept_compile(text)` calls `Parser.Parse` and serializes the `SyntaxTree` as part of its response. The flat declaration list serializes naturally as a JSON array. Each node's `ConstructKind` becomes the `"kind"` field. `IsMissing` nodes are included with an `"isMissing": true` flag so MCP consumers can distinguish real declarations from error-recovery placeholders.
+Each line's preposition immediately establishes the scope. The parser needs zero lookahead to know which family of production it is entering — it just reads the preposition and proceeds.
 
----
+### Single-Pass Recursive Descent
 
-## What Stays Hand-Written
+The parser makes a single forward pass through the token stream. It never backtracks. Each production consumes the tokens it needs, emits diagnostics for tokens it expected but didn't find, and returns a node. The top-level dispatch loop peeks at the current token, selects a production, and calls it. The production consumes its tokens and returns.
+
+Precept's grammar is LL(1) with a small number of two-token lookaheads (preposition + verb). No production requires unbounded lookahead. A single-pass design bounds memory to the depth of the expression tree and guarantees linear-time parsing. The token stream is immutable and indexable — `Peek(n)` is O(1), so bounded lookahead adds no allocation cost.
+
+### Pratt Expression Parsing
+
+Expressions use a Pratt parser (top-down operator precedence) rather than recursive descent with one function per precedence level. `ParseExpression(int minBp)` parses a complete expression, stopping when it encounters a token whose left-binding power is ≤ `minBp`. This handles unary prefix operators, binary infix operators, member access, function calls, and the `if`/`then`/`else` conditional — all in a single loop with a precedence table.
+
+Precept has 10 precedence levels, prefix operators (`not`, unary `-`), postfix operators (`.`, `(`), and non-associative comparisons. A Pratt parser expresses all of this in ~80 lines of dispatch logic plus a binding-power table. A recursive-descent expression parser would need 10+ mutually recursive methods with identical structure.
+
+### Resilient by Construction
+
+The parser never throws, never returns null, and never produces a partial tree. Every production has a well-defined recovery path: missing tokens produce `IsMissing` nodes with zero-length spans; structurally lost positions scan forward to sync points (declaration-starting keywords). The resulting tree is always traversable by downstream stages.
+
+The language server calls `Parser.Parse` on every keystroke. A parser that fails on incomplete input forces the language server to special-case "no tree" scenarios throughout completions, hover, go-to-definition, and diagnostics. A resilient parser eliminates that entire class of defensive code. The MCP tools (`precept_compile`, `precept_inspect`) also consume the tree directly — they need a structurally coherent tree even when the author is mid-edit.
+
+### Flat Declaration List
+
+The AST is a flat list of declaration nodes. There are no nested block nodes, no scope-introducing braces, and no parent-child relationships in the tree structure. Semantic scoping (`AllowedIn` — e.g., a state ensure is only valid after a state declaration) is a type-checker concern, not a parser concern. The parser produces the flat list; the type checker validates semantic ordering.
+
+Precept is a line-oriented policy language. The author writes declarations top-to-bottom; the runtime reads them the same way. A flat list matches the mental model: each line is a self-contained declaration with its own preposition scope. Nested AST blocks would impose a hierarchical structure that the language surface does not express.
+
+The `AllowedIn` field on `ConstructMeta` captures the semantic scoping that a nesting parser would express structurally. For example, `StateEnsure` has `AllowedIn = [StateDeclaration]` — meaning it is only valid after a state declaration exists. But this is a type-checker validation, not a parsing constraint. The parser emits the flat node; the type checker checks `AllowedIn` against the declared state names.
+
+### What Stays Hand-Written
 
 Not everything should be catalog-driven. The following remain hand-written because they are parser-internal mechanics, not domain knowledge:
 
@@ -941,3 +977,46 @@ Not everything should be catalog-driven. The following remain hand-written becau
 - **Error recovery decisions** — which tokens are sync points and how `Expect()` synthesizes missing nodes. Recovery strategy is implementation, not vocabulary.
 
 These change when the parsing algorithm changes, not when the language surface changes. The catalog drives *what* the parser recognizes; the hand-written code drives *how* it recognizes it.
+
+---
+
+## Innovation
+
+- **Preposition-first structural grammar.** Four preposition keywords (`in`, `to`, `from`, `on`) carry all semantic scope in the grammar without block delimiters. The parser dispatches on these with a one-token lookahead after the target — no brace matching, no indentation tracking, no ambiguous continuation.
+- **Catalog-derived dispatch table.** The top-level dispatch loop is built from `ConstructMeta.LeadingToken` entries — the same catalog metadata that drives grammar generation, MCP vocabulary, and completions. The parser does not maintain a parallel keyword list.
+- **Pratt expression parsing for a constraint DSL.** The bounded expression grammar (10 precedence levels, non-associative comparisons, `if`/`then`/`else`) is handled by a single ~80-line Pratt loop with a binding-power table. No mutually recursive per-precedence methods.
+- **Depth-unaware interpolation reassembly.** Interpolated string and typed-constant segments are reassembled without tracking nesting depth — the token stream terminates expression holes naturally because `StringMiddle`/`StringEnd` have no binding power in the expression grammar.
+
+---
+
+## Open Questions / Implementation Notes
+
+- The test coverage below documents current test coverage. No known structural gaps.
+- `AllowedIn` enforcement: currently a TypeChecker concern. If a future language feature needs parser-level scope enforcement (e.g., block-scoped declarations), revisit.
+
+---
+
+## Deliberate Exclusions
+
+- **No CST (Concrete Syntax Tree).** Comments and whitespace are discarded. A CST is needed only by a formatter; Precept has no formatter.
+- **No incremental reparsing.** Precept's 64KB ceiling makes full reparse on every edit fast enough. No red-green tree infrastructure.
+- **No semantic validation.** `AllowedIn` enforcement, name resolution, and type checking belong to the TypeChecker. The parser validates structural form only.
+- **No two-pass parsing.** The grammar is LL(1) with bounded lookahead — no first/follow set computation, no earley or GLR machinery.
+
+---
+
+## Cross-References
+
+- `docs/compiler/lexer.md` — produces the `TokenStream` this stage consumes
+- `docs/compiler/type-checker.md` — consumes `SyntaxTree`; owns `AllowedIn` enforcement and semantic validation
+- `docs/compiler-and-runtime-design.md §5` — Parser section in the main design doc
+- `docs/language/catalog-system.md` — Constructs catalog design
+
+---
+
+## Source Files
+
+- `src/Precept/Pipeline/Parser.cs` — static class + `ParseSession` struct
+- `src/Precept/Pipeline/SyntaxNodes.cs` — all AST node records
+- `src/Precept/Pipeline/SourceSpan.cs` — dual-coordinate location record
+- `test/Precept.Tests/PreceptParserTests.cs` — parser unit tests
