@@ -140,6 +140,22 @@ Every stage begins from two roots. The `.precept` source text is the author-owne
 
 The lexer converts raw text into classified tokens with exact spans. It has no semantic opinion. The key design choice: `TokenKind` comes directly from catalog metadata (`Tokens.GetMeta`), not from a parallel enum maintained by the lexer. The lexer is a vocabulary consumer, not a vocabulary owner.
 
+```mermaid
+flowchart LR
+    SRC(["source text"]):::input
+    CAT(["Tokens · Diagnostics\ncatalogs"]):::input
+    LEX[["Lexer"]]:::stage
+    OUT["TokenStream"]:::artifact
+
+    SRC --> LEX
+    CAT --> LEX
+    LEX --> OUT
+
+    classDef input fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+    classDef stage fill:#ede9fe,stroke:#7c3aed,color:#3b0764
+    classDef artifact fill:#fef3c7,stroke:#d97706,color:#78350f
+```
+
 **Takes in:** `string source`; catalogs: `Tokens`, `Diagnostics`.
 **Produces:** `TokenStream(ImmutableArray<Token> Tokens, ImmutableArray<Diagnostic> Diagnostics)` where `Token` is `Token(TokenKind Kind, string Text, SourceSpan Span)`.
 **Catalog entry:** `TokenKind` comes directly from `Tokens.GetMeta(...)` / `Tokens.Keywords`; token categories, TextMate scope, semantic token type, and completion hints remain derivable from `TokenMeta`.
@@ -157,7 +173,23 @@ The lexer converts raw text into classified tokens with exact spans. It has no s
 
 The parser builds the source-structural model of the authored program. Its key design choice: `SyntaxTree` preserves the author's source structure — including recovery shape for broken programs — without resolving names, types, or overloads. Tooling needs source-faithful structure (folding, outline, recovery context) independently of semantic resolution.
 
-**Takes in:** `TokenStream`; catalogs: `Constructs`, `Tokens`, `Operators`, `Diagnostics`.
+```mermaid
+flowchart LR
+    TS(["TokenStream"]):::input
+    CAT(["Constructs · Tokens\nOperators · Diagnostics\ncatalogs"]):::input
+    PAR[["Parser"]]:::stage
+    OUT["SyntaxTree"]:::artifact
+
+    TS -->|"token stream"| PAR
+    CAT --> PAR
+    PAR --> OUT
+
+    classDef input fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+    classDef stage fill:#ede9fe,stroke:#7c3aed,color:#3b0764
+    classDef artifact fill:#fef3c7,stroke:#d97706,color:#78350f
+```
+
+**Takes in:**`TokenStream`; catalogs: `Constructs`, `Tokens`, `Operators`, `Diagnostics`.
 **Produces:** `SyntaxTree(PreceptSyntax Root, ImmutableArray<Diagnostic> Diagnostics)` with source-faithful declaration and expression nodes, missing-node representation, and span ownership. (Current shape: diagnostics-only stub.)
 **Catalog entry:** The parser stamps syntax-level identities as soon as syntax alone can know them: construct kind, anchor keyword, action keyword, operator token, literal segment form.
 **Consumed by:** TypeChecker, LS syntax-facing features (outline, folding, recovery-aware local context).
@@ -249,7 +281,23 @@ The typed layer must feel like a semantic database, not an AST with annotations.
 
 The type checker is the first stage that reasons about semantics. Its key design choice: type resolution is a separate pass from parsing — `TypedModel` is a projection of `SyntaxTree`, not an in-place annotation — because tooling and downstream stages need to reason about source structure and semantic meaning independently.
 
-**Takes in:** `SyntaxTree`; catalogs: `Types`, `Functions`, `Operators`, `Operations`, `Modifiers`, `Actions`, `Constructs`, `Diagnostics`.
+```mermaid
+flowchart LR
+    ST(["SyntaxTree"]):::input
+    CAT(["Types · Functions · Operators\nOperations · Modifiers · Actions\nConstructs · Diagnostics\ncatalogs"]):::input
+    TC[["Type Checker"]]:::stage
+    OUT["TypedModel"]:::artifact
+
+    ST -->|"syntax tree"| TC
+    CAT --> TC
+    TC --> OUT
+
+    classDef input fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+    classDef stage fill:#ede9fe,stroke:#7c3aed,color:#3b0764
+    classDef artifact fill:#fef3c7,stroke:#d97706,color:#78350f
+```
+
+**Takes in:**`SyntaxTree`; catalogs: `Types`, `Functions`, `Operators`, `Operations`, `Modifiers`, `Actions`, `Constructs`, `Diagnostics`.
 **Produces:** Semantic symbol tables, binding indexes, normalized declaration inventories, typed expressions/actions, dependency facts, source-origin handles, and diagnostics. (Current shape: diagnostics-only stub.)
 **Catalog entry:** This is the first stage that resolves `TypeKind`, `FunctionKind`, `OperatorKind`, `OperationKind`, `ModifierMeta`, `ActionMeta`, `FunctionOverload`, `TypeAccessor`, and attached `ProofRequirement` records into semantic identity.
 **Consumed by:** GraphAnalyzer, ProofEngine, LS semantic tooling, MCP compile output, lowering.
@@ -301,7 +349,23 @@ The parser stamps everything that syntax alone can determine. The type checker s
 
 The graph analyzer derives lifecycle structure from semantic declarations. Its key design choice: graph analysis consumes the resolved `TypedModel` — not syntax — because reachability, dominance, and topology require resolved state/event/transition identity, not source-structural nesting.
 
-**Takes in:** `TypedModel`; catalogs: `Modifiers`, `Actions`, `Diagnostics`.
+```mermaid
+flowchart LR
+    TM(["TypedModel"]):::input
+    CAT(["Modifiers · Actions\nDiagnostics\ncatalogs"]):::input
+    GA[["Graph Analyzer"]]:::stage
+    OUT["GraphResult"]:::artifact
+
+    TM -->|"semantic declarations"| GA
+    CAT --> GA
+    GA --> OUT
+
+    classDef input fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+    classDef stage fill:#ede9fe,stroke:#7c3aed,color:#3b0764
+    classDef artifact fill:#fef3c7,stroke:#d97706,color:#78350f
+```
+
+**Takes in:**`TypedModel`; catalogs: `Modifiers`, `Actions`, `Diagnostics`.
 **Produces:** Graph facts keyed by semantic identities plus diagnostics. (Current shape: diagnostics-only stub.)
 **Catalog entry:** State semantics (`initial`, `terminal`, `required`, `irreversible`, `success`, `warning`, `error`) come from modifier metadata already resolved by the type checker; the analyzer must not reinterpret raw syntax.
 **Consumed by:** ProofEngine, `Precept.From`, LS structural diagnostics, runtime structural precomputation.
@@ -326,7 +390,23 @@ The graph analyzer derives lifecycle structure from semantic declarations. Its k
 
 The proof engine is the last analysis stage before lowering — and the compile-time half of the structural guarantee. It discharges statically preventable runtime hazards: if it can prove an operation is safe at compile time, no runtime check is needed; if it cannot, the compiler emits a diagnostic and the author must fix the source before an executable model is produced. Its key design choice: proof is bounded — four strategies only, no general SMT solver — and proof stops at analysis. The runtime receives only lowered fault-site residue for defense-in-depth, not the proof graph itself.
 
-**Takes in:** `TypedModel`, `GraphResult`; catalogs: `Operations`, `Functions`, `Types`, `Diagnostics`, `Faults`.
+```mermaid
+flowchart LR
+    TM(["TypedModel +\nGraphResult"]):::input
+    CAT(["Operations · Functions\nTypes · Diagnostics · Faults\ncatalogs"]):::input
+    PE[["Proof Engine"]]:::stage
+    OUT["ProofModel"]:::artifact
+
+    TM -->|"semantic model + graph facts"| PE
+    CAT --> PE
+    PE --> OUT
+
+    classDef input fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+    classDef stage fill:#ede9fe,stroke:#7c3aed,color:#3b0764
+    classDef artifact fill:#fef3c7,stroke:#d97706,color:#78350f
+```
+
+**Takes in:**`TypedModel`, `GraphResult`; catalogs: `Operations`, `Functions`, `Types`, `Diagnostics`, `Faults`.
 **Produces:** Obligations, evidence, dispositions, preventable-fault links, diagnostics, and semantic site attribution. (Current shape: diagnostics-only stub.)
 **Catalog entry:** Proof obligations originate in metadata: `BinaryOperationMeta.ProofRequirements`, `FunctionOverload.ProofRequirements`, `TypeAccessor.ProofRequirements`, and action metadata. `FaultCode` ↔ `DiagnosticCode` linkage remains catalog-owned as a prevention/backstop relationship.
 **Consumed by:** `CompilationResult`, LS/MCP proof reporting, lowering of fault residue into runtime backstops.
@@ -376,6 +456,30 @@ catalog metadata → ProofRequirement → ProofObligation → DiagnosticCode →
 
 `CompilationResult` is an aggregation boundary, not a reasoning stage — but it is the artifact that makes the guarantee inspectable. It captures the complete analysis pipeline as one immutable snapshot so consumers can access any stage's output without re-running the pipeline. Even broken programs produce a `CompilationResult` with partial analysis.
 
+```mermaid
+flowchart LR
+    SRC(["source text"]):::input
+    TS(["TokenStream"]):::input
+    ST(["SyntaxTree"]):::input
+    TM(["TypedModel"]):::input
+    GR(["GraphResult"]):::input
+    PM(["ProofModel"]):::input
+    SNAP[["Compilation\nSnapshot"]]:::stage
+    OUT["CompilationResult"]:::artifact
+
+    SRC --> SNAP
+    TS --> SNAP
+    ST --> SNAP
+    TM --> SNAP
+    GR --> SNAP
+    PM --> SNAP
+    SNAP --> OUT
+
+    classDef input fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+    classDef stage fill:#ede9fe,stroke:#7c3aed,color:#3b0764
+    classDef artifact fill:#fef3c7,stroke:#d97706,color:#78350f
+```
+
 **Takes in:** Raw source + the five pipeline stages.
 **Produces:** `CompilationResult(TokenStream Tokens, SyntaxTree SyntaxTree, TypedModel Model, GraphResult Graph, ProofModel Proof, ImmutableArray<Diagnostic> Diagnostics, bool HasErrors)`.
 **Consumed by:** LS, MCP `precept_compile`, `Precept.From`.
@@ -403,7 +507,21 @@ When a `.precept` file changes (field added, state renamed, constraint tightened
 
 Lowering is the transformation from analysis to execution — and the stage that makes the structural guarantee executable. The evaluator becomes a plan executor that does not reason about semantics at runtime because lowering has already resolved all semantic questions into executable plans. `Precept.From(CompilationResult)` is the sole owner of this transformation — no other code path builds the runtime model. It selectively transforms analysis knowledge into runtime-native shapes rather than copying or referencing compile-time artifacts.
 
-**Takes in:** Error-free `CompilationResult`; semantic inputs come from `TypedModel`, `GraphResult`, and proof residue from `ProofModel`. Lowering reads catalog metadata transitively through already-resolved model identities (e.g., for default-value computation, constraint text extraction, fault-site descriptor construction), but does not perform fresh catalog lookups for classification purposes.
+```mermaid
+flowchart LR
+    CR(["CompilationResult"]):::input
+    LOW[["Lowering\n(Precept.From)"]]:::stage
+    OUT["Precept"]:::artifact
+
+    CR -->|"only when !HasErrors"| LOW
+    LOW --> OUT
+
+    classDef input fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+    classDef stage fill:#ede9fe,stroke:#7c3aed,color:#3b0764
+    classDef artifact fill:#fef3c7,stroke:#d97706,color:#78350f
+```
+
+**Takes in:**Error-free `CompilationResult`; semantic inputs come from `TypedModel`, `GraphResult`, and proof residue from `ProofModel`. Lowering reads catalog metadata transitively through already-resolved model identities (e.g., for default-value computation, constraint text extraction, fault-site descriptor construction), but does not perform fresh catalog lookups for classification purposes.
 **Produces:** `Precept` as a sealed executable model owning descriptor tables, slot layout, dispatch indexes, lowered execution plans, explicit constraint-plan indexes, reachability and topology indexes, inspection metadata, and fault-site backstops.
 **Catalog entry:** Catalog metadata reaches runtime only in lowered semantic form: descriptor identity, resolved operation/function/action identity, constraint descriptors, and proof-owned fault-site residue.
 **Consumed by:** `Precept.Create`, `Precept.Restore`, `Version` operations, MCP runtime tools, host applications.
@@ -472,6 +590,33 @@ The stable runtime contract is descriptor-backed. Current public stubs still exp
 ## 11. Runtime surface and operations
 
 Once a valid `Precept` exists, four operations govern entity lifecycle. The evaluator is a shared plan executor — it consumes only lowered artifacts and executes prebuilt plans. Execution semantics are fully determined at lowering time.
+
+```mermaid
+flowchart TD
+    P(["Precept"]):::input
+
+    CREATE["Create"]:::artifact
+    RESTORE["Restore"]:::artifact
+    EVAL[["Evaluator"]]:::stage
+    STRUCT["Structural\nqueries"]:::artifact
+
+    P --> CREATE
+    P --> RESTORE
+    P --> EVAL
+    P --> STRUCT
+
+    FIRE["Fire · InspectFire"]:::artifact
+    UPD["Update · InspectUpdate"]:::artifact
+    FAULT["Fault backstops"]:::artifact
+
+    EVAL --> FIRE
+    EVAL --> UPD
+    EVAL --> FAULT
+
+    classDef input fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+    classDef stage fill:#ede9fe,stroke:#7c3aed,color:#3b0764
+    classDef artifact fill:#fef3c7,stroke:#d97706,color:#78350f
+```
 
 ### Evaluator
 
