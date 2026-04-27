@@ -57,15 +57,14 @@ public sealed class PRECEPT0006ProofSubjectPlacementIsValid : DiagnosticAnalyzer
         var op = (IObjectCreationOperation)ctx.Operation;
 
         var typeName = op.Type?.Name;
-        var ns = op.Type?.ContainingNamespace;
-        if (ns?.Name != "Language" || ns.ContainingNamespace?.Name != "Precept") return;
+        if (!CatalogAnalysisHelpers.IsInNamespace(op, "Precept", "Language")) return;
 
         // ── Rule 1: PresenceProofRequirement must use SelfSubject, not ParamSubject ──────
         if (typeName == "PresenceProofRequirement")
         {
             if (op.Arguments.Length > 0)
             {
-                var subjectValue = UnwrapConversions(op.Arguments[0].Value);
+                var subjectValue = CatalogAnalysisHelpers.UnwrapConversions(op.Arguments[0].Value);
                 if (subjectValue is IObjectCreationOperation subjectCreation &&
                     subjectCreation.Type?.Name == "ParamSubject")
                 {
@@ -92,7 +91,7 @@ public sealed class PRECEPT0006ProofSubjectPlacementIsValid : DiagnosticAnalyzer
         int subjectCount = typeName == "QualifierCompatibilityProofRequirement" ? 2 : 1;
         for (int i = 0; i < subjectCount && i < op.Arguments.Length; i++)
         {
-            var subjectValue = UnwrapConversions(op.Arguments[i].Value);
+            var subjectValue = CatalogAnalysisHelpers.UnwrapConversions(op.Arguments[i].Value);
             if (subjectValue is IObjectCreationOperation selfSubjectCreation &&
                 selfSubjectCreation.Type?.Name == "SelfSubject" &&
                 HasNonNullAccessor(selfSubjectCreation))
@@ -138,10 +137,4 @@ public sealed class PRECEPT0006ProofSubjectPlacementIsValid : DiagnosticAnalyzer
         return true;
     }
 
-    private static IOperation UnwrapConversions(IOperation op)
-    {
-        while (op is IConversionOperation conv && conv.IsImplicit)
-            op = conv.Operand;
-        return op;
-    }
 }

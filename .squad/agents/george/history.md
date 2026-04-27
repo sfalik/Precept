@@ -10,8 +10,19 @@
 - `OperatorTable`, widening checks, and several parser/checker mapping tables are still parallel copies of catalog knowledge. Replacing them yields the highest implementation payoff.
 - Multi-source analyzer tests only need a broader helper signature; real-catalog BCL-heavy stubs should stay out of the default test path.
 - Precept.Next delivery quality depends on doc/code contract alignment first. Hollow models, missing diagnostic codes, and stale surface docs block trustworthy slice work faster than raw implementation effort does.
+- Proof/fault architecture needs a hard split: `CompilationResult` owns `ProofModel`; `Precept.From(compilation)` owns lowering into executable constraint tables and fault-site projections.
+- Constraint behavior is a separate contract from fault behavior: rules/ensures lower into `ConstraintPlan` buckets (`always`, state-anchor, event-anchor), while statically preventable hazards lower only as impossible-path `FaultSite` backstops.
+- Shane's current preferences for the synthesized design are now explicit and binding: semantic naming over syntax-shaped names, metadata as early as knowable, and three typed action shapes (`TypedAction`, `TypedInputAction`, `TypedBindingAction`).
+- Key paths for this design thread: `docs\compiler-and-runtime-design.md`, `docs\runtime\runtime-api.md`, `docs\working\proposal-george-proof-fault-contract.md`, `.squad\decisions\inbox\george-proof-fault-contract.md`.
+- The synthesized design is only coherent when it makes three splits explicit at once: `CompilationResult` vs. `Precept`, constraints vs. faults, and authoring consumers vs. execution consumers. Leaving any one of those implicit invites parallel-model drift.
+- The action family needed the exact settled names (`TypedAction`, `TypedInputAction`, `TypedBindingAction`) to stay aligned with Shane's directive while still enforcing semantic naming. Anything looser invites a fresh naming fight.
 
 ## Recent Updates
+
+### 2026-04-26 — SyntaxTree vs TypedModel boundary review
+- Confirmed the dual-artifact design is correct if the typed layer is allowed to reorganize around semantic identity instead of preserving raw source shape.
+- Re-grounded the boundary: `SyntaxTree` owns parser-facing structure, spans, and recovery details; `TypedModel` owns resolved semantic meaning.
+- Flagged accidental mirroring as the practical danger during implementation, not the existence of both artifacts.
 
 ### 2026-04-26 — Cross-catalog analyzer helper API became the implementation center
 - Audited all 10 catalog `GetMeta` shapes and the existing analyzer suite to define a reusable helper surface.
@@ -22,6 +33,25 @@
 - Confirmed there were no missing surfaced types; the real correctness fix was `Period` gaining `EqualityComparable`.
 - Identified the remaining highest-value follow-up as consumer drift, especially the language server's hardcoded completion lists.
 - Helped shape the analyzer expansion into an infrastructure-first queue rather than a purely simple-patterns-first rollout.
+
+### 2026-04-27 — Combined compiler/runtime v2 draft boundary pass
+- Locked the document-level split so compiler and runtime stay co-equal products of one source program rather than letting runtime read authoring artifacts directly.
+- Made the anti-mirroring rule explicit: `SyntaxTree` owns parser shape and recovery; `TypedModel` must become a semantic database, not a renamed AST.
+- Re-grounded LS/MCP consumption boundaries: authoring features read `CompilationResult`; preview/execution features cross the lowering boundary and read `Precept`.
+
+### 2026-04-27 — Merged v2 review follow-through
+- The merged architecture draft is close, but it still needs one more hardening pass before lock: the typed-model minimum inventory, LS feature-to-artifact mapping, and runtime executable-model contract are the remaining soft spots.
+- A runtime design stays honest only if constraint planning preserves anchor semantics (`always`, `in`, `to`, `from`, `on`) instead of collapsing them into vague state/event buckets.
+- The practical anti-mirroring enforcement point is source-origin semantic identity: if hover/definition/token classification cannot run from typed references plus declaration origins, the typed layer is still too syntax-shaped.
+
+### 2026-04-27 — Final concurrence on combined v2 architecture
+- Frank's revision closed the architectural blockers: the typed-model minimum inventory, LS feature matrix, executable lowering contract, and explicit anchor taxonomy are now stated sharply enough to guide implementation.
+- The decisive coherence win is the non-symmetric model: diagnostics block executable-model construction, runtime outcomes express normal domain/boundary behavior, and faults remain impossible-path backstops only.
+- The remaining work is stage-level alignment, not main-doc architecture repair — especially syncing `docs\runtime\fault-system.md` and later descriptor-backed API detail under D8/R4.
+
+### 2026-04-27 — Post-approval v2 follow-up framing
+- Treat `docs\working\combined-design-v2.md` as architecturally settled at the top level; future work on this lane should stay stage-scoped unless Shane explicitly reopens the main split.
+- Immediate follow-up belongs in stage-level docs and API detail, not another full top-level rewrite.
 
 ### 2026-04-25 — Fully metadata-driven compiler feasibility review
 - Confirmed lexer is already close to catalog-driven, parser lookup tables are worth deriving, type checker gets the biggest win, and graph/proof/evaluator work remains partly algorithmic by design.

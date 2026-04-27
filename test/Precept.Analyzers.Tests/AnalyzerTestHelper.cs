@@ -18,10 +18,19 @@ internal static class AnalyzerTestHelper
     /// prevents "should be empty" tests from passing vacuously when the source is malformed
     /// and the analyzer never fires.
     /// </summary>
-    internal static async Task<IReadOnlyList<Diagnostic>> AnalyzeAsync<TAnalyzer>(string source)
+    internal static Task<IReadOnlyList<Diagnostic>> AnalyzeAsync<TAnalyzer>(string source)
+        where TAnalyzer : DiagnosticAnalyzer, new()
+        => AnalyzeAsync<TAnalyzer>(new[] { source });
+
+    /// <summary>
+    /// Compiles multiple source strings (each as a separate syntax tree) and runs
+    /// <typeparamref name="TAnalyzer"/> against the combined compilation.
+    /// Used for cross-catalog analyzers that accumulate data across files.
+    /// </summary>
+    internal static async Task<IReadOnlyList<Diagnostic>> AnalyzeAsync<TAnalyzer>(params string[] sources)
         where TAnalyzer : DiagnosticAnalyzer, new()
     {
-        var syntaxTree = CSharpSyntaxTree.ParseText(source);
+        var syntaxTrees = sources.Select(s => CSharpSyntaxTree.ParseText(s)).ToArray();
 
         var dotnetDir = Path.GetDirectoryName(typeof(object).Assembly.Location)!;
         var references = new List<MetadataReference>
@@ -36,7 +45,7 @@ internal static class AnalyzerTestHelper
 
         var compilation = CSharpCompilation.Create(
             "TestAssembly",
-            [syntaxTree],
+            syntaxTrees,
             references,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 

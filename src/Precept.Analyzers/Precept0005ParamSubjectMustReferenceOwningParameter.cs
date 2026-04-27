@@ -52,14 +52,12 @@ public sealed class PRECEPT0005ParamSubjectMustReferenceOwningParameter : Diagno
         var op = (IObjectCreationOperation)ctx.Operation;
 
         // Scope to Precept.Language.ParamSubject only.
-        var type = op.Type;
-        if (type?.Name != "ParamSubject") return;
-        var ns = type.ContainingNamespace;
-        if (ns?.Name != "Language" || ns.ContainingNamespace?.Name != "Precept") return;
+        if (op.Type?.Name != "ParamSubject") return;
+        if (!CatalogAnalysisHelpers.IsInNamespace(op, "Precept", "Language")) return;
 
         // Get the ParameterMeta argument.
         if (op.Arguments.Length == 0) return;
-        var argValue = UnwrapConversions(op.Arguments[0].Value);
+        var argValue = CatalogAnalysisHelpers.UnwrapConversions(op.Arguments[0].Value);
 
         // Resolve the symbol referenced by the argument.
         var argSymbol = GetReferencedSymbol(argValue);
@@ -147,10 +145,4 @@ public sealed class PRECEPT0005ParamSubjectMustReferenceOwningParameter : Diagno
             CollectParameterMetaSymbols(child, symbols);
     }
 
-    private static IOperation UnwrapConversions(IOperation op)
-    {
-        while (op is IConversionOperation conv && conv.IsImplicit)
-            op = conv.Operand;
-        return op;
-    }
 }

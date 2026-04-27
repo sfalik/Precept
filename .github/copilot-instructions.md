@@ -58,10 +58,16 @@ npm run loop:local     # Package + install locally (also a VS Code task)
 
 - **Runtime / language server changes** → edit `src/Precept/` or `tools/Precept.LanguageServer/` → run Build task → extension auto-detects new build, no reload needed.
 - **Extension UI / grammar / TypeScript** → edit `tools/Precept.VsCode/` → run `extension: install` task → reload window.
-- **MCP server** → edit `tools/Precept.Mcp/` → keep the workspace-owned `.vscode/mcp.json` `servers.precept` entry pointed at `tools/scripts/start-precept-mcp.js` → reload window → rebuild happens lazily on next tool invocation from source.
+- **MCP server** → edit `tools/Precept.Mcp/` → the VS Code/workspace-local source-first config is `.vscode/mcp.json` (`servers.precept` → `tools/scripts/start-precept-mcp.js`); the Copilot CLI repo-local config is repo-root `.mcp.json` (`mcpServers.precept` → same script) → reload window → rebuild happens lazily on next tool invocation from source.
 - **Plugin (agents/skills markdown)** → edit workspace-native copies in `.github/agents/` and `.github/skills/` → reload window → changes appear immediately. Run `plugin: sync payload` only when updating the shipped plugin payload under `tools/Precept.Plugin/` for explicit validation.
 
-Keep `tools/Precept.Plugin/.mcp.json` in shipped `dotnet tool run precept-mcp` form. That plugin file uses its own `mcpServers` payload schema. Use `.vscode/mcp.json` for repo-local MCP development with the VS Code `servers` schema, `.github/agents/` and `.github/skills/` as the workspace-native customization source, and treat plugin/distribution-shaped validation as explicit validation, not the default inner loop.
+Three distinct MCP config surfaces exist and must stay distinct:
+
+- **`.vscode/mcp.json`** — VS Code/workspace-local source-first config. Uses the VS Code `servers` schema. Points `servers.precept` at `tools/scripts/start-precept-mcp.js`.
+- **`.mcp.json` (repo root)** — Copilot CLI repo-local config. Uses the CLI `mcpServers` schema. Points `mcpServers.precept` at the same `tools/scripts/start-precept-mcp.js`. Does not mirror the `github` entry — Copilot CLI provides GitHub MCP natively.
+- **`tools/Precept.Plugin/.mcp.json`** — shipped/distribution payload. Uses `mcpServers` with `dotnet tool run precept-mcp`. Do not use this surface for local development.
+
+Use `.github/agents/` and `.github/skills/` as the workspace-native customization source for agents and skills. Treat plugin/distribution-shaped validation (`tools/Precept.Plugin/`) as explicit validation, not the default inner loop.
 
 ## Issue Implementation Workflow
 

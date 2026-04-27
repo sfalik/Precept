@@ -107,6 +107,11 @@ Team cast on 2026-04-04: Frank (Lead), George (Runtime), Kramer (Tooling), Elain
 
 ## Recent Updates
 
+### 2026-04-27T00:19:02Z - Combined design v2 closeout recorded
+- Wrote the session log for the v2 architecture closeout after Frank's revision and George's final approval.
+- Merged 17 related architecture inbox notes/directives into one canonical `decisions.md` entry and cleared the processed v2 design inbox files.
+- Updated Frank and George history with the approved boundary set and the remaining stage-level follow-up targets.
+
 ### 2026-04-12T19:45:41Z - Squad `@copilot` lane retirement recorded
 - Wrote orchestration logs for Newman and Frank plus a session log for the Squad operations contract change.
 - Merged 2 relevant inbox items into one canonical `decisions.md` entry, recording the lane retirement and marking the earlier direct-`@copilot` directive as superseded.

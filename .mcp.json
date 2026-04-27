@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "precept": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["tools/scripts/start-precept-mcp.js"]
+    }
+  }
+}

@@ -6,6 +6,21 @@
 
 ---
 
+### 2026-04-27T00:19:02Z: Combined compiler/runtime v2 architecture canonicalized
+**By:** Scribe
+**Status:** Merged, deduplicated, inbox cleared (17 files)
+
+**Merged sources:** `syntax-tree-typed-model-boundary`, `george-v2-review`, `george-v2-compiler-runtime`, `george-proof-fault-contract`, `george-combined-final`, `frank-v2-fault-diagnostic-boundary`, `frank-v2-compiler-runtime`, `frank-proof-fault-contract`, `frank-combined-design-v2-contract-hardening`, `frank-combined-design-draft`, `copilot-directive-20260426-191540`, `copilot-directive-20260426-190457`, `copilot-directive-20260426-185930`, `copilot-directive-20260426-185330`, `copilot-directive-2026-04-26T20-04-23-faults-diagnostics`, `copilot-directive-2026-04-26T19-57-38-advanced-design-scope`, `copilot-directive-2026-04-26T19-57-38-04-00`.
+
+- `CompilationResult` is the complete five-stage authoring/tooling snapshot, while `Precept` is the lowered executable model. Lowering happens only in `Precept.From(compilation)`, not inside proof and not as a sixth compiler stage.
+- `SyntaxTree` and `TypedModel` are intentionally non-mirroring artifacts: syntax owns source structure, spans, and recovery; the typed layer owns semantic truth, including symbols, bindings, normalized declarations, typed expressions/actions, dependency facts, and source-origin handles.
+- Language-server and MCP authoring consumption is artifact-specific: lexical classification reads `TokenStream`, source-structural UX reads `SyntaxTree`, semantic tokens/completions/hover/definition read `TypedModel`, and preview/inspection only crosses to lowered `Precept` after successful compilation.
+- Lowering is an explicit executable-model contract, not a hand-waved bridge: descriptor-backed identity, slot layout, routing indexes, recomputation order, access-mode indexes, inspection metadata, and distinct executable constraint-plan families for `always`, `in`, `to`, `from`, and `on` anchors are all first-class runtime obligations.
+- Constraint enforcement and fault handling are sibling runtime contracts, not mirrored error channels. Constraint failures remain ordinary runtime/domain outcomes; `Fault` is reserved for impossible-path engine invariant breaches, and every `FaultCode` keeps a compiler-owned prevention counterpart in the diagnostics/proof system.
+- Three semantic action shapes remain canonical across typed and lowered models: base action, operand-bearing action, and binding-shaped action; `pop` and `dequeue` stay binding-shaped even when no capture target is authored.
+- The combined v2 rewrite is the advanced successor to `docs\compiler-and-runtime-design.md`: it must cover compiler and runtime in equal detail and serve as the base contract for later stage-level design documents.
+- George's final concurrence closes top-level architecture repair on this pass. Remaining follow-up is stage-level alignment, especially syncing `docs\runtime\fault-system.md`, preserving the descriptor-backed runtime API direction, and keeping future Frank synthesis/review work on this lane in Opus.
+
 ### 2026-04-27T00:00:00Z: MCP dual-surface operating model canonicalized
 **By:** Scribe
 **Status:** Merged, deduplicated, inbox cleared (4 files)

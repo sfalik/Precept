@@ -13,7 +13,26 @@
 - `InvalidCharacter` is the single most structurally broken diagnostic in the lexer: it covers three completely different problems (invalid source char, unrecognized escape, lone `}` in a text value) with one undifferentiated message. Each needs its own code and fix-oriented message.
 - The lone `}` case is the highest-probability first-contact failure for domain authors using interpolation in text values. It has zero instructional value in the current message.
 
+- Combined design docs that mix architectural narrative with contract reference create a "two documents pretending to be one" problem. The fix is structural: split the reading path into a narrative spine and a reference appendix, not just reformatting tables.
+- Stage contracts as 6-row tables look consistent but read poorly for both humans and AI. Key-value bold-labeled prose outperforms tables for non-tabular metadata.
+- Tables that compare across a dimension (constraint evaluation matrix, SyntaxTree vs TypedModel split, artifact classification) are genuinely tabular and should stay. Tables that list properties of a single thing (stage contracts, field naming discipline) are not tabular and should convert to prose/lists.
+- Progressive disclosure in design docs means: first sentence = what this stage does; bold labels = inputs/outputs/consumers; expanded prose only for non-obvious contracts. Dense paragraphs after tables defeat the purpose of having structure.
+
 ## Recent Updates
+
+### 2026-04-27 — Design doc genre analysis (follow-up to readability review)
+- Analyzed the "reference manual vs. design document" genre split for combined-design-v2.
+- Surveyed canonical formats: Roslyn design notes, V8 design docs, LLVM design docs, IETF RFCs, Go proposals, Rust RFCs, C2 wiki pattern language docs.
+- Key finding: design docs in the compiler/runtime space are structured around *decisions*, not *inventories*. The unit of design is the decision, not the artifact. Each section answers "what did we decide, why, and what did we reject?" — not "here is a complete enumeration of properties."
+- The single highest-impact structural change: add a motivation/problem section at the top that frames *what design problem each section solves*, and reframe stage contracts from "here's what it does" to "here's why it's shaped this way."
+- Existing "why" content is present but buried — §1's CompilationResult/Precept split paragraph, §5.3's anti-mirroring rationale, §5.9's constraint evaluation rules, §8's Fault philosophy, §10's locked assertions all contain real design reasoning. The problem is that the "why" is subordinated to the "what" instead of leading.
+- Filed reusable pattern to `.squad/decisions/inbox/elaine-design-doc-format.md`.
+
+### 2026-04-27 — Combined design v2 readability review
+- Reviewed `docs/working/combined-design-v2.md` for information architecture, table overuse, navigability, and progressive disclosure.
+- Identified 7 high-impact concrete fixes. Key themes: stage contract format should convert from tables to labeled prose; §2 has two redundant artifact tables that should merge; §8 tries to do three jobs in one section; the doc lacks a quick-reference entry point.
+- Filed reusable pattern (stage contract format) to `.squad/decisions/inbox/elaine-doc-readability.md`.
+- What's working well: the pipeline diagram (§3), SyntaxTree vs TypedModel comparison (§5.3), constraint evaluation matrix (§5.9), and design assertions (§10) should not be changed.
 
 ### 2026-04-11 — Verdict modifiers UX perspective
 - Recommended badge-level authored verdict cues, not full-surface fills, to preserve clarity and avoid false confidence.
