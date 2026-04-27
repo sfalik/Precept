@@ -718,7 +718,7 @@ Constraint identity survives into `ConstraintResult` and `ConstraintViolation` t
 
 ### Update
 
-Update governs direct field edits under access-mode declarations and constraint evaluation. `InspectUpdate` additionally evaluates the event landscape over the hypothetical post-patch state. The runtime API survey confirms that no surveyed state machine runtime — XState, Temporal, SCXML, Erlang gen_statem, Akka Typed, AWS Step Functions — provides direct field mutation outside the event/transition mechanism. XState's context can only change via `assign` actions triggered by transitions; Temporal's workflow state is encapsulated and only mutated via signal/update handlers; Erlang gen_statem's state data is internal to the callback module. Precept's `Update` operation is architecturally unique in this space — it introduces a governed, constraint-checked field edit surface alongside the event/transition mechanism.
+Update governs direct field edits under access-mode declarations and constraint evaluation. `InspectUpdate` additionally evaluates the event landscape over the hypothetical post-patch state. `Update` exists because Precept is not a state machine runtime — it is a domain integrity engine that owns the data layer alongside the lifecycle layer. Fields have access-mode declarations per state, always-constraints, recomputed dependencies, and structured outcomes for denied or constrained writes. A pure event/transition mechanism would leave direct field edits ungoverned; `Update` closes that gap without routing every data change through an event.
 
 | | |
 |---|---|
