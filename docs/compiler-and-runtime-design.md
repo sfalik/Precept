@@ -21,7 +21,7 @@ Everything in this document — every pipeline stage, every artifact, every runt
 
 Precept keeps its language purposely simple. Rather than embedding domain knowledge in pipeline stage implementations (as traditional compilers do), Precept externalizes the entire language definition as structured metadata in ten catalogs. Pipeline stages are generic machinery that reads this metadata.
 
-This inverts the traditional compiler model. In Roslyn, GCC, or TypeScript, domain knowledge is scattered across pipeline stage implementations. Adding a language feature means touching dozens of files. In Precept, adding a language feature means adding an enum member and filling an exhaustive switch — the C# compiler refuses to build if any member lacks metadata, and propagation to every consumer (grammar, completions, hover, MCP, semantic tokens) is automatic.
+This inverts the traditional compiler model. In general-purpose compilers (Roslyn, GCC, TypeScript), domain knowledge is scattered across pipeline stage implementations — adding a language feature means touching dozens of files. The surveyed DSL-scale systems take a different approach: CEL centralizes its language definition in `Env` declarations, OPA/Rego externalizes rule indexing and type environments in `ast.Compiler`, and CUE's lattice-based evaluation derives behavior from schema declarations. Precept takes this pattern further — adding a language feature means adding an enum member and filling an exhaustive switch. The C# compiler refuses to build if any member lacks metadata, and propagation to every consumer (grammar, completions, hover, MCP, semantic tokens) is automatic.
 
 The ten catalogs fall into two groups:
 
@@ -40,7 +40,7 @@ The architectural principle: **if something is domain knowledge, it is metadata;
 
 ### Purpose-built
 
-Precept's pipeline is not a general-purpose compiler framework. It is designed for Precept's specific shape: a declarative DSL with fields, states, events, transitions, constraints, and guards. Every stage knows what it is building toward — an executable model that structurally prevents invalid configurations. The pipeline does not need to be extensible to other languages. It needs to be correct for this one.
+Precept's pipeline is purpose-built for Precept's specific shape: a declarative DSL with fields, states, events, transitions, constraints, and guards. Every stage knows what it is building toward — an executable model that structurally prevents invalid configurations. This is the norm at DSL scale. The surveyed systems — CEL (single-expression safety language), OPA/Rego (policy evaluation), Dhall (configuration with guaranteed termination), Pkl (structured configuration), CUE (constraint-based configuration) — all build purpose-specific pipelines tuned to their domain, not extensible compiler frameworks. Precept follows the same principle: the pipeline does not need to be extensible to other languages. It needs to be correct for this one.
 
 ### Unified pipeline
 
@@ -142,13 +142,14 @@ The lexer converts raw text into classified tokens with exact spans. It has no s
 
 ```mermaid
 flowchart LR
-    classDef data fill:#f8fafc,stroke:#94a3b8,color:#334155
-    classDef stage fill:#ede9fe,stroke:#7c3aed,stroke-width:3px,color:#3b0764
+    classDef input fill:#dbeafe,stroke:#60a5fa,color:#1e3a5f
+    classDef stage fill:#ede9fe,stroke:#a78bfa,color:#3b1f7e
+    classDef artifact fill:#fef3c7,stroke:#f59e0b,color:#78350f
 
-    SRC(["source text"]):::data
-    CAT(["Tokens · Diagnostics\ncatalogs"]):::data
-    LEX{{"Lexer"}}:::stage
-    OUT(["TokenStream"]):::data
+    SRC([source text]):::input
+    CAT([Tokens · Diagnostics\ncatalogs]):::input
+    LEX(Lexer):::stage
+    OUT[TokenStream]:::artifact
 
     SRC --> LEX
     CAT --> LEX
@@ -175,13 +176,14 @@ The parser builds the source-structural model of the authored program. Its key d
 
 ```mermaid
 flowchart LR
-    classDef data fill:#f8fafc,stroke:#94a3b8,color:#334155
-    classDef stage fill:#ede9fe,stroke:#7c3aed,stroke-width:3px,color:#3b0764
+    classDef input fill:#dbeafe,stroke:#60a5fa,color:#1e3a5f
+    classDef stage fill:#ede9fe,stroke:#a78bfa,color:#3b1f7e
+    classDef artifact fill:#fef3c7,stroke:#f59e0b,color:#78350f
 
-    TS(["TokenStream"]):::data
-    CAT(["Constructs · Tokens\nOperators · Diagnostics\ncatalogs"]):::data
-    PAR{{"Parser"}}:::stage
-    OUT(["SyntaxTree"]):::data
+    TS[TokenStream]:::artifact
+    CAT([Constructs · Tokens\nOperators · Diagnostics\ncatalogs]):::input
+    PAR(Parser):::stage
+    OUT[SyntaxTree]:::artifact
 
     TS -->|"token stream"| PAR
     CAT --> PAR
@@ -232,15 +234,15 @@ Expression nodes: `BinaryExpressionSyntax`, `UnaryExpressionSyntax`, `LiteralExp
 
 Catalog metadata factors into parsing decisions at specific points. The parser uses `Constructs.GetMeta()` to determine legal declaration forms — each `ConstructKind` defines the expected slot sequence, and the parser validates that slots appear in the declared order with declared optionality. The parser uses `Operators.GetMeta()` for expression parsing — operator precedence and associativity come from catalog metadata, not a hardcoded table. Keyword recognition is inherited from the lexer's catalog-driven `TokenKind` assignments; the parser dispatches on `TokenKind`, not on string comparison.
 
-### Anti-Roslyn guidance
+### Right-sized parser patterns
 
-Precept's grammar is **not** a general-purpose programming language grammar. Implementers must not default to conventional compiler patterns:
+Precept's grammar calls for parser patterns scaled to a flat, keyword-anchored, line-oriented DSL — not patterns designed for deeply nested general-purpose languages. The surveyed DSL-scale systems confirm what works at this scale:
 
-- **No red/green tree architecture.** Precept's grammar is flat and line-oriented — there is no deep nesting, no brace-delimited scopes, no expression statements. Red/green trees solve a problem Precept does not have.
-- **Error recovery is skip-to-next-declaration-keyword.** Not token-level insertion/deletion with cost models. The 64KB source ceiling and line-oriented grammar make construct-level panic recovery both sufficient and correct.
-- **Expressions only appear in specific slots** — guards, action RHS, ensure clauses, computed fields, if/then/else, and because clauses. The parser does not need a general-purpose expression parser for the full language.
-- **Operator precedence comes from `Operators.GetMeta()`.** Not a hardcoded precedence table. The correct pattern is precedence-climbing, not Pratt parsing or ANTLR grammar generation.
-- **The grammar is LL(1) with single-token lookahead** in most positions, given the keyword-anchored, line-oriented design.
+- **Flat parse trees.** Precept's grammar has no deep nesting, no brace-delimited scopes, no expression statements. Red/green tree architectures (Roslyn, rust-analyzer) solve incremental reparsing of deeply nested, brace-delimited structures — a problem that does not exist in flat, line-oriented grammars. CEL produces a flat protobuf AST; OPA/Rego produces module-level `Rule` lists; Dhall and Jsonnet both produce single-expression trees with no incremental infrastructure.
+- **Declaration-boundary error recovery.** When the parser encounters a malformed construct, it skips to the next newline-anchored declaration keyword (`field`, `state`, `event`, `rule`, `from`, `in`, `to`, `on`). This is panic-mode recovery with synchronization at declaration boundaries. Token-level insertion/deletion with cost models (as in Roslyn or GCC) is designed for statement-level grammars where recovery points are ambiguous. Precept's keyword-anchored lines provide unambiguous synchronization. OPA's parser similarly synchronizes at rule boundaries; Pkl's tree-sitter grammar provides node-level error recovery.
+- **Expressions only in specific slots** — guards, action RHS, ensure clauses, computed fields, if/then/else, and because clauses. CEL is a single-expression language; OPA confines expressions to rule bodies and comprehensions. Precept follows the same containment pattern — the parser does not need a general-purpose expression parser for the full language.
+- **Operator precedence from metadata.** Operator precedence comes from `Operators.GetMeta()`, not a hardcoded table. The correct pattern is precedence-climbing — a standard technique for expression parsing at this scale (CEL uses a similar approach in its ANTLR-generated parser with explicit precedence levels; OPA's parser embeds precedence in its recursive descent structure).
+- **LL(1) with single-token lookahead** in most positions, given the keyword-anchored, line-oriented design. This is simpler than the LL(k) or GLR techniques general-purpose languages require.
 
 ### `ActionKind` dual-use note
 
@@ -283,13 +285,14 @@ The type checker is the first stage that reasons about semantics. Its key design
 
 ```mermaid
 flowchart LR
-    classDef data fill:#f8fafc,stroke:#94a3b8,color:#334155
-    classDef stage fill:#ede9fe,stroke:#7c3aed,stroke-width:3px,color:#3b0764
+    classDef input fill:#dbeafe,stroke:#60a5fa,color:#1e3a5f
+    classDef stage fill:#ede9fe,stroke:#a78bfa,color:#3b1f7e
+    classDef artifact fill:#fef3c7,stroke:#f59e0b,color:#78350f
 
-    ST(["SyntaxTree"]):::data
-    CAT(["Types · Functions · Operators\nOperations · Modifiers · Actions\nConstructs · Diagnostics\ncatalogs"]):::data
-    TC{{"Type Checker"}}:::stage
-    OUT(["TypedModel"]):::data
+    ST[SyntaxTree]:::artifact
+    CAT([Types · Functions · Operators\nOperations · Modifiers · Actions\nConstructs · Diagnostics\ncatalogs]):::input
+    TC(Type Checker):::stage
+    OUT[TypedModel]:::artifact
 
     ST -->|"syntax tree"| TC
     CAT --> TC
@@ -306,9 +309,9 @@ flowchart LR
 
 **Implementation status:** `TypeChecker.Check` is stubbed; the semantic model contract is ahead of implementation.
 
-### Anti-pattern: per-construct check methods
+### Right-sized type checking: generic resolution passes
 
-The type checker should NOT have a `CheckFieldDeclaration()`, `CheckTransitionRow()`, `CheckRuleDeclaration()` method per construct kind. The correct model is generic resolution passes that read construct metadata from catalogs — catalog-resolvable checks are generic passes, and only construct-specific structural validation that genuinely differs by kind (field declarations vs. transition rows have different type-checking needs) warrants per-kind methods. The type checker builds semantic symbol tables and binding indexes — a symbol-table-driven approach — not a parallel tree that mirrors `SyntaxTree` with type annotations added.
+The type checker should NOT have a `CheckFieldDeclaration()`, `CheckTransitionRow()`, `CheckRuleDeclaration()` method per construct kind. The surveyed DSL-scale type checkers confirm the right pattern for this scale: CEL's checker walks the AST once, resolving types against its `Env` environment with overload dispatch from a centralized function registry; OPA's type checker (`ast/check.go`) makes a single pass over rules against a `TypeEnv`. The correct model for Precept is the same — generic resolution passes that read construct metadata from catalogs. Catalog-resolvable checks are generic passes; only construct-specific structural validation that genuinely differs by kind (field declarations vs. transition rows have different type-checking needs) warrants per-kind methods. The type checker builds semantic symbol tables and binding indexes — a symbol-table-driven approach — not a parallel tree that mirrors `SyntaxTree` with type annotations added.
 
 ### Typed action family — three shapes only
 
@@ -351,13 +354,14 @@ The graph analyzer derives lifecycle structure from semantic declarations. Its k
 
 ```mermaid
 flowchart LR
-    classDef data fill:#f8fafc,stroke:#94a3b8,color:#334155
-    classDef stage fill:#ede9fe,stroke:#7c3aed,stroke-width:3px,color:#3b0764
+    classDef input fill:#dbeafe,stroke:#60a5fa,color:#1e3a5f
+    classDef stage fill:#ede9fe,stroke:#a78bfa,color:#3b1f7e
+    classDef artifact fill:#fef3c7,stroke:#f59e0b,color:#78350f
 
-    TM(["TypedModel"]):::data
-    CAT(["Modifiers · Actions\nDiagnostics\ncatalogs"]):::data
-    GA{{"Graph Analyzer"}}:::stage
-    OUT(["GraphResult"]):::data
+    TM[TypedModel]:::artifact
+    CAT([Modifiers · Actions\nDiagnostics\ncatalogs]):::input
+    GA(Graph Analyzer):::stage
+    OUT[GraphResult]:::artifact
 
     TM -->|"semantic declarations"| GA
     CAT --> GA
@@ -392,13 +396,14 @@ The proof engine is the last analysis stage before lowering — and the compile-
 
 ```mermaid
 flowchart LR
-    classDef data fill:#f8fafc,stroke:#94a3b8,color:#334155
-    classDef stage fill:#ede9fe,stroke:#7c3aed,stroke-width:3px,color:#3b0764
+    classDef input fill:#dbeafe,stroke:#60a5fa,color:#1e3a5f
+    classDef stage fill:#ede9fe,stroke:#a78bfa,color:#3b1f7e
+    classDef artifact fill:#fef3c7,stroke:#f59e0b,color:#78350f
 
-    TM(["TypedModel +\nGraphResult"]):::data
-    CAT(["Operations · Functions\nTypes · Diagnostics · Faults\ncatalogs"]):::data
-    PE{{"Proof Engine"}}:::stage
-    OUT(["ProofModel"]):::data
+    TM[TypedModel +\nGraphResult]:::artifact
+    CAT([Operations · Functions\nTypes · Diagnostics · Faults\ncatalogs]):::input
+    PE(Proof Engine):::stage
+    OUT[ProofModel]:::artifact
 
     TM -->|"semantic model + graph facts"| PE
     CAT --> PE
@@ -458,17 +463,18 @@ catalog metadata → ProofRequirement → ProofObligation → DiagnosticCode →
 
 ```mermaid
 flowchart LR
-    classDef data fill:#f8fafc,stroke:#94a3b8,color:#334155
-    classDef stage fill:#ede9fe,stroke:#7c3aed,stroke-width:3px,color:#3b0764
+    classDef input fill:#dbeafe,stroke:#60a5fa,color:#1e3a5f
+    classDef stage fill:#ede9fe,stroke:#a78bfa,color:#3b1f7e
+    classDef artifact fill:#fef3c7,stroke:#f59e0b,color:#78350f
 
-    SRC(["source text"]):::data
-    TS(["TokenStream"]):::data
-    ST(["SyntaxTree"]):::data
-    TM(["TypedModel"]):::data
-    GR(["GraphResult"]):::data
-    PM(["ProofModel"]):::data
-    SNAP{{"Compilation\nSnapshot"}}:::stage
-    OUT(["CompilationResult"]):::data
+    SRC([source text]):::input
+    TS[TokenStream]:::artifact
+    ST[SyntaxTree]:::artifact
+    TM[TypedModel]:::artifact
+    GR[GraphResult]:::artifact
+    PM[ProofModel]:::artifact
+    SNAP(Compilation\nSnapshot):::stage
+    OUT[CompilationResult]:::artifact
 
     SRC --> SNAP
     TS --> SNAP
@@ -509,12 +515,12 @@ Lowering is the transformation from analysis to execution — and the stage that
 
 ```mermaid
 flowchart LR
-    classDef data fill:#f8fafc,stroke:#94a3b8,color:#334155
-    classDef stage fill:#ede9fe,stroke:#7c3aed,stroke-width:3px,color:#3b0764
+    classDef stage fill:#ede9fe,stroke:#a78bfa,color:#3b1f7e
+    classDef artifact fill:#fef3c7,stroke:#f59e0b,color:#78350f
 
-    CR(["CompilationResult"]):::data
-    LOW{{"Lowering\n(Precept.From)"}}:::stage
-    OUT(["Precept"]):::data
+    CR[CompilationResult]:::artifact
+    LOW(Lowering\n— Precept.From —):::stage
+    OUT[Precept]:::artifact
 
     CR -->|"only when !HasErrors"| LOW
     LOW --> OUT
@@ -555,11 +561,11 @@ These are the runtime face of declarations. Every runtime API surface routes thr
 
 ### Expression evaluation model
 
-The executable model is a **flat evaluation plan** — precomputed slot references, operation opcodes, literal constants, and result slots — not a recursive tree interpreter. Think of it as register-based bytecode where "registers" are field slots. This makes evaluation predictable-time, cache-friendly, and trivially serializable for inspection. Tree-walk interpretation is explicitly rejected: it would be correct but would sacrifice the performance, inspectability, and determinism properties that make Precept's runtime distinctive.
+The executable model is a **flat evaluation plan** — precomputed slot references, operation opcodes, literal constants, and result slots — not a recursive tree interpreter. Think of it as register-based bytecode where "registers" are field slots. This makes evaluation predictable-time, cache-friendly, and trivially serializable for inspection. Tree-walk interpretation is the dominant pattern in the surveyed DSL-scale systems — CEL uses tree-walking via `Interpretable.Eval()`, OPA/Rego uses top-down tree evaluation, Dhall normalizes via recursive substitution, Pkl evaluates lazily through its AST — and it would be correct for Precept. However, Precept's evaluation is tighter than expression evaluation: it executes a fixed action/constraint plan against a known slot layout. The flat plan trades the simplicity of tree-walking for predictable-time execution, inspectability (MCP tools can display plan structure without tracing recursive calls), and determinism properties that make Precept's runtime distinctive. This is a design decision, not a researched consensus — the surveyed systems succeed with tree-walking at their scale.
 
-### Anti-pattern: serialized TypedModel
+### Lowering is restructuring, not renaming
 
-The runtime model is organized for execution, not for semantic analysis. Constraint plans are grouped by activation anchor, not by source declaration order. Action plans are grouped by transition row, not by field. The runtime model is a dispatch-optimized index, not a renamed analysis model. An implementer must NOT map `TypedModel` types 1:1 to runtime types — lowering is a selective, restructuring transformation.
+The runtime model is organized for execution, not for semantic analysis. Constraint plans are grouped by activation anchor, not by source declaration order. Action plans are grouped by transition row, not by field. The runtime model is a dispatch-optimized index, not a renamed analysis model. The surveyed systems confirm this pattern: CEL's `Program` is a lowered `Interpretable` tree optimized for evaluation, not a copy of the checked AST; OPA's `Compiler` builds internal rule indexes that restructure policy for efficient top-down evaluation; XState v5 transforms machine configuration into a normalized internal model with precomputed transition maps. An implementer must NOT map `TypedModel` types 1:1 to runtime types — lowering is a selective, restructuring transformation.
 
 ### Constraint activation indexes
 
@@ -593,24 +599,25 @@ Once a valid `Precept` exists, four operations govern entity lifecycle. The eval
 
 ```mermaid
 flowchart TD
-    classDef data fill:#f8fafc,stroke:#94a3b8,color:#334155
-    classDef stage fill:#ede9fe,stroke:#7c3aed,stroke-width:3px,color:#3b0764
+    classDef artifact fill:#fef3c7,stroke:#f59e0b,color:#78350f
+    classDef runtime fill:#d1fae5,stroke:#34d399,color:#064e3b
+    classDef leaf fill:#a7f3d0,stroke:#10b981,color:#064e3b
 
-    P(["Precept"]):::data
+    P[Precept]:::artifact
 
-    CREATE(["Create"]):::data
-    RESTORE(["Restore"]):::data
-    EVAL{{"Evaluator"}}:::stage
-    STRUCT(["Structural\nqueries"]):::data
+    CREATE(Create):::runtime
+    RESTORE(Restore):::runtime
+    EVAL(Evaluator):::runtime
+    STRUCT(Structural\nqueries):::runtime
 
     P --> CREATE
     P --> RESTORE
     P --> EVAL
     P --> STRUCT
 
-    FIRE(["Fire · InspectFire"]):::data
-    UPD(["Update · InspectUpdate"]):::data
-    FAULT(["Fault backstops"]):::data
+    FIRE([Fire · InspectFire]):::leaf
+    UPD([Update · InspectUpdate]):::leaf
+    FAULT([Fault backstops]):::leaf
 
     EVAL --> FIRE
     EVAL --> UPD
@@ -753,7 +760,7 @@ All compile-time and runtime types in Precept are deeply immutable. This is not 
 
 The choice of C# type kind for each artifact follows from its role. Stage artifacts (`TokenStream`, `SyntaxTree`, `TypedModel`, `GraphResult`, `ProofModel`) and `CompilationResult` are `sealed record class` — immutable snapshots with value equality, making test assertions direct structural comparisons rather than field-by-field checks. `Diagnostic` is `readonly record struct` — small, value-typed, and zero-allocation when stored in collections, reflecting its high-volume, short-lived role. `Precept` is `sealed class`, not a record — it has factory methods (`From`) and carries behavior, making it a behavior-bearing object rather than a data bag. `Version` is `sealed record class` — an immutable entity snapshot with value equality, consistent with its role as the atomic unit of state that operations return. There are no interfaces and no abstract classes: each type has exactly one implementation. Interfaces are added only when a second implementation appears or a consumer requires substitution — never speculatively.
 
-On every document edit, the language server runs the full pipeline (`Compiler.Compile(source)`) and atomically replaces its held `CompilationResult` reference. Incremental compilation infrastructure — Roslyn's red-green trees, rust-analyzer's salsa database — solves a general-purpose-scale problem that does not exist at Precept's DSL scale, where the full pipeline runs in microseconds. The surveyed DSL-scale systems (Regal/OPA, CEL, Pkl) all use full recompile on edit. The swap is safe for concurrent LSP requests because `CompilationResult` is fully immutable — no locks are needed beyond `Interlocked.Exchange` on the reference itself.
+On every document edit, the language server runs the full pipeline (`Compiler.Compile(source)`) and atomically replaces its held `CompilationResult` reference. Incremental compilation infrastructure — Roslyn's red-green trees, rust-analyzer's salsa database — solves a problem that does not exist at Precept's DSL scale, where the full pipeline runs in microseconds. The surveyed DSL-scale systems uniformly confirm this: OPA/Regal recompiles the full module set on single-file edits; Dhall's LSP runs the full pipeline (parse → resolve → type check) on each save; Jsonnet's language server re-parses and re-evaluates on each change; CEL compiles single expressions in one call with no incremental infrastructure. None of these systems has found incremental recompilation necessary at their scale. The swap is safe for concurrent LSP requests because `CompilationResult` is fully immutable — no locks are needed beyond `Interlocked.Exchange` on the reference itself.
 
 The language server calls `Compiler.Compile(source)` directly — same process, no published NuGet package, no serialization boundary. This is the dominant pattern at DSL scale, where the LS-to-compiler code ratio is 1:3 to 1:10. Single-process integration eliminates serialization overhead, IPC latency, and version-mismatch risk. A separate compiler process or package is warranted only when the compiler is shared across multiple host tools with independent release cycles — a threshold Precept has not reached and may never reach.
 
