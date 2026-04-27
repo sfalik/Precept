@@ -6,6 +6,14 @@
 
 ## Learnings
 
+### 2026-07-17 — Combined Design v2 readability re-review
+- The philosophy-rooted rewrite successfully shifts the doc from "compiler reference manual" to "design document." §1 now opens with a problem statement and guarantee, not an inventory. Per-stage sections lead with the key design decision. This is the genre fix I asked for.
+- Stage contract format has been converted from 6-row tables to bold-labeled prose — exactly right. The doc now reads as progressive disclosure rather than a wall of metadata.
+- The "How it serves the guarantee" paragraphs per stage are useful for the first 3–4 stages but become formulaic by §8–§10. Diminishing returns — later stages could fold this into the opening sentence.
+- §5 Parser section is close to implementation-ready but missing two things: error recovery strategy (what shape do malformed nodes take?) and an explicit SyntaxTree node inventory or shape contract. A parser author would finish the section knowing the *philosophy* but not the *shape*.
+- Table usage is now well-calibrated. Field naming discipline table (§6) is the one remaining key-value table that reads as a list, not a comparison — but it's small enough that conversion isn't urgent.
+- The doc still lacks a "How to read this document" paragraph at the top. For a 486-line technical doc with two audiences, a 3-sentence navigation guide would meaningfully improve first-contact usability.
+
 - README form work is mostly hierarchy, line economy, and plaintext resilience.
 - Preview concepts must be validated against realistic sample complexity, not only small demo precepts.
 - Verdict modifiers are strongest as subtle authored-intent cues layered beneath runtime outcomes.

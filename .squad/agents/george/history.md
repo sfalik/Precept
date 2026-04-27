@@ -53,6 +53,16 @@
 - Treat `docs\working\combined-design-v2.md` as architecturally settled at the top level; future work on this lane should stay stage-scoped unless Shane explicitly reopens the main split.
 - Immediate follow-up belongs in stage-level docs and API detail, not another full top-level rewrite.
 
+### 2026-04-28 — Technical review of combined-design-v2.md (accuracy, implementation readiness, anti-Roslyn-bias)
+- Verdict: APPROVED-WITH-CONCERNS. Architecturally sound, catalog-consistent, philosophy-faithful. Constraint evaluation matrix, activation indexes, proof/fault chain, and artifact boundaries are all accurate.
+- Critical gap: the doc never enumerates the SyntaxTree node inventory — an implementer has no guidance on what AST nodes to produce. The Constructs catalog (11 ConstructKind values with typed ConstructSlot entries) should drive the node hierarchy, and this mapping must be explicit.
+- Critical gap: the parser/TypeChecker contract boundary is implicit. What does the parser guarantee? What does the TypeChecker re-check? This is the #1 source of multi-pass compiler bugs.
+- Critical gap: no expression grammar specification. Expressions appear in 6+ slot positions but the doc never lists the expression forms (binary, unary, literal, field-ref, event-arg-ref, function-call, if/then/else, is-set, contains, member-access).
+- Roslyn-bias risk: an implementer will default to red/green trees, per-construct check methods, Z3-style solvers, and TypedModel-as-renamed-AST. The doc must explicitly name the correct patterns: flat keyword-dispatched parsing, semantic-table-driven type checking, simple predicate proof strategies, and dispatch-optimized lowered model.
+- Right-sizing is good. Proof engine strategies, constraint activation indexes, and the three-tier constraint query are correctly scoped for Precept's actual language.
+- Expression evaluation model is never specified (tree-walk vs compiled delegates vs IL). For Precept's scale, tree-walk is correct and should be stated.
+- The `set` keyword dual-use (action vs type) requires parser position-context disambiguation — the doc mentions ActionKind stamping at parse time but doesn't call out this specific ambiguity.
+
 ### 2026-04-25 — Fully metadata-driven compiler feasibility review
 - Confirmed lexer is already close to catalog-driven, parser lookup tables are worth deriving, type checker gets the biggest win, and graph/proof/evaluator work remains partly algorithmic by design.
 - Reiterated the clean architectural split: metadata for domain knowledge, hand-written code for execution strategy.
