@@ -62,3 +62,48 @@ All 6 slices completed in a single pass:
 - `BuildNodeExtensions` methods are stubs — need real implementations or removal once slot parsers return typed nodes.
 - `Parser.Parse()` entry point is still `NotImplementedException` — the dispatch loop is PR 3's first slice.
 - `StateEnsureNode` and `StateActionNode` `Preposition` fields use `default` in BuildNode — the dispatch loop will inject the actual preposition token.
+
+## PR 3: Non-Disambiguated Constructs (2025-07-23)
+
+### Slices Completed
+
+| Slice | Description | Status |
+|-------|-------------|--------|
+| 3.1 | Pratt expression parser (ParseExpression, ParseAtom) with full precedence table | ✅ |
+| 3.2 | 9 slot parsers: IdentifierList, TypeExpression, ModifierList, StateModifierList, ArgumentList, ComputeExpression, RuleExpression, GuardClause, BecauseClause | ✅ |
+| 3.3 | Top-level dispatch loop (ParseAll), 5 non-disambiguated construct parsers (PreceptHeader, FieldDeclaration, StateDeclaration, EventDeclaration, RuleDeclaration), SyncToNextDeclaration, error recovery | ✅ |
+
+### Test Count
+- Before: 1885 (Precept.Tests) + 207 (Analyzers) = 2092
+- After:  1944 (Precept.Tests) + 207 (Analyzers) = 2151
+- Delta:  +59 new tests (20 ExpressionParserTests, 26 SlotParserTests, 13 ParserTests)
+
+### Expression Node Types Added
+9 new expression types in `SyntaxNodes/Expressions/`:
+- `IdentifierExpression`, `LiteralExpression`, `BinaryExpression`, `UnaryExpression`
+- `CallExpression`, `MemberAccessExpression`, `ConditionalExpression`
+- `ParenthesizedExpression`, `InterpolatedStringExpression` (with `InterpolationPart` DU)
+
+### Wrapper Nodes for Slot→BuildNode Bridge
+Internal wrapper records replace the `NotImplementedException` stubs from PR 2:
+- `TokenWrapper`, `TokenArrayWrapper`, `FieldModifierArrayWrapper`
+- `StateEntryArrayWrapper`, `ArgumentArrayWrapper`, `StatementArrayWrapper`
+- `BuildNodeExtensions` now unpack these via concrete casts.
+
+### Design Decisions
+1. **StateDeclaration uses direct parsing** (not ParseConstructSlots) because its comma-separated state-entry grammar doesn't fit the slot-per-call model. ParseStateEntries handles `Identifier StateModifier*` entries separated by commas.
+2. **EventDeclaration uses direct parsing** for the same reason — argument lists use `(name as type, ...)` syntax with parens.
+3. **StateModifierKeywords** FrozenSet added, derived from `Modifiers.All.OfType<StateModifierMeta>()`.
+4. **ExpressionBoundaryTokens** FrozenSet defines natural expression termination points.
+5. **Keyword identifiers in expression position**: `min`, `max`, etc. lex as constraint keywords, not identifiers. Function calls require identifier tokens — tests use `myFunc(a, b)` rather than `min(a, b)`. True built-in function call support will need lexer-context awareness or parser keyword-to-identifier reinterpretation (similar to `set` → `SetType`).
+6. **Disambiguated constructs (In/To/From/On)** have a placeholder `DisambiguateAndParse` that skips to the next declaration — PR 4's scope.
+
+### Surprises / Deviations
+- The `NonAssociativeComparison` diagnostic fires correctly for chained comparisons like `a < b < c`.
+- Interpolated string parsing (StringStart/StringMiddle/StringEnd tokens) works end-to-end with the Pratt parser.
+- No changes needed to `Constructs.cs` or any catalog files.
+
+### Issues for PR 4
+- Disambiguated construct parsers: In → StateEnsure/AccessMode/OmitDeclaration, To → StateEnsure/StateAction, From → TransitionRow/StateEnsure/StateAction, On → EventEnsure/EventHandler.
+- Remaining stub slot parsers: ActionChain, Outcome, StateTarget, EventTarget, EnsureClause, AccessModeKeyword, FieldTarget.
+- Keyword-as-function-name reinterpretation for `min()`, `max()`, etc.

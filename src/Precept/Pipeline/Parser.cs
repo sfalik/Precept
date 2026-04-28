@@ -123,6 +123,16 @@ public static class Parser
             .ToFrozenSet();
 
     /// <summary>
+    /// Token kinds that are state-level modifiers.
+    /// Derived from <see cref="Modifiers.All"/> where the modifier is a <see cref="StateModifierMeta"/>.
+    /// </summary>
+    internal static readonly FrozenSet<TokenKind> StateModifierKeywords =
+        Modifiers.All
+            .OfType<StateModifierMeta>()
+            .Select(m => m.Token.Kind)
+            .ToFrozenSet();
+
+    /// <summary>
     /// Token kinds that begin an action statement (<c>set</c>, <c>add</c>, etc.).
     /// Derived from <see cref="Actions.All"/>.
     /// </summary>
@@ -131,29 +141,305 @@ public static class Parser
             .Select(a => a.Token.Kind)
             .ToFrozenSet();
 
+    /// <summary>
+    /// Tokens that always terminate expression parsing — declaration boundaries,
+    /// clause introducers, and structural tokens.
+    /// </summary>
+    private static readonly FrozenSet<TokenKind> ExpressionBoundaryTokens = new[]
+    {
+        TokenKind.When, TokenKind.Because, TokenKind.Arrow, TokenKind.Ensure,
+        TokenKind.EndOfSource, TokenKind.NewLine,
+        TokenKind.Precept, TokenKind.Field, TokenKind.State, TokenKind.Event,
+        TokenKind.Rule, TokenKind.In, TokenKind.To, TokenKind.From, TokenKind.On,
+    }.ToFrozenSet();
+
     // ════════════════════════════════════════════════════════════════════════════
     //  Public entry point
     // ════════════════════════════════════════════════════════════════════════════
 
-    public static SyntaxTree Parse(TokenStream tokens) => throw new NotImplementedException();
+    public static SyntaxTree Parse(TokenStream tokens)
+    {
+        var session = new ParseSession(tokens.Tokens);
+        return session.ParseAll();
+    }
 
     // ════════════════════════════════════════════════════════════════════════════
     //  ParseSession — mutable cursor state for a single parse pass
     // ════════════════════════════════════════════════════════════════════════════
 
-    private ref struct ParseSession
+    internal ref struct ParseSession
     {
         private readonly ImmutableArray<Token> _tokens;
-#pragma warning disable CS0414 // Fields assigned but not yet used (PR 3 dispatch loop will use)
         private int _position;
         private readonly ImmutableArray<Diagnostic>.Builder _diagnostics;
-#pragma warning restore CS0414
 
         public ParseSession(ImmutableArray<Token> tokens)
         {
             _tokens = tokens;
             _position = 0;
             _diagnostics = ImmutableArray.CreateBuilder<Diagnostic>();
+        }
+
+        // ── Token navigation ──────────────────────────────────────────────────
+
+        private Token Current() => _tokens[_position];
+
+        private Token Peek(int offset)
+        {
+            var idx = _position + offset;
+            return idx < _tokens.Length ? _tokens[idx] : _tokens[^1];
+        }
+
+        private Token Advance()
+        {
+            var token = _tokens[_position];
+            if (_position < _tokens.Length - 1)
+                _position++;
+            return token;
+        }
+
+        private bool Match(TokenKind kind)
+        {
+            if (Current().Kind != kind) return false;
+            Advance();
+            return true;
+        }
+
+        private Token Expect(TokenKind kind)
+        {
+            if (Current().Kind == kind) return Advance();
+            _diagnostics.Add(Diagnostics.Create(DiagnosticCode.ExpectedToken, Current().Span, kind, Current().Text));
+            return new Token(kind, string.Empty, Current().Span);
+        }
+
+        private bool IsAtEnd() => Current().Kind == TokenKind.EndOfSource;
+
+        private void SkipTrivia()
+        {
+            while (Current().Kind is TokenKind.NewLine or TokenKind.Comment)
+                Advance();
+        }
+
+        private void EmitDiagnostic(DiagnosticCode code, SourceSpan span, params object?[] args)
+        {
+            _diagnostics.Add(Diagnostics.Create(code, span, args));
+        }
+
+        // ── Top-level dispatch loop ───────────────────────────────────────────
+
+        internal SyntaxTree ParseAll()
+        {
+            PreceptHeaderNode? header = null;
+            var declarations = ImmutableArray.CreateBuilder<Declaration>();
+
+            SkipTrivia();
+
+            // Parse optional precept header
+            if (!IsAtEnd() && Current().Kind == TokenKind.Precept)
+            {
+                header = ParsePreceptHeaderDeclaration();
+                SkipTrivia();
+            }
+
+            // Main dispatch loop
+            while (!IsAtEnd())
+            {
+                SkipTrivia();
+                if (IsAtEnd()) break;
+
+                var token = Current();
+                Declaration? decl = token.Kind switch
+                {
+                    TokenKind.Field => ParseFieldDeclaration(),
+                    TokenKind.State => ParseStateDeclaration(),
+                    TokenKind.Event => ParseEventDeclaration(),
+                    TokenKind.Rule  => ParseRuleDeclaration(),
+                    // Disambiguated constructs — PR 4
+                    TokenKind.In or TokenKind.To or TokenKind.From or TokenKind.On
+                        => DisambiguateAndParse(token),
+                    _ => null,
+                };
+
+                if (decl is not null)
+                {
+                    declarations.Add(decl);
+                }
+                else if (token.Kind != TokenKind.In && token.Kind != TokenKind.To
+                      && token.Kind != TokenKind.From && token.Kind != TokenKind.On)
+                {
+                    EmitDiagnostic(DiagnosticCode.ExpectedToken, token.Span, "declaration keyword", token.Text);
+                    SyncToNextDeclaration();
+                }
+            }
+
+            return new SyntaxTree(header, declarations.ToImmutable(), _diagnostics.ToImmutable());
+        }
+
+        private Declaration? DisambiguateAndParse(Token token)
+        {
+            // PR 4 will implement disambiguation for In/To/From/On scoped constructs.
+            // For now, skip to next declaration.
+            SyncToNextDeclaration();
+            return null;
+        }
+
+        private void SyncToNextDeclaration()
+        {
+            Advance(); // skip current offending token
+            while (!IsAtEnd() && !Constructs.LeadingTokens.Contains(Current().Kind))
+                Advance();
+        }
+
+        // ── Construct parsers (non-disambiguated) ─────────────────────────────
+
+        private PreceptHeaderNode ParsePreceptHeaderDeclaration()
+        {
+            var start = Current().Span;
+            Advance(); // consume 'precept'
+            var name = Expect(TokenKind.Identifier);
+            return new PreceptHeaderNode(SourceSpan.Covering(start, name.Span), name);
+        }
+
+        private FieldDeclarationNode ParseFieldDeclaration()
+        {
+            var meta = Constructs.GetMeta(ConstructKind.FieldDeclaration);
+            var start = Current().Span;
+            Advance(); // consume 'field'
+            var slots = ParseConstructSlots(meta);
+            var lastSpan = GetLastSlotSpan(slots, start);
+            return (FieldDeclarationNode)BuildNode(ConstructKind.FieldDeclaration, slots,
+                SourceSpan.Covering(start, lastSpan));
+        }
+
+        private StateDeclarationNode ParseStateDeclaration()
+        {
+            var start = Current().Span;
+            Advance(); // consume 'state'
+            var entries = ParseStateEntries();
+            var lastSpan = entries.Length > 0 ? entries[^1].Span : start;
+            return new StateDeclarationNode(SourceSpan.Covering(start, lastSpan), entries);
+        }
+
+        private EventDeclarationNode ParseEventDeclaration()
+        {
+            var start = Current().Span;
+            Advance(); // consume 'event'
+
+            var names = ParseIdentifierListTokens();
+            var args = ImmutableArray<ArgumentNode>.Empty;
+            bool isInitial = false;
+
+            if (Current().Kind == TokenKind.LeftParen || Current().Kind == TokenKind.Identifier)
+            {
+                // Check for 'with' keyword for argument list
+            }
+
+            // Check for argument list introduced by 'with' or '('
+            if (Match(TokenKind.LeftParen))
+            {
+                args = ParseArgumentListInner();
+                Expect(TokenKind.RightParen);
+            }
+
+            if (Current().Kind == TokenKind.Initial)
+            {
+                isInitial = true;
+                Advance();
+            }
+
+            var lastSpan = isInitial ? _tokens[_position - 1].Span
+                : args.Length > 0 ? args[^1].Span
+                : names[^1].Span;
+            return new EventDeclarationNode(SourceSpan.Covering(start, lastSpan), names, args, isInitial);
+        }
+
+        private RuleDeclarationNode ParseRuleDeclaration()
+        {
+            var start = Current().Span;
+            Advance(); // consume 'rule'
+
+            var condition = ParseExpression(0);
+            Expression? guard = null;
+            if (Current().Kind == TokenKind.When)
+            {
+                Advance(); // consume 'when'
+                guard = ParseExpression(0);
+            }
+
+            var because = Expect(TokenKind.Because);
+            var message = ParseExpression(0);
+
+            return new RuleDeclarationNode(
+                SourceSpan.Covering(start, message.Span),
+                condition, guard, message);
+        }
+
+        // ── State entry parsing ───────────────────────────────────────────────
+
+        private ImmutableArray<StateEntryNode> ParseStateEntries()
+        {
+            var entries = ImmutableArray.CreateBuilder<StateEntryNode>();
+
+            do
+            {
+                if (Current().Kind != TokenKind.Identifier) break;
+                var nameToken = Advance();
+                var modifiers = ImmutableArray.CreateBuilder<Token>();
+                while (StateModifierKeywords.Contains(Current().Kind))
+                    modifiers.Add(Advance());
+
+                var entrySpan = modifiers.Count > 0
+                    ? SourceSpan.Covering(nameToken.Span, modifiers[^1].Span)
+                    : nameToken.Span;
+                entries.Add(new StateEntryNode(entrySpan, nameToken, modifiers.ToImmutable()));
+            }
+            while (Match(TokenKind.Comma));
+
+            return entries.ToImmutable();
+        }
+
+        // ── Identifier list helpers ───────────────────────────────────────────
+
+        private ImmutableArray<Token> ParseIdentifierListTokens()
+        {
+            var names = ImmutableArray.CreateBuilder<Token>();
+            names.Add(Expect(TokenKind.Identifier));
+
+            while (Current().Kind == TokenKind.Comma)
+            {
+                Advance();
+                if (Current().Kind == TokenKind.Identifier)
+                    names.Add(Advance());
+                else
+                {
+                    EmitDiagnostic(DiagnosticCode.ExpectedToken, Current().Span, "identifier", Current().Text);
+                    break;
+                }
+            }
+            return names.ToImmutable();
+        }
+
+        // ── Argument list parsing ─────────────────────────────────────────────
+
+        private ImmutableArray<ArgumentNode> ParseArgumentListInner()
+        {
+            var args = ImmutableArray.CreateBuilder<ArgumentNode>();
+            if (Current().Kind == TokenKind.RightParen) return args.ToImmutable();
+
+            do
+            {
+                var argName = Expect(TokenKind.Identifier);
+                var asToken = Expect(TokenKind.As);
+                var type = ParseTypeRef();
+                var modifiers = ParseFieldModifierNodes();
+                var argSpan = modifiers.Length > 0
+                    ? SourceSpan.Covering(argName.Span, modifiers[^1].Span)
+                    : SourceSpan.Covering(argName.Span, type.Span);
+                args.Add(new ArgumentNode(argSpan, argName, type, modifiers));
+            }
+            while (Match(TokenKind.Comma));
+
+            return args.ToImmutable();
         }
 
         // ── Generic slot iteration (Slice 2.5) ────────────────────────────────
@@ -204,24 +490,369 @@ public static class Parser
                 $"Unknown ConstructSlotKind: {slotKind}"),
         };
 
-        // ── Slot parser stubs (PR 3–5 will implement) ─────────────────────────
+        // ── Slot parsers (PR 3 — non-disambiguated constructs) ────────────────
 
-        private SyntaxNode? ParseIdentifierList(bool isOptional) => throw new NotImplementedException();
-        private SyntaxNode? ParseTypeExpression(bool isOptional) => throw new NotImplementedException();
-        private SyntaxNode? ParseModifierList(bool isOptional) => throw new NotImplementedException();
-        private SyntaxNode? ParseStateModifierList(bool isOptional) => throw new NotImplementedException();
-        private SyntaxNode? ParseArgumentList(bool isOptional) => throw new NotImplementedException();
-        private SyntaxNode? ParseComputeExpression(bool isOptional) => throw new NotImplementedException();
-        private SyntaxNode? ParseGuardClause(bool isOptional) => throw new NotImplementedException();
+        private SyntaxNode? ParseIdentifierList(bool isOptional)
+        {
+            if (Current().Kind != TokenKind.Identifier)
+            {
+                if (!isOptional)
+                    EmitDiagnostic(DiagnosticCode.ExpectedToken, Current().Span, "identifier", Current().Text);
+                return null;
+            }
+            var tokens = ParseIdentifierListTokens();
+            return new TokenArrayWrapper(tokens[0].Span, tokens);
+        }
+
+        private SyntaxNode? ParseTypeExpression(bool isOptional)
+        {
+            if (Current().Kind != TokenKind.As)
+            {
+                if (!isOptional)
+                    EmitDiagnostic(DiagnosticCode.ExpectedToken, Current().Span, "as", Current().Text);
+                return null;
+            }
+            Advance(); // consume 'as'
+            return ParseTypeRef();
+        }
+
+        private SyntaxNode? ParseModifierList(bool isOptional)
+        {
+            var modifiers = ParseFieldModifierNodes();
+            if (modifiers.Length == 0) return null;
+            return new FieldModifierArrayWrapper(modifiers[0].Span, modifiers);
+        }
+
+        private SyntaxNode? ParseStateModifierList(bool isOptional)
+        {
+            // State entries are parsed by ParseStateEntries directly — this slot
+            // is only invoked via the generic slot machinery, so it's unused for
+            // state declarations (which use direct parsing). Return null (optional).
+            return null;
+        }
+
+        private SyntaxNode? ParseArgumentList(bool isOptional)
+        {
+            if (Current().Kind != TokenKind.LeftParen) return null;
+            Advance(); // consume '('
+            var args = ParseArgumentListInner();
+            Expect(TokenKind.RightParen);
+            if (args.Length == 0) return null;
+            return new ArgumentArrayWrapper(args[0].Span, args);
+        }
+
+        private SyntaxNode? ParseComputeExpression(bool isOptional)
+        {
+            if (Current().Kind != TokenKind.Arrow) return null;
+            Advance(); // consume '->'
+            return ParseExpression(0);
+        }
+
+        private SyntaxNode? ParseGuardClause(bool isOptional)
+        {
+            if (Current().Kind != TokenKind.When) return null;
+            Advance(); // consume 'when'
+            return ParseExpression(0);
+        }
+
+        private SyntaxNode? ParseBecauseClause(bool isOptional)
+        {
+            if (Current().Kind != TokenKind.Because)
+            {
+                if (!isOptional)
+                    EmitDiagnostic(DiagnosticCode.ExpectedToken, Current().Span, "because", Current().Text);
+                return null;
+            }
+            Advance(); // consume 'because'
+            return ParseExpression(0);
+        }
+
+        private SyntaxNode? ParseRuleExpression(bool isOptional)
+        {
+            return ParseExpression(0);
+        }
+
+        // ── Slot parser stubs (PR 4–5 will implement) ─────────────────────────
+
         private SyntaxNode? ParseActionChain(bool isOptional) => throw new NotImplementedException();
         private SyntaxNode? ParseOutcome(bool isOptional) => throw new NotImplementedException();
         private SyntaxNode? ParseStateTarget(bool isOptional) => throw new NotImplementedException();
         private SyntaxNode? ParseEventTarget(bool isOptional) => throw new NotImplementedException();
         private SyntaxNode? ParseEnsureClause(bool isOptional) => throw new NotImplementedException();
-        private SyntaxNode? ParseBecauseClause(bool isOptional) => throw new NotImplementedException();
         private SyntaxNode? ParseAccessModeKeyword(bool isOptional) => throw new NotImplementedException();
         private SyntaxNode? ParseFieldTarget(bool isOptional) => throw new NotImplementedException();
-        private SyntaxNode? ParseRuleExpression(bool isOptional) => throw new NotImplementedException();
+
+        // ── Type reference parsing ────────────────────────────────────────────
+
+        private TypeRefNode ParseTypeRef()
+        {
+            var current = Current();
+
+            // "set" in type position: lexer emits Set, parser reinterprets
+            if (current.Kind == TokenKind.Set || current.Kind == TokenKind.QueueType || current.Kind == TokenKind.StackType)
+            {
+                var collectionToken = Advance();
+                Expect(TokenKind.Of);
+                var elemToken = Advance(); // element type
+                return new CollectionTypeRefNode(
+                    SourceSpan.Covering(collectionToken.Span, elemToken.Span),
+                    collectionToken, elemToken, null);
+            }
+
+            if (current.Kind == TokenKind.ChoiceType)
+            {
+                var choiceToken = Advance();
+                var options = ImmutableArray.CreateBuilder<Expression>();
+                // choice(...) or choice "A" "B" "C"
+                if (Match(TokenKind.LeftParen))
+                {
+                    if (Current().Kind != TokenKind.RightParen)
+                    {
+                        do
+                        {
+                            options.Add(ParseExpression(0));
+                        }
+                        while (Match(TokenKind.Comma));
+                    }
+                    Expect(TokenKind.RightParen);
+                }
+                else
+                {
+                    while (Current().Kind == TokenKind.StringLiteral)
+                        options.Add(new LiteralExpression(Current().Span, Advance()));
+                }
+                var lastSpan = options.Count > 0 ? options[^1].Span : choiceToken.Span;
+                return new ChoiceTypeRefNode(SourceSpan.Covering(choiceToken.Span, lastSpan), options.ToImmutable());
+            }
+
+            if (TypeKeywords.Contains(current.Kind))
+            {
+                var typeToken = Advance();
+                TypeQualifierNode? qualifier = null;
+                // Check for qualifier: in/of
+                if (Current().Kind == TokenKind.In || Current().Kind == TokenKind.Of)
+                {
+                    var qualKw = Advance();
+                    var qualVal = ParseExpression(0);
+                    qualifier = new TypeQualifierNode(
+                        SourceSpan.Covering(qualKw.Span, qualVal.Span), qualKw, qualVal);
+                }
+                var span = qualifier is not null
+                    ? SourceSpan.Covering(typeToken.Span, qualifier.Span)
+                    : typeToken.Span;
+                return new ScalarTypeRefNode(span, typeToken, qualifier);
+            }
+
+            // Unknown type — emit diagnostic and return a placeholder
+            EmitDiagnostic(DiagnosticCode.ExpectedToken, current.Span, "type", current.Text);
+            return new ScalarTypeRefNode(current.Span,
+                new Token(TokenKind.Identifier, current.Text, current.Span), null);
+        }
+
+        // ── Field modifier parsing ────────────────────────────────────────────
+
+        private ImmutableArray<FieldModifierNode> ParseFieldModifierNodes()
+        {
+            var modifiers = ImmutableArray.CreateBuilder<FieldModifierNode>();
+            while (ModifierKeywords.Contains(Current().Kind))
+            {
+                var modToken = Advance();
+                // Check if this is a value-bearing modifier
+                var modMeta = Modifiers.All.OfType<FieldModifierMeta>()
+                    .FirstOrDefault(m => m.Token.Kind == modToken.Kind);
+                if (modMeta?.HasValue == true)
+                {
+                    var value = ParseExpression(0);
+                    modifiers.Add(new ValueModifierNode(
+                        SourceSpan.Covering(modToken.Span, value.Span), modToken, value));
+                }
+                else
+                {
+                    modifiers.Add(new FlagModifierNode(modToken.Span, modToken));
+                }
+            }
+            return modifiers.ToImmutable();
+        }
+
+        // ── Expression parser (Pratt) ─────────────────────────────────────────
+
+        internal Expression ParseExpression(int minPrecedence)
+        {
+            var left = ParseAtom();
+
+            while (true)
+            {
+                var current = Current();
+
+                // Natural termination: boundary tokens or end-of-source
+                if (ExpressionBoundaryTokens.Contains(current.Kind))
+                    break;
+
+                // Member access (dot) — highest binary precedence
+                if (current.Kind == TokenKind.Dot)
+                {
+                    if (minPrecedence > 80) break;
+                    Advance(); // consume '.'
+                    var member = Expect(TokenKind.Identifier);
+                    left = new MemberAccessExpression(
+                        SourceSpan.Covering(left.Span, member.Span), left, member);
+                    continue;
+                }
+
+                // Binary operator — check precedence table
+                if (!OperatorPrecedence.TryGetValue(current.Kind, out var opInfo))
+                    break;
+
+                if (opInfo.Precedence < minPrecedence)
+                    break;
+
+                // Non-associative operators (comparisons) — detect chaining
+                var meta = Operators.ByToken.GetValueOrDefault((current.Kind, Arity.Binary));
+                if (meta?.Associativity == Associativity.NonAssociative)
+                {
+                    if (left is BinaryExpression prevBin)
+                    {
+                        var prevMeta = Operators.ByToken.GetValueOrDefault((prevBin.Operator.Kind, Arity.Binary));
+                        if (prevMeta?.Associativity == Associativity.NonAssociative)
+                        {
+                            EmitDiagnostic(DiagnosticCode.NonAssociativeComparison, current.Span,
+                                "use 'and' to combine comparisons");
+                            break;
+                        }
+                    }
+                }
+
+                var opToken = Advance();
+                int nextMinPrec = opInfo.RightAssociative ? opInfo.Precedence : opInfo.Precedence + 1;
+                var right = ParseExpression(nextMinPrec);
+                left = new BinaryExpression(
+                    SourceSpan.Covering(left.Span, right.Span), left, opToken, right);
+            }
+
+            return left;
+        }
+
+        private Expression ParseAtom()
+        {
+            var current = Current();
+
+            switch (current.Kind)
+            {
+                case TokenKind.NumberLiteral:
+                case TokenKind.StringLiteral:
+                    return new LiteralExpression(current.Span, Advance());
+
+                case TokenKind.True:
+                case TokenKind.False:
+                    return new LiteralExpression(current.Span, Advance());
+
+                // Interpolated string: StringStart expr (StringMiddle expr)* StringEnd
+                case TokenKind.StringStart:
+                    return ParseInterpolatedString();
+
+                case TokenKind.Identifier:
+                {
+                    var name = Advance();
+                    // Function call: name(args...)
+                    if (Current().Kind == TokenKind.LeftParen)
+                    {
+                        Advance(); // consume '('
+                        var args = ImmutableArray.CreateBuilder<Expression>();
+                        if (Current().Kind != TokenKind.RightParen)
+                        {
+                            do
+                            {
+                                args.Add(ParseExpression(0));
+                            }
+                            while (Match(TokenKind.Comma));
+                        }
+                        var closeParen = Expect(TokenKind.RightParen);
+                        return new CallExpression(
+                            SourceSpan.Covering(name.Span, closeParen.Span), name, args.ToImmutable());
+                    }
+                    return new IdentifierExpression(name.Span, name);
+                }
+
+                case TokenKind.Not:
+                {
+                    var op = Advance();
+                    var operand = ParseExpression(25); // not precedence
+                    return new UnaryExpression(
+                        SourceSpan.Covering(op.Span, operand.Span), op, operand);
+                }
+
+                case TokenKind.Minus:
+                {
+                    var op = Advance();
+                    var operand = ParseExpression(65); // negate precedence
+                    return new UnaryExpression(
+                        SourceSpan.Covering(op.Span, operand.Span), op, operand);
+                }
+
+                case TokenKind.LeftParen:
+                {
+                    var open = Advance();
+                    var inner = ParseExpression(0);
+                    var close = Expect(TokenKind.RightParen);
+                    return new ParenthesizedExpression(
+                        SourceSpan.Covering(open.Span, close.Span), inner);
+                }
+
+                case TokenKind.If:
+                {
+                    var ifToken = Advance();
+                    var condition = ParseExpression(0);
+                    Expect(TokenKind.Then);
+                    var whenTrue = ParseExpression(0);
+                    Expect(TokenKind.Else);
+                    var whenFalse = ParseExpression(0);
+                    return new ConditionalExpression(
+                        SourceSpan.Covering(ifToken.Span, whenFalse.Span),
+                        condition, whenTrue, whenFalse);
+                }
+
+                default:
+                    EmitDiagnostic(DiagnosticCode.ExpectedToken, current.Span, "expression", current.Text);
+                    return new IdentifierExpression(current.Span,
+                        new Token(TokenKind.Identifier, string.Empty, current.Span));
+            }
+        }
+
+        private InterpolatedStringExpression ParseInterpolatedString()
+        {
+            var parts = ImmutableArray.CreateBuilder<InterpolationPart>();
+            var startToken = Advance(); // consume StringStart
+            parts.Add(new TextInterpolationPart(startToken.Span, startToken));
+
+            while (Current().Kind != TokenKind.StringEnd && !IsAtEnd())
+            {
+                // Parse expression hole
+                var expr = ParseExpression(0);
+                parts.Add(new ExpressionInterpolationPart(expr.Span, expr));
+
+                // Parse middle text segment if present
+                if (Current().Kind == TokenKind.StringMiddle)
+                {
+                    var mid = Advance();
+                    parts.Add(new TextInterpolationPart(mid.Span, mid));
+                }
+            }
+
+            var endToken = Current().Kind == TokenKind.StringEnd ? Advance() : Current();
+            parts.Add(new TextInterpolationPart(endToken.Span, endToken));
+
+            return new InterpolatedStringExpression(
+                SourceSpan.Covering(startToken.Span, endToken.Span), parts.ToImmutable());
+        }
+
+        // ── Helpers ───────────────────────────────────────────────────────────
+
+        private static SourceSpan GetLastSlotSpan(SyntaxNode?[] slots, SourceSpan fallback)
+        {
+            for (int i = slots.Length - 1; i >= 0; i--)
+                if (slots[i] is not null) return slots[i]!.Span;
+            return fallback;
+        }
     }
 
     // ════════════════════════════════════════════════════════════════════════════
@@ -303,16 +934,26 @@ public static class Parser
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-//  BuildNode helper extensions — temporary casting bridges until PR 3
-//  introduces concrete wrapper nodes for identifier lists, etc.
+//  Wrapper nodes — thin packaging for slot parser return types
+//
+//  These let slot parsers return typed collections as SyntaxNode? and let
+//  BuildNode unpack them via As* extensions. They are internal implementation
+//  detail of the parser — downstream stages see only the final Declaration types.
 // ════════════════════════════════════════════════════════════════════════════
+
+internal sealed record TokenWrapper(SourceSpan Span, Token Value) : SyntaxNode(Span);
+internal sealed record TokenArrayWrapper(SourceSpan Span, ImmutableArray<Token> Values) : SyntaxNode(Span);
+internal sealed record FieldModifierArrayWrapper(SourceSpan Span, ImmutableArray<FieldModifierNode> Values) : SyntaxNode(Span);
+internal sealed record StateEntryArrayWrapper(SourceSpan Span, ImmutableArray<StateEntryNode> Values) : SyntaxNode(Span);
+internal sealed record ArgumentArrayWrapper(SourceSpan Span, ImmutableArray<ArgumentNode> Values) : SyntaxNode(Span);
+internal sealed record StatementArrayWrapper(SourceSpan Span, ImmutableArray<Statement> Values) : SyntaxNode(Span);
 
 internal static class BuildNodeExtensions
 {
-    internal static Token AsToken(this SyntaxNode _) => throw new NotImplementedException();
-    internal static ImmutableArray<Token> AsTokenArray(this SyntaxNode _) => throw new NotImplementedException();
-    internal static ImmutableArray<FieldModifierNode> AsFieldModifiers(this SyntaxNode _) => throw new NotImplementedException();
-    internal static ImmutableArray<StateEntryNode> AsStateEntries(this SyntaxNode _) => throw new NotImplementedException();
-    internal static ImmutableArray<ArgumentNode> AsArguments(this SyntaxNode _) => throw new NotImplementedException();
-    internal static ImmutableArray<Statement> AsStatements(this SyntaxNode _) => throw new NotImplementedException();
+    internal static Token AsToken(this SyntaxNode node) => ((TokenWrapper)node).Value;
+    internal static ImmutableArray<Token> AsTokenArray(this SyntaxNode node) => ((TokenArrayWrapper)node).Values;
+    internal static ImmutableArray<FieldModifierNode> AsFieldModifiers(this SyntaxNode node) => ((FieldModifierArrayWrapper)node).Values;
+    internal static ImmutableArray<StateEntryNode> AsStateEntries(this SyntaxNode node) => ((StateEntryArrayWrapper)node).Values;
+    internal static ImmutableArray<ArgumentNode> AsArguments(this SyntaxNode node) => ((ArgumentArrayWrapper)node).Values;
+    internal static ImmutableArray<Statement> AsStatements(this SyntaxNode node) => ((StatementArrayWrapper)node).Values;
 }
