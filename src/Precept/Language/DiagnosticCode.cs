@@ -45,6 +45,7 @@ public enum DiagnosticCode
     CircularComputedField,
     WritableOnEventArg,
     ConflictingAccessModes,
+    RedundantAccessMode,
     ListLiteralOutsideDefault,
     DuplicateChoiceValue,
     EmptyChoice,

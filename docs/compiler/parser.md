@@ -127,7 +127,6 @@ public static class Parser
 | `State` | `ParseStateDeclaration()` | `StateDeclaration` |
 | `Event` | `ParseEventDeclaration()` | `EventDeclaration` |
 | `Rule` | `ParseRuleDeclaration()` | `RuleDeclaration` |
-| `Write` | `ParseAccessMode()` | `AccessMode` (root-level `write all` only — stateless precepts) |
 | `In` | `ParseInScoped()` | *(disambiguates below)* |
 | `To` | `ParseToScoped()` | *(disambiguates below)* |
 | `From` | `ParseFromScoped()` | *(disambiguates below)* |
@@ -531,11 +530,10 @@ in Approved ensure ApprovedAmount > 0 because "Approved claims must specify a pa
 (in StateTarget ("when" BoolExpr)?)? AccessKeyword FieldTarget
 AccessKeyword := write | read | omit
 
-Root-level form (stateless precepts only): write all
-State-scoped form:                         in StateTarget ("when" BoolExpr)? write|read|omit FieldTarget
+State-scoped form: in StateTarget ("when" BoolExpr)? write|read|omit FieldTarget
 ```
 
-Root-level `write all` is the only valid root-level access mode — it is sugar for marking all non-computed fields writable in a stateless precept. Root-level `write <FieldName>` (bare field list) is not valid syntax; use the `writable` modifier on the field declaration instead.
+Root-level access mode declarations are not valid syntax. Root-level `write <FieldName>` (bare field list) is invalid — use the `writable` modifier on the field declaration instead. Root-level `read` and `omit` are also invalid.
 
 ```csharp
 public sealed record AccessModeNode(

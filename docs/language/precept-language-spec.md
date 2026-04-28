@@ -85,7 +85,7 @@ Every token the lexer can produce. Organized by category to match the `TokenKind
 
 | Token | Text | Context |
 |-------|------|---------|
-| `Write` | `write` | State-scoped write access mode (`in <State> write …`) and root-level `write all` sugar (stateless precepts) |
+| `Write` | `write` | State-scoped write access mode (`in <State> write …`) |
 | `Read` | `read` | State-scoped read access mode (`in <State> read …`) |
 | `Omit` | `omit` | State-scoped omit access mode (`in <State> omit …`) |
 
@@ -108,7 +108,7 @@ Every token the lexer can produce. Organized by category to match the `TokenKind
 
 | Token | Text | Context |
 |-------|------|---------|
-| `All` | `all` | Universal quantifier / `write all` (stateless precepts), `read all` / `omit all` (state-scoped) |
+| `All` | `all` | Universal quantifier / `read all` / `omit all` (state-scoped) |
 | `Any` | `any` | State wildcard (`in any`, `from any`) |
 
 #### Keywords: State Modifiers (v2)
@@ -562,7 +562,6 @@ After the `precept <Name>` header, the parser enters a loop that dispatches on t
 | `state` | `StateDeclaration` |
 | `event` | `EventDeclaration` |
 | `rule` | `RuleDeclaration` |
-| `write` | `AccessModeDeclaration` (root-level `write all` only — stateless precepts) |
 | `in` | `StateEnsureDeclaration` or `AccessModeDeclaration` |
 | `to` | `StateEnsureDeclaration` or `StateActionDeclaration` |
 | `from` | `TransitionRowDeclaration`, `StateEnsureDeclaration`, or `StateActionDeclaration` |
@@ -646,8 +645,8 @@ Each action and the outcome are introduced by `->`. The `->` arrow is deliberate
 #### State/event ensure
 
 ```
-(in|to|from) StateTarget ("when" BoolExpr)? ensure BoolExpr because StringExpr
-on Identifier ("when" BoolExpr)? ensure BoolExpr because StringExpr
+(in|to|from) StateTarget ensure BoolExpr ("when" BoolExpr)? ("because" StringExpr)?
+on Identifier ensure BoolExpr ("when" BoolExpr)? ("because" StringExpr)?
 ```
 
 #### Stateless event hook
@@ -671,27 +670,36 @@ State actions support an optional `when` guard between the state target and the 
 #### Access mode
 
 ```
-in StateTarget ("when" BoolExpr)? (write|read|omit) FieldTarget   ← state-scoped
-write all                                                           ← root-level (stateless precepts only)
+FieldTarget  :=  identifier ("," identifier)* | all
+
+in StateTarget modify FieldTarget readonly ("when" BoolExpr)?   ← state-scoped constrain to read-only
+in StateTarget modify FieldTarget editable ("when" BoolExpr)?   ← state-scoped declare editable (upgrade)
+in StateTarget omit FieldTarget                                  ← state-scoped structural exclusion
 ```
+
+**Two verbs, two roles:**
+- `modify` = constraint verb (field present, access mode applied). Takes a field target and an access mode adjective (`readonly` or `editable`). Parallel to `omit` — both are verbs, different semantics.
+- `omit` = exclusion verb (field absent from state entirely). Takes a field target only — no adjective, no guard.
 
 **Two-layer access mode composition model:**
 
 - **Layer 1 — field-level baseline (`writable` modifier):** `writable` on a field declaration sets that field's baseline access mode to writable across all states. Fields without `writable` default to read-only.
-- **Layer 2 — state-level override (`in <State> write|read|omit`):** State-scoped declarations override the field's baseline for a specific (field, state) pair only. State-level always wins over the field-level baseline.
-- **Undeclared (field, state) pairs** use the field's baseline: `read` for fields without `writable`, `write` for fields with `writable`.
+- **Layer 2 — state-level override (`in <State> modify|omit`):** State-scoped declarations override the field's baseline for a specific (field, state) pair only. State-level always wins over the field-level baseline.
+- **Undeclared (field, state) pairs** use the field's baseline: read-only for fields without `writable`, editable for fields with `writable`.
 
-Root-level `write all` is valid for stateless precepts only — it is sugar for marking all non-computed fields writable with no state restriction. Root-level `write <FieldName>` (bare field list form) is **not valid syntax** — use the `writable` modifier on the field declaration instead. Root-level `read` and `omit` are not valid syntax: `read` is the default (declaring it globally would be redundant), and `omit` globally would make a field structurally absent in every state, rendering its declaration pointless.
+Root-level access mode declarations are **not valid syntax** — use the `writable` modifier on the field declaration for field-level mutability. All access mode overrides are state-scoped.
 
-State-scoped access modes (`in StateTarget`) support all three verbs. The field target is either `all` or a comma-separated list of field names.
+State-scoped access modes (`in StateTarget`) use `modify` for constraint declarations and `omit` for structural exclusion. The field target is either `all` or a comma-separated list of field names.
 
 **Composition rules:**
-1. **Field baseline** — `writable` modifier on a field declaration sets the field's default to `write` across all states.
-2. **D3 default** — fields without `writable` default to `read` for every (field, state) pair unless overridden by a state-scoped declaration.
-3. **State-level override always wins** — an explicit `in <State> write|read|omit` declaration overrides the field's baseline for that (field, state) pair only.
-4. **Guarded `write` is the only guarded access mode** — `read` and `omit` cannot have guards.
+1. **Field baseline** — `writable` modifier on a field declaration sets the field's default to editable across all states.
+2. **D3 default** — fields without `writable` default to read-only for every (field, state) pair unless overridden by a state-scoped declaration.
+3. **State-level override always wins** — an explicit `in <State> modify|omit` declaration overrides the field's baseline for that (field, state) pair only.
+4a. **`readonly` and `editable` are the only guarded access modes** — guarded `editable` upgrades a read-only baseline to editable when the guard holds; guarded `readonly` downgrades a writable baseline to read-only when the guard holds; in both cases the field is always structurally present. `omit` cannot be guarded because conditional structural presence breaks static per-state field maps.
+4b. **Guarded `readonly` requires a `writable` baseline** — a guarded `readonly` on a field without `writable` is a compile error (`RedundantAccessMode`); both branches would otherwise resolve to read-only, making the guard vacuous.
+4c. **Unguarded declarations must change the effective mode** — `in <State> modify F editable` where `F` carries `writable` (editable is already the baseline) and `in <State> modify F readonly` where `F` lacks `writable` (read-only is the D3 default) are both compile errors (`RedundantAccessMode`). A declaration that resolves to the same mode the field already falls back to changes nothing — it is dead code. This mirrors the `RedundantModifier` pattern: declarations that have no effect are refused, not merely warned about. **`omit` is exempt** — it operates on structural presence rather than mutability and always changes the effective shape of the state, so it can never be redundant on the mutability axis. **`all` forms (`in <State> modify all readonly`) are also exempt** — a broadcast declaration's effective change depends on the current field population; applying redundancy checks to bulk forms would make valid declarations brittle as fields are added or removed.
 5. **`omit` clears on state entry** — field value resets to default on any transition into an `omit` state (including self-transitions); does NOT apply to `no transition`.
-6. **`set` targeting an `omit` field in the target state** is a compile error; `read`/`write` do not restrict `set`.
+6. **`set` targeting an `omit` field in the target state** is a compile error; `readonly`/`editable` do not restrict `set`.
 7. **Conflicting modes** on the same (field, state) pair is a compile error.
 8. **`writable` on a computed field** is a compile error (`ComputedFieldNotWritable`).
 9. **`writable` on an event argument** is a compile error (`WritableOnEventArg`).
@@ -1173,6 +1181,8 @@ Type errors: applying a set operation to a non-set field, a queue operation to a
 | `writable` on computed field | A computed field carries the `writable` modifier | `ComputedFieldNotWritable` |
 | `writable` on event arg | An event argument carries the `writable` modifier | `WritableOnEventArg` |
 | Conflicting access modes | Same field has both `write` and `omit` in the same state | `ConflictingAccessModes` |
+| Redundant access mode (unguarded) | `in <State> write F` where `F` has `writable` (baseline already `write`), or `in <State> read F` where `F` lacks `writable` (baseline already `read`); named-field forms only | `RedundantAccessMode` (error) |
+| Redundant access mode (guarded) | `in <State> read F when Guard` where `F` lacks `writable` — guard-true branch = `read`, guard-false branch = `read` (D3 baseline); the guard changes nothing | `RedundantAccessMode` (error) |
 
 #### Computed field validation
 
@@ -1274,6 +1284,7 @@ The type checker emits diagnostics for root causes only. When `ErrorType` is flo
 | `ComputedFieldWithDefault` | Error | "Field '{0}' is computed and cannot have a default value" | Both `->` and `default` |
 | `CircularComputedField` | Error | "Computed field '{0}' has a circular dependency: {1}" | Self-reference or transitive cycle in computed field dependency graph |
 | `ConflictingAccessModes` | Error | "Field '{0}' has conflicting access modes in state '{1}'" | write + omit same field same state |
+| `RedundantAccessMode` | Error | "The '{0}' access mode for field '{1}' in state '{2}' is redundant — the effective mode is already '{0}'" | `in S write F` where F has `writable`; `in S read F` where F lacks `writable`; `in S read F when Guard` where F lacks `writable` |
 | `WritableOnEventArg` | Error | "The 'writable' modifier cannot appear on event argument '{0}'" | `writable` on an event arg declaration |
 | `ListLiteralOutsideDefault` | Error | "List values can only appear in default clauses" | `[...]` outside default position |
 | `DuplicateChoiceValue` | Error | "Choice value '{0}' is duplicated" | Repeated string in choice set |

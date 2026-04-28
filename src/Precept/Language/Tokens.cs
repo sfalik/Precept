@@ -44,8 +44,8 @@ public static class Tokens
     /// <summary>'as' and 'into' appear after Identifier (field name or event arg name).</summary>
     private static readonly TokenKind[] VA_AfterIdent = [TokenKind.Identifier];
 
-    /// <summary>'all' follows access-mode keywords (write all, read all, omit all).</summary>
-    private static readonly TokenKind[] VA_AllQuantifier = [TokenKind.Write, TokenKind.Read, TokenKind.Omit];
+    /// <summary>'all' follows omit keyword (e.g. omit all). write/read and write all retired in B4 (2026-04-28).</summary>
+    private static readonly TokenKind[] VA_AllQuantifier = [TokenKind.Omit];
 
     /// <summary>'any' follows prepositions as a state wildcard (in any, from any, to any).</summary>
     private static readonly TokenKind[] VA_AnyQuantifier = [TokenKind.In, TokenKind.From, TokenKind.To];
@@ -166,12 +166,15 @@ public static class Tokens
         TokenKind.Reject      => new(kind, "reject",      Cat_Out, "Rejection outcome",
             TextMateScope: "keyword.other.outcome.precept", SemanticTokenType: "keyword", ValidAfter: VA_AfterArrow),
 
-        // ── Keywords: Access Modes ─────────────────────────────────
-        TokenKind.Write       => new(kind, "write",       Cat_Acc, "Field write access mode",
+        // ── Keywords: Access Modes (B4 — 2026-04-28) ──────────────────
+        // Write and Read retired: vocabulary locked B4. New: modify/readonly/editable.
+        TokenKind.Modify        => new(kind, "modify",        Cat_Acc, "Access mode verb: declare field access constraint",
             TextMateScope: "keyword.other.access-mode.precept", SemanticTokenType: "keyword"),
-        TokenKind.Read        => new(kind, "read",        Cat_Acc, "Field read access mode",
+        TokenKind.Readonly      => new(kind, "readonly",      Cat_Acc, "Access mode adjective: field is read-only in this state",
             TextMateScope: "keyword.other.access-mode.precept", SemanticTokenType: "keyword"),
-        TokenKind.Omit        => new(kind, "omit",        Cat_Acc, "Field omit access mode",
+        TokenKind.Editable      => new(kind, "editable",      Cat_Acc, "Access mode adjective: field is writable in this state",
+            TextMateScope: "keyword.other.access-mode.precept", SemanticTokenType: "keyword"),
+        TokenKind.Omit          => new(kind, "omit",          Cat_Acc, "Field omit: field is structurally absent",
             TextMateScope: "keyword.other.access-mode.precept", SemanticTokenType: "keyword"),
 
         // ── Keywords: Logical Operators ────────────────────────────

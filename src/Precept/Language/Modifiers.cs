@@ -174,13 +174,13 @@ public static class Modifiers
 
         // ── Access modifiers ────────────────────────────────────────────────────
         ModifierKind.Write => new AccessModifierMeta(
-            kind, Tokens.GetMeta(TokenKind.Write),
+            kind, Tokens.GetMeta(TokenKind.Editable),
             "Field is present and writable",
             ModifierCategory.Structural, IsPresent: true, IsWritable: true,
             MutuallyExclusiveWith: [ModifierKind.Read, ModifierKind.Omit]),
 
         ModifierKind.Read => new AccessModifierMeta(
-            kind, Tokens.GetMeta(TokenKind.Read),
+            kind, Tokens.GetMeta(TokenKind.Readonly),
             "Field is present and read-only",
             ModifierCategory.Structural, IsPresent: true, IsWritable: false,
             MutuallyExclusiveWith: [ModifierKind.Write, ModifierKind.Omit]),

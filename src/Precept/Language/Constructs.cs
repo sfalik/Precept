@@ -100,11 +100,20 @@ public static class Constructs
         ConstructKind.AccessMode => new(
             kind,
             "access mode",
-            "Declares field write access per state via 'in' scope (write, read, or omit), or 'write all' at root level for stateless precepts",
-            "in Draft write Amount",
+            "Declares field access per state: 'in State modify Field readonly|editable [when Guard]'",
+            "in Draft modify Amount editable",
             [],
-            [SlotOptStateTarget, SlotAccessModeKeyword, SlotFieldTarget],
-            TokenKind.Write),
+            [SlotStateTarget, SlotFieldTarget, SlotAccessModeKeyword, SlotGuardClause],
+            TokenKind.In),
+
+        ConstructKind.OmitDeclaration => new(
+            kind,
+            "omit declaration",
+            "Structurally excludes a field from a state: 'in State omit Field' (no guard — exclusion is unconditional)",
+            "in Draft omit InternalNotes",
+            [],
+            [SlotStateTarget, SlotFieldTarget],
+            TokenKind.In),
 
         ConstructKind.StateAction=> new(
             kind,

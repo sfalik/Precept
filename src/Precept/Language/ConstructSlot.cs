@@ -19,7 +19,7 @@ public enum ConstructSlotKind
     EventTarget,           // event name (or "initial" marker)
     EnsureClause,          // "ensure expression because message"
     BecauseClause,         // "because message"
-    AccessModeKeyword,     // write | read | omit
+    AccessModeKeyword,     // readonly | editable (B4 access mode adjectives)
     FieldTarget,           // field name or "all"
 }
 

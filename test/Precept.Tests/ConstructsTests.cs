@@ -44,7 +44,7 @@ public class ConstructsTests
     [Fact]
     public void Total_Count()
     {
-        Constructs.All.Should().HaveCount(11);
+        Constructs.All.Should().HaveCount(12);
     }
 
     // ── Top-level constructs (AllowedIn is empty) ───────────────────────────────
@@ -57,6 +57,7 @@ public class ConstructsTests
     [InlineData(ConstructKind.RuleDeclaration)]
     [InlineData(ConstructKind.TransitionRow)]
     [InlineData(ConstructKind.AccessMode)]
+    [InlineData(ConstructKind.OmitDeclaration)]
     [InlineData(ConstructKind.EventHandler)]
     public void TopLevelConstructs_HaveEmptyAllowedIn(ConstructKind kind)
     {
@@ -77,7 +78,14 @@ public class ConstructsTests
     public void AccessMode_IsTopLevel()
     {
         Constructs.GetMeta(ConstructKind.AccessMode)
-            .AllowedIn.Should().BeEmpty("AccessMode is a top-level construct — both root-level write and state-scoped 'in' forms appear at precept body level");
+            .AllowedIn.Should().BeEmpty("AccessMode is a top-level construct — the 'in State' form appears at precept body level");
+    }
+
+    [Fact]
+    public void OmitDeclaration_IsTopLevel()
+    {
+        Constructs.GetMeta(ConstructKind.OmitDeclaration)
+            .AllowedIn.Should().BeEmpty("OmitDeclaration is a top-level construct — 'in State omit Field' appears at precept body level");
     }
 
     [Fact]
@@ -99,7 +107,7 @@ public class ConstructsTests
     [Fact]
     public void TopLevel_Count()
     {
-        Constructs.All.Count(c => c.AllowedIn.Length == 0).Should().Be(8);
+        Constructs.All.Count(c => c.AllowedIn.Length == 0).Should().Be(9);
     }
 
     [Fact]
@@ -183,6 +191,38 @@ public class ConstructsTests
     }
 
     [Fact]
+    public void AccessMode_HasGuardClauseAsOptional()
+    {
+        var slots = Constructs.GetMeta(ConstructKind.AccessMode).Slots;
+
+        var guardSlot = slots.Should().ContainSingle(s => s.Kind == ConstructSlotKind.GuardClause).Subject;
+        guardSlot.IsRequired.Should().BeFalse("guards are optional on access modes");
+        slots.Last().Kind.Should().Be(ConstructSlotKind.GuardClause,
+            "guard clause must be the final slot in the access mode sequence");
+    }
+
+    [Fact]
+    public void AccessMode_SlotOrder_StateTarget_FieldTarget_AccessModeKeyword_Guard()
+    {
+        var slots = Constructs.GetMeta(ConstructKind.AccessMode).Slots.ToArray();
+        slots[0].Kind.Should().Be(ConstructSlotKind.StateTarget,       "first slot is state target");
+        slots[1].Kind.Should().Be(ConstructSlotKind.FieldTarget,        "second slot is field target (after consumed 'modify' verb)");
+        slots[2].Kind.Should().Be(ConstructSlotKind.AccessModeKeyword,  "third slot is the readonly|editable adjective");
+        slots[3].Kind.Should().Be(ConstructSlotKind.GuardClause,        "fourth slot is optional guard");
+    }
+
+    [Fact]
+    public void OmitDeclaration_HasNoGuardClause()
+    {
+        var slots = Constructs.GetMeta(ConstructKind.OmitDeclaration).Slots;
+        slots.Should().NotContain(s => s.Kind == ConstructSlotKind.GuardClause,
+            "omit is unconditional — no when clause");
+        slots.Should().HaveCount(2, "omit has exactly StateTarget + FieldTarget");
+    }
+            "guard clause must be the final slot in the access mode sequence");
+    }
+
+    [Fact]
     public void TransitionRow_HasGuardClauseAndActionChainAsOptional()
     {
         var slots = Constructs.GetMeta(ConstructKind.TransitionRow).Slots;
@@ -212,7 +252,8 @@ public class ConstructsTests
     [InlineData(ConstructKind.RuleDeclaration,  TokenKind.Rule)]
     [InlineData(ConstructKind.TransitionRow,    TokenKind.From)]
     [InlineData(ConstructKind.StateEnsure,      TokenKind.In)]
-    [InlineData(ConstructKind.AccessMode,       TokenKind.Write)]
+    [InlineData(ConstructKind.AccessMode,       TokenKind.In)]
+    [InlineData(ConstructKind.OmitDeclaration,  TokenKind.In)]
     [InlineData(ConstructKind.StateAction,      TokenKind.To)]
     [InlineData(ConstructKind.EventEnsure,      TokenKind.On)]
     public void LeadingToken_IsCorrect(ConstructKind kind, TokenKind expectedToken)
