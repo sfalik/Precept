@@ -120,6 +120,12 @@ public class DiagnosticsTests
         Diagnostics.GetMeta(DiagnosticCode.DivisionByZero).Severity.Should().Be(Severity.Error);
     }
 
+    [Fact]
+    public void WritableOnEventArg_HasErrorSeverity()
+    {
+        Diagnostics.GetMeta(DiagnosticCode.WritableOnEventArg).Severity.Should().Be(Severity.Error);
+    }
+
     // ── Helpers ─────────────────────────────────────────────────────────────────
 
     public static TheoryData<DiagnosticCode> AllDiagnosticCodes()
@@ -176,6 +182,7 @@ public class DiagnosticsTests
         DiagnosticCode.ComputedFieldNotWritable,
         DiagnosticCode.ComputedFieldWithDefault,
         DiagnosticCode.CircularComputedField,
+        DiagnosticCode.WritableOnEventArg,
         DiagnosticCode.ConflictingAccessModes,
         DiagnosticCode.ListLiteralOutsideDefault,
         DiagnosticCode.DuplicateChoiceValue,

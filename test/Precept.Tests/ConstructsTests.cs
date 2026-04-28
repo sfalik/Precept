@@ -201,4 +201,23 @@ public class ConstructsTests
         var outcomeSlot = slots.Should().ContainSingle(s => s.Kind == ConstructSlotKind.Outcome).Subject;
         outcomeSlot.IsRequired.Should().BeTrue("every transition row must specify an outcome");
     }
+
+    // ── LeadingToken regression anchors ────────────────────────────────────────
+
+    [Theory]
+    [InlineData(ConstructKind.PreceptHeader,    TokenKind.Precept)]
+    [InlineData(ConstructKind.FieldDeclaration, TokenKind.Field)]
+    [InlineData(ConstructKind.StateDeclaration, TokenKind.State)]
+    [InlineData(ConstructKind.EventDeclaration, TokenKind.Event)]
+    [InlineData(ConstructKind.RuleDeclaration,  TokenKind.Rule)]
+    [InlineData(ConstructKind.TransitionRow,    TokenKind.From)]
+    [InlineData(ConstructKind.StateEnsure,      TokenKind.In)]
+    [InlineData(ConstructKind.AccessMode,       TokenKind.Write)]
+    [InlineData(ConstructKind.StateAction,      TokenKind.To)]
+    [InlineData(ConstructKind.EventEnsure,      TokenKind.On)]
+    public void LeadingToken_IsCorrect(ConstructKind kind, TokenKind expectedToken)
+    {
+        Constructs.GetMeta(kind).LeadingToken.Should().Be(expectedToken,
+            $"{kind} dispatch must begin with {expectedToken}");
+    }
 }
