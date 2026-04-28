@@ -3,9 +3,9 @@ precept VehicleServiceAppointment
 # A service advisor checks a vehicle in, recommends work, and waits for approval.
 # The request uses a set of recommended services so advisors can add and remove items safely.
 
-field CustomerName as string nullable
-field VehiclePlate as string nullable
-field AdvisorName as string nullable
+field CustomerName as string optional
+field VehiclePlate as string optional
+field AdvisorName as string optional
 field ApprovedWorkCount as number default 0 nonnegative
 field InvoiceTotal as number default 0 nonnegative
 field PickupContacted as boolean default false
@@ -18,7 +18,7 @@ state InService
 state ReadyForPickup
 state Closed
 
-in CheckedIn edit AdvisorName
+in CheckedIn modify AdvisorName editable
 in ReadyForPickup ensure PickupContacted because "Customers must be notified before pickup"
 
 # If service leaves approval, it must leave with at least one approved recommendation.
@@ -26,12 +26,12 @@ from AwaitingApproval ensure RecommendedServices.count > 0 because "Approval can
 
 to ReadyForPickup -> set PickupContacted = true
 
-event CheckIn with Customer as string notempty, Plate as string notempty, Advisor as string notempty
-event RecommendService with ServiceName as string notempty
-event RemoveServiceRecommendation with ServiceName as string notempty
-event ApproveEstimate with ApprovedCount as number, EstimateTotal as number
-on ApproveEstimate ensure ApprovedCount > 0 because "At least one service must be approved"
-on ApproveEstimate ensure EstimateTotal >= 0 because "Estimate totals cannot be negative"
+event CheckIn(Customer as string notempty, Plate as string notempty, Advisor as string notempty)
+event RecommendService(ServiceName as string notempty)
+event RemoveServiceRecommendation(ServiceName as string notempty)
+event ApproveEstimate(ApprovedCount as number, EstimateTotal as number)
+on ApproveEstimate ensure ApproveEstimate.ApprovedCount > 0 because "At least one service must be approved"
+on ApproveEstimate ensure ApproveEstimate.EstimateTotal >= 0 because "Estimate totals cannot be negative"
 
 event FinishService
 event PickUpVehicle

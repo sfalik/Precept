@@ -3,12 +3,12 @@ precept ApartmentRentalApplication
 # A rental application moves from submission through screening, approval, and lease execution.
 # The rules stay realistic: income, credit, and household size all influence approval.
 
-field ApplicantName as string nullable
+field ApplicantName as string optional
 field MonthlyIncome as number default 0 nonnegative
 field RequestedRent as number default 0 nonnegative
 field CreditScore as number default 0 nonnegative
 field HouseholdSize as number default 1 positive
-field ReviewerNote as string nullable
+field ReviewerNote as string optional
 field DepositPaid as boolean default false
 field LeaseSigned as boolean default false
 
@@ -21,16 +21,16 @@ state Declined
 in Approved ensure MonthlyIncome >= RequestedRent * 3 because "Approved applicants must satisfy the 3x rent rule"
 in MoveInReady ensure DepositPaid and LeaseSigned because "Move-in ready applications need both a deposit and a signed lease"
 
-event Submit with
+event Submit(
     Name as string notempty,
     Income as number nonnegative,
     Rent as number positive,
     Score as number nonnegative,
-    Household as number default 1 positive
-event Approve with Note as string nullable default null notempty
+    Household as number default 1 positive)
+event Approve(Note as string optional notempty)
 event PayDeposit
 event SignLease
-event Decline with Note as string notempty
+event Decline(Note as string notempty)
 
 from Draft on Submit
     -> set ApplicantName = Submit.Name

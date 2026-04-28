@@ -73,7 +73,7 @@ For `.precept` editor highlighting, the locked direction is a dark-mode-only 8-s
 
 | Family | Hex | Typography | Locked role |
 |--------|-----|------------|-------------|
-| Structure · Semantic | `#4338CA` | bold | `precept`, `field`, `state`, `event`, `rule`, `from`, `on`, `in`, `to`, `set`, `transition`, `edit`, `ensure`, `reject`, `when`, `no` |
+| Structure · Semantic | `#4338CA` | bold | `precept`, `field`, `state`, `event`, `rule`, `from`, `on`, `in`, `to`, `set`, `transition`, `write`, `ensure`, `reject`, `when`, `no` |
 | Structure · Grammar | `#6366F1` | normal | `as`, `with`, `default`, `nullable`, `any`, `of`, `into`, `because`, `=`, `->`, operators, punctuation glue |
 | States | `#A898F5` | normal / italic if constrained | State names; italic means the state participates in `in/to/from X ensure` |
 | Events | `#30B8E8` | normal / italic if constrained | Event names; italic means the event has `on X ensure` |
@@ -103,7 +103,7 @@ Scaffolding and control. Two indigo shades split the words that drive behavior f
 
 | Shade | Hex | CR | Typography | Role | Keywords |
 |-------|-----|----|------------|------|----------|
-| Semantic | `#4338CA` | 2.5 | bold | Behavioral drivers | precept, field, state, event, rule, from, on, in, to, set, transition, edit, ensure, reject, when, no |
+| Semantic | `#4338CA` | 2.5 | bold | Behavioral drivers | precept, field, state, event, rule, from, on, in, to, set, transition, write, ensure, reject, when, no |
 | Grammar | `#6366F1` | 4.4 | normal | Connective tissue | as, with, default, nullable, any, of, into, because, operators, punctuation glue, `->`, `=` |
 
 #### States · Violet · 260°

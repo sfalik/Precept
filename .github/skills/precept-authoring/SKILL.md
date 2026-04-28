@@ -55,8 +55,8 @@ state <Name> [initial]
 # State constraints
 in <State> ensure <expr> because "<message>"
 
-# Edit declarations
-in <State> edit <Field1>, <Field2>
+# Write declarations
+in <State> write <Field1>, <Field2>
 
 # Events and event ensures
 event <Name> [with <Arg> as <type> [default <value>], ...]

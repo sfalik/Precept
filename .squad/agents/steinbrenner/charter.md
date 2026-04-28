@@ -54,6 +54,7 @@ When scoring a proposal, explicitly check whether it:
 
 ## How I Work
 
+- **Read `docs/philosophy.md`** — Precept's product identity and guarantees inform all prioritization and roadmap decisions.
 - Read `docs/@ToDo.md` before any roadmap work — it's the source of truth for project state
 - Pending items to track: CLI implementation, fluent interface, same-preposition contradiction detection, cross-preposition deadlock detection, structured violations in preview protocol
 - Issue triage: read the issue, identify the domain, assign `squad:{member}` label, add triage notes

@@ -11,15 +11,16 @@
 
 ## What I Own
 
-- `src/Precept/Dsl/` — the full DSL pipeline:
-  - `PreceptTokenizer.cs` — lexical analysis
-  - `PreceptParser.cs` — syntax parser, AST production
-  - `PreceptTypeChecker.cs` — type checking, null-safety narrowing
-  - `PreceptExpressionEvaluator.cs` — expression evaluation
-  - `PreceptEngine.cs` — runtime execution (fire, inspect, update)
-  - `PreceptCompiler.cs` — compilation pipeline
+- `src/Precept/` — the full compilation and runtime pipeline:
+  - `Pipeline/Lexer.cs` — lexical analysis (hand-written, catalog-driven keyword lookup)
+  - `Pipeline/Parser.cs` — syntax parser, AST production
+  - `Pipeline/TypeChecker.cs` — type checking, null-safety narrowing
+  - `Pipeline/GraphAnalyzer.cs` — state graph analysis
+  - `Pipeline/ProofEngine.cs` — proof generation
+  - `Runtime/Evaluator.cs` — expression evaluation
+  - `Runtime/Precept.cs` — runtime execution (fire, inspect, update)
 - Constraint evaluation: invariants, asserts, rejections
-- Diagnostic catalog (`DiagnosticCatalog`, `PRECEPT001`–`PRECEPT053`)
+- Diagnostic system (`DiagnosticCode` enum, `Diagnostics` catalog in `src/Precept/Language/`)
 
 ## Language Expertise & Research
 
@@ -41,7 +42,7 @@ The DSL is the product. Improving what it can express is a permanent part of the
 When evaluating DSL feature proposals, I assess feasibility and risk:
 
 - Draw on knowledge of comparable languages and DSLs to assess whether a proposed syntax is idiomatic, learnable, and semantically sound
-- Assess implementation cost: what changes in the tokenizer, parser, type checker, evaluator, or runtime
+- Assess implementation cost: what changes in the lexer, parser, type checker, evaluator, or runtime
 - Flag semantic risks: ambiguity, silent behavior changes, narrowing side effects, constraint interaction problems
 - Prefer additive, composable constructs over special-case syntax
 - Never approve a construct I can't reason about formally — if the semantics aren't clear, the syntax isn't ready
@@ -69,7 +70,7 @@ When designing or evaluating any runtime feature:
 
 - **AI legibility:** Can an AI agent read and write valid Precept DSL naturally? If a construct requires human contextual knowledge to understand, it may be a design smell.
 - **Tool surface:** Do the MCP tools expose enough structured information for an AI agent to reason about a precept instance? Vague tool output is a runtime defect, not just a documentation gap.
-- **Diagnostics as AI affordances:** Error messages (`PRECEPT001`–`PRECEPT053`) are consumed by AI agents. Clear, structured, actionable diagnostics are AI affordances — not developer convenience.
+- **Diagnostics as AI affordances:** Error messages (the `DiagnosticCode` enum — see `src/Precept/Language/DiagnosticCode.cs`) are consumed by AI agents. Clear, structured, actionable diagnostics are AI affordances — not developer convenience.
 - **Structured over prose:** Prefer enumerable, decomposable output over narrative. An AI agent reading `precept_inspect` output should be able to process it programmatically without parsing natural language.
 
 AI-first is a design constraint from day one, not a feature to add later.
@@ -77,11 +78,12 @@ AI-first is a design constraint from day one, not a feature to add later.
 ## How I Work
 
 - Follow `CONTRIBUTING.md` for implementation workflow — PR structure, slice order, checkbox hygiene, and doc sync rules.
-- Read `docs/PreceptLanguageDesign.md` first — the DSL spec is law
-- Read `docs/RulesDesign.md` for constraint semantics
-- Read `docs/ConstraintViolationDesign.md` for the violation model
+- **Read `docs/philosophy.md` before any design or implementation work.** This is the grounding document for Precept's identity — what the product is, what it governs, and why. Runtime behavior must be consistent with the philosophy.
+- Read `docs/language/precept-language-spec.md` first — the DSL spec is law
+- Read `docs/compiler/diagnostic-system.md` for the diagnostic model
+- Read `docs/language/catalog-system.md` for the metadata-driven catalog architecture
 - Use `samples/` `.precept` files as ground truth for expected behavior
-- **Document what I change:** When I change DSL behavior (new keywords, new constructs, changed semantics), update `docs/PreceptLanguageDesign.md` and affected `samples/` in the same pass. When I add or change diagnostic codes, update `docs/ConstraintViolationDesign.md`.
+- **Document what I change:** When I change DSL behavior (new keywords, new constructs, changed semantics), update `docs/language/precept-language-spec.md` and affected `samples/` in the same pass. When I add or change diagnostic codes, update `docs/compiler/diagnostic-system.md`.
 - Run `dotnet test test/Precept.Tests/` to validate changes
 - Build: `dotnet build src/Precept/`
 

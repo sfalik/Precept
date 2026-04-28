@@ -5,15 +5,15 @@ precept TravelReimbursement
 # Built-in functions (round, min, clamp) keep arithmetic readable.
 # RequestedTotal is a computed field — always equal to the sum of its components.
 
-field EmployeeName as string nullable
+field EmployeeName as string optional
 field TripDays as number default 1 positive
-field LodgingTotal as number default 0
-field MealsTotal as number default 0
+field LodgingTotal as decimal default 0
+field MealsTotal as decimal default 0
 field MileageTotal as decimal default 0 maxplaces 2
 field MileageRate as number default 0.67
 field RequestedTotal as number -> LodgingTotal + MealsTotal + MileageTotal nonnegative
 field ApprovedTotal as number default 0 nonnegative
-field FinanceNote as string nullable
+field FinanceNote as string optional
 rule ApprovedTotal <= RequestedTotal because "Approved total cannot exceed the request"
 
 state Draft initial
@@ -24,23 +24,23 @@ state Rejected
 
 in Paid ensure ApprovedTotal > 0 because "Paid reimbursements must have an approved amount"
 
-event Submit with
+event Submit(
     Employee as string notempty,
     Days as number,
     Lodging as number,
     Meals as number,
     Miles as number,
-    Rate as number default 0.67
-on Submit ensure Days > 0 because "Trip days must be positive"
-on Submit ensure Lodging >= 0 because "Lodging cannot be negative"
-on Submit ensure Meals >= 0 because "Meals cannot be negative"
-on Submit ensure Miles >= 0 because "Mileage cannot be negative"
-on Submit ensure Rate >= 0 because "Mileage rate cannot be negative"
+    Rate as number default 0.67)
+on Submit ensure Submit.Days > 0 because "Trip days must be positive"
+on Submit ensure Submit.Lodging >= 0 because "Lodging cannot be negative"
+on Submit ensure Submit.Meals >= 0 because "Meals cannot be negative"
+on Submit ensure Submit.Miles >= 0 because "Mileage cannot be negative"
+on Submit ensure Submit.Rate >= 0 because "Mileage rate cannot be negative"
 
-event Approve with Amount as number, Note as string nullable default null notempty
-on Approve ensure Amount > 0 because "Approved amounts must be positive"
+event Approve(Amount as number, Note as string optional notempty)
+on Approve ensure Approve.Amount > 0 because "Approved amounts must be positive"
 
-event Reject with Note as string notempty
+event Reject(Note as string notempty)
 event Pay
 
 # Average lodging per day is checked with division to keep the example realistic.

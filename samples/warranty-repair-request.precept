@@ -3,11 +3,11 @@ precept WarrantyRepairRequest
 # A warranty repair captures the intake decision, the repair work itself, and the return process.
 # The repair step log uses a stack so the last entered step can be reversed cleanly.
 
-field CustomerName as string nullable
-field ProductName as string nullable
-field SerialNumber as string nullable
-field ApprovalNote as string nullable
-field LastReversedStep as string nullable
+field CustomerName as string optional
+field ProductName as string optional
+field SerialNumber as string optional
+field ApprovalNote as string optional
+field LastReversedStep as string optional
 field RepairComplete as boolean default false
 field ShippingLabelSent as boolean default false
 field RepairSteps as stack of string
@@ -25,11 +25,11 @@ in Closed ensure ShippingLabelSent because "Closed cases must have a return labe
 
 to ReadyToReturn -> set ShippingLabelSent = true
 
-event Submit with Customer as string notempty, Product as string notempty, Serial as string notempty
-event Approve with Note as string nullable default null notempty
-event Deny with Note as string notempty
+event Submit(Customer as string notempty, Product as string notempty, Serial as string notempty)
+event Approve(Note as string optional notempty)
+event Deny(Note as string notempty)
 event StartRepair
-event LogRepairStep with StepName as string notempty
+event LogRepairStep(StepName as string notempty)
 event UndoLastStep
 event FinishRepair
 event ConfirmReturn

@@ -3,14 +3,14 @@ precept EventRegistration
 # A simple attendee registration workflow with payment and check-in.
 # This sample is intentionally tutorial-like and uses mostly scalar fields.
 
-field RegistrantName as string nullable
-field ContactEmail as string nullable
+field RegistrantName as string optional
+field ContactEmail as string optional
 field SeatsReserved as number default 0 nonnegative
 field TicketsIssued as number default 0 nonnegative
 field AmountDue as decimal default 0 nonnegative
 field PaymentReceived as boolean default false
-field CancellationReason as string nullable
-field CheckInDesk as string nullable
+field CancellationReason as string optional
+field CheckInDesk as string optional
 rule TicketsIssued <= SeatsReserved because "Issued tickets cannot exceed reserved seats"
 
 state Draft initial
@@ -20,30 +20,30 @@ state Cancelled
 state CheckedIn
 
 # Staff can correct contact details while the registration is still open.
-in Draft edit ContactEmail
-in PendingPayment edit ContactEmail, SeatsReserved
+in Draft modify ContactEmail editable
+in PendingPayment modify ContactEmail, SeatsReserved editable
 
 in Confirmed ensure PaymentReceived because "Confirmed registrations must be paid"
 in Confirmed ensure TicketsIssued == SeatsReserved because "Confirmed registrations must issue one ticket per reserved seat"
-in CheckedIn ensure CheckInDesk != null because "Checked-in registrations must record the desk"
+in CheckedIn ensure CheckInDesk is set because "Checked-in registrations must record the desk"
 
 # Every transition into Confirmed finishes the same bookkeeping.
 to Confirmed -> set PaymentReceived = true -> set AmountDue = 0
 
-event StartRegistration with
+event StartRegistration(
     Name as string notempty,
     Email as string notempty,
     Seats as number default 1,
-    PricePerSeat as number default 25
-on StartRegistration ensure Seats > 0 because "At least one seat must be reserved"
-on StartRegistration ensure PricePerSeat > 0 because "The seat price must be positive"
+    PricePerSeat as number default 25)
+on StartRegistration ensure StartRegistration.Seats > 0 because "At least one seat must be reserved"
+on StartRegistration ensure StartRegistration.PricePerSeat > 0 because "The seat price must be positive"
 
-event UpdateSeats with Seats as number
-on UpdateSeats ensure Seats > 0 because "Updated seat count must stay positive"
+event UpdateSeats(Seats as number)
+on UpdateSeats ensure UpdateSeats.Seats > 0 because "Updated seat count must stay positive"
 
 event RecordPayment
-event Cancel with Reason as string nullable default null notempty
-event CheckIn with Desk as string notempty
+event Cancel(Reason as string optional notempty)
+event CheckIn(Desk as string notempty)
 
 from Draft on StartRegistration
     -> set RegistrantName = StartRegistration.Name

@@ -10,15 +10,7 @@ internal static class Program
         {
             options
                 .WithInput(Console.OpenStandardInput())
-                .WithOutput(Console.OpenStandardOutput())
-                .WithHandler<PreceptTextDocumentSyncHandler>()
-                .WithHandler<PreceptCompletionHandler>()
-                .WithHandler<PreceptHoverHandler>()
-                .WithHandler<PreceptDefinitionHandler>()
-                .WithHandler<PreceptCodeActionHandler>()
-                .WithHandler<PreceptDocumentSymbolHandler>()
-                .WithHandler<PreceptSemanticTokensHandler>()
-                .WithHandler<PreceptPreviewHandler>();
+                .WithOutput(Console.OpenStandardOutput());
         });
 
         await server.WaitForExit;

@@ -1,4 +1,4 @@
-import { spawnSync } from "child_process";
+﻿import { spawnSync } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
@@ -10,13 +10,9 @@ import {
 } from "vscode-languageclient/node";
 
 let client: LanguageClient | undefined;
-let clientStartPromise: Promise<void> | undefined;
-const snapshotSequenceByPanel = new WeakMap<vscode.WebviewPanel, number>();
 let currentPreviewPanel: vscode.WebviewPanel | undefined;
-let currentPreviewDocumentUri: vscode.Uri | undefined;
+let currentPreviewTarget: vscode.Uri | undefined;
 let previewFollowActiveEditor = true;
-let extensionContext: vscode.ExtensionContext | undefined;
-let elkLayoutEngine: any | undefined;
 let languageServerRestartTimer: NodeJS.Timeout | undefined;
 let languageServerRestartInProgress = false;
 let languageServerRestartRequested = false;
@@ -44,70 +40,11 @@ interface LanguageServerLaunchInfo {
   args: string[];
   cwd: string;
   projectPath?: string;
-  buildDllPath?: string;
   runtimeDllPath?: string;
 }
 
-function nextSnapshotSequence(panel: vscode.WebviewPanel): number {
-  const next = (snapshotSequenceByPanel.get(panel) ?? 0) + 1;
-  snapshotSequenceByPanel.set(panel, next);
-  return next;
-}
-
-type PreviewAction = "snapshot" | "fire" | "reset" | "replay" | "inspect" | "inspectUpdate" | "update";
-
-interface PreviewRequest {
-  action: PreviewAction;
-  uri: string;
-  text?: string;
-  eventName?: string;
-  args?: Record<string, unknown>;
-  steps?: Array<{ eventName: string; args?: Record<string, unknown> }>;
-  fieldUpdates?: Record<string, unknown>;
-}
-
-interface PreviewResponse {
-  success: boolean;
-  error?: string;
-  snapshot?: unknown;
-  replayMessages?: string[];
-}
-
-interface LayoutNode {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
-interface LayoutEdge {
-  transitionIndex: number;
-  points: Array<{ x: number; y: number }>;
-}
-
-interface SnapshotLayout {
-  width: number;
-  height: number;
-  nodes: Record<string, LayoutNode>;
-  edges: LayoutEdge[];
-}
-
-interface TransitionLike {
-  from: string;
-  to: string;
-  event: string;
-  kind: string;
-}
-
-type PreviewLayoutMode = "spacious" | "balanced" | "compact" | "orthogonal" | "top-down";
-
-interface PreviewTarget {
-  uri: vscode.Uri;
-  fileName: string;
-}
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
-  extensionContext = context;
   const outputChannel = vscode.window.createOutputChannel("Precept");
   context.subscriptions.push(outputChannel);
 
@@ -115,18 +52,29 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   languageServerStatusItem.name = "Precept Language Server";
   languageServerStatusItem.command = "precept.showLanguageServerMode";
   context.subscriptions.push(languageServerStatusItem);
-  updateLanguageServerStatusItem("starting");
+  updateLanguageServerStatusItem("starting", undefined, undefined);
   languageServerStatusItem.show();
 
   const openPreviewDisposable = vscode.commands.registerCommand("precept.openPreview", () => {
-    void openInspectorPreviewPanel(context, outputChannel);
+    void openPreviewPanel();
   });
   context.subscriptions.push(openPreviewDisposable);
 
   const togglePreviewLockingDisposable = vscode.commands.registerCommand("precept.togglePreviewLocking", () => {
-    void togglePreviewLocking(outputChannel);
+    togglePreviewLocking();
   });
   context.subscriptions.push(togglePreviewLockingDisposable);
+
+  const activeEditorSubscription = vscode.window.onDidChangeActiveTextEditor((editor) => {
+    if (!previewFollowActiveEditor || !currentPreviewPanel) {
+      return;
+    }
+    if (!editor || editor.document.languageId !== "precept") {
+      return;
+    }
+    retargetPreviewPanel(currentPreviewPanel, editor.document.uri, editor.document.fileName);
+  });
+  context.subscriptions.push(activeEditorSubscription);
 
   const showLanguageServerModeDisposable = vscode.commands.registerCommand("precept.showLanguageServerMode", () => {
     showLanguageServerMode(outputChannel);
@@ -136,7 +84,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const launchInfo = resolveLanguageServerLaunchInfo(context, outputChannel);
 
   if (!launchInfo) {
-    updateLanguageServerStatusItem("error", "server not found");
+    updateLanguageServerStatusItem("error", "server not found", undefined);
     outputChannel.appendLine("Language server not found. Checked dev build and bundled server paths.");
     void vscode.window.showErrorMessage(
       "Precept: could not locate the language server. See the Precept output channel for details."
@@ -164,7 +112,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   try {
     await startLanguageClient(launchInfo, clientOptions, outputChannel);
   } catch (error) {
-    updateLanguageServerStatusItem("error", "startup failed");
+    updateLanguageServerStatusItem("error", "startup failed", undefined);
     outputChannel.appendLine(`Language client failed to start: ${String(error)}`);
     void vscode.window.showErrorMessage("Precept: failed to start the language server. See the Precept output channel for details.");
     outputChannel.show(true);
@@ -192,57 +140,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     );
   }
 
-  const changeSubscription = vscode.workspace.onDidChangeTextDocument((event) => {
-    if (!currentPreviewPanel || !currentPreviewDocumentUri) {
-      return;
-    }
-
-    if (event.document.uri.toString() !== currentPreviewDocumentUri.toString()) {
-      return;
-    }
-
-    void sendSnapshotToPanel(currentPreviewPanel, event.document, outputChannel);
-  });
-  context.subscriptions.push(changeSubscription);
-
-  const saveSubscription = vscode.workspace.onDidSaveTextDocument((document) => {
-    if (!currentPreviewPanel || !currentPreviewDocumentUri) {
-      return;
-    }
-
-    if (document.uri.toString() !== currentPreviewDocumentUri.toString()) {
-      return;
-    }
-
-    void sendSnapshotToPanel(currentPreviewPanel, document, outputChannel);
-  });
-  context.subscriptions.push(saveSubscription);
-
-  const activeEditorSubscription = vscode.window.onDidChangeActiveTextEditor((editor) => {
-    if (!previewFollowActiveEditor || !currentPreviewPanel) {
-      return;
-    }
-
-    const target = getPreviewTargetFromEditor(editor);
-    if (!target) {
-      return;
-    }
-
-    void retargetPreviewPanel(currentPreviewPanel, target, context, outputChannel, false);
-  });
-  context.subscriptions.push(activeEditorSubscription);
-
 }
 
 export async function deactivate(): Promise<void> {
   if (currentPreviewPanel) {
     currentPreviewPanel.dispose();
+    currentPreviewPanel = undefined;
   }
-
-  currentPreviewPanel = undefined;
-  currentPreviewDocumentUri = undefined;
+  currentPreviewTarget = undefined;
   previewFollowActiveEditor = true;
-  extensionContext = undefined;
 
   if (languageServerRestartTimer) {
     clearTimeout(languageServerRestartTimer);
@@ -342,7 +248,7 @@ async function startLanguageClient(
   output: vscode.OutputChannel
 ): Promise<void> {
   currentLanguageServerLaunchInfo = launchInfo;
-  updateLanguageServerStatusItem("starting");
+  updateLanguageServerStatusItem("starting", undefined, undefined);
   const serverOptions = createServerOptions(launchInfo);
   const nextClient = new LanguageClient(
     "preceptLanguageServer",
@@ -353,16 +259,21 @@ async function startLanguageClient(
 
   nextClient.onDidChangeState((state) => {
     output.appendLine(`Language client state: ${state.oldState} -> ${state.newState}`);
+    // State 1=Starting, 2=Stopped, 3=Running
+    if (state.newState === 2) {
+      updateLanguageServerStatusItem("stopped", undefined, undefined);
+    }
   });
 
   client = nextClient;
 
   try {
     await nextClient.start();
-    updateLanguageServerStatusItem("ready");
+    const caps = nextClient.initializeResult?.capabilities ?? {};
+    updateLanguageServerStatusItem("ready", undefined, caps);
   } catch (error) {
     client = undefined;
-    updateLanguageServerStatusItem("error", "start failed");
+    updateLanguageServerStatusItem("error", "start failed", undefined);
     throw error;
   }
 }
@@ -433,7 +344,7 @@ async function restartLanguageClient(
   }
 
   languageServerRestartInProgress = true;
-  updateLanguageServerStatusItem("restarting");
+  updateLanguageServerStatusItem("restarting", undefined, undefined);
 
   try {
     do {
@@ -457,18 +368,17 @@ async function restartLanguageClient(
       try {
         await startPromise;
       } finally {
-        clientStartPromise = undefined;
       }
     } while (languageServerRestartRequested);
 
     void vscode.window.setStatusBarMessage("Precept language server restarted", 3000);
   } catch (error) {
     output.appendLine(`Language client restart failed: ${String(error)}`);
-    updateLanguageServerStatusItem("error", "restart failed");
+    updateLanguageServerStatusItem("error", "restart failed", undefined);
   } finally {
     languageServerRestartInProgress = false;
     if (client) {
-      updateLanguageServerStatusItem("ready");
+      updateLanguageServerStatusItem("ready", undefined, client?.initializeResult?.capabilities ?? {});
     }
   }
 }
@@ -478,61 +388,110 @@ function toGlobPath(filePath: string): string {
 }
 
 function updateLanguageServerStatusItem(
-  state: "starting" | "ready" | "restarting" | "error",
-  detail?: string
+  state: "starting" | "ready" | "restarting" | "error" | "stopped",
+  detail: string | undefined,
+  caps: object | undefined
 ): void {
   if (!languageServerStatusItem) {
     return;
   }
 
+  const modeIcon = getLanguageServerModeIcon(currentLanguageServerLaunchInfo?.mode);
   const launchLabel = getLanguageServerLaunchModeLabel(currentLanguageServerLaunchInfo?.mode);
+  const obj = caps ? caps as Record<string, unknown> : undefined;
+  const activeCount = obj ? Object.keys(obj).filter(k => {
+    if (nonCapabilityKeys.has(k)) { return false; }
+    const v = obj[k]; return v !== undefined && v !== null && v !== false;
+  }).length : undefined;
+  const capCountLabel = activeCount !== undefined ? ` · $(list-unordered) ${activeCount}` : "";
+
   switch (state) {
     case "starting":
-      languageServerStatusItem.text = `$(sync~spin) Precept LS: ${launchLabel}`;
+      languageServerStatusItem.text = `$(sync~spin) Precept${modeIcon}`;
       break;
     case "restarting":
-      languageServerStatusItem.text = `$(sync~spin) Precept LS: ${launchLabel}`;
+      languageServerStatusItem.text = `$(sync~spin) Precept${modeIcon}`;
       break;
     case "error":
-      languageServerStatusItem.text = `$(error) Precept LS: ${launchLabel}`;
+      languageServerStatusItem.text = `$(error) Precept${modeIcon}`;
+      break;
+    case "stopped":
+      languageServerStatusItem.text = `$(circle-slash) Precept${modeIcon}`;
       break;
     default:
-      languageServerStatusItem.text = `$(server-process) Precept LS: ${launchLabel}`;
+      languageServerStatusItem.text = `$(pulse) Precept${modeIcon}${capCountLabel}`;
       break;
   }
 
-  const detailLine = detail ? `Status: ${detail}` : `Status: ${state}`;
-  const launchInfo = currentLanguageServerLaunchInfo
-    ? buildLanguageServerLaunchInfoText(currentLanguageServerLaunchInfo)
-    : "Launch mode not resolved yet.";
-  languageServerStatusItem.tooltip = `Precept language server\n${detailLine}\n${launchInfo}\nClick for full launch details.`;
+  let tooltipText: string;
+  switch (state) {
+    case "starting":
+      tooltipText = `**Precept** · Starting\u2026`;
+      break;
+    case "restarting":
+      tooltipText = `**Precept** · Restarting\u2026`;
+      break;
+    case "error":
+      tooltipText = `**Precept** · Error${detail ? `\n\n${detail}` : "\n\nServer did not start. Check the **Precept** output channel."}`;
+      break;
+    case "stopped":
+      tooltipText = `**Precept** · Stopped`;
+      break;
+    default: {
+      const capsLine = caps ? buildCapabilityTooltipLines(caps) : "";
+      tooltipText = `**Precept** · \`${launchLabel.toLowerCase()}\`${capsLine ? `\n\n${capsLine}` : ""}`;
+      break;
+    }
+  }
+  languageServerStatusItem.tooltip = new vscode.MarkdownString(tooltipText);
   languageServerStatusItem.show();
+}
+
+const nonCapabilityKeys = new Set(["experimental", "workspace", "positionEncoding"]);
+
+function buildCapabilityTooltipLines(caps: object): string {
+  const obj = caps as Record<string, unknown>;
+  const active: string[] = [];
+  for (const key of Object.keys(obj)) {
+    if (nonCapabilityKeys.has(key)) { continue; }
+    const val = obj[key];
+    if (val !== undefined && val !== null && val !== false) {
+      active.push(key);
+    }
+  }
+  if (active.length === 0) {
+    return "No capabilities reported.";
+  }
+  return active.map(k => `✓ ${k}`).join(" · ");
 }
 
 function getLanguageServerLaunchModeLabel(mode: LanguageServerLaunchMode | undefined): string {
   switch (mode) {
     case "dev-build-shadow-copy":
-      return "Dev";
+      return "dev";
     case "bundled":
-      return "Ready";
+      return "bundled";
     default:
       return "?";
   }
 }
 
+function getLanguageServerModeIcon(mode: LanguageServerLaunchMode | undefined): string {
+  switch (mode) {
+    case "dev-build-shadow-copy":
+      return " $(beaker)";
+    default:
+      return "";
+  }
+}
+
 function buildLanguageServerLaunchInfoText(launchInfo: LanguageServerLaunchInfo): string {
   const lines = [
-    `Mode: ${launchInfo.mode}`,
-    `Command: ${launchInfo.command} ${launchInfo.args.join(" ")}`,
-    `Working directory: ${launchInfo.cwd}`
+    `Mode: ${launchInfo.mode}`
   ];
 
-  if (launchInfo.buildDllPath) {
-    lines.push(`Dev build DLL: ${launchInfo.buildDllPath}`);
-  }
-
   if (launchInfo.runtimeDllPath) {
-    lines.push(`Runtime DLL: ${launchInfo.runtimeDllPath}`);
+    lines.push(`Runtime: ${launchInfo.runtimeDllPath}`);
   }
 
   return lines.join("\n");
@@ -581,7 +540,6 @@ function resolveDevLaunchConfiguration(
       args: [runtimeDllPath],
       cwd: serverWorkingDirectory,
       projectPath,
-      buildDllPath: devBuildDllPath,
       runtimeDllPath
     };
   } catch (error) {
@@ -683,30 +641,63 @@ function pruneLanguageServerRuntimeDirectories(runtimeRoot: string, activeRuntim
       // Ignore cleanup failures; the next restart can try again.
     }
   }
+
 }
 
-async function openInspectorPreviewPanel(context: vscode.ExtensionContext, output: vscode.OutputChannel): Promise<void> {
-  const target = getPreviewTargetFromEditor(vscode.window.activeTextEditor);
-  if (!target) {
+// ---------------------------------------------------------------------------
+// Preview panel — scaffold for v2. Shows a placeholder until the v2 runtime
+// and language server are operational.
+// ---------------------------------------------------------------------------
+
+function getPreviewPanelTitle(fileName: string): string {
+  const suffix = previewFollowActiveEditor ? "" : " [Locked]";
+  return `Preview ${path.basename(fileName)}${suffix}`;
+}
+
+function buildPreviewPlaceholderHtml(fileName: string): string {
+  const displayName = path.basename(fileName).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  return `<!doctype html>
+<html>
+<head><meta charset="UTF-8"></head>
+<body style="background:#1e1e1e;color:#ccc;font-family:Segoe UI,Arial,sans-serif;margin:0;
+             display:flex;align-items:center;justify-content:center;height:100vh;box-sizing:border-box">
+  <div style="text-align:center;padding:32px">
+    <div style="font-size:48px;margin-bottom:16px">&#x2697;&#xFE0F;</div>
+    <h2 style="color:#A5B4FC;margin:0 0 8px">Precept Preview</h2>
+    <p style="color:#9096A6;margin:0">Coming in v2 &mdash; the interactive state inspector is being rebuilt.</p>
+    <p style="color:#6B7280;font-size:0.85em;margin:12px 0 0">${displayName}</p>
+  </div>
+</body>
+</html>`;
+}
+
+function retargetPreviewPanel(panel: vscode.WebviewPanel, uri: vscode.Uri, fileName: string): void {
+  currentPreviewTarget = uri;
+  panel.title = getPreviewPanelTitle(fileName);
+  panel.webview.html = buildPreviewPlaceholderHtml(fileName);
+}
+
+async function openPreviewPanel(): Promise<void> {
+  const editor = vscode.window.activeTextEditor;
+  if (!editor || editor.document.languageId !== "precept") {
     void vscode.window.showInformationMessage("Open a .precept file first to launch Preview.");
     return;
   }
 
+  const { uri, fileName } = editor.document;
+
   if (currentPreviewPanel) {
     previewFollowActiveEditor = true;
+    retargetPreviewPanel(currentPreviewPanel, uri, fileName);
     currentPreviewPanel.reveal(vscode.ViewColumn.Beside, true);
-    await retargetPreviewPanel(currentPreviewPanel, target, context, output, true);
     return;
   }
 
   const panel = vscode.window.createWebviewPanel(
     "preceptPreview",
-    getPreviewPanelTitle(target.fileName),
+    getPreviewPanelTitle(fileName),
     vscode.ViewColumn.Beside,
-    {
-      enableScripts: true,
-      retainContextWhenHidden: true
-    }
+    { enableScripts: false, retainContextWhenHidden: true }
   );
 
   currentPreviewPanel = panel;
@@ -715,456 +706,32 @@ async function openInspectorPreviewPanel(context: vscode.ExtensionContext, outpu
   panel.onDidDispose(() => {
     if (currentPreviewPanel === panel) {
       currentPreviewPanel = undefined;
-      currentPreviewDocumentUri = undefined;
+      currentPreviewTarget = undefined;
       previewFollowActiveEditor = true;
     }
   });
 
-  panel.onDidChangeViewState((event) => {
-    if (!event.webviewPanel.visible) {
-      return;
-    }
-
-    const previewUri = currentPreviewDocumentUri;
-    if (!previewUri) {
-      return;
-    }
-
-    void getDocumentByUri(previewUri)
-      .then((document) => sendSnapshotToPanel(event.webviewPanel, document, output))
-      .catch((error) => {
-        output.appendLine(`Preview refresh failed: ${String(error)}`);
-      });
-  });
-
-  panel.webview.onDidReceiveMessage(async (message) => {
-    if (!message || typeof message !== "object") {
-      return;
-    }
-
-    if (message.type === "ready") {
-      if (!currentPreviewDocumentUri) {
-        return;
-      }
-
-      const readyDocument = await getDocumentByUri(currentPreviewDocumentUri);
-      await sendSnapshotToPanel(panel, readyDocument, output);
-      return;
-    }
-
-    if (message.type !== "previewRequest") {
-      return;
-    }
-
-    const requestId = typeof message.requestId === "number" ? message.requestId : undefined;
-    const action = message.action as PreviewAction | undefined;
-    if (typeof requestId === "undefined" || !action) {
-      return;
-    }
-
-    const previewUri = currentPreviewDocumentUri;
-    if (!previewUri) {
-      return;
-    }
-
-    const liveDocument = await getDocumentByUri(previewUri);
-    const request: PreviewRequest = {
-      action,
-      uri: liveDocument.uri.toString(),
-      text: liveDocument.getText(),
-      eventName: typeof message.eventName === "string" ? message.eventName : undefined,
-      args: typeof message.args === "object" && message.args !== null ? message.args as Record<string, unknown> : undefined,
-      steps: Array.isArray(message.steps) ? message.steps : undefined,
-      fieldUpdates: typeof message.fieldUpdates === "object" && message.fieldUpdates !== null ? message.fieldUpdates as Record<string, unknown> : undefined
-    };
-
-    const response = await sendPreviewRequest(request, output);
-    const responseWithLayout = await withLayout(response, output);
-    void panel.webview.postMessage({
-      type: "previewResponse",
-      requestId,
-      ...responseWithLayout
-    });
-  });
-
-  await retargetPreviewPanel(panel, target, context, output, true);
+  retargetPreviewPanel(panel, uri, fileName);
 }
 
-function getPreviewTargetFromEditor(editor: vscode.TextEditor | undefined): PreviewTarget | undefined {
-  if (!editor || editor.document.languageId !== "precept") {
-    return undefined;
-  }
-
-  return {
-    uri: editor.document.uri,
-    fileName: editor.document.fileName
-  };
-}
-
-function isSamePreviewTarget(left: vscode.Uri | undefined, right: vscode.Uri): boolean {
-  return !!left && left.toString() === right.toString();
-}
-
-function getPreviewPanelTitle(fileName: string): string {
-  const suffix = previewFollowActiveEditor ? "" : " [Locked]";
-  return `Preview ${path.basename(fileName)}${suffix}`;
-}
-
-async function retargetPreviewPanel(
-  panel: vscode.WebviewPanel,
-  target: PreviewTarget,
-  context: vscode.ExtensionContext,
-  output: vscode.OutputChannel,
-  resetWebviewState: boolean
-): Promise<void> {
-  const targetChanged = !isSamePreviewTarget(currentPreviewDocumentUri, target.uri);
-  currentPreviewDocumentUri = target.uri;
-  panel.title = getPreviewPanelTitle(target.fileName);
-
-  if (targetChanged || resetWebviewState) {
-    panel.webview.html = await getInspectorPreviewHtml(context, output, target.fileName, previewFollowActiveEditor);
-    return;
-  }
-
-  const document = await getDocumentByUri(target.uri);
-  await sendSnapshotToPanel(panel, document, output);
-  void postSourceInfoToPanel(panel, target.fileName);
-}
-
-function postSourceInfoToPanel(panel: vscode.WebviewPanel, fileName: string): Thenable<boolean> {
-  return panel.webview.postMessage({
-    type: "sourceInfo",
-    fileName: path.basename(fileName),
-    locked: !previewFollowActiveEditor
-  });
-}
-
-async function togglePreviewLocking(output: vscode.OutputChannel): Promise<void> {
-  if (!currentPreviewPanel || !currentPreviewDocumentUri) {
+function togglePreviewLocking(): void {
+  if (!currentPreviewPanel) {
     void vscode.window.showInformationMessage("Open Preview first to toggle preview locking.");
     return;
   }
 
   previewFollowActiveEditor = !previewFollowActiveEditor;
 
-  if (previewFollowActiveEditor) {
-    const activeTarget = getPreviewTargetFromEditor(vscode.window.activeTextEditor);
-    if (activeTarget && !isSamePreviewTarget(currentPreviewDocumentUri, activeTarget.uri) && extensionContext) {
-      await retargetPreviewPanel(currentPreviewPanel, activeTarget, extensionContext, output, true);
-      return;
-    }
+  const editor = vscode.window.activeTextEditor;
+  if (previewFollowActiveEditor && editor && editor.document.languageId === "precept") {
+    retargetPreviewPanel(currentPreviewPanel, editor.document.uri, editor.document.fileName);
+  } else if (currentPreviewTarget) {
+    currentPreviewPanel.title = getPreviewPanelTitle(currentPreviewTarget.fsPath);
   }
 
-  try {
-    const document = await getDocumentByUri(currentPreviewDocumentUri);
-    currentPreviewPanel.title = getPreviewPanelTitle(document.fileName);
-    void postSourceInfoToPanel(currentPreviewPanel, document.fileName);
-  } catch (error) {
-    output.appendLine(`Preview lock toggle failed: ${String(error)}`);
-  }
-
-  const message = previewFollowActiveEditor
-    ? "Precept Preview now follows the active .precept editor."
-    : "Precept Preview is now locked to the current .precept file.";
-  void vscode.window.showInformationMessage(message);
-}
-
-async function sendSnapshotToPanel(
-  panel: vscode.WebviewPanel,
-  document: vscode.TextDocument,
-  output: vscode.OutputChannel
-): Promise<void> {
-  const snapshotSequence = nextSnapshotSequence(panel);
-  const response = await sendPreviewRequest(
-    {
-      action: "snapshot",
-      uri: document.uri.toString(),
-      text: document.getText()
-    },
-    output
+  void vscode.window.showInformationMessage(
+    previewFollowActiveEditor
+      ? "Precept Preview now follows the active .precept editor."
+      : "Precept Preview is now locked to the current .precept file."
   );
-  const responseWithLayout = await withLayout(response, output);
-
-  void panel.webview.postMessage({
-    type: "snapshot",
-    snapshotSequence,
-    ...responseWithLayout
-  });
-}
-
-function getElkEngine(): any {
-  if (elkLayoutEngine) {
-    return elkLayoutEngine;
-  }
-
-  const Elk = require("elkjs/lib/elk.bundled.js");
-  elkLayoutEngine = new Elk();
-  return elkLayoutEngine;
-}
-
-function extractSnapshotStates(snapshot: Record<string, unknown>): string[] {
-  const rawStates = (snapshot.states ?? snapshot.States) as unknown;
-  if (!Array.isArray(rawStates)) {
-    return [];
-  }
-
-  return rawStates
-    .map((item) => String(item ?? ""))
-    .filter((item) => item.length > 0);
-}
-
-function extractSnapshotTransitions(snapshot: Record<string, unknown>): TransitionLike[] {
-  const rawTransitions = (snapshot.transitions ?? snapshot.Transitions) as unknown;
-  if (!Array.isArray(rawTransitions)) {
-    return [];
-  }
-
-  return rawTransitions
-    .map((transition) => {
-      if (!transition || typeof transition !== "object") {
-        return null;
-      }
-
-      const value = transition as Record<string, unknown>;
-      const from = String(value.from ?? value.From ?? "");
-      const to = String(value.to ?? value.To ?? "");
-      const event = String(value.event ?? value.Event ?? "");
-      const kind = String(value.kind ?? value.Kind ?? "transition");
-      if (!from || !to) {
-        return null;
-      }
-
-      return { from, to, event, kind };
-    })
-    .filter((value): value is TransitionLike => value !== null);
-}
-
-function getPreviewLayoutMode(): PreviewLayoutMode {
-  const configured = vscode.workspace
-    .getConfiguration("precept.preview")
-    .get<string>("layoutMode", "balanced");
-
-  if (configured === "spacious" || configured === "compact" || configured === "orthogonal" || configured === "top-down" || configured === "balanced") {
-    return configured;
-  }
-
-  return "balanced";
-}
-
-function getElkLayoutOptions(mode: PreviewLayoutMode): Record<string, string> {
-  const direction = mode === "top-down" ? "DOWN" : "DOWN";
-  const nodeSpacing = mode === "compact" ? "6" : mode === "spacious" ? "12" : "7";
-  const layerSpacing = mode === "compact" ? "10" : mode === "spacious" ? "20" : "15";
-
-  return {
-    "elk.algorithm": "layered",
-    "elk.direction": direction,
-    "elk.spacing.nodeNode": nodeSpacing,
-    "elk.layered.spacing.nodeNodeBetweenLayers": layerSpacing,
-    "elk.layered.spacing.edgeNodeBetweenLayers": "21",
-    "elk.layered.crossingMinimization.strategy": "LAYER_SWEEP",
-    "elk.layered.nodePlacement.strategy": "NETWORK_SIMPLEX",
-    "elk.edgeRouting": "ORTHOGONAL",
-    "elk.layered.mergeEdges": "false",
-    "elk.layered.feedbackEdges": "true",
-    "elk.separateConnectedComponents": "false",
-    "elk.layered.cycleBreaking.strategy": "MODEL_ORDER",
-    "elk.insideSelfLoops.activate": "true",
-    "elk.edgeLabels.inline": "true",
-    "elk.layered.considerModelOrder.strategy": "NODES_AND_EDGES"
-  };
-}
-
-function computeNodeSize(stateName: string): { width: number; height: number } {
-  const charWidth = 8.5;
-  const horizontalPadding = 36;
-  const width = Math.max(80, Math.round(stateName.length * charWidth + horizontalPadding));
-  const height = 44;
-  return { width, height };
-}
-
-async function computeLayoutForSnapshot(snapshot: Record<string, unknown>): Promise<SnapshotLayout | undefined> {
-  const states = extractSnapshotStates(snapshot);
-  if (states.length === 0) {
-    return undefined;
-  }
-
-  const transitions = extractSnapshotTransitions(snapshot);
-  const nodeSizes = new Map(states.map((state) => [state, computeNodeSize(state)]));
-
-  const elk = getElkEngine();
-  const layoutMode = getPreviewLayoutMode();
-  const layoutInput = {
-    id: "root",
-    layoutOptions: getElkLayoutOptions(layoutMode),
-    children: states.map((state) => ({
-      id: state,
-      width: nodeSizes.get(state)?.width ?? 80,
-      height: nodeSizes.get(state)?.height ?? 44
-    })),
-    edges: transitions
-      .map((transition, originalIndex) => ({ transition, originalIndex }))
-      .filter(({ transition }) => transition.kind === "transition")
-      .map(({ transition, originalIndex }) => ({
-      id: `transition-${originalIndex}`,
-      sources: [transition.from],
-      targets: [transition.to],
-      labels: transition.event
-        ? [{
-          id: `label-${originalIndex}`,
-          text: transition.event,
-          width: Math.max(32, transition.event.length * 7),
-          height: 12
-        }]
-        : []
-    }))
-  };
-
-  const layoutResult = await elk.layout(layoutInput);
-  const resultChildren = Array.isArray(layoutResult.children) ? layoutResult.children : [];
-  const resultEdges = Array.isArray(layoutResult.edges) ? layoutResult.edges : [];
-
-  const padding = 14;
-  const nodes: Record<string, LayoutNode> = {};
-  for (const child of resultChildren) {
-    if (!child?.id) {
-      continue;
-    }
-
-    const size = nodeSizes.get(String(child.id)) ?? { width: 80, height: 44 };
-    const x = Number(child.x ?? 0) + (size.width / 2) + padding;
-    const y = Number(child.y ?? 0) + (size.height / 2) + padding;
-    nodes[String(child.id)] = { x, y, width: size.width, height: size.height };
-  }
-
-  const edges: LayoutEdge[] = [];
-  for (const edge of resultEdges) {
-    const id = String(edge?.id ?? "");
-    const match = /^transition-(\d+)$/.exec(id);
-    if (!match) {
-      continue;
-    }
-
-    const transitionIndex = Number(match[1]);
-    const sections = Array.isArray(edge.sections) ? edge.sections : [];
-    const points: Array<{ x: number; y: number }> = [];
-
-    if (sections.length > 0) {
-      for (const section of sections) {
-        if (section.startPoint) {
-          points.push({ x: Number(section.startPoint.x) + padding, y: Number(section.startPoint.y) + padding });
-        }
-
-        for (const bendPoint of section.bendPoints ?? []) {
-          points.push({ x: Number(bendPoint.x) + padding, y: Number(bendPoint.y) + padding });
-        }
-
-        if (section.endPoint) {
-          points.push({ x: Number(section.endPoint.x) + padding, y: Number(section.endPoint.y) + padding });
-        }
-      }
-    }
-
-    if (points.length >= 2) {
-      edges.push({ transitionIndex, points });
-    }
-  }
-
-  const width = Number(layoutResult.width ?? 0) + padding * 2;
-  const height = Number(layoutResult.height ?? 0) + padding * 2;
-
-  return { width, height, nodes, edges };
-}
-
-async function withLayout(response: PreviewResponse, output: vscode.OutputChannel): Promise<PreviewResponse> {
-  if (!response.success || !response.snapshot || typeof response.snapshot !== "object") {
-    return response;
-  }
-
-  try {
-    const snapshot = response.snapshot as Record<string, unknown>;
-    const layout = await computeLayoutForSnapshot(snapshot);
-    if (!layout) {
-      return response;
-    }
-
-    return {
-      ...response,
-      snapshot: {
-        ...snapshot,
-        layout
-      }
-    };
-  } catch (error) {
-    output.appendLine(`Preview layout failed: ${String(error)}`);
-    return response;
-  }
-}
-
-async function sendPreviewRequest(request: PreviewRequest, output: vscode.OutputChannel): Promise<PreviewResponse> {
-  if (clientStartPromise) {
-    try {
-      await clientStartPromise;
-    } catch {
-      // The response below will surface the restart failure.
-    }
-  }
-
-  if (!client) {
-    return {
-      success: false,
-      error: "Language client is not started."
-    };
-  }
-
-  try {
-    const response = await client.sendRequest<PreviewResponse>("precept/preview/request", request);
-    return response;
-  } catch (error) {
-    output.appendLine(`Preview request failed (${request.action}): ${String(error)}`);
-    return {
-      success: false,
-      error: String(error)
-    };
-  }
-}
-
-async function getDocumentByUri(uri: vscode.Uri): Promise<vscode.TextDocument> {
-  const open = vscode.workspace.textDocuments.find((doc) => doc.uri.toString() === uri.toString());
-  if (open) {
-    return open;
-  }
-
-  return vscode.workspace.openTextDocument(uri);
-}
-
-async function getInspectorPreviewHtml(
-  context: vscode.ExtensionContext,
-  output: vscode.OutputChannel,
-  filePath: string,
-  isDynamicPreview: boolean
-): Promise<string> {
-  const previewTemplatePath = path.join(context.extensionPath, "webview", "inspector-preview.html");
-
-  try {
-    const rawHtml = await fs.promises.readFile(previewTemplatePath, "utf8");
-    const displayFileName = escapeHtml(path.basename(filePath));
-    const previewModeLabel = escapeHtml(isDynamicPreview ? "Following active editor" : "Locked to current file");
-
-    return rawHtml
-      .replace(/__FILE_NAME__/g, displayFileName)
-      .replace(/__PREVIEW_MODE__/g, previewModeLabel);
-  } catch (error) {
-    output.appendLine(`Failed loading Preview HTML: ${String(error)}`);
-    return `<!doctype html><html><body style=\"background:#1e1e1e;color:#fff;font-family:Segoe UI,Arial,sans-serif;padding:16px\"><h2>Preview</h2><p>Failed to load preview template at:<br>${escapeHtml(previewTemplatePath)}</p></body></html>`;
-  }
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/\"/g, "&quot;")
-    .replace(/'/g, "&#39;");
 }

@@ -23,6 +23,7 @@
 
 ## How I Work
 
+- **Read `docs/philosophy.md`** — the canonical source for Precept's product identity, positioning, and guarantees. Brand voice flows from the philosophy.
 - Read `design/brand/brand-decisions.md` first — all brand decisions are locked. I execute against them, not debate them.
 - Read `design/brand/philosophy.md` for the product narrative
 - Read `design/brand/brand-spec.html` for typography, color, and do/don't guidelines

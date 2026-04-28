@@ -270,7 +270,15 @@ dotnet test                         # Run all tests (xUnit + FluentAssertions)
 1. Run task `build`.
 2. Run task `extension: install`, then reload the window.
 
-If you previously used an older local plugin-registration flow, remove any stale `chat.pluginLocations` entry that points at `tools/Precept.Plugin/`. The current local model uses workspace-native `.github/agents/`, `.github/skills/`, and `.vscode/mcp.json` instead.
+## MCP Configuration Surfaces
+
+Three MCP config files exist and must stay distinct:
+
+- **`.vscode/mcp.json`** — VS Code/workspace-local source-first config. Uses the VS Code `servers` schema. Primary surface for contributors working on Precept in VS Code.
+- **`.mcp.json` (repo root)** — Copilot CLI repo-local config. Uses the CLI `mcpServers` schema. Points at the same source-first `tools/scripts/start-precept-mcp.js` wrapper. Does not include a `github` entry — Copilot CLI provides GitHub MCP natively.
+- **`tools/Precept.Plugin/.mcp.json`** — shipped/distribution payload in `dotnet tool run precept-mcp` form. Not for local development. Updated only via `plugin: sync payload`.
+
+Do not let these files drift into separate hand-authored contracts. Both `.vscode/mcp.json` and repo-root `.mcp.json` must point at the same source-first launch path.
 
 ### Reload rules
 
@@ -281,7 +289,7 @@ If you previously used an older local plugin-registration flow, remove any stale
 | Agent or skill markdown | Reload Window | Yes |
 | MCP server | Reload Window | Lazy rebuild on next tool call |
 
-See [ArtifactOperatingModelDesign.md](docs/ArtifactOperatingModelDesign.md) for the local-vs-distribution operating model, worktree rules, the workspace `.vscode/mcp.json` `servers` schema, and the plugin payload sync boundary.
+See [Precept Plugin README](tools/Precept.Plugin/README.md) for the local-vs-distribution operating model, worktree rules, the `.vscode/mcp.json` VS Code/workspace-local `servers` schema, the repo-root `.mcp.json` Copilot CLI `mcpServers` schema, and the plugin payload sync boundary.
 
 ### Test projects
 

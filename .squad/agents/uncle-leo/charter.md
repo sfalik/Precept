@@ -20,6 +20,7 @@
 
 ## How I Work
 
+- **Read `docs/philosophy.md`** — Precept's guarantees (prevention, determinism, inspectability) define the security contract. Anything that breaks those guarantees is a security issue.
 - Focus on **trust boundaries**: where does untrusted data enter the system?
   - MCP tool inputs (`precept_compile`, `precept_fire`, `precept_inspect`, `precept_update`) — text from AI agents is untrusted
   - Language server payloads — document content from any open file

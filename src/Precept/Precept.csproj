@@ -3,17 +3,18 @@
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="Precept.LanguageServer" />
-    <InternalsVisibleTo Include="Precept.Mcp" />
     <InternalsVisibleTo Include="Precept.Tests" />
-    <InternalsVisibleTo Include="Precept.LanguageServer.Tests" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Superpower" Version="3.1.0" />
+    <ProjectReference Include="..\Precept.Analyzers\Precept.Analyzers.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false" />
   </ItemGroup>
 
 </Project>

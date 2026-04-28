@@ -4,10 +4,8 @@ precept ComputedTaxNet
 # The proof engine keeps Tax non-negative and Net strictly positive once
 # Subtotal stays positive and TaxRate remains between 0 and 0.99.
 
-field Subtotal as number default 120 positive
-field TaxRate as number default 0.08 min 0 max 0.99
+field Subtotal as number default 120 positive writable
+field TaxRate as number default 0.08 min 0 max 0.99 writable
 
-field Tax as number -> Subtotal * TaxRate nonnegative
-field Net as number -> Subtotal - Tax positive
-
-edit Subtotal, TaxRate
+field Tax as number nonnegative -> Subtotal * TaxRate
+field Net as number positive -> Subtotal - Tax

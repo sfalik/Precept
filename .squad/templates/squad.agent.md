@@ -513,7 +513,7 @@ When spawning agents, include an `MCP TOOLS AVAILABLE` block in the prompt (see 
 Never crash or halt because an MCP tool is missing. MCP tools are enhancements, not dependencies.
 
 1. **CLI fallback** — GitHub MCP missing → use `gh` CLI. Azure MCP missing → use `az` CLI.
-2. **Inform the user** — "Trello integration requires the Trello MCP server. Add it to `.copilot/mcp-config.json`."
+2. **Inform the user** — "Trello integration requires the Trello MCP server. Add it to repo-root `.mcp.json` for Copilot CLI, `.vscode/mcp.json` for VS Code, or `~/.copilot/mcp-config.json` for personal/global setup."
 3. **Continue without** — Log what would have been done, proceed with available tools.
 
 ### Eager Execution Philosophy
