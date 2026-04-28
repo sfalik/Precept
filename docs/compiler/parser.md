@@ -807,7 +807,7 @@ The parser reads token metadata indirectly through `TokenKind` values. It does n
 - **Trivia token kinds control the skip loop.** `TokenKind.NewLine` and `TokenKind.Comment` are the two trivia kinds. `SkipTrivia()` consumes them between declaration-level dispatches. Within a single declaration, newlines are consumed as part of multi-line continuations (transition rows with `->` chains span multiple lines). The parser treats `NewLine` as a soft statement boundary — it terminates expressions but not arrow chains.
 
 - **Keyword token kinds are stable identifiers.** The parser switches on `TokenKind.Field`, `TokenKind.From`, `TokenKind.Set`, etc. These values come from the `TokenKind` enum, which is defined by the Tokens catalog. Adding a new keyword to the catalog adds a new `TokenKind` value; the parser must handle it or the exhaustive `ConstructKind` switch catches the gap.
-- **Operator binding powers are a parser concern.** The Tokens catalog classifies operators by category (`TokenCategory.Operator`), but binding powers (precedence, associativity) are parser-internal. The catalog says "`+` is an operator"; the parser says "`+` has left-binding power 50." This is intentional — operator precedence is parsing mechanics, not domain knowledge. It changes when the expression grammar changes, not when the keyword inventory changes. The precedence table lives in the parser, not in the catalog.
+- **Operator vocabulary vs. binding powers.** `Operators.All` is the catalog source of truth for which tokens are operators — the parser's expression dispatch derives operator recognition sets from it. Binding powers (precedence numbers, associativity direction) are parser-internal mechanics: the catalog says "`+` is an arithmetic operator"; the parser says "`+` has left-binding power 50." Binding powers change when the expression grammar changes, not when the operator inventory changes. The precedence table is parser-internal; the operator set is catalog-derived.
 - **`set` / `min` / `max` dual-use is documented in both catalogs.** The Tokens catalog documents the lexer's strategy (always emit one kind); the Constructs catalog documents where each interpretation appears in declaration shapes. The parser bridges the two — it is the only stage that knows both the token kind and the syntactic position.
 
 ### Diagnostics Catalog
@@ -926,6 +926,43 @@ The parser dispatches on `ConstructKind` values, not on ad-hoc token sequences. 
 The Constructs catalog carries `LeadingToken`, `Slots`, `AllowedIn`, and `UsageExample` per construct. These are the parser's dispatch key, shape skeleton, semantic scoping rule, and diagnostic example text — read from metadata, not duplicated in parser code.
 
 Consider the `TransitionRow` construct. Its catalog entry declares `LeadingToken = TokenKind.From`, `Slots = [StateTarget, EventTarget, GuardClause, ActionChain, Outcome]`, and `AllowedIn = []` (top-level). The parser reads this shape: dispatch on `From`, parse a state target, parse an event target, optionally parse a guard, loop through an action chain, parse an outcome. If a new slot is added to the construct (say, a `BecauseClause`), the parser gains a new step in the production — but the catalog is the authority that says the step exists.
+
+### Dispatch Table: Grammar Structure vs. Vocabulary
+
+The parser's hand-written dispatch table is not a catalog violation. The catalog-system design doc draws the line explicitly for the Parser row: *"Grammar productions stay hand-written."* The metadata-driven principle applies to **vocabulary**, not grammar structure.
+
+**What the catalog-driven principle governs.** Vocabulary is the enumerable set of keywords, operators, types, and modifiers that constitute the language surface — domain knowledge that is independently useful to grammar generators, completions, hover text, and MCP consumers. Operator recognition sets, type keyword sets, modifier keyword sets, action keyword sets: these are domain knowledge and must derive from catalog frozen dictionaries (`Operators.All`, `Types.All`, `Modifiers.All`, `Actions.All`). Hand-coding these lists inside parse methods is a violation.
+
+**Why grammar structure is different.** Grammar structure is the shape of productions and the logic that selects between them — control flow, not domain knowledge. It changes when the grammar changes, not when the language surface changes. Putting a `ParseHandler` delegate or production-selection logic in `ConstructCatalog` would:
+
+- Not eliminate disambiguation — the 1:N `LeadingToken` cases require lookahead that cannot live in metadata
+- Couple the catalog to the parser's internal method signatures
+- Move code without removing complexity
+- Violate the catalog's role: declarative metadata, not imperative behavior
+
+**The 1:N problem.** Four leading tokens map to multiple `ConstructKind`s:
+
+| Leading token | ConstructKinds | Disambiguation |
+|---------------|----------------|----------------|
+| `In` | `StateEnsure`, `AccessMode` | verb after state target (`ensure` vs. `write`/`read`/`omit`) |
+| `To` | `StateEnsure`, `StateAction` | verb after state target (`ensure` vs. `->`) |
+| `From` | `TransitionRow`, `StateEnsure`, `StateAction` | verb after state target (`on` vs. `ensure` vs. `->`) |
+| `On` | `EventEnsure`, `EventHandler` | verb after event target (`ensure` vs. `->`) |
+
+A catalog lookup on `LeadingToken` cannot select a production. The parser must read past the state/event target to the following verb. That disambiguation is grammar structure; metadata cannot hold it.
+
+**What the catalog already provides.** `ConstructMeta.LeadingToken` carries the token→construct mapping for grammar generation, completions, and MCP vocabulary — all consumers that need to know which tokens start which constructs. The parser reads those same entries to build its dispatch table. The catalog is doing its part; production selection on top of it is mechanics, not a gap.
+
+**The vocabulary gap to watch.** When the parser is implemented, vocabulary tables inside parse methods must derive from catalog frozen dictionaries — not be hand-coded:
+
+| Vocabulary | Must derive from |
+|-----------|-----------------|
+| Operator recognition and precedence | `Operators.All` |
+| Type keyword sets | `Types.All` |
+| Modifier recognition sets | `Modifiers.All` |
+| Action keyword sets | `Actions.All` |
+
+Hard-coding these lists inside `ParseFieldModifiers()`, `ParseTypeRef()`, or the expression null-denotation dispatch would be the real violation — not the dispatch table.
 
 ### Preposition-First Grammar
 

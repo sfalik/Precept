@@ -6,6 +6,10 @@
 
 ## Learnings
 
+- Cross-review with Frank on catalog-driven parser scope (2026-04-27): Frank's Layer D factory pattern (generic slot iteration + per-construct AST node factories, NO new ConstructSlot metadata fields) drops my XL/4-5-week estimate to L/2.5-3 weeks by eliminating ~24h of slot-metadata design work. Layer B dispatch is exactly as light as he claimed (~8h total). Layer C (`DisambiguationToken: TokenKind[]?`) remains my recommendation for LS/MCP consumers despite Frank rejecting it for parser parsimony — it's live metadata with concrete LS completions and MCP vocabulary use cases, not dead weight. Layer D "NOT RECOMMENDED" softens to "viable on clean slate" with one pre-condition: a dedicated test validating that each ConstructKind's slot count/ordering in the catalog matches exactly what its BuildNode factory expects. The real Shane decision: Option 1 (A+B+C+E, 1 week, zero architectural risk) vs. Option 3 (A+B+D+E, 4 weeks, better architecture for a parser we're writing from scratch).
+
+- `Parser.cs` was annotated with Frank's dispatch table design rationale (2026-04-27):the dispatch loop is hand-written grammar mechanics (not catalog-derived), the 1:N disambiguation problem for `In`/`To`/`From`/`On` is documented, vocabulary tables must derive from catalog metadata (`Operators.All`, `Types.All`, `Modifiers.All`, `Actions.All`), and all design comments reference `docs/language/catalog-system.md` § Pipeline Stage Impact as the authoritative boundary ruling.
+
 - Analyzer infrastructure has to follow the actual Roslyn operation tree shapes in the catalog code. Constructor arguments are the happy path; object initializers, spreads, and followed field initializers are the edge cases.
 - `OperatorTable`, widening checks, and several parser/checker mapping tables are still parallel copies of catalog knowledge. Replacing them yields the highest implementation payoff.
 - Multi-source analyzer tests only need a broader helper signature; real-catalog BCL-heavy stubs should stay out of the default test path.
@@ -16,6 +20,12 @@
 - Key paths for this design thread: `docs\compiler-and-runtime-design.md`, `docs\runtime\runtime-api.md`, `docs\working\proposal-george-proof-fault-contract.md`, `.squad\decisions\inbox\george-proof-fault-contract.md`.
 - The synthesized design is only coherent when it makes three splits explicit at once: `CompilationResult` vs. `Precept`, constraints vs. faults, and authoring consumers vs. execution consumers. Leaving any one of those implicit invites parallel-model drift.
 - The action family needed the exact settled names (`TypedAction`, `TypedInputAction`, `TypedBindingAction`) to stay aligned with Shane's directive while still enforcing semantic naming. Anything looser invites a fresh naming fight.
+
+## Learnings (continued)
+
+- Catalog-driven parser estimate (2026-04-27): Layer A (vocabulary tables) is the clear win — 80 entries across OperatorKind(18), TypeKind(26), ModifierKind(28), ActionKind(8) should never be hardcoded in the parser. Layers B (`ByLeadingToken` index) and C (`DisambiguationToken` field) are worth 1 week of catalog completeness work with zero architectural risk. Layer D (slot-driven generic parsing) is 4-5 weeks of XL work with high regression risk and near-zero correctness benefit at 11-construct grammar scale — the `Slots` field already serves tooling consumers. Layer E (sync-point derivation) bundles into Layer A trivially. Key finding: the catalog's `Slots` IS the slot-driven parser, just for tooling consumers instead of the parsing engine — that's the right boundary.
+- `Modifiers.ByToken` needs to return `IReadOnlyList<ModifierMeta>` not a single value, because `TokenKind.Initial` maps to both `ModifierKind.InitialState` and `ModifierKind.InitialEvent`. All other vocabulary tables can be single-value dictionaries.
+- `DisambiguationToken` field on `ConstructMeta` should be typed `TokenKind[]?` not `TokenKind?` — `AccessMode` disambiguation from `In` uses 3 possible tokens (Write, Read, Omit). A single nullable field would be wrong.
 
 ## Recent Updates
 
