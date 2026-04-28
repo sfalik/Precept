@@ -219,8 +219,6 @@ public class ConstructsTests
             "omit is unconditional — no when clause");
         slots.Should().HaveCount(2, "omit has exactly StateTarget + FieldTarget");
     }
-            "guard clause must be the final slot in the access mode sequence");
-    }
 
     [Fact]
     public void TransitionRow_HasGuardClauseAndActionChainAsOptional()
