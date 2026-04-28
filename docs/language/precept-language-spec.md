@@ -44,7 +44,7 @@ Every token the lexer can produce. Organized by category to match the `TokenKind
 
 | Token | Text | Context |
 |-------|------|---------|
-| `In` | `in` | State-scoped scope preposition (`in State ensure ...`, `in State write|read|omit ...`) |
+| `In` | `in` | State-scoped scope preposition (`in State ensure ...`, `in State modify|omit ...`) |
 | `To` | `to` | Entry-gate ensure (`to State ensure ...`) |
 | `From` | `from` | Exit-gate ensure or transition source (`from State ...`) |
 | `On` | `on` | Event trigger (`on Event ensure ...`, `from State on Event ...`) |
@@ -81,13 +81,14 @@ Every token the lexer can produce. Organized by category to match the `TokenKind
 | `No` | `no` | Prefix for `no transition` |
 | `Reject` | `reject` | Rejection outcome |
 
-#### Keywords: Access Modes (v2)
+#### Keywords: Access Modes (v2 → v3)
 
 | Token | Text | Context |
 |-------|------|---------|
-| `Write` | `write` | State-scoped write access mode (`in <State> write …`) |
-| `Read` | `read` | State-scoped read access mode (`in <State> read …`) |
-| `Omit` | `omit` | State-scoped omit access mode (`in <State> omit …`) |
+| `Modify` | `modify` | State-scoped access mode verb (`in <State> modify <Field> readonly\|editable …`) |
+| `Readonly` | `readonly` | Access mode adjective — constrain to read-only (`in <State> modify <Field> readonly …`) |
+| `Editable` | `editable` | Access mode adjective — declare editable (`in <State> modify <Field> editable …`) |
+| `Omit` | `omit` | State-scoped structural exclusion (`in <State> omit …`) |
 
 #### Keywords: Logical Operators
 
@@ -108,7 +109,7 @@ Every token the lexer can produce. Organized by category to match the `TokenKind
 
 | Token | Text | Context |
 |-------|------|---------|
-| `All` | `all` | Universal quantifier / `read all` / `omit all` (state-scoped) |
+| `All` | `all` | Universal quantifier / `modify all` / `omit all` (state-scoped) |
 | `Any` | `any` | State wildcard (`in any`, `from any`) |
 
 #### Keywords: State Modifiers (v2)
@@ -274,7 +275,7 @@ success  warning  error
 in  to  from  on  when  any  all  of
 set  add  remove  enqueue  dequeue  push  pop  clear  into
 transition  no  reject
-write  read  omit
+write  read  omit  modify  readonly  editable
 string  number  boolean  integer  decimal  choice  maxplaces  ordered
 date  time  instant  duration  period  timezone  zoneddatetime  datetime
 money  currency  quantity  unitofmeasure  dimension  price  exchangerate
@@ -287,7 +288,9 @@ min  max  minlength  maxlength  mincount  maxcount
 
 **v2 additions** (not in v1): `optional`, `writable`, `write`, `read`, `omit`, `clear`, `nonzero`, `is`, `integer`, `decimal`, `choice`, `maxplaces`, `ordered`, `terminal`, `required`, `irreversible`, `success`, `warning`, `error`, `date`, `time`, `instant`, `duration`, `period`, `timezone`, `zoneddatetime`, `datetime`, `money`, `currency`, `quantity`, `unitofmeasure`, `dimension`, `price`, `exchangerate`.
 
-**v1 removals:** `nullable`, `null`, and `edit` are not reserved in v2. `optional` replaces `nullable`. `write` replaces `edit`. The `null` literal is removed entirely — `optional` fields use `is set`/`is not set` for presence testing and `clear` for value removal. All three are ordinary identifiers in v2; no special parser recognition is needed.
+**v3 additions** (not in v2): `modify`, `readonly`, `editable`. The access mode verbs `write`/`read` are retired from access mode declarations in favor of the `modify` verb + adjective pattern. `write` and `read` remain reserved but no longer serve as access mode keywords.
+
+**v1 removals:** `nullable`, `null`, and `edit` are not reserved in v2. `optional` replaces `nullable`. `modify` replaces `edit`. The `null` literal is removed entirely — `optional` fields use `is set`/`is not set` for presence testing and `clear` for value removal. All three are ordinary identifiers in v2; no special parser recognition is needed.
 
 ### 1.3 Literal Syntax
 
@@ -610,7 +613,7 @@ These preposition keywords parse a state target, then look ahead to select the p
 | Preposition | Following verb | Production |
 |-------------|---------------|-----------|
 | `in` | `ensure` | state ensure (scoped to `in`) |
-| `in` | `write`/`read`/`omit` | access mode (state-scoped) |
+| `in` | `modify`/`omit` | access mode (state-scoped) |
 | `to` | `ensure` | state ensure (scoped to `to`) |
 | `to` | `->` | state action (entry hook) |
 | `from` | `on` | transition row |
@@ -672,9 +675,18 @@ State actions support an optional `when` guard between the state target and the 
 ```
 FieldTarget  :=  identifier ("," identifier)* | all
 
-in StateTarget modify FieldTarget readonly ("when" BoolExpr)?   ← state-scoped constrain to read-only
-in StateTarget modify FieldTarget editable ("when" BoolExpr)?   ← state-scoped declare editable (upgrade)
-in StateTarget omit FieldTarget                                  ← state-scoped structural exclusion
+── modify (field present, access level declared) ──────────────────────────────
+in StateTarget modify Field readonly ("when" BoolExpr)?              ← singular access constraint
+in StateTarget modify Field editable ("when" BoolExpr)?              ← singular access upgrade
+in StateTarget modify Field { "," Field }* readonly ("when" BoolExpr)?  ← comma-separated shorthand
+in StateTarget modify Field { "," Field }* editable ("when" BoolExpr)?  ← comma-separated shorthand
+in StateTarget modify all readonly ("when" BoolExpr)?                ← state-scoped all
+in StateTarget modify all editable ("when" BoolExpr)?                ← state-scoped all
+
+── omit (field structurally absent — no guard) ────────────────────────────────
+in StateTarget omit Field                                            ← singular structural exclusion
+in StateTarget omit Field { "," Field }*                             ← comma-separated shorthand
+in StateTarget omit all                                              ← state-scoped all (no fields visible)
 ```
 
 **Two verbs, two roles:**
@@ -1177,12 +1189,12 @@ Type errors: applying a set operation to a non-set field, a queue operation to a
 |-------|-----------|------------|
 | Field not declared | Access mode names a field that doesn't exist | `UndeclaredField` |
 | State not declared | Access mode scoped to a state that doesn't exist | `UndeclaredState` |
-| Computed field in write mode | A computed field is listed in a `write` access mode declaration | `ComputedFieldNotWritable` |
+| Computed field in editable mode | A computed field is listed in a `modify ... editable` access mode declaration | `ComputedFieldNotWritable` |
 | `writable` on computed field | A computed field carries the `writable` modifier | `ComputedFieldNotWritable` |
 | `writable` on event arg | An event argument carries the `writable` modifier | `WritableOnEventArg` |
-| Conflicting access modes | Same field has both `write` and `omit` in the same state | `ConflictingAccessModes` |
-| Redundant access mode (unguarded) | `in <State> write F` where `F` has `writable` (baseline already `write`), or `in <State> read F` where `F` lacks `writable` (baseline already `read`); named-field forms only | `RedundantAccessMode` (error) |
-| Redundant access mode (guarded) | `in <State> read F when Guard` where `F` lacks `writable` — guard-true branch = `read`, guard-false branch = `read` (D3 baseline); the guard changes nothing | `RedundantAccessMode` (error) |
+| Conflicting access modes | Same field has both `modify` and `omit` in the same state | `ConflictingAccessModes` |
+| Redundant access mode (unguarded) | `in <State> modify F editable` where `F` has `writable` (baseline already editable), or `in <State> modify F readonly` where `F` lacks `writable` (baseline already read-only); named-field forms only | `RedundantAccessMode` (error) |
+| Redundant access mode (guarded) | `in <State> modify F readonly when Guard` where `F` lacks `writable` — guard-true branch = read-only, guard-false branch = read-only (D3 baseline); the guard changes nothing | `RedundantAccessMode` (error) |
 
 #### Computed field validation
 
@@ -1280,11 +1292,11 @@ The type checker emits diagnostics for root causes only. When `ErrorType` is flo
 | `InvalidModifierValue` | Error | "The value for '{0}' must be {1}" | Negative count/length, non-integer maxplaces |
 | `DuplicateModifier` | Error | "The '{0}' constraint is already applied to this field" | Same modifier twice |
 | `RedundantModifier` | Warning | "'{0}' is unnecessary — '{1}' already implies it" | nonnegative + positive |
-| `ComputedFieldNotWritable` | Error | "Field '{0}' is computed and cannot be assigned" | `set` targeting computed field, `write` access mode on computed field, or `writable` modifier on computed field |
+| `ComputedFieldNotWritable` | Error | "Field '{0}' is computed and cannot be assigned" | `set` targeting computed field, `modify ... editable` access mode on computed field, or `writable` modifier on computed field |
 | `ComputedFieldWithDefault` | Error | "Field '{0}' is computed and cannot have a default value" | Both `->` and `default` |
 | `CircularComputedField` | Error | "Computed field '{0}' has a circular dependency: {1}" | Self-reference or transitive cycle in computed field dependency graph |
-| `ConflictingAccessModes` | Error | "Field '{0}' has conflicting access modes in state '{1}'" | write + omit same field same state |
-| `RedundantAccessMode` | Error | "The '{0}' access mode for field '{1}' in state '{2}' is redundant — the effective mode is already '{0}'" | `in S write F` where F has `writable`; `in S read F` where F lacks `writable`; `in S read F when Guard` where F lacks `writable` |
+| `ConflictingAccessModes` | Error | "Field '{0}' has conflicting access modes in state '{1}'" | modify + omit same field same state |
+| `RedundantAccessMode` | Error | "The '{0}' access mode for field '{1}' in state '{2}' is redundant — the effective mode is already '{0}'" | `in S modify F editable` where F has `writable`; `in S modify F readonly` where F lacks `writable`; `in S modify F readonly when Guard` where F lacks `writable` |
 | `WritableOnEventArg` | Error | "The 'writable' modifier cannot appear on event argument '{0}'" | `writable` on an event arg declaration |
 | `ListLiteralOutsideDefault` | Error | "List values can only appear in default clauses" | `[...]` outside default position |
 | `DuplicateChoiceValue` | Error | "Choice value '{0}' is duplicated" | Repeated string in choice set |

@@ -867,7 +867,7 @@ The method:
 | `ParseActionChain()` | ~25 | Peek for `->` (F3), consume arrows and action statements. |
 | `ParseOutcome()` | ~20 | Check for `->`, parse `transition State` / `no transition` / `reject "msg"`. |
 | `ParseAccessModeKeyword()` | ~8 | Match `Readonly`/`Editable`, return `TokenValueNode`. (Note: these are the B4 adjective keywords. `Modify` is consumed by the disambiguator, not stored as a slot.) |
-| `ParseFieldTarget()` | ~8 | Consume identifier or `All`. |
+| `ParseFieldTarget()` | ~15 | Consume identifier, comma-separated identifier list, or `All`. Supports singular (`Amount`), list (`Amount, Balance, Notes`), and `all` forms. |
 
 #### Slice 4.4: `In`-Scoped Constructs
 
@@ -890,6 +890,11 @@ The disambiguator for `In`-scoped constructs:
 [InlineData("in Approved modify Balance readonly")]
 [InlineData("in Processing modify Amount readonly when not Finalized")]
 [InlineData("in Closed omit Amount")]
+[InlineData("in Red modify VehiclesWaiting, LeftTurnQueued editable")]
+[InlineData("in Draft modify EmployeeName, Department, AccessReason editable")]
+[InlineData("in Approved modify all readonly")]
+[InlineData("in Archived omit Notes, Attachments")]
+[InlineData("in Terminal omit all")]
 public void ParseAccessMode_InScoped(string input) { ... }
 
 [Theory]
