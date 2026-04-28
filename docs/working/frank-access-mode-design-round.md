@@ -1356,3 +1356,23 @@ in Archived omit Notes
 **Guard position:** Post-field. `in Draft modify Amount readonly when not Finalized`. The adjective precedes the guard — natural verb-object-complement-condition order.
 
 **Reference:** B4 analysis (§ B4 above), F12 decision in `docs/working/catalog-parser-design-v7.md`.
+
+### B4 Shorthand Addendum — LOCKED (2026-04-28T03:01)
+
+**Decisions by Shane (two directives):**
+
+1. **`modify` preserves comma-separated and `all` shorthands.** The `FieldTarget` slot supports singular, comma-separated list, and `all` forms. Examples:
+   - `in Red modify VehiclesWaiting, LeftTurnQueued editable` (comma-separated)
+   - `in Draft modify EmployeeName, Department, AccessReason editable` (comma-separated)
+   - `in State modify all editable` (state-scoped all)
+
+2. **`omit` also supports the same shorthands.** The `OmitDeclaration` FieldTarget slot uses the same shape:
+   - `in Archived omit Notes, Attachments` (comma-separated)
+   - `in Terminal omit all` (state-scoped all — valid for marker/terminal states where no fields are exposed)
+
+**Shared FieldTarget shape:** Both `modify` and `omit` verbs operate over `FieldTarget := identifier ("," identifier)* | all`. The AST FieldTarget node is shared; the distinction is in the containing construct (AccessModeDeclaration vs. OmitDeclaration).
+
+**AST implications:**
+- `OmitDeclaration` AST node: no `GuardClause` slot (structurally excluded — `omit` cannot be guarded, locked decision from A2).
+- `AccessModeDeclaration` AST node: has `GuardClause` slot at end (optional `when` guard).
+- Both share the `FieldTarget` slot as their first slot.

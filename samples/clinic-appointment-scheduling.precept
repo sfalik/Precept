@@ -18,8 +18,7 @@ state CheckedIn
 state Completed
 state Cancelled
 
-in Scheduled modify ScheduledDay editable
-in Scheduled modify ScheduledMinute editable
+in Scheduled modify ScheduledDay, ScheduledMinute editable
 in Scheduled ensure ConfirmationCode is set because "Scheduled appointments need a confirmation code"
 in Completed ensure VisitCompleted because "Completed visits must be marked complete"
 

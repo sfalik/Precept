@@ -203,7 +203,7 @@ Version version = outcome switch
 | Recompute computed fields | ✅ | ✅ | ✅ |
 | Evaluate constraints | ✅ | ✅ | ✅ |
 
-Access modes are bypassed because persisted fields were written when the entity was in prior states — a field that is `read` in `Approved` was `write` when the entity was in `Draft`. Restore accepts all stored fields regardless of the restored state's access declarations.
+Access modes are bypassed because persisted fields were written when the entity was in prior states — a field that is `readonly` in `Approved` was `editable` when the entity was in `Draft`. Restore accepts all stored fields regardless of the restored state's access declarations.
 
 **Return type:** `RestoreOutcome` — three variants:
 - `Restored(Version)` — data valid, constraints passed.
@@ -397,11 +397,11 @@ For stateless precepts, `ApplicableConstraints` includes all global rules and al
 ```csharp
 public sealed record FieldAccessInfo(
     string FieldName,
-    FieldAccessMode Mode,       // Read or Write
+    FieldAccessMode Mode,       // Readonly or Editable
     string FieldType,
     object? CurrentValue);
 
-public enum FieldAccessMode { Read, Write }
+public enum FieldAccessMode { Readonly, Editable }
 ```
 
 Returned by `Version.FieldAccess`. Lists every non-omitted field in the current state with its access mode and current value. `Omit`ted fields are structurally absent — they don't appear in this list.

@@ -145,7 +145,7 @@ The four preposition-scoped methods parse a state or event target, then look ahe
 | Lookahead after state target | Production | `ConstructKind` |
 |------------------------------|-----------|-----------------|
 | `Ensure` | `ParseStateEnsure(In)` | `StateEnsure` |
-| `Write`, `Read`, `Omit` | `ParseAccessMode(stateTarget)` | `AccessMode` |
+| `Modify`, `Omit` | `ParseAccessMode(stateTarget)` | `AccessMode` |
 | `When` *(then re-check)* | consume guard, re-dispatch | *(same as above)* |
 
 **`ParseToScoped()`** — Leading token `to`:
@@ -191,7 +191,7 @@ The parser sees `from` → calls `ParseFromScoped()` → parses state target `Un
 When the dispatch loop encounters an unrecognized token, it emits an `UnexpectedKeyword` diagnostic and scans forward for a sync token — a keyword that unambiguously starts a new declaration:
 
 ```
-precept  field  state  event  rule  from  to  in  on  write  read  omit
+precept  field  state  event  rule  from  to  in  on  modify  omit
 ```
 
 These are exactly the `LeadingToken` values from the Constructs catalog plus `EndOfSource`. Continuation tokens (`when`, `->`, `set`, `transition`, `ensure`, `because`) are never sync points — they appear mid-production and would cause the parser to skip valid content. The sync scanner also stops at `EndOfSource`.
@@ -527,13 +527,17 @@ in Approved ensure ApprovedAmount > 0 because "Approved claims must specify a pa
 #### AccessMode
 
 ```
-(in StateTarget ("when" BoolExpr)?)? AccessKeyword FieldTarget
-AccessKeyword := write | read | omit
+FieldTarget  :=  identifier ("," identifier)* | all
 
-State-scoped form: in StateTarget ("when" BoolExpr)? write|read|omit FieldTarget
+── modify (field present, access level declared) ──────────────────────────────
+in StateTarget modify FieldTarget readonly ("when" BoolExpr)?   ← constrain to read-only
+in StateTarget modify FieldTarget editable ("when" BoolExpr)?   ← declare editable (upgrade)
+
+── omit (field structurally absent — no guard) ────────────────────────────────
+in StateTarget omit FieldTarget                                  ← structural exclusion
 ```
 
-Root-level access mode declarations are not valid syntax. Root-level `write <FieldName>` (bare field list) is invalid — use the `writable` modifier on the field declaration instead. Root-level `read` and `omit` are also invalid.
+Root-level access mode declarations are not valid syntax. Root-level `modify <FieldName>` (bare field list) is invalid — use the `writable` modifier on the field declaration instead. Root-level `omit` is also invalid.
 
 ```csharp
 public sealed record AccessModeNode(
@@ -547,7 +551,7 @@ public sealed record AccessModeNode(
 ```
 
 ```precept
-in UnderReview write FraudFlag
+in UnderReview modify FraudFlag editable
 ```
 
 #### StateAction
@@ -788,7 +792,7 @@ The 11 `ConstructKind` values map to exactly 11 parse productions:
 | `RuleDeclaration` | `ParseRuleDeclaration()` | `Rule` |
 | `TransitionRow` | `ParseTransitionRow()` | `From` |
 | `StateEnsure` | `ParseStateEnsure()` | `In`, `To`, or `From` |
-| `AccessMode` | `ParseAccessMode()` | `In` or `Write` |
+| `AccessMode` | `ParseAccessMode()` | `In` or `Modify` |
 | `StateAction` | `ParseStateAction()` | `To` or `From` |
 | `EventEnsure` | `ParseEventEnsure()` | `On` |
 | `EventHandler` | `ParseEventHandler()` | `On` |
@@ -879,8 +883,9 @@ When the top-level dispatch loop encounters a token that cannot start any declar
 | `To` | `to` |
 | `In` | `in` |
 | `On` | `on` |
-| `Write` | `write` |
-| `Read` | `read` |
+| `Modify` | `modify` |
+| `Readonly` | `readonly` |
+| `Editable` | `editable` |
 | `Omit` | `omit` |
 | `EndOfSource` | — |
 
@@ -942,7 +947,7 @@ The parser's hand-written dispatch table is not a catalog violation. The catalog
 
 | Leading token | ConstructKinds | Disambiguation |
 |---------------|----------------|----------------|
-| `In` | `StateEnsure`, `AccessMode` | verb after state target (`ensure` vs. `write`/`read`/`omit`) |
+| `In` | `StateEnsure`, `AccessMode` | verb after state target (`ensure` vs. `modify`/`omit`) |
 | `To` | `StateEnsure`, `StateAction` | verb after state target (`ensure` vs. `->`) |
 | `From` | `TransitionRow`, `StateEnsure`, `StateAction` | verb after state target (`on` vs. `ensure` vs. `->`) |
 | `On` | `EventEnsure`, `EventHandler` | verb after event target (`ensure` vs. `->`) |
@@ -971,7 +976,7 @@ A flat, line-oriented grammar with no block delimiters needs an unambiguous stru
 The insurance-claim sample illustrates the pattern. Every line after the header declarations begins with `from`, `in`, or `on`:
 
 ```precept
-in UnderReview write FraudFlag
+in UnderReview modify FraudFlag editable
 in Approved ensure ApprovedAmount > 0 because "Approved claims must specify a payout amount"
 on Submit ensure Amount > 0 because "Claim amounts must be positive"
 from Draft on Submit -> set ClaimantName = Submit.Claimant -> transition Submitted

@@ -716,7 +716,7 @@ All declaration-attached modifiers across the language surface — field constra
 | `FieldModifierMeta` | `optional`, `writable`, `default`, `nonnegative`, `positive`, `nonzero`, `notempty`, `min`, `max`, `minlength`, `maxlength`, `mincount`, `maxcount`, `maxplaces`, `ordered` | 15 |
 | `StateModifierMeta` | `initial` (state), `terminal`, `required`, `irreversible`, `success`, `warning`, `error` | 7 |
 | `EventModifierMeta` | `initial` (event) | 1 |
-| `AccessModifierMeta` | `write`, `read`, `omit` | 3 |
+| `AccessModifierMeta` | `modify`, `readonly`, `editable`, `omit` | 4 |
 | `AnchorModifierMeta` | `in`, `to`, `from` | 3 (with `AnchorTarget` disambiguating ensure vs state-action) |
 
 **Consumers:** MCP vocabulary, LS completions (modifier names after type, state modifiers in state declarations, access modes in state blocks), LS hover, type checker (modifier applicability per TypeKind, access mode enforcement, state modifier graph analysis), graph analyzer (structural modifier validation).
@@ -772,7 +772,7 @@ public sealed record EventModifierMeta(
     GraphAnalysisKind  RequiredAnalysis = GraphAnalysisKind.None
 ) : ModifierMeta(Kind, Token, Description, Category);
 
-// ── Access modes (3: write, read, omit) ─────────────────
+// ── Access modes (4: modify, readonly, editable, omit) ──
 public sealed record AccessModifierMeta(
     ModifierKind     Kind,
     TokenMeta        Token,
@@ -781,9 +781,9 @@ public sealed record AccessModifierMeta(
     bool             IsPresent    = true,    // false = omit (structurally absent)
     bool             IsWritable   = true     // false = read-only
 ) : ModifierMeta(Kind, Token, Description, Category);
-// write: IsPresent=true,  IsWritable=true
-// read:  IsPresent=true,  IsWritable=false
-// omit:  IsPresent=false, IsWritable=false
+// modify + editable: IsPresent=true,  IsWritable=true
+// modify + readonly: IsPresent=true,  IsWritable=false
+// omit:              IsPresent=false, IsWritable=false
 
 // ── Ensure/action anchors (in, to, from) ────────────────
 public sealed record AnchorModifierMeta(
