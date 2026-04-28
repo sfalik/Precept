@@ -1,3 +1,8 @@
+using System.Collections.Frozen;
+using System.Collections.Immutable;
+using Precept.Language;
+using Precept.Pipeline.SyntaxNodes;
+
 namespace Precept.Pipeline;
 
 // Design: Parser Architecture and Dispatch Table
@@ -84,5 +89,230 @@ namespace Precept.Pipeline;
 /// </remarks>
 public static class Parser
 {
+    // ════════════════════════════════════════════════════════════════════════════
+    //  Vocabulary FrozenDictionaries — derived from catalog metadata (Layer A)
+    // ════════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Operator precedence and associativity, keyed by <see cref="TokenKind"/>.
+    /// Derived from <see cref="Operators.All"/>. Binary operators only (unary
+    /// handled by prefix binding power in the Pratt loop).
+    /// </summary>
+    internal static readonly FrozenDictionary<TokenKind, (int Precedence, bool RightAssociative)> OperatorPrecedence =
+        Operators.All
+            .Where(op => op.Arity == Arity.Binary)
+            .ToFrozenDictionary(
+                op => op.Token.Kind,
+                op => (op.Precedence, op.Associativity == Associativity.Right));
+
+    /// <summary>
+    /// Token kinds that introduce a type in <c>as Type</c> position.
+    /// Derived from <see cref="Types.ByToken"/>.
+    /// </summary>
+    internal static readonly FrozenSet<TokenKind> TypeKeywords =
+        Types.ByToken.Keys.ToFrozenSet();
+
+    /// <summary>
+    /// Token kinds that are field-level modifiers (both flag and value-bearing).
+    /// Derived from <see cref="Modifiers.All"/> where the modifier is a <see cref="FieldModifierMeta"/>.
+    /// </summary>
+    internal static readonly FrozenSet<TokenKind> ModifierKeywords =
+        Modifiers.All
+            .OfType<FieldModifierMeta>()
+            .Select(m => m.Token.Kind)
+            .ToFrozenSet();
+
+    /// <summary>
+    /// Token kinds that begin an action statement (<c>set</c>, <c>add</c>, etc.).
+    /// Derived from <see cref="Actions.All"/>.
+    /// </summary>
+    internal static readonly FrozenSet<TokenKind> ActionKeywords =
+        Actions.All
+            .Select(a => a.Token.Kind)
+            .ToFrozenSet();
+
+    // ════════════════════════════════════════════════════════════════════════════
+    //  Public entry point
+    // ════════════════════════════════════════════════════════════════════════════
+
     public static SyntaxTree Parse(TokenStream tokens) => throw new NotImplementedException();
+
+    // ════════════════════════════════════════════════════════════════════════════
+    //  ParseSession — mutable cursor state for a single parse pass
+    // ════════════════════════════════════════════════════════════════════════════
+
+    private ref struct ParseSession
+    {
+        private readonly ImmutableArray<Token> _tokens;
+#pragma warning disable CS0414 // Fields assigned but not yet used (PR 3 dispatch loop will use)
+        private int _position;
+        private readonly ImmutableArray<Diagnostic>.Builder _diagnostics;
+#pragma warning restore CS0414
+
+        public ParseSession(ImmutableArray<Token> tokens)
+        {
+            _tokens = tokens;
+            _position = 0;
+            _diagnostics = ImmutableArray.CreateBuilder<Diagnostic>();
+        }
+
+        // ── Generic slot iteration (Slice 2.5) ────────────────────────────────
+
+        /// <summary>
+        /// Walks each slot in a construct's metadata and invokes the corresponding
+        /// slot parser. Returns a slot array suitable for <see cref="BuildNode"/>.
+        /// </summary>
+        private SyntaxNode?[] ParseConstructSlots(ConstructMeta meta)
+        {
+            var slots = new SyntaxNode?[meta.Slots.Count];
+            for (int i = 0; i < meta.Slots.Count; i++)
+            {
+                var slot = meta.Slots[i];
+                slots[i] = InvokeSlotParser(slot.Kind, !slot.IsRequired);
+            }
+            return slots;
+        }
+
+        // ── InvokeSlotParser — exhaustive switch (Slice 2.3) ──────────────────
+
+        /// <summary>
+        /// Dispatches to the appropriate slot parser for the given slot kind.
+        /// CS8509 enforcement: adding a new <see cref="ConstructSlotKind"/> member
+        /// without an arm here is a build error.
+        /// </summary>
+        private SyntaxNode? InvokeSlotParser(ConstructSlotKind slotKind, bool isOptional) => slotKind switch
+        {
+            ConstructSlotKind.IdentifierList     => ParseIdentifierList(isOptional),
+            ConstructSlotKind.TypeExpression      => ParseTypeExpression(isOptional),
+            ConstructSlotKind.ModifierList        => ParseModifierList(isOptional),
+            ConstructSlotKind.StateModifierList   => ParseStateModifierList(isOptional),
+            ConstructSlotKind.ArgumentList        => ParseArgumentList(isOptional),
+            ConstructSlotKind.ComputeExpression   => ParseComputeExpression(isOptional),
+            ConstructSlotKind.GuardClause         => ParseGuardClause(isOptional),
+            ConstructSlotKind.ActionChain         => ParseActionChain(isOptional),
+            ConstructSlotKind.Outcome             => ParseOutcome(isOptional),
+            ConstructSlotKind.StateTarget         => ParseStateTarget(isOptional),
+            ConstructSlotKind.EventTarget         => ParseEventTarget(isOptional),
+            ConstructSlotKind.EnsureClause        => ParseEnsureClause(isOptional),
+            ConstructSlotKind.BecauseClause       => ParseBecauseClause(isOptional),
+            ConstructSlotKind.AccessModeKeyword   => ParseAccessModeKeyword(isOptional),
+            ConstructSlotKind.FieldTarget         => ParseFieldTarget(isOptional),
+            ConstructSlotKind.RuleExpression      => ParseRuleExpression(isOptional),
+            // CS8509 enforcement: a new ConstructSlotKind member without an arm is a build error.
+            // The wildcard below covers only unnamed numeric values outside the defined enum range.
+            _ => throw new ArgumentOutOfRangeException(nameof(slotKind), slotKind,
+                $"Unknown ConstructSlotKind: {slotKind}"),
+        };
+
+        // ── Slot parser stubs (PR 3–5 will implement) ─────────────────────────
+
+        private SyntaxNode? ParseIdentifierList(bool isOptional) => throw new NotImplementedException();
+        private SyntaxNode? ParseTypeExpression(bool isOptional) => throw new NotImplementedException();
+        private SyntaxNode? ParseModifierList(bool isOptional) => throw new NotImplementedException();
+        private SyntaxNode? ParseStateModifierList(bool isOptional) => throw new NotImplementedException();
+        private SyntaxNode? ParseArgumentList(bool isOptional) => throw new NotImplementedException();
+        private SyntaxNode? ParseComputeExpression(bool isOptional) => throw new NotImplementedException();
+        private SyntaxNode? ParseGuardClause(bool isOptional) => throw new NotImplementedException();
+        private SyntaxNode? ParseActionChain(bool isOptional) => throw new NotImplementedException();
+        private SyntaxNode? ParseOutcome(bool isOptional) => throw new NotImplementedException();
+        private SyntaxNode? ParseStateTarget(bool isOptional) => throw new NotImplementedException();
+        private SyntaxNode? ParseEventTarget(bool isOptional) => throw new NotImplementedException();
+        private SyntaxNode? ParseEnsureClause(bool isOptional) => throw new NotImplementedException();
+        private SyntaxNode? ParseBecauseClause(bool isOptional) => throw new NotImplementedException();
+        private SyntaxNode? ParseAccessModeKeyword(bool isOptional) => throw new NotImplementedException();
+        private SyntaxNode? ParseFieldTarget(bool isOptional) => throw new NotImplementedException();
+        private SyntaxNode? ParseRuleExpression(bool isOptional) => throw new NotImplementedException();
+    }
+
+    // ════════════════════════════════════════════════════════════════════════════
+    //  BuildNode — exhaustive 12-arm switch (Slice 2.4)
+    // ════════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Assembles a typed <see cref="Declaration"/> from the generic slot array
+    /// produced by <see cref="ParseSession.ParseConstructSlots"/>. One arm per
+    /// <see cref="ConstructKind"/>.
+    /// </summary>
+    internal static Declaration BuildNode(ConstructKind kind, SyntaxNode?[] slots, SourceSpan span) => kind switch
+    {
+        ConstructKind.PreceptHeader => new PreceptHeaderNode(span,
+            ((SyntaxNode)slots[0]!).AsToken()),
+
+        ConstructKind.FieldDeclaration => new FieldDeclarationNode(span,
+            ((SyntaxNode)slots[0]!).AsTokenArray(),
+            (TypeRefNode)slots[1]!,
+            slots[2]?.AsFieldModifiers() ?? [],
+            slots[3] as Expression),
+
+        ConstructKind.StateDeclaration => new StateDeclarationNode(span,
+            ((SyntaxNode)slots[0]!).AsStateEntries()),
+
+        ConstructKind.EventDeclaration => new EventDeclarationNode(span,
+            ((SyntaxNode)slots[0]!).AsTokenArray(),
+            slots[1]?.AsArguments() ?? [],
+            false),
+
+        ConstructKind.RuleDeclaration => new RuleDeclarationNode(span,
+            (Expression)slots[0]!,
+            slots[1] as Expression,
+            (Expression)slots[2]!),
+
+        ConstructKind.TransitionRow => new TransitionRowNode(span,
+            (StateTargetNode)slots[0]!,
+            ((SyntaxNode)slots[1]!).AsToken(),
+            slots[2] as Expression,
+            slots[3]?.AsStatements() ?? [],
+            (OutcomeNode)slots[4]!),
+
+        ConstructKind.StateEnsure => new StateEnsureNode(span,
+            default, // preposition token injected by dispatch loop
+            (StateTargetNode)slots[0]!,
+            null,
+            (Expression)((SyntaxNode)slots[1]!),
+            default!),
+
+        ConstructKind.AccessMode => new AccessModeNode(span,
+            (StateTargetNode)slots[0]!,
+            (FieldTargetNode)slots[1]!,
+            ((SyntaxNode)slots[2]!).AsToken(),
+            slots[3] as Expression),
+
+        ConstructKind.OmitDeclaration => new OmitDeclarationNode(span,
+            (StateTargetNode)slots[0]!,
+            (FieldTargetNode)slots[1]!),
+
+        ConstructKind.StateAction => new StateActionNode(span,
+            default, // preposition token injected by dispatch loop
+            (StateTargetNode)slots[0]!,
+            null,
+            slots[1]?.AsStatements() ?? []),
+
+        ConstructKind.EventEnsure => new EventEnsureNode(span,
+            ((SyntaxNode)slots[0]!).AsToken(),
+            null,
+            (Expression)((SyntaxNode)slots[1]!),
+            default!),
+
+        ConstructKind.EventHandler => new EventHandlerNode(span,
+            ((SyntaxNode)slots[0]!).AsToken(),
+            slots[1]?.AsStatements() ?? []),
+
+        _ => throw new ArgumentOutOfRangeException(nameof(kind), kind,
+            $"Unknown ConstructKind: {kind}"),
+    };
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  BuildNode helper extensions — temporary casting bridges until PR 3
+//  introduces concrete wrapper nodes for identifier lists, etc.
+// ════════════════════════════════════════════════════════════════════════════
+
+internal static class BuildNodeExtensions
+{
+    internal static Token AsToken(this SyntaxNode _) => throw new NotImplementedException();
+    internal static ImmutableArray<Token> AsTokenArray(this SyntaxNode _) => throw new NotImplementedException();
+    internal static ImmutableArray<FieldModifierNode> AsFieldModifiers(this SyntaxNode _) => throw new NotImplementedException();
+    internal static ImmutableArray<StateEntryNode> AsStateEntries(this SyntaxNode _) => throw new NotImplementedException();
+    internal static ImmutableArray<ArgumentNode> AsArguments(this SyntaxNode _) => throw new NotImplementedException();
+    internal static ImmutableArray<Statement> AsStatements(this SyntaxNode _) => throw new NotImplementedException();
 }
