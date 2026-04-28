@@ -44,8 +44,8 @@ public static class Tokens
     /// <summary>'as' and 'into' appear after Identifier (field name or event arg name).</summary>
     private static readonly TokenKind[] VA_AfterIdent = [TokenKind.Identifier];
 
-    /// <summary>'all' follows omit keyword (e.g. omit all). write/read and write all retired in B4 (2026-04-28).</summary>
-    private static readonly TokenKind[] VA_AllQuantifier = [TokenKind.Omit];
+    /// <summary>'all' follows modify or omit keyword (e.g. modify all, omit all). write/read and write all retired in B4 (2026-04-28).</summary>
+    private static readonly TokenKind[] VA_AllQuantifier = [TokenKind.Modify, TokenKind.Omit];
 
     /// <summary>'any' follows prepositions as a state wildcard (in any, from any, to any).</summary>
     private static readonly TokenKind[] VA_AnyQuantifier = [TokenKind.In, TokenKind.From, TokenKind.To];

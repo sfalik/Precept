@@ -275,7 +275,7 @@ success  warning  error
 in  to  from  on  when  any  all  of
 set  add  remove  enqueue  dequeue  push  pop  clear  into
 transition  no  reject
-write  read  omit  modify  readonly  editable
+omit  modify  readonly  editable
 string  number  boolean  integer  decimal  choice  maxplaces  ordered
 date  time  instant  duration  period  timezone  zoneddatetime  datetime
 money  currency  quantity  unitofmeasure  dimension  price  exchangerate
@@ -286,9 +286,11 @@ nonnegative  positive  nonzero  notempty
 min  max  minlength  maxlength  mincount  maxcount
 ```
 
-**v2 additions** (not in v1): `optional`, `writable`, `write`, `read`, `omit`, `clear`, `nonzero`, `is`, `integer`, `decimal`, `choice`, `maxplaces`, `ordered`, `terminal`, `required`, `irreversible`, `success`, `warning`, `error`, `date`, `time`, `instant`, `duration`, `period`, `timezone`, `zoneddatetime`, `datetime`, `money`, `currency`, `quantity`, `unitofmeasure`, `dimension`, `price`, `exchangerate`.
+**v2 additions** (not in v1): `optional`, `writable`, `omit`, `clear`, `nonzero`, `is`, `integer`, `decimal`, `choice`, `maxplaces`, `ordered`, `terminal`, `required`, `irreversible`, `success`, `warning`, `error`, `date`, `time`, `instant`, `duration`, `period`, `timezone`, `zoneddatetime`, `datetime`, `money`, `currency`, `quantity`, `unitofmeasure`, `dimension`, `price`, `exchangerate`.
 
-**v3 additions** (not in v2): `modify`, `readonly`, `editable`. The access mode verbs `write`/`read` are retired from access mode declarations in favor of the `modify` verb + adjective pattern. `write` and `read` remain reserved but no longer serve as access mode keywords.
+**v3 additions** (not in v2): `modify`, `readonly`, `editable`. The access mode verbs `write`/`read` are removed entirely in favor of the `modify` verb + adjective pattern. `write` and `read` are no longer reserved — they are ordinary identifiers in v3.
+
+**v3 removals:** `write` and `read` are not reserved in v3. The `modify` verb + `readonly`/`editable` adjective pattern replaces them. Both are ordinary identifiers in v3; no special parser recognition is needed.
 
 **v1 removals:** `nullable`, `null`, and `edit` are not reserved in v2. `optional` replaces `nullable`. `modify` replaces `edit`. The `null` literal is removed entirely — `optional` fields use `is set`/`is not set` for presence testing and `clear` for value removal. All three are ordinary identifiers in v2; no special parser recognition is needed.
 
@@ -565,7 +567,7 @@ After the `precept <Name>` header, the parser enters a loop that dispatches on t
 | `state` | `StateDeclaration` |
 | `event` | `EventDeclaration` |
 | `rule` | `RuleDeclaration` |
-| `in` | `StateEnsureDeclaration` or `AccessModeDeclaration` |
+| `in` | `StateEnsureDeclaration`, `AccessModeDeclaration`, or `OmitDeclaration` |
 | `to` | `StateEnsureDeclaration` or `StateActionDeclaration` |
 | `from` | `TransitionRowDeclaration`, `StateEnsureDeclaration`, or `StateActionDeclaration` |
 | `on` | `EventEnsureDeclaration` or `EventHandlerDeclaration` |
@@ -613,7 +615,8 @@ These preposition keywords parse a state target, then look ahead to select the p
 | Preposition | Following verb | Production |
 |-------------|---------------|-----------|
 | `in` | `ensure` | state ensure (scoped to `in`) |
-| `in` | `modify`/`omit` | access mode (state-scoped) |
+| `in` | `modify` | access mode (state-scoped) |
+| `in` | `omit` | omit declaration (state-scoped structural exclusion) |
 | `to` | `ensure` | state ensure (scoped to `to`) |
 | `to` | `->` | state action (entry hook) |
 | `from` | `on` | transition row |
@@ -670,12 +673,14 @@ Event hooks without a `when`/`ensure` continuation are parsed as stateless event
 
 State actions support an optional `when` guard between the state target and the action chain. The guard is passed through to the AST node.
 
-#### Access mode
+#### Access mode and omit declaration
+
+Two separate constructs govern per-state field access: `AccessMode` (modify + adjective + optional guard) and `OmitDeclaration` (omit, no guard). They share the `in` preposition but are distinct `ConstructKind`s with different slot sequences.
 
 ```
 FieldTarget  :=  identifier ("," identifier)* | all
 
-── modify (field present, access level declared) ──────────────────────────────
+── AccessMode: modify (field present, access level declared) ───────────────────
 in StateTarget modify Field readonly ("when" BoolExpr)?              ← singular access constraint
 in StateTarget modify Field editable ("when" BoolExpr)?              ← singular access upgrade
 in StateTarget modify Field { "," Field }* readonly ("when" BoolExpr)?  ← comma-separated shorthand
@@ -683,7 +688,7 @@ in StateTarget modify Field { "," Field }* editable ("when" BoolExpr)?  ← comm
 in StateTarget modify all readonly ("when" BoolExpr)?                ← state-scoped all
 in StateTarget modify all editable ("when" BoolExpr)?                ← state-scoped all
 
-── omit (field structurally absent — no guard) ────────────────────────────────
+── OmitDeclaration: omit (field structurally absent — no guard) ────────────────
 in StateTarget omit Field                                            ← singular structural exclusion
 in StateTarget omit Field { "," Field }*                             ← comma-separated shorthand
 in StateTarget omit all                                              ← state-scoped all (no fields visible)
