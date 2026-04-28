@@ -14,6 +14,7 @@
 - Runtime resolved-value enums (for example `FieldAccessMode { Read, Write }`) are outputs of compilation, not declaration-surface vocabulary. Do not collapse modifier docs into runtime descriptor docs.
 - For language-surface doc audits, the update set is predictable: token catalog, modifier catalog, parser/type-checker docs, diagnostic catalog, language spec/vision, and evaluator prose; historical working docs and runtime result-shape docs change only when their own contract changes.
 - Clean-slate parser work changes the calculus: richer catalog-driven dispatch and routing are viable when the parser is still a stub, but semantic meaning and downstream type safety remain irreducibly hand-authored.
+- Access mode design round verdicts (A1 guarded read approved with writable-only constraint, A2 guarded omit stays prohibited, A3 vocabulary unchanged, A4 redundancy rule locked as compile error) written to `docs/working/frank-access-mode-design-round.md` on 2026-04-28. Rule 4 split into 4a/4b/4c, vision doc updated, grammar updated with two guarded lines. Open question: rule 7 refinement semantics for unguarded write + guarded read on same pair (unchanged).
 
 ## Recent Updates
 
@@ -27,6 +28,22 @@
 - Round 3 resolved George's six flagged items: accept `LeadingTokenSlot`, keep `BuildNode` as an exhaustive switch, apply peek-before-consume for `ActionChain`, allow both `when` guard positions, keep disambiguation tokens explicit, and sequence the catalog migration behind a `PrimaryLeadingToken` bridge.
 - Extensibility outcome: catalog-driven parsing removes most parser-layer glue for new constructs, but generic AST and AST-as-catalog-tree were rejected; source generation stays deferred until construct count or consumers justify the infrastructure.
 
+### 2026-04-27 — Catalog-driven parser design v7: final design & implementation plan
+- Closed L1 (language change decision): Shane confirmed pre-verb guard position as canonical (`in State when Guard write Field`). Recorded as decision F11. Language simplification proposal rejected.
+- Closed T1 (test nit): Restructured `BuildNodeHandlesEveryConstructKind` assertion to distinguish `ArgumentOutOfRangeException` (gap) from null-propagation exceptions (arm exists).
+- Authored the five-PR implementation plan meeting CONTRIBUTING.md quality bar: PR 1 (catalog migration), PR 2 (parser infrastructure), PR 3 (non-disambiguated constructs), PR 4 (simple disambiguation), PR 5 (from-scoped + error sync).
+- Design loop concluded after 7 rounds. 17 decisions (F1–F11, G1–G6) resolved with zero open items. v7 supersedes v1–v6.
+- Deliverable: `docs/working/catalog-parser-design-v7.md` — method-level specificity, exact file paths, tests per slice, regression anchors, file inventory, tooling/MCP sync assessment.
+
 ### 2026-04-28 — Combined design boundary/philosophy revision
 - Corrected the overclaim that "nothing crosses the boundary" and recentered the main design doc on Precept's philosophy and guarantee.
 - Locked the real rule: type dependency direction stays one-way, while lowered runtime-native shapes may intentionally preserve selected analysis knowledge.
+
+### 2026-04-28 — Spec grammar corrections (4 errors)
+- Fixed guard/access-mode grammar inconsistency: grammar was showing `when` as valid with all three access verbs, contradicting rule 4 which correctly restricts guards to `write` only. Split grammar into guarded write line and unguarded read/omit line.
+- Applied Shane-approved language change: moved `when` guard from pre-verb to post-field position (`in State write Field when Guard`). This eliminates the disambiguator pre-parsing complexity identified in George's v5-lang-simplify analysis. Updated spec, vision doc, and both affected sample files.
+- Fixed ensure grammar: spec showed pre-ensure guard position; all sample files consistently use post-expression guard. Updated spec to match samples (`ensure Expr when Guard because Msg`).
+- Added `FieldTarget` formal definition: grammar was showing a bare `FieldTarget` without defining it. Added `FieldTarget := identifier ("," identifier)* | all` to match documented prose and sample usage of comma-separated field lists.
+### 2026-04-28 — Redundant access mode diagnostic and inbox merge
+- `RedundantAccessMode` is now the canonical compile-time error for dead named-field access declarations; `RedundantGuardedRead` is retired, while `omit` and broadcast `all` remain exempt and rule 7 stays open.
+- Access-mode backlog is durably merged: guarded `read` remains a writable-only downgrade, guarded `omit` remains prohibited, the vocabulary stays `read`/`write`/`omit`, and `write all` is removed from the language in favor of field-level `writable`.
