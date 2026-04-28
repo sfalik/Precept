@@ -57,3 +57,35 @@
 ### 2026-04-28 — B4 vocabulary locked
 - Shane approved Frank's B4 direction: access-mode declarations now use `modify` as the verb with `readonly` / `editable` as the access adjectives.
 - This closes the adjective-pair decision, supersedes B2/B3 recommendations, and preserves `omit` as the separate structural-exclusion verb rather than folding it into the same access-mode family.
+
+### 2026-04-28T03:01 — Full documentation sweep: access-mode shorthand grammar
+
+**Complete locked grammar (authoritative):**
+```
+in State modify Field readonly [when Guard]         ← singular access constraint
+in State modify Field editable [when Guard]         ← singular access upgrade
+in State modify F1, F2, ... readonly/editable [when Guard]  ← comma-separated shorthand
+in State modify all readonly/editable [when Guard]  ← state-scoped all
+
+in State omit Field                                 ← singular structural exclusion
+in State omit F1, F2, ...                          ← comma-separated shorthand
+in State omit all                                   ← state-scoped all (no fields visible)
+```
+
+**Key semantic notes:**
+- `modify` = field IS present, access level is being declared (can be guarded)
+- `omit` = field is structurally ABSENT from this state (cannot be guarded — ever)
+- Both verbs share FieldTarget shape: singular | comma-separated list | `all`
+- OmitDeclaration AST: no GuardClause slot. AccessModeDeclaration AST: has GuardClause slot (optional).
+
+**Docs updated (8 files):**
+- `docs/language/precept-language-spec.md` — keyword tables, reserved words, grammar (9 forms for both verbs), dispatch table, validation table, diagnostic catalog
+- `docs/language/precept-language-vision.md` — source inputs, surface table, keyword families, Layer 2 verb table, composition rules, parser/type-checker responsibilities, language contract
+- `docs/working/catalog-parser-design-v7.md` — ParseFieldTarget description, shorthand test cases
+- `docs/working/frank-access-mode-design-round.md` — B4 Shorthand Addendum
+- `docs/compiler/parser.md` — disambiguation tables, grammar, sync points, token tables, examples
+- `docs/language/catalog-system.md` — AccessModifierMeta DU table and code example
+- `docs/runtime/runtime-api.md` — FieldAccessMode enum, Restore prose
+- `docs/runtime/evaluator.md` — Access-Mode Enforcement composition model reference
+
+**Pattern found:** Old `write`/`read` vocabulary leaked into four categories: (1) keyword tables/lists, (2) grammar rules and dispatch tables, (3) diagnostic description examples, (4) runtime behavioral prose. The token catalog tables were the most consistent leakage surface — every doc that listed keywords had `write`/`read`. Secondary docs (lexer, tooling-surface, diagnostic-system) were clean because they reference catalog mechanics generically rather than listing specific keywords.

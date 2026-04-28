@@ -86,6 +86,13 @@
 - All 1809 tests pass.
 
 
-### 2026-04-28 — AccessMode catalog fix landed
-- Implemented the missing `SlotGuardClause` on `ConstructKind.AccessMode`, added the missing `RedundantAccessMode` diagnostic metadata arm, and removed the stale `write all` wording from the construct description.
-- Added the guard-slot regression test (`AccessMode_HasGuardClauseAsOptional`) and verified the batch outcome at 1809 passing tests.
+### 2026-04-28 — Access-mode vocabulary migration (B4)
+
+- Implemented the full B4 vocabulary lock: `Write`/`Read` retired from `TokenKind`, replaced by `Modify`, `Readonly`, `Editable`.
+- `ConstructKind.OmitDeclaration` added as a separate construct (no guard slot, just StateTarget + FieldTarget). `AccessMode` now uses leading token `In` (was `Write`), slot order changed to StateTarget → FieldTarget → AccessModeKeyword → GuardClause (verb `modify` consumed by disambiguator, not stored).
+- `Modifiers.cs`: `ModifierKind.Write` now references `TokenKind.Editable`; `ModifierKind.Read` references `TokenKind.Readonly`.
+- All 17 sample access-mode lines across 14 files migrated. Comma-separated field lists split into separate declarations.
+- Key surprise: `src/Precept/Language/ConstructSlot.cs` description for `AccessModeKeyword` said `write | read | omit` — updated to `readonly | editable`.
+- 1817 + 207 = 2024 tests pass after all changes.
+- Cross-surface: Kramer must re-run the grammar generator; Newman has no DTO work (catalog-derived tokens surface automatically through `Tokens.All`).
+- Spec reserved-keywords list still has stale `write`/`read` entries alongside new tokens — flagged as cleanup debt, not blocking.
