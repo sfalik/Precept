@@ -13,6 +13,8 @@
 - Typed action naming is fixed: `TypedAction`, `TypedInputAction`, and `TypedBindingAction`. Anything looser invites fresh naming drift.
 - Parser vocabulary should derive from catalog metadata, but grammar mechanics should stay hand-written unless the catalog can express the routing contract without hiding invariants.
 - Named local index constants inside exhaustive `BuildNode` switch arms are the right defense against slot-order drift; registry-like structures and exhaustive pattern matches should use different data structures for different invariants.
+- PRECEPT0007 enforces exhaustiveness on DiagnosticCode.GetMeta; a DiagnosticCode member without a catalog arm is a build error. Any time a new DiagnosticCode is added, its Diagnostics.GetMeta arm must be added in the same commit or the build breaks.
+- Slot additions to a construct's sequence must include a regression test that pins the slot kind AND its position (last slot guard). Tests that only assert "guard slot exists" don't catch ordering regressions — assert `slots.Last().Kind == GuardClause` as well.
 
 ## Recent Updates
 
@@ -58,3 +60,32 @@
 ### 2026-04-28 — Access mode backlog canonicalized
 - Feasibility findings are now durably recorded: guarded `read` is feasible only as a writable-baseline downgrade, guarded `omit` remains structurally invalid, and vocabulary alternatives were explored but not adopted as canonical surface.
 - Follow-through from the merge: dead named-field access declarations now collapse to `RedundantAccessMode`, the parser lane stays validation-first rather than generator-first, and George's rule-7 conflict/refinement question remains unresolved.
+
+### 2026-04-28 — Parser complexity re-evaluation (when-move and `->` proposal)
+- Confirmed: Parser.cs is a pure stub (`throw new NotImplementedException()`). All complexity analysis is design-level, not runtime code.
+- The when-post-field 6→4 step reduction (v5 claim) is accurate. Proof is in the catalog: AccessMode slot sequence has no GuardClause, meaning when the parser is written the disambiguator will never stash a guard for access modes.
+- `->` proposal adds no parser benefit. Arrow is already a full token (`TokenKind.Arrow`, TwoCharOperators). The `-> F ADJ` shape moves AccessModeKeyword from a free LeadingTokenSlot injection to an explicit third slot parser step. Net complexity: same to marginally worse. Frank's B3 semantic coherence objection is reinforced, not contradicted, by the parser analysis.
+- `F ADJECTIVE` order (adjective after field) creates zero new lookahead — keywords and identifiers are lexically distinct token kinds.
+- Surfaced a pending catalog gap: AccessMode is missing SlotGuardClause at end of slot sequence. Must be added before parser implementation for that construct begins.
+- Full analysis: `docs/working/george-parser-complexity-when-analysis.md`
+
+### 2026-04-28 — Parser complexity re-evaluation under `->` grammar and omit/access-mode split
+- Re-evaluated the `when`-post-field complexity finding (v5-lang-simplify) against Shane's new `->` operator grammar and the proposed omit/access-mode semantic split.
+- Finding 1: `when`-post-field finding fully holds and is strengthened. Under `in State -> Field ADJECTIVE [when Guard]`, the guard is even further from the disambiguation point. 4-step disambiguator unchanged.
+- Finding 2: `->` grammar is marginally simpler than the settled verb-before-field grammar. Disambiguation token changes from a vocabulary keyword (identifier-space) to a punctuation operator — single token, no collision risk, immune to vocabulary evolution. Field/adjective boundary handled lexically by keyword classification; no lookahead ambiguity.
+- Finding 3: omit/access-mode split eliminates the internal conditional-guard-slot branch from the current unified production. Two structurally flat productions (`OmitDeclaration`, `AccessModeDeclaration`) are routed by distinct tokens (`omit` keyword, `->` operator) — simpler than one production with asymmetric internal structure.
+- Net verdict: proposed grammar is the simplest of the three shapes evaluated (original > settled > proposed). All improvements are structural, not just incidental.
+- One AST design question flagged for Shane: separate `OmitDeclaration` + `AccessModeDeclaration` nodes vs. one unified `AccessDeclaration` node. No parser complexity impact but affects type-checker and catalog shape.
+- Analysis written to `docs/working/catalog-parser-design-v5-lang-simplify.md` § Addendum and `.squad/decisions/inbox/george-parser-complexity-reeval.md`.
+
+### 2026-04-28 — AccessMode guard slot catalog fix
+- Fixed `ConstructKind.AccessMode` slot sequence in `src/Precept/Language/Constructs.cs`: added `SlotGuardClause` as the final slot. Bug was confirmed: parser generation from catalog would have silently omitted guard support for access modes.
+- Fixed companion pre-existing build error: `DiagnosticCode.RedundantAccessMode` was in the enum but had no `Diagnostics.GetMeta` arm. PRECEPT0007 Roslyn analyzer was treating this as a compile error. Added the missing arm with `Severity.Warning` (hygiene issue, not structural violation).
+- Also cleaned up the stale `write all` reference in the AccessMode description (language feature removed per April 28 owner directive).
+- Added regression test `AccessMode_HasGuardClauseAsOptional` that pins both presence and position of the guard slot (slots.Last() assertion guards slot-order drift).
+- All 1809 tests pass.
+
+
+### 2026-04-28 — AccessMode catalog fix landed
+- Implemented the missing `SlotGuardClause` on `ConstructKind.AccessMode`, added the missing `RedundantAccessMode` diagnostic metadata arm, and removed the stale `write all` wording from the construct description.
+- Added the guard-slot regression test (`AccessMode_HasGuardClauseAsOptional`) and verified the batch outcome at 1809 passing tests.
