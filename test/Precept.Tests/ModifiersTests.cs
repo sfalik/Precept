@@ -154,6 +154,29 @@ public class ModifiersTests
         meta.ApplicableTo.Should().BeEmpty("empty = applies to all types");
     }
 
+    [Fact]
+    public void Writable_AppliesToAnyType()
+    {
+        var meta = (FieldModifierMeta)Modifiers.GetMeta(ModifierKind.Writable);
+        meta.ApplicableTo.Should().BeEmpty("empty = applies to all types; computed-field restriction is enforced by the type checker, not the modifier catalog");
+    }
+
+    [Fact]
+    public void Writable_IsStructuralFlag()
+    {
+        var meta = (FieldModifierMeta)Modifiers.GetMeta(ModifierKind.Writable);
+        meta.Category.Should().Be(ModifierCategory.Structural);
+        meta.HasValue.Should().BeFalse("writable is a bare flag");
+    }
+
+    [Fact]
+    public void Writable_TokenTextIsWritable()
+    {
+        var meta = (FieldModifierMeta)Modifiers.GetMeta(ModifierKind.Writable);
+        meta.Token.Text.Should().Be("writable");
+        meta.Token.Kind.Should().Be(TokenKind.Writable);
+    }
+
     // ── HasValue flag ───────────────────────────────────────────────────────────
 
     [Theory]
@@ -178,6 +201,7 @@ public class ModifiersTests
     [InlineData(ModifierKind.Positive)]
     [InlineData(ModifierKind.Nonzero)]
     [InlineData(ModifierKind.Notempty)]
+    [InlineData(ModifierKind.Writable)]
     public void FlagModifiers_HasValueIsFalse(ModifierKind kind)
     {
         var meta = (FieldModifierMeta)Modifiers.GetMeta(kind);

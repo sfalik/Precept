@@ -11,13 +11,11 @@ precept SumOnRhsRule
 # Gap 2 closure: sum-on-RHS rule storage was added in feature/issue-106-divisor-safety.
 # See docs/ProofEngineDesign.md § Gap Closure for details.
 
-field Total as number default 100 positive
-field Tax as number default 10 positive
-field Fee as number default 5 positive
+field Total as number default 100 positive writable
+field Tax as number default 10 positive writable
+field Fee as number default 5 positive writable
 
 rule Total > Tax + Fee because "Total must exceed combined tax and fee"
 
 # Net is provably positive: the proof engine reads Total - Tax - Fee > 0 from the rule.
 field Net as number -> Total - Tax - Fee positive
-
-write Total, Tax, Fee
