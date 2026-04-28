@@ -19,7 +19,7 @@ state Resolved
 state Closed
 
 in Assigned ensure AssignedAgent is set because "Assigned tickets must name an agent"
-in New write Priority
+in New modify Priority editable
 
 event RegisterAgent(AgentName as string notempty)
 event Triage(Title as string notempty, Level as number default 3)

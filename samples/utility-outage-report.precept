@@ -19,7 +19,7 @@ state Dispatched
 state Restored
 state Closed
 
-in VerifiedState write EstimatedCustomers
+in VerifiedState modify EstimatedCustomers editable
 in Dispatched ensure AssignedCrew is set because "Dispatched outages must name a crew"
 
 event FileReport(Reporter as string notempty, Region as string notempty, Customers as number)

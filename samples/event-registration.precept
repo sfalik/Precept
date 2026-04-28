@@ -20,8 +20,9 @@ state Cancelled
 state CheckedIn
 
 # Staff can correct contact details while the registration is still open.
-in Draft write ContactEmail
-in PendingPayment write ContactEmail, SeatsReserved
+in Draft modify ContactEmail editable
+in PendingPayment modify ContactEmail editable
+in PendingPayment modify SeatsReserved editable
 
 in Confirmed ensure PaymentReceived because "Confirmed registrations must be paid"
 in Confirmed ensure TicketsIssued == SeatsReserved because "Confirmed registrations must issue one ticket per reserved seat"

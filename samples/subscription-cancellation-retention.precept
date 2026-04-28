@@ -15,7 +15,7 @@ state Active initial
 state RetentionReview
 state Cancelled
 
-in RetentionReview write LastAgentNote
+in RetentionReview modify LastAgentNote editable
 
 event RequestCancellation(
     Name as string notempty,

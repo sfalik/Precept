@@ -18,7 +18,7 @@ state InService
 state ReadyForPickup
 state Closed
 
-in CheckedIn write AdvisorName
+in CheckedIn modify AdvisorName editable
 in ReadyForPickup ensure PickupContacted because "Customers must be notified before pickup"
 
 # If service leaves approval, it must leave with at least one approved recommendation.

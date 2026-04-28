@@ -15,7 +15,8 @@ state Green
 state Yellow
 state FlashingRed
 
-in Red write VehiclesWaiting, LeftTurnQueued
+in Red modify VehiclesWaiting editable
+in Red modify LeftTurnQueued editable
 
 event Advance
 event Emergency(AuthorizedBy as string notempty, Reason as string notempty)
