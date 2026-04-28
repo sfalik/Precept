@@ -737,7 +737,7 @@ public abstract record ModifierMeta(
     ModifierKind[]?   MutuallyExclusiveWith = null // at most one of the group may appear on a declaration
 );
 
-// ── Field modifiers (14) ─────────────────────────────────
+// ── Field modifiers (15) ─────────────────────────────────
 public sealed record FieldModifierMeta(
     ModifierKind     Kind,
     TokenMeta        Token,

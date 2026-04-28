@@ -104,9 +104,9 @@ public static class Constructs
             "in Draft write Amount",
             [],
             [SlotOptStateTarget, SlotAccessModeKeyword, SlotFieldTarget],
-            TokenKind.In),
+            TokenKind.Write),
 
-        ConstructKind.StateAction => new(
+        ConstructKind.StateAction=> new(
             kind,
             "state action",
             "Entry or exit hook that fires actions when entering or leaving a state",

@@ -44,7 +44,7 @@ Every token the lexer can produce. Organized by category to match the `TokenKind
 
 | Token | Text | Context |
 |-------|------|---------|
-| `In` | `in` | State-scoped ensure/edit (`in State ensure ...`) |
+| `In` | `in` | State-scoped scope preposition (`in State ensure ...`, `in State write|read|omit ...`) |
 | `To` | `to` | Entry-gate ensure (`to State ensure ...`) |
 | `From` | `from` | Exit-gate ensure or transition source (`from State ...`) |
 | `On` | `on` | Event trigger (`on Event ensure ...`, `from State on Event ...`) |
@@ -108,7 +108,7 @@ Every token the lexer can produce. Organized by category to match the `TokenKind
 
 | Token | Text | Context |
 |-------|------|---------|
-| `All` | `all` | Universal quantifier / `edit all` |
+| `All` | `all` | Universal quantifier / `write all` (stateless precepts), `read all` / `omit all` (state-scoped) |
 | `Any` | `any` | State wildcard (`in any`, `from any`) |
 
 #### Keywords: State Modifiers (v2)
