@@ -1,4 +1,4 @@
-# Parser
+# Parser (v2)
 
 ---
 
@@ -7,10 +7,12 @@
 | Property | Value |
 |---|---|
 | Doc maturity | Full |
-| Implementation state | Stub — `Parse()` throws `NotImplementedException` |
-| Source | `src/Precept/Pipeline/Parser.cs`, `src/Precept/Pipeline/SyntaxNodes.cs` |
+| Implementation state | Complete — 5-PR implementation per v8 plan. All 12 constructs parse. 2033+ tests green. |
+| Source files | `src/Precept/Pipeline/Parser.cs`, `src/Precept/Pipeline/SyntaxNodes/` (directory) |
 | Upstream | Lexer (`TokenStream`) |
 | Downstream | TypeChecker, LS syntax features, MCP `precept_compile` |
+
+**Note:** This document describes the parser as it exists after the v8 implementation plan is complete. The PR sequence and implementation slices live in `docs/working/catalog-parser-design-v8.md`.
 
 ---
 
@@ -22,7 +24,9 @@ The parser is the second stage of the Precept compilation pipeline. It transform
 public static SyntaxTree Parse(TokenStream tokens)
 ```
 
-The parser always runs to end-of-source. On malformed input it emits diagnostics and inserts `IsMissing` nodes or skips to sync points, ensuring downstream stages receive a structurally coherent tree. The type checker, graph analyzer, proof engine, language server, and MCP tools all receive a complete tree — they never need to defensively handle "no tree" as a result.
+The parser is a hand-written recursive descent parser with a Pratt expression parser for operator precedence. The top-level dispatch loop is a keyword switch. Vocabulary recognition (operators, types, modifiers, actions) is derived from catalog metadata. Slot sequencing is entirely driven by `ConstructMeta.Slots` — `InvokeSlotParser()` is the generic slot dispatch mechanism. It produces an AST (not a CST) — comments and whitespace are consumed silently. No information is discarded that downstream stages need; no information is preserved that only a formatter would need.
+
+The parser always runs to end-of-source. On malformed input it emits diagnostics and inserts synthetic tokens (empty text, zero-length span) or skips to sync points, ensuring downstream stages receive a structurally coherent tree. The type checker, graph analyzer, proof engine, language server, and MCP tools all receive a complete tree — they never need to defensively handle "no tree" as a result.
 
 The public surface:
 
@@ -41,13 +45,13 @@ The parser handles three families of input:
 - **Expressions** — arithmetic, comparison, logical, member access, function calls, conditionals, literals, interpolated strings and typed constants
 - **Error recovery** — missing-node insertion for expected tokens, sync-point resync for structurally lost positions
 
-The `SyntaxTree` is the `Compilation.SyntaxTree` field — it is part of the tooling surface and queryable by the language server for span-based operations (hover, go-to-definition, completions).
+The `SyntaxTree` is the `Compilation.SyntaxTree` field — it is part of the tooling surface and queryable by the language server for span-based operations (hover, go-to-definition, completions). `SyntaxTree.Declarations` is `ImmutableArray<Declaration>`.
 
 ---
 
 ## Responsibilities and Boundaries
 
-**OWNS:** Source-structural representation of authored programs; error recovery shape (`IsMissing` nodes, `SkippedTokens`); `SourceSpan` ownership for every node; disambiguation of dual-use tokens (`set`, `min`, `max`) by syntactic position.
+**OWNS:** Source-structural representation of authored programs; error recovery shape (synthetic tokens with empty text and zero-length spans, sync-point recovery); `SourceSpan` ownership for every node; disambiguation of dual-use tokens (`set`, `min`, `max`) by syntactic position; parsing `OmitDeclaration` as a structurally separate construct from `AccessMode`.
 
 **Does NOT OWN:** Name resolution, type compatibility, overload selection, semantic legality (`AllowedIn` constraint enforcement) — these belong to the TypeChecker. Token classification — the Lexer already classifies all tokens before the parser sees them. Operator precedence is parser-internal (not catalog metadata).
 
@@ -85,11 +89,10 @@ public static class Parser
     public static SyntaxTree Parse(TokenStream tokens)
     {
         var session = new ParseSession(tokens);
-        session.ParseAll();
-        return session.Build();
+        return session.ParseAll();
     }
 
-    private struct ParseSession
+    internal ref struct ParseSession
     {
         private readonly TokenStream _tokens;
         private int _position;
@@ -111,45 +114,73 @@ public static class Parser
 | `Current()` | Returns `_tokens[_position]` without advancing |
 | `Peek(int offset)` | Returns `_tokens[_position + offset]` for bounded lookahead |
 | `Advance()` | Returns `Current()` and increments `_position` |
-| `Expect(TokenKind)` | If `Current()` matches, advances and returns the token. Otherwise emits `ExpectedToken` diagnostic and returns a synthetic `IsMissing` token at the current span |
+| `Expect(TokenKind)` | If `Current()` matches, advances and returns the token. Otherwise emits `ExpectedToken` diagnostic and returns a synthetic token with `Kind` set to the expected kind, `Text = string.Empty`, and a zero-length span at the current position |
 | `Match(TokenKind)` | If `Current()` matches, advances and returns `true`. Otherwise returns `false` without advancing |
 | `SkipTrivia()` | Advances past `NewLine` and `Comment` tokens. Called before each dispatch decision |
 
-`Expect()` is the primary error-recovery primitive. It always returns a token — real or synthetic — so the calling production can always construct a complete node. The synthetic token carries `IsMissing = true` and a zero-length `SourceSpan` at the current position, preserving the location for downstream diagnostics.
+`Expect()` is the primary error-recovery primitive. It always returns a token — real or synthetic — so the calling production can always construct a complete node. The synthetic token has `Text = string.Empty` and a zero-length `SourceSpan` at the current position, preserving the location for downstream diagnostics.
+
+### 5-Layer Architecture
+
+The parser is organized into five layers:
+
+| Layer | Name | Responsibility |
+|-------|------|----------------|
+| **A** | Vocabulary FrozenDictionaries | Operator precedence, type keywords, modifier sets, action recognition — all derived from catalog metadata at startup. No hardcoded vocabulary in the parser. |
+| **B** | Top-Level Dispatch | Keyword-dispatched loop. Leading token → dispatch to construct parser or disambiguator. `Constructs.ByLeadingToken` index provides the mapping. |
+| **C** | Generic Slot Iteration | `ParseConstructSlots()` iterates `ConstructMeta.Slots`, calling `InvokeSlotParser()` per slot. CS8509 exhaustive switch on `ConstructSlotKind`. |
+| **D** | Disambiguation | Four scoped prepositions (`in`, `to`, `from`, `on`) share a generic disambiguator. Consumes the anchor target, peeks at the disambiguation token, routes to the matched construct. |
+| **E** | Error Sync | `SyncToNextDeclaration()` recovers from parse errors by advancing to the next known leading token, derived from `Constructs.LeadingTokens`. |
 
 ### Top-Level Dispatch Loop
 
-`ParseAll()` consumes the `precept` header, then enters a loop that skips trivia (newlines, comments) and dispatches on the current token to select a declaration production:
+`ParseAll()` consumes the `precept` header, then enters a loop that skips trivia (newlines, comments) and dispatches on the current token. The dispatch is a hand-written keyword switch:
 
-| Current token | Production | `ConstructKind` |
-|---------------|-----------|-----------------|
-| `Field` | `ParseFieldDeclaration()` | `FieldDeclaration` |
-| `State` | `ParseStateDeclaration()` | `StateDeclaration` |
-| `Event` | `ParseEventDeclaration()` | `EventDeclaration` |
-| `Rule` | `ParseRuleDeclaration()` | `RuleDeclaration` |
-| `In` | `ParseInScoped()` | *(disambiguates below)* |
-| `To` | `ParseToScoped()` | *(disambiguates below)* |
-| `From` | `ParseFromScoped()` | *(disambiguates below)* |
-| `On` | `ParseOnScoped()` | *(disambiguates below)* |
-| `EndOfSource` | exit loop | — |
-| *anything else* | `EmitDiagnostic` + `SyncToNextDeclaration()` | — |
+```
+Current token → keyword switch → route to construct parser or disambiguator
+  Direct dispatch for unique leading tokens (Field, State, Event, Rule)
+  Disambiguation for shared leading tokens (In, To, From, On)
+  Not found → EmitDiagnostic + SyncToNextDeclaration()
+```
 
-The dispatch table is a direct map from `ConstructMeta.LeadingToken` to parse methods. Each construct in the catalog declares its leading token; the parser uses this to route without maintaining a parallel keyword list.
+The resulting dispatch table:
+
+| Current token | Candidates | Dispatch |
+|---------------|------------|----------|
+| `Precept` | 1 (PreceptHeader) | direct |
+| `Field` | 1 (FieldDeclaration) | direct |
+| `State` | 1 (StateDeclaration) | direct |
+| `Event` | 1 (EventDeclaration) | direct |
+| `Rule` | 1 (RuleDeclaration) | direct |
+| `In` | 3 (StateEnsure, AccessMode, OmitDeclaration) | disambiguate |
+| `To` | 2 (StateEnsure, StateAction) | disambiguate |
+| `From` | 3 (TransitionRow, StateEnsure, StateAction) | disambiguate |
+| `On` | 2 (EventEnsure, EventHandler) | disambiguate |
+| `EndOfSource` | — | exit loop |
+| *anything else* | — | `EmitDiagnostic` + `SyncToNextDeclaration()` |
+
+**Note:** The `Precept` header is parsed **before** the main dispatch loop begins. The table includes it for completeness, but the dispatch loop only processes declaration-level tokens (`Field`, `State`, `Event`, `Rule`, `In`, `To`, `From`, `On`).
+
+The dispatch table is a hand-written keyword switch. Vocabulary dictionaries (operators, types, modifiers, actions) are catalog-derived; the dispatch structure itself is grammar mechanics.
 
 ### Preposition Disambiguation
 
-The four preposition-scoped methods parse a state or event target, then look ahead to select the specific production:
+The four preposition-scoped methods parse a state or event target, optionally pre-consume a `when` guard (stashing it for later injection), then look ahead to select the specific production.
 
-**`ParseInScoped()`** — Leading token `in`:
+**`ParseInScoped()` / `DisambiguateAndParse` for `In`** (3 constructs):
 
 | Lookahead after state target | Production | `ConstructKind` |
 |------------------------------|-----------|-----------------|
 | `Ensure` | `ParseStateEnsure(In)` | `StateEnsure` |
 | `Modify` | `ParseAccessMode(stateTarget)` | `AccessMode` |
 | `Omit` | `ParseOmitDeclaration(stateTarget)` | `OmitDeclaration` |
-| `When` *(then re-check)* | consume guard, re-dispatch | *(same as above)* |
+| `When` *(then re-check)* | stash guard, re-dispatch | *(same as above)* |
 
-**`ParseToScoped()`** — Leading token `to`:
+`OmitDeclaration` is a distinct construct — NOT a sub-case of `AccessMode`. The disambiguation splits cleanly on the verb token: `modify` routes to `AccessMode`, `omit` routes to `OmitDeclaration`. They share no parent node type and have different slot sequences (4 slots vs. 2 slots), different guard eligibility (optional vs. never), and different semantic categories (mutability constraint vs. structural exclusion).
+
+When the disambiguator pre-consumes a `when` guard and then routes to `OmitDeclaration`, it emits `DiagnosticCode.OmitDoesNotSupportGuard`. The guard is discarded — there is no slot to inject it into. The resulting `OmitDeclarationNode` has no guard.
+
+**`ParseToScoped()`** — Leading token `to` (2 constructs):
 
 | Lookahead after state target | Production | `ConstructKind` |
 |------------------------------|-----------|-----------------|
@@ -157,7 +188,7 @@ The four preposition-scoped methods parse a state or event target, then look ahe
 | `Arrow` | `ParseStateAction(To)` | `StateAction` |
 | `When` *(then re-check)* | consume guard, re-dispatch | *(same as above)* |
 
-**`ParseFromScoped()`** — Leading token `from`:
+**`ParseFromScoped()`** — Leading token `from` (3 constructs):
 
 | Lookahead after state target | Production | `ConstructKind` |
 |------------------------------|-----------|-----------------|
@@ -166,7 +197,9 @@ The four preposition-scoped methods parse a state or event target, then look ahe
 | `Arrow` | `ParseStateAction(From)` | `StateAction` |
 | `When` *(then re-check)* | consume guard, re-dispatch | *(same as above)* |
 
-**`ParseOnScoped()`** — Leading token `on`:
+For `from`-scoped transition rows: when a guard was pre-consumed (stashedGuard is not null) and the disambiguation routes to `TransitionRow` (token is `On`), the parser emits `DiagnosticCode.PreEventGuardNotAllowed`. Error recovery injects the guard at the post-event `GuardClause` slot.
+
+**`ParseOnScoped()`** — Leading token `on` (2 constructs):
 
 | Lookahead after event target | Production | `ConstructKind` |
 |------------------------------|-----------|-----------------|
@@ -175,6 +208,8 @@ The four preposition-scoped methods parse a state or event target, then look ahe
 | `When` *(then re-check)* | consume guard, re-dispatch | *(same as above)* |
 
 The `When` case is the only two-step lookahead: the preposition method consumes the `when` guard expression, then re-inspects the next token to select the production. This is still bounded — the guard is parsed as a normal expression (Pratt parser stops at `ensure`, `->`, or a newline), and the next token is inspected exactly once.
+
+When the disambiguator pre-consumes a `when` guard and then routes to `EventHandler` (arrow `->` follows), it emits `DiagnosticCode.EventHandlerDoesNotSupportGuard`. The guard is discarded — `EventHandlerNode` has no `Guard` property. This is consistent with the `OmitDeclaration` guard-discard pattern.
 
 An example from the insurance-claim sample illustrates the preposition flow:
 
@@ -186,124 +221,6 @@ from UnderReview on Approve when (not PoliceReportRequired or MissingDocuments.c
 ```
 
 The parser sees `from` → calls `ParseFromScoped()` → parses state target `UnderReview` → sees `on` → calls `ParseTransitionRow()` → parses event target `Approve` → sees `when` → calls `ParseExpression(0)` for the guard → sees `->` → enters action chain loop → parses two `set` actions → sees `-> transition` → parses outcome → emits `TransitionRow` node. Each `->` is consumed as an action separator; the final `-> transition` terminates the loop.
-
-### Sync-Point Recovery
-
-When the dispatch loop encounters an unrecognized token, it emits an `UnexpectedKeyword` diagnostic and scans forward for a sync token — a keyword that unambiguously starts a new declaration:
-
-```
-precept  field  state  event  rule  from  to  in  on
-```
-
-These are exactly the `LeadingToken` values from the Constructs catalog plus `EndOfSource`. Continuation tokens (`when`, `->`, `set`, `transition`, `ensure`, `because`) are never sync points — they appear mid-production and would cause the parser to skip valid content. The sync scanner also stops at `EndOfSource`.
-
-Within `in`-scoped parse failures, `modify` and `omit` serve as additional recovery anchors — they signal the start of a new access mode or omit declaration and allow the parser to resync within the preposition scope.
-
-Recovery preserves all tokens between the error point and the sync point as a `SkippedTokens` span in diagnostics, so the language server can report the full extent of the unrecognized region.
-
-### `set` Disambiguation
-
-The lexer always emits `TokenKind.Set`. The parser disambiguates by position:
-
-| Context | Interpretation | How detected |
-|---------|---------------|-------------- |
-| After `as` or `of` in `ParseTypeRef()` | Collection type (`set of T`) | Next token is `Of` |
-| After `->` in action chain | Assignment action (`set X = V`) | Inside `ParseActionChain()` |
-| After `is` / `is not` in expression | Presence test (`X is set`) | Inside Pratt left-denotation for `Is` |
-
-The parser never synthesizes a `TokenKind.SetType` token. It treats `Set` in a type position as a collection type constructor and produces a `CollectionTypeNode` with the set kind. The AST encodes the semantic meaning; the token kind stays as-is.
-
-### `min` / `max` Disambiguation
-
-`min` and `max` serve dual roles: constraint keyword in field modifier position, built-in function in expression position.
-
-| Context | Interpretation | How detected |
-|---------|---------------|-------------- |
-| Inside `ParseFieldModifiers()` | Constraint — consumes a following expression as the bound value | Current position is the modifier zone after a type reference |
-| Inside `ParseExpression()` nud | Function call — followed by `(` | Next token is `LeftParen` |
-
-The disambiguation is trivial: constraint keywords are never followed by `(`, and function calls always are. The Pratt parser's null-denotation handler checks: if the token is `Min` or `Max` and the next token is `LeftParen`, it parses a function call expression. Otherwise, it falls through to identifier handling (which would be an error in expression position — the type checker catches it).
-
-An example from the insurance-claim sample shows both uses in a single transition:
-
-```precept
-field ClaimAmount as decimal default 0 nonnegative maxplaces 2
-
-from UnderReview on Approve when ...
-    -> set ApprovedAmount = if FraudFlag then min(Approve.Amount, ClaimAmount / 2) else Approve.Amount
-```
-
-In the field declaration, `nonnegative` and `maxplaces 2` are constraint modifiers parsed by `ParseFieldModifiers()`. In the action expression, `min(Approve.Amount, ClaimAmount / 2)` is a function call parsed by the Pratt expression parser's null-denotation for `Min` + `LeftParen`.
-
-### Expression Parsing Detail
-
-The Pratt parser is the shared expression engine for all production methods. Any slot that expects an expression — guard clauses, ensure clauses, action RHS values, default values, constraint bounds, computed expressions — calls `ParseExpression(0)` (or `ParseExpression(minBp)` for sub-expressions at a specific precedence floor).
-
-The binding power table:
-
-| Token(s) | Left BP | Right BP | Associativity |
-|----------|---------|----------|:-------------:|
-| `or` | 10 | 10 | left |
-| `and` | 20 | 20 | left |
-| `not` (prefix) | — | 25 | right |
-| `==` `!=` `~=` `!~` `<` `>` `<=` `>=` | 30 | 31 | non-associative |
-| `contains` | 40 | 40 | left |
-| `is` | 40 | 40 | left |
-| `+` `-` (infix) | 50 | 50 | left |
-| `*` `/` `%` | 60 | 60 | left |
-| `-` (prefix) | — | 65 | right |
-| `.` | 80 | 80 | left |
-| `(` (postfix) | 80 | 0 | left |
-
-Non-associative comparisons use right-binding power 31 (one above the left-binding power of 30) to prevent right-associativity. The explicit left-operand check in the comparison handler catches left-associative chaining and emits `NonAssociativeComparison`.
-
-#### Null-Denotation (Atoms and Prefix)
-
-The null-denotation is the entry point for expressions. It handles atoms (identifiers, literals, parenthesized expressions) and prefix operators (`not`, unary `-`). When the current token has no null-denotation entry, the parser emits `ExpectedToken("expression")` and returns a missing `IdentifierExpression`.
-
-#### Left-Denotation (Infix and Postfix)
-
-The left-denotation handles infix operators, member access (`.`), function calls (`(`), and the `is`/`is not`/`contains` keyword operators. The `is` handler is multi-token: it consumes an optional `Not`, then expects `Set`. The `contains` handler parses the right operand at the same binding power.
-
-#### Conditional Expressions
-
-`if`/`then`/`else` is parsed as a null-denotation: consume `if`, parse condition at BP 0, expect `then`, parse consequent at BP 0, expect `else`, parse alternative at BP 0. The `else` branch is required — there is no short-form `if`/`then` without `else`.
-
-An example from the insurance-claim sample:
-
-```precept
--> set ApprovedAmount = if FraudFlag then min(Approve.Amount, ClaimAmount / 2) else Approve.Amount
-```
-
-The Pratt parser sees `if` as a null-denotation entry, parses `FraudFlag` as the condition (stops at `then`), parses `min(Approve.Amount, ClaimAmount / 2)` as the consequent (stops at `else`), and parses `Approve.Amount` as the alternative (stops at the next newline or `->`, which has no binding power).
-
-#### Interpolation Reassembly
-
-The parser reassembles interpolated literals from the segmented token stream the lexer produced. Both `ParseInterpolatedString()` and `ParseInterpolatedTypedConstant()` use the same loop:
-
-1. Consume `Start` token → `TextSegment`
-2. `ParseExpression(0)` → `ExpressionSegment`
-3. If `Middle` → `TextSegment`, go to step 2
-4. If `End` → `TextSegment`, done
-
-`ParseExpression(0)` terminates naturally at `StringMiddle`/`StringEnd`/`TypedConstantMiddle`/`TypedConstantEnd` because these token kinds have no binding power in the expression parser. This is the depth-unaware reassembly property: because `}` always ends an interpolation hole and has no meaning in the expression grammar, the parser stops naturally without tracking nesting depth.
-
-#### Action Chain Parsing
-
-The action chain is a loop that consumes `->` followed by an action keyword. Each action is a self-contained statement:
-
-| Action keyword | Syntax | Slot |
-|----------------|--------|------|
-| `set` | `set Identifier = Expr` | scalar assignment |
-| `add` | `add Identifier Expr` | set add |
-| `remove` | `remove Identifier Expr` | set remove |
-| `enqueue` | `enqueue Identifier Expr` | queue enqueue |
-| `dequeue` | `dequeue Identifier (into Identifier)?` | queue dequeue |
-| `push` | `push Identifier Expr` | stack push |
-| `pop` | `pop Identifier (into Identifier)?` | stack pop |
-| `clear` | `clear Identifier` | collection clear |
-
-The loop breaks when the token after `->` is an outcome keyword (`transition`, `no`, `reject`). For event handlers and state actions, the loop breaks at newline or `EndOfSource` — there is no outcome.
 
 ### SourceSpan Contract
 
@@ -319,40 +236,24 @@ public readonly record struct SourceSpan(
 - **Offset/Length** — for slicing the source string (used by the evaluator for error messages, by MCP tools for snippet extraction)
 - **Line/Column** — for LSP diagnostics, hover, and go-to-definition (1-based lines, 1-based start column, exclusive end column per LSP convention)
 
-`SourceSpan.Covering(first, last)` computes the minimal span that encloses two child spans — used to build declaration-level spans from their component tokens. `SourceSpan.Missing` (all zeros) marks synthetic `IsMissing` nodes.
+`SourceSpan.Covering(first, last)` computes the minimal span that encloses two child spans — used to build declaration-level spans from their component tokens.
 
 Downstream stages never need the raw source text to emit located diagnostics — the `SourceSpan` carries both coordinate systems on every node.
 
 ---
 
-## AST Node Catalog
+## AST Node Hierarchy
 
-### SourceSpan
-
-Every AST node carries a `SourceSpan` — the dual-coordinate location record defined in [src/Precept/Pipeline/SourceSpan.cs](../../src/Precept/Pipeline/SourceSpan.cs). The implementation is documented in [§ SourceSpan Contract](#sourcespan-contract) above. No changes needed — the parser reads `Token.Span` directly for leaf nodes and creates compound spans via `SourceSpan.Covering(first, last)` for declaration-level nodes. The parser never reconstructs a `SourceSpan` from separate token fields — the lexer provides it.
-
-### SyntaxNode Base and Intermediate Types
+### Base Types
 
 ```csharp
-public abstract record SyntaxNode(SourceSpan Span, bool IsMissing = false);
+public abstract record SyntaxNode(SourceSpan Span);
+public abstract record Declaration(SourceSpan Span) : SyntaxNode(Span);
+public abstract record Statement(SourceSpan Span) : SyntaxNode(Span);
+public abstract record Expression(SourceSpan Span) : SyntaxNode(Span);
 ```
 
-All AST nodes inherit from `SyntaxNode`. `Span` covers the full source extent of the node. `IsMissing` is `true` when the parser synthesized the node to fill an expected-but-absent position — downstream stages can inspect this flag to suppress cascading diagnostics on phantom nodes. Records are immutable by default; no `with` copies are expected after construction.
-
-Three abstract intermediates partition the node space for downstream pattern matching:
-
-```csharp
-public abstract record Declaration(SourceSpan Span, ConstructKind Kind, bool IsMissing = false)
-    : SyntaxNode(Span, IsMissing);
-
-public abstract record Statement(SourceSpan Span, bool IsMissing = false)
-    : SyntaxNode(Span, IsMissing);
-
-public abstract record Expression(SourceSpan Span, bool IsMissing = false)
-    : SyntaxNode(Span, IsMissing);
-```
-
-`Declaration` carries a `ConstructKind` so consumers can switch on the catalog identity without downcasting. `Statement` covers action statements inside arrow chains. `Expression` covers the Pratt-parsed expression tree. The type checker, graph analyzer, and language server all switch on these three families.
+`Declaration` is the base for all declaration nodes (the 12 construct types). `Statement` covers action statements inside arrow chains. `Expression` covers the Pratt-parsed expression tree. The type checker, graph analyzer, and language server all switch on these three families.
 
 ### SyntaxTree
 
@@ -365,6 +266,18 @@ public sealed record SyntaxTree(
 
 `Header` is nullable for the case where the source is empty or the `precept` keyword is missing — the parser emits an `ExpectedToken` diagnostic and produces a tree with `Header = null`. `Declarations` is the flat list in source order. `Diagnostics` accumulates every parse-stage diagnostic. This is the `Compilation.SyntaxTree` field.
 
+### FieldTargetNode — Discriminated Union
+
+```csharp
+public abstract record FieldTargetNode(SourceSpan Span) : SyntaxNode(Span);
+
+public sealed record SingularFieldTarget(SourceSpan Span, Token Name) : FieldTargetNode(Span);
+public sealed record ListFieldTarget(SourceSpan Span, ImmutableArray<Token> Names) : FieldTargetNode(Span);
+public sealed record AllFieldTarget(SourceSpan Span, Token AllToken) : FieldTargetNode(Span);
+```
+
+**Why a discriminated union:** The three shapes carry structurally different data — `Token` vs. `ImmutableArray<Token>` vs. keyword token. A flat record with nullable fields would have `Token? Name`, `ImmutableArray<Token>? Names`, `Token? AllToken` — three mutually exclusive nullable fields where exactly one must be non-null. This is the exact anti-pattern that `catalog-system.md` § Architectural Identity prohibits: flat records with inapplicable nullable fields. The DU ensures compile-time exhaustiveness in every consumer via pattern matching — downstream consumers (type checker, graph analyzer, MCP) switch on the subtype and access only the fields that exist for that shape. Invalid states are structurally impossible.
+
 ### Declaration Nodes
 
 #### PreceptHeader
@@ -375,8 +288,8 @@ precept Identifier
 
 ```csharp
 public sealed record PreceptHeaderNode(
-    SourceSpan Span, Token Name, bool IsMissing = false)
-    : Declaration(Span, ConstructKind.PreceptHeader, IsMissing);
+    SourceSpan Span, Token Name)
+    : Declaration(Span);
 ```
 
 ```precept
@@ -395,9 +308,8 @@ public sealed record FieldDeclarationNode(
     ImmutableArray<Token> Names,
     TypeRefNode Type,
     ImmutableArray<FieldModifierNode> Modifiers,
-    Expression? ComputedExpression,
-    bool IsMissing = false)
-    : Declaration(Span, ConstructKind.FieldDeclaration, IsMissing);
+    Expression? ComputedExpression)
+    : Declaration(Span);
 ```
 
 ```precept
@@ -415,15 +327,13 @@ StateModifier := initial | terminal | required | irreversible | success | warnin
 ```csharp
 public sealed record StateDeclarationNode(
     SourceSpan Span,
-    ImmutableArray<StateEntryNode> Entries,
-    bool IsMissing = false)
-    : Declaration(Span, ConstructKind.StateDeclaration, IsMissing);
+    ImmutableArray<StateEntryNode> Entries)
+    : Declaration(Span);
 
 public sealed record StateEntryNode(
     SourceSpan Span, Token Name,
-    ImmutableArray<Token> Modifiers,
-    bool IsMissing = false)
-    : SyntaxNode(Span, IsMissing);
+    ImmutableArray<Token> Modifiers)
+    : SyntaxNode(Span);
 ```
 
 ```precept
@@ -433,7 +343,7 @@ state Draft initial, Submitted, UnderReview, Approved, Denied, Paid
 #### EventDeclaration
 
 ```
-event Identifier ("," Identifier)* ("with" ArgList)? ("initial")?
+event Identifier ("," Identifier)* ("(" ArgList ")")? ("initial")?
 ArgList := ArgDecl ("," ArgDecl)*
 ArgDecl := Identifier as TypeRef FieldModifier*
 ```
@@ -443,16 +353,14 @@ public sealed record EventDeclarationNode(
     SourceSpan Span,
     ImmutableArray<Token> Names,
     ImmutableArray<ArgumentNode> Arguments,
-    bool IsInitial,
-    bool IsMissing = false)
-    : Declaration(Span, ConstructKind.EventDeclaration, IsMissing);
+    bool IsInitial)
+    : Declaration(Span);
 
 public sealed record ArgumentNode(
     SourceSpan Span, Token Name,
     TypeRefNode Type,
-    ImmutableArray<FieldModifierNode> Modifiers,
-    bool IsMissing = false)
-    : SyntaxNode(Span, IsMissing);
+    ImmutableArray<FieldModifierNode> Modifiers)
+    : SyntaxNode(Span);
 ```
 
 ```precept
@@ -470,9 +378,8 @@ public sealed record RuleDeclarationNode(
     SourceSpan Span,
     Expression Condition,
     Expression? Guard,
-    Expression Message,
-    bool IsMissing = false)
-    : Declaration(Span, ConstructKind.RuleDeclaration, IsMissing);
+    Expression Message)
+    : Declaration(Span);
 ```
 
 ```precept
@@ -493,9 +400,8 @@ public sealed record TransitionRowNode(
     Token EventName,
     Expression? Guard,
     ImmutableArray<Statement> Actions,
-    OutcomeNode Outcome,
-    bool IsMissing = false)
-    : Declaration(Span, ConstructKind.TransitionRow, IsMissing);
+    OutcomeNode Outcome)
+    : Declaration(Span);
 ```
 
 ```precept
@@ -518,9 +424,8 @@ public sealed record StateEnsureNode(
     StateTargetNode State,
     Expression? Guard,
     Expression Condition,
-    Expression Message,
-    bool IsMissing = false)
-    : Declaration(Span, ConstructKind.StateEnsure, IsMissing);
+    Expression Message)
+    : Declaration(Span);
 ```
 
 ```precept
@@ -530,24 +435,19 @@ in Approved ensure ApprovedAmount > 0 because "Approved claims must specify a pa
 #### AccessMode
 
 ```
-FieldTarget  :=  identifier ("," identifier)* | all
-
-── modify (field present, access level declared) ──────────────────────────────
-in StateTarget modify FieldTarget readonly ("when" BoolExpr)?   ← constrain to read-only
-in StateTarget modify FieldTarget editable ("when" BoolExpr)?   ← declare editable (upgrade)
+in StateTarget modify FieldTarget readonly|editable ("when" BoolExpr)?
 ```
 
-Root-level access mode declarations are not valid syntax. Root-level `modify <FieldName>` (bare field list) is invalid — use the `writable` modifier on the field declaration instead.
+`AccessMode` is a separate construct from `OmitDeclaration`. It declares the mutability constraint of a field within a state — the field is present, and its access level is constrained. The `modify` keyword is the disambiguation token consumed by the disambiguator; it is not stored as a slot value.
 
 ```csharp
 public sealed record AccessModeNode(
     SourceSpan Span,
     StateTargetNode State,
     FieldTargetNode Fields,
-    Token AccessModeKeyword,
-    Expression? Guard,
-    bool IsMissing = false)
-    : Declaration(Span, ConstructKind.AccessMode, IsMissing);
+    Token Mode,          // TokenKind.Readonly or TokenKind.Editable
+    Expression? Guard)   // optional when-clause
+    : Declaration(Span);
 ```
 
 ```precept
@@ -557,19 +457,21 @@ in UnderReview modify FraudFlag editable
 #### OmitDeclaration
 
 ```
-── omit (field structurally absent — no guard) ────────────────────────────────
-in StateTarget omit FieldTarget                                  ← structural exclusion
+in StateTarget omit FieldTarget
 ```
 
-`OmitDeclaration` is a separate construct from `AccessMode`. It has no `GuardClause` slot — exclusion is unconditional. Root-level `omit` is not valid syntax.
+`OmitDeclaration` is a separate construct from `AccessMode`. It declares structural exclusion — the field is absent from the state entirely. It has no `Mode` slot, no `GuardClause` slot — exclusion is unconditional. The `omit` keyword is the disambiguation token consumed by the disambiguator; it is not stored as a slot value.
+
+The structural separation is not incidental. `OmitDeclaration` and `AccessMode` differ in: (a) slot sequence (omit has 2 slots, access mode has 4), (b) guard eligibility (omit: never, access mode: optional), (c) semantic category (structural exclusion vs. mutability constraint). A shared node would require internal branching and nullable fields for the mode and guard that are structurally impossible for omit. Per `catalog-system.md` § Architectural Identity: "Do not use flat records with inapplicable nullable fields — use a DU instead."
+
+NEVER has a guard clause — the slot sequence `[StateTarget, FieldTarget]` enforces this structurally. Attempting `in State omit Field when Guard` is a parse error (`DiagnosticCode.OmitDoesNotSupportGuard`).
 
 ```csharp
 public sealed record OmitDeclarationNode(
     SourceSpan Span,
     StateTargetNode State,
-    FieldTargetNode Fields,
-    bool IsMissing = false)
-    : Declaration(Span, ConstructKind.OmitDeclaration, IsMissing);
+    FieldTargetNode Fields)
+    : Declaration(Span);
 ```
 
 ```precept
@@ -588,9 +490,8 @@ public sealed record StateActionNode(
     Token Preposition,
     StateTargetNode State,
     Expression? Guard,
-    ImmutableArray<Statement> Actions,
-    bool IsMissing = false)
-    : Declaration(Span, ConstructKind.StateAction, IsMissing);
+    ImmutableArray<Statement> Actions)
+    : Declaration(Span);
 ```
 
 ```precept
@@ -609,9 +510,8 @@ public sealed record EventEnsureNode(
     Token EventName,
     Expression? Guard,
     Expression Condition,
-    Expression Message,
-    bool IsMissing = false)
-    : Declaration(Span, ConstructKind.EventEnsure, IsMissing);
+    Expression Message)
+    : Declaration(Span);
 ```
 
 ```precept
@@ -628,14 +528,30 @@ on Identifier ("->" ActionStatement)*
 public sealed record EventHandlerNode(
     SourceSpan Span,
     Token EventName,
-    ImmutableArray<Statement> Actions,
-    bool IsMissing = false)
-    : Declaration(Span, ConstructKind.EventHandler, IsMissing);
+    ImmutableArray<Statement> Actions)
+    : Declaration(Span);
 ```
 
 ```precept
 on UpdateName -> set name = newName
 ```
+
+### Complete Declaration Node Summary
+
+| # | ConstructKind | Node Type | Slots |
+|---|---------------|-----------|-------|
+| 1 | PreceptHeader | PreceptHeaderNode | [IdentifierList] |
+| 2 | FieldDeclaration | FieldDeclarationNode | [IdentifierList, TypeExpression, ModifierList?, ComputeExpression?] |
+| 3 | StateDeclaration | StateDeclarationNode | [IdentifierList, StateModifierList?] |
+| 4 | EventDeclaration | EventDeclarationNode | [IdentifierList, ArgumentList?] |
+| 5 | RuleDeclaration | RuleDeclarationNode | [RuleExpression, GuardClause?, BecauseClause] |
+| 6 | TransitionRow | TransitionRowNode | [StateTarget, EventTarget, GuardClause?, ActionChain?, Outcome] |
+| 7 | StateEnsure | StateEnsureNode | [StateTarget, EnsureClause] |
+| 8 | AccessMode | AccessModeNode | [StateTarget, FieldTarget, AccessModeKeyword, GuardClause?] |
+| 9 | OmitDeclaration | OmitDeclarationNode | [StateTarget, FieldTarget] |
+| 10 | StateAction | StateActionNode | [StateTarget, ActionChain] |
+| 11 | EventEnsure | EventEnsureNode | [EventTarget, EnsureClause] |
+| 12 | EventHandler | EventHandlerNode | [EventTarget, ActionChain] |
 
 ### Action Statement Nodes
 
@@ -643,65 +559,47 @@ Action statements appear inside arrow chains (`-> action -> action -> ...`). Eac
 
 ```csharp
 public sealed record SetStatement(
-    SourceSpan Span, Token Field, Expression Value,
-    bool IsMissing = false) : Statement(Span, IsMissing);
+    SourceSpan Span, Token Field, Expression Value) : Statement(Span);
 
 public sealed record AddStatement(
-    SourceSpan Span, Token Field, Expression Value,
-    bool IsMissing = false) : Statement(Span, IsMissing);
+    SourceSpan Span, Token Field, Expression Value) : Statement(Span);
 
 public sealed record RemoveStatement(
-    SourceSpan Span, Token Field, Expression Value,
-    bool IsMissing = false) : Statement(Span, IsMissing);
+    SourceSpan Span, Token Field, Expression Value) : Statement(Span);
 
 public sealed record EnqueueStatement(
-    SourceSpan Span, Token Field, Expression Value,
-    bool IsMissing = false) : Statement(Span, IsMissing);
+    SourceSpan Span, Token Field, Expression Value) : Statement(Span);
 
 public sealed record DequeueStatement(
-    SourceSpan Span, Token Field, Token? IntoField,
-    bool IsMissing = false) : Statement(Span, IsMissing);
+    SourceSpan Span, Token Field, Token? IntoField) : Statement(Span);
 
 public sealed record PushStatement(
-    SourceSpan Span, Token Field, Expression Value,
-    bool IsMissing = false) : Statement(Span, IsMissing);
+    SourceSpan Span, Token Field, Expression Value) : Statement(Span);
 
 public sealed record PopStatement(
-    SourceSpan Span, Token Field, Token? IntoField,
-    bool IsMissing = false) : Statement(Span, IsMissing);
+    SourceSpan Span, Token Field, Token? IntoField) : Statement(Span);
 
 public sealed record ClearStatement(
-    SourceSpan Span, Token Field,
-    bool IsMissing = false) : Statement(Span, IsMissing);
+    SourceSpan Span, Token Field) : Statement(Span);
 ```
 
-`set` takes `Field = Value`. `add`, `remove`, `enqueue`, and `push` take `Field Value`. `dequeue` and `pop` take `Field` with an optional `into Field` for destructuring. `clear` takes only `Field`. Examples from the insurance-claim sample:
-
-```precept
--> set ClaimantName = Submit.Claimant
--> add MissingDocuments RequestDocument.Name
--> remove MissingDocuments ReceiveDocument.Name
-```
+`set` takes `Field = Value`. `add`, `remove`, `enqueue`, and `push` take `Field Value`. `dequeue` and `pop` take `Field` with an optional `into Field` for destructuring. `clear` takes only `Field`.
 
 ### Outcome Nodes
 
 Outcomes terminate a transition row's arrow chain. Three shapes:
 
 ```csharp
-public abstract record OutcomeNode(SourceSpan Span, bool IsMissing = false)
-    : SyntaxNode(Span, IsMissing);
+public abstract record OutcomeNode(SourceSpan Span) : SyntaxNode(Span);
 
 public sealed record TransitionOutcomeNode(
-    SourceSpan Span, Token TargetState,
-    bool IsMissing = false) : OutcomeNode(Span, IsMissing);
+    SourceSpan Span, Token TargetState) : OutcomeNode(Span);
 
 public sealed record NoTransitionOutcomeNode(
-    SourceSpan Span,
-    bool IsMissing = false) : OutcomeNode(Span, IsMissing);
+    SourceSpan Span) : OutcomeNode(Span);
 
 public sealed record RejectOutcomeNode(
-    SourceSpan Span, Expression Message,
-    bool IsMissing = false) : OutcomeNode(Span, IsMissing);
+    SourceSpan Span, Expression Message) : OutcomeNode(Span);
 ```
 
 ```precept
@@ -710,48 +608,31 @@ public sealed record RejectOutcomeNode(
 -> reject "Required documents must be complete before a claim can be approved"
 ```
 
-The parser recognizes `transition` after `->` to produce `TransitionOutcomeNode`, `no transition` (two tokens) for `NoTransitionOutcomeNode`, and `reject` followed by a string expression for `RejectOutcomeNode`.
-
 ### Supporting Types
 
 #### StateTarget
 
 ```csharp
 public sealed record StateTargetNode(
-    SourceSpan Span, Token Name, bool IsQuantifier,
-    bool IsMissing = false) : SyntaxNode(Span, IsMissing);
+    SourceSpan Span, Token Name, bool IsQuantifier) : SyntaxNode(Span);
 ```
 
 `Name` is either a state identifier or the `any` quantifier keyword. `IsQuantifier` is `true` when the target is `any` rather than a specific state name.
 
-#### FieldTarget
-
-```csharp
-public sealed record FieldTargetNode(
-    SourceSpan Span, ImmutableArray<Token> Names, bool IsAll,
-    bool IsMissing = false) : SyntaxNode(Span, IsMissing);
-```
-
-`IsAll` is `true` when the target is the `all` keyword. Otherwise `Names` contains one or more comma-separated field identifiers.
-
 #### TypeRef Hierarchy
 
 ```csharp
-public abstract record TypeRefNode(SourceSpan Span, bool IsMissing = false)
-    : SyntaxNode(Span, IsMissing);
+public abstract record TypeRefNode(SourceSpan Span) : SyntaxNode(Span);
 
 public sealed record ScalarTypeRefNode(
-    SourceSpan Span, Token TypeName, TypeQualifierNode? Qualifier,
-    bool IsMissing = false) : TypeRefNode(Span, IsMissing);
+    SourceSpan Span, Token TypeName, TypeQualifierNode? Qualifier) : TypeRefNode(Span);
 
 public sealed record CollectionTypeRefNode(
     SourceSpan Span, Token CollectionKind, Token ElementType,
-    TypeQualifierNode? Qualifier,
-    bool IsMissing = false) : TypeRefNode(Span, IsMissing);
+    TypeQualifierNode? Qualifier) : TypeRefNode(Span);
 
 public sealed record ChoiceTypeRefNode(
-    SourceSpan Span, ImmutableArray<Expression> Options,
-    bool IsMissing = false) : TypeRefNode(Span, IsMissing);
+    SourceSpan Span, ImmutableArray<Expression> Options) : TypeRefNode(Span);
 ```
 
 `ScalarTypeRefNode` covers `string`, `decimal`, `boolean`, `money`, etc. `CollectionTypeRefNode` covers `set of T`, `queue of T`, `stack of T` — `CollectionKind` is the `Set`/`Queue`/`Stack` token. `ChoiceTypeRefNode` covers `choice("A", "B", "C")`.
@@ -760,8 +641,7 @@ public sealed record ChoiceTypeRefNode(
 
 ```csharp
 public sealed record TypeQualifierNode(
-    SourceSpan Span, Token Keyword, Expression Value,
-    bool IsMissing = false) : SyntaxNode(Span, IsMissing);
+    SourceSpan Span, Token Keyword, Expression Value) : SyntaxNode(Span);
 ```
 
 `Keyword` is `In` or `Of` — narrowing the type domain (e.g., `money in 'USD'`, `quantity of 'weight'`).
@@ -769,19 +649,261 @@ public sealed record TypeQualifierNode(
 #### FieldModifier Hierarchy
 
 ```csharp
-public abstract record FieldModifierNode(SourceSpan Span, bool IsMissing = false)
-    : SyntaxNode(Span, IsMissing);
+public abstract record FieldModifierNode(SourceSpan Span) : SyntaxNode(Span);
 
 public sealed record FlagModifierNode(
-    SourceSpan Span, Token Keyword,
-    bool IsMissing = false) : FieldModifierNode(Span, IsMissing);
+    SourceSpan Span, Token Keyword) : FieldModifierNode(Span);
 
 public sealed record ValueModifierNode(
-    SourceSpan Span, Token Keyword, Expression Value,
-    bool IsMissing = false) : FieldModifierNode(Span, IsMissing);
+    SourceSpan Span, Token Keyword, Expression Value) : FieldModifierNode(Span);
 ```
 
 Flag modifiers (`optional`, `writable`, `nonnegative`, `positive`, `nonzero`, `notempty`, `ordered`) carry only the keyword token. Value modifiers (`default`, `min`, `max`, `minlength`, `maxlength`, `mincount`, `maxcount`, `maxplaces`) carry a keyword and an expression value. The DU prevents consumers from accessing a `Value` property on flag-only modifiers.
+
+---
+
+## Grammar Reference
+
+### Access Mode Forms (6 — guarded)
+
+```
+in State modify Field readonly [when Guard]            ← singular
+in State modify Field editable [when Guard]            ← singular
+in State modify F1, F2, ... readonly [when Guard]      ← list (comma-separated shorthand)
+in State modify F1, F2, ... editable [when Guard]      ← list
+in State modify all readonly [when Guard]              ← all
+in State modify all editable [when Guard]              ← all
+```
+
+### Omit Forms (3 — never guarded)
+
+```
+in State omit Field                                    ← singular (never has guard)
+in State omit F1, F2, ...                             ← list (never has guard)
+in State omit all                                      ← all (never has guard)
+```
+
+### Grammar Production Rules
+
+```
+AccessModeDeclaration := "in" StateTarget "modify" FieldTarget AccessModeKeyword GuardClause?
+OmitDeclaration       := "in" StateTarget "omit" FieldTarget
+
+FieldTarget           := Identifier
+                       | Identifier ("," Identifier)+
+                       | "all"
+
+AccessModeKeyword     := "readonly" | "editable"
+GuardClause           := "when" Expression
+StateTarget           := Identifier
+```
+
+### Guard Restriction
+
+`omit` never accepts a `when` guard clause. Structural field presence must never be data-dependent — this is a permanently locked invariant, not a current-sprint decision.
+
+- **Post-field position:** Attempting `in State omit Field when Guard` is a parse error. The parser emits `DiagnosticCode.OmitDoesNotSupportGuard` and recovers by consuming/discarding the guard, producing an `OmitDeclarationNode` with no guard.
+- **Pre-stashed position:** When the generic disambiguator pre-consumes a `when` before routing (e.g., `in State when Guard omit Field`), the parser detects that the routed construct is `OmitDeclaration` and emits the same `DiagnosticCode.OmitDoesNotSupportGuard`. The guard is discarded — there is no slot to inject it into.
+
+Both positions produce the same diagnostic code and the same recovery: `OmitDeclarationNode` with no guard.
+
+---
+
+## Slot Dispatch
+
+### `InvokeSlotParser()` Mechanism
+
+`ParseConstructSlots()` iterates `ConstructMeta.Slots` for the routed construct, calling `InvokeSlotParser()` for each slot. `InvokeSlotParser()` is an exhaustive switch on `ConstructSlotKind` — CS8509 enforced at build time. Adding a new `ConstructSlotKind` member without a corresponding arm in this switch is a compilation error. Each arm calls the corresponding named slot parser method.
+
+| `ConstructSlotKind` | Parser Method |
+|---------------------|---------------|
+| `IdentifierList` | `ParseIdentifierList()` |
+| `TypeExpression` | `ParseTypeExpression()` |
+| `ModifierList` | `ParseModifierList()` |
+| `StateModifierList` | `ParseStateModifierList()` |
+| `ArgumentList` | `ParseArgumentList()` |
+| `ComputeExpression` | `ParseComputeExpression()` |
+| `RuleExpression` | `ParseRuleExpression()` |
+| `GuardClause` | `ParseGuardClause()` |
+| `BecauseClause` | `ParseBecauseClause()` |
+| `ActionChain` | `ParseActionChain()` |
+| `Outcome` | `ParseOutcome()` |
+| `StateTarget` | `ParseStateTarget()` |
+| `EventTarget` | `ParseEventTarget()` |
+| `EnsureClause` | `ParseEnsureClause()` |
+| `AccessModeKeyword` | `ParseAccessModeKeyword()` |
+| `FieldTarget` | `ParseFieldTarget()` |
+
+Optional slots (those with `IsRequired = false`) are skipped when the current token does not match the slot's expected leading token.
+
+### `BuildNode()` Mechanism
+
+After all slots are filled, `BuildNode()` constructs the typed AST node from the slot array. This is an exhaustive switch on `ConstructKind` — CS8509 enforced at build time. Adding a new `ConstructKind` without a `BuildNode` arm is a compilation error. Each arm casts the slot values to their expected types and constructs the corresponding sealed record.
+
+---
+
+## `set` Disambiguation
+
+The lexer always emits `TokenKind.Set`. The parser disambiguates by position:
+
+| Context | Interpretation | How detected |
+|---------|---------------|-------------- |
+| After `as` or `of` in `ParseTypeRef()` | Collection type (`set of T`) | Next token is `Of` |
+| After `->` in action chain | Assignment action (`set X = V`) | Inside `ParseActionChain()` |
+| After `is` / `is not` in expression | Presence test (`X is set`) | Inside Pratt left-denotation for `Is` |
+
+The parser never synthesizes a `TokenKind.SetType` token. It treats `Set` in a type position as a collection type constructor and produces a `CollectionTypeNode` with the set kind. The AST encodes the semantic meaning; the token kind stays as-is.
+
+---
+
+## `min` / `max` Disambiguation
+
+`min` and `max` serve dual roles: constraint keyword in field modifier position, built-in function in expression position.
+
+| Context | Interpretation | How detected |
+|---------|---------------|-------------- |
+| Inside `ParseFieldModifiers()` | Constraint — consumes a following expression as the bound value | Current position is the modifier zone after a type reference |
+| Inside `ParseExpression()` nud | Function call — followed by `(` | Next token is `LeftParen` |
+
+The disambiguation is trivial: constraint keywords are never followed by `(`, and function calls always are. The Pratt parser's null-denotation handler checks: if the token is `Min` or `Max` and the next token is `LeftParen`, it parses a function call expression. Otherwise, it falls through to identifier handling (which would be an error in expression position — the type checker catches it).
+
+An example from the insurance-claim sample shows both uses in a single transition:
+
+```precept
+field ClaimAmount as decimal default 0 nonnegative maxplaces 2
+
+from UnderReview on Approve when ...
+    -> set ApprovedAmount = if FraudFlag then min(Approve.Amount, ClaimAmount / 2) else Approve.Amount
+```
+
+In the field declaration, `nonnegative` and `maxplaces 2` are constraint modifiers parsed by `ParseFieldModifiers()`. In the action expression, `min(Approve.Amount, ClaimAmount / 2)` is a function call parsed by the Pratt expression parser's null-denotation for `Min` + `LeftParen`.
+
+---
+
+## Expression Parsing Detail
+
+The Pratt parser is the shared expression engine for all production methods. Any slot that expects an expression — guard clauses, ensure clauses, action RHS values, default values, constraint bounds, computed expressions — calls `ParseExpression(0)` (or `ParseExpression(minBp)` for sub-expressions at a specific precedence floor).
+
+The binding power table:
+
+| Token(s) | Left BP | Right BP | Associativity |
+|----------|---------|----------|:-------------:|
+| `or` | 10 | 10 | left |
+| `and` | 20 | 20 | left |
+| `not` (prefix) | — | 25 | right |
+| `==` `!=` `~=` `!~` `<` `>` `<=` `>=` | 30 | 31 | non-associative |
+| `contains` | 40 | 40 | left |
+| `is` | 40 | 40 | left |
+| `+` `-` (infix) | 50 | 50 | left |
+| `*` `/` `%` | 60 | 60 | left |
+| `-` (prefix) | — | 65 | right |
+| `.` | 80 | 80 | left |
+| `(` (postfix) | 80 | 0 | left |
+
+Non-associative comparisons use right-binding power 31 (one above the left-binding power of 30) to prevent right-associativity. The explicit left-operand check in the comparison handler catches left-associative chaining and emits `NonAssociativeComparison`.
+
+### Null-Denotation (Atoms and Prefix)
+
+The null-denotation is the entry point for expressions. It handles atoms (identifiers, literals, parenthesized expressions) and prefix operators (`not`, unary `-`). When the current token has no null-denotation entry, the parser emits `ExpectedToken("expression")` and returns a missing `IdentifierExpression`.
+
+### Left-Denotation (Infix and Postfix)
+
+The left-denotation handles infix operators, member access (`.`), function calls (`(`), and the `is`/`is not`/`contains` keyword operators. The `is` handler is multi-token: it consumes an optional `Not`, then expects `Set`. The `contains` handler parses the right operand at the same binding power.
+
+### Conditional Expressions
+
+`if`/`then`/`else` is parsed as a null-denotation: consume `if`, parse condition at BP 0, expect `then`, parse consequent at BP 0, expect `else`, parse alternative at BP 0. The `else` branch is required — there is no short-form `if`/`then` without `else`.
+
+An example from the insurance-claim sample:
+
+```precept
+-> set ApprovedAmount = if FraudFlag then min(Approve.Amount, ClaimAmount / 2) else Approve.Amount
+```
+
+The Pratt parser sees `if` as a null-denotation entry, parses `FraudFlag` as the condition (stops at `then`), parses `min(Approve.Amount, ClaimAmount / 2)` as the consequent (stops at `else`), and parses `Approve.Amount` as the alternative (stops at the next newline or `->`, which has no binding power).
+
+### Interpolation Reassembly
+
+The parser reassembles interpolated literals from the segmented token stream the lexer produced. Both `ParseInterpolatedString()` and `ParseInterpolatedTypedConstant()` use the same loop:
+
+1. Consume `Start` token → `TextSegment`
+2. `ParseExpression(0)` → `ExpressionSegment`
+3. If `Middle` → `TextSegment`, go to step 2
+4. If `End` → `TextSegment`, done
+
+`ParseExpression(0)` terminates naturally at `StringMiddle`/`StringEnd`/`TypedConstantMiddle`/`TypedConstantEnd` because these token kinds have no binding power in the expression parser. This is the depth-unaware reassembly property: because `}` always ends an interpolation hole and has no meaning in the expression grammar, the parser stops naturally without tracking nesting depth.
+
+### Action Chain Parsing
+
+The action chain is a loop that consumes `->` followed by an action keyword. Each action is a self-contained statement:
+
+| Action keyword | Syntax | Slot |
+|----------------|--------|------|
+| `set` | `set Identifier = Expr` | scalar assignment |
+| `add` | `add Identifier Expr` | set add |
+| `remove` | `remove Identifier Expr` | set remove |
+| `enqueue` | `enqueue Identifier Expr` | queue enqueue |
+| `dequeue` | `dequeue Identifier (into Identifier)?` | queue dequeue |
+| `push` | `push Identifier Expr` | stack push |
+| `pop` | `pop Identifier (into Identifier)?` | stack pop |
+| `clear` | `clear Identifier` | collection clear |
+
+The loop breaks when the token after `->` is an outcome keyword (`transition`, `no`, `reject`). For event handlers and state actions, the loop breaks at newline or `EndOfSource` — there is no outcome.
+
+---
+
+## Sync-Point Recovery
+
+When the dispatch loop encounters an unrecognized token, it emits an `ExpectedToken` diagnostic and scans forward for a sync token — a keyword that unambiguously starts a new declaration. The sync token set is derived from `Constructs.LeadingTokens` — a `FrozenSet<TokenKind>` built from catalog metadata at startup.
+
+The sync set contains exactly 9 tokens:
+
+```
+precept  field  state  event  rule  from  to  in  on
+```
+
+These are the `LeadingToken` values from all `DisambiguationEntry` records across all constructs. `EndOfSource` also terminates the scan. Continuation tokens (`when`, `->`, `set`, `transition`, `ensure`, `because`) are never sync points — they appear mid-production and would cause the parser to skip valid content.
+
+Within `in`-scoped parse failures, `modify` and `omit` serve as in-scope recovery anchors — they signal the start of a new access mode or omit declaration disambiguation after a state target. However, they are NOT in `Constructs.LeadingTokens` (they are post-anchor disambiguation tokens, not construct-initiating leading tokens). If parsing fails inside an `in`-scoped construct, the error sync advances until it finds the next top-level leading token (including `in` itself), at which point the outer dispatch loop re-enters disambiguation cleanly.
+
+`SyncToNextDeclaration()` silently advances past tokens to the next known leading token. No skipped-token spans are preserved in the tree.
+
+---
+
+## Validation Layer
+
+The parser enforces correctness through four tiers, ordered from earliest detection to latest:
+
+### Tier 1 — Build Time (CS8509): `InvokeSlotParser()` Switch
+
+The `InvokeSlotParser()` method uses an exhaustive switch on `ConstructSlotKind`. Adding a new `ConstructSlotKind` member without a corresponding arm fails the C# build with CS8509. This guarantees that every slot kind recognized by the catalog has a parser implementation.
+
+### Tier 2 — Build Time (CS8509): `BuildNode()` Switch
+
+The `BuildNode()` method uses an exhaustive switch on `ConstructKind`. Adding a new `ConstructKind` without a corresponding arm fails the build. This guarantees that every construct recognized by the catalog can produce a typed AST node.
+
+### Tier 3 — Test Time: Catalog Invariant Tests
+
+A suite of tests validates structural invariants that cannot be expressed by CS8509:
+
+| Test | What it validates |
+|------|-------------------|
+| `AllConstructsHaveAtLeastOneEntry` | Every `ConstructMeta` in `Constructs.All` has a non-empty `Entries` array |
+| `DisambiguatedConstructs_HaveCorrectEntryCount` | Constructs with shared leading tokens have the expected number of entries |
+| `EveryConstructSlotKindIsUsedByAtLeastOneConstruct` | No dead slot kinds in the enum |
+| Slot-ordering drift tests | Anchor slots are at index 0, guard slots are at expected positions, `OmitDeclaration` never has a guard slot |
+
+### Tier 4 — Design Time: Catalog-First Workflow
+
+The catalog is the single source of truth. New constructs are added to `Constructs.cs` first — never to switch arms first. The workflow:
+
+1. Add the `ConstructKind` enum member
+2. Add the `GetMeta()` arm with entries and slots
+3. Build fails (Tier 1 and Tier 2 catch the missing switch arms)
+4. Add the `InvokeSlotParser()` arm and `BuildNode()` arm
+5. Build succeeds; Tier 3 tests validate the structural invariants
+
+This ordering ensures the catalog is always ahead of the parser implementation — never behind it.
 
 ---
 
@@ -794,35 +916,25 @@ The Constructs catalog (`Constructs.All`) is the exhaustive registry of every de
 | Field | Parser use |
 |-------|-----------|
 | `Kind` | `ConstructKind` enum value — the identity of the production |
-| `LeadingToken` | The `TokenKind` that triggers this production in the dispatch loop |
-| `Slots` | Ordered sequence of `ConstructSlot` values — the structural skeleton of the declaration. Each slot has a `ConstructSlotKind` (e.g., `IdentifierList`, `TypeExpression`, `GuardClause`) and an `IsRequired` flag |
-| `AllowedIn` | Semantic scoping — which parent construct kinds this construct is valid after. Empty means top-level. The parser does not enforce this (flat list); the type checker does |
-| `Name`, `Description`, `UsageExample` | Used in diagnostic messages and MCP vocabulary — the parser references these for error context |
+| `Entries` | `ImmutableArray<DisambiguationEntry>` — the leading token and optional disambiguation tokens per form |
+| `Slots` | Ordered sequence of `ConstructSlot` values — the structural skeleton of the declaration |
+| `AllowedIn` | Semantic scoping — which parent construct kinds this construct is valid after. The parser does not enforce this; the type checker does |
+| `Name`, `Description`, `UsageExample` | Used in diagnostic messages and MCP vocabulary |
 
-The parser's relationship with the Constructs catalog is read-only. The parser does not modify catalog entries. It reads `LeadingToken` to build the dispatch table. It reads `Slots` to validate that each production method covers the correct sequence of slot kinds. It reads `Name` and `UsageExample` to produce diagnostic messages that match the domain language.
+Each `DisambiguationEntry` carries:
 
-The slot sequence is the construct's structural skeleton. For example, `FieldDeclaration` has slots `[IdentifierList, TypeExpression, ModifierList, ComputeExpression]` — the parser's `ParseFieldDeclaration()` method parses exactly those four slot kinds in that order. `ModifierList` and `ComputeExpression` have `IsRequired = false`, so the parser checks for their presence before attempting to parse them. The slot sequence is not a parser generator input — it is a structural contract that the hand-written production method must satisfy.
+| Field | Purpose |
+|-------|---------|
+| `LeadingToken` | The `TokenKind` that triggers this form in the dispatch loop |
+| `DisambiguationTokens` | For shared leading tokens, the tokens that distinguish this construct from siblings. Null for unique leading tokens |
+| `LeadingTokenSlot` | When the leading token is also slot content, identifies which slot receives the consumed token value. No current consumer |
 
-The 12 `ConstructKind` values map to exactly 12 parse productions:
+The parser's relationship with the Constructs catalog is read-only. It reads `Entries` to build the `ByLeadingToken` dispatch index. It reads `Slots` to validate that each production method covers the correct sequence of slot kinds. It reads `Name` and `UsageExample` to produce diagnostic messages that match the domain language.
 
-| `ConstructKind` | Parse method | Leading token |
-|-----------------|-------------|---------------|
-| `PreceptHeader` | `ParsePreceptHeader()` | `Precept` |
-| `FieldDeclaration` | `ParseFieldDeclaration()` | `Field` |
-| `StateDeclaration` | `ParseStateDeclaration()` | `State` |
-| `EventDeclaration` | `ParseEventDeclaration()` | `Event` |
-| `RuleDeclaration` | `ParseRuleDeclaration()` | `Rule` |
-| `TransitionRow` | `ParseTransitionRow()` | `From` |
-| `StateEnsure` | `ParseStateEnsure()` | `In`, `To`, or `From` |
-| `AccessMode` | `ParseAccessMode()` | `In` (via `Modify` lookahead) |
-| `OmitDeclaration` | `ParseOmitDeclaration()` | `In` (via `Omit` lookahead) |
-| `StateAction` | `ParseStateAction()` | `To` or `From` |
-| `EventEnsure` | `ParseEventEnsure()` | `On` |
-| `EventHandler` | `ParseEventHandler()` | `On` |
+The two derived indexes:
 
-Constructs with shared leading tokens (`In` → `StateEnsure`, `AccessMode`, or `OmitDeclaration`; `On` → `EventEnsure` or `EventHandler`) are resolved by the preposition disambiguation logic described above. The parser knows which production to select after parsing the target and one lookahead token — no ambiguity reaches the production method itself.
-
-Note that `From` leads to three possible productions (`TransitionRow`, `StateEnsure`, `StateAction`), and `To` leads to two (`StateEnsure`, `StateAction`). The preposition disambiguation tables above capture the full resolution logic.
+- **`ByLeadingToken`** — `FrozenDictionary<TokenKind, ImmutableArray<(ConstructKind, DisambiguationEntry)>>` — groups all entries by their leading token, enabling O(1) dispatch lookup.
+- **`LeadingTokens`** — `FrozenSet<TokenKind>` — the flat set of all leading tokens, used as the sync-point recovery set.
 
 ### Tokens Catalog
 
@@ -830,8 +942,6 @@ The parser reads token metadata indirectly through `TokenKind` values. It does n
 
 - **Keyword token kinds are stable identifiers.** The parser switches on `TokenKind.Field`, `TokenKind.From`, `TokenKind.Set`, etc. These values come from the `TokenKind` enum, which is defined by the Tokens catalog. Adding a new keyword to the catalog adds a new `TokenKind` value; the parser must handle it or the exhaustive `ConstructKind` switch catches the gap. The parser never compares `Token.Text` against string literals to identify keywords — `TokenKind` is the sole classification mechanism.
 - **Trivia token kinds control the skip loop.** `TokenKind.NewLine` and `TokenKind.Comment` are the two trivia kinds. `SkipTrivia()` consumes them between declaration-level dispatches. Within a single declaration, newlines are consumed as part of multi-line continuations (transition rows with `->` chains span multiple lines). The parser treats `NewLine` as a soft statement boundary — it terminates expressions but not arrow chains.
-
-- **Keyword token kinds are stable identifiers.** The parser switches on `TokenKind.Field`, `TokenKind.From`, `TokenKind.Set`, etc. These values come from the `TokenKind` enum, which is defined by the Tokens catalog. Adding a new keyword to the catalog adds a new `TokenKind` value; the parser must handle it or the exhaustive `ConstructKind` switch catches the gap.
 - **Operator vocabulary vs. binding powers.** `Operators.All` is the catalog source of truth for which tokens are operators — the parser's expression dispatch derives operator recognition sets from it. Binding powers (precedence numbers, associativity direction) are parser-internal mechanics: the catalog says "`+` is an arithmetic operator"; the parser says "`+` has left-binding power 50." Binding powers change when the expression grammar changes, not when the operator inventory changes. The precedence table is parser-internal; the operator set is catalog-derived.
 - **`set` / `min` / `max` dual-use is documented in both catalogs.** The Tokens catalog documents the lexer's strategy (always emit one kind); the Constructs catalog documents where each interpretation appears in declaration shapes. The parser bridges the two — it is the only stage that knows both the token kind and the syntactic position.
 
@@ -842,15 +952,19 @@ The parser emits diagnostics via `Diagnostics.Create(DiagnosticCode, SourceSpan,
 | Code | Condition |
 |------|-----------|
 | `ExpectedToken` | A required token was not found at the current position |
-| `UnexpectedKeyword` | A keyword appeared in a position where it cannot start a production |
 | `NonAssociativeComparison` | Chained comparison expression (`A == B == C`) |
-| `InvalidCallTarget` | Parenthesized call on a non-callable expression |
+| `OmitDoesNotSupportGuard` | A `when` guard appeared on an `omit` declaration (post-field or pre-stashed) |
+| `EventHandlerDoesNotSupportGuard` | A `when` guard appeared on an event handler (`on Event when Guard -> action`) |
+| `PreEventGuardNotAllowed` | A `when` guard appeared before the event target in a `from`-scoped transition row |
+| `ExpectedOutcome` | A transition row ended without a valid outcome (`transition`, `no transition`, or `reject`) |
+
+**Note:** `UnexpectedKeyword` and `InvalidCallTarget` are defined in `DiagnosticCode` but are reserved — not currently emitted by the parser. They are retained for potential future use.
 
 Diagnostic messages are written for the **domain author** — the same audience as the lexer's diagnostics. "Expected a field name here, but found 'transition'" rather than "Expected Identifier, got TokenKind.Transition." The Diagnostics catalog holds the templates; the parser passes the contextual values (expected token description, found token text, construct name).
 
-The parser's diagnostic count is deliberately small — four codes for an entire grammar. This reflects the resilient-by-construction principle: most malformed input is handled by `Expect()` returning `IsMissing` nodes (counted under `ExpectedToken`), not by specialized error productions. Additional codes will be added only when the domain author needs a distinct message that `ExpectedToken` cannot convey.
+All codes are in the `DiagnosticCode` enum under the `// ── Parse ──` section, adjacent to the lexer codes. `MutuallyExclusiveQualifiers` is in the `// ── Type ──` section (it is a type-checker diagnostic). The diagnostic catalog owns severity (all are `Error`) and message templates — the parser never constructs message strings directly.
 
-All four codes are in the `DiagnosticCode` enum under the `// ── Parse ──` section, adjacent to the lexer codes. The diagnostic catalog owns severity (all four are `Error`) and message templates — the parser never constructs message strings directly.
+The parser's diagnostic count is deliberately small — six active codes for an entire grammar. This reflects the resilient-by-construction principle: most malformed input is handled by `Expect()` returning synthetic tokens (counted under `ExpectedToken`), not by specialized error productions. `UnexpectedKeyword` and `InvalidCallTarget` are reserved but not currently emitted. Additional codes are added only when the domain author needs a distinct diagnostic that `ExpectedToken` cannot convey.
 
 ### Downstream Consumer Impact
 
@@ -867,15 +981,15 @@ The resilient-by-construction guarantee means the language server never needs to
 
 #### Grammar Generation
 
-The TextMate grammar is generated from catalog metadata, not from the parser. However, the parser's dispatch table and the grammar's pattern table must agree on which keywords start which productions. The Constructs catalog's `LeadingToken` field is the shared source of truth — both the parser's dispatch and the grammar generator read from it.
+The TextMate grammar is generated from catalog metadata, not from the parser. However, the parser's dispatch table and the grammar's pattern table must agree on which keywords start which productions. The `DisambiguationEntry.LeadingToken` field is the shared source of truth — both the parser's dispatch and the grammar generator read from it.
 
 #### Completions
 
-Context-aware completions use the parser's position to determine which `ConstructSlotKind` the cursor is in. The language server calls `Parser.Parse` on the partial text, finds the `IsMissing` node nearest the cursor, reads its slot kind, and offers completions from the catalog metadata for that slot. For example, an `IsMissing` node in the `Outcome` slot position triggers `transition`, `no transition`, and `reject` as completion candidates.
+Context-aware completions use the parser's position to determine which `ConstructSlotKind` the cursor is in. The language server calls `Parser.Parse` on the partial text, finds the synthetic token (empty text) nearest the cursor, reads its slot kind, and offers completions from the catalog metadata for that slot. For example, a synthetic token in the `Outcome` slot position triggers `transition`, `no transition`, and `reject` as completion candidates.
 
 #### MCP Compile Tool
 
-`precept_compile(text)` calls `Parser.Parse` and serializes the `SyntaxTree` as part of its response. The flat declaration list serializes naturally as a JSON array. Each node's `ConstructKind` becomes the `"kind"` field. `IsMissing` nodes are included with an `"isMissing": true` flag so MCP consumers can distinguish real declarations from error-recovery placeholders.
+`precept_compile(text)` calls `Parser.Parse` and serializes the `SyntaxTree` as part of its response. The flat declaration list serializes naturally as a JSON array. Each node's `ConstructKind` becomes the `"kind"` field. Synthetic tokens (empty text, zero-length span) are included so MCP consumers can detect error-recovery placeholders.
 
 ---
 
@@ -886,14 +1000,14 @@ Context-aware completions use the parser's position to determine which `Construc
 `Expect(TokenKind)` is the primary recovery primitive. When the current token does not match, the parser:
 
 1. Emits `ExpectedToken` diagnostic with the expected description and the found token.
-2. Returns a synthetic `Token` with `IsMissing = true` and `SourceSpan.Missing`.
+2. Returns a synthetic `Token` with `Kind` set to the expected kind, `Text = string.Empty`, and a zero-length `SourceSpan` at the current position.
 3. Does **not** advance — the unexpected token remains current for the calling production to handle.
 
-The calling production constructs a complete node using the synthetic token. Downstream stages see a structurally coherent tree; they can inspect `IsMissing` to skip validation on phantom nodes.
+The calling production constructs a complete node using the synthetic token. Downstream stages see a structurally coherent tree; they can inspect `Token.Text == string.Empty` to detect synthetic tokens.
 
 ### Sync-Point Resync
 
-When the top-level dispatch loop encounters a token that cannot start any declaration, it scans forward to the next sync token:
+When the top-level dispatch loop encounters a token that cannot start any declaration, it scans forward to the next sync token from `Constructs.LeadingTokens`:
 
 | Sync token | Keyword |
 |------------|---------|
@@ -906,33 +1020,28 @@ When the top-level dispatch loop encounters a token that cannot start any declar
 | `To` | `to` |
 | `In` | `in` |
 | `On` | `on` |
-| `Modify` | `modify` |
-| `Readonly` | `readonly` |
-| `Editable` | `editable` |
-| `Omit` | `omit` |
 | `EndOfSource` | — |
 
-These are the `LeadingToken` values from the Constructs catalog. Continuation tokens (`when`, `->`, `set`, `transition`, `ensure`, `because`) are never sync points — they appear mid-production and would cause the parser to skip valid content.
+Continuation tokens (`when`, `->`, `set`, `transition`, `ensure`, `because`) are never sync points — they appear mid-production and would cause the parser to skip valid content.
 
 ### Error Conditions
 
 | Condition | Diagnostic code | Recovery action |
 |-----------|-----------------|-----------------|
-| Expected token not found | `ExpectedToken` | Insert `IsMissing` node, do not advance |
-| Unrecognized token at declaration position | `UnexpectedKeyword` | Scan to next sync point, skip intervening tokens |
+| Expected token not found | `ExpectedToken` | Insert synthetic token (empty text, zero-length span), do not advance |
+| Unrecognized token at declaration position | `ExpectedToken` | Scan to next sync point, skip intervening tokens |
 | Chained comparison (`A == B == C`) | `NonAssociativeComparison` | Emit diagnostic, return left operand as the expression |
-| Non-callable expression followed by `(` | `InvalidCallTarget` | Emit diagnostic, parse arguments but mark node as missing |
-
-### Diagnostic Catalog Integration
-
-All four parse-stage codes live in the `DiagnosticCode` enum under `// ── Parse ──`. The Diagnostics catalog owns severity (all `Error`) and message templates. The parser passes contextual values — expected token description, found token text, construct name — via `Diagnostics.Create(DiagnosticCode, SourceSpan, params object[])`. Messages target the domain author: "Expected a state name here, but found 'ensure'" not "Expected Identifier, got TokenKind.Ensure."
+| Guard on omit declaration | `OmitDoesNotSupportGuard` | Emit diagnostic, discard guard, parse OmitDeclarationNode without it |
+| Guard on event handler | `EventHandlerDoesNotSupportGuard` | Emit diagnostic, discard guard, parse EventHandlerNode without it |
+| Pre-event guard on transition row | `PreEventGuardNotAllowed` | Emit diagnostic, inject guard at post-event GuardClause slot |
+| Missing outcome on transition row | `ExpectedOutcome` | Emit diagnostic, insert synthetic outcome node |
 
 ---
 
 ## Contracts and Guarantees
 
 - **Always produces a tree.** `Parser.Parse` never returns null, never throws, and always produces a `SyntaxTree`. Downstream stages do not need to handle "no tree" as a result.
-- **Every character is accounted for.** `IsMissing` nodes have zero-length spans at the expected position; `SkippedTokens` spans capture everything between an error and the next sync point. No source character is silently discarded.
+- **Every character is accounted for.** Synthetic tokens have zero-length spans at the expected position. `SyncToNextDeclaration()` silently advances past unrecognized tokens to the next leading token. No source character is silently discarded.
 - **`SourceSpan` coverage.** Every node's `Span` covers its full source extent. Declaration-level spans cover from the leading token to the last token in the declaration.
 - **`ConstructKind` identity.** Every `Declaration` node carries a `ConstructKind` from the Constructs catalog — the parser never leaves this field unset.
 - **Flat list in source order.** `Declarations` is in the order the declarations appear in the source. No reordering.
@@ -949,9 +1058,7 @@ The parser consumes at least one token per loop iteration. Every `Advance()` cal
 
 The parser dispatches on `ConstructKind` values, not on ad-hoc token sequences. Each declaration production corresponds to exactly one `ConstructKind`, and the Constructs catalog (`Constructs.All`) is the exhaustive inventory of every declaration shape the parser can produce. When a new construct is added to the catalog, the parser gains a new production — the dispatch table, the slot sequence, and the MCP vocabulary all derive from the same metadata.
 
-The Constructs catalog carries `LeadingToken`, `Slots`, `AllowedIn`, and `UsageExample` per construct. These are the parser's dispatch key, shape skeleton, semantic scoping rule, and diagnostic example text — read from metadata, not duplicated in parser code.
-
-Consider the `TransitionRow` construct. Its catalog entry declares `LeadingToken = TokenKind.From`, `Slots = [StateTarget, EventTarget, GuardClause, ActionChain, Outcome]`, and `AllowedIn = []` (top-level). The parser reads this shape: dispatch on `From`, parse a state target, parse an event target, optionally parse a guard, loop through an action chain, parse an outcome. If a new slot is added to the construct (say, a `BecauseClause`), the parser gains a new step in the production — but the catalog is the authority that says the step exists.
+The Constructs catalog carries `Entries`, `Slots`, `AllowedIn`, and `UsageExample` per construct. These are the parser's dispatch key, shape skeleton, semantic scoping rule, and diagnostic example text — read from metadata, not duplicated in parser code.
 
 ### Dispatch Table: Grammar Structure vs. Vocabulary
 
@@ -977,26 +1084,22 @@ The parser's hand-written dispatch table is not a catalog violation. The catalog
 
 A catalog lookup on `LeadingToken` cannot select a production. The parser must read past the state/event target to the following verb. That disambiguation is grammar structure; metadata cannot hold it.
 
-**What the catalog already provides.** `ConstructMeta.LeadingToken` carries the token→construct mapping for grammar generation, completions, and MCP vocabulary — all consumers that need to know which tokens start which constructs. The parser reads those same entries to build its dispatch table. The catalog is doing its part; production selection on top of it is mechanics, not a gap.
+**The vocabulary gap to watch.** Vocabulary tables inside parse methods derive from catalog frozen dictionaries — not hand-coded:
 
-**The vocabulary gap to watch.** When the parser is implemented, vocabulary tables inside parse methods must derive from catalog frozen dictionaries — not be hand-coded:
-
-| Vocabulary | Must derive from |
+| Vocabulary | Derives from |
 |-----------|-----------------|
 | Operator recognition and precedence | `Operators.All` |
 | Type keyword sets | `Types.All` |
 | Modifier recognition sets | `Modifiers.All` |
 | Action keyword sets | `Actions.All` |
 
-Hard-coding these lists inside `ParseFieldModifiers()`, `ParseTypeRef()`, or the expression null-denotation dispatch would be the real violation — not the dispatch table.
-
 ### Preposition-First Grammar
 
-The four preposition keywords (`in`, `to`, `from`, `on`) are the parser's primary structural signal for scoped declarations. After the precept header and the declaration keywords (`field`, `state`, `event`, `rule`), every remaining production begins with a preposition. The parser reads the preposition, parses the state or event target, then looks ahead one token to select the specific production: ensure, access mode, action, transition, or event handler.
+The four preposition keywords (`in`, `to`, `from`, `on`) are the parser's primary structural signal for scoped declarations. After the precept header and the declaration keywords (`field`, `state`, `event`, `rule`), every remaining production begins with a preposition. The parser reads the preposition, parses the state or event target, then looks ahead one token to select the specific production: ensure, access mode, omit, action, transition, or event handler.
 
 A flat, line-oriented grammar with no block delimiters needs an unambiguous structural signal at the start of each line. Prepositions are the natural English equivalent of a block opener — they scope the line to a state or event context without requiring braces or indentation.
 
-The insurance-claim sample illustrates the pattern. Every line after the header declarations begins with `from`, `in`, or `on`:
+The insurance-claim sample illustrates the pattern. Every scoped declaration after the header begins with `from`, `in`, or `on`:
 
 ```precept
 in UnderReview modify FraudFlag editable
@@ -1022,7 +1125,7 @@ Precept has 10 precedence levels, prefix operators (`not`, unary `-`), postfix o
 
 ### Resilient by Construction
 
-The parser never throws, never returns null, and never produces a partial tree. Every production has a well-defined recovery path: missing tokens produce `IsMissing` nodes with zero-length spans; structurally lost positions scan forward to sync points (declaration-starting keywords). The resulting tree is always traversable by downstream stages.
+The parser never throws, never returns null, and never produces a partial tree. Every production has a well-defined recovery path: missing tokens produce synthetic tokens with empty text and zero-length spans; structurally lost positions scan forward to sync points (declaration-starting keywords). The resulting tree is always traversable by downstream stages.
 
 The language server calls `Parser.Parse` on every keystroke. A parser that fails on incomplete input forces the language server to special-case "no tree" scenarios throughout completions, hover, go-to-definition, and diagnostics. A resilient parser eliminates that entire class of defensive code. The MCP tools (`precept_compile`, `precept_inspect`) also consume the tree directly — they need a structurally coherent tree even when the author is mid-edit.
 
@@ -1031,8 +1134,6 @@ The language server calls `Parser.Parse` on every keystroke. A parser that fails
 The AST is a flat list of declaration nodes. There are no nested block nodes, no scope-introducing braces, and no parent-child relationships in the tree structure. Semantic scoping (`AllowedIn` — e.g., a state ensure is only valid after a state declaration) is a type-checker concern, not a parser concern. The parser produces the flat list; the type checker validates semantic ordering.
 
 Precept is a line-oriented policy language. The author writes declarations top-to-bottom; the runtime reads them the same way. A flat list matches the mental model: each line is a self-contained declaration with its own preposition scope. Nested AST blocks would impose a hierarchical structure that the language surface does not express.
-
-The `AllowedIn` field on `ConstructMeta` captures the semantic scoping that a nesting parser would express structurally. For example, `StateEnsure` has `AllowedIn = [StateDeclaration]` — meaning it is only valid after a state declaration exists. But this is a type-checker validation, not a parsing constraint. The parser emits the flat node; the type checker checks `AllowedIn` against the declared state names.
 
 ### What Stays Hand-Written
 
@@ -1051,16 +1152,10 @@ These change when the parsing algorithm changes, not when the language surface c
 ## Innovation
 
 - **Preposition-first structural grammar.** Four preposition keywords (`in`, `to`, `from`, `on`) carry all semantic scope in the grammar without block delimiters. The parser dispatches on these with a one-token lookahead after the target — no brace matching, no indentation tracking, no ambiguous continuation.
-- **Catalog-derived dispatch table.** The top-level dispatch loop is built from `ConstructMeta.LeadingToken` entries — the same catalog metadata that drives grammar generation, MCP vocabulary, and completions. The parser does not maintain a parallel keyword list.
+- **Catalog-derived dispatch with derived indexes.** `Constructs.ByLeadingToken` and `Constructs.LeadingTokens` are built from `DisambiguationEntry` metadata — the same catalog that drives grammar generation, MCP vocabulary, and completions. The parser does not maintain a parallel keyword list.
 - **Pratt expression parsing for a constraint DSL.** The bounded expression grammar (10 precedence levels, non-associative comparisons, `if`/`then`/`else`) is handled by a single ~80-line Pratt loop with a binding-power table. No mutually recursive per-precedence methods.
 - **Depth-unaware interpolation reassembly.** Interpolated string and typed-constant segments are reassembled without tracking nesting depth — the token stream terminates expression holes naturally because `StringMiddle`/`StringEnd` have no binding power in the expression grammar.
-
----
-
-## Open Questions / Implementation Notes
-
-- The test coverage below documents current test coverage. No known structural gaps.
-- `AllowedIn` enforcement: currently a TypeChecker concern. If a future language feature needs parser-level scope enforcement (e.g., block-scoped declarations), revisit.
+- **4-tier validation pyramid.** CS8509 at build time catches missing switch arms; test-time invariant tests catch structural drift; design-time workflow ensures catalog-first evolution. No runtime surprises.
 
 ---
 
@@ -1073,18 +1168,30 @@ These change when the parsing algorithm changes, not when the language surface c
 
 ---
 
+## Open Questions / Implementation Notes
+
+- The v8 implementation plan lives in `docs/working/catalog-parser-design-v8.md`. The PR sequence (5 PRs, 23 slices) is defined there.
+- `AllowedIn` enforcement: currently a TypeChecker concern. If a future language feature needs parser-level scope enforcement (e.g., block-scoped declarations), revisit.
+- Proposal C (`when` as `StateAction` disambiguation token) is deferred — not incorporated in this design. See v8 §8 for the "how to add it later" path.
+
+---
+
 ## Cross-References
 
 - `docs/compiler/lexer.md` — produces the `TokenStream` this stage consumes
 - `docs/compiler/type-checker.md` — consumes `SyntaxTree`; owns `AllowedIn` enforcement and semantic validation
-- `docs/compiler-and-runtime-design.md §5` — Parser section in the main design doc
-- `docs/language/catalog-system.md` — Constructs catalog design
+- `docs/language/catalog-system.md` — Constructs catalog design, metadata-driven architecture
+- `docs/working/catalog-parser-design-v8.md` — implementation plan (PR sequence, test specs per slice)
 
 ---
 
 ## Source Files
 
 - `src/Precept/Pipeline/Parser.cs` — static class + `ParseSession` struct
-- `src/Precept/Pipeline/SyntaxNodes.cs` — all AST node records
+- `src/Precept/Pipeline/SyntaxNodes/` — AST node records (directory of per-node files)
 - `src/Precept/Pipeline/SourceSpan.cs` — dual-coordinate location record
-- `test/Precept.Tests/PreceptParserTests.cs` — parser unit tests
+- `src/Precept/Language/Constructs.cs` — construct catalog (dispatch metadata)
+- `src/Precept/Language/Construct.cs` — `ConstructMeta` record definition
+- `src/Precept/Language/ConstructSlot.cs` — `ConstructSlot` / `ConstructSlotKind`
+- `src/Precept/Language/DisambiguationEntry.cs` — `DisambiguationEntry` record (created in PR 1)
+- `test/Precept.Tests/ParserTests.cs` — parser unit tests
