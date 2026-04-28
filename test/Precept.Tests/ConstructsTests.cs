@@ -256,7 +256,218 @@ public class ConstructsTests
     [InlineData(ConstructKind.EventEnsure,      TokenKind.On)]
     public void LeadingToken_IsCorrect(ConstructKind kind, TokenKind expectedToken)
     {
-        Constructs.GetMeta(kind).LeadingToken.Should().Be(expectedToken,
+        Constructs.GetMeta(kind).PrimaryLeadingToken.Should().Be(expectedToken,
             $"{kind} dispatch must begin with {expectedToken}");
+    }
+
+    // ── Slice 1.2: PrimaryLeadingToken bridge ──────────────────────────────────
+
+    [Theory]
+    [InlineData(ConstructKind.PreceptHeader,    TokenKind.Precept)]
+    [InlineData(ConstructKind.FieldDeclaration, TokenKind.Field)]
+    [InlineData(ConstructKind.StateDeclaration, TokenKind.State)]
+    [InlineData(ConstructKind.EventDeclaration, TokenKind.Event)]
+    [InlineData(ConstructKind.RuleDeclaration,  TokenKind.Rule)]
+    [InlineData(ConstructKind.TransitionRow,    TokenKind.From)]
+    [InlineData(ConstructKind.StateEnsure,      TokenKind.In)]
+    [InlineData(ConstructKind.AccessMode,       TokenKind.In)]
+    [InlineData(ConstructKind.OmitDeclaration,  TokenKind.In)]
+    [InlineData(ConstructKind.StateAction,      TokenKind.To)]
+    [InlineData(ConstructKind.EventEnsure,      TokenKind.On)]
+    [InlineData(ConstructKind.EventHandler,     TokenKind.On)]
+    public void PrimaryLeadingToken_MatchesExpectedToken(ConstructKind kind, TokenKind expectedToken)
+    {
+        Constructs.GetMeta(kind).PrimaryLeadingToken.Should().Be(expectedToken);
+    }
+
+    [Fact]
+    public void Entries_IsNotEmpty_ForAllConstructs()
+    {
+        foreach (var meta in Constructs.All)
+        {
+            meta.Entries.Should().NotBeEmpty($"{meta.Kind} must have at least one DisambiguationEntry");
+        }
+    }
+
+    // ── Slice 1.4: Entries, slots, disambiguation ──────────────────────────────
+
+    [Fact]
+    public void AllConstructsHaveAtLeastOneEntry()
+    {
+        foreach (var meta in Constructs.All)
+        {
+            meta.Entries.Length.Should().BeGreaterThan(0,
+                $"{meta.Kind} must have at least one entry");
+        }
+    }
+
+    [Fact]
+    public void LeadingTokenSlot_OnlyUsedWhenLeadingTokenIsAlsoSlotContent()
+    {
+        foreach (var meta in Constructs.All)
+        {
+            foreach (var entry in meta.Entries)
+            {
+                if (entry.LeadingTokenSlot is { } slotKind)
+                {
+                    meta.Slots.Should().Contain(s => s.Kind == slotKind,
+                        $"{meta.Kind} entry for {entry.LeadingToken} has LeadingTokenSlot={slotKind} but no matching slot");
+                }
+            }
+        }
+    }
+
+    [Fact]
+    public void RuleDeclaration_HasRuleExpressionSlot()
+    {
+        var slots = Constructs.GetMeta(ConstructKind.RuleDeclaration).Slots;
+        slots.Should().HaveCount(3, "RuleDeclaration: [RuleExpression, GuardClause(opt), BecauseClause]");
+        slots[0].Kind.Should().Be(ConstructSlotKind.RuleExpression);
+        slots[1].Kind.Should().Be(ConstructSlotKind.GuardClause);
+        slots[1].IsRequired.Should().BeFalse();
+        slots[2].Kind.Should().Be(ConstructSlotKind.BecauseClause);
+    }
+
+    [Fact]
+    public void AccessMode_HasCorrectSlotSequence()
+    {
+        var slots = Constructs.GetMeta(ConstructKind.AccessMode).Slots;
+        slots.Should().HaveCount(4, "AccessMode: [StateTarget, FieldTarget, AccessModeKeyword, GuardClause(opt)]");
+        slots[0].Kind.Should().Be(ConstructSlotKind.StateTarget);
+        slots[1].Kind.Should().Be(ConstructSlotKind.FieldTarget);
+        slots[2].Kind.Should().Be(ConstructSlotKind.AccessModeKeyword);
+        slots[3].Kind.Should().Be(ConstructSlotKind.GuardClause);
+        slots[3].IsRequired.Should().BeFalse();
+    }
+
+    [Fact]
+    public void OmitDeclaration_HasCorrectSlotSequence()
+    {
+        var slots = Constructs.GetMeta(ConstructKind.OmitDeclaration).Slots;
+        slots.Should().HaveCount(2, "OmitDeclaration: [StateTarget, FieldTarget]");
+        slots[0].Kind.Should().Be(ConstructSlotKind.StateTarget);
+        slots[1].Kind.Should().Be(ConstructSlotKind.FieldTarget);
+    }
+
+    [Fact]
+    public void OmitDeclaration_HasNoGuardSlot()
+    {
+        Constructs.GetMeta(ConstructKind.OmitDeclaration).Slots
+            .Should().NotContain(s => s.Kind == ConstructSlotKind.GuardClause,
+                "omit is unconditional — OmitDeclaration must not have a guard slot");
+    }
+
+    [Theory]
+    [InlineData(ConstructKind.StateEnsure,      3)]
+    [InlineData(ConstructKind.AccessMode,        1)]
+    [InlineData(ConstructKind.OmitDeclaration,   1)]
+    [InlineData(ConstructKind.StateAction,       2)]
+    [InlineData(ConstructKind.EventEnsure,       1)]
+    [InlineData(ConstructKind.EventHandler,      1)]
+    [InlineData(ConstructKind.TransitionRow,     1)]
+    public void DisambiguatedConstructs_HaveCorrectEntryCount(ConstructKind kind, int expectedCount)
+    {
+        Constructs.GetMeta(kind).Entries.Length.Should().Be(expectedCount,
+            $"{kind} should have {expectedCount} disambiguation entries");
+    }
+
+    [Fact]
+    public void AccessMode_DisambiguationTokens_ContainModifyOnly()
+    {
+        var entries = Constructs.GetMeta(ConstructKind.AccessMode).Entries;
+        var inEntry = entries.Should().ContainSingle(e => e.LeadingToken == TokenKind.In).Subject;
+        inEntry.DisambiguationTokens.Should().NotBeNull();
+        inEntry.DisambiguationTokens!.Value.Should().BeEquivalentTo([TokenKind.Modify],
+            "AccessMode disambiguates with Modify only — Omit belongs to OmitDeclaration");
+    }
+
+    [Fact]
+    public void OmitDeclaration_DisambiguationTokens_ContainOmitOnly()
+    {
+        var entries = Constructs.GetMeta(ConstructKind.OmitDeclaration).Entries;
+        var inEntry = entries.Should().ContainSingle(e => e.LeadingToken == TokenKind.In).Subject;
+        inEntry.DisambiguationTokens.Should().NotBeNull();
+        inEntry.DisambiguationTokens!.Value.Should().BeEquivalentTo([TokenKind.Omit],
+            "OmitDeclaration disambiguates with Omit only — Modify belongs to AccessMode");
+    }
+
+    [Fact]
+    public void AllConstructs_UsageExample_IsNotNullOrEmpty()
+    {
+        foreach (var meta in Constructs.All)
+        {
+            meta.UsageExample.Should().NotBeNullOrEmpty(
+                $"{meta.Kind} must have a usage example");
+        }
+    }
+
+    // ── Slice 1.5: Derived indexes ─────────────────────────────────────────────
+
+    [Fact]
+    public void EveryLeadingTokenMapsToAtLeastOneConstruct()
+    {
+        var allLeadingTokens = Constructs.All
+            .SelectMany(m => m.Entries)
+            .Select(e => e.LeadingToken)
+            .Distinct();
+
+        foreach (var token in allLeadingTokens)
+        {
+            Constructs.ByLeadingToken.Should().ContainKey(token,
+                $"token {token} appears as a leading token but is missing from ByLeadingToken index");
+        }
+    }
+
+    [Fact]
+    public void LeadingTokens_ContainsAllExpectedTokens()
+    {
+        var expected = new[]
+        {
+            TokenKind.Field, TokenKind.State, TokenKind.Event, TokenKind.Rule,
+            TokenKind.From, TokenKind.In, TokenKind.To, TokenKind.On, TokenKind.Precept
+        };
+
+        foreach (var token in expected)
+        {
+            Constructs.LeadingTokens.Should().Contain(token, $"{token} should be a leading token");
+        }
+    }
+
+    [Fact]
+    public void LeadingTokens_DoesNotContainRetiredTokens()
+    {
+        // Write was retired from access mode context in B4
+        Constructs.LeadingTokens.Should().NotContain(TokenKind.Writable,
+            "Writable is not a leading token for any construct");
+    }
+
+    [Theory]
+    [InlineData(TokenKind.In,   3)]
+    [InlineData(TokenKind.To,   2)]
+    [InlineData(TokenKind.From, 3)]
+    [InlineData(TokenKind.On,   2)]
+    public void SharedLeadingTokens_HaveCorrectCandidateCount(TokenKind token, int expectedCount)
+    {
+        Constructs.ByLeadingToken[token].Length.Should().Be(expectedCount,
+            $"token {token} should map to {expectedCount} construct candidates");
+    }
+
+    [Theory]
+    [InlineData(TokenKind.Precept)]
+    [InlineData(TokenKind.Field)]
+    [InlineData(TokenKind.State)]
+    [InlineData(TokenKind.Event)]
+    [InlineData(TokenKind.Rule)]
+    public void UniqueLeadingTokens_HaveSingleCandidate(TokenKind token)
+    {
+        Constructs.ByLeadingToken[token].Length.Should().Be(1,
+            $"token {token} should uniquely identify a single construct");
+    }
+
+    [Fact]
+    public void LeadingTokens_Count_IsCorrect()
+    {
+        Constructs.LeadingTokens.Count.Should().Be(9,
+            "9 distinct leading tokens: Precept, Field, State, Event, Rule, From, In, To, On");
     }
 }

@@ -21,6 +21,7 @@ public enum ConstructSlotKind
     BecauseClause,         // "because message"
     AccessModeKeyword,     // readonly | editable (B4 access mode adjectives)
     FieldTarget,           // field name or "all"
+    RuleExpression,        // the rule's boolean expression (e.g. amount > 0)
 }
 
 /// <summary>

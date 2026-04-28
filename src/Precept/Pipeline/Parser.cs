@@ -9,8 +9,8 @@ namespace Precept.Pipeline;
 //
 // Architectural Boundary (per Frank's ruling, 2026-04-27):
 //   - Grammar productions (recursive descent structure, dispatch loop, disambiguation
-//     sequences) → hand-written. The catalog's ConstructMeta.LeadingToken exists for
-//     completions, grammar generation, and MCP — not for parser dispatch.
+//     sequences) → hand-written. The catalog's ConstructMeta.Entries / PrimaryLeadingToken
+//     exists for completions, grammar generation, and MCP — not for parser dispatch.
 //   - Vocabulary tables (operator precedence, type keywords, modifier sets, action
 //     recognition sets) → MUST be derived from catalog metadata, specifically:
 //       • Operators.All       → operator precedence/association tables

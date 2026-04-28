@@ -13,7 +13,7 @@ namespace Precept.Analyzers;
 /// X31: Each <c>ConstructMeta.AllowedIn</c> array must not contain the arm's own
 ///      <c>ConstructKind</c> (a construct cannot be nested inside itself).
 ///
-/// X32: Two construct arms may not share a <c>ConstructMeta.LeadingToken</c> unless their
+/// X32: Two construct arms may not share a <c>ConstructMeta.PrimaryLeadingToken</c> unless their
 ///      slot sequences diverge — diverging slots give the parser a lookahead disambiguation
 ///      point. Identical leading token AND identical slot sequences = genuine ambiguity.
 ///
