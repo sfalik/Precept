@@ -107,3 +107,45 @@ Internal wrapper records replace the `NotImplementedException` stubs from PR 2:
 - Disambiguated construct parsers: In → StateEnsure/AccessMode/OmitDeclaration, To → StateEnsure/StateAction, From → TransitionRow/StateEnsure/StateAction, On → EventEnsure/EventHandler.
 - Remaining stub slot parsers: ActionChain, Outcome, StateTarget, EventTarget, EnsureClause, AccessModeKeyword, FieldTarget.
 - Keyword-as-function-name reinterpretation for `min()`, `max()`, etc.
+
+## PR 4: Disambiguated Constructs — in/to/on (2025-07-24)
+
+### Slices Completed
+
+| Slice | Description | Status |
+|-------|-------------|--------|
+| 4.1 | Generic disambiguator with stashed guard injection | ✅ |
+| 4.2 | `in`-scoped: AccessMode, OmitDeclaration, StateEnsure(in) + FieldTarget DU, AccessModeKeyword | ✅ |
+| 4.3 | `to`-scoped: StateEnsure(to), StateAction + action chain + all 8 action statements | ✅ |
+| 4.4 | `on`-scoped: EventEnsure, EventHandler | ✅ |
+| 4.5 | DiagnosticCode additions: OmitDoesNotSupportGuard, PreEventGuardNotAllowed | ✅ |
+
+### Test Count
+- Before: 1950 (Precept.Tests) + 207 (Analyzers) = 2157
+- After:  1985 (Precept.Tests) + 207 (Analyzers) = 2192
+- Delta:  +35 new tests in ParserTests.cs
+
+### Design Decisions
+
+1. **Direct parsers vs generic slot path:** Disambiguated constructs use direct parse methods (ParseAccessMode, ParseOmitDeclaration, ParseStateEnsure, etc.) because the disambiguator pre-consumes the anchor and guard. The generic ParseConstructSlots + BuildNode path is unsuitable here — it would re-parse tokens already consumed. The generic slot parsers (ParseStateTarget, ParseFieldTarget, ParseAccessModeKeyword, etc.) are also implemented for any future generic-slot usage or InvokeSlotParser calls.
+
+2. **Stashed guard injection:** `TryParseStashedGuard` peeks for `when` before the disambiguation token. If found, the guard expression is pre-parsed and passed to the construct parser, which injects it into the guard slot. OmitDeclaration rejects it with `OmitDoesNotSupportGuard`.
+
+3. **OmitDeclaration guard rejection is two-sided:** Both pre-field (`in State when X omit ...`) and post-field (`in State omit Field when X`) paths emit `OmitDoesNotSupportGuard`. The post-field case consumes and discards the guard expression to maintain sync.
+
+4. **ActionChain implemented:** Parses `-> action` chains with `IsOutcomeAhead()` lookahead to stop before outcomes. Used by both `ParseStateAction`/`ParseEventHandler` (direct) and the generic `ParseActionChain` slot parser.
+
+5. **`from`-scoped branch is a passthrough stub** — always emits diagnostic and syncs. PR 5 will implement TransitionRow + from-scoped StateEnsure/StateAction.
+
+6. **`ParseOutcome` still throws `NotImplementedException`** — only needed for TransitionRow (PR 5).
+
+### Surprises / Deviations
+- No changes needed to any AST node definitions — the PR 2 node hierarchy was exactly right.
+- `Token` is a `readonly record struct`, so `Token?` is a nullable value type requiring `.Value` after null-check.
+- `PreEventGuardNotAllowed` diagnostic code registered but not yet emitted — it's for TransitionRow stashed guard rejection in PR 5.
+
+### Issues for PR 5
+- `ParseOutcome` slot parser: transition / no transition / reject.
+- `from`-scoped disambiguation: `From State On Event` → TransitionRow, `From State ensure` → StateEnsure, `From State ->` → StateAction.
+- TransitionRow grammar: `from State on Event [when Guard] [-> Actions] -> Outcome`.
+- `PreEventGuardNotAllowed` emission when a stashed guard would land on TransitionRow.

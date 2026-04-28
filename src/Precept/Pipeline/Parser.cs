@@ -277,10 +277,358 @@ public static class Parser
 
         private Declaration? DisambiguateAndParse(Token token)
         {
-            // PR 4 will implement disambiguation for In/To/From/On scoped constructs.
-            // For now, skip to next declaration.
+            var leadingKind = token.Kind;
+            Advance(); // consume 'in', 'to', 'from', or 'on'
+            var start = token.Span;
+
+            // Parse anchor target: state for in/to/from, event for on
+            if (leadingKind == TokenKind.On)
+            {
+                var eventTarget = ParseEventTargetDirect();
+                if (eventTarget is null)
+                {
+                    SyncToNextDeclaration();
+                    return null;
+                }
+
+                var stashedGuard = TryParseStashedGuard();
+
+                if (IsAtEnd())
+                {
+                    EmitDiagnostic(DiagnosticCode.ExpectedToken, Current().Span, "ensure or ->", Current().Text);
+                    return null;
+                }
+
+                return Current().Kind switch
+                {
+                    TokenKind.Ensure => ParseEventEnsure(start, eventTarget.Value, stashedGuard),
+                    TokenKind.Arrow  => ParseEventHandler(start, eventTarget.Value),
+                    _ => EmitAmbiguityAndSync(Current()),
+                };
+            }
+            else
+            {
+                var stateTarget = ParseStateTargetDirect();
+                if (stateTarget is null)
+                {
+                    SyncToNextDeclaration();
+                    return null;
+                }
+
+                var stashedGuard = TryParseStashedGuard();
+
+                if (IsAtEnd())
+                {
+                    EmitDiagnostic(DiagnosticCode.ExpectedToken, Current().Span, "disambiguation token", Current().Text);
+                    return null;
+                }
+
+                return leadingKind switch
+                {
+                    TokenKind.In => Current().Kind switch
+                    {
+                        TokenKind.Modify => ParseAccessMode(start, stateTarget, stashedGuard),
+                        TokenKind.Omit   => ParseOmitDeclaration(start, stateTarget, stashedGuard),
+                        TokenKind.Ensure => ParseStateEnsure(start, token, stateTarget, stashedGuard),
+                        _ => EmitAmbiguityAndSync(Current()),
+                    },
+                    TokenKind.To => Current().Kind switch
+                    {
+                        TokenKind.Ensure => ParseStateEnsure(start, token, stateTarget, stashedGuard),
+                        TokenKind.Arrow  => ParseStateAction(start, token, stateTarget, stashedGuard),
+                        _ => EmitAmbiguityAndSync(Current()),
+                    },
+                    TokenKind.From => Current().Kind switch
+                    {
+                        // PR 5: TransitionRow, StateEnsure (from-scoped), StateAction (from-scoped)
+                        _ => EmitAmbiguityAndSync(Current()),
+                    },
+                    _ => EmitAmbiguityAndSync(Current()),
+                };
+            }
+        }
+
+        private Declaration? EmitAmbiguityAndSync(Token token)
+        {
+            EmitDiagnostic(DiagnosticCode.ExpectedToken, token.Span, "disambiguation token", token.Text);
             SyncToNextDeclaration();
             return null;
+        }
+
+        private Expression? TryParseStashedGuard()
+        {
+            if (Current().Kind != TokenKind.When) return null;
+            Advance(); // consume 'when'
+            return ParseExpression(0);
+        }
+
+        private StateTargetNode? ParseStateTargetDirect()
+        {
+            if (Current().Kind == TokenKind.Any)
+            {
+                var tok = Advance();
+                return new StateTargetNode(tok.Span, tok, IsQuantifier: true);
+            }
+            if (Current().Kind == TokenKind.Identifier)
+            {
+                var tok = Advance();
+                return new StateTargetNode(tok.Span, tok, IsQuantifier: false);
+            }
+            EmitDiagnostic(DiagnosticCode.ExpectedToken, Current().Span, "state name", Current().Text);
+            return null;
+        }
+
+        private Token? ParseEventTargetDirect()
+        {
+            if (Current().Kind == TokenKind.Identifier)
+                return Advance();
+            EmitDiagnostic(DiagnosticCode.ExpectedToken, Current().Span, "event name", Current().Text);
+            return null;
+        }
+
+        // ── in-scoped construct parsers ───────────────────────────────────────
+
+        private AccessModeNode ParseAccessMode(SourceSpan start, StateTargetNode anchor, Expression? stashedGuard)
+        {
+            Advance(); // consume 'modify'
+            var fields = ParseFieldTargetDirect();
+            var mode = ParseAccessModeKeywordDirect();
+
+            // Guard: stashed (pre-field) or post-field
+            Expression? guard = stashedGuard;
+            if (guard is null && Current().Kind == TokenKind.When)
+            {
+                Advance();
+                guard = ParseExpression(0);
+            }
+
+            var lastSpan = guard?.Span ?? mode.Span;
+            return new AccessModeNode(SourceSpan.Covering(start, lastSpan), anchor, fields, mode, guard);
+        }
+
+        private OmitDeclarationNode ParseOmitDeclaration(SourceSpan start, StateTargetNode anchor, Expression? stashedGuard)
+        {
+            Advance(); // consume 'omit'
+
+            if (stashedGuard is not null)
+                EmitDiagnostic(DiagnosticCode.OmitDoesNotSupportGuard, stashedGuard.Span);
+
+            var fields = ParseFieldTargetDirect();
+
+            // Post-field guard: consume and discard with diagnostic
+            if (Current().Kind == TokenKind.When)
+            {
+                var whenSpan = Current().Span;
+                Advance(); // consume 'when'
+                ParseExpression(0); // consume and discard
+                EmitDiagnostic(DiagnosticCode.OmitDoesNotSupportGuard, whenSpan);
+            }
+
+            return new OmitDeclarationNode(SourceSpan.Covering(start, fields.Span), anchor, fields);
+        }
+
+        private StateEnsureNode ParseStateEnsure(SourceSpan start, Token preposition, StateTargetNode anchor, Expression? stashedGuard)
+        {
+            Advance(); // consume 'ensure'
+            var condition = ParseExpression(0);
+            var because = Expect(TokenKind.Because);
+            var message = ParseExpression(0);
+
+            return new StateEnsureNode(
+                SourceSpan.Covering(start, message.Span),
+                preposition, anchor, stashedGuard, condition, message);
+        }
+
+        // ── to-scoped construct parsers ───────────────────────────────────────
+
+        private StateActionNode ParseStateAction(SourceSpan start, Token preposition, StateTargetNode anchor, Expression? stashedGuard)
+        {
+            // First arrow is the disambiguation token
+            Advance(); // consume '->'
+            var first = ParseActionStatement();
+            var actions = ImmutableArray.CreateBuilder<Statement>();
+            actions.Add(first);
+
+            while (Current().Kind == TokenKind.Arrow && !IsOutcomeAhead())
+            {
+                Advance(); // consume '->'
+                actions.Add(ParseActionStatement());
+            }
+
+            var lastSpan = actions[^1].Span;
+            return new StateActionNode(
+                SourceSpan.Covering(start, lastSpan),
+                preposition, anchor, stashedGuard, actions.ToImmutable());
+        }
+
+        // ── on-scoped construct parsers ───────────────────────────────────────
+
+        private EventEnsureNode ParseEventEnsure(SourceSpan start, Token eventName, Expression? stashedGuard)
+        {
+            Advance(); // consume 'ensure'
+            var condition = ParseExpression(0);
+            var because = Expect(TokenKind.Because);
+            var message = ParseExpression(0);
+
+            return new EventEnsureNode(
+                SourceSpan.Covering(start, message.Span),
+                eventName, stashedGuard, condition, message);
+        }
+
+        private EventHandlerNode ParseEventHandler(SourceSpan start, Token eventName)
+        {
+            Advance(); // consume '->'
+            var first = ParseActionStatement();
+            var actions = ImmutableArray.CreateBuilder<Statement>();
+            actions.Add(first);
+
+            while (Current().Kind == TokenKind.Arrow && !IsOutcomeAhead())
+            {
+                Advance(); // consume '->'
+                actions.Add(ParseActionStatement());
+            }
+
+            var lastSpan = actions[^1].Span;
+            return new EventHandlerNode(
+                SourceSpan.Covering(start, lastSpan),
+                eventName, actions.ToImmutable());
+        }
+
+        // ── Shared parsing helpers for disambiguated constructs ───────────────
+
+        private FieldTargetNode ParseFieldTargetDirect()
+        {
+            if (Current().Kind == TokenKind.All)
+            {
+                var allTok = Advance();
+                return new AllFieldTarget(allTok.Span, allTok);
+            }
+
+            if (Current().Kind != TokenKind.Identifier)
+            {
+                EmitDiagnostic(DiagnosticCode.ExpectedToken, Current().Span, "field name", Current().Text);
+                return new SingularFieldTarget(Current().Span,
+                    new Token(TokenKind.Identifier, string.Empty, Current().Span));
+            }
+
+            var first = Advance();
+            if (Current().Kind != TokenKind.Comma)
+                return new SingularFieldTarget(first.Span, first);
+
+            var names = ImmutableArray.CreateBuilder<Token>();
+            names.Add(first);
+            while (Current().Kind == TokenKind.Comma)
+            {
+                Advance(); // consume ','
+                if (Current().Kind == TokenKind.Identifier)
+                    names.Add(Advance());
+                else
+                {
+                    EmitDiagnostic(DiagnosticCode.ExpectedToken, Current().Span, "field name", Current().Text);
+                    break;
+                }
+            }
+            return new ListFieldTarget(
+                SourceSpan.Covering(names[0].Span, names[^1].Span), names.ToImmutable());
+        }
+
+        private Token ParseAccessModeKeywordDirect()
+        {
+            if (Current().Kind is TokenKind.Readonly or TokenKind.Editable)
+                return Advance();
+
+            EmitDiagnostic(DiagnosticCode.ExpectedToken, Current().Span, "readonly or editable", Current().Text);
+            return new Token(TokenKind.Readonly, string.Empty, Current().Span);
+        }
+
+        private Statement ParseActionStatement()
+        {
+            var current = Current();
+            switch (current.Kind)
+            {
+                case TokenKind.Set:
+                {
+                    var kw = Advance();
+                    var field = Expect(TokenKind.Identifier);
+                    Expect(TokenKind.Assign);
+                    var value = ParseExpression(0);
+                    return new SetStatement(SourceSpan.Covering(kw.Span, value.Span), field, value);
+                }
+                case TokenKind.Add:
+                {
+                    var kw = Advance();
+                    var field = Expect(TokenKind.Identifier);
+                    var value = ParseExpression(0);
+                    return new AddStatement(SourceSpan.Covering(kw.Span, value.Span), field, value);
+                }
+                case TokenKind.Remove:
+                {
+                    var kw = Advance();
+                    var field = Expect(TokenKind.Identifier);
+                    var value = ParseExpression(0);
+                    return new RemoveStatement(SourceSpan.Covering(kw.Span, value.Span), field, value);
+                }
+                case TokenKind.Enqueue:
+                {
+                    var kw = Advance();
+                    var field = Expect(TokenKind.Identifier);
+                    var value = ParseExpression(0);
+                    return new EnqueueStatement(SourceSpan.Covering(kw.Span, value.Span), field, value);
+                }
+                case TokenKind.Dequeue:
+                {
+                    var kw = Advance();
+                    var field = Expect(TokenKind.Identifier);
+                    Token? into = null;
+                    if (Current().Kind == TokenKind.Into)
+                    {
+                        Advance();
+                        into = Expect(TokenKind.Identifier);
+                    }
+                    var endSpan = into?.Span ?? field.Span;
+                    return new DequeueStatement(SourceSpan.Covering(kw.Span, endSpan), field, into);
+                }
+                case TokenKind.Push:
+                {
+                    var kw = Advance();
+                    var field = Expect(TokenKind.Identifier);
+                    var value = ParseExpression(0);
+                    return new PushStatement(SourceSpan.Covering(kw.Span, value.Span), field, value);
+                }
+                case TokenKind.Pop:
+                {
+                    var kw = Advance();
+                    var field = Expect(TokenKind.Identifier);
+                    Token? into = null;
+                    if (Current().Kind == TokenKind.Into)
+                    {
+                        Advance();
+                        into = Expect(TokenKind.Identifier);
+                    }
+                    var endSpan = into?.Span ?? field.Span;
+                    return new PopStatement(SourceSpan.Covering(kw.Span, endSpan), field, into);
+                }
+                case TokenKind.Clear:
+                {
+                    var kw = Advance();
+                    var field = Expect(TokenKind.Identifier);
+                    return new ClearStatement(SourceSpan.Covering(kw.Span, field.Span), field);
+                }
+                default:
+                {
+                    EmitDiagnostic(DiagnosticCode.ExpectedToken, current.Span, "action keyword", current.Text);
+                    return new SetStatement(current.Span,
+                        new Token(TokenKind.Identifier, string.Empty, current.Span),
+                        new IdentifierExpression(current.Span,
+                            new Token(TokenKind.Identifier, string.Empty, current.Span)));
+                }
+            }
+        }
+
+        private bool IsOutcomeAhead()
+        {
+            var next = Peek(1);
+            return next.Kind is TokenKind.Transition or TokenKind.No or TokenKind.Reject;
         }
 
         private void SyncToNextDeclaration()
@@ -572,15 +920,62 @@ public static class Parser
             return ParseExpression(0);
         }
 
-        // ── Slot parser stubs (PR 4–5 will implement) ─────────────────────────
+        // ── Slot parsers for disambiguated constructs (PR 4) ────────────────
 
-        private SyntaxNode? ParseActionChain(bool isOptional) => throw new NotImplementedException();
-        private SyntaxNode? ParseOutcome(bool isOptional) => throw new NotImplementedException();
-        private SyntaxNode? ParseStateTarget(bool isOptional) => throw new NotImplementedException();
-        private SyntaxNode? ParseEventTarget(bool isOptional) => throw new NotImplementedException();
-        private SyntaxNode? ParseEnsureClause(bool isOptional) => throw new NotImplementedException();
-        private SyntaxNode? ParseAccessModeKeyword(bool isOptional) => throw new NotImplementedException();
-        private SyntaxNode? ParseFieldTarget(bool isOptional) => throw new NotImplementedException();
+        private SyntaxNode? ParseActionChain(bool isOptional)
+        {
+            var actions = ImmutableArray.CreateBuilder<Statement>();
+            while (Current().Kind == TokenKind.Arrow && !IsOutcomeAhead())
+            {
+                Advance(); // consume '->'
+                actions.Add(ParseActionStatement());
+            }
+            if (actions.Count == 0) return null;
+            return new StatementArrayWrapper(
+                SourceSpan.Covering(actions[0].Span, actions[^1].Span), actions.ToImmutable());
+        }
+
+        private SyntaxNode? ParseOutcome(bool isOptional) => throw new NotImplementedException(); // PR 5
+
+        private SyntaxNode? ParseStateTarget(bool isOptional)
+        {
+            var target = ParseStateTargetDirect();
+            return target;
+        }
+
+        private SyntaxNode? ParseEventTarget(bool isOptional)
+        {
+            var tok = ParseEventTargetDirect();
+            if (tok is null) return null;
+            return new TokenWrapper(tok.Value.Span, tok.Value);
+        }
+
+        private SyntaxNode? ParseEnsureClause(bool isOptional)
+        {
+            if (Current().Kind != TokenKind.Ensure)
+            {
+                if (!isOptional)
+                    EmitDiagnostic(DiagnosticCode.ExpectedToken, Current().Span, "ensure", Current().Text);
+                return null;
+            }
+            Advance(); // consume 'ensure'
+            return ParseExpression(0);
+        }
+
+        private SyntaxNode? ParseAccessModeKeyword(bool isOptional)
+        {
+            if (Current().Kind is TokenKind.Readonly or TokenKind.Editable)
+                return new TokenWrapper(Current().Span, Advance());
+            if (!isOptional)
+                EmitDiagnostic(DiagnosticCode.ExpectedToken, Current().Span, "readonly or editable", Current().Text);
+            return null;
+        }
+
+        private SyntaxNode? ParseFieldTarget(bool isOptional)
+        {
+            var target = ParseFieldTargetDirect();
+            return target;
+        }
 
         // ── Type reference parsing ────────────────────────────────────────────
 

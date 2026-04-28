@@ -183,4 +183,357 @@ public class ParserTests
             """);
         tree.Diagnostics.Should().BeEmpty();
     }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  PR 4 — Disambiguated Constructs (in/to/on)
+    // ════════════════════════════════════════════════════════════════════════
+
+    // ── Slice 4.1: Generic Disambiguator ───────────────────────────────────
+
+    [Fact]
+    public void Disambiguator_NoMatchingToken_EmitsDiagnosticAndSyncs()
+    {
+        var tree = Parse("in Draft foobar Amount");
+        tree.Diagnostics.Should().NotBeEmpty();
+        tree.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.ExpectedToken));
+    }
+
+    [Fact]
+    public void Disambiguator_EmptyAfterAnchor_EmitsDiagnostic()
+    {
+        var tree = Parse("in Draft");
+        tree.Diagnostics.Should().NotBeEmpty();
+    }
+
+    [Fact]
+    public void Disambiguator_StashedGuard_InjectedIntoGuardSlot()
+    {
+        var tree = Parse("""in Draft when Active ensure amount > 0 because "msg" """);
+        tree.Diagnostics.Should().BeEmpty();
+        var node = tree.Declarations[0].Should().BeOfType<StateEnsureNode>().Subject;
+        node.Guard.Should().NotBeNull();
+        node.Guard.Should().BeOfType<IdentifierExpression>();
+    }
+
+    [Fact]
+    public void Disambiguator_StashedGuard_WithOmit_EmitsDiagnostic()
+    {
+        var tree = Parse("in Closed when SomeCondition omit Amount");
+        tree.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.OmitDoesNotSupportGuard));
+        var node = tree.Declarations[0].Should().BeOfType<OmitDeclarationNode>().Subject;
+        // OmitDeclarationNode structurally has no Guard property
+    }
+
+    // ── Slice 4.2: FieldTarget parsing ─────────────────────────────────────
+
+    [Fact]
+    public void ParseFieldTarget_Singular()
+    {
+        var tree = Parse("in Draft modify FraudFlag readonly");
+        var node = tree.Declarations[0].Should().BeOfType<AccessModeNode>().Subject;
+        node.Fields.Should().BeOfType<SingularFieldTarget>()
+            .Which.Name.Text.Should().Be("FraudFlag");
+    }
+
+    [Fact]
+    public void ParseFieldTarget_List()
+    {
+        var tree = Parse("in Draft modify Name, Description, Notes readonly");
+        var node = tree.Declarations[0].Should().BeOfType<AccessModeNode>().Subject;
+        var list = node.Fields.Should().BeOfType<ListFieldTarget>().Subject;
+        list.Names.Should().HaveCount(3);
+        list.Names[0].Text.Should().Be("Name");
+        list.Names[1].Text.Should().Be("Description");
+        list.Names[2].Text.Should().Be("Notes");
+    }
+
+    [Fact]
+    public void ParseFieldTarget_All()
+    {
+        var tree = Parse("in Draft modify all readonly");
+        var node = tree.Declarations[0].Should().BeOfType<AccessModeNode>().Subject;
+        node.Fields.Should().BeOfType<AllFieldTarget>();
+    }
+
+    [Fact]
+    public void ParseFieldTarget_Missing_ProducesDiagnostic()
+    {
+        var tree = Parse("in Draft modify readonly");
+        tree.Diagnostics.Should().NotBeEmpty();
+    }
+
+    // ── Slice 4.2: AccessModeKeyword ───────────────────────────────────────
+
+    [Fact]
+    public void ParseAccessModeKeyword_Readonly()
+    {
+        var tree = Parse("in Draft modify Amount readonly");
+        var node = tree.Declarations[0].Should().BeOfType<AccessModeNode>().Subject;
+        node.Mode.Kind.Should().Be(TokenKind.Readonly);
+    }
+
+    [Fact]
+    public void ParseAccessModeKeyword_Editable()
+    {
+        var tree = Parse("in Draft modify Amount editable");
+        var node = tree.Declarations[0].Should().BeOfType<AccessModeNode>().Subject;
+        node.Mode.Kind.Should().Be(TokenKind.Editable);
+    }
+
+    [Fact]
+    public void ParseAccessModeKeyword_Missing_ProducesDiagnostic()
+    {
+        var tree = Parse("in Draft modify Amount");
+        tree.Diagnostics.Should().NotBeEmpty();
+    }
+
+    // ── Slice 4.2: AccessMode construct ────────────────────────────────────
+
+    [Fact]
+    public void Parse_AccessMode_Singular_Readonly()
+    {
+        var tree = Parse("in UnderReview modify FraudFlag readonly");
+        tree.Diagnostics.Should().BeEmpty();
+        var node = tree.Declarations[0].Should().BeOfType<AccessModeNode>().Subject;
+        node.State.Name.Text.Should().Be("UnderReview");
+        node.Fields.Should().BeOfType<SingularFieldTarget>()
+            .Which.Name.Text.Should().Be("FraudFlag");
+        node.Mode.Kind.Should().Be(TokenKind.Readonly);
+        node.Guard.Should().BeNull();
+    }
+
+    [Fact]
+    public void Parse_AccessMode_Singular_Editable()
+    {
+        var tree = Parse("in Submitted modify Amount editable");
+        tree.Diagnostics.Should().BeEmpty();
+        var node = tree.Declarations[0].Should().BeOfType<AccessModeNode>().Subject;
+        node.Mode.Kind.Should().Be(TokenKind.Editable);
+    }
+
+    [Fact]
+    public void Parse_AccessMode_List_Readonly()
+    {
+        var tree = Parse("in Draft modify Name, Description readonly");
+        tree.Diagnostics.Should().BeEmpty();
+        var node = tree.Declarations[0].Should().BeOfType<AccessModeNode>().Subject;
+        var list = node.Fields.Should().BeOfType<ListFieldTarget>().Subject;
+        list.Names.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public void Parse_AccessMode_All_Editable()
+    {
+        var tree = Parse("in Review modify all editable");
+        tree.Diagnostics.Should().BeEmpty();
+        var node = tree.Declarations[0].Should().BeOfType<AccessModeNode>().Subject;
+        node.Fields.Should().BeOfType<AllFieldTarget>();
+        node.Mode.Kind.Should().Be(TokenKind.Editable);
+    }
+
+    [Fact]
+    public void Parse_AccessMode_WithPostFieldGuard()
+    {
+        var tree = Parse("in UnderReview modify FraudFlag editable when not FraudFlag");
+        tree.Diagnostics.Should().BeEmpty();
+        var node = tree.Declarations[0].Should().BeOfType<AccessModeNode>().Subject;
+        node.Guard.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void Parse_AccessMode_WithPreFieldGuard()
+    {
+        var tree = Parse("in UnderReview when Active modify FraudFlag readonly");
+        tree.Diagnostics.Should().BeEmpty();
+        var node = tree.Declarations[0].Should().BeOfType<AccessModeNode>().Subject;
+        node.Guard.Should().NotBeNull();
+        node.Guard.Should().BeOfType<IdentifierExpression>();
+    }
+
+    // ── Slice 4.2: OmitDeclaration construct ──────────────────────────────
+
+    [Fact]
+    public void Parse_OmitDeclaration_Singular()
+    {
+        var tree = Parse("in Draft omit InternalNotes");
+        tree.Diagnostics.Should().BeEmpty();
+        var node = tree.Declarations[0].Should().BeOfType<OmitDeclarationNode>().Subject;
+        node.Fields.Should().BeOfType<SingularFieldTarget>()
+            .Which.Name.Text.Should().Be("InternalNotes");
+    }
+
+    [Fact]
+    public void Parse_OmitDeclaration_List()
+    {
+        var tree = Parse("in Draft omit Notes, Memo");
+        tree.Diagnostics.Should().BeEmpty();
+        var node = tree.Declarations[0].Should().BeOfType<OmitDeclarationNode>().Subject;
+        var list = node.Fields.Should().BeOfType<ListFieldTarget>().Subject;
+        list.Names.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public void Parse_OmitDeclaration_All()
+    {
+        var tree = Parse("in Draft omit all");
+        tree.Diagnostics.Should().BeEmpty();
+        var node = tree.Declarations[0].Should().BeOfType<OmitDeclarationNode>().Subject;
+        node.Fields.Should().BeOfType<AllFieldTarget>();
+    }
+
+    [Fact]
+    public void Parse_OmitDeclaration_WithPostFieldGuard_EmitsDiagnostic()
+    {
+        var tree = Parse("in Draft omit Amount when SomeCondition");
+        tree.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.OmitDoesNotSupportGuard));
+        var node = tree.Declarations[0].Should().BeOfType<OmitDeclarationNode>().Subject;
+        // Structurally impossible to have a Guard — OmitDeclarationNode has no Guard property
+    }
+
+    [Fact]
+    public void Parse_OmitDeclaration_WithPreFieldGuard_EmitsDiagnostic()
+    {
+        var tree = Parse("in Closed when SomeCondition omit Amount");
+        tree.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.OmitDoesNotSupportGuard));
+        tree.Declarations[0].Should().BeOfType<OmitDeclarationNode>();
+    }
+
+    // ── Slice 4.2: StateEnsure (in-scoped) ────────────────────────────────
+
+    [Fact]
+    public void Parse_StateEnsure_In_Simple()
+    {
+        var tree = Parse("""in Approved ensure ApprovedAmount > 0 because "msg" """);
+        tree.Diagnostics.Should().BeEmpty();
+        var node = tree.Declarations[0].Should().BeOfType<StateEnsureNode>().Subject;
+        node.State.Name.Text.Should().Be("Approved");
+        node.Preposition.Kind.Should().Be(TokenKind.In);
+        node.Guard.Should().BeNull();
+    }
+
+    [Fact]
+    public void Parse_StateEnsure_In_WithGuard()
+    {
+        var tree = Parse("""in Submitted when isComplete ensure amount > 0 because "msg" """);
+        tree.Diagnostics.Should().BeEmpty();
+        var node = tree.Declarations[0].Should().BeOfType<StateEnsureNode>().Subject;
+        node.Guard.Should().NotBeNull();
+    }
+
+    // ── Slice 4.3: StateEnsure (to-scoped) ────────────────────────────────
+
+    [Fact]
+    public void Parse_StateEnsure_To_Simple()
+    {
+        var tree = Parse("""to Submitted ensure isValid because "msg" """);
+        tree.Diagnostics.Should().BeEmpty();
+        var node = tree.Declarations[0].Should().BeOfType<StateEnsureNode>().Subject;
+        node.Preposition.Kind.Should().Be(TokenKind.To);
+    }
+
+    // ── Slice 4.3: StateAction ─────────────────────────────────────────────
+
+    [Fact]
+    public void Parse_StateAction_To_Simple()
+    {
+        var tree = Parse("to Submitted -> set submittedAt = now()");
+        tree.Diagnostics.Should().BeEmpty();
+        var node = tree.Declarations[0].Should().BeOfType<StateActionNode>().Subject;
+        node.State.Name.Text.Should().Be("Submitted");
+        node.Actions.Should().HaveCount(1);
+        node.Actions[0].Should().BeOfType<SetStatement>();
+    }
+
+    [Fact]
+    public void Parse_StateAction_To_MultipleActions()
+    {
+        var tree = Parse("""to Approved -> set status = "approved" -> set processedAt = now()""");
+        tree.Diagnostics.Should().BeEmpty();
+        var node = tree.Declarations[0].Should().BeOfType<StateActionNode>().Subject;
+        node.Actions.Should().HaveCount(2);
+        node.Actions[0].Should().BeOfType<SetStatement>();
+        node.Actions[1].Should().BeOfType<SetStatement>();
+    }
+
+    [Fact]
+    public void Parse_StateAction_To_WithGuard()
+    {
+        var tree = Parse("to Submitted when isComplete -> set submittedAt = now()");
+        tree.Diagnostics.Should().BeEmpty();
+        var node = tree.Declarations[0].Should().BeOfType<StateActionNode>().Subject;
+        node.Guard.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void Parse_StateAction_Set()
+    {
+        var tree = Parse("to Draft -> set name = value");
+        tree.Diagnostics.Should().BeEmpty();
+        var node = tree.Declarations[0].Should().BeOfType<StateActionNode>().Subject;
+        node.Actions[0].Should().BeOfType<SetStatement>()
+            .Which.Field.Text.Should().Be("name");
+    }
+
+    [Fact]
+    public void Parse_StateAction_Add()
+    {
+        var tree = Parse("to Draft -> add items value");
+        tree.Diagnostics.Should().BeEmpty();
+        var node = tree.Declarations[0].Should().BeOfType<StateActionNode>().Subject;
+        node.Actions[0].Should().BeOfType<AddStatement>()
+            .Which.Field.Text.Should().Be("items");
+    }
+
+    [Fact]
+    public void Parse_StateAction_Clear()
+    {
+        var tree = Parse("to Draft -> clear items");
+        tree.Diagnostics.Should().BeEmpty();
+        var node = tree.Declarations[0].Should().BeOfType<StateActionNode>().Subject;
+        node.Actions[0].Should().BeOfType<ClearStatement>()
+            .Which.Field.Text.Should().Be("items");
+    }
+
+    // ── Slice 4.4: EventEnsure ─────────────────────────────────────────────
+
+    [Fact]
+    public void Parse_EventEnsure_Simple()
+    {
+        var tree = Parse("""on Submit ensure Amount > 0 because "msg" """);
+        tree.Diagnostics.Should().BeEmpty();
+        var node = tree.Declarations[0].Should().BeOfType<EventEnsureNode>().Subject;
+        node.EventName.Text.Should().Be("Submit");
+        node.Guard.Should().BeNull();
+    }
+
+    [Fact]
+    public void Parse_EventEnsure_WithGuard()
+    {
+        var tree = Parse("""on Submit when isNew ensure Amount > 0 because "msg" """);
+        tree.Diagnostics.Should().BeEmpty();
+        var node = tree.Declarations[0].Should().BeOfType<EventEnsureNode>().Subject;
+        node.Guard.Should().NotBeNull();
+    }
+
+    // ── Slice 4.4: EventHandler ────────────────────────────────────────────
+
+    [Fact]
+    public void Parse_EventHandler_Simple()
+    {
+        var tree = Parse("on UpdateName -> set name = newName");
+        tree.Diagnostics.Should().BeEmpty();
+        var node = tree.Declarations[0].Should().BeOfType<EventHandlerNode>().Subject;
+        node.EventName.Text.Should().Be("UpdateName");
+        node.Actions.Should().HaveCount(1);
+        node.Actions[0].Should().BeOfType<SetStatement>();
+    }
+
+    [Fact]
+    public void Parse_EventHandler_MultipleActions()
+    {
+        var tree = Parse("on Deposit -> add balance amount -> set lastDeposit = amount");
+        tree.Diagnostics.Should().BeEmpty();
+        var node = tree.Declarations[0].Should().BeOfType<EventHandlerNode>().Subject;
+        node.Actions.Should().HaveCount(2);
+    }
 }

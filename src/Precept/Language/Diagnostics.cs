@@ -44,6 +44,10 @@ public static class Diagnostics
         DiagnosticCode.MutuallyExclusiveQualifiers => new(nameof(DiagnosticCode.MutuallyExclusiveQualifiers), DiagnosticStage.Type, Severity.Error,  "'in' and 'of' qualifiers cannot both appear on this type — only 'price' supports both",                                                DiagnosticCategory.TypeSystem,
             RelatedCodes: [DiagnosticCode.QualifierMismatch],
             FixHint: "Use 'in' for currency, 'of' for unit, or both only on 'price' types"),
+        DiagnosticCode.OmitDoesNotSupportGuard    => new(nameof(DiagnosticCode.OmitDoesNotSupportGuard),    DiagnosticStage.Parse, Severity.Error,   "'omit' is an unconditional structural exclusion — 'when' guards are not allowed",                                                       DiagnosticCategory.Structure,
+            FixHint: "Remove the 'when' guard. If you need conditional visibility, use 'modify Field readonly when Guard' instead"),
+        DiagnosticCode.PreEventGuardNotAllowed    => new(nameof(DiagnosticCode.PreEventGuardNotAllowed),    DiagnosticStage.Parse, Severity.Error,   "A 'when' guard before the event target is not supported on transition rows — place the guard after 'on Event'",                         DiagnosticCategory.Structure,
+            FixHint: "Move the 'when' clause to after the event name: 'from State on Event when Guard'"),
 
         // ── Type ─────────────────────────────────────────────────────────────────
         DiagnosticCode.UndeclaredField                => new(nameof(DiagnosticCode.UndeclaredField),                DiagnosticStage.Type,  Severity.Error,   "Field '{0}' is not declared",                                                                                                          DiagnosticCategory.Naming,

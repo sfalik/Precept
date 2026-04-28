@@ -18,6 +18,8 @@ public enum DiagnosticCode
     NonAssociativeComparison,
     InvalidCallTarget,
     MutuallyExclusiveQualifiers,
+    OmitDoesNotSupportGuard,
+    PreEventGuardNotAllowed,
 
     // ── Type ─────────────────────────────────────────────
     UndeclaredField,
