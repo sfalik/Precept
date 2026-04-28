@@ -6,11 +6,11 @@
 
 ---
 
-## Scope
+## Scope  
 
 This document is the language-only source of truth for the next compiler effort.
 
-It is intentionally limited to:
+It is intentionally limited to: 
 
 1. The source language authors write.
 2. The static meaning of that language.
