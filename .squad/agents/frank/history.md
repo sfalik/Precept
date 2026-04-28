@@ -89,3 +89,8 @@ in State omit all                                   ← state-scoped all (no fie
 - `docs/runtime/evaluator.md` — Access-Mode Enforcement composition model reference
 
 **Pattern found:** Old `write`/`read` vocabulary leaked into four categories: (1) keyword tables/lists, (2) grammar rules and dispatch tables, (3) diagnostic description examples, (4) runtime behavioral prose. The token catalog tables were the most consistent leakage surface — every doc that listed keywords had `write`/`read`. Secondary docs (lexer, tooling-surface, diagnostic-system) were clean because they reference catalog mechanics generically rather than listing specific keywords.
+
+### 2026-04-28 — Full documentation sweep: shorthand grammar
+- Completed the live-doc sweep for the locked access-mode surface across spec, vision, parser, catalog, runtime, and evaluator docs.
+- Canonicalized shared `FieldTarget` shorthand for both `modify` and `omit`, with guards allowed only on `modify`.
+- Synced the decision ledger so George's parser/AST lane tracks separate `AccessModeDeclaration` and `OmitDeclaration` nodes.

@@ -96,3 +96,8 @@
 - 1817 + 207 = 2024 tests pass after all changes.
 - Cross-surface: Kramer must re-run the grammar generator; Newman has no DTO work (catalog-derived tokens surface automatically through `Tokens.All`).
 - Spec reserved-keywords list still has stale `write`/`read` entries alongside new tokens — flagged as cleanup debt, not blocking.
+
+### 2026-04-28 — Shorthand and AST directives synced
+- Shane locked shared `FieldTarget` shorthand for both `modify` and `omit`, including comma-separated lists and `all`.
+- `AccessModeDeclaration` and `OmitDeclaration` stay separate AST node kinds; `omit` has no guard slot.
+- Frank's doc sweep updated the live parser/spec/runtime docs, and any split-field sample simplifications are superseded by the shorthand-preservation directive.

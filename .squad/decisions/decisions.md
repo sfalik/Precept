@@ -1,28 +1,3 @@
-# Decision: README hero PNG fallback
-
-- **Context:** GitHub does not render the styled inline HTML contract block in `README.md` as intended.
-- **Decision:** Use `brand/readme-hero-dsl.png` as the GitHub-facing contract sample and keep a collapsed plain-text version immediately below for copyability.
-- **Why:** The PNG preserves the intended branded syntax presentation on GitHub, while the collapsed source keeps the sample useful to humans and AI agents without turning the section back into a long raw block.
-- **Files:** `README.md`, `brand/readme-hero-dsl.png`, `brand/readme-hero-dsl.precept`
-
----
-
-## Decision
-
-Treat `docs/HowWeGotHere.md` as a retrospective historical narrative, not as a live trunk-consolidation memo.
-
-## Why
-
-- Shane asked to remove the branch-history section as irrelevant.
-- The "worth preserving" material read like an active recommendation set instead of a record of what endured.
-- The unresolved/recommendation sections kept pulling the document back into pending-decision framing.
-
-## Applied To
-
-- `docs/HowWeGotHere.md`
-
----
-
 # Readability Review: combined-design-v2.md (2026-07-17)
 
 **Reviewer:** Elaine (UX Designer)
@@ -44,6 +19,8 @@ The rewrite succeeds. §1 opens with a problem statement and architectural commi
 ## Decision
 
 This doc is ready to serve as the architectural foundation for per-stage design docs (starting with the parser). The concerns above are improvements, not blockers — the parser concern is the most urgent because that's the immediate next use case.
+
+---
 
 ---
 
@@ -127,6 +104,8 @@ Replace "lowered expression nodes and action plans" with a concrete specificatio
 ---
 
 *This review is direct because the timing demands it. Addressing these three items now — before the parser, type checker, and evaluator are built — is nearly free. Addressing them after implementation begins is expensive. The architecture is sound. These are the gaps that would bite us.*
+
+---
 
 ---
 
@@ -291,6 +270,8 @@ Neither of these requires abandoning the conservative default. The proposal conf
 
 ---
 
+---
+
 # George — Technical Review: combined-design-v2.md
 
 **Date:** 2026-04-28
@@ -408,6 +389,8 @@ However, the doc has **critical implementation-readiness gaps for the Parser** (
 - Could it emit round-trip parse tests (text -> AST -> text) per construct automatically?
 - How does this interact with the generic AST proposal — if AST nodes are generic/generated, do tests follow?
 - What is the boundary between generated test scaffolding and hand-authored test logic?
+
+---
 
 ---
 
@@ -586,9 +569,14 @@ More concretely: the scan-priority rule becomes harder. The current rule is clea
 Compare the two:
 
 ```
+
+---
+
 # Current (->)
 field Tax as number nonnegative -> Subtotal * TaxRate
 field Net as number positive -> Subtotal - Tax
+
+---
 
 # Proposed (<-)
 field Tax as number nonnegative <- Subtotal * TaxRate
@@ -721,6 +709,8 @@ The right-pointing arrow:
 
 ---
 
+---
+
 # Design Session Round 1: Catalog-Driven Parser Full Vision
 
 **By:** Frank
@@ -750,6 +740,8 @@ Round 1 of a 3-round design session requested by Shane. The prior analysis walke
 ## What Round 2 Should Challenge
 
 See `## For George` section in the design doc. Key areas: `Entries` replacing `LeadingToken` (breaking catalog change), `when` guard uniformity assumption, slot parser `SyntaxNode?` return type fragility, factory dictionary vs. switch, anchor/guard injection coupling, and clean-slate re-estimate.
+
+---
 
 ---
 
@@ -843,6 +835,8 @@ All `docs/working/` files (historical records — must not be updated per audit 
 ## Open Questions / Escalations
 
 None. All decisions locked and documented above.
+
+---
 
 ---
 
@@ -944,6 +938,8 @@ The code sample comment reads `// ── Field modifiers (14) ──────
 4. `docs/language/catalog-system.md` line 740 — `(14)` → `(15)`.
 
 Items 2–4 are doc-only and may land in the same commit as item 1.
+
+---
 
 ---
 
@@ -1053,6 +1049,8 @@ which option is chosen once parser implementation begins.
 Per George's charter: no implementation work until Frank's sign-off on the design. These bugs
 are discovered in design review — the right time. The parser is still a stub. These are zero-cost
 fixes at design time.
+
+---
 
 ---
 
@@ -1386,3 +1384,41 @@ The catalog-level work is solid. The `Writable` modifier entry in `Modifiers.cs`
 
 Both fixes are one-liners or near-one-liners. No soup until then.
 
+---
+
+# Decision: Access-mode shorthand grammar and AST split
+
+**Date:** 2026-04-28
+**By:** Shane (owner) with Frank and George follow-through
+**Status:** Locked
+
+## Decision
+
+- Access declarations use `modify` plus the adjectives `readonly` or `editable`; structural exclusion uses `omit`.
+- `modify` and `omit` share the same `FieldTarget` shapes: a single field, a comma-separated field list, or `all`.
+- The locked grammar is:
+
+```precept
+in State modify Field readonly [when Guard]
+in State modify Field editable [when Guard]
+in State modify F1, F2, ... readonly|editable [when Guard]
+in State modify all readonly|editable [when Guard]
+
+in State omit Field
+in State omit F1, F2, ...
+in State omit all
+```
+
+- Guards are permitted only on `modify`; `omit` is never guardable.
+- Syntax and catalog shapes stay split: `AccessModeDeclaration` and `OmitDeclaration` are separate AST node kinds, not a unified access-declaration node.
+
+## Why
+
+- Shane explicitly directed the team to preserve comma-separated field shorthand and the `all` shorthand in the new `modify` surface.
+- He also extended that same shorthand to `omit`, because both verbs operate over the same `FieldTarget` domain.
+- Separate AST nodes preserve the real semantic difference: `omit` changes structural presence, while `modify` declares an access level and optionally carries a guard.
+
+## Follow-through
+
+- Frank completed the live-doc sweep across the language spec, language vision, parser design, parser reference, catalog-system doc, runtime API doc, evaluator doc, and the design-round record so the published grammar is consistent everywhere.
+- George's vocabulary-migration implementation remains the code baseline for `modify` / `readonly` / `editable` / `omit`; any earlier sample simplifications that split comma-separated targets are superseded by this shorthand-preservation directive.
