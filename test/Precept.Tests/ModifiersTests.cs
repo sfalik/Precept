@@ -42,14 +42,14 @@ public class ModifiersTests
     [Fact]
     public void Total_Count()
     {
-        // 14 field + 7 state + 1 event + 3 access + 3 anchor = 28
-        Modifiers.All.Should().HaveCount(28);
+        // 15 field + 7 state + 1 event + 3 access + 3 anchor = 29
+        Modifiers.All.Should().HaveCount(29);
     }
 
     [Fact]
     public void FieldModifier_Count()
     {
-        Modifiers.All.OfType<FieldModifierMeta>().Should().HaveCount(14);
+        Modifiers.All.OfType<FieldModifierMeta>().Should().HaveCount(15);
     }
 
     [Fact]
@@ -332,9 +332,9 @@ public class ModifiersTests
     [Fact]
     public void Category_StructuralCount()
     {
-        // 14 field + 4 structural state + 1 event + 3 access + 3 anchor = 25
+        // 15 field + 4 structural state + 1 event + 3 access + 3 anchor = 26
         Modifiers.All.Count(m => m.Category == ModifierCategory.Structural)
-            .Should().Be(25);
+            .Should().Be(26);
     }
 
     [Fact]

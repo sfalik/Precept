@@ -45,7 +45,7 @@ The type checker is the semantic resolution boundary — everything that require
 
 ## Processing Model
 
-Single-pass semantic resolution. Each declaration is resolved in catalog order: fields first (types resolved), states second (modifiers resolved), events and args third, transition rows fourth (guards and action chains resolved), constraints fifth. The `SemanticIndex` is built incrementally and sealed at the end of the pass.
+Single-pass semantic resolution. Each declaration is resolved in catalog order: fields first (types and modifiers resolved, including `writable` baseline flagging), states second (modifiers resolved), events and args third (args validated — `writable` rejected on event args with `WritableOnEventArg`), transition rows fourth (guards and action chains resolved), constraints fifth. The `SemanticIndex` is built incrementally and sealed at the end of the pass.
 
 ---
 

@@ -140,6 +140,9 @@ public enum DiagnosticCode
     FunctionArityMismatch,
     FunctionArgConstraintViolation,
 
+    // ── Type: Access modes ───────────────────────────────
+    WritableOnEventArg,
+
     // ── Type: Business-domain ────────────────────────────
     QualifierMismatch,
     DimensionCategoryMismatch,
@@ -209,6 +212,7 @@ public static class Diagnostics
         DiagnosticCode.InvalidMemberAccess            => new(nameof(DiagnosticCode.InvalidMemberAccess),            DiagnosticStage.Type,  Severity.Error,   "Member accessor '{0}' is not supported on type '{1}'"),
         DiagnosticCode.FunctionArityMismatch          => new(nameof(DiagnosticCode.FunctionArityMismatch),          DiagnosticStage.Type,  Severity.Error,   "Function '{0}' expects {1} arguments, got {2}"),
         DiagnosticCode.FunctionArgConstraintViolation => new(nameof(DiagnosticCode.FunctionArgConstraintViolation), DiagnosticStage.Type,  Severity.Error,   "Argument {0} to '{1}' violates constraint: {2}"),
+        DiagnosticCode.WritableOnEventArg             => new(nameof(DiagnosticCode.WritableOnEventArg),             DiagnosticStage.Type,  Severity.Error,   "The 'writable' modifier cannot appear on event argument '{0}'"),
 
         // Business-domain type diagnostics
         DiagnosticCode.QualifierMismatch              => new(nameof(DiagnosticCode.QualifierMismatch),              DiagnosticStage.Type,  Severity.Error,   "Value does not match the '{0}' qualifier on field '{1}'"),

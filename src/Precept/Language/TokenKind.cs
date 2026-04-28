@@ -15,6 +15,7 @@ public enum TokenKind
     As,
     Default,
     Optional,
+    Writable,
     Because,
     Initial,
 

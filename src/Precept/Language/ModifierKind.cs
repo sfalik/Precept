@@ -2,11 +2,11 @@ namespace Precept.Language;
 
 /// <summary>
 /// Each member identifies a distinct modifier across all 5 declaration surfaces.
-/// Grouped by DU subtype: field (14), state (7), event (1), access (3), anchor (3).
+/// Grouped by DU subtype: field (15), state (7), event (1), access (3), anchor (3).
 /// </summary>
 public enum ModifierKind
 {
-    // ── Field modifiers (14) — FieldModifierMeta ────────────────────────────────
+    // ── Field modifiers (15) — FieldModifierMeta ────────────────────────────────
 
     /// <summary>Flag: field is nullable (presence tested via is set / is not set).</summary>
     Optional,
@@ -36,6 +36,8 @@ public enum ModifierKind
     Maxcount,
     /// <summary>Value: maximum decimal places.</summary>
     Maxplaces,
+    /// <summary>Flag: field is directly editable (write baseline); defaults to read-only without this modifier.</summary>
+    Writable,
 
     // ── State modifiers (7) — StateModifierMeta ─────────────────────────────────
 

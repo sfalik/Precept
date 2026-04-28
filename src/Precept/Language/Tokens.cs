@@ -80,7 +80,7 @@ public static class Tokens
         // After type qualifiers (in 'USD', of 'mass') — typed constant ends the qualifier
         TokenKind.TypedConstant, TokenKind.StringLiteral, TokenKind.Identifier,
         // After other modifiers/constraints
-        TokenKind.Optional, TokenKind.Default, TokenKind.Nonnegative, TokenKind.Positive,
+        TokenKind.Optional, TokenKind.Writable, TokenKind.Default, TokenKind.Nonnegative, TokenKind.Positive,
         TokenKind.Nonzero, TokenKind.Notempty, TokenKind.Ordered,
         TokenKind.NumberLiteral, // after min/max/minlength/etc. value
     ];
@@ -108,6 +108,8 @@ public static class Tokens
         TokenKind.Default     => new(kind, "default",     Cat_Decl, "Default value modifier",
             TextMateScope: "keyword.declaration.precept", SemanticTokenType: "keyword", ValidAfter: VA_FieldModifier),
         TokenKind.Optional    => new(kind, "optional",    Cat_Decl, "Field optionality modifier",
+            TextMateScope: "keyword.declaration.precept", SemanticTokenType: "keyword", ValidAfter: VA_FieldModifier),
+        TokenKind.Writable    => new(kind, "writable",    Cat_Decl, "Field writable-baseline modifier",
             TextMateScope: "keyword.declaration.precept", SemanticTokenType: "keyword", ValidAfter: VA_FieldModifier),
         TokenKind.Because     => new(kind, "because",     Cat_Decl, "Reason clause",
             TextMateScope: "keyword.declaration.precept", SemanticTokenType: "keyword"),

@@ -43,6 +43,7 @@ public enum DiagnosticCode
     ComputedFieldNotWritable,
     ComputedFieldWithDefault,
     CircularComputedField,
+    WritableOnEventArg,
     ConflictingAccessModes,
     ListLiteralOutsideDefault,
     DuplicateChoiceValue,

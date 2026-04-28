@@ -115,6 +115,8 @@ public static class Diagnostics
             FixHint: "Restructure the computed fields to break the circular dependency"),
         DiagnosticCode.ConflictingAccessModes         => new(nameof(DiagnosticCode.ConflictingAccessModes),         DiagnosticStage.Type,  Severity.Error,   "Field '{0}' has conflicting access modes in state '{1}'",                                                                              DiagnosticCategory.Structure,
             FixHint: "Ensure each field has at most one access mode per state"),
+        DiagnosticCode.WritableOnEventArg             => new(nameof(DiagnosticCode.WritableOnEventArg),             DiagnosticStage.Type,  Severity.Error,   "The 'writable' modifier cannot appear on event argument '{0}'",                                                                        DiagnosticCategory.Structure,
+            FixHint: "Remove 'writable' — event arguments are always read-only within the transition body"),
         DiagnosticCode.ListLiteralOutsideDefault      => new(nameof(DiagnosticCode.ListLiteralOutsideDefault),      DiagnosticStage.Type,  Severity.Error,   "List values can only appear in default clauses",                                                                                       DiagnosticCategory.Structure,
             FixHint: "Move the list value into a 'default' clause on the field declaration"),
         DiagnosticCode.DuplicateChoiceValue           => new(nameof(DiagnosticCode.DuplicateChoiceValue),           DiagnosticStage.Type,  Severity.Error,   "Choice value '{0}' is duplicated",                                                                                                     DiagnosticCategory.TypeSystem,

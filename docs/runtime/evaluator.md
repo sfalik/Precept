@@ -81,7 +81,7 @@ The evaluator reads prebuilt constraint buckets from `ConstraintPlanIndex`. For 
 
 ### Access-Mode Enforcement (Update)
 
-Update checks `FieldDescriptor.AccessMode` for the current state before applying the patch. A field with `readonly` access in the current state produces an `AccessDenied` violation, not a constraint violation.
+Update checks `FieldDescriptor.AccessMode` for the current state before applying the patch. A field with `readonly` access in the current state produces an `AccessDenied` violation, not a constraint violation. The `AccessMode` value in `FieldDescriptor` is the **resolved** per-(field, state) mode — derived from the two-layer composition model (field-level `writable` baseline + state-level `in <State> write|read|omit` override) at Precept Builder time. The evaluator never re-computes this; it reads the pre-resolved descriptor.
 
 ### Fault Backstop Routing
 

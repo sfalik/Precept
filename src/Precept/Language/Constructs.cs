@@ -100,11 +100,11 @@ public static class Constructs
         ConstructKind.AccessMode => new(
             kind,
             "access mode",
-            "Declares field write access for a stateless precept (root-level) or per-state via 'in' scope (write, read, or omit)",
-            "write Amount",
+            "Declares field write access per state via 'in' scope (write, read, or omit), or 'write all' at root level for stateless precepts",
+            "in Draft write Amount",
             [],
             [SlotOptStateTarget, SlotAccessModeKeyword, SlotFieldTarget],
-            TokenKind.Write),
+            TokenKind.In),
 
         ConstructKind.StateAction => new(
             kind,

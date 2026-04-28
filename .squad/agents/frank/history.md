@@ -16,6 +16,8 @@
 - Constraint evaluation and proof/fault are sibling contracts, not one pseudo-validation system: runtime constraint plans govern expected outcomes, while faults remain impossible-path backstops.
 - The action family and naming rule are stable architectural memory: three semantic shapes only, with semantic field names instead of syntax-shaped names.
 - MCP/CLI surface changes are operating-model decisions. Repo-local development needs one authoritative source-first definition with client-specific projections.
+- Runtime resolved-value enums (`FieldAccessMode { Read, Write }`) represent the output of compilation, not the declaration surface. Compile-time modifiers (`writable`) feed into the builder; the builder produces the resolved descriptors the runtime reads. These are different abstraction layers and must not be conflated during doc audits.
+- When a new field modifier is added, the files that need updates are: token catalog (kind enum + count), modifier catalog (member list + count), field-modifier flag list in parser, dispatch/grammar notes in parser, type-checker processing model, diagnostic enum + switch, spec grammar nodes, spec modifier table, spec validation table, spec diagnostic catalog, vision keyword list, vision declaration form table, vision access-modes section, and evaluator enforcement prose. Files that do NOT need updates: result-types, runtime fault codes, working docs (historical), MCP/LS stubs.
 
 ## Recent Updates
 
@@ -38,3 +40,13 @@
 
 ### 2026-04-24 — Precept.Next pre-TypeChecker gate
 - Found TypeChecker start blocked by contract scaffolding gaps: hollow TypedModel surface, nullable SyntaxTree root mismatch, missing diagnostics, and no SourceSpan→SourceRange bridge.
+
+### 2026-04-27 — `writable` field modifier doc audit
+- Audited all 32 files in `docs/` for the `writable` field modifier language change.
+- 7 files updated: `precept-language-spec.md`, `precept-language-vision.md`, `parser.md`, `type-checker.md`, `diagnostic-system.md`, `catalog-system.md`, `evaluator.md`.
+- 25 files confirmed no change (including `docs/working/` historical records, `result-types.md`, and all stubs).
+- Key pattern: files with concrete language surface vocabulary (token catalog, modifier tables, grammar nodes, diagnostic enum) required updates; files describing resolved runtime values or stub-level tooling surfaces did not.
+- Confirmed architectural invariant: `result-types.md`'s `FieldAccessMode { Read, Write }` is the *resolved* runtime mode — correct as-is. The `writable` modifier is a compile-time declaration; resolution into runtime access mode happens in the Precept Builder.
+- Locked two-layer composition model in spec, vision, and all compiler docs: Layer 1 = field `writable` baseline; Layer 2 = `in <State>` state-scoped override. State-level always wins.
+- `WritableOnEventArg` added as a compile-time-only diagnostic (no runtime backstop path).
+- Inbox decision written to `.squad/decisions/inbox/frank-doc-audit-writable.md`.

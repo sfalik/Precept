@@ -165,8 +165,9 @@ The language envelope includes these top-level forms:
 | `in/to/from <State> [when <Guard>] ensure <Expr> because "..."` | Declares state-scoped constraints |
 | `on <Event> [when <Guard>] ensure <Expr> because "..."` | Declares event-scoped arg constraints |
 | `to/from <State> -> ...` | Declares state entry or exit actions |
-| `in <State> ... write/read/omit ...` | Declares state-scoped field access modes |
-| `write ...` | Declares root editability for stateless precepts |
+| `in <State> ... write/read/omit ...` | Declares state-scoped field access mode overrides |
+| `field X as T writable` | Sets field X's baseline access mode to writable across all states |
+| `write all` | Declares all non-computed fields writable for stateless precepts (root-level sugar) |
 | `from <State> on <Event> ... -> ...` | Declares transition routing and mutation |
 | `on <Event> -> ...` | Declares stateless event action hooks |
 
@@ -194,7 +195,7 @@ The language is keyword-dominant for structure and domain meaning.
 
 Keyword families:
 
-1. Declaration keywords: `precept`, `field`, `state`, `event`, `rule`, `ensure`, `write`.
+1. Declaration keywords: `precept`, `field`, `state`, `event`, `rule`, `ensure`, `write`, `writable`.
 2. Structural prepositions: `in`, `to`, `from`, `on`, `of`, `with`, `into`.
 3. Control keywords: `when`, `if`, `then`, `else`.
 4. Action keywords: `set`, `add`, `remove`, `enqueue`, `dequeue`, `push`, `pop`, `clear`, `transition`, `reject`, `no`.
@@ -763,7 +764,21 @@ This form gives stateless entities meaningful event-driven behavior without inve
 
 ### Field Access Modes
 
-The language declares per-state field access modes using a three-verb system:
+The language declares field access mode through a two-layer composition model:
+
+**Layer 1 — field-level baseline (`writable` modifier):**
+
+`writable` is a trailing flag modifier on field declarations (same slot as `optional`, `nonnegative`, etc.). It marks the field as directly editable by default across all states. Fields without `writable` default to read-only (D3 baseline preserved).
+
+```precept
+field Amount as money writable
+```
+
+`writable` on a computed field is a compile error. `writable` on an event argument is a compile error.
+
+**Layer 2 — state-level overrides (`in <State> write|read|omit`):**
+
+The three-verb system governs per-state field visibility:
 
 | Verb | Meaning | Update API | Fire pipeline (`set`) |
 |------|---------|------------|----------------------|
@@ -771,25 +786,31 @@ The language declares per-state field access modes using a three-verb system:
 | `read` | Field present and readonly | Read only | Allowed |
 | `write` | Field present and editable | Read + write | Allowed |
 
+State-level always wins over the field-level baseline for the specific (field, state) pair.
+
 The surface includes:
 
-1. `in <State> write/read/omit <Fields>` for stateful entities.
-2. `write <Fields>` or `write all` for stateless entities.
-3. Root-level `read` and `omit` are not valid syntax — D3 is the baseline.
+1. `field X as T writable` — sets X's baseline to writable across all states.
+2. `in <State> write/read/omit <Fields>` — overrides the baseline for specific (field, state) pairs.
+3. `write all` — root-level sugar for stateless precepts: marks all non-computed fields writable.
+4. Root-level `write <FieldName>` (bare field list) is **not valid syntax** — use `writable` on the field declaration.
+5. Root-level `read` and `omit` are not valid syntax — D3 is the baseline.
 
 #### D3 per-pair baseline
 
-For any (field, state) pair without an explicit declaration, the default access mode is `read`. D3 operates per-(field, state) pair and never turns off. This means the author only declares exceptions to readonly — no boilerplate required for the common case.
+For any (field, state) pair without an explicit state-level declaration, the effective access mode is the field's baseline: `read` for fields without `writable`, `write` for fields with `writable`. This per-pair resolution never turns off. Authors declare field baselines with `writable` and state-level exceptions with `in <State> write/read/omit` — no boilerplate required for the common case.
 
 #### Composition rules
 
-1. **D3 is the universal per-pair baseline** — undeclared pairs default to `read`.
-2. **Explicit declarations override D3** for the specific (field, state) pair only.
-3. **Guarded `write` is the only guarded access mode** — `read`/`omit` cannot have guards.
-4. **`omit` clears on state entry** — value reset to default on any transition into an `omit` state (including cycles); does NOT apply to `no transition`.
-5. **`set` validation against target state** — `set` targeting a field `omit`ted in the target state is a compile error; `read`/`write` do NOT restrict `set`.
-6. **Contradiction detection** — same (field, state) pair with conflicting modes is a compile error.
-7. **Root-level `write` for stateless precepts only** — root-level `read`/`omit` is not valid syntax.
+1. **Field baseline** — `writable` on a field sets its default to `write` for all (field, state) pairs.
+2. **D3 default** — fields without `writable` default to `read` for every (field, state) pair unless overridden.
+3. **State-level override always wins** — `in <State> write/read/omit` overrides the field's baseline for that pair only.
+4. **Guarded `write` is the only guarded access mode** — `read`/`omit` cannot have guards.
+5. **`omit` clears on state entry** — value reset to default on any transition into an `omit` state (including cycles); does NOT apply to `no transition`.
+6. **`set` validation against target state** — `set` targeting a field `omit`ted in the target state is a compile error; `read`/`write` do NOT restrict `set`.
+7. **Contradiction detection** — same (field, state) pair with conflicting modes is a compile error.
+8. **Root-level `write all` for stateless precepts only** — root-level `read`/`omit` is not valid syntax; root-level `write <FieldName>` is not valid syntax (use `writable` on the field declaration).
+9. **`writable` on computed fields or event args** is a compile error.
 
 #### Guarded write
 
@@ -1011,12 +1032,14 @@ The parser must:
 5. Parse guarded declarations and guarded routing.
 6. Parse computed fields and action chains.
 7. Parse declaration-attached modifiers when they land.
-8. Parse `optional` as a field modifier.
+8. Parse `optional` and `writable` as field modifiers.
 9. Parse `is set` / `is not set` as multi-word presence operators in expression contexts.
 10. Parse `clear <Field>` as an action in transition rows and hooks.
 11. Parse `omit`/`read`/`write` with chained verb groups after `in <State>`.
-12. Reject `null` as a literal or keyword (removed from the language).
-13. Reject `nullable` and `edit` with migration diagnostics.
+12. Parse root-level `write all` for stateless precepts.
+13. Reject root-level `write <FieldName>` (bare field list form) — use `writable` modifier instead.
+14. Reject `null` as a literal or keyword (removed from the language).
+15. Reject `nullable` and `edit` with migration diagnostics.
 
 ### Typechecker responsibilities
 
@@ -1032,7 +1055,7 @@ The typechecker must:
 8. Enforce business-domain operator compatibility, qualification compatibility, currency pairing, and unit commensurability.
 9. Enforce the typed constant admission and narrowing model.
 10. Enforce stateless event hook legality.
-11. Enforce per-state field access mode rules: D3 per-pair baseline resolution, explicit declaration overrides, contradiction detection (conflicting modes on same field/state pair), `set`-into-`omit` validation (compile error), root-level `read`/`omit` rejection, guarded `read`/`omit` rejection.
+11. Enforce per-state field access mode rules: two-layer composition model (field `writable` baseline + state-level `in <State> write|read|omit` overrides), contradiction detection (conflicting modes on same field/state pair), `set`-into-`omit` validation (compile error), root-level `read`/`omit` rejection, guarded `read`/`omit` rejection, `writable` on computed fields rejected (`ComputedFieldNotWritable`), `writable` on event args rejected (`WritableOnEventArg`).
 12. Enforce modifier compatibility and contradiction rules.
 13. Enforce numeric lane integrity: reject cross-lane arithmetic (decimal + number), require explicit bridges, and resolve context-sensitive literal types.
 14. Enforce collection emptiness guards: reject bare `.min`/`.max`/`.peek` outside a conditional expression that tests `.count > 0` (`UnguardedCollectionAccess`); reject `dequeue`/`pop` without the same proof (`UnguardedCollectionMutation`). Proof sources: conditional guard or `mincount` constraint.
@@ -1119,7 +1142,7 @@ Any clean-room compiler for Precept must be able to serve a language with all of
 17. Static completeness: if a precept compiles without diagnostics, no type errors occur at runtime.
 18. Totality: every expression evaluates to a result or a definite error — no silent NaN, Infinity, or null propagation.
 19. No `null` literal — `optional` fields, `is set`/`is not set` presence operators, and `clear` replace all null-based patterns.
-20. Per-state field access modes (`omit`/`read`/`write`) with D3 per-pair baseline, guarded `write`, `omit` clearing on state entry, and compile-time access mode enforcement.
+20. Per-state field access modes (`omit`/`read`/`write`) and field-level `writable` baseline modifier — two-layer composition model: `writable` sets the field's default across all states; `in <State> write|read|omit` overrides per-pair; D3 (`read`) is the fallback for fields without `writable`; `write all` is stateless sugar; `writable` on computed fields or event args is a compile error.
 
 That is the language target. The compiler architecture may change completely, but the language contract above is what the new system must honor.
 

@@ -132,6 +132,7 @@ public enum TokenKind
     Precept,
     Field,
     State,
+    Writable,
     ...
 }
 ```
@@ -157,7 +158,7 @@ FrozenDictionary<TokenKind, TypeMeta>     TypesByToken     = Types.All.ToFrozenD
 FrozenDictionary<TokenKind, OperatorMeta> OperatorsByToken = Operators.All.ToFrozenDictionary(o => o.Token.Kind);
 ```
 
-This avoids cross-ref fields on `TokenMeta` that would be inapplicable for most members (only ~25 of 90+ tokens are type keywords, ~16 are operators). It also avoids the dual-use problem — `Set` is both an action and a type, `Min`/`Max` are both modifiers and functions — which would require either multiple nullable fields or a DU wrapper. Derived indexes handle dual-use naturally: each catalog builds its own index from its own `All` property.
+This avoids cross-ref fields on `TokenMeta` that would be inapplicable for most members (only ~25 of 91+ tokens are type keywords, ~16 are operators). It also avoids the dual-use problem — `Set` is both an action and a type, `Min`/`Max` are both modifiers and functions — which would require either multiple nullable fields or a DU wrapper. Derived indexes handle dual-use naturally: each catalog builds its own index from its own `All` property.
 
 The LS never needs token → catalog entry lookups — it works from AST nodes and resolved symbols, which already carry the typed `Kind`. MCP iterates each catalog's `All` directly. The reverse index exists for any consumer that needs it, derived from the source of truth (the downstream catalog's `Token` field).
 
@@ -712,7 +713,7 @@ All declaration-attached modifiers across the language surface — field constra
 
 | Subtype | Members | Count |
 |---------|---------|-------|
-| `FieldModifierMeta` | `optional`, `default`, `nonnegative`, `positive`, `nonzero`, `notempty`, `min`, `max`, `minlength`, `maxlength`, `mincount`, `maxcount`, `maxplaces`, `ordered` | 14 |
+| `FieldModifierMeta` | `optional`, `writable`, `default`, `nonnegative`, `positive`, `nonzero`, `notempty`, `min`, `max`, `minlength`, `maxlength`, `mincount`, `maxcount`, `maxplaces`, `ordered` | 15 |
 | `StateModifierMeta` | `initial` (state), `terminal`, `required`, `irreversible`, `success`, `warning`, `error` | 7 |
 | `EventModifierMeta` | `initial` (event) | 1 |
 | `AccessModifierMeta` | `write`, `read`, `omit` | 3 |

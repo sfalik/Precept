@@ -36,6 +36,7 @@ Every token the lexer can produce. Organized by category to match the `TokenKind
 | `As` | `as` | Type annotation (`field X as number`) |
 | `Default` | `default` | Default value modifier |
 | `Optional` | `optional` | Field optionality modifier (v2) |
+| `Writable` | `writable` | Field writable-baseline modifier — marks a non-computed field as directly editable by default across all states (v2) |
 | `Because` | `because` | Reason clause |
 | `Initial` | `initial` | Initial state marker |
 
@@ -84,9 +85,9 @@ Every token the lexer can produce. Organized by category to match the `TokenKind
 
 | Token | Text | Context |
 |-------|------|---------|
-| `Write` | `write` | Field write access mode |
-| `Read` | `read` | Field read access mode |
-| `Omit` | `omit` | Field omit access mode |
+| `Write` | `write` | State-scoped write access mode (`in <State> write …`) and root-level `write all` sugar (stateless precepts) |
+| `Read` | `read` | State-scoped read access mode (`in <State> read …`) |
+| `Omit` | `omit` | State-scoped omit access mode (`in <State> omit …`) |
 
 #### Keywords: Logical Operators
 
@@ -267,7 +268,7 @@ Keywords are **strictly lowercase**. Identifiers are case-sensitive: `From` is a
 The complete v2 reserved keyword set:
 
 ```
-precept  field  as  default  optional  rule  because
+precept  field  as  default  optional  writable  rule  because
 state  initial  terminal  required  irreversible  event  ensure
 success  warning  error
 in  to  from  on  when  any  all  of
@@ -284,7 +285,7 @@ nonnegative  positive  nonzero  notempty
 min  max  minlength  maxlength  mincount  maxcount
 ```
 
-**v2 additions** (not in v1): `optional`, `write`, `read`, `omit`, `clear`, `nonzero`, `is`, `integer`, `decimal`, `choice`, `maxplaces`, `ordered`, `terminal`, `required`, `irreversible`, `success`, `warning`, `error`, `date`, `time`, `instant`, `duration`, `period`, `timezone`, `zoneddatetime`, `datetime`, `money`, `currency`, `quantity`, `unitofmeasure`, `dimension`, `price`, `exchangerate`.
+**v2 additions** (not in v1): `optional`, `writable`, `write`, `read`, `omit`, `clear`, `nonzero`, `is`, `integer`, `decimal`, `choice`, `maxplaces`, `ordered`, `terminal`, `required`, `irreversible`, `success`, `warning`, `error`, `date`, `time`, `instant`, `duration`, `period`, `timezone`, `zoneddatetime`, `datetime`, `money`, `currency`, `quantity`, `unitofmeasure`, `dimension`, `price`, `exchangerate`.
 
 **v1 removals:** `nullable`, `null`, and `edit` are not reserved in v2. `optional` replaces `nullable`. `write` replaces `edit`. The `null` literal is removed entirely — `optional` fields use `is set`/`is not set` for presence testing and `clear` for value removal. All three are ordinary identifiers in v2; no special parser recognition is needed.
 
@@ -561,7 +562,7 @@ After the `precept <Name>` header, the parser enters a loop that dispatches on t
 | `state` | `StateDeclaration` |
 | `event` | `EventDeclaration` |
 | `rule` | `RuleDeclaration` |
-| `write` | `AccessModeDeclaration` (root-level, no state scope) |
+| `write` | `AccessModeDeclaration` (root-level `write all` only — stateless precepts) |
 | `in` | `StateEnsureDeclaration` or `AccessModeDeclaration` |
 | `to` | `StateEnsureDeclaration` or `StateActionDeclaration` |
 | `from` | `TransitionRowDeclaration`, `StateEnsureDeclaration`, or `StateActionDeclaration` |
@@ -671,22 +672,29 @@ State actions support an optional `when` guard between the state target and the 
 
 ```
 in StateTarget ("when" BoolExpr)? (write|read|omit) FieldTarget   ← state-scoped
-write FieldTarget                                                   ← root-level
+write all                                                           ← root-level (stateless precepts only)
 ```
 
-**Read-by-default baseline:** For every (field, state) pair without an explicit declaration, the default access mode is `read`. Authors declare only exceptions to readonly — `write` opens a field for editing in that state; `omit` removes it from the state's data shape entirely. No boilerplate is needed for the common case.
+**Two-layer access mode composition model:**
 
-Root-level `write` is valid for stateless precepts only — it declares fields writable with no state restriction. Root-level `read` and `omit` are not valid syntax: `read` is the default (declaring it globally would be redundant), and `omit` globally would make a field structurally absent in every state, rendering its declaration pointless.
+- **Layer 1 — field-level baseline (`writable` modifier):** `writable` on a field declaration sets that field's baseline access mode to writable across all states. Fields without `writable` default to read-only.
+- **Layer 2 — state-level override (`in <State> write|read|omit`):** State-scoped declarations override the field's baseline for a specific (field, state) pair only. State-level always wins over the field-level baseline.
+- **Undeclared (field, state) pairs** use the field's baseline: `read` for fields without `writable`, `write` for fields with `writable`.
+
+Root-level `write all` is valid for stateless precepts only — it is sugar for marking all non-computed fields writable with no state restriction. Root-level `write <FieldName>` (bare field list form) is **not valid syntax** — use the `writable` modifier on the field declaration instead. Root-level `read` and `omit` are not valid syntax: `read` is the default (declaring it globally would be redundant), and `omit` globally would make a field structurally absent in every state, rendering its declaration pointless.
 
 State-scoped access modes (`in StateTarget`) support all three verbs. The field target is either `all` or a comma-separated list of field names.
 
 **Composition rules:**
-1. **Read by default** — undeclared (field, state) pairs default to `read`.
-2. **Explicit declarations override the default** for the specific (field, state) pair only.
-3. **Guarded `write` is the only guarded access mode** — `read` and `omit` cannot have guards.
-4. **`omit` clears on state entry** — field value resets to default on any transition into an `omit` state (including self-transitions); does NOT apply to `no transition`.
-5. **`set` targeting an `omit` field in the target state** is a compile error; `read`/`write` do not restrict `set`.
-6. **Conflicting modes** on the same (field, state) pair is a compile error.
+1. **Field baseline** — `writable` modifier on a field declaration sets the field's default to `write` across all states.
+2. **D3 default** — fields without `writable` default to `read` for every (field, state) pair unless overridden by a state-scoped declaration.
+3. **State-level override always wins** — an explicit `in <State> write|read|omit` declaration overrides the field's baseline for that (field, state) pair only.
+4. **Guarded `write` is the only guarded access mode** — `read` and `omit` cannot have guards.
+5. **`omit` clears on state entry** — field value resets to default on any transition into an `omit` state (including self-transitions); does NOT apply to `no transition`.
+6. **`set` targeting an `omit` field in the target state** is a compile error; `read`/`write` do not restrict `set`.
+7. **Conflicting modes** on the same (field, state) pair is a compile error.
+8. **`writable` on a computed field** is a compile error (`ComputedFieldNotWritable`).
+9. **`writable` on an event argument** is a compile error (`WritableOnEventArg`).
 
 ### 2.3 Type References
 
@@ -717,6 +725,7 @@ Field modifiers appear after the type reference and before any computed expressi
 | Modifier | Syntax | Category |
 |----------|--------|----------|
 | `optional` | flag | Field is nullable; use `is set`/`is not set` for presence |
+| `writable` | flag | Field baseline is directly editable across all states (unless overridden per-state); invalid on computed fields and event args |
 | `ordered` | flag | Choice field supports ordinal comparison |
 | `nonnegative` | flag | Value ≥ 0 |
 | `positive` | flag | Value > 0 |
@@ -1115,6 +1124,7 @@ Modifiers are constraints on field/arg values. The type checker validates applic
 
 | Modifier | Applicable to | Error when applied to |
 |----------|---------------|----------------------|
+| `writable` | any non-computed field type (field declarations only) | computed fields (`ComputedFieldNotWritable`); event arguments (`WritableOnEventArg`) |
 | `nonnegative` | `integer`, `decimal`, `number` | `string`, `boolean`, `choice`, collections, temporal, domain |
 | `positive` | `integer`, `decimal`, `number` | (same as above) |
 | `nonzero` | `integer`, `decimal`, `number` | (same as above) |
@@ -1159,7 +1169,9 @@ Type errors: applying a set operation to a non-set field, a queue operation to a
 |-------|-----------|------------|
 | Field not declared | Access mode names a field that doesn't exist | `UndeclaredField` |
 | State not declared | Access mode scoped to a state that doesn't exist | `UndeclaredState` |
-| Computed field in write mode | A computed field is listed in a `write` access mode | `ComputedFieldNotWritable` |
+| Computed field in write mode | A computed field is listed in a `write` access mode declaration | `ComputedFieldNotWritable` |
+| `writable` on computed field | A computed field carries the `writable` modifier | `ComputedFieldNotWritable` |
+| `writable` on event arg | An event argument carries the `writable` modifier | `WritableOnEventArg` |
 | Conflicting access modes | Same field has both `write` and `omit` in the same state | `ConflictingAccessModes` |
 
 #### Computed field validation
@@ -1258,10 +1270,11 @@ The type checker emits diagnostics for root causes only. When `ErrorType` is flo
 | `InvalidModifierValue` | Error | "The value for '{0}' must be {1}" | Negative count/length, non-integer maxplaces |
 | `DuplicateModifier` | Error | "The '{0}' constraint is already applied to this field" | Same modifier twice |
 | `RedundantModifier` | Warning | "'{0}' is unnecessary — '{1}' already implies it" | nonnegative + positive |
-| `ComputedFieldNotWritable` | Error | "Field '{0}' is computed and cannot be assigned" | `set` targeting computed field, or in `write` mode |
+| `ComputedFieldNotWritable` | Error | "Field '{0}' is computed and cannot be assigned" | `set` targeting computed field, `write` access mode on computed field, or `writable` modifier on computed field |
 | `ComputedFieldWithDefault` | Error | "Field '{0}' is computed and cannot have a default value" | Both `->` and `default` |
 | `CircularComputedField` | Error | "Computed field '{0}' has a circular dependency: {1}" | Self-reference or transitive cycle in computed field dependency graph |
 | `ConflictingAccessModes` | Error | "Field '{0}' has conflicting access modes in state '{1}'" | write + omit same field same state |
+| `WritableOnEventArg` | Error | "The 'writable' modifier cannot appear on event argument '{0}'" | `writable` on an event arg declaration |
 | `ListLiteralOutsideDefault` | Error | "List values can only appear in default clauses" | `[...]` outside default position |
 | `DuplicateChoiceValue` | Error | "Choice value '{0}' is duplicated" | Repeated string in choice set |
 | `EmptyChoice` | Error | "A choice type must have at least one value" | `choice()` with no args |

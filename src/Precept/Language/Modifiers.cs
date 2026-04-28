@@ -121,6 +121,12 @@ public static class Modifiers
             ModifierCategory.Structural, DecimalOnly, HasValue: true,
             HoverDescription: "The decimal field must have at most this many digits after the decimal point."),
 
+        ModifierKind.Writable => new FieldModifierMeta(
+            kind, Tokens.GetMeta(TokenKind.Writable),
+            "Field is directly editable; read-only by default without this modifier",
+            ModifierCategory.Structural, AnyType,
+            HoverDescription: "The field is directly editable. Without this modifier, the field is read-only by default. Use 'in State write Field' to override per state."),
+
         // ── State modifiers ─────────────────────────────────────────────────────
         ModifierKind.InitialState => new StateModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Initial),
