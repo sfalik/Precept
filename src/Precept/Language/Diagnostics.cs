@@ -46,6 +46,8 @@ public static class Diagnostics
             FixHint: "Use 'in' for currency, 'of' for unit, or both only on 'price' types"),
         DiagnosticCode.OmitDoesNotSupportGuard    => new(nameof(DiagnosticCode.OmitDoesNotSupportGuard),    DiagnosticStage.Parse, Severity.Error,   "'omit' is an unconditional structural exclusion — 'when' guards are not allowed",                                                       DiagnosticCategory.Structure,
             FixHint: "Remove the 'when' guard. If you need conditional visibility, use 'modify Field readonly when Guard' instead"),
+        DiagnosticCode.EventHandlerDoesNotSupportGuard => new(nameof(DiagnosticCode.EventHandlerDoesNotSupportGuard), DiagnosticStage.Parse, Severity.Error, "Event handlers ('on Event -> action') do not support 'when' guards — guards are only valid on event ensures and transition rows",       DiagnosticCategory.Structure,
+            FixHint: "Remove the 'when' guard, or use 'on Event ensure Condition because Message' for guarded event logic"),
         DiagnosticCode.PreEventGuardNotAllowed    => new(nameof(DiagnosticCode.PreEventGuardNotAllowed),    DiagnosticStage.Parse, Severity.Error,   "A 'when' guard before the event target is not supported on transition rows — place the guard after 'on Event'",                         DiagnosticCategory.Structure,
             FixHint: "Move the 'when' clause to after the event name: 'from State on Event when Guard'"),
         DiagnosticCode.ExpectedOutcome            => new(nameof(DiagnosticCode.ExpectedOutcome),            DiagnosticStage.Parse, Severity.Error,   "Expected a transition outcome ('-> transition State', '-> no transition', or '-> reject Message') but none was found",                 DiagnosticCategory.Structure,

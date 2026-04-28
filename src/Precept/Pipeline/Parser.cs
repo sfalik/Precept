@@ -26,11 +26,12 @@ namespace Precept.Pipeline;
 //     catalog-system violation.
 //
 // Why the dispatch table is hand-written (the 1:N problem):
-//   Five leading tokens (Field, State, Event, Rule, Write) map 1:1 to a single
+//   Five leading tokens (Field, State, Event, Rule) map 1:1 to a single
 //   ConstructKind and can be dispatched trivially. But four tokens (In, To, From, On)
 //   each map to 2–3 ConstructKinds. Disambiguation requires consuming a state/event
-//   target and then looking ahead to the following verb. That's grammar structure that
-//   cannot be expressed as a flat catalog lookup table.
+//   target and then looking ahead to the following verb (e.g. Modify, Omit, Ensure,
+//   Arrow). That's grammar structure that cannot be expressed as a flat catalog lookup
+//   table.
 //
 // Top-Level Dispatch Loop (intended shape):
 // -----------------------------------------
@@ -45,11 +46,11 @@ namespace Precept.Pipeline;
 //       State  → ParseStateDeclaration()      → ConstructKind.StateDeclaration
 //       Event  → ParseEventDeclaration()      → ConstructKind.EventDeclaration
 //       Rule   → ParseRuleDeclaration()       → ConstructKind.RuleDeclaration
-//       Write  → ParseAccessMode()            → ConstructKind.AccessMode (stateless precepts only)
 //
 //       In     → ParseInScoped()              → disambiguates:
-//                                                  ConstructKind.StateEnsure  (In <state> ensure ...)
-//                                                  ConstructKind.AccessMode   (In <state> write ...)
+//                                                  ConstructKind.StateEnsure      (In <state> ensure ...)
+//                                                  ConstructKind.AccessMode       (In <state> modify ...)
+//                                                  ConstructKind.OmitDeclaration  (In <state> omit ...)
 //
 //       To     → ParseToScoped()              → disambiguates:
 //                                                  ConstructKind.StateEnsure  (To <state> ensure ...)
@@ -69,7 +70,7 @@ namespace Precept.Pipeline;
 //
 // Error Recovery:
 //   SyncToNextDeclaration() advances past the offending token(s) to the next known
-//   leading token (Field, State, Event, Rule, Write, In, To, From, On) so parsing
+//   leading token (Field, State, Event, Rule, In, To, From, On) so parsing
 //   can continue and produce a maximal set of diagnostics in one pass.
 
 /// <summary>
@@ -302,7 +303,7 @@ public static class Parser
                 return Current().Kind switch
                 {
                     TokenKind.Ensure => ParseEventEnsure(start, eventTarget.Value, stashedGuard),
-                    TokenKind.Arrow  => ParseEventHandler(start, eventTarget.Value),
+                    TokenKind.Arrow  => ParseEventHandlerWithGuardCheck(start, eventTarget.Value, stashedGuard),
                     _ => EmitAmbiguityAndSync(Current()),
                 };
             }
@@ -573,6 +574,14 @@ public static class Parser
 
         private EventHandlerNode ParseEventHandler(SourceSpan start, Token eventName)
         {
+            return ParseEventHandlerWithGuardCheck(start, eventName, stashedGuard: null);
+        }
+
+        private EventHandlerNode ParseEventHandlerWithGuardCheck(SourceSpan start, Token eventName, Expression? stashedGuard)
+        {
+            if (stashedGuard is not null)
+                EmitDiagnostic(DiagnosticCode.EventHandlerDoesNotSupportGuard, stashedGuard.Span);
+
             Advance(); // consume '->'
             var first = ParseActionStatement();
             var actions = ImmutableArray.CreateBuilder<Statement>();

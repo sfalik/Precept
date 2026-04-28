@@ -7,7 +7,7 @@
 | Property | Value |
 |---|---|
 | Doc maturity | Full |
-| Implementation state | Stub — `Parse()` throws `NotImplementedException`. Implementation per v8 plan (`docs/working/catalog-parser-design-v8.md`) |
+| Implementation state | Complete — 5-PR implementation per v8 plan. All 12 constructs parse. 2033+ tests green. |
 | Source files | `src/Precept/Pipeline/Parser.cs`, `src/Precept/Pipeline/SyntaxNodes/` (directory) |
 | Upstream | Lexer (`TokenStream`) |
 | Downstream | TypeChecker, LS syntax features, MCP `precept_compile` |
@@ -24,9 +24,9 @@ The parser is the second stage of the Precept compilation pipeline. It transform
 public static SyntaxTree Parse(TokenStream tokens)
 ```
 
-The parser is **catalog-driven**. `Constructs.ByLeadingToken` and `Constructs.LeadingTokens` are the primary dispatch indexes — not a hardcoded switch. For each declaration, the parser looks up the current token in `ByLeadingToken` to determine the set of candidate constructs. When the leading token maps to a single construct with no disambiguation tokens, the parser dispatches directly. When multiple constructs share a leading token, the parser enters the disambiguation path. `InvokeSlotParser()` is the generic slot dispatch mechanism — an exhaustive switch on `ConstructSlotKind` with CS8509 enforcement at build time. `BuildNode()` constructs the typed AST node from a filled slot array.
+The parser is a hand-written recursive descent parser with a Pratt expression parser for operator precedence. The top-level dispatch loop is a keyword switch. Vocabulary recognition (operators, types, modifiers, actions) is derived from catalog metadata. Slot sequencing is entirely driven by `ConstructMeta.Slots` — `InvokeSlotParser()` is the generic slot dispatch mechanism. It produces an AST (not a CST) — comments and whitespace are consumed silently. No information is discarded that downstream stages need; no information is preserved that only a formatter would need.
 
-The parser always runs to end-of-source. On malformed input it emits diagnostics and inserts `IsMissing` nodes or skips to sync points, ensuring downstream stages receive a structurally coherent tree. The type checker, graph analyzer, proof engine, language server, and MCP tools all receive a complete tree — they never need to defensively handle "no tree" as a result.
+The parser always runs to end-of-source. On malformed input it emits diagnostics and inserts synthetic tokens (empty text, zero-length span) or skips to sync points, ensuring downstream stages receive a structurally coherent tree. The type checker, graph analyzer, proof engine, language server, and MCP tools all receive a complete tree — they never need to defensively handle "no tree" as a result.
 
 The public surface:
 
@@ -51,7 +51,7 @@ The `SyntaxTree` is the `Compilation.SyntaxTree` field — it is part of the too
 
 ## Responsibilities and Boundaries
 
-**OWNS:** Source-structural representation of authored programs; error recovery shape (`IsMissing` nodes, `SkippedTokens`); `SourceSpan` ownership for every node; disambiguation of dual-use tokens (`set`, `min`, `max`) by syntactic position; parsing `OmitDeclaration` as a structurally separate construct from `AccessMode`.
+**OWNS:** Source-structural representation of authored programs; error recovery shape (synthetic tokens with empty text and zero-length spans, sync-point recovery); `SourceSpan` ownership for every node; disambiguation of dual-use tokens (`set`, `min`, `max`) by syntactic position; parsing `OmitDeclaration` as a structurally separate construct from `AccessMode`.
 
 **Does NOT OWN:** Name resolution, type compatibility, overload selection, semantic legality (`AllowedIn` constraint enforcement) — these belong to the TypeChecker. Token classification — the Lexer already classifies all tokens before the parser sees them. Operator precedence is parser-internal (not catalog metadata).
 
@@ -89,11 +89,10 @@ public static class Parser
     public static SyntaxTree Parse(TokenStream tokens)
     {
         var session = new ParseSession(tokens);
-        session.ParseAll();
-        return session.Build();
+        return session.ParseAll();
     }
 
-    private struct ParseSession
+    internal ref struct ParseSession
     {
         private readonly TokenStream _tokens;
         private int _position;
@@ -115,11 +114,11 @@ public static class Parser
 | `Current()` | Returns `_tokens[_position]` without advancing |
 | `Peek(int offset)` | Returns `_tokens[_position + offset]` for bounded lookahead |
 | `Advance()` | Returns `Current()` and increments `_position` |
-| `Expect(TokenKind)` | If `Current()` matches, advances and returns the token. Otherwise emits `ExpectedToken` diagnostic and returns a synthetic `IsMissing` token at the current span |
+| `Expect(TokenKind)` | If `Current()` matches, advances and returns the token. Otherwise emits `ExpectedToken` diagnostic and returns a synthetic token with `Kind` set to the expected kind, `Text = string.Empty`, and a zero-length span at the current position |
 | `Match(TokenKind)` | If `Current()` matches, advances and returns `true`. Otherwise returns `false` without advancing |
 | `SkipTrivia()` | Advances past `NewLine` and `Comment` tokens. Called before each dispatch decision |
 
-`Expect()` is the primary error-recovery primitive. It always returns a token — real or synthetic — so the calling production can always construct a complete node. The synthetic token carries `IsMissing = true` and a zero-length `SourceSpan` at the current position, preserving the location for downstream diagnostics.
+`Expect()` is the primary error-recovery primitive. It always returns a token — real or synthetic — so the calling production can always construct a complete node. The synthetic token has `Text = string.Empty` and a zero-length `SourceSpan` at the current position, preserving the location for downstream diagnostics.
 
 ### 5-Layer Architecture
 
@@ -135,12 +134,12 @@ The parser is organized into five layers:
 
 ### Top-Level Dispatch Loop
 
-`ParseAll()` consumes the `precept` header, then enters a loop that skips trivia (newlines, comments) and dispatches on the current token. The dispatch is catalog-driven:
+`ParseAll()` consumes the `precept` header, then enters a loop that skips trivia (newlines, comments) and dispatches on the current token. The dispatch is a hand-written keyword switch:
 
 ```
-Current token → Constructs.ByLeadingToken lookup → candidates
-  If 1 candidate, no disambiguation tokens → direct ParseConstruct()
-  If 1+ candidates with disambiguation tokens → DisambiguateAndParse()
+Current token → keyword switch → route to construct parser or disambiguator
+  Direct dispatch for unique leading tokens (Field, State, Event, Rule)
+  Disambiguation for shared leading tokens (In, To, From, On)
   Not found → EmitDiagnostic + SyncToNextDeclaration()
 ```
 
@@ -160,7 +159,9 @@ The resulting dispatch table:
 | `EndOfSource` | — | exit loop |
 | *anything else* | — | `EmitDiagnostic` + `SyncToNextDeclaration()` |
 
-The dispatch table is built from `Constructs.ByLeadingToken` — a `FrozenDictionary<TokenKind, ImmutableArray<(ConstructKind, DisambiguationEntry)>>` derived at startup from all `ConstructMeta.Entries`. The parser does not maintain a parallel keyword list.
+**Note:** The `Precept` header is parsed **before** the main dispatch loop begins. The table includes it for completeness, but the dispatch loop only processes declaration-level tokens (`Field`, `State`, `Event`, `Rule`, `In`, `To`, `From`, `On`).
+
+The dispatch table is a hand-written keyword switch. Vocabulary dictionaries (operators, types, modifiers, actions) are catalog-derived; the dispatch structure itself is grammar mechanics.
 
 ### Preposition Disambiguation
 
@@ -208,6 +209,8 @@ For `from`-scoped transition rows: when a guard was pre-consumed (stashedGuard i
 
 The `When` case is the only two-step lookahead: the preposition method consumes the `when` guard expression, then re-inspects the next token to select the production. This is still bounded — the guard is parsed as a normal expression (Pratt parser stops at `ensure`, `->`, or a newline), and the next token is inspected exactly once.
 
+When the disambiguator pre-consumes a `when` guard and then routes to `EventHandler` (arrow `->` follows), it emits `DiagnosticCode.EventHandlerDoesNotSupportGuard`. The guard is discarded — `EventHandlerNode` has no `Guard` property. This is consistent with the `OmitDeclaration` guard-discard pattern.
+
 An example from the insurance-claim sample illustrates the preposition flow:
 
 ```precept
@@ -233,7 +236,7 @@ public readonly record struct SourceSpan(
 - **Offset/Length** — for slicing the source string (used by the evaluator for error messages, by MCP tools for snippet extraction)
 - **Line/Column** — for LSP diagnostics, hover, and go-to-definition (1-based lines, 1-based start column, exclusive end column per LSP convention)
 
-`SourceSpan.Covering(first, last)` computes the minimal span that encloses two child spans — used to build declaration-level spans from their component tokens. `SourceSpan.Missing` (all zeros) marks synthetic `IsMissing` nodes.
+`SourceSpan.Covering(first, last)` computes the minimal span that encloses two child spans — used to build declaration-level spans from their component tokens.
 
 Downstream stages never need the raw source text to emit located diagnostics — the `SourceSpan` carries both coordinate systems on every node.
 
@@ -340,7 +343,7 @@ state Draft initial, Submitted, UnderReview, Approved, Denied, Paid
 #### EventDeclaration
 
 ```
-event Identifier ("," Identifier)* ("with" ArgList)? ("initial")?
+event Identifier ("," Identifier)* ("(" ArgList ")")? ("initial")?
 ArgList := ArgDecl ("," ArgDecl)*
 ArgDecl := Identifier as TypeRef FieldModifier*
 ```
@@ -851,7 +854,7 @@ The loop breaks when the token after `->` is an outcome keyword (`transition`, `
 
 ## Sync-Point Recovery
 
-When the dispatch loop encounters an unrecognized token, it emits an `UnexpectedKeyword` diagnostic and scans forward for a sync token — a keyword that unambiguously starts a new declaration. The sync token set is derived from `Constructs.LeadingTokens` — a `FrozenSet<TokenKind>` built from catalog metadata at startup.
+When the dispatch loop encounters an unrecognized token, it emits an `ExpectedToken` diagnostic and scans forward for a sync token — a keyword that unambiguously starts a new declaration. The sync token set is derived from `Constructs.LeadingTokens` — a `FrozenSet<TokenKind>` built from catalog metadata at startup.
 
 The sync set contains exactly 9 tokens:
 
@@ -863,7 +866,7 @@ These are the `LeadingToken` values from all `DisambiguationEntry` records acros
 
 Within `in`-scoped parse failures, `modify` and `omit` serve as in-scope recovery anchors — they signal the start of a new access mode or omit declaration disambiguation after a state target. However, they are NOT in `Constructs.LeadingTokens` (they are post-anchor disambiguation tokens, not construct-initiating leading tokens). If parsing fails inside an `in`-scoped construct, the error sync advances until it finds the next top-level leading token (including `in` itself), at which point the outer dispatch loop re-enters disambiguation cleanly.
 
-Recovery preserves all tokens between the error point and the sync point as a `SkippedTokens` span in diagnostics, so the language server can report the full extent of the unrecognized region.
+`SyncToNextDeclaration()` silently advances past tokens to the next known leading token. No skipped-token spans are preserved in the tree.
 
 ---
 
@@ -949,15 +952,17 @@ The parser emits diagnostics via `Diagnostics.Create(DiagnosticCode, SourceSpan,
 | Code | Condition |
 |------|-----------|
 | `ExpectedToken` | A required token was not found at the current position |
-| `UnexpectedKeyword` | A keyword appeared in a position where it cannot start a production |
 | `NonAssociativeComparison` | Chained comparison expression (`A == B == C`) |
-| `InvalidCallTarget` | Parenthesized call on a non-callable expression |
 | `OmitDoesNotSupportGuard` | A `when` guard appeared on an `omit` declaration (post-field or pre-stashed) |
+| `EventHandlerDoesNotSupportGuard` | A `when` guard appeared on an event handler (`on Event when Guard -> action`) |
 | `PreEventGuardNotAllowed` | A `when` guard appeared before the event target in a `from`-scoped transition row |
+| `ExpectedOutcome` | A transition row ended without a valid outcome (`transition`, `no transition`, or `reject`) |
+
+**Note:** `UnexpectedKeyword` and `InvalidCallTarget` are defined in `DiagnosticCode` but are reserved — not currently emitted by the parser. They are retained for potential future use.
 
 Diagnostic messages are written for the **domain author** — the same audience as the lexer's diagnostics. "Expected a field name here, but found 'transition'" rather than "Expected Identifier, got TokenKind.Transition." The Diagnostics catalog holds the templates; the parser passes the contextual values (expected token description, found token text, construct name).
 
-All codes are in the `DiagnosticCode` enum under the `// ── Parse ──` section, adjacent to the lexer codes. The diagnostic catalog owns severity (all are `Error`) and message templates — the parser never constructs message strings directly.
+All codes are in the `DiagnosticCode` enum under the `// ── Parse ──` section, adjacent to the lexer codes. `MutuallyExclusiveQualifiers` is in the `// ── Type ──` section (it is a type-checker diagnostic). The diagnostic catalog owns severity (all are `Error`) and message templates — the parser never constructs message strings directly.
 
 ### Downstream Consumer Impact
 
@@ -978,11 +983,11 @@ The TextMate grammar is generated from catalog metadata, not from the parser. Ho
 
 #### Completions
 
-Context-aware completions use the parser's position to determine which `ConstructSlotKind` the cursor is in. The language server calls `Parser.Parse` on the partial text, finds the `IsMissing` node nearest the cursor, reads its slot kind, and offers completions from the catalog metadata for that slot. For example, an `IsMissing` node in the `Outcome` slot position triggers `transition`, `no transition`, and `reject` as completion candidates.
+Context-aware completions use the parser's position to determine which `ConstructSlotKind` the cursor is in. The language server calls `Parser.Parse` on the partial text, finds the synthetic token (empty text) nearest the cursor, reads its slot kind, and offers completions from the catalog metadata for that slot. For example, a synthetic token in the `Outcome` slot position triggers `transition`, `no transition`, and `reject` as completion candidates.
 
 #### MCP Compile Tool
 
-`precept_compile(text)` calls `Parser.Parse` and serializes the `SyntaxTree` as part of its response. The flat declaration list serializes naturally as a JSON array. Each node's `ConstructKind` becomes the `"kind"` field. `IsMissing` nodes are included with an `"isMissing": true` flag so MCP consumers can distinguish real declarations from error-recovery placeholders.
+`precept_compile(text)` calls `Parser.Parse` and serializes the `SyntaxTree` as part of its response. The flat declaration list serializes naturally as a JSON array. Each node's `ConstructKind` becomes the `"kind"` field. Synthetic tokens (empty text, zero-length span) are included so MCP consumers can detect error-recovery placeholders.
 
 ---
 
@@ -993,10 +998,10 @@ Context-aware completions use the parser's position to determine which `Construc
 `Expect(TokenKind)` is the primary recovery primitive. When the current token does not match, the parser:
 
 1. Emits `ExpectedToken` diagnostic with the expected description and the found token.
-2. Returns a synthetic `Token` with `IsMissing = true` and `SourceSpan.Missing`.
+2. Returns a synthetic `Token` with `Kind` set to the expected kind, `Text = string.Empty`, and a zero-length `SourceSpan` at the current position.
 3. Does **not** advance — the unexpected token remains current for the calling production to handle.
 
-The calling production constructs a complete node using the synthetic token. Downstream stages see a structurally coherent tree; they can inspect `IsMissing` to skip validation on phantom nodes.
+The calling production constructs a complete node using the synthetic token. Downstream stages see a structurally coherent tree; they can inspect `Token.Text == string.Empty` to detect synthetic tokens.
 
 ### Sync-Point Resync
 
@@ -1021,19 +1026,20 @@ Continuation tokens (`when`, `->`, `set`, `transition`, `ensure`, `because`) are
 
 | Condition | Diagnostic code | Recovery action |
 |-----------|-----------------|-----------------|
-| Expected token not found | `ExpectedToken` | Insert `IsMissing` node, do not advance |
-| Unrecognized token at declaration position | `UnexpectedKeyword` | Scan to next sync point, skip intervening tokens |
+| Expected token not found | `ExpectedToken` | Insert synthetic token (empty text, zero-length span), do not advance |
+| Unrecognized token at declaration position | `ExpectedToken` | Scan to next sync point, skip intervening tokens |
 | Chained comparison (`A == B == C`) | `NonAssociativeComparison` | Emit diagnostic, return left operand as the expression |
-| Non-callable expression followed by `(` | `InvalidCallTarget` | Emit diagnostic, parse arguments but mark node as missing |
 | Guard on omit declaration | `OmitDoesNotSupportGuard` | Emit diagnostic, discard guard, parse OmitDeclarationNode without it |
+| Guard on event handler | `EventHandlerDoesNotSupportGuard` | Emit diagnostic, discard guard, parse EventHandlerNode without it |
 | Pre-event guard on transition row | `PreEventGuardNotAllowed` | Emit diagnostic, inject guard at post-event GuardClause slot |
+| Missing outcome on transition row | `ExpectedOutcome` | Emit diagnostic, insert synthetic outcome node |
 
 ---
 
 ## Contracts and Guarantees
 
 - **Always produces a tree.** `Parser.Parse` never returns null, never throws, and always produces a `SyntaxTree`. Downstream stages do not need to handle "no tree" as a result.
-- **Every character is accounted for.** `IsMissing` nodes have zero-length spans at the expected position; `SkippedTokens` spans capture everything between an error and the next sync point. No source character is silently discarded.
+- **Every character is accounted for.** Synthetic tokens have zero-length spans at the expected position. `SyncToNextDeclaration()` silently advances past unrecognized tokens to the next leading token. No source character is silently discarded.
 - **`SourceSpan` coverage.** Every node's `Span` covers its full source extent. Declaration-level spans cover from the leading token to the last token in the declaration.
 - **Flat list in source order.** `Declarations` is in the order the declarations appear in the source. No reordering.
 
@@ -1104,7 +1110,7 @@ Precept has 10 precedence levels, prefix operators (`not`, unary `-`), postfix o
 
 ### Resilient by Construction
 
-The parser never throws, never returns null, and never produces a partial tree. Every production has a well-defined recovery path: missing tokens produce `IsMissing` nodes with zero-length spans; structurally lost positions scan forward to sync points (declaration-starting keywords). The resulting tree is always traversable by downstream stages.
+The parser never throws, never returns null, and never produces a partial tree. Every production has a well-defined recovery path: missing tokens produce synthetic tokens with empty text and zero-length spans; structurally lost positions scan forward to sync points (declaration-starting keywords). The resulting tree is always traversable by downstream stages.
 
 The language server calls `Parser.Parse` on every keystroke. A parser that fails on incomplete input forces the language server to special-case "no tree" scenarios throughout completions, hover, go-to-definition, and diagnostics. A resilient parser eliminates that entire class of defensive code. The MCP tools (`precept_compile`, `precept_inspect`) also consume the tree directly — they need a structurally coherent tree even when the author is mid-edit.
 
@@ -1173,4 +1179,4 @@ These change when the parsing algorithm changes, not when the language surface c
 - `src/Precept/Language/Construct.cs` — `ConstructMeta` record definition
 - `src/Precept/Language/ConstructSlot.cs` — `ConstructSlot` / `ConstructSlotKind`
 - `src/Precept/Language/DisambiguationEntry.cs` — `DisambiguationEntry` record (created in PR 1)
-- `test/Precept.Tests/PreceptParserTests.cs` — parser unit tests
+- `test/Precept.Tests/ParserTests.cs` — parser unit tests

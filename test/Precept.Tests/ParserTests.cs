@@ -818,6 +818,116 @@ public class ParserTests
         tree.Declarations.OfType<TransitionRowNode>().Should().NotBeEmpty();
     }
 
+    // ════════════════════════════════════════════════════════════════════════
+    //  Phase 7 — Remediation test cases (TG-1 through TG-10)
+    // ════════════════════════════════════════════════════════════════════════
+
+    // TG-1: AccessMode editable with pre-field guard
+    [Fact]
+    public void Parse_AccessMode_Editable_WithPreFieldGuard()
+    {
+        var tree = Parse("in UnderReview when Active modify FraudFlag editable");
+        tree.Diagnostics.Should().BeEmpty();
+        var node = tree.Declarations[0].Should().BeOfType<AccessModeNode>().Subject;
+        node.Guard.Should().NotBeNull();
+        node.Mode.Kind.Should().Be(TokenKind.Editable);
+    }
+
+    // TG-2: OmitDeclaration list with post-field guard emits diagnostic
+    [Fact]
+    public void Parse_OmitDeclaration_List_WithPostFieldGuard_EmitsDiagnostic()
+    {
+        var tree = Parse("in Draft omit Notes, Memo when SomeCondition");
+        tree.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.OmitDoesNotSupportGuard));
+        tree.Declarations[0].Should().BeOfType<OmitDeclarationNode>();
+    }
+
+    // TG-3: OmitDeclaration all with post-field guard emits diagnostic
+    [Fact]
+    public void Parse_OmitDeclaration_All_WithPostFieldGuard_EmitsDiagnostic()
+    {
+        var tree = Parse("in Draft omit all when SomeCondition");
+        tree.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.OmitDoesNotSupportGuard));
+        tree.Declarations[0].Should().BeOfType<OmitDeclarationNode>();
+    }
+
+    // TG-4: OmitDeclaration list with pre-field guard emits diagnostic
+    [Fact]
+    public void Parse_OmitDeclaration_List_WithPreFieldGuard_EmitsDiagnostic()
+    {
+        var tree = Parse("in Closed when SomeCondition omit Notes, Memo");
+        tree.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.OmitDoesNotSupportGuard));
+        tree.Declarations[0].Should().BeOfType<OmitDeclarationNode>();
+    }
+
+    // TG-5: OmitDeclaration all with pre-field guard emits diagnostic
+    [Fact]
+    public void Parse_OmitDeclaration_All_WithPreFieldGuard_EmitsDiagnostic()
+    {
+        var tree = Parse("in Closed when SomeCondition omit all");
+        tree.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.OmitDoesNotSupportGuard));
+        tree.Declarations[0].Should().BeOfType<OmitDeclarationNode>();
+    }
+
+    // TG-6: Bare modify at top level produces diagnostic and syncs
+    [Fact]
+    public void Parse_BareModifyAtTopLevel_ProducesDiagnosticAndSyncs()
+    {
+        var tree = Parse("modify Amount readonly\nfield name as string");
+        tree.Diagnostics.Should().NotBeEmpty();
+        // Parser should recover and parse the field declaration
+        tree.Declarations.OfType<FieldDeclarationNode>().Should().NotBeEmpty();
+    }
+
+    // TG-7: EventHandler with stashed guard emits diagnostic (exercises NB-2 fix)
+    [Fact]
+    public void Parse_EventHandler_WithStashedGuard_EmitsDiagnostic()
+    {
+        var tree = Parse("on Submit when isNew -> set name = foo");
+        tree.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.EventHandlerDoesNotSupportGuard));
+        var node = tree.Declarations[0].Should().BeOfType<EventHandlerNode>().Subject;
+        node.EventName.Text.Should().Be("Submit");
+        node.Actions.Should().NotBeEmpty();
+    }
+
+    // TG-8a: EOF after modify produces diagnostic
+    [Fact]
+    public void Parse_AccessMode_EOF_After_Modify_ProducesDiagnostic()
+    {
+        var tree = Parse("in Draft modify");
+        tree.Diagnostics.Should().NotBeEmpty();
+    }
+
+    // TG-8b: EOF after omit produces diagnostic
+    [Fact]
+    public void Parse_OmitDeclaration_EOF_After_Omit_ProducesDiagnostic()
+    {
+        var tree = Parse("in Draft omit");
+        tree.Diagnostics.Should().NotBeEmpty();
+    }
+
+    // TG-9: Mixed AccessMode and OmitDeclaration produce distinct node types
+    [Fact]
+    public void Parse_MixedAccessModeAndOmit_DistinctNodeTypes()
+    {
+        var tree = Parse("in Draft modify Amount readonly\nin Draft omit Notes");
+        tree.Diagnostics.Should().BeEmpty();
+        tree.Declarations.Should().HaveCount(2);
+        var accessMode = tree.Declarations[0].Should().BeOfType<AccessModeNode>().Subject;
+        accessMode.Mode.Kind.Should().Be(TokenKind.Readonly);
+        tree.Declarations[1].Should().BeOfType<OmitDeclarationNode>();
+    }
+
+    // TG-10: TransitionRow pre-event guard with complex guard expression
+    [Fact]
+    public void Parse_TransitionRow_PreEventGuard_WithComplexGuardExpression()
+    {
+        var tree = Parse("from Draft when amount > 0 and isValid on Submit -> transition Submitted");
+        tree.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.PreEventGuardNotAllowed));
+        var node = tree.Declarations[0].Should().BeOfType<TransitionRowNode>().Subject;
+        node.Guard.Should().NotBeNull();
+    }
+
     private static readonly string SamplesDir = Path.Combine(
         AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "..", "samples");
 }
