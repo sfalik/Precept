@@ -48,6 +48,8 @@ public static class Diagnostics
             FixHint: "Remove the 'when' guard. If you need conditional visibility, use 'modify Field readonly when Guard' instead"),
         DiagnosticCode.PreEventGuardNotAllowed    => new(nameof(DiagnosticCode.PreEventGuardNotAllowed),    DiagnosticStage.Parse, Severity.Error,   "A 'when' guard before the event target is not supported on transition rows — place the guard after 'on Event'",                         DiagnosticCategory.Structure,
             FixHint: "Move the 'when' clause to after the event name: 'from State on Event when Guard'"),
+        DiagnosticCode.ExpectedOutcome            => new(nameof(DiagnosticCode.ExpectedOutcome),            DiagnosticStage.Parse, Severity.Error,   "Expected a transition outcome ('-> transition State', '-> no transition', or '-> reject Message') but none was found",                 DiagnosticCategory.Structure,
+            FixHint: "Add an outcome at the end of the transition row: '-> transition TargetState', '-> no transition', or '-> reject \"reason\"'"),
 
         // ── Type ─────────────────────────────────────────────────────────────────
         DiagnosticCode.UndeclaredField                => new(nameof(DiagnosticCode.UndeclaredField),                DiagnosticStage.Type,  Severity.Error,   "Field '{0}' is not declared",                                                                                                          DiagnosticCategory.Naming,

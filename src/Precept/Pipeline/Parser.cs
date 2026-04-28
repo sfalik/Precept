@@ -340,7 +340,9 @@ public static class Parser
                     },
                     TokenKind.From => Current().Kind switch
                     {
-                        // PR 5: TransitionRow, StateEnsure (from-scoped), StateAction (from-scoped)
+                        TokenKind.On     => ParseTransitionRow(start, stateTarget, stashedGuard),
+                        TokenKind.Ensure => ParseStateEnsure(start, token, stateTarget, stashedGuard),
+                        TokenKind.Arrow  => ParseStateAction(start, token, stateTarget, stashedGuard),
                         _ => EmitAmbiguityAndSync(Current()),
                     },
                     _ => EmitAmbiguityAndSync(Current()),
@@ -449,16 +451,110 @@ public static class Parser
             var actions = ImmutableArray.CreateBuilder<Statement>();
             actions.Add(first);
 
+            SkipTrivia();
             while (Current().Kind == TokenKind.Arrow && !IsOutcomeAhead())
             {
                 Advance(); // consume '->'
                 actions.Add(ParseActionStatement());
+                SkipTrivia();
             }
 
             var lastSpan = actions[^1].Span;
             return new StateActionNode(
                 SourceSpan.Covering(start, lastSpan),
                 preposition, anchor, stashedGuard, actions.ToImmutable());
+        }
+
+        // ── from-scoped construct parsers ──────────────────────────────────────
+
+        private TransitionRowNode ParseTransitionRow(SourceSpan start, StateTargetNode fromState, Expression? stashedGuard)
+        {
+            Advance(); // consume 'on'
+            var eventName = Expect(TokenKind.Identifier);
+
+            // Guard handling: stashed pre-event guard → emit diagnostic, inject post-event
+            Expression? guard;
+            if (stashedGuard is not null)
+            {
+                EmitDiagnostic(DiagnosticCode.PreEventGuardNotAllowed, stashedGuard.Span);
+                guard = stashedGuard;
+            }
+            else
+            {
+                guard = TryParseStashedGuard();
+            }
+
+            // Parse action chain: -> action -> action -> ... -> outcome
+            var actions = ImmutableArray.CreateBuilder<Statement>();
+            SkipTrivia();
+            while (Current().Kind == TokenKind.Arrow && !IsOutcomeAhead())
+            {
+                Advance(); // consume '->'
+                var action = TryParseActionStatementWithRecovery();
+                if (action is not null)
+                    actions.Add(action);
+                SkipTrivia();
+            }
+
+            // Parse outcome
+            OutcomeNode outcome;
+            SkipTrivia();
+            if (Current().Kind == TokenKind.Arrow)
+            {
+                Advance(); // consume '->'
+                outcome = ParseOutcomeNode();
+            }
+            else
+            {
+                EmitDiagnostic(DiagnosticCode.ExpectedOutcome, Current().Span);
+                outcome = new NoTransitionOutcomeNode(Current().Span);
+            }
+
+            var lastSpan = outcome.Span;
+            return new TransitionRowNode(
+                SourceSpan.Covering(start, lastSpan),
+                fromState, eventName, guard, actions.ToImmutable(), outcome);
+        }
+
+        private OutcomeNode ParseOutcomeNode()
+        {
+            var current = Current();
+            if (current.Kind == TokenKind.Transition)
+            {
+                Advance(); // consume 'transition'
+                var target = Expect(TokenKind.Identifier);
+                return new TransitionOutcomeNode(SourceSpan.Covering(current.Span, target.Span), target);
+            }
+            if (current.Kind == TokenKind.No)
+            {
+                var noTok = Advance(); // consume 'no'
+                var transTok = Expect(TokenKind.Transition);
+                return new NoTransitionOutcomeNode(SourceSpan.Covering(noTok.Span, transTok.Span));
+            }
+            if (current.Kind == TokenKind.Reject)
+            {
+                var rejectTok = Advance(); // consume 'reject'
+                var message = ParseExpression(0);
+                return new RejectOutcomeNode(SourceSpan.Covering(rejectTok.Span, message.Span), message);
+            }
+            EmitDiagnostic(DiagnosticCode.ExpectedOutcome, current.Span);
+            return new NoTransitionOutcomeNode(current.Span);
+        }
+
+        /// <summary>
+        /// Attempt to parse an action statement; on failure, consume tokens until the next
+        /// arrow or declaration boundary and return null to allow parsing to continue.
+        /// </summary>
+        private Statement? TryParseActionStatementWithRecovery()
+        {
+            if (ActionKeywords.Contains(Current().Kind))
+                return ParseActionStatement();
+
+            // Error recovery: unexpected token after '->'
+            EmitDiagnostic(DiagnosticCode.ExpectedToken, Current().Span, "action keyword", Current().Text);
+            while (!IsAtEnd() && Current().Kind != TokenKind.Arrow && !Constructs.LeadingTokens.Contains(Current().Kind))
+                Advance();
+            return null;
         }
 
         // ── on-scoped construct parsers ───────────────────────────────────────
@@ -482,10 +578,12 @@ public static class Parser
             var actions = ImmutableArray.CreateBuilder<Statement>();
             actions.Add(first);
 
+            SkipTrivia();
             while (Current().Kind == TokenKind.Arrow && !IsOutcomeAhead())
             {
                 Advance(); // consume '->'
                 actions.Add(ParseActionStatement());
+                SkipTrivia();
             }
 
             var lastSpan = actions[^1].Span;
@@ -935,7 +1033,17 @@ public static class Parser
                 SourceSpan.Covering(actions[0].Span, actions[^1].Span), actions.ToImmutable());
         }
 
-        private SyntaxNode? ParseOutcome(bool isOptional) => throw new NotImplementedException(); // PR 5
+        private SyntaxNode? ParseOutcome(bool isOptional)
+        {
+            if (Current().Kind != TokenKind.Arrow)
+            {
+                if (!isOptional)
+                    EmitDiagnostic(DiagnosticCode.ExpectedOutcome, Current().Span);
+                return null;
+            }
+            Advance(); // consume '->'
+            return ParseOutcomeNode();
+        }
 
         private SyntaxNode? ParseStateTarget(bool isOptional)
         {

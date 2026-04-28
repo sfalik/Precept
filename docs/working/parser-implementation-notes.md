@@ -149,3 +149,56 @@ Internal wrapper records replace the `NotImplementedException` stubs from PR 2:
 - `from`-scoped disambiguation: `From State On Event` → TransitionRow, `From State ensure` → StateEnsure, `From State ->` → StateAction.
 - TransitionRow grammar: `from State on Event [when Guard] [-> Actions] -> Outcome`.
 - `PreEventGuardNotAllowed` emission when a stashed guard would land on TransitionRow.
+
+## PR 5: From-Scoped Constructs, TransitionRow, Error Sync (2025-07-25)
+
+### Slices Completed
+
+| Slice | Description | Status |
+|-------|-------------|--------|
+| 5.1 | `ParseFromScoped` + `ParseTransitionRow` + `ParseOutcomeNode` + from-scoped StateEnsure/StateAction | ✅ |
+| 5.2 | Error recovery hardening: `TryParseActionStatementWithRecovery`, `ExpectedOutcome` diagnostic, missing outcome synthetic node | ✅ |
+| 5.3 | End-to-end integration tests against sample `.precept` files | ✅ |
+| 5.4 | Final parser wiring: `ParseOutcome(bool)` slot parser implemented, no remaining `NotImplementedException` | ✅ |
+
+### Test Count
+- Before: 1985 (Precept.Tests) + 207 (Analyzers) = 2192
+- After:  2019 (Precept.Tests) + 207 (Analyzers) = 2226
+- Delta:  +34 new tests in ParserTests.cs
+
+### Design Decisions
+
+1. **TransitionRow grammar:** `from State on Event [when Guard] -> action* -> outcome`. Actions are parsed in a loop; `IsOutcomeAhead()` lookahead stops the action loop when the next `->` leads to `transition`, `no`, or `reject`.
+
+2. **PreEventGuardNotAllowed recovery:** When a stashed guard routes to TransitionRow, the diagnostic is emitted and the guard is injected into the post-event guard slot. This preserves maximal parse output — the tree is complete, the diagnostic flags the issue.
+
+3. **ParseOutcomeNode:** Three-way dispatch on `Transition` → `TransitionOutcomeNode`, `No` (+ `Transition`) → `NoTransitionOutcomeNode`, `Reject` → `RejectOutcomeNode`. Unrecognized token emits `ExpectedOutcome` and returns a synthetic `NoTransitionOutcomeNode`.
+
+4. **TryParseActionStatementWithRecovery:** Wraps `ParseActionStatement` with error sync. On unexpected token, emits diagnostic and consumes until the next `->` or declaration boundary, returning null (skipped from action list).
+
+5. **Multi-line trivia in action chains:** Added `SkipTrivia()` calls in `ParseTransitionRow`, `ParseStateAction`, and `ParseEventHandler` before arrow checks. Sample files use multi-line `->` chains and the parser needs to skip newlines/comments between them.
+
+6. **Sample file selection for integration tests:** `crosswalk-signal.precept` and `trafficlight.precept` parse error-free. `insurance-claim.precept` and `hiring-pipeline.precept` have pre-existing expression-parser issues (`is set` where `set` lexes as `TokenKind.Set` action keyword instead of identifier) — these are tracked but not PR 5 scope.
+
+### Surprises / Deviations
+- Three existing tests (+3 → 1988 from 1985 baseline) started passing once `ParseOutcome(bool)` was implemented and the `from`-scoped branch stopped syncing unconditionally.
+- `ExpectedOutcome` diagnostic code added to `DiagnosticCode` enum and `Diagnostics.GetMeta` switch.
+- The custom Roslyn analyzer `PRECEPT0007` enforces exhaustive switches on `DiagnosticCode` — adding `ExpectedOutcome` without the `GetMeta` arm was caught immediately.
+
+### Known Gaps / Follow-ups
+- `is set` expression parsing: `set` lexes as `TokenKind.Set` (action keyword) and fails in expression position. Needs lexer-context or parser keyword-to-identifier reinterpretation — same class of issue as `min()`/`max()` function calls.
+- `BuildNode` for FieldDeclaration crashes on `field` with no identifier (null slot[0]). Generic slot path needs null guards, but direct parsing covers all current grammar.
+
+---
+
+## PR Sequence Summary
+
+| PR | Scope | Test Delta | Status |
+|----|-------|------------|--------|
+| PR 1 | Catalog migration: DisambiguationEntry, ConstructMeta.Entries, derived indexes | 2046 → 2066 (+20) | ✅ |
+| PR 2 | Parser infrastructure: AST hierarchy, BuildNode 12-arm, InvokeSlotParser 16-arm | 2066 → 2092 (+26) | ✅ |
+| PR 3 | Pratt expression parser, slot parsers, dispatch loop, 5 non-disambiguated parsers | 2092 → 2151 (+59) | ✅ |
+| PR 4 | Generic disambiguator, in/to/on scoped constructs | 2157 → 2192 (+35) | ✅ |
+| PR 5 | From-scoped constructs, TransitionRow, outcomes, error sync, integration tests | 2192 → 2226 (+34) | ✅ |
+
+**Total:** 2046 → 2226 (+180 tests). Parser is fully functional — all 12 construct kinds parse, no remaining `NotImplementedException`.

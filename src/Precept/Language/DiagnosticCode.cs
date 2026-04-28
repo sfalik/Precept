@@ -20,6 +20,7 @@ public enum DiagnosticCode
     MutuallyExclusiveQualifiers,
     OmitDoesNotSupportGuard,
     PreEventGuardNotAllowed,
+    ExpectedOutcome,
 
     // ── Type ─────────────────────────────────────────────
     UndeclaredField,

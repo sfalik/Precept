@@ -1,3 +1,6 @@
+using System;
+using System.IO;
+using System.Linq;
 using FluentAssertions;
 using Precept.Language;
 using Precept.Pipeline;
@@ -536,4 +539,285 @@ public class ParserTests
         var node = tree.Declarations[0].Should().BeOfType<EventHandlerNode>().Subject;
         node.Actions.Should().HaveCount(2);
     }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  PR 5 — From-Scoped Constructs, TransitionRow, Outcomes, Error Sync
+    // ════════════════════════════════════════════════════════════════════════
+
+    // ── Slice 5.1: TransitionRow ───────────────────────────────────────────
+
+    [Fact]
+    public void Parse_TransitionRow_SimpleTransition()
+    {
+        var tree = Parse("from Draft on Submit -> transition Submitted");
+        tree.Diagnostics.Should().BeEmpty();
+        var node = tree.Declarations[0].Should().BeOfType<TransitionRowNode>().Subject;
+        node.FromState.Name.Text.Should().Be("Draft");
+        node.EventName.Text.Should().Be("Submit");
+        node.Guard.Should().BeNull();
+        node.Actions.Should().BeEmpty();
+        node.Outcome.Should().BeOfType<TransitionOutcomeNode>()
+            .Which.TargetState.Text.Should().Be("Submitted");
+    }
+
+    [Fact]
+    public void Parse_TransitionRow_WithGuard()
+    {
+        var tree = Parse("from UnderReview on Approve when Amount <= ClaimAmount -> transition Approved");
+        tree.Diagnostics.Should().BeEmpty();
+        var node = tree.Declarations[0].Should().BeOfType<TransitionRowNode>().Subject;
+        node.Guard.Should().NotBeNull();
+        node.Outcome.Should().BeOfType<TransitionOutcomeNode>();
+    }
+
+    [Fact]
+    public void Parse_TransitionRow_WithActionsAndTransition()
+    {
+        var tree = Parse("from UnderReview on Approve -> set ApprovedAmount = Amount -> transition Approved");
+        tree.Diagnostics.Should().BeEmpty();
+        var node = tree.Declarations[0].Should().BeOfType<TransitionRowNode>().Subject;
+        node.Actions.Should().HaveCount(1);
+        node.Actions[0].Should().BeOfType<SetStatement>();
+        node.Outcome.Should().BeOfType<TransitionOutcomeNode>();
+    }
+
+    [Fact]
+    public void Parse_TransitionRow_MultipleActions()
+    {
+        var tree = Parse("from UnderReview on Approve -> set ApprovedAmount = Amount -> set Note = Approve.Note -> transition Approved");
+        tree.Diagnostics.Should().BeEmpty();
+        var node = tree.Declarations[0].Should().BeOfType<TransitionRowNode>().Subject;
+        node.Actions.Should().HaveCount(2);
+        node.Outcome.Should().BeOfType<TransitionOutcomeNode>();
+    }
+
+    [Fact]
+    public void Parse_TransitionRow_NoTransition()
+    {
+        var tree = Parse("from Active on Ping -> no transition");
+        tree.Diagnostics.Should().BeEmpty();
+        var node = tree.Declarations[0].Should().BeOfType<TransitionRowNode>().Subject;
+        node.Outcome.Should().BeOfType<NoTransitionOutcomeNode>();
+    }
+
+    [Fact]
+    public void Parse_TransitionRow_Reject()
+    {
+        var tree = Parse("""from Draft on Submit when not isValid -> reject "Validation failed" """);
+        tree.Diagnostics.Should().BeEmpty();
+        var node = tree.Declarations[0].Should().BeOfType<TransitionRowNode>().Subject;
+        node.Guard.Should().NotBeNull();
+        node.Outcome.Should().BeOfType<RejectOutcomeNode>();
+    }
+
+    [Fact]
+    public void Parse_TransitionRow_PreEventGuard_EmitsDiagnosticAndParses()
+    {
+        var tree = Parse("from Draft when SomeCondition on Submit -> transition Submitted");
+        tree.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.PreEventGuardNotAllowed));
+        var node = tree.Declarations[0].Should().BeOfType<TransitionRowNode>().Subject;
+        node.Guard.Should().NotBeNull();
+        node.Outcome.Should().BeOfType<TransitionOutcomeNode>();
+    }
+
+    [Fact]
+    public void Parse_TransitionRow_AnyState()
+    {
+        var tree = Parse("from any on VehiclesArrive -> set VehiclesWaiting = VehiclesWaiting + VehiclesArrive.Count -> no transition");
+        tree.Diagnostics.Should().BeEmpty();
+        var node = tree.Declarations[0].Should().BeOfType<TransitionRowNode>().Subject;
+        node.FromState.IsQuantifier.Should().BeTrue();
+        node.Outcome.Should().BeOfType<NoTransitionOutcomeNode>();
+    }
+
+    [Fact]
+    public void Parse_TransitionRow_WithActionsAndReject()
+    {
+        var tree = Parse("""from Screening on PassScreen -> reject "At least one interviewer required" """);
+        tree.Diagnostics.Should().BeEmpty();
+        var node = tree.Declarations[0].Should().BeOfType<TransitionRowNode>().Subject;
+        node.Outcome.Should().BeOfType<RejectOutcomeNode>();
+    }
+
+    // ── Slice 5.1: StateEnsure (from-scoped) ──────────────────────────────
+
+    [Fact]
+    public void Parse_StateEnsure_From_Simple()
+    {
+        var tree = Parse("""from Draft ensure isComplete because "Must complete form" """);
+        tree.Diagnostics.Should().BeEmpty();
+        var node = tree.Declarations[0].Should().BeOfType<StateEnsureNode>().Subject;
+        node.Preposition.Kind.Should().Be(TokenKind.From);
+        node.State.Name.Text.Should().Be("Draft");
+    }
+
+    // ── Slice 5.1: StateAction (from-scoped) ──────────────────────────────
+
+    [Fact]
+    public void Parse_StateAction_From_Simple()
+    {
+        var tree = Parse("from Draft -> set processedAt = now()");
+        tree.Diagnostics.Should().BeEmpty();
+        var node = tree.Declarations[0].Should().BeOfType<StateActionNode>().Subject;
+        node.Preposition.Kind.Should().Be(TokenKind.From);
+        node.State.Name.Text.Should().Be("Draft");
+        node.Actions.Should().HaveCount(1);
+        node.Actions[0].Should().BeOfType<SetStatement>();
+    }
+
+    // ── Slice 5.2: Error Recovery Hardening ────────────────────────────────
+
+    [Fact]
+    public void Parse_MissingOutcome_ProducesDiagnosticAndSyntheticNode()
+    {
+        var tree = Parse("from Draft on Submit -> set x = 1");
+        tree.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.ExpectedOutcome));
+        var node = tree.Declarations[0].Should().BeOfType<TransitionRowNode>().Subject;
+        node.Outcome.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void Parse_MalformedActionStatement_ProducesDiagnosticAndContinues()
+    {
+        var tree = Parse("from Draft on Submit -> GARBAGE -> transition Done");
+        tree.Diagnostics.Should().NotBeEmpty();
+        var node = tree.Declarations[0].Should().BeOfType<TransitionRowNode>().Subject;
+        node.Outcome.Should().BeOfType<TransitionOutcomeNode>()
+            .Which.TargetState.Text.Should().Be("Done");
+    }
+
+    [Fact]
+    public void Parse_MultipleErrors_AllReported()
+    {
+        var tree = Parse("""
+            from Draft on Submit -> GARBAGE -> transition Done
+            from Draft on Approve -> JUNK -> transition Approved
+            """);
+        tree.Diagnostics.Should().HaveCountGreaterThanOrEqualTo(2);
+    }
+
+    // ── Slice 5.3: End-to-End Integration Tests (Sample Files) ─────────────
+
+    [Theory]
+    [InlineData("crosswalk-signal.precept")]
+    [InlineData("trafficlight.precept")]
+    public void Parse_SampleFile_ProducesNoParseErrors(string sampleFile)
+    {
+        var source = File.ReadAllText(Path.Combine(SamplesDir, sampleFile));
+        var tokens = Lexer.Lex(source);
+        var tree = Parser.Parse(tokens);
+        tree.Diagnostics.Should().BeEmpty($"sample file '{sampleFile}' should parse without errors");
+    }
+
+    [Theory]
+    [InlineData("crosswalk-signal.precept", "CrosswalkSignal")]
+    [InlineData("trafficlight.precept", "TrafficLight")]
+    [InlineData("hiring-pipeline.precept", "HiringPipeline")]
+    public void Parse_SampleFile_HeaderIsCorrect(string sampleFile, string expectedName)
+    {
+        var source = File.ReadAllText(Path.Combine(SamplesDir, sampleFile));
+        var tree = Parser.Parse(Lexer.Lex(source));
+        tree.Header.Should().NotBeNull();
+        tree.Header!.Name.Text.Should().Be(expectedName);
+    }
+
+    [Theory]
+    [InlineData("crosswalk-signal.precept", 5)]
+    [InlineData("trafficlight.precept", 5)]
+    [InlineData("hiring-pipeline.precept", 5)]
+    public void Parse_SampleFile_DeclarationCountIsReasonable(string sampleFile, int minCount)
+    {
+        var source = File.ReadAllText(Path.Combine(SamplesDir, sampleFile));
+        var tree = Parser.Parse(Lexer.Lex(source));
+        tree.Declarations.Length.Should().BeGreaterThanOrEqualTo(minCount,
+            $"sample file '{sampleFile}' should have at least {minCount} declarations");
+    }
+
+    [Theory]
+    [InlineData("crosswalk-signal.precept")]
+    [InlineData("trafficlight.precept")]
+    public void Parse_SampleFile_AccessModeNodes_HaveNoNullState(string sampleFile)
+    {
+        var source = File.ReadAllText(Path.Combine(SamplesDir, sampleFile));
+        var tree = Parser.Parse(Lexer.Lex(source));
+        var accessModes = tree.Declarations.OfType<AccessModeNode>();
+        foreach (var am in accessModes)
+            am.State.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void Parse_SampleFile_OmitDeclarationNodes_HaveNoGuard()
+    {
+        // Verify OmitDeclarationNode has exactly 3 constructor parameters (Span, State, Fields) — no Guard
+        var ctors = typeof(OmitDeclarationNode).GetConstructors();
+        ctors.Should().HaveCount(1);
+        var parameters = ctors[0].GetParameters();
+        parameters.Should().NotContain(p => p.Name == "Guard",
+            "OmitDeclarationNode must not have a Guard parameter — it is structurally impossible");
+    }
+
+    [Theory]
+    [InlineData("crosswalk-signal.precept")]
+    [InlineData("trafficlight.precept")]
+    [InlineData("hiring-pipeline.precept")]
+    public void Parse_SampleFile_HasTransitionRows(string sampleFile)
+    {
+        var source = File.ReadAllText(Path.Combine(SamplesDir, sampleFile));
+        var tree = Parser.Parse(Lexer.Lex(source));
+        tree.Declarations.OfType<TransitionRowNode>().Should().NotBeEmpty(
+            $"sample file '{sampleFile}' should contain at least one transition row");
+    }
+
+    // ── Slice 5.4: Final Parser Wiring ─────────────────────────────────────
+
+    [Fact]
+    public void Parser_Parse_ReturnsNonNullTree()
+    {
+        var tree = Parse("precept Test");
+        tree.Should().NotBeNull();
+        tree.Header.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void Parser_Parse_EmptyInput_ReturnsTreeWithNullHeaderAndDiagnostic()
+    {
+        var tree = Parse("");
+        tree.Header.Should().BeNull();
+    }
+
+    [Fact]
+    public void Parser_Parse_AllConstructKinds_RoundTrip()
+    {
+        var tree = Parse("""
+            precept AllKinds
+            field amount as decimal nonnegative
+            state Draft initial, Submitted, Approved terminal
+            event Submit(Amount as decimal)
+            rule amount > 0 because "must be positive"
+            in Draft modify amount editable
+            in Draft omit amount
+            in Submitted ensure amount > 0 because "msg"
+            to Submitted -> set processedAt = now()
+            on Submit ensure Submit.Amount > 0 because "positive"
+            on Submit -> set amount = Submit.Amount
+            from Draft on Submit -> set amount = Submit.Amount -> transition Submitted
+            from Approved ensure amount > 0 because "msg"
+            """);
+
+        tree.Diagnostics.Should().BeEmpty();
+        tree.Declarations.OfType<FieldDeclarationNode>().Should().NotBeEmpty();
+        tree.Declarations.OfType<StateDeclarationNode>().Should().NotBeEmpty();
+        tree.Declarations.OfType<EventDeclarationNode>().Should().NotBeEmpty();
+        tree.Declarations.OfType<RuleDeclarationNode>().Should().NotBeEmpty();
+        tree.Declarations.OfType<AccessModeNode>().Should().NotBeEmpty();
+        tree.Declarations.OfType<OmitDeclarationNode>().Should().NotBeEmpty();
+        tree.Declarations.OfType<StateEnsureNode>().Should().HaveCountGreaterThanOrEqualTo(2);
+        tree.Declarations.OfType<StateActionNode>().Should().NotBeEmpty();
+        tree.Declarations.OfType<EventEnsureNode>().Should().NotBeEmpty();
+        tree.Declarations.OfType<EventHandlerNode>().Should().NotBeEmpty();
+        tree.Declarations.OfType<TransitionRowNode>().Should().NotBeEmpty();
+    }
+
+    private static readonly string SamplesDir = Path.Combine(
+        AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "..", "samples");
 }
