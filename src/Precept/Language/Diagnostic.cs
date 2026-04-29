@@ -4,18 +4,18 @@ namespace Precept.Language;
 
 public enum DiagnosticStage
 {
-    Lex,
-    Parse,
-    Type,
-    Graph,
-    Proof
+    Lex   = 1,
+    Parse = 2,
+    Type  = 3,
+    Graph = 4,
+    Proof = 5,
 }
 
 public enum Severity
 {
-    Info,
-    Warning,
-    Error
+    Info    = 1,
+    Warning = 2,
+    Error   = 3,
 }
 
 /// <summary>

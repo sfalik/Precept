@@ -3,7 +3,7 @@ using Precept.Language;
 namespace Precept.Runtime;
 
 /// <summary>Field access mode in a given state: read-only or read-write.</summary>
-public enum FieldAccessMode { Read, Write }
+public enum FieldAccessMode { Read = 1, Write = 2 }
 
 /// <summary>
 /// Describes a non-omitted field in the current state: descriptor, access mode,

@@ -3,10 +3,10 @@ namespace Precept.Runtime;
 // ─── Inspection types — returned by InspectFire / InspectUpdate ─────
 
 /// <summary>Row-level certainty in first-match routing.</summary>
-public enum Prospect { Certain, Possible, Impossible }
+public enum Prospect { Certain = 1, Possible = 2, Impossible = 3 }
 
 /// <summary>Per-constraint evaluation result under partial information.</summary>
-public enum ConstraintStatus { Satisfied, Violated, Unresolvable }
+public enum ConstraintStatus { Satisfied = 1, Violated = 2, Unresolvable = 3 }
 
 /// <summary>
 /// Progressive inspection of an event. Returned by <see cref="Version.InspectFire"/>

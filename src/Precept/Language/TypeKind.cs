@@ -7,38 +7,38 @@ namespace Precept.Language;
 public enum TypeKind
 {
     // ── Scalar ─────────────────────────────────────────────────────
-    String,
-    Boolean,
-    Integer,
-    Decimal,
-    Number,
-    Choice,
+    String        =  1,
+    Boolean       =  2,
+    Integer       =  3,
+    Decimal       =  4,
+    Number        =  5,
+    Choice        =  6,
 
     // ── Temporal ───────────────────────────────────────────────────
-    Date,
-    Time,
-    Instant,
-    Duration,
-    Period,
-    Timezone,
-    ZonedDateTime,
-    DateTime,
+    Date          =  7,
+    Time          =  8,
+    Instant       =  9,
+    Duration      = 10,
+    Period        = 11,
+    Timezone      = 12,
+    ZonedDateTime = 13,
+    DateTime      = 14,
 
     // ── Business-Domain ────────────────────────────────────────────
-    Money,
-    Currency,
-    Quantity,
-    UnitOfMeasure,
-    Dimension,
-    Price,
-    ExchangeRate,
+    Money         = 15,
+    Currency      = 16,
+    Quantity      = 17,
+    UnitOfMeasure = 18,
+    Dimension     = 19,
+    Price         = 20,
+    ExchangeRate  = 21,
 
     // ── Collection ─────────────────────────────────────────────────
-    Set,
-    Queue,
-    Stack,
+    Set           = 22,
+    Queue         = 23,
+    Stack         = 24,
 
     // ── Special ────────────────────────────────────────────────────
-    Error,
-    StateRef,
+    Error         = 25,
+    StateRef      = 26,
 }
