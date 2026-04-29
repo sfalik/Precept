@@ -14,6 +14,19 @@
 
 
 
+### 2026-04-29T05:34:09Z: Collection type expansion follow-up recorded
+
+**By:** Scribe
+
+**Status:** Merged, deduplicated, inbox cleared (1 file)
+
+**Merged sources:** `frank-collection-types-research`.
+
+- Frank closed the remaining ordered-choice documentation gaps in `docs/language/collection-types.md`, so `choice(...) ordered` is treated consistently in the grammar, orderability framing, and comparison material.
+- The doc now has `§ Proposed Additional Types`, evaluating six candidates with priority bands: `bag`, `log`, and `map` high; `sortedset` and `priorityqueue` medium; `deque` low.
+- The new `§ Comparison With Other Collection Systems` cross-language table maps 14 capabilities across 9 ecosystems and reinforces restricted `map of choice(...) to V` as the strongest next collection-type research target.
+
+---
 ### 2026-04-29T05:18:06Z: Collection types design doc authored and indexed
 
 **By:** Scribe

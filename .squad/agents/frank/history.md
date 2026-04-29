@@ -20,6 +20,11 @@
 
 ## Recent Updates
 
+### 2026-04-29 — Ordered-choice gaps closed and collection comparisons added
+- Fixed the last three `choice(...) ordered` documentation gaps in `docs/language/collection-types.md`.
+- Added `§ Proposed Additional Types` evaluating 6 candidates with priorities: `bag`, `log`, `map` high; `sortedset`, `priorityqueue` medium; `deque` low.
+- Added `§ Comparison With Other Collection Systems`, mapping 14 capabilities across 9 ecosystems to ground future collection-surface decisions.
+- Scribe merged the resulting decision note into `decisions.md` and cleared the inbox entry.
 ### 2026-04-29 — Collection research recorded durably
 - Scribe logged frank-6 and frank-7, merged both collection research records into `decisions.md`, and summarized this history after the size gate tripped.
 
