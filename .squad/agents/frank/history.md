@@ -6,7 +6,9 @@
 
 ## Learnings
 
-- Conservative defaults are structural guarantees: write/edit surfaces open exceptions, they do not become the baseline by omission.
+- When plan examples use disjunction `or` patterns in switch arms, verify variable bindings — `or` patterns cannot bind names, making interpolated throw messages a compile-time trap.
+- Plans that introduce error-recovery helpers (like `ErrorStatement()`) must specify whether they're new methods or existing ones. Phantom method calls are silent plan defects that become George's problem at implementation time.
+-Conservative defaults are structural guarantees: write/edit surfaces open exceptions, they do not become the baseline by omission.
 - Metadata belongs in catalogs when consumers need per-member knowledge; pipeline/tooling drift comes from hardcoded parallel copies.
 - Parser algorithms stay hand-written, but vocabulary tables, precedence data, and disambiguation metadata should derive from catalog truth where possible.
 - Authoring consumers read `CompilationResult`; execution/preview consumers read lowered `Precept`; runtime-native lowered data may intentionally preserve selected analysis residue.
@@ -80,3 +82,10 @@
 - Key architectural recommendation: prefer catalog shape changes over Roslyn analyzers. Two immediate wins (remove `BuildNode()` wildcard for CS8509, derive `ExpressionBoundaryTokens` from `Constructs.LeadingTokens`). Two catalog shape investments (`RoutingFamily` on `ConstructMeta`, `ActionSyntaxShape` on `ActionMeta`). These four changes close all 8 gaps without custom Roslyn analyzers.
 - `InvokeSlotParser()` is the gold standard — already CS8509-enforced, no wildcard. New `ConstructSlotKind` members produce build errors. This pattern should be replicated across all exhaustive switches.
 - Artifacts: `.squad/decisions/inbox/frank-catalog-extensibility.md`.
+
+### 2026-04-28 — Catalog extensibility implementation plan review: BLOCKED (3 fixable)
+- Reviewed the coordinator's implementation plan for the 8 catalog extensibility gaps. Plan is structurally sound and architecturally aligned — all 8 gaps covered, catalog philosophy maintained, CS8509 mechanism confirmed effective with `TreatWarningsAsErrors=true`.
+- Three blockers found: (1) PreceptHeader is classified as `RoutingFamily.Direct` but it's parsed in a pre-loop code path, not through `ParseDirectConstruct()` — needs a `Header` routing family member. (2) Slice 3b is missing from the execution order table. (3) Slice 3b presents two code options (catch-all `var k =>` vs explicit listing) without committing — only the explicit listing achieves CS8509.
+- Confirmed `FrozenSet.Union()` + `.ToFrozenSet()` works via LINQ on `IEnumerable<T>`. ActionSyntaxShape as flat enum is correct (DU would be overengineering). BuildNode wildcard removal is safe — all 12 arms present.
+- Noted that ActionSyntaxShape is added in Slice 4 but never consumed by Slice 5 (which switches on ActionKind, not shape). Plan should state whether this is intentional forward investment.
+- Artifacts: `.squad/decisions/inbox/frank-catalog-extensibility-plan-review.md`.

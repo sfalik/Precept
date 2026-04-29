@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using FluentAssertions;
 using Precept.Language;
+using Precept.Pipeline;
 using Xunit;
 
 namespace Precept.Tests;
@@ -495,5 +496,42 @@ public class ConstructsTests
     {
         Constructs.LeadingTokens.Count.Should().Be(9,
             "9 distinct leading tokens: Precept, Field, State, Event, Rule, From, In, To, On");
+    }
+
+    // ── ExpressionBoundaryTokens derivation ─────────────────────────────────────
+
+    [Fact]
+    public void ExpressionBoundaryTokens_ContainsAllConstructLeadingTokens()
+    {
+        var boundary = Parser.ExpressionBoundaryTokens;
+        foreach (var tk in Constructs.LeadingTokens)
+        {
+            boundary.Should().Contain(tk, $"LeadingToken {tk} must be an expression boundary");
+        }
+    }
+
+    // ── RoutingFamily ────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Constructs_RoutingFamily_AllMembersHaveValue()
+    {
+        foreach (var kind in Enum.GetValues<ConstructKind>())
+        {
+            var meta = Constructs.GetMeta(kind);
+            meta.RoutingFamily.Should().NotBe((RoutingFamily)0,
+                $"{kind} must have a non-default RoutingFamily");
+        }
+    }
+
+    [Theory]
+    [InlineData(ConstructKind.FieldDeclaration, "field f as string")]
+    [InlineData(ConstructKind.StateDeclaration, "state Draft initial")]
+    [InlineData(ConstructKind.EventDeclaration, "event Submit")]
+    [InlineData(ConstructKind.RuleDeclaration, "rule amount > 0 because \"msg\"")]
+    public void ParseDirectConstruct_CoversAllDirectConstructs(ConstructKind kind, string source)
+    {
+        var tokens = Precept.Pipeline.Lexer.Lex(source);
+        var tree = Precept.Pipeline.Parser.Parse(tokens);
+        tree.Diagnostics.Should().BeEmpty($"{kind} minimal snippet should parse without errors");
     }
 }

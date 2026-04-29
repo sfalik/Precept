@@ -9,6 +9,7 @@ public sealed record ActionMeta(
     TokenMeta    Token,
     string       Description,
     TypeTarget[] ApplicableTo,
+    ActionSyntaxShape SyntaxShape,
     bool         ValueRequired = false,
     bool         IntoSupported = false,
     ProofRequirement[]? ProofRequirements = null,
@@ -22,4 +23,17 @@ public sealed record ActionMeta(
 
     /// <summary>Construct kinds where this action may appear.</summary>
     public ConstructKind[] AllowedIn { get; } = AllowedIn ?? [];
+}
+
+/// <summary>The token consumption pattern for this action's argument syntax.</summary>
+public enum ActionSyntaxShape
+{
+    /// <summary>verb field = expression  (set)</summary>
+    AssignValue,
+    /// <summary>verb field expression    (add, remove, enqueue, push)</summary>
+    CollectionValue,
+    /// <summary>verb field [into field]  (dequeue, pop)</summary>
+    CollectionInto,
+    /// <summary>verb field               (clear)</summary>
+    FieldOnly,
 }

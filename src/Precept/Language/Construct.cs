@@ -19,6 +19,7 @@ public sealed record ConstructMeta(
     ConstructKind[]                      AllowedIn,
     IReadOnlyList<ConstructSlot>         Slots,
     ImmutableArray<DisambiguationEntry>  Entries,
+    RoutingFamily                        RoutingFamily,
     string?                              SnippetTemplate = null)
 {
     /// <summary>Slot sequence for this construct's declaration shape.</summary>
@@ -30,4 +31,21 @@ public sealed record ConstructMeta(
     /// <summary>Use <see cref="PrimaryLeadingToken"/> or <see cref="Entries"/> instead.</summary>
     [Obsolete("Use PrimaryLeadingToken or Entries")]
     public TokenKind LeadingToken => PrimaryLeadingToken;
+}
+
+/// <summary>Identifies how the parser routes this construct.</summary>
+public enum RoutingFamily
+{
+    /// <summary>
+    /// Parsed in the file-header preamble (Parser.cs ParseAll pre-loop), not through
+    /// the standard dispatch. A duplicate 'precept' line CAN reach ParseDirectConstruct()
+    /// and hits the wildcard throw — that guard must remain.
+    /// </summary>
+    Header,
+    /// <summary>Unique leading token; routed directly by ParseDirectConstruct().</summary>
+    Direct,
+    /// <summary>Shares in/to/from leading token; routed via DisambiguateAndParse().</summary>
+    StateScoped,
+    /// <summary>Shares the 'on' leading token; routed via DisambiguateAndParse().</summary>
+    EventScoped,
 }

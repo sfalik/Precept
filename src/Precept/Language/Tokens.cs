@@ -171,9 +171,9 @@ public static class Tokens
         TokenKind.Modify        => new(kind, "modify",        Cat_Acc, "Access mode verb: declare field access constraint",
             TextMateScope: "keyword.other.access-mode.precept", SemanticTokenType: "keyword"),
         TokenKind.Readonly      => new(kind, "readonly",      Cat_Acc, "Access mode adjective: field is read-only in this state",
-            TextMateScope: "keyword.other.access-mode.precept", SemanticTokenType: "keyword"),
+            TextMateScope: "keyword.other.access-mode.precept", SemanticTokenType: "keyword", IsAccessModeAdjective: true),
         TokenKind.Editable      => new(kind, "editable",      Cat_Acc, "Access mode adjective: field is writable in this state",
-            TextMateScope: "keyword.other.access-mode.precept", SemanticTokenType: "keyword"),
+            TextMateScope: "keyword.other.access-mode.precept", SemanticTokenType: "keyword", IsAccessModeAdjective: true),
         TokenKind.Omit          => new(kind, "omit",          Cat_Acc, "Field omit: field is structurally absent",
             TextMateScope: "keyword.other.access-mode.precept", SemanticTokenType: "keyword"),
 
@@ -452,4 +452,11 @@ public static class Tokens
     /// </summary>
     public static FrozenSet<char> TwoCharOperatorStarters { get; } =
         TwoCharOperators.Keys.Select(k => k.Item1).ToFrozenSet();
+
+    /// <summary>
+    /// Tokens that function as access-mode adjectives. Derived from
+    /// <see cref="TokenMeta.IsAccessModeAdjective"/> entries.
+    /// </summary>
+    public static FrozenSet<TokenKind> AccessModeKeywords { get; } =
+        All.Where(m => m.IsAccessModeAdjective).Select(m => m.Kind).ToFrozenSet();
 }

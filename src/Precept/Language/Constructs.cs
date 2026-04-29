@@ -46,7 +46,8 @@ public static class Constructs
             "precept LoanApplication",
             [],
             [SlotIdentifierList],
-            [new(TokenKind.Precept)]),
+            [new(TokenKind.Precept)],
+            RoutingFamily.Header),
 
         ConstructKind.FieldDeclaration => new(
             kind,
@@ -55,7 +56,8 @@ public static class Constructs
             "field amount as money nonnegative",
             [],
             [SlotIdentifierList, SlotTypeExpression, SlotModifierList, SlotComputeExpression],
-            [new(TokenKind.Field)]),
+            [new(TokenKind.Field)],
+            RoutingFamily.Direct),
 
         ConstructKind.StateDeclaration => new(
             kind,
@@ -64,7 +66,8 @@ public static class Constructs
             "state Draft initial, Submitted, Approved terminal success",
             [],
             [SlotStateEntryList],
-            [new(TokenKind.State)]),
+            [new(TokenKind.State)],
+            RoutingFamily.Direct),
 
         ConstructKind.EventDeclaration => new(
             kind,
@@ -73,7 +76,8 @@ public static class Constructs
             "event Submit(approver as string)",
             [],
             [SlotIdentifierList, SlotArgumentList, SlotInitialMarker],
-            [new(TokenKind.Event)]),
+            [new(TokenKind.Event)],
+            RoutingFamily.Direct),
 
         ConstructKind.RuleDeclaration => new(
             kind,
@@ -82,7 +86,8 @@ public static class Constructs
             "rule amount > 0 because \"Amount must be positive\"",
             [],
             [SlotRuleExpression, SlotGuardClause, SlotBecauseClause],
-            [new(TokenKind.Rule)]),
+            [new(TokenKind.Rule)],
+            RoutingFamily.Direct),
 
         ConstructKind.TransitionRow => new(
             kind,
@@ -91,7 +96,8 @@ public static class Constructs
             "from Draft on Submit -> set reviewer = approver -> transition Submitted",
             [],
             [SlotStateTarget, SlotEventTarget, SlotGuardClause, SlotActionChain, SlotOutcome],
-            [new(TokenKind.From, [TokenKind.On])]),
+            [new(TokenKind.From, [TokenKind.On])],
+            RoutingFamily.StateScoped),
 
         ConstructKind.StateEnsure => new(
             kind,
@@ -100,7 +106,8 @@ public static class Constructs
             "in Approved ensure amount > 0 because \"Approved amount must be positive\"",
             [ConstructKind.StateDeclaration],
             [SlotStateTarget, SlotEnsureClause],
-            [new(TokenKind.In, [TokenKind.Ensure]), new(TokenKind.To, [TokenKind.Ensure]), new(TokenKind.From, [TokenKind.Ensure])]),
+            [new(TokenKind.In, [TokenKind.Ensure]), new(TokenKind.To, [TokenKind.Ensure]), new(TokenKind.From, [TokenKind.Ensure])],
+            RoutingFamily.StateScoped),
 
         ConstructKind.AccessMode => new(
             kind,
@@ -109,7 +116,8 @@ public static class Constructs
             "in Draft modify Amount editable",
             [],
             [SlotStateTarget, SlotFieldTarget, SlotAccessModeKeyword, SlotGuardClause],
-            [new(TokenKind.In, [TokenKind.Modify])]),
+            [new(TokenKind.In, [TokenKind.Modify])],
+            RoutingFamily.StateScoped),
 
         ConstructKind.OmitDeclaration => new(
             kind,
@@ -118,7 +126,8 @@ public static class Constructs
             "in Draft omit InternalNotes",
             [],
             [SlotStateTarget, SlotFieldTarget],
-            [new(TokenKind.In, [TokenKind.Omit])]),
+            [new(TokenKind.In, [TokenKind.Omit])],
+            RoutingFamily.StateScoped),
 
         ConstructKind.StateAction=> new(
             kind,
@@ -127,7 +136,8 @@ public static class Constructs
             "to Submitted -> set submittedAt = now()",
             [ConstructKind.StateDeclaration],
             [SlotStateTarget, SlotActionChain],
-            [new(TokenKind.To, [TokenKind.Arrow]), new(TokenKind.From, [TokenKind.Arrow])]),
+            [new(TokenKind.To, [TokenKind.Arrow]), new(TokenKind.From, [TokenKind.Arrow])],
+            RoutingFamily.StateScoped),
 
         ConstructKind.EventEnsure => new(
             kind,
@@ -136,7 +146,8 @@ public static class Constructs
             "on Submit ensure reviewer != \"\" because \"Reviewer required\"",
             [ConstructKind.EventDeclaration],
             [SlotEventTarget, SlotEnsureClause],
-            [new(TokenKind.On, [TokenKind.Ensure])]),
+            [new(TokenKind.On, [TokenKind.Ensure])],
+            RoutingFamily.EventScoped),
 
         ConstructKind.EventHandler => new(
             kind,
@@ -145,7 +156,8 @@ public static class Constructs
             "on UpdateName -> set name = newName",
             [],
             [SlotEventTarget, SlotActionChain],
-            [new(TokenKind.On, [TokenKind.Arrow])]),
+            [new(TokenKind.On, [TokenKind.Arrow])],
+            RoutingFamily.EventScoped),
 
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind,
             $"Unknown ConstructKind: {kind}"),

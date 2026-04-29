@@ -78,13 +78,14 @@ public static class Parser
     /// Tokens that always terminate expression parsing — declaration boundaries,
     /// clause introducers, and structural tokens.
     /// </summary>
-    private static readonly FrozenSet<TokenKind> ExpressionBoundaryTokens = new[]
+    private static readonly FrozenSet<TokenKind> StructuralBoundaryTokens = new[]
     {
         TokenKind.When, TokenKind.Because, TokenKind.Arrow, TokenKind.Ensure,
         TokenKind.EndOfSource, TokenKind.NewLine,
-        TokenKind.Precept, TokenKind.Field, TokenKind.State, TokenKind.Event,
-        TokenKind.Rule, TokenKind.In, TokenKind.To, TokenKind.From, TokenKind.On,
     }.ToFrozenSet();
+
+    internal static readonly FrozenSet<TokenKind> ExpressionBoundaryTokens =
+        StructuralBoundaryTokens.Union(Constructs.LeadingTokens).ToFrozenSet();
 
     // ════════════════════════════════════════════════════════════════════════════
     //  Public entry point
@@ -572,7 +573,7 @@ public static class Parser
 
         private Token ParseAccessModeKeywordDirect()
         {
-            if (Current().Kind is TokenKind.Readonly or TokenKind.Editable)
+            if (Tokens.AccessModeKeywords.Contains(Current().Kind))
                 return Advance();
 
             EmitDiagnostic(DiagnosticCode.ExpectedToken, Current().Span, "readonly or editable", Current().Text);
@@ -1286,10 +1287,12 @@ public static class Parser
     // ════════════════════════════════════════════════════════════════════════════
 
     /// <summary>
-    /// Assembles a typed <see cref="Declaration"/> from the generic slot array
-    /// produced by <see cref="ParseSession.ParseConstructSlots"/>. One arm per
-    /// <see cref="ConstructKind"/>.
+    /// Assembles the final <see cref="Declaration"/> from the slot array produced by
+    /// <see cref="ParseSlots"/>. One arm per <see cref="ConstructKind"/> — no default.
+    /// CS8509 fires here when a new <see cref="ConstructKind"/> is added without a
+    /// corresponding assembly arm.
     /// </summary>
+#pragma warning disable CS8524 // unnamed enum values are unreachable — CS8509 enforces named-value coverage
     internal static Declaration BuildNode(ConstructKind kind, SyntaxNode?[] slots, SourceSpan span) => kind switch
     {
         ConstructKind.PreceptHeader => new PreceptHeaderNode(span,
@@ -1353,10 +1356,8 @@ public static class Parser
         ConstructKind.EventHandler => new EventHandlerNode(span,
             ((SyntaxNode)slots[0]!).AsToken(),
             slots[1]?.AsStatements() ?? []),
-
-        _ => throw new ArgumentOutOfRangeException(nameof(kind), kind,
-            $"Unknown ConstructKind: {kind}"),
     };
+#pragma warning restore CS8524
 }
 
 // ════════════════════════════════════════════════════════════════════════════
