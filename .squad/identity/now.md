@@ -1,6 +1,6 @@
 ---
 updated_at: 2026-04-28T23:04:41Z
-focus_area: spike/catalog-extensibility — catalog extensibility + PRECEPT0018 analyzer
+focus_area: spike/Precept-V2 — catalog extensibility + PRECEPT0018 analyzer
 active_issues: []
 spike_mode: true
 ---
@@ -15,7 +15,7 @@ Commits go directly to `precept-architecture`. If you feel the urge to open a PR
 
 # What We're Focused On
 
-**Branch:** `spike/catalog-extensibility` — catalog extensibility spike + PRECEPT0018 analyzer.
+**Branch:** `spike/Precept-V2` — catalog extensibility spike + PRECEPT0018 analyzer.
 
 **Status (2026-04-25):** All C, M, I, and O items resolved. Two commits landed this session:
 - `db9961d` — I-items bulk (39 files, 2116 tests)
