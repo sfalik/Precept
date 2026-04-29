@@ -18,7 +18,7 @@ state AwaitingReturn
 state Refunded
 state Declined
 
-in Submitted write ReasonText
+in Submitted modify ReasonText editable
 in AwaitingReturn ensure ApprovedAmount > 0 because "A waiting return must already have an approved amount"
 in Refunded ensure ReturnReceived because "A refunded request must have the item marked as returned"
 

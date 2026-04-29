@@ -78,43 +78,52 @@ public class WritableSurfaceTests(ITestOutputHelper output)
         act.Should().Throw<NotImplementedException>();
     }
 
-    // ── Case 3: write all on stateless precept ──────────────────────────────
+    // ── Case 3: in Draft modify Amount editable (new access mode vocab B4) ───
 
     [Fact]
-    public void Case3_WriteAll_LexesCorrectly()
+    public void Case3_ModifyEditable_LexesCorrectly()
     {
-        var src = "precept TestWriteAll\nfield Amount as money\nwrite all";
+        // write all retired in B4 (2026-04-28). New surface: in State modify Field editable.
+        var src =
+            "precept TestModify\n" +
+            "field Amount as money\n" +
+            "state Draft initial, Approved terminal success\n" +
+            "in Draft modify Amount editable\n" +
+            "from Draft on Approve -> transition Approved\n" +
+            "event Approve";
         var stream = Lexer.Lex(src);
 
         stream.Diagnostics.Should().BeEmpty();
         var kinds = stream.Tokens.Select(t => t.Kind).ToArray();
         output.WriteLine("Tokens: " + string.Join(", ", kinds));
 
-        kinds.Should().ContainInOrder(
-            TokenKind.Precept, TokenKind.Identifier, TokenKind.NewLine,
-            TokenKind.Field, TokenKind.Identifier, TokenKind.As, TokenKind.MoneyType, TokenKind.NewLine,
-            TokenKind.Write, TokenKind.All,
-            TokenKind.EndOfSource);
+        kinds.Should().ContainInOrder(TokenKind.In, TokenKind.Identifier, TokenKind.Modify, TokenKind.Identifier, TokenKind.Editable);
     }
 
     [Fact]
-    public void Case3_WriteAll_CompileThrowsNotImplemented()
+    public void Case3_ModifyEditable_CompileThrowsNotImplemented()
     {
-        var src = "precept TestWriteAll\nfield Amount as money\nwrite all";
+        var src =
+            "precept TestModify\n" +
+            "field Amount as money\n" +
+            "state Draft initial, Approved terminal success\n" +
+            "in Draft modify Amount editable\n" +
+            "from Draft on Approve -> transition Approved\n" +
+            "event Approve";
         var act = () => Compiler.Compile(src);
         act.Should().Throw<NotImplementedException>();
     }
 
-    // ── Case 4: in Draft write Amount (stateful) ────────────────────────────
+    // ── Case 4: in Draft modify Amount readonly (read-only access mode) ──────
 
     [Fact]
-    public void Case4_InStateWrite_LexesCorrectly()
+    public void Case4_InStateModifyReadonly_LexesCorrectly()
     {
         var src =
             "precept TestStateful\n" +
             "field Amount as money\n" +
             "state Draft initial, Approved terminal success\n" +
-            "in Draft write Amount\n" +
+            "in Draft modify Amount readonly\n" +
             "from Draft on Approve -> transition Approved\n" +
             "event Approve";
 
@@ -124,21 +133,22 @@ public class WritableSurfaceTests(ITestOutputHelper output)
         var kinds = stream.Tokens.Select(t => t.Kind).ToArray();
         output.WriteLine("Tokens: " + string.Join(", ", kinds));
 
-        // Key tokens: In, Identifier(Draft), Write, Identifier(Amount)
+        // Key tokens: In, Identifier(Draft), Modify, Identifier(Amount), Readonly
         kinds.Should().Contain(TokenKind.In);
-        kinds.Should().Contain(TokenKind.Write);
-        // No Writable modifier token — this is the access-mode write
+        kinds.Should().Contain(TokenKind.Modify);
+        kinds.Should().Contain(TokenKind.Readonly);
+        // No Writable modifier token — this is the access-mode modify, not field-level writable
         kinds.Should().NotContain(TokenKind.Writable);
     }
 
     [Fact]
-    public void Case4_InStateWrite_CompileThrowsNotImplemented()
+    public void Case4_InStateModifyReadonly_CompileThrowsNotImplemented()
     {
         var src =
             "precept TestStateful\n" +
             "field Amount as money\n" +
             "state Draft initial, Approved terminal success\n" +
-            "in Draft write Amount\n" +
+            "in Draft modify Amount readonly\n" +
             "from Draft on Approve -> transition Approved\n" +
             "event Approve";
 
@@ -146,40 +156,40 @@ public class WritableSurfaceTests(ITestOutputHelper output)
         act.Should().Throw<NotImplementedException>();
     }
 
-    // ── Case 5: write Amount at root level (old eliminated syntax) ──────────
+    // ── Case 5: in Draft omit Amount (structural exclusion) ──────────────────
 
     [Fact]
-    public void Case5_RootLevelWrite_LexesCorrectly()
+    public void Case5_InStateOmit_LexesCorrectly()
     {
+        // write at root level was old eliminated syntax. Now testing omit — structural exclusion.
         var src =
-            "precept TestOldSyntax\n" +
+            "precept TestOmit\n" +
             "field Amount as money\n" +
             "state Draft initial, Approved terminal success\n" +
-            "write Amount\n" +
+            "in Draft omit Amount\n" +
             "from Draft on Approve -> transition Approved\n" +
             "event Approve";
 
         var stream = Lexer.Lex(src);
-        // Lexer is context-free — it does not reject root-level write; Parser would.
+        // Lexer is context-free — it does not reject semantically invalid forms; Parser would.
         stream.Diagnostics.Should().BeEmpty();
 
         var kinds = stream.Tokens.Select(t => t.Kind).ToArray();
         output.WriteLine("Tokens: " + string.Join(", ", kinds));
 
-        // write lexes as Write token; Amount as Identifier
-        var writeIdx = Array.IndexOf(kinds, TokenKind.Write);
-        writeIdx.Should().BeGreaterThan(-1);
-        kinds[writeIdx + 1].Should().Be(TokenKind.Identifier);
+        // in Draft omit Amount → In, Identifier, Omit, Identifier
+        kinds.Should().Contain(TokenKind.In);
+        kinds.Should().Contain(TokenKind.Omit);
     }
 
     [Fact]
-    public void Case5_RootLevelWrite_CompileThrowsNotImplemented()
+    public void Case5_InStateOmit_CompileThrowsNotImplemented()
     {
         var src =
-            "precept TestOldSyntax\n" +
+            "precept TestOmit\n" +
             "field Amount as money\n" +
             "state Draft initial, Approved terminal success\n" +
-            "write Amount\n" +
+            "in Draft omit Amount\n" +
             "from Draft on Approve -> transition Approved\n" +
             "event Approve";
 

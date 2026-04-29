@@ -22,8 +22,8 @@ state Approved
 state Denied
 state Paid
 
-in UnderReview write FraudFlag
-in UnderReview when not FraudFlag write AdjusterName
+in UnderReview modify FraudFlag editable
+in UnderReview modify AdjusterName editable when not FraudFlag
 in Approved ensure ApprovedAmount > 0 because "Approved claims must specify a payout amount"
 in Approved ensure DecisionNote is set when FraudFlag because "Fraud-flagged approvals require a decision note"
 

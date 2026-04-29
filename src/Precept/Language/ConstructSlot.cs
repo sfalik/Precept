@@ -6,12 +6,12 @@ namespace Precept.Language;
 /// </summary>
 public enum ConstructSlotKind
 {
-    IdentifierList,        // one or more user-defined names (e.g. field names, state names, event names)
+    IdentifierList,        // one or more user-defined names (e.g. field names, event names)
     TypeExpression,        // "as TypeKeyword Qualifiers" type annotation
     ModifierList,          // field modifiers (nonnegative, positive, notempty, etc.)
-    StateModifierList,     // state modifiers (terminal, initial, required, success, warning, error, irreversible)
+    StateEntryList,        // comma-separated (name modifier*) pairs for state declarations
     ArgumentList,          // event parameter list "(name as type, ...)"
-    ComputeExpression,     // "= expression" default or computed value
+    ComputeExpression,     // "-> expression" computed value
     GuardClause,           // "when expression"
     ActionChain,           // "-> action -> action" chain
     Outcome,               // "-> transition State | -> no transition | -> reject 'reason'"
@@ -19,8 +19,10 @@ public enum ConstructSlotKind
     EventTarget,           // event name (or "initial" marker)
     EnsureClause,          // "ensure expression because message"
     BecauseClause,         // "because message"
-    AccessModeKeyword,     // write | read | omit
+    AccessModeKeyword,     // readonly | editable (B4 access mode adjectives)
     FieldTarget,           // field name or "all"
+    RuleExpression,        // the rule's boolean expression (e.g. amount > 0)
+    InitialMarker,         // optional "initial" keyword on event declarations
 }
 
 /// <summary>

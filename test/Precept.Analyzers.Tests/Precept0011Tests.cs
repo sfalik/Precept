@@ -10,8 +10,8 @@ public class PRECEPT0011Tests
     private const string ModStubs = @"
 namespace Precept.Language
 {
-    public enum ModifierKind { Nonnegative, Positive, Nonzero, Success, Warning, Error, Write, Read, Omit }
-    public enum TokenKind { Nonnegative, Positive, Nonzero, Success, Warning, Error, Write, Read, Omit }
+    public enum ModifierKind { Nonnegative, Positive, Nonzero, Success, Warning, Error, Editable, Readonly, Omit }
+    public enum TokenKind { Nonnegative, Positive, Nonzero, Success, Warning, Error, Editable, Readonly, Omit }
     public enum ModifierCategory { Structural, Semantic }
     public enum TypeKind { Integer }
 
@@ -27,8 +27,8 @@ namespace Precept.Language
             TokenKind.Success     => new(kind, ""success""),
             TokenKind.Warning     => new(kind, ""warning""),
             TokenKind.Error       => new(kind, ""error""),
-            TokenKind.Write       => new(kind, ""write""),
-            TokenKind.Read        => new(kind, ""read""),
+            TokenKind.Editable      => new(kind, ""editable""),
+            TokenKind.Readonly      => new(kind, ""readonly""),
             TokenKind.Omit        => new(kind, ""omit""),
             _ => throw new System.ArgumentOutOfRangeException(nameof(kind)),
         };
@@ -203,14 +203,14 @@ namespace Precept.Language
     {
         public static ModifierMeta GetMeta(ModifierKind kind) => kind switch
         {
-            ModifierKind.Write => new StateModifierMeta(
-                kind, Tokens.GetMeta(TokenKind.Write), ""write"",
+            ModifierKind.Editable => new StateModifierMeta(
+                kind, Tokens.GetMeta(TokenKind.Editable), ""editable"",
                 ModifierCategory.Structural,
-                MutuallyExclusiveWith: [ModifierKind.Read]),
-            ModifierKind.Read => new StateModifierMeta(
-                kind, Tokens.GetMeta(TokenKind.Read), ""read"",
+                MutuallyExclusiveWith: [ModifierKind.Readonly]),
+            ModifierKind.Readonly => new StateModifierMeta(
+                kind, Tokens.GetMeta(TokenKind.Readonly), ""readonly"",
                 ModifierCategory.Structural,
-                MutuallyExclusiveWith: [ModifierKind.Write]),
+                MutuallyExclusiveWith: [ModifierKind.Editable]),
             _ => throw new System.ArgumentOutOfRangeException(nameof(kind)),
         };
     }" + CloseBrace;

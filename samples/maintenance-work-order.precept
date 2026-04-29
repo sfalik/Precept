@@ -21,7 +21,7 @@ state InProgress
 state Completed
 state Cancelled
 
-in Draft write Location, IssueSummary, Urgent
+in Draft modify Location, IssueSummary, Urgent editable
 in Scheduled ensure AssignedTechnician is set because "Scheduled work must have an assigned technician"
 in Completed ensure CompletionNote is set because "Completed work orders need a completion note"
 

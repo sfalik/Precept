@@ -330,4 +330,29 @@ public class ActionsTests
                 $"{kind} does not mutate a collection in a way requiring non-empty proof");
         }
     }
+
+    // ── ActionSyntaxShape ────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Actions_ActionSyntaxShape_AllMembersHaveValue()
+    {
+        foreach (var kind in Enum.GetValues<ActionKind>())
+        {
+            var meta = Actions.GetMeta(kind);
+            Enum.IsDefined(meta.SyntaxShape).Should().BeTrue(
+                $"{kind} must have a defined ActionSyntaxShape");
+        }
+    }
+
+    [Fact]
+    public void Actions_ByTokenKind_ContainsAllActionKinds()
+    {
+        Actions.ByTokenKind.Should().HaveCount(8);
+        foreach (var meta in Actions.All)
+        {
+            Actions.ByTokenKind.Should().ContainKey(meta.Token.Kind,
+                $"ByTokenKind must contain entry for {meta.Kind}");
+            Actions.ByTokenKind[meta.Token.Kind].Kind.Should().Be(meta.Kind);
+        }
+    }
 }

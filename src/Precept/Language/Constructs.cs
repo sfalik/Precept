@@ -1,3 +1,6 @@
+using System.Collections.Frozen;
+using System.Collections.Immutable;
+
 namespace Precept.Language;
 
 /// <summary>
@@ -14,7 +17,7 @@ public static class Constructs
     private static readonly ConstructSlot SlotIdentifierList    = new(ConstructSlotKind.IdentifierList);
     private static readonly ConstructSlot SlotTypeExpression    = new(ConstructSlotKind.TypeExpression);
     private static readonly ConstructSlot SlotModifierList      = new(ConstructSlotKind.ModifierList,       IsRequired: false);
-    private static readonly ConstructSlot SlotStateModifierList = new(ConstructSlotKind.StateModifierList,  IsRequired: false);
+    private static readonly ConstructSlot SlotStateEntryList    = new(ConstructSlotKind.StateEntryList);
     private static readonly ConstructSlot SlotArgumentList      = new(ConstructSlotKind.ArgumentList,       IsRequired: false);
     private static readonly ConstructSlot SlotComputeExpression = new(ConstructSlotKind.ComputeExpression,  IsRequired: false);
     private static readonly ConstructSlot SlotGuardClause       = new(ConstructSlotKind.GuardClause,        IsRequired: false, Description: "when expression");
@@ -27,6 +30,8 @@ public static class Constructs
     private static readonly ConstructSlot SlotBecauseClause     = new(ConstructSlotKind.BecauseClause);
     private static readonly ConstructSlot SlotAccessModeKeyword = new(ConstructSlotKind.AccessModeKeyword);
     private static readonly ConstructSlot SlotFieldTarget       = new(ConstructSlotKind.FieldTarget);
+    private static readonly ConstructSlot SlotRuleExpression    = new(ConstructSlotKind.RuleExpression);
+    private static readonly ConstructSlot SlotInitialMarker     = new(ConstructSlotKind.InitialMarker,     IsRequired: false);
 
     // ════════════════════════════════════════════════════════════════════════════
     //  GetMeta — exhaustive switch
@@ -41,7 +46,8 @@ public static class Constructs
             "precept LoanApplication",
             [],
             [SlotIdentifierList],
-            TokenKind.Precept),
+            [new(TokenKind.Precept)],
+            RoutingFamily.Header),
 
         ConstructKind.FieldDeclaration => new(
             kind,
@@ -50,7 +56,8 @@ public static class Constructs
             "field amount as money nonnegative",
             [],
             [SlotIdentifierList, SlotTypeExpression, SlotModifierList, SlotComputeExpression],
-            TokenKind.Field),
+            [new(TokenKind.Field)],
+            RoutingFamily.Direct),
 
         ConstructKind.StateDeclaration => new(
             kind,
@@ -58,8 +65,9 @@ public static class Constructs
             "Declares one or more lifecycle states with optional state modifiers",
             "state Draft initial, Submitted, Approved terminal success",
             [],
-            [SlotIdentifierList, SlotStateModifierList],
-            TokenKind.State),
+            [SlotStateEntryList],
+            [new(TokenKind.State)],
+            RoutingFamily.Direct),
 
         ConstructKind.EventDeclaration => new(
             kind,
@@ -67,8 +75,9 @@ public static class Constructs
             "Declares one or more named events with optional arguments and the initial modifier",
             "event Submit(approver as string)",
             [],
-            [SlotIdentifierList, SlotArgumentList],
-            TokenKind.Event),
+            [SlotIdentifierList, SlotArgumentList, SlotInitialMarker],
+            [new(TokenKind.Event)],
+            RoutingFamily.Direct),
 
         ConstructKind.RuleDeclaration => new(
             kind,
@@ -76,8 +85,9 @@ public static class Constructs
             "Declares a data-truth constraint with a guard and reason",
             "rule amount > 0 because \"Amount must be positive\"",
             [],
-            [SlotGuardClause, SlotBecauseClause],
-            TokenKind.Rule),
+            [SlotRuleExpression, SlotGuardClause, SlotBecauseClause],
+            [new(TokenKind.Rule)],
+            RoutingFamily.Direct),
 
         ConstructKind.TransitionRow => new(
             kind,
@@ -86,7 +96,8 @@ public static class Constructs
             "from Draft on Submit -> set reviewer = approver -> transition Submitted",
             [],
             [SlotStateTarget, SlotEventTarget, SlotGuardClause, SlotActionChain, SlotOutcome],
-            TokenKind.From),
+            [new(TokenKind.From, [TokenKind.On])],
+            RoutingFamily.StateScoped),
 
         ConstructKind.StateEnsure => new(
             kind,
@@ -95,16 +106,28 @@ public static class Constructs
             "in Approved ensure amount > 0 because \"Approved amount must be positive\"",
             [ConstructKind.StateDeclaration],
             [SlotStateTarget, SlotEnsureClause],
-            TokenKind.In),
+            [new(TokenKind.In, [TokenKind.Ensure]), new(TokenKind.To, [TokenKind.Ensure]), new(TokenKind.From, [TokenKind.Ensure])],
+            RoutingFamily.StateScoped),
 
         ConstructKind.AccessMode => new(
             kind,
             "access mode",
-            "Declares field write access per state via 'in' scope (write, read, or omit), or 'write all' at root level for stateless precepts",
-            "in Draft write Amount",
+            "Declares field access per state: 'in State modify Field readonly|editable [when Guard]'",
+            "in Draft modify Amount editable",
             [],
-            [SlotOptStateTarget, SlotAccessModeKeyword, SlotFieldTarget],
-            TokenKind.Write),
+            [SlotStateTarget, SlotFieldTarget, SlotAccessModeKeyword, SlotGuardClause],
+            [new(TokenKind.In, [TokenKind.Modify])],
+            RoutingFamily.StateScoped),
+
+        ConstructKind.OmitDeclaration => new(
+            kind,
+            "omit declaration",
+            "Structurally excludes a field from a state: 'in State omit Field' (no guard — exclusion is unconditional)",
+            "in Draft omit InternalNotes",
+            [],
+            [SlotStateTarget, SlotFieldTarget],
+            [new(TokenKind.In, [TokenKind.Omit])],
+            RoutingFamily.StateScoped),
 
         ConstructKind.StateAction=> new(
             kind,
@@ -113,7 +136,8 @@ public static class Constructs
             "to Submitted -> set submittedAt = now()",
             [ConstructKind.StateDeclaration],
             [SlotStateTarget, SlotActionChain],
-            TokenKind.To),
+            [new(TokenKind.To, [TokenKind.Arrow]), new(TokenKind.From, [TokenKind.Arrow])],
+            RoutingFamily.StateScoped),
 
         ConstructKind.EventEnsure => new(
             kind,
@@ -122,7 +146,8 @@ public static class Constructs
             "on Submit ensure reviewer != \"\" because \"Reviewer required\"",
             [ConstructKind.EventDeclaration],
             [SlotEventTarget, SlotEnsureClause],
-            TokenKind.On),
+            [new(TokenKind.On, [TokenKind.Ensure])],
+            RoutingFamily.EventScoped),
 
         ConstructKind.EventHandler => new(
             kind,
@@ -131,7 +156,8 @@ public static class Constructs
             "on UpdateName -> set name = newName",
             [],
             [SlotEventTarget, SlotActionChain],
-            TokenKind.On),
+            [new(TokenKind.On, [TokenKind.Arrow])],
+            RoutingFamily.EventScoped),
 
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind,
             $"Unknown ConstructKind: {kind}"),
@@ -143,4 +169,26 @@ public static class Constructs
 
     public static IReadOnlyList<ConstructMeta> All { get; } =
         Enum.GetValues<ConstructKind>().Select(GetMeta).ToArray();
+
+    // ════════════════════════════════════════════════════════════════════════════
+    //  Derived indexes
+    // ════════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Maps each leading token to the constructs that can begin with it,
+    /// along with the disambiguation entry for each.
+    /// </summary>
+    public static IReadOnlyDictionary<TokenKind, ImmutableArray<(ConstructKind Kind, DisambiguationEntry Entry)>>
+        ByLeadingToken { get; } = All
+            .SelectMany(meta => meta.Entries.Select(entry => (meta.Kind, entry)))
+            .GroupBy(t => t.entry.LeadingToken)
+            .ToFrozenDictionary(g => g.Key, g => g.ToImmutableArray());
+
+    /// <summary>
+    /// The set of all tokens that can begin a construct declaration.
+    /// </summary>
+    public static FrozenSet<TokenKind> LeadingTokens { get; } = All
+        .SelectMany(m => m.Entries)
+        .Select(e => e.LeadingToken)
+        .ToFrozenSet();
 }

@@ -10,10 +10,17 @@
 - Cross-catalog analyzer stubs must stay minimal and must not pull in `FrozenDictionary`, `ImmutableArray`, or other real-catalog BCL-heavy surfaces.
 - Dual-surface MCP validation is blind unless the config artifact and directly related documentation land together.
 - Numeric-literal and arithmetic tests are heavily shaped by context flow: binary-expression operands resolve under null expected-type, so some mismatch paths are only observable at the unit-table layer.
+- Hardcoded enum counts in infrastructure tests (e.g. `InvokeSlotParser_SwitchIsExhaustive`) must be updated whenever a `ConstructSlotKind` member is added. The pattern is safe and intentional, but the count must track reality. Pattern: keep the count, update the message to name the added member and new count.
+- Catalog slot-structure tests must exist for every construct that has a non-trivial or recently-changed slot sequence. When R3/R4 change a construct's slots, the old assumption in a `KeyConstructs_HaveMinimumSlotCount` theory becomes wrong. Replace broad theories with targeted `HasExactly*Slot` facts that document the rationale.
 
 ## Recent Updates
 
-### 2026-04-27 — MCP dual-surface validation rerun approved
+### 2026-04-28 — Parser remediation coverage audit (R1–R6)
+- Audited all 6 remediation slices. Behavioral coverage was complete; two tests were broken by the remediation itself (not by the audit).
+- B1: `InvokeSlotParser_SwitchIsExhaustive` had stale count (16) after R4 added `InitialMarker`. Fixed to 17.
+- B2: `KeyConstructs_HaveMinimumSlotCount(StateDeclaration)` expected ≥2 slots; R3 correctly collapsed StateDeclaration to 1 compound `StateEntryList` slot. Removed from theory, added `StateDeclaration_HasExactlyOneSlot_StateEntryList`.
+- Added `EventDeclaration_HasInitialMarkerSlot` to pin the R4 catalog shape.
+- Final: 2034 tests, 0 failing. Verdict: APPROVED.
 - The pre-landing blocked run is now superseded. Root `.mcp.json` exists, parses cleanly, and correctly uses the CLI `mcpServers` schema with only the local `precept` server.
 - `.vscode/mcp.json` remains the VS Code/workspace `servers` config with both `precept` and `github`, and `tools/Precept.Plugin/.mcp.json` remains the unchanged shipped payload.
 - Directly related docs now describe the three-surface boundary precisely, and no stale live operating-model reference remains.
@@ -35,3 +42,7 @@
 ### 2026-04-24 — Precept.Next coverage audit and slice support
 - Identified the compile-time blockers that prevented deeper TypeChecker test work: hollow model shapes and missing diagnostic codes.
 - Added targeted Faults and OperatorTable/binary-expression coverage while documenting what remained untestable until scaffolding was fixed.
+
+### 2026-04-29 — Parser remediation coverage audit recorded
+- Coverage audit for parser remediation slices R1-R6 is now recorded as approved with 2034/2034 tests passing.
+- Durable regression anchors now include the updated ConstructSlotKind count, the exact StateDeclaration slot-shape fact, and the EventDeclaration initial-marker slot fact.

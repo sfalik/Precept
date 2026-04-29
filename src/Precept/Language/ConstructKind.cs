@@ -29,8 +29,11 @@ public enum ConstructKind
     /// <summary><c>(in|to|from) StateTarget ensure Expr because Msg</c></summary>
     StateEnsure,
 
-    /// <summary><c>(in StateTarget)? (write|read|omit) FieldTarget</c></summary>
+    /// <summary><c>in StateTarget modify FieldTarget readonly|editable [when Guard]</c></summary>
     AccessMode,
+
+    /// <summary><c>in StateTarget omit FieldTarget</c> — structural exclusion, no guard.</summary>
+    OmitDeclaration,
 
     /// <summary><c>(to|from) StateTarget -> Actions</c></summary>
     StateAction,

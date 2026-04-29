@@ -14,10 +14,13 @@ public enum DiagnosticCode
 
     // ── Parse ────────────────────────────────────────────
     ExpectedToken,
-    UnexpectedKeyword,
     NonAssociativeComparison,
-    InvalidCallTarget,
-    MutuallyExclusiveQualifiers,
+    UnexpectedKeyword,       // reserved — not currently emitted by the parser
+    InvalidCallTarget,       // reserved — not currently emitted by the parser
+    OmitDoesNotSupportGuard,
+    EventHandlerDoesNotSupportGuard,
+    PreEventGuardNotAllowed,
+    ExpectedOutcome,
 
     // ── Type ─────────────────────────────────────────────
     UndeclaredField,
@@ -26,6 +29,7 @@ public enum DiagnosticCode
     InvalidMemberAccess,
     FunctionArityMismatch,
     FunctionArgConstraintViolation,
+    MutuallyExclusiveQualifiers,
     DuplicateFieldName,
     DuplicateStateName,
     DuplicateEventName,
@@ -45,6 +49,7 @@ public enum DiagnosticCode
     CircularComputedField,
     WritableOnEventArg,
     ConflictingAccessModes,
+    RedundantAccessMode,
     ListLiteralOutsideDefault,
     DuplicateChoiceValue,
     EmptyChoice,

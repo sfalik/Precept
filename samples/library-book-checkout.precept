@@ -20,8 +20,8 @@ state Returned
 state Lost
 
 # Staff can correct due-date handling while a loan is active.
-in CheckedOut write DueDay
-in Overdue write DueDay, FineAmount
+in CheckedOut modify DueDay editable
+in Overdue modify DueDay, FineAmount editable
 
 in Available ensure BorrowerId is not set because "Available books cannot still be assigned to a borrower"
 in CheckedOut ensure BorrowerId is set because "Checked-out books must record a borrower"

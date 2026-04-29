@@ -54,7 +54,8 @@ public sealed record TokenMeta(
     /// context-sensitive completions are valuable. Use this metadata to filter completion
     /// candidates without full parse-state analysis.
     /// </summary>
-    TokenKind[]?                   ValidAfter = null
+    TokenKind[]?                   ValidAfter = null,
+    bool                           IsAccessModeAdjective = false
 );
 
 /// <summary>

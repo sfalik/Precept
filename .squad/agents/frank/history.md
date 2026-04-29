@@ -2,57 +2,90 @@
 
 - Owns the core DSL/runtime architecture across parser, type checker, diagnostics, graph analysis, and execution semantics.
 - Protects cross-surface contract integrity across runtime, docs, MCP, and contributor workflow changes.
-- Historical summary: led the combined compiler/runtime design consolidation, proof/fault boundary hardening, catalog-consumer drift analysis, and canonical design-doc promotion work.
+- Historical summary: led the combined compiler/runtime design consolidation, access-mode redesign decisions, and parser catalog-shape direction.
 
 ## Learnings
 
-- D3's closed-world access default is a structural safety property. `write` opens exceptions; inverting to write-by-default weakens auditability and computed-field clarity.
-- Runtime boundaries should be described by dependency direction, not by pretending no analysis knowledge crosses lowering. Lowered runtime-native descriptors may carry selected compile-time residue.
-- Catalog completeness is no longer the main bottleneck; consumer drift is. Highest-value follow-up is removing hardcoded language knowledge from checker, LS, MCP, and tooling consumers.
-- Parser and lexer algorithms should stay hand-written, but vocabulary tables, precedence data, and classification sets should derive from catalog metadata wherever the catalog is the language truth.
-- Authoring consumers read `CompilationResult`; execution and preview consumers read lowered `Precept`. Constraint plans and proof/fault behavior are sibling contracts, not one blended validation layer.
-- Runtime resolved-value enums (for example `FieldAccessMode { Read, Write }`) are outputs of compilation, not declaration-surface vocabulary. Do not collapse modifier docs into runtime descriptor docs.
-- For language-surface doc audits, the update set is predictable: token catalog, modifier catalog, parser/type-checker docs, diagnostic catalog, language spec/vision, and evaluator prose; historical working docs and runtime result-shape docs change only when their own contract changes.
-- Clean-slate parser work changes the calculus: richer catalog-driven dispatch and routing are viable when the parser is still a stub, but semantic meaning and downstream type safety remain irreducibly hand-authored.
-- Access mode design round verdicts (A1 guarded read approved with writable-only constraint, A2 guarded omit stays prohibited, A3 vocabulary unchanged, A4 redundancy rule locked as compile error) written to `docs/working/frank-access-mode-design-round.md` on 2026-04-28. Rule 4 split into 4a/4b/4c, vision doc updated, grammar updated with two guarded lines. Open question: rule 7 refinement semantics for unguarded write + guarded read on same pair (unchanged).
-- Rule 7 closed: structurally precluded by 4b+4c mutual exclusion. `ConflictingAccessModes` not needed for this case.
-- B2 vocabulary consistency round (2026-04-28): `unlocked` fails as a field modifier because it's a resultative participle (implies prior lock event), not a dispositional adjective (names a static property). The new constraint requires modifier and access mode keywords to share the same vocabulary family. Recommended `editable`/`editable`+`fixed`+`omit`: using the same word for modifier and upgrade keyword creates a tautological family connection; `fixed` is the universally business-natural antonym with no permanence, no I/O, no operational connotation. Six families evaluated; `frozen` was close second but narrower domain applicability.
-- B3 grammar proposal evaluation (2026-04-28): Shane's omit/access-mode semantic framing (exclusion vs. constraint) is correct and sharper than prior rounds — accepted into design rationale. His `->` operator proposal rejected on semantic coherence grounds: `->` has established pipeline-flow semantics throughout Precept (action chains, state actions, computed fields); repurposing it for field targeting creates a second unrelated meaning. Grammar shape split (adjective-after-field) rejected as redundant — the vocabulary's part-of-speech difference (verb `omit` vs. adjectives `editable`/`fixed`) already encodes the semantic distinction. `readonly` rejected as I/O-rooted programmer vocabulary. Recommendation unchanged from B2: `editable`/`fixed`/`omit` in verb-before-field position.
-- B4 `modify` verb evaluation (2026-04-28): Shane's `modify` proposal recommended-with-caveats. `modify` creates true verb parallelism with `omit` that B2's adjective-as-verb `editable` did not achieve. Verb/adjective separation is the core improvement: `modify` is the verb, `readonly`/`editable` are adjectives naming the access level. This fixes B2's double-duty problem. Adjective-after-field position is no longer redundant when `modify` is the verb — it's the natural complement position in a verb-object-complement construction. Recommended pair: `readonly`/`editable` (with `fixed`/`editable` as alternative pending Shane's call). Zero keyword collision in current catalog. Supersedes B2/B3 recommendations.
+- When plan examples use disjunction `or` patterns in switch arms, verify variable bindings — `or` patterns cannot bind names, making interpolated throw messages a compile-time trap.
+- Plans that introduce error-recovery helpers (like `ErrorStatement()`) must specify whether they're new methods or existing ones. Phantom method calls are silent plan defects that become George's problem at implementation time.
+-Conservative defaults are structural guarantees: write/edit surfaces open exceptions, they do not become the baseline by omission.
+- Metadata belongs in catalogs when consumers need per-member knowledge; pipeline/tooling drift comes from hardcoded parallel copies.
+- Parser algorithms stay hand-written, but vocabulary tables, precedence data, and disambiguation metadata should derive from catalog truth where possible.
+- Authoring consumers read `CompilationResult`; execution/preview consumers read lowered `Precept`; runtime-native lowered data may intentionally preserve selected analysis residue.
+- Design loop convergence pattern: validation infrastructure first (v5), then vocabulary lock (v7), then structural separation corrections (v8). Each layer depends on the previous — you can't split AST nodes correctly until the vocabulary is locked, and you can't lock vocabulary until the validation layer ensures nothing drifts silently.
+- The v7→v8 OmitDeclaration split is the canonical example of why `catalog-system.md`'s flat-record prohibition matters: different slot counts + different guard eligibility + different semantic categories = separate constructs, not internal branching.
+- A complete design evaluation requires reading the *implementation* alongside the *design* — the wrapper node pattern (TokenWrapper, etc.) and the InitialMarker remediation-phase addition were both correct implementation details not visible in the design documents.
+- When a construct family splits, verification must cover catalog entries, AST nodes, BuildNode arms, routing tests, slot-order tests, and slice-level regression anchors.
 
 ## Recent Updates
 
-### 2026-04-27 — `writable` field modifier audit and review
-- Audited all 32 docs files for the `writable` language change. Locked the two-layer access model: field-level `writable` baseline plus state-scoped `write|read|omit` overrides, with state-level rules winning per field/state pair.
-- Confirmed compile-time-only `WritableOnEventArg`, preserved root `write all` for stateless precepts, and recorded which documentation surfaces must change when modifiers are added.
-- Review verdict stayed blocked on one real catalog issue (`AccessMode.LeadingToken`) plus a few stale doc references.
+### 2026-04-28 — Access-mode vocabulary and shorthand locked
+- Final surface: `modify` verb, `readonly` / `editable` adjectives, `omit` as separate structural-exclusion verb, shared `FieldTarget` shorthand, and post-field guards only on `modify`.
+- Live docs were swept so spec, vision, parser, catalog, runtime, and evaluator surfaces all reflect the same grammar.
 
-### 2026-04-27 — Catalog-driven parser design loop
-- Round 1 established the full-vision parser shape: `DisambiguationEntry`, generic disambiguation, generic slot iteration, and generator-ready architecture.
-- Round 3 resolved George's six flagged items: accept `LeadingTokenSlot`, keep `BuildNode` as an exhaustive switch, apply peek-before-consume for `ActionChain`, allow both `when` guard positions, keep disambiguation tokens explicit, and sequence the catalog migration behind a `PrimaryLeadingToken` bridge.
-- Extensibility outcome: catalog-driven parsing removes most parser-layer glue for new constructs, but generic AST and AST-as-catalog-tree were rejected; source generation stays deferred until construct count or consumers justify the infrastructure.
+### 2026-04-28 — Parser design v8 and review-cycle completion
+- frank-4 authored `docs/working/catalog-parser-design-v8.md`, splitting `OmitDeclaration` from `AccessMode`, promoting `FieldTargetNode` to a DU, and updating the Phase 1 implementation slices.
+- george-4 blocked v8 on 4 items: omit-guard diagnostic coverage, stashed-guard behavior on omit routing, sync clarification, and formalized 2.1a/2.1b split.
+- frank-5 applied all 4 fixes; george-5 spot-checked and approved. Phase 1 is complete and ready to hand off to Phase 2.
 
-### 2026-04-27 — Catalog-driven parser design v7: final design & implementation plan
-- Closed L1 (language change decision): Shane confirmed pre-verb guard position as canonical (`in State when Guard write Field`). Recorded as decision F11. Language simplification proposal rejected.
-- Closed T1 (test nit): Restructured `BuildNodeHandlesEveryConstructKind` assertion to distinguish `ArgumentOutOfRangeException` (gap) from null-propagation exceptions (arm exists).
-- Authored the five-PR implementation plan meeting CONTRIBUTING.md quality bar: PR 1 (catalog migration), PR 2 (parser infrastructure), PR 3 (non-disambiguated constructs), PR 4 (simple disambiguation), PR 5 (from-scoped + error sync).
-- Design loop concluded after 7 rounds. 17 decisions (F1–F11, G1–G6) resolved with zero open items. v7 supersedes v1–v6.
-- Deliverable: `docs/working/catalog-parser-design-v7.md` — method-level specificity, exact file paths, tests per slice, regression anchors, file inventory, tooling/MCP sync assessment.
+### 2026-04-28 — Phase 4: parser-v2.md authored
+- Created `docs/compiler/parser-v2.md` — the permanent canonical parser reference document, successor to `docs/compiler/parser.md`.
+- Synthesized from parser.md (structure/format template), v8 design doc (catalog-driven architecture, disambiguation tables, FieldTargetNode DU, OmitDeclaration separation, validation tiers), and Constructs.cs (exact slot sequences).
+- New sections vs. parser.md: AST Node Hierarchy (full 12-node hierarchy with DU rationale), Grammar Reference (all 9 forms), Slot Dispatch (InvokeSlotParser/BuildNode mechanisms), Validation Layer (4-tier pyramid), 5-Layer Architecture summary.
+- Updated sections: Top-Level Dispatch (catalog-driven ByLeadingToken lookup), Preposition Disambiguation (3 candidates under In), Diagnostics (6 codes, +2 new), Sync-Point Recovery (LeadingTokens FrozenSet, not hardcoded list).
+- Supporting artifacts: `docs/working/parser-v2-build-notes.md`, `.squad/decisions/inbox/frank-parser-v2-authored.md`.
 
-### 2026-04-28 — Combined design boundary/philosophy revision
-- Corrected the overclaim that "nothing crosses the boundary" and recentered the main design doc on Precept's philosophy and guarantee.
-- Locked the real rule: type dependency direction stays one-way, while lowered runtime-native shapes may intentionally preserve selected analysis knowledge.
-
-### 2026-04-28 — Spec grammar corrections (4 errors)
-- Fixed guard/access-mode grammar inconsistency: grammar was showing `when` as valid with all three access verbs, contradicting rule 4 which correctly restricts guards to `write` only. Split grammar into guarded write line and unguarded read/omit line.
-- Applied Shane-approved language change: moved `when` guard from pre-verb to post-field position (`in State write Field when Guard`). This eliminates the disambiguator pre-parsing complexity identified in George's v5-lang-simplify analysis. Updated spec, vision doc, and both affected sample files.
-- Fixed ensure grammar: spec showed pre-ensure guard position; all sample files consistently use post-expression guard. Updated spec to match samples (`ensure Expr when Guard because Msg`).
-- Added `FieldTarget` formal definition: grammar was showing a bare `FieldTarget` without defining it. Added `FieldTarget := identifier ("," identifier)* | all` to match documented prose and sample usage of comma-separated field lists.
-### 2026-04-28 — Redundant access mode diagnostic and inbox merge
-- `RedundantAccessMode` is now the canonical compile-time error for dead named-field access declarations; `RedundantGuardedRead` is retired, while `omit` and broadcast `all` remain exempt and rule 7 stays open.
-- Access-mode backlog is durably merged: guarded `read` remains a writable-only downgrade, guarded `omit` remains prohibited, the vocabulary stays `read`/`write`/`omit`, and `write all` is removed from the language in favor of field-level `writable`.
+### 2026-04-28 — Phase 3 cross-surface consistency audit
+- Horizontal audit across all live surfaces: spec, v8 design doc, catalog source (Constructs.cs, TokenKind.cs, ConstructSlot.cs, Tokens.cs), parser.md, DiagnosticCode.cs, and 5 representative samples.
+- Found 8 inconsistencies across 4 files: spec reserved keyword list included removed `write`/`read` tokens (3 fixes); parser.md had `modify`/`omit` in top-level sync set, wrong computed expression syntax `=` vs `->`, stale "11" ConstructKind count, nullable/singular AST node shapes (5 fixes); ConstructSlot.cs comment said `=` instead of `->` for computed expressions; Tokens.cs VA_AllQuantifier missing `TokenKind.Modify` for `modify all` completions.
+- All fixes align secondary sources with their authoritative primaries. Build clean, all 2024 tests pass.
+- Artifacts: `docs/working/audit-cross-notes.md`, `.squad/decisions/inbox/frank-audit-cross.md`.
 
 
-### 2026-04-28 — B4 vocabulary locked
-- Shane approved Frank's B4 direction: access-mode declarations now use `modify` as the verb with `readonly` / `editable` as the access adjectives.
-- This closes the adjective-pair decision, supersedes B2/B3 recommendations, and preserves `omit` as the separate structural-exclusion verb rather than folding it into the same access-mode family.
+- Audited all 11 session decisions against live documentation and source files.
+- Found 9 gaps — all in `docs/compiler/parser.md` (6) and `docs/language/precept-language-spec.md` (3). Every gap was the same category: dispatch tables and AST docs treating `OmitDeclaration` as part of `AccessMode` rather than as a separate construct.
+- Source catalog files (`Constructs.cs`, `TokenKind.cs`, `ConstructSlot.cs`, `DiagnosticCode.cs`) were already correct — no code changes needed.
+- Artifacts: `docs/working/audit-decisions-notes.md`, `.squad/decisions/inbox/frank-audit-decisions.md`.
+
+### 2026-04-28 — Parser R1–R6 compliance review: APPROVED
+- Reviewed all 6 remediation slices against v8 design. Verdict: APPROVED with zero blocking findings and 10 positive observations.
+- Two-tier architecture confirmed correct: non-disambiguated constructs (field, state, event, rule) go through full slot machinery; disambiguated constructs use catalog-driven `FindDisambiguatedConstruct()` with hand-written per-construct parsers.
+- All vocabulary frozen sets derive from catalog metadata. Sync recovery uses `Constructs.LeadingTokens`. No hardcoded parallel keyword lists.
+- Key pattern: `InvokeSlotParser()` CS8509 enforcement means adding a new `ConstructSlotKind` without a parser arm is a compile error — structural safety net.
+- Artifacts: `docs/working/parser-review.md`, `.squad/decisions/inbox/frank-parser-review.md`.
+
+
+### 2026-04-28 — Vision vs. Spec audit completed
+- Audited `docs/language/precept-language-vision.md` (74 KB, ~1167 lines) against `docs/language/precept-language-spec.md` (39 KB, ~1350 lines).
+- **Two contradictions found:** (1) `with` listed as a structural preposition in vision but absent from spec — stale reference, never implemented. (2) "Root editability" in stateless precept list conflicts with the locked `write all` removal decision — should read "Field-level editability."
+- **Critical unique content in vision not yet in spec:** the 11 Design Principles, Governance vs. Validation framing, 7 Execution Model Properties, 7 Proof Philosophy principles, outcome semantic distinctions, and constraint violation subject attribution. These are the "why" backbone — the spec has no preamble or §4/§5 to host them.
+- **5 duplication zones:** access mode composition, function catalog, modifier applicability, numeric lane rules, entity construction — maintained in both docs, creating maintenance tax.
+- **Recommendation: Do NOT archive yet.** Migrate Category A language-identity content into a new §0 "Language Design Goals" in the spec first. Remaining content migrates as spec §4 (graph analyzer) and §5 (proof engine) are written. Archive after all migrations complete.
+- Artifact: `.squad/decisions/inbox/frank-vision-spec-audit.md`.
+
+### 2026-04-29 — Parser remediation review batch recorded
+- Architectural compliance review for Parser.cs remediation slices R1-R6 was approved with zero blocking findings and is now merged into the squad decision ledger.
+- The parser-v2 reference and Phase 3 cross-surface audit are now recorded as durable team context alongside the approved remediation review.
+
+### 2026-04-28 — Parser design evaluation (v5–v8) completed
+- Evaluated all six working design documents (v5, v5-lang-simplify, v6, v7, v8, v8-session-notes) against the canonical parser spec (docs/compiler/parser.md) and current implementation (src/Precept/Pipeline/Parser.cs).
+- **Verdict: ADOPT v8 as-is.** The design is sound, the implementation is complete, and it matches the canonical spec with zero contradictions.
+- The evolution arc resolved every identified gap: v5 fixed validation infrastructure + RuleExpression, v7 locked vocabulary + implementation plan, v8 corrected OmitDeclaration structural separation + FieldTargetNode DU.
+- Key confirmation: The catalog-driven boundary is drawn correctly — domain knowledge in catalogs, grammar mechanics hand-written. No metadata-driven architecture violations.
+- Implementation (Parser.cs, 1386 lines) faithfully executes v8 across all 12 constructs, all 5 architectural layers, and 2034+ passing tests.
+- Minor observation: `InitialMarker` slot kind was added during remediation, not in v8's original plan. Covered by the spec. Not a gap.
+- Design loop is closed. Working documents can be archived as audit trail.
+
+### 2026-04-28 — Catalog-driven extensibility audit completed
+- Full baseline audit of the lexer/parser/AST metadata boundary. Lexer is 100% catalog-driven for keywords, operators, and punctuation — zero code changes needed for new vocabulary. Parser has a dual-layer architecture: vocabulary recognition (Layer A) is fully catalog-driven; grammar structure (Layer B) has 4 hand-written switches that need hardening.
+- Identified 8 gaps where adding a new `ConstructKind`, `ActionKind`, or `ConstructSlotKind` doesn't produce compile errors: `BuildNode()` wildcard, `ParseDirectConstruct()` wildcard, `DisambiguateAndParse()` hardcoded routing, `ParseActionStatement()` 8-arm switch, `ExpressionBoundaryTokens` hardcoded set, no `ConstructKind`↔`Declaration` subtype enforcement, no `ActionKind`↔`Statement` subtype enforcement, hardcoded access mode adjectives.
+- Key architectural recommendation: prefer catalog shape changes over Roslyn analyzers. Two immediate wins (remove `BuildNode()` wildcard for CS8509, derive `ExpressionBoundaryTokens` from `Constructs.LeadingTokens`). Two catalog shape investments (`RoutingFamily` on `ConstructMeta`, `ActionSyntaxShape` on `ActionMeta`). These four changes close all 8 gaps without custom Roslyn analyzers.
+- `InvokeSlotParser()` is the gold standard — already CS8509-enforced, no wildcard. New `ConstructSlotKind` members produce build errors. This pattern should be replicated across all exhaustive switches.
+- Artifacts: `.squad/decisions/inbox/frank-catalog-extensibility.md`.
+
+### 2026-04-28 — Catalog extensibility implementation plan review: BLOCKED (3 fixable)
+- Reviewed the coordinator's implementation plan for the 8 catalog extensibility gaps. Plan is structurally sound and architecturally aligned — all 8 gaps covered, catalog philosophy maintained, CS8509 mechanism confirmed effective with `TreatWarningsAsErrors=true`.
+- Three blockers found: (1) PreceptHeader is classified as `RoutingFamily.Direct` but it's parsed in a pre-loop code path, not through `ParseDirectConstruct()` — needs a `Header` routing family member. (2) Slice 3b is missing from the execution order table. (3) Slice 3b presents two code options (catch-all `var k =>` vs explicit listing) without committing — only the explicit listing achieves CS8509.
+- Confirmed `FrozenSet.Union()` + `.ToFrozenSet()` works via LINQ on `IEnumerable<T>`. ActionSyntaxShape as flat enum is correct (DU would be overengineering). BuildNode wildcard removal is safe — all 12 arms present.
+- Noted that ActionSyntaxShape is added in Slice 4 but never consumed by Slice 5 (which switches on ActionKind, not shape). Plan should state whether this is intentional forward investment.
+- Artifacts: `.squad/decisions/inbox/frank-catalog-extensibility-plan-review.md`.

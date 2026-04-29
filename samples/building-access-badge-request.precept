@@ -21,7 +21,7 @@ state Issued
 state Rejected
 
 # Requesters can revise the request while it is still being prepared.
-in Draft write EmployeeName, Department, AccessReason, RequestedFloors
+in Draft modify EmployeeName, Department, AccessReason, RequestedFloors editable
 
 in Approved ensure LowestRequestedFloor > 0 because "Approved badges must grant at least one floor"
 in Approved ensure HighestRequestedFloor >= LowestRequestedFloor because "Approved floor bounds must stay ordered"

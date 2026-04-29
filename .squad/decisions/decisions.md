@@ -1,28 +1,3 @@
-# Decision: README hero PNG fallback
-
-- **Context:** GitHub does not render the styled inline HTML contract block in `README.md` as intended.
-- **Decision:** Use `brand/readme-hero-dsl.png` as the GitHub-facing contract sample and keep a collapsed plain-text version immediately below for copyability.
-- **Why:** The PNG preserves the intended branded syntax presentation on GitHub, while the collapsed source keeps the sample useful to humans and AI agents without turning the section back into a long raw block.
-- **Files:** `README.md`, `brand/readme-hero-dsl.png`, `brand/readme-hero-dsl.precept`
-
----
-
-## Decision
-
-Treat `docs/HowWeGotHere.md` as a retrospective historical narrative, not as a live trunk-consolidation memo.
-
-## Why
-
-- Shane asked to remove the branch-history section as irrelevant.
-- The "worth preserving" material read like an active recommendation set instead of a record of what endured.
-- The unresolved/recommendation sections kept pulling the document back into pending-decision framing.
-
-## Applied To
-
-- `docs/HowWeGotHere.md`
-
----
-
 # Readability Review: combined-design-v2.md (2026-07-17)
 
 **Reviewer:** Elaine (UX Designer)
@@ -44,6 +19,8 @@ The rewrite succeeds. §1 opens with a problem statement and architectural commi
 ## Decision
 
 This doc is ready to serve as the architectural foundation for per-stage design docs (starting with the parser). The concerns above are improvements, not blockers — the parser concern is the most urgent because that's the immediate next use case.
+
+---
 
 ---
 
@@ -127,6 +104,8 @@ Replace "lowered expression nodes and action plans" with a concrete specificatio
 ---
 
 *This review is direct because the timing demands it. Addressing these three items now — before the parser, type checker, and evaluator are built — is nearly free. Addressing them after implementation begins is expensive. The architecture is sound. These are the gaps that would bite us.*
+
+---
 
 ---
 
@@ -291,6 +270,8 @@ Neither of these requires abandoning the conservative default. The proposal conf
 
 ---
 
+---
+
 # George — Technical Review: combined-design-v2.md
 
 **Date:** 2026-04-28
@@ -408,6 +389,8 @@ However, the doc has **critical implementation-readiness gaps for the Parser** (
 - Could it emit round-trip parse tests (text -> AST -> text) per construct automatically?
 - How does this interact with the generic AST proposal — if AST nodes are generic/generated, do tests follow?
 - What is the boundary between generated test scaffolding and hand-authored test logic?
+
+---
 
 ---
 
@@ -586,9 +569,14 @@ More concretely: the scan-priority rule becomes harder. The current rule is clea
 Compare the two:
 
 ```
+
+---
+
 # Current (->)
 field Tax as number nonnegative -> Subtotal * TaxRate
 field Net as number positive -> Subtotal - Tax
+
+---
 
 # Proposed (<-)
 field Tax as number nonnegative <- Subtotal * TaxRate
@@ -721,6 +709,8 @@ The right-pointing arrow:
 
 ---
 
+---
+
 # Design Session Round 1: Catalog-Driven Parser Full Vision
 
 **By:** Frank
@@ -750,6 +740,8 @@ Round 1 of a 3-round design session requested by Shane. The prior analysis walke
 ## What Round 2 Should Challenge
 
 See `## For George` section in the design doc. Key areas: `Entries` replacing `LeadingToken` (breaking catalog change), `when` guard uniformity assumption, slot parser `SyntaxNode?` return type fragility, factory dictionary vs. switch, anchor/guard injection coupling, and clean-slate re-estimate.
+
+---
 
 ---
 
@@ -843,6 +835,8 @@ All `docs/working/` files (historical records — must not be updated per audit 
 ## Open Questions / Escalations
 
 None. All decisions locked and documented above.
+
+---
 
 ---
 
@@ -944,6 +938,8 @@ The code sample comment reads `// ── Field modifiers (14) ──────
 4. `docs/language/catalog-system.md` line 740 — `(14)` → `(15)`.
 
 Items 2–4 are doc-only and may land in the same commit as item 1.
+
+---
 
 ---
 
@@ -1053,6 +1049,8 @@ which option is chosen once parser implementation begins.
 Per George's charter: no implementation work until Frank's sign-off on the design. These bugs
 are discovered in design review — the right time. The parser is still a stub. These are zero-cost
 fixes at design time.
+
+---
 
 ---
 
@@ -1386,3 +1384,237 @@ The catalog-level work is solid. The `Writable` modifier entry in `Modifiers.cs`
 
 Both fixes are one-liners or near-one-liners. No soup until then.
 
+---
+
+# Decision: Access-mode shorthand grammar and AST split
+
+**Date:** 2026-04-28
+**By:** Shane (owner) with Frank and George follow-through
+**Status:** Locked
+
+## Decision
+
+- Access declarations use `modify` plus the adjectives `readonly` or `editable`; structural exclusion uses `omit`.
+- `modify` and `omit` share the same `FieldTarget` shapes: a single field, a comma-separated field list, or `all`.
+- The locked grammar is:
+
+```precept
+in State modify Field readonly [when Guard]
+in State modify Field editable [when Guard]
+in State modify F1, F2, ... readonly|editable [when Guard]
+in State modify all readonly|editable [when Guard]
+
+in State omit Field
+in State omit F1, F2, ...
+in State omit all
+```
+
+- Guards are permitted only on `modify`; `omit` is never guardable.
+- Syntax and catalog shapes stay split: `AccessModeDeclaration` and `OmitDeclaration` are separate AST node kinds, not a unified access-declaration node.
+
+## Why
+
+- Shane explicitly directed the team to preserve comma-separated field shorthand and the `all` shorthand in the new `modify` surface.
+- He also extended that same shorthand to `omit`, because both verbs operate over the same `FieldTarget` domain.
+- Separate AST nodes preserve the real semantic difference: `omit` changes structural presence, while `modify` declares an access level and optionally carries a guard.
+
+## Follow-through
+
+- Frank completed the live-doc sweep across the language spec, language vision, parser design, parser reference, catalog-system doc, runtime API doc, evaluator doc, and the design-round record so the published grammar is consistent everywhere.
+- George's vocabulary-migration implementation remains the code baseline for `modify` / `readonly` / `editable` / `omit`; any earlier sample simplifications that split comma-separated targets are superseded by this shorthand-preservation directive.
+
+---
+
+---
+
+### 2026-04-28 — v8 parser design document authored
+
+**By:** Frank
+**Status:** Complete
+**Decision type:** Design document
+
+**Decisions captured in v8:**
+- OmitDeclaration is a separate construct from AccessMode with its own DisambiguationEntry `[new(TokenKind.In, [TokenKind.Omit])]`, separate AST node (2 slots only), and separate disambiguation routing.
+- AccessMode DisambiguationEntry narrowed from `[Modify, Omit]` (v7) to `[Modify]` only (v8).
+- FieldTargetNode is a discriminated union: abstract base + SingularFieldTarget, ListFieldTarget, AllFieldTarget sealed subtypes.
+- ByLeadingToken[In] dispatches to 3 constructs (was 2 in v7): StateEnsure, AccessMode, OmitDeclaration.
+- Total ConstructKinds is 12 (was 11 in v7). BuildNode switch has 12 arms.
+- v7's `InScoped_RoutesToAccessMode_WhenOmitFollowsState` test was incorrect and is replaced by `InScoped_RoutesToOmitDeclaration_WhenOmitFollowsState`.
+- Proposal C (when as StateAction disambiguation token) is DEFERRED — not incorporated without Shane's approval.
+
+**Artifacts produced:**
+- `docs/working/catalog-parser-design-v8.md` — primary design document, supersedes v7
+- `docs/working/v8-design-session-notes.md` — change summary and decision verification matrix
+
+---
+
+---
+
+v8 fixes applied per George's review: 4 targeted edits (omit guard diagnostic, stashed guard behavior, sync clarification, 2.1 split formalized). Verdict expected: APPROVED.
+
+---
+
+---
+
+v8 approved after fix verification — proceed to Phase 2.
+
+---
+
+---
+
+# George's Review of catalog-parser-design-v8.md
+
+**By:** George (Runtime Dev)
+**Date:** 2026-04-28
+**Reviewing:** `docs/working/catalog-parser-design-v8.md`
+
+---
+
+## George's Review of catalog-parser-design-v8.md
+
+**Verdict:** BLOCKED
+
+---
+
+### Check A — OmitDeclaration Split
+**PASS**: All four items confirmed.
+- `AccessMode` entry: `[new(TokenKind.In, [TokenKind.Modify])]` ✓ (§4 critical entries table, line 322)
+- `OmitDeclaration` entry: `[new(TokenKind.In, [TokenKind.Omit])]` ✓ (§4 critical entries table, line 323)
+- `ByLeadingToken[In]` theory uses `InlineData(TokenKind.In, 3)` ✓ (Slice 1.5 test spec)
+- v7's wrong test `InScoped_RoutesToAccessMode_WhenOmitFollowsState` explicitly replaced with `InScoped_RoutesToOmitDeclaration_WhenOmitFollowsState` ✓ (§ Slice 4.4, with full corrected test body shown)
+
+---
+
+### Check B — omit guard prohibition
+**FAIL**: Structural slot is correct but diagnostic test coverage is incomplete.
+
+- `OmitDeclaration` has NO `GuardClause` slot: ✓ confirmed (`[SlotStateTarget, SlotFieldTarget]` — 2 slots, no guard; §1 Slot Sequences, §3 `OmitDeclarationNode`)
+- Test for `in State omit Field when Guard` → diagnostic: **MISSING**
+
+`ParseOmit_NeverHasGuard` (Slice 4.4) checks only that "result node has NO Guard property at all (structural impossibility)." This verifies the happy-path AST shape, but does NOT assert that parsing `in State omit Field when Guard` emits a diagnostic. Those are two different behaviors — one tests correct output, the other tests incorrect input detection.
+
+**Additionally**, the stashed-guard + OmitDeclaration case is unaddressed: `in State when Guard omit Field` — the generic disambiguator (Slice 4.1 step 3) pre-consumes an optional `when` guard before peeking the disambiguation token. If it stashes a guard and routes to `OmitDeclaration`, Slice 4.2 step 4 says "Inject stashed guard into GuardClause slot index (if present)." There is no GuardClause slot in `OmitDeclaration`. The spec says "if present" which implies silent discard — but this is a permanently-locked language invariant. A stashed guard being silently discarded when routed to `OmitDeclaration` is a diagnostic gap that needs to be explicitly specified and tested.
+
+**Two concrete fixes needed:**
+1. Add `ParseOmit_WithGuard_PostField_EmitsDiagnostic` test spec: `in Closed omit Amount when Active` → diagnostic.
+2. Specify behavior in Slice 4.2 when stashed guard cannot be injected because routed construct has no GuardClause slot. Either: (a) emit a named diagnostic, or (b) explicitly document "silent discard" as acceptable. Pick one and add a test.
+
+---
+
+### Check C — FieldTargetNode DU
+**PASS**: Correct abstract base + 3 sealed subtypes, specified with full C# signatures in §3.
+- `abstract record FieldTargetNode(SourceSpan Span) : SyntaxNode(Span)` ✓
+- `sealed record SingularFieldTarget(SourceSpan Span, Token Name)` ✓
+- `sealed record ListFieldTarget(SourceSpan Span, ImmutableArray<Token> Names)` ✓
+- `sealed record AllFieldTarget(SourceSpan Span, Token AllToken)` ✓
+- `ParseFieldTarget()` spec returns correct DU subtype based on token shape ✓ (Slice 4.3)
+
+---
+
+### Check D — comma-separated shorthand
+**PASS**: All 9 grammar forms explicitly enumerated in §2. Test coverage:
+- 6 `modify` forms tested individually (Singular×2, List×2, All×2 for readonly/editable) ✓
+- 3 `omit` forms tested individually (Singular, List, All) ✓
+- Comma-separated list tests: `ParseAccessMode_ListReadonly`, `ParseAccessMode_ListEditable`, `ParseOmit_List` ✓
+- `all` tests: `ParseAccessMode_AllReadonly`, `ParseAccessMode_AllEditable`, `ParseOmit_All` ✓
+
+---
+
+### Check E — sync tokens
+**PASS** (with implementation clarity concern): §1 correctly documents `modify` and `omit` as recovery anchors within `in`-scoped parse failures, and `ErrorSync_SyncSetIncludesModifyAndOmit` test is present.
+
+However, the `SyncToNextDeclaration()` implementation shown in Slice 5.4 only loops on `Constructs.LeadingTokens`:
+
+```csharp
+if (Constructs.LeadingTokens.Contains(Current().Kind))
+    return;
+```
+
+`modify` and `omit` are NOT in `LeadingTokens` — they are disambiguation tokens that appear AFTER `in`. The spec says they "serve as recovery anchors within `in`-scoped parse failures" but the shown sync loop has no path to check them. The implementation mechanism is not shown: is it a secondary check in the disambiguator itself? A supplementary token set passed to sync? This is implementable but under-specified. Frank should document the concrete mechanism or accept that this test verifies disambiguator-level recovery, not `SyncToNextDeclaration()`.
+
+This doesn't block the design (it's a real limitation of the shown code snippet) but the test name `ErrorSync_SyncSetIncludesModifyAndOmit` will be misleading if modify/omit are handled by the disambiguator rather than by the sync function. **Recommend clarifying the mechanism in Slice 5.4.**
+
+---
+
+### Check F — Proposal C
+**PASS**: §8 explicitly marks Proposal C (`when` as `StateAction` disambiguation token) as DEFERRED/OPEN, "explicitly NOT incorporated in v8." Shane has not approved it. ✓
+
+---
+
+### Slice Sizing
+
+**Slice 1.4** (~140 lines): FITS. Full `GetMeta()` rewrite for 12 constructs is a big switch body but structurally uniform. No split needed — each case is roughly the same pattern. As long as the implementer keeps local slot-index constants per arm, this is manageable in one context window.
+
+**Slice 2.1** (~220 lines): **SPLIT NEEDED.** 220 lines across 15+ files in a new directory with base types + DU + 12 concrete nodes is over the comfort threshold. Frank already proposed the right split:
+- **2.1a** (~80 lines): Base types (`SyntaxNode`, `Declaration`, `Expression`, shared nodes), plus `FieldTargetNode` DU (abstract + 3 sealed subtypes). The DU needs to be visible before anything references it.
+- **2.1b** (~140 lines): All 12 concrete `Declaration` subtypes.
+
+This split respects the dependency: `AccessModeNode` and `OmitDeclarationNode` reference `FieldTargetNode`, so 2.1a must complete before 2.1b.
+
+**Slice 3.1** (~100–150 lines): FITS. Pratt parser is the most intellectually dense piece, but 100–150 lines for the full implementation is realistic for a well-scoped method. The vocabulary dictionary is already wired in Slice 2.2. No split needed.
+
+**No other slices are oversized** — Slice 3.2 is ~120 lines but spread across 9 simple parsing methods with uniform patterns (peek, consume, return). That's fine.
+
+---
+
+### Feasibility Issues
+
+1. **Slice 4.2: stashed guard + OmitDeclaration (BLOCKING)**: The generic disambiguator pre-consumes a `when` guard before routing. For `OmitDeclaration`, there is no GuardClause slot to inject into. The spec says "if present" (silent discard) but this is a permanently-locked invariant violation that should produce a diagnostic. The behavior must be explicitly specified before implementation — a developer cannot make this decision unilaterally. This ties directly to Check B item 2.
+
+2. **Slice 5.4: modify/omit recovery mechanism (implementation clarity)**: `SyncToNextDeclaration()` as written loops only on `Constructs.LeadingTokens`. The spec claims `modify` and `omit` serve as recovery anchors within `in`-scoped failures, but the implementation path is not shown. Is this a secondary check in `ParseInScopedConstruct()` itself? Or does `SyncToNextDeclaration()` accept supplementary tokens? Needs one more sentence of spec. Not blocking on its own, but the test `ErrorSync_SyncSetIncludesModifyAndOmit` will be hard to implement without it.
+
+3. **Slice 2.1 split**: Frank's suggested 2.1a/2.1b split is correct but not formally part of the plan — it's described as a "consider" option. Given 220 lines, I'm recommending it be formalized. Not blocking but should be resolved before sprint starts.
+
+---
+
+### Test Spec Gaps
+
+1. **(BLOCKING) `in State omit Field when Guard` → diagnostic not tested**: No Soup Nazi spec anywhere tests that a post-field `when` on an omit declaration emits a diagnostic. `ParseOmit_NeverHasGuard` only tests structural shape. Need: `ParseOmit_WithPostFieldGuard_EmitsDiagnostic`.
+
+2. **(BLOCKING) `in State when Guard omit Field` → stashed guard + no injection slot**: The pre-field guard + omit routing path has no specified behavior and no test. Need: `ParseOmit_WithPreFieldGuard_EmitsDiagnosticAndDiscards` (or equivalent — but the behavior must be decided first per Feasibility Issue #1).
+
+3. **(Minor) Slice 4.2 tests don't cover the OmitDeclaration injection path**: `GuardInjection_StashedGuard_LandsInCorrectSlot` only tests `StateEnsure`. A companion test covering OmitDeclaration (no injection slot path) would prevent silent discard from being accidentally removed.
+
+4. **(Minor) Disambiguation routing tests are type-assertion based** ✓ (e.g., `BeOfType<OmitDeclarationNode>()`). No gap here — this is correct.
+
+---
+
+### BuildNode Completeness
+**PASS**: 12 arms confirmed, with explicit `OmitDeclaration` arm shown:
+```csharp
+ConstructKind.OmitDeclaration => new OmitDeclarationNode(span,
+    (StateTargetNode)slots[0]!, (FieldTargetNode)slots[1]!),
+```
+Total arm count is 12, matching total `ConstructKind` count. Wildcard `_` arm with `ArgumentOutOfRangeException` present ✓.
+
+---
+
+### Summary
+
+v8 is substantially correct — the OmitDeclaration split is clean, the FieldTargetNode DU is architecturally sound, disambiguation entries are properly separated, and test coverage for all 9 grammar forms is solid. Two blocking gaps: (1) there is no diagnostic test for guard-attempted-on-omit (the invariant is stated but not verified at the parse-input level), and (2) the behavior when a pre-consumed `when` guard is stashed and then routed to OmitDeclaration (which has no GuardClause slot) is completely unspecified — this is an implementation corner case that a developer cannot resolve independently.
+
+---
+
+## Items Frank Must Fix Before Phase 2
+
+1. **Add `ParseOmit_WithPostFieldGuard_EmitsDiagnostic` to Slice 4.4 Soup Nazi spec**: Parse `"in Closed omit Amount when Active"` → assert diagnostic emitted (specify the diagnostic code — either a new `OmitDoesNotSupportGuard` or reuse an existing code).
+
+2. **Specify Slice 4.2 behavior when stashed guard + OmitDeclaration (no GuardClause slot)**: Document whether the stashed guard is (a) silently discarded with a diagnostic, or (b) silently discarded without a diagnostic. Then add a corresponding Soup Nazi test: `ParseOmit_WithPreFieldGuard_EmitsDiagnosticAndParses` or `ParseOmit_WithPreFieldGuard_DiscardsGuardSilently` (but option (a) is strongly preferred — this is an invariant violation).
+
+3. **(Recommended, not strictly blocking) Clarify Slice 5.4 sync mechanism**: Add one sentence explaining HOW `modify` and `omit` serve as within-`in`-block recovery anchors. The shown `SyncToNextDeclaration()` loop doesn't include them; the actual mechanism (secondary check in the disambiguator? supplementary token set?) needs to be named.
+
+4. **(Recommended) Formalize Slice 2.1a/2.1b split**: Change the "consider" language to a firm split. The 220-line single-slice is above threshold.
+
+---
+
+---
+
+### 2026-04-28 — Phase 2 decisions audit complete
+
+**By:** Frank
+**Status:** Complete
+**Decision type:** Audit
+
+**Category of fixes:** Documentation dispatch tables and AST sections in `docs/compiler/parser.md` and `docs/language/precept-language-spec.md` still treated `OmitDeclaration` as part of the `AccessMode` construct. 9 targeted edits applied to align both files with the locked decisions: `OmitDeclaration` is a separate `ConstructKind` with its own disambiguation entry, AST node, and 2-slot sequence (no guard). Source catalog files were already correct.
+
+**Audit artifact:** `docs/working/audit-decisions-notes.md`

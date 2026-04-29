@@ -1,3 +1,5 @@
+using System.Collections.Frozen;
+
 namespace Precept.Language;
 
 /// <summary>
@@ -49,31 +51,31 @@ public static class Actions
         ActionKind.Set => new(
             kind, Tokens.GetMeta(TokenKind.Set),
             "Assign a value to a scalar field",
-            AnyType, ValueRequired: true, AllowedIn: AllActionContexts,
+            AnyType, ActionSyntaxShape.AssignValue, ValueRequired: true, AllowedIn: AllActionContexts,
             HoverDescription: "Assigns a value to a field. Works on any scalar, temporal, or business-domain field."),
 
         ActionKind.Add => new(
             kind, Tokens.GetMeta(TokenKind.Add),
             "Add an element to a set",
-            SetOnly, ValueRequired: true, AllowedIn: AllActionContexts,
+            SetOnly, ActionSyntaxShape.CollectionValue, ValueRequired: true, AllowedIn: AllActionContexts,
             HoverDescription: "Adds an element to a set field. Has no effect if the element is already present."),
 
         ActionKind.Remove => new(
             kind, Tokens.GetMeta(TokenKind.Remove),
             "Remove an element from a set",
-            SetOnly, ValueRequired: true, AllowedIn: AllActionContexts,
+            SetOnly, ActionSyntaxShape.CollectionValue, ValueRequired: true, AllowedIn: AllActionContexts,
             HoverDescription: "Removes an element from a set field. Has no effect if the element is not present."),
 
         ActionKind.Enqueue => new(
             kind, Tokens.GetMeta(TokenKind.Enqueue),
             "Enqueue an element onto a queue",
-            QueueOnly, ValueRequired: true, AllowedIn: AllActionContexts,
+            QueueOnly, ActionSyntaxShape.CollectionValue, ValueRequired: true, AllowedIn: AllActionContexts,
             HoverDescription: "Appends an element to the back of a queue field."),
 
         ActionKind.Dequeue => new(
             kind, Tokens.GetMeta(TokenKind.Dequeue),
             "Dequeue the front element of a queue",
-            QueueOnly, IntoSupported: true,
+            QueueOnly, ActionSyntaxShape.CollectionInto, IntoSupported: true,
             ProofRequirements:
             [
                 new NumericProofRequirement(new SelfSubject(CollectionCount), OperatorKind.GreaterThan, 0m,
@@ -85,13 +87,13 @@ public static class Actions
         ActionKind.Push => new(
             kind, Tokens.GetMeta(TokenKind.Push),
             "Push an element onto a stack",
-            StackOnly, ValueRequired: true, AllowedIn: AllActionContexts,
+            StackOnly, ActionSyntaxShape.CollectionValue, ValueRequired: true, AllowedIn: AllActionContexts,
             HoverDescription: "Pushes an element onto the top of a stack field."),
 
         ActionKind.Pop => new(
             kind, Tokens.GetMeta(TokenKind.Pop),
             "Pop the top element of a stack",
-            StackOnly, IntoSupported: true,
+            StackOnly, ActionSyntaxShape.CollectionInto, IntoSupported: true,
             ProofRequirements:
             [
                 new NumericProofRequirement(new SelfSubject(CollectionCount), OperatorKind.GreaterThan, 0m,
@@ -103,7 +105,7 @@ public static class Actions
         ActionKind.Clear => new(
             kind, Tokens.GetMeta(TokenKind.Clear),
             "Clear all elements from a collection or reset an optional field",
-            CollectionsAndOptional, AllowedIn: AllActionContexts,
+            CollectionsAndOptional, ActionSyntaxShape.FieldOnly, AllowedIn: AllActionContexts,
             HoverDescription: "Removes all elements from a collection, or resets an optional field to null."),
 
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind,
@@ -116,4 +118,12 @@ public static class Actions
 
     public static IReadOnlyList<ActionMeta> All { get; } =
         Enum.GetValues<ActionKind>().Select(GetMeta).ToArray();
+
+    /// <summary>
+    /// O(1) lookup from token kind to action metadata.
+    /// Mirrors <see cref="Constructs.ByLeadingToken"/>. Used by the parser to resolve
+    /// the current token to an <see cref="ActionMeta"/> without a linear scan.
+    /// </summary>
+    public static FrozenDictionary<TokenKind, ActionMeta> ByTokenKind { get; } =
+        All.ToFrozenDictionary(m => m.Token.Kind);
 }

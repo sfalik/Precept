@@ -30,6 +30,8 @@ The README's narrative around the hero example remains valid: it correctly notes
 
 ---
 
+---
+
 # Decision: README Hero DSL PNG Rendering
 
 **Author:** Elaine (UX)  
@@ -59,6 +61,9 @@ The README hero DSL snippet exists as an HTML file (`brand/readme-hero-dsl.html`
 If the hero snippet changes, re-render with:
 
 ```bash
+
+---
+
 # One-shot: install puppeteer, screenshot, remove
 npm install --no-save puppeteer
 node -e "<screenshot script>"  # see commit for full script
@@ -66,6 +71,8 @@ npm uninstall puppeteer && rm package.json package-lock.json && rm -rf node_modu
 ```
 
 Future improvement: automate this as a build script or CI step.
+
+---
 
 ---
 
@@ -88,12 +95,16 @@ Future improvement: automate this as a build script or CI step.
 
 ---
 
+---
+
 # Decision: Issue #22 Design Fidelity Directive
 
 **Date:** 2026-04-08
 **By:** Shane (user directive)
 
 When implementing issue #22, if anything the team is going to implement strays from the design docs or seems ambiguous, they must stop and ask rather than guess. Design understanding is a prerequisite before coding starts.
+
+---
 
 ---
 
@@ -141,6 +152,8 @@ Use `customer-profile.precept`, `fee-schedule.precept`, `payment-method.precept`
 
 ---
 
+---
+
 # Decision: Slice 7 Test Coverage — Known Gaps (Deferred)
 
 **Date:** 2026-04-08
@@ -153,6 +166,8 @@ Three coverage gaps identified during Slice 7 test writing and explicitly deferr
 3. `PreceptInstance.WorkflowName` mismatch on stateless Inspect not covered.
 
 These are known gaps, recorded for future test pass. Not blocking Slice 7 merge.
+
+---
 
 ---
 
@@ -175,6 +190,8 @@ These are known gaps, recorded for future test pass. Not blocking Slice 7 merge.
 ## Rationale
 
 The combined-design-v2 doc had accumulated all review feedback, innovations callouts, and section expansions across multiple review rounds. The short doc's only unique content was the type strategy reasoning, which v2 now carries. Keeping both docs would create a drift risk with no benefit.
+
+---
 
 ---
 
@@ -231,12 +248,16 @@ These don't cross because no runtime operation needs them — the prohibition is
 
 ---
 
+---
+
 # Design Evaluation: Per-Field `readonly` Modifier as Access Default Inversion
 
 **Author:** Frank (Lead/Architect & Language Designer)
 **Date:** 2025-07-14
 **Requested by:** Shane
 **Verdict:** **Reject**
+
+---
 
 ---
 
@@ -303,11 +324,15 @@ Six surveys were not consulted in the initial grounding. Each was read against t
 
 ---
 
+---
+
 # Doc Audit: `writable` Field Modifier — Findings & Decisions
 
 **Date:** 2025-04-27  
 **Author:** Frank (Lead/Architect)  
 **Scope:** All 32 files in `docs/` audited for `writable` modifier language change
+
+---
 
 ---
 
@@ -318,3 +343,31 @@ Six surveys were not consulted in the initial grounding. Each was read against t
 **Scope:** `writable` field modifier — full catalog + regression + MCP audit
 **Test run:** 1793 tests (includes 10 new `WritableSurfaceTests` added during investigation), 0 failed, 0 skipped ✅
 
+---
+
+# Decision: README hero PNG fallback
+
+- **Context:** GitHub does not render the styled inline HTML contract block in `README.md` as intended.
+- **Decision:** Use `brand/readme-hero-dsl.png` as the GitHub-facing contract sample and keep a collapsed plain-text version immediately below for copyability.
+- **Why:** The PNG preserves the intended branded syntax presentation on GitHub, while the collapsed source keeps the sample useful to humans and AI agents without turning the section back into a long raw block.
+- **Files:** `README.md`, `brand/readme-hero-dsl.png`, `brand/readme-hero-dsl.precept`
+
+---
+
+## Decision
+
+Treat `docs/HowWeGotHere.md` as a retrospective historical narrative, not as a live trunk-consolidation memo.
+
+## Why
+
+- Shane asked to remove the branch-history section as irrelevant.
+- The "worth preserving" material read like an active recommendation set instead of a record of what endured.
+- The unresolved/recommendation sections kept pulling the document back into pending-decision framing.
+
+## Applied To
+
+- `docs/HowWeGotHere.md`
+
+---
+
+---

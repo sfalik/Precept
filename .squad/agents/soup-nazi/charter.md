@@ -54,7 +54,7 @@ Required families:
 - All 3 state assert prepositions (`in`, `to`, `from`)
 - All 3 transition outcome types on one event (guarded transition, no transition, reject)
 - Collection reads in guards and invariants (`.count`, arg access `Event.ArgName`)
-- Write — all forms: `in State write Field`, `in any write Field`, `write all` (stateless), `write F1, F2` (stateless)
+- Write — all forms: `in State write Field`, `in any write Field`, `in State write F1, F2`
 - Event args: required and nullable, with `on Event assert` form
 - Cross-field invariant + nullable narrowing invariant
 - `from any` routing expansion
@@ -62,7 +62,7 @@ Required families:
 Invalid probes — synthesize one trigger per diagnostic:
 - `precept Empty` → empty-precept error (graph-level diagnostic — check `DiagnosticCode` enum for current name)
 - Stateless + event → stateless-with-events warning (valid: true)
-- Root `write all` + states declared → root-write-with-states error (valid: false)
+- Root-level `write` keyword detected → diagnostic (use `writable` modifier on field declaration)
 - Two `initial` states → `MultipleInitialStates` (error, valid: false)
 - Pure garbage input → parse error (valid: false)
 
@@ -85,7 +85,7 @@ Pass: every outcome exercised exactly, data mutations consistent with DSL, no un
 
 ### Round 3: Stateless End-to-End (fixed)
 
-Use synthesized `customer-profile` (write all) and `fee-schedule` (write specific fields) shapes or equivalent.
+Use synthesized `customer-profile` (all fields `writable`) and `fee-schedule` (selective `writable`) shapes or equivalent.
 Cover: null-state inspect, valid update, invariant ConstraintFailure, fire→Undefined, UneditableField on locked field.
 
 ### Round 4: Diagnostic Edge Cases (fixed)

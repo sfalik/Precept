@@ -375,4 +375,13 @@ public class TokensTests
         TokenKind.NewLine,
         TokenKind.Comment,
     ];
+
+    // ── AccessModeKeywords ───────────────────────────────────────────────────────
+
+    [Fact]
+    public void Tokens_AccessModeKeywords_ContainsReadonlyAndEditable()
+    {
+        Tokens.AccessModeKeywords.Should().Contain(TokenKind.Readonly);
+        Tokens.AccessModeKeywords.Should().Contain(TokenKind.Editable);
+    }
 }
