@@ -28,6 +28,8 @@ public sealed record ActionMeta(
 /// <summary>The token consumption pattern for this action's argument syntax.</summary>
 public enum ActionSyntaxShape
 {
+    /// <summary>Not set — sentinel value for default-initialization detection.</summary>
+    None = 0,
     /// <summary>verb field = expression  (set)</summary>
     AssignValue,
     /// <summary>verb field expression    (add, remove, enqueue, push)</summary>

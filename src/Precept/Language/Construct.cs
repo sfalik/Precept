@@ -36,6 +36,8 @@ public sealed record ConstructMeta(
 /// <summary>Identifies how the parser routes this construct.</summary>
 public enum RoutingFamily
 {
+    /// <summary>Not set — sentinel value for default-initialization detection.</summary>
+    None = 0,
     /// <summary>
     /// Parsed in the file-header preamble (Parser.cs ParseAll pre-loop), not through
     /// the standard dispatch. A duplicate 'precept' line CAN reach ParseDirectConstruct()

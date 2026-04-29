@@ -944,6 +944,6 @@ public class ParserTests
             from S on Go -> from
             """);
 
-        tree.Diagnostics.Should().Contain(d => d.Code == DiagnosticCode.ExpectedToken);
+        tree.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.ExpectedToken));
     }
 }

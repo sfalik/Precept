@@ -161,7 +161,9 @@ public class ParserInfrastructureTests
     [Fact]
     public void BuildNode_UnknownKind_ThrowsArgumentOutOfRangeException()
     {
+        // After Slice 2, the wildcard arm is removed; an out-of-range value throws
+        // SwitchExpressionException (a subtype of InvalidOperationException) at runtime.
         var act = () => Parser.BuildNode((ConstructKind)999, [], SourceSpan.Missing);
-        act.Should().Throw<ArgumentOutOfRangeException>();
+        act.Should().Throw<InvalidOperationException>();
     }
 }

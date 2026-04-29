@@ -615,6 +615,8 @@ public static class Parser
                 ActionSyntaxShape.CollectionValue => ParseCollectionValueStatement(meta),
                 ActionSyntaxShape.CollectionInto  => ParseCollectionIntoStatement(meta),
                 ActionSyntaxShape.FieldOnly       => ParseFieldOnlyStatement(meta),
+                ActionSyntaxShape.None => throw new InvalidOperationException(
+                    $"ActionSyntaxShape.None on {meta.Kind} — every ActionMeta must have an explicit SyntaxShape"),
             };
 #pragma warning restore CS8524
         }
