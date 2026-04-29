@@ -702,11 +702,13 @@ public static class Parser
 
         private StateDeclarationNode ParseStateDeclaration()
         {
+            var meta = Constructs.GetMeta(ConstructKind.StateDeclaration);
             var start = Current().Span;
             Advance(); // consume 'state'
-            var entries = ParseStateEntries();
-            var lastSpan = entries.Length > 0 ? entries[^1].Span : start;
-            return new StateDeclarationNode(SourceSpan.Covering(start, lastSpan), entries);
+            var slots = ParseConstructSlots(meta);
+            var lastSpan = GetLastSlotSpan(slots, start);
+            return (StateDeclarationNode)BuildNode(ConstructKind.StateDeclaration, slots,
+                SourceSpan.Covering(start, lastSpan));
         }
 
         private EventDeclarationNode ParseEventDeclaration()
@@ -850,7 +852,7 @@ public static class Parser
             ConstructSlotKind.IdentifierList     => ParseIdentifierList(isOptional),
             ConstructSlotKind.TypeExpression      => ParseTypeExpression(isOptional),
             ConstructSlotKind.ModifierList        => ParseModifierList(isOptional),
-            ConstructSlotKind.StateModifierList   => ParseStateModifierList(isOptional),
+            ConstructSlotKind.StateEntryList      => ParseStateEntryList(isOptional),
             ConstructSlotKind.ArgumentList        => ParseArgumentList(isOptional),
             ConstructSlotKind.ComputeExpression   => ParseComputeExpression(isOptional),
             ConstructSlotKind.GuardClause         => ParseGuardClause(isOptional),
@@ -902,12 +904,17 @@ public static class Parser
             return new FieldModifierArrayWrapper(modifiers[0].Span, modifiers);
         }
 
-        private SyntaxNode? ParseStateModifierList(bool isOptional)
+        private SyntaxNode? ParseStateEntryList(bool isOptional)
         {
-            // State entries are parsed by ParseStateEntries directly — this slot
-            // is only invoked via the generic slot machinery, so it's unused for
-            // state declarations (which use direct parsing). Return null (optional).
-            return null;
+            var entries = ParseStateEntries();
+            if (entries.Length == 0)
+            {
+                if (!isOptional)
+                    EmitDiagnostic(DiagnosticCode.ExpectedToken, Current().Span, "state name", Current().Text);
+                return null;
+            }
+            return new StateEntryArrayWrapper(
+                SourceSpan.Covering(entries[0].Span, entries[^1].Span), entries);
         }
 
         private SyntaxNode? ParseArgumentList(bool isOptional)

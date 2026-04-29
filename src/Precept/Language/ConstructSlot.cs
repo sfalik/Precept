@@ -6,10 +6,10 @@ namespace Precept.Language;
 /// </summary>
 public enum ConstructSlotKind
 {
-    IdentifierList,        // one or more user-defined names (e.g. field names, state names, event names)
+    IdentifierList,        // one or more user-defined names (e.g. field names, event names)
     TypeExpression,        // "as TypeKeyword Qualifiers" type annotation
     ModifierList,          // field modifiers (nonnegative, positive, notempty, etc.)
-    StateModifierList,     // state modifiers (terminal, initial, required, success, warning, error, irreversible)
+    StateEntryList,        // comma-separated (name modifier*) pairs for state declarations
     ArgumentList,          // event parameter list "(name as type, ...)"
     ComputeExpression,     // "-> expression" computed value
     GuardClause,           // "when expression"

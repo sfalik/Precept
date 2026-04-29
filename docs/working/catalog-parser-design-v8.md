@@ -264,7 +264,7 @@ public sealed record AccessModeNode(
 |---|---------------|-----------|-------|
 | 1 | PreceptHeader | PreceptHeaderNode | [IdentifierList] |
 | 2 | FieldDeclaration | FieldDeclarationNode | [IdentifierList, TypeExpression, ModifierList?, ComputeExpression?] |
-| 3 | StateDeclaration | StateDeclarationNode | [IdentifierList, StateModifierList?] |
+| 3 | StateDeclaration | StateDeclarationNode | [StateEntryList] |
 | 4 | EventDeclaration | EventDeclarationNode | [IdentifierList, ArgumentList?] |
 | 5 | RuleDeclaration | RuleDeclarationNode | [RuleExpression, GuardClause?, BecauseClause] |
 | 6 | TransitionRow | TransitionRowNode | [StateTarget, EventTarget, GuardClause?, ActionChain?, Outcome] |
@@ -847,7 +847,7 @@ ParseExpression_EmptyInput_ProducesDiagnostic()
 | `ParseIdentifierList()` | ~15 |
 | `ParseTypeExpression()` | ~20 |
 | `ParseModifierList()` | ~15 |
-| `ParseStateModifierList()` | ~15 |
+| `ParseStateEntryList()` | ~20 |
 | `ParseArgumentList()` | ~25 |
 | `ParseComputeExpression()` | ~10 |
 | `ParseRuleExpression()` | ~5 |
@@ -869,9 +869,10 @@ ParseModifierList_SingleModifier()
 ParseModifierList_MultipleModifiers()
 ParseModifierList_NoModifiers_ReturnsNull()
 
-ParseStateModifierList_Terminal_Success()
-ParseStateModifierList_Initial()
-ParseStateModifierList_NoModifiers_ReturnsNull()
+ParseStateEntryList_SingleState()
+ParseStateEntryList_MultipleStates()
+ParseStateEntryList_WithModifiers()
+ParseStateEntryList_EmptyProducesDiagnostic()
 
 ParseArgumentList_SingleArg()
 ParseArgumentList_MultipleArgs()
@@ -1431,6 +1432,22 @@ Borderline slices: 1.4, 3.1. George should confirm these are manageable or propo
 3. Update tests: `SharedLeadingTokens_HaveCorrectCandidateCount` does not change (StateAction entry count stays the same — `When` would be added to existing entries' DisambiguationTokens, not as a new entry).
 
 **Does NOT block any v8 implementation work.**
+
+---
+
+## Design Correction — R3: StateDeclaration Slot Definition
+
+**Discovered during remediation (2026-04-28).**
+
+The original v8 slot definition for `StateDeclaration` was `[IdentifierList, StateModifierList?]`. This was incorrect.
+
+**Root cause:** State modifiers are *per-entry* — they attach to individual state names (`Draft initial`, `Approved terminal success`), not to the declaration as a whole. A flat `IdentifierList` slot followed by a separate `StateModifierList?` slot cannot represent this structure.
+
+**Consequence:** `ParseStateModifierList()` was a no-op (returned `null` unconditionally) because `ParseStateDeclaration()` bypassed slot machinery and called `ParseStateEntries()` directly, handling modifiers inline.
+
+**Correction:** `StateDeclaration` slot definition changed to `[StateEntryList]` — a single slot holding the comma-separated `(name, modifiers*)` sequence. `ConstructSlotKind.StateModifierList` removed; `ConstructSlotKind.StateEntryList` added. `ParseStateEntryList()` wraps `ParseStateEntries()` and returns a `StateEntryArrayWrapper`. `ParseStateDeclaration()` now routes through `ParseConstructSlots() → BuildNode()`.
+
+`BuildNode.StateDeclaration` was already correct for this design (it called `.AsStateEntries()` on `slots[0]`).
 
 ---
 

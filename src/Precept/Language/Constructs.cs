@@ -17,7 +17,7 @@ public static class Constructs
     private static readonly ConstructSlot SlotIdentifierList    = new(ConstructSlotKind.IdentifierList);
     private static readonly ConstructSlot SlotTypeExpression    = new(ConstructSlotKind.TypeExpression);
     private static readonly ConstructSlot SlotModifierList      = new(ConstructSlotKind.ModifierList,       IsRequired: false);
-    private static readonly ConstructSlot SlotStateModifierList = new(ConstructSlotKind.StateModifierList,  IsRequired: false);
+    private static readonly ConstructSlot SlotStateEntryList    = new(ConstructSlotKind.StateEntryList);
     private static readonly ConstructSlot SlotArgumentList      = new(ConstructSlotKind.ArgumentList,       IsRequired: false);
     private static readonly ConstructSlot SlotComputeExpression = new(ConstructSlotKind.ComputeExpression,  IsRequired: false);
     private static readonly ConstructSlot SlotGuardClause       = new(ConstructSlotKind.GuardClause,        IsRequired: false, Description: "when expression");
@@ -62,7 +62,7 @@ public static class Constructs
             "Declares one or more lifecycle states with optional state modifiers",
             "state Draft initial, Submitted, Approved terminal success",
             [],
-            [SlotIdentifierList, SlotStateModifierList],
+            [SlotStateEntryList],
             [new(TokenKind.State)]),
 
         ConstructKind.EventDeclaration => new(
