@@ -114,6 +114,56 @@ namespace Precept.Language
         msg.Should().Contain("value 0");
     }
 
+    /// <summary>
+    /// TP7: Zero-valued member is NOT at index 0 — verifies all members are scanned, not just index 0.
+    /// </summary>
+    private const string TP7_ZeroNotFirstMember = @"
+namespace Precept.Language { public enum Foo { A = 1, B = 0, C = 2 } }";
+
+    [Fact]
+    public async Task TP7_ZeroNotFirstMember_Reports()
+    {
+        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<PRECEPT0018SemanticEnumZeroSlot>(TP7_ZeroNotFirstMember);
+        diagnostics.Should().ContainSingle();
+        diagnostics[0].Id.Should().Be("PRECEPT0018");
+        diagnostics[0].GetMessage().Should().Contain("B");
+        diagnostics[0].GetMessage().Should().Contain("Foo");
+    }
+
+    /// <summary>
+    /// TP8: Private nested enum inside Precept.Language — visibility does not exempt from the rule.
+    /// </summary>
+    private const string TP8_PrivateEnum = @"
+namespace Precept.Language
+{
+    public class Container
+    {
+        private enum Foo { A, B }
+    }
+}";
+
+    [Fact]
+    public async Task TP8_PrivateEnum_Reports()
+    {
+        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<PRECEPT0018SemanticEnumZeroSlot>(TP8_PrivateEnum);
+        diagnostics.Should().ContainSingle();
+        diagnostics[0].Id.Should().Be("PRECEPT0018");
+    }
+
+    /// <summary>
+    /// TP9: Internal enum inside Precept.Language — visibility does not exempt from the rule.
+    /// </summary>
+    private const string TP9_InternalEnum = @"
+namespace Precept.Language { internal enum Foo { A, B } }";
+
+    [Fact]
+    public async Task TP9_InternalEnum_Reports()
+    {
+        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<PRECEPT0018SemanticEnumZeroSlot>(TP9_InternalEnum);
+        diagnostics.Should().ContainSingle();
+        diagnostics[0].Id.Should().Be("PRECEPT0018");
+    }
+
     // ── True negatives ────────────────────────────────────────────────────────
 
     /// <summary>
@@ -320,5 +370,35 @@ namespace Precept.Language
         diagnostics.Should().ContainSingle();
         diagnostics[0].GetMessage().Should().Contain("AlsoZero");
         diagnostics[0].GetMessage().Should().NotContain("None");
+    }
+
+    /// <summary>
+    /// EC6: byte underlying type — Convert.ToInt64 handles byte correctly; first member flagged.
+    /// </summary>
+    private const string EC6_ByteUnderlying = @"
+namespace Precept.Language { public enum Foo : byte { A, B } }";
+
+    [Fact]
+    public async Task EC6_ByteUnderlyingType_Reports()
+    {
+        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<PRECEPT0018SemanticEnumZeroSlot>(EC6_ByteUnderlying);
+        diagnostics.Should().ContainSingle();
+        diagnostics[0].Id.Should().Be("PRECEPT0018");
+        diagnostics[0].GetMessage().Should().Contain("A");
+    }
+
+    /// <summary>
+    /// EC7: long underlying type — Convert.ToInt64 widening path; zero member flagged.
+    /// </summary>
+    private const string EC7_LongUnderlying = @"
+namespace Precept.Language { public enum Foo : long { A = 0L, B = 1L } }";
+
+    [Fact]
+    public async Task EC7_LongUnderlyingType_Reports()
+    {
+        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<PRECEPT0018SemanticEnumZeroSlot>(EC7_LongUnderlying);
+        diagnostics.Should().ContainSingle();
+        diagnostics[0].Id.Should().Be("PRECEPT0018");
+        diagnostics[0].GetMessage().Should().Contain("A");
     }
 }
