@@ -20,6 +20,14 @@
 
 ## Recent Updates
 
+### 2026-04-29 — Reconciled duplicate collection-types research sections
+- Removed frank-9's `§Proposed Collection Types` section (duplicate of frank-10's `§Proposed Additional Types`).
+- Absorbed three rejected candidates (ring buffer, bounded collection, multimap) from frank-9 into frank-10's section as explicit `### Rejected:` subsections with full evaluation rationale.
+- Added all three rejects to `### Priority Summary` table and ring buffer + multimap to `## Comparison With Other Collection Systems`.
+- Added Open Question #10: temporal/business-domain types as collection inner types.
+- Moved `## Cross-References` to document end (after comparison table).
+- Updated Open Question #9 section reference from `§Proposed Collection Types` to `§Proposed Additional Types`.
+
 ### 2026-04-29 — Ordered-choice gaps closed and collection comparisons added
 - Fixed the last three `choice(...) ordered` documentation gaps in `docs/language/collection-types.md`.
 - Added `§ Proposed Additional Types` evaluating 6 candidates with priorities: `bag`, `log`, `map` high; `sortedset`, `priorityqueue` medium; `deque` low.
@@ -27,6 +35,23 @@
 - Scribe merged the resulting decision note into `decisions.md` and cleared the inbox entry.
 ### 2026-04-29 — Collection research recorded durably
 - Scribe logged frank-6 and frank-7, merged both collection research records into `decisions.md`, and summarized this history after the size gate tripped.
+
+### 2026-04-29 — Collection type expansion research and ordered-choice fixes
+- Fixed grammar production in collection-types.md: `choice(...)` → `choice(...) ordered?` to reflect the optional `ordered` modifier.
+- Surveyed collection types across Java, Python, C#, Kotlin, Scala, Haskell, and domain-specific systems (Drools, DMN, Camunda, event sourcing).
+- Evaluated 8 candidate types: priority queue, ordered set, multiset, deque, ring buffer, bounded collection, map, multimap.
+- Recommended: reject 4 (sorted set, deque, ring buffer, bounded collection), defer 3 (priority queue, multiset, restricted map), reject 1 (multimap).
+- Restricted `map of choice(...) to V` identified as the strongest future candidate — statically known key set enables proof engine reasoning.
+- Ring buffer rejected on philosophy grounds — silent eviction violates inspectability principle.
+- Added §Proposed Collection Types section and Open Question #9 to `docs/language/collection-types.md`.
+
+### 2026-04-29 — Ordered-choice gap fixed + additional collection types researched
+- Fixed three spots in `docs/language/collection-types.md` where `choice(...) ordered` was incorrectly treated as non-orderable: orderable definition, grammar production, and Ordering category assessment.
+- Clarified that `ordered` as a field-level modifier on collection fields is a type error, but `ordered` on the inner `choice(...)` type is valid.
+- Surveyed collection types across .NET, Java, Python, Rust, SQL, CEL, Zod/Valibot, and functional languages.
+- Authored §Proposed Additional Types evaluating 6 candidates: `bag`, `log`, `map` (high priority), `sortedset`, `priorityqueue` (medium), `deque` (low).
+- Authored §Comparison With Other Collection Systems reference table mapping 14 capabilities across 9 language ecosystems.
+- Decision record filed to inbox for scribe merge.
 
 ### 2026-04-29 — Collection types design doc authored
 - Created `docs/language/collection-types.md` as the canonical reference for the shipped collection surface (set/queue/stack) and proposed extensions (quantifiers, field constraints).
@@ -55,3 +80,4 @@
 
 ### 2026-04-28 — Prior closeout summary
 - Locked spike mode as first-class squad workflow, closed the parser/catalog extensibility loop, completed the PRECEPT0018 review pass, and defined the vision-to-spec migration boundary for the next day's implementation work.
+
