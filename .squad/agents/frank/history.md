@@ -42,3 +42,14 @@
 - Source catalog files (`Constructs.cs`, `TokenKind.cs`, `ConstructSlot.cs`, `DiagnosticCode.cs`) were already correct — no code changes needed.
 - Artifacts: `docs/working/audit-decisions-notes.md`, `.squad/decisions/inbox/frank-audit-decisions.md`.
 
+### 2026-04-28 — Parser R1–R6 compliance review: APPROVED
+- Reviewed all 6 remediation slices against v8 design. Verdict: APPROVED with zero blocking findings and 10 positive observations.
+- Two-tier architecture confirmed correct: non-disambiguated constructs (field, state, event, rule) go through full slot machinery; disambiguated constructs use catalog-driven `FindDisambiguatedConstruct()` with hand-written per-construct parsers.
+- All vocabulary frozen sets derive from catalog metadata. Sync recovery uses `Constructs.LeadingTokens`. No hardcoded parallel keyword lists.
+- Key pattern: `InvokeSlotParser()` CS8509 enforcement means adding a new `ConstructSlotKind` without a parser arm is a compile error — structural safety net.
+- Artifacts: `docs/working/parser-review.md`, `.squad/decisions/inbox/frank-parser-review.md`.
+
+
+### 2026-04-29 — Parser remediation review batch recorded
+- Architectural compliance review for Parser.cs remediation slices R1-R6 was approved with zero blocking findings and is now merged into the squad decision ledger.
+- The parser-v2 reference and Phase 3 cross-surface audit are now recorded as durable team context alongside the approved remediation review.

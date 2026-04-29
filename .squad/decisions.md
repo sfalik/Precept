@@ -6,6 +6,19 @@
 
 ---
 
+### 2026-04-29T00:43:25Z: Parser remediation review batch approved and synchronized
+**By:** Scribe
+**Status:** Merged, deduplicated, inbox cleared (4 files)
+
+**Merged sources:** frank-audit-cross, frank-parser-review, frank-parser-v2-authored, soup-nazi-parser-coverage.
+
+- Parser remediation slices R1-R6 are architecturally approved against the v8 catalog-driven parser design: top-level dispatch is catalog-owned, rule/state/event routing now flows through slot machinery where intended, preposition disambiguation is metadata-driven, and the cleanup removed the unauthorized header comment.
+- The permanent parser reference is now authored in docs/compiler/parser-v2.md. It captures the catalog-driven dispatch model, 5-layer architecture, full 12-node declaration hierarchy, OmitDeclaration separation, FieldTargetNode DU, validation pyramid, and expanded parser diagnostics.
+- Cross-surface consistency was re-aligned before the review closed: 8 inconsistencies were fixed across the spec, parser reference, slot comments, and token metadata so secondary sources match catalog-first primaries.
+- Coverage for the 6 remediation slices is approved at 2034/2034 passing tests. The audit fixed the stale ConstructSlotKind count, replaced the obsolete StateDeclaration slot-count assertion with an exact slot-shape fact, and added EventDeclaration_HasInitialMarkerSlot as the new catalog regression anchor.
+
+---
+
 ### 2026-04-28T06:41:30Z: Access-mode vocabulary locked and catalog fix landed
 **By:** Scribe
 **Status:** Merged, deduplicated, inbox cleared (13 files)
@@ -292,4 +305,5 @@ Merged `compiler-architecture-proposal.md` and `runtime-architecture-proposal.md
 **Status:** Standing decision
 
 Shane challenged the initial placement of R3 (immutability guarantees). Resolution: immutability is a public API contract, not an evaluator implementation detail. R3 documentation belongs in `docs.next/runtime/runtime-api.md`, not `docs.next/runtime/evaluator.md`.
+
 
