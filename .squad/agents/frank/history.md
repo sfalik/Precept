@@ -20,6 +20,14 @@
 
 ## Recent Updates
 
+### 2026-04-29 — Adopted each/any/no quantifier syntax
+- Replaced the C#-ish `.all(item, pred)` method-call form with the approved keyword-first quantifier syntax: `each`/`any`/`no` `binding in Collection (predicate)`.
+- Updated `docs/language/collection-types.md`: new syntax examples, grammar sketch, lexer note (`each` and `no` need new entries; `all` superseded by `each`).
+- Closed Open Questions Q2 (three keywords — decided: `each`/`any`/`no`) and Q3 (named binding — decided: author-named).
+- Re-numbered remaining open questions (10 → 8).
+- Updated inline `.all(x, ...)` example in Ordering category to `each x in Items (...)` form.
+- Filed decision record to `.squad/decisions/inbox/frank-quantifier-syntax.md`.
+
 ### 2026-04-29 — Reconciled duplicate collection-types research sections
 - Removed frank-9's `§Proposed Collection Types` section (duplicate of frank-10's `§Proposed Additional Types`).
 - Absorbed three rejected candidates (ring buffer, bounded collection, multimap) from frank-9 into frank-10's section as explicit `### Rejected:` subsections with full evaluation rationale.

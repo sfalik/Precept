@@ -453,26 +453,43 @@ This restriction exists because collections have no canonical string representat
 
 **Research basis:** CEL (Common Expression Language) provides 5 parse-time macros — `all`, `exists`, `exists_one`, `filter`, `map` — all non-Turing-complete, expanding at parse time over finite collections. OPA/Rego uses universal/existential quantification over sets. SQL uses `ALL`/`ANY`/`EXISTS` over subqueries.
 
-**Recommendation:** Bounded quantifier predicates only — `all`, `any`, `none`. No general loops, no `map`/`filter`/`reduce`.
+**Recommendation:** Bounded quantifier predicates only — `each`, `any`, `no`. No general loops, no `map`/`filter`/`reduce`.
 
 **Rationale:** Quantifiers are logical predicates over finite collections, not iteration constructs. They are provably terminating — the collection is finite and no mutation occurs during evaluation. This distinguishes them from general iteration, which the language philosophy explicitly excludes (§0.4.1 "No iteration constructs").
 
-**Proposed syntax:**
+**Approved syntax:**
 
 ```precept
-# In rule expressions — global truth
-rule Items.all(item, item > 0)
+# Universal — all elements must satisfy predicate
+rule each item in Items (item > 0) because "All items must be positive"
 
-# In guard expressions — conditional matching
-from Submitted on Approve when Reviewers.any(r, r == Approve.ReviewerName)
+# Existential — at least one element satisfies predicate
+when any r in Reviewers (r == Approve.ReviewerName)
 
-# Negated quantifier — no matching element
-rule Amounts.none(a, a < 0)
+# Negated existential — no element satisfies predicate
+rule no a in Amounts (a < 0) because "No negative amounts permitted"
+
+# Compound guard — predicate scopes cleanly within parens
+from Submitted on Approve
+    when any r in Reviewers (r == Approve.ReviewerName) and MissingDocuments.count == 0
+    -> set ApprovedBy = Approve.ReviewerName
+    -> transition Approved
 ```
 
-**Syntax form:** `Collection.quantifier(binding, predicate)` — the binding variable is named by the author and scoped to the predicate expression. The predicate is a boolean expression.
+**Syntax form:** `quantifier binding in Collection (predicate)` — the binding variable is a bare identifier named by the author and locally scoped to the parenthesized predicate. The predicate is a boolean expression.
 
-**Lexer note:** `All` and `Any` are already reserved keywords in the Precept lexer. Disambiguation is positional — `All`/`Any` after a `.` in member-access position is a quantifier call; elsewhere it retains its existing meaning (if any).
+**Grammar sketch:**
+
+```
+QuantifierExpr  :=  QuantifierKind Identifier in CollectionField '(' BoolExpr ')'
+QuantifierKind  :=  each | any | no
+```
+
+**Lexer note:** `any` is already a reserved keyword in the Precept lexer. `each` and `no` require new lexer entries. The previously reserved `all` keyword is superseded by `each` — `each` is grammatically correct ("each item in Items") where `all` would be broken English ("all item in Items").
+
+**Decided (Q2 — three keywords):** The language ships `each`, `any`, `no` as three distinct keywords. Three keywords are more discoverable and read more naturally in business rules. `no` reads better than `not any` in business rule context.
+
+**Decided (Q3 — named binding):** The quantifier syntax uses author-named binding variables (`item`, `r`, `a`). Named bindings are explicit and avoid nesting ambiguity. A fixed `it` pronoun creates scoping problems if quantifiers are ever nested.
 
 **What is deliberately held back:** `map`, `filter`, `reduce`, `sum`, and any transformation that produces a new collection or aggregate value. These require structured collection element types (a larger feature surface) and would cross the line from predicate into computation.
 
@@ -485,7 +502,7 @@ rule Amounts.none(a, a < 0)
 1. **Cardinality** — `mincount`/`maxcount` (already shipped)
 2. **Membership/value** — `contains` (already shipped)
 3. **Element-shape (quantified predicates)** — requires quantifiers (proposed above)
-4. **Ordering** — relative order of elements (partial path: `choice(...) ordered` as an inner type already enables element-level comparison via declaration-position rank, making `.min`/`.max` valid and enabling quantifier predicates like `Items.all(x, x >= "medium")` over ordered-choice sets; the remaining gap is ordering *constraints* on element sequences — e.g., "elements must be monotonically increasing" — which has no path yet)
+4. **Ordering** — relative order of elements (partial path: `choice(...) ordered` as an inner type already enables element-level comparison via declaration-position rank, making `.min`/`.max` valid and enabling quantifier predicates like `each x in Items (x >= "medium")` over ordered-choice sets; the remaining gap is ordering *constraints* on element sequences — e.g., "elements must be monotonically increasing" — which has no path yet)
 5. **Cross-collection** — relationships between two collection fields
 6. **Aggregate-relational** — `.count`, `.min`, `.max` in rule expressions (already shipped)
 
@@ -506,7 +523,7 @@ rule Amounts.none(a, a < 0)
 
 **`subset`/`disjoint` form (open question):** These could be field modifiers in the declaration (`field Selected as set of string subset AllowedValues`) or rule expressions in the body (`rule Selected subset AllowedValues`). The declaration form is more concise; the rule form is more flexible (can reference computed or conditional relationships).
 
-**Layer B (second priority): Quantifier predicates** — `all`/`any`/`none` as described above.
+**Layer B (second priority): Quantifier predicates** — `each`/`any`/`no` as described above.
 
 **Layer C (deferred): Dedicated `check` blocks** — readability-only sugar, no new capability beyond what rules + quantifiers provide. Deferred until the need becomes clear from real-world usage.
 
@@ -514,23 +531,19 @@ rule Amounts.none(a, a < 0)
 
 1. **Philosophy compatibility of quantifiers.** Does §0.4.1 "No iteration constructs" philosophically allow bounded quantifiers? Should the spec be amended to explicitly distinguish bounded predicates from general iteration? The distinction is meaningful — quantifiers assert truth over a finite domain, they don't iterate — but the current spec wording doesn't draw this line.
 
-2. **Three quantifiers or two + negation?** Should the language ship `all`/`any`/`none` as three distinct keywords, or `all`/`any` with `not ... any` serving as `none`? Three keywords are more discoverable and read more naturally in business rules. Two + negation is more minimal and avoids adding a keyword that's syntactically equivalent to `not any`.
+2. **Quantifier priority.** Should quantifiers ship before or after proof engine / graph analyzer work that's already in flight? Quantifiers introduce proof obligations — the compiler must verify that the predicate holds for all elements, or emit a diagnostic. This work depends on the proof engine's ability to reason about collection elements.
 
-3. **Named binding variable or fixed `it`?** Should the quantifier syntax use a named binding — `Items.all(item, item > 0)` — or a fixed pronoun — `Items.all(it > 0)`? Named bindings are more explicit and avoid ambiguity in nested expressions. A fixed `it` is terser but creates scoping problems if quantifiers are ever nested.
+3. **Collection `notempty` keyword.** Should `notempty` on a collection reuse the same keyword as string `notempty`, or get a distinct keyword? Reusing the keyword creates a natural parallel ("`notempty` means non-empty, regardless of what it's applied to"). A distinct keyword avoids potential confusion if the semantics diverge in the future.
 
-4. **Quantifier priority.** Should quantifiers ship before or after proof engine / graph analyzer work that's already in flight? Quantifiers introduce proof obligations — the compiler must verify that the predicate holds for all elements, or emit a diagnostic. This work depends on the proof engine's ability to reason about collection elements.
+4. **`unique` on `set` type.** Should `unique` on a `set` produce a warning (redundant — sets can't have duplicates) or silently accept? A warning is parallel to `RedundantModifier` for numeric constraints. Silent acceptance is more forgiving but allows conceptual mistakes to pass unnoticed.
 
-5. **Collection `notempty` keyword.** Should `notempty` on a collection reuse the same keyword as string `notempty`, or get a distinct keyword? Reusing the keyword creates a natural parallel ("`notempty` means non-empty, regardless of what it's applied to"). A distinct keyword avoids potential confusion if the semantics diverge in the future.
+5. **Cross-collection constraint form.** Should `subset`/`disjoint` be field modifiers (in the declaration) or rule expressions (in rule/ensure/when bodies)? Field modifiers are concise and declarative. Rule expressions are more flexible — they can be conditional, they can reference event args, and they can compose with boolean logic.
 
-6. **`unique` on `set` type.** Should `unique` on a `set` produce a warning (redundant — sets can't have duplicates) or silently accept? A warning is parallel to `RedundantModifier` for numeric constraints. Silent acceptance is more forgiving but allows conceptual mistakes to pass unnoticed.
+6. **Proposal granularity.** One combined proposal for all collection extensions, or two separate increments — quantifiers as one, field-level constraints as another? The 3-layer recommendation suggests separate increments (Layer A ships first, Layer B second), but the formal proposal structure is TBD.
 
-7. **Cross-collection constraint form.** Should `subset`/`disjoint` be field modifiers (in the declaration) or rule expressions (in rule/ensure/when bodies)? Field modifiers are concise and declarative. Rule expressions are more flexible — they can be conditional, they can reference event args, and they can compose with boolean logic.
+7. **Collection type expansion.** After quantifier predicates and field constraints ship, which collection type — if any — should be next? The §Proposed Additional Types section below surveys candidates. Before any of these could become a formal GitHub issue, the following research would be needed: (a) a concrete corpus of `.precept` files that cannot express a real business rule without the proposed type, (b) a proof engine impact assessment for the type's mutation operations, (c) an inner type compatibility analysis (which scalar types are valid, which are type errors), and (d) a philosophy review confirming the type reads as domain declaration, not general-purpose programming.
 
-8. **Proposal granularity.** One combined proposal for all collection extensions, or two separate increments — quantifiers as one, field-level constraints as another? The 3-layer recommendation suggests separate increments (Layer A ships first, Layer B second), but the formal proposal structure is TBD.
-
-9. **Collection type expansion.** After quantifier predicates and field constraints ship, which collection type — if any — should be next? The §Proposed Additional Types section below surveys candidates. Before any of these could become a formal GitHub issue, the following research would be needed: (a) a concrete corpus of `.precept` files that cannot express a real business rule without the proposed type, (b) a proof engine impact assessment for the type's mutation operations, (c) an inner type compatibility analysis (which scalar types are valid, which are type errors), and (d) a philosophy review confirming the type reads as domain declaration, not general-purpose programming.
-
-10. **Temporal and business-domain types as inner types.** The `ScalarType` production currently admits only primitives (`string`, `~string`, `integer`, `decimal`, `number`, `boolean`, `choice`). There is no principled reason to exclude temporal types (`date`, `time`, `datetime`, `duration`) or business-domain types (`money`, `percentage`) from collection inner types. `set of date`, `queue of money`, and `map of string to date` are all semantically coherent — these types have natural ordering and comparison semantics. This appears to be an incremental build artifact (collections and typed scalars landed at different times) rather than an intentional restriction. Should the `ScalarType` production be extended to include all Precept scalar types?
+8. **Temporal and business-domain types as inner types.** The `ScalarType` production currently admits only primitives (`string`, `~string`, `integer`, `decimal`, `number`, `boolean`, `choice`). There is no principled reason to exclude temporal types (`date`, `time`, `datetime`, `duration`) or business-domain types (`money`, `percentage`) from collection inner types. `set of date`, `queue of money`, and `map of string to date` are all semantically coherent — these types have natural ordering and comparison semantics. This appears to be an incremental build artifact (collections and typed scalars landed at different times) rather than an intentional restriction. Should the `ScalarType` production be extended to include all Precept scalar types?
 
 ---
 
