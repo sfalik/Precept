@@ -75,7 +75,17 @@ from Draft on RemoveFloor when RequestedFloors contains RemoveFloor.Floor
 | `.min` | `T` | `.count > 0` guard required | `T` must be orderable. Proof obligation: `UnguardedCollectionAccess`. |
 | `.max` | `T` | `.count > 0` guard required | `T` must be orderable. Proof obligation: `UnguardedCollectionAccess`. |
 
-"Orderable" means the inner type supports `<`/`>` comparison: all numeric types (`integer`, `decimal`, `number`) and `string` (including `~string`, which uses `OrdinalIgnoreCase` ordering — deterministic). `boolean` and `choice` (unordered) are not orderable; `.min`/`.max` on `set of boolean` or `set of choice(...)` is a type error.
+"Orderable" means the inner type supports `<`/`>` comparison: all numeric types (`integer`, `decimal`, `number`), `string` (including `~string`, which uses `OrdinalIgnoreCase` ordering — deterministic), and `choice(...) ordered` (which defines rank by declaration position). `boolean` and unordered `choice(...)` are not orderable; `.min`/`.max` on `set of boolean` or `set of choice(...)` (without `ordered`) is a type error. On `set of choice(...) ordered`, `.min` returns the element with the lowest declaration position and `.max` returns the highest — these are safe when the `.count > 0` guard is satisfied.
+
+```precept
+field RiskLevels as set of choice("low", "medium", "high") ordered
+# .min → "low", .max → "high" (by declaration position)
+
+from Active on Evaluate when RiskLevels.count > 0
+    -> set LowestRisk = RiskLevels.min
+    -> set HighestRisk = RiskLevels.max
+    -> no transition
+```
 
 ```precept
 from Draft on Submit when RequestedFloors.count > 0
@@ -222,7 +232,7 @@ The inner type `T` in `set of T`, `queue of T`, or `stack of T` must be a scalar
 
 ```
 CollectionType  :=  (set | queue | stack) of ScalarType
-ScalarType      :=  string | ~string | integer | decimal | number | boolean | choice(...)
+ScalarType      :=  string | ~string | integer | decimal | number | boolean | choice(...) ordered?
 ```
 
 Collections of collections (`set of set of string`) are not supported. Collections of temporal or business-domain types are not currently supported — the inner type must be a primitive.
@@ -360,7 +370,7 @@ The proof engine recognizes `F.count > 0` in the `when` clause as sufficient pro
 | `mincount`/`maxcount` on scalar field | `InvalidModifierForType` |
 | `min`/`max`/`nonnegative`/`notempty`/`minlength`/`maxlength`/`maxplaces` on collection field | `InvalidModifierForType` |
 
-**Scalar constraints do not apply to collections.** `notempty`, `min`, `max`, `minlength`, `maxlength`, `maxplaces`, `nonnegative`, `positive`, `nonzero`, and `ordered` are all type errors on collection fields. Collections have their own constraint vocabulary: `mincount` and `maxcount`.
+**Scalar constraints do not apply to collections.** `notempty`, `min`, `max`, `minlength`, `maxlength`, `maxplaces`, `nonnegative`, `positive`, `nonzero`, and `ordered` are all type errors when applied as field-level modifiers on collection fields (e.g., `field Tags as set of string ordered` is invalid). Collections have their own constraint vocabulary: `mincount` and `maxcount`. Note that `ordered` on the *inner `choice(...)` type* is valid — `field Priorities as set of choice("low", "medium", "high") ordered` declares an ordered-choice inner type, not a collection-level modifier.
 
 ---
 
@@ -475,7 +485,7 @@ rule Amounts.none(a, a < 0)
 1. **Cardinality** — `mincount`/`maxcount` (already shipped)
 2. **Membership/value** — `contains` (already shipped)
 3. **Element-shape (quantified predicates)** — requires quantifiers (proposed above)
-4. **Ordering** — relative order of elements (no clear path yet)
+4. **Ordering** — relative order of elements (partial path: `choice(...) ordered` as an inner type already enables element-level comparison via declaration-position rank, making `.min`/`.max` valid and enabling quantifier predicates like `Items.all(x, x >= "medium")` over ordered-choice sets; the remaining gap is ordering *constraints* on element sequences — e.g., "elements must be monotonically increasing" — which has no path yet)
 5. **Cross-collection** — relationships between two collection fields
 6. **Aggregate-relational** — `.count`, `.min`, `.max` in rule expressions (already shipped)
 
@@ -529,3 +539,265 @@ This document is the canonical source for collection type rules. Other documents
 | [Language Spec](precept-language-spec.md) | §2.3 type grammar, §3.6 `contains` typing, §3.8 action validation, accessor tables | Brief summary + "See [Collection Types](collection-types.md)" |
 | [Primitive Types](primitive-types.md) | `~string` inner type, `.count` → `integer` production | Cross-reference to §Inner Type System |
 | [Type Checker](../compiler/type-checker.md) | Collection action validation, emptiness proof obligations | Brief summary + link |
+
+---
+
+## Proposed Additional Types
+
+> **This is research and proposal, not shipped behavior.** The candidates below were evaluated against external collection systems and filtered through Precept's philosophy: prevention not detection, deterministic inspectability, proof engine safety, keyword-anchored flat statements, business-analyst readability, and non-Turing-completeness. No syntax below is implemented.
+
+### Evaluation Criteria
+
+Every candidate must pass all six filters before advancing:
+
+1. **Unlocks a business rule** that `set`/`queue`/`stack` cannot express today
+2. **Deterministic and inspectable** — no hidden ordering surprises, no ambient state
+3. **Proof engine can reason about safety** — access patterns are statically verifiable
+4. **Fits Precept's keyword-anchored flat-statement style** — no nested expressions or builder chains
+5. **Business analyst readable** — the keyword name communicates behavior without documentation
+6. **Non-Turing-complete** — finite, bounded operations; no unbounded recursion or general iteration
+
+### Candidate 1: `sortedset of T`
+
+**What it is:** Like `set` but maintains elements in sorted order by the inner type's natural ordering. `.min` and `.max` are always-safe accessors (no emptiness guard needed when combined with `notempty`), and iteration order is deterministic.
+
+**Business scenario:** A loan application tracks required approval levels. The business rule is "the highest approval level determines the signing authority." With a plain `set`, `.min`/`.max` require emptiness guards every time. A `sortedset` with a `notempty` constraint makes these always-safe.
+
+```precept
+field ApprovalLevels as sortedset of choice("team-lead", "director", "vp", "cfo") ordered notempty
+
+# .min → always-safe, returns lowest declared rank
+# .max → always-safe, returns highest declared rank
+rule SigningAuthority == ApprovalLevels.max
+    reason "Signing authority must match the highest required approval"
+```
+
+**Proof engine implications:** If the field carries `notempty` (or `mincount 1`), `.min`/`.max` are statically safe — no `UnguardedCollectionAccess` needed. The proof engine must track the `notempty` constraint as a proof discharge for access obligations. The inner type `T` must be orderable.
+
+**Grammar fit:**
+
+```
+field F as sortedset of T
+```
+
+Reuses the `of` connector and all existing constraint keywords (`mincount`, `maxcount`, `notempty`).
+
+**Action surface:** Identical to `set` — `add`, `remove`, `clear`. No new keywords. The sorted invariant is maintained internally.
+
+**Priority:** **Medium.** The business value is real (eliminating emptiness guards on ordered collections), but `set` + explicit guards covers the same ground with more ceremony. This is a convenience and safety improvement, not a capability gap.
+
+### Candidate 2: `bag of T` (multiset)
+
+**What it is:** Like `set` but allows duplicate elements. Each element has an associated count. Supports `add` (increment count), `remove` (decrement count), `.countof(element)` accessor.
+
+**Business scenario:** An inventory system tracks item quantities. A shopping cart allows multiple units of the same SKU. A claims processor counts how many times a particular diagnosis code appears.
+
+```precept
+field CartItems as bag of string
+
+from Shopping on AddItem
+    -> add CartItems AddItem.SKU
+    -> no transition
+
+from Shopping on RemoveItem when CartItems contains RemoveItem.SKU
+    -> remove CartItems RemoveItem.SKU
+    -> no transition
+
+rule CartItems.countof("hazmat-item") <= 3
+    reason "No more than 3 hazardous items per order"
+```
+
+**Proof engine implications:** `.countof(element)` always returns a non-negative integer (0 if absent) — always safe, no proof obligation. `.count` returns total element count including duplicates. The proof engine must understand that `remove` on a bag decrements rather than deletes (the element persists until count reaches 0).
+
+**Grammar fit:**
+
+```
+field F as bag of T
+```
+
+Natural keyword — "bag" is the established mathematical term for multiset, and is more intuitive to a business analyst than "multiset."
+
+**Action surface:** Reuses `add`, `remove`, `clear`. New accessor: `.countof(element)` — returns integer count of a specific element.
+
+**Priority:** **High.** This unlocks counting and quantity-tracking rules that `set` (which collapses duplicates) and `queue`/`stack` (which don't expose per-element counts) cannot express. Many real business domains need "how many of X" as a first-class concept.
+
+### Candidate 3: `deque of T`
+
+**What it is:** Double-ended queue. Supports push/pop at both front and back.
+
+**Business scenario:** A customer service queue that supports both normal FIFO processing and priority escalation to the front. A browser-history model that adds to the back and can trim from either end.
+
+```precept
+field ServiceQueue as deque of string
+
+from Active on EnqueueNormal
+    -> push-back ServiceQueue EnqueueNormal.CustomerId
+    -> no transition
+
+from Active on Escalate
+    -> push-front ServiceQueue Escalate.CustomerId
+    -> no transition
+
+from Active on ServeNext when ServiceQueue.count > 0
+    -> pop-front ServiceQueue into CurrentCustomer
+    -> transition Serving
+```
+
+**Proof engine implications:** Same emptiness obligations as queue/stack — `pop-front` and `pop-back` require `.count > 0`. Two peek variants: `.peekfront` and `.peekback`, each requiring the same guard.
+
+**Grammar fit:**
+
+```
+field F as deque of T
+```
+
+**Action surface:** New keywords required: `push-front`, `push-back`, `pop-front`, `pop-back`. New accessors: `.peekfront`, `.peekback`. This is 4 new action keywords and 2 new accessors — a significant surface expansion.
+
+**Priority:** **Low.** The double-ended access pattern is rare in business-rule domains. Most real scenarios are either FIFO (queue) or LIFO (stack). The escalation pattern can be modeled with two separate queues (priority + normal) or a priority queue. The keyword surface cost is high relative to the business-rule unlock.
+
+### Candidate 4: `priorityqueue of T`
+
+**What it is:** A queue where elements are dequeued by priority rather than insertion order. Each enqueue includes a priority value; dequeue always removes the highest-priority element.
+
+**Business scenario:** A claims triage system where claims are processed by severity. A work-item queue where urgent items bypass the normal order.
+
+```precept
+field ClaimQueue as priorityqueue of string
+
+from Receiving on FileClaim
+    -> enqueue ClaimQueue FileClaim.ClaimId priority FileClaim.Severity
+    -> no transition
+
+from Processing on ProcessNext when ClaimQueue.count > 0
+    -> dequeue ClaimQueue into CurrentClaim
+    -> transition Reviewing
+```
+
+**Proof engine implications:** Emptiness obligations identical to `queue`. The priority value introduces a secondary type requirement — the `priority` argument must be orderable. The proof engine must understand that dequeue order is by priority, not insertion, which affects reasoning about which element `.peek` returns.
+
+**Grammar fit:**
+
+```
+field F as priorityqueue of T
+```
+
+New syntax required for `enqueue ... priority Expr`. The `priority` keyword is new.
+
+**Action surface:** Extends `enqueue` with optional `priority` clause. Reuses `dequeue`, `dequeue into`, `clear`, `.peek`, `.count`. Adds `priority` as a contextual keyword.
+
+**Priority:** **Medium.** Priority-based processing is a real business pattern, but the interaction between the priority type and the inner type creates complexity. The proof engine must reason about priority ordering, not just element types. Consider whether this is better served by a `sortedset` with a composite key or by application-layer logic outside the precept.
+
+### Candidate 5: `log of T`
+
+**What it is:** An append-only ordered sequence. Elements can be added but never removed. Supports `.count`, positional read (`.at(index)`), `.last`, and `.first`. Models audit trails, event histories, and compliance records.
+
+**Business scenario:** A loan application must maintain an immutable record of all status changes for regulatory compliance. An insurance claim tracks every assessment note chronologically.
+
+```precept
+field AuditTrail as log of string
+
+from any on any
+    -> append AuditTrail "{CurrentState} -> {Event.Name}: {Event.Reason}"
+    -> no transition
+
+rule AuditTrail.count > 0
+    reason "Every entity must have at least one audit entry"
+
+from Review on Examine when AuditTrail.count > 0
+    -> set LastAction = AuditTrail.last
+    -> no transition
+```
+
+**Proof engine implications:** `append` is always safe (no precondition). `.last` and `.first` require `.count > 0` (same obligation pattern as `.peek`). `.at(index)` requires `index >= 0 and index < F.count` — this introduces an index-bounds proof obligation, which is a new category of safety proof. The append-only invariant simplifies reasoning: the proof engine knows that `.count` is monotonically non-decreasing within an event.
+
+**Grammar fit:**
+
+```
+field F as log of T
+```
+
+"Log" is immediately understandable to a business analyst — "this is the audit log."
+
+**Action surface:** One new keyword: `append`. New accessors: `.first`, `.last`, `.at(index)`. No removal operations exist by design.
+
+**Priority:** **High.** Append-only audit trails are a pervasive business requirement across regulated industries (finance, insurance, healthcare). No existing collection type can model "add but never remove" — `queue` allows `dequeue`, `stack` allows `pop`, and `set` allows `remove`. The `log` type makes the immutability guarantee structural, which is exactly Precept's philosophy of prevention over detection.
+
+### Candidate 6: `map of K to V`
+
+**What it is:** A key-value association. Each key maps to exactly one value. Supports set-by-key, get-by-key, contains-key, and remove-by-key.
+
+**Business scenario:** A policy record maps coverage types to their limits. A fee schedule maps transaction types to fee amounts. A configuration entity maps setting names to values.
+
+```precept
+field CoverageLimits as map of string to decimal
+
+from Draft on SetCoverage
+    -> put CoverageLimits SetCoverage.CoverageType = SetCoverage.Limit
+    -> no transition
+
+from Active on CheckCoverage when CoverageLimits containskey CheckCoverage.CoverageType
+    -> set CurrentLimit = CoverageLimits.get(CheckCoverage.CoverageType)
+    -> no transition
+
+rule CoverageLimits.count <= 10
+    reason "No more than 10 coverage types per policy"
+```
+
+**Proof engine implications:** `.get(key)` requires a `containskey` guard — same pattern as emptiness proofs but keyed. This is a new proof obligation category: key-presence safety. `put` is always safe (creates or overwrites). `removekey` requires no guard (no-op if absent, like `remove` on `set`). The proof engine must track key-presence from `containskey` guards in `when` clauses.
+
+**Grammar fit:**
+
+```
+field F as map of K to V
+```
+
+Introduces `to` as a type-position keyword connecting key and value types. Both `K` and `V` must be scalar types. The `to` keyword is new in this context but reads naturally.
+
+**Action surface:** New keywords: `put`, `removekey`, `containskey`, `.get(key)`. `containskey` parallels `contains` on sets. `.count` reuses existing accessor. `.keys` and `.values` could return sets for use in `contains` and quantifier expressions.
+
+**Priority:** **High.** Key-value association is fundamental to business modeling. Configuration tables, fee schedules, lookup mappings, and per-category settings are everywhere. Today, modeling these in Precept requires either multiple parallel fields or external application logic — both of which break the one-file-complete-rules guarantee. A `map` type keeps the association inside the contract.
+
+### Priority Summary
+
+| Candidate | Priority | Rationale |
+|---|---|---|
+| `bag of T` | **High** | Unlocks quantity tracking — pervasive in commerce, inventory, counting rules |
+| `log of T` | **High** | Unlocks append-only audit trails — pervasive in regulated industries, aligns perfectly with prevention philosophy |
+| `map of K to V` | **High** | Unlocks key-value association — pervasive in configuration, fee schedules, coverage tables |
+| `sortedset of T` | **Medium** | Convenience improvement — eliminates emptiness guards on ordered collections, but `set` + guards covers same ground |
+| `priorityqueue of T` | **Medium** | Real pattern but complex proof surface — priority ordering adds a secondary type axis |
+| `deque of T` | **Low** | Rare in business-rule domains — double-ended access is an infrastructure pattern, not a business-rule pattern |
+
+### Recommended Rollout
+
+1. **First:** `bag` and `log` — highest business-rule unlock per complexity dollar; `bag` extends the existing set action surface minimally, `log` introduces one new keyword (`append`) and aligns with audit/compliance requirements
+2. **Second:** `map` — highest structural value but largest surface expansion (new type connector `to`, new proof obligation category for key-presence)
+3. **Evaluate:** `sortedset` — only after quantifier predicates ship, because sorted-set value compounds with element-level predicates
+4. **Defer:** `priorityqueue` and `deque` — insufficient business-rule pressure to justify the surface cost
+
+---
+
+## Comparison With Other Collection Systems
+
+> A brief survey of collection types across languages and frameworks, mapped to Precept's current and proposed surface.
+
+| Capability | .NET | Java | Python | Rust | SQL | CEL | F#/Haskell | Precept (shipped) | Precept (proposed) |
+|---|---|---|---|---|---|---|---|---|---|
+| **Unordered unique set** | `HashSet<T>` | `HashSet` | `set` | `HashSet` | — | — | `Set<'T>` | `set of T` ✓ | — |
+| **Sorted unique set** | `SortedSet<T>` | `TreeSet` | — | `BTreeSet` | — | — | `Set<'T>` (sorted) | — | `sortedset of T` |
+| **Insertion-order set** | — | `LinkedHashSet` | — | `IndexSet`* | — | — | — | — | Not proposed† |
+| **Multiset / bag** | — | — | `Counter` | — | `MULTISET` | — | — | — | `bag of T` |
+| **FIFO queue** | `Queue<T>` | `ArrayDeque` | `deque` | `VecDeque` | — | — | — | `queue of T` ✓ | — |
+| **LIFO stack** | `Stack<T>` | `ArrayDeque` | `list` | `Vec` | — | — | — | `stack of T` ✓ | — |
+| **Double-ended queue** | — | `ArrayDeque` | `deque` | `VecDeque` | — | — | — | — | `deque of T` (low pri) |
+| **Priority queue** | `PriorityQueue<T,P>` | `PriorityQueue` | `heapq` | `BinaryHeap` | — | — | — | — | `priorityqueue of T` (med pri) |
+| **Append-only log** | `ImmutableList<T>` | — | — | — | — | `list` (immutable) | `list` (cons) | — | `log of T` |
+| **Key-value map** | `Dictionary<K,V>` | `HashMap` | `dict` | `HashMap` | — | `map` | `Map<'K,'V>` | — | `map of K to V` |
+| **Non-empty guarantee** | — | — | — | — | `NOT NULL` | — | `NonEmpty` | `notempty`/`mincount 1` ✓ | — |
+| **Element uniqueness** | inherent in sets | inherent in sets | inherent in sets | inherent in sets | `UNIQUE` | — | inherent in sets | inherent in `set` ✓ | `unique` on queue/stack |
+| **Cardinality constraints** | — | — | — | — | `CHECK` | `.size()` | — | `mincount`/`maxcount` ✓ | — |
+| **Element predicates** | LINQ `.All`/`.Any` | Streams | comprehensions | `.iter().all()`/`.any()` | `ALL`/`ANY`/`EXISTS` | `.all()`/`.exists()` | `forall`/`exists` | — | `all`/`any`/`none` |
+| **Subset/disjoint** | `.IsSubsetOf` | `.containsAll` | `<=`/`.isdisjoint` | `.is_subset` | — | — | `Set.isSubset` | — | `subset`/`disjoint` |
+
+\* `IndexSet` is from the `indexmap` crate, not Rust std.
+† Insertion-order sets conflate two concerns (uniqueness + temporal ordering) in a way that makes proof-engine reasoning ambiguous — the "order" has no semantic meaning the engine can verify. Precept's `queue` (explicit FIFO) and `set` (explicit uniqueness) are the correct decomposition.
