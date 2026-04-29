@@ -10,6 +10,9 @@
 - Metadata belongs in catalogs when consumers need per-member knowledge; pipeline/tooling drift comes from hardcoded parallel copies.
 - Parser algorithms stay hand-written, but vocabulary tables, precedence data, and disambiguation metadata should derive from catalog truth where possible.
 - Authoring consumers read `CompilationResult`; execution/preview consumers read lowered `Precept`; runtime-native lowered data may intentionally preserve selected analysis residue.
+- Design loop convergence pattern: validation infrastructure first (v5), then vocabulary lock (v7), then structural separation corrections (v8). Each layer depends on the previous — you can't split AST nodes correctly until the vocabulary is locked, and you can't lock vocabulary until the validation layer ensures nothing drifts silently.
+- The v7→v8 OmitDeclaration split is the canonical example of why `catalog-system.md`'s flat-record prohibition matters: different slot counts + different guard eligibility + different semantic categories = separate constructs, not internal branching.
+- A complete design evaluation requires reading the *implementation* alongside the *design* — the wrapper node pattern (TokenWrapper, etc.) and the InitialMarker remediation-phase addition were both correct implementation details not visible in the design documents.
 - When a construct family splits, verification must cover catalog entries, AST nodes, BuildNode arms, routing tests, slot-order tests, and slice-level regression anchors.
 
 ## Recent Updates
@@ -50,6 +53,30 @@
 - Artifacts: `docs/working/parser-review.md`, `.squad/decisions/inbox/frank-parser-review.md`.
 
 
+### 2026-04-28 — Vision vs. Spec audit completed
+- Audited `docs/language/precept-language-vision.md` (74 KB, ~1167 lines) against `docs/language/precept-language-spec.md` (39 KB, ~1350 lines).
+- **Two contradictions found:** (1) `with` listed as a structural preposition in vision but absent from spec — stale reference, never implemented. (2) "Root editability" in stateless precept list conflicts with the locked `write all` removal decision — should read "Field-level editability."
+- **Critical unique content in vision not yet in spec:** the 11 Design Principles, Governance vs. Validation framing, 7 Execution Model Properties, 7 Proof Philosophy principles, outcome semantic distinctions, and constraint violation subject attribution. These are the "why" backbone — the spec has no preamble or §4/§5 to host them.
+- **5 duplication zones:** access mode composition, function catalog, modifier applicability, numeric lane rules, entity construction — maintained in both docs, creating maintenance tax.
+- **Recommendation: Do NOT archive yet.** Migrate Category A language-identity content into a new §0 "Language Design Goals" in the spec first. Remaining content migrates as spec §4 (graph analyzer) and §5 (proof engine) are written. Archive after all migrations complete.
+- Artifact: `.squad/decisions/inbox/frank-vision-spec-audit.md`.
+
 ### 2026-04-29 — Parser remediation review batch recorded
 - Architectural compliance review for Parser.cs remediation slices R1-R6 was approved with zero blocking findings and is now merged into the squad decision ledger.
 - The parser-v2 reference and Phase 3 cross-surface audit are now recorded as durable team context alongside the approved remediation review.
+
+### 2026-04-28 — Parser design evaluation (v5–v8) completed
+- Evaluated all six working design documents (v5, v5-lang-simplify, v6, v7, v8, v8-session-notes) against the canonical parser spec (docs/compiler/parser.md) and current implementation (src/Precept/Pipeline/Parser.cs).
+- **Verdict: ADOPT v8 as-is.** The design is sound, the implementation is complete, and it matches the canonical spec with zero contradictions.
+- The evolution arc resolved every identified gap: v5 fixed validation infrastructure + RuleExpression, v7 locked vocabulary + implementation plan, v8 corrected OmitDeclaration structural separation + FieldTargetNode DU.
+- Key confirmation: The catalog-driven boundary is drawn correctly — domain knowledge in catalogs, grammar mechanics hand-written. No metadata-driven architecture violations.
+- Implementation (Parser.cs, 1386 lines) faithfully executes v8 across all 12 constructs, all 5 architectural layers, and 2034+ passing tests.
+- Minor observation: `InitialMarker` slot kind was added during remediation, not in v8's original plan. Covered by the spec. Not a gap.
+- Design loop is closed. Working documents can be archived as audit trail.
+
+### 2026-04-28 — Catalog-driven extensibility audit completed
+- Full baseline audit of the lexer/parser/AST metadata boundary. Lexer is 100% catalog-driven for keywords, operators, and punctuation — zero code changes needed for new vocabulary. Parser has a dual-layer architecture: vocabulary recognition (Layer A) is fully catalog-driven; grammar structure (Layer B) has 4 hand-written switches that need hardening.
+- Identified 8 gaps where adding a new `ConstructKind`, `ActionKind`, or `ConstructSlotKind` doesn't produce compile errors: `BuildNode()` wildcard, `ParseDirectConstruct()` wildcard, `DisambiguateAndParse()` hardcoded routing, `ParseActionStatement()` 8-arm switch, `ExpressionBoundaryTokens` hardcoded set, no `ConstructKind`↔`Declaration` subtype enforcement, no `ActionKind`↔`Statement` subtype enforcement, hardcoded access mode adjectives.
+- Key architectural recommendation: prefer catalog shape changes over Roslyn analyzers. Two immediate wins (remove `BuildNode()` wildcard for CS8509, derive `ExpressionBoundaryTokens` from `Constructs.LeadingTokens`). Two catalog shape investments (`RoutingFamily` on `ConstructMeta`, `ActionSyntaxShape` on `ActionMeta`). These four changes close all 8 gaps without custom Roslyn analyzers.
+- `InvokeSlotParser()` is the gold standard — already CS8509-enforced, no wildcard. New `ConstructSlotKind` members produce build errors. This pattern should be replicated across all exhaustive switches.
+- Artifacts: `.squad/decisions/inbox/frank-catalog-extensibility.md`.
