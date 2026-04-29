@@ -6,6 +6,19 @@
 
 ---
 
+### 2026-04-29T01:39:22Z: Catalog extensibility plan v3 cleared for George
+**By:** Scribe
+**Status:** Merged, deduplicated, inbox cleared (2 files)
+
+**Merged sources:** frank-catalog-ext-plan-v2-review, frank-catalog-extensibility-plan-review.
+
+- Frank's first review blocked the catalog extensibility plan on three structural fixes: split PreceptHeader into RoutingFamily.Header, add Slice 3b to the execution order after Slice 3, and commit Slice 3b to explicit wrong-family ConstructKind listings so CS8509 stays active.
+- Frank's second review confirmed those first-round blockers were resolved and approved the architecture, but found two new surgical blockers in the revised text: an unbound k variable in the Slice 3b throw examples and a phantom ErrorStatement(current) call in Slice 5.
+- The coordinator patched both plan defects in plan.md: the Slice 3b guard text no longer references an unbound pattern variable, and Slice 5 now specifies the real synthetic-error-node handling instead of a nonexistent helper.
+- src/Precept/Language/Token.cs was added to the file inventory because Slice 6 changes TokenMeta.IsAccessModeAdjective there, and the GetMeta wildcard note remains a documented non-blocking follow-up.
+- Net result: the plan is now at v3, blockers are cleared, and George can implement from the updated plan.
+
+---
 ### 2026-04-29T01:09:17Z: Catalog extensibility audit and parser design evaluation recorded
 **By:** Scribe
 **Status:** Merged, deduplicated, inbox cleared (3 files)
