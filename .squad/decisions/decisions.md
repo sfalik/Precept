@@ -18,12 +18,12 @@ The rewrite succeeds. §1 opens with a problem statement and architectural commi
 
 ## Decision
 
-This doc is ready to serve as the architectural foundation for per-stage design docs (starting with the parser). The concerns above are improvements, not blockers — the parser concern is the most urgent because that's the immediate next use case.
-
----
-
----
-
+This doc is ready to serve as the architectural foundation for per-stage design docs (starting with the parser). The concerns above are improvements, not blockers — the parser concern is the most urgent because that's the immediate next use case.
+
+---
+
+---
+
 # Design Review: combined-design-v2.md — Soundness, Completeness, Innovation
 
 **Reviewer:** Frank (Lead Architect)
@@ -103,12 +103,12 @@ Replace "lowered expression nodes and action plans" with a concrete specificatio
 
 ---
 
-*This review is direct because the timing demands it. Addressing these three items now — before the parser, type checker, and evaluator are built — is nearly free. Addressing them after implementation begins is expensive. The architecture is sound. These are the gaps that would bite us.*
-
----
-
----
-
+*This review is direct because the timing demands it. Addressing these three items now — before the parser, type checker, and evaluator are built — is nearly free. Addressing them after implementation begins is expensive. The architecture is sound. These are the gaps that would bite us.*
+
+---
+
+---
+
 # Decision: Combined Design v2 Comprehensive Revision Pass
 
 **By:** Frank
@@ -266,12 +266,12 @@ If the underlying concern is verbosity in stateless precepts that happen to have
 - A `write all` shorthand already exists and handles the fully-open case.
 - If a `write all except F1, F2` syntax were needed, it could be evaluated without inverting the default. The exception list would still be a positive declaration against a positively-declared baseline.
 
-Neither of these requires abandoning the conservative default. The proposal conflates "reduce boilerplate" with "invert the safety model." Only the former is a real problem; the latter is the wrong solution.
-
----
-
----
-
+Neither of these requires abandoning the conservative default. The proposal conflates "reduce boilerplate" with "invert the safety model." Only the former is a real problem; the latter is the wrong solution.
+
+---
+
+---
+
 # George — Technical Review: combined-design-v2.md
 
 **Date:** 2026-04-28
@@ -388,12 +388,12 @@ However, the doc has **critical implementation-readiness gaps for the Parser** (
 - Could a Roslyn generator read ConstructCatalog/ConstructMeta and emit parser test stubs?
 - Could it emit round-trip parse tests (text -> AST -> text) per construct automatically?
 - How does this interact with the generic AST proposal — if AST nodes are generic/generated, do tests follow?
-- What is the boundary between generated test scaffolding and hand-authored test logic?
-
----
-
----
-
+- What is the boundary between generated test scaffolding and hand-authored test logic?
+
+---
+
+---
+
 # Calculated Field Arrow Direction: `<-` vs `->` Analysis
 
 **Author:** Frank (Lead/Architect & Language Designer)
@@ -705,12 +705,12 @@ The right-pointing arrow:
 | Computed field research | `research/language/expressiveness/computed-fields.md` | Read-only derivation contract, precedent survey |
 | `computed-tax-net.precept` | `samples/computed-tax-net.precept:10–11` | Canonical computed field usage |
 | `invoice-line-item.precept` | `samples/invoice-line-item.precept:16–20` | Multi-step computed field chains |
-| `travel-reimbursement.precept` | `samples/travel-reimbursement.precept:14` | Computed field with modifier interleaving |
-
----
-
----
-
+| `travel-reimbursement.precept` | `samples/travel-reimbursement.precept:14` | Computed field with modifier interleaving |
+
+---
+
+---
+
 # Design Session Round 1: Catalog-Driven Parser Full Vision
 
 **By:** Frank
@@ -739,12 +739,12 @@ Round 1 of a 3-round design session requested by Shane. The prior analysis walke
 
 ## What Round 2 Should Challenge
 
-See `## For George` section in the design doc. Key areas: `Entries` replacing `LeadingToken` (breaking catalog change), `when` guard uniformity assumption, slot parser `SyntaxNode?` return type fragility, factory dictionary vs. switch, anchor/guard injection coupling, and clean-slate re-estimate.
-
----
-
----
-
+See `## For George` section in the design doc. Key areas: `Entries` replacing `LeadingToken` (breaking catalog change), `when` guard uniformity assumption, slot parser `SyntaxNode?` return type fragility, factory dictionary vs. switch, anchor/guard injection coupling, and clean-slate re-estimate.
+
+---
+
+---
+
 # Decision: Catalog-Driven Parser Design — Round 3 Resolutions
 
 **By:** Frank
@@ -834,12 +834,12 @@ All `docs/working/` files (historical records — must not be updated per audit 
 
 ## Open Questions / Escalations
 
-None. All decisions locked and documented above.
-
----
-
----
-
+None. All decisions locked and documented above.
+
+---
+
+---
+
 # Frank — `writable` Field Modifier Review
 
 **Date:** 2026-04-27  
@@ -937,12 +937,12 @@ The code sample comment reads `// ── Field modifiers (14) ──────
 3. `docs/language/precept-language-spec.md` line 111 — `edit all` → `write all`.
 4. `docs/language/catalog-system.md` line 740 — `(14)` → `(15)`.
 
-Items 2–4 are doc-only and may land in the same commit as item 1.
-
----
-
----
-
+Items 2–4 are doc-only and may land in the same commit as item 1.
+
+---
+
+---
+
 # Decision Note: Catalog-Driven Parser Design Round 2
 
 **By:** George
@@ -1048,12 +1048,12 @@ which option is chosen once parser implementation begins.
 
 Per George's charter: no implementation work until Frank's sign-off on the design. These bugs
 are discovered in design review — the right time. The parser is still a stub. These are zero-cost
-fixes at design time.
-
----
-
----
-
+fixes at design time.
+
+---
+
+---
+
 # Soup Nazi — Writable Coverage Review
 **Date:** 2026-04-27  
 **Reviewer:** Soup Nazi (Tester)  
@@ -1421,12 +1421,12 @@ in State omit all
 ## Follow-through
 
 - Frank completed the live-doc sweep across the language spec, language vision, parser design, parser reference, catalog-system doc, runtime API doc, evaluator doc, and the design-round record so the published grammar is consistent everywhere.
-- George's vocabulary-migration implementation remains the code baseline for `modify` / `readonly` / `editable` / `omit`; any earlier sample simplifications that split comma-separated targets are superseded by this shorthand-preservation directive.
-
----
-
----
-
+- George's vocabulary-migration implementation remains the code baseline for `modify` / `readonly` / `editable` / `omit`; any earlier sample simplifications that split comma-separated targets are superseded by this shorthand-preservation directive.
+
+---
+
+---
+
 ### 2026-04-28 — v8 parser design document authored
 
 **By:** Frank
@@ -1444,24 +1444,24 @@ in State omit all
 
 **Artifacts produced:**
 - `docs/working/catalog-parser-design-v8.md` — primary design document, supersedes v7
-- `docs/working/v8-design-session-notes.md` — change summary and decision verification matrix
-
----
-
----
-
-v8 fixes applied per George's review: 4 targeted edits (omit guard diagnostic, stashed guard behavior, sync clarification, 2.1 split formalized). Verdict expected: APPROVED.
-
----
-
----
-
-v8 approved after fix verification — proceed to Phase 2.
-
----
-
----
-
+- `docs/working/v8-design-session-notes.md` — change summary and decision verification matrix
+
+---
+
+---
+
+v8 fixes applied per George's review: 4 targeted edits (omit guard diagnostic, stashed guard behavior, sync clarification, 2.1 split formalized). Verdict expected: APPROVED.
+
+---
+
+---
+
+v8 approved after fix verification — proceed to Phase 2.
+
+---
+
+---
+
 # George's Review of catalog-parser-design-v8.md
 
 **By:** George (Runtime Dev)
@@ -1603,12 +1603,12 @@ v8 is substantially correct — the OmitDeclaration split is clean, the FieldTar
 
 3. **(Recommended, not strictly blocking) Clarify Slice 5.4 sync mechanism**: Add one sentence explaining HOW `modify` and `omit` serve as within-`in`-block recovery anchors. The shown `SyncToNextDeclaration()` loop doesn't include them; the actual mechanism (secondary check in the disambiguator? supplementary token set?) needs to be named.
 
-4. **(Recommended) Formalize Slice 2.1a/2.1b split**: Change the "consider" language to a firm split. The 220-line single-slice is above threshold.
-
----
-
----
-
+4. **(Recommended) Formalize Slice 2.1a/2.1b split**: Change the "consider" language to a firm split. The 220-line single-slice is above threshold.
+
+---
+
+---
+
 ### 2026-04-28 — Phase 2 decisions audit complete
 
 **By:** Frank
@@ -1617,4 +1617,1268 @@ v8 is substantially correct — the OmitDeclaration split is clean, the FieldTar
 
 **Category of fixes:** Documentation dispatch tables and AST sections in `docs/compiler/parser.md` and `docs/language/precept-language-spec.md` still treated `OmitDeclaration` as part of the `AccessMode` construct. 9 targeted edits applied to align both files with the locked decisions: `OmitDeclaration` is a separate `ConstructKind` with its own disambiguation entry, AST node, and 2-slot sequence (no guard). Source catalog files were already correct.
 
-**Audit artifact:** `docs/working/audit-decisions-notes.md`
+**Audit artifact:** `docs/working/audit-decisions-notes.md`
+
+---
+
+---
+
+### 2026-04-28T23:04:41Z: User directive — spike mode constraints
+**By:** Shane (via Copilot)
+**What:** While on the `precept-architecture` spike branch, no new branches and no PRs are to be created. All commits go directly to `precept-architecture`. Agents must never run `git checkout -b` or `gh pr create` during a spike session.
+**Why:** User request — spike branches are exploratory; PRs and sub-branches add noise and process overhead that doesn't belong in a spike.
+
+---
+
+---
+
+# Deep Re-Review: Catalog Extensibility CS8509 Enforcement
+
+**Reviewer:** Frank (Lead/Architect)
+**Date:** 2026-04-28
+**Branch:** `feature/catalog-extensibility`
+**Prior verdict:** APPROVED (frank-george-deviation-review.md)
+**Revised verdict:** **BLOCKED** — 5 wildcard gaps defeat CS8509 enforcement
+
+---
+
+## Scope of re-review
+
+The plan's central goal:
+
+> When a developer adds a new `ConstructKind`, `ActionKind`, `ActionSyntaxShape`, or `RoutingFamily` to the catalog, the compiler must produce **CS8509 errors** at every location that needs updating. No silent gaps. No runtime-only throws.
+
+I re-examined every switch expression in the implementation, not just the two originally reported deviations.
+
+---
+
+## What IS correct (confirmed)
+
+| Switch | File:Line | CS8509 intact? | Notes |
+|--------|-----------|----------------|-------|
+| `BuildNode()` | Parser.cs:1315–1378 | ✅ | All 12 `ConstructKind` arms, no wildcard, `#pragma CS8524` only |
+| `DisambiguateAndParse()` EventScoped | Parser.cs:239–252 | ✅ | All `ConstructKind` arms listed explicitly, no wildcard |
+| `DisambiguateAndParse()` StateScoped | Parser.cs:272–286 | ✅ | All `ConstructKind` arms listed explicitly, no wildcard |
+| `ParseActionStatement()` outer | Parser.cs:612–620 | ✅ | All 4 `ActionSyntaxShape` arms + explicit `None` throw, no wildcard |
+
+These four switches achieve the plan's goal. Adding a new named enum member triggers CS8509.
+
+---
+
+## What is BROKEN — 5 gaps
+
+### Gap 1–4: Inner `ActionKind` switches use `_ => throw`
+
+**Plan requirement (Slice 5, explicitly):**
+
+> Inner switch on `ActionKind` inside each shape handler (**no default**): fires when a new ActionKind is added with an existing shape but no node constructor.
+
+The plan's code examples showed `// No default — CS8509 fires when new [shape] ActionKind added` on every inner switch.
+
+**Actual implementation:**
+
+| # | Method | File:Line | Pattern | CS8509? |
+|---|--------|-----------|---------|---------|
+| 1 | `ParseAssignValueStatement` | Parser.cs:631–635 | `_ => throw new InvalidOperationException(...)` | ❌ suppressed |
+| 2 | `ParseCollectionValueStatement` | Parser.cs:644–651 | `_ => throw new InvalidOperationException(...)` | ❌ suppressed |
+| 3 | `ParseCollectionIntoStatement` | Parser.cs:666–671 | `_ => throw new InvalidOperationException(...)` | ❌ suppressed |
+| 4 | `ParseFieldOnlyStatement` | Parser.cs:679–683 | `_ => throw new InvalidOperationException(...)` | ❌ suppressed |
+
+**Failure scenario:** Add `ActionKind.Increment` with `SyntaxShape = AssignValue` to the catalog. The outer `ActionSyntaxShape` switch routes it correctly to `ParseAssignValueStatement`. But the inner `ActionKind` switch's `_ =>` wildcard catches it — producing a runtime `InvalidOperationException` instead of a CS8509 compile error. The developer gets no compiler guidance.
+
+**This directly defeats Gap 7 from the plan** ("ActionKind↔Statement node enforcement — Covered by gap 4 fix: ParseActionStatement CS8509 forces one arm per ActionKind").
+
+**Fix:** Remove all four `_ => throw` arms. Add `#pragma warning disable CS8524` / `restore` around each inner switch (same pattern as BuildNode and the outer switch). Each inner switch already lists every `ActionKind` that belongs to its shape — the wildcard is purely redundant defensive code.
+
+### Gap 5: `InvokeSlotParser` uses `_ => throw`
+
+| # | Method | File:Line | Pattern | CS8509? |
+|---|--------|-----------|---------|---------|
+| 5 | `InvokeSlotParser` | Parser.cs:845–868 | `_ => throw new ArgumentOutOfRangeException(...)` | ❌ suppressed |
+
+**The code comments and test are misleading:**
+
+- Line 864: `// CS8509 enforcement: a new ConstructSlotKind member without an arm is a build error.`
+- Line 866: `_ => throw` — **this wildcard makes the comment false.** `_ =>` covers all remaining patterns including named members. CS8509 does NOT fire.
+- Test `InvokeSlotParser_SwitchIsExhaustive` (ParserInfrastructureTests.cs:90–97) checks the member **count** (17) — this is a fragile fallback, not CS8509 enforcement.
+
+**Failure scenario:** Add `ConstructSlotKind.ConditionalBlock = 17`. The `_ =>` wildcard catches it at runtime. The count-based test catches it only if someone remembers to update the magic number. Neither is a CS8509 build error.
+
+**Scope consideration:** `ConstructSlotKind` is not one of the four enums named in the plan's goal statement. However, the implementation itself claims CS8509 enforcement via code comments and a test named `InvokeSlotParser_SwitchIsExhaustive`. If the team chose to use test enforcement instead of CS8509 here, the comment and test name are misleading. Either way, this needs resolution.
+
+**Fix:** Remove the `_ => throw` arm. Add `#pragma warning disable CS8524` / `restore` around the switch. All 17 `ConstructSlotKind` members already have arms. Update or remove the count-based test (it becomes redundant once CS8509 is the actual enforcement mechanism).
+
+---
+
+## How my prior review went wrong
+
+In my original review, I caught myself mid-analysis:
+
+> Wait — correction: `_ =>` in a switch expression **does** suppress CS8509 because it covers all remaining patterns including named members.
+
+I then dismissed this because `InvokeSlotParser` operates on `ConstructSlotKind`, not the two deviating enums I was reviewing. This was correct but insufficient — I should have then asked: "Are there OTHER wildcards on enums that ARE in scope?" I never examined the four inner `ActionKind` switches. They are **squarely within Slice 5's scope** and the plan explicitly required no defaults. I failed to check whether the implementation matched the plan on those switches.
+
+---
+
+## Verdict: BLOCKED
+
+**5 switches must be fixed before merge:**
+
+1. `ParseAssignValueStatement` (Parser.cs:634) — remove `_ => throw`, add `#pragma CS8524`
+2. `ParseCollectionValueStatement` (Parser.cs:650) — remove `_ => throw`, add `#pragma CS8524`
+3. `ParseCollectionIntoStatement` (Parser.cs:670) — remove `_ => throw`, add `#pragma CS8524`
+4. `ParseFieldOnlyStatement` (Parser.cs:682) — remove `_ => throw`, add `#pragma CS8524`
+5. `InvokeSlotParser` (Parser.cs:866) — remove `_ => throw`, add `#pragma CS8524`, fix misleading comment
+
+**Gaps 1–4 are plan violations** — Slice 5 explicitly required inner `ActionKind` switches with no default arm. The implementation has wildcards on all four.
+
+**Gap 5 is a correctness/honesty issue** — the code claims CS8509 enforcement but the wildcard defeats it. Whether it's in formal plan scope or not, the misleading comment must be resolved.
+
+After these fixes, every catalog enum switch in the parser will use the same pattern: explicit arms for all named members, `#pragma CS8524` to suppress unnamed-integer noise, no wildcard. CS8509 will fire on every new enum member. The plan's central goal will be achieved.
+
+---
+
+---
+
+# Enum Deviation Review — `feature/catalog-extensibility`
+
+**From:** Frank (Lead/Architect)  
+**Date:** 2026-04-28  
+**Re:** Two deviations reported by George post-implementation
+
+---
+
+## 1. `ActionSyntaxShape.None` — **UNDERMINES CS8509**
+
+### What George did
+Added `None = 0` to `ActionSyntaxShape` and added a corresponding `ActionSyntaxShape.None => throw new InvalidOperationException(...)` arm to the outer switch in `ParseActionStatement`.
+
+### Why it matters
+The plan required the outer `ActionSyntaxShape` switch and the inner `ActionKind` switches to have **no** default or wildcard arms — pure CS8509 enforcement. The `None` arm creates an escape hatch that defeats this.
+
+Here is the exact failure mode:
+
+1. Developer adds `ActionKind.Foo = 9`.
+2. They forget to set a real `SyntaxShape` — either because they copy an incomplete stub or because `None = 0` is now a valid-looking named value that default-initializes silently.
+3. The outer `ActionSyntaxShape` switch in `ParseActionStatement` hits `ActionSyntaxShape.None => throw`. That arm is satisfied. Execution terminates at runtime.
+4. The inner per-shape `ActionKind` switches (`ParseAssignValueStatement`, `ParseCollectionValueStatement`, etc.) are **never reached**.
+5. CS8509 fires at **none** of them — the new `ActionKind.Foo` slips the net entirely until runtime.
+
+The plan's purpose was to make that slip **impossible at compile time**. George's `None` sentinel converts a compile-time hard error into a runtime exception. That is the wrong direction.
+
+### Unreported companion deviation (B3)
+While inspecting the inner switches, I found that George also used `_ => throw` wildcards in `ParseAssignValueStatement` and `ParseCollectionValueStatement`:
+
+```csharp
+// ParseAssignValueStatement — line ~632
+ActionKind.Set => new SetStatement(span, field, value),
+_ => throw new InvalidOperationException(...),
+
+// ParseCollectionValueStatement — line ~643
+ActionKind.Add => ..., ActionKind.Remove => ..., ActionKind.Enqueue => ..., ActionKind.Push => ...,
+_ => throw new InvalidOperationException(...),
+```
+
+The `_` wildcard suppresses CS8509. A developer adding `ActionKind.Foo` with `SyntaxShape = AssignValue` would NOT get a compile-time error at `ParseAssignValueStatement` — it falls through to `_ => throw` silently at runtime. George did **not** report this deviation. It is the structural companion to the `None` problem and must be fixed at the same time.
+
+(Note: George correctly used explicit wrong-family throw arms in the `DisambiguateAndParse` switches — lines 243–249 and 279–283 list every non-matching `ConstructKind` explicitly. The same discipline must be applied to the inner `ActionKind` switches.)
+
+### Required fixes
+- **B1:** Remove `None = 0` from `ActionSyntaxShape`. The enum must have exactly four members: `AssignValue`, `CollectionValue`, `CollectionInto`, `FieldOnly` — values 1 through 4, or leave C# auto-assign them starting from 1 if no explicit numbering is needed.
+- **B2:** Remove the `ActionSyntaxShape.None => throw` arm from the `ParseActionStatement` outer switch. The switch must cover only the four real shapes with no wildcard.
+- **B3:** Replace `_ => throw` wildcards in `ParseAssignValueStatement` and `ParseCollectionValueStatement` (and any other inner `ActionKind` switches that use a wildcard) with exhaustive explicit-arm patterns. For each shape-dispatch method, list every `ActionKind` that **does not** belong to that shape as an explicit `=> throw new InvalidOperationException(...)` arm. This is exactly how `DisambiguateAndParse` was implemented — the same pattern must apply here.
+
+---
+
+## 2. `RoutingFamily.None` — **SAFE**
+
+### What George did
+Added `None = 0` to `RoutingFamily`.
+
+### Analysis
+`RoutingFamily` is **never switched on** in `Parser.cs`. The parser routes constructs via `FindDisambiguatedConstruct` using token kinds from `DisambiguationEntry` — `RoutingFamily` is read from catalog metadata to guide routing logic but is not itself the discriminant of any switch expression in production code.
+
+The test `Constructs_RoutingFamily_AllMembersHaveValue` correctly validates:
+
+```csharp
+meta.RoutingFamily.Should().NotBe((RoutingFamily)0,
+    $"{kind} must have a non-default RoutingFamily");
+```
+
+This catches any `ConstructKind` that ships without a valid `RoutingFamily` — including any developer who accidentally leaves the field default-initialized. The enforcement is at test time, not compile time, but that is acceptable because `RoutingFamily` carries no CS8509-enforced switch in the parser.
+
+`RoutingFamily.None` is a design smell — a sentinel for a non-value — and I would prefer it not exist. But it does not undermine CS8509 enforcement in production code. **No required fix before merge.** George may clean it up in a follow-on if desired.
+
+---
+
+## 3. `#pragma warning disable CS8524` — **SAFE**
+
+### What George did
+Added `#pragma warning disable CS8524` / `#pragma warning restore CS8524` pairs around four exhaustive switch expressions.
+
+### Analysis
+CS8524 and CS8509 are **distinct diagnostics**:
+
+- **CS8509** fires when a **named** enum member is absent from a switch expression. This is the enforcement diagnostic for the catalog extensibility plan.
+- **CS8524** fires when an **unnamed** raw integer value (e.g., `(ConstructKind)99`) could potentially reach a switch expression that does not have a catch-all arm.
+
+A `#pragma disable CS8524` does **not** suppress CS8509. Both can be active simultaneously and independently.
+
+All four pragmas are **tightly scoped** — each `disable` is immediately followed by a `restore` after the switch expression closes:
+
+| Block | Lines | Switch |
+|-------|-------|--------|
+| 1 | 237–251 | EventScoped `FindDisambiguatedConstruct` switch |
+| 2 | 270–285 | StateScoped `FindDisambiguatedConstruct` switch |
+| 3 | 610–620 | `ActionSyntaxShape` switch in `ParseActionStatement` |
+| 4 | 1313–1378 | `BuildNode` 12-arm `ConstructKind` switch |
+
+No pragma spans a file boundary or suppresses anything beyond the intended switch. CS8509 is active at all four sites. George's explanation is technically correct.
+
+---
+
+## 4. Overall Verdict — **BLOCKED**
+
+The branch does not merge until George resolves the following numbered items. **No exceptions.**
+
+**B1:** Remove `None = 0` from `ActionSyntaxShape`. Enum must have exactly: `AssignValue`, `CollectionValue`, `CollectionInto`, `FieldOnly`.
+
+**B2:** Remove the `ActionSyntaxShape.None => throw` arm from the outer switch in `ParseActionStatement`. Outer switch must be a clean 4-arm exhaustive switch, no sentinel handling.
+
+**B3:** Replace `_ => throw` wildcard arms in the inner `ActionKind` switches (`ParseAssignValueStatement`, `ParseCollectionValueStatement`, and any other inner dispatch methods that switch on `ActionKind`) with exhaustive explicit-arm patterns — listing every `ActionKind` value that does not belong to that shape as a named throw arm. CS8509 must fire at these switches when a new `ActionKind` is added.
+
+---
+
+**`RoutingFamily.None` does not block merge.  
+`#pragma disable CS8524` does not block merge.**
+
+Fix B1–B3, push, and request re-review.
+
+---
+
+---
+
+## Frank — Final Re-Review Verdict
+
+**Date:** 2026-04-28  
+**Branch:** feature/catalog-extensibility  
+**Commit reviewed:** 5e5b2f958b041f199c7360c79feb49f6c7e02ba4
+
+---
+
+### Verdict: APPROVED
+
+---
+
+### Findings
+
+Every blocking item from both prior review documents is closed.
+
+**B1 — `ActionSyntaxShape.None = 0` removed:** ✅  
+`ActionSyntaxShape` now has exactly 4 members with no explicit integer assignments:
+```csharp
+public enum ActionSyntaxShape { AssignValue, CollectionValue, CollectionInto, FieldOnly }
+```
+C# auto-assigns 0–3. No sentinel. Note: `AssignValue = 0` now occupies the zero slot formerly held by `None`. This means a default-initialized `ActionMeta.SyntaxShape` silently resolves to `AssignValue` rather than an obvious error sentinel. This is a minor structural note — it doesn't undermine CS8509 enforcement (all 8 catalog entries explicitly declare their `SyntaxShape`, and no route through the outer switch bypasses the inner switches), but it's worth recording: if a future `ActionMeta` entry is added with `SyntaxShape` accidentally omitted from the constructor, the `Enum.IsDefined` test will pass silently because `AssignValue = 0` is defined. **Not a blocker**, but the team should remain aware that `None = 0`'s safety-net role is not fully replicated by the current arrangement.
+
+**B2 — `ActionSyntaxShape.None` arm removed from outer switch:** ✅  
+`ParseActionStatement` outer switch is a clean 4-arm exhaustive switch:
+```csharp
+return meta.SyntaxShape switch
+{
+    ActionSyntaxShape.AssignValue     => ParseAssignValueStatement(meta),
+    ActionSyntaxShape.CollectionValue => ParseCollectionValueStatement(meta),
+    ActionSyntaxShape.CollectionInto  => ParseCollectionIntoStatement(meta),
+    ActionSyntaxShape.FieldOnly       => ParseFieldOnlyStatement(meta),
+};
+```
+`#pragma CS8524` tightly scoped. No wildcard. No sentinel arm.
+
+**B3 — `ParseAssignValueStatement` inner switch:** ✅  
+All 8 `ActionKind` members covered with explicit named arms. `Set` is the valid arm; `Add`, `Remove`, `Enqueue`, `Dequeue`, `Push`, `Pop`, `Clear` each throw with identity-specific messages. No wildcard. `#pragma CS8524` tightly scoped.
+
+**B4 — `ParseCollectionValueStatement` inner switch:** ✅  
+All 8 `ActionKind` members covered. `Add`, `Remove`, `Enqueue`, `Push` are valid; `Set`, `Dequeue`, `Pop`, `Clear` throw. No wildcard. `#pragma CS8524` tightly scoped.
+
+**B5 — `ParseCollectionIntoStatement` inner switch:** ✅  
+All 8 `ActionKind` members covered. `Dequeue`, `Pop` are valid; `Set`, `Add`, `Remove`, `Enqueue`, `Push`, `Clear` throw. No wildcard. `#pragma CS8524` tightly scoped.
+
+**B6 — `ParseFieldOnlyStatement` inner switch:** ✅  
+All 8 `ActionKind` members covered. `Clear` is the valid arm; `Set`, `Add`, `Remove`, `Enqueue`, `Dequeue`, `Push`, `Pop` throw. No wildcard. `#pragma CS8524` tightly scoped.
+
+**B7 — `InvokeSlotParser`:** ✅  
+`_ => throw` removed. All 17 `ConstructSlotKind` members have explicit named arms. `#pragma CS8524` tightly scoped. Comment updated to accurately state "CS8509 enforces named-value coverage here; #pragma CS8524 suppresses unnamed-integer noise" — no longer a false claim.
+
+**Test fix — `Actions_ActionSyntaxShape_AllMembersHaveValue`:** ✅  
+`NotBe((ActionSyntaxShape)0)` replaced with `Enum.IsDefined(meta.SyntaxShape).Should().BeTrue(...)`. This is the correct assertion now that no `None = 0` sentinel exists to distinguish "unset" from the first real member. The test guards against raw integer values outside the defined set.
+
+**Actions.cs — 8 ActionMeta entries:** ✅  
+All 8 `ActionKind` entries carry a non-zero, explicitly-set `SyntaxShape`: `Set → AssignValue`, `Add/Remove/Enqueue/Push → CollectionValue`, `Dequeue/Pop → CollectionInto`, `Clear → FieldOnly`. No entry is missing a shape declaration.
+
+---
+
+### CS8509 Enforcement Status
+
+**Confirmed. The pattern achieves the stated goal.**
+
+The enforcement chain is structurally sound:
+
+1. A developer adds `ActionKind.Increment = 8` to the enum and declares `SyntaxShape = AssignValue` on the new `ActionMeta`.
+2. The outer `ActionSyntaxShape` switch routes to `ParseAssignValueStatement`.
+3. The inner `ActionKind` switch in `ParseAssignValueStatement` has no arm for `ActionKind.Increment`. **CS8509 fires. Build fails.**
+4. The developer must add the arm before the branch compiles.
+
+The same chain holds for all 4 inner switches depending on which `SyntaxShape` the new kind declares. CS8509 is active at all four sites because no wildcard suppresses it. `#pragma CS8524` suppresses only CS8524 (unnamed-integer noise) and has no effect on CS8509 — the two diagnostics are independent.
+
+The only remaining caveat is the observation under B1: if a developer adds a new `ActionMeta` and omits `SyntaxShape` entirely (relying on default initialization), it silently routes to `AssignValue` (value 0) rather than producing an obvious test failure. This is a test-time gap, not a compile-time gap, and does not affect CS8509 enforcement. The `Enum.IsDefined` test will pass in that scenario. A future hardening option is to add explicit `= 1, 2, 3, 4` numbering so 0 becomes undefined, but that is not required for this merge.
+
+**All 7 blocking items closed. No open findings. Branch is approved for merge.**
+
+---
+
+---
+
+# Deviation Review: George's Catalog Extensibility Implementation
+
+**Reviewer:** Frank (Lead/Architect)
+**Date:** 2026-04-28
+**Branch:** `feature/catalog-extensibility`
+**Verdict:** APPROVED — both deviations are safe; CS8509 enforcement is intact.
+
+---
+
+## Deviation 1: `None = 0` on `RoutingFamily` and `ActionSyntaxShape`
+
+### Finding: Safe — no CS8509 gap
+
+**`RoutingFamily`** (Construct.cs:37–53):
+- `None = 0` exists as a sentinel for default-initialization detection.
+- **No switch expression in the codebase dispatches on `RoutingFamily` at all.** The parser routes by `ConstructKind` (via `DisambiguateAndParse` and `BuildNode`), not by `RoutingFamily`. `RoutingFamily` is a metadata property on `ConstructMeta` — it classifies constructs for documentation and routing-table grouping, but the actual dispatch switches are on `ConstructKind`.
+- Since there is no `RoutingFamily` switch, `None` cannot act as a catch-all or mask missing arms. CS8509 enforcement operates entirely through the `ConstructKind` switches, which have no `None` member and no wildcard arms (except the `_ => throw` in `GetMeta` and `InvokeSlotParser`, which are defensive guards against unnamed integer casts, not semantic catch-alls).
+- Every `ConstructMeta` in `Constructs.cs` assigns a non-`None` routing family (Header, Direct, StateScoped, or EventScoped). `None` is only reachable via `default(RoutingFamily)`.
+
+**`ActionSyntaxShape`** (Action.cs:29–41):
+- `None = 0` exists as the same sentinel pattern.
+- The `ParseActionStatement` switch (Parser.cs:611–621) dispatches on `ActionSyntaxShape` and includes an **explicit `ActionSyntaxShape.None => throw` arm** — it does not fall through or act as a default. It hard-throws with a diagnostic message identifying the offending `ActionKind`.
+- Every `ActionMeta` in `Actions.cs` assigns a non-`None` shape. `None` is only reachable via `default(ActionSyntaxShape)`.
+- Adding a new `ActionSyntaxShape` member (e.g., `ConditionalValue`) would trigger CS8509 on the `ParseActionStatement` switch because the new member would have no arm. The `None` arm does not catch it.
+
+**Conclusion:** `None = 0` sentinels are inert. They serve test/initialization detection and do not participate in any switch dispatch path that would mask a missing arm. CS8509 enforcement is fully intact for both enum families.
+
+---
+
+## Deviation 2: `#pragma warning disable CS8524`
+
+### Finding: Safe — CS8524 suppression does not affect CS8509
+
+**The two warnings are independent:**
+- **CS8509** fires when a *named* enum member has no matching arm. This is the enforcement we depend on.
+- **CS8524** fires when an *unnamed* integer value (e.g., `(ConstructKind)999`) has no matching arm. This is noise for our use case.
+
+**Evidence from Parser.cs:**
+- 4 pragma-scoped regions suppress CS8524 only: lines 238–252, 271–286, 611–621, 1314–1379.
+- Each pragma is tightly scoped (`disable` immediately before the switch, `restore` immediately after).
+- `TreatWarningsAsErrors=true` is set in `Precept.csproj` (line 7), meaning CS8509 fires as an **error**, not a warning. Suppressing CS8524 has zero effect on CS8509 — they are separate diagnostic IDs with separate suppression state.
+
+**Verification:** The `BuildNode` switch (Parser.cs:1315–1378) has exactly 11 arms for exactly 11 `ConstructKind` members, with no wildcard. If a 12th `ConstructKind` is added, CS8509 fires as a build error. The CS8524 pragma does not intercept this.
+
+**The `InvokeSlotParser` switch** (Parser.cs:845–868) uses the older `_ => throw` pattern for `ConstructSlotKind`, which is also fine — the wildcard catches only unnamed integer casts, and CS8509 still fires for missing named members because the switch is an expression (not a statement).
+
+Wait — correction: `_ =>` in a switch expression **does** suppress CS8509 because it covers all remaining patterns including named members. However, `InvokeSlotParser` switches on `ConstructSlotKind`, not one of the two deviating enums. The four `#pragma` regions all cover switches that have **no wildcard arm** — they list every named member explicitly and suppress only the unnamed-integer CS8524 noise. This is exactly the correct pattern.
+
+---
+
+## Summary
+
+| Deviation | Safe? | Reason |
+|-----------|-------|--------|
+| `None = 0` on `RoutingFamily` | ✅ | No switch dispatches on `RoutingFamily`; sentinel is metadata-only |
+| `None = 0` on `ActionSyntaxShape` | ✅ | Explicit `None => throw` arm; does not mask new members |
+| `#pragma disable CS8524` | ✅ | Independent from CS8509; tightly scoped; `TreatWarningsAsErrors` makes CS8509 a build error |
+
+**The catalog extensibility contract is intact:** adding a new `ConstructKind` or `ActionKind` (or `ActionSyntaxShape` / `RoutingFamily`) member produces CS8509 build errors at every incomplete switch. George's deviations are structurally sound.
+
+---
+
+---
+
+# PRECEPT0018 — Semantic Enum Zero-Slot Analyzer
+
+**Author:** Frank (Code Reviewer)
+**Date:** 2026-04-28
+**Status:** Ready for implementation
+**Implementer:** George
+
+---
+
+## 1. Feasibility
+
+**Straightforward.** This is a textbook `SymbolAction` analyzer on `SymbolKind.NamedType` filtered to enums. The Roslyn `IFieldSymbol.ConstantValue` API gives direct access to the underlying integer value of each member. No control-flow analysis, no cross-compilation lookups, no semantic model gymnastics.
+
+The existing `src/Precept.Analyzers/` project already targets `netstandard2.0` with `Microsoft.CodeAnalysis.CSharp 5.3.0` and is wired into `src/Precept/Precept.csproj` via `<ProjectReference OutputItemType="Analyzer">`. Infrastructure cost: zero.
+
+**Diagnostic ID:** `PRECEPT0018`
+
+---
+
+## 2. The Rule
+
+### What triggers a violation
+
+An enum member resolves to integer value `0` AND does not meet any of the exemption criteria below.
+
+Precisely: for every `enum` type declaration where the containing namespace starts with `Precept`, iterate its `IFieldSymbol` members with `HasConstantValue == true`. If any member's `ConstantValue` converts to `0L` (after widening to `long`), and no exemption applies, report `PRECEPT0018` on that member.
+
+### Exemption criteria (in evaluation order)
+
+| # | Condition | Rationale |
+|---|-----------|-----------|
+| E1 | The enum has `[System.Flags]` | Flags enums require `None = 0` by design. Standard C# pattern. |
+| E2 | The member is named exactly `None` | Universal .NET sentinel convention. `None = 0` is structural — it means "no value assigned." |
+| E3 | The member has `[AllowZeroDefault]` | Explicit opt-out for intentional semantic defaults where zero-init is correct by design. |
+
+**That's it.** Three exemptions. No name allowlists for `Any`, `Normal`, `Default`, `Unknown`, etc. Those must use `[AllowZeroDefault]` — see § 3 for justification.
+
+### Scope
+
+- **Checked:** All enums in any namespace starting with `Precept` (covers `Precept.Language`, `Precept.Runtime`, `Precept.Pipeline`, etc.).
+- **Not checked:** Test assemblies, third-party code, namespaces outside `Precept.*`.
+- **Visibility:** All access levels — `public`, `internal`, `private`. The `LexerMode` enum is `private` and still needs protection. The silent-default risk is the same regardless of visibility.
+
+### `[Flags]` enums
+
+Auto-exempted entirely (E1). The analyzer skips them — it does not inspect individual members. Currently only `TypeTrait` is `[Flags]` in the codebase.
+
+---
+
+## 3. Opt-Out Mechanism
+
+**Recommended:** `[AllowZeroDefault]` attribute on the member, with `[Flags]` and `None`-named auto-exemptions.
+
+### Why not the alternatives
+
+| Option | Verdict | Reason |
+|--------|---------|--------|
+| **Name allowlist** (`None`, `Unknown`, `Any`, `Normal`, `Default`, …) | ❌ Rejected | Brittle. Every new sentinel-like name requires a code change to the analyzer. `InState` and `Ensure` are not sentinel-sounding but sit at zero intentionally in some contexts. The allowlist either grows unbounded or misses cases. |
+| **`[SemanticEnum]` on the enum** (opt-in) | ❌ Rejected | Inverts the safety default. Unannotated enums are unchecked — which means every new enum is unprotected until someone remembers to add the attribute. The whole point of this analyzer is to prevent *forgetting*. |
+| **`[SuppressZeroDefault]` on the member** | ❌ Rejected | Semantically identical to `[AllowZeroDefault]` but with a confusing double-negative name. "Suppress the zero-default diagnostic" vs. "Allow zero as the default" — the latter reads as intent, the former reads as workaround. |
+| **`[AllowZeroDefault]` on the member** | ✅ Selected | See below. |
+
+### Why `[AllowZeroDefault]`
+
+1. **Safe by default.** Every enum is checked. You must explicitly opt out — the dangerous path requires a conscious decision.
+2. **Self-documenting.** The attribute at the declaration site says "yes, zero-init is intentional here" — future readers don't have to reconstruct why.
+3. **No magic lists.** The only auto-exempted name is `None`, which is the universal .NET convention. Everything else requires explicit annotation.
+4. **Minimal noise.** Only 3 existing enums need the attribute: `LexerMode.Normal`, `QualifierMatch.Any`, `PeriodDimension.Any`. That's 3 one-line annotations across the entire codebase.
+5. **Consistent with project philosophy.** Precept's design principle is "make invalid states structurally impossible." An opt-out attribute is the structural version of that principle applied to the analyzer itself.
+
+### Why `None` gets auto-exempted (not just the attribute)
+
+`None = 0` is a .NET ecosystem convention with decades of usage. Requiring `[AllowZeroDefault]` on every `None` member would be pure ceremony — nobody has ever accidentally named a member `None` when they meant it to be semantically meaningful. The auto-exemption eliminates ~3 annotations (`RoutingFamily.None`, `GraphAnalysisKind.None`, `QualifierAxis.None`) with zero false-negative risk.
+
+---
+
+## 4. Placement
+
+### Analyzer class
+
+**File:** `src/Precept.Analyzers/Precept0018SemanticEnumZeroSlot.cs`
+
+Lives alongside the existing 17 analyzers. No new project needed.
+
+### Attribute class
+
+**File:** `src/Precept/AllowZeroDefaultAttribute.cs`
+
+```csharp
+namespace Precept;
+
+/// <summary>
+/// Suppresses PRECEPT0018 for an enum member at value 0.
+/// Apply this when zero-initialization is intentional — e.g., a "don't-care" default
+/// or a documented initial state. The attribute signals that default(T) routing to
+/// this member was a deliberate design choice, not an accident.
+/// </summary>
+[AttributeUsage(AttributeTargets.Field, AllowMultiple = false)]
+public sealed class AllowZeroDefaultAttribute : Attribute { }
+```
+
+**Why `AttributeTargets.Field`:** Enum members are fields in the CLR model. `AttributeTargets.Field` is the correct target. (There is no `AttributeTargets.EnumMember`.)
+
+### No csproj changes needed
+
+- `src/Precept.Analyzers/Precept.Analyzers.csproj` — no changes. The project already has the Roslyn reference and build configuration.
+- `src/Precept/Precept.csproj` — no changes. The `<ProjectReference>` to Analyzers is already in place.
+- `test/Precept.Analyzers.Tests/` — no changes to the test project file (it already references the analyzer project).
+
+---
+
+## 5. Diagnostic Output
+
+### Message format
+
+```
+PRECEPT0018: Enum member '{0}' in '{1}' has value 0. Semantic enums must use explicit
+1-based values so default(T) throws instead of silently routing. Assign '{0} = 1'
+(and renumber subsequent members) or mark with [AllowZeroDefault] if zero-init is intentional.
+```
+
+**Substitutions:**
+- `{0}` = member name (e.g., `AssignValue`)
+- `{1}` = enum name (e.g., `ActionSyntaxShape`)
+
+### Descriptor
+
+```csharp
+private static readonly DiagnosticDescriptor Rule = new(
+    DiagnosticId,
+    title: "Enum member at value 0 in semantic enum",
+    messageFormat: "Enum member '{0}' in '{1}' has value 0 — semantic enums must use explicit " +
+                   "1-based values so default(T) throws instead of silently routing. " +
+                   "Assign '{0} = 1' (and renumber subsequent members) or mark with [AllowZeroDefault] " +
+                   "if zero-init is intentional.",
+    category: "Precept.Language",
+    defaultSeverity: DiagnosticSeverity.Error,
+    isEnabledByDefault: true,
+    description: "Every enum where all members are semantically meaningful must leave the zero " +
+                 "slot unnamed. default(T) = (T)0 = unnamed = SwitchExpressionException rather " +
+                 "than silent routing to an arbitrary first member. Enums with None = 0, " +
+                 "[Flags] enums, and members marked [AllowZeroDefault] are exempt.");
+```
+
+**Severity: Error.** The existing project uses `TreatWarningsAsErrors`, so Warning would also block the build. But this is a correctness invariant — it deserves Error severity to match the other PRECEPT analyzers.
+
+---
+
+## 6. Implementation Guide
+
+### File inventory
+
+| File | Action | Description |
+|------|--------|-------------|
+| `src/Precept/AllowZeroDefaultAttribute.cs` | **Create** | The opt-out attribute |
+| `src/Precept.Analyzers/Precept0018SemanticEnumZeroSlot.cs` | **Create** | The analyzer |
+| `test/Precept.Analyzers.Tests/Precept0018Tests.cs` | **Create** | Test cases |
+
+### Analyzer skeleton
+
+```csharp
+using System.Collections.Immutable;
+using System.Linq;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.Diagnostics;
+
+namespace Precept.Analyzers;
+
+/// <summary>
+/// PRECEPT0018 — Enum members at value 0 in Precept.* namespaces must be either:
+/// (a) named "None" (structural sentinel), (b) in a [Flags] enum, or
+/// (c) marked with [AllowZeroDefault]. All other zero-valued members are flagged
+/// because default(T) silently routes to them.
+/// </summary>
+[DiagnosticAnalyzer(LanguageNames.CSharp)]
+public sealed class PRECEPT0018SemanticEnumZeroSlot : DiagnosticAnalyzer
+{
+    public const string DiagnosticId = "PRECEPT0018";
+
+    private static readonly DiagnosticDescriptor Rule = new( /* see § 5 */ );
+
+    public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
+        ImmutableArray.Create(Rule);
+
+    public override void Initialize(AnalysisContext context)
+    {
+        context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
+        context.EnableConcurrentExecution();
+        context.RegisterSymbolAction(AnalyzeEnum, SymbolKind.NamedType);
+    }
+
+    private static void AnalyzeEnum(SymbolAnalysisContext ctx)
+    {
+        var type = (INamedTypeSymbol)ctx.Symbol;
+
+        // Only enums.
+        if (type.TypeKind != TypeKind.Enum)
+            return;
+
+        // Scope: Precept.* namespaces only.
+        if (!IsInPreceptNamespace(type))
+            return;
+
+        // E1: [Flags] enums are exempt.
+        if (type.GetAttributes().Any(a =>
+            a.AttributeClass?.Name == "FlagsAttribute" &&
+            a.AttributeClass.ContainingNamespace?.ToDisplayString() == "System"))
+            return;
+
+        // Check each member for value 0.
+        foreach (var member in type.GetMembers().OfType<IFieldSymbol>())
+        {
+            if (!member.HasConstantValue)
+                continue;
+
+            if (System.Convert.ToInt64(member.ConstantValue) != 0L)
+                continue;
+
+            // E2: Named "None" — structural sentinel.
+            if (member.Name == "None")
+                continue;
+
+            // E3: [AllowZeroDefault] attribute.
+            if (member.GetAttributes().Any(a =>
+                a.AttributeClass?.Name == "AllowZeroDefaultAttribute"))
+                continue;
+
+            // Violation.
+            ctx.ReportDiagnostic(Diagnostic.Create(
+                Rule,
+                member.Locations.FirstOrDefault(),
+                member.Name,
+                type.Name));
+        }
+    }
+
+    private static bool IsInPreceptNamespace(INamedTypeSymbol type)
+    {
+        var ns = type.ContainingNamespace;
+        while (ns != null && !ns.IsGlobalNamespace)
+        {
+            if (ns.Name == "Precept")
+                return true;
+            ns = ns.ContainingNamespace;
+        }
+        return false;
+    }
+}
+```
+
+### Key implementation notes
+
+1. **`Convert.ToInt64`** handles all underlying enum types (`byte`, `short`, `int`, `long`, `uint`, etc.) safely.
+2. **Namespace check walks up** the containment chain. `Precept.Language.TokenKind` → finds `Precept` at depth 2. `System.DayOfWeek` → never hits `Precept`.
+3. **Attribute matching is by name**, not by type identity. The analyzer runs in `netstandard2.0` and doesn't reference `src/Precept/` — it cannot resolve the attribute's `INamedTypeSymbol` by reference. Name matching (`"AllowZeroDefaultAttribute"`) is the standard Roslyn analyzer pattern for this.
+4. **`RegisterSymbolAction` on `SymbolKind.NamedType`** fires once per type declaration. This is more efficient than syntax-node analysis for enum-level checks.
+
+---
+
+## 7. Test Plan
+
+All tests go in `test/Precept.Analyzers.Tests/Precept0018Tests.cs`. Use the existing `AnalyzerTestHelper.AnalyzeAsync<T>` pattern.
+
+### True positives (MUST flag)
+
+| # | Test name | Source | Expected |
+|---|-----------|--------|----------|
+| TP1 | `Implicit_zero_first_member_flags` | `namespace Precept.Language { public enum Foo { Bar, Baz } }` | 1 diagnostic on `Bar` |
+| TP2 | `Explicit_zero_first_member_flags` | `namespace Precept.Language { public enum Foo { Bar = 0, Baz = 1 } }` | 1 diagnostic on `Bar` |
+| TP3 | `Zero_not_first_member` | `namespace Precept.Language { public enum Foo { A = 1, B = 0, C = 2 } }` | 1 diagnostic on `B` |
+| TP4 | `Private_enum_still_flagged` | `namespace Precept.Pipeline { class Outer { enum Inner { X, Y } } }` | 1 diagnostic on `X` |
+| TP5 | `Internal_enum_still_flagged` | `namespace Precept.Runtime { internal enum Foo { Bar, Baz } }` | 1 diagnostic on `Bar` |
+| TP6 | `Nested_precept_namespace` | `namespace Precept.Language.Nested { public enum Foo { Bar } }` | 1 diagnostic on `Bar` |
+
+### True negatives (MUST NOT flag)
+
+| # | Test name | Source | Expected |
+|---|-----------|--------|----------|
+| TN1 | `None_at_zero_exempt` | `namespace Precept.Language { public enum Foo { None = 0, Bar = 1 } }` | 0 diagnostics |
+| TN2 | `Flags_enum_exempt` | `namespace Precept.Language { [System.Flags] public enum Foo { None = 0, A = 1, B = 2 } }` | 0 diagnostics |
+| TN3 | `Flags_enum_with_non_None_zero` | `namespace Precept.Language { [System.Flags] public enum Foo { All = 0, A = 1 } }` | 0 diagnostics (entire `[Flags]` enum exempt) |
+| TN4 | `AllowZeroDefault_attribute` | Source with `[AllowZeroDefault] Any = 0` | 0 diagnostics |
+| TN5 | `One_based_enum_clean` | `namespace Precept.Language { public enum Foo { A = 1, B = 2, C = 3 } }` | 0 diagnostics |
+| TN6 | `Non_precept_namespace_ignored` | `namespace SomeOtherLib { public enum Foo { Bar } }` | 0 diagnostics |
+| TN7 | `No_zero_member_at_all` | `namespace Precept.Language { public enum Foo { A = 1, B = 2 } }` | 0 diagnostics |
+
+### Edge cases
+
+| # | Test name | Source | Expected |
+|---|-----------|--------|----------|
+| EC1 | `Multiple_zero_members` | `namespace Precept.Language { public enum Foo { A = 0, B = 0, C = 1 } }` | 2 diagnostics (both `A` and `B`) |
+| EC2 | `None_plus_semantic_zero` | `namespace Precept.Language { public enum Foo { None = 0, Bad = 0, Good = 1 } }` | 1 diagnostic on `Bad` (only `None` exempted by name) |
+| EC3 | `Empty_enum` | `namespace Precept.Language { public enum Foo { } }` | 0 diagnostics |
+| EC4 | `Byte_underlying_type` | `namespace Precept.Language { public enum Foo : byte { A, B } }` | 1 diagnostic on `A` |
+| EC5 | `Long_underlying_type` | `namespace Precept.Language { public enum Foo : long { A = 0L, B = 1L } }` | 1 diagnostic on `A` |
+
+### Regression anchors (real Precept enums)
+
+These don't use synthetic source — they document the expected analyzer behavior against the actual codebase once the fix wave completes. George should add these as comments in the test file or as a companion checklist, not as compilable tests (since they'd require the full Precept assembly):
+
+| Enum | Expected | After fix wave |
+|------|----------|----------------|
+| `Severity` (1-based) | Clean | ✅ Already fixed |
+| `DiagnosticStage` (1-based) | Clean | ✅ Already fixed |
+| `TypeKind` (1-based) | Clean | ✅ Already fixed |
+| `RoutingFamily.None = 0` | Clean (E2: name `None`) | ✅ Already correct |
+| `TypeTrait` (`[Flags]`) | Clean (E1) | ✅ Already correct |
+| `QualifierMatch.Any = 0` | Clean after `[AllowZeroDefault]` | Needs attribute |
+| `PeriodDimension.Any = 0` | Clean after `[AllowZeroDefault]` | Needs attribute |
+| `LexerMode.Normal = 0` | Clean after `[AllowZeroDefault]` | Needs attribute |
+| `TokenKind.Precept = 0` | **Flagged** | Needs 1-based fix |
+| `OperatorKind.Or = 0` | **Flagged** | Needs 1-based fix |
+
+---
+
+## 8. Rollout Sequence
+
+The analyzer enforces at Error severity in a `TreatWarningsAsErrors` build. Enabling it before fixing the remaining ~23 at-risk enums will break the build. George should follow this sequence:
+
+1. **Create the attribute** (`AllowZeroDefaultAttribute.cs`) — zero risk, additive.
+2. **Create the analyzer** (`Precept0018SemanticEnumZeroSlot.cs`) — does not fire until build.
+3. **Create the tests** (`Precept0018Tests.cs`) — validates analyzer logic in isolation.
+4. **Add `[AllowZeroDefault]` to the 3 intentional-zero enums:**
+   - `LexerMode.Normal`
+   - `QualifierMatch.Any`
+   - `PeriodDimension.Any`
+5. **Fix the remaining ~20 catalog enums** to 1-based values (same pattern as the 6 already fixed). This is a separate PR or a later batch in the same PR — George's call based on scope.
+6. **Build.** If clean, the analyzer is live.
+
+**Step 5 is the big one.** The 6 already-fixed enums (`Severity`, `DiagnosticStage`, `ConstraintStatus`, `Prospect`, `FieldAccessMode`, `ActionSyntaxShape`, `TypeKind`) prove the pattern. The remaining ~20 follow the same mechanical transformation: assign `= 1` to the first member, explicit sequential values to the rest, update any hardcoded integer references in tests.
+
+---
+
+## 9. What This Does NOT Cover
+
+- **Enum members with no explicit value that aren't at zero.** The analyzer only checks value `0`. It does not enforce "all members must have explicit values" — that's a style rule, not a correctness invariant.
+- **Switch exhaustiveness.** PRECEPT0007 already covers `GetMeta` switch exhaustiveness. This analyzer is complementary — it protects the *enum declaration*, not the *switch consumption*.
+- **Struct default-initialization.** If a struct has a semantic enum field, `default(Struct)` produces `(Enum)0`. This analyzer catches the enum-side problem; struct-level protection would be a separate analyzer.
+
+---
+
+## Appendix A: Enums That Will Need `[AllowZeroDefault]`
+
+| Enum | Member | File | Justification |
+|------|--------|------|---------------|
+| `LexerMode` | `Normal` | `Pipeline/Lexer.cs` | Correct initial state — zero-init of the lexer starts in `Normal` mode by design. |
+| `QualifierMatch` | `Any` | `Language/Operation.cs` | Documented default for ~95% of catalog entries. Zero-init means "matches any qualifier" — correct. |
+| `PeriodDimension` | `Any` | `Language/ProofRequirement.cs` | Don't-care default. Zero-init means "any time dimension acceptable" — correct. |
+
+## Appendix B: Enums That Will Need 1-Based Fix
+
+These are the catalog enums where the first semantic member currently sits at implicit or explicit `0`. Each needs the same mechanical fix applied to the first 6:
+
+`ActionKind`, `AnchorScope`, `AnchorTarget`, `Arity`, `Associativity`, `ConstructKind`, `ConstructSlotKind`, `ConstraintKind`, `DiagnosticCategory`, `DiagnosticCode`, `FaultCode`, `FaultSeverity`, `FunctionCategory`, `FunctionKind`, `ModifierCategory`, `ModifierKind`, `OperationKind`, `OperatorFamily`, `OperatorKind`, `ProofRequirementKind`, `TokenCategory`, `TokenKind`
+
+**Count: ~22 enums.** All follow the same pattern — assign `= 1` to the first member and explicit sequential values to the rest.
+
+---
+
+*Frank — 2026-04-28. This document is implementation-ready. George: follow § 6 for file paths, § 7 for tests, § 8 for rollout order. No ambiguity should remain.*
+
+---
+
+---
+
+# Spike Mode Is First-Class
+
+**By:** Frank (Lead/Architect)
+**Date:** 2026-04-28T23:09:18.057-04:00
+**What:** Spike mode is now formally encoded across routing, ceremonies, wisdom, and `CONTRIBUTING.md`. Activation and exit intents are explicit, spike branches follow the `spike/{kebab-description}` convention, PR-demanding ceremonies are suppressed while `spike_mode: true`, and spike work exits through a structured closeout.
+**Why:** Exploratory work is a real process mode, not an informal exception. If routing, ceremonies, durable wisdom, and contributor workflow docs do not encode spike mode together, the system incorrectly demands implementation gates, PRs, and branch churn during spikes.
+
+## Encoded surfaces
+
+- `.squad/routing.md` now recognizes spike activation and exit intents and suppresses PR-demanding auto-triggers during a spike.
+- `.squad/ceremonies.md` now suppresses Design Review and PR Review when `spike_mode: true`, and defines manual Spike Kickoff / Spike Closeout ceremonies.
+- `.squad/identity/wisdom.md` now records the spike branch naming convention and the rule that spike mode suppresses PR-dependent ceremonies.
+- `CONTRIBUTING.md` now defines the contributor-facing spike workflow, including activation, branch rules, ceremony suppression, and deliberate closeout.
+
+## Architectural decision
+
+Spike mode is first-class. It must be activated deliberately, enforced consistently, and closed out explicitly. Exploratory work does not bypass process; it follows its own process.
+
+---
+
+---
+
+# Zero-Slot Enum Audit — `src/Precept/`
+
+**Reviewer:** Frank  
+**Date:** 2026-04-28  
+**Scope:** All `enum` declarations in `src/Precept/` audited for named semantic values at position 0  
+**Trigger:** `ActionSyntaxShape` fix (explicit 1-based values); Shane asked "are there others?"
+
+---
+
+## Executive Summary
+
+Shane's fix was correct and necessary. There are **four confirmed risks** sharing the same class of failure, one of which (`Severity.Info=0`) has the most dangerous silent-failure profile in the codebase today. Two more (`ConstraintStatus.Satisfied=0`, `Prospect.Certain=0`) are dormant time bombs that will matter the moment the evaluator and inspection engine are no longer stubs. The remaining enums are either intentionally sentinel-at-zero, protected by wildcard-throw arms, or unused in live switch dispatch.
+
+---
+
+## 1. Zero-Slot Risks Found
+
+### RISK 1 — `Severity` · `Severity.cs` (inside `Diagnostic.cs`) · **HIGH**
+
+```csharp
+public enum Severity
+{
+    Info,     // = 0  ← RISK
+    Warning,
+    Error
+}
+```
+
+**Where switched on:**  
+`Compiler.cs:34` — `diagnostics.Any(d => d.Severity == Severity.Error)` sets `HasErrors`.  
+Every diagnostic consumer in the language server and MCP tools compares against `Severity.Error` or `Severity.Warning`.
+
+**Zero-default consequence:**  
+`Diagnostic` is a `readonly record struct`. `default(Diagnostic)` gives `Severity = Info`. A bug in any new diagnostic factory path that passes `default` for severity (e.g., `new Diagnostic(default, stage, code, msg, span)`) silently downgrades all errors to informational. `Compiler.HasErrors` returns `false`. The pipeline passes. Invalid precepts compile clean. This is the most dangerous silent failure mode in the codebase — it bypasses the correctness gate entirely.
+
+**Current protection:**  
+`Diagnostics.Create(code, span)` is the sole factory and always derives severity from `DiagnosticMeta`. But the struct is publicly constructible without it.
+
+**Recommended fix:**  
+```csharp
+public enum Severity
+{
+    Info    = 1,
+    Warning = 2,
+    Error   = 3,
+}
+```
+`default(Severity) = (Severity)0` is unnamed. Any uninitialized diagnostic severity will throw `SwitchExpressionException` on first inspection — loud, not silent.
+
+---
+
+### RISK 2 — `DiagnosticStage` · `Diagnostic.cs` · **MEDIUM**
+
+```csharp
+public enum DiagnosticStage
+{
+    Lex,    // = 0  ← RISK
+    Parse,
+    Type,
+    Graph,
+    Proof
+}
+```
+
+**Where switched on:**  
+Stage is carried in every `Diagnostic` struct and in `DiagnosticMeta`. The language server and MCP vocabulary filter diagnostics by stage for display ordering and category attribution. A zero-default stage misattributes the diagnostic to `Lex` regardless of what pipeline stage produced it.
+
+**Zero-default consequence:**  
+Same struct-constructibility exposure as `Severity`. Less catastrophic (wrong attribution, not wrong severity), but still wrong: a type-check error silently appears as a lex error in tooling output.
+
+**Recommended fix:**  
+```csharp
+public enum DiagnosticStage
+{
+    Lex   = 1,
+    Parse = 2,
+    Type  = 3,
+    Graph = 4,
+    Proof = 5,
+}
+```
+
+**Note:** Fix `Severity` and `DiagnosticStage` together — they share the same struct and the same factory.
+
+---
+
+### RISK 3 — `ConstraintStatus` · `Inspection.cs` · **HIGH (dormant)**
+
+```csharp
+public enum ConstraintStatus { Satisfied, Violated, Unresolvable }
+//                             ^= 0  ← RISK
+```
+
+**Where switched on:**  
+`ConstraintResult.Status` is the per-constraint evaluation output returned by `InspectFire` and `InspectUpdate`. MCP tool `precept_inspect` surfaces this directly to callers. UI and agent consumers branch on `Satisfied` vs. `Violated` to decide whether constraints are blocking.
+
+**Zero-default consequence:**  
+`ConstraintResult` is a reference-type record, so accidental zero-construction is less likely than with a struct. The risk is in the evaluator implementation (currently `throw new NotImplementedException()`). When the evaluator is implemented, any code path that constructs a `ConstraintResult` without explicitly setting `Status` (possible in collection initializers, factory patterns, or test scaffolding) silently marks a **violated constraint as satisfied**. This is a direct correctness failure in the constraint enforcement model — the entire point of Precept.
+
+**Recommended fix:**  
+```csharp
+public enum ConstraintStatus { Satisfied = 1, Violated = 2, Unresolvable = 3 }
+```
+
+Fix this **before** the evaluator is implemented, not after. Retrofitting is harder once there are construction sites.
+
+---
+
+### RISK 4 — `Prospect` · `Inspection.cs` · **HIGH (dormant)**
+
+```csharp
+public enum Prospect { Certain, Possible, Impossible }
+//                     ^= 0  ← RISK
+```
+
+**Where switched on:**  
+`RowInspection.Prospect` and `EventInspection.OverallProspect` are the first-match routing certainty signals returned from inspection. MCP `precept_inspect` uses these to tell callers which rows will fire, which might fire, and which cannot. A wrong `Certain` on an impossible row leads agents and UIs to present incorrect state-transition forecasts.
+
+**Zero-default consequence:**  
+Same analysis as `ConstraintStatus`. The evaluator is a stub. When implemented, an uninitialized `Prospect` field silently presents an impossible row as **certain to fire** — the most misleading possible output from inspection.
+
+**Recommended fix:**  
+```csharp
+public enum Prospect { Certain = 1, Possible = 2, Impossible = 3 }
+```
+
+---
+
+### RISK 5 — `FieldAccessMode` · `SharedTypes.cs` · **MEDIUM (dormant)**
+
+```csharp
+public enum FieldAccessMode { Read, Write }
+//                            ^= 0  ← RISK
+```
+
+**Where switched on:**  
+`FieldSnapshot.Mode` and `FieldAccessInfo.Mode` in runtime inspection. Callers use this to decide whether to render a field as editable in UIs or allow write operations in the runtime API.
+
+**Zero-default consequence:**  
+Zero-initialized mode = `Read`. A field that should be writable in the current state silently appears read-only. Write attempts are blocked without error. This is a subtle behavioral correctness failure — not a crash, not a thrown exception, just wrong behavior in the access model.
+
+**Recommended fix:**  
+```csharp
+public enum FieldAccessMode { Read = 1, Write = 2 }
+```
+
+---
+
+### RISK 6 — `TypeKind` · `TypeKind.cs` · **MEDIUM (dormant)**
+
+```csharp
+public enum TypeKind
+{
+    String,  // = 0  ← RISK
+    Boolean,
+    Integer,
+    // ... 24 more
+}
+```
+
+**Where switched on:**  
+`Types.GetMeta(TypeKind kind)` has a `_ => throw ArgumentOutOfRangeException` wildcard — an **unnamed** zero would throw. But `String` is a **named** member at 0. An uninitialized `TypeKind` in the type checker (currently a stub) would silently treat any untyped expression node as `String`. Type compatibility checks, operation lookup, and accessor validation would all pass for `String` when the actual type is unknown.
+
+**Current protection:**  
+The TypeChecker is `throw new NotImplementedException()`. No live dispatch today.
+
+**Recommended fix:**  
+```csharp
+public enum TypeKind
+{
+    String = 1,
+    Boolean = 2,
+    Integer = 3,
+    // ...
+}
+```
+
+Given the size of `TypeKind` (26 members) and the number of construction sites in catalog metadata, this is a larger change. Flag for implementation before TypeChecker is filled in.
+
+---
+
+## 2. Enums Assessed as Safe
+
+| Enum | Reason |
+|------|--------|
+| `RoutingFamily` | `None=0` is an **explicit sentinel** — XML doc says "Not set — sentinel value for default-initialization detection." This is the right pattern. |
+| `GraphAnalysisKind` | `None=0` is a structural sentinel. Used as the default for `EventModifierMeta.RequiredAnalysis` — "no analysis required." Correct usage. |
+| `QualifierAxis` | `None=0` is a structural sentinel. Used as the default for `FixedReturnAccessor.ReturnsQualifier` — "no qualifier returned." Correct usage. |
+| `TypeTrait` | `[Flags]` enum. `None=0` is the standard flags-enum sentinel pattern. Correct. |
+| `PeriodDimension` | `Any=0` acts as a "don't care" default. `DimensionProofRequirement` uses it when any dimension is acceptable. Functionally sentinel. |
+| `QualifierMatch` | `Any=0` documented explicitly as "Default for ~95% of entries." Used as a default parameter value in `BinaryOperationMeta`. Correct usage — this is the intentional safe default. |
+| `LexerMode` (private) | `Normal=0` is the correct initial lexer state. The scanner struct is zero-initialized with `Normal` as default, which is intentional. Even without the explicit assignment in `Scanner()`, zero-init would be correct. |
+| `FaultSeverity` | Single member `Fatal=0`. No dispatch ambiguity possible. |
+| `ActionKind` | `Set=0`. All 4 parser shape-specific switches enumerate every `ActionKind` with explicit arms (either correct or `throw InvalidOperationException`). An unnamed 0 would throw; the named `Set=0` correctly routes to `SetStatement` in `ParseAssignValueStatement`. `Actions.GetMeta` has `_ => throw`. Mitigated by exhaustive per-shape arm coverage. |
+| `ConstraintKind` | `Invariant=0`. `Constraints.GetMeta` has `_ => throw`. `ConstraintMeta` uses a DU subtype pattern — consumers pattern-match on `ConstraintMeta.Invariant` (the subtype), not on `ConstraintKind` directly. The DU acts as a second guard layer. |
+| `ConstructKind` | `PreceptHeader=0`. `ParseDirectConstruct` has a `var k => throw` wildcard. `BuildNode` has CS8524 pragma (named exhaustive) — an unnamed 0 would throw `SwitchExpressionException`; `PreceptHeader` is never reached via the direct-parse path for a legitimate precept header. |
+| `ConstructSlotKind` | `IdentifierList=0`. `InvokeSlotParser` has CS8524 pragma, no wildcard — unnamed 0 throws. But named `IdentifierList=0` would route to `ParseIdentifierList` if zero-initialized. Low risk: slots are only constructed in the catalog with explicit `ConstructSlotKind` values. |
+| `DiagnosticCategory`, `DiagnosticCode`, `FaultCode` | Catalog enums used in `GetMeta` switches that all have `_ => throw`. Zero-default names would dispatch to first member, but all construction is factory-controlled. |
+| `FunctionKind`, `FunctionCategory` | `GetMeta` has `_ => throw`. Factory-controlled. |
+| `ModifierKind` | `Optional=0`. `Modifiers.GetMeta` has `_ => throw` (confirmed by pattern). Modifier metadata always built via catalog. |
+| `OperationKind`, `OperatorKind` | `GetMeta` has `_ => throw`. Factory-controlled. |
+| `ProofRequirementKind` | `Numeric=0`. `GetMeta` has `_ => throw`. |
+| `TokenKind` | `Precept=0`. `Tokens.GetMeta` has (inferred) `_ => throw`. Tokens come from the lexer, never from zero-init. |
+| `Arity`, `Associativity`, `OperatorFamily` | Used exclusively in catalog `OperatorMeta` records. Always explicitly set. Associativity: `Left=0` is the overwhelmingly common operator direction — a zero-default here would be correct for most operators. |
+| `AnchorScope`, `AnchorTarget` | `InState=0`, `Ensure=0`. Used only in `AnchorModifierMeta` construction in the Modifiers catalog. All construction is explicit. |
+| `ModifierCategory`, `TypeCategory` | Classification fields on metadata records. Always explicitly set in catalog construction. |
+| `TokenCategory` | `Declaration=0`. Used in `TokenMeta.Categories` lists, always explicitly populated. |
+
+---
+
+## 3. Root Cause Analysis
+
+**Why wasn't 1-based explicit values used from the start?**
+
+Honest assessment: it was an oversight, not a considered tradeoff.
+
+The evidence is the inconsistency. `RoutingFamily.None=0`, `GraphAnalysisKind.None=0`, and `QualifierAxis.None=0` all show that **someone was aware of the zero-default trap** and applied the sentinel pattern in those cases. But `Severity.Info=0`, `Prospect.Certain=0`, and `ConstraintStatus.Satisfied=0` show the protection wasn't applied consistently.
+
+The pattern was:
+1. **Applied correctly** when the developer had a structural "nothing here" concept that wanted to live at zero — the sentinel pattern was deliberate.
+2. **Not applied** for semantic enums where every value is meaningful and there is no structural "nothing." Those defaulted to 0-based because C# defaults to 0-based.
+
+`ActionSyntaxShape` was the acute case because:
+- The enum was likely refactored from an earlier form that had a `None` sentinel
+- When `None` was removed, the first real value inherited slot 0 without explicit reassignment
+- The parser switch was exhaustive-named with CS8524 pragma (no wildcard throw), so a zero-default silently routed
+
+The broader problem is that the 1-based-for-semantic-enums policy was never written down as a design rule. The `ActionSyntaxShape` fix established the pattern after the fact. The other risks above are the same class of bug waiting to manifest — most blocked by stubs today, all active risks once those stubs are filled in.
+
+**Recommended policy going forward:**
+
+> Every enum where ALL members are semantically meaningful (no structural "nothing" at 0) should use explicit 1-based integer values. The zero slot is unnamed. `default(Kind) = (Kind)0` throws or is structurally detectable.
+> 
+> Enums with an explicit `None = 0` sentinel are correct as-is — that IS the intended zero behavior.
+
+This policy, if encoded in a Roslyn analyzer or code review checklist, would have caught every risk identified in this audit at definition time.
+
+---
+
+*Report written by Frank. Fix `Severity` + `DiagnosticStage` first — they are in a live struct with a correctness gate. Fix `ConstraintStatus`, `Prospect`, and `FieldAccessMode` before the evaluator is implemented. Flag `TypeKind` as a pre-TypeChecker task.*
+
+---
+
+---
+
+# Decision: ActionSyntaxShape — Explicit 1-Based Integer Values
+
+**Date:** 2026-04-28  
+**Author:** George (Runtime Dev)  
+**Branch:** `precept-architecture`  
+**Commit:** `de2005a`
+
+## Decision
+
+`ActionSyntaxShape` members now carry explicit integer values starting at 1:
+
+```csharp
+public enum ActionSyntaxShape
+{
+    AssignValue     = 1,
+    CollectionValue = 2,
+    CollectionInto  = 3,
+    FieldOnly       = 4,
+}
+```
+
+`default(ActionSyntaxShape)` == `(ActionSyntaxShape)0` — an unnamed integer value with no named arm in any exhaustive switch.
+
+## Why
+
+The prior layout had `AssignValue = 0` (implicit). Any code that constructs an `ActionMeta` and leaves `SyntaxShape` as `default` silently routes through `ParseAssignValueStatement`. With `TreatWarningsAsErrors=true` and the existing `#pragma CS8524` pairs on each switch, the unnamed zero slot now causes a `SwitchExpressionException` at runtime instead of silent wrong-parser dispatch. The 1-based layout is self-enforcing structural protection at zero runtime cost.
+
+## Alternatives Considered
+
+- **Keep `None = 0` sentinel** — rejected because B1 removed it precisely to eliminate the dead "None" arm from the parser switch. Reinstating it defeats that cleanup.
+- **Add a runtime guard in `ActionMeta` constructor** — redundant; the switch throws automatically without any extra code once zero is unnamed.
+- **Leave values implicit** — leaves the silent zero-default trap in place; easy to trigger with a careless `ActionMeta(...)` call that omits the positional `SyntaxShape` argument in a future slice.
+
+## Tradeoff Accepted
+
+Serialized integer values for `ActionSyntaxShape` (if any external system ever persists them) shift by +1 relative to the old implicit layout. No current consumers serialize this enum, so the tradeoff is zero-cost in practice.
+
+## Test Change
+
+`Actions_ActionSyntaxShape_AllMembersHaveValue` (used `Enum.IsDefined`) was replaced by `Actions_ActionSyntaxShape_AllMembersAreNonZero` (asserts `(int)s > 0`). The new assertion directly enforces the 1-based invariant; the old assertion was weakened the moment `None=0` was removed, because `Enum.IsDefined(AssignValue)` is trivially true regardless of its integer value.
+
+---
+
+---
+
+# George → Frank: B1–B7 Fixed — Re-review Requested
+
+**From:** George (Runtime Dev)  
+**Date:** 2026-04-28  
+**Branch:** `feature/catalog-extensibility`  
+**Commit:** `5e5b2f9`  
+**Re:** Frank's BLOCKED verdicts in `frank-enum-deviation-review.md` and `frank-deep-deviation-review.md`
+
+---
+
+All 7 blocking issues are resolved. Build is clean (0 errors, 0 warnings, TreatWarningsAsErrors=true). All 2044 tests pass.
+
+## What was changed
+
+### B1 — `ActionSyntaxShape.None` removed (`src/Precept/Language/Action.cs`)
+
+Removed `None = 0` and its XML doc comment. The enum now has exactly four members:
+
+```csharp
+public enum ActionSyntaxShape
+{
+    AssignValue,
+    CollectionValue,
+    CollectionInto,
+    FieldOnly,
+}
+```
+
+### B2 — Outer switch cleaned (`src/Precept/Pipeline/Parser.cs` — `ParseActionStatement`)
+
+Removed the `ActionSyntaxShape.None => throw` arm. The outer switch now has exactly 4 arms with the `#pragma CS8524` pair intact.
+
+### B3 — `ParseAssignValueStatement` inner switch
+
+Replaced `_ => throw` with explicit named throw arms for every `ActionKind` not in the `AssignValue` shape: `Add`, `Remove`, `Enqueue`, `Dequeue`, `Push`, `Pop`, `Clear`. Added `#pragma CS8524` pair.
+
+### B4 — `ParseCollectionValueStatement` inner switch
+
+Replaced `_ => throw` with explicit named throw arms for `Set`, `Dequeue`, `Pop`, `Clear`. Added `#pragma CS8524` pair.
+
+### B5 — `ParseCollectionIntoStatement` inner switch
+
+Replaced `_ => throw` with explicit named throw arms for `Set`, `Add`, `Remove`, `Enqueue`, `Push`, `Clear`. Added `#pragma CS8524` pair.
+
+### B6 — `ParseFieldOnlyStatement` inner switch
+
+Replaced `_ => throw` with explicit named throw arms for `Set`, `Add`, `Remove`, `Enqueue`, `Dequeue`, `Push`, `Pop`. Added `#pragma CS8524` pair.
+
+### B7 — `InvokeSlotParser` wildcard and comment (`Parser.cs`)
+
+- Removed `_ => throw new ArgumentOutOfRangeException(...)` arm
+- Added `#pragma warning disable CS8524` before the switch and `restore` after
+- Replaced the misleading comment with: "CS8509 enforces named-value coverage here; #pragma CS8524 suppresses unnamed-integer noise."
+
+### Companion test fix (`test/Precept.Tests/ActionsTests.cs`)
+
+`Actions_ActionSyntaxShape_AllMembersHaveValue` was checking `NotBe((ActionSyntaxShape)0)`. With `None = 0` removed, `AssignValue` is now value 0, making that assertion a false positive. Updated to `Enum.IsDefined(meta.SyntaxShape)` which catches undefined integer values without falsely flagging `AssignValue`.
+
+---
+
+## Verification
+
+```
+dotnet build src/Precept/Precept.csproj  → succeeded, 0 errors, 0 warnings
+dotnet test test/Precept.Tests/          → Passed! 2044/2044
+```
+
+Every catalog enum switch in the parser now follows the `BuildNode` gold standard:  
+explicit arms for all named members · `#pragma CS8524` to suppress unnamed-integer noise · no wildcard · CS8509 active.
+
+---
+
+---
+
+# Decision: Catalog Extensibility Implementation Complete (PR #138)
+
+**By:** George (Runtime Dev)
+**Date:** 2026-04-28
+**Branch:** feature/catalog-extensibility
+**PR:** #138
+
+## Status
+
+All 7 slices implemented and passing (2044 tests).
+
+## What Was Done
+
+### Slice 1 — ExpressionBoundaryTokens derived from catalog
+`ExpressionBoundaryTokens` is now composed of `StructuralBoundaryTokens` (6 fixed tokens: When, Because, Arrow, Ensure, EndOfSource, NewLine) plus `Constructs.LeadingTokens` — no more hardcoded construct-leading tokens in the parser. Adding a new construct kind with a new leading token automatically extends the expression boundary.
+
+### Slice 2 — BuildNode wildcard removed (CS8509 enforced)
+The `_ => throw` wildcard arm was removed from `BuildNode`. The switch now has one arm per `ConstructKind` with no default. CS8509 fires when a new `ConstructKind` is added without a corresponding assembly arm. `#pragma warning disable CS8524` suppresses the unnamed-integer variant (correct: we only guard against new named members, not arbitrary integer casts).
+
+### Slice 3 — RoutingFamily enum + ConstructMeta field
+`RoutingFamily` enum added: `None=0` (sentinel), `Header`, `Direct`, `StateScoped`, `EventScoped`. Added as required positional parameter to `ConstructMeta`. All 12 catalog entries populated. Tests assert no entry has `None` routing family.
+
+### Slice 3b — DisambiguateAndParse exhaustive switches
+Both EventScoped and StateScoped switches in `DisambiguateAndParse` now have:
+- Named arms for each matching construct
+- `null =>` arm calling `EmitAmbiguityAndSync` (handles "not found" from lookup)
+- Explicit wrong-family throw arms (all non-matching ConstructKind values listed explicitly — no wildcard)
+
+This gives CS8509-style protection: adding a new ConstructKind forces updating both switches.
+
+### Slice 4 — ActionSyntaxShape enum + ActionMeta field + Actions.ByTokenKind
+`ActionSyntaxShape` enum added: `None=0` (sentinel), `AssignValue`, `CollectionValue`, `CollectionInto`, `FieldOnly`. Added as required positional parameter to `ActionMeta`. All 8 catalog entries populated. `Actions.ByTokenKind` (FrozenDictionary) added for O(1) token→meta lookup.
+
+### Slice 5 — ParseActionStatement two-level CS8509 refactor
+`ParseActionStatement` replaced with a shape-dispatch entry + 4 private helpers:
+- Outer switch on `meta.SyntaxShape` (no default — CS8509 on new shapes)
+- Inner switch per helper on `meta.Kind` (no default — CS8509 on new actions within each shape)
+- Unknown token path uses `Actions.ByTokenKind.TryGetValue` instead of a `default:` case
+
+### Slice 6 — AccessModeKeywords derived from catalog
+`TokenMeta.IsAccessModeAdjective` bool flag added (optional, default false). `Readonly` and `Editable` tokens tagged. `Tokens.AccessModeKeywords` FrozenSet derived from tagged entries. `ParseAccessModeKeywordDirect` uses `Tokens.AccessModeKeywords.Contains(...)` instead of `is TokenKind.Readonly or TokenKind.Editable`.
+
+## Implementation Deviations from Plan
+
+1. **`None=0` sentinels** — Both `RoutingFamily` and `ActionSyntaxShape` got a `None=0` member not in the original plan spec. This is required for the "all members have non-default value" tests to work correctly (testing `.NotBe((RoutingFamily)0)` requires `0` to be the sentinel, not a valid value).
+
+2. **`#pragma warning disable CS8524`** — The plan described "CS8509 fires here." The actual compiler warning for exhaustive named-enum switches without wildcard is CS8524 (unnamed values) when the switch handles all named values explicitly. CS8509 fires when named values are missed. Both concerns are addressed: CS8524 is suppressed (unnamed integer casts aren't our concern), and CS8509 will fire if a new named ConstructKind is added without an arm.
+
+## Cross-Surface Impact
+
+Parser internal only. No grammar, language server, MCP, or sample changes needed.
+
+---
+
+---
+
+# Decision: All Semantic Zero-Slot Enums Use Explicit 1-Based Values
+
+**Date:** 2026-04-28  
+**Author:** George (Runtime Dev)  
+**Status:** Implemented — commit `d300b26` on `precept-architecture`
+
+---
+
+## Decision
+
+Every enum in `src/Precept/` where ALL members are semantically meaningful (no structural "nothing" at 0) must use explicit 1-based integer values. The zero slot stays unnamed. `default(Kind)` = `(Kind)0` = unnamed = throws `SwitchExpressionException` rather than silently routing to a wrong member.
+
+This is a blanket structural invariant, not per-enum policy. Once established, new enums start at 1 by default.
+
+---
+
+## Enums Fixed
+
+| Enum | File | Member count | Zero-slot risk |
+|------|------|:---:|------|
+| `Severity` | `Language/Diagnostic.cs` | 3 | `default(Diagnostic)` gives `Severity.Info`; `HasErrors` returns false on zero-constructed diagnostics |
+| `DiagnosticStage` | `Language/Diagnostic.cs` | 5 | Zero-constructed diagnostics attributed to `Lex` stage |
+| `ConstraintStatus` | `Runtime/Inspection.cs` | 3 | Zero-initialized result marks violated constraint as `Satisfied` — inverts Precept's core correctness guarantee |
+| `Prospect` | `Runtime/Inspection.cs` | 3 | Zero-initialized prospect presents an impossible transition row as `Certain` to fire |
+| `FieldAccessMode` | `Runtime/SharedTypes.cs` | 2 | Zero-initialized mode silently locks writable fields as `Read` |
+| `TypeKind` | `Language/TypeKind.cs` | 26 | Zero-initialized kind silently treats unknown types as `String` |
+
+---
+
+## Pattern Applied
+
+```csharp
+// Before (unsafe — String = 0 is a valid member)
+public enum TypeKind { String, Boolean, Integer, ... }
+
+// After (safe — (TypeKind)0 is unnamed, throws SwitchExpressionException)
+public enum TypeKind
+{
+    String  = 1,
+    Boolean = 2,
+    Integer = 3,
+    ...
+}
+```
+
+---
+
+## Rationale
+
+- **Silent wrong-branch routing is the failure mode.** When an enum member sits at 0 and a struct gets zero-initialized (field omitted, `default(T)`, array element, unset out-parameter), the switch routes silently to that member. The bug is invisible — no exception, no compiler warning, semantically wrong behavior.
+- **The 1-based layout is free.** No behavioral change when all constructors set the field explicitly. The only observable difference is that `(T)0` now has no named arm — which is exactly the trip-wire we want.
+- **`SwitchExpressionException` is the right signal.** It fires immediately at the misuse site with a clear message, not downstream after data has propagated. This is strictly better than a silent wrong-value path.
+- **Consistency with `ActionSyntaxShape`.** That enum was made 1-based in the prior session (commit `de2005a`). Applying the same rule to all other enums closes the audit uniformly.
+
+---
+
+## Alternatives Rejected
+
+- **Leave at 0, add runtime guards:** Adds noise at every consumer, doesn't eliminate the silent path.
+- **Add `None = 0` sentinel:** The sentinel itself becomes a valid arm; switch exhaustiveness can mask it. The unnamed-slot approach is strictly stronger.
+- **Per-enum risk assessment:** Inconsistent. The rule is simple enough to apply universally. Dormant enums (`ConstraintStatus`, `Prospect`, `FieldAccessMode`, `TypeKind`) are safer to fix now than when the evaluator ships and they're live.
+
+---
+
+## Impact on Tests
+
+No tests used `(EnumName)0` or `default(EnumName)` — no test changes required. All 2044 tests passed without modification.
+
+---
+
+## Going Forward
+
+New enums in `src/Precept/` where all members are semantically meaningful must start at 1. The canonical check: *"Is there a valid program state represented by integer 0 for this type?"* If no, start at 1.

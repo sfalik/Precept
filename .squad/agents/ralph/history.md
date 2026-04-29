@@ -35,3 +35,7 @@ Initial setup complete.
 - 2026-04-15: Chore lane is currently clear on GitHub. Issue #97 (`squad:chore`) is closed as completed and PR #98 is merged; there are no remaining open `squad:chore` issues or open chore PRs to route this cycle.
 - 2026-04-15: Chore lane reopened with issue #100 (`type:chore`, `squad:chore`) about the precept-name token color scope bug. It is already routed to Frank via `squad:frank`, has no open linked chore PR, and the chore PR board remains empty this cycle.
 
+### 2026-04-29 — Spike mode is now first-class
+- Routing and ceremony docs now explicitly recognize spike activation and exit intents.
+- While `spike_mode: true`, Ralph should suppress PR-demanding ceremonies/review flows and expect spike branches to use `spike/{kebab-description}` until deliberate closeout.
+- `CONTRIBUTING.md` now treats spike work as a formal workflow rather than an informal exception.
