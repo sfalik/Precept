@@ -7,9 +7,165 @@
 | Property | Value |
 |---|---|
 | Doc maturity | Incremental — grows as each compiler stage is designed and implemented |
-| Implementation state | §1 Lexer complete; §2 Parser complete; §3 Type Checker complete; §4–5 stubs |
-| Grounding | `docs/language/precept-language-vision.md` (target surface) · `docs/PreceptLanguageDesign.md` (v1 spec) |
+| Implementation state | §1 Lexer complete; §2 Parser complete; §3 Type Checker complete; §3A Language Semantics complete; §0 Preamble complete; §4–5 stubs (pre-implementation contracts in §0.5–0.6) |
+| Grounding | `docs/PreceptLanguageDesign.md` (v1 spec); vision archived at `docs/archive/language-design/precept-language-vision.md` |
 | Clean room rule | References v1 grammar and keyword inventory; does not import v1 implementation details |
+
+---
+
+## 0. Preamble
+
+This section captures the language's foundational identity: the design principles, conceptual model, governance philosophy, execution model properties, and pre-implementation contracts for pipeline stages not yet built. It is authoritative — any redesign that contradicts material here has departed from Precept's identity.
+
+### 0.1 Design Principles
+
+The language must preserve these principles. They are non-negotiable — any redesign that violates one has departed from Precept's identity.
+
+1. **Prevention, not detection.** Invalid entity configurations — combinations of lifecycle position and field values that violate declared rules — cannot exist. They are structurally prevented before any change is committed, not caught after the fact. This is the defining commitment: the contract prevents them. A compiler that validates on request is doing detection; a compiler that makes invalid configurations structurally impossible is doing prevention.
+
+2. **One file, complete rules.** Every field, rule, ensure, and transition lives in the `.precept` definition. There is no scattered logic across service layers, validators, event handlers, or ORM interceptors. All proof facts, all type information, all constraint scope, all routing — everything needed to understand and enforce the contract — derives from a single file. No imports, no cross-file references, no external rule injection, no ambient configuration.
+
+3. **Deterministic semantics.** Same definition, same data, same outcome — always. No non-deterministic solvers, no timing-dependent analysis, no culture-dependent operations, no stochastic reasoning. This is what makes the engine trustworthy as a business rules host and auditable as an AI agent tool.
+
+4. **Full inspectability.** The language must make the engine's reasoning fully exposable. At any point, you can preview every possible action and its outcome without executing anything. The engine exposes the complete reasoning: conditions evaluated, branches taken, constraints applied. You see not only what would happen, but why. Nothing is hidden. Inspectability extends to proof reasoning — proven ranges, source attribution, and what the engine could not prove must all be surfaceable through diagnostics, hover, and tooling.
+
+5. **Keyword-anchored readability.** Structure is explicit and line-oriented, not indentation-sensitive. Statement kind is identified by its opening keyword sequence. The language is AI-safe: regular enough that humans and agents can author it reliably without layout-sensitive syntax traps.
+
+6. **Explicit domain meaning over primitive convenience.** When a value has real domain identity (money, date, quantity, currency), the language should name it as a distinct type with its own operator rules and compile-time enforcement. Primitive types are the storage mechanism; domain types are the meaning mechanism.
+
+7. **Compile-time-first static checking.** The compiler proves what it can, rejects what it can prove invalid, and does not guess. Compile-time structural checking catches unreachable states, type mismatches, constraint contradictions, division by zero, overflow, empty collection access, and more — before runtime, before any entity instance exists. A precept that compiles without diagnostics has no unproven evaluation faults. This is where the "contract" metaphor becomes literal: the compile step validates the definition's structural soundness before any instance exists.
+
+8. **Approximation honesty.** The language does not present approximation as exactness. If a value or operation is inherently approximate, that fact must be explicit in the contract. Exact-value lanes remain exact. Silent approximation inside an exact-looking path weakens the user's ability to reason about outcomes. The line between exact and approximate behavior must be visible in the type system and the language surface.
+
+9. **Mandatory rationale.** Every constraint carries a mandatory reason. The engine requires not just the rule, but its rationale. This is a language requirement, not a convention — the `because` clause is syntactically required on every rule and ensure.
+
+10. **Totality.** Every expression evaluates to a result — never silent `NaN`, `Infinity`, or `null`. The evaluation surface has no undefined behavior. For any expression that *could* fault at runtime — division by zero, overflow, empty collection access — the compiler must either prove safety or emit a diagnostic requiring the author to supply constraints that make safety provable. A precept that compiles without diagnostics has no unproven arithmetic or access faults. Runtime fault traps exist only as defensive redundancy for paths the compiler has already proven unreachable.
+
+11. **Static completeness.** If a precept compiles without diagnostics, it does not fault at runtime. The compiler catches all type errors, proves all arithmetic safety obligations, and verifies all access preconditions at compile time. Every fault class that the evaluator can produce — type mismatch, division by zero, overflow, empty collection access, constraint range impossibility — is linked to a compiler diagnostic that prevents it. Runtime fault checks exist only as defensive redundancy, never as the primary enforcement mechanism. This is the bridge between the compiler and the evaluator: the compiler's job is to make every evaluator error path unreachable.
+
+### 0.2 Language Model
+
+A precept defines a governed business entity.
+
+The entity may be:
+
+1. Stateful: lifecycle positions, transitions, state-scoped rules, and event routing.
+2. Stateless: data integrity, editability, and event-driven mutation without a state machine.
+
+The governing concepts are:
+
+1. Fields: stored or computed data.
+2. Rules: global data truth.
+3. Ensures: contextual truth tied to state or event context.
+4. Events: typed triggers.
+5. Actions: mutations.
+6. Transitions: movement truth.
+7. Editability: direct mutation permissions.
+8. Modifiers: declaration-attached structural, semantic, or severity intent.
+
+The language protects configurations, not isolated values. In a stateful precept, a configuration is current state plus current field data. In a stateless precept, it is the current field data alone.
+
+### 0.3 Governance, Not Validation
+
+This distinction is fundamental to the language's identity and governs how every constraint surface works.
+
+**Validation** checks data at a moment in time, when called. A validator runs when you invoke it. Code paths that don't call the validator bypass the rules. There is always a window where invalid state can exist.
+
+**Governance** declares what the data is allowed to become and enforces that declaration structurally, on every operation, with no code path that bypasses the contract. The language makes certain configurations structurally impossible — not checked, not caught, but prevented.
+
+This distinction shapes the language at every level:
+
+1. Rules are not assertions called at a checkpoint. They are declarations that hold structurally on every operation where they apply.
+2. Guarded rules do not weaken the guarantee. They make it precise — the rule applies exactly where the domain says it should, and the engine ensures it cannot be bypassed.
+3. State is not a passive label. It is an active rule-activator. An entity in `Approved` has different data requirements than the same entity in `Draft` — the state defines what must be true about the data there.
+4. Mutations are atomic. All mutations execute on a working copy. Constraints are evaluated against the working copy. If all constraints pass, the working copy is promoted. If any constraint fails, the working copy is discarded. There is no window where a partially-committed mutation with a violated rule exists.
+5. An invalid definition cannot produce an engine. The compile-time gate is a structural boundary — not a convention, not a best practice. If the definition has errors, no engine exists to run.
+
+The full guarantee is about configurations: the pair of (current lifecycle position, current field values) for stateful entities, or simply current field values for stateless entities. Invalid configurations are structurally impossible. A valid entity is simply one where every constraint holds for its current configuration.
+
+### 0.4 Execution Model Properties
+
+The following properties of Precept's execution model are language design choices, not implementation accidents. They are what make tractable compile-time reasoning possible, and any future compiler must preserve them.
+
+1. **No loops.** The language has no iteration constructs. Expression trees are finite and acyclic. This eliminates the need for fixpoint computation and widening operators.
+
+2. **No control-flow branches.** A transition row is a flat sequence: evaluate a guard, execute assignments left-to-right, check rules and ensures. There are no `if` statements that split execution into paths that later reconverge. Conditional *expressions* (`if/then/else`) produce a single value — both branches are type-checked, exactly one is evaluated — but they do not create control-flow divergence.
+
+3. **No reconverging flow.** Because there are no loops or branches, there is no join point where two different states must be merged. Each assignment in a row sees the state left by all preceding assignments. This makes sequential flow analysis a linear walk, not a dataflow graph.
+
+4. **Closed type vocabulary.** The language has a fixed set of types. No user-defined types, no parametric polymorphism, no open type hierarchies. This makes exhaustive type checking possible over a finite, fully-known vocabulary.
+
+5. **Finite state space.** States, events, fields, and rules are declared statically. Every transition row, state action, and rule can be enumerated exhaustively. No symbolic execution over unbounded domains is needed.
+
+6. **Expression purity.** Expressions cannot mutate entity state, trigger side effects, or observe anything outside their evaluation context (current field values and event arguments). This is a language semantic, not a caller convention. It is what makes inspection safe — you can always ask what an expression would produce without affecting anything.
+
+7. **No separate compilation.** Each `.precept` file is self-contained. No imports, no cross-file references. The compiler processes the entire definition in one pass. All proof facts derive from the single file.
+
+These properties are the reason the language can support tractable compile-time proofs. Standard interval arithmetic, bounded relational closure, and single-pass validation are directly applicable without the lattice infrastructure that general-purpose analyzers require. The absence of widening is a feature: in general-purpose analyzers, widening is the primary source of precision loss.
+
+### 0.5 Graph Analyzer Design Contract
+
+> **Pre-implementation contract.** This section captures the language's requirements for
+> the graph analyzer. §4 is a stub pending implementation. These requirements define the
+> contract the implementation must satisfy.
+
+The compiler must build and reason over the full state transition graph at compile time. The graph is constructed from declared states, events, and transition rows. This is a first-class language requirement, not an optional optimization.
+
+The graph analysis surface must support at least these reasoning capabilities:
+
+1. **BFS/DFS reachability from initial.** Required to detect unreachable states (C48) and to define the reachable state set that other modifiers reason over. `initial` provides the root.
+2. **Terminal state identification.** States with no outgoing transition rows. Required to anchor path analysis and to validate `terminal` modifier declarations.
+3. **Dead-end state detection.** Non-terminal states where all outgoing rows reject or produce no-transition. These have transition machinery that never succeeds — likely authoring mistakes (C50).
+4. **Incoming/outgoing edge analysis.** Per-state: which events fire into this state, which events fire out. Required for `guarded` (all incoming transitions have guards), `entry` (event fires only from initial), `isolated` (event fires from exactly one state), `universal` (event fires from every reachable non-terminal state).
+5. **Dominator analysis.** Required for `required`/`milestone` — the modifier asserts that all initial→terminal paths must visit this state. Dominator analysis (O(V+E) via Lengauer-Tarjan) determines whether a state is on every such path.
+6. **Reverse-reachability.** Required for `irreversible` (no path from this state back to any ancestor state in the initial→forward ordering) and `sealed after <State>` (no mutation after the named state is entered — requires reachability analysis from the named state forward).
+7. **Row-partition analysis.** Required for `writeonce` (field set at most once across all reachable transition rows) and `sealed after` (no row reachable after the named state assigns to the field).
+8. **Outcome-type analysis.** Per (state, event) pair: do all rows produce `transition`? `no transition`? All `reject`? Required for `advancing` (every success is a state transition), `settling` (every success is no-transition), `completing` (transitions only to terminal states), `absorbing` (event handlers never transition out), and for existing diagnostics like C51 (reject-only pairs) and C52 (events that never succeed).
+
+**Overapproximation rule.** Structural graph analysis treats all edges as traversable regardless of `when` guards — it overapproximates reachability. This is sound: structural guarantees cannot account for guard-dependent path selection because guard satisfaction depends on runtime data. A modifier that claims "all paths visit this state" means all *structurally declared* paths, not all guard-satisfiable paths. This is the correct tradeoff for compile-time analysis.
+
+**Interaction with existing diagnostics.** The graph analysis that modifiers require is an extension of the analysis the compiler already performs for C48 (unreachable states), C49 (orphaned events), C50 (dead-end states), C51 (reject-only pairs), and C52 (events that never succeed). Modifiers do not replace these diagnostics — they make them stronger by adding author-declared intent that the compiler can cross-check against the graph structure.
+
+### 0.6 Proof Engine Design Contract
+
+> **Pre-implementation contract.** This section captures the language's requirements for
+> the proof engine. §5 is a stub pending implementation. These requirements define the
+> contract the implementation must satisfy.
+
+#### Proof-system responsibilities
+
+The proof layer must be able to support the language's proof-bearing claims. That includes:
+
+1. **Numeric interval reasoning.** Field constraints, rules, and guards contribute provable numeric ranges. The proof system tracks these ranges through assignment chains.
+2. **Relational reasoning** over numeric expressions involving multiple fields.
+3. **Divisor safety.** Two-tier: proven-zero divisors are hard errors; divisors with no compile-time nonzero proof are obligation diagnostics requiring the author to supply a constraint (e.g., `nonzero`, `positive`, a rule, or a guard).
+4. **Non-negative proof obligations** such as `sqrt` inputs and `pow(integer, integer)` exponents. The compiler requires a provable non-negative path — via `nonnegative` constraint, a rule, an ensure, or a guard — before accepting the expression.
+5. **Assignment range impossibility.** An assignment expression provably outside the target field's constraint range is a compile-time error.
+6. **Contradictory rule detection.** When two rules' ranges are provably incompatible — no value can satisfy both simultaneously — the compiler reports the contradiction.
+7. **Vacuous rule detection.** When a rule is provably always true given field constraints, the compiler reports it as tautological.
+8. **Dead guard detection.** A guard provably always false means the row or block can never execute.
+9. **Tautological guard detection.** A guard provably always true means the `when` clause has no effect.
+10. **Compile-time rule enforcement against defaults.** Rules and initial-state ensures are checked against default field values at compile time. A definition where default values violate a declared rule is rejected before any instance exists.
+11. **Sharpening of reachability and routing diagnostics** from proven-dead guards.
+12. **Structured proof attribution** suitable for hover, diagnostics, and agent consumption — every proven range carries the constraints and rules that contributed to it.
+
+#### Proof philosophy
+
+The proof layer is governed by these requirements, which are language-level commitments, not implementation preferences:
+
+1. **Soundness over completeness.** The proof layer must never claim an expression is safe when it is not. Every proof path must return a provably correct result or conservatively decline. False negatives (missed proofs) cause author friction — the author must supply additional constraints. False positives (wrong "safe" claims) cause runtime failures. The language always chooses the safe direction.
+
+2. **Proven violations only.** The language reports what is definitively broken, not what might be broken. Flagging possible violations turns the compiler into a nag that trains authors to ignore warnings. Flagging only proven violations makes it a trusted guide — when it speaks, it is right.
+
+3. **Opaque solvers are rejected on principle.** The language's proof reasoning must be legible — to authors, to tooling, and to AI agents. Proof witnesses must be structured data, not opaque solver traces. If the compiler cannot prove safety, it says so explicitly — the author is never confronted with an unexplainable verdict. This is why SMT/Z3 solvers are excluded even when they could prove more: opaque proof witnesses violate the inspectability commitment.
+
+4. **One file, complete proof facts.** All proof facts derive from the `.precept` definition. No external oracle, no hidden configuration, no side channel. The proof engine's knowledge boundary is the file boundary.
+
+5. **Truth-based diagnostic classification.** Proof outcomes are classified into three categories: *proved dangerous* (the compiler can demonstrate a violation), *proved safe* (the compiler can demonstrate correctness), and *unresolved* (the compiler cannot determine either). These categories map to distinct author actions: fix a proven violation, rely on proven safety, or supply additional constraints to help the compiler. Diagnostics are classified by proof outcome, not by syntax shape.
+
+6. **Proof attribution is required, not optional.** Every proven range must carry its source attribution — the field constraints, rules, and guards that contributed. Authors must see what the engine proved, what it could not prove, and why. Proof results flow as structured data, not parsed prose — tooling and agents consume the proof model directly, never by parsing diagnostic message text.
+
+7. **Sequential proof flow.** Actions in a chain are sequenced — each subsequent action sees the proof state left by all preceding actions. When a field is reassigned, prior proof facts about that field are invalidated before the new assignment's facts are stored. This is a language semantic that ensures proof reasoning tracks the actual mutation sequence.
 
 ---
 
@@ -1318,6 +1474,162 @@ The type checker emits diagnostics for root causes only. When `ErrorType` is flo
 
 ---
 
+## 3A. Language Semantics
+
+This section defines the semantic model that sits between mechanical type checking (§3) and structural graph analysis (§4). It specifies the meaning of constraint surfaces, outcome verdicts, mutation guarantees, entity construction, and inspection — the concepts that give the language its governance identity beyond syntax and types.
+
+### 3A.1 Constraint Semantics
+
+The language distinguishes categories of truth.
+
+#### Rules
+
+`rule` expresses global data truth — constraints that hold after every mutation.
+
+Rules support optional guards:
+
+```precept
+rule Score >= 680 because "Credit score too low"
+rule DownPayment >= RequestedAmount * 0.20 when LoanType == "conventional" because "Conventional loans require 20% down"
+```
+
+A guarded rule applies only when its guard is true. This is conditional constraint scoping — the rule is precise about where the domain says it should apply — not a weakening of the guarantee. The engine ensures the rule holds in every configuration where its guard is satisfied.
+
+Rules operate in field scope. They cannot reference event arguments — this ensures reusability across all events.
+
+#### Ensures
+
+`ensure` expresses contextual truth — constraints scoped to a specific state or event.
+
+Ensures also support optional guards:
+
+```precept
+in Review ensure Reviewers.count >= 2 because "Review requires at least two reviewers"
+in Open when Escalated ensure Priority >= 3 because "Escalated tickets must be high priority"
+on Submit when Submit.Type == "payment" ensure Submit.Amount > 0 because "Payment amounts must be positive"
+```
+
+The surface includes these anchors:
+
+1. `in <State> ensure ...` — residency truth. The constraint holds for every operation while the entity is in this state.
+2. `to <State> ensure ...` — entry truth. The constraint is checked on any transition into this state.
+3. `from <State> ensure ...` — exit truth. The constraint is checked on any transition out of this state.
+4. `on <Event> ensure ...` — event-argument truth. The constraint validates the caller-provided event arguments.
+
+#### Rejections
+
+`reject` is authored prohibition, not failed data truth. This is a designed prohibition in the definition, not a constraint violation — it means the author deliberately forbade this outcome.
+
+The distinction between rejection and constraint failure is semantically significant. A rejection says "the definition explicitly disallows this"; a constraint failure says "the data would violate a declared truth." They require different responses from callers and different diagnostic framing.
+
+#### Guards
+
+`when` guards are routing logic, not constraints. They do not produce violations. A guard that evaluates to false simply means the row does not match — the runtime moves to the next row. Only the row that actually fires (or an explicit `reject` fallback) produces outcomes. This is a fundamental language semantic: guards select; constraints enforce.
+
+#### Collect-all vs first-match
+
+The language makes a semantic distinction between:
+
+1. **Validation surfaces,** which are collect-all. Rules and ensures are evaluated exhaustively — every applicable constraint is checked, and all violations are reported. The caller receives the complete set of failures, not just the first one encountered.
+2. **Routing surfaces,** which are first-match and order-sensitive. Transition rows are evaluated in declaration order — the first matching guard wins, and remaining rows are not evaluated.
+
+This distinction is a language design choice, not an optimization. Validation must be exhaustive because partial feedback is useless to callers — reporting only the first violation forces trial-and-error correction. Routing must be first-match because transition rows are authored with priority ordering — evaluating all rows would create ambiguity about which outcome applies.
+
+### 3A.2 Outcomes and Semantic Verdicts
+
+The language defines a stable semantic verdict space. Every operation that can mutate an entity produces one of a fixed set of outcomes. These outcome types are semantically distinct — not just diagnostic convenience — and callers must be able to discriminate between them.
+
+The outcome types are:
+
+1. **Successful transition.** Event fired; state changed; entity updated.
+2. **Successful no-transition event.** Event fired; in-place mutations committed; no state change. This is a deliberate design allowing in-place data changes to be event-driven without triggering entry/exit actions.
+3. **Explicit rejection.** An authored `reject` row matched — a designed prohibition, not a data constraint failure.
+4. **Constraint failure.** Mutations would violate a rule or ensure; rolled back.
+5. **Unmatched routed event.** Transition rows exist for the event but all guards failed — an instance data condition.
+6. **Undefined event surface.** No transition rows defined for this event in the current state — a definition gap.
+7. **Successful direct update.** Field write committed.
+8. **Access mode failure.** Patch targets a field not editable in the current state — either `readonly` (read-only) or `omit` (structurally absent).
+9. **Invalid input failure.** Patch is structurally malformed.
+
+**Why the distinctions matter:**
+
+- **Rejection vs constraint failure.** Rejection is an authored decision; constraint failure is a data truth violation. They require different responses from callers and different diagnostic framing.
+- **Unmatched vs undefined.** Undefined means no routing surface exists (a definition gap the author should address); unmatched means routing exists but the current data does not satisfy any guard (an instance data condition the caller can address).
+- **Transition vs no-transition.** Both are successes. No-transition events execute mutations without state change — a meaningful event-driven pattern, not a degenerate case.
+
+#### Construction outcomes
+
+Entity construction via the initial event produces the same outcome space. All event outcomes are valid at construction: `Transitioned` (construction-time routing to a different state), `Applied` (stayed in initial state), `Rejected` (business rejection at intake), `ConstraintsFailed` (data truth violation at intake), `Unmatched` (guarded initial rows, none matched). `UndefinedEvent` cannot occur — the compiler guarantees the initial event exists. The caller uses the same pattern matching for construction that they use for every event.
+
+#### Restoration outcomes
+
+Entity restoration from persisted data produces a distinct outcome space: successful restoration (data valid, constraints passed), constraint failure (persisted data violates current definition's rules/ensures), or invalid input (structural mismatch — undefined state, unknown fields, type mismatch). Restoring an entity in an invalid state is not allowed — the governance guarantee applies from the moment an entity is loaded, not just when it is mutated. Future migration logic runs before constraint evaluation, transforming persisted data to conform to the current definition.
+
+### 3A.3 Constraint Violation Subject Attribution
+
+When a constraint is violated, the language supports semantic subject attribution — not just the violation message, but what the violation is about.
+
+Every constraint has both **semantic subjects** (the fields or args the constraint references) and a **scope** (why this constraint exists — which rule, which state ensure, which event ensure).
+
+The four constraint kinds have distinct attribution:
+
+1. **Event ensures** target event arguments plus the event scope. The user provided those args.
+2. **Rules** target directly referenced fields plus the definition scope. The runtime does not reverse-map through mutations — if the author wants arg-level feedback, they write an event ensure.
+3. **State ensures** target directly referenced fields plus the state scope (with anchor: in, to, or from).
+4. **Transition rejections** target the event as a whole — this is an authored routing rule, not a data constraint.
+
+Computed fields referenced in constraints are also targets, with transitive expansion to the concrete stored fields they depend on.
+
+This attribution model is a language-level requirement because it flows from how the language distinguishes constraint scopes. The consumer decides rendering; the language provides the semantic structure.
+
+### 3A.4 Mutation Atomicity
+
+All mutations execute on a working copy. Constraints are evaluated against the working copy after all mutations complete. If every constraint passes, the working copy is promoted to become the entity's committed state. If any constraint fails, the working copy is discarded and the entity's state is unchanged. An invalid configuration never exists, even transiently. There is no window between mutation and constraint checking where a partially-committed state with violated rules can be observed.
+
+This guarantee applies to all mutation surfaces: event-driven transitions, stateless event hooks, direct field updates, and state entry/exit actions. The working copy semantics are uniform — every path through the engine that can modify entity data uses the same all-or-nothing promotion/discard model.
+
+### 3A.5 Entity Construction
+
+Construction is modeled as an **initial event** — the precept's constructor. This solves the fundamental problem that entities with required fields (non-optional, no default) cannot be constructed parameterlessly: the author would be forced to either invent nonsense defaults or make things optional that should not be.
+
+```precept
+event Create(ApplicantName as string, Amount as currency in USD, CreditScore as integer) initial
+```
+
+The `initial` modifier on an event designates it as the construction event. The runtime's `Create(args)` operation fires this event atomically as part of entity creation:
+
+1. Build a hollow version (defaults applied, initial state set, omitted fields structurally absent).
+2. Fire the initial event with the caller's args through the standard pipeline — same guards, same mutations, same ensures, same constraint checking as any other event.
+3. Return the outcome — same verdict space the caller uses for every event (see §3A.2).
+
+If the precept does not declare an initial event, `Create()` is parameterless and always succeeds (the compiler guarantees all fields have defaults or are optional — enforced by `RequiredFieldsNeedInitialEvent` / `InitialEventMissingAssignments`).
+
+**Construction-time constraint composition.** When the initial event fires, constraints compose naturally with no new language surface:
+
+1. **Arg ensures** (`on Create ensure ...`) — pre-assignment validation of caller-provided args.
+2. **Field constraints** (rules, field-level ensures) — post-assignment truth.
+3. **Global rules** (`rule ...`) — always evaluated.
+4. **Entry ensures** (`to <InitialState> ensure ...`) — construction-specific truth. These are the same entry ensures that fire on any transition into the initial state, but at construction time they serve as the intake invariant — what must be true about data when the entity first exists.
+5. **Residency ensures** (`in <InitialState> ensure ...`) — while-in-state truth.
+
+No special "construction constraint" form is needed. `to <InitialState> ensure` is the natural construction-time rule: it fires when the entity enters the initial state, which is exactly what construction does.
+
+**Compiler enforcement:**
+- **`RequiredFieldsNeedInitialEvent`:** Precept has required fields (non-optional, no default) but does not declare an initial event — construction cannot produce a valid initial version.
+- **`InitialEventMissingAssignments`:** Initial event does not assign all required fields that lack defaults — post-construction state may violate constraints.
+
+**Design rationale:** Construction goes through the full event pipeline because entities must satisfy their constraints from the moment they exist. A parameterless construction path cannot enforce business invariants at intake. By modeling construction as an event, the language reuses all existing machinery — guards can discriminate construction routing, ensures validate args, `reject` can refuse intake, and the caller uses the same pattern matching they use for every event.
+
+### 3A.6 Inspection as a First-Class Operation
+
+Inspection is not a reporting layer — it is a fundamental language operation. It has the same depth as event execution: guard evaluation, exit actions, mutations, entry actions, computed field recomputation, and constraint evaluation — all executed on a working copy without committing.
+
+The answer to "what would happen?" is always available, from any state, for any event, and is honest. The inspection result matches what execution would produce for the same inputs. Inspectability is what makes the governance contract trustworthy — you can always ask, and the language guarantees the answer matches what execution would do.
+
+This is not merely a tooling convenience. It is a language-level guarantee that flows from the execution model's properties: expression purity (§0.4 property 6 — expressions cannot mutate state), deterministic semantics (§0.1 principle 3 — same inputs produce same outputs), and working copy isolation (§3A.4 — mutations execute on a copy). These properties together make inspection safe and honest by construction, not by convention.
+
+---
+
 ## 4. Graph Analyzer
 
 > **Status:** Stub — to be written when the graph analyzer is designed and implemented.
@@ -1347,4 +1659,4 @@ _TBD — open questions will be captured here as later pipeline stages are desig
 | [Type Checker](../compiler/type-checker.md) | §3 implementation detail |
 | [Graph Analyzer](../compiler/graph-analyzer.md) | §4 implementation detail |
 | [Proof Engine](../compiler/proof-engine.md) | §5 implementation detail |
-| [Language Vision](precept-language-vision.md) | Target language surface — this spec tracks what's implemented |
+| [Language Vision](../archive/language-design/precept-language-vision.md) | Archived target language surface — this spec tracks what's implemented |
