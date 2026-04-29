@@ -235,12 +235,21 @@ public static class Parser
                     return null;
                 }
 
+#pragma warning disable CS8524 // unnamed enum values are unreachable — named arms cover all defined ConstructKind values
                 return FindDisambiguatedConstruct(leadingKind, Current().Kind) switch
                 {
                     ConstructKind.EventEnsure  => ParseEventEnsure(start, eventTarget.Value, stashedGuard),
                     ConstructKind.EventHandler => ParseEventHandlerWithGuardCheck(start, eventTarget.Value, stashedGuard),
-                    _ => EmitAmbiguityAndSync(Current()),
+                    null => EmitAmbiguityAndSync(Current()),
+                    ConstructKind.PreceptHeader or ConstructKind.FieldDeclaration or
+                    ConstructKind.StateDeclaration or ConstructKind.EventDeclaration or
+                    ConstructKind.RuleDeclaration or ConstructKind.TransitionRow or
+                    ConstructKind.StateEnsure or ConstructKind.AccessMode or
+                    ConstructKind.OmitDeclaration or ConstructKind.StateAction
+                        => throw new InvalidOperationException(
+                            "Non-EventScoped ConstructKind reached EventScoped switch — check DisambiguationEntry.LeadingToken values."),
                 };
+#pragma warning restore CS8524
             }
             else
             {
@@ -259,6 +268,7 @@ public static class Parser
                     return null;
                 }
 
+#pragma warning disable CS8524 // unnamed enum values are unreachable — named arms cover all defined ConstructKind values
                 return FindDisambiguatedConstruct(leadingKind, Current().Kind) switch
                 {
                     ConstructKind.AccessMode      => ParseAccessMode(start, stateTarget, stashedGuard),
@@ -266,8 +276,14 @@ public static class Parser
                     ConstructKind.StateEnsure     => ParseStateEnsure(start, token, stateTarget, stashedGuard),
                     ConstructKind.StateAction     => ParseStateAction(start, token, stateTarget, stashedGuard),
                     ConstructKind.TransitionRow   => ParseTransitionRow(start, stateTarget, stashedGuard),
-                    _ => EmitAmbiguityAndSync(Current()),
+                    null => EmitAmbiguityAndSync(Current()),
+                    ConstructKind.PreceptHeader or ConstructKind.FieldDeclaration or
+                    ConstructKind.StateDeclaration or ConstructKind.EventDeclaration or
+                    ConstructKind.RuleDeclaration or ConstructKind.EventEnsure or ConstructKind.EventHandler
+                        => throw new InvalidOperationException(
+                            "Non-StateScoped ConstructKind reached StateScoped switch — check DisambiguationEntry.LeadingToken values."),
                 };
+#pragma warning restore CS8524
             }
         }
 
@@ -583,85 +599,86 @@ public static class Parser
         private Statement ParseActionStatement()
         {
             var current = Current();
-            switch (current.Kind)
+            if (!Actions.ByTokenKind.TryGetValue(current.Kind, out var meta))
             {
-                case TokenKind.Set:
-                {
-                    var kw = Advance();
-                    var field = Expect(TokenKind.Identifier);
-                    Expect(TokenKind.Assign);
-                    var value = ParseExpression(0);
-                    return new SetStatement(SourceSpan.Covering(kw.Span, value.Span), field, value);
-                }
-                case TokenKind.Add:
-                {
-                    var kw = Advance();
-                    var field = Expect(TokenKind.Identifier);
-                    var value = ParseExpression(0);
-                    return new AddStatement(SourceSpan.Covering(kw.Span, value.Span), field, value);
-                }
-                case TokenKind.Remove:
-                {
-                    var kw = Advance();
-                    var field = Expect(TokenKind.Identifier);
-                    var value = ParseExpression(0);
-                    return new RemoveStatement(SourceSpan.Covering(kw.Span, value.Span), field, value);
-                }
-                case TokenKind.Enqueue:
-                {
-                    var kw = Advance();
-                    var field = Expect(TokenKind.Identifier);
-                    var value = ParseExpression(0);
-                    return new EnqueueStatement(SourceSpan.Covering(kw.Span, value.Span), field, value);
-                }
-                case TokenKind.Dequeue:
-                {
-                    var kw = Advance();
-                    var field = Expect(TokenKind.Identifier);
-                    Token? into = null;
-                    if (Current().Kind == TokenKind.Into)
-                    {
-                        Advance();
-                        into = Expect(TokenKind.Identifier);
-                    }
-                    var endSpan = into?.Span ?? field.Span;
-                    return new DequeueStatement(SourceSpan.Covering(kw.Span, endSpan), field, into);
-                }
-                case TokenKind.Push:
-                {
-                    var kw = Advance();
-                    var field = Expect(TokenKind.Identifier);
-                    var value = ParseExpression(0);
-                    return new PushStatement(SourceSpan.Covering(kw.Span, value.Span), field, value);
-                }
-                case TokenKind.Pop:
-                {
-                    var kw = Advance();
-                    var field = Expect(TokenKind.Identifier);
-                    Token? into = null;
-                    if (Current().Kind == TokenKind.Into)
-                    {
-                        Advance();
-                        into = Expect(TokenKind.Identifier);
-                    }
-                    var endSpan = into?.Span ?? field.Span;
-                    return new PopStatement(SourceSpan.Covering(kw.Span, endSpan), field, into);
-                }
-                case TokenKind.Clear:
-                {
-                    var kw = Advance();
-                    var field = Expect(TokenKind.Identifier);
-                    return new ClearStatement(SourceSpan.Covering(kw.Span, field.Span), field);
-                }
-                default:
-                {
-                    EmitDiagnostic(DiagnosticCode.ExpectedToken, current.Span, "action keyword", current.Text);
-                    return new SetStatement(current.Span,
-                        new Token(TokenKind.Identifier, string.Empty, current.Span),
-                        new IdentifierExpression(current.Span,
-                            new Token(TokenKind.Identifier, string.Empty, current.Span)));
-                }
+                EmitDiagnostic(DiagnosticCode.ExpectedToken, current.Span, "action keyword", current.Text);
+                return new SetStatement(current.Span,
+                    new Token(TokenKind.Identifier, string.Empty, current.Span),
+                    new IdentifierExpression(current.Span,
+                        new Token(TokenKind.Identifier, string.Empty, current.Span)));
             }
+
+#pragma warning disable CS8524 // unnamed ActionSyntaxShape values are unreachable — CS8509 enforces named-value coverage
+            return meta.SyntaxShape switch
+            {
+                ActionSyntaxShape.AssignValue     => ParseAssignValueStatement(meta),
+                ActionSyntaxShape.CollectionValue => ParseCollectionValueStatement(meta),
+                ActionSyntaxShape.CollectionInto  => ParseCollectionIntoStatement(meta),
+                ActionSyntaxShape.FieldOnly       => ParseFieldOnlyStatement(meta),
+            };
+#pragma warning restore CS8524
+        }
+
+        private Statement ParseAssignValueStatement(ActionMeta meta)
+        {
+            var kw = Advance();
+            var field = Expect(TokenKind.Identifier);
+            Expect(TokenKind.Assign);
+            var value = ParseExpression(0);
+            var span = SourceSpan.Covering(kw.Span, value.Span);
+            return meta.Kind switch
+            {
+                ActionKind.Set => new SetStatement(span, field, value),
+                _ => throw new InvalidOperationException($"Unexpected ActionKind {meta.Kind} in ParseAssignValueStatement"),
+            };
+        }
+
+        private Statement ParseCollectionValueStatement(ActionMeta meta)
+        {
+            var kw = Advance();
+            var field = Expect(TokenKind.Identifier);
+            var value = ParseExpression(0);
+            var span = SourceSpan.Covering(kw.Span, value.Span);
+            return meta.Kind switch
+            {
+                ActionKind.Add    => new AddStatement(span, field, value),
+                ActionKind.Remove => new RemoveStatement(span, field, value),
+                ActionKind.Enqueue => new EnqueueStatement(span, field, value),
+                ActionKind.Push   => new PushStatement(span, field, value),
+                _ => throw new InvalidOperationException($"Unexpected ActionKind {meta.Kind} in ParseCollectionValueStatement"),
+            };
+        }
+
+        private Statement ParseCollectionIntoStatement(ActionMeta meta)
+        {
+            var kw = Advance();
+            var field = Expect(TokenKind.Identifier);
+            Token? into = null;
+            if (Current().Kind == TokenKind.Into)
+            {
+                Advance();
+                into = Expect(TokenKind.Identifier);
+            }
+            var endSpan = into?.Span ?? field.Span;
+            var span = SourceSpan.Covering(kw.Span, endSpan);
+            return meta.Kind switch
+            {
+                ActionKind.Dequeue => new DequeueStatement(span, field, into),
+                ActionKind.Pop     => new PopStatement(span, field, into),
+                _ => throw new InvalidOperationException($"Unexpected ActionKind {meta.Kind} in ParseCollectionIntoStatement"),
+            };
+        }
+
+        private Statement ParseFieldOnlyStatement(ActionMeta meta)
+        {
+            var kw = Advance();
+            var field = Expect(TokenKind.Identifier);
+            var span = SourceSpan.Covering(kw.Span, field.Span);
+            return meta.Kind switch
+            {
+                ActionKind.Clear => new ClearStatement(span, field),
+                _ => throw new InvalidOperationException($"Unexpected ActionKind {meta.Kind} in ParseFieldOnlyStatement"),
+            };
         }
 
         private bool IsOutcomeAhead()

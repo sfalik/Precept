@@ -930,4 +930,20 @@ public class ParserTests
 
     private static readonly string SamplesDir = Path.Combine(
         AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "..", "samples");
+
+    // ── ParseActionStatement error path ──────────────────────────────────────
+
+    [Fact]
+    public void ParseActionStatement_UnknownToken_EmitsDiagnostic()
+    {
+        // 'from' is not an action keyword — feeding it in an action position should emit ExpectedToken
+        var tree = Parse("""
+            precept X
+            state S initial, T terminal success
+            event Go
+            from S on Go -> from
+            """);
+
+        tree.Diagnostics.Should().Contain(d => d.Code == DiagnosticCode.ExpectedToken);
+    }
 }
