@@ -528,17 +528,9 @@ rule Amounts.none(a, a < 0)
 
 8. **Proposal granularity.** One combined proposal for all collection extensions, or two separate increments — quantifiers as one, field-level constraints as another? The 3-layer recommendation suggests separate increments (Layer A ships first, Layer B second), but the formal proposal structure is TBD.
 
----
+9. **Collection type expansion.** After quantifier predicates and field constraints ship, which collection type — if any — should be next? The §Proposed Additional Types section below surveys candidates. Before any of these could become a formal GitHub issue, the following research would be needed: (a) a concrete corpus of `.precept` files that cannot express a real business rule without the proposed type, (b) a proof engine impact assessment for the type's mutation operations, (c) an inner type compatibility analysis (which scalar types are valid, which are type errors), and (d) a philosophy review confirming the type reads as domain declaration, not general-purpose programming.
 
-## Cross-References
-
-This document is the canonical source for collection type rules. Other documents reference — not restate — these rules:
-
-| Document | What it references | Link pattern |
-|---|---|---|
-| [Language Spec](precept-language-spec.md) | §2.3 type grammar, §3.6 `contains` typing, §3.8 action validation, accessor tables | Brief summary + "See [Collection Types](collection-types.md)" |
-| [Primitive Types](primitive-types.md) | `~string` inner type, `.count` → `integer` production | Cross-reference to §Inner Type System |
-| [Type Checker](../compiler/type-checker.md) | Collection action validation, emptiness proof obligations | Brief summary + link |
+10. **Temporal and business-domain types as inner types.** The `ScalarType` production currently admits only primitives (`string`, `~string`, `integer`, `decimal`, `number`, `boolean`, `choice`). There is no principled reason to exclude temporal types (`date`, `time`, `datetime`, `duration`) or business-domain types (`money`, `percentage`) from collection inner types. `set of date`, `queue of money`, and `map of string to date` are all semantically coherent — these types have natural ordering and comparison semantics. This appears to be an incremental build artifact (collections and typed scalars landed at different times) rather than an intentional restriction. Should the `ScalarType` production be extended to include all Precept scalar types?
 
 ---
 
@@ -757,6 +749,72 @@ Introduces `to` as a type-position keyword connecting key and value types. Both 
 
 **Priority:** **High.** Key-value association is fundamental to business modeling. Configuration tables, fee schedules, lookup mappings, and per-category settings are everywhere. Today, modeling these in Precept requires either multiple parallel fields or external application logic — both of which break the one-file-complete-rules guarantee. A `map` type keeps the association inside the contract.
 
+### Rejected: Ring Buffer / Circular Buffer
+
+**Motivation:** Fixed-size FIFO that automatically discards the oldest element when capacity is exceeded. Use cases: "last 5 approvals," "recent 10 events," bounded audit history. Python's `collections.deque(maxlen=N)` and Apache Commons' `CircularFifoQueue` serve this pattern.
+
+**Proposed syntax:**
+
+```precept
+field RecentApprovals as ringbuffer of string capacity 5
+
+# enqueue always succeeds — if full, oldest element is silently discarded
+from Active on LogAction
+    -> enqueue AuditTrail LogAction.Description
+    -> no transition
+```
+
+**Proof engine implications:** The auto-eviction is the fatal flaw. Current `queue` `enqueue` never discards. A ring buffer's `enqueue` silently destroys data — the oldest element vanishes without the author writing a `dequeue`. This is implicit mutation. The proof engine cannot reason about what was lost or verify post-conditions that depend on evicted elements.
+
+**Grammar fit:** `field F as ringbuffer of T capacity N`. Introduces `capacity` as a type-position keyword (see Bounded Collection rejection below — `capacity` is a synonym for `maxcount`).
+
+**Action surface:** Reuses `enqueue`, `dequeue`, `.peek`, `.count`. No new keywords, but `enqueue` gains hidden side effects (eviction) that violate the explicit-action contract.
+
+**Priority/Recommendation:** **Reject.** Silent eviction directly violates the inspectability principle — "nothing is hidden" (philosophy §What makes it different). When an `enqueue` on a full ring buffer discards the oldest element, the author didn't write a `dequeue` — data disappeared implicitly. The bounded-history use case is real but must be modeled with `queue of T` + `maxcount N` + explicit `dequeue` before `enqueue` when at capacity. That pattern makes the eviction visible and provable.
+
+### Rejected: Bounded Collection (`capacity` modifier)
+
+**Motivation:** Enforce maximum size at declaration time via a `capacity` modifier on existing types (`queue of T capacity N`, `set of T capacity N`) rather than via `maxcount` constraints.
+
+**Proposed syntax:**
+
+```precept
+# These two would be equivalent:
+field Tags as set of string capacity 10
+field Tags as set of string maxcount 10
+```
+
+**Proof engine implications:** Identical to `maxcount N` — the proof engine already handles cardinality bounds. A `capacity` modifier compiles to the same constraint.
+
+**Grammar fit:** `capacity N` as an alternative to `maxcount N` in the constraint position.
+
+**Action surface:** None — pure syntactic sugar.
+
+**Priority/Recommendation:** **Reject.** `maxcount N` already provides this capability. A `capacity` synonym adds language surface cost with zero capability gain. Precept's philosophy favors a small, precise surface (§0.4.1) — adding a second spelling for the same constraint violates that principle. If the naming is a concern, it's a keyword-alias discussion, not a type discussion.
+
+### Rejected: Multimap
+
+**Motivation:** Key maps to a collection of values — one-to-many relationships. Use cases: category-to-items, department-to-employees, tag-to-documents. Guava's `Multimap`, Scala's `Map[K, List[V]]` idiom.
+
+**Proposed syntax:**
+
+```precept
+field DepartmentMembers as multimap of string to string
+
+-> put DepartmentMembers "engineering" "alice"
+-> put DepartmentMembers "engineering" "bob"
+
+when DepartmentMembers["engineering"] contains "alice"
+```
+
+**Proof engine implications:** Strictly harder than `map`. Each key maps to a collection, so the proof engine must reason about nested collection emptiness, per-key cardinality, and cross-key relationships. This compounds the already-complex `map` proof surface.
+
+**Grammar fit:** `field F as multimap of K to V`. Reuses the `of ... to` connector from `map`.
+
+**Action surface:** Same as `map` (`put`, `removekey`, `containskey`, `.get(key)`) but `.get(key)` returns a collection, not a scalar — introducing nested collection semantics that Precept explicitly excludes.
+
+**Priority/Recommendation:** **Reject.** A multimap is a collection of collections behind a key lookup — two levels of indirection that enter general-purpose data structure territory. Even if `map` ships, `multimap` adds nested collection semantics that Precept's flat-statement philosophy prohibits. The one-to-many pattern is better served by explicit set fields (`field EngineeringTeam as set of string`, `field SalesTeam as set of string`) with cross-collection constraints (`subset`, `disjoint`) relating them.
+
 ### Priority Summary
 
 | Candidate | Priority | Rationale |
@@ -767,6 +825,9 @@ Introduces `to` as a type-position keyword connecting key and value types. Both 
 | `sortedset of T` | **Medium** | Convenience improvement — eliminates emptiness guards on ordered collections, but `set` + guards covers same ground |
 | `priorityqueue of T` | **Medium** | Real pattern but complex proof surface — priority ordering adds a secondary type axis |
 | `deque of T` | **Low** | Rare in business-rule domains — double-ended access is an infrastructure pattern, not a business-rule pattern |
+| `ringbuffer of T` | **Reject** | Silent eviction violates inspectability — implicit mutation the proof engine cannot track |
+| `capacity` modifier | **Reject** | Synonym for `maxcount` — language surface cost with no capability gain |
+| `multimap of K to V` | **Reject** | Nested collection semantics Precept explicitly excludes — use explicit set fields + constraints |
 
 ### Recommended Rollout
 
@@ -785,7 +846,7 @@ Introduces `to` as a type-position keyword connecting key and value types. Both 
 |---|---|---|---|---|---|---|---|---|---|
 | **Unordered unique set** | `HashSet<T>` | `HashSet` | `set` | `HashSet` | — | — | `Set<'T>` | `set of T` ✓ | — |
 | **Sorted unique set** | `SortedSet<T>` | `TreeSet` | — | `BTreeSet` | — | — | `Set<'T>` (sorted) | — | `sortedset of T` |
-| **Insertion-order set** | — | `LinkedHashSet` | — | `IndexSet`* | — | — | — | — | Not proposed† |
+| **Insertion-order set** | — | `LinkedHashSet` | — | `IndexSet`* | — | — | — | — | Not proposed†† |
 | **Multiset / bag** | — | — | `Counter` | — | `MULTISET` | — | — | — | `bag of T` |
 | **FIFO queue** | `Queue<T>` | `ArrayDeque` | `deque` | `VecDeque` | — | — | — | `queue of T` ✓ | — |
 | **LIFO stack** | `Stack<T>` | `ArrayDeque` | `list` | `Vec` | — | — | — | `stack of T` ✓ | — |
@@ -793,11 +854,28 @@ Introduces `to` as a type-position keyword connecting key and value types. Both 
 | **Priority queue** | `PriorityQueue<T,P>` | `PriorityQueue` | `heapq` | `BinaryHeap` | — | — | — | — | `priorityqueue of T` (med pri) |
 | **Append-only log** | `ImmutableList<T>` | — | — | — | — | `list` (immutable) | `list` (cons) | — | `log of T` |
 | **Key-value map** | `Dictionary<K,V>` | `HashMap` | `dict` | `HashMap` | — | `map` | `Map<'K,'V>` | — | `map of K to V` |
+| **Ring buffer** | — | `CircularFifoQueue`* | `deque(maxlen=N)` | — | — | — | — | — | Rejected† |
+| **Multimap** | `ILookup<K,V>` | `Multimap` (Guava) | — | — | — | — | `Map[K, List[V]]`‡ | — | Rejected§ |
 | **Non-empty guarantee** | — | — | — | — | `NOT NULL` | — | `NonEmpty` | `notempty`/`mincount 1` ✓ | — |
 | **Element uniqueness** | inherent in sets | inherent in sets | inherent in sets | inherent in sets | `UNIQUE` | — | inherent in sets | inherent in `set` ✓ | `unique` on queue/stack |
 | **Cardinality constraints** | — | — | — | — | `CHECK` | `.size()` | — | `mincount`/`maxcount` ✓ | — |
 | **Element predicates** | LINQ `.All`/`.Any` | Streams | comprehensions | `.iter().all()`/`.any()` | `ALL`/`ANY`/`EXISTS` | `.all()`/`.exists()` | `forall`/`exists` | — | `all`/`any`/`none` |
 | **Subset/disjoint** | `.IsSubsetOf` | `.containsAll` | `<=`/`.isdisjoint` | `.is_subset` | — | — | `Set.isSubset` | — | `subset`/`disjoint` |
 
-\* `IndexSet` is from the `indexmap` crate, not Rust std.
-† Insertion-order sets conflate two concerns (uniqueness + temporal ordering) in a way that makes proof-engine reasoning ambiguous — the "order" has no semantic meaning the engine can verify. Precept's `queue` (explicit FIFO) and `set` (explicit uniqueness) are the correct decomposition.
+\* `IndexSet` is from the `indexmap` crate, not Rust std. `CircularFifoQueue` is from Apache Commons Collections.
+† Ring buffer rejected: silent eviction on full `enqueue` violates inspectability — use `queue` + `maxcount` + explicit `dequeue`.
+‡ Scala `Map[K, List[V]]` is the idiomatic multimap encoding, not a dedicated type.
+§ Multimap rejected: nested collection semantics Precept explicitly excludes — use explicit set fields + `subset`/`disjoint` constraints.
+†† Insertion-order sets conflate two concerns (uniqueness + temporal ordering) in a way that makes proof-engine reasoning ambiguous — the "order" has no semantic meaning the engine can verify. Precept's `queue` (explicit FIFO) and `set` (explicit uniqueness) are the correct decomposition.
+
+---
+
+## Cross-References
+
+This document is the canonical source for collection type rules. Other documents reference — not restate — these rules:
+
+| Document | What it references | Link pattern |
+|---|---|---|
+| [Language Spec](precept-language-spec.md) | §2.3 type grammar, §3.6 `contains` typing, §3.8 action validation, accessor tables | Brief summary + "See [Collection Types](collection-types.md)" |
+| [Primitive Types](primitive-types.md) | `~string` inner type, `.count` → `integer` production | Cross-reference to §Inner Type System |
+| [Type Checker](../compiler/type-checker.md) | Collection action validation, emptiness proof obligations | Brief summary + link |
