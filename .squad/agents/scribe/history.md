@@ -107,6 +107,11 @@ Team cast on 2026-04-04: Frank (Lead), George (Runtime), Kramer (Tooling), Elain
 
 ## Recent Updates
 
+### 2026-04-29T04:47:14Z - Principles/vision closeout recorded
+- Wrote orchestration logs for frank-3, frank-4, and frank-5 plus a one-paragraph session log for the spec-principles / vision-archive closeout batch.
+- Merged 6 inbox records into 2 canonical `decisions.md` entries, deduplicating the earlier archive-readiness audit and clearing the processed inbox files.
+- Updated Scribe's durable session memory; no decision-archive move was needed because there were no 30-day archive candidates in this batch.
+
 ### 2026-04-27T00:19:02Z - Combined design v2 closeout recorded
 - Wrote the session log for the v2 architecture closeout after Frank's revision and George's final approval.
 - Merged 17 related architecture inbox notes/directives into one canonical `decisions.md` entry and cleared the processed v2 design inbox files.
