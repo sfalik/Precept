@@ -211,6 +211,33 @@ The `## Implementation Plan` in the PR body is the execution blueprint. A plan t
 
 **A plan that fails this bar is incomplete.** Send it back for detail before coding begins — just as a proposal without rationale is sent back for rationale.
 
+### Spike Workflow
+
+A spike is exploratory work that validates a hypothesis or explores a design space without committing to a PR. Spikes are first-class in the Squad process — they have their own mode, ceremonies, and conventions.
+
+**When to spike:**
+- You need to validate a design approach before writing a proposal
+- You're exploring a trade-off that requires actual code to understand
+- You're stress-testing catalog extensibility, analyzer behavior, or parser mechanics before committing to a full implementation plan
+
+**Spike mode rules:**
+1. **No PRs.** A spike never opens a PR during the spike. All commits go directly to the spike branch.
+2. **No new branches.** Work on the spike branch only. No `git checkout -b` during a spike.
+3. **Branch naming.** Spike branches use the `spike/{kebab-description}` prefix (e.g., `spike/catalog-extensibility`).
+4. **Ceremonies suppressed.** Design review and PR review ceremonies are suppressed during a spike. The implementation gate does not fire.
+5. **Exit deliberately.** End a spike with the Spike Closeout ceremony: decide what to keep, promote findings to a proper proposal or PR, clear spike mode.
+
+**Activating spike mode:**
+- Say "let's start a spike on X" — the coordinator activates spike mode, sets `spike_mode: true` in `.squad/identity/now.md`, and records the spike question.
+- Or run the Spike Kickoff ceremony manually.
+
+**Closing out a spike:**
+- Say "end the spike" or "close out the spike" — triggers the Spike Closeout ceremony.
+- The closeout captures what was learned, decides what to keep, and produces a proper implementation PR or discards the spike.
+
+**Spike vs. feature branch:**
+A spike is NOT a slow-moving feature branch. If the work is ready for review, it is not a spike — open a proper PR and go through the implementation gate.
+
 #### 7. Merge and Close
 
 After review approval:

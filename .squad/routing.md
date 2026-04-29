@@ -52,6 +52,22 @@ How to decide who handles what.
 3. Members can reassign by removing their label and adding another member's label.
 4. The `squad` label marks the shared backlog entry point — issues waiting for Lead triage and board placement.
 
+## Spike Mode
+
+Spike mode is a first-class routing state for exploratory work. Spike branches use the `spike/{description}` prefix convention. While `spike_mode: true`, commits go directly to the spike branch, the implementation gate is suppressed, and design review / PR review ceremonies are suppressed because no PR should exist during the spike. Exiting spike mode always triggers a structured closeout prompt.
+
+### Spike activation
+
+| User says | Action |
+|-----------|--------|
+| "let's start a spike" / "spike mode" / "start a spike on X" / "let's spike on X" | Set `spike_mode: true` in `.squad/identity/now.md`, create `spike/{description}` branch (convention only — do not execute git), update focus area in `now.md`, suppress all ceremony auto-triggers that would demand a PR |
+
+### Spike exit
+
+| User says | Action |
+|-----------|--------|
+| "end the spike" / "close out the spike" / "exit spike mode" / "wrap up the spike" | Clear `spike_mode` from `.squad/identity/now.md`, prompt Shane for: (1) rename branch to `spike/{description}` if not already, (2) PR decision (open PR → merge, or discard spike), (3) Scribe cleanup |
+
 ## Rules
 
 1. **Eager by default** — spawn all agents who could usefully start work, including anticipatory downstream work.

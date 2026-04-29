@@ -13,12 +13,17 @@
 - When a construct family splits, verification must cover catalog entries, AST nodes, build paths, routing tests, slot-order tests, and regression anchors.
 - A complete design evaluation requires reading implementation alongside design; wrapper-node and remediation-only additions can be correct even when absent from the design docs.
 - Spike mode only becomes enforceable when routing, ceremony guards, durable wisdom, and contributor workflow docs are patched together; leaving one surface untouched lets the coordinator regress into PR-demanding behavior during exploratory work.
+- Manual enum audit lists will always be incomplete — the analyzer itself is the source of truth. Appendix B missed TypeCategory; the running analyzer caught it. This validates the design decision to make the analyzer safe-by-default rather than allowlist-driven.
+- Test plan spec compliance must be verified at the test-ID level, not just the count. George shipped 18/18 tests but substituted 5 spec tests with 5 different tests — the total count matched while coverage gaps hid. Cross-reference by spec ID, not by quantity.
 
 ## Recent Updates
 
 ### 2026-04-29 — PRECEPT0018 correctness gate closed
 - George's follow-up commit `e7a643d` added the three missing required PRECEPT0018 regression tests plus the two advisory visibility anchors, closing Frank's only blocking finding (B1).
 - Final state recorded durably: analyzer, attribute, all 3 `[AllowZeroDefault]` placements, and all 23 enum fixes were already correct; the lane is now blocked on nothing.
+
+### 2026-04-28 — PRECEPT0018 correctness gate review
+- Reviewed George's PRECEPT0018 implementation against the design spec. Analyzer, attribute, all 3 `[AllowZeroDefault]` placements, and all 23 enum fixes are correct. TypeCategory (not in Appendix B) was a legitimate addition. Blocked on 3 missing spec test cases: TP3 (zero-not-first-member), EC4 (byte underlying type), EC5 (long underlying type). These test distinct code paths and must exist as regression anchors.
 
 ### 2026-04-28 — Spike mode first-class across squad workflow
 - Patched routing, ceremonies, durable wisdom, and `CONTRIBUTING.md` so spike activation/exit are explicit, spike branches follow `spike/{kebab-description}`, PR-demanding ceremonies are suppressed while `spike_mode: true`, and exploratory work exits through deliberate closeout.

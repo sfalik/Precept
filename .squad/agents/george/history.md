@@ -15,6 +15,8 @@
 - `#pragma warning disable CS8524` is the right suppression for fully-named exhaustive switches (not CS8509): CS8509 fires for non-exhaustive coverage, CS8524 fires for unnamed enum integer values; suppressing CS8524 while letting CS8509 fire is correct when guarding against new named members.
 - When adding required positional parameters to shared catalog record types, all call sites (including those using named arguments after the positional block) must be updated. Grep for `new ActionMeta(` and `new ConstructMeta(` before touching signatures.
 - `IReadOnlyList<T>` does not expose `.ToFrozenDictionary()` directly — use `IEnumerable<T>` extension via the same reference (it works because `IReadOnlyList<T>` is `IEnumerable<T>`).
+- `private enum` is not valid at C# namespace level (only `public`/`internal` are). "Private enum" correctness-gate tests should use a private nested enum inside a class in the target namespace — `ContainingNamespace` skips the containing type, so namespace-scope checks still fire correctly.
+- When a spec calls for underlying-type tests (`byte`, `long`), verify that the analyzer's value extraction uses `Convert.ToInt64` (not a direct cast) — widening to `long` is the safe path for all integral underlying types.
 
 ## Recent Updates
 
@@ -25,7 +27,82 @@ Frank's B1 correctness-gate finding is closed. The original implementation commi
 - Final PRECEPT0018 status: implemented, fully spec-covered, and green at 230 analyzer tests + 2044 core tests.
 - Important closeout pattern: when a reviewer specifies test IDs, backfill by spec ID rather than by total test count; the first pass matched the quantity but not the required cases.
 
-### 2026-04-28 — Catalog extensibility implementation (PR #138)
+### 2026-04-28 — PRECEPT0018: spec tests gap resolved (Frank B1 finding)
+
+Frank's correctness gate review issued a BLOCKED verdict (B1) on the PRECEPT0018 implementation: 3 required spec tests were missing plus 2 advisory regression anchors. Added all 5 in `test/Precept.Analyzers.Tests/Precept0018Tests.cs` (commit `e7a643d`):
+
+| New Test | Frank ID | Coverage |
+|---|---|---|
+| `TP7_ZeroNotFirstMember_Reports` | TP3 | Zero member at non-zero declaration index — full member scan, not just index 0 |
+| `TP8_PrivateEnum_Reports` | TP4 | Private nested enum — visibility not filtered |
+| `TP9_InternalEnum_Reports` | TP5 | Internal enum — visibility not filtered |
+| `EC6_ByteUnderlyingType_Reports` | EC4 | `byte` underlying type — `Convert.ToInt64` path |
+| `EC7_LongUnderlyingType_Reports` | EC5 | `long` underlying type — `Convert.ToInt64` widening |
+
+Analyzer tests: 230 (was 225). Core tests: 2044. No other files touched.
+
+### 2026-04-28 — PRECEPT0018: all semantic enums enforced to 1-based via analyzer
+
+Frank designed and George implemented PRECEPT0018. The analyzer enforces that every enum member at integer value 0 in any `Precept.*` namespace must be either: (a) named `None` (structural sentinel), (b) in a `[Flags]` enum, or (c) marked `[AllowZeroDefault]`. All other zero-valued first members are an analyzer error.
+
+**Deliverables (commit `a7b0bb7`):**
+
+| Artifact | Detail |
+|----------|--------|
+| `AllowZeroDefaultAttribute` | New `src/Precept/AllowZeroDefaultAttribute.cs` — escape hatch for intentional zero-init |
+| `PRECEPT0018SemanticEnumZeroSlot` | New analyzer in `src/Precept.Analyzers/` — DiagnosticSeverity.Error, enabled by default |
+| 3 `[AllowZeroDefault]` exemptions | `LexerMode.Normal`, `QualifierMatch.Any`, `PeriodDimension.Any` |
+| 23 enums made 1-based | ActionKind, AnchorScope, AnchorTarget, Arity, Associativity, ConstructKind, ConstructSlotKind, ConstraintKind, DiagnosticCategory, DiagnosticCode, FaultCode, FaultSeverity, FunctionCategory, FunctionKind, ModifierCategory, ModifierKind, OperationKind, OperatorFamily, OperatorKind, ProofRequirementKind, TokenCategory, TokenKind, TypeCategory |
+| 18 new tests | 6 TP + 7 TN + 5 EC — all pass |
+
+**Result:** Build: 0 errors, 0 warnings. All 2269 tests pass (2044 runtime + 225 analyzer).
+
+**Learning:** `TypeCategory` was not in Frank's explicit list of 22 but would have been flagged by the analyzer. Fixed proactively to keep the build clean. When implementing an exhaustive enum-safety analyzer, always verify the full set of flagged enums by doing a dry run before finalizing the exemption list.
+
+
+
+Frank's audit found 6 enums where a semantically meaningful named member occupied integer 0, creating silent-default risk. Applied explicit 1-based values to all 6 in a single commit (`d300b26`):
+
+| Enum | File | Risk |
+|------|------|------|
+| `Severity` | `Language/Diagnostic.cs` | `default(Diagnostic)` silently gives `Severity.Info`; compiler errors masquerade as informational |
+| `DiagnosticStage` | `Language/Diagnostic.cs` | Zero-constructed diagnostics silently attributed to `Lex` stage |
+| `ConstraintStatus` | `Runtime/Inspection.cs` | Zero-initialized result silently marks a violated constraint as `Satisfied` |
+| `Prospect` | `Runtime/Inspection.cs` | Zero-initialized prospect silently presents an impossible transition as `Certain` |
+| `FieldAccessMode` | `Runtime/SharedTypes.cs` | Zero-initialized mode silently locks writable fields as `Read` |
+| `TypeKind` | `Language/TypeKind.cs` | Zero-initialized kind silently treats unknown types as `String` (26 members, all renumbered) |
+
+No tests used `(EnumName)0` or `default(EnumName)` — no test changes required. Build: 0 errors. All 2044 tests pass.
+
+**Learning**: The 1-based layout is the right default for any enum where ALL members are semantically meaningful. Defer to it at declaration time; retrofitting is cheap but the silent-default risk can survive undetected for years.
+
+
+
+### 2026-04-28 — ActionSyntaxShape made 1-based (explicit values)
+
+`ActionSyntaxShape` members were given explicit integer values starting at 1 (`AssignValue=1`, `CollectionValue=2`, `CollectionInto=3`, `FieldOnly=4`). This makes `default(ActionSyntaxShape)` = `(ActionSyntaxShape)0` — an unnamed integer with no named arm in any switch. Any uninitialized `SyntaxShape` now throws `SwitchExpressionException` immediately rather than silently routing through `ParseAssignValueStatement`.
+
+The test `Actions_ActionSyntaxShape_AllMembersHaveValue` was replaced with `Actions_ActionSyntaxShape_AllMembersAreNonZero`, which uses `((int)s).Should().BeGreaterThan(0)` — a structurally stronger guard that directly enforces the 1-based invariant.
+
+Commit: `de2005a`. Build: 0 errors, 0 warnings. All 2044 tests pass.
+
+**Learning**: When a zero-slot sentinel is removed, shift all named enum members to start at 1 rather than relying on the test suite alone to catch future zero-initialization bugs. The 1-based layout gives the compiler's exhaustive switch analysis an unnamed zero slot that throws without any extra code.
+
+### 2026-04-28 — B1–B7 fixes: CS8509 enforcement complete (re-review requested)
+
+Frank's deep re-review found 7 blocking issues after the initial catalog-extensibility implementation. All resolved in one commit (`5e5b2f9`) on `feature/catalog-extensibility`:
+
+- **B1**: Removed `None = 0` from `ActionSyntaxShape` (`Action.cs`). Enum now has exactly 4 real members: `AssignValue`, `CollectionValue`, `CollectionInto`, `FieldOnly`.
+- **B2**: Removed `ActionSyntaxShape.None => throw` arm from outer `ParseActionStatement` switch. The 4-arm exhaustive switch + `#pragma CS8524` pair is clean.
+- **B3–B6**: Replaced all four `_ => throw` wildcards in the inner `ActionKind` switches (`ParseAssignValueStatement`, `ParseCollectionValueStatement`, `ParseCollectionIntoStatement`, `ParseFieldOnlyStatement`) with exhaustive explicit named-arm patterns. Each switch now lists every `ActionKind` not belonging to its shape as a named throw arm, plus `#pragma CS8524` pair. CS8509 fires on each switch when a new `ActionKind` is added.
+- **B7**: Removed `_ => throw` from `InvokeSlotParser`. Added `#pragma CS8524` pair. Replaced the misleading comment ("wildcard covers unnamed numeric values") with the accurate statement: "CS8509 enforces named-value coverage here; #pragma CS8524 suppresses unnamed-integer noise."
+- **Test fix**: `Actions_ActionSyntaxShape_AllMembersHaveValue` updated from `NotBe((ActionSyntaxShape)0)` to `Enum.IsDefined(meta.SyntaxShape)` — the old guard was only meaningful when `None = 0` existed as a sentinel; with it gone `AssignValue` is 0 so the old assertion was a false positive.
+
+Build: 0 errors, 0 warnings (TreatWarningsAsErrors=true). All 2044 tests pass.
+
+**Learnings**: When removing a `None = 0` sentinel, always audit tests that compare against `(EnumType)0` — they become false positives the moment a real member takes that slot.
+
+
 - Implemented all 7 slices of the catalog extensibility plan (v3, approved by Frank) on branch `feature/catalog-extensibility`.
 - Slice 1: `ExpressionBoundaryTokens` now derives from `Constructs.LeadingTokens` + structural literals — no more hardcoded construct-leading tokens in parser.
 - Slice 2: `BuildNode` wildcard removed; CS8509 now fires on missing arms; `#pragma disable CS8524` suppresses the unnamed-integer variant.

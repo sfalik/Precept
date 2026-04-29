@@ -13,6 +13,7 @@
 | **Participants** | all-relevant (implementing devs MUST attend for language-surface changes) |
 | **Time budget** | focused |
 | **Enabled** | ✅ yes |
+| **Spike guard** | Suppressed when `spike_mode: true` — design review is incompatible with spike work |
 | **Completion gate** | Owner (Shane) sign-off. No implementation plan is authored until this gate clears. |
 
 **Track A (standard proposal — no new canonical design):**
@@ -49,6 +50,7 @@
 | **Participants** | Lead (architecture, code quality, doc sync), Tester (AC-to-test coverage, edge cases) |
 | **Time budget** | focused |
 | **Enabled** | ✅ yes |
+| **Spike guard** | Suppressed when `spike_mode: true` — no PRs exist during a spike |
 
 ### Coordinator pre-flight (BLOCKING — do these BEFORE spawning reviewers)
 
@@ -66,6 +68,55 @@
 4. **Synthesis** — coordinator presents summary to user: verdicts, agreements, disagreements, consolidated action items
 5. **Post reviews** — Scribe posts each reviewer's structured review to the PR via squad-review.js
 6. **Status sync** — if reviews approve and PR merges, Scribe transitions the linked issue to `Done` on the project board
+
+---
+
+## Spike Kickoff
+
+| Field | Value |
+|-------|-------|
+| **Trigger** | manual |
+| **When** | on "let's start a spike" / "spike mode" intent |
+| **Condition** | spike_mode is not already true |
+| **Facilitator** | lead |
+| **Participants** | lead + relevant devs |
+| **Time budget** | focused |
+| **Enabled** | ✅ yes |
+
+**Agenda:**
+1. Name the spike and its question (what are we trying to learn or validate?)
+2. Set spike scope — what is in/out during the spike
+3. Set the spike branch name: `spike/{kebab-description}`
+4. Set `spike_mode: true` in `.squad/identity/now.md`
+5. Set focus area in `now.md`
+6. Confirm: no PRs, no new branches, direct commits to spike branch
+
+**Output:** Updated `now.md` with `spike_mode: true`, focus area, and spike question captured in `decisions/inbox/frank-spike-kickoff-{description}.md`
+
+---
+
+## Spike Closeout
+
+| Field | Value |
+|-------|-------|
+| **Trigger** | manual |
+| **When** | on "end the spike" / "close out the spike" intent |
+| **Condition** | spike_mode is true |
+| **Facilitator** | lead |
+| **Participants** | lead + Shane |
+| **Time budget** | focused |
+| **Enabled** | ✅ yes |
+
+**Agenda:**
+1. What did we learn? (spike question answered, partially answered, or not answered)
+2. What do we keep? (which commits are worth promoting)
+3. Branch rename: ensure branch is `spike/{description}` before any next step
+4. PR decision: (a) open a PR → merge the spike findings, or (b) discard — delete the branch
+5. If keeping: Frank authors an implementation plan for any follow-on work promoted from the spike
+6. Clear `spike_mode` from `now.md`
+7. Scribe logs the closeout
+
+**Output:** `spike_mode` cleared in `now.md`, spike question + outcome captured in `decisions/inbox/frank-spike-closeout-{description}.md`
 
 ---
 
