@@ -29,11 +29,11 @@ public sealed record ActionMeta(
 public enum ActionSyntaxShape
 {
     /// <summary>verb field = expression  (set)</summary>
-    AssignValue,
+    AssignValue     = 1,
     /// <summary>verb field expression    (add, remove, enqueue, push)</summary>
-    CollectionValue,
+    CollectionValue = 2,
     /// <summary>verb field [into field]  (dequeue, pop)</summary>
-    CollectionInto,
+    CollectionInto  = 3,
     /// <summary>verb field               (clear)</summary>
-    FieldOnly,
+    FieldOnly       = 4,
 }

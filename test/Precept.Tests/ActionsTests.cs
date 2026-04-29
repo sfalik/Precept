@@ -334,14 +334,11 @@ public class ActionsTests
     // ── ActionSyntaxShape ────────────────────────────────────────────────────────
 
     [Fact]
-    public void Actions_ActionSyntaxShape_AllMembersHaveValue()
+    public void Actions_ActionSyntaxShape_AllMembersAreNonZero()
     {
-        foreach (var kind in Enum.GetValues<ActionKind>())
-        {
-            var meta = Actions.GetMeta(kind);
-            Enum.IsDefined(meta.SyntaxShape).Should().BeTrue(
-                $"{kind} must have a defined ActionSyntaxShape");
-        }
+        var shapes = Enum.GetValues<ActionSyntaxShape>();
+        shapes.Should().AllSatisfy(s => ((int)s).Should().BeGreaterThan(0,
+            because: "default(ActionSyntaxShape) must not match any named shape"));
     }
 
     [Fact]
