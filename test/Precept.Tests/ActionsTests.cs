@@ -339,8 +339,8 @@ public class ActionsTests
         foreach (var kind in Enum.GetValues<ActionKind>())
         {
             var meta = Actions.GetMeta(kind);
-            meta.SyntaxShape.Should().NotBe((ActionSyntaxShape)0,
-                $"{kind} must have a non-default SyntaxShape");
+            Enum.IsDefined(meta.SyntaxShape).Should().BeTrue(
+                $"{kind} must have a defined ActionSyntaxShape");
         }
     }
 

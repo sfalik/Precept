@@ -615,8 +615,6 @@ public static class Parser
                 ActionSyntaxShape.CollectionValue => ParseCollectionValueStatement(meta),
                 ActionSyntaxShape.CollectionInto  => ParseCollectionIntoStatement(meta),
                 ActionSyntaxShape.FieldOnly       => ParseFieldOnlyStatement(meta),
-                ActionSyntaxShape.None => throw new InvalidOperationException(
-                    $"ActionSyntaxShape.None on {meta.Kind} — every ActionMeta must have an explicit SyntaxShape"),
             };
 #pragma warning restore CS8524
         }
@@ -628,11 +626,19 @@ public static class Parser
             Expect(TokenKind.Assign);
             var value = ParseExpression(0);
             var span = SourceSpan.Covering(kw.Span, value.Span);
+#pragma warning disable CS8524 // unnamed ActionKind values are unreachable — CS8509 enforces named-value coverage
             return meta.Kind switch
             {
-                ActionKind.Set => new SetStatement(span, field, value),
-                _ => throw new InvalidOperationException($"Unexpected ActionKind {meta.Kind} in ParseAssignValueStatement"),
+                ActionKind.Set     => new SetStatement(span, field, value),
+                ActionKind.Add     => throw new InvalidOperationException($"ActionKind.Add does not belong to the AssignValue shape"),
+                ActionKind.Remove  => throw new InvalidOperationException($"ActionKind.Remove does not belong to the AssignValue shape"),
+                ActionKind.Enqueue => throw new InvalidOperationException($"ActionKind.Enqueue does not belong to the AssignValue shape"),
+                ActionKind.Dequeue => throw new InvalidOperationException($"ActionKind.Dequeue does not belong to the AssignValue shape"),
+                ActionKind.Push    => throw new InvalidOperationException($"ActionKind.Push does not belong to the AssignValue shape"),
+                ActionKind.Pop     => throw new InvalidOperationException($"ActionKind.Pop does not belong to the AssignValue shape"),
+                ActionKind.Clear   => throw new InvalidOperationException($"ActionKind.Clear does not belong to the AssignValue shape"),
             };
+#pragma warning restore CS8524
         }
 
         private Statement ParseCollectionValueStatement(ActionMeta meta)
@@ -641,14 +647,19 @@ public static class Parser
             var field = Expect(TokenKind.Identifier);
             var value = ParseExpression(0);
             var span = SourceSpan.Covering(kw.Span, value.Span);
+#pragma warning disable CS8524 // unnamed ActionKind values are unreachable — CS8509 enforces named-value coverage
             return meta.Kind switch
             {
-                ActionKind.Add    => new AddStatement(span, field, value),
-                ActionKind.Remove => new RemoveStatement(span, field, value),
+                ActionKind.Add     => new AddStatement(span, field, value),
+                ActionKind.Remove  => new RemoveStatement(span, field, value),
                 ActionKind.Enqueue => new EnqueueStatement(span, field, value),
-                ActionKind.Push   => new PushStatement(span, field, value),
-                _ => throw new InvalidOperationException($"Unexpected ActionKind {meta.Kind} in ParseCollectionValueStatement"),
+                ActionKind.Push    => new PushStatement(span, field, value),
+                ActionKind.Set     => throw new InvalidOperationException($"ActionKind.Set does not belong to the CollectionValue shape"),
+                ActionKind.Dequeue => throw new InvalidOperationException($"ActionKind.Dequeue does not belong to the CollectionValue shape"),
+                ActionKind.Pop     => throw new InvalidOperationException($"ActionKind.Pop does not belong to the CollectionValue shape"),
+                ActionKind.Clear   => throw new InvalidOperationException($"ActionKind.Clear does not belong to the CollectionValue shape"),
             };
+#pragma warning restore CS8524
         }
 
         private Statement ParseCollectionIntoStatement(ActionMeta meta)
@@ -663,12 +674,19 @@ public static class Parser
             }
             var endSpan = into?.Span ?? field.Span;
             var span = SourceSpan.Covering(kw.Span, endSpan);
+#pragma warning disable CS8524 // unnamed ActionKind values are unreachable — CS8509 enforces named-value coverage
             return meta.Kind switch
             {
                 ActionKind.Dequeue => new DequeueStatement(span, field, into),
                 ActionKind.Pop     => new PopStatement(span, field, into),
-                _ => throw new InvalidOperationException($"Unexpected ActionKind {meta.Kind} in ParseCollectionIntoStatement"),
+                ActionKind.Set     => throw new InvalidOperationException($"ActionKind.Set does not belong to the CollectionInto shape"),
+                ActionKind.Add     => throw new InvalidOperationException($"ActionKind.Add does not belong to the CollectionInto shape"),
+                ActionKind.Remove  => throw new InvalidOperationException($"ActionKind.Remove does not belong to the CollectionInto shape"),
+                ActionKind.Enqueue => throw new InvalidOperationException($"ActionKind.Enqueue does not belong to the CollectionInto shape"),
+                ActionKind.Push    => throw new InvalidOperationException($"ActionKind.Push does not belong to the CollectionInto shape"),
+                ActionKind.Clear   => throw new InvalidOperationException($"ActionKind.Clear does not belong to the CollectionInto shape"),
             };
+#pragma warning restore CS8524
         }
 
         private Statement ParseFieldOnlyStatement(ActionMeta meta)
@@ -676,11 +694,19 @@ public static class Parser
             var kw = Advance();
             var field = Expect(TokenKind.Identifier);
             var span = SourceSpan.Covering(kw.Span, field.Span);
+#pragma warning disable CS8524 // unnamed ActionKind values are unreachable — CS8509 enforces named-value coverage
             return meta.Kind switch
             {
-                ActionKind.Clear => new ClearStatement(span, field),
-                _ => throw new InvalidOperationException($"Unexpected ActionKind {meta.Kind} in ParseFieldOnlyStatement"),
+                ActionKind.Clear   => new ClearStatement(span, field),
+                ActionKind.Set     => throw new InvalidOperationException($"ActionKind.Set does not belong to the FieldOnly shape"),
+                ActionKind.Add     => throw new InvalidOperationException($"ActionKind.Add does not belong to the FieldOnly shape"),
+                ActionKind.Remove  => throw new InvalidOperationException($"ActionKind.Remove does not belong to the FieldOnly shape"),
+                ActionKind.Enqueue => throw new InvalidOperationException($"ActionKind.Enqueue does not belong to the FieldOnly shape"),
+                ActionKind.Dequeue => throw new InvalidOperationException($"ActionKind.Dequeue does not belong to the FieldOnly shape"),
+                ActionKind.Push    => throw new InvalidOperationException($"ActionKind.Push does not belong to the FieldOnly shape"),
+                ActionKind.Pop     => throw new InvalidOperationException($"ActionKind.Pop does not belong to the FieldOnly shape"),
             };
+#pragma warning restore CS8524
         }
 
         private bool IsOutcomeAhead()
@@ -842,6 +868,8 @@ public static class Parser
         /// CS8509 enforcement: adding a new <see cref="ConstructSlotKind"/> member
         /// without an arm here is a build error.
         /// </summary>
+        // CS8509 enforces named-value coverage here; #pragma CS8524 suppresses unnamed-integer noise.
+#pragma warning disable CS8524
         private SyntaxNode? InvokeSlotParser(ConstructSlotKind slotKind, bool isOptional) => slotKind switch
         {
             ConstructSlotKind.IdentifierList     => ParseIdentifierList(isOptional),
@@ -861,11 +889,8 @@ public static class Parser
             ConstructSlotKind.FieldTarget         => ParseFieldTarget(isOptional),
             ConstructSlotKind.RuleExpression      => ParseRuleExpression(isOptional),
             ConstructSlotKind.InitialMarker       => ParseInitialMarker(isOptional),
-            // CS8509 enforcement: a new ConstructSlotKind member without an arm is a build error.
-            // The wildcard below covers only unnamed numeric values outside the defined enum range.
-            _ => throw new ArgumentOutOfRangeException(nameof(slotKind), slotKind,
-                $"Unknown ConstructSlotKind: {slotKind}"),
         };
+#pragma warning restore CS8524
 
         // ── Slot parsers (PR 3 — non-disambiguated constructs) ────────────────
 
