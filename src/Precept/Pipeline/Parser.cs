@@ -181,32 +181,34 @@ public static class Parser
                 if (IsAtEnd()) break;
 
                 var token = Current();
-                Declaration? decl = token.Kind switch
-                {
-                    TokenKind.Field => ParseFieldDeclaration(),
-                    TokenKind.State => ParseStateDeclaration(),
-                    TokenKind.Event => ParseEventDeclaration(),
-                    TokenKind.Rule  => ParseRuleDeclaration(),
-                    // Disambiguated constructs — PR 4
-                    TokenKind.In or TokenKind.To or TokenKind.From or TokenKind.On
-                        => DisambiguateAndParse(token),
-                    _ => null,
-                };
 
-                if (decl is not null)
-                {
-                    declarations.Add(decl);
-                }
-                else if (token.Kind != TokenKind.In && token.Kind != TokenKind.To
-                      && token.Kind != TokenKind.From && token.Kind != TokenKind.On)
+                if (!Constructs.ByLeadingToken.TryGetValue(token.Kind, out var candidates))
                 {
                     EmitDiagnostic(DiagnosticCode.ExpectedToken, token.Span, "declaration keyword", token.Text);
                     SyncToNextDeclaration();
+                    continue;
                 }
+
+                Declaration? decl = candidates is [var only] && only.Entry.DisambiguationTokens is null or { IsEmpty: true }
+                    ? ParseDirectConstruct(only.Kind)
+                    : DisambiguateAndParse(token);
+
+                if (decl is not null)
+                    declarations.Add(decl);
             }
 
             return new SyntaxTree(header, declarations.ToImmutable(), _diagnostics.ToImmutable());
         }
+
+
+        private Declaration? ParseDirectConstruct(ConstructKind kind) => kind switch
+        {
+            ConstructKind.FieldDeclaration => ParseFieldDeclaration(),
+            ConstructKind.StateDeclaration => ParseStateDeclaration(),
+            ConstructKind.EventDeclaration => ParseEventDeclaration(),
+            ConstructKind.RuleDeclaration  => ParseRuleDeclaration(),
+            var k => throw new InvalidOperationException($"Unexpected direct construct: {k}"),
+        };
 
         private Declaration? DisambiguateAndParse(Token token)
         {
