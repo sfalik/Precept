@@ -107,6 +107,11 @@ Team cast on 2026-04-04: Frank (Lead), George (Runtime), Kramer (Tooling), Elain
 
 ## Recent Updates
 
+### 2026-04-29T05:00:52Z - Collection iteration/rules research recorded
+- Wrote orchestration logs for frank-6 and frank-7 plus the session log for the paired collection research batch.
+- Archived 0 decision entries older than 7 days, merged 2 inbox records into canonical `decisions.md` entries, and cleared the processed inbox files.
+- `decisions.md` size: 190331B -> 229312B; summarized Frank's oversized history and refreshed durable squad state.
+
 ### 2026-04-29T04:47:14Z - Principles/vision closeout recorded
 - Wrote orchestration logs for frank-3, frank-4, and frank-5 plus a one-paragraph session log for the spec-principles / vision-archive closeout batch.
 - Merged 6 inbox records into 2 canonical `decisions.md` entries, deduplicating the earlier archive-readiness audit and clearing the processed inbox files.

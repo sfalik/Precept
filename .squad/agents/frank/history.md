@@ -6,36 +6,40 @@
 
 ## Learnings
 
-- Conservative defaults are structural guarantees: write/edit surfaces open exceptions, they do not become the baseline by omission.
-- Metadata belongs in catalogs when consumers need per-member knowledge; pipeline/tooling drift comes from hardcoded parallel copies.
-- Parser algorithms stay hand-written, but vocabulary tables, precedence data, and disambiguation metadata should derive from catalog truth where possible.
-- Authoring consumers read `CompilationResult`; execution/preview consumers read lowered `Precept`; runtime-native lowered data may intentionally preserve selected analysis residue.
-- When a construct family splits, verification must cover catalog entries, AST nodes, build paths, routing tests, slot-order tests, and regression anchors.
-- A complete design evaluation requires reading implementation alongside design; wrapper-node and remediation-only additions can be correct even when absent from the design docs.
-- Spike mode only becomes enforceable when routing, ceremony guards, durable wisdom, and contributor workflow docs are patched together; leaving one surface untouched lets the coordinator regress into PR-demanding behavior during exploratory work.
-- Manual enum audit lists will always be incomplete — the analyzer itself is the source of truth. Appendix B missed TypeCategory; the running analyzer caught it. This validates the design decision to make the analyzer safe-by-default rather than allowlist-driven.
-- Test plan spec compliance must be verified at the test-ID level, not just the count. George shipped 18/18 tests but substituted 5 spec tests with 5 different tests — the total count matched while coverage gaps hid. Cross-reference by spec ID, not by quantity.
+- Vision-to-spec migration works best as a substance-preserving transplant with minimal reframing.
+- Pre-implementation contracts are clearer when the spec names stubs and responsibilities explicitly.
+- Merge overlapping vision sources instead of restating the same rule in parallel sections.
+- Catalog metadata should carry consumer-facing distinctions; hardcoded parallel copies drift.
+- Parser algorithms may stay hand-written while vocabulary, precedence, and disambiguation data remain catalog-driven.
+- Execution consumers read lowered `Precept`; authoring consumers read `CompilationResult`.
+- Enum and construct-family changes require cross-surface verification: catalog entries, AST nodes, tests, routing, and regression anchors.
+- Analyzer/spec verification must be done by spec ID and code path, not by test count alone.
+- Spike mode only sticks when routing, ceremonies, and contributor workflow docs all enforce it together.
+- Philosophy and guarantee language can lag implementation/spec reality; when that happens, flag the gap rather than silently rewriting philosophy.
 
 ## Recent Updates
 
-### 2026-04-29 — PRECEPT0018 correctness gate closed
-- George's follow-up commit `e7a643d` added the three missing required PRECEPT0018 regression tests plus the two advisory visibility anchors, closing Frank's only blocking finding (B1).
-- Final state recorded durably: analyzer, attribute, all 3 `[AllowZeroDefault]` placements, and all 23 enum fixes were already correct; the lane is now blocked on nothing.
+### 2026-04-29 — Collection research recorded durably
+- Scribe logged frank-6 and frank-7, merged both collection research records into `decisions.md`, and summarized this history after the size gate tripped.
 
-### 2026-04-28 — PRECEPT0018 correctness gate review
-- Reviewed George's PRECEPT0018 implementation against the design spec. Analyzer, attribute, all 3 `[AllowZeroDefault]` placements, and all 23 enum fixes are correct. TypeCategory (not in Appendix B) was a legitimate addition. Blocked on 3 missing spec test cases: TP3 (zero-not-first-member), EC4 (byte underlying type), EC5 (long underlying type). These test distinct code paths and must exist as regression anchors.
+### 2026-04-29 — Collection-level rule design direction
+- Surveyed 7 external systems, built a 6-category taxonomy, and mapped the categories onto concrete Precept business-rule pressure.
+- Recommended a 3-layer rollout: field-level collection modifiers first (`unique`, collection `notempty`, `subset`, `disjoint`), quantifier predicates second, dedicated `check` blocks deferred.
+- Provability boundary: cardinality and uniqueness are often static; element-shape and aggregate rules depend on quantifiers; ordering is hardest.
 
-### 2026-04-28 — Spike mode first-class across squad workflow
-- Patched routing, ceremonies, durable wisdom, and `CONTRIBUTING.md` so spike activation/exit are explicit, spike branches follow `spike/{kebab-description}`, PR-demanding ceremonies are suppressed while `spike_mode: true`, and exploratory work exits through deliberate closeout.
+### 2026-04-29 — Collection iteration direction
+- Studied CEL, OPA/Rego, and SQL precedents and recommended bounded quantifier predicates (`all`/`any`/`none`) as acceptable, but no general loops or `map`/`filter`/`reduce` yet.
+- Key implementation note: `All` and `Any` already exist in the lexer; parser disambiguation can be positional.
 
-### 2026-04-28 — Catalog extensibility closeout
-- Catalog-driven extensibility audit identified the parser hardening gaps; plan review blocked weak spots; deep re-review caught wildcard switches defeating CS8509; final B1-B7 re-review approved the fixed implementation and the remaining enum deviations as safe.
+### 2026-04-29 — Spec migration closeout
+- Migrated the §0 Preamble and §3A Language Semantics into `docs/language/precept-language-spec.md`, archived the old vision doc, and swept cross-references.
+- Locked the no-runtime-faults principle as "prove safety or emit diagnostics" and flagged the remaining owner-only philosophy wording gap around evaluation-fault prevention.
 
-### 2026-04-28 — Parser design loop closed
-- Evaluated parser design v5-v8, approved the remediation batch, authored the permanent `docs/compiler/parser-v2.md` reference, and finished the cross-surface consistency audit that aligned spec, parser docs, catalogs, diagnostics, and representative samples.
+### 2026-04-29 — Vision/spec audit completed
+- Audited the vision against the live spec, identifying philosophy-bearing content, semantic gaps, and two stale contradictions that informed the migration order.
 
-### 2026-04-28 — Vision/spec migration boundary locked
-- Audited the language vision against the live spec, identified two contradictions plus the philosophy-first content that must migrate before archival, and recommended deferring vision archival until the spec absorbs the identity-bearing material.
+### 2026-04-29 — PRECEPT0018 gate closed
+- George's follow-up commit `e7a643d` added the three missing required PRECEPT0018 regression tests plus the two advisory visibility anchors, closing Frank's only blocking finding.
 
-### 2026-04-29 — Spike-mode decision recorded durably
-- Scribe merged the spike-mode architectural decision into `decisions.md`, archived aged decision records under the hard gate, and propagated the new operating model into team memory.
+### 2026-04-28 — Prior closeout summary
+- Locked spike mode as first-class squad workflow, closed the parser/catalog extensibility loop, completed the PRECEPT0018 review pass, and defined the vision-to-spec migration boundary for the next day's implementation work.
