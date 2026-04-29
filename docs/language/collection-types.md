@@ -626,7 +626,40 @@ Natural keyword — "bag" is the established mathematical term for multiset, and
 
 **Priority:** **High.** This unlocks counting and quantity-tracking rules that `set` (which collapses duplicates) and `queue`/`stack` (which don't expose per-element counts) cannot express. Many real business domains need "how many of X" as a first-class concept.
 
-### Candidate 3: `deque of T`
+### Candidate 3: `list of T`
+
+**What it is:** An ordered sequence with stable positions, duplicates allowed, and index access. Differs from all existing types:
+- `queue` — ordered, but FIFO-only, no random access
+- `stack` — ordered, but LIFO-only, no random access
+- `log` — ordered + positional read, but append-only (no removal)
+- `set` — unordered, no duplicates
+- `bag` — unordered, duplicates allowed
+
+`list` is the only type with: ordered positions + arbitrary insertion AND arbitrary positional removal.
+
+**Business scenario:** An approval chain where reviewers can recuse themselves — ordered sequence, arbitrary removal by value or position. Ordered step lists where steps can be retracted. Any domain where sequence matters and elements can be withdrawn.
+
+**Proof engine implications:**
+- `.at(N)` — tractable. Requires index-bounds guard (`when Items.count > N`), same pattern as emptiness guards on `.peek`, extended to two-sided bounds check. Author supplies the guard; proof engine discharges from it.
+- `insert` / `remove-at` — **shift subsequent positions**. Once element at index 1 is removed, every proof about "element at index 3" is stale. `log`'s append-only invariant gives the proof engine stable positions. `list`'s arbitrary mutation does not. Per-access index-bounds safety is achievable; cross-mutation positional invariants are not. This is a real cost.
+
+**Grammar fit:**
+
+```
+field F as list of T
+```
+
+Clean. Reuses `of`. No new declaration keywords.
+
+**Action surface:** `append`, `insert F at N Expr` (insert at position), `remove F Expr` (first-occurrence removal), `remove-at F N` (positional removal), `clear`. Accessors: `.at(N)`, `.first`, `.last`, `.count`.
+
+**Relation to `bag` and `log`:**
+- vs `bag`: orthogonal. `bag` tracks frequencies (unordered); `list` tracks positions (ordered). Neither subsumes the other.
+- vs `log`: deliberate non-overlap. `log` covers "immutable record that accumulates" — positional read (`.at(N)`, `.first`, `.last`) IS in `log`. `list` adds the one thing `log` prohibits: arbitrary removal. If `log` satisfies real positional-read use cases in practice, the incremental case for `list` weakens.
+
+**Priority:** **Low.** Not a reject — no philosophy violation (unlike ring buffer's silent eviction). But the genuine incremental territory over `log` is narrow (arbitrary removal), the proof cost of positional-mutation is real, and mutable-ordered-list business scenarios are rarer than `bag`/`log`/`map` frequency. Right sequencing: evaluate after `log` ships.
+
+### Candidate 4: `deque of T`
 
 **What it is:** Double-ended queue. Supports push/pop at both front and back.
 
@@ -660,7 +693,7 @@ field F as deque of T
 
 **Priority:** **Low.** The double-ended access pattern is rare in business-rule domains. Most real scenarios are either FIFO (queue) or LIFO (stack). The escalation pattern can be modeled with two separate queues (priority + normal) or a priority queue. The keyword surface cost is high relative to the business-rule unlock.
 
-### Candidate 4: `priorityqueue of T priority P`
+### Candidate 5: `priorityqueue of T priority P`
 
 **What it is:** A queue where elements are dequeued by priority rather than insertion order. Each element has two axes: a value (type `T`) and a priority (type `P`). The priority type `P` must be orderable (numeric or `choice(...) ordered`). Dequeue always removes the element with the best priority according to the declared sort direction.
 
@@ -832,7 +865,7 @@ The following questions from frank-14 are now resolved:
 
 2. **`ascending`/`descending` keyword reuse.** These keywords may also be relevant for `sortedset` iteration order or future ordering features. Should they be reserved broadly as ordering modifiers, or scoped specifically to `priorityqueue` and `dequeue`?
 
-### Candidate 5: `log of T`
+### Candidate 6: `log of T`
 
 **What it is:** An append-only ordered sequence. Elements can be added but never removed. Supports `.count`, positional read (`.at(index)`), `.last`, and `.first`. Models audit trails, event histories, and compliance records.
 
@@ -867,7 +900,9 @@ field F as log of T
 
 **Priority:** **High.** Append-only audit trails are a pervasive business requirement across regulated industries (finance, insurance, healthcare). No existing collection type can model "add but never remove" — `queue` allows `dequeue`, `stack` allows `pop`, and `set` allows `remove`. The `log` type makes the immutability guarantee structural, which is exactly Precept's philosophy of prevention over detection.
 
-### Candidate 6: `map of K to V`
+**Note on `list of T` overlap:** The positional-read accessors — `.at(N)`, `.first`, `.last` — appear in both `log` and the separately evaluated `list of T` candidate. The overlap is deliberate: `log` covers the common case — read-only positional access on an accumulating record with a stable, monotonically growing index space. `list of T` is the separate evaluation for mutable ordered sequences, adding the one operation `log` prohibits: arbitrary positional removal. If `log` satisfies real positional-read use cases in practice, the incremental case for `list` weakens.
+
+### Candidate 7: `map of K to V`
 
 **What it is:** A key-value association. Each key maps to exactly one value. Supports set-by-key, get-by-key, contains-key, and remove-by-key.
 
@@ -881,14 +916,14 @@ from Draft on SetCoverage
     -> no transition
 
 from Active on CheckCoverage when CoverageLimits containskey CheckCoverage.CoverageType
-    -> set CurrentLimit = CoverageLimits.get(CheckCoverage.CoverageType)
+    -> set CurrentLimit = CoverageLimits for CheckCoverage.CoverageType
     -> no transition
 
 rule CoverageLimits.count <= 10
     reason "No more than 10 coverage types per policy"
 ```
 
-**Proof engine implications:** `.get(key)` requires a `containskey` guard — same pattern as emptiness proofs but keyed. This is a new proof obligation category: key-presence safety. `put` is always safe (creates or overwrites). `removekey` requires no guard (no-op if absent, like `remove` on `set`). The proof engine must track key-presence from `containskey` guards in `when` clauses.
+**Proof engine implications:** `F for key` requires a `containskey` guard — same pattern as emptiness proofs but keyed. This is a new proof obligation category: key-presence safety. `put` is always safe (creates or overwrites). `removekey` requires no guard (no-op if absent, like `remove` on `set`). The proof engine must track key-presence from `containskey` guards in `when` clauses.
 
 **Grammar fit:**
 
@@ -898,7 +933,9 @@ field F as map of K to V
 
 Introduces `to` as a type-position keyword connecting key and value types. Both `K` and `V` must be scalar types. The `to` keyword is new in this context but reads naturally.
 
-**Action surface:** New keywords: `put`, `removekey`, `containskey`, `.get(key)`. `containskey` parallels `contains` on sets. `.count` reuses existing accessor. `.keys` and `.values` could return sets for use in `contains` and quantifier expressions.
+> **⚠ Open Question — Access keyword not finalized.** The working syntax shown above uses the infix keyword `for` (`CoverageLimits for CheckCoverage.CoverageType`). This is Shane's current lean, but the keyword has **not** been locked in. Both `for` and `at` remain on the table. Do not treat `for` as a settled decision — explicit owner sign-off is required before this keyword advances to a formal proposal or implementation.
+
+**Action surface:** New keywords: `put`, `removekey`, `containskey`, `for` (infix key access). `containskey` parallels `contains` on sets. `.count` reuses existing accessor. `.keys` and `.values` could return sets for use in `contains` and quantifier expressions.
 
 **Priority:** **High.** Key-value association is fundamental to business modeling. Configuration tables, fee schedules, lookup mappings, and per-category settings are everywhere. Today, modeling these in Precept requires either multiple parallel fields or external application logic — both of which break the one-file-complete-rules guarantee. A `map` type keeps the association inside the contract.
 
@@ -964,7 +1001,7 @@ when DepartmentMembers["engineering"] contains "alice"
 
 **Grammar fit:** `field F as multimap of K to V`. Reuses the `of ... to` connector from `map`.
 
-**Action surface:** Same as `map` (`put`, `removekey`, `containskey`, `.get(key)`) but `.get(key)` returns a collection, not a scalar — introducing nested collection semantics that Precept explicitly excludes.
+**Action surface:** Same as `map` (`put`, `removekey`, `containskey`, `for`) but `F for key` returns a collection, not a scalar — introducing nested collection semantics that Precept explicitly excludes.
 
 **Priority/Recommendation:** **Reject.** A multimap is a collection of collections behind a key lookup — two levels of indirection that enter general-purpose data structure territory. Even if `map` ships, `multimap` adds nested collection semantics that Precept's flat-statement philosophy prohibits. The one-to-many pattern is better served by explicit set fields (`field EngineeringTeam as set of string`, `field SalesTeam as set of string`) with cross-collection constraints (`subset`, `disjoint`) relating them.
 
@@ -978,6 +1015,7 @@ when DepartmentMembers["engineering"] contains "alice"
 | `sortedset of T` | **Medium** | Convenience improvement — eliminates emptiness guards on ordered collections, but `set` + guards covers same ground |
 | `priorityqueue of T priority P` | **Medium** | Real pattern; two-type-parameter grammar generalizes with `map`; proof surface manageable (emptiness + static direction) |
 | `deque of T` | **Low** | Rare in business-rule domains — double-ended access is an infrastructure pattern, not a business-rule pattern |
+| `list of T` | **Low** | Narrow incremental territory over `log`; mutable-ordered-list use cases rarer than bag/log/map; evaluate after `log` ships |
 | `ringbuffer of T` | **Reject** | Silent eviction violates inspectability — implicit mutation the proof engine cannot track |
 | `capacity` modifier | **Reject** | Synonym for `maxcount` — language surface cost with no capability gain |
 | `multimap of K to V` | **Reject** | Nested collection semantics Precept explicitly excludes — use explicit set fields + constraints |
@@ -1006,6 +1044,7 @@ when DepartmentMembers["engineering"] contains "alice"
 | **Double-ended queue** | — | `ArrayDeque` | `deque` | `VecDeque` | — | — | — | — | `deque of T` (low pri) |
 | **Priority queue** | `PriorityQueue<T,P>` | `PriorityQueue` | `heapq` | `BinaryHeap` | — | — | — | — | `priorityqueue of T priority P` (med pri) |
 | **Append-only log** | `ImmutableList<T>` | — | — | — | — | `list` (immutable) | `list` (cons) | — | `log of T` |
+| **Ordered sequence with random access** | `List<T>` | `ArrayList` | `list` | `Vec<T>` | — | — | — | — | `list of T` |
 | **Key-value map** | `Dictionary<K,V>` | `HashMap` | `dict` | `HashMap` | — | `map` | `Map<'K,'V>` | — | `map of K to V` |
 | **Ring buffer** | — | `CircularFifoQueue`* | `deque(maxlen=N)` | — | — | — | — | — | Rejected† |
 | **Multimap** | `ILookup<K,V>` | `Multimap` (Guava) | — | — | — | — | `Map[K, List[V]]`‡ | — | Rejected§ |
