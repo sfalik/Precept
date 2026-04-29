@@ -1,0 +1,1 @@
+Recorded the compile-time structural checking language update: `docs/philosophy.md` now explicitly names evaluation faults (division by zero, overflow, empty collection access) under the guarantee, spec P7 mirrors that language, and the originating documentation change landed in commit `a52282a`.
