@@ -234,10 +234,10 @@ public static class Parser
                     return null;
                 }
 
-                return Current().Kind switch
+                return FindDisambiguatedConstruct(leadingKind, Current().Kind) switch
                 {
-                    TokenKind.Ensure => ParseEventEnsure(start, eventTarget.Value, stashedGuard),
-                    TokenKind.Arrow  => ParseEventHandlerWithGuardCheck(start, eventTarget.Value, stashedGuard),
+                    ConstructKind.EventEnsure  => ParseEventEnsure(start, eventTarget.Value, stashedGuard),
+                    ConstructKind.EventHandler => ParseEventHandlerWithGuardCheck(start, eventTarget.Value, stashedGuard),
                     _ => EmitAmbiguityAndSync(Current()),
                 };
             }
@@ -258,31 +258,28 @@ public static class Parser
                     return null;
                 }
 
-                return leadingKind switch
+                return FindDisambiguatedConstruct(leadingKind, Current().Kind) switch
                 {
-                    TokenKind.In => Current().Kind switch
-                    {
-                        TokenKind.Modify => ParseAccessMode(start, stateTarget, stashedGuard),
-                        TokenKind.Omit   => ParseOmitDeclaration(start, stateTarget, stashedGuard),
-                        TokenKind.Ensure => ParseStateEnsure(start, token, stateTarget, stashedGuard),
-                        _ => EmitAmbiguityAndSync(Current()),
-                    },
-                    TokenKind.To => Current().Kind switch
-                    {
-                        TokenKind.Ensure => ParseStateEnsure(start, token, stateTarget, stashedGuard),
-                        TokenKind.Arrow  => ParseStateAction(start, token, stateTarget, stashedGuard),
-                        _ => EmitAmbiguityAndSync(Current()),
-                    },
-                    TokenKind.From => Current().Kind switch
-                    {
-                        TokenKind.On     => ParseTransitionRow(start, stateTarget, stashedGuard),
-                        TokenKind.Ensure => ParseStateEnsure(start, token, stateTarget, stashedGuard),
-                        TokenKind.Arrow  => ParseStateAction(start, token, stateTarget, stashedGuard),
-                        _ => EmitAmbiguityAndSync(Current()),
-                    },
+                    ConstructKind.AccessMode      => ParseAccessMode(start, stateTarget, stashedGuard),
+                    ConstructKind.OmitDeclaration => ParseOmitDeclaration(start, stateTarget, stashedGuard),
+                    ConstructKind.StateEnsure     => ParseStateEnsure(start, token, stateTarget, stashedGuard),
+                    ConstructKind.StateAction     => ParseStateAction(start, token, stateTarget, stashedGuard),
+                    ConstructKind.TransitionRow   => ParseTransitionRow(start, stateTarget, stashedGuard),
                     _ => EmitAmbiguityAndSync(Current()),
                 };
             }
+        }
+
+        private static ConstructKind? FindDisambiguatedConstruct(TokenKind leadingKind, TokenKind disambToken)
+        {
+            if (!Constructs.ByLeadingToken.TryGetValue(leadingKind, out var candidates))
+                return null;
+            foreach (var (kind, entry) in candidates)
+            {
+                if (entry.DisambiguationTokens?.Contains(disambToken) == true)
+                    return kind;
+            }
+            return null;
         }
 
         private Declaration? EmitAmbiguityAndSync(Token token)
