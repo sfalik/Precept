@@ -16,6 +16,10 @@
 
 ## Recent Updates
 
+### 2026-04-29 — PRECEPT0018 correctness gate closed
+- George's follow-up commit `e7a643d` added the three missing required PRECEPT0018 regression tests plus the two advisory visibility anchors, closing Frank's only blocking finding (B1).
+- Final state recorded durably: analyzer, attribute, all 3 `[AllowZeroDefault]` placements, and all 23 enum fixes were already correct; the lane is now blocked on nothing.
+
 ### 2026-04-28 — Spike mode first-class across squad workflow
 - Patched routing, ceremonies, durable wisdom, and `CONTRIBUTING.md` so spike activation/exit are explicit, spike branches follow `spike/{kebab-description}`, PR-demanding ceremonies are suppressed while `spike_mode: true`, and exploratory work exits through deliberate closeout.
 

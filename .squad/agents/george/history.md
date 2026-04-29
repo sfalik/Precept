@@ -18,6 +18,13 @@
 
 ## Recent Updates
 
+### 2026-04-29 — PRECEPT0018 correctness gate cleared
+
+Frank's B1 correctness-gate finding is closed. The original implementation commit `a7b0bb7` remains the baseline landing for the analyzer/attribute/exemption/enum work, and the follow-up commit `e7a643d` added the missing 5 regression anchors without changing runtime behavior.
+
+- Final PRECEPT0018 status: implemented, fully spec-covered, and green at 230 analyzer tests + 2044 core tests.
+- Important closeout pattern: when a reviewer specifies test IDs, backfill by spec ID rather than by total test count; the first pass matched the quantity but not the required cases.
+
 ### 2026-04-28 — Catalog extensibility implementation (PR #138)
 - Implemented all 7 slices of the catalog extensibility plan (v3, approved by Frank) on branch `feature/catalog-extensibility`.
 - Slice 1: `ExpressionBoundaryTokens` now derives from `Constructs.LeadingTokens` + structural literals — no more hardcoded construct-leading tokens in parser.

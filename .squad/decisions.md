@@ -6,6 +6,19 @@
 
 ---
 
+### 2026-04-29T03:09:18Z: PRECEPT0018 correctness gate closed and test backfill recorded
+**By:** Scribe
+**Status:** Merged, deduplicated, inbox cleared (3 files)
+
+**Merged sources:** `frank-precept0018-review`, `george-precept0018-implemented`, `george-precept0018-tests-added`.
+
+- Frank's correctness-gate review confirmed the PRECEPT0018 analyzer, `AllowZeroDefaultAttribute`, all three intentional zero-value exemptions, and the 23 enum fixes were correct, then blocked merge only on three missing required regression tests: TP3 (zero-valued member not first), EC4 (`byte` underlying type), and EC5 (`long` underlying type).
+- George's implementation record is now preserved as the baseline landing: commit `a7b0bb7` created the analyzer and attribute, applied `[AllowZeroDefault]` to `LexerMode.Normal`, `QualifierMatch.Any`, and `PeriodDimension.Any`, and made all 23 semantic enums 1-based with 225 analyzer tests and 2044 core tests green.
+- George's follow-up commit `e7a643d` closed Frank's B1 finding and the two advisory anchors by adding TP7–TP9 and EC6–EC7 in `test/Precept.Analyzers.Tests/Precept0018Tests.cs`; analyzer tests rose to 230 while core tests stayed 2044.
+- Net result: PRECEPT0018 is now durably recorded as implemented and correctness-cleared, with no post-review code changes beyond the missing regression tests.
+
+---
+
 ### 2026-04-29T01:39:22Z: Catalog extensibility plan v3 cleared for George
 **By:** Scribe
 **Status:** Merged, deduplicated, inbox cleared (2 files)
