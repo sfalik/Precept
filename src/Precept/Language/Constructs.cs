@@ -31,6 +31,7 @@ public static class Constructs
     private static readonly ConstructSlot SlotAccessModeKeyword = new(ConstructSlotKind.AccessModeKeyword);
     private static readonly ConstructSlot SlotFieldTarget       = new(ConstructSlotKind.FieldTarget);
     private static readonly ConstructSlot SlotRuleExpression    = new(ConstructSlotKind.RuleExpression);
+    private static readonly ConstructSlot SlotInitialMarker     = new(ConstructSlotKind.InitialMarker,     IsRequired: false);
 
     // ════════════════════════════════════════════════════════════════════════════
     //  GetMeta — exhaustive switch
@@ -71,7 +72,7 @@ public static class Constructs
             "Declares one or more named events with optional arguments and the initial modifier",
             "event Submit(approver as string)",
             [],
-            [SlotIdentifierList, SlotArgumentList],
+            [SlotIdentifierList, SlotArgumentList, SlotInitialMarker],
             [new(TokenKind.Event)]),
 
         ConstructKind.RuleDeclaration => new(

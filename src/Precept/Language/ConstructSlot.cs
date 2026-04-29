@@ -22,6 +22,7 @@ public enum ConstructSlotKind
     AccessModeKeyword,     // readonly | editable (B4 access mode adjectives)
     FieldTarget,           // field name or "all"
     RuleExpression,        // the rule's boolean expression (e.g. amount > 0)
+    InitialMarker,         // optional "initial" keyword on event declarations
 }
 
 /// <summary>

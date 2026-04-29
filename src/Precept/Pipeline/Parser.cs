@@ -713,35 +713,13 @@ public static class Parser
 
         private EventDeclarationNode ParseEventDeclaration()
         {
+            var meta = Constructs.GetMeta(ConstructKind.EventDeclaration);
             var start = Current().Span;
             Advance(); // consume 'event'
-
-            var names = ParseIdentifierListTokens();
-            var args = ImmutableArray<ArgumentNode>.Empty;
-            bool isInitial = false;
-
-            if (Current().Kind == TokenKind.LeftParen || Current().Kind == TokenKind.Identifier)
-            {
-                // Check for 'with' keyword for argument list
-            }
-
-            // Check for argument list introduced by 'with' or '('
-            if (Match(TokenKind.LeftParen))
-            {
-                args = ParseArgumentListInner();
-                Expect(TokenKind.RightParen);
-            }
-
-            if (Current().Kind == TokenKind.Initial)
-            {
-                isInitial = true;
-                Advance();
-            }
-
-            var lastSpan = isInitial ? _tokens[_position - 1].Span
-                : args.Length > 0 ? args[^1].Span
-                : names[^1].Span;
-            return new EventDeclarationNode(SourceSpan.Covering(start, lastSpan), names, args, isInitial);
+            var slots = ParseConstructSlots(meta);
+            var lastSpan = GetLastSlotSpan(slots, start);
+            return (EventDeclarationNode)BuildNode(ConstructKind.EventDeclaration, slots,
+                SourceSpan.Covering(start, lastSpan));
         }
 
         private RuleDeclarationNode ParseRuleDeclaration()
@@ -865,6 +843,7 @@ public static class Parser
             ConstructSlotKind.AccessModeKeyword   => ParseAccessModeKeyword(isOptional),
             ConstructSlotKind.FieldTarget         => ParseFieldTarget(isOptional),
             ConstructSlotKind.RuleExpression      => ParseRuleExpression(isOptional),
+            ConstructSlotKind.InitialMarker       => ParseInitialMarker(isOptional),
             // CS8509 enforcement: a new ConstructSlotKind member without an arm is a build error.
             // The wildcard below covers only unnamed numeric values outside the defined enum range.
             _ => throw new ArgumentOutOfRangeException(nameof(slotKind), slotKind,
@@ -956,6 +935,13 @@ public static class Parser
         private SyntaxNode? ParseRuleExpression(bool isOptional)
         {
             return ParseExpression(0);
+        }
+
+        private SyntaxNode? ParseInitialMarker(bool isOptional)
+        {
+            if (Current().Kind != TokenKind.Initial) return null;
+            var token = Advance();
+            return new TokenWrapper(token.Span, token);
         }
 
         // ── Slot parsers for disambiguated constructs (PR 4) ────────────────
@@ -1324,7 +1310,7 @@ public static class Parser
         ConstructKind.EventDeclaration => new EventDeclarationNode(span,
             ((SyntaxNode)slots[0]!).AsTokenArray(),
             slots[1]?.AsArguments() ?? [],
-            false),
+            slots[2] is not null),
 
         ConstructKind.RuleDeclaration => new RuleDeclarationNode(span,
             (Expression)slots[0]!,
