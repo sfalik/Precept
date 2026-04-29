@@ -16,11 +16,18 @@
 - Analyzer/spec verification must be done by spec ID and code path, not by test count alone.
 - Spike mode only sticks when routing, ceremonies, and contributor workflow docs all enforce it together.
 - Philosophy and guarantee language can lag implementation/spec reality; when that happens, flag the gap rather than silently rewriting philosophy.
+- Collection design docs consolidate best when structured per-kind (set/queue/stack) with shared cross-cutting sections (inner types, emptiness safety, constraints) rather than per-concern, because the per-kind structure mirrors how authors encounter the surface in `.precept` files.
 
 ## Recent Updates
 
 ### 2026-04-29 — Collection research recorded durably
 - Scribe logged frank-6 and frank-7, merged both collection research records into `decisions.md`, and summarized this history after the size gate tripped.
+
+### 2026-04-29 — Collection types design doc authored
+- Created `docs/language/collection-types.md` as the canonical reference for the shipped collection surface (set/queue/stack) and proposed extensions (quantifiers, field constraints).
+- Document follows `primitive-types.md` style: per-kind sections, action/accessor/constraint tables, emptiness safety with proof obligations, diagnostic codes, and cross-references.
+- Proposed Extensions section synthesizes frank-6 (CEL quantifier research) and frank-7 (6-category collection rules taxonomy) into concrete proposals with 8 explicitly captured open questions for owner decision.
+- Updated `docs/language/README.md` Documents table and Reading Order.
 
 ### 2026-04-29 — Collection-level rule design direction
 - Surveyed 7 external systems, built a 6-category taxonomy, and mapped the categories onto concrete Precept business-rule pressure.

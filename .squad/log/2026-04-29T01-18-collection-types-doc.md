@@ -1,0 +1,2 @@
+Merged Frank's collection-types documentation result into the squad record: the new `docs/language/collection-types.md` reference and `docs/language/README.md` index update are now logged in `decisions.md`, the inbox item was cleared, the archive gate was evaluated as a no-op because no active entries were older than 30 days, and health metrics were recorded (48586 -> 49892 bytes, 1 inbox file processed, history summarized: none).
+
