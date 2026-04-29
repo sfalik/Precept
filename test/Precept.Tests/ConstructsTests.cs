@@ -181,13 +181,39 @@ public class ConstructsTests
 
     [Theory]
     [InlineData(ConstructKind.FieldDeclaration)]
-    [InlineData(ConstructKind.StateDeclaration)]
     [InlineData(ConstructKind.EventDeclaration)]
     [InlineData(ConstructKind.TransitionRow)]
     public void KeyConstructs_HaveMinimumSlotCount(ConstructKind kind)
     {
         Constructs.GetMeta(kind).Slots.Should().HaveCountGreaterThanOrEqualTo(2,
             $"{kind} is a complex construct and needs at least 2 slots");
+    }
+
+    [Fact]
+    public void StateDeclaration_HasExactlyOneSlot_StateEntryList()
+    {
+        // R3: StateDeclaration uses a single StateEntryList slot — a compound slot
+        // that parses one or more (name modifier*) entries. The old approach of
+        // separate IdentifierList + ModifierList was incorrect; modifiers are
+        // per-entry, not a trailing list for the whole declaration.
+        var slots = Constructs.GetMeta(ConstructKind.StateDeclaration).Slots;
+        slots.Should().HaveCount(1, "StateDeclaration uses exactly one compound StateEntryList slot (R3 design)");
+        slots[0].Kind.Should().Be(ConstructSlotKind.StateEntryList);
+        slots[0].IsRequired.Should().BeTrue("the entry list is required — a state declaration needs at least one name");
+    }
+
+    [Fact]
+    public void EventDeclaration_HasInitialMarkerSlot()
+    {
+        // R4: EventDeclaration gained SlotInitialMarker so the 'initial' keyword
+        // is parsed via slot machinery rather than a bespoke branch.
+        var slots = Constructs.GetMeta(ConstructKind.EventDeclaration).Slots;
+        slots.Should().HaveCount(3, "EventDeclaration: [IdentifierList, ArgumentList(opt), InitialMarker(opt)]");
+        slots[0].Kind.Should().Be(ConstructSlotKind.IdentifierList);
+        slots[1].Kind.Should().Be(ConstructSlotKind.ArgumentList);
+        slots[1].IsRequired.Should().BeFalse("event arguments are optional");
+        slots[2].Kind.Should().Be(ConstructSlotKind.InitialMarker);
+        slots[2].IsRequired.Should().BeFalse("the initial marker is optional");
     }
 
     [Fact]

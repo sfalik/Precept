@@ -93,8 +93,8 @@ public class ParserInfrastructureTests
         // without a corresponding arm in InvokeSlotParser, the build fails.
         // This test documents the invariant — the real enforcement is the compiler.
         var enumCount = Enum.GetValues<ConstructSlotKind>().Length;
-        enumCount.Should().Be(16,
-            "if this count changes, verify InvokeSlotParser has a matching arm");
+        enumCount.Should().Be(17,
+            "if this count changes, verify InvokeSlotParser has a matching arm (R4 added InitialMarker = 17)");
     }
 
     // ════════════════════════════════════════════════════════════════════════════
