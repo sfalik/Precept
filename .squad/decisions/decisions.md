@@ -3629,3 +3629,1732 @@ No tests used `(EnumName)0` or `default(EnumName)` — no test changes required.
 ## Going Forward
 
 New enums in `src/Precept/` where all members are semantically meaningful must start at 1. The canonical check: *"Is there a valid program state represented by integer 0 for this type?"* If no, start at 1.
+
+---
+
+# Decision: Map Access Syntax
+
+**Date:** 2026-04-29  
+**Author:** Frank (Lead Language Designer)  
+**Status:** Advisory — pending owner decision  
+**Context:** Shane asked whether `CoverageLimits.get(CheckCoverage.CoverageType)` is too C#-like or fits Precept's grammar.
+
+---
+
+## 1. Does `.get(key)` Fit Precept's Grammar?
+
+**Short answer: It partially fits, but it's the wrong design choice.**
+
+The spec *does* have a precedent for parameterized accessors: `.inZone(tz)` on `instant` and `datetime` (spec §3.3, temporal accessors). The parser already handles `MemberAccessExpression` + `(` → `MethodCallExpression` at binding power 80. So `.get(key)` is *parseable* — the machinery exists.
+
+However, there's a critical distinction:
+
+- **`.inZone(tz)` is a type-system accessor** — it's a fixed method name on a specific type, taking a single typed constant argument. It transforms one temporal type to another. It's a narrow, catalog-driven exception.
+- **`.get(key)` is a general-purpose keyed lookup** — the argument is an arbitrary expression, not a type constant. It's closer to subscript access than to a type accessor.
+
+The quantifier decision (`.all(item, pred)` → `each item in Items (pred)`) rejected multi-argument method-call syntax because it looked like C# and violated Precept's keyword-first declarative style. `.get(key)` is a single-argument form, so it's *less* of a violation — but it still introduces `object.verb(arg)` OOP method-call syntax into a language that otherwise uses `keyword Object Arg` action grammar everywhere:
+
+```
+-> set Field = Expr        # keyword Field = Expr
+-> add Collection Value    # keyword Collection Value
+-> remove Collection Value # keyword Collection Value
+-> push Collection Value   # keyword Collection Value
+```
+
+Making map access the one place where `Object.verb(Arg)` appears in expression position is an unnecessary style break.
+
+## 2. Candidate Evaluation
+
+### A. `CoverageLimits.get(CheckCoverage.CoverageType)` — method call
+
+- **Parse:** Unambiguous — spec already defines `MemberAccessExpression` + `(` → `MethodCallExpression`.
+- **Style fit:** Poor. OOP method-call form in an otherwise keyword-driven language. The quantifier precedent rejected this pattern.
+- **Contexts:** Works syntactically in rules, actions, and guards. Visually noisy.
+- **Verdict:** Parseable but stylistically wrong. **Reject.**
+
+### B. `CoverageLimits[CheckCoverage.CoverageType]` — subscript bracket
+
+- **Parse:** Requires adding `[` as a left-denotation token at high binding power. Currently `[` only appears in null-denotation (list literals). Adding it as infix/postfix creates a new parse path.
+- **Style fit:** Familiar from every C-family language, but Precept has no other postfix bracket notation. Brackets currently mean "list literal," not "index into."
+- **Contexts:** Works everywhere, binds tightly. `rule CoverageLimits[CheckCoverage.CoverageType] >= 50000` reads cleanly.
+- **Verdict:** Parseable with grammar extension. Visually compact. But introduces a new syntactic category (postfix brackets) that has no other use in the language. **Acceptable but not preferred.**
+
+### C. `CoverageLimits at CheckCoverage.CoverageType` — keyword `at`
+
+- **Parse:** `at` as an infix keyword operator (like `contains`) at binding power ~40. Left operand is map-typed expression, right operand is key expression.
+- **Style fit:** Excellent. Reads like English: "coverage limits at this coverage type." Follows the same `Collection operator Key` pattern as `MissingDocuments contains ReceiveDocument.Name`.
+- **Contexts:**
+  - Rule: `rule CoverageLimits at CheckCoverage.CoverageType >= 50000` ✓
+  - Action: `-> set CurrentLimit = CoverageLimits at CheckCoverage.CoverageType` ✓
+  - Guard: `when CoverageLimits at CheckCoverage.CoverageType > MinCoverage` ✓
+- **Precedence concern:** At BP 40 (same as `contains`), `CoverageLimits at CheckCoverage.CoverageType >= 50000` parses as `(CoverageLimits at CheckCoverage.CoverageType) >= 50000` — correct, because `.` binds tighter (80) and comparison binds looser (30).
+- **Lexer:** `at` is a new keyword but has no collision risk — it's not used anywhere in the current grammar.
+- **Verdict:** **Recommended.** Clean English reading, follows `contains` precedent exactly, no grammar conflicts, works in all three contexts.
+
+### D. `CoverageLimits of CheckCoverage.CoverageType` — reuse `of`
+
+- **Parse:** `of` is already heavily overloaded: `set of T`, `queue of T`, `map of K to V`, `choice of ...`. Using it as an infix expression operator creates parser ambiguity in type positions.
+- **Style fit:** Reads okay in isolation but "limits of coverage type" reverses the natural English meaning (the type is the key, not the possessor).
+- **Verdict:** **Reject.** Too overloaded, semantically backwards.
+
+### E. `CoverageLimits for CheckCoverage.CoverageType` — keyword `for`
+
+- **Parse:** `for` is not currently a keyword. Could work as infix operator.
+- **Style fit:** "Coverage limits for this coverage type" reads naturally. However, `for` strongly implies iteration in most programming contexts, which conflicts with Precept's no-iteration philosophy.
+- **Verdict:** **Acceptable but risky.** The iteration connotation is a liability.
+
+### F. `lookup CoverageLimits CheckCoverage.CoverageType` — keyword-first
+
+- **Parse:** Keyword-first form matching action grammar (`keyword Collection Key`).
+- **Style fit:** Matches action patterns but map access is an *expression*, not an action. Keyword-first forms in Precept are statements/actions (`set`, `add`, `remove`, `push`, `transition`). Expressions use infix/postfix notation. A keyword-first expression would be a new grammatical category.
+- **Contexts:** Awkward in rules: `rule lookup CoverageLimits CheckCoverage.CoverageType >= 50000` — where does the `lookup` end and the `>=` begin? Requires parenthesization: `rule (lookup CoverageLimits CheckCoverage.CoverageType) >= 50000`.
+- **Verdict:** **Reject.** Expression-position keyword-first form creates ambiguity and requires parens.
+
+### G. `CoverageLimits.get CheckCoverage.CoverageType` — accessor without parens
+
+- **Parse:** `.get` would parse as a `MemberAccessExpression` yielding a value, then `CheckCoverage.CoverageType` is a separate expression with no connecting operator. The parser would see two adjacent expressions with no infix operator between them — a parse error.
+- **Style fit:** Looks like a shell command, not a Precept expression.
+- **Verdict:** **Reject.** Unparseable without grammar surgery.
+
+## 3. Recommendation
+
+**Use `at` as the map access operator.**
+
+```
+CoverageLimits at CheckCoverage.CoverageType
+```
+
+### Rationale
+
+1. **Follows the `contains` precedent exactly.** `contains` is an infix keyword operator that takes a collection on the left and a value on the right. `at` is the same pattern: map on the left, key on the right.
+
+2. **No method calls in expression position.** The quantifier decision established that Precept prefers keyword forms over method-call syntax. `at` is a keyword, not a method.
+
+3. **`.inZone(tz)` is the exception, not the rule.** That accessor exists because timezone conversion is a type-system operation (it changes the return type). Map lookup is a data operation — it should use the language's standard expression vocabulary, not the type accessor escape hatch.
+
+4. **Reads as English.** "Coverage limits at this coverage type" is immediately clear to business stakeholders.
+
+5. **Proof engine integration is clean.** `containskey` guards the `at` operator the same way `.count > 0` guards `.peek` — the proof engine tracks key-presence from `when CoverageLimits containskey K` and permits `CoverageLimits at K` in the guarded scope.
+
+### Usage in all three contexts
+
+```precept
+# Rule expression
+rule CoverageLimits at CheckCoverage.CoverageType >= 50000
+    because "Each coverage type must meet minimum threshold"
+
+# Action body
+from Active on CheckCoverage when CoverageLimits containskey CheckCoverage.CoverageType
+    -> set CurrentLimit = CoverageLimits at CheckCoverage.CoverageType
+    -> no transition
+
+# Event guard
+from Active on AdjustCoverage
+    when CoverageLimits containskey AdjustCoverage.CoverageType
+    and CoverageLimits at AdjustCoverage.CoverageType > MinCoverage
+    -> ...
+```
+
+### Implementation sketch
+
+- New lexer keyword: `at` → `TokenKind.At`
+- New left-denotation entry: `At` at binding power 40 → `MapAccessExpression(left, ParseExpression(40))`
+- Type checker: left must be `map of K to V`, right must be assignable to `K`, result type is `V`
+- Proof engine: `at` requires a `containskey` guard in scope for the same map and key expression (new proof obligation: `KeyPresence`)
+
+
+---
+
+# Advisory: Map Access Keyword — `at` vs `for`
+
+**Author:** Frank (Lead Language Designer)
+**Date:** 2026-04-29
+**Status:** Advisory (no file changes)
+**Context:** Shane asked whether `for` should replace the previously recommended `at` as the map access infix keyword.
+
+---
+
+## 1. Existing Uses in Precept
+
+### `for` — Not a reserved keyword
+
+`for` does **not** appear in the v2 reserved keyword set (§1.2 of `precept-language-spec.md`). It is an ordinary identifier today. It appears in sample files only inside comments and string literals — never as syntax. Adding `for` as a keyword would be a net-new reservation.
+
+### `at` — Not a reserved keyword
+
+`at` also does **not** appear in the v2 reserved keyword set. Like `for`, it appears in sample files only inside comments and string literals (e.g., `"capped at half"`, `"at least one floor"`). Adding `at` would also be a net-new reservation.
+
+**Tie.** Neither keyword carries existing syntactic baggage. Both are fresh reservations.
+
+---
+
+## 2. Cognitive Load — What Does English Prime You For?
+
+This is where the two diverge meaningfully.
+
+### `for` — "intended for / on behalf of / filtered by"
+
+In English, `for` implies **purpose, benefit, or selection**: "the limit *for* this coverage type," "the fee *for* this transaction." It reads like a natural-language lookup: "get me the value meant for this key."
+
+In programming, `for` is universally associated with **iteration** — `for` loops, `for-each`, `for...in`, `for...of`. Every mainstream language (C, Java, Python, JavaScript, Go, Rust, Swift, Kotlin) uses `for` as an iteration keyword. Precept has no loops by design (§0.4.1: "No loops"), but adopting `for` as a map access keyword creates a false association for anyone who has ever written code. It will feel like it should iterate. This is a real cognitive cost.
+
+### `at` — "located at / indexed at"
+
+In English, `at` implies **location or position**: "the value *at* this key," "the element *at* index 3." It reads as spatial lookup — which is exactly what map access is.
+
+In programming, `at` is used for **element access** — C++ `vector.at(i)`, Java `List.get()` (conceptually "at index"), Python's `__getitem__`. No mainstream language uses `at` for iteration. The association is clean: `at` means "retrieve the thing located here."
+
+**Advantage: `at`.** The word `for` carries iteration baggage from every programming language. `at` carries lookup/access semantics with no conflicting association.
+
+---
+
+## 3. Readability in All Three Contexts
+
+### Rule expression
+
+```precept
+rule CoverageLimits for CheckCoverage.CoverageType >= 50000
+rule CoverageLimits at CheckCoverage.CoverageType >= 50000
+```
+
+**`for`** reads: "the coverage limits *for* the coverage type must be ≥ 50,000." Natural English — this is `for`'s strongest context. A business analyst would write it this way.
+
+**`at`** reads: "the coverage limits *at* the coverage type must be ≥ 50,000." Slightly more technical, but still clear. "At" signals lookup, which is accurate.
+
+**Edge: `for`** — in isolation, the `for` reading is slightly more natural in this context.
+
+### Action body
+
+```precept
+-> set SomeField to CoverageLimits for CheckCoverage.CoverageType
+-> set SomeField to CoverageLimits at CheckCoverage.CoverageType
+```
+
+**`for`** reads: "set SomeField *to* CoverageLimits *for* the coverage type." The `to` ... `for` pairing is natural but introduces a subtle risk: the prepositions `to` and `for` now both appear in the same statement with different structural roles. `to` is the assignment target connector; `for` is the map access operator. A reader must parse two prepositions doing unrelated jobs.
+
+**`at`** reads: "set SomeField *to* CoverageLimits *at* the coverage type." The `to` ... `at` pairing is clearer — `to` means "assign into," `at` means "look up from." Different prepositions, different roles, no confusion.
+
+**Edge: `at`** — avoids the `to`/`for` preposition collision in action context.
+
+### Event guard
+
+```precept
+when CoverageLimits for CheckCoverage.CoverageType > MinCoverage
+when CoverageLimits at CheckCoverage.CoverageType > MinCoverage
+```
+
+**`for`** reads: "when the coverage limits *for* the coverage type exceed the minimum." Natural, clear.
+
+**`at`** reads: "when the coverage limits *at* the coverage type exceed the minimum." Clear, slightly more technical.
+
+**Edge: `for`** — marginal.
+
+### Composite reading
+
+Across all three contexts, `for` wins on pure English fluency in 2 of 3, but `at` wins on **structural clarity** — it is never ambiguous about what role it plays. The action-body `to`/`for` collision is a real readability problem, not a theoretical one. Precept uses `to` as a core keyword (state-gate ensures, `map of K to V`). Adding `for` as another overloaded preposition increases the preposition density in action statements.
+
+**Overall edge: `at`.** The structural clarity advantage outweighs the marginal English fluency advantage of `for`.
+
+---
+
+## 4. Parse Ambiguity
+
+### `for`
+
+No **grammatical** ambiguity — `for` is not reserved, so the parser can adopt it as a new infix operator without collision. However, if Precept ever introduces bounded quantifiers (currently proposed in `collection-types.md` §Proposed Extensions — `each`, `any`, `no`), future language evolution could face pressure to use `for` in a quantifier context (e.g., `each item in Items for ...`). Reserving `for` now for map access would block that path.
+
+### `at`
+
+No grammatical ambiguity. `at` has no plausible future use in Precept's design space beyond element access. It is a dead-end keyword in the best sense — it does exactly one thing and nothing else will ever want it.
+
+**Advantage: `at`.** Smaller future-reservation footprint.
+
+---
+
+## 5. Precedent — Infix Operator Pattern
+
+Precept's existing infix keyword operator is `contains`:
+
+```precept
+MissingDocuments contains ReceiveDocument.Name
+```
+
+Pattern: `Collection <infix-keyword> Operand`
+
+Both candidates follow this pattern:
+
+```precept
+CoverageLimits at CheckCoverage.CoverageType       -- map access
+CoverageLimits for CheckCoverage.CoverageType       -- map access
+MissingDocuments contains ReceiveDocument.Name       -- membership
+```
+
+`contains` is a **verb** — it describes what the collection does with the operand. `at` is a **preposition** — it describes where in the collection to look. `for` is also a preposition but with a purpose/selection flavor.
+
+The infix slot accepts both verbs and prepositions (precedent: `contains` is a verb, `is` is a verb in `is set`/`is not set`). Neither `at` nor `for` breaks the pattern.
+
+**Tie.** Both fit the infix precedent.
+
+---
+
+## 6. Verdict
+
+**I recommend `at`.** The original recommendation stands.
+
+`for` is not bad — it reads beautifully in rule context and guard context. But it has three disadvantages that `at` does not:
+
+1. **Iteration baggage.** Every programmer alive associates `for` with loops. Precept has no loops. Using `for` for map access creates a false cognitive prime that `at` avoids entirely.
+
+2. **Preposition collision with `to`.** In action bodies (`-> set F to M for K`), `to` and `for` are both prepositions doing different structural jobs in the same statement. `at` creates no such collision — `to` assigns, `at` looks up.
+
+3. **Future reservation cost.** `for` is a high-value English word that could plausibly serve quantifier syntax or other future constructs. `at` has no competing future claim.
+
+The marginal English fluency advantage of `for` in rule and guard contexts does not outweigh these structural disadvantages. `at` reads clearly in all three contexts, parses unambiguously, carries the right programming-language association (element access), and leaves `for` available for future language evolution.
+
+**Recommendation: `at` confirmed.**
+
+```precept
+-- Canonical map access syntax
+CoverageLimits at CheckCoverage.CoverageType
+```
+
+
+---
+
+# Decision: Map Access Keyword — `for` vs `at`
+
+**By:** Frank (Lead Language Designer)
+**Date:** 2026-04-29
+**Status:** Advisory — owner decision needed
+**Context:** Follow-up to frank-16 (`at` recommendation). Shane asks whether `for` is better.
+
+---
+
+## 1. Keyword Inventory Check
+
+Neither `for` nor `at` is in Precept's v2/v3 reserved keyword set. Both are fresh — no existing meaning to collide with.
+
+## 2. English Reading Test
+
+| Form | Reading |
+|------|---------|
+| `CoverageLimits at CheckCoverage.CoverageType` | "coverage limits *at* this coverage type" — spatial/indexing, like looking up a slot |
+| `CoverageLimits for CheckCoverage.CoverageType` | "coverage limits *for* this coverage type" — relational, like asking "which limit applies to this type?" |
+
+`for` reads more naturally in business-rule English. Domain experts say "the limit **for** auto coverage" not "the limit **at** auto coverage." `at` carries a programmer connotation (array-at-index) that `for` avoids.
+
+## 3. Grammar Ambiguity Test
+
+### Rule context
+```precept
+rule CoverageLimits for CheckCoverage.CoverageType >= 50000
+    because "Minimum coverage per type"
+```
+Parses cleanly: `CoverageLimits for CheckCoverage.CoverageType` is the LHS expression, `>=` begins the comparison. No ambiguity.
+
+### Action context
+```precept
+-> set SomeField = CoverageLimits for CheckCoverage.CoverageType
+```
+Parses cleanly: `=` left-delimits the RHS expression; `for` is an infix operator binding map-to-key within the expression.
+
+### Guard context
+```precept
+when CoverageLimits for CheckCoverage.CoverageType > MinCoverage
+```
+Parses cleanly: `for` binds tighter than `>`, producing `(CoverageLimits for CheckCoverage.CoverageType) > MinCoverage`.
+
+### Loop/iteration confusion risk
+Precept has **no loops** (§0.4.1 — "No iteration constructs"). There is no `for` loop, no `for-each`, no iteration keyword anywhere in the grammar. The quantifier syntax uses `each`/`any`/`no` + `in`, not `for`. Reserving `for` as a map-access keyword creates no collision with any existing or planned construct. A reader familiar with C-family languages might initially expect `for` to mean iteration — but Precept's keyword-anchored design principle (§0.1.5) means statement kind is identified by the *opening* keyword, and `for` would never appear at statement-opening position. It only appears as an infix operator within an expression.
+
+## 4. Precedent Check
+
+`for` does not appear anywhere in Precept's grammar, keyword tables, sample files (checked all 28), or collection-types doc as a language keyword. The only occurrences of "for" in `.precept` files are inside string literals and comments. Zero tension.
+
+## 5. Verdict: `for` is better than `at`
+
+**Recommendation: adopt `for` over `at`.**
+
+Reasons:
+1. **Domain-natural phrasing.** Business users say "the limit *for* this type," not "the limit *at* this type." `for` matches how domain experts talk about keyed lookups.
+2. **No grammar ambiguity.** `for` parses unambiguously in all three usage contexts (rule, action, guard). Binding precedence is straightforward — tighter than comparison operators, same tier as `.` member access.
+3. **No existing keyword collision.** `for` is unused in Precept. No iteration constructs exist or are planned that would conflict.
+4. **Avoids programmer connotation.** `at` suggests array indexing. `for` suggests relational lookup — which is what map access semantically *is* in a business-rule language.
+
+The only counterargument for `at` is familiarity for developers who know `dict.at(key)` from C++ or similar. But Precept optimizes for domain readability (§0.1.5), not programmer familiarity.
+
+
+---
+
+# Decision Record: `map` Access Keyword — Working Syntax `for`, Decision Open
+
+**By:** Frank  
+**Date:** 2026-04-29  
+**Status:** Open — pending owner sign-off
+
+## Summary
+
+`docs/language/collection-types.md` (§ Candidate 6: `map of K to V`) now documents the map key-access syntax using the infix keyword `for`:
+
+```
+CoverageLimits for CheckCoverage.CoverageType
+```
+
+This replaces the prior `.get(key)` method-call notation that appeared in the code example, proof-engine implications prose, and action surface bullet.
+
+## What Changed
+
+- Code block in the map candidate now uses `F for key` infix form.
+- Proof engine implications updated: `F for key` requires a `containskey` guard.
+- Action surface bullet now lists `for` (infix key access) instead of `.get(key)`.
+- Multimap rejection section updated to reference `for` consistently.
+- An **open-question callout** was added immediately after the grammar fit block, making it explicit that `for` is the working spelling but is **not finalized**. Both `for` and `at` are under consideration.
+
+## Decision Status
+
+**Not locked.** Shane is leaning toward `for` but has not committed. The keyword requires explicit owner sign-off before it can advance to a formal proposal or be implemented in the runtime, lexer, or parser.
+
+## Why `for` is the current lean
+
+`CoverageLimits for CheckCoverage.CoverageType` reads as natural English — "the coverage limits *for* that coverage type." It aligns with the business-analyst-readability filter. `at` is also plausible (`CoverageLimits at CheckCoverage.CoverageType`) and has precedent in index-access idioms across several languages, but `for` is more semantically precise in a key-value lookup context.
+
+## Next Step
+
+Owner decision required. When Shane locks the keyword, update the open-question callout to a resolved note and advance `map` to a formal GitHub issue.
+
+
+---
+
+### 2026-04-29: Quantifier predicate syntax — approved form
+
+**By:** Shane (via Frank design advisory)
+
+**Decision:** Quantifier predicates use keyword-first, English-readable form:
+`quantifier binding in Collection (predicate)`
+Keywords: `each` (universal), `any` (existential), `no` (negated existential).
+
+**Rejected:** `.all(item, pred)` method-call form — violates three surface conventions
+(method calls with args, binding variables, commas in expressions).
+
+**Rationale:** `each item in Items (item > 0)` reads as English declaration.
+`.all(item, item > 0)` reads as C# method invocation. Precept is keyword-anchored;
+every construct opens with a keyword. Named binding over fixed `it` — avoids
+nesting ambiguity. Three keywords over two+negation — `no` is more natural than
+`not any` in business rule prose.
+
+**Lexer impact:** `each` and `no` need new lexer entries. `all` reserved keyword
+superseded by `each` — `each` is grammatically correct where `all` would be broken.
+
+
+---
+
+### 2026-04-29: Quantifier negated existential — `no` confirmed over `none`
+
+**By:** Frank (design advisory, owner evaluation)
+
+**Status:** Analysis complete — pending owner confirmation to lock
+
+**Question:** Should the negated existential quantifier be `no` or `none`?
+
+```precept
+# Under consideration:
+rule no a in Amounts (a < 0) because "No negative amounts permitted"
+rule none a in Amounts (a < 0) because "No negative amounts permitted"
+```
+
+---
+
+**Decision: `no` is the correct keyword. `none` is rejected.**
+
+---
+
+### 1. English Readability
+
+`no binding in Collection` is natural English. `no` is a determiner — the same
+word class as `each` and `any` in the quantifier family. "No item in Items" reads
+as a direct English statement: "no item in this collection satisfies the predicate."
+
+`none binding in Collection` is not grammatical English. `none` is a pronoun,
+not a determiner. English speakers say "none of the items" — the pronoun requires
+"of the" to connect to a noun. "None item" is a usage error in standard English.
+A business rules author reading `none amount in Amounts (...)` would stumble.
+
+With a descriptive binding name: `no amount in Amounts (amount < 0)` reads
+as spoken English with essentially zero friction. `none amount in Amounts (...)` does not.
+
+### 2. Grammar Symmetry
+
+`each` / `any` / `no` are all English determiners. The three words form a
+grammatically consistent set — same word class, same position before a bare noun.
+
+`each` / `any` / `none` breaks the family. `none` is a pronoun. The word class
+shifts mid-family, and the syntactic role of the keyword in the expression changes
+subtly but incorrectly. This is the kind of inconsistency that erodes readability
+over time without authors being able to identify exactly why something feels wrong.
+
+### 3. Keyword Collision Assessment
+
+`no` is already a registered keyword in the Precept lexer (Token: `No`, Text: `no`,
+Context: "Prefix for `no transition`"). It appears in the spec under Keywords: Outcomes.
+
+The alleged ambiguity with `-> no transition` is **not a real parsing problem**:
+
+- `no transition` — `No` token followed by `Transition` keyword
+- `no a in Amounts (...)` — `No` token followed by an `Identifier`
+
+After the lexer emits `No`, the parser needs exactly one additional token of lookahead:
+- Next token is `Transition` → outcome production
+- Next token is an identifier → quantifier production
+
+These productions are in entirely different positions in the grammar (action block
+outcome vs. rule/guard predicate context), making the disambiguation trivially
+unambiguous. There is no formal grammar ambiguity.
+
+The practical implication: the `No` token already exists. Adding the quantifier
+use case means `No` serves two grammatical roles in different productions. The spec
+keyword table's context field for `No` will need to be expanded to document both
+roles when the quantifier proposal advances to implementation. This is a
+documentation task, not a parser task.
+
+`none` avoids this dual-role situation entirely — it is currently unreserved. But
+avoiding a dual-role for an already-overloaded token is not a strong enough reason
+to choose a word that fails the English readability test. The dual-role is harmless.
+
+### 4. Precedent
+
+**Alloy** (the canonical formal specification language for set/relation predicates):
+uses `no` as the negated existential quantifier: `no x: S | pred`. This is the most
+directly relevant precedent — Alloy's quantifier surface (`all`, `some`, `no`) is
+exactly the design space Precept is operating in.
+
+**SQL**: `NOT EXISTS (SELECT ...)` — too verbose to be relevant to keyword choice.
+
+**OCL**: No standalone negated existential keyword; negation is `not collection->exists(x | pred)`.
+
+**LINQ**: No `.None()` in the standard library. Third-party extensions exist but are
+non-canonical.
+
+**Natural language logic**: "For no x in S, P(x)" — uses `no` as the quantifier.
+"None of the x in S satisfies P" — uses `none` but requires "of the" structure.
+
+Alloy's precedent is dispositive. It faced the identical design choice and chose `no`.
+
+### 5. Spec Impact
+
+The quantifier keyword table in `precept-language-spec.md` currently reads:
+
+| Token | Text | Context |
+|-------|------|---------|
+| `All` | `all` | Universal quantifier / `modify all` / `omit all` (state-scoped) |
+| `Any` | `any` | State wildcard (`in any`, `from any`) |
+
+When the quantifier proposal advances, this table requires:
+- `All` → retired or reassigned (already superseded by `each` per prior decision)
+- `Any` → context column expanded to include "Existential quantifier binding"
+- `Each` → new entry, universal quantifier binding
+- `No` (existing entry under Outcomes) → context column expanded to include
+  "Negated existential quantifier binding"
+
+The Outcomes table `No | no | Prefix for no transition` row becomes:
+`No | no | Prefix for no transition; negated existential quantifier`
+
+---
+
+**Verdict:** `no` stays. The prior decision (frank-quantifier-syntax.md) was correct.
+The `no`/`none` question has a clear answer: `no` is the determiner, `none` is the pronoun,
+and determiners are the right word class for this syntactic position. `each`/`any`/`no`
+is a coherent grammatical family. Alloy confirms the precedent. The `no transition`
+collision is non-issue parsing. No change to the approved syntax.
+
+
+---
+
+# Decision: `ordered` as Collection Modifier vs `sortedset` as Named Type
+
+**Date:** 2026-04-29  
+**Author:** Frank (Lead/Architect)  
+**Status:** Pending owner sign-off  
+**Verdict:** `sortedset` as a named type is correct. `ordered` stays scoped to `choice(...)` inner types. Do not introduce a collection-level `ordered` modifier.
+
+---
+
+## Question
+
+Shane proposed reusing the existing `ordered` keyword at the collection level:
+
+```precept
+# Instead of:
+field ApprovalLevels as sortedset of string
+
+# Shane's proposal:
+field ApprovalLevels as set of string ordered
+```
+
+The rationale: `ordered` already exists as a modifier on `choice(...)` inner types. Why introduce a new type name when the modifier approach reuses existing vocabulary?
+
+---
+
+## Analysis
+
+### 1. What `ordered` currently means on `choice(...)`
+
+`ordered` on `choice(...)` is a **modifier on the inner element type**. It declares declaration-position rank on the values of that choice type — `"low" < "medium" < "high"` by their index in the `choice(...)` list. This enables ordinal comparison operators (`<`, `>`, `<=`, `>=`) and makes `.min`/`.max` valid on collections whose inner type is `choice(...) ordered`.
+
+The precise distinction: `ordered` governs **element comparability** (can these values be compared?), not **collection storage order** (in what sequence does the collection store its elements?). The `ordered` modifier answers the type-checker question "is this type orderable?" — it does not answer the runtime question "how are elements laid out in memory or iteration order?"
+
+`set of choice("low", "medium", "high") ordered` is an unordered collection whose element type happens to support ordinal comparison. The set itself is still unordered — elements are stored with no guaranteed iteration sequence. Only the *type* carries rank.
+
+### 2. What `set of T ordered` would mean
+
+If `ordered` were allowed as a collection-level modifier, there are two distinct interpretations with no syntactic way to distinguish between them:
+
+**Interpretation A — Sorted storage:** Elements maintained in sorted order by the inner type's comparer at all times. Equivalent to `SortedSet<T>` (C#), `TreeSet` (Java). Iteration yields ascending order.
+
+**Interpretation B — Stable insertion order:** Elements maintained in the order they were added. Equivalent to `LinkedHashSet<T>` (Java), Python's `dict` post-3.7. Iteration yields insertion order.
+
+Both are legitimately called "ordered" in common language. A business analyst reading `set of string ordered` cannot determine which semantics applies without consulting documentation. `sortedset of T` is unambiguous — the type name carries the full semantics before any constraints are read.
+
+### 3. Semantic collision: the grammar is already occupied
+
+`ordered` is already valid in the inner-type position of a collection declaration:
+
+```precept
+field RiskLevels as set of choice("low", "medium", "high") ordered
+```
+
+Here, `ordered` attaches to `choice(...)`. If collection-level `ordered` is introduced at the trailing position, this line becomes ambiguous:
+
+- Is `ordered` still on the inner type (current meaning)?
+- Has it migrated to the collection level (new meaning)?
+
+The parser must decide. There is no single-token lookahead that resolves which of the two attachment sites an `ordered` at the end of the declaration belongs to.
+
+And the double-modifier scenario:
+
+```precept
+field RiskLevels as set of choice("low", "medium", "high") ordered ordered
+```
+
+This is the unavoidable consequence: to have *both* semantics simultaneously, an author would need two `ordered` tokens. The grammar rule distinguishing "first `ordered` belongs to `choice(...)`, second belongs to the collection" is arbitrary and invisible to anyone reading the declaration. This is a grammar landmine.
+
+The current spec is explicit: `ordered` is valid only on `choice` and is a type error on all non-choice types, including collections (`field Tags as set of string ordered` is invalid). Collection-level `ordered` would require dismantling that constraint and replacing it with positional disambiguation logic — adding complexity to gain nothing.
+
+### 4. Grammar fit
+
+Precept's style is keyword-anchored flat statements. The type name at the start of a declaration names the thing completely. Modifiers after the type name are **constraints** — properties of the declared type, not alternatives to its identity.
+
+Compare the parse roles:
+
+```precept
+field Tags as set of string notempty              # set of string IS the type; notempty IS a constraint
+field Tags as set of string ordered               # if ordered changes storage: the modifier IS the type
+```
+
+In the second form, `ordered` is not constraining `set of string` — it is redefining it. That violates the flat-statement style where the constraint position is for validation rules, not semantic variants.
+
+`sortedset of T` follows the same pattern as all other collection types: the keyword names the thing, `of T` specifies the element type, and trailing tokens are constraints:
+
+```precept
+field ApprovalLevels as sortedset of choice("team-lead", "director", "vp", "cfo") ordered notempty
+```
+
+Here `sortedset` names the storage semantics, `choice(...) ordered` names the inner type with rank, `notempty` is a constraint. Every token is in the right position.
+
+### 5. Precedent
+
+Static type systems are unanimous: named types, not modifiers, for collections with different storage semantics.
+
+| Language | Unordered unique set | Sorted unique set | Approach |
+|---|---|---|---|
+| C# | `HashSet<T>` | `SortedSet<T>` | Named type |
+| Java | `HashSet<T>` | `TreeSet<T>` | Named type |
+| Python | `set` | `SortedList` (sortedcontainers) | Named type |
+| Kotlin | `hashSetOf()` | `sortedSetOf()` | Named function |
+| Scala | `Set` | `SortedSet` | Named type |
+
+The only domains that use modifier-for-ordering are query languages (SQL `ORDER BY`, LINQ `.OrderBy()`) — and those apply ordering at *query time* to a result set, not at *declaration time* to a stored collection. Precept is a declaration language, not a query language. That precedent does not transfer.
+
+Python's `OrderedDict` is the canonical example of this choice made correctly: Python did not introduce `dict ordered`. It introduced a named type. The same reasoning applies here.
+
+### 6. Extensibility
+
+If `ordered` becomes a collection-level modifier, examine what it means across the full collection surface:
+
+| Collection | Effect of `ordered` modifier | Problem |
+|---|---|---|
+| `queue of T` | Queues are already insertion-ordered. `ordered` → sorted? That changes FIFO to sorted-dequeue, breaking the queue contract. | Semantic collision with existing semantics. |
+| `stack of T` | Stacks are LIFO. `ordered` → sorted? That changes push/pop semantics fundamentally. | Same collision. |
+| `priorityqueue of T priority P` | Already has `ascending`/`descending` direction modifiers. `ordered` → redundant? conflicting? | Vocabulary noise. |
+| `deque of T` | Double-ended. Sorted deque means neither push-front nor push-back preserves the invariant unambiguously. | Ambiguous interaction. |
+
+The modifier does not generalize. It creates noise or ambiguity on every other collection type. `sortedset` is a clean, bounded addition with no surface area bleed. Its semantics are fully contained by the name and do not conflict with any existing modifier.
+
+---
+
+## Verdict
+
+**`sortedset` as a named type is correct. `ordered` must stay scoped to `choice(...)` inner types.**
+
+The reasons are conclusive and mutually reinforcing:
+
+1. **Semantic precision.** `ordered` on `choice(...)` modifies element-type comparability. `sortedset` specifies collection storage semantics. These are different concepts. One keyword cannot carry both meanings without ambiguity.
+
+2. **Grammar collision.** `ordered` is already valid — and already meaningful — in the inner-type position of collection declarations. Allowing it at the collection level too creates a genuine parsing ambiguity. The double-`ordered` scenario (`set of choice(...) ordered ordered`) is a grammar landmine with no clean resolution.
+
+3. **Type-declaration style.** In Precept's flat-statement model, the type name carries the storage semantics. Trailing modifiers are constraints. Using a trailing modifier to silently change what type you get violates this invariance.
+
+4. **Precedent.** Every major static type system uses named types for collections with different storage semantics. The modifier approach is a query-time pattern that does not transfer to declaration-time type design.
+
+5. **Non-generalizable.** Collection-level `ordered` creates noise or semantic collision on `queue`, `stack`, `priorityqueue`, and `deque`. `sortedset` has no such bleed.
+
+The `ordered` modifier has one meaning, one valid application site, and zero ambiguity today. The correct response to Shane's question is: those two `ordered` keywords are doing different things and belong at different semantic levels. Conflating them would be an architectural regression.
+
+**Recommendation:** Keep `sortedset of T` in the candidate section at Medium priority. Keep `ordered` scoped to `choice(...)`. Do not introduce a collection-level `ordered` modifier now or in the future without a new design review.
+
+
+---
+
+# Decision: `sorted` as Collection-Level Modifier vs `sortedset` as Named Type
+
+**Date:** 2026-04-29  
+**Author:** Frank (Lead/Architect)  
+**Status:** Pending owner sign-off  
+**Verdict:** `sortedset` as a named type remains correct. `sorted` as a collection-level modifier is rejected. The grammar collision is gone — but the deeper objections survive the keyword swap.
+
+---
+
+## Question
+
+Shane read the previous rejection of `ordered` as a collection-level modifier and pushed back — not on the grammar collision specifically, but on the principle. His counter-proposal:
+
+```precept
+field Tags as set of string sorted
+field RiskLevels as set of choice("low", "medium", "high") ordered sorted
+field Priorities as set of integer sorted
+```
+
+Constraints:
+- `sorted` only applies where it makes semantic sense (`set of T` — not `queue`, `stack`, `priorityqueue`)
+- `sorted` is only valid when inner type `T` is comparable (numeric, `string`, `~string`, `choice(...) ordered`)
+- The principle: Precept is modifier-heavy and should stay consistent with that
+
+This is not the same as the prior `ordered` proposal. It deserves an honest separate analysis.
+
+---
+
+## Analysis
+
+### 1. Does `sorted` eliminate the grammar collision?
+
+**Yes. Completely.**
+
+`sorted` is a new keyword with no existing use anywhere in the Precept grammar. It does not appear in the inner-type position, the constraint position, or anywhere else. The declaration:
+
+```precept
+field RiskLevels as set of choice("low", "medium", "high") ordered sorted
+```
+
+is unambiguous: `ordered` attaches to `choice(...)` (inner-type modifier enabling ordinal comparison), `sorted` attaches to the collection (collection-level modifier). There is no positional ambiguity, no double-keyword nightmare, no parser disambiguation crisis.
+
+The grammar collision was the easiest argument against `ordered`. It no longer applies to `sorted`. I acknowledge this clearly. Shane's keyword swap resolves the specific syntactic problem from the prior analysis.
+
+### 2. Does the type constraint hold up?
+
+**Yes, the enforcement is clean.**
+
+The existing "orderable" predicate — already used to gate `.min`/`.max` validity — applies directly:
+
+| Inner type | `sorted` valid? | Reason |
+|---|---|---|
+| `integer`, `decimal`, `number` | ✓ | Numeric — naturally orderable |
+| `string`, `~string` | ✓ | String ordering — deterministic (`OrdinalIgnoreCase` for `~string`) |
+| `choice(...) ordered` | ✓ | Declaration-position rank enables ordinal comparison |
+| `boolean` | ✗ | Not orderable — Precept defines no comparison relation on boolean |
+| `choice(...)` (without `ordered`) | ✗ | Unordered choice — no comparison relation, no natural sort key |
+
+These are clean type errors. The type checker can enforce them by reusing the existing `IsOrderable(T)` predicate already gating `.min`/`.max`.
+
+One subtlety: `set of choice("low", "medium", "high") sorted` (without `ordered` on the inner type) is a type error because `choice(...)` without `ordered` is not orderable. If the author wants sorted-set semantics, they need both modifiers: `set of choice(...) ordered sorted`. This is not a bug — it's the right rule. The coupling between `ordered` on the inner type and `sorted` on the collection is the same coupling that exists with `sortedset of choice(...) ordered`.
+
+**Verdict on constraint enforcement: clean and implementable.**
+
+### 3. Does `sorted` read as a modifier or as a type?
+
+**It reads like a type — not a modifier. That's the problem.**
+
+Precept's modifier vocabulary falls into three semantic categories:
+
+| Category | Examples | What they do |
+|---|---|---|
+| Validation constraints | `notempty`, `nonnegative`, `positive`, `min`, `max`, `mincount`, `maxcount`, `minlength`, `maxlength` | Define what values are allowed; proof engine checks them |
+| Structural/access declarations | `optional`, `writable` | Declare field presence / mutability baseline |
+| Type-enrichment | `ordered` (on `choice(...)`) | Add a comparison relation to the inner type; enable operations that weren't valid before |
+
+`sorted` fits none of these.
+
+- It does not define what values are valid — a `set of integer sorted` and a `set of integer` accept exactly the same values.
+- It does not govern field presence or mutability.
+- It does not add a comparison relation to the inner type — the inner type's orderability exists independently.
+
+What `sorted` does: it changes the **backing data structure** and **iteration behavior** of the collection. A `set of string sorted` uses a tree-backed implementation that maintains sorted order at all times. Iteration yields ascending order. `.min`/`.max` are always safe (when `notempty` is also present). A `set of string` uses a hash-backed implementation. Iteration yields arbitrary order.
+
+These are **different things**, not the same thing with a constraint applied. `sorted` is doing type discrimination disguised as a modifier.
+
+Compare the semantics carefully:
+
+```precept
+field Tags as set of string notempty maxcount 10
+# → still a hash-backed set; notempty and maxcount are constraints on values
+# → if you remove those modifiers, you still have the same underlying type
+
+field Tags as set of string sorted
+# → tree-backed set; sorted iteration; safe .min/.max
+# → if you remove `sorted`, you have a fundamentally different type
+```
+
+`sorted` is not orthogonal to `set of string`. It selects a different implementation variant. The modifier is the type, which is exactly the failure mode my previous analysis described — and it applies here just as much as it did for `ordered`.
+
+### 4. Precept's modifier philosophy — is `sorted` a category break?
+
+**Yes. And it's more subtle than it first appears.**
+
+The closest existing analog is `ordered` on `choice(...)`. That modifier adds comparison capability to an element type — it enables `<`/`>` and `.min`/`.max`. One could argue: doesn't `sorted` do something similar at the collection level — it enables safe `.min`/`.max` on the collection?
+
+The analogy breaks at a critical point:
+
+- `ordered` on `choice(...)` declares a **semantic property** of the element type: these values have a rank. The runtime doesn't need to change anything — values are still stored the same way; the type system now knows they can be compared.
+- `sorted` on `set of T` directs a **runtime implementation choice**: use a different data structure. The type carries the same values either way; the difference is visible in iteration order and in how the backing structure maintains its invariant.
+
+The first is a semantic declaration. The second is a storage directive. Precept's modifier vocabulary has never had a storage directive before. Introducing `sorted` would mean the modifier grammar now has two incompatible semantic categories: "what values are valid / how values are accessed" and "how the runtime stores the data." That is a design tax. Future proposals will ask why they can't use `persistent`, `indexed`, or `deduplicate` as similar storage directives — and the answer "because we only accepted one of these" is an arbitrary stop-rule.
+
+### 5. Grammar position
+
+The grammar position is **unambiguous and clean**. I have no objection here.
+
+`sorted` appears in the trailing modifier position after the type reference:
+
+```
+FieldDecl  :=  field Identifier as CollectionType Modifier*
+```
+
+It coexists cleanly with other modifiers:
+
+```precept
+field Tags as set of string sorted notempty maxcount 10
+```
+
+Parse order for `set of choice(...) ordered sorted notempty`:
+1. `set` — collection kind
+2. `of choice("low", "medium", "high")` — inner type
+3. `ordered` — inner-type modifier (attaches to `choice(...)`)
+4. `sorted` — collection-level modifier (attaches to `set of T`)
+5. `notempty` — validation constraint on the collection
+
+Each step is unambiguous at LL(1). Grammar production is straightforward. The "only on `set`" restriction is type-checker enforcement, not grammar restriction — the parser admits it; the checker rejects it on `queue` and `stack` with `InvalidModifierForType`.
+
+**No grammar objection to `sorted`. Position is clean.**
+
+### 6. The named-type counterargument
+
+`sortedset of T` is unambiguous, self-documenting, and follows a unanimous pattern.
+
+Every major type system that distinguishes hash-backed from tree-backed containers uses **named types**:
+
+| Language | Unordered unique set | Sorted unique set |
+|---|---|---|
+| C# | `HashSet<T>` | `SortedSet<T>` |
+| Java | `HashSet<T>` | `TreeSet<T>` |
+| Python | `set` | `SortedList` (sortedcontainers) |
+| Kotlin | `hashSetOf()` | `sortedSetOf()` |
+| Scala | `Set` | `SortedSet` |
+| F# | `Set<'T>` (sorted by default) | distinct from `HashSet<T>` |
+
+This is not an accident. It reflects a genuine insight: sorted-ness is a type-level property, not an attribute of a value. `SortedSet<T>` and `HashSet<T>` have different performance contracts, different iteration semantics, and different structural invariants. Type names carry that contract upfront. Modifiers don't.
+
+Shane's modifier-consistency principle is valid — Precept IS modifier-heavy, and that's right. But the principle applies when an attribute is **orthogonal to type identity**. `notempty` is orthogonal — a `set of string` and a `set of string notempty` are the same type with a constraint applied. `sorted` is not orthogonal — `set of string sorted` and `set of string` are different implementations.
+
+The principle applies when you're qualifying; it doesn't apply when you're selecting a variant.
+
+Furthermore: if `sorted` ships as a modifier, `sortedset` as a named type becomes redundant syntax. The vocabulary is permanently split. If `sortedset` ships as a named type, there's nothing to reconcile — it stands alone. The named-type path is more forward-compatible.
+
+### 7. The "only on set" restriction reveals type-level semantics
+
+This is the structural argument that settles the question.
+
+Shane explicitly restricts `sorted` to `set` only — not `queue`, `stack`, `priorityqueue`. That restriction is correct: `queue of T sorted` would mean sorted-dequeue, which breaks the FIFO contract entirely; `stack of T sorted` would break LIFO; these interactions are incoherent.
+
+But notice what this restriction means: **`sorted` is a property that discriminates between collection kinds**. It is valid on `set`, invalid on `queue` and `stack`, because it defines a different behavioral category. That is what type names do. Modifiers that can only validly apply to one collection kind — and whose application changes the behavioral contract in ways that make it incompatible with other collection kinds — are type discriminators in disguise.
+
+`notempty` (proposed), `mincount`, `maxcount` — these apply uniformly across all three collection kinds without semantic weirdness. `sorted` cannot. That asymmetry is not a modifier attribute; it's a type property.
+
+---
+
+## Verdict
+
+**`sortedset` as a named type remains correct. `sorted` as a collection-level modifier is rejected.**
+
+The grammar collision is gone — I said `ordered` had a real collision; `sorted` does not. That objection is fully resolved.
+
+The remaining objections are not merely grammar preferences. They reflect structural arguments about what modifiers are and what type names are:
+
+1. **`sorted` is a storage directive, not a validation constraint.** All Precept modifiers either constrain values, govern access, or enrich type semantics. `sorted` directs the runtime to use a different backing data structure. That is a different semantic register — one Precept has never placed in the modifier position.
+
+2. **The "only on `set`" restriction is a type discriminator, not a modifier attribute.** A modifier that is valid on exactly one collection kind and whose semantics are incompatible with all other collection kinds is expressing type-level information. It belongs in a type name.
+
+3. **`sortedset` is self-documenting and unambiguous.** An author reading `field ApprovalLevels as sortedset of choice(...) ordered notempty` immediately knows: sorted unique collection, ordered-choice inner type, non-empty constraint. An author reading `field ApprovalLevels as set of choice(...) ordered sorted notempty` must know what `sorted` means on a `set` — that it changes backing structure, that it affects iteration order, that it makes `.min`/`.max` safe. That is hidden complexity.
+
+4. **Shannon's modifier-heavy principle is valid in general, but doesn't apply here.** Precept is right to be modifier-heavy where modifiers express orthogonal attributes. Sorted-ness is not orthogonal to set identity — it selects a variant. The principle applies when you're constraining; not when you're choosing an implementation.
+
+5. **Precedent is unanimous.** Every static type system that solved this problem chose named types. The modifier approach is a query-time pattern; it does not transfer to declaration-time type design.
+
+**Recommendation:** Keep `sortedset of T` in the §Proposed Additional Types section at Medium priority. Keep `sorted` out of the modifier vocabulary. If Shane disagrees with this verdict after reviewing the category-break and type-discriminator arguments, schedule a design review — but do not accept `sorted` as a modifier on the basis of modifier-consistency alone.
+
+
+---
+
+# Decision: Priorityqueue Design — Five Open Questions Resolved
+
+**Date:** 2026-04-29
+**Author:** Frank (Lead Language Designer)
+**Scope:** `docs/language/collection-types.md` — `priorityqueue` subsection in § Proposed Additional Types
+**Trigger:** Shane's answers to five open questions from frank-14
+
+---
+
+## Resolved Questions
+
+### 1. Priority Direction
+
+**Decision:** Direction is specifiable at both declaration and operation sites. Declaration sets the default; dequeue can override.
+
+- Declaration: `field F as priorityqueue of T priority P descending`
+- Operation override: `-> dequeue F ascending into Target priority PTarget`
+- Default is `ascending` (lowest value dequeued first) when no modifier is specified.
+- Modifier follows its target in both positions, consistent with Precept's modifier-follows-target grammar.
+
+### 2. Peek Behavior
+
+**Decision:** `.peek` returns the element value (type `T`); `.peekpriority` returns the priority value (type `P`).
+
+Two separate scalar accessors rather than a compound return. This is consistent with Precept's flat accessor model — every existing accessor returns a single scalar. Both require `.count > 0` emptiness guard.
+
+### 3. Priority-Type Constraints (Quantifier Predicates)
+
+**Decision:** Quantifier predicates (`each`/`any`/`no`) work on the priority axis via a two-field binding.
+
+When iterating a `priorityqueue`, the binding variable exposes `.value` (element, type `T`) and `.priority` (priority, type `P`). Example: `no claim in ClaimQueue (claim.priority < 2)`.
+
+This is a meaningful design precedent: single-type collections produce bare scalar bindings; two-type-parameter collections produce two-field projection bindings. The pattern generalizes to `map` (`.key`/`.value`).
+
+### 4. Dequeue Priority Capture
+
+**Decision:** Approved syntax: `-> dequeue F into Target priority PriorityTarget`.
+
+`PriorityTarget` receives the dequeued item's priority value, typed as the declared priority type. The `priority` capture clause is optional — omitting it discards the priority value.
+
+### 5. Grammar Alignment with `map`
+
+**Decision:** Generalized two-type-parameter grammar using role-connector keywords.
+
+```
+TwoParamCollectionType :=
+    priorityqueue of ScalarType priority ScalarType TypeQualifier?
+  | map of ScalarType to ScalarType TypeQualifier?
+```
+
+`priority` and `to` are role-connector keywords introducing the secondary type parameter. `of` introduces the primary type. This is the canonical pattern for all two-type-parameter collection types in Precept.
+
+---
+
+## New Open Questions Surfaced
+
+1. **Quantifier binding shape inference.** The type checker must distinguish bare-scalar bindings (single-type collections) from two-field projection bindings (two-type-parameter collections). Should this be implicit (inferred from collection type) or explicit?
+
+2. **`ascending`/`descending` keyword scope.** These may also apply to `sortedset` iteration or future ordering features. Reserve broadly or scope to `priorityqueue`?
+
+---
+
+## Artifacts Updated
+
+- `docs/language/collection-types.md` — full priorityqueue subsection rewritten with all five decisions integrated
+- Priority Summary table and Recommended Rollout updated
+- Comparison table updated to `priorityqueue of T priority P`
+
+
+---
+
+## Decision: `priorityqueue` requires explicit priority type in field declaration
+
+**Date:** 2026-04-29
+**Author:** Frank (Lead Language Designer)
+**Status:** Advisory — pending owner decision
+**Scope:** `priorityqueue of T` proposal in `docs/language/collection-types.md`
+
+### Context
+
+The current `priorityqueue` proposal declares only the element type (`priorityqueue of string`). The priority value passed to `enqueue ... priority Expr` has no declared type in the field declaration. Shane identified this gap.
+
+### Decision Recommendation
+
+The field declaration must include an explicit priority type parameter:
+
+```
+priorityqueue of T priority P
+```
+
+Concrete example:
+
+```precept
+field ClaimQueue as priorityqueue of string priority integer
+```
+
+### Rationale
+
+1. **No-runtime-faults principle (spec §0.1 items 7, 10, 11).** If the priority type is inferred from the first `enqueue` site, the compiler cannot verify type consistency across multiple enqueue sites without first resolving all action chains — and cannot verify orderability at declaration time. Explicit declaration gives the type checker a proof anchor at registration pass time, before any expression is checked.
+
+2. **Prevention, not detection.** Precept's identity is that invalid configurations are structurally impossible. An undeclared priority type means the compiler discovers mismatches reactively (detection) rather than preventing them structurally (prevention). The declaration is the contract.
+
+3. **Precedent: existing collection grammar.** The shipped `CollectionType := (set | queue | stack) of ScalarType` uses a single type parameter. `priorityqueue` is the first collection kind requiring two type parameters. The `map of K to V` proposal (high priority) also requires two type parameters with a different connector (`to`). The `priority` keyword naturally mirrors this: `of` introduces the element type, `priority` introduces the priority type — each connector names the role of its type parameter.
+
+4. **Orderability proof obligation.** The priority type must be orderable (the queue must know which element has highest priority). Explicit declaration lets the compiler enforce this at the field declaration, not at first usage. If `P` is `choice(...)`, the `ordered` modifier is required — same pattern as `set of choice(...) ordered`.
+
+5. **Inference weakness.** Inference from first usage creates fragile proof surface: reordering event declarations could change which `enqueue` site the compiler sees first, and error messages would point to usage sites rather than the declaration. Explicit declaration is the Precept way.
+
+### Corrected Grammar
+
+```
+CollectionType  :=  (set | queue | stack) of ScalarType TypeQualifier?
+                 |  priorityqueue of ScalarType priority ScalarType TypeQualifier?
+```
+
+The second `ScalarType` (after `priority`) must be orderable — numeric types, `date`, `time`, `instant`, `duration`, or `choice(...) ordered`.
+
+### Open Questions Surfaced
+
+1. **Priority direction:** Is highest-value-first or lowest-value-first the default? Should there be a `descending`/`ascending` modifier? (e.g., `priorityqueue of string priority integer descending`)
+2. **Priority accessor:** Should `.peek` return just the element, or a pair of (element, priority)? Is there a `.peekpriority` accessor?
+3. **Priority constraints:** Can field modifiers apply to the priority type? (e.g., `priorityqueue of string priority integer min 1 max 5`) — and if so, where do they attach syntactically?
+4. **Dequeue semantics:** Does `dequeue ClaimQueue into CurrentClaim` discard the priority, or is there a way to capture it? (e.g., `dequeue ClaimQueue into CurrentClaim priority CurrentPriority`)
+5. **Grammar alignment with `map`:** Both `priorityqueue of T priority P` and `map of K to V` are two-type-parameter collections. Should the grammar production be generalized, or kept as separate productions?
+
+
+---
+
+# Collection Surface Re-evaluation: Three Challenges Answered
+
+**Date:** 2026-04-29  
+**Author:** Frank (Lead/Architect)  
+**Status:** Pending owner sign-off  
+**Scope:** Response to Shane's three challenges following the `sorted`-modifier rejection and `bag`/`list` analysis
+
+---
+
+## Challenge 1: "Enriches element-type semantics" vs "enriches collection-type semantics"
+
+### Shane's challenge
+
+You accepted `ordered` on `choice(...)` because it "enriches element-type semantics." But `sorted` on `set of T` enriches the collection's semantics — it declares "this collection maintains sort order." Both change runtime behavior. Why is one a legitimate enrichment and the other a storage directive?
+
+### Assessment: the distinction is real, but my prior explanation was imprecise
+
+The prior explanation correctly identified the distinction but stated it in a form that is vulnerable to this challenge. Here is the precise formulation.
+
+**`ordered` on `choice(...)`** — what does it actually do?
+
+Before `ordered`, the values `"low"`, `"medium"`, `"high"` have no comparison relation. The expression `"low" < "medium"` is a type error. The comparison relation does **not exist** in the type system until `ordered` is applied. The modifier creates something that was not previously there. This is semantic enrichment at the type level — the type system gains new knowledge about the values' relationships.
+
+**`sorted` on `set of T` where T is already orderable (e.g., `integer`)**  — what does it actually do?
+
+Before `sorted`, `set of integer` already knows how to compare values. The expression `1 < 2` is valid. `.min`/`.max` are already available (with emptiness guards). The comparison relation already exists. `sorted` does not add any capability to the type system — it changes how the collection stores and iterates its elements. This is a storage and behavioral directive — the runtime uses a different data structure.
+
+**The precise test:** Does the modifier add a capability to the type system that was not previously present? Or does it use an already-present capability to direct runtime behavior?
+
+- `ordered` on `choice(...)` — ADDS a capability (comparison). Before `ordered`, you cannot compare choice values. After `ordered`, you can.
+- `sorted` on `set of T` — USES an already-present capability to change storage. Before `sorted`, you can already compare `integer` values. After `sorted`, you still compare them the same way — the collection just stores them in a tree instead of a hash.
+
+This is not a thin distinction. It maps cleanly onto: "does the modifier change what the type system knows?" vs "does the modifier change what the runtime does with knowledge the type system already has?"
+
+**Verdict on Challenge 1:** The distinction between semantic enrichment and storage directive is real and defensible. My prior reasoning was correct; the explanation needed sharpening. No revision to the `sortedset` verdict is required.
+
+---
+
+## Challenge 2: Is `set` the only collection that could be `sorted`?
+
+### Shane's challenge
+
+My structural kill-shot was: "a modifier valid on exactly one collection kind is a type discriminator, not a modifier." Shane points out that `sorted` could apply to both `set` and `list`:
+
+- `set of string sorted` → sorted set (unique + sorted)
+- `list of string sorted` → sorted list (duplicates + sorted)
+
+If `sorted` applies coherently to both, the kill-shot fails.
+
+### Honest evaluation: the kill-shot as stated was too strong
+
+Shane is right. `sorted` DOES generalize to `list`. If `list` ships, `list of string sorted` is a coherent concept: a sorted bag — maintains elements in sorted order, allows duplicates. Python's `sortedcontainers.SortedList` is exactly this. The concept exists and is useful.
+
+The "only valid on exactly one collection kind" test was a good heuristic but not the correct test. I stated it too strongly. Correcting the record.
+
+### The correct test — and why the verdict still holds
+
+The correct test is not "how many collection kinds does it apply to?" The correct test is:
+
+**Does the modifier change the operation surface of the target type — or does it merely constrain the values the type accepts?**
+
+Modifiers that constrain values are genuine modifiers:
+- `notempty` on `set` — same operations, now requires ≥1 element. Doesn't remove or add operations.
+- `mincount N` on `queue` — same operations, now requires ≥N elements. Doesn't remove or add operations.
+
+Modifiers that change the operation surface are type discriminators:
+- `sorted` on `list` — `list of string sorted` cannot support `insert at index` or `remove-at`. Position in a sorted list is determined by value, not by the author. The arbitrary-position mutation that is `list`'s defining territory over `log`/`queue`/`stack` is gone. `sorted` does not constrain the values `list` accepts — it REMOVES the operations that make `list` what it is.
+- `sorted` on `set` — `set of string sorted` vs `set of string` are different behavioral contracts. Iteration order changes. The backing structure changes (tree vs hash). `.min`/`.max` become O(1) vs O(n). These differences are visible to the author and the proof engine in ways that go beyond value constraints.
+
+When removing a modifier gets you a fundamentally different type — not just an unconstrained version of the same type — the modifier is doing type-selection, not qualification.
+
+Compare:
+- Remove `notempty` from `set of string notempty` → `set of string`. Same type, more permissive.
+- Remove `sorted` from `set of string sorted` → `set of string`. Different storage contract, different iteration semantics, different `.min`/`.max` performance. Not the same type with a constraint removed — a different type.
+- Remove `sorted` from `list of string sorted` → `list of string`. Operations reappear (`insert at index`, `remove-at`). The sorted list is not a constrained list — it's a different operational contract with fewer capabilities.
+
+**Revised kill-shot:** A modifier that changes the operation surface or behavioral contract of the target type — rather than constraining the values it accepts — is a type discriminator, not a modifier. `sorted` fails this test on both `set` and `list`.
+
+### Does the `sortedset` verdict need revision?
+
+No. The conclusion is unchanged. The underlying argument is stronger on the revised formulation because:
+
+1. `sorted` on `set` changes the behavioral contract (storage, iteration, performance). Named type is correct.
+2. `sorted` on `list` removes capabilities from the type. If both apply, the modifier is doing different things to different types — which means it carries type-level information the modifier position cannot express cleanly.
+3. The collection type system still needs `sortedset` as a named type. The "sorted list = sorted bag" concept would need its own named type too (a type that's currently out of scope).
+
+**Verdict on Challenge 2:** The kill-shot as stated was too strong. The revised formulation — "changes the operation surface rather than constraining values" — is the correct test. The verdict (reject `sorted` as a modifier; `sortedset` as a named type is correct) stands under the revised test.
+
+---
+
+## Challenge 3a: Is `bag` a good business word?
+
+### Shane's challenge
+
+Business analysts don't say "bag." They might loosely say "list." `bag` is computer science jargon (multiset). What do business users actually call an unordered collection with multiples?
+
+### Assessment
+
+This deserves a direct answer. Let me work through the alternatives honestly:
+
+| Word | Assessment |
+|---|---|
+| `multiset` | Mathematically precise. More jargon than `bag`, not less. Computer scientists know it; analysts don't. |
+| `tally` | Captures the "counting" angle well. But suggests only a count aggregate, not a collection of items. `tally of string` reads like a counter, not a collection. |
+| `inventory` | Domain-specific. Perfect in retail; wrong in claims processing, project management, or finance. |
+| `quantities` | Plural noun, grammatically awkward as a type keyword. |
+| `counter` | Python's name for this concept. Reads like a device ("a counter on the wall") not a collection type. |
+| `list` | Already designated for a different type (ordered mutable sequence). Reusing it would create permanent ambiguity between "ordered sequence" and "frequency-tracking collection." |
+| `bag` | 1 syllable. CS-technical but short. Established usage: Perl's `Bag`, Guava's `Multiset`/`Bag`, SQL's `MULTISET`, Python's `Counter`, `sortedcontainers.SortedList`. |
+
+The business case for `bag`: a business analyst working with order quantities, claim frequencies, or inventory counts will learn `bag` in a single sentence of documentation — "bag = an unordered collection that tracks how many of each thing you have." The word is short, distinct, and learnable.
+
+The more important point: the reason `bag` struggles in business vocabulary is not that it's unfamiliar — it's that business domains don't often name this concept at all. They write `items: 3x SKU-001, 1x SKU-007` in a spreadsheet, not "a bag of items." The CONCEPT is ubiquitous even if the word isn't. When the doc says "bag of T is the right type when you need to track quantities or frequencies — how many of X you have," the concept clicks immediately.
+
+The alternatives that would satisfy "a business analyst uses this word naturally" are all domain-specific (`inventory`, `tally`) and would be just as unfamiliar to analysts in adjacent domains. `bag` is the least wrong option.
+
+**One real risk:** authors may reach for `list` when they mean `bag`, because "list" is how business people speak casually about any collection. The documentation and diagnostics need to be explicit: `list of T` = ordered sequence, `bag of T` = quantity-tracking collection.
+
+**Verdict on Challenge 3a:** `bag` is the correct keyword. The alternatives are worse. The documentation must do the work of explaining what `bag` means in business terms on first use. No verdict change.
+
+---
+
+## Challenge 3b: Does `set = bag with unique` suggest a unified design?
+
+### Shane's proposal
+
+If `set` is mathematically a bag with uniqueness enforced, should the design reflect that? Proposed unified model:
+
+- `bag of T` — unordered, duplicates
+- `bag of T unique` — unordered, no duplicates (= current `set`)
+- `bag of T sorted` — sorted, duplicates
+- `bag of T unique sorted` — sorted, no duplicates (= current `sortedset`)
+
+### Evaluation
+
+The mathematical relationship (set = bag with uniqueness) is real. The question is whether it should manifest in the language surface.
+
+**Arguments the unified model gets right:**
+
+1. It is internally consistent — four combinations from two modifiers.
+2. It acknowledges the mathematical family.
+3. It would make `sorted` legitimate if it weren't for the operation-surface argument above.
+
+**Arguments the unified model gets wrong:**
+
+**1. `set` is the shipped canonical type. `bag` is a proposed new type.** You do not redesign a shipped, documented, tested, and philosophically grounded type as a derived form of something that doesn't exist yet. The direction of derivation is wrong. `set` predates `bag` in the design. Making `set` a modifier-qualified variant of `bag` creates an awkward retrofitting problem with the existing surface.
+
+**2. The common case requires a modifier; the uncommon case is the base.** In the domain scenarios where collections appear in `.precept` files, `set`-style membership tracking (tags, categories, allowed values, assigned interviewers) is FAR more common than `bag`-style quantity tracking (order line items, claim frequencies). Requiring business analysts to write `bag of string unique` for the common case when `set of string` already exists is backward ergonomics. Precept's surface should make the common case as clean as possible.
+
+**3. `bag`'s primary value is `.countof(element)`, which has no natural role on `set`.** The defining differentiator of `bag` over `set` is the ability to ask "how many of X do I have?" — `.countof(element)`. On a `bag of string unique`, every element is present 0 or 1 times. The `.countof(element)` accessor returns only 0 or 1. It's not wrong, but it's not useful. The author just wants `contains`. This is a design smell: the primary accessor of the base type is degenerate on the most common variant.
+
+**4. `unique` on `bag` changes the operation surface.** A `bag of T unique` can no longer hold duplicates — the `add` operation's behavior changes (from "increment count" to "no-op if present"). This is the same operation-surface test from Challenge 2. `unique` is not just constraining values; it's changing what `add` does. That's a type-level distinction.
+
+**5. The mathematical insight doesn't transfer to language design.** `integer` and `natural number` are related mathematically (naturals = integers with `nonnegative`), but Precept doesn't have `integer nonnegative` as its primary vocabulary for non-negative integers — it uses the `nonnegative` modifier as a constraint on an already-natural type. Similarly, the modifier-heavy design works for adding constraints on top of a stable type, not for deriving one canonical type from another. `set` and `bag` are different enough in their design intent and primary accessor surface to warrant distinct names.
+
+**Verdict on Challenge 3b:** The unified-bag model is rejected. `set` and `bag` are distinct named types. They have different primary use cases, different action emphasis, and different accessor contracts. The mathematical relationship is noted but does not imply shared vocabulary roots. `set` remains the canonical keyword for unique-membership collections. `bag` is evaluated as a new High-priority candidate for quantity-tracking collections.
+
+---
+
+## The "base types vs semantic variants" framing
+
+Shane's framing proposal: `set`, `bag`, `list` as three base types; `queue`, `stack`, `priorityqueue`, `log`, `map` as semantic variants.
+
+### Assessment: partially right, but misrepresents Precept's design philosophy
+
+The framing captures a real mathematical relationship: `queue`, `stack`, `log`, and `priorityqueue` are all ordered sequences — mathematically, they could be described as `list` with access restrictions. The mathematical structure is there.
+
+But in Precept, the TYPE NAME IS THE CONTRACT. `queue of T` does not mean "list of T with FIFO access restriction" — it means FIFO processing is the designed intent, and the type enforces it structurally. An author who declares `field AgentQueue as queue of string` is communicating a domain decision, not selecting an implementation. The type name is the declaration. The operational contract is the identity.
+
+Calling `queue`, `stack`, `log`, and `priorityqueue` "semantic variants" of `list` would:
+
+1. Suggest they could be replaced by `list` + modifiers — which is exactly the `sorted` modifier problem in reverse. `queue` is NOT a `list` with a FIFO modifier. The FIFO constraint is not orthogonal to the type — it IS the type.
+2. Undervalue the business clarity of named types. When a domain expert sees `field ServiceQueue as queue of string`, they don't need to read modifiers to understand FIFO semantics. The name carries the contract immediately.
+3. Create a precedent for "why can't I write `list of T fifo`?" — which is a grammar expansion we explicitly don't want.
+
+A more accurate taxonomy for Precept, organized by design intent:
+
+| Family | Types | Organizing principle |
+|---|---|---|
+| Membership collections | `set`, `bag` | What things you have, with or without frequency |
+| Sequenced access | `queue`, `stack`, `log`, `priorityqueue` | The ACCESS PATTERN is the defining constraint |
+| Sorted membership | `sortedset` | Like `set`, but tree-backed with sorted iteration |
+| Indexed mutable sequence | `list` (low priority candidate) | Ordered with arbitrary positional access/mutation |
+| Associative | `map` | Key-value structure, lookup by key |
+
+In this taxonomy, there are no "base types" — every type IS its contract. `queue` is not a variant of `list`; `bag` is not a variant of `set`. Each name is a complete statement of the collection's behavioral identity.
+
+**Verdict on framing:** The `set`/`bag`/`list` as base types framing is partially right (it correctly clusters the unordered membership types together) but wrong in classifying `queue`, `stack`, `log`, and `priorityqueue` as variants. In Precept, sequenced-access types are domain contracts, not constrained lists.
+
+---
+
+## Summary of Verdict Changes
+
+| Question | Prior verdict | Revised verdict |
+|---|---|---|
+| Semantic enrichment vs storage directive | Correct but imprecisely stated | Same conclusion, sharper formulation: `ordered` ADDS a comparison capability that didn't exist; `sorted` USES existing comparison capability to change storage |
+| Kill-shot on `sorted` modifier | "Only valid on one kind" — overstated | Corrected to: "changes the operation surface rather than constraining values" — verdict unchanged |
+| Can `sorted` apply to `list`? | Not addressed | Yes — `sorted list` is coherent as sorted bag. My prior formulation was too strong. But revised kill-shot holds. |
+| `bag` vocabulary | Acceptable | Still acceptable — alternatives are all worse; documentation must explain business-facing meaning |
+| Unified bag model (`set = bag unique`) | Not previously evaluated | Rejected. Wrong direction of derivation, wrong accessor ergonomics, operation-surface change. |
+| `set`/`bag`/`list` as base types | Not previously evaluated | Partially right; wrong to treat `queue`/`stack`/`log`/`priorityqueue` as variants rather than domain contracts |
+
+**Net result:** Two prior arguments needed sharpening (the semantic enrichment distinction and the kill-shot formulation). One argument was too strong as stated (`sorted` valid on exactly one kind). The verdicts — `sortedset` as named type, `sorted` as modifier rejected, `bag` acceptable vocabulary, unified-bag model rejected — all stand.
+
+
+---
+
+# `list of T` — Oversight Acknowledgment and Full Evaluation
+
+**By:** Frank  
+**Date:** 2026-04-29  
+**Status:** Decision — Low priority; add to doc as evaluated candidate (not reject, not high)
+
+---
+
+## Was It an Oversight?
+
+Yes. Plainly.
+
+The `§ Proposed Additional Types` section evaluated sorted sets, multisets, double-ended queues, priority queues, append-only logs, ring buffers, bounded collections, and multimaps. What it never evaluated — not as a candidate, not as an explicit reject — was the most fundamental indexed collection type in every general-purpose ecosystem: the ordered, duplicates-allowed, index-accessible sequence. `List<T>` in .NET. `ArrayList` in Java. `list` in Python. `Vec<T>` in Rust.
+
+This is confirmed by the comparison table. Python's `list` appears in two rows — once as the LIFO stack surrogate, once as the "immutable" append-only stand-in — but never in its primary role as a general-purpose ordered sequence with random access. There is no row for "Ordered sequence with random access" in the table at all. It was mapped piecemeal into other roles and the base concept was never evaluated on its own.
+
+There is no principled reason it was skipped. The research started from the question "what collection types exist across ecosystems?" and somehow the most universal one ended up absorbed into other rows. This is a gap in the research, not a deliberate design decision.
+
+---
+
+## Evaluation: `list of T`
+
+### What It Is
+
+An ordered sequence of elements, allowing duplicates, with stable insertion-order positions. Elements can be appended, inserted at an arbitrary index, removed at an arbitrary index, and read by index.
+
+Differentiators from existing types:
+- `queue of T` — ordered + duplicates, but FIFO-only (no random access, remove only from front)
+- `stack of T` — ordered + duplicates, but LIFO-only (no random access, remove only from top)
+- `log of T` — ordered + duplicates, but append-only (no removal at all, positions stable)
+- `set of T` — unordered + no duplicates
+
+`list of T` is the only type that combines: ordered insertion, preserved positions, duplicates, arbitrary insertion, AND arbitrary positional removal.
+
+### Business Scenario
+
+The genuine use case for `list` (and only `list`) is an ordered sequence where arbitrary removal is permitted:
+
+```precept
+field ApprovalChain as list of string
+
+from Draft on AddReviewer
+    -> append ApprovalChain AddReviewer.ReviewerName
+    -> no transition
+
+from Draft on RecuseReviewer when ApprovalChain contains RecuseReviewer.ReviewerName
+    -> remove ApprovalChain RecuseReviewer.ReviewerName
+    -> no transition
+
+rule ApprovalChain.count >= 2
+    reason "At least two reviewers required"
+```
+
+This specific pattern — ordered list of named reviewers, with recusal-style removal — cannot be modeled by `queue` (which destroys order through dequeue semantics), `stack` (LIFO only), or `log` (no removal). The scenario is real but not widespread.
+
+Most business-rule scenarios that feel like they need `list` resolve cleanly into one of the more constrained types when you examine the actual invariant:
+- "Ordered history that accumulates" → `log`
+- "Items processed in order" → `queue`
+- "Items processed in reverse" → `stack`
+- "Membership tracking" → `set`
+
+### Proof Engine Implications
+
+**`.at(N)` — index access.** A new proof obligation category: index-bounds safety. The proof engine must verify:
+- `N >= 0` (trivially discharged when N is a literal)
+- `N < F.count` (requires a guard when N is a variable)
+
+This is tractable. The pattern follows the same model as emptiness obligations on `.peek`/`.first`/`.last`, extended to a two-sided bounds check. Authors must supply:
+
+```precept
+from State on AccessItem when Items.count > EventArgs.Index
+    -> set Result = Items.at(EventArgs.Index)
+```
+
+**`insert(index, element)` and `remove-at(index)` — positional mutation.** This is the hard problem. When elements are removed or inserted at arbitrary positions, all subsequent positions shift. A proof established for "element at index 3 is X" is invalidated by a subsequent `remove-at(1)`. The proof engine has no stable positional invariant to reason from — unlike `log` where positions are monotonically stable (append-only means index 3 stays index 3 forever), a mutable list's positions are dynamic.
+
+This does not make the type impossible, but it means the proof engine effectively cannot offer anything beyond the basic index-bounds check on each individual access. Any attempt to reason about "what value is at position N after this sequence of mutations" requires tracking full mutation history — which is not how Precept's proof engine is designed to work.
+
+**`append` (safe case).** If the action surface is restricted to append + remove-from-back (LIFO) or append + remove-from-front (FIFO), the proof surface simplifies. But that's just `stack` or `queue`. The incremental value over those types is specifically the arbitrary-position access and mutation, which is the proof-hard part.
+
+### Grammar Fit
+
+```
+field F as list of T
+```
+
+Reuses the existing `of` connector and all existing constraints (`mincount`, `maxcount`, `notempty`, `optional`). Clean grammar fit — no new keywords at declaration time.
+
+### Action Surface
+
+| Action | Syntax | Behavior |
+|--------|--------|----------|
+| `append` | `append F Expr` | Add element to end. Always safe. |
+| `insert` | `insert F at Expr Expr` | Insert element at index. Proof: index in bounds. |
+| `remove-at` | `remove-at F Expr` | Remove element at index. Proof: index in bounds. |
+| `remove` | `remove F Expr` | Remove first occurrence of value. No-op if absent. |
+| `clear` | `clear F` | Remove all elements. Always safe. |
+
+| Accessor | Returns | Proof |
+|----------|---------|-------|
+| `.count` | `integer` | None |
+| `.at(N)` | `T` | `N >= 0 and N < F.count` |
+| `.first` | `T` | `.count > 0` |
+| `.last` | `T` | `.count > 0` |
+
+### Relation to `bag` and `log`
+
+**`list` vs `bag`:** Orthogonal. `bag` tracks element frequencies without positional structure — `bag.countof("X")` is meaningful, position is not. `list` tracks positional structure without frequency tracking — `list.at(2)` is meaningful, duplicate counts are not first-class. Neither type subsumes the other; they address different business-rule dimensions.
+
+**`list` vs `log`:** Related but distinct by design intent. `log` is ordered + append-only — positions are stable because nothing is ever removed. `list` is ordered + mutable — positions shift when elements are inserted or removed. The critical observation: **the most valuable part of `list` — ordered insertion + positional read access — is already in `log`'s candidate write-up** (`log` already includes `.at(N)`, `.first`, `.last`). The incremental territory `list` adds over `log` is exactly the thing `log` prohibits by design: arbitrary removal.
+
+`list` does not render `log` redundant. `log` is the right type when the business rule is "immutable record" (audit trail, compliance history). `list` would be the right type when the business rule is "ordered sequence where elements can be retracted." These are genuinely different domain semantics — but `log`'s constraint is a feature, not a limitation.
+
+### Does `list` Render Either `bag` or `log` Redundant?
+
+No. Each serves a distinct purpose:
+- `bag` — counting occurrences, quantity tracking (how many of X)
+- `log` — immutable ordered history (what happened, in order, permanently)
+- `list` — mutable ordered sequence (ordered positions, arbitrary changes)
+
+### Priority Assessment
+
+**Low.** Here is the reasoning:
+
+1. **The read-access half of the value proposition collapses into `log`.** If the business need is "ordered sequence with positional read," `log.at(N)` already addresses it in the `log` candidate. `list` adds arbitrary removal on top of that, which is a different (and weaker) semantic commitment.
+
+2. **The business scenarios that genuinely require `list` over `log`/`queue`/`stack` are narrow.** The "ordered sequence with recusal removal" pattern exists, but it's not the pervasive need that `bag` (quantity tracking) and `log` (audit compliance) are. Most ordered-sequence business rules have a cleaner semantic fit with append-only or FIFO/LIFO access.
+
+3. **The proof engine cost of arbitrary positional mutation is real.** `log`'s append-only invariant gives the proof engine stable positions to reason from. `list`'s arbitrary mutation does not. The proof engine provides index-bounds checks on individual accesses, but it cannot verify positional invariants across mutations. This is not a fatal flaw, but it is a genuine cost that needs to be accepted consciously.
+
+4. **Evaluate after `log` ships.** If `.at(N)` on a `log` satisfies the real use cases that appear in practice, `list` may not need to exist as a separate type. If real-world `.precept` files reveal a concrete need for ordered-with-removal that `log`/`queue`/`stack` genuinely cannot serve, the case for `list` strengthens.
+
+This is not a reject — ring buffer was rejected on philosophy grounds (silent eviction violates "nothing is hidden"). `list` has no philosophy violation. It is simply low-priority relative to its proof-engine complexity cost and narrow incremental territory over `log`.
+
+---
+
+## Decision
+
+1. **Acknowledge the oversight.** `list of T` was not evaluated in the original research pass. This is documented here as a gap, not a deliberate decision.
+
+2. **Add `list of T` to `collection-types.md` as a Low priority candidate**, evaluated with this write-up. It belongs in the priority table between `deque` (low) and the rejects.
+
+3. **Defer to after `log` ships.** Real-world usage will reveal whether `.at(N)` on `log` satisfies the positional-read use cases. Only then evaluate whether a mutable `list` addresses a genuine gap.
+
+4. **Comparison table gap.** A "Ordered sequence with random access" row is missing from the `§ Comparison With Other Collection Systems` table. This should be added: `.NET List<T>`, Java `ArrayList`, Python `list` (primary role), Rust `Vec<T>`, SQL (none), CEL (none), Haskell (none) → Precept proposed `list of T` (low pri).
+
+---
+
+## Action Items
+
+- [ ] Add `### Candidate 7: list of T` to `docs/language/collection-types.md` with this evaluation
+- [ ] Add "Ordered sequence with random access" row to the comparison table
+- [ ] Update Priority Summary table to include `list of T` at Low priority (below `deque`)
+- [ ] Note in `log of T` candidate: the positional read overlap with `list` is deliberate — `log` covers the common case (immutable ordered history + read-by-index) and `list` is evaluated separately for the mutable-sequence use case
+
+
+---
+
+# Decision: `sortedset of T` — Value Assessment
+
+**Date:** 2026-04-29  
+**Author:** Frank (Lead/Architect)  
+**Status:** Pending owner sign-off  
+**Verdict:** Reject. `set of T notempty` covers every legitimate use case. No Precept construct can observe sorted iteration order. The benefit claimed for `sortedset` is owned entirely by `notempty`, not by sorted storage.
+
+---
+
+## The Challenge
+
+Shane's challenge:
+
+> "Why would iteration order matter? There are no loops in Precept."
+
+The context: quantifiers (`each`, `any`, `no`) are boolean predicates — they don't accumulate, fold, or produce ordered sequences. Rules and guards consume `.count`, `.min`, `.max`, `contains`, and quantifiers. The question is whether `sortedset` adds anything that `set` with equivalent constraints does not.
+
+---
+
+## Analysis
+
+### 1. Is there any Precept construct where iteration order affects correctness?
+
+**No.**
+
+Every operation in Precept's current and near-future surface is order-independent:
+
+| Operation | Order sensitivity |
+|---|---|
+| `each F (predicate)` | Boolean predicate — result is true or false regardless of iteration order |
+| `any F (predicate)` | Same — short-circuits on first match, but the result is the same regardless |
+| `no F (predicate)` | Same — the boolean result is iteration-order-independent |
+| `.count` | Cardinality — order-independent |
+| `.min` | Finds the minimum value — the minimum is the minimum regardless of storage order |
+| `.max` | Finds the maximum value — same |
+| `contains` | Membership test — order-independent |
+| `add` / `remove` / `clear` | Mutations — the author never observes sort order during mutation |
+
+There is no Precept construct that has access to "the third element" or "the element at position N." There is no folding. No sequence consumption. No accumulation where order affects the result.
+
+**Sorted iteration order is structurally unobservable in Precept's surface today and in every near-future proposal.**
+
+---
+
+### 2. The `.min`/`.max` argument
+
+The existing candidate description says:
+
+> "A `sortedset` with a `notempty` constraint makes these always-safe."
+
+This framing is wrong about which ingredient provides the safety. The `notempty` is doing all the work. Consider these two declarations:
+
+```precept
+field ApprovalLevels as sortedset of choice("team-lead", "director", "vp", "cfo") ordered notempty
+# .max is always safe
+
+field ApprovalLevels as set of choice("team-lead", "director", "vp", "cfo") ordered notempty
+# .max is also always safe — identical proof obligation
+```
+
+The proof engine discharges the `UnguardedCollectionAccess` obligation by checking whether `notempty` (or `mincount 1`) is declared on the field. It does not inspect whether the backing storage is a tree or a hash. `set of T notempty` satisfies the `.min`/`.max` proof obligation identically to `sortedset of T notempty`.
+
+The performance difference — O(1) access to min/max on a tree-backed sorted set vs O(n) linear scan on a hash-backed set — is real but irrelevant in a DSL governing business contract entities. Collections in `.precept` files contain tags, categories, approval levels, and fee-schedule keys — not high-frequency streaming data. The O(n) scan over a set of 3–50 elements is not a performance problem anyone in this domain cares about.
+
+**The `.min`/`.max` safety argument is wholly owned by `notempty`. `sortedset` contributes nothing to the proof obligation or its discharge.**
+
+---
+
+### 3. Declaration intent without observable behavior
+
+The residual argument for `sortedset` is declaration intent — the type name signals that sort order is semantically meaningful to the author.
+
+But if no Precept construct can observe the sort order — no loop, no folding, no ordered sequence consumer, no index access — then the author is declaring intent *about something that cannot be verified or consumed by the language*. That is not intent; it is noise.
+
+Worse: it is a false signal. A reader seeing `field ApprovalLevels as sortedset of choice(...) ordered` infers that sort order matters to some computation in the precept. If the only consumers are `.min`, `.max`, and quantifiers — all order-independent — the type declaration has misled the reader.
+
+A type's declaration should reflect a behavioral contract that is visible in the language. `set` declares: unordered, unique membership. `sortedset` would declare: sorted, unique membership — where "sorted" is semantically invisible to every operation the language exposes. That is a type with no observable type boundary. It is indistinguishable from `set` at the language surface.
+
+**Intent without observable behavior is noise, not signal. A type that cannot be distinguished from another type by any language construct is not a type — it is an implementation detail wearing a type costume.**
+
+---
+
+### 4. Performance
+
+Tree-backed sorted set: O(log n) insert. Hash-backed set: O(1) average insert.
+
+In a DSL governing business integrity contracts — loan applications, insurance claims, policy records — collections are small. Approval levels, required reviewers, permitted fee categories. The O(log n) vs O(1) distinction is noise at those sizes. There is no domain where this tradeoff matters to anyone writing a `.precept` file.
+
+The only scenario where the tree structure pays its cost is high-frequency insertion into large collections — exactly the workload Precept is not designed for. The performance argument cuts against `sortedset`, not for it.
+
+---
+
+### 5. Could a future construct observe sorted order?
+
+Theoretically: if Precept ever adds ordered-iteration constructs — folding, sequence-consuming aggregations, index access by rank — `sortedset` would become observable. But:
+
+1. Such constructs conflict directly with Precept's "no loops" design principle.
+2. Every near-future proposal described in the language research (`deque`, indexed access) is either low-priority or explicitly out of scope.
+3. "Keep this type because a future construct might use it" could justify any type. The bar for speculative future use is not met here — especially when the speculative construct contradicts the language's own philosophy.
+
+If Precept ever adds ordered-iteration constructs, the design review at that time will include the question "do we need a sorted variant of set to support this?" That is the correct moment to introduce `sortedset`. Not now, when it is semantically invisible to everything in the language.
+
+---
+
+## Verdict
+
+**Reject `sortedset of T`.**
+
+| Claim | Assessment |
+|---|---|
+| No Precept construct observes iteration order | Confirmed. Quantifiers, `.min`/`.max`, `contains`, `.count` — all order-independent. |
+| `.min`/`.max` safety | Owned by `notempty`, not sorted storage. `set of T notempty` is proof-identical. |
+| Declaration intent | Vacuous when nothing in the language can observe the declared property. |
+| Performance | Irrelevant. Business-rule collections are small. O(log n) vs O(1) is noise. |
+| Speculative future use | Does not meet the bar. Speculative constructs that contradict the language's philosophy are not a valid design anchor. |
+
+`set of T` with the appropriate `notempty` / `mincount` constraint covers every real use case that was claimed for `sortedset`. `sortedset` adds tree-backed storage with O(log n) inserts, carries a type name that signals a property no consumer can observe, and delivers nothing the existing surface cannot already express.
+
+**Recommendation:** Move `sortedset of T` from Candidate 1 in the Proposed Additional Types section to a `### Rejected:` subsection, alongside `ringbuffer`, `bounded collection`, and `multimap`. Update the Priority Summary table. Remove from the Rollout plan. Note the rejection in the comparison table. Remove the Open Question about `ascending`/`descending` keyword reuse for `sortedset`.
+
+**Impact on collection taxonomy:** The "Sorted membership" family described in prior decisions becomes an empty family. The correct collection taxonomy for Precept's surface does not include a sorted-membership category. If a future ordered-iteration construct arrives and makes sorted order observable, `sortedset` can be re-evaluated at that time with an actual consuming construct to justify it.
+
+
+---
+
+# ScalarType Extension — Temporal and Business-Domain Inner Types
+
+**Author:** Frank (Lead/Architect)
+**Date:** 2026-04-29
+**Status:** Verdict delivered — pending owner sign-off before doc update
+
+---
+
+## The Question
+
+`collection-types.md` line 238 says:
+
+> "Collections of temporal or business-domain types are not currently supported — the inner type must be a primitive."
+
+The current grammar:
+
+```
+ScalarType := string | ~string | integer | decimal | number | boolean | choice(...) ordered?
+```
+
+Shane is asking why. This document delivers the answer.
+
+---
+
+## 1. Temporal Types — Inventory and Ordering
+
+Eight types from `temporal-type-system.md`:
+
+| Type | Backing | `<`/`>` | Equality | Notes |
+|------|---------|---------|----------|-------|
+| `date` | `NodaTime.LocalDate` | **Yes** | Calendar date | Total ordering. `'2026-01-01' < '2026-06-01'` is unambiguous. |
+| `time` | `NodaTime.LocalTime` | **Yes** | Time of day | Total ordering. No timezone — comparison is unambiguous. |
+| `instant` | `NodaTime.Instant` | **Yes** | UTC nanosecond | Total ordering. UTC by definition — no ambiguity. |
+| `duration` | `NodaTime.Duration` | **Yes** | Nanosecond magnitude | Total ordering. |
+| `datetime` | `NodaTime.LocalDateTime` | **Yes** | Calendar date+time | Total ordering. Timezone-free — comparison is unambiguous. |
+| `period` | `NodaTime.Period` | **No** | **Structural only** | `'1 month' != '30 days'` — structurally different components. NodaTime deliberately omits `IComparable<Period>` because month length varies. `.min`/`.max` unavailable. `contains` works (structural match). |
+| `timezone` | `NodaTime.DateTimeZone` | **No** | IANA identifier | Identity type. `==`/`!=` only. Analogous to `boolean` in this respect — `set of boolean` is valid, `boolean.min` is a type error. |
+| `zoneddatetime` | `NodaTime.ZonedDateTime` | **No** | Instant + local + zone compound | NodaTime deliberately omits `IComparable<ZonedDateTime>` — ordering semantics are ambiguous (by instant? by wall clock?). Doc says: compare via `.instant` or `.datetime` accessor instead. `==`/`!=` compare all three components. Valid equality for set deduplication, but niche. |
+
+**Summary:** Five temporal types are fully orderable (`date`, `time`, `instant`, `duration`, `datetime`). Three are equality-only (`period`, `timezone`, `zoneddatetime`) — for the same principled NodaTime reason in each case, not a Precept restriction.
+
+---
+
+## 2. Business-Domain Types — Inventory and Ordering
+
+Seven types from `business-domain-types.md`:
+
+| Type | Backing | `<`/`>` | Equality | Notes |
+|------|---------|---------|----------|-------|
+| `money` | `decimal` + ISO 4217 currency | **Yes** (same currency) | Same currency | `'100 USD' < '200 USD'` is valid. Cross-currency `<` is a type error — same rule as cross-currency `+`. |
+| `currency` | ISO 4217 code (string) | **No** | Code equality | Identity type. Currency codes have no natural ordering. `'USD' < 'EUR'` has no business meaning. |
+| `quantity` | `decimal` + UCUM unit | **Yes** (same dimension, auto-converts) | Same dimension | `'5 kg' < '10 kg'` is valid. `'5 kg' < '10 lbs'` auto-converts (D8). Cross-dimension `<` is a type error. |
+| `unitofmeasure` | UCUM unit identifier | **No** | Unit identifier | Identity type. `'kg' < 'lbs'` has no business meaning. |
+| `dimension` | Dimension category (string) | **No** | Category equality | Identity type. `'mass' < 'length'` has no business meaning. |
+| `price` | `decimal` + currency + unit | **Yes** (same currency + unit) | Same currency + unit | `'4.17 USD/each' < '5.00 USD/each'` is valid. Cross-currency or cross-unit `<` is a type error. |
+| `exchangerate` | `decimal` + currency pair | **No** | Same currency pair | Doc explicitly notes: "Exchange rates have no meaningful ordering outside their time context." `==`/`!=` require same currency pair. Limited utility in collections but not structurally wrong. |
+
+**Summary:** Three business-domain types are orderable (`money`, `quantity`, `price`). Four are equality-only (`currency`, `unitofmeasure`, `dimension`, `exchangerate`).
+
+---
+
+## 3. Is the Restriction Principled?
+
+**No. It is not principled. It is incidental.**
+
+Evidence:
+
+**A. The doc says so.** Line 238 says "not currently supported" — explicitly "not yet," not "by design." Open Question 8 in the same doc says directly: "There is no principled reason to exclude temporal types... from collection inner types. This appears to be an incremental build artifact (collections and typed scalars landed at different times) rather than an intentional restriction."
+
+**B. Every type satisfies the collection inner type requirements:**
+1. Single value — not a collection type itself. ✓ All satisfy this.
+2. Well-defined equality semantics. ✓ Every type has `==`/`!=`.
+3. No nested collections. ✓ None are collections.
+
+**C. The non-orderable cases are already handled by existing precedent.** `boolean` is in ScalarType. `set of boolean` is valid. `.min`/`.max` on `set of boolean` is a type error because `boolean` is not orderable. The same `TypeTrait.Orderable` check that governs this behavior applies to `period`, `timezone`, `zoneddatetime`, `currency`, `unitofmeasure`, `dimension`, and `exchangerate`. The machinery exists. Nothing new is needed to handle non-orderable inner types.
+
+**D. The `in`/`of` qualifier question is grammar design, not a semantic barrier.** `set of money in 'USD'` needs parser disambiguation — does `in 'USD'` bind to `money` (inner type qualifier) or to the collection declaration? This is solvable by the same disambiguation pattern used for `set of choice(...) ordered` — `ordered` attaches to `choice(...)`, and `in '<currency>'` would attach to `money`. This is a grammar design task, not a reason to exclude the types.
+
+---
+
+## 4. What Would `set of date` Look Like?
+
+Real business scenarios that collections of temporal types already demand:
+
+**`set of date`:**
+```precept
+field BlackoutDates as set of date
+field ValidFilingDates as set of date
+field ContractMilestones as set of date
+```
+
+- `BlackoutDates contains '2026-07-04'` — is today a blackout day?
+- `ValidFilingDates.min` — earliest valid filing date (`.count > 0` guard required, just like `set of integer`)
+- `ValidFilingDates.max` — latest valid filing date
+- `each d in BlackoutDates (d > Today)` — quantifier over a set of dates — entirely natural
+
+The day-counter simulation machinery noted in the temporal doc (60+ lines of boilerplate across 3 samples) is a direct consequence of not having `date` as an inner type. Authors are using `set of integer` to hold day offsets. This is exactly the problem `set of date` solves.
+
+---
+
+## 5. What Would `set of money` Look Like?
+
+Real business scenarios that collections of monetary types demand:
+
+**`set of money in 'USD'`:**
+```precept
+field ApprovedFeeAmounts as set of money in 'USD'
+field DisallowedPaymentThresholds as set of money in 'USD'
+field AcceptedBidAmounts as set of money in 'USD'
+```
+
+- `ApprovedFeeAmounts contains '150 USD'` — is this fee on the approved list?
+- `ApprovedFeeAmounts.min` — the minimum approved fee (guarded)
+- `ApprovedFeeAmounts.max` — the maximum approved fee (guarded)
+
+**Open `set of money` (no currency qualifier):** A set mixing `'100 USD'` and `'85 EUR'` is problematic — what does `.min` return? This is analogous to the cross-dimension `quantity` problem. The design answer is: `.min`/`.max` require a proven-same-currency proof, or the field must be declared `as set of money in 'USD'`. This is not a blocker — it is a type-checker constraint, the same kind of constraint that applies to `money + money` (cross-currency is a type error).
+
+---
+
+## 6. Incidental or Principled — Verdict
+
+**Incidental.** The restriction came from the order of implementation: `set`/`queue`/`stack` shipped against the primitive type vocabulary. Temporal and business-domain types were designed later. The `ScalarType` grammar was never updated when the new types arrived. No design review ever said "temporal types must not be collection inner types." No architecture note captures a reason. The Open Questions section in the same doc explicitly identifies this as an artifact.
+
+The proof: if you try to construct a principled reason for excluding `date` from `set of date`, you can't. Equality is deterministic. Ordering is total. `contains` is safe. `.min`/`.max` are safe with a count guard. There is no argument.
+
+---
+
+## 7. The `~string` Question
+
+Does `~string` have a parallel for temporal or business-domain types? **No, and this is the expected and correct answer.**
+
+`~string` addresses a single concern: case-insensitive string comparison. It is a modifier that changes the comparer from `StringComparer.Ordinal` to `StringComparer.OrdinalIgnoreCase`.
+
+Temporal types have no concept of case. `'2026-01-01'` is `'2026-01-01'` — there is no upper/lower case in a date. Business-domain types are similarly immune: ISO 4217 enforces uppercase for currency codes (`USD`, not `usd`), UCUM enforces lowercase for units (`kg`, not `KG`), and all comparisons are already case-normalized by the parsing layer before they enter the type system. The `~` modifier is not applicable, not analogous, and not needed for any of these types.
+
+---
+
+## 8. Verdict and Updated Grammar
+
+**Expand `ScalarType` to include all Precept scalar types.** The restriction is an incremental build artifact with no principled basis.
+
+**Proposed expanded grammar:**
+
+```
+CollectionType    :=  (set | queue | stack) of ScalarType
+
+ScalarType        :=  PrimitiveType | TemporalType | BusinessDomainType
+
+PrimitiveType     :=  string
+                   |  ~string
+                   |  integer
+                   |  decimal
+                   |  number
+                   |  boolean
+                   |  choice(...) ordered?
+
+TemporalType      :=  date
+                   |  time
+                   |  instant
+                   |  duration
+                   |  period (PeriodQualifier)?
+                   |  timezone
+                   |  zoneddatetime
+                   |  datetime
+
+PeriodQualifier   :=  in '<unit>'
+                   |  of ('date' | 'time' | 'datetime')
+
+BusinessDomainType :=  money (in '<currency>')?
+                    |  currency
+                    |  quantity ( (in '<unit>') | (of '<dimension>') )?
+                    |  unitofmeasure
+                    |  dimension
+                    |  price (PriceQualifier)?
+                    |  exchangerate
+
+PriceQualifier    :=  in '<currency>/<unit>'
+                   |  in '<currency>' of '<dimension>'
+                   |  in '<currency>'
+                   |  in '<unit>'
+                   |  of '<dimension>'
+```
+
+**Ordering and accessor availability — the full table:**
+
+| Inner type | Orderable (`.min`/`.max`) | Equality (`contains`) | Notes |
+|------------|--------------------------|----------------------|-------|
+| `date` | ✓ | ✓ | |
+| `time` | ✓ | ✓ | |
+| `instant` | ✓ | ✓ | |
+| `duration` | ✓ | ✓ | |
+| `datetime` | ✓ | ✓ | |
+| `period` | ✗ | ✓ (structural) | `.min`/`.max` are type errors. `'1 month' != '30 days'` in a set. Needs documentation. |
+| `timezone` | ✗ | ✓ | `.min`/`.max` are type errors. Same pattern as `set of boolean`. |
+| `zoneddatetime` | ✗ | ✓ (compound: instant + local + zone) | Niche but valid. `.min`/`.max` type errors. |
+| `money in 'USD'` | ✓ | ✓ | Same-currency required for ordering. |
+| `money` (open) | ✗ (mixed currencies) | ✓ (same currency match) | `.min`/`.max` are type errors without proven same-currency. Needs documented restriction. |
+| `currency` | ✗ | ✓ | `.min`/`.max` are type errors. Identity type. |
+| `quantity in 'kg'` | ✓ | ✓ | Same-dimension with auto-convert for comparison. |
+| `quantity of 'mass'` | ✓ (commensurable) | ✓ | Same-dimension rule applies. |
+| `quantity` (open) | ✗ | ✓ (same unit match) | `.min`/`.max` type errors without proven dimension. |
+| `unitofmeasure` | ✗ | ✓ | Identity type. `.min`/`.max` type errors. |
+| `dimension` | ✗ | ✓ | Identity type. `.min`/`.max` type errors. |
+| `price in 'USD/each'` | ✓ | ✓ | Same currency+unit required. |
+| `price` (open) | ✗ | ✓ (same currency+unit match) | `.min`/`.max` type errors without proven currency+unit. |
+| `exchangerate` | ✗ | ✓ (same pair) | `.min`/`.max` type errors. Limited utility but not wrong. |
+
+**Types I would exclude — none.** There is no type in either family that fails the three collection inner type requirements (single value, equality semantics, not a collection). Even the equality-only types are valid as inner types — they just can't use `.min`/`.max`, which is already the case for `boolean`.
+
+**Grammar complexity note.** `in`/`of` qualification in inner type position requires parser disambiguation. `set of money in 'USD'` must parse as `set of (money in 'USD')`, not as something ambiguous. The same disambiguation pattern used for `set of choice(...) ordered` applies: after consuming the inner type keyword (`money`, `quantity`, `price`, `period`), check for `in` or `of` and consume the qualifier as part of the inner type spec. This is a grammar design task, not a semantic barrier. Owner sign-off needed on grammar before doc update.
+
+---
+
+## Action Required
+
+1. **Shane: approve semantic verdict.** The restriction should be removed. `ScalarType` should expand to include all Precept scalar types. No principled reason for the exclusion exists.
+
+2. **Grammar design for `in`/`of` in inner type position.** Before the doc is updated, the parser disambiguation strategy for `set of money in 'USD'` needs to be locked. This is mechanical but needs an explicit decision.
+
+3. **Documentation notes for edge cases.** When the doc is updated, three cases need explicit callouts:
+   - `period` in a set: structural equality means `'1 month' != '30 days'`
+   - `zoneddatetime` in a set: compound equality (instant + local + zone) — two `zoneddatetime` values representing the same moment in different timezones are different elements
+   - Open `money`/`quantity`/`price` in a set: `.min`/`.max` require a same-currency/same-unit proof; use qualified inner types (`money in 'USD'`) for cleaner semantics
+
+4. **One stale reference to resolve.** Open Question 8 in collection-types.md mentions `percentage` as a business-domain type. No such type appears in `business-domain-types.md`. Either `percentage` was planned and not designed yet, or the reference is stale. Shane should clarify.
+
+**Do not update the doc until Shane approves.**
+
