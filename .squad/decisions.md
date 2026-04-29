@@ -6,6 +6,20 @@
 
 ---
 
+### 2026-04-29T01:09:17Z: Catalog extensibility audit and parser design evaluation recorded
+**By:** Scribe
+**Status:** Merged, deduplicated, inbox cleared (3 files)
+
+**Merged sources:** `frank-catalog-extensibility`, `frank-parser-design-eval`, `frank-vision-spec-audit`.
+
+- Frank's catalog extensibility audit confirmed the lexer is already 100% catalog-driven for keywords, operators, and punctuation; the remaining extensibility risk is entirely in parser/catalog enforcement boundaries.
+- Eight parser hardening gaps are now the durable follow-up list: `BuildNode()` wildcard, `ParseDirectConstruct()` wildcard, hardcoded `DisambiguateAndParse()` routing, `ParseActionStatement()` switch exhaustiveness, hardcoded `ExpressionBoundaryTokens`, missing `ConstructKind`↔declaration subtype enforcement, missing `ActionKind`↔statement subtype enforcement, and hardcoded access-mode adjectives.
+- The preferred remediation path is catalog shape change rather than Roslyn analyzers: remove wildcard fallthroughs for CS8509 coverage, derive boundary tokens from `Constructs.LeadingTokens`, add `RoutingFamily` to `ConstructMeta`, and add `ActionSyntaxShape` to `ActionMeta`.
+- Frank's parser design evaluation across v5-v8 approved v8 as the closed canonical baseline: current code matches the parser spec, `OmitDeclaration` is correctly split from `AccessMode`, `FieldTargetNode` is a DU, and the 5-layer parser architecture is complete. Working docs are now audit trail, not pending design debt.
+- Frank's vision-versus-spec audit found two live contradictions (`with` still listed as a structural preposition in the vision doc, and stale “root editability” wording after `write all` removal) and concluded the vision doc should not be archived until its language-identity material is migrated into the spec.
+
+---
+
 ### 2026-04-29T00:43:25Z: Parser remediation review batch approved and synchronized
 **By:** Scribe
 **Status:** Merged, deduplicated, inbox cleared (4 files)
@@ -67,6 +81,8 @@
 - No content dropped; all facts, contracts, and assertions preserved. Comparative tables retained where genuinely comparative.
 - Motivation: Shifted from reference spec to design doc genre, making decisions and rationale explicit and readable.
 
+---
+
 ### 2026-04-28T00:00:00Z: Combined Design v2 Gap Patch Complete
 **By:** Frank
 **Status:** Complete
@@ -74,6 +90,8 @@
 - Added 10 missing design specifics to combined-design-v2.md: action-shape model, constraint activation indexes, constraint evaluation matrix, constraint exposure tiers, proof strategy enumeration, proof/fault chain formula, earliest-knowable kind assignment, named anti-patterns, compile-time vs lowered artifact table, implementation action items.
 - Locked: three action shapes, precomputed constraint activation, closed proof strategies, explicit proof/fault chain ownership, five implementation action items.
 - No philosophy gaps surfaced; all changes are implementation domain only.
+
+---
 
 ### 2026-04-27T00:00:00Z: MCP dual-surface operating model canonicalized
 **By:** Scribe
@@ -88,6 +106,8 @@
 - Validation rerun passed: all three MCP config surfaces parse cleanly, schemas stay separated (`mcpServers` for CLI/plugin, `servers` for VS Code), and no directly related stale live reference remains.
 - Team pattern locked: dual-surface config work is only considered landed when the config artifact and at least one directly related doc land together.
 
+---
+
 ### 2026-04-26T15:48:53Z: Analyzer expansion plan and catalog conventions canonicalized
 **By:** Scribe
 **Status:** Merged, deduplicated, inbox cleared (10 files)
@@ -101,6 +121,9 @@
 - Queue/order dedupe: the earlier simple-patterns-first plan is superseded by Shane's later directive to front-load the trait↔operation consistency path because it builds reusable switch-walker and enum-resolution infrastructure for the rest of the analyzer suite.
 - Soup Nazi's test-plan bar stands: helper tests plus analyzer suites total about 298 cases, with the accepted blind spot limited to spread elements inside shared static arrays and guarded by declaration-site validation/regression anchors.
 - Owner directive stands: lexer token classification must converge on fully catalog-driven behavior; implementation tactics may vary, but the architectural target is no-exceptions catalog authority.
+
+---
+
 ### 2026-04-26T00:00:00Z: Catalog completeness, consumer drift, and analyzer sprint merge
 **By:** Scribe
 **Status:** Merged, deduplicated, inbox cleared (7 files)
@@ -131,6 +154,8 @@
 **Backlog concentration after deduplication:**
 - The consolidated review's correctness and metadata-gap items are recorded as completed in the source/design pass.
 - Remaining work is concentrated in tooling-generation drift, broader analyzer expansion (PRECEPT0007-PRECEPT0014), snapshot/golden catalog tests, and generated matrix coverage.
+
+---
 
 ### 2026-04-25T12:00:00Z: Full catalog-system review — 10-item metadata-driven design review (owner sign-off)
 **By:** Scribe
@@ -305,5 +330,3 @@ Merged `compiler-architecture-proposal.md` and `runtime-architecture-proposal.md
 **Status:** Standing decision
 
 Shane challenged the initial placement of R3 (immutability guarantees). Resolution: immutability is a public API contract, not an evaluator implementation detail. R3 documentation belongs in `docs.next/runtime/runtime-api.md`, not `docs.next/runtime/evaluator.md`.
-
-
