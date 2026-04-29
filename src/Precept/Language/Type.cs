@@ -7,11 +7,11 @@ namespace Precept.Language;
 /// </summary>
 public enum TypeCategory
 {
-    Scalar,
-    Temporal,
-    BusinessDomain,
-    Collection,
-    Special,
+    Scalar         = 1,
+    Temporal       = 2,
+    BusinessDomain = 3,
+    Collection     = 4,
+    Special        = 5,
 }
 
 // ── TypeTrait ──────────────────────────────────────────────────────────────────

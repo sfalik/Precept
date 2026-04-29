@@ -9,41 +9,41 @@ public sealed class StaticallyPreventableAttribute(DiagnosticCode code) : Attrib
 public enum FaultCode
 {
     [StaticallyPreventable(DiagnosticCode.DivisionByZero)]
-    DivisionByZero,
+    DivisionByZero             =  1,
 
     [StaticallyPreventable(DiagnosticCode.SqrtOfNegative)]
-    SqrtOfNegative,
+    SqrtOfNegative             =  2,
 
     [StaticallyPreventable(DiagnosticCode.TypeMismatch)]
-    TypeMismatch,
+    TypeMismatch               =  3,
 
     [StaticallyPreventable(DiagnosticCode.UndeclaredField)]
-    UndeclaredField,
+    UndeclaredField            =  4,
 
     [StaticallyPreventable(DiagnosticCode.NullInNonNullableContext)]
-    UnexpectedNull,
+    UnexpectedNull             =  5,
 
     [StaticallyPreventable(DiagnosticCode.InvalidMemberAccess)]
-    InvalidMemberAccess,
+    InvalidMemberAccess        =  6,
 
     [StaticallyPreventable(DiagnosticCode.FunctionArityMismatch)]
-    FunctionArityMismatch,
+    FunctionArityMismatch      =  7,
 
     [StaticallyPreventable(DiagnosticCode.FunctionArgConstraintViolation)]
-    FunctionArgConstraintViolation,
+    FunctionArgConstraintViolation =  8,
 
     [StaticallyPreventable(DiagnosticCode.UnguardedCollectionAccess)]
-    CollectionEmptyOnAccess,
+    CollectionEmptyOnAccess    =  9,
 
     [StaticallyPreventable(DiagnosticCode.UnguardedCollectionMutation)]
-    CollectionEmptyOnMutation,
+    CollectionEmptyOnMutation  = 10,
 
     [StaticallyPreventable(DiagnosticCode.QualifierMismatch)]
-    QualifierMismatch,
+    QualifierMismatch          = 11,
 
     [StaticallyPreventable(DiagnosticCode.NumericOverflow)]
-    NumericOverflow,
+    NumericOverflow            = 12,
 
     [StaticallyPreventable(DiagnosticCode.OutOfRange)]
-    OutOfRange,
+    OutOfRange                 = 13,
 }

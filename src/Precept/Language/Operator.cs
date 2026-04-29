@@ -1,7 +1,7 @@
 namespace Precept.Language;
 
 /// <summary>Unary or binary.</summary>
-public enum Arity { Unary, Binary }
+public enum Arity { Unary = 1, Binary = 2 }
 
 /// <summary>
 /// Broad operator family — used by the grammar generator, LS semantic tokens,
@@ -9,14 +9,14 @@ public enum Arity { Unary, Binary }
 /// </summary>
 public enum OperatorFamily
 {
-    Arithmetic,
-    Comparison,
-    Logical,
-    Membership,
+    Arithmetic  = 1,
+    Comparison  = 2,
+    Logical     = 3,
+    Membership  = 4,
 }
 
 /// <summary>Binding direction for the Pratt parser.</summary>
-public enum Associativity { Left, Right, NonAssociative }
+public enum Associativity { Left = 1, Right = 2, NonAssociative = 3 }
 
 /// <summary>
 /// Metadata for a single operator. Token is the lexer token that produces this

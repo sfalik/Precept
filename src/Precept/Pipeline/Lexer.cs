@@ -51,6 +51,7 @@ public static class Lexer
 
     private enum LexerMode
     {
+        [Precept.AllowZeroDefault]
         Normal,
         String,
         TypedConstant,

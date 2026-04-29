@@ -7,19 +7,19 @@ public enum ConstraintKind
 {
     // ── Always-active ───────────────────────────────────────────────────
     /// <summary>Global invariant — <c>rule</c> declaration. Always enforced.</summary>
-    Invariant,
+    Invariant = 1,
 
     // ── State-anchored ──────────────────────────────────────────────────
     /// <summary>State residency — <c>in &lt;State&gt; ensure</c>. Enforced while in state.</summary>
-    StateResident,
+    StateResident = 2,
 
     /// <summary>State entry — <c>to &lt;State&gt; ensure</c>. Enforced on transition into state.</summary>
-    StateEntry,
+    StateEntry = 3,
 
     /// <summary>State exit — <c>from &lt;State&gt; ensure</c>. Enforced on transition out of state.</summary>
-    StateExit,
+    StateExit = 4,
 
     // ── Event-anchored ──────────────────────────────────────────────────
     /// <summary>Event precondition — <c>on &lt;Event&gt; ensure</c>. Enforced before event fires.</summary>
-    EventPrecondition,
+    EventPrecondition = 5,
 }

@@ -7,20 +7,20 @@ namespace Precept.Language;
 public enum ActionKind
 {
     // ── Scalar ──────────────────────────────────────────────────────
-    Set,
+    Set = 1,
 
     // ── Set collection ──────────────────────────────────────────────
-    Add,
-    Remove,
+    Add     = 2,
+    Remove  = 3,
 
     // ── Queue collection ────────────────────────────────────────────
-    Enqueue,
-    Dequeue,
+    Enqueue = 4,
+    Dequeue = 5,
 
     // ── Stack collection ────────────────────────────────────────────
-    Push,
-    Pop,
+    Push    = 6,
+    Pop     = 7,
 
     // ── Universal (collections + optional scalars) ──────────────────
-    Clear,
+    Clear   = 8,
 }

@@ -10,6 +10,7 @@ public record ParameterMeta(TypeKind Kind, string? Name = null);
 public enum QualifierMatch
 {
     /// <summary>No qualifier inspection needed. Default for ~95% of entries.</summary>
+    [Precept.AllowZeroDefault]
     Any,
     /// <summary>Operand qualifiers are equal (same currency, same dimension).</summary>
     Same,

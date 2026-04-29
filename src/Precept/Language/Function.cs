@@ -6,9 +6,9 @@ namespace Precept.Language;
 /// </summary>
 public enum FunctionCategory
 {
-    Numeric,
-    String,
-    Temporal,
+    Numeric  = 1,
+    String   = 2,
+    Temporal = 3,
 }
 
 /// <summary>

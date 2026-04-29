@@ -7,7 +7,7 @@ namespace Precept.Language;
 public enum FaultSeverity
 {
     /// <summary>The transition fails immediately; no state changes are committed.</summary>
-    Fatal,
+    Fatal = 1,
 }
 
 // TODO: Stub — shape will be finalized when the evaluator result type is designed.

@@ -7,30 +7,30 @@ namespace Precept.Language;
 public enum OperatorKind
 {
     // ── Logical ────────────────────────────────────────────────────
-    Or,
-    And,
-    Not,
+    Or                        =  1,
+    And                       =  2,
+    Not                       =  3,
 
     // ── Comparison ─────────────────────────────────────────────────
-    Equals,
-    NotEquals,
-    CaseInsensitiveEquals,
-    CaseInsensitiveNotEquals,
-    LessThan,
-    GreaterThan,
-    LessThanOrEqual,
-    GreaterThanOrEqual,
+    Equals                    =  4,
+    NotEquals                 =  5,
+    CaseInsensitiveEquals     =  6,
+    CaseInsensitiveNotEquals  =  7,
+    LessThan                  =  8,
+    GreaterThan               =  9,
+    LessThanOrEqual           = 10,
+    GreaterThanOrEqual        = 11,
 
     // ── Membership ─────────────────────────────────────────────────
-    Contains,
+    Contains                  = 12,
 
     // ── Arithmetic (binary) ────────────────────────────────────────
-    Plus,
-    Minus,
-    Times,
-    Divide,
-    Modulo,
+    Plus                      = 13,
+    Minus                     = 14,
+    Times                     = 15,
+    Divide                    = 16,
+    Modulo                    = 17,
 
     // ── Arithmetic (unary) ─────────────────────────────────────────
-    Negate,
+    Negate                    = 18,
 }

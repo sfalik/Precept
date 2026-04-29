@@ -10,11 +10,11 @@ namespace Precept.Language;
 public enum ModifierCategory
 {
     /// <summary>Compile-time-provable properties — lifecycle shape, terminality, one-write. Requires graph analysis.</summary>
-    Structural,
+    Structural = 1,
     /// <summary>Intent and tooling meaning — success, error, sensitive, audit, deprecated. No graph analysis.</summary>
-    Semantic,
+    Semantic   = 2,
     /// <summary>Language-level control over how declarations surface as warnings vs hard invariants.</summary>
-    Severity,
+    Severity   = 3,
 }
 
 /// <summary>
@@ -37,18 +37,18 @@ public enum GraphAnalysisKind
 public enum AnchorScope
 {
     /// <summary>While in this state.</summary>
-    InState,
+    InState  = 1,
     /// <summary>On entry to a state.</summary>
-    OnEntry,
+    OnEntry  = 2,
     /// <summary>On exit from a state.</summary>
-    OnExit,
+    OnExit   = 3,
 }
 
 /// <summary>Disambiguates anchor usage between ensure and state-action contexts.</summary>
 public enum AnchorTarget
 {
-    Ensure,
-    StateAction,
+    Ensure      = 1,
+    StateAction = 2,
 }
 
 // ════════════════════════════════════════════════════════════════════════════════

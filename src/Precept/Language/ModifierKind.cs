@@ -9,73 +9,73 @@ public enum ModifierKind
     // ── Field modifiers (15) — FieldModifierMeta ────────────────────────────────
 
     /// <summary>Flag: field is nullable (presence tested via is set / is not set).</summary>
-    Optional,
+    Optional    =  1,
     /// <summary>Flag: choice field supports ordinal comparison.</summary>
-    Ordered,
+    Ordered     =  2,
     /// <summary>Flag: value ≥ 0.</summary>
-    Nonnegative,
+    Nonnegative =  3,
     /// <summary>Flag: value &gt; 0.</summary>
-    Positive,
+    Positive    =  4,
     /// <summary>Flag: value ≠ 0.</summary>
-    Nonzero,
+    Nonzero     =  5,
     /// <summary>Flag: string is non-empty.</summary>
-    Notempty,
+    Notempty    =  6,
     /// <summary>Value: default value expression.</summary>
-    Default,
+    Default     =  7,
     /// <summary>Value: minimum value.</summary>
-    Min,
+    Min         =  8,
     /// <summary>Value: maximum value.</summary>
-    Max,
+    Max         =  9,
     /// <summary>Value: minimum string length.</summary>
-    Minlength,
+    Minlength   = 10,
     /// <summary>Value: maximum string length.</summary>
-    Maxlength,
+    Maxlength   = 11,
     /// <summary>Value: minimum collection count.</summary>
-    Mincount,
+    Mincount    = 12,
     /// <summary>Value: maximum collection count.</summary>
-    Maxcount,
+    Maxcount    = 13,
     /// <summary>Value: maximum decimal places.</summary>
-    Maxplaces,
+    Maxplaces   = 14,
     /// <summary>Flag: field is directly editable (write baseline); defaults to read-only without this modifier.</summary>
-    Writable,
+    Writable    = 15,
 
     // ── State modifiers (7) — StateModifierMeta ─────────────────────────────────
 
     /// <summary>Structural: the precept starts in this state.</summary>
-    InitialState,
+    InitialState  = 16,
     /// <summary>Structural: no outgoing transitions.</summary>
-    Terminal,
+    Terminal      = 17,
     /// <summary>Structural: all initial→terminal paths visit this state (dominator).</summary>
-    Required,
+    Required      = 18,
     /// <summary>Structural: no path from this state back to any ancestor.</summary>
-    Irreversible,
+    Irreversible  = 19,
     /// <summary>Semantic: success outcome state.</summary>
-    Success,
+    Success       = 20,
     /// <summary>Semantic: warning outcome state.</summary>
-    Warning,
+    Warning       = 21,
     /// <summary>Semantic: error outcome state.</summary>
-    Error,
+    Error         = 22,
 
     // ── Event modifiers (1 v2) — EventModifierMeta ──────────────────────────────
 
     /// <summary>Keyword: this event is the auto-fire entry point.</summary>
-    InitialEvent,
+    InitialEvent  = 23,
 
     // ── Access modifiers (3) — AccessModifierMeta ───────────────────────────────
 
     /// <summary>Field is present and writable.</summary>
-    Write,
+    Write = 24,
     /// <summary>Field is present and read-only.</summary>
-    Read,
+    Read  = 25,
     /// <summary>Field is structurally absent.</summary>
-    Omit,
+    Omit  = 26,
 
     // ── Anchor modifiers (3) — AnchorModifierMeta ───────────────────────────────
 
     /// <summary>Anchor: in-state scope.</summary>
-    In,
+    In   = 27,
     /// <summary>Anchor: on-entry scope (to).</summary>
-    To,
+    To   = 28,
     /// <summary>Anchor: on-exit scope (from).</summary>
-    From,
+    From = 29,
 }

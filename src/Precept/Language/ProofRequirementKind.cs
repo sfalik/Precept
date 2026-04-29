@@ -7,18 +7,18 @@ public enum ProofRequirementKind
 {
     // ── Single-subject ──────────────────────────────────────────────────
     /// <summary>Numeric interval check — value comparison against threshold (e.g. divisor != 0).</summary>
-    Numeric,
+    Numeric                =  1,
 
     /// <summary>Presence check — optional field must be set before access.</summary>
-    Presence,
+    Presence               =  2,
 
     /// <summary>Dimension check — period operand must have required time dimension.</summary>
-    Dimension,
+    Dimension              =  3,
 
     /// <summary>Modifier check — field must declare a required modifier (e.g. <c>ordered</c>).</summary>
-    Modifier,
+    Modifier               =  4,
 
     // ── Dual-subject ────────────────────────────────────────────────────
     /// <summary>Qualifier axis compatibility — two operands must share a qualifier value (e.g. same currency).</summary>
-    QualifierCompatibility,
+    QualifierCompatibility =  5,
 }

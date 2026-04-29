@@ -65,6 +65,7 @@ public sealed record PresenceProofRequirement(
 public enum PeriodDimension
 {
     /// <summary>Any time dimension is acceptable.</summary>
+    [Precept.AllowZeroDefault]
     Any,
     /// <summary>Must be a date-level dimension (year, month, day).</summary>
     Date,

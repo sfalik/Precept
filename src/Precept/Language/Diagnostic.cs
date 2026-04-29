@@ -26,19 +26,19 @@ public enum Severity
 public enum DiagnosticCategory
 {
     /// <summary>Name resolution — undeclared, duplicate, or out-of-scope identifiers.</summary>
-    Naming,
+    Naming         = 1,
     /// <summary>Type system — type mismatches, invalid member access, modifier violations, qualifier errors.</summary>
-    TypeSystem,
+    TypeSystem     = 2,
     /// <summary>Temporal types — date/time format, timezone, period/duration arithmetic.</summary>
-    Temporal,
+    Temporal       = 3,
     /// <summary>Business-domain types — currency, unit, dimension, price arithmetic rules.</summary>
-    BusinessDomain,
+    BusinessDomain = 4,
     /// <summary>Structural grammar and precept-level declarations — missing initial state, circular dependencies, computed field rules.</summary>
-    Structure,
+    Structure      = 5,
     /// <summary>Runtime safety — guards required before collection access or mutation.</summary>
-    Safety,
+    Safety         = 6,
     /// <summary>Proof engine results — unsatisfiable guards, division by zero, sqrt of negative.</summary>
-    Proof,
+    Proof          = 7,
 }
 
 public readonly record struct Diagnostic(
