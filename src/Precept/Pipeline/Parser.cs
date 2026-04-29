@@ -744,23 +744,13 @@ public static class Parser
 
         private RuleDeclarationNode ParseRuleDeclaration()
         {
+            var meta = Constructs.GetMeta(ConstructKind.RuleDeclaration);
             var start = Current().Span;
             Advance(); // consume 'rule'
-
-            var condition = ParseExpression(0);
-            Expression? guard = null;
-            if (Current().Kind == TokenKind.When)
-            {
-                Advance(); // consume 'when'
-                guard = ParseExpression(0);
-            }
-
-            var because = Expect(TokenKind.Because);
-            var message = ParseExpression(0);
-
-            return new RuleDeclarationNode(
-                SourceSpan.Covering(start, message.Span),
-                condition, guard, message);
+            var slots = ParseConstructSlots(meta);
+            var lastSpan = GetLastSlotSpan(slots, start);
+            return (RuleDeclarationNode)BuildNode(ConstructKind.RuleDeclaration, slots,
+                SourceSpan.Covering(start, lastSpan));
         }
 
         // ── State entry parsing ───────────────────────────────────────────────
