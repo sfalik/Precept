@@ -11,7 +11,7 @@ Date: 2026-04-28
 
 ### Documentation
 - `docs/language/precept-language-spec.md` — grammar, dispatch tables, composition rules, diagnostic catalog
-- `docs/language/precept-language-vision.md` — access mode surface, two-layer model
+- `docs/archive/language-design/precept-language-vision.md` — access mode surface, two-layer model (archived)
 - `docs/compiler/parser.md` — dispatch tables, AST nodes, construct table, 1:N table, sync points
 - `docs/compiler/diagnostic-system.md` — diagnostic metadata references
 - `docs/compiler/lexer.md` — keyword catalog references
@@ -56,7 +56,7 @@ Date: 2026-04-28
 - `src/Precept/Language/TokenKind.cs` — ✓ `Write`/`Read` removed, `Modify`/`Readonly`/`Editable`/`Omit` present with correct retirement comment
 - `src/Precept/Language/ConstructSlot.cs` — ✓ `AccessModeKeyword` and `FieldTarget` slot kinds present
 - `src/Precept/Language/DiagnosticCode.cs` — ✓ No stale references to `write`/`read` vocab; `ConflictingAccessModes`, `RedundantAccessMode` present
-- `docs/language/precept-language-vision.md` — ✓ Uses correct `modify`/`readonly`/`editable`/`omit` vocabulary throughout
+- `docs/archive/language-design/precept-language-vision.md` — ✓ Uses correct `modify`/`readonly`/`editable`/`omit` vocabulary throughout
 - `docs/compiler/diagnostic-system.md` — ✓ Access mode section header clean
 - `docs/compiler/lexer.md` — ✓ References AccessMode keyword category correctly
 - `samples/*.precept` — ✓ No retired `write`/`read` usage found

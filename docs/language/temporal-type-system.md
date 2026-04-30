@@ -8,7 +8,7 @@
 |---|---|
 | Doc maturity | Draft |
 | Implementation state | Proposal — not yet implemented |
-| Grounding | `docs/language/precept-language-vision.md` § Type System |
+| Grounding | `docs/language/precept-language-spec.md`; vision archived at `docs/archive/language-design/precept-language-vision.md` § Type System |
 | Prototype | `docs/TemporalTypeSystemDesign.md` on `research/nodatime-type-alignment` branch (PR #114) |
 | Related | [Issue #107](https://github.com/sfalik/Precept/issues/107) · [Primitive Types](primitive-types.md) · [Business-Domain Types](business-domain-types.md) · [Literal System](../compiler/literal-system.md) |
 
@@ -291,7 +291,7 @@ field ContractEnd as date default '2099-12-31'
 | `date ± '2 weeks'` | `date` | = 14 days. |
 | `date + time` | `datetime` | Combines a calendar date with a time of day. `LocalDate + LocalTime → LocalDateTime`. NodaTime native. |
 | `date - date` | `period` | Calendar distance. `Period.Between(d1, d2)`. Preserves structural components. |
-| `==`, `!=`, `<`, `>`, `<=`, `>=` | `boolean` | NodaTime default behavior. Thin wrapper — no custom logic. |
+| `==`, `!=`, `<`, `>`, `<=`, `>=` | `boolean` | NodaTime native — Precept does not define or alter the semantics. |
 
 | **Not supported** | **Why** |
 |---|---|
@@ -353,7 +353,7 @@ field CheckInTime as time optional
 | `time ± '45 seconds'` | `time` | Same bridging. Wraps at midnight. |
 | `time + date` | `datetime` | Commutative form of `date + time`. Same result: `LocalDate + LocalTime → LocalDateTime`. |
 | `time - time` | `period` | Time-component period between two times. `Period.Between(t1, t2)` returns period with `.hours`, `.minutes`, `.seconds` components. NodaTime faithful. |
-| `==`, `!=`, `<`, `>`, `<=`, `>=` | `boolean` | NodaTime default behavior. Thin wrapper — no custom logic. |
+| `==`, `!=`, `<`, `>`, `<=`, `>=` | `boolean` | NodaTime native — Precept does not define or alter the semantics. |
 
 **Note:** `time ± period` requires the period to be provably time-only (Decision #26). NodaTime's `LocalTime.Plus(Period)` **throws `ArgumentException`** on periods with non-zero date components — it does NOT silently ignore them. The `of 'time'` constraint or literal time-unit analysis provides the compile-time proof. `time + '5 days'` is a compile error. `time + '3 hours'` is valid (literal analysis proves time-only).
 
@@ -415,7 +415,7 @@ field IncidentTimestamp as instant
 | `instant ± '30 minutes'` | `instant` | Typed constant quantity — resolves to `Duration.FromMinutes(30)`. |
 | `instant ± '45 seconds'` | `instant` | Typed constant quantity — resolves to `Duration.FromSeconds(45)`. |
 | `instant ± '2 weeks'` | `instant` | Typed constant quantity — `'weeks'` resolves to `Duration.FromDays(14)` in instant context. |
-| `==`, `!=`, `<`, `>`, `<=`, `>=` | `boolean` | NodaTime default behavior. Thin wrapper — no custom logic. |
+| `==`, `!=`, `<`, `>`, `<=`, `>=` | `boolean` | NodaTime native — Precept does not define or alter the semantics. |
 
 | **Not supported** | **Why** |
 |---|---|
@@ -510,7 +510,7 @@ These resolve to `Duration.FromHours`, `Duration.FromMinutes`, `Duration.FromSec
 - **Compound expressions:** `duration / (Rate + 1)` assumes satisfiable — no diagnostic (consistent with #106's Principle #8 conservatism).
 
 Duration division is not a special case — it inherits the same divisor safety as numeric division. The only temporal-specific notes: (1) `DivideByZeroException` (instead of IEEE 754 `Infinity`) makes the runtime consequence more severe for duration than for float, and (2) `duration / duration` requires a duration-typed nonzero proof, which `nonzero` on duration fields provides (#111).
-| `==`, `!=`, `<`, `>`, `<=`, `>=` | `boolean` | NodaTime default behavior. Thin wrapper — no custom logic. |
+| `==`, `!=`, `<`, `>`, `<=`, `>=` | `boolean` | NodaTime native — Precept does not define or alter the semantics. |
 
 | **Not supported** | **Why** |
 |---|---|
@@ -749,7 +749,7 @@ No standalone construction function exists. `zoneddatetime` is always reached vi
 | `zoneddatetime ± '{N} hours'` | `zoneddatetime` | Interpolated typed constant — variable expression resolves to `duration`. |
 | `zoneddatetime ± '{N} days'` | `zoneddatetime` | Interpolated typed constant — `days` resolves to `duration` in zoneddatetime context. |
 | `zoneddatetime - zoneddatetime` | `duration` | Instant subtraction. |
-| `==`, `!=` | `boolean` | NodaTime default behavior (`ZonedDateTime.Equals()` — compares instant + calendar + zone). Thin wrapper. |
+| `==`, `!=` | `boolean` | NodaTime native equality — Precept does not define or alter the semantics. `ZonedDateTime.Equals()` compares instant + calendar + zone. |
 
 | **Not supported** | **Why** |
 |---|---|
@@ -804,7 +804,7 @@ field ScheduledFor as datetime default '2026-04-13T09:00:00'
 | `datetime ± '30 days'`, `± '3 months'`, `± '1 year'`, `± '2 weeks'` | `datetime` | Typed constant quantities — resolve to `period` in datetime context. |
 | `datetime ± '3 hours'`, `± '30 minutes'`, `± '45 seconds'` | `datetime` | Typed constant quantities — resolve to `period` in datetime context (Decision #9). `LocalDateTime.Plus(Period.FromHours(3))`. Overflow advances the date naturally. |
 | `datetime - datetime` | `period` | `Period.Between(ldt1, ldt2)`. |
-| `==`, `!=`, `<`, `>`, `<=`, `>=` | `boolean` | NodaTime default behavior. Thin wrapper — no custom logic. |
+| `==`, `!=`, `<`, `>`, `<=`, `>=` | `boolean` | NodaTime native — Precept does not define or alter the semantics. |
 
 Note: `datetime ± period` accepts all component categories — `LocalDateTime.Plus/Minus(Period)` has no restrictions. Time-unit typed constants (`'3 hours'`, `'30 minutes'`, `'45 seconds'`) resolve to `period` in `datetime` context via context-dependent resolution (Decision #9), NOT to `duration`. This means `datetime + '3 hours'` becomes `LocalDateTime.Plus(Period.FromHours(3))` — NodaTime-native, overflow advances the date naturally (e.g., `'2026-01-15T23:00:00' + '3 hours'` → `'2026-01-16T02:00:00'`).
 
@@ -1545,7 +1545,7 @@ Temporal types are valid as collection inner types where the collection's struct
 | `timezone` | **✗** — no natural ordering | ✓ |
 | `zoneddatetime` | **✗** — no natural ordering | ✓ |
 
-`set of period`, `set of timezone`, and `set of zoneddatetime` are compile errors: "This type has no natural ordering. Use `queue of <T>` or `stack of <T>` instead."
+`set of period`, `set of timezone`, and `set of zoneddatetime` are valid — these types have well-defined equality semantics (NodaTime native) and set membership is coherent. `.min` and `.max` are type errors on these sets: the types carry no natural ordering. The error message is: `"Type '{T}' supports equality but not ordering. Remove the .min/.max call, or use a type that supports ordering."` The prior restriction ("use queue or stack instead") was more restrictive than necessary — equality alone is sufficient for set membership.
 
 ---
 
@@ -1737,5 +1737,5 @@ _TBD — implementation questions will be captured here when this proposal advan
 | [Primitive Types](primitive-types.md) | Temporal types extend the primitive numeric lane model; `duration` scaling uses `number`-lane arithmetic |
 | [Business-Domain Types](business-domain-types.md) | Depends on `period`, `duration`, `timezone`, and the typed constant delimiter established here |
 | [Literal System](../compiler/literal-system.md) | Canonical design for two-door literal model — temporal typed constants are Door 2 inhabitants |
-| [Language Vision](precept-language-vision.md) | Grounding for temporal type surface decisions |
+| [Language Vision](../archive/language-design/precept-language-vision.md) | Archived target language surface — grounding for temporal type surface decisions |
 | [Issue #107](https://github.com/sfalik/Precept/issues/107) | Linked proposal |

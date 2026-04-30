@@ -1,3 +1,9 @@
+> **Archived 2026-04-29.** This document has been superseded by
+> `docs/language/precept-language-spec.md`, which is now the single canonical
+> language specification. Content from this document was migrated to the spec
+> in §0 Preamble and §3A Language Semantics. Two stale references (`with` keyword,
+> `write all` root editability) were removed before archiving.
+
 # Precept Language Vision
 
 **Date:** 2026-04-20
@@ -195,7 +201,7 @@ The language is keyword-dominant for structure and domain meaning.
 Keyword families:
 
 1. Declaration keywords: `precept`, `field`, `state`, `event`, `rule`, `ensure`, `modify`, `writable`.
-2. Structural prepositions: `in`, `to`, `from`, `on`, `of`, `with`, `into`.
+2. Structural prepositions: `in`, `to`, `from`, `on`, `of`, `into`.
 3. Control keywords: `when`, `if`, `then`, `else`.
 4. Action keywords: `set`, `add`, `remove`, `enqueue`, `dequeue`, `push`, `pop`, `clear`, `transition`, `reject`, `no`.
 5. Constraint keywords: `optional`, `default`, `because`, `nonnegative`, `positive`, `nonzero`, `notempty`, `min`, `max`, `minlength`, `maxlength`, `mincount`, `maxcount`, `maxplaces`, `ordered`.
@@ -747,7 +753,7 @@ They may declare:
 
 1. Fields.
 2. Rules.
-3. Root editability.
+3. Field editability (`writable` modifier and state-level `modify`/`omit` overrides).
 4. Events.
 5. Stateless event hooks.
 

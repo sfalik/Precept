@@ -5,7 +5,7 @@
 **Status:** Design session Round 4 — concrete artifacts, correctness contracts, feasibility spikes
 **References:**
 - `docs/working/catalog-parser-design-v3.md` — Frank's Round 3 (superseded by this document)
-- `docs/language/precept-language-vision.md` — language surface source of truth
+- `docs/archive/language-design/precept-language-vision.md` — language surface source of truth (archived)
 - `docs/language/precept-language-spec.md` — DSL spec (law)
 - `docs/language/catalog-system.md` — metadata-driven architecture
 - `docs/philosophy.md` — product identity
@@ -22,7 +22,7 @@
 
 I have read the following documents in full:
 
-1. **`docs/language/precept-language-vision.md`** — the future-state language surface.
+1. **`docs/archive/language-design/precept-language-vision.md`** — the future-state language surface (archived).
 2. **`docs/language/precept-language-spec.md`** — the DSL spec (v2).
 3. **`docs/language/catalog-system.md`** — metadata-driven catalog architecture.
 4. **`docs/philosophy.md`** — product identity and positioning.

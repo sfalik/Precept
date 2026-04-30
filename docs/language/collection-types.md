@@ -233,9 +233,16 @@ The inner type `T` in `set of T`, `queue of T`, or `stack of T` must be a scalar
 ```
 CollectionType  :=  (set | queue | stack) of ScalarType
 ScalarType      :=  string | ~string | integer | decimal | number | boolean | choice(...) ordered?
+               |   date | time | datetime | instant | duration
+               |   period ('of' ('date' | 'time') | 'in' PeriodUnit)?
+               |   timezone | zoneddatetime
+               |   money ('in' CurrencyCode)?
+               |   quantity ('of' DimensionCode | 'in' UnitCode)?
+               |   price ('in' CurrencyCode)?
+               |   currency | unitofmeasure | dimension | exchangerate
 ```
 
-Collections of collections (`set of set of string`) are not supported. Collections of temporal or business-domain types are not currently supported — the inner type must be a primitive.
+Collections of collections (`set of set of string`) are not supported. All Precept scalar types — including temporal and business-domain types — are valid inner types. See §Temporal and Business-Domain Inner Types below for ordering constraints and qualified type syntax.
 
 ### `~string` — case-insensitive inner type
 
@@ -257,6 +264,94 @@ field Labels as set of ~string   # OrdinalIgnoreCase — "Apple" and "apple" are
 **`~string` is collection-only.** `field Name as ~string` is a compile-time error: `CaseInsensitiveStringOnNonCollection`. The `~` prefix is only valid immediately after `of` in a collection type position.
 
 **`~string` in queue and stack.** While `~string` is most meaningful for sets (where deduplication and membership benefit from case-insensitive comparison), it is also valid as the inner type for `queue of ~string` and `stack of ~string`. The `contains` operator on these collections uses `OrdinalIgnoreCase` matching.
+
+### Temporal and Business-Domain Inner Types
+
+All temporal and business-domain types are valid collection inner types. Ordering and comparison capabilities vary:
+
+**Temporal types:**
+
+| Inner type | `.min`/`.max` | Notes |
+|---|---|---|
+| `date` | ✓ | Ordinal calendar ordering |
+| `time` | ✓ | |
+| `datetime` | ✓ | |
+| `instant` | ✓ | UTC timeline ordering |
+| `duration` | ✓ | |
+| `period` | ✗ — type error | Equality-only (unqualified). Structural components are not directly comparable — `'1 month'` has no fixed length. See Decision #14 in temporal-type-system.md. |
+| `period of 'date'` | ✗ — type error | Equality-only. Category constraint (years/months/weeks/days only). Used as arithmetic-safety qualifier for `date ± period` — not an ordering qualifier. |
+| `period of 'time'` | ✗ — type error | Equality-only. Category constraint (hours/minutes/seconds only). Used as arithmetic-safety qualifier for `time ± period` — not an ordering qualifier. |
+| `period in 'days'` | ✓ | Unit-qualified: all elements are single-basis periods. Ordering is by single component value (`.days`). Valid bases: `days`, `months`, `years`, `weeks`, `hours`, `minutes`, `seconds`. |
+| `timezone` | ✗ — type error | Equality-only. No natural ordering across timezone identifiers. |
+| `zoneddatetime` | ✗ — type error | Equality-only. NodaTime native equality compares instant + calendar + zone; two values representing the same moment in different timezones are different elements. |
+
+**Business-domain types:**
+
+| Inner type | `.min`/`.max` | Notes |
+|---|---|---|
+| `money in 'USD'` | ✓ — same currency guaranteed | Unqualified `money`: `.min`/`.max` are type errors (cross-currency ordering undefined; exchange rates are dynamic) |
+| `quantity of 'length'` | ✓ — conversion-aware | `.min`/`.max` normalize to SI base unit for comparison; return original element. `'5 km' == '5000 m'` is `TRUE`. See §Qualified inner types. |
+| `quantity in 'kg'` | ✓ — same unit guaranteed | Unqualified `quantity`: `.min`/`.max` are type errors |
+| `price in 'USD'` | ✓ — same currency guaranteed | Unqualified `price`: `.min`/`.max` are type errors |
+| `price in 'USD' of 'mass'` | ✓ — currency + dimension both pinned | Currency is static; mass conversions are static SI |
+| `currency` | ✗ — type error | Equality-only |
+| `unitofmeasure` | ✗ — type error | Equality-only |
+| `dimension` | ✗ — type error | Equality-only |
+| `exchangerate` | ✗ — type error | Equality-only |
+
+**Qualified inner types**
+
+`money`, `quantity`, and `price` support qualifiers that restrict elements to a homogeneous denomination and unlock ordering:
+
+```precept
+field Charges    as set of money in 'USD'         # all elements USD — .min/.max valid
+field Weights    as set of quantity in 'kg'        # all elements kg — .min/.max valid
+field Distances  as set of quantity of 'length'    # any length unit — .min/.max valid, conversion-aware
+```
+
+**Three qualification levels for `quantity`:**
+
+| Declaration | Admitted elements | `.min`/`.max` | Equality |
+|---|---|---|---|
+| `set of quantity` | Any quantity (any dimension, any unit) | ✗ type error | Structural (value + unit) |
+| `set of quantity of 'length'` | Any length unit (`km`, `miles`, `m`, `cm`, ...) | ✓ conversion-aware | Conversion-aware: `'5 km' == '5000 m'` |
+| `set of quantity in 'km'` | `km` only | ✓ structural | Structural: `'5 km' == '5 km'` |
+
+`of 'DimensionCode'` and `in 'UnitCode'` are mutually exclusive. `set of quantity of 'length' in 'km'` is a grammar error.
+
+**Dimension-qualified ordering: how it works**
+
+When a dimension qualifier is present (`of 'length'`), the runtime normalizes all elements to the SI base unit for comparison purposes only. The original element — with its original unit — is returned by `.min`/`.max`:
+
+```precept
+field Distances as set of quantity of 'length'
+
+add Distances '5 km'
+add Distances '3 miles'
+add Distances '10 m'
+
+# Distances.min  →  '10 m'     (10 m < 3 miles ≈ 4828 m < 5 km = 5000 m)
+# Distances.max  →  '5 km'
+```
+
+Equality inside a dimension-qualified collection is conversion-aware. Adding `'5000 m'` to a set already containing `'5 km'` is a no-op — they are the same element:
+
+```precept
+add Distances '5000 m'   # no-op — '5 km' already present (5 km = 5000 m)
+```
+
+**Supported dimensions (v1):** `length`, `mass`, `volume`, `area`, `energy`, `pressure`, `temperature`.
+
+SI base units for normalization: `m` (length), `kg` (mass), `L` (volume), `m2` (area), `J` (energy), `Pa` (pressure), `K` (temperature).
+
+**Grammar disambiguation:** The two `of` tokens in `set of quantity of 'length'` are not ambiguous. The parser distinguishes them by lookahead: the collection-connector `of` is always followed by a type keyword; the dimension-qualifier `of` is always followed by a quoted string literal. Binding is `set of (quantity of 'length')`.
+
+When `in 'CurrencyCode'` or `in 'UnitCode'` appears after the inner type in a collection declaration, it binds to the inner type, not the collection. The collection itself has no currency or unit qualifier — the qualifier is part of the inner scalar type specification.
+
+Adding a value of the wrong denomination is a type error at the `add` site:
+```precept
+add Charges $50 EUR     # TypeMismatch — expected money in 'USD', got money in 'EUR'
+```
 
 ### Token vocabulary
 
@@ -543,7 +638,7 @@ QuantifierKind  :=  each | any | no
 
 7. **Collection type expansion.** After quantifier predicates and field constraints ship, which collection type — if any — should be next? The §Proposed Additional Types section below surveys candidates. Before any of these could become a formal GitHub issue, the following research would be needed: (a) a concrete corpus of `.precept` files that cannot express a real business rule without the proposed type, (b) a proof engine impact assessment for the type's mutation operations, (c) an inner type compatibility analysis (which scalar types are valid, which are type errors), and (d) a philosophy review confirming the type reads as domain declaration, not general-purpose programming.
 
-8. **Temporal and business-domain types as inner types.** The `ScalarType` production currently admits only primitives (`string`, `~string`, `integer`, `decimal`, `number`, `boolean`, `choice`). There is no principled reason to exclude temporal types (`date`, `time`, `datetime`, `duration`) or business-domain types (`money`, `percentage`) from collection inner types. `set of date`, `queue of money`, and `map of string to date` are all semantically coherent — these types have natural ordering and comparison semantics. This appears to be an incremental build artifact (collections and typed scalars landed at different times) rather than an intentional restriction. Should the `ScalarType` production be extended to include all Precept scalar types?
+8. ~~Temporal and business-domain types as inner types~~ — **Resolved.** The `ScalarType` production now includes all temporal and business-domain types. `percentage` was a stale reference — this type does not exist in the business-domain type system. See §Temporal and Business-Domain Inner Types for the full expansion. Locked Decision.
 
 ---
 
@@ -562,36 +657,7 @@ Every candidate must pass all six filters before advancing:
 5. **Business analyst readable** — the keyword name communicates behavior without documentation
 6. **Non-Turing-complete** — finite, bounded operations; no unbounded recursion or general iteration
 
-### Candidate 1: `sortedset of T`
-
-**What it is:** Like `set` but maintains elements in sorted order by the inner type's natural ordering. `.min` and `.max` are always-safe accessors (no emptiness guard needed when combined with `notempty`), and iteration order is deterministic.
-
-**Business scenario:** A loan application tracks required approval levels. The business rule is "the highest approval level determines the signing authority." With a plain `set`, `.min`/`.max` require emptiness guards every time. A `sortedset` with a `notempty` constraint makes these always-safe.
-
-```precept
-field ApprovalLevels as sortedset of choice("team-lead", "director", "vp", "cfo") ordered notempty
-
-# .min → always-safe, returns lowest declared rank
-# .max → always-safe, returns highest declared rank
-rule SigningAuthority == ApprovalLevels.max
-    reason "Signing authority must match the highest required approval"
-```
-
-**Proof engine implications:** If the field carries `notempty` (or `mincount 1`), `.min`/`.max` are statically safe — no `UnguardedCollectionAccess` needed. The proof engine must track the `notempty` constraint as a proof discharge for access obligations. The inner type `T` must be orderable.
-
-**Grammar fit:**
-
-```
-field F as sortedset of T
-```
-
-Reuses the `of` connector and all existing constraint keywords (`mincount`, `maxcount`, `notempty`).
-
-**Action surface:** Identical to `set` — `add`, `remove`, `clear`. No new keywords. The sorted invariant is maintained internally.
-
-**Priority:** **Medium.** The business value is real (eliminating emptiness guards on ordered collections), but `set` + explicit guards covers the same ground with more ceremony. This is a convenience and safety improvement, not a capability gap.
-
-### Candidate 2: `bag of T` (multiset)
+### Candidate 1: `bag of T` (multiset)
 
 **What it is:** Like `set` but allows duplicate elements. Each element has an associated count. Supports `add` (increment count), `remove` (decrement count), `.countof(element)` accessor.
 
@@ -626,7 +692,7 @@ Natural keyword — "bag" is the established mathematical term for multiset, and
 
 **Priority:** **High.** This unlocks counting and quantity-tracking rules that `set` (which collapses duplicates) and `queue`/`stack` (which don't expose per-element counts) cannot express. Many real business domains need "how many of X" as a first-class concept.
 
-### Candidate 3: `list of T`
+### Candidate 2: `list of T`
 
 **What it is:** An ordered sequence with stable positions, duplicates allowed, and index access. Differs from all existing types:
 - `queue` — ordered, but FIFO-only, no random access
@@ -659,7 +725,7 @@ Clean. Reuses `of`. No new declaration keywords.
 
 **Priority:** **Low.** Not a reject — no philosophy violation (unlike ring buffer's silent eviction). But the genuine incremental territory over `log` is narrow (arbitrary removal), the proof cost of positional-mutation is real, and mutable-ordered-list business scenarios are rarer than `bag`/`log`/`map` frequency. Right sequencing: evaluate after `log` ships.
 
-### Candidate 4: `deque of T`
+### Candidate 3: `deque of T`
 
 **What it is:** Double-ended queue. Supports push/pop at both front and back.
 
@@ -693,7 +759,7 @@ field F as deque of T
 
 **Priority:** **Low.** The double-ended access pattern is rare in business-rule domains. Most real scenarios are either FIFO (queue) or LIFO (stack). The escalation pattern can be modeled with two separate queues (priority + normal) or a priority queue. The keyword surface cost is high relative to the business-rule unlock.
 
-### Candidate 5: `priorityqueue of T priority P`
+### Candidate 4: `priorityqueue of T priority P`
 
 **What it is:** A queue where elements are dequeued by priority rather than insertion order. Each element has two axes: a value (type `T`) and a priority (type `P`). The priority type `P` must be orderable (numeric or `choice(...) ordered`). Dequeue always removes the element with the best priority according to the declared sort direction.
 
@@ -794,10 +860,6 @@ This is a meaningful design distinction: for single-type collections (`set`, `qu
 rule no claim in ClaimQueue (claim.priority < 2)
     reason "All claims must have priority 2 or higher"
 
-# Assert all claims have normal or high priority (with choice-typed priority)
-rule each claim in TriageQueue (claim.priority in choice("normal", "high"))
-    reason "Only normal and high priority claims accepted"
-
 # Existential check on element value
 when any claim in ClaimQueue (claim.value == TargetClaimId)
 
@@ -805,6 +867,14 @@ when any claim in ClaimQueue (claim.value == TargetClaimId)
 rule no claim in ClaimQueue (claim.priority < 3 and claim.value == "")
     reason "High-priority claims must have a claim ID"
 ```
+
+When the priority axis is choice-typed, the declaration is the constraint — no rule needed. A claim with a priority outside the declared choices is a type error at the `enqueue` site:
+
+```precept
+field TriageQueue as priorityqueue of ClaimId priority choice("normal", "high")
+```
+
+A `"critical"` priority claim cannot enter `TriageQueue` — the type prevents it.
 
 **Grammar for priorityqueue quantifier binding:**
 
@@ -863,9 +933,9 @@ The following questions from frank-14 are now resolved:
 
 1. **Quantifier binding shape for single-type vs. two-type collections.** When a quantifier iterates a `set of string`, the binding IS the string. When it iterates a `priorityqueue of string priority integer`, the binding exposes `.value` and `.priority`. This means the type checker must distinguish binding shapes by collection kind. Is this implicit (the type checker infers the shape from the collection type) or explicit (the author declares the binding shape)? Implicit is simpler and consistent with how the binding already adapts to the collection's inner type.
 
-2. **`ascending`/`descending` keyword reuse.** These keywords may also be relevant for `sortedset` iteration order or future ordering features. Should they be reserved broadly as ordering modifiers, or scoped specifically to `priorityqueue` and `dequeue`?
+2. **`ascending`/`descending` keyword reuse.** These keywords may also be relevant for future ordering features beyond `priorityqueue`. Should they be reserved broadly as ordering modifiers, or scoped specifically to `priorityqueue` and `dequeue`?
 
-### Candidate 6: `log of T`
+### Candidate 5: `log of T`
 
 **What it is:** An append-only ordered sequence. Elements can be added but never removed. Supports `.count`, positional read (`.at(index)`), `.last`, and `.first`. Models audit trails, event histories, and compliance records.
 
@@ -902,7 +972,7 @@ field F as log of T
 
 **Note on `list of T` overlap:** The positional-read accessors — `.at(N)`, `.first`, `.last` — appear in both `log` and the separately evaluated `list of T` candidate. The overlap is deliberate: `log` covers the common case — read-only positional access on an accumulating record with a stable, monotonically growing index space. `list of T` is the separate evaluation for mutable ordered sequences, adding the one operation `log` prohibits: arbitrary positional removal. If `log` satisfies real positional-read use cases in practice, the incremental case for `list` weakens.
 
-### Candidate 7: `map of K to V`
+### Candidate 6: `map of K to V`
 
 **What it is:** A key-value association. Each key maps to exactly one value. Supports set-by-key, get-by-key, contains-key, and remove-by-key.
 
@@ -933,9 +1003,9 @@ field F as map of K to V
 
 Introduces `to` as a type-position keyword connecting key and value types. Both `K` and `V` must be scalar types. The `to` keyword is new in this context but reads naturally.
 
-> **⚠ Open Question — Access keyword not finalized.** The working syntax shown above uses the infix keyword `for` (`CoverageLimits for CheckCoverage.CoverageType`). This is Shane's current lean, but the keyword has **not** been locked in. Both `for` and `at` remain on the table. Do not treat `for` as a settled decision — explicit owner sign-off is required before this keyword advances to a formal proposal or implementation.
+> **Locked Decision — Access keyword: `for`.** Map value access uses the infix keyword `for`: `CoverageLimits for CheckCoverage.CoverageType`. Considered: `at`. Rejected: `at` would create ambiguity with future temporal constructs and reads less naturally with map field names in business context.
 
-**Action surface:** New keywords: `put`, `removekey`, `containskey`, `for` (infix key access). `containskey` parallels `contains` on sets. `.count` reuses existing accessor. `.keys` and `.values` could return sets for use in `contains` and quantifier expressions.
+**Action surface:** New keywords: `put`, `removekey`, `containskey`, `for` is the infix key-access keyword. `containskey` parallels `contains` on sets. `.count` reuses existing accessor. `.keys` and `.values` could return sets for use in `contains` and quantifier expressions.
 
 **Priority:** **High.** Key-value association is fundamental to business modeling. Configuration tables, fee schedules, lookup mappings, and per-category settings are everywhere. Today, modeling these in Precept requires either multiple parallel fields or external application logic — both of which break the one-file-complete-rules guarantee. A `map` type keeps the association inside the contract.
 
@@ -1005,6 +1075,16 @@ when DepartmentMembers["engineering"] contains "alice"
 
 **Priority/Recommendation:** **Reject.** A multimap is a collection of collections behind a key lookup — two levels of indirection that enter general-purpose data structure territory. Even if `map` ships, `multimap` adds nested collection semantics that Precept's flat-statement philosophy prohibits. The one-to-many pattern is better served by explicit set fields (`field EngineeringTeam as set of string`, `field SalesTeam as set of string`) with cross-collection constraints (`subset`, `disjoint`) relating them.
 
+### Rejected: `sortedset of T`
+
+**Motivation:** Like `set` but maintains elements in sorted order by the inner type's natural ordering. `.min` and `.max` were claimed to be "always-safe" when combined with `notempty`, and iteration order would be deterministic.
+
+**Why rejected:** No Precept construct can observe sorted iteration order. Quantifiers (`each`, `any`, `no`) are boolean predicates — order-independent by definition. `.min`/`.max` return the minimum and maximum value regardless of storage order; the proof obligation for safe access is discharged by `notempty` alone. `set of T notempty` is proof-identical to `sortedset of T notempty` — the sorted storage contributes nothing to the safety guarantee. The action surface (`add`, `remove`, `clear`) is identical to `set`.
+
+The sole difference between `sortedset` and `set` that is visible at the language surface is the type name. A type whose behavior is indistinguishable from another type by any language construct is not a type — it is an implementation detail wearing a type costume. Tree-backed storage with O(log n) inserts buys no benefit in a DSL governing business contracts where collections are small.
+
+If Precept ever adds ordered-iteration constructs that make sorted order observable, `sortedset` can be re-evaluated at that time with an actual consuming construct to justify it.
+
 ### Priority Summary
 
 | Candidate | Priority | Rationale |
@@ -1012,7 +1092,7 @@ when DepartmentMembers["engineering"] contains "alice"
 | `bag of T` | **High** | Unlocks quantity tracking — pervasive in commerce, inventory, counting rules |
 | `log of T` | **High** | Unlocks append-only audit trails — pervasive in regulated industries, aligns perfectly with prevention philosophy |
 | `map of K to V` | **High** | Unlocks key-value association — pervasive in configuration, fee schedules, coverage tables |
-| `sortedset of T` | **Medium** | Convenience improvement — eliminates emptiness guards on ordered collections, but `set` + guards covers same ground |
+| `sortedset of T` | **Reject** | No Precept construct observes iteration order; `.min`/`.max` safety is owned by `notempty` alone; `set notempty` is proof-identical |
 | `priorityqueue of T priority P` | **Medium** | Real pattern; two-type-parameter grammar generalizes with `map`; proof surface manageable (emptiness + static direction) |
 | `deque of T` | **Low** | Rare in business-rule domains — double-ended access is an infrastructure pattern, not a business-rule pattern |
 | `list of T` | **Low** | Narrow incremental territory over `log`; mutable-ordered-list use cases rarer than bag/log/map; evaluate after `log` ships |
@@ -1024,8 +1104,7 @@ when DepartmentMembers["engineering"] contains "alice"
 
 1. **First:** `bag` and `log` — highest business-rule unlock per complexity dollar; `bag` extends the existing set action surface minimally, `log` introduces one new keyword (`append`) and aligns with audit/compliance requirements
 2. **Second:** `map` — highest structural value but largest surface expansion (new type connector `to`, new proof obligation category for key-presence)
-3. **Evaluate:** `sortedset` — only after quantifier predicates ship, because sorted-set value compounds with element-level predicates
-4. **Evaluate:** `priorityqueue` — two-type-parameter design resolved; evaluate after `map` ships since `priority`/`to` share the role-connector pattern. `deque` deferred — insufficient business-rule pressure
+3. **Evaluate:** `priorityqueue` — two-type-parameter design resolved; evaluate after `map` ships since `priority`/`to` share the role-connector pattern. `deque` deferred — insufficient business-rule pressure
 
 ---
 
@@ -1036,7 +1115,7 @@ when DepartmentMembers["engineering"] contains "alice"
 | Capability | .NET | Java | Python | Rust | SQL | CEL | F#/Haskell | Precept (shipped) | Precept (proposed) |
 |---|---|---|---|---|---|---|---|---|---|
 | **Unordered unique set** | `HashSet<T>` | `HashSet` | `set` | `HashSet` | — | — | `Set<'T>` | `set of T` ✓ | — |
-| **Sorted unique set** | `SortedSet<T>` | `TreeSet` | — | `BTreeSet` | — | — | `Set<'T>` (sorted) | — | `sortedset of T` |
+| **Sorted unique set** | `SortedSet<T>` | `TreeSet` | — | `BTreeSet` | — | — | `Set<'T>` (sorted) | — | Rejected¶ |
 | **Insertion-order set** | — | `LinkedHashSet` | — | `IndexSet`* | — | — | — | — | Not proposed†† |
 | **Multiset / bag** | — | — | `Counter` | — | `MULTISET` | — | — | — | `bag of T` |
 | **FIFO queue** | `Queue<T>` | `ArrayDeque` | `deque` | `VecDeque` | — | — | — | `queue of T` ✓ | — |
@@ -1058,6 +1137,7 @@ when DepartmentMembers["engineering"] contains "alice"
 † Ring buffer rejected: silent eviction on full `enqueue` violates inspectability — use `queue` + `maxcount` + explicit `dequeue`.
 ‡ Scala `Map[K, List[V]]` is the idiomatic multimap encoding, not a dedicated type.
 § Multimap rejected: nested collection semantics Precept explicitly excludes — use explicit set fields + `subset`/`disjoint` constraints.
+¶ Sorted unique set rejected: no Precept construct observes sorted iteration order; `.min`/`.max` safety is owned by `notempty` alone; `set of T notempty` is proof-identical.
 †† Insertion-order sets conflate two concerns (uniqueness + temporal ordering) in a way that makes proof-engine reasoning ambiguous — the "order" has no semantic meaning the engine can verify. Precept's `queue` (explicit FIFO) and `set` (explicit uniqueness) are the correct decomposition.
 
 ---

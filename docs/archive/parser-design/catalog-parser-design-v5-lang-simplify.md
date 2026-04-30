@@ -6,7 +6,7 @@
 **References:**
 - `docs/working/catalog-parser-design-v4.md` — Round 4 design (current parser design)
 - `docs/language/precept-language-spec.md` — DSL spec (law)
-- `docs/language/precept-language-vision.md` — language vision (target surface)
+- `docs/archive/language-design/precept-language-vision.md` — language vision (target surface, archived)
 - All 28 sample files in `samples/`
 
 ---

@@ -5,7 +5,7 @@
 **Status:** Design session Round 5 — validation layer, extensibility contracts, G5 resolution
 **References:**
 - `docs/working/catalog-parser-design-v4.md` — George's Round 4 (superseded by this document)
-- `docs/language/precept-language-vision.md` — language surface source of truth
+- `docs/archive/language-design/precept-language-vision.md` — language surface source of truth (archived)
 - `docs/language/precept-language-spec.md` — DSL spec (law)
 - `docs/language/catalog-system.md` — metadata-driven catalog architecture
 - `docs/philosophy.md` — product identity
@@ -22,7 +22,7 @@
 
 I have read the following documents in full:
 
-1. **`docs/language/precept-language-vision.md`** (~70KB) — Confirmed reading. The full intended language surface. Covers stateful and stateless precepts, the three-lane numeric system, temporal and business-domain types, the modifier system, field access modes, and proof system responsibilities. Key for this round: the core declaration inventory at line 153 shows `rule <Expr> [when <Guard>] because "..."` — the rule body is a standalone boolean expression, NOT introduced by `when`.
+1. **`docs/archive/language-design/precept-language-vision.md`** (~70KB) — Confirmed reading. The full intended language surface. Covers stateful and stateless precepts, the three-lane numeric system, temporal and business-domain types, the modifier system, field access modes, and proof system responsibilities. Key for this round: the core declaration inventory at line 153 shows `rule <Expr> [when <Guard>] because "..."` — the rule body is a standalone boolean expression, NOT introduced by `when`.
 
 2. **`docs/language/precept-language-spec.md`** — Confirmed reading. The law. § 2.2 defines the rule grammar as `rule BoolExpr ("when" BoolExpr)? because StringExpr`. The guard is optional and introduced by `when`; the rule body is bare. § 2.2 also shows the transition row grammar: `from StateTarget on Identifier ("when" BoolExpr)?` — guard after event. The parenthetical exception at line 621: "All three support an optional `when` guard between the state target and the verb (except `from ... on`, where the guard is inside the transition row after the event name)."
 

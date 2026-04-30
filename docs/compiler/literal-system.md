@@ -11,7 +11,7 @@
 | Downstream | All pipeline stages (Lexer, Parser, Type Checker, Evaluator); runtime evaluator; diagnostics engine |
 
 **Decisions answered:** Lexer decision 3 (interpolation decomposition), plus literal-system-wide contracts for all pipeline stages  
-**Grounding:** `docs/language/precept-language-vision.md` § Literal System, language design principles  
+**Grounding:** `docs/language/precept-language-spec.md`; vision archived at `docs/archive/language-design/precept-language-vision.md` § Literal System  
 **Prototype reference:** `docs/LiteralSystemDesign.md` on `research/nodatime-type-alignment` branch (PR #114)
 
 ---
@@ -520,7 +520,7 @@ String coercion during interpolation always uses invariant-culture formatting. `
 
 | Topic | Document |
 |---|---|
-| Product-level literal system vision | `docs/language/precept-language-vision.md` § Literal System |
+| Product-level literal system vision | `docs/archive/language-design/precept-language-vision.md` § Literal System (archived) |
 | Full DSL semantics reference | `docs/language/precept-language-spec.md` |
 | Prototype with full design exploration (PR #114) | `docs/LiteralSystemDesign.md` on `research/nodatime-type-alignment` branch |
 | Mode stack implementation, complete token kind catalog | `docs/compiler/lexer.md` |

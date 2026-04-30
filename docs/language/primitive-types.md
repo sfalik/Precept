@@ -539,6 +539,6 @@ This document is the canonical source for primitive type rules. Other documents 
 |---|---|---|
 | [Language Spec](precept-language-spec.md) | §3.1 type inventory, §3.2 widening, §3.6 operator typing | Brief summary + "See [Primitive Types](primitive-types.md)" |
 | [Type Checker](../compiler/type-checker.md) | §4.2 widening, §4.2a numeric lanes | Brief summary + "See [Primitive Types · Numeric Lane Rules](primitive-types.md#numeric-lane-rules)" |
-| [Language Vision](precept-language-vision.md) | Numeric lane system, choice type, operator contracts | Brief summary + link |
+| [Language Vision](../archive/language-design/precept-language-vision.md) | Archived — numeric lane system, choice type, operator contracts | Brief summary + link |
 | [Business-Domain Types](business-domain-types.md) | D12 scalar operand contract, widening ceiling | References this doc for the conversion map |
 | [Temporal Type System](temporal-type-system.md) | Numeric backing for duration scaling | References this doc for `number`-lane duration arithmetic |
