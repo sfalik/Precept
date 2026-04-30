@@ -14,6 +14,20 @@
 
 
 
+### 2025-07-14T12:00:00Z: Priority queue connector review recorded
+
+**By:** Scribe
+
+**Status:** Merged, deduplicated, inbox cleared (2 files)
+
+**Merged sources:** `frank-queue-connector-review`, `elaine-queue-connector-review`.
+
+- Frank's technical review recommends keeping `by` at priority-queue action sites: `at` remains pre-rejected because it collides with future temporal vocabulary, declaration-site `by` is already locked, and the `into`/`by` dequeue form is parser-safe and type-checker-safe even if its English read is slightly repurposed.
+- Elaine's UX review recommends switching action sites from `by` to `with` while leaving declaration-site `by` untouched: the real readability problem is directional mismatch at dequeue capture, not the declaration role connector.
+- Elaine also surfaced the stronger teaching pattern: lead docs and samples with the three-line `peek` / `priority` / `dequeue` sequence, and position `dequeue ... into X ... Y` as shorthand rather than the canonical first-read form.
+- Combined record: owner sign-off is still pending, both reviews reject `at` as the right fix, and the remaining open decision is whether priority-queue action-site symmetry should optimize for technical continuity (`by`) or directionally neutral readability (`with`).
+
+---
 ### 2026-04-29T05:34:09Z: Collection type expansion follow-up recorded
 
 **By:** Scribe
