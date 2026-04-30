@@ -211,8 +211,8 @@ Relational comparison (`<`, `>`, `<=`, `>=`) is a type error. Arithmetic is a ty
 **Declaration:**
 
 ```precept
-field Status as choice("draft", "active", "closed") default "draft"
-field Priority as choice("low", "medium", "high") ordered default "low"
+field Status as choice of string("draft", "active", "closed") default "draft"
+field Priority as choice of string("low", "medium", "high") ordered default "low"
 ```
 
 **Backing:** String value constrained to a declared finite set. Stored and serialized as the string value.
@@ -221,8 +221,8 @@ field Priority as choice("low", "medium", "high") ordered default "low"
 
 | Variant | Declared with | Comparison | Use case |
 |---|---|---|---|
-| Unordered | `choice(...)` | `==`, `!=` only | Status, category — no ranking |
-| Ordered | `choice(...) ordered` | `==`, `!=`, `<`, `<=`, `>`, `>=` | Priority, severity — rank by declaration order |
+| Unordered | `choice of T(...)` | `==`, `!=` only | Status, category — no ranking |
+| Ordered | `choice of T(...) ordered` | `==`, `!=`, `<`, `<=`, `>`, `>=` | Priority, severity — rank by declaration order |
 
 **Operators:**
 

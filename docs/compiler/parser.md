@@ -632,10 +632,11 @@ public sealed record CollectionTypeRefNode(
     TypeQualifierNode? Qualifier) : TypeRefNode(Span);
 
 public sealed record ChoiceTypeRefNode(
-    SourceSpan Span, ImmutableArray<Expression> Options) : TypeRefNode(Span);
+    SourceSpan Span, Language.Token? ElementType,
+    ImmutableArray<Expression> Options) : TypeRefNode(Span);
 ```
 
-`ScalarTypeRefNode` covers `string`, `decimal`, `boolean`, `money`, etc. `CollectionTypeRefNode` covers `set of T`, `queue of T`, `stack of T` — `CollectionKind` is the `Set`/`Queue`/`Stack` token. `ChoiceTypeRefNode` covers `choice("A", "B", "C")`.
+`ScalarTypeRefNode` covers `string`, `decimal`, `boolean`, `money`, etc. `CollectionTypeRefNode` covers `set of T`, `queue of T`, `stack of T` — `CollectionKind` is the `Set`/`Queue`/`Stack` token. `ChoiceTypeRefNode` covers `choice of string("A", "B", "C")` — `ElementType` is the `string | integer | decimal | number | boolean` token (null only on parse-error recovery).
 
 #### TypeQualifier
 

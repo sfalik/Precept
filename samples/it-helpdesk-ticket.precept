@@ -9,7 +9,7 @@ field AssignedAgent as string optional
 field LastQueuedAgent as string optional
 field ResolutionNote as string optional
 field ReopenCount as integer default 0 nonnegative
-field Priority as choice("Low","Medium","High","Critical") default "Low"
+field Priority as choice of string("Low","Medium","High","Critical") default "Low"
 field AgentQueue as queue of string
 
 state New initial

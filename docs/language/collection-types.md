@@ -75,10 +75,10 @@ from Draft on RemoveFloor when RequestedFloors contains RemoveFloor.Floor
 | `.min` | `T` | `.count > 0` guard required | `T` must be orderable. Proof obligation: `UnguardedCollectionAccess`. |
 | `.max` | `T` | `.count > 0` guard required | `T` must be orderable. Proof obligation: `UnguardedCollectionAccess`. |
 
-"Orderable" means the inner type supports `<`/`>` comparison: all numeric types (`integer`, `decimal`, `number`), `string` (including `~string`, which uses `OrdinalIgnoreCase` ordering — deterministic), and `choice(...) ordered` (which defines rank by declaration position). `boolean` and unordered `choice(...)` are not orderable; `.min`/`.max` on `set of boolean` or `set of choice(...)` (without `ordered`) is a type error. On `set of choice(...) ordered`, `.min` returns the element with the lowest declaration position and `.max` returns the highest — these are safe when the `.count > 0` guard is satisfied.
+"Orderable" means the inner type supports `<`/`>` comparison: all numeric types (`integer`, `decimal`, `number`), `string` (including `~string`, which uses `OrdinalIgnoreCase` ordering — deterministic), and `choice of T(...) ordered` (which defines rank by declaration position). `boolean` and unordered `choice of T(...)` are not orderable; `.min`/`.max` on `set of boolean` or `set of choice of T(...)` (without `ordered`) is a type error. On `set of choice of T(...) ordered`, `.min` returns the element with the lowest declaration position and `.max` returns the highest — these are safe when the `.count > 0` guard is satisfied.
 
 ```precept
-field RiskLevels as set of choice("low", "medium", "high") ordered
+field RiskLevels as set of choice of string("low", "medium", "high") ordered
 # .min → "low", .max → "high" (by declaration position)
 
 from Active on Evaluate when RiskLevels.count > 0
@@ -232,7 +232,7 @@ The inner type `T` in `set of T`, `queue of T`, or `stack of T` must be a scalar
 
 ```
 CollectionType  :=  (set | queue | stack) of ScalarType
-ScalarType      :=  string | ~string | integer | decimal | number | boolean | choice(...) ordered?
+ScalarType      :=  string | ~string | integer | decimal | number | boolean | choice of T(...) ordered?
                |   date | time | datetime | instant | duration
                |   period ('of' ('date' | 'time') | 'in' PeriodUnit)?
                |   timezone | zoneddatetime
@@ -465,7 +465,7 @@ The proof engine recognizes `F.count > 0` in the `when` clause as sufficient pro
 | `mincount`/`maxcount` on scalar field | `InvalidModifierForType` |
 | `min`/`max`/`nonnegative`/`notempty`/`minlength`/`maxlength`/`maxplaces` on collection field | `InvalidModifierForType` |
 
-**Scalar constraints do not apply to collections.** `notempty`, `min`, `max`, `minlength`, `maxlength`, `maxplaces`, `nonnegative`, `positive`, `nonzero`, and `ordered` are all type errors when applied as field-level modifiers on collection fields (e.g., `field Tags as set of string ordered` is invalid). Collections have their own constraint vocabulary: `mincount` and `maxcount`. Note that `ordered` on the *inner `choice(...)` type* is valid — `field Priorities as set of choice("low", "medium", "high") ordered` declares an ordered-choice inner type, not a collection-level modifier.
+**Scalar constraints do not apply to collections.** `notempty`, `min`, `max`, `minlength`, `maxlength`, `maxplaces`, `nonnegative`, `positive`, `nonzero`, and `ordered` are all type errors when applied as field-level modifiers on collection fields (e.g., `field Tags as set of string ordered` is invalid). Collections have their own constraint vocabulary: `mincount` and `maxcount`. Note that `ordered` on the *inner `choice of T(...)` type* is valid — `field Priorities as set of choice of string("low", "medium", "high") ordered` declares an ordered-choice inner type, not a collection-level modifier.
 
 ---
 
@@ -597,7 +597,7 @@ QuantifierKind  :=  each | any | no
 1. **Cardinality** — `mincount`/`maxcount` (already shipped)
 2. **Membership/value** — `contains` (already shipped)
 3. **Element-shape (quantified predicates)** — requires quantifiers (proposed above)
-4. **Ordering** — relative order of elements (partial path: `choice(...) ordered` as an inner type already enables element-level comparison via declaration-position rank, making `.min`/`.max` valid and enabling quantifier predicates like `each x in Items (x >= "medium")` over ordered-choice sets; the remaining gap is ordering *constraints* on element sequences — e.g., "elements must be monotonically increasing" — which has no path yet)
+4. **Ordering** — relative order of elements (partial path: `choice of T(...) ordered` as an inner type already enables element-level comparison via declaration-position rank, making `.min`/`.max` valid and enabling quantifier predicates like `each x in Items (x >= "medium")` over ordered-choice sets; the remaining gap is ordering *constraints* on element sequences — e.g., "elements must be monotonically increasing" — which has no path yet)
 5. **Cross-collection** — relationships between two collection fields
 6. **Aggregate-relational** — `.count`, `.min`, `.max` in rule expressions (already shipped)
 
@@ -761,7 +761,7 @@ field F as deque of T
 
 ### Candidate 4: `priorityqueue of T priority P`
 
-**What it is:** A queue where elements are dequeued by priority rather than insertion order. Each element has two axes: a value (type `T`) and a priority (type `P`). The priority type `P` must be orderable (numeric or `choice(...) ordered`). Dequeue always removes the element with the best priority according to the declared sort direction.
+**What it is:** A queue where elements are dequeued by priority rather than insertion order. Each element has two axes: a value (type `T`) and a priority (type `P`). The priority type `P` must be orderable (numeric or `choice of T(...) ordered`). Dequeue always removes the element with the best priority according to the declared sort direction.
 
 **Business scenario:** A claims triage system where claims are processed by severity. A work-item queue where urgent items bypass the normal order.
 
@@ -871,7 +871,7 @@ rule no claim in ClaimQueue (claim.priority < 3 and claim.value == "")
 When the priority axis is choice-typed, the declaration is the constraint — no rule needed. A claim with a priority outside the declared choices is a type error at the `enqueue` site:
 
 ```precept
-field TriageQueue as priorityqueue of ClaimId priority choice("normal", "high")
+field TriageQueue as priorityqueue of ClaimId priority choice of string("normal", "high")
 ```
 
 A `"critical"` priority claim cannot enter `TriageQueue` — the type prevents it.

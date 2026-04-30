@@ -1468,7 +1468,7 @@ Three arguments against double-quoted temporal resolution, in order of strength:
 
 ### The choice-type precedent
 
-An important counter-argument was considered: Precept's `choice` fields already use `"..."` double-quoted strings where the meaning depends on the field declaration. `choice("Draft", "Active", "Closed")` defines allowed values — `"Draft"` is only valid in the context of that field.
+An important counter-argument was considered: Precept's `choice` fields already use `"..."` double-quoted strings where the meaning depends on the field declaration. `choice of string("Draft", "Active", "Closed")` defines allowed values — `"Draft"` is only valid in the context of that field.
 
 However, the distinction matters: **choice is a constraint on a value within the same type** — a string field constrained to specific string values. The string `"Draft"` is still a string; the field merely limits which strings are valid. Temporal would be a **type-family conversion** — the string `"2026-01-15"` would need to become a fundamentally different type (`date`). This crosses from value-constraint to type-conversion, which is the stronger argument for a distinct delimiter.
 

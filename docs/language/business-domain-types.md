@@ -1470,7 +1470,7 @@ For business-domain types, comparison operators carry domain preconditions. **Cr
 
 ### D1. `money` as a distinct type — not `decimal` + `choice`
 
-- **What:** `money` is a first-class type that carries both magnitude and currency, not a pair of `decimal` + `choice("USD","EUR","GBP")` fields.
+- **What:** `money` is a first-class type that carries both magnitude and currency, not a pair of `decimal` + `choice of string("USD","EUR","GBP")` fields.
 - **Why:** Once Precept has `quantity`, `price`, and dimensional cancellation, money must participate in the same algebra. A `decimal` field cannot be the numerator in `price = money / quantity` because it has no currency identity.
 - **Alternatives rejected:** (A) `decimal` + `choice` — no algebra participation. (B) Parameterized `money("USD")` — too complex; `in 'USD'` achieves the same effect.
 - **Precedent:** F# units of measure, UCUM, temporal `in` syntax.
