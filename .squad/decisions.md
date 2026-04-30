@@ -14,6 +14,21 @@
 
 
 
+### 2025-07-14T17:00:00Z: Priority queue connector root-cause analysis recorded
+
+**By:** Scribe
+
+**Status:** Merged, deduplicated, inbox cleared (2 files)
+
+**Merged sources:** `frank-pqueue-connector-rootcause`, `elaine-pqueue-connector-rootcause`.
+
+- Frank's structural analysis concludes the connector hunt is the wrong problem: priority-queue enqueue is a two-input verb, so the clean surface is positional enqueue (`enqueue Queue Item Priority`) plus an extended `into` capture for dequeue (`dequeue Queue into Item Priority`), with no new keywords or punctuation.
+- Elaine's readability analysis reaches the opposite action-site conclusion: positional and tuple forms hide roles or feel alien, three-line capture splits an atomic action, and the strongest readable shape remains a connector form that names the provided/captured value explicitly.
+- Both analyses agree the declaration-site `by` should not control the action-site vocabulary, `=` tells the wrong identity story, and the three-line peek/priority/dequeue sequence is acceptable as teaching scaffolding rather than the canonical "capture both" syntax.
+- The live disagreement is now crisp for Shane: choose Frank's connector-free structural model, or keep the connector shape and decide whether Elaine's direct noun-form `priority` is the best action-site word.
+
+---
+
 ### 2025-07-14T12:00:00Z: Priority queue connector review recorded
 
 **By:** Scribe
