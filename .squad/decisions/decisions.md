@@ -5358,3 +5358,792 @@ PriceQualifier    :=  in '<currency>/<unit>'
 
 **Do not update the doc until Shane approves.**
 
+
+---
+
+# `choice(...)` Design Analysis
+
+**By:** Frank, Lead Architect  
+**Date:** 2026-04-29  
+**Status:** Consolidated — key decisions locked by owner 2026-04-29
+
+**Owner decision (2026-04-29):** `set ChoiceField = stringVariable` → **TypeMismatch**. Choice is a sealed type. String variables cannot be assigned to choice fields. Only choice-typed sources (with subset-compatible value sets) and compile-time string literals in the declared set are valid.
+
+---
+
+## Owner Note (2026-04-29, added during fresh assessment)
+
+Shane: *"I guess the real value of choice is showing the user a drop-down."*
+
+This may be the load-bearing insight. `string + rule` already provides prevention. What `choice` uniquely adds — over and above a rule — is a **UI rendering signal**: "render this field as a dropdown, not a free-text input." Tooling (language server, form generators, admin UIs) reads the choice set to offer a closed list of options. The type system enforcement may be secondary to the presentation metadata.
+
+This reframes the whole design question: is `choice` a *type*, a *constraint*, or a *rendering hint*? The answer determines the right model.
+
+---
+
+## Orientation: What the Gap Actually Is
+
+Before evaluating options, let's be precise about the failure. The problem is not that `choice` lacks non-string support. The problem is a broken identity rule: **choice types have no identity beyond the field that declares them.** Each declaration is its own isolated universe. You cannot reference it, match against it, or route through it. The dynamic arg case is the most acute symptom, but the root cause is the absence of any structural type identity for choice.
+
+Every option below is really an answer to the question: *what is the identity of a choice type?*
+
+---
+
+## Option A: Structural Equivalence — Keep String-Only, Add Type Identity
+
+**What this means precisely:** Two `choice(...)` declarations are the same type if their string value sets are equivalent. For **unordered** choice: set equality (order-independent — `choice("a","b")` ≡ `choice("b","a")`). For **ordered** choice: sequence equality (order defines rank — `choice("low","medium","high")` ≡ `choice("low","medium","high")` but ≢ `choice("medium","low","high")`). The declaration sequence is the ordinal rank definition; two ordered-choice types with different sequences have different rank semantics and are incompatible for ordinal comparison.
+
+**Grammar impact:** Zero. This is a purely type-checker change. The AST is unchanged. The type identity check changes from reference equality ("same declaration node") to value equality ("same set or sequence of string literals").
+
+**Behavior changes:**
+- An event arg `Level as choice("low","medium","high")` is now structurally compatible with `field Priority as choice("low","medium","high")`. Assignment `set Priority = SetPriority.Level` becomes valid.
+- The runtime validates incoming arg values against the declared choice set at fire time — membership enforcement, not just type-system enforcement.
+- Ordinal comparison between two structurally equivalent ordered choice values (`SetPriority.Level > Priority`) becomes valid when both carry the same ordered sequence. The compile-time check is: identical sequence → same rank definition → comparison is well-defined.
+- Ordinal comparison between two ordered choices with the same *members* but different *sequences* remains a type error — the rank definitions conflict.
+
+**Concrete syntax (Option A):**
+
+```precept
+field Priority as choice("low", "medium", "high") ordered default "low"
+
+event SetPriority(Level as choice("low", "medium", "high") ordered)
+
+from Active on SetPriority
+    -> set Priority = SetPriority.Level   # valid: structurally equivalent types
+    -> no transition
+
+# Comparison also valid — identical sequence, same rank
+from Active on SetPriority when SetPriority.Level > Priority
+    -> set Priority = SetPriority.Level
+    -> no transition
+```
+
+```precept
+# Subset arg — different choice set → still a type error
+event Promote(Target as choice("medium", "high") ordered)  # ≢ choice("low","medium","high") — different set
+-> set Priority = Promote.Target   # TypeMismatch
+```
+
+**Pros:**
+- Closes the dynamic arg gap completely with zero grammar changes
+- Backward compatible — no existing `.precept` files break
+- Conceptually honest: types defined by structure, not by declaration node
+- Implementation scope is localized to the type checker's choice equality rule
+
+**Cons:**
+- Repeating the entire set in the event arg declaration is verbose for large choice sets (6+ options)
+- Does not address non-string values
+- Ordinal rank edge case: if you have `choice("low","medium","high") ordered` (field) and `choice("low","medium","high")` (unordered arg), assignment is valid (same set, demoting ordering is safe widening), but ordinal comparison is a type error (arg has no rank). The type checker must track whether `ordered` is in play for comparison resolution, not just for assignment.
+
+**Philosophy fit:** Strong. Structural typing for closed-set literals is the principled model. The closed type vocabulary (§0.4, Property 4) is preserved — `choice(...)` remains a built-in type constructor, not a user-defined type. No new language concepts introduced.
+
+**Assessment:** This should happen regardless of what else is decided. It is the minimum viable fix and has no downsides at the language level. Every other option builds on top of it.
+
+---
+
+## Option B: Typed Choice — `choice of T`
+
+**What this means:** The `choice` type constructor accepts an optional element-type qualifier, consistent with the collection type pattern (`set of T`, `queue of T`). `choice of string(...)` is the explicit form of the current `choice(...)`. `choice of integer(...)` and `choice of decimal(...)` extend to non-string types.
+
+**Grammar:**
+
+```
+ChoiceType := choice ("of" ChoiceElementType)? "(" ChoiceValueExpr ("," ChoiceValueExpr)* ")"
+ChoiceElementType := string | integer | decimal | number
+ChoiceValueExpr   := StringExpr | IntegerLiteral | DecimalLiteral | ...
+```
+
+The `of` keyword here is the same connector used in `set of T` — it specifies the element type. `choice("a","b")` and `choice of string("a","b")` are the same type (backward-compatible default).
+
+**Concrete syntax (Option B):**
+
+```precept
+# String choice (current behavior preserved)
+field Status as choice("draft", "active", "closed") default "draft"
+
+# Integer choice — explicit codes
+field ErrorCode as choice of integer(0, 404, 500) default 0
+
+# Decimal choice — fixed rate tier
+field TaxRate as choice of decimal(0.0, 0.05, 0.10, 0.20) default 0.0
+
+# Event arg with typed choice
+event SetErrorCode(Code as choice of integer(0, 404, 500))
+
+from Active on SetErrorCode
+    -> set ErrorCode = SetErrorCode.Code
+    -> no transition
+```
+
+**Ordinal rank for integer/decimal choice:**
+
+The natural expectation when you see `choice of integer(3, 1, 2) ordered` is ambiguous — is the rank numeric order or declaration order? Decision: **Keep declaration-order rank universally.** The asymmetry of "integer choice uses numeric order" is a special case that adds complexity for minimal gain. A business analyst writing `choice of integer(404, 500, 200)` who wants 200 < 404 < 500 will be surprised either way unless behavior is explicitly documented. The simpler contract: **the order you declare is the order of rank.** This rule is identical for string and numeric choice. List values in the rank you want.
+
+**The `ordered` modifier on integer choice:** `ordered` is the *capability gate* — it enables ordinal operators on the field, regardless of underlying type. Without `ordered`, even a `choice of integer` field is equality-only. This is important: it distinguishes "this field has an ordered meaning" from "the underlying integers can be compared." You may declare `choice of integer(500, 404, 200)` where you specifically DON'T want numeric ordering exposed — just constraint on valid values, not rank.
+
+**Pros:**
+- Principled generalization, consistent with `set of T` grammar
+- Closes real use cases: error codes, numeric priority levels, fixed rate tiers, integer status codes
+- Default backward-compatible — existing `choice(...)` is unchanged
+- Structural equivalence (Option A) carries over naturally to typed choice
+
+**Cons:**
+- Grammar complexity: parser must handle `choice of T (values)` vs `choice (values)`, requiring one-token lookahead after `choice`
+- Type checker must handle non-string choice values in assignment, comparison, and validation
+- The `of` keyword is already used in two other contexts (collection inner type connector, and `of 'DimensionFamily'` qualifier). Adding `choice of T` is a third use — unambiguous by context, but the catalog must document this
+- Existing `TypeMismatch` diagnostic for non-string choice values becomes version-gated
+
+**Philosophy fit:** Solid. The collection types established the `of T` pattern as the element-type idiom. Extending to choice is consistent. The closed type vocabulary is maintained — `choice of integer` is a built-in parameterized type, not a user-defined type.
+
+**Assessment:** Right direction, but a separate proposal from Option A. Do Option A first; bring Option B as a follow-on once A is stable.
+
+---
+
+## Option C: Named Choice Types — `type Priority = choice(...)`
+
+**What this means:** A new top-level declaration form introduces named aliases for choice sets. Fields and event args reference the name.
+
+```precept
+type Priority = choice("low", "medium", "high") ordered
+field Priority as Priority default "low"
+event SetPriority(Level as Priority)
+```
+
+**The conflict with the closed type vocabulary principle:**
+
+The language spec (§0.4, Property 4) explicitly states: *"Closed type vocabulary. The language has a fixed set of types. No user-defined types, no parametric polymorphism, no open type hierarchies. This makes exhaustive type checking possible over a finite, fully-known vocabulary."*
+
+Named types require:
+- A new top-level declaration scope (symbol table entries for type names)
+- A scoping model (file-local only? namespace-scoped? importable?)
+- Reference resolution at every field/arg declaration site
+- Rules about forward declarations and ordering
+- For cross-file use: an import or reference mechanism
+
+This is a substantial language expansion. It changes the language's identity model from "types are structural, closed, built-in" to "types can be named and declared."
+
+**Where Option C is strongest:** It is the cleanest solution to the reuse problem. A 10-value choice set used in 8 fields and 3 event args requires repeating all 10 values 11 times under Option A. Option C eliminates that entirely.
+
+**Assessment:** Option C is not wrong as a design direction — it's wrong as an *immediate* decision. It requires a separate, dedicated proposal that explicitly revisits §0.4, Property 4 and defines the scope rules. Log it as a future proposal. Do not conflate it with the current cluster.
+
+---
+
+## Option D: Choice Is a Read-Only Set — Conceptual Unification
+
+**The semantic argument for separation:**
+
+| Concept | What the field HOLDS | Cardinality |
+|---|---|---|
+| `set of string` | A **collection of string values** — the field IS the set | Zero to N values |
+| `choice("a","b","c")` | A **single string value** constrained to a domain | Exactly one value |
+
+A `set of string` field answers: *"what values does this entity currently hold?"*  
+A `choice("a","b","c")` field answers: *"what is this entity's current status/category/mode?"*
+
+`Tags contains "urgent"` is a runtime test — the answer changes as tags are added/removed.  
+`Status contains "active"` would mean... what? Either: "is the current value of Status equal to 'active'?" (that's `Status == "active"`, not `contains`) or "is 'active' a declared member of the Status type?" (always compile-time knowable for literals).
+
+There is no runtime use case for `contains` on a scalar choice field.
+
+**Where the observation has genuine merit:** `set of choice(...)` already works and is correct. The collection-types doc notes `set of choice("low","medium","high") ordered` — a field holding a *set* of priority values with `.min`/`.max` by rank. This is the correct composition. Do not collapse choice into set.
+
+**Assessment:** Reject. Choice is NOT a read-only set. Do not add `contains` to scalar choice fields. The scalar vs. collection distinction is fundamental.
+
+---
+
+## Cross-Cutting: The `''` Notation Question
+
+**What `''` means today:** Typed constants (`'...'`) are for values that carry a unit or dimension qualifier — `'1 USD'`, `'5 km'`, `'3 months'`. The `''` delimiter signals: "this value's meaning requires a qualifier."
+
+**For `choice of integer(1, 2, 3)` — should values be `'1'`, `'2'`, `'3'` or `1`, `2`, `3`?**
+
+**Bare integer literals. Definitively.**
+
+1. `'1'` in typed-constant context means "a typed constant whose text is `1`" — which requires the type checker to resolve the numeric type from the surrounding `choice of integer` context, exactly as it already does for bare `1`. The `''` adds zero information.
+2. The `''` notation carries the mental model of "unit-qualified value." An integer with no unit is not a typed constant in that sense. Writing `choice of integer('1', '2', '3')` imports the wrong mental model.
+3. Consistency: `field MaxCount as integer min 1 max 100 default 5` — all integer literals are bare. No reason choice values should differ.
+4. The business analyst audience (§2 of philosophy.md) writes numbers as numbers.
+
+**The `''` notation is wrong for numeric choice values.** Use bare literals.
+
+---
+
+## Recommendation Summary
+
+### Lock now — Option A
+
+**Structural equivalence** in the type checker. Two `choice(...)` types are equal if:
+- **Unordered:** their string value sets are equal (order-independent)
+- **Ordered:** their string value sequences are equal (different sequences → different types → ordinal comparison is a type error)
+
+No grammar changes. Zero breaking changes. Closes the dynamic arg gap.
+
+### Propose next — Option B
+
+`choice of T` as a follow-on proposal. Bare literals. Declaration-order rank universally. `ordered` remains the capability gate for all typed choice.
+
+### Defer — Option C
+
+Named types. Requires a dedicated proposal explicitly revisiting §0.4 Property 4 and defining scope rules.
+
+### Reject — Option D
+
+`contains` on scalar choice fields. The semantic difference between a scalar constrained value and a collection is fundamental.
+
+---
+
+## Decision Table
+
+| Question | Answer |
+|---|---|
+| Is choice a read-only set? | No. Choice is a scalar type with a constrained value domain. |
+| Should `contains` work on a choice field? | No. `contains` tests membership in a collection. A choice field is not a collection. |
+| Should `choice of integer` use bare literals or `''`? | Bare literals. `''` is for unit/dimension-qualified typed constants. |
+| Should `ordered` for integer choice use numeric rank or declaration rank? | Declaration rank, consistent with string choice. |
+| Should `ordered` still be required for integer choice ordinal operators? | Yes. `ordered` is the intent signal. |
+| What closes the dynamic arg gap today? | Option A: structural equivalence in the type checker. No grammar changes needed. |
+| What is the right long-term model for non-string choice values? | Option B: `choice of T`, following the established `set of T` pattern. |
+| Should named types be introduced to solve the reuse problem? | Not in this cluster. Requires a dedicated proposal addressing §0.4 Property 4. |
+
+---
+
+## Addendum: The `''` Notation Question (Revisited)
+
+**Date:** 2026-04-29  
+**Occasion:** Shane's UX disambiguation argument — not addressed in the original analysis.
+
+---
+
+### The argument I didn't address
+
+My prior analysis dismissed `''` for numeric choice values on the grounds that it imports the wrong mental model (unit-qualified constants) and adds zero information. That's correct for the `choice of integer` case. But Shane's argument is different, and it applies to the **untyped string case** I didn't question:
+
+> `choice("normal", "high")` — the `""` implies these are strings. Users will expect `set Status = "normal"` to work like any string assignment. But it doesn't: choice enforces membership. The `""` sets the wrong expectation about what the field accepts.
+
+> `choice('normal', 'high')` — the `''` signals "typed literal, type determined by context." That communicates the value is *constrained* — not a free string you can substitute at will.
+
+This is a UX framing argument about the **declaration site**, not the assignment site. It deserves a direct response.
+
+---
+
+### Is the `''` signal coherent here?
+
+The spec (§1.3) defines the two delimiter forms with precise, non-overlapping contracts:
+
+- `"..."` — **always produces `string`**. The type is fixed by the delimiter.
+- `'...'` — produces **non-primitive values**. The lexer treats content opaquely; the type checker resolves the specific type from context.
+
+The content validation table (§3.3) enumerates every valid context for `'...'`: `date`, `time`, `instant`, `datetime`, `money`, `quantity`, `period`, `duration`, `timezone`, etc. Every row is a non-primitive type. There is no `choice` row, and there cannot be one without adding a new resolution path.
+
+Here is why that matters: a choice value like `'normal'` is not a non-primitive value. At the runtime level, a choice field holds a **string**. The choice constraint is a membership rule applied to a string — it does not change the underlying type. Using `'normal'` in a choice declaration would require the type checker to resolve a typed constant to... `string`, as constrained by choice membership. That breaks the invariant that `'...'` → non-primitive. The delimiter would be lying about the type.
+
+Shane's reading of `''` as "typed literal, context-determines-type" is correct — but "context-determines-type" in the spec means *the type is non-primitive and the lexer can't determine it*. It does not mean "free-text literal that the surrounding construct will validate." Choice values don't meet that contract. They're strings, and the spec says `""` is the string delimiter.
+
+---
+
+### Why the delimiter isn't the right lever for this UX problem
+
+The UX concern is real. Users seeing `choice("draft", "active", "closed")` may reasonably believe the field accepts any string. But the lever Shane is pulling — the declaration-site delimiter — can't fix the assignment-site behavior.
+
+Consider what happens after adopting `''`:
+
+```precept
+field Status as choice('draft', 'active', 'closed') default 'draft'
+```
+
+Users will *still* write:
+
+```precept
+set Status = "active"   # membership-validated — this is still valid
+set Status = "bogus"    # MembershipViolation — this is still an error
+```
+
+The assignment surface uses `""` regardless of what the declaration uses, because `set Status = "active"` reads a string literal off the field type, not the declaration delimiter. The `''` at declaration time doesn't change what users write at assignment time. The UX confusion doesn't disappear — it just moves: now users wonder why the declaration uses `'...'` but their assignments use `"..."`.
+
+Worse: `''` at the assignment site — `set Status = 'active'` — should be a type error, because `'active'` is a typed constant in a context that expects a string-type field value. A user who infers from the declaration that choice values use `''` will write this and be confused by the error.
+
+---
+
+### What would actually address the UX concern
+
+The underlying concern is: **users don't see the membership constraint from the call site.** The right fix is tooling:
+
+1. **Language server hover:** Hovering on `set Status = "bogus"` shows "Status is a choice field — valid values: draft, active, closed."
+2. **Diagnostic message quality:** `MembershipViolation` should name the valid set in the error, not just say "not a member."
+3. **Completion:** The language server offers choice members as completions when editing an assignment to a choice field.
+
+These address the actual failure mode (user doesn't know the constraint exists) without corrupting the delimiter contract.
+
+---
+
+### Verdict
+
+**Keep `""` for choice values in the untyped `choice(...)` case.** Definitively.
+
+The UX argument is valid as a problem statement, but `''` is the wrong solution. It contradicts the spec invariant (`'...'` → non-primitive), it doesn't fix the assignment-site behavior, and it introduces new confusion when users try to use `''` in assignments. The right fixes are diagnostic quality and language server completions.
+
+The decision table entry stands:
+
+| Should choice declaration values use `''` instead of `""`? | No. `'...'` is the non-primitive literal form. Choice values are strings. The membership constraint is enforced by the type checker, not signaled by the delimiter. |
+
+---
+
+### Does the answer change under Option B (`choice of T`)?
+
+No — it sharpens the existing answer.
+
+For `choice of string("draft", "active")`: values are strings → `""`. Unchanged.
+
+For `choice of integer(0, 404, 500)` or `choice of decimal(0.05, 0.10)`: values are numeric literals → bare. The `''` argument doesn't arise, because there's no temptation to use `""` for integers, and `''` would again claim non-primitive semantics for plain numbers.
+
+Option B doesn't create a case where `''` becomes appropriate for choice values. If anything, the explicit `choice of string(...)` form makes the "these are strings" expectation *more* correct, not less.
+
+---
+
+## Fresh Assessment — Outside the Box
+
+**Date:** 2026-04-30  
+**Occasion:** Shane's challenge to re-examine the premise — not just refine the existing options.
+
+---
+
+### Start here: the spec is hiding an ambiguity that's driving the entire tension
+
+The addendum said: "a choice value is a string constrained by a rule." That phrase is the problem. Not wrong, exactly, but dangerously imprecise — it leaves open a question the spec never answers:
+
+**Can a `string`-typed value be assigned to a choice field at runtime, with membership validated then?**
+
+If the answer is **yes** — even conditionally — then `choice` is a constrained string, and the question about whether it's "different from `string + rule`" collapses. If the answer is **no**, then `choice` is a sealed vocabulary type that justifies itself through structural prevention.
+
+The spec doesn't say. The grammar defines `ChoiceType` as `choice "(" StringExpr ("," StringExpr)* ")"`, which signals the underlying type is string, but says nothing about assignment compatibility at the variable (non-literal) level. The operator table shows `choice ≡ choice` for comparisons — choice does not compare directly against `string`. But assignment rules aren't stated with the same precision.
+
+This ambiguity is the root of every downstream tension in this discussion. Before we can answer any of the other questions, we have to decide: **what is a choice value?**
+
+---
+
+### The prevention test — the one question that settles the design
+
+Here is the sharp test. Does this compile?
+
+```precept
+field Status as string writable
+field Priority as choice("Low","Medium","High") default "Low"
+
+# Can I do this?
+set Priority = Status
+```
+
+If yes: `choice` is a constrained string. Runtime enforcement. Detection dressed up as a type.  
+If no: `choice` is a sealed vocabulary type. Compile-time blocked. Prevention.
+
+`choice` only justifies its existence over `string + rule` if the answer is **no.**
+
+With `string + rule`, `set Priority = Status` compiles and runs; the rule fires afterward. The invalid value never persists in a committed entity — Precept's atomicity guarantee covers that. But there's a runtime evaluation fault path: you can attempt `set Priority = "bogus"` and it *tries* before it fails. With sealed `choice`, `set Priority = Status` is a type error that the compiler catches before any instance exists. That is a qualitatively different guarantee.
+
+The prevention principle in `docs/philosophy.md` is precise: "Invalid entity configurations cannot exist. They are structurally prevented before any change is committed." A runtime membership check satisfies the first half. Only a compile-time type block satisfies both halves. **The load-bearing element of `choice`'s existence is compile-time blocking of runtime string values entering choice fields.** Everything else is secondary.
+
+---
+
+### Framing 1: Choice as a sealed vocabulary type — not a constrained string
+
+This is the sharpest version of the current design, made fully explicit.
+
+A `choice(...)` field holds a **vocabulary value**. Not a string. The runtime stores it as a string, but that's an implementation detail — the language surface treats it as an opaque scalar type. Implications:
+
+- `set Priority = "Low"` — **valid.** String literal `"Low"` is known at compile time; the compiler verifies it's a member.
+- `set Priority = SomeStringField` — **TYPE ERROR.** A `string` value is not a vocabulary value. The compiler cannot verify membership at compile time.
+- `set Priority = SetPriority.Level` where `Level as choice("Low","Medium","High")` — **valid.** Structural equivalence; same vocabulary.
+- `Priority == "Low"` — **valid.** Literal comparison: the compiler verifies the literal is a member.
+- `Priority == SomeStringField` — **TYPE ERROR.** Runtime string comparison would bypass type safety.
+
+This model makes `choice` genuinely different from `string + rule`:
+
+| | `string + rule in(...)` | `choice(...)` sealed |
+|---|---|---|
+| `set F = "bogus"` | Compiles, rule rejects at runtime | Compile error: `MembershipViolation` |
+| `set F = StringVariable` | Compiles, rule rejects if invalid | Compile error: `StringAssignedToChoice` |
+| `set F = ChoiceArg` | No such arg — arg is `string` | Valid if structurally compatible |
+| Prevention guarantee | Structural (atomicity) | Structural (type system) |
+| Compile-time diagnosis | None at assignment | Yes — both cases |
+
+The cost: this is stricter than whatever the current implementation does. It blocks any `.precept` that assigns a string variable to a choice field. That is the right call. Those files have a hidden detection dependency they don't know they have.
+
+**This is the design `choice` should commit to. Not as a new feature — as a clarification of what it already is, made unambiguous in the spec.**
+
+---
+
+### Framing 2: Named vocabulary shorthand — shared sets without user-defined types
+
+The ergonomic problem that keeps surfacing: a 6-value choice set repeated across 4 fields and 2 event args is maddening to maintain. Named vocabulary sets solve that without touching the type system.
+
+```precept
+vocabulary Priority = ("Low", "Medium", "High", "Critical") ordered
+
+field Priority as Priority default "Low"
+field EscalationTarget as Priority default "High"
+event SetPriority(Level as Priority)
+event Escalate(Target as Priority)
+
+from Active on SetPriority
+    -> set Priority = SetPriority.Level
+    -> no transition
+```
+
+The critical design decision: `vocabulary` introduces a **named shorthand**, not a type. `field Priority as Priority` expands at parse time to `field Priority as choice("Low","Medium","High","Critical") ordered`. The actual type in the type checker is still `choice(...)`. No user-defined type exists. §0.4 Property 4 is preserved — the closed type vocabulary is untouched.
+
+This is macro expansion, not a type system extension. No symbol table entry, no reference resolution, no scoping rules beyond file-local. The implementation is a pre-pass that substitutes the vocabulary reference with the inline form before the type checker sees it.
+
+What this is NOT: Option C. Option C introduces a named type with type identity. A `vocabulary` entry has no type identity — two fields using the same vocabulary entry are both `choice(...)` with identical sets, structurally equivalent (Option A). The name is purely for authoring convenience.
+
+**Assessment:** Worth a dedicated proposal. Not this cluster — but not far off either. The prevention guarantee is unaffected because the resolved type is still sealed `choice(...)`.
+
+---
+
+### Framing 3: The "field-level `in` constraint" — the honest degenerate case
+
+What if we make the constrained-string reading fully explicit in the syntax and accept its implications?
+
+```precept
+field Priority as string in("Low","Medium","High") ordered default "Low"
+```
+
+`in(...)` as a field-level structural constraint — not a separate rule, part of the type annotation. The compiler enforces membership on literals. The type is `string`. Variable assignment still compiles — because it's `string`.
+
+This framing deserves naming because it's the design we slide into if we fail to commit to the sealed vocabulary model. It's what `choice` degrades to if we allow `set Priority = SomeStringField` without blocking it. The type becomes `string` with decoration. The prevention guarantee partially evaporates.
+
+I'm naming it not to recommend it but to establish it as the failure mode. If someone argues "choice should be more permissive about string assignment," this is where that argument leads. The question to ask them: "do you want `field Priority as string in(...)` instead?" If the answer is yes, write that and call it what it is. If the answer is no — then seal the type.
+
+**Assessment:** Do not implement. Name it so we know what we're avoiding.
+
+---
+
+### Cross-language survey — what it actually teaches
+
+**TypeScript string literal unions** (`"Low" | "Medium" | "High"`): structurally typed, string variable → union type is a compile-time error without explicit narrowing. This is precisely the sealed vocabulary model. TypeScript gets right what the current Precept spec leaves ambiguous. The right mental model: `choice(...)` is Precept's string literal union. Act like it.
+
+**Rust enums**: nominal, not structural. `Priority::Low` is not a string. Clean for type safety; wrong ergonomic model for a business-analyst DSL. A domain expert will write `"Low"` and ask why it doesn't work.
+
+**SQL `CHECK` constraints**: detection, not prevention. The DB attempts the insert and rejects it. This is `string + rule` territory. The comparison illustrates exactly why Precept's stronger guarantee matters.
+
+**Kotlin sealed classes**: same nominal tradeoff as Rust. Exhaustive pattern matching is a great property, but the construction overhead is wrong for the audience.
+
+**The survey verdict:** TypeScript string literal unions are the correct analogue. Same strings, same structural typing, compile-time prevention. The only thing TypeScript gets right that Precept hasn't fully committed to: the blocking of string-variable-to-union assignment. Commit to it.
+
+---
+
+### The subset-subtype model — is it sound under the sealed vocabulary model?
+
+Shane's proposal: `arg Priority as choice("Low","Medium")` should be valid for `field Priority as choice("Low","Medium","High")` because the subset is provably safe.
+
+Under the sealed vocabulary model: **yes, this is sound.** The compiler can verify at compile time that every value the arg can hold is a member of the field's declared set. No runtime check needed. Prevention holds.
+
+What this requires: a subtype relation on choice types — `choice(A) <: choice(B)` iff `A ⊆ B`. For ordered choice: `A` must be an order-preserving subset of `B` (same relative rank) to support ordinal comparison across the assignment. This is a natural extension of structural equivalence (Option A) and doesn't require grammar changes.
+
+The direction matters: arg→field assignment uses the subtype relation (narrower is assignable to wider). Field→arg assignment does not (the field might hold a value the arg can't represent). The type checker enforces this asymmetry.
+
+---
+
+### Direct answer to Shane's question
+
+**"At this point, is it different than `field Priority as string` + `rule Priority in('Low','Medium','High')`?"**
+
+Yes — IF and only IF the spec commits to two things:
+
+1. **Compile-time literal checking**: `set Priority = "bogus"` is a compile error, not a runtime failure.
+2. **String variable blocking**: `set Priority = SomeStringField` is a type error. No runtime path exists for a non-member value to reach the field through the type system.
+
+Without both, `choice` is a better-surfaced `string + rule` — useful ergonomically, but not qualitatively different in prevention terms. The prevention principle in `docs/philosophy.md` requires (2) in particular. A runtime path where an arbitrary string value can flow into a choice field is detection dressed up as a type.
+
+**The current spec doesn't commit to (2).** That's the design gap. It's fixable without changing the grammar.
+
+---
+
+### Concrete recommendation
+
+**Commit to the sealed vocabulary model. Now — as a spec clarification, not a new feature.**
+
+1. **Add an explicit assignment rule to the spec:** A `string` value is not assignment-compatible with a `choice` field. The only compatible assignment sources are: (a) a string literal that is a declared member, verified at compile time; (b) a value from a structurally compatible or subset choice type.
+
+2. **Add a diagnostic entry:** `StringAssignedToChoice` — emitted when a `string`-typed expression is assigned to a `choice` field. Severity: Error.
+
+3. **Lock Option A (structural equivalence)** as the arg supply mechanism. Extend it to include the subset-subtype relation: `choice(A)` is assignable to `choice(B)` iff `A ⊆ B`.
+
+4. **File the named vocabulary shorthand** as a separate follow-on proposal — not a type system change, a macro expansion for authoring ergonomics.
+
+5. **Update the operator table and assignment compatibility tables** in the spec to reflect the sealed model explicitly. This is the single biggest documentation gap.
+
+The thing I want to say plainly: **the current design is incomplete, not wrong.** The mechanism is correct. The abstraction is correct. But without the spec commitment to blocking string variable assignment, `choice` is partially prevention and partially detection, and we've been arguing about the wrong things as a result. Seal the type, add the diagnostic, document the rule. The rest of the design — structural equivalence, subset subtyping, named vocabulary shorthand as future work — follows cleanly from that one commitment.
+
+```precept
+# What the sealed vocabulary model looks like in practice
+
+field Priority as choice("Low","Medium","High","Critical") default "Low"
+field Notes as string writable
+
+# These compile:
+set Priority = "High"                                # literal — verified at compile time
+set Priority = EscalationEvent.Level                 # Level as choice("Low","Medium","High","Critical") — same set
+set Priority = EscalationEvent.Target                # Target as choice("High","Critical") — subset, valid
+
+# These are type errors:
+set Priority = Notes                                 # StringAssignedToChoice — blocked
+set Priority = "Urgent"                              # MembershipViolation — not in declared set
+set Priority = EscalationEvent.Urgency               # Urgency as choice("Routine","Urgent") — incompatible sets
+```
+
+The language surface doesn't change. The prevention guarantee becomes honest.
+
+---
+
+## Consolidated Design Update — 2026-04-29
+
+**Date:** 2026-04-29  
+**Occasion:** Owner design session synthesis — Shane's consolidated input on five open questions.
+
+---
+
+### 1. The Load-Bearing Insight: Choice = Dropdown Signal + Closed-Set Constraint
+
+Shane's formulation is precise and should be the canonical justification: *"I guess the real value of choice is showing the user a drop-down."*
+
+This is the JSON Schema `enum` model. A `choice` field simultaneously does two things:
+
+1. **Constrains the value domain** — membership enforcement at the type-system level.
+2. **Signals the presentation contract** — "render this field as a dropdown, not a free-text input." Language server, form generators, and admin UIs read the choice set to offer a closed list of options.
+
+The second property is what justifies `choice` over `string + rule`. Both enforce membership. Only `choice` communicates "the valid values are enumerable and knowable at design time, not just runtime." That's the metadata consumers need to render a dropdown, generate an OpenAPI enum, or populate a UI picker.
+
+**This framing does not invalidate the prevention test.** It adds a second justification. The dropdown contract still requires the type to be sealed — an open `string` value flowing into a `choice` field would corrupt the dropdown semantics (the field would hold values the dropdown doesn't offer). The prevention argument and the dropdown argument converge on the same architectural conclusion: seal the type.
+
+**What changes in the spec:** The justification for `choice` must include the UI rendering signal explicitly. "Choice enforces membership" is half the answer. "Choice enables dropdown rendering" is the other half. Both properties must appear in the spec's introduction of the `choice` type.
+
+---
+
+### 2. The Subset Subtype Model — Replacing Exact-Match Structural Equivalence
+
+My original Option A defined structural equivalence as exact-match: two choice types are the same iff their sets are identical. Shane's consolidated input replaces this with **subset subtype assignment**: `choice(A) <: choice(B)` iff `A ⊆ B`.
+
+**The new rule:**
+
+An event arg of type `choice(A)` is valid as the source for assignment to a field of type `choice(B)` iff every member of `A` is a member of `B`. The compiler verifies this statically — no runtime check needed. Prevention holds: every value the arg can carry is a guaranteed member of the field's declared set.
+
+```precept
+field Priority as choice("Low", "Medium", "High") default "Low"
+
+# Valid — {"Low","Medium"} ⊆ {"Low","Medium","High"}
+event Triage(Level as choice("Low", "Medium"))
+from Active on Triage
+    -> set Priority = Triage.Level    # OK: every Level value is in Priority's set
+
+# Valid — {"High"} ⊆ {"Low","Medium","High"}
+event MarkUrgent(Level as choice("High"))
+from Active on MarkUrgent
+    -> set Priority = MarkUrgent.Level  # OK
+
+# TYPE ERROR — "Critical" ∉ {"Low","Medium","High"}
+event Escalate(Level as choice("Medium", "Critical"))
+from Active on Escalate
+    -> set Priority = Escalate.Level   # TypeMismatch: "Critical" not in field's declared set
+
+# TYPE ERROR — superset: field may hold "Low" which isn't in arg's set
+event StrictEscalate(Level as choice("Medium", "High", "Critical"))
+from Active on StrictEscalate
+    -> set Priority = StrictEscalate.Level   # TypeMismatch: superset is not a subtype
+```
+
+**Direction constraint:** The subtype relation is arg→field only. A field can supply a value to a *wider* arg (subtype widens to supertype), not to a *narrower* one. The type checker enforces this asymmetry.
+
+**What this replaces:** The exact-match requirement from Option A. Exact match was sound but too restrictive — it forced event arg declarations to repeat the entire field set verbatim. Subset subtype is the TypeScript string literal union model: `"Low" | "Medium"` is assignable to `"Low" | "Medium" | "High"` because the narrower union is a subtype of the wider. Precise, statically verified, well-precedented.
+
+**What this does NOT change:** The prevention test remains open. Subset subtype governs choice→choice assignment. Whether string→choice assignment compiles is addressed in §6.
+
+---
+
+### 3. Ordered Choice + Subset: The Order-Preserving Subsequence Rule
+
+For ordinal comparison (`<`, `>`, `<=`, `>=`, `.min`, `.max`) between two choice values, it is not sufficient that the arg's set is a subset of the field's set. The ranks must be consistent.
+
+**The rule:** An ordered `choice(A)` arg supports ordinal comparison with an ordered `choice(B)` field iff `A` is an **order-preserving subsequence** of `B` — that is, the relative order of members in `A` matches their relative order in `B`.
+
+```precept
+field Priority as choice("Low", "Medium", "High") ordered default "Low"
+# Declared ranks: Low=1, Medium=2, High=3
+```
+
+| Arg type | Subsequence check | Ordinal comparison valid? |
+|---|---|---|
+| `choice("Low", "Medium") ordered` | Low=1 < Medium=2 in both ✓ | Yes |
+| `choice("Medium", "High") ordered` | Medium=2 < High=3 in both ✓ | Yes |
+| `choice("Low", "High") ordered` | Low=1 < High=3 in both ✓ (non-contiguous is fine) | Yes |
+| `choice("Medium", "Low") ordered` | Medium=1 in arg, Medium=2 in field — rank conflict ✗ | TypeMismatch |
+| `choice("Low", "Medium")` (unordered) | Arg has no rank | Assignment valid; ordinal comparison TypeMismatch |
+
+**Assignment vs. comparison:** The subtype relation (§2) governs assignment. The order-preserving subsequence rule governs ordinal comparison. A choice arg can be assignable to a field (subset ✓) but still not support ordinal comparison (rank conflict). Both checks are static.
+
+```precept
+# Concrete example — assignment valid, ordinal comparison valid
+event Triage(Level as choice("Low", "Medium") ordered)
+from Active on Triage when Triage.Level < Priority
+    -> set Priority = Triage.Level    # both valid: subset ✓, order-preserving ✓
+
+# Assignment valid, ordinal comparison TypeMismatch (reversed order)
+event InvertedTriage(Level as choice("Medium", "Low") ordered)
+from Active on InvertedTriage when InvertedTriage.Level < Priority  # TypeMismatch: rank conflict
+    -> set Priority = InvertedTriage.Level   # this line would be valid if above weren't a type error
+```
+
+**Declaration order universally — for all types.** String choice and all typed choice (`integer`, `decimal`, `number`) use declaration order as the rank definition. There are no special cases for natural numeric order. The author controls rank by how they write the list. If natural numeric order is desired, list values numerically — and they agree by construction.
+
+```precept
+# Declaration order = rank order for all types
+field ErrorCode as choice of integer(200, 404, 500) ordered default 200
+# Ranks: 200=1, 404=2, 500=3 — author listed ascending; natural and declared order agree
+
+field SeverityCode as choice of integer(500, 404, 200) ordered default 500
+# Ranks: 500=1, 404=2, 200=3 — deliberately reversed; the author controls this
+# 500 < 404 < 200 by declared rank
+```
+
+**Spec impact:** The operator table row at line 1127 currently reads `choice (ordered, same set)`. Under the subset subtype model, the constraint is no longer same-set — it is order-preserving subsequence. That row's right-operand description must be updated to reflect this. The exact-match framing was only accurate under Option A's original equivalence rule.
+
+---
+
+### 4. `choice of T` — Locked Grammar for All Primitives
+
+**Locked.** `choice of T` extends to all primitive types: `string`, `integer`, `decimal`, `number`, `boolean`.
+
+**Grammar:**
+
+```
+ChoiceType        := choice ("of" ChoiceElementType)? "(" ChoiceValueExpr ("," ChoiceValueExpr)* ")"
+ChoiceElementType := string | integer | decimal | number | boolean
+ChoiceValueExpr   := StringLiteral | IntegerLiteral | DecimalLiteral | NumberLiteral | BooleanLiteral
+```
+
+`choice("a","b")` = `choice of string("a","b")` — backward-compatible default. All existing `.precept` files are unchanged.
+
+**Concrete syntax for all types:**
+
+```precept
+# String choice — unchanged
+field Status as choice("draft", "active", "closed") default "draft"
+
+# Integer choice — HTTP status codes, numeric tiers
+field ErrorCode as choice of integer(200, 404, 500) ordered default 200
+
+# Decimal choice — exact rate tiers (base-10 precision required)
+field TaxRate as choice of decimal(0.00, 0.05, 0.10, 0.20) default 0.00
+
+# Number choice — threshold picker (IEEE 754 precision acceptable for this domain)
+field AlertThreshold as choice of number(1500, 2500, 5000) default 2500
+
+# Boolean choice — full domain declared explicitly
+field IsActive as choice of boolean(true, false) default true
+
+# Event arg using typed choice — subset subtype applies
+event SetCode(Code as choice of integer(200, 404))
+from Active on SetCode
+    -> set ErrorCode = SetCode.Code   # valid: {"200","404"} ⊆ {"200","404","500"}
+```
+
+**Bare literals for non-string values.** `choice of integer('1', '2', '3')` is a type error — `''` is the non-primitive literal form (spec §1.3). Integers are primitives. Numeric choice values are written as plain numeric literals, consistent with all other numeric usage in the language (`field MaxCount as integer min 1 max 100 default 5`).
+
+**Type isolation — `decimal` and `number` remain incompatible.** No implicit `decimal → number` widening exists in any context (spec §3.2). `choice of decimal(0.05, 0.10)` and `choice of number(0.05, 0.10)` are distinct types. Whether precision is base-10 exact or IEEE 754 approximate is a meaningful decision; the `of T` qualifier makes that intent explicit.
+
+```precept
+field ExactRate as choice of decimal(0.05, 0.10) default 0.05
+field ApproxThreshold as choice of number(0.05, 0.10) default 0.05
+
+event SetRate(Rate as choice of number(0.05, 0.10))
+from Active on SetRate
+    -> set ExactRate = SetRate.Rate   # TypeMismatch: decimal ≠ number, no implicit widening
+```
+
+**`ordered` on `choice of boolean`:** `boolean` has no meaningful declared order — `true < false` vs `false < true` is undefined semantics with no business analogue. `ordered` must be disallowed on `choice of boolean`. The grammar permits it; the type checker rejects it with a dedicated diagnostic (e.g., `OrderedChoiceOnBoolean`).
+
+**Mixed literal unions:** Off the table. `choice("low", 1, true)` is invalid. All members of a choice literal list must share a single element type. Type mismatch within the list is a parse-time or type-checker error.
+
+---
+
+### 5. String `<`/`>` vs. Ordered Choice `<`/`>` — Two Distinct Operator Behaviors
+
+**Confirmed from spec line 1126:** `< > <= >=` work on `string` fields with **lexicographic ordering**.
+
+**The problem this creates for business values:** Lexicographic ordering is almost always wrong for severity, tier, or priority fields.
+
+```
+# Lexicographic — "High" < "Low" < "Medium"
+# A comparison Priority > "Low" returns true when Priority == "High" — backwards
+```
+
+**The ordered choice correction:** `choice("Low","Medium","High") ordered` declares explicit semantic rank — `Low=1, Medium=2, High=3`. The `<`/`>` operators on this field use declared rank, not lexicographic order. The author's intent is captured in the declaration.
+
+**Two operator behaviors on two distinct types — not an inconsistency:**
+
+| Field type | `<`/`>` behavior | Correct for business ranking? |
+|---|---|---|
+| `string` | Lexicographic (spec §4, line 1126) | Usually no — alphabetic accident |
+| `choice(...) ordered` | Declared rank (spec §4, line 1127) | Always yes — author-defined |
+| `choice(...)` (unordered) | Not permitted | N/A — type error at compile time |
+
+This is appropriate semantics per type. `string` has `<`/`>` because strings have a universal total order (lexicographic). This is correct wherever lexicographic order is meaningful — alphabetic lists, code points, identifiers. `ordered choice` has `<`/`>` because the author has explicitly declared a semantic rank. The `ordered` keyword is the signal that ordinal operators should use declared rank, overriding any default.
+
+The operator table's two separate rows (lines 1126 and 1127) correctly capture this as distinct behaviors — they coexist without conflict because the left-operand types are distinct.
+
+**Practical implication for tooling:** A `string` field used for severity or priority levels should be migrated to `choice(...) ordered`. Using `<`/`>` on a plain `string` field for business rankings compiles and runs but produces wrong results. A language server warning when `<`/`>` is used on a `string` field in guard/rule context — suggesting `choice ordered` — would be a useful quality-of-life improvement, though this is tooling work, not a type system change.
+
+---
+
+### 6. The Prevention Test — Open Question Requiring Owner Sign-Off
+
+**Status: OPEN.**
+
+The question introduced in my Fresh Assessment and carried forward explicitly because it has not been answered:
+
+```precept
+field Notes as string writable
+field Priority as choice("Low", "Medium", "High") default "Low"
+
+set Priority = Notes   # TypeMismatch or valid?
+```
+
+**If TypeMismatch (sealed vocabulary model):**
+- `choice` is structurally different from `string + rule`
+- Only string literals verified at compile time and structurally compatible choice values are assignment-compatible sources
+- Prevention is complete: no runtime path for an arbitrary string to enter a choice field through the type system
+- The TypeScript string literal union analogue — what the Fresh Assessment named as the correct model
+
+**If valid (constrained string model):**
+- `choice` is a `string` field with membership enforcement at runtime
+- The language allows attempting the assignment; the runtime rejects invalid values via atomicity
+- This is Framing 3 from the Fresh Assessment — field-level `in` constraint — the named failure mode
+
+**My recommendation is unchanged:** Seal the type. `set Priority = someStringVariable` should be a `TypeMismatch` diagnostic (Error). The dropdown framing reinforces this — if a `choice` field's value set is knowable at design time for UI rendering, the type must be sealed or the rendering contract is meaningless (the field could hold values the dropdown doesn't offer).
+
+**What owner sign-off resolves:**
+1. Whether `StringAssignedToChoice` is added as an Error-severity diagnostic
+2. Whether any existing `.precept` files assign string variables to choice fields and would need migration
+3. Whether comparison of a choice field against a `string` variable (`Priority == someStringField`) is also a type error, or only assignment is blocked
+
+This question is independent of the subset subtype model (§2), which governs choice→choice assignment. The open question is specifically: does `string` narrow to `choice` at all, under any circumstances?
+
+---
+
+### 7. Decision Table
+
+| Question | Answer | Status |
+|---|---|---|
+| What is `choice`'s primary justification over `string + rule`? | Dropdown signal: finite valid values knowable at design time, renderable as UI picker. Membership enforcement is convergent, not the primary differentiator. | **Locked** |
+| What is the arg→field assignment rule for choice? | Subset subtype: `choice(A) <: choice(B)` iff `A ⊆ B`. Compiler verifies statically. | **Locked** |
+| What is the rule for ordinal comparison across two ordered choice values? | Order-preserving subsequence: arg's declared sequence must be rank-consistent with field's declared sequence. | **Locked** |
+| Does `choice` support non-string element types? | Yes. `choice of T` for `string`, `integer`, `decimal`, `number`, `boolean`. | **Locked** |
+| What literals do non-string choice values use? | Bare literals. `choice of integer(0, 404, 500)`. The `''` form is a type error. | **Locked** |
+| What governs rank for all choice types? | Declaration order, universally — string AND numeric. No special case for natural numeric order. | **Locked** |
+| Is `ordered` required to enable `<`/`>` on choice fields? | Yes. `ordered` is the capability gate for all element types. | **Locked** |
+| Is `ordered` valid on `choice of boolean`? | No. `boolean` has no meaningful declared ordering. Type checker rejects with diagnostic. | **Locked** |
+| Does `decimal` widen to `number` in choice assignment or comparison? | No. `decimal` does not implicitly widen to `number` in any context (spec §3.2). `choice of decimal` and `choice of number` are distinct types. | **Locked** |
+| Are mixed literal unions (`choice("low", 1, true)`) valid? | No. All members must share a single element type. | **Locked** |
+| What is the distinction between string `<`/`>` and ordered choice `<`/`>`? | String: lexicographic (spec line 1126). Ordered choice: declared rank (spec line 1127). Two distinct operator behaviors on two distinct types — not an inconsistency. | **Locked** |
+| Does `set Priority = someStringVariable` compile? | **OPEN.** Recommendation: TypeMismatch (sealed vocabulary). Requires owner sign-off. | **Open** |
+| Should Option C (named types) be introduced? | Not in this cluster. Requires separate proposal explicitly addressing §0.4 Property 4. | Deferred |
+| Should `vocabulary` shorthand be proposed as authoring ergonomics? | Worth a dedicated follow-on proposal. Macro expansion at parse time; no type system change. Preserves §0.4 Property 4. | Deferred |
