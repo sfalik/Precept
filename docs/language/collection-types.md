@@ -231,16 +231,23 @@ from InRepair on UndoLastStep
 The inner type `T` in `set of T`, `queue of T`, or `stack of T` must be a scalar type. The collection grammar is:
 
 ```
-CollectionType  :=  (set | queue | stack) of ScalarType
-ScalarType      :=  string | ~string | integer | decimal | number | boolean | choice of T(...) ordered?
-               |   date | time | datetime | instant | duration
-               |   period ('of' ('date' | 'time') | 'in' PeriodUnit)?
-               |   timezone | zoneddatetime
-               |   money ('in' CurrencyCode)?
-               |   quantity ('of' DimensionCode | 'in' UnitCode)?
-               |   price ('in' CurrencyCode)?
-               |   currency | unitofmeasure | dimension | exchangerate
+CollectionType    :=  (set | queue | stack) of ScalarType
+ScalarType        :=  string | ~string | integer | decimal | number | boolean
+                  |   ChoiceType
+                  |   date | time | datetime | instant | duration
+                  |   period ('of' ('date' | 'time') | 'in' PeriodUnit)?
+                  |   timezone | zoneddatetime
+                  |   money ('in' CurrencyCode)?
+                  |   quantity ('of' DimensionCode | 'in' UnitCode)?
+                  |   price ('in' CurrencyCode)?
+                  |   currency | unitofmeasure | dimension | exchangerate
+
+ChoiceType        :=  choice "of" ChoiceElementType "(" ChoiceValueExpr ("," ChoiceValueExpr)* ")" ordered?
+ChoiceElementType :=  string | integer | decimal | number | boolean
+ChoiceValueExpr   :=  StringLiteral | NumberLiteral | BooleanLiteral
 ```
+
+**v1 limit:** `set of choice of string(...)` is not supported in v1. The collection inner type must be a simple scalar, not a parameterized choice type. Nesting typed choice inside a collection requires a separate AST/parser slice.
 
 Collections of collections (`set of set of string`) are not supported. All Precept scalar types — including temporal and business-domain types — are valid inner types. See §Temporal and Business-Domain Inner Types below for ordering constraints and qualified type syntax.
 

@@ -154,6 +154,9 @@ public class DiagnosticsTests
         DiagnosticCode.UnexpectedKeyword,
         DiagnosticCode.NonAssociativeComparison,
         DiagnosticCode.InvalidCallTarget,
+        DiagnosticCode.EmptyChoice,
+        DiagnosticCode.ChoiceMissingElementType,
+        DiagnosticCode.ChoiceElementTypeMismatch,
     };
 
     public static TheoryData<DiagnosticCode> TypeCodes => new()
@@ -186,7 +189,11 @@ public class DiagnosticsTests
         DiagnosticCode.ConflictingAccessModes,
         DiagnosticCode.ListLiteralOutsideDefault,
         DiagnosticCode.DuplicateChoiceValue,
-        DiagnosticCode.EmptyChoice,
+        // ── Type (choice) — new codes ───────────────────────────────────────────────
+        DiagnosticCode.NonChoiceAssignedToChoice,
+        DiagnosticCode.ChoiceLiteralNotInSet,
+        DiagnosticCode.ChoiceArgOutsideFieldSet,
+        DiagnosticCode.ChoiceRankConflict,
         DiagnosticCode.CollectionOperationOnScalar,
         DiagnosticCode.ScalarOperationOnCollection,
         DiagnosticCode.IsSetOnNonOptional,

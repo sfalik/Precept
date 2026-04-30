@@ -20,7 +20,7 @@ public static class SyntaxReference
     public static string CommentSyntax      => "# to end of line";
     public static string IdentifierRules    => "Starts with letter, alphanumeric + underscore, case-sensitive";
     public static string StringLiteralRules => "Double-quoted strings with {expr} interpolation and \\, \\n, \\t, \\\", {{, }} escapes; single-quoted typed constants ('value') for date, time, instant, duration, period, timezone, zoneddatetime, datetime literals";
-    public static string NumberLiteralRules => "Integers (42), decimals (3.14), exponent notation (1.5e2, 1e-5); no hex/underscore separators";
+    public static string NumberLiteralRules => "Integers (42, -1), decimals (3.14, -3.14), exponent notation (1.5e2, -1e5, 1e-5); no hex/underscore separators; negative numbers are first-class literals (parser constant-folds unary minus on numeric literals)";
     public static string WhitespaceRules    => "Not significant — indentation is cosmetic, line breaks separate declarations";
     public static string NullNarrowing      => "if Field is set narrows to guaranteed-present in the then branch";
 

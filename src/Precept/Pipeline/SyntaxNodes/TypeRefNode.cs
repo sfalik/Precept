@@ -18,9 +18,10 @@ public sealed record CollectionTypeRefNode(
     Language.Token ElementType,
     TypeQualifierNode? Qualifier) : TypeRefNode(Span);
 
-/// <summary><c>as choice "A" "B" "C"</c></summary>
+/// <summary><c>as choice of string("A", "B", "C")</c></summary>
 public sealed record ChoiceTypeRefNode(
     SourceSpan Span,
+    Language.Token? ElementType,
     ImmutableArray<Expression> Options) : TypeRefNode(Span);
 
 /// <summary>Type qualifier: <c>in USD</c>, <c>of mass</c></summary>

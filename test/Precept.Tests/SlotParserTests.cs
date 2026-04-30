@@ -68,12 +68,87 @@ public class SlotParserTests
     }
 
     [Fact]
-    public void ParseTypeExpression_ChoiceType()
+    public void ParseTypeExpression_ChoiceType_StringElement()
     {
-        var tree = Parse("field status as choice(\"A\", \"B\")");
+        var tree = Parse("field status as choice of string(\"A\", \"B\")");
         var field = tree.Declarations[0].Should().BeOfType<FieldDeclarationNode>().Subject;
         var choice = field.Type.Should().BeOfType<ChoiceTypeRefNode>().Subject;
+        choice.ElementType!.Value.Kind.Should().Be(TokenKind.StringType);
         choice.Options.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public void ParseTypeExpression_ChoiceType_IntegerElement()
+    {
+        var tree = Parse("field code as choice of integer(0, 404, 500)");
+        var field = tree.Declarations[0].Should().BeOfType<FieldDeclarationNode>().Subject;
+        var choice = field.Type.Should().BeOfType<ChoiceTypeRefNode>().Subject;
+        choice.ElementType!.Value.Kind.Should().Be(TokenKind.IntegerType);
+        choice.Options.Should().HaveCount(3);
+    }
+
+    [Fact]
+    public void ParseTypeExpression_ChoiceType_DecimalElement()
+    {
+        var tree = Parse("field rate as choice of decimal(0.0, 0.05)");
+        var field = tree.Declarations[0].Should().BeOfType<FieldDeclarationNode>().Subject;
+        var choice = field.Type.Should().BeOfType<ChoiceTypeRefNode>().Subject;
+        choice.ElementType!.Value.Kind.Should().Be(TokenKind.DecimalType);
+        choice.Options.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public void ParseTypeExpression_ChoiceType_NumberElement()
+    {
+        var tree = Parse("field score as choice of number(1.5, 2.5)");
+        var field = tree.Declarations[0].Should().BeOfType<FieldDeclarationNode>().Subject;
+        var choice = field.Type.Should().BeOfType<ChoiceTypeRefNode>().Subject;
+        choice.ElementType!.Value.Kind.Should().Be(TokenKind.NumberType);
+        choice.Options.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public void ParseTypeExpression_ChoiceType_BooleanElement()
+    {
+        var tree = Parse("field flag as choice of boolean(true, false)");
+        var field = tree.Declarations[0].Should().BeOfType<FieldDeclarationNode>().Subject;
+        var choice = field.Type.Should().BeOfType<ChoiceTypeRefNode>().Subject;
+        choice.ElementType!.Value.Kind.Should().Be(TokenKind.BooleanType);
+        choice.Options.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public void ParseTypeExpression_ChoiceType_NegativeNumericValues()
+    {
+        var tree = Parse("field temp as choice of integer(-10, 0, 10)");
+        var field = tree.Declarations[0].Should().BeOfType<FieldDeclarationNode>().Subject;
+        var choice = field.Type.Should().BeOfType<ChoiceTypeRefNode>().Subject;
+        choice.Options.Should().HaveCount(3);
+        choice.Options[0].Should().BeOfType<LiteralExpression>()
+            .Which.Value.Text.Should().Be("-10");
+    }
+
+    [Fact]
+    public void ParseTypeExpression_ChoiceType_BareChoice_ProducesDiagnostic()
+    {
+        // choice(...) without 'of T' must produce ChoiceMissingElementType
+        var tree = Parse("field status as choice(\"A\", \"B\")");
+        tree.Diagnostics.Should().ContainSingle(d => d.Code == nameof(DiagnosticCode.ChoiceMissingElementType));
+    }
+
+    [Fact]
+    public void ParseTypeExpression_ChoiceType_UnknownElementType_ProducesDiagnostic()
+    {
+        var tree = Parse("field status as choice of uuid(\"A\")");
+        tree.Diagnostics.Should().NotBeEmpty();
+    }
+
+    [Fact]
+    public void ParseTypeExpression_ChoiceType_WrongLiteralKind_ProducesDiagnostic()
+    {
+        // integer element type but string literal value
+        var tree = Parse("field code as choice of integer(\"not-an-int\")");
+        tree.Diagnostics.Should().ContainSingle(d => d.Code == nameof(DiagnosticCode.ChoiceElementTypeMismatch));
     }
 
     [Fact]

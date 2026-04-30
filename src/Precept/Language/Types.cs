@@ -160,12 +160,12 @@ public static class Types
 
         TypeKind.Choice => new(
             kind, Tokens.GetMeta(TokenKind.ChoiceType),
-            "Enumerated string set",
+            "Enumerated value set with explicit element type",
             TypeCategory.Scalar,
             Traits: TypeTrait.EqualityComparable,
             DisplayName: "choice",
-            HoverDescription: "A field restricted to a declared set of string values. Add the 'ordered' modifier to enable comparison operators between choice values.",
-            UsageExample: "field Priority as choice(\"Low\",\"Medium\",\"High\",\"Critical\") default \"Low\""
+            HoverDescription: "A sealed enumerated type restricted to a declared set of typed values. Requires an explicit element type: 'choice of string(...)', 'choice of integer(...)', etc. Add the 'ordered' modifier to enable comparison operators ranked by declaration order.",
+            UsageExample: "field Priority as choice of string(\"Low\",\"Medium\",\"High\") ordered default \"Low\""
         ),
 
         // ── Temporal ───────────────────────────────────────────────────

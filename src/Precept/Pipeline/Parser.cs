@@ -87,6 +87,15 @@ public static class Parser
     internal static readonly FrozenSet<TokenKind> ExpressionBoundaryTokens =
         StructuralBoundaryTokens.Union(Constructs.LeadingTokens).ToFrozenSet();
 
+    /// <summary>
+    /// The five primitive types allowed as element types in a <c>choice of T(...)</c> declaration.
+    /// </summary>
+    internal static readonly FrozenSet<TokenKind> ChoiceElementTypeKeywords = new[]
+    {
+        TokenKind.StringType, TokenKind.IntegerType, TokenKind.DecimalType,
+        TokenKind.NumberType, TokenKind.BooleanType,
+    }.ToFrozenSet();
+
     // ════════════════════════════════════════════════════════════════════════════
     //  Public entry point
     // ════════════════════════════════════════════════════════════════════════════
@@ -1073,27 +1082,41 @@ public static class Parser
             if (current.Kind == TokenKind.ChoiceType)
             {
                 var choiceToken = Advance();
-                var options = ImmutableArray.CreateBuilder<Expression>();
-                // choice(...) or choice "A" "B" "C"
-                if (Match(TokenKind.LeftParen))
+
+                // 'of T' is required — bare choice(...) emits ChoiceMissingElementType
+                if (!Match(TokenKind.Of))
                 {
-                    if (Current().Kind != TokenKind.RightParen)
-                    {
-                        do
-                        {
-                            options.Add(ParseExpression(0));
-                        }
-                        while (Match(TokenKind.Comma));
-                    }
-                    Expect(TokenKind.RightParen);
+                    EmitDiagnostic(DiagnosticCode.ChoiceMissingElementType, choiceToken.Span);
+                    ConsumeThrough(TokenKind.RightParen);
+                    return new ChoiceTypeRefNode(choiceToken.Span, null, ImmutableArray<Expression>.Empty);
+                }
+
+                // Element type must be one of the 5 primitive keywords
+                var elemToken = Current();
+                if (!ChoiceElementTypeKeywords.Contains(elemToken.Kind))
+                {
+                    EmitDiagnostic(DiagnosticCode.ExpectedToken, elemToken.Span, "string, integer, decimal, number, or boolean", elemToken.Text);
+                    ConsumeThrough(TokenKind.RightParen);
+                    return new ChoiceTypeRefNode(choiceToken.Span, null, ImmutableArray<Expression>.Empty);
+                }
+                Advance(); // consume validated element type
+
+                var options = ImmutableArray.CreateBuilder<Expression>();
+                Expect(TokenKind.LeftParen);
+
+                if (Current().Kind == TokenKind.RightParen)
+                {
+                    EmitDiagnostic(DiagnosticCode.EmptyChoice, Current().Span);
                 }
                 else
                 {
-                    while (Current().Kind == TokenKind.StringLiteral)
-                        options.Add(new LiteralExpression(Current().Span, Advance()));
+                    do { options.Add(ParseChoiceValue(elemToken)); }
+                    while (Match(TokenKind.Comma));
                 }
-                var lastSpan = options.Count > 0 ? options[^1].Span : choiceToken.Span;
-                return new ChoiceTypeRefNode(SourceSpan.Covering(choiceToken.Span, lastSpan), options.ToImmutable());
+
+                Expect(TokenKind.RightParen);
+                var lastSpan = options.Count > 0 ? options[^1].Span : elemToken.Span;
+                return new ChoiceTypeRefNode(SourceSpan.Covering(choiceToken.Span, lastSpan), elemToken, options.ToImmutable());
             }
 
             if (TypeKeywords.Contains(current.Kind))
@@ -1118,6 +1141,77 @@ public static class Parser
             EmitDiagnostic(DiagnosticCode.ExpectedToken, current.Span, "type", current.Text);
             return new ScalarTypeRefNode(current.Span,
                 new Token(TokenKind.Identifier, current.Text, current.Span), null);
+        }
+
+        // ── Choice helpers ────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Parses a single choice value literal that must match the declared element type.
+        /// Emits <see cref="DiagnosticCode.ChoiceElementTypeMismatch"/> if the literal kind
+        /// doesn't match. Numeric element types (integer, decimal, number) all accept
+        /// <see cref="TokenKind.NumberLiteral"/> — subtype discrimination is deferred to the type stage.
+        /// </summary>
+        private Expression ParseChoiceValue(Token elemToken)
+        {
+            var cur = Current();
+
+            // For numeric element types, absorb an optional leading minus and fold into a signed literal.
+            if (elemToken.Kind is TokenKind.IntegerType or TokenKind.DecimalType or TokenKind.NumberType)
+            {
+                Token? minusToken = null;
+                if (cur.Kind == TokenKind.Minus)
+                {
+                    minusToken = Advance();
+                    cur = Current();
+                }
+
+                if (cur.Kind == TokenKind.NumberLiteral)
+                {
+                    var tok = Advance();
+                    if (minusToken is not null)
+                    {
+                        var negText = "-" + tok.Text;
+                        var span = SourceSpan.Covering(minusToken.Value.Span, tok.Span);
+                        tok = new Token(TokenKind.NumberLiteral, negText, span);
+                    }
+                    return new LiteralExpression(tok.Span, tok);
+                }
+
+                // Wrong literal kind
+                EmitDiagnostic(DiagnosticCode.ChoiceElementTypeMismatch, cur.Span, elemToken.Text);
+                if (cur.Kind is not (TokenKind.Comma or TokenKind.RightParen or TokenKind.EndOfSource))
+                    Advance();
+                return new LiteralExpression(cur.Span, cur);
+            }
+
+            bool isValid = elemToken.Kind switch
+            {
+                TokenKind.StringType  => cur.Kind == TokenKind.StringLiteral,
+                TokenKind.BooleanType => cur.Kind is TokenKind.True or TokenKind.False,
+                _                     => false,
+            };
+
+            if (!isValid)
+            {
+                EmitDiagnostic(DiagnosticCode.ChoiceElementTypeMismatch, cur.Span, elemToken.Text);
+                if (cur.Kind is not (TokenKind.Comma or TokenKind.RightParen or TokenKind.EndOfSource))
+                    Advance();
+                return new LiteralExpression(cur.Span, cur);
+            }
+
+            return new LiteralExpression(cur.Span, Advance());
+        }
+
+        /// <summary>
+        /// Consumes tokens until a <see cref="TokenKind.RightParen"/> is consumed or end-of-source.
+        /// Used in error recovery to prevent cascade diagnostics after a malformed choice type.
+        /// </summary>
+        private void ConsumeThrough(TokenKind stopKind)
+        {
+            while (!IsAtEnd() && Current().Kind != stopKind)
+                Advance();
+            if (Current().Kind == stopKind)
+                Advance();
         }
 
         // ── Field modifier parsing ────────────────────────────────────────────
@@ -1256,6 +1350,15 @@ public static class Parser
                 {
                     var op = Advance();
                     var operand = ParseExpression(65); // negate precedence
+                    // Constant-fold: -<NumberLiteral> → signed LiteralExpression
+                    if (operand is LiteralExpression { Value.Kind: TokenKind.NumberLiteral } lit)
+                    {
+                        var negText = lit.Value.Text!.StartsWith('-')
+                            ? lit.Value.Text[1..]       // --1 → "1"
+                            : "-" + lit.Value.Text;     // -1  → "-1"
+                        var span = SourceSpan.Covering(op.Span, lit.Span);
+                        return new LiteralExpression(span, new Token(TokenKind.NumberLiteral, negText, span));
+                    }
                     return new UnaryExpression(
                         SourceSpan.Covering(op.Span, operand.Span), op, operand);
                 }

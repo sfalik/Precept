@@ -305,7 +305,7 @@ Every token the lexer can produce. Organized by category to match the `TokenKind
 | `IntegerType` | `integer` | Scalar type (v2: explicit integer, separate from number) |
 | `DecimalType` | `decimal` | Scalar type (v2: exact base-10) |
 | `NumberType` | `number` | Scalar type (general numeric) |
-| `ChoiceType` | `choice` | Constrained string value set type |
+| `ChoiceType` | `choice` | Enumerated value set type — requires explicit element type (`choice of T(...)`) |
 | `SetType` | `set` | Set collection type (dual-use with action keyword) |
 | `QueueType` | `queue` | Queue collection type |
 | `StackType` | `stack` | Stack collection type |
@@ -456,14 +456,14 @@ The language has two quoted literal forms with distinct roles. Double-quoted str
 
 #### Numeric literals
 
-A numeric literal is a sequence of decimal digits, optionally followed by a decimal part and/or an exponent part. No leading `+` or `-` (unary minus is a separate operator token). No underscores or grouping separators.
+A numeric literal is a sequence of decimal digits, optionally preceded by a unary minus, and optionally followed by a decimal part and/or an exponent part. The parser constant-folds `-` followed by a `NumberLiteral` into a single signed literal value — negative numbers are first-class literals, not runtime negation. No leading `+`. No underscores or grouping separators.
 
 ```
-NumberLiteral  :=  Digits ('.' Digits)? (('e' | 'E') ('+' | '-')? Digits)?
+NumberLiteral  :=  '-'? Digits ('.' Digits)? (('e' | 'E') ('+' | '-')? Digits)?
 Digits         :=  [0-9]+
 ```
 
-Examples: `0`, `42`, `3.14`, `0.5`, `100.00`, `1.5e2`, `1e-5`, `3.0E+10`
+Examples: `0`, `42`, `-1`, `3.14`, `-3.14`, `0.5`, `1.5e2`, `-1e5`, `1e-5`, `3.0E+10`
 
 The lexer produces a single `NumberLiteral` token for all numeric forms. The type checker determines the specific numeric type based on context (see [§3.3 Context-Sensitive Type Resolution](#33-context-sensitive-type-resolution)).
 
@@ -891,7 +891,9 @@ ScalarType  :=  string | number | integer | decimal | boolean
              |  dimension | price | exchangerate
 
 CollectionType  :=  (set | queue | stack) of ScalarType TypeQualifier?
-ChoiceType      :=  choice "(" StringExpr ("," StringExpr)* ")"
+ChoiceType        :=  choice "of" ChoiceElementType "(" ChoiceValueExpr ("," ChoiceValueExpr)* ")"
+ChoiceElementType :=  string | integer | decimal | number | boolean
+ChoiceValueExpr   :=  StringLiteral | NumberLiteral | BooleanLiteral
 TypeQualifier   :=  (in | of) Expr
 ```
 
@@ -1124,7 +1126,7 @@ Event args are accessed via dotted notation: `EventName.ArgName`. The type check
 | `~=` `!~` | `string` | `string` | `boolean` | No — case-insensitive ordinal comparison (`OrdinalIgnoreCase`); type error on non-string operands |
 | `<` `>` `<=` `>=` | numeric | numeric | `boolean` | Yes — `integer` widens to `decimal` or `number`; `decimal` vs `number` is a type error (see §3.2) |
 | `<` `>` `<=` `>=` | `string` | `string` | `boolean` | No (lexicographic) |
-| `<` `>` `<=` `>=` | `choice` (ordered) | `choice` (ordered, same set) | `boolean` | No (ordinal) |
+| `<` `>` `<=` `>=` | `choice of T` (ordered) | `choice of T` (ordered, same element type, order-preserving subsequence) | `boolean` | No (declaration-position rank) |
 | `and` `or` | `boolean` | `boolean` | `boolean` | No |
 
 **Common numeric type:** When two numeric operands have different lanes, the result is the wider type: `integer op decimal` → `decimal`; `integer op number` → `number`. However, `decimal op number` is a **type error** — the author must use an explicit bridge function (`approximate(decimalValue)` to convert to `number`, or `round(numberValue, places)` to convert to `decimal`). There is no implicit `decimal → number` widening in any context — the conversion is lossy. See [Primitive Types · Numeric Lane Rules](primitive-types.md#numeric-lane-rules) for the complete conversion map and §3.7 for bridge function signatures.
@@ -1371,9 +1373,17 @@ Type errors: applying a set operation to a non-set field, a queue operation to a
 
 | Check | Fires when | Diagnostic |
 |-------|-----------|------------|
-| Duplicate choice value | `choice("a", "a")` | `DuplicateChoiceValue` |
-| Empty choice | `choice()` — no values | `EmptyChoice` |
-| Non-string choice value | `choice(42)` | `TypeMismatch` |
+| Missing element type | `choice("a", "b")` — no `of T` | `ChoiceMissingElementType` |
+| Empty choice | `choice of string()` — no values | `EmptyChoice` |
+| Duplicate choice value | `choice of string("a", "a")` | `DuplicateChoiceValue` |
+| Wrong literal kind | `choice of integer("not-a-number")` | `ChoiceElementTypeMismatch` |
+| Non-choice assigned to choice | `set Priority = someStringVar` | `NonChoiceAssignedToChoice` |
+| Choice literal not in set | `set Priority = "Unknown"` where `"Unknown"` not declared | `ChoiceLiteralNotInSet` |
+| Choice arg outside field set | Arg `choice("Low")` supplied to `choice("Low","Med","High")` field — values outside | `ChoiceArgOutsideFieldSet` |
+| Element type mismatch | `choice of integer` arg to `choice of string` field | `ChoiceElementTypeMismatch` |
+| Rank conflict | `choice("Med","Low")` arg to `choice("Low","Med","High")` field — order not preserved | `ChoiceRankConflict` |
+
+**v1 limits:** Negative numeric literals (e.g., `choice of integer(-1, 0, 1)`) are supported via parser constant-folding. Typed choice nested inside a collection element type (e.g., `set of choice of string(...)`) is not supported in v1 — the inner type must be a simple scalar.
 
 #### List literal validation
 
@@ -1460,8 +1470,14 @@ The type checker emits diagnostics for root causes only. When `ErrorType` is flo
 | `RedundantAccessMode` | Error | "The '{0}' access mode for field '{1}' in state '{2}' is redundant — the effective mode is already '{0}'" | `in S modify F editable` where F has `writable`; `in S modify F readonly` where F lacks `writable`; `in S modify F readonly when Guard` where F lacks `writable` |
 | `WritableOnEventArg` | Error | "The 'writable' modifier cannot appear on event argument '{0}'" | `writable` on an event arg declaration |
 | `ListLiteralOutsideDefault` | Error | "List values can only appear in default clauses" | `[...]` outside default position |
-| `DuplicateChoiceValue` | Error | "Choice value '{0}' is duplicated" | Repeated string in choice set |
-| `EmptyChoice` | Error | "A choice type must have at least one value" | `choice()` with no args |
+| `DuplicateChoiceValue` | Error | "Choice value '{0}' is duplicated" | Repeated value in choice set |
+| `EmptyChoice` | Error | "A choice type must have at least one value" | `choice of T()` with no args |
+| `ChoiceMissingElementType` | Error | "A choice type requires an explicit element type — use 'choice of string(...)', 'choice of integer(...)', etc." | `choice(...)` without `of T` |
+| `ChoiceElementTypeMismatch` | Error | "Expected a {0} literal — this choice is declared as 'choice of {0}'" | Literal kind doesn't match declared element type, or `choice of integer` arg to `choice of string` field |
+| `NonChoiceAssignedToChoice` | Error | "Field '{0}' is a choice type — only choice-compatible values can be assigned to it" | Non-choice source assigned to choice field |
+| `ChoiceLiteralNotInSet` | Error | "'{0}' is not a declared value of '{1}'" | Literal not in field's declared set |
+| `ChoiceArgOutsideFieldSet` | Error | "Argument choice includes '{0}', which is not in field '{1}'" | Arg choice has values outside field's set |
+| `ChoiceRankConflict` | Error | "The order of values in this argument conflicts with the declared order of '{0}'" | Arg choice sequence is not an order-preserving subsequence of field's sequence |
 | `CollectionOperationOnScalar` | Error | "'{0}' is a {1} operation, but '{2}' is not a {1}" | add/remove on non-set, etc. |
 | `ScalarOperationOnCollection` | Error | "'{0}' cannot be used with collection field '{1}'" | set = on collection field |
 | `IsSetOnNonOptional` | Error | "'{0}' always has a value — 'is set' only works on optional fields" | is set / is not set on required field |

@@ -103,4 +103,12 @@ public enum DiagnosticCode
     UnsatisfiableGuard                 =  82,
     DivisionByZero                     =  83,
     SqrtOfNegative                     =  84,
+
+    // ── Type (choice) ────────────────────────────────────
+    NonChoiceAssignedToChoice          =  85,
+    ChoiceLiteralNotInSet              =  86,
+    ChoiceArgOutsideFieldSet           =  87,
+    ChoiceElementTypeMismatch          =  88,
+    ChoiceRankConflict                 =  89,
+    ChoiceMissingElementType           =  90,
 }

@@ -225,11 +225,52 @@ public class ExpressionParserTests
         bin.Operator.Kind.Should().Be(TokenKind.GreaterThan);
     }
 
+    // ── Negative literal folding ───────────────────────────────────────────
+
     [Fact]
-    public void ParseExpression_TerminatesAtArrow()
+    public void ParseExpression_NegativeInteger_FoldsToLiteral()
     {
-        var expr = ParseExpr("total + tax -> something");
+        var expr = ParseExpr("-1");
+        var lit = expr.Should().BeOfType<LiteralExpression>().Subject;
+        lit.Value.Kind.Should().Be(TokenKind.NumberLiteral);
+        lit.Value.Text.Should().Be("-1");
+    }
+
+    [Fact]
+    public void ParseExpression_NegativeDecimal_FoldsToLiteral()
+    {
+        var expr = ParseExpr("-3.14");
+        var lit = expr.Should().BeOfType<LiteralExpression>().Subject;
+        lit.Value.Kind.Should().Be(TokenKind.NumberLiteral);
+        lit.Value.Text.Should().Be("-3.14");
+    }
+
+    [Fact]
+    public void ParseExpression_DoubleNegation_FoldsToPositive()
+    {
+        // --1 → LiteralExpression("1"), not UnaryExpression(UnaryExpression(...))
+        var expr = ParseExpr("--1");
+        var lit = expr.Should().BeOfType<LiteralExpression>().Subject;
+        lit.Value.Kind.Should().Be(TokenKind.NumberLiteral);
+        lit.Value.Text.Should().Be("1");
+    }
+
+    [Fact]
+    public void ParseExpression_NegativeIdentifier_RemainsUnary()
+    {
+        // -x is not a literal — must stay as UnaryExpression
+        var expr = ParseExpr("-x");
+        expr.Should().BeOfType<UnaryExpression>();
+    }
+
+    [Fact]
+    public void ParseExpression_BinaryMinus_NotFolded()
+    {
+        // a - 1 is binary subtraction, not constant-fold
+        var expr = ParseExpr("a - 1");
         var bin = expr.Should().BeOfType<BinaryExpression>().Subject;
-        bin.Operator.Kind.Should().Be(TokenKind.Plus);
+        bin.Operator.Kind.Should().Be(TokenKind.Minus);
+        bin.Right.Should().BeOfType<LiteralExpression>()
+            .Which.Value.Text.Should().Be("1"); // positive "1", not "-1"
     }
 }
