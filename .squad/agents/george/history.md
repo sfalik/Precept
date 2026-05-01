@@ -6,6 +6,8 @@
 
 ## Learnings
 
+- Spec grammar optionality markers (`?`) must match parser enforcement exactly. If the parser requires a token (e.g., `because` in ensure declarations), the spec grammar must not mark it optional — the spec is the contract that documentation consumers and future implementers read first.
+
 - Eliminate hardcoded parallel copies of catalog knowledge; derive parser/checker behavior from metadata whenever the behavior is part of the language contract.
 - Exhaustiveness guarantees need explicit compiler enforcement (`#pragma warning disable CS8524` + no wildcard arms) plus pinned regression tests.
 - Use `None = 0` only for real structural sentinels; otherwise make named enum members 1-based so zero-initialization fails loudly.
@@ -16,8 +18,27 @@
 - Parser-facing type properties that reflect durable language truth belong in catalog traits (`TypeTrait.ChoiceElement`), not hand-maintained token lists.
 - A slice is only complete when docs, diagnostics, tests, and samples all still agree on the contract.
 - Record signature changes require a construction-site audit across the ENTIRE file including dead-code exhaustive switch arms — not just the live parse methods. BuildNode's exhaustive switch creates silent obligations whenever a record gains a constructor parameter.
+- New expression AST nodes placed in `src/Precept/Pipeline/SyntaxNodes/Expressions/` should use namespace `Precept.Pipeline.SyntaxNodes` (not the `.Expressions` sub-namespace) — the physical folder organization is finer-grained than the namespace structure.
+- When mirroring interpolated string parsing for a new token family, the only changes needed are the three token kind references (Start/Middle/End) and the return type — everything else (loop structure, `InterpolationPart` DU reuse) is identical.
+- Multi-token postfix operators (`is set`, `is not set`) do NOT belong in `OperatorKind`/`Operators.All` because `OperatorMeta` has a single `Token` field and `Arity` has no `Postfix` value. Handle them directly as special cases in the Pratt led loop, placed BEFORE the `OperatorPrecedence.TryGetValue` check (same pattern as member-access `.`).
+- The `TokenKind.Is` token is not in `ExpressionBoundaryTokens` (not a construct leading token), but it IS silently swallowed by the `OperatorPrecedence.TryGetValue` fallthrough-break if no handler is placed before it. Any new led-handler for a token that isn't in `OperatorPrecedence` must be inserted between the `Dot` handler and the `OperatorPrecedence.TryGetValue` guard.
+- `dotnet build ... -q` can mask the distinction between a "Question build" diagnostic (informational) and actual compilation errors. Omit `-q` when a build is failing unexpectedly — filter the output with `Where-Object` instead so real errors are visible.
 
 ## Recent Updates
+
+### 2026-05-01 — GAP-3: `is set` / `is not set` postfix operators implemented (Slice 3)
+- Created `IsSetExpression` and `IsNotSetExpression` AST nodes in `src/Precept/Pipeline/SyntaxNodes/Expressions/`, namespace `Precept.Pipeline.SyntaxNodes`.
+- Added a Pratt led handler for `TokenKind.Is` in `ParseExpression`'s while loop, inserted before the `OperatorPrecedence.TryGetValue` guard (same position as the `Dot`/member-access handler). Binding power 60. Consumes `is [not] set` and returns the appropriate node.
+- Neither `IsSet` nor `IsNotSet` were added to `OperatorKind`/`Operators.All` — the `OperatorMeta` record has a single `Token` field and `Arity` has no `Postfix` value, making catalog entries unclean for multi-token postfix operators.
+- Added 4 tests in `ExpressionParserTests.cs`: `ParseExpression_IsSet`, `ParseExpression_IsNotSet`, `ParseExpression_IsSet_InCondition`, `ParseExpression_IsNotSet_InCondition`.
+- Fresh build total: 2134 passing. Zero regressions. Committed as `4a041c2`.
+
+
+- Created `TypedConstantExpression` (simple typed constant) and `InterpolatedTypedConstantExpression` (interpolated form) AST nodes in `src/Precept/Pipeline/SyntaxNodes/Expressions/`.
+- Added `case TokenKind.TypedConstant` and `case TokenKind.TypedConstantStart` to `ParseAtom()` in `Parser.cs`.
+- Added `ParseInterpolatedTypedConstant()` mirroring `ParseInterpolatedString()` exactly, reusing `InterpolationPart` DU.
+- Added 4 tests in `ExpressionParserTests.cs`: simple (`'USD'`), date (`'2026-04-15'`), interpolated (`'Hello {name}'`), and field-default form.
+- Final count: 2111 passing (baseline 2107 + 4 new). Zero regressions. Committed as `7248dbf`.
 
 ### 2026-05-01 — Annotation bridge plan follow-up noted
 - Scribe recorded the generic annotation-bridge decision in the canonical ledger while George's plan update remains pending.
