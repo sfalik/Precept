@@ -1407,6 +1407,7 @@ public static class Parser
         [HandlesForm(ExpressionFormKind.MemberAccess)]
         [HandlesForm(ExpressionFormKind.BinaryOperation)]
         [HandlesForm(ExpressionFormKind.MethodCall)]
+        [HandlesForm(ExpressionFormKind.PostfixOperation)]
         internal Expression ParseExpression(int minPrecedence)
         {
             var left = ParseAtom();

@@ -17,7 +17,7 @@ public class ExpressionFormCatalogTests
     [Fact]
     public void ExpressionForms_All_HasExpectedCount()
     {
-        ExpressionForms.All.Should().HaveCount(10);
+        ExpressionForms.All.Should().HaveCount(11);
     }
 
     [Fact]
@@ -56,6 +56,7 @@ public class ExpressionFormCatalogTests
     [InlineData(ExpressionFormKind.BinaryOperation)]
     [InlineData(ExpressionFormKind.MemberAccess)]
     [InlineData(ExpressionFormKind.MethodCall)]
+    [InlineData(ExpressionFormKind.PostfixOperation)]
     public void ExpressionForms_IsLeftDenotation_CorrectForLedForms(ExpressionFormKind kind)
     {
         ExpressionForms.GetMeta(kind).IsLeftDenotation.Should().BeTrue(
@@ -89,6 +90,7 @@ public class ExpressionFormCatalogTests
     [InlineData(ExpressionFormKind.FunctionCall,    ExpressionCategory.Invocation)]
     [InlineData(ExpressionFormKind.MethodCall,      ExpressionCategory.Invocation)]
     [InlineData(ExpressionFormKind.ListLiteral,     ExpressionCategory.Collection)]
+    [InlineData(ExpressionFormKind.PostfixOperation, ExpressionCategory.Composite)]
     public void ExpressionForms_Category_CorrectForAllForms(ExpressionFormKind kind, ExpressionCategory expected)
     {
         ExpressionForms.GetMeta(kind).Category.Should().Be(expected);
@@ -100,5 +102,29 @@ public class ExpressionFormCatalogTests
     public void ExpressionForms_All_CountMatchesEnumValues()
     {
         ExpressionForms.All.Should().HaveCount(Enum.GetValues<ExpressionFormKind>().Length);
+    }
+
+    // ── PostfixOperation shape ────────────────────────────────────────────────
+
+    [Fact]
+    public void ExpressionForms_PostfixOperation_IsLeftDenotation()
+    {
+        ExpressionForms.GetMeta(ExpressionFormKind.PostfixOperation).IsLeftDenotation
+            .Should().BeTrue(because: "PostfixOperation extends an existing left operand");
+    }
+
+    [Fact]
+    public void ExpressionForms_PostfixOperation_LeadTokenIsIs()
+    {
+        ExpressionForms.GetMeta(ExpressionFormKind.PostfixOperation).LeadTokens
+            .Should().ContainSingle()
+            .Which.Should().Be(TokenKind.Is);
+    }
+
+    [Fact]
+    public void ExpressionForms_PostfixOperation_CategoryIsComposite()
+    {
+        ExpressionForms.GetMeta(ExpressionFormKind.PostfixOperation).Category
+            .Should().Be(ExpressionCategory.Composite);
     }
 }

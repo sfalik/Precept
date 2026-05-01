@@ -24,6 +24,9 @@ public enum ExpressionFormKind
 
     // Collections — aggregate literal forms
     ListLiteral     = 10,
+
+    // Postfix — left-denotation presence checks
+    PostfixOperation = 11,
 }
 
 /// <summary>
@@ -75,6 +78,7 @@ public static class ExpressionForms
         ExpressionFormKind.FunctionCall     => new(kind, ExpressionCategory.Invocation, false, [TokenKind.Identifier],    "A named function call: name(args)."),
         ExpressionFormKind.MethodCall       => new(kind, ExpressionCategory.Invocation, true,  [TokenKind.LeftParen],     "A method call on an expression: target.method(args)."),
         ExpressionFormKind.ListLiteral      => new(kind, ExpressionCategory.Collection, false, [TokenKind.LeftBracket],   "A list literal: [elem, elem, ...]."),
+        ExpressionFormKind.PostfixOperation => new(kind, ExpressionCategory.Composite,  true,  [TokenKind.Is],            "A postfix presence-check operation: expr is set / expr is not set."),
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
     };
 
