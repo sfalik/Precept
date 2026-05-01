@@ -17,6 +17,11 @@
 
 ## Recent Updates
 
+### 2026-05-01 — Generic annotation bridge merged to ledger
+- Canonical decision merged: the class marker is now `[HandlesCatalogExhaustively(typeof(T))]`, replacing the earlier parameterless `[HandlesExpressionForms]` direction.
+- Durable enforcement shape locked as catalog-agnostic: `HandlesFormAttribute(object kind)` pairs with PRECEPT0019 so future catalog enums opt in without analyzer rewrites.
+- Session closeout recorded the bridge under the full-vision annotation workstream and cleared the processed inbox artifacts.
+
 ### 2026-05-01 — Annotation-bridge coverage design recorded
 - Recommended the annotation-bridge pattern for expression-form coverage: handler methods claim responsibility with `[HandlesForm(...)]`, while pipeline classes opt in with parameterless `[HandlesExpressionForms]`.
 - Locked the preferred enforcement stack as PRECEPT0007 for catalog completeness, PRECEPT0019 for handler-claim completeness, and xUnit for end-to-end parser coverage.

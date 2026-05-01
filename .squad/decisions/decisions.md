@@ -8366,3 +8366,106 @@ This is a silent divergence. The spec describes a named node type that was never
 ---
 
 _End of George's architectural concerns inbox item._
+
+# Decision: Full-Vision Annotation-Bridge Pattern
+
+**Author:** Frank  
+**Date:** 2026-05-01  
+**Status:** Designed — ready for implementation integration  
+
+## Summary
+
+Replaces the narrow MVP `[HandlesExpressionForms]` (parameterless, ExpressionFormKind-only) with a **catalog-agnostic, parameterized annotation-bridge** that enforces pipeline exhaustiveness for ANY catalog enum.
+
+## Class Marker
+
+**Name:** `HandlesCatalogExhaustivelyAttribute`  
+**Location:** `src/Precept/HandlesCatalogExhaustivelyAttribute.cs`  
+**Parameter:** `Type catalogEnum` — the catalog enum whose members must all be handled  
+**AllowMultiple:** `true` — a class may handle multiple catalog enums  
+
+```csharp
+[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]
+public sealed class Parser { ... }
+
+// Future: same class handles two catalogs
+[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]
+[HandlesCatalogExhaustively(typeof(OperatorKind))]
+public sealed class Evaluator { ... }
+```
+
+**Why this name over alternatives:**
+- `[PipelineStage(typeof(...))]` — too generic, doesn't communicate the exhaustiveness guarantee
+- `[HandlesAllForms(typeof(...))]` — "Forms" is ExpressionFormKind-specific vocabulary; breaks when used with OperatorKind
+- `[HandlesCatalogExhaustively(typeof(...))]` — precise: declares WHAT (a catalog enum) and the GUARANTEE (exhaustive coverage)
+
+**Why in `src/Precept/` (not `src/Precept.Analyzers/`):**
+- `Precept.Analyzers` does NOT reference `Precept` — it's a Roslyn analyzer that runs at compile time and discovers attributes by name
+- The attribute must be compiled INTO the assembly being analyzed (Precept), alongside the catalog enums it references
+- The analyzer finds it by string matching on `"HandlesCatalogExhaustivelyAttribute"`
+
+## Method Marker
+
+**Name:** `HandlesFormAttribute`  
+**Location:** `src/Precept/Language/HandlesFormAttribute.cs`  
+**Parameter:** `object kind` — accepts any enum value  
+
+```csharp
+[HandlesForm(ExpressionFormKind.Literal)]
+private SyntaxNode ParseLiteral() { ... }
+
+// Future: operator handling
+[HandlesForm(OperatorKind.Add)]
+[HandlesForm(OperatorKind.Subtract)]
+private TypedExpression EvaluateArithmetic(...) { ... }
+```
+
+**Design tradeoff — type safety vs. generality:**
+- Typed (`ExpressionFormKind kind`): Maximum compile-time safety, but locks the attribute to one enum. Need N attributes for N catalogs.
+- Generic (`object kind`): Single attribute works for all catalogs. Call-site still writes typed literals (`ExpressionFormKind.Literal`) with full IntelliSense. The analyzer validates type correctness by matching against the class marker's declared enum.
+- **Chosen:** `object kind`. One attribute, all catalogs. The analyzer is the enforcement layer — it verifies the enum type matches. No proliferation of per-catalog method attributes.
+
+## PRECEPT0019 — Pipeline Coverage Exhaustiveness
+
+**Location:** `src/Precept.Analyzers/Precept0019PipelineCoverageExhaustiveness.cs`  
+**Category:** `Precept.Pipeline`  
+**Severity:** Error  
+
+**Discovery algorithm (generic):**
+1. `RegisterSymbolAction` on `SymbolKind.NamedType`
+2. For each class, find all `[HandlesCatalogExhaustively(typeof(T))]` attributes
+3. Extract `T` from the `typeof` argument
+4. Collect all `T` members (enum fields with constant values)
+5. Scan all methods in the class for `[HandlesForm(X)]` where `X.GetType() == T`
+6. Report any `T` members without at least one corresponding `[HandlesForm]` annotation
+
+**Message format:** `"{ClassName} is missing [HandlesForm] coverage for {N} member(s): {list}"`
+
+**Key property:** Adding a 14th, 15th, or Nth catalog enum requires ZERO changes to the analyzer. Decorate a pipeline class → enforcement activates automatically.
+
+## What This Enables for Future Catalogs
+
+| Scenario | What you do | What happens automatically |
+|----------|-------------|---------------------------|
+| New catalog enum (e.g. `ConstraintFormKind`) | Create the enum, decorate pipeline classes | PRECEPT0019 fires on missing handlers |
+| New pipeline class handles existing catalog | Add `[HandlesCatalogExhaustively]` | Immediate exhaustiveness enforcement |
+| New member added to existing catalog | Add to enum | All decorated classes get errors until handlers added |
+| Multiple catalogs per class | Stack `[HandlesCatalogExhaustively]` attributes | Independent enforcement per enum |
+
+## Relationship to PRECEPT0007
+
+- **PRECEPT0007:** Enforces `GetMeta` switch exhaustiveness — every catalog enum member has a metadata entry
+- **PRECEPT0019:** Enforces pipeline method exhaustiveness — every catalog enum member has handler logic
+
+These are complementary layers:
+- PRECEPT0007 = "every form has metadata" (catalog completeness)
+- PRECEPT0019 = "every form has runtime handling" (pipeline completeness)
+
+## Files Changed
+
+| Action | Path |
+|--------|------|
+| Deleted | `src/Precept/HandlesExpressionFormsAttribute.cs` |
+| Created | `src/Precept/HandlesCatalogExhaustivelyAttribute.cs` |
+| Created | `src/Precept/Language/HandlesFormAttribute.cs` |
+| Created | `src/Precept.Analyzers/Precept0019PipelineCoverageExhaustiveness.cs` |

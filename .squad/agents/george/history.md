@@ -19,6 +19,11 @@
 
 ## Recent Updates
 
+### 2026-05-01 — Annotation bridge plan follow-up noted
+- Scribe recorded the generic annotation-bridge decision in the canonical ledger while George's plan update remains pending.
+- Carry-forward expectation: plan/docs should use `HandlesCatalogExhaustively(typeof(T))` as the class marker and keep PRECEPT0019 generic rather than ExpressionFormKind-specific.
+- Inbox processing for this batch is complete; only plan synchronization remains outstanding.
+
 ### 2026-05-01 — Parser-gap plan audit and coverage design synchronized
 - Updated `docs/working/parser-gap-fixes-plan.md` to add Slice 13 (`ExpressionFormCoverageTests`), move `LeadTokens` onto `ExpressionFormMeta`, and register `ExpressionFormKind` for PRECEPT0007 coverage in `CatalogAnalysisHelpers`.
 - Locked the annotation bridge into Slice 4: `HandlesFormAttribute` + PRECEPT0019 now ship with the catalog and annotate `Parser`, `TypeChecker`, `Evaluator`, and `GraphAnalyzer`, while Slice 13 remains the parser-routing assertion layer.
