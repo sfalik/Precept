@@ -328,6 +328,66 @@ When the Functions and Operators catalogs land, they will likely need dispatch-e
 | **PRECEPT0005** | `ParamSubject.Parameter` must be reference-equal to a `ParameterMeta` instance declared in the same overload's or operation's parameter list. Prevents stale references after parameter changes. |
 | **PRECEPT0006** | `ParamSubject` must not appear in `TypeAccessor.ProofRequirements` or `ActionMeta.ProofRequirements`. `SelfSubject` must not appear in `BinaryOperationMeta.ProofRequirements`. Subject type must be valid for the containing catalog entry. `DimensionProofRequirement` is only valid on `BinaryOperationMeta.ProofRequirements` — a build error if placed on `FunctionOverload`, `TypeAccessor`, or `ActionMeta`. |
 
+## Exhaustiveness Enforcement Strategies
+
+The catalog system uses two distinct enforcement strategies for dispatch over catalog enum types. The choice depends on the dispatch topology — whether responsibility is centralized in a single switch or distributed across multiple handler methods.
+
+### Strategy 1: CS8509 — Compiler-Enforced Exhaustive Switch
+
+**When to use:** A single centralized C# switch expression dispatches over all members of a catalog enum type.
+
+The compiler fires CS8509 (non-exhaustive switch expression) at the switch site if a new named member is added without a corresponding arm. With `<TreatWarningsAsErrors>true</TreatWarningsAsErrors>`, this is a build-breaking error. No annotation or analyzer is needed — the compiler enforces it directly.
+
+**Current dispatch sites using CS8509:**
+
+| Catalog Enum | Dispatch Site | What it builds |
+|---|---|---|
+| `ConstructKind` | `BuildNode` | AST node construction per grammar construct |
+| `ActionKind` | `ParseSetStatement`, `ParseTransitionStatement`, `ParseEmitStatement`, `ParseFailStatement` | Action parsing — shape-partitioned across four switch expressions |
+| `ActionSyntaxShape` | `ParseActionStatement` | Action verb → syntax shape routing |
+| `ConstructSlotKind` | `InvokeSlotParser` | Slot kind → parser method dispatch |
+
+In each case, the switch expression covers the full enum surface in one location. Adding a member without an arm is a compile error at that exact site.
+
+### Strategy 2: `[HandlesCatalogExhaustively]` + `[HandlesCatalogMember]` — Analyzer-Enforced Distributed Dispatch
+
+**When to use:** Dispatch is distributed across multiple handler methods with no single switch expression covering all members. CS8509 physically cannot see across the dispatch split — each method handles a subset of members, but no location covers the whole enum.
+
+The canonical example is `ExpressionFormKind` in the Pratt parser. The nud/led architecture splits responsibility:
+
+- **`ParseAtom`** handles null-denotation forms: literals, identifiers, prefix operators, parenthesized expressions, function calls
+- **`ParseExpression`** handles left-denotation forms: infix operators, postfix operators, method calls
+
+No single switch covers all 11 expression forms. Adding `ExpressionFormKind.NewForm` without a corresponding handler method would silently leave it unhandled — the compiler cannot see the gap.
+
+**Enforcement mechanism:**
+
+1. The class (or partial primary declaration) is annotated with `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]` — declaring "this class collectively handles every member of this catalog enum."
+2. Each handler method is annotated with `[HandlesCatalogMember(ExpressionFormKind.Literal)]` (one per form handled) — declaring "this method is responsible for this specific catalog member."
+3. **PRECEPT0019** (pipeline coverage exhaustiveness analyzer) verifies: the union of all `[HandlesCatalogMember]` annotations on the class covers the full enum. If a member is missing, PRECEPT0019 fires a diagnostic.
+
+This gives the same safety guarantee as CS8509 — no member goes unhandled — but operates across distributed dispatch boundaries where the compiler's switch exhaustiveness cannot reach.
+
+### Decision Rule for New Dispatchers
+
+When adding a new dispatcher over a catalog enum type, choose at the same commit:
+
+| Dispatch topology | Enforcement | Annotation needed |
+|---|---|---|
+| Single centralized switch expression | CS8509 (compiler) | None |
+| Distributed handler methods (multiple methods, no unified switch) | PRECEPT0019 (analyzer) | `[HandlesCatalogExhaustively(typeof(T))]` on class + `[HandlesCatalogMember(Kind.X)]` on each handler |
+
+Do not defer this decision. The enforcement mechanism is chosen at the commit that introduces the dispatch, not retrofitted later.
+
+### Phase 3 Note: TypeChecker and ProofEngine
+
+When TypeChecker and ProofEngine implement type/constraint dispatch (D8/R4 and beyond), the team must decide at implementation time:
+
+- The TypeChecker catalog guide steers toward **catalog-property-driven dispatch** — reading metadata properties from `TypeMeta` or `ConstraintMeta` rather than switching on `TypeKind` or `ConstraintKind`. If the implementation follows this guidance, there is no per-kind switch and no per-kind handler methods — meaning neither CS8509 nor `[HandlesCatalogExhaustively]` applies. The catalog metadata itself drives behavior generically.
+- If any type/constraint dispatcher deviates from this and introduces a per-kind switch or distributed handlers, the decision rule above applies at that commit.
+
+This decision cannot be made in advance — it depends on the actual dispatch architecture chosen at implementation time.
+
 ## Naming Convention
 
 | Part | Convention | Examples |
