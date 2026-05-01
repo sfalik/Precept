@@ -27,8 +27,10 @@ namespace Precept.Pipeline;
 [Precept.HandlesCatalogExhaustively(typeof(ExpressionFormKind))]
 public static class TypeChecker
 {
+    // TODO Phase 3: implement type-checking dispatch
     public static SemanticIndex Check(SyntaxTree tree) => throw new NotImplementedException();
 
+    // TODO Phase 3: implement per-expression-form type inference
     [HandlesCatalogMember(ExpressionFormKind.Literal)]
     [HandlesCatalogMember(ExpressionFormKind.Identifier)]
     [HandlesCatalogMember(ExpressionFormKind.Grouped)]

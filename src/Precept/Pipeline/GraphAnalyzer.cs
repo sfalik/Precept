@@ -22,8 +22,10 @@ namespace Precept.Pipeline;
 [Precept.HandlesCatalogExhaustively(typeof(ExpressionFormKind))]
 public static class GraphAnalyzer
 {
+    // TODO Phase 3: implement graph analysis dispatch
     public static StateGraph Analyze(SemanticIndex semantics) => throw new NotImplementedException();
 
+    // TODO Phase 3: implement per-expression-form reachability / constraint analysis
     [HandlesCatalogMember(ExpressionFormKind.Literal)]
     [HandlesCatalogMember(ExpressionFormKind.Identifier)]
     [HandlesCatalogMember(ExpressionFormKind.Grouped)]

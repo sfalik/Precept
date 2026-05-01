@@ -43,6 +43,7 @@ namespace Precept.Runtime;
 public static class Evaluator
 {
     // ── Commit ──────────────────────────────────────────────────────
+    // TODO Phase 3: implement Fire/Update once the executable model is designed (D8/R4)
     // TODO D8/R4: All string parameters become typed metadata descriptors from
     // the executable model. The evaluator consumes descriptors, not strings.
 
@@ -53,6 +54,7 @@ public static class Evaluator
         => throw new NotImplementedException();
 
     // ── Inspect ─────────────────────────────────────────────────────
+    // TODO Phase 3: implement InspectFire/InspectUpdate once the executable model is designed (D8/R4)
 
     internal static EventInspection InspectFire(Precept precept, Version version, string eventName, IReadOnlyDictionary<string, object?>? args)     // TODO D8/R4: descriptor-keyed
         => throw new NotImplementedException();
@@ -61,6 +63,7 @@ public static class Evaluator
         => throw new NotImplementedException();
 
     // ── Restore ─────────────────────────────────────────────────────
+    // TODO Phase 3: implement Restore once the executable model is designed (D8/R4)
 
     internal static RestoreOutcome Restore(Precept precept, string? state, IReadOnlyDictionary<string, object?> fields)                            // TODO D8/R4: descriptor-keyed
         => throw new NotImplementedException();
