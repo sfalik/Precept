@@ -315,4 +315,137 @@ public class ExpressionParserTests
         var modifier = field.Modifiers[0].Should().BeOfType<ValueModifierNode>().Subject;
         modifier.Value.Should().BeOfType<TypedConstantExpression>();
     }
+
+    // ── Comparison operators (Slice 8) ─────────────────────────────────────
+
+    [Fact]
+    public void ParseExpression_ComparisonLessThan()
+    {
+        var expr = ParseExpr("a < b");
+        var bin = expr.Should().BeOfType<BinaryExpression>().Subject;
+        bin.Operator.Kind.Should().Be(TokenKind.LessThan);
+        bin.Left.Should().BeOfType<IdentifierExpression>().Which.Name.Text.Should().Be("a");
+        bin.Right.Should().BeOfType<IdentifierExpression>().Which.Name.Text.Should().Be("b");
+    }
+
+    [Fact]
+    public void ParseExpression_ComparisonLessThanOrEqual()
+    {
+        var expr = ParseExpr("a <= b");
+        var bin = expr.Should().BeOfType<BinaryExpression>().Subject;
+        bin.Operator.Kind.Should().Be(TokenKind.LessThanOrEqual);
+        bin.Left.Should().BeOfType<IdentifierExpression>().Which.Name.Text.Should().Be("a");
+        bin.Right.Should().BeOfType<IdentifierExpression>().Which.Name.Text.Should().Be("b");
+    }
+
+    [Fact]
+    public void ParseExpression_ComparisonGreaterThanOrEqual()
+    {
+        var expr = ParseExpr("a >= b");
+        var bin = expr.Should().BeOfType<BinaryExpression>().Subject;
+        bin.Operator.Kind.Should().Be(TokenKind.GreaterThanOrEqual);
+        bin.Left.Should().BeOfType<IdentifierExpression>().Which.Name.Text.Should().Be("a");
+        bin.Right.Should().BeOfType<IdentifierExpression>().Which.Name.Text.Should().Be("b");
+    }
+
+    [Fact]
+    public void ParseExpression_ComparisonEquals()
+    {
+        var expr = ParseExpr("a == b");
+        var bin = expr.Should().BeOfType<BinaryExpression>().Subject;
+        bin.Operator.Kind.Should().Be(TokenKind.DoubleEquals);
+        bin.Left.Should().BeOfType<IdentifierExpression>().Which.Name.Text.Should().Be("a");
+        bin.Right.Should().BeOfType<IdentifierExpression>().Which.Name.Text.Should().Be("b");
+    }
+
+    [Fact]
+    public void ParseExpression_ComparisonNotEquals()
+    {
+        var expr = ParseExpr("a != b");
+        var bin = expr.Should().BeOfType<BinaryExpression>().Subject;
+        bin.Operator.Kind.Should().Be(TokenKind.NotEquals);
+        bin.Left.Should().BeOfType<IdentifierExpression>().Which.Name.Text.Should().Be("a");
+        bin.Right.Should().BeOfType<IdentifierExpression>().Which.Name.Text.Should().Be("b");
+    }
+
+    [Fact]
+    public void ParseExpression_ComparisonNonAssociative_EmitsDiagnostic()
+    {
+        // a < b < c — the second < chains a NonAssociative operator; parser emits diagnostic and stops
+        var tree = Parser.Parse(Lexer.Lex("""rule a < b < c because "msg" """));
+        tree.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.NonAssociativeComparison));
+    }
+
+    // ── contains operator (Slice 9) ────────────────────────────────────────
+
+    [Fact]
+    public void ParseExpression_Contains()
+    {
+        var expr = ParseExpr("tags contains \"urgent\"");
+        var bin = expr.Should().BeOfType<BinaryExpression>().Subject;
+        bin.Operator.Kind.Should().Be(TokenKind.Contains);
+        bin.Left.Should().BeOfType<IdentifierExpression>().Which.Name.Text.Should().Be("tags");
+        bin.Right.Should().BeOfType<LiteralExpression>()
+            .Which.Value.Kind.Should().Be(TokenKind.StringLiteral);
+    }
+
+    [Fact]
+    public void ParseExpression_Contains_Precedence()
+    {
+        // contains (prec 40) binds tighter than and (prec 20)
+        // "tags contains "a" and x > 0" → and(contains(tags, "a"), >(x, 0))
+        var expr = ParseExpr("tags contains \"a\" and x > 0");
+        var and = expr.Should().BeOfType<BinaryExpression>().Subject;
+        and.Operator.Kind.Should().Be(TokenKind.And);
+        and.Left.Should().BeOfType<BinaryExpression>()
+            .Which.Operator.Kind.Should().Be(TokenKind.Contains);
+        and.Right.Should().BeOfType<BinaryExpression>()
+            .Which.Operator.Kind.Should().Be(TokenKind.GreaterThan);
+    }
+
+    // ── Interpolated strings (Slice 11) ───────────────────────────────────
+
+    [Fact]
+    public void ParseExpression_InterpolatedString_SingleHole()
+    {
+        // "Hello {name}" → 3 parts: TextInterpolationPart(StringStart), ExpressionInterpolationPart(name), TextInterpolationPart(StringEnd)
+        var expr = ParseExpr("\"Hello {name}\"");
+        var interp = expr.Should().BeOfType<InterpolatedStringExpression>().Subject;
+        interp.Parts.Should().HaveCount(3);
+        interp.Parts[0].Should().BeOfType<TextInterpolationPart>();
+        interp.Parts[1].Should().BeOfType<ExpressionInterpolationPart>()
+            .Which.Value.Should().BeOfType<IdentifierExpression>()
+            .Which.Name.Text.Should().Be("name");
+        interp.Parts[2].Should().BeOfType<TextInterpolationPart>();
+    }
+
+    [Fact]
+    public void ParseExpression_InterpolatedString_MultipleHoles()
+    {
+        // "{a} and {b}" → 5 parts: Text, Expr(a), Text, Expr(b), Text
+        var expr = ParseExpr("\"{a} and {b}\"");
+        var interp = expr.Should().BeOfType<InterpolatedStringExpression>().Subject;
+        interp.Parts.Should().HaveCount(5);
+        interp.Parts[0].Should().BeOfType<TextInterpolationPart>();
+        interp.Parts[1].Should().BeOfType<ExpressionInterpolationPart>()
+            .Which.Value.Should().BeOfType<IdentifierExpression>()
+            .Which.Name.Text.Should().Be("a");
+        interp.Parts[2].Should().BeOfType<TextInterpolationPart>();
+        interp.Parts[3].Should().BeOfType<ExpressionInterpolationPart>()
+            .Which.Value.Should().BeOfType<IdentifierExpression>()
+            .Which.Name.Text.Should().Be("b");
+        interp.Parts[4].Should().BeOfType<TextInterpolationPart>();
+    }
+
+    [Fact]
+    public void ParseExpression_InterpolatedString_ExpressionInHole()
+    {
+        // "Total: {a + b}" → 3 parts, middle hole contains BinaryExpression(Plus)
+        var expr = ParseExpr("\"Total: {a + b}\"");
+        var interp = expr.Should().BeOfType<InterpolatedStringExpression>().Subject;
+        interp.Parts.Should().HaveCount(3);
+        interp.Parts[1].Should().BeOfType<ExpressionInterpolationPart>()
+            .Which.Value.Should().BeOfType<BinaryExpression>()
+            .Which.Operator.Kind.Should().Be(TokenKind.Plus);
+    }
 }

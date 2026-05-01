@@ -946,4 +946,599 @@ public class ParserTests
 
         tree.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.ExpectedToken));
     }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  Slice 6 — Parser Whitespace-Insensitivity (WSI) Tests
+    // ════════════════════════════════════════════════════════════════════════
+
+    // ── WSI-1: Multi-line whitespace — round-trip equivalence ──────────────
+
+    [Fact]
+    public void WSI_MultiLine_FieldDeclaration_ProducesSameAstAsOneLine()
+    {
+        var singleLine = Parse("""field Status as string default "active" """);
+        var multiLine = Parse("""
+            field Status as string
+                default "active"
+            """);
+
+        singleLine.Diagnostics.Should().BeEmpty();
+        multiLine.Diagnostics.Should().BeEmpty();
+
+        var single = singleLine.Declarations[0].Should().BeOfType<FieldDeclarationNode>().Subject;
+        var multi  = multiLine.Declarations[0].Should().BeOfType<FieldDeclarationNode>().Subject;
+
+        single.Names[0].Text.Should().Be(multi.Names[0].Text);
+        single.Type.Should().BeOfType<ScalarTypeRefNode>();
+        multi.Type.Should().BeOfType<ScalarTypeRefNode>();
+        single.Modifiers.Should().HaveCount(multi.Modifiers.Length,
+            "modifier count must be identical regardless of newlines");
+    }
+
+    [Fact]
+    public void WSI_MultiLine_EventDeclaration_ProducesSameAstAsOneLine()
+    {
+        var singleLine = Parse("event Assign(assigneeId as string, priority as integer)");
+        var multiLine = Parse("""
+            event Assign(
+                assigneeId as string,
+                priority as integer
+            )
+            """);
+
+        singleLine.Diagnostics.Should().BeEmpty();
+        multiLine.Diagnostics.Should().BeEmpty();
+
+        var single = singleLine.Declarations[0].Should().BeOfType<EventDeclarationNode>().Subject;
+        var multi  = multiLine.Declarations[0].Should().BeOfType<EventDeclarationNode>().Subject;
+
+        single.Arguments.Should().HaveCount(2);
+        multi.Arguments.Should().HaveCount(2);
+        single.Arguments[0].Name.Text.Should().Be(multi.Arguments[0].Name.Text);
+        single.Arguments[1].Name.Text.Should().Be(multi.Arguments[1].Name.Text);
+    }
+
+    [Fact]
+    public void WSI_MultiLine_StateDeclaration_ProducesSameAstAsOneLine()
+    {
+        var singleLine = Parse("state Draft, Active, Closed");
+        var multiLine = Parse("""
+            state Draft, Active,
+                Closed
+            """);
+
+        singleLine.Diagnostics.Should().BeEmpty();
+        multiLine.Diagnostics.Should().BeEmpty();
+
+        var single = singleLine.Declarations[0].Should().BeOfType<StateDeclarationNode>().Subject;
+        var multi  = multiLine.Declarations[0].Should().BeOfType<StateDeclarationNode>().Subject;
+
+        single.Entries.Should().HaveCount(3);
+        multi.Entries.Should().HaveCount(3);
+        single.Entries.Select(e => e.Name.Text)
+            .Should().BeEquivalentTo(multi.Entries.Select(e => e.Name.Text));
+    }
+
+    [Fact]
+    public void WSI_MultiLine_TransitionRow_ProducesSameAstAsOneLine()
+    {
+        var singleLine = Parse("from Draft on Submit -> set ClaimantName = Submit.Name -> transition Submitted");
+        var multiLine = Parse("""
+            from Draft on Submit
+                -> set ClaimantName = Submit.Name
+                -> transition Submitted
+            """);
+
+        singleLine.Diagnostics.Should().BeEmpty();
+        multiLine.Diagnostics.Should().BeEmpty();
+
+        var single = singleLine.Declarations[0].Should().BeOfType<TransitionRowNode>().Subject;
+        var multi  = multiLine.Declarations[0].Should().BeOfType<TransitionRowNode>().Subject;
+
+        single.Actions.Should().HaveCount(1);
+        multi.Actions.Should().HaveCount(1);
+        single.Outcome.Should().BeOfType<TransitionOutcomeNode>();
+        multi.Outcome.Should().BeOfType<TransitionOutcomeNode>();
+    }
+
+    // ── WSI-2: Comment filtering — inline comments inside declarations ──────
+
+    [Fact]
+    public void WSI_Comment_InlineAfterFieldType_DoesNotBreakParsing()
+    {
+        var tree = Parse("""
+            field Priority as integer # priority score 1-5
+                default 3
+            """);
+
+        tree.Diagnostics.Should().BeEmpty();
+        var field = tree.Declarations[0].Should().BeOfType<FieldDeclarationNode>().Subject;
+        field.Names[0].Text.Should().Be("Priority");
+        field.Type.Should().BeOfType<ScalarTypeRefNode>()
+            .Which.TypeName.Kind.Should().Be(TokenKind.IntegerType);
+        field.Modifiers.Should().HaveCount(1, "default 3 is one value-bearing modifier");
+    }
+
+    [Fact]
+    public void WSI_Comment_InlineInsideArgList_DoesNotBreakParsing()
+    {
+        var tree = Parse("""
+            event Submit(
+                comment as string # optional note
+            )
+            """);
+
+        tree.Diagnostics.Should().BeEmpty();
+        var evt = tree.Declarations[0].Should().BeOfType<EventDeclarationNode>().Subject;
+        evt.Arguments.Should().HaveCount(1);
+        evt.Arguments[0].Name.Text.Should().Be("comment");
+    }
+
+    [Fact]
+    public void WSI_Comment_BetweenDeclarations_DoesNotBreakParsing()
+    {
+        var tree = Parse("""
+            precept Demo
+            # Fields section
+            field Count as integer default 0
+            # States section
+            state Active initial, Closed terminal
+            """);
+
+        tree.Diagnostics.Should().BeEmpty();
+        tree.Header!.Name.Text.Should().Be("Demo");
+        tree.Declarations.OfType<FieldDeclarationNode>().Should().HaveCount(1);
+        tree.Declarations.OfType<StateDeclarationNode>().Should().HaveCount(1);
+    }
+
+    // ── WSI-3: Multi-qualifier parsing — both families ─────────────────────
+
+    [Fact]
+    public void WSI_Qualifier_ExchangeRate_TwoQualifiers_InAndTo()
+    {
+        var tree = Parse("""field Rate as exchangerate in "USD" to "EUR" """);
+
+        tree.Diagnostics.Should().BeEmpty();
+        var field   = tree.Declarations[0].Should().BeOfType<FieldDeclarationNode>().Subject;
+        var typeRef = field.Type.Should().BeOfType<ScalarTypeRefNode>().Subject;
+
+        typeRef.TypeName.Kind.Should().Be(TokenKind.ExchangeRateType);
+        typeRef.Qualifiers.Should().HaveCount(2, "exchangerate has in/to qualifier axes");
+        typeRef.Qualifiers[0].Keyword.Kind.Should().Be(TokenKind.In);
+        typeRef.Qualifiers[0].Value.Should().BeOfType<LiteralExpression>()
+            .Which.Value.Text.Should().Be("USD");
+        typeRef.Qualifiers[1].Keyword.Kind.Should().Be(TokenKind.To);
+        typeRef.Qualifiers[1].Value.Should().BeOfType<LiteralExpression>()
+            .Which.Value.Text.Should().Be("EUR");
+    }
+
+    [Fact]
+    public void WSI_Qualifier_Price_TwoQualifiers_InAndOf()
+    {
+        var tree = Parse("""field Cost as price in "USD" of "mass" """);
+
+        tree.Diagnostics.Should().BeEmpty();
+        var field   = tree.Declarations[0].Should().BeOfType<FieldDeclarationNode>().Subject;
+        var typeRef = field.Type.Should().BeOfType<ScalarTypeRefNode>().Subject;
+
+        typeRef.TypeName.Kind.Should().Be(TokenKind.PriceType);
+        typeRef.Qualifiers.Should().HaveCount(2, "price has in/of qualifier axes");
+        typeRef.Qualifiers[0].Keyword.Kind.Should().Be(TokenKind.In);
+        typeRef.Qualifiers[0].Value.Should().BeOfType<LiteralExpression>()
+            .Which.Value.Text.Should().Be("USD");
+        typeRef.Qualifiers[1].Keyword.Kind.Should().Be(TokenKind.Of);
+        typeRef.Qualifiers[1].Value.Should().BeOfType<LiteralExpression>()
+            .Which.Value.Text.Should().Be("mass");
+    }
+
+    [Fact]
+    public void WSI_Qualifier_Money_SingleQualifier_In()
+    {
+        var tree = Parse("""field Amount as money in "USD" """);
+
+        tree.Diagnostics.Should().BeEmpty();
+        var field   = tree.Declarations[0].Should().BeOfType<FieldDeclarationNode>().Subject;
+        var typeRef = field.Type.Should().BeOfType<ScalarTypeRefNode>().Subject;
+
+        typeRef.TypeName.Kind.Should().Be(TokenKind.MoneyType);
+        typeRef.Qualifiers.Should().HaveCount(1, "money has only an in-currency qualifier axis");
+        typeRef.Qualifiers[0].Keyword.Kind.Should().Be(TokenKind.In);
+    }
+
+    [Fact]
+    public void WSI_Qualifier_ExchangeRate_InArgPosition_TwoQualifiers()
+    {
+        // Qualifiers must survive inside event argument lists too
+        var tree = Parse("""event SetRate(r as exchangerate in "USD" to "EUR") """);
+
+        tree.Diagnostics.Should().BeEmpty();
+        var evt = tree.Declarations[0].Should().BeOfType<EventDeclarationNode>().Subject;
+        evt.Arguments.Should().HaveCount(1);
+        var argType = evt.Arguments[0].Type.Should().BeOfType<ScalarTypeRefNode>().Subject;
+        argType.TypeName.Kind.Should().Be(TokenKind.ExchangeRateType);
+        argType.Qualifiers.Should().HaveCount(2);
+        argType.Qualifiers[0].Keyword.Kind.Should().Be(TokenKind.In);
+        argType.Qualifiers[1].Keyword.Kind.Should().Be(TokenKind.To);
+    }
+
+    // ── WSI-4: Qualifier disambiguation — in/modify/ensure at declaration boundary
+
+    [Fact]
+    public void WSI_Disambiguation_InDraftModify_IsNotQualifier_ForExchangeRateType()
+    {
+        // 'in Draft' followed by 'modify' must NOT be parsed as a type qualifier.
+        // The disambiguation checks Peek(2) against the construct verb set.
+        var tree = Parse("""
+            field Rate as exchangerate
+            in Draft modify Rate editable
+            """);
+
+        tree.Diagnostics.Should().BeEmpty();
+        tree.Declarations.Should().HaveCount(2);
+        var typeRef = tree.Declarations[0].Should().BeOfType<FieldDeclarationNode>()
+            .Subject.Type.Should().BeOfType<ScalarTypeRefNode>().Subject;
+        typeRef.Qualifiers.Should().BeEmpty(
+            "in Draft followed by 'modify' is a declaration boundary, not a qualifier");
+        tree.Declarations[1].Should().BeOfType<AccessModeNode>();
+    }
+
+    [Fact]
+    public void WSI_Disambiguation_InActiveEnsure_IsNotQualifier_ForExchangeRateType()
+    {
+        // 'in Active' followed by 'ensure' is StateEnsure, not a qualifier on exchangerate.
+        var tree = Parse("""
+            field Rate as exchangerate
+            in Active ensure Rate.amount > 0 because "msg"
+            """);
+
+        tree.Diagnostics.Should().BeEmpty();
+        tree.Declarations.Should().HaveCount(2);
+        var typeRef = tree.Declarations[0].Should().BeOfType<FieldDeclarationNode>()
+            .Subject.Type.Should().BeOfType<ScalarTypeRefNode>().Subject;
+        typeRef.Qualifiers.Should().BeEmpty(
+            "in Active followed by 'ensure' is a declaration boundary, not a qualifier");
+        tree.Declarations[1].Should().BeOfType<StateEnsureNode>();
+    }
+
+    [Fact]
+    public void WSI_Disambiguation_StringType_InDraftModify_IsSecondDeclaration()
+    {
+        // string has no qualifier shape — 'in Draft modify' is the next declaration trivially.
+        var tree = Parse("""
+            field Status as string
+            in Draft modify Status readonly
+            """);
+
+        tree.Declarations.Should().HaveCount(2);
+        var typeRef = tree.Declarations[0].Should().BeOfType<FieldDeclarationNode>()
+            .Subject.Type.Should().BeOfType<ScalarTypeRefNode>().Subject;
+        typeRef.Qualifiers.Should().BeEmpty("string has no qualifier shape");
+        tree.Declarations[1].Should().BeOfType<AccessModeNode>();
+    }
+
+    // ── WSI-5: Collection qualifiers — element type qualifiers on collection type refs
+
+    [Fact]
+    public void WSI_CollectionQualifier_SetOfExchangeRate_TwoElementQualifiers()
+    {
+        var tree = Parse("""field Rates as set of exchangerate in "USD" to "EUR" """);
+
+        tree.Diagnostics.Should().BeEmpty();
+        var field   = tree.Declarations[0].Should().BeOfType<FieldDeclarationNode>().Subject;
+        var typeRef = field.Type.Should().BeOfType<CollectionTypeRefNode>().Subject;
+
+        typeRef.CollectionKind.Kind.Should().Be(TokenKind.Set);
+        typeRef.ElementType.Kind.Should().Be(TokenKind.ExchangeRateType);
+        typeRef.Qualifiers.Should().HaveCount(2,
+            "exchangerate element type carries in/to qualifier axes");
+        typeRef.Qualifiers[0].Keyword.Kind.Should().Be(TokenKind.In);
+        typeRef.Qualifiers[0].Value.Should().BeOfType<LiteralExpression>()
+            .Which.Value.Text.Should().Be("USD");
+        typeRef.Qualifiers[1].Keyword.Kind.Should().Be(TokenKind.To);
+    }
+
+    [Fact]
+    public void WSI_CollectionQualifier_SetOfMoney_SingleElementQualifier()
+    {
+        var tree = Parse("""field Portfolio as set of money in "USD" """);
+
+        tree.Diagnostics.Should().BeEmpty();
+        var field   = tree.Declarations[0].Should().BeOfType<FieldDeclarationNode>().Subject;
+        var typeRef = field.Type.Should().BeOfType<CollectionTypeRefNode>().Subject;
+
+        typeRef.ElementType.Kind.Should().Be(TokenKind.MoneyType);
+        typeRef.Qualifiers.Should().HaveCount(1);
+        typeRef.Qualifiers[0].Keyword.Kind.Should().Be(TokenKind.In);
+    }
+
+    [Fact]
+    public void WSI_CollectionQualifier_SetOfString_NoElementQualifiers()
+    {
+        // string has no qualifier shape — collection element qualifiers must be empty
+        var tree = Parse("field Tags as set of string");
+
+        tree.Diagnostics.Should().BeEmpty();
+        var field   = tree.Declarations[0].Should().BeOfType<FieldDeclarationNode>().Subject;
+        var typeRef = field.Type.Should().BeOfType<CollectionTypeRefNode>().Subject;
+
+        typeRef.ElementType.Kind.Should().Be(TokenKind.StringType);
+        typeRef.Qualifiers.Should().BeEmpty("string has no qualifier shape");
+    }
+
+    // ── WSI-6: Negative cases — types without qualifier shape ───────────────
+
+    [Fact]
+    public void WSI_Negative_IntegerType_InDraftFollowedByDecl_ParsedAsNextDeclaration()
+    {
+        // integer has no qualifier shape; 'in Draft' cannot attach as a qualifier.
+        var tree = Parse("""
+            field Count as integer
+            in Draft modify Count readonly
+            """);
+
+        tree.Declarations.Should().HaveCount(2);
+        var typeRef = tree.Declarations[0].Should().BeOfType<FieldDeclarationNode>()
+            .Subject.Type.Should().BeOfType<ScalarTypeRefNode>().Subject;
+        typeRef.TypeName.Kind.Should().Be(TokenKind.IntegerType);
+        typeRef.Qualifiers.Should().BeEmpty("integer has no qualifier shape");
+        tree.Declarations[1].Should().BeOfType<AccessModeNode>();
+    }
+
+    [Fact]
+    public void WSI_Negative_BooleanType_InDraftFollowedByDecl_ParsedAsNextDeclaration()
+    {
+        var tree = Parse("""
+            field Flag as boolean
+            in Draft modify Flag readonly
+            """);
+
+        tree.Declarations.Should().HaveCount(2);
+        var typeRef = tree.Declarations[0].Should().BeOfType<FieldDeclarationNode>()
+            .Subject.Type.Should().BeOfType<ScalarTypeRefNode>().Subject;
+        typeRef.TypeName.Kind.Should().Be(TokenKind.BooleanType);
+        typeRef.Qualifiers.Should().BeEmpty("boolean has no qualifier shape");
+    }
+
+    // ── WSI-7: Compilation.Tokens regression — pre-parse filter does not strip ──
+
+    [Fact]
+    public void WSI_TokenStream_ContainsNewLineTokens_AfterMultiLineParse()
+    {
+        // The pre-parse filter in Parser.Parse() strips NewLine from the working copy
+        // but must NOT touch TokenStream.Tokens — that is the full-fidelity record.
+        var source = """
+            precept Test
+            field Status as string
+            state Draft initial
+            """;
+        var tokens = Lexer.Lex(source);
+        var tree   = Parser.Parse(tokens);
+
+        // Full token stream retains NewLine tokens
+        tokens.Tokens.Should().Contain(t => t.Kind == TokenKind.NewLine,
+            "TokenStream.Tokens retains the full pre-filter token stream");
+
+        // The parsed declarations must be correct — NewLine tokens produce no nodes
+        tree.Header.Should().NotBeNull();
+        tree.Declarations.Should().HaveCount(2,
+            "only field and state appear in Declarations — NewLine tokens are never parsed as nodes");
+        tree.Diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void WSI_TokenStream_ContainsCommentTokens_AfterCommentedParse()
+    {
+        var source = """
+            precept Demo # this is the demo precept
+            field Count as integer # a counter
+            """;
+        var tokens = Lexer.Lex(source);
+        var tree   = Parser.Parse(tokens);
+
+        // Comment tokens survive in TokenStream.Tokens
+        tokens.Tokens.Should().Contain(t => t.Kind == TokenKind.Comment,
+            "TokenStream.Tokens retains Comment tokens");
+
+        // AST must be clean — comments do not create extra nodes or diagnostics
+        tree.Header!.Name.Text.Should().Be("Demo");
+        tree.Declarations.Should().HaveCount(1,
+            "only the field declaration appears — Comment tokens are never parsed as nodes");
+        tree.Diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void WSI_TokenStream_NewLineCount_IsGreaterThanZero_ForMultiLineSource()
+    {
+        // Belt-and-suspenders: confirm the filter runs on a COPY, not in-place.
+        var multiLine  = "precept X\nfield a as integer\nfield b as integer\nstate S initial";
+        var singleLine = "precept X field a as integer field b as integer state S initial";
+
+        var multiTokens  = Lexer.Lex(multiLine);
+        var singleTokens = Lexer.Lex(singleLine);
+
+        var multiTree  = Parser.Parse(multiTokens);
+        var singleTree = Parser.Parse(singleTokens);
+
+        multiTokens.Tokens
+            .Count(t => t.Kind == TokenKind.NewLine)
+            .Should().BeGreaterThan(0,
+                "multi-line source produces NewLine tokens retained in the token stream");
+        singleTokens.Tokens
+            .Count(t => t.Kind == TokenKind.NewLine)
+            .Should().Be(0, "single-line source produces no NewLine tokens");
+
+        // Both must produce identical declaration counts — whitespace is cosmetic
+        multiTree.Declarations.Should().HaveCount(
+            singleTree.Declarations.Length,
+            "whitespace must not affect declaration count");
+        multiTree.Diagnostics.Should().BeEmpty();
+        singleTree.Diagnostics.Should().BeEmpty();
+    }
+
+    // ── WSI-8: Integration — sample files parse with no parse-stage errors ──
+
+    [Theory]
+    [InlineData("hiring-pipeline.precept")]
+    public void WSI_Integration_SampleFile_ParsesWithNoErrors(string sampleFile)
+    {
+        var source = File.ReadAllText(Path.Combine(SamplesDir, sampleFile));
+        var tree = Parser.Parse(Lexer.Lex(source));
+        tree.Diagnostics.Should().BeEmpty(
+            $"sample file '{sampleFile}' should parse without errors");
+    }
+
+    [Fact]
+    public void WSI_Integration_InsuranceClaim_HasExpectedDeclarationCounts()
+    {
+        // insurance-claim.precept uses 'is set' expressions and 'in State ensure ... when ...'
+        // constructs that the current parser partially handles. We verify the key structural
+        // declarations are present (parser recovery works) rather than asserting zero diagnostics.
+        var source = File.ReadAllText(Path.Combine(SamplesDir, "insurance-claim.precept"));
+        var tree = Parser.Parse(Lexer.Lex(source));
+
+        tree.Header.Should().NotBeNull();
+        tree.Header!.Name.Text.Should().Be("InsuranceClaim");
+
+        tree.Declarations.OfType<FieldDeclarationNode>().Should().HaveCount(8,
+            "8 field declarations in insurance-claim.precept");
+        tree.Declarations.OfType<StateDeclarationNode>().Should().HaveCount(6,
+            "6 state declarations (one per state line)");
+        tree.Declarations.OfType<EventDeclarationNode>()
+            .Should().HaveCountGreaterThanOrEqualTo(5);
+        tree.Declarations.OfType<TransitionRowNode>()
+            .Should().HaveCountGreaterThanOrEqualTo(8);
+    }
+
+    [Fact]
+    public void WSI_Integration_LoanApplication_HasExpectedDeclarationCounts()
+    {
+        // loan-application.precept uses 'in State ensure ... when ...' which the current
+        // parser emits a diagnostic for (When is a StructuralBoundaryToken that terminates
+        // the ensure condition, then Expect(Because) sees 'when' instead). Parser recovers.
+        var source = File.ReadAllText(Path.Combine(SamplesDir, "loan-application.precept"));
+        var tree = Parser.Parse(Lexer.Lex(source));
+
+        tree.Header.Should().NotBeNull();
+        tree.Header!.Name.Text.Should().Be("LoanApplication");
+
+        tree.Declarations.OfType<FieldDeclarationNode>()
+            .Should().HaveCountGreaterThanOrEqualTo(7);
+        tree.Declarations.OfType<StateDeclarationNode>()
+            .Should().HaveCountGreaterThanOrEqualTo(5);
+        tree.Declarations.OfType<TransitionRowNode>()
+            .Should().HaveCountGreaterThanOrEqualTo(5);
+    }
+
+    // ── WSI-9: ChoiceElementTypeKeywords catalog-derived regression ──────────
+
+    [Fact]
+    public void ChoiceElementTypeKeywords_ContainsExactlyFiveTypes()
+    {
+        Parser.ChoiceElementTypeKeywords.Should().HaveCount(5,
+            "exactly 5 primitive types carry TypeTrait.ChoiceElement");
+    }
+
+    [Fact]
+    public void ChoiceElementTypeKeywords_ContainsExpectedMembers()
+    {
+        Parser.ChoiceElementTypeKeywords.Should().BeEquivalentTo(
+            new[]
+            {
+                TokenKind.StringType, TokenKind.BooleanType, TokenKind.IntegerType,
+                TokenKind.DecimalType, TokenKind.NumberType,
+            },
+            "ChoiceElementTypeKeywords must be derived from TypeTrait.ChoiceElement — " +
+            "never a hardcoded parallel list");
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  Slice 10 — Collection Mutation Action Tests
+    // ════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Parse_ActionRemove()
+    {
+        var tree = Parse("from Draft on RemoveItem -> remove ItemList \"x\" -> no transition");
+        tree.Diagnostics.Should().BeEmpty();
+        var node = tree.Declarations[0].Should().BeOfType<TransitionRowNode>().Subject;
+        node.Actions.Should().HaveCount(1);
+        node.Actions[0].Should().BeOfType<RemoveStatement>()
+            .Which.Field.Text.Should().Be("ItemList");
+    }
+
+    [Fact]
+    public void Parse_ActionEnqueue()
+    {
+        var tree = Parse("from Draft on AddToQueue -> enqueue ItemQueue \"item\" -> no transition");
+        tree.Diagnostics.Should().BeEmpty();
+        var node = tree.Declarations[0].Should().BeOfType<TransitionRowNode>().Subject;
+        node.Actions[0].Should().BeOfType<EnqueueStatement>()
+            .Which.Field.Text.Should().Be("ItemQueue");
+    }
+
+    [Fact]
+    public void Parse_ActionDequeue()
+    {
+        var tree = Parse("from Draft on ProcessNext -> dequeue ItemQueue -> no transition");
+        tree.Diagnostics.Should().BeEmpty();
+        var node = tree.Declarations[0].Should().BeOfType<TransitionRowNode>().Subject;
+        var stmt = node.Actions[0].Should().BeOfType<DequeueStatement>().Subject;
+        stmt.Field.Text.Should().Be("ItemQueue");
+        stmt.IntoField.Should().BeNull();
+    }
+
+    [Fact]
+    public void Parse_ActionDequeueInto()
+    {
+        var tree = Parse("from Draft on ProcessNext -> dequeue ItemQueue into target -> no transition");
+        tree.Diagnostics.Should().BeEmpty();
+        var node = tree.Declarations[0].Should().BeOfType<TransitionRowNode>().Subject;
+        var stmt = node.Actions[0].Should().BeOfType<DequeueStatement>().Subject;
+        stmt.Field.Text.Should().Be("ItemQueue");
+        stmt.IntoField.Should().NotBeNull();
+        stmt.IntoField!.Value.Text.Should().Be("target");
+    }
+
+    [Fact]
+    public void Parse_ActionPush()
+    {
+        var tree = Parse("from Draft on AddEntry -> push ItemStack \"item\" -> no transition");
+        tree.Diagnostics.Should().BeEmpty();
+        var node = tree.Declarations[0].Should().BeOfType<TransitionRowNode>().Subject;
+        node.Actions[0].Should().BeOfType<PushStatement>()
+            .Which.Field.Text.Should().Be("ItemStack");
+    }
+
+    [Fact]
+    public void Parse_ActionPop()
+    {
+        var tree = Parse("from Draft on UndoEntry -> pop ItemStack -> no transition");
+        tree.Diagnostics.Should().BeEmpty();
+        var node = tree.Declarations[0].Should().BeOfType<TransitionRowNode>().Subject;
+        var stmt = node.Actions[0].Should().BeOfType<PopStatement>().Subject;
+        stmt.Field.Text.Should().Be("ItemStack");
+        stmt.IntoField.Should().BeNull();
+    }
+
+    [Fact]
+    public void Parse_ActionPopInto()
+    {
+        var tree = Parse("from Draft on UndoEntry -> pop ItemStack into lastEntry -> no transition");
+        tree.Diagnostics.Should().BeEmpty();
+        var node = tree.Declarations[0].Should().BeOfType<TransitionRowNode>().Subject;
+        var stmt = node.Actions[0].Should().BeOfType<PopStatement>().Subject;
+        stmt.Field.Text.Should().Be("ItemStack");
+        stmt.IntoField.Should().NotBeNull();
+        stmt.IntoField!.Value.Text.Should().Be("lastEntry");
+    }
+
+    [Fact]
+    public void Parse_ActionClear()
+    {
+        var tree = Parse("from Draft on Reset -> clear ItemList -> no transition");
+        tree.Diagnostics.Should().BeEmpty();
+        var node = tree.Declarations[0].Should().BeOfType<TransitionRowNode>().Subject;
+        node.Actions[0].Should().BeOfType<ClearStatement>()
+            .Which.Field.Text.Should().Be("ItemList");
+    }
 }
