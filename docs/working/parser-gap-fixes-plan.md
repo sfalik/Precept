@@ -50,7 +50,7 @@ All 13 slices shipped on `spike/Precept-V2`. Test baseline: 2107 → 2482 (+375 
 |-------|-----------|-------------|--------|
 | 14 | D | GAP-A: `when`-guard on `ParseStateEnsure`/`ParseEventEnsure` (method bodies only, no AST changes) | ✅ Done |
 | 15 | E | GAP-B: Modifiers after computed (`->`) field expressions (`ParseFieldDeclaration` rewrite) | ✅ Done |
-| 16 | F | GAP-C: Keyword-as-member-name (`Min`/`Max`) in `MemberAccess` handler | ⏳ Pending |
+| 16 | F | GAP-C: Keyword-as-member-name (`Min`/`Max`) in `MemberAccess` handler | ✅ Done |
 | 17 | G2 | `is set` precedence audit: resolve 60 vs spec 40, sync parser and spec | ⏳ Pending |
 | 18 | G3 | `contains` chaining non-associativity test | ⏳ Pending |
 
@@ -1416,7 +1416,7 @@ private FieldDeclarationNode ParseFieldDeclaration()
 
 ---
 
-### Slice 16: Work Item F — GAP-C: Keyword-as-Member-Name in `MemberAccess` ⏳ PENDING
+### Slice 16: Work Item F — GAP-C: Keyword-as-Member-Name in `MemberAccess` ✅ DONE
 
 **Goal:** Fix the 1 broken sample file that uses `.min` and `.max` member access on collections.
 
