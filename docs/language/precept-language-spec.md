@@ -668,7 +668,7 @@ The parser always runs to end-of-source. On malformed input it emits diagnostics
 | 25 (prefix) | `not` | logical negation | right (prefix) |
 | 30 | `==` `!=` `~=` `!~` `<` `>` `<=` `>=` | comparison | non-associative |
 | 40 | `contains` | collection membership | left |
-| 40 | `is` (`is set` / `is not set`) | presence test | left |
+| 60 | `is` (`is set` / `is not set`) | presence test | left |
 | 50 | `+` `-` (infix) | additive arithmetic | left |
 | 60 | `*` `/` `%` | multiplicative arithmetic | left |
 | 65 (prefix) | `-` (unary) | negation | right (prefix) |

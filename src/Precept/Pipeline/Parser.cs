@@ -1431,6 +1431,7 @@ public static class Parser
                 }
 
                 // is set / is not set — postfix null-check (binding power 60, non-associative)
+                // Precedence 60 — matches Operators.GetMeta(OperatorKind.IsSet).Precedence. Spec §2.1.
                 if (current.Kind == TokenKind.Is)
                 {
                     if (minPrecedence > 60) break;
@@ -1450,6 +1451,7 @@ public static class Parser
                 }
 
                 // Method call — '(' following a MemberAccessExpression (binding power 90)
+                // Precedence 90 — tighter than dot-access (80) per spec §2.1.
                 if (current.Kind == TokenKind.LeftParen)
                 {
                     if (left is MemberAccessExpression memberAccess)
