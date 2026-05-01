@@ -29,7 +29,7 @@ The language must preserve these principles. They are non-negotiable — any red
 
 4. **Full inspectability.** The language must make the engine's reasoning fully exposable. At any point, you can preview every possible action and its outcome without executing anything. The engine exposes the complete reasoning: conditions evaluated, branches taken, constraints applied. You see not only what would happen, but why. Nothing is hidden. Inspectability extends to proof reasoning — proven ranges, source attribution, and what the engine could not prove must all be surfaceable through diagnostics, hover, and tooling.
 
-5. **Keyword-anchored readability.** Structure is explicit and line-oriented, not indentation-sensitive. Statement kind is identified by its opening keyword sequence. The language is AI-safe: regular enough that humans and agents can author it reliably without layout-sensitive syntax traps.
+5. **Keyword-anchored readability.** Structure is explicit and line-oriented, but "line-oriented" means declarations are anchored by keywords, not terminated by newlines. Statement kind is identified by its opening keyword sequence. A declaration may span multiple lines freely; whitespace — including newlines — is cosmetic within the declaration. Inside transitions, `from` starts a new transition row and each `->` starts the next pipeline step; those keywords are the structural boundaries, not layout. This keeps the language AI-safe for authoring, avoids layout traps during reformatting/copy-paste/code generation, keeps tooling boundary detection keyword-driven instead of layout-driven, and lets dense compound declarations such as `queue of T by choice of string(...) ordered` wrap across lines for human readability without changing meaning.
 
 6. **Explicit domain meaning over primitive convenience.** When a value has real domain identity (money, date, quantity, currency), the language should name it as a distinct type with its own operator rules and compile-time enforcement. Primitive types are the storage mechanism; domain types are the meaning mechanism.
 
@@ -523,7 +523,7 @@ field Balance as number  # This is an inline comment
 
 **Whitespace:** Spaces and tabs between tokens are consumed silently (no token emitted). They serve only as delimiters between keyword/identifier tokens.
 
-**Newlines:** Line terminators (LF `\n`, CRLF `\r\n`, CR `\r`) produce `NewLine` tokens. The parser uses newlines to determine statement boundaries — Precept is a line-oriented language with continuation via `->` chains.
+**Newlines:** Line terminators (LF `\n`, CRLF `\r\n`, CR `\r`) produce `NewLine` tokens, but they are trivia to the parser rather than structural boundaries. Statement kind is determined entirely by the opening keyword sequence, not by line position or termination. Declarations may span multiple lines freely. Within transitions, `from` introduces a new transition row and each `->` introduces a new pipeline step; those keywords are the only structural separators inside the transition surface.
 
 ### 1.5 Operator and Punctuation Scanning
 
@@ -807,8 +807,8 @@ Each action and the outcome are introduced by `->`. The `->` arrow is deliberate
 #### State/event ensure
 
 ```
-(in|to|from) StateTarget ensure BoolExpr ("when" BoolExpr)? ("because" StringExpr)?
-on Identifier ensure BoolExpr ("when" BoolExpr)? ("because" StringExpr)?
+(in|to|from) StateTarget ensure BoolExpr ("when" BoolExpr)? because StringExpr
+on Identifier ensure BoolExpr ("when" BoolExpr)? because StringExpr
 ```
 
 #### Stateless event hook
@@ -898,6 +898,8 @@ TypeQualifier   :=  (in | of) Expr
 ```
 
 Type qualifiers narrow the value domain: `in '<unit>'` pins to a specific unit or currency, `of '<family>'` constrains to a dimension family. A field may use `in` or `of`, not both.
+
+**`ChoiceType` delimiter note:** The `(...)` enclosing choice values is a type-level constraint parameter — those values define the allowed domain and are part of the type itself, not a value being assigned. This is intentionally distinct from the `[...]` list literal syntax used in `default` clauses, which is a value expression. Using `(...)` here signals type parameterization; using `[...]` would create a visual collision in compound forms like `set of choice of string(...) ... default [...]` where both delimiters would appear in the same declaration for different purposes.
 
 **`set` disambiguation:** The lexer always emits `TokenKind.Set`. In `ParseTypeRef()`, when followed by `of`, the parser treats it as the collection type. Outside type position, `set` is the action keyword.
 
