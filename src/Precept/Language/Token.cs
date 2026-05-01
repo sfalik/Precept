@@ -55,7 +55,13 @@ public sealed record TokenMeta(
     /// candidates without full parse-state analysis.
     /// </summary>
     TokenKind[]?                   ValidAfter = null,
-    bool                           IsAccessModeAdjective = false
+    bool                           IsAccessModeAdjective = false,
+    /// <summary>
+    /// True if this keyword token may appear as a member name after <c>.</c> (e.g., <c>min</c>
+    /// and <c>max</c> are DSL aggregation keywords but also idiomatic member-accessor names).
+    /// Drives <see cref="Pipeline.Parser.KeywordsValidAsMemberName"/>.
+    /// </summary>
+    bool                           IsValidAsMemberName = false
 );
 
 /// <summary>

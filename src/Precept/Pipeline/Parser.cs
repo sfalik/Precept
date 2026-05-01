@@ -132,9 +132,10 @@ public static partial class Parser
     /// Token kinds that may appear as a member name after <c>.</c> even though they
     /// are normally keywords. <c>min</c> and <c>max</c> are DSL aggregation keywords
     /// but are also idiomatic member-accessor names on numeric sequences.
+    /// Catalog-derived from <see cref="TokenMeta.IsValidAsMemberName"/>.
     /// </summary>
     internal static readonly FrozenSet<TokenKind> KeywordsValidAsMemberName =
-        new[] { TokenKind.Min, TokenKind.Max }.ToFrozenSet();
+        Tokens.All.Where(t => t.IsValidAsMemberName).Select(t => t.Kind).ToFrozenSet();
 
     // ════════════════════════════════════════════════════════════════════════════
     //  Public entry point
