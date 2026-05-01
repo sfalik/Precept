@@ -2284,24 +2284,26 @@ The `<TreatWarningsAsErrors>true</TreatWarningsAsErrors>` line remains. The `War
 
 ---
 
-### Phase 2 — Acceptance Gate (13 Points)
+### Phase 2 — Acceptance Gate (14 Points) ✅ ALL RESOLVED
 
 **"Done" means ALL of the following are true simultaneously:**
 
-1. **`dotnet build` — zero errors, zero warnings** — no suppressions, no `WarningsNotAsErrors` of any kind
-2. **`dotnet test` — all tests pass** — Phase 1 baseline: 2482; Phase 2 target: 2510–2530 (see Test Count Projection below)
-3. **PRECEPT0019 severity = `DiagnosticSeverity.Error`** in `src/Precept.Analyzers/Precept0019PipelineCoverageExhaustiveness.cs`
-4. **`<WarningsNotAsErrors>PRECEPT0019</WarningsNotAsErrors>` removed** from `src/Precept/Precept.csproj`
-5. **`KnownBrokenFiles` in `SampleFileIntegrationTests.cs` is empty** — all 28 sample files parse clean with zero diagnostics
-6. **`KnownBrokenSampleFile_StillHasParserErrors` test removed or adapted** — when `KnownBrokenFiles` is empty the sentinel theory is obsolete; convert to an assertion that the list is empty, or remove
-7. **`OperatorKind.IsSet = 19` and `OperatorKind.IsNotSet = 20` exist** in catalog with `MultiTokenOp` metadata, correct token sequences (`[Is, Set]` and `[Is, Not, Set]`), `Arity.Postfix`, `OperatorFamily.Presence`, `Precedence: 60`
-8. **`Arity.Postfix = 3` exists** in the `Arity` enum
-9. **`ExpressionFormKind.PostfixOperation = 11` exists** with correct catalog metadata: `IsLeftDenotation = true`, `LeadTokens = [TokenKind.Is]`, `Category = ExpressionCategory.Composite`
-10. **`ExpressionFormCoverageTests.cs` exists and all tests pass** — Layer 2 (test-time) coverage assertion is in place alongside Layer 1 (compile-time) PRECEPT0007 enforcement
-11. **`TypeChecker` and `GraphAnalyzer` annotated with `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]`** and full `[HandlesForm]` coverage for all 11 forms
-12. **Spec §2.1 `is set`/`is not set` precedence matches implementation** — either spec updated to 60 (recommended) or parser updated to 40, with a comment in `Parser.cs` linking the implementation binding power to the catalog entry
-13. **No deferred items, no holes** — `CONTRIBUTING.md` "done" definition met; spike branch is clear for type-checker work to begin
-14. **Phase 2e complete** — `TokenMeta.IsValidAsMemberName` flag added and `KeywordsValidAsMemberName` derived from catalog (Slice 29); PRECEPT0021 and PRECEPT0022 analyzers implemented, tested, and producing zero diagnostics on the current codebase (Slices 30–31); PRECEPT0023 tracked and ready to implement once Phase 2b ships (Slice 32)
+1. ✅ **`dotnet build` — zero errors, zero warnings** — no suppressions, no `WarningsNotAsErrors` of any kind
+2. ✅ **`dotnet test` — all tests pass** — Phase 1 baseline: 2482; Phase 2 actual: 2678 (254 Analyzer + 2424 Core)
+3. ✅ **PRECEPT0019 severity = `DiagnosticSeverity.Error`** in `src/Precept.Analyzers/Precept0019PipelineCoverageExhaustiveness.cs`
+4. ✅ **`<WarningsNotAsErrors>PRECEPT0019</WarningsNotAsErrors>` removed** from `src/Precept/Precept.csproj`
+5. ✅ **`KnownBrokenFiles` in `SampleFileIntegrationTests.cs` is empty** — all 28 sample files parse clean with zero diagnostics
+6. ✅ **`KnownBrokenSampleFile_StillHasParserErrors` test removed or adapted** — when `KnownBrokenFiles` is empty the sentinel theory is obsolete; convert to an assertion that the list is empty, or remove
+7. ✅ **`OperatorKind.IsSet = 19` and `OperatorKind.IsNotSet = 20` exist** in catalog with `MultiTokenOp` metadata, correct token sequences (`[Is, Set]` and `[Is, Not, Set]`), `Arity.Postfix`, `OperatorFamily.Presence`, `Precedence: 60`
+8. ✅ **`Arity.Postfix = 3` exists** in the `Arity` enum
+9. ✅ **`ExpressionFormKind.PostfixOperation = 11` exists** with correct catalog metadata: `IsLeftDenotation = true`, `LeadTokens = [TokenKind.Is]`, `Category = ExpressionCategory.Composite`
+10. ✅ **`ExpressionFormCoverageTests.cs` exists and all tests pass** — Layer 2 (test-time) coverage assertion is in place alongside Layer 1 (compile-time) PRECEPT0007 enforcement
+11. ✅ **`TypeChecker` and `GraphAnalyzer` annotated with `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]`** and full `[HandlesForm]` coverage for all 11 forms
+12. ✅ **Spec §2.1 `is set`/`is not set` precedence matches implementation** — spec was updated to 60 in Slice 17 (G2). §2.1 table now correctly shows `| 60 | \`is\` (\`is set\` / \`is not set\`) | presence test | left |`. No parser change needed.
+13. ✅ **No deferred items, no holes** — `CONTRIBUTING.md` "done" definition met; spike branch is clear for type-checker work to begin
+14. ✅ **Phase 2e complete** — `TokenMeta.IsValidAsMemberName` flag added and `KeywordsValidAsMemberName` derived from catalog (Slice 29); PRECEPT0021 and PRECEPT0022 analyzers implemented, tested, and producing zero diagnostics on the current codebase (Slices 30–31); PRECEPT0023 implemented with corrected invariants (Slice 32; see note below)
+
+**PRECEPT0023c correction note:** The original Phase 2e implementation of PRECEPT0023c used the wrong key — it checked for duplicate *lead tokens* among `MultiTokenOp` entries. `ByTokenSequence` is keyed by the full `(TokenKind, TokenKind?, TokenKind?)` tuple, so `IsSet=[Is,Set]` and `IsNotSet=[Is,Not,Set]` legitimately share the `Is` lead token without collision. The correct invariant — duplicate *full token sequences* — was implemented in a follow-up fix (2026-05-01). Severity promoted from `Warning` to `Error` now that the invariant is structurally correct.
 
 ---
 
