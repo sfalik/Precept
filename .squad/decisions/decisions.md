@@ -6967,3 +6967,312 @@ The project's canonical regression protocol requires 4 rounds of `precept_compil
 | `WSI_ChoiceElement_CatalogRegression_ExactlyFiveTypes` | ChoiceElementTypeKeywords catalog | ✅ Pass |
 | `WSI_ChoiceElement_CatalogRegression_OnlyPrimitiveTypes` | ChoiceElementTypeKeywords catalog | ✅ Pass |
 | `WSI_ChoiceElement_CatalogRegression_ContainsExpectedKinds` | ChoiceElementTypeKeywords catalog | ✅ Pass |
+
+---
+
+# Frank gap analysis inbox
+
+Date: 2026-05-01
+Requested by: Shane
+
+## GAP-1 — single-quoted qualifier values
+
+- Spec intent is clear: single quotes are typed constants, double quotes are plain strings.
+- The spec's qualifier examples explicitly use typed constants: `field Amount as money in 'USD'`, `field Distance as quantity of 'length'`.
+- Qualifier values should remain typed/domain values, not labels. Future checking should validate them against currency/unit/dimension registries rather than treat them as arbitrary text.
+- Current parser behavior is therefore a bug, not an intentional restriction. `ParseAtom()` needs typed-constant support in ordinary expression positions used by type qualifiers.
+
+## GAP-2 — `ensure ... when ...`
+
+- Guarded ensures are already part of language intent, but the spec is internally inconsistent on placement.
+- Grammar sections use post-condition form (`ensure BoolExpr ("when" BoolExpr)?`), while one prose/example section still shows pre-`ensure` guard placement.
+- Samples use post-condition form consistently: `in Approved ensure DecisionNote is set when FraudFlag because ...`.
+- Semantic intent: the guard makes the ensure conditional, like guarded rules. It does **not** behave like a transition-row availability guard.
+- Recommendation: parser fix plus spec cleanup to one canonical form, with post-condition `ensure Condition when Guard because ...` as the preferred surface.
+
+## GAP-3 — `is set` / `is not set`
+
+- The spec already treats `is set` / `is not set` as a real expression operator and ties it to the removal of `null`.
+- The operator means presence/absence of an optional value, not collection membership.
+- Samples show both field and optional event-argument usage (`DecisionNote is set`, `Approve.Note is set`), so spec wording should broaden from "optional field" to optional references/slots.
+- Recommendation: implement as catalog-owned presence operators (`IsSet` / `IsNotSet`, or equivalent metadata-backed representation), then align parser/type checker/spec wording.
+
+## Overall
+
+- All three gaps are expression-surface drift between spec/samples and parser reality.
+- GAP-1 and GAP-3 share the same immediate parser root: the Pratt parser's atom/led coverage does not match the spec's literal/operator surface.
+- GAP-2 is a grammar-shape drift: AST and samples expect guarded ensures, but parser recognition only handles the older/stale placement.
+- Fixing these gaps should unblock the two broken sample files, and also expose one adjacent issue: guarded `on ... ensure ... when ...` uses the same broken ensure shape and should be fixed in the same pass.
+
+---
+
+# George gap analysis inbox — parser implementation
+
+Date: 2026-05-01
+Requested by: Shane
+
+---
+
+## GAP-1 — Single-quoted strings (`'USD'`) lex as `TypedConstant`, not `StringLiteral`
+
+### Lexer facts
+
+The lexer emits four distinct token kinds for single-quoted literals:
+
+| Kind | Value | Description |
+|------|-------|-------------|
+| `TypedConstant = 116` | text | Simple form `'USD'` — no interpolation |
+| `TypedConstantStart = 117` | text | First segment of `'prefix {expr}...'` |
+| `TypedConstantMiddle = 118` | text | Middle segment between interpolation holes |
+| `TypedConstantEnd = 119` | text | Final segment of an interpolated typed constant |
+
+These are structurally parallel to `StringLiteral/StringStart/StringMiddle/StringEnd`. The lexer enters `LexerMode.TypedConstant` on `'`, produces `TypedConstant` on the closing `'` (no interpolation), or the `Start/End` pair when `{...}` holes are present. The lexer is complete — the gap is entirely in the parser.
+
+### ParseAtom() gap
+
+`ParseAtom()` handles: `NumberLiteral`, `StringLiteral`, `True`, `False`, `StringStart`, `Identifier`, `Not`, `Minus`, `LeftParen`, `If`. No case exists for `TypedConstant` (116) or `TypedConstantStart` (117). Any call to `ParseExpression(0)` that encounters a single-quoted value falls to the `default:` arm and emits `ExpectedToken "expression"`.
+
+### Where qualifier values enter ParseAtom
+
+`ParseTypeRef()` (line 1123) is the only qualifier-value path. When the catalog says a type has a `QualifierShape`, it enters a while-loop that calls `ParseExpression(0)` for each qualifier value. That route hits `ParseAtom()`. The qualifier keyword itself is consumed by `Advance()` before `ParseExpression(0)` is called, so the first token `ParseAtom()` sees is the value — a `TypedConstant` token.
+
+### Minimal fix
+
+Two new case arms in `ParseAtom()`:
+
+```csharp
+case TokenKind.TypedConstant:
+    return new LiteralExpression(current.Span, Advance());
+
+case TokenKind.TypedConstantStart:
+    return ParseInterpolatedTypedConstant();
+```
+
+Plus a `ParseInterpolatedTypedConstant()` method that mirrors `ParseInterpolatedString()` exactly, substituting `TypedConstantMiddle`/`TypedConstantEnd` for `StringMiddle`/`StringEnd`. The `InterpolatedStringExpression` AST node can be reused — it wraps `ImmutableArray<InterpolationPart>` with no string-vs-typed-constant discrimination at the AST level. (Type checking later supplies that context.)
+
+This is a four-line change to the switch plus a ~25-line parse method.
+
+### Risks
+
+1. **ParseChoiceValue** (line 1233): directly checks `cur.Kind == TokenKind.StringLiteral` for string-typed choice options — `TypedConstant` will still fail there. This is a separate but related gap not in scope for this task.
+2. **Type checking**: `UnresolvedTypedConstant (52)` and `InvalidTypedConstantContent (53)` diagnostics exist and are ready. The TypeChecker is a stub, so no immediate downstream breakage. When TypeChecker is implemented it will need to validate TypedConstant values against the qualifier's expected type (currency code, unit, dimension, etc.).
+3. **Interpolated typed constants**: The interpolated path (`TypedConstantStart`) raises the question of whether interpolation is valid in qualifier position — e.g., `money in 'US{country}'`. This needs Frank's spec sign-off. The simple non-interpolated form (`TypedConstant`) is unambiguous and can be fixed immediately.
+
+### Downstream consumers to update
+
+TypeChecker: stub (no change needed now). Evaluator: stub (no change needed now). No runtime impact.
+
+### Effort: **Small**
+
+### Dependency on Frank
+
+**Yes** — narrowly: is an interpolated TypedConstant (`TypedConstantStart`) valid in qualifier position? For the simple non-interpolated form this is a clear bug fix. Frank should confirm whether interpolated qualifier values are in scope for the same pass or deferred.
+
+---
+
+## GAP-2 — `StateEnsure` with `when` guard not implemented
+
+### Current ParseStateEnsure implementation
+
+```csharp
+// Parser.cs line 418
+private StateEnsureNode ParseStateEnsure(SourceSpan start, Token preposition, StateTargetNode anchor, Expression? stashedGuard)
+{
+    Advance(); // consume 'ensure'
+    var condition = ParseExpression(0);
+    var because = Expect(TokenKind.Because);   // ← fails when 'when' is next
+    var message = ParseExpression(0);
+    return new StateEnsureNode(..., stashedGuard, condition, message);
+}
+```
+
+### Why `when` causes failure
+
+`TokenKind.When` is in `StructuralBoundaryTokens` (line 95):
+
+```csharp
+private static readonly FrozenSet<TokenKind> StructuralBoundaryTokens = new[]
+{
+    TokenKind.When, TokenKind.Because, TokenKind.Arrow, TokenKind.Ensure,
+    TokenKind.EndOfSource,
+}.ToFrozenSet();
+```
+
+So `ParseExpression(0)` inside `ParseStateEnsure` terminates at `when` (correctly, per the boundary set). Then `Expect(TokenKind.Because)` fires on the `when` token → emits `ExpectedToken "because"`.
+
+### Guard semantics: stashed vs inline
+
+The dispatch loop calls `TryParseStashedGuard()` before dispatching. A "stashed guard" handles the pre-`ensure` form: `in State when Guard ensure Condition because Msg`. The `stashedGuard` parameter carries that guard in.
+
+The failing form is **post-condition inline guard**: `in State ensure Condition when Guard because Msg`. These are equivalent semantically (the guard makes the ensure conditional), but the stashed path is already wired and the inline path is not.
+
+### AST node: already designed for Guard
+
+`StateEnsureNode` (SyntaxNodes/StateEnsureNode.cs):
+
+```csharp
+public sealed record StateEnsureNode(
+    SourceSpan Span,
+    Token Preposition,
+    StateTargetNode State,
+    Expression? Guard,       // ← exists; used for stashed guard
+    Expression Condition,
+    Expression Message) : Declaration(Span);
+```
+
+No new AST node is needed.
+
+### Minimal fix
+
+Mirror exactly what `ParseAccessMode` does (lines 387–391):
+
+```csharp
+private StateEnsureNode ParseStateEnsure(SourceSpan start, Token preposition, StateTargetNode anchor, Expression? stashedGuard)
+{
+    Advance(); // consume 'ensure'
+    var condition = ParseExpression(0);
+
+    // Post-condition inline guard: accept either stashed or inline, not both
+    Expression? guard = stashedGuard;
+    if (guard is null && Current().Kind == TokenKind.When)
+    {
+        Advance(); // consume 'when'
+        guard = ParseExpression(0);
+    }
+
+    var because = Expect(TokenKind.Because);
+    var message = ParseExpression(0);
+
+    return new StateEnsureNode(
+        SourceSpan.Covering(start, message.Span),
+        preposition, anchor, guard, condition, message);
+}
+```
+
+This is a five-line addition to an existing method. No new infrastructure.
+
+### Adjacent gap: EventEnsure
+
+`ParseEventEnsure()` (line 543) has the **identical** missing inline-guard handling. `insurance-claim.precept` line 35 demonstrates it: `on Submit ensure Submit.Amount <= 100000 when Submit.RequiresPoliceReport because "..."`. The `EventEnsureNode` also has `Expression? Guard`. The same fix applies to both methods — they should be updated in the same pass.
+
+### Risks
+
+1. **Dual guard ambiguity**: If someone writes `in State when A ensure Condition when B because Msg`, both stashed and inline guards are present. The `guard is null` check handles this gracefully (stashed takes precedence, inline is silently ignored). A dedicated diagnostic for the dual-guard case would be cleaner but is not required for the minimal fix.
+2. **GAP-3 interaction**: The canonical sample `in Approved ensure DecisionNote is set when FraudFlag because ...` has BOTH GAP-2 and GAP-3 active simultaneously. Fixing GAP-2 alone does not make that sample parse cleanly — `is set` must also be resolved. The two fixes are independent but should land together for the sample to validate end-to-end.
+3. **Spec consistency**: Frank's analysis notes a spec ambiguity between pre-`ensure` and post-condition guard placement. Implementation should follow the post-condition form (as samples show), and the spec cleanup should confirm the canonical form.
+
+### Downstream consumers
+
+TypeChecker: stub. Evaluator: stub. No impact.
+
+### Effort: **Small**
+
+### Dependency on Frank
+
+**Yes** — confirm that the post-condition `ensure Condition when Guard because Msg` form is the canonical surface, and whether the pre-`ensure` stashed form is also supported or should be deprecated. Also confirm EventEnsure should get the same fix in the same pass.
+
+---
+
+## GAP-3 — `is set` / `is not set` membership expressions
+
+### Current `is` handling in the parser
+
+`Is` has `TokenKind.Is = 42`. It appears in `Tokens.cs` (Cat_Mem, "Multi-token operator prefix (is set, is not set)"), in `TokenKind.cs`, and is referenced in `SyntaxReference.cs` and `Modifiers.cs` documentation. But:
+
+- `OperatorKind` has no `IsSet` or `IsNotSet` member.
+- `Operators.cs` has no entry for `Is`.
+- `OperatorPrecedence` (derived from `Operators.All`, binary only) has no entry for `TokenKind.Is`.
+- `TokenKind.Is` is referenced **nowhere** in `Parser.cs`.
+
+The Pratt loop exits immediately on `is` after the left operand (`!OperatorPrecedence.TryGetValue(current.Kind, out var opInfo)` → `break`). There is no partial implementation — `is` as an operator is entirely absent from the parser.
+
+### Exact sample usage
+
+From `insurance-claim.precept` line 28:
+```
+in Approved ensure DecisionNote is set when FraudFlag because "..."
+```
+
+From `loan-application.precept` line 62:
+```
+-> set DecisionNote = if Approve.Note is set then Approve.Note else ...
+```
+
+From `library-book-checkout.precept`:
+```
+in Available ensure BorrowerId is not set because "..."
+in CheckedOut ensure BorrowerId is set because "..."
+```
+
+`is set` is a boolean presence check on an optional field. `is not set` is its negation. Neither uses `is null` — the samples exclusively use `is set`/`is not set`. The Tokens catalog description also only lists these two forms.
+
+### Implementation gap
+
+`is set` is a **two-token postfix operator**: left operand + `is` + `set`. `is not set` is a **three-token postfix operator**: left operand + `is` + `not` + `set`. This makes it non-trivial for the current Pratt architecture:
+
+- `OperatorPrecedence` is a `FrozenDictionary<TokenKind, (Precedence, RightAssociative)>` keyed on a single token kind. `Is` can be added as an entry to get the Pratt loop to recognize the start of the operator, but the loop body must then handle multi-token lookahead to distinguish `is set` vs `is not set`.
+- The existing `UnaryExpression` node holds a single `Token Operator` — it cannot represent a two- or three-token operator sequence.
+
+### What a catalog-driven implementation looks like
+
+**Step 1 — OperatorKind:**
+Add `IsSet = 19` and `IsNotSet = 20` to `OperatorKind`. These are postfix unary operators.
+
+**Step 2 — Operators.cs:**
+Add two entries with `Arity.Unary` (postfix), `OperatorFamily.Membership`, `Precedence: 40` (same as `Contains`), backed by `Tokens.GetMeta(TokenKind.Is)` as the leading token. The `OperatorMeta` record may need a `SecondToken` field, or a `MultiTokenSuffix string[]` field, for the trailing `set`/`not set` text. This is a Frank/architecture decision on how multi-token operators live in the catalog.
+
+**Step 3 — AST node:**
+A new `IsSetExpression` (or `PresenceCheckExpression`) node:
+```csharp
+public sealed record IsSetExpression(
+    SourceSpan Span,
+    Expression Operand,
+    bool IsSet) : Expression(Span);
+```
+`UnaryExpression` cannot be used because it only holds one operator token.
+
+**Step 4 — Pratt loop:**
+Add `TokenKind.Is` to `OperatorPrecedence` (precedence 40, non-associative). In the Pratt loop, handle `Is` specially: consume `Is` token, peek at next token:
+- If `Set` → consume it, produce `IsSetExpression(left, IsSet: true)`
+- If `Not` → consume it, expect `Set`, produce `IsSetExpression(left, IsSet: false)`
+- Otherwise → diagnostic
+
+**Step 5 — Type checker (when unblocked):**
+`DiagnosticCode.IsSetOnNonOptional = 49` already exists with the correct message. The type checker should use it when `IsSetExpression.Operand` resolves to a non-optional type.
+
+### Risks
+
+1. **`not` keyword collision**: `is not set` uses the `Not` keyword between `is` and `set`. `Not` also exists as a standalone prefix operator. Inside the `Is` Pratt branch, consuming `Not` is unambiguous (you're already past `Is`), but the grammar comment must be explicit.
+2. **Precedence of `not` inside `is not set`**: This is NOT the prefix `not` operator being applied — it is structural syntax within the `is not set` form. The Pratt loop must consume `not` as a keyword token, not re-enter `ParseExpression` recursively.
+3. **Catalog shape for multi-token operators**: This is the first case where an operator spans more than one token. If the catalog's `OperatorMeta.Token` field only accommodates one token, a shape extension is needed. This is a non-trivial catalog design decision.
+4. **Type-checker interaction**: `IsSetExpression` must only be valid on `optional` fields. The `IsSetOnNonOptional` diagnostic is at the type stage. The parser should accept `is set` on any left operand; the type checker enforces the optional constraint.
+
+### Effort: **Medium**
+
+This requires: Frank decision on catalog shape for multi-token operators, a new AST node, OperatorKind additions, non-trivial Pratt loop extension, and a new diagnostic path in the type checker (when unblocked). None of the individual pieces are large, but together they touch four layers (catalog, AST, parser, type stage).
+
+### Dependency on Frank
+
+**Yes** — specifically:
+- Should `IsSet`/`IsNotSet` be `OperatorKind` members? If yes, does `OperatorMeta` need a multi-token suffix field?
+- What is the precedence level relative to `Contains` and comparison operators?
+- Is `is null` / `is not null` also in scope, or exclusively `is set`/`is not set`?
+- AST: reuse `UnaryExpression` with a compound operator token, or new `IsSetExpression` node?
+
+---
+
+## Overall assessment
+
+### Implementation order recommendation
+
+1. **GAP-1 first** — independent, minimal risk, unblocks any precept using typed-constant qualifier values. Simple non-interpolated form only; defer interpolated qualifier constants if Frank wants a separate decision.
+2. **GAP-3 second** — requires Frank's catalog-shape decision first. Once that's locked, implementation is medium scope but self-contained.
+3. **GAP-2 third** — depends on `is set` (GAP-3) being parseable before the canonical insurance-claim sample validates end-to-end. But the GAP-2 parser fix itself is independent of GAP-3 and can land first — it just won't clear the sample until GAP-3 also lands.
+
+Pragmatic sequencing: **GAP-2 immediately** (five lines, zero design risk), **GAP-1 immediately** (simple form), **GAP-3 after Frank design sign-off**.
+
+### Shared infrastructure
+
+- **GAP-2 and EventEnsure**: These two fixes share the identical pattern and must land in the same commit. `ParseStateEnsure` and `ParseEventEnsure` are parallel implementations that drifted.
+- **GAP-1 and GAP-3**: Both require `ParseAtom()` changes. If landed in the same pass, a single test sweep covers both.
+- **GAP-3 catalog work**: The multi-token operator shape decision (if Frank requires a catalog extension) could also affect future operators with compound syntax. That design decision should be scoped and resolved before touching `OperatorMeta`.

@@ -18,6 +18,10 @@
 
 ## Recent Updates
 
+### 2026-05-01 — GAP-1/2/3 parser analysis recorded
+- Inbox analysis on `ParseAtom()`, inline `ensure ... when ...`, and multi-token presence operators was merged into `.squad/decisions/decisions.md`.
+- Durable implementation sequence captured: GAP-2 immediately, GAP-1 simple typed constants immediately, GAP-3 after catalog/AST shape sign-off.
+
 ### 2026-05-01 — WSI parser slices 2–5 recorded
 - Deleted the dead `SkipTrivia()` path and removed `NewLine` from `StructuralBoundaryTokens`, making parser structure explicitly trivia-free.
 - Rewrote `ParseTypeRef` for multi-qualifier scalar types, with `AmbiguousQualifierPrepositions` derived from catalog metadata rather than hardcoded token tables.

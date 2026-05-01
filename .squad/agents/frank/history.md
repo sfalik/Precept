@@ -17,6 +17,10 @@
 
 ## Recent Updates
 
+### 2026-05-01 — GAP-1/2/3 spec analysis recorded
+- Inbox analysis on typed constants, guarded `ensure`, and `is set` / `is not set` was merged into `.squad/decisions/decisions.md`.
+- Durable recommendation captured: canonical guarded-ensure surface stays post-condition (`ensure Condition when Guard because ...`), while GAP-3 remains blocked on catalog-backed presence-operator design.
+
 ### 2026-05-01 — WSI docs sync recorded
 - Updated `docs/language/precept-language-spec.md` (§0.1.5 and §1.4), `docs/compiler/parser.md`, `docs/working/parser-implementation-notes.md`, and `docs/language/collection-types.md` to align docs with trivia-free parsing and multi-line qualifier examples.
 - Locked wording: line-oriented structure is keyword-anchored, not newline-delimited.
