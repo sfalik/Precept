@@ -8469,3 +8469,37 @@ These are complementary layers:
 | Created | `src/Precept/HandlesCatalogExhaustivelyAttribute.cs` |
 | Created | `src/Precept/Language/HandlesFormAttribute.cs` |
 | Created | `src/Precept.Analyzers/Precept0019PipelineCoverageExhaustiveness.cs` |
+
+
+## Session: Phase 2 Plan — Parser Gap Fixes Complete, Phase 2 Authored
+
+### Key Decisions
+
+1. **GAP-A implementation approach (reconciled):** Frank initially believed PostConditionGuard needed to be added as a new field to StateEnsureNode/EventEnsureNode. George verified from source that Guard: Expression? is already present on both nodes. Resolution: no AST changes needed for GAP-A. The fix is purely in the parser method bodies — ParseStateEnsure and ParseEventEnsure need to check for when after ParseExpression(0) and populate the existing Guard field.
+
+2. **Phase 2 plan structure confirmed:** 3 phases, 13 slices (14–26):
+   - Phase 2a (parallel): Slices 14–18 — GAP-A, GAP-B, GAP-C, precedence audit, contains test
+   - Phase 2b (sequential): Slices 19–22 — full DU Option B, ByToken restructure
+   - Phase 2c (sequential): Slices 23–26 — TypeChecker/GraphAnalyzer annotations, ExpressionFormCoverageTests, PRECEPT0019 → Error
+
+3. **OperatorFamily.Presence** (George's name) preferred over Frank's `Nullability` for the new family covering `is set`/`is not set`.
+
+4. **ByTokenSequence** as the lookup method name for multi-token operator lookup.
+
+5. **Shane's directive (from prior session, confirmed):** No deferred items, no GitHub issues, no holes on spike/Precept-V2 before moving to type-checker work. 13-point acceptance gate must be fully met.
+
+6. **Phase 1 implementation review — 2 items not done:**
+   - Slice 2 / GAP-A: entirely unimplemented (when-guard). No AST changes needed per George's source inspection.
+   - Slice 13: `ExpressionFormCoverageTests.cs` was never written. Becomes Slice 25 in Phase 2c.
+
+7. **Phase 1 test baseline:** 2482 passing, 0 failing. Phase 2 target: 2525–2530.
+
+8. **`is set` precedence:** 60 in implementation, 40 in spec. Slice 17 will audit and resolve — recommended resolution is spec → 60 (implementation binding power matches `not` at 60 and fits the semantic intent).
+
+### Agents That Ran This Session
+
+- **Frank-6:** Full 13-slice implementation review + Phase 2 plan outline → `.squad/decisions/inbox/frank-extended-plan-review.md`
+- **George-6:** Technical C# design for all Phase 2 work items → `.squad/decisions/inbox/george-extended-plan-technical.md`
+- **Soup Nazi-2:** Implementation Status table added to plan doc top
+- **Soup Nazi-3:** Reviewer notes annotated with Phase 1/2 status banners
+- **Frank-7:** Phase 2 synthesis — Slices 14–26 appended to `docs/working/parser-gap-fixes-plan.md`

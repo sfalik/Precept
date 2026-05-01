@@ -23,3 +23,7 @@
 - **F10:** Confirmed `EnsureClause` and `BecauseClause` as separate slots.
 
 Resolved all five of George's P1–P5 items. Design declared stable for implementation planning. PR 1 scope confirmed with F8 addition.
+
+## [Session] Phase 2 Plan Complete
+
+Phase 1 full implementation review by Frank-6: 9 slices clean, Slice 2 (GAP-A when-guard) and Slice 13 (ExpressionFormCoverageTests) not implemented. George-6 technical design for all Phase 2 items — key finding: GAP-A requires zero AST changes (Guard field already present). Frank-7 synthesis: Slices 14–26 authored and appended to docs/working/parser-gap-fixes-plan.md. Shane's directive confirmed: no deferred items before type-checker work. 13-point acceptance gate defined. Phase 1 test baseline: 2482 passing.
