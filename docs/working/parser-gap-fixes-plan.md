@@ -40,9 +40,9 @@ All 13 slices shipped on `spike/Precept-V2`. Test baseline: 2107 → 2482 (+375 
 | 12 | Sample file integration tests (58 tests; GAP-A/B/C sentinel-gated) | ✅ Done |
 | 13 | ExpressionFormCoverageTests (reflection + round-trip) | ✅ Done |
 
-### Phase 2 — Extended Gap Resolution ⏳ PENDING
+### Phase 2 — Extended Gap Resolution ✅ PHASE 2b COMPLETE
 
-**Baseline:** 2482 tests passing. Projected: +30–50 new tests. Known-broken sample files: 7 (GAP-A: 2, GAP-B: 4, GAP-C: 1).
+**Baseline:** 2247 tests passing (2240 passing + 7 intentional KnownBrokenFiles failures; Phase 1 exit). Post-Phase 2a: 2261 tests, 0 failing. Post-Phase 2b: 2274 tests, 0 failing.
 
 #### Phase 2a — Parallel (independent, no catalog changes)
 
@@ -58,10 +58,10 @@ All 13 slices shipped on `spike/Precept-V2`. Test baseline: 2107 → 2482 (+375 
 
 | Slice | Work Item | Description | Status |
 |-------|-----------|-------------|--------|
-| 19 | A1 | Enum additions: `Arity.Postfix`, `OperatorKind.IsSet/IsNotSet`, `OperatorFamily.Presence` | ⏳ Pending |
-| 20 | A2/B | `OperatorMeta` → DU (`SingleTokenOp`/`MultiTokenOp`) + `ByToken`/`ByTokenSequence` restructure | ⏳ Pending |
-| 21 | A3 | `ExpressionFormKind.PostfixOperation` (11th member) + `[HandlesForm]` on `is`-handler | ⏳ Pending |
-| 22 | A4 | Migrate all consumer call sites off `OperatorMeta.Token` to new DU API | ⏳ Pending |
+| 19 | A1 | Enum additions: `Arity.Postfix`, `OperatorKind.IsSet/IsNotSet`, `OperatorFamily.Presence` | ✅ Done |
+| 20 | A2/B | `OperatorMeta` → DU (`SingleTokenOp`/`MultiTokenOp`) + `ByToken`/`ByTokenSequence` restructure | ✅ Done |
+| 21 | A3 | `ExpressionFormKind.PostfixOperation` (11th member) + `[HandlesForm]` on `is`-handler | ✅ Done |
+| 22 | A4 | Consumer call site audit — no stragglers; build clean, 2274 tests passing | ✅ Done |
 
 #### Phase 2c — Sequential (PRECEPT0019 promotion, depends on 2b)
 
@@ -77,6 +77,7 @@ All 13 slices shipped on `spike/Precept-V2`. Test baseline: 2107 → 2482 (+375 
 | Slice | Work Item | Description | Status |
 |-------|-----------|-------------|--------|
 | 27 | S1 | Split `Parser.cs` (1757 lines) into 3 partial files for AI agent manageability | ⏳ Pending |
+| 28 | A5 | PRECEPT0020 — Operators `ByToken` / `OperatorPrecedence` collision analyzer | ⏳ Pending |
 
 Shane's directive: no deferred items, no holes — all gaps resolved on this spike before type-checker work begins.
 
@@ -2561,5 +2562,96 @@ Zero errors, zero warnings.
 - Zero changes to any test file
 - Zero changes to any non-Parser production file
 - `git diff --stat` shows only: `Parser.cs` modified, `Parser.Declarations.cs` added, `Parser.Expressions.cs` added
+
+**Assignee:** George
+
+---
+
+### Slice 28: PRECEPT0020 — Operators ByToken / OperatorPrecedence Collision ⏳ PENDING
+
+**Goal:** Add a new Roslyn analyzer that catches duplicate `(Token.Kind, Arity)` keys in the `Operators.GetMeta` switch at compile time, before they become startup-throw failures in `Operators.ByToken` or `Parser.OperatorPrecedence`.
+
+**Rationale:** PRECEPT0009 already enforces uniqueness of composite keys in the Operations catalog (`ByBinaryOp`, `ByUnaryOp` FrozenDictionaries). The Operators catalog has an exactly parallel problem: `Operators.ByToken` is a `FrozenDictionary<(TokenKind, Arity), OperatorMeta>` and `Parser.OperatorPrecedence` is a `FrozenDictionary<TokenKind, (int, bool)>` keyed on binary operators only. A key collision in either causes a `ArgumentException` (duplicate key) thrown inside a static field initializer — extremely hard to diagnose from the stack trace. Phase 2b is about to restructure `OperatorMeta` into a DU and will introduce new token-lookup indexes; locking down the existing `ByToken` invariant before that work is the right safety-first sequencing. See `docs/working/analyzer-recommendations.md` § 3 PRECEPT0020 for full rationale.
+
+**Dependency:** Independent of all Phase 2b–2c slices. Can be implemented at any point after Slice 27.
+
+---
+
+**Files to create / modify:**
+
+| File | Change |
+|------|--------|
+| `src/Precept.Analyzers/Precept0020OperatorsTokenCollision.cs` | **Create** — new `[DiagnosticAnalyzer]` implementing PRECEPT0020a and PRECEPT0020b |
+| `test/Precept.Analyzers.Tests/Precept0020OperatorsTokenCollisionTests.cs` | **Create** — unit tests |
+
+---
+
+**Invariants enforced:**
+
+| Sub-rule | ID | Invariant | Severity |
+|----------|----|-----------|----------|
+| ByToken collision | PRECEPT0020a | No two `OperatorMeta` arms may share `(Token.Kind, Arity)` composite key | Error |
+| OperatorPrecedence collision | PRECEPT0020b | No two *binary* `OperatorMeta` arms may share `Token.Kind` | Error |
+
+---
+
+**Method inventory — `Precept0020OperatorsTokenCollision.cs`:**
+
+| Symbol | Kind | Notes |
+|--------|------|-------|
+| `DiagnosticId_ByTokenCollision` | const string | `"PRECEPT0020a"` |
+| `DiagnosticId_PrecedenceCollision` | const string | `"PRECEPT0020b"` |
+| `ByTokenCollisionRule` | static field | `DiagnosticDescriptor`, category `"Precept.Language"`, severity `Error` |
+| `PrecedenceCollisionRule` | static field | `DiagnosticDescriptor`, category `"Precept.Language"`, severity `Error` |
+| `SupportedDiagnostics` | override property | `ImmutableArray.Create(ByTokenCollisionRule, PrecedenceCollisionRule)` |
+| `Initialize(AnalysisContext)` | override method | `RegisterCompilationStartAction` → registers per-switch `OperationKind.SwitchExpression` action + `RegisterCompilationEndAction` |
+| `Collect(OperationAnalysisContext, ConcurrentBag<OperatorArmInfo>)` | private static | Scopes to `GetMeta(OperatorKind)` via `TryGetCatalogSwitchKind`; per arm: calls `ExtractTokenKindName` + `ExtractArityName`; adds to bag |
+| `CrossCheck(CompilationAnalysisContext, ConcurrentBag<OperatorArmInfo>)` | private static | Builds `byTokenKey` dict `"(tokenKind, arity)" → (armCase, location)` and `byPrecedenceKey` dict `"tokenKind" → (armCase, location)` for binary arms; reports first-conflict per key |
+| `ExtractTokenKindName(IObjectCreationOperation)` | private static | Finds the `Token` constructor argument; confirms it's an `IInvocationOperation` (i.e., `Tokens.GetMeta(TokenKind.X)` call); extracts the first argument of that invocation via `ResolveEnumFieldName`; returns null if argument shape is unexpected (inline Token — already PRECEPT0022 territory) |
+| `ExtractArityName(IObjectCreationOperation)` | private static | Finds the `Arity` constructor argument (by parameter name); returns `ResolveEnumFieldName` result |
+| `OperatorArmInfo` | private sealed class | `ArmCase: string`, `TokenKindName: string`, `ArityName: string`, `IsBinary: bool`, `Location: Location` |
+| `FindObjectCreation(IOperation)` | private static | Reuse pattern from PRECEPT0009 — `UnwrapConversions` then walk children |
+
+**Key implementation note — `ExtractTokenKindName`:**
+
+The `Token` parameter of `OperatorMeta(OperatorKind kind, TokenMeta token, ...)` receives an `IInvocationOperation` from `Tokens.GetMeta(TokenKind.X)`. To extract `TokenKind.X`:
+
+```csharp
+// 1. Find the 'token' constructor argument (named "Token" or second positional arg with type TokenMeta).
+// 2. Unwrap conversions — result should be IInvocationOperation.
+// 3. Check invocation target method name is "GetMeta" and containing type name is "Tokens".
+// 4. The first argument of the invocation is IFieldReferenceOperation on TokenKind.
+// 5. Return that field's Name.
+```
+
+If the unwrapped value is *not* an `IInvocationOperation` (e.g., someone passed an inline `new TokenMeta(...)`), return `null` to skip this arm — PRECEPT0022 handles the inline-Token case.
+
+---
+
+**Tests — `Precept0020OperatorsTokenCollisionTests.cs`:**
+
+| Test | What it verifies |
+|------|-----------------|
+| `GivenOperatorsWithAllDistinctTokenArityPairs_NoDiagnostic` | Baseline — current `Operators.GetMeta` produces zero diagnostics |
+| `GivenTwoUnaryAndOneBinaryOnSameToken_NoDiagnostic` | Minus/Negate pattern: `(Minus, Binary)` and `(Minus, Unary)` are distinct — no PRECEPT0020a |
+| `GivenTwoArmsWithSameTokenAndSameArity_ReportsPRECEPT0020a` | Injected collision: two `Unary` arms both pointing at `TokenKind.Minus` — reports ByToken collision on the second arm |
+| `GivenTwoBinaryArmsWithSameToken_ReportsPRECEPT0020b` | Injected collision: two `Binary` arms both pointing at `TokenKind.Plus` — reports OperatorPrecedence collision on the second arm |
+| `GivenTwoBinaryArmsWithSameToken_ReportsBoth0020a_And_0020b` | Same scenario as above also triggers PRECEPT0020a (since `(Plus, Binary)` collides) — confirms both rules fire |
+| `GivenOperatorWithInlineToken_DoesNotCrash` | If `Token` arg is inline `new TokenMeta(...)`, skip gracefully — PRECEPT0020 skips, no crash |
+
+**Regression anchors:**
+
+Run `dotnet test test/Precept.Analyzers.Tests/` — all existing analyzer tests must remain green. Run the analyzer against `src/Precept/Language/Operators.cs` — zero diagnostics emitted (no real collisions currently exist).
+
+---
+
+**Acceptance criteria:**
+
+- `Precept0020OperatorsTokenCollision.cs` exists and compiles
+- PRECEPT0020a fires when two arms share `(Token.Kind, Arity)` — confirmed by unit tests
+- PRECEPT0020b fires when two binary arms share `Token.Kind` — confirmed by unit tests
+- Running against `src/Precept/Language/Operators.cs` produces zero diagnostics (current catalog is clean)
+- All existing analyzer tests pass (`dotnet test test/Precept.Analyzers.Tests/`)
+- `dotnet build` — zero errors, zero warnings
 
 **Assignee:** George
