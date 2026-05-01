@@ -1,3 +1,6 @@
+using Precept.Language;
+using Precept.Pipeline.SyntaxNodes;
+
 namespace Precept.Pipeline;
 
 // CATALOG-DRIVEN IMPLEMENTATION GUIDE
@@ -21,7 +24,22 @@ namespace Precept.Pipeline;
 //
 // See: docs/language/catalog-system.md § TypeChecker-catalog integration pattern
 
+[Precept.HandlesCatalogExhaustively(typeof(ExpressionFormKind))]
 public static class TypeChecker
 {
     public static SemanticIndex Check(SyntaxTree tree) => throw new NotImplementedException();
+
+    [HandlesForm(ExpressionFormKind.Literal)]
+    [HandlesForm(ExpressionFormKind.Identifier)]
+    [HandlesForm(ExpressionFormKind.Grouped)]
+    [HandlesForm(ExpressionFormKind.BinaryOperation)]
+    [HandlesForm(ExpressionFormKind.UnaryOperation)]
+    [HandlesForm(ExpressionFormKind.MemberAccess)]
+    [HandlesForm(ExpressionFormKind.Conditional)]
+    [HandlesForm(ExpressionFormKind.FunctionCall)]
+    [HandlesForm(ExpressionFormKind.MethodCall)]
+    [HandlesForm(ExpressionFormKind.ListLiteral)]
+    [HandlesForm(ExpressionFormKind.PostfixOperation)]
+    private static void CheckExpression(Expression expression) =>
+        throw new NotImplementedException("TypeChecker expression handling — Phase 3 implementation");
 }

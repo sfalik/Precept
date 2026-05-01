@@ -75,31 +75,34 @@ public class ExpressionFormCoverageTests
                 .Any(a => a.CatalogEnum == typeof(ExpressionFormKind)))
             .ToList();
 
-        matchingTypes.Should().ContainSingle(
-            because: "exactly one type must carry [HandlesCatalogExhaustively(typeof(ExpressionFormKind))]");
-        matchingTypes[0].Should().NotBeNull();
+        matchingTypes.Should().HaveCount(3,
+            because: "ParseSession, TypeChecker, and GraphAnalyzer must each carry [HandlesCatalogExhaustively(typeof(ExpressionFormKind))]");
     }
 
     [Fact]
     public void Parser_HandlesFormAnnotations_CoverAllExpressionFormKinds()
     {
         var preceptAssembly = typeof(ExpressionFormKind).Assembly;
-        var annotatedType = preceptAssembly.GetTypes()
-            .First(t => t.GetCustomAttributes<HandlesCatalogExhaustivelyAttribute>()
-                .Any(a => a.CatalogEnum == typeof(ExpressionFormKind)));
+        var annotatedTypes = preceptAssembly.GetTypes()
+            .Where(t => t.GetCustomAttributes<HandlesCatalogExhaustivelyAttribute>()
+                .Any(a => a.CatalogEnum == typeof(ExpressionFormKind)))
+            .ToList();
 
-        var handledKinds = annotatedType
-            .GetMethods(BindingFlags.Public | BindingFlags.NonPublic |
-                        BindingFlags.Instance | BindingFlags.DeclaredOnly)
-            .SelectMany(m => m.GetCustomAttributes<HandlesFormAttribute>())
-            .Select(a => a.Kind)
-            .OfType<ExpressionFormKind>()
-            .ToHashSet();
-
-        foreach (var kind in Enum.GetValues<ExpressionFormKind>())
+        foreach (var annotatedType in annotatedTypes)
         {
-            handledKinds.Should().Contain(kind,
-                because: $"the parser type must have at least one [HandlesForm({kind})] annotation");
+            var handledKinds = annotatedType
+                .GetMethods(BindingFlags.Public | BindingFlags.NonPublic |
+                            BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly)
+                .SelectMany(m => m.GetCustomAttributes<HandlesFormAttribute>())
+                .Select(a => a.Kind)
+                .OfType<ExpressionFormKind>()
+                .ToHashSet();
+
+            foreach (var kind in Enum.GetValues<ExpressionFormKind>())
+            {
+                handledKinds.Should().Contain(kind,
+                    because: $"{annotatedType.Name} must have at least one [HandlesForm({kind})] annotation");
+            }
         }
     }
 
