@@ -198,8 +198,9 @@ public class TokensTests
     [Fact]
     public void TypeKeywords_HaveStorageTypeScope()
     {
+        var syntheticKinds = SyntheticTokenKindSet();
         Tokens.All
-            .Where(m => m.Categories.Any(c => c == TokenCategory.Type))
+            .Where(m => !syntheticKinds.Contains(m.Kind) && m.Categories.Any(c => c == TokenCategory.Type))
             .Should().AllSatisfy(m =>
                 m.TextMateScope.Should().Be("storage.type.precept",
                     $"{m.Kind} is a type keyword"));
@@ -249,8 +250,9 @@ public class TokensTests
     [Fact]
     public void TypeKeywords_HaveTypeSemanticTokenType()
     {
+        var syntheticKinds = SyntheticTokenKindSet();
         Tokens.All
-            .Where(m => m.Categories.Any(c => c == TokenCategory.Type))
+            .Where(m => !syntheticKinds.Contains(m.Kind) && m.Categories.Any(c => c == TokenCategory.Type))
             .Should().AllSatisfy(m =>
                 m.SemanticTokenType.Should().Be("type",
                     $"{m.Kind} is a type keyword"));
@@ -374,6 +376,7 @@ public class TokensTests
         TokenKind.EndOfSource,
         TokenKind.NewLine,
         TokenKind.Comment,
+        TokenKind.SetType,  // Parser-synthesized alias from TokenKind.Set
     ];
 
     // ── AccessModeKeywords ───────────────────────────────────────────────────────

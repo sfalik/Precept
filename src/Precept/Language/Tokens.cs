@@ -257,7 +257,7 @@ public static class Tokens
         TokenKind.ChoiceType  => new(kind, "choice",      Cat_Type, "Constrained string value set type",
             TextMateScope: "storage.type.precept", SemanticTokenType: "type", ValidAfter: VA_TypeRef),
         TokenKind.SetType     => new(kind, null,          Cat_Type, "Set collection type (parser-synthesized from TokenKind.Set in type position)",
-            TextMateScope: null, SemanticTokenType: null, ValidAfter: VA_TypeRef),
+            TextMateScope: null, SemanticTokenType: null, ValidAfter: null),
         TokenKind.QueueType   => new(kind, "queue",       Cat_Type, "Queue collection type",
             TextMateScope: "storage.type.precept", SemanticTokenType: "type", ValidAfter: VA_TypeRef),
         TokenKind.StackType   => new(kind, "stack",       Cat_Type, "Stack collection type",
