@@ -9,14 +9,14 @@ public abstract record TypeRefNode(SourceSpan Span) : SyntaxNode(Span);
 public sealed record ScalarTypeRefNode(
     SourceSpan Span,
     Language.Token TypeName,
-    TypeQualifierNode? Qualifier) : TypeRefNode(Span);
+    ImmutableArray<TypeQualifierNode> Qualifiers) : TypeRefNode(Span);
 
 /// <summary><c>as set of string</c>, <c>as queue of integer</c></summary>
 public sealed record CollectionTypeRefNode(
     SourceSpan Span,
     Language.Token CollectionKind,
     Language.Token ElementType,
-    TypeQualifierNode? Qualifier) : TypeRefNode(Span);
+    ImmutableArray<TypeQualifierNode> Qualifiers) : TypeRefNode(Span);
 
 /// <summary><c>as choice of string("A", "B", "C")</c></summary>
 public sealed record ChoiceTypeRefNode(

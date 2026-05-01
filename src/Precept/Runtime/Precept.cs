@@ -14,6 +14,12 @@ namespace Precept.Runtime;
 ///
 /// Internal structure (dispatch tables, slot arrays, constraint buckets) is
 /// pending D8/R4 (executable model contract).
+///
+/// Catalog-driven construction: use Constraints.GetMeta(kind) to route each
+/// constraint into its activation bucket; pattern-match on ConstraintMeta DU
+/// subtypes (not ConstraintKind enum values directly). ConstraintMeta.StateAnchored
+/// groups the three state-scoped subtypes for shared graph-analysis paths.
+/// See: docs/language/catalog-system.md § Evaluator-catalog integration pattern
 /// </remarks>
 public sealed class Precept
 {

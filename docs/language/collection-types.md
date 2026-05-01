@@ -355,6 +355,14 @@ SI base units for normalization: `m` (length), `kg` (mass), `L` (volume), `m2` (
 
 When `in 'CurrencyCode'` or `in 'UnitCode'` appears after the inner type in a collection declaration, it binds to the inner type, not the collection. The collection itself has no currency or unit qualifier — the qualifier is part of the inner scalar type specification.
 
+The same binding rule applies to multi-qualifier inner types:
+
+```precept
+field FxRates as set of exchangerate in 'USD' to 'EUR'
+```
+
+This parses as `set of (exchangerate in 'USD' to 'EUR')`. Both qualifiers belong to the inner scalar type.
+
 Adding a value of the wrong denomination is a type error at the `add` site:
 ```precept
 add Charges $50 EUR     # TypeMismatch — expected money in 'USD', got money in 'EUR'
@@ -730,7 +738,7 @@ Clean. Reuses `of`. No new declaration keywords.
 - vs `bag`: orthogonal. `bag` tracks frequencies (unordered); `list` tracks positions (ordered). Neither subsumes the other.
 - vs `log`: deliberate non-overlap. `log` covers "immutable record that accumulates" — positional read (`.at(N)`, `.first`, `.last`) IS in `log`. `list` adds the one thing `log` prohibits: arbitrary removal. If `log` satisfies real positional-read use cases in practice, the incremental case for `list` weakens.
 
-**Priority:** **Low.** Not a reject — no philosophy violation (unlike ring buffer's silent eviction). But the genuine incremental territory over `log` is narrow (arbitrary removal), the proof cost of positional-mutation is real, and mutable-ordered-list business scenarios are rarer than `bag`/`log`/`map` frequency. Right sequencing: evaluate after `log` ships.
+**Priority:** **Low.** Not a reject — no philosophy violation (unlike ring buffer's silent eviction). But the genuine incremental territory over `log` is narrow (arbitrary removal), the proof cost of positional-mutation is real, and mutable-ordered-list business scenarios are rarer than `bag`/`log`/`lookup` frequency. Right sequencing: evaluate after `log` ships.
 
 ### Candidate 3: `deque of T`
 
@@ -764,183 +772,182 @@ field F as deque of T
 
 **Action surface:** New keywords required: `push-front`, `push-back`, `pop-front`, `pop-back`. New accessors: `.peekfront`, `.peekback`. This is 4 new action keywords and 2 new accessors — a significant surface expansion.
 
-**Priority:** **Low.** The double-ended access pattern is rare in business-rule domains. Most real scenarios are either FIFO (queue) or LIFO (stack). The escalation pattern can be modeled with two separate queues (priority + normal) or a priority queue. The keyword surface cost is high relative to the business-rule unlock.
+**Priority:** **Deferred.** The double-ended access pattern is rare in business-rule domains. Most real scenarios are either FIFO (queue) or LIFO (stack). The escalation pattern can be modeled with two separate queues (priority + normal) or a `queue of T by P`. The keyword surface cost is high relative to the business-rule unlock (`push-front`, `push-back`, `pop-front`, `pop-back` = 4 new action keywords). Re-evaluate after `queue of T by P` ships and real usage confirms a gap that priority queuing cannot fill.
 
-### Candidate 4: `priorityqueue of T priority P`
+### Candidate 4: `queue of T by P`
 
-**What it is:** A queue where elements are dequeued by priority rather than insertion order. Each element has two axes: a value (type `T`) and a priority (type `P`). The priority type `P` must be orderable (numeric or `choice of T(...) ordered`). Dequeue always removes the element with the best priority according to the declared sort direction.
+**What it is:** A queue where elements are dequeued by ordering value rather than insertion order. Each element has two axes: a value (type `T`) and an ordering key (type `P`). The ordering type `P` must be orderable (numeric or `choice of T(...) ordered`). Dequeue always removes the element with the best ordering value according to the declared sort direction.
 
 **Business scenario:** A claims triage system where claims are processed by severity. A work-item queue where urgent items bypass the normal order.
 
 ```precept
-field ClaimQueue as priorityqueue of string priority integer descending
+field ClaimQueue as queue of string
+    by choice of string("critical", "high", "normal", "low") ordered
 
 from Receiving on FileClaim
-    -> enqueue ClaimQueue FileClaim.ClaimId priority FileClaim.Severity
+    -> enqueue ClaimQueue FileClaim.ClaimId by FileClaim.Severity
     -> no transition
 
 from Processing on ProcessNext when ClaimQueue.count > 0
-    -> dequeue ClaimQueue into CurrentClaim priority CurrentPriority
+    -> dequeue ClaimQueue into CurrentClaim by CurrentSeverity
     -> transition Reviewing
 ```
 
-#### Priority Direction
+#### Sort Direction
 
-The sort direction determines which priority value is dequeued first. Direction is declared at the field level and can be overridden per-operation at the dequeue site.
-
-**Declaration-level direction** (sets the default):
+The sort direction determines which ordering value is dequeued first. Direction is declared at the field level only — it is a static property of the field declaration and cannot be overridden per-operation.
 
 ```precept
-field UrgentQueue as priorityqueue of string priority integer descending
-field WorkItems as priorityqueue of string priority integer ascending
-field TriageQueue as priorityqueue of string priority integer   # default: ascending
+# ordered choice: declaration-position rank 0 ("critical") dequeued first (ascending default)
+field ClaimQueue  as queue of string
+    by choice of string("critical", "high", "normal", "low") ordered
+
+# numeric ordering: lowest integer dequeued first
+field WorkItems   as queue of string by integer ascending
+
+# numeric ordering, highest first
+field ScoredQueue as queue of string by integer descending
+
+# default: ascending
+field TriageQueue as queue of string by integer
 ```
 
-- `ascending` (default) — lowest priority value dequeued first. Natural for numbered priority levels where 1 = highest urgency.
-- `descending` — highest priority value dequeued first. Natural for severity scores where higher = more urgent.
+- `ascending` (default) — lowest rank dequeued first. For ordered choice, the first listed value (declaration-position rank 0) dequeues first. For integers, the lowest number dequeues first.
+- `descending` — highest rank dequeued first. For ordered choice, the last listed value dequeues first. For integers, the highest number dequeues first.
 
 If no direction modifier is specified, the default is `ascending`.
 
-**Operation-level override** (at the dequeue site):
+**Design rationale:** Direction is fixed at the field level because it is a semantic property of what the queue represents. A field that needs to dequeue from both ends is two fields, not one field with ambiguous processing logic. Per-operation overrides were considered and rejected: `.peek` cannot reflect an override that hasn't happened yet, creating a footgun where you peek the highest but dequeue the lowest; the proof engine complexity for conditional field behavior is unjustified for an edge case; and the "without redeclaring the field" justification is circular — if your logic genuinely needs both directions, the model is wrong.
 
-```precept
-# Uses the declaration-level default (descending)
--> dequeue UrgentQueue into NextClaim priority NextPriority
+#### Peek with Ordering Value
 
-# Overrides to ascending for this specific dequeue
--> dequeue UrgentQueue ascending into NextClaim priority NextPriority
-```
-
-The direction modifier follows the collection name and precedes `into`. This fits Precept's modifier-follows-target grammar — the modifier qualifies the dequeue operation on that collection.
-
-**Design rationale:** Supporting both sites gives authors a clean default for the common case while allowing exceptional dequeue logic without redeclaring the field. This parallels how `ordered` modifies the `choice` type at the declaration site but the ordering is always available at the expression site.
-
-#### Peek with Priority
-
-`.peek` returns the element value (type `T`) of the front-of-queue item — consistent with `.peek` on `queue`. A separate `.peekpriority` accessor returns the priority value (type `P`) of the same front-of-queue item.
+`.peek` returns the element value (type `T`) of the front-of-queue item — consistent with `.peek` on `queue`. A separate `.peekby` accessor returns the ordering value (type `P`) of the same front-of-queue item. The name reflects its meaning directly: "peek at the `by`-axis value of the front element."
 
 | Accessor | Returns | Guard required | Description |
 |---|---|---|---|
-| `.peek` | `T` | `.count > 0` | Element value of the highest-priority item |
-| `.peekpriority` | `P` | `.count > 0` | Priority value of the highest-priority item |
+| `.peek` | `T` | `.count > 0` | Element value of the front (best-ordered) item |
+| `.peekby` | `P` | `.count > 0` | Ordering value of the front (best-ordered) item |
 | `.count` | `integer` | — | Number of elements in the queue |
 
 ```precept
 from Processing on CheckNext when ClaimQueue.count > 0
-    -> set NextClaimId = ClaimQueue.peek
-    -> set NextSeverity = ClaimQueue.peekpriority
+    -> set NextClaimId  = ClaimQueue.peek
+    -> set NextSeverity = ClaimQueue.peekby
     -> no transition
 ```
 
-**Design rationale:** Two separate accessors (`.peek` and `.peekpriority`) rather than a tuple or compound return. This is consistent with Precept's flat accessor model — every accessor returns a single scalar value. No existing accessor returns multiple values, and introducing compound returns would require a new language mechanism.
+**Design rationale:** Two separate accessors (`.peek` and `.peekby`) rather than a tuple or compound return. This is consistent with Precept's flat accessor model — every accessor returns a single scalar value. The declaration maps directly onto the two accessors: `queue of T by P` → `.peek` returns `T`, `.peekby` returns `P`.
 
-#### Dequeue with Priority Capture
+#### Dequeue with Ordering Value Capture
 
-The `dequeue ... into` form is extended with an optional `priority` capture clause:
+The `dequeue ... into` form is extended with an optional `by` capture clause:
 
 ```precept
--> dequeue ClaimQueue into CurrentClaim priority CurrentPriority
+-> dequeue ClaimQueue into CurrentClaim by CurrentSeverity
 ```
 
 - `CurrentClaim` receives the dequeued element value (type `T` — here `string`).
-- `CurrentPriority` receives the dequeued element's priority (type `P` — here `integer`).
+- `CurrentSeverity` receives the dequeued element's ordering value (type `P` — here the declared `choice of string(...) ordered` type).
 - Both target fields must be declared and type-compatible.
-- The `priority` capture is optional — `dequeue ClaimQueue into CurrentClaim` remains valid and discards the priority value.
+- The `by` capture is optional — `dequeue ClaimQueue into CurrentClaim` remains valid and discards the ordering value.
 
-Full form with direction override:
+#### Quantifier Predicates on Ordering Axis
 
-```precept
--> dequeue ClaimQueue ascending into CurrentClaim priority CurrentPriority
-```
-
-#### Quantifier Predicates on Priority Axis
-
-When a quantifier (`each`/`any`/`no`) iterates over a `priorityqueue`, the binding variable exposes two fields:
+When a quantifier (`each`/`any`/`no`) iterates over a `queue of T by P`, the binding variable exposes two fields:
 
 - `.value` — the element (type `T`)
-- `.priority` — the priority value (type `P`)
+- `.by` — the ordering value (type `P`)
 
-This is a meaningful design distinction: for single-type collections (`set`, `queue`, `stack`), the binding variable IS the element (a bare scalar). For `priorityqueue`, the binding variable is a **two-field projection** exposing both axes.
+This is a meaningful design distinction: for single-type collections (`set`, `queue`, `stack`), the binding variable IS the element (a bare scalar). For `queue of T by P`, the binding variable is a **two-field projection** exposing both axes.
 
 ```precept
-# Assert no low-priority claims in the queue
-rule no claim in ClaimQueue (claim.priority < 2)
-    reason "All claims must have priority 2 or higher"
+# Assert no low-severity claims are waiting in the queue
+rule no claim in ClaimQueue (claim.by == "low")
+    reason "Low-severity claims must not enter the processing queue"
 
 # Existential check on element value
 when any claim in ClaimQueue (claim.value == TargetClaimId)
 
 # Compound predicate across both axes
-rule no claim in ClaimQueue (claim.priority < 3 and claim.value == "")
-    reason "High-priority claims must have a claim ID"
+rule no claim in ClaimQueue (claim.by == "critical" and claim.value == "")
+    reason "Critical claims must have a claim ID"
 ```
 
-When the priority axis is choice-typed, the declaration is the constraint — no rule needed. A claim with a priority outside the declared choices is a type error at the `enqueue` site:
+When the ordering axis is choice-typed, the declaration is the constraint — no rule needed. An element with ordering value outside the declared choices is a type error at the `enqueue` site:
 
 ```precept
-field TriageQueue as priorityqueue of ClaimId priority choice of string("normal", "high")
+field TriageQueue as queue of ClaimId
+    by choice of string("normal", "high") ordered
 ```
 
-A `"critical"` priority claim cannot enter `TriageQueue` — the type prevents it.
+An ordering value of `"critical"` cannot enter `TriageQueue` — the type prevents it. With ordered choice, the valid set is fixed at declaration; no rule is needed to enforce it.
 
-**Grammar for priorityqueue quantifier binding:**
+**Grammar for `queue of T by P` quantifier binding:**
 
 ```
-# For priorityqueue: binding exposes .value and .priority
-QuantifierExpr  :=  QuantifierKind Identifier in PriorityQueueField '(' BoolExpr ')'
-# Inside BoolExpr, Identifier.value : T and Identifier.priority : P
+# For queue of T by P: binding exposes .value and .by
+QuantifierExpr  :=  QuantifierKind Identifier in OrderedQueueField '(' BoolExpr ')'
+# Inside BoolExpr, Identifier.value : T and Identifier.by : P
 ```
 
-**Note:** For `map of K to V`, the analogous binding shape would be `.key` and `.value`. The principle generalizes: two-type-parameter collections expose a two-field binding in quantifier scope.
+**Note:** For `lookup of K to V`, the analogous binding shape would be `.key` and `.value`. The principle generalizes: two-type-parameter collections expose a two-field binding in quantifier scope.
 
 #### Grammar Fit — Generalized Two-Type-Parameter Pattern
 
-The `priorityqueue` and `map` types both take two type parameters connected by a role keyword. The generalized grammar:
+The `queue of T by P` and `lookup of K to V` types both take two type parameters connected by a role keyword. The generalized grammar:
 
 ```
 TwoParamCollectionType :=
-    priorityqueue of ScalarType priority ScalarType TypeQualifier?
-  | map of ScalarType to ScalarType TypeQualifier?
+    queue  of ScalarType by ScalarType DirectionModifier?
+  | lookup of ScalarType to ScalarType
 
 DirectionModifier := ascending | descending
 ```
 
-Both `priority` and `to` are **role-connector keywords** that introduce the secondary type parameter. The `of` keyword introduces the primary type. This is the generalized pattern for all two-type-parameter collection types.
+Both `by` and `to` are **role-connector keywords** (prepositions) that introduce the secondary type parameter. The `of` keyword introduces the primary type. This is the generalized pattern for all two-type-parameter collection types.
 
-For `priorityqueue`, the full field declaration grammar is:
+For `queue of T by P`, the full field declaration grammar is:
 
 ```
-PriorityQueueDecl :=
-    field Identifier as priorityqueue of ScalarType priority ScalarType DirectionModifier?
+OrderedQueueDecl :=
+    field Identifier as queue of ScalarType by ScalarType DirectionModifier?
 ```
 
 Where `DirectionModifier` defaults to `ascending` if omitted.
 
-**Proof engine implications:** Emptiness obligations identical to `queue`. The priority value introduces a secondary type requirement — the `priority` argument on `enqueue` must match the declared priority type `P`, and `P` must be orderable. The proof engine must understand that dequeue order is by priority (respecting direction), not insertion, which affects reasoning about which element `.peek` and `.peekpriority` return. The direction modifier is a static property of the field (or a per-operation override) — it does not introduce runtime non-determinism.
+**Proof engine implications:** Emptiness obligations identical to `queue`. The ordering value introduces a secondary type requirement — the `by` argument on `enqueue` must match the declared ordering type `P`, and `P` must satisfy `TypeTrait.Orderable`. The proof engine must understand that dequeue order is by ordering value (respecting direction), not insertion, which affects reasoning about which element `.peek` and `.peekby` return. The direction modifier is a static property of the field declaration.
 
-**Action surface:** Extends `enqueue` with required `priority` clause. Extends `dequeue into` with optional `priority` capture clause. Adds `ascending`/`descending` as direction modifiers (contextual keywords in type-position and dequeue-position). Reuses `clear`, `.count`. Adds `.peekpriority` accessor. `priority`, `ascending`, `descending` are contextual keywords.
+**Tiebreak guarantee:** When multiple elements share the same ordering value, they are dequeued in the order they were enqueued — **insertion-order (stable) tiebreaking**. This is a language guarantee, not an implementation detail. `.count` returns the total number of elements across all ordering groups. Quantifier predicates iterate all elements, not just those at the front ordering value.
 
-**Priority:** **Medium.** Priority-based processing is a real business pattern, and the two-type-parameter grammar generalizes cleanly with `map`. The proof surface is manageable — emptiness obligations are identical to `queue`, and direction is a static property. The quantifier binding shape (`.value`/`.priority`) sets a precedent for all future two-type-parameter collections.
+**Direction override note:** `.peek` and `.peekby` always reflect the field's declared direction. Direction is fixed at declaration — there is no per-operation override.
+
+**Implementation note:** `.NET`'s `PriorityQueue<TElement, TPriority>` cannot be the direct backing type — it explicitly does not guarantee tiebreak order. The approved backing structure is `SortedDictionary<TPriority, Queue<TElement>>` (each ordering bucket is a FIFO queue) with a separately maintained element counter. For `ordered choice of T` ordering types, the comparer must be built from declaration-position rank at build time — natural string ordering gives the wrong result.
+
+**Action surface:** Extends `enqueue` with required `by` clause. Extends `dequeue into` with optional `by` capture clause. Adds `ascending`/`descending` as direction modifiers (contextual keywords in type-position only). Reuses `clear`, `.count`. Adds `.peekby` accessor. `by`, `ascending`, `descending` are contextual keywords.
+
+**Priority:** **Medium.** Ordered-queue processing is a real business pattern, and the two-type-parameter grammar generalizes cleanly with `lookup`. The proof surface is manageable — emptiness obligations are identical to `queue`, and direction is a static property. The quantifier binding shape (`.value`/`.by`) sets a precedent for all future two-type-parameter collections.
 
 #### Resolved Design Questions
 
 The following questions from frank-14 are now resolved:
 
-1. **~~Priority direction~~** — RESOLVED. Direction is declared at the field level (`ascending`/`descending` modifier, default `ascending`) and can be overridden per-operation at the dequeue site. The modifier follows its target in both positions, consistent with Precept's grammar conventions.
+1. **~~Priority direction~~** — RESOLVED. Direction is declared at the field level only (`ascending`/`descending` modifier, default `ascending`). Per-operation override rejected: `.peek` cannot reflect a not-yet-executed override; proof engine complexity is unjustified; a field needing both directions is a modelling error — use two fields.
 
-2. **~~Peek behavior~~** — RESOLVED. `.peek` returns the element value (type `T`); `.peekpriority` returns the priority value (type `P`). Two separate scalar accessors, consistent with the flat accessor model.
+2. **~~Peek behavior~~** — RESOLVED. `.peek` returns the element value (type `T`); `.peekby` returns the ordering value (type `P`). Two separate scalar accessors, consistent with the flat accessor model. The declaration maps directly: `queue of T by P` → `.peek` returns `T`, `.peekby` returns `P`.
 
-3. **~~Priority-type constraints~~** — RESOLVED. Quantifier predicates (`each`/`any`/`no`) apply to the priority axis via a two-field binding: `binding.value` (element) and `binding.priority` (priority value). This generalizes to all two-type-parameter collections.
+3. **~~Priority-type constraints~~** — RESOLVED. Quantifier predicates (`each`/`any`/`no`) apply to the ordering axis via a two-field binding: `binding.value` (element) and `binding.by` (ordering value). This generalizes to all two-type-parameter collections.
 
-4. **~~Dequeue capture~~** — RESOLVED. Approved syntax: `dequeue F into Target priority PriorityTarget`. The `priority` capture is optional — omitting it discards the priority value.
+4. **~~Dequeue capture~~** — RESOLVED. Approved syntax: `dequeue F into Target by OrderTarget`. The `by` capture is optional — omitting it discards the ordering value.
 
-5. **~~Grammar alignment with `map`~~** — RESOLVED. Both `priorityqueue` and `map` use the generalized two-type-parameter pattern: `of PrimaryType role-connector SecondaryType`. Role connectors are `priority` and `to` respectively.
+5. **~~Grammar alignment with `lookup`~~** — RESOLVED. Both `queue of T by P` and `lookup of K to V` use the generalized two-type-parameter pattern: `of PrimaryType role-connector SecondaryType`. Role connectors are `by` and `to` respectively — both prepositions naming the semantic relationship.
+
+6. **~~Equal-priority tiebreaking~~** — RESOLVED. Insertion-order (stable) tiebreaking is the language guarantee. .NET's `PriorityQueue<T,P>` cannot be the direct backing type (unspecified tiebreak). Approved backing: `SortedDictionary<TPriority, Queue<TElement>>` with a separately maintained element counter and declaration-derived comparers for ordered-choice `P` types. See inbox record `frank-george-priorityqueue-backing-structure.md`.
 
 #### Open Questions (New)
 
-1. **Quantifier binding shape for single-type vs. two-type collections.** When a quantifier iterates a `set of string`, the binding IS the string. When it iterates a `priorityqueue of string priority integer`, the binding exposes `.value` and `.priority`. This means the type checker must distinguish binding shapes by collection kind. Is this implicit (the type checker infers the shape from the collection type) or explicit (the author declares the binding shape)? Implicit is simpler and consistent with how the binding already adapts to the collection's inner type.
+1. **Quantifier binding shape for single-type vs. two-type collections.** When a quantifier iterates a `set of string`, the binding IS the string. When it iterates a `queue of string by integer`, the binding exposes `.value` and `.by`. This means the type checker must distinguish binding shapes by collection kind. Is this implicit (the type checker infers the shape from the collection type) or explicit (the author declares the binding shape)? Implicit is simpler and consistent with how the binding already adapts to the collection's inner type.
 
-2. **`ascending`/`descending` keyword reuse.** These keywords may also be relevant for future ordering features beyond `priorityqueue`. Should they be reserved broadly as ordering modifiers, or scoped specifically to `priorityqueue` and `dequeue`?
+2. **`ascending`/`descending` keyword reuse.** These keywords may also be relevant for future ordering features beyond `queue of T by P`. Should they be reserved broadly as ordering modifiers, or scoped specifically to priority queue declarations?
 
 ### Candidate 5: `log of T`
 
@@ -979,20 +986,20 @@ field F as log of T
 
 **Note on `list of T` overlap:** The positional-read accessors — `.at(N)`, `.first`, `.last` — appear in both `log` and the separately evaluated `list of T` candidate. The overlap is deliberate: `log` covers the common case — read-only positional access on an accumulating record with a stable, monotonically growing index space. `list of T` is the separate evaluation for mutable ordered sequences, adding the one operation `log` prohibits: arbitrary positional removal. If `log` satisfies real positional-read use cases in practice, the incremental case for `list` weakens.
 
-### Candidate 6: `map of K to V`
+### Candidate 6: `lookup of K to V`
 
 **What it is:** A key-value association. Each key maps to exactly one value. Supports set-by-key, get-by-key, contains-key, and remove-by-key.
 
 **Business scenario:** A policy record maps coverage types to their limits. A fee schedule maps transaction types to fee amounts. A configuration entity maps setting names to values.
 
 ```precept
-field CoverageLimits as map of string to decimal
+field CoverageLimits as lookup of string to decimal
 
 from Draft on SetCoverage
     -> put CoverageLimits SetCoverage.CoverageType = SetCoverage.Limit
     -> no transition
 
-from Active on CheckCoverage when CoverageLimits containskey CheckCoverage.CoverageType
+from Active on CheckCoverage when CoverageLimits contains CheckCoverage.CoverageType
     -> set CurrentLimit = CoverageLimits for CheckCoverage.CoverageType
     -> no transition
 
@@ -1000,21 +1007,21 @@ rule CoverageLimits.count <= 10
     reason "No more than 10 coverage types per policy"
 ```
 
-**Proof engine implications:** `F for key` requires a `containskey` guard — same pattern as emptiness proofs but keyed. This is a new proof obligation category: key-presence safety. `put` is always safe (creates or overwrites). `removekey` requires no guard (no-op if absent, like `remove` on `set`). The proof engine must track key-presence from `containskey` guards in `when` clauses.
+**Proof engine implications:** `F for key` requires a `contains` guard — same pattern as emptiness proofs but keyed. This is a new proof obligation category: key-presence safety. `put` is always safe (creates or overwrites). `remove` requires no guard (no-op if absent, like `remove` on `set`). The proof engine must track key-presence from `contains` guards in `when` clauses.
 
 **Grammar fit:**
 
 ```
-field F as map of K to V
+field F as lookup of K to V
 ```
 
 Introduces `to` as a type-position keyword connecting key and value types. Both `K` and `V` must be scalar types. The `to` keyword is new in this context but reads naturally.
 
-> **Locked Decision — Access keyword: `for`.** Map value access uses the infix keyword `for`: `CoverageLimits for CheckCoverage.CoverageType`. Considered: `at`. Rejected: `at` would create ambiguity with future temporal constructs and reads less naturally with map field names in business context.
+> **Locked Decision — Access keyword: `for`.** Lookup value access uses the infix keyword `for`: `CoverageLimits for CheckCoverage.CoverageType`. Considered: `at`. Rejected: `at` would create ambiguity with future temporal constructs and reads less naturally with lookup field names in business context.
 
-**Action surface:** New keywords: `put`, `removekey`, `containskey`, `for` is the infix key-access keyword. `containskey` parallels `contains` on sets. `.count` reuses existing accessor. `.keys` and `.values` could return sets for use in `contains` and quantifier expressions.
+**Action surface:** New keywords: `put`, `remove`, `for` (infix key-access keyword). `contains` (membership test) reuses the existing set operator — the type checker validates the argument against key type `K`. `remove` reuses the existing set action — no-op if key absent. `.count` reuses existing accessor. `.keys` and `.values` could return sets for use in `contains` and quantifier expressions.
 
-**Priority:** **High.** Key-value association is fundamental to business modeling. Configuration tables, fee schedules, lookup mappings, and per-category settings are everywhere. Today, modeling these in Precept requires either multiple parallel fields or external application logic — both of which break the one-file-complete-rules guarantee. A `map` type keeps the association inside the contract.
+**Priority:** **High.** Key-value association is fundamental to business modeling. Configuration tables, fee schedules, lookup mappings, and per-category settings are everywhere. Today, modeling these in Precept requires either multiple parallel fields or external application logic — both of which break the one-file-complete-rules guarantee. A `lookup` type keeps the association inside the contract.
 
 ### Rejected: Ring Buffer / Circular Buffer
 
@@ -1074,13 +1081,13 @@ field DepartmentMembers as multimap of string to string
 when DepartmentMembers["engineering"] contains "alice"
 ```
 
-**Proof engine implications:** Strictly harder than `map`. Each key maps to a collection, so the proof engine must reason about nested collection emptiness, per-key cardinality, and cross-key relationships. This compounds the already-complex `map` proof surface.
+**Proof engine implications:** Strictly harder than `lookup`. Each key maps to a collection, so the proof engine must reason about nested collection emptiness, per-key cardinality, and cross-key relationships. This compounds the already-complex `lookup` proof surface.
 
-**Grammar fit:** `field F as multimap of K to V`. Reuses the `of ... to` connector from `map`.
+**Grammar fit:** `field F as multimap of K to V`. Reuses the `of ... to` connector from `lookup`.
 
-**Action surface:** Same as `map` (`put`, `removekey`, `containskey`, `for`) but `F for key` returns a collection, not a scalar — introducing nested collection semantics that Precept explicitly excludes.
+**Action surface:** Same as `lookup` (`put`, `remove`, `contains`, `for`) but `F for key` returns a collection, not a scalar — introducing nested collection semantics that Precept explicitly excludes.
 
-**Priority/Recommendation:** **Reject.** A multimap is a collection of collections behind a key lookup — two levels of indirection that enter general-purpose data structure territory. Even if `map` ships, `multimap` adds nested collection semantics that Precept's flat-statement philosophy prohibits. The one-to-many pattern is better served by explicit set fields (`field EngineeringTeam as set of string`, `field SalesTeam as set of string`) with cross-collection constraints (`subset`, `disjoint`) relating them.
+**Priority/Recommendation:** **Reject.** A multimap is a collection of collections behind a key lookup — two levels of indirection that enter general-purpose data structure territory. Even if `lookup` ships, `multimap` adds nested collection semantics that Precept's flat-statement philosophy prohibits. The one-to-many pattern is better served by explicit set fields (`field EngineeringTeam as set of string`, `field SalesTeam as set of string`) with cross-collection constraints (`subset`, `disjoint`) relating them.
 
 ### Rejected: `sortedset of T`
 
@@ -1098,11 +1105,11 @@ If Precept ever adds ordered-iteration constructs that make sorted order observa
 |---|---|---|
 | `bag of T` | **High** | Unlocks quantity tracking — pervasive in commerce, inventory, counting rules |
 | `log of T` | **High** | Unlocks append-only audit trails — pervasive in regulated industries, aligns perfectly with prevention philosophy |
-| `map of K to V` | **High** | Unlocks key-value association — pervasive in configuration, fee schedules, coverage tables |
+| `lookup of K to V` | **High** | Unlocks key-value association — pervasive in configuration, fee schedules, coverage tables |
 | `sortedset of T` | **Reject** | No Precept construct observes iteration order; `.min`/`.max` safety is owned by `notempty` alone; `set notempty` is proof-identical |
-| `priorityqueue of T priority P` | **Medium** | Real pattern; two-type-parameter grammar generalizes with `map`; proof surface manageable (emptiness + static direction) |
-| `deque of T` | **Low** | Rare in business-rule domains — double-ended access is an infrastructure pattern, not a business-rule pattern |
-| `list of T` | **Low** | Narrow incremental territory over `log`; mutable-ordered-list use cases rarer than bag/log/map; evaluate after `log` ships |
+| `queue of T by P` | **Medium** | Real pattern; two-type-parameter grammar generalizes with `lookup`; proof surface manageable (emptiness + static direction) |
+| `deque of T` | **Deferred** | Rare in business-rule domains; escalation pattern covered by priority queuing (`queue of T by P`); re-evaluate after `queue of T by P` ships |
+| `list of T` | **Low** | Narrow incremental territory over `log`; mutable-ordered-list use cases rarer than bag/log/lookup; evaluate after `log` ships |
 | `ringbuffer of T` | **Reject** | Silent eviction violates inspectability — implicit mutation the proof engine cannot track |
 | `capacity` modifier | **Reject** | Synonym for `maxcount` — language surface cost with no capability gain |
 | `multimap of K to V` | **Reject** | Nested collection semantics Precept explicitly excludes — use explicit set fields + constraints |
@@ -1110,8 +1117,8 @@ If Precept ever adds ordered-iteration constructs that make sorted order observa
 ### Recommended Rollout
 
 1. **First:** `bag` and `log` — highest business-rule unlock per complexity dollar; `bag` extends the existing set action surface minimally, `log` introduces one new keyword (`append`) and aligns with audit/compliance requirements
-2. **Second:** `map` — highest structural value but largest surface expansion (new type connector `to`, new proof obligation category for key-presence)
-3. **Evaluate:** `priorityqueue` — two-type-parameter design resolved; evaluate after `map` ships since `priority`/`to` share the role-connector pattern. `deque` deferred — insufficient business-rule pressure
+2. **Second:** `lookup` — highest structural value but largest surface expansion (new type connector `to`, new proof obligation category for key-presence)
+3. **Evaluate:** `queue of T by P` — two-type-parameter design resolved; evaluate after `lookup` ships since `by`/`to` share the role-connector pattern. `deque` deferred — insufficient business-rule pressure
 
 ---
 
@@ -1127,11 +1134,11 @@ If Precept ever adds ordered-iteration constructs that make sorted order observa
 | **Multiset / bag** | — | — | `Counter` | — | `MULTISET` | — | — | — | `bag of T` |
 | **FIFO queue** | `Queue<T>` | `ArrayDeque` | `deque` | `VecDeque` | — | — | — | `queue of T` ✓ | — |
 | **LIFO stack** | `Stack<T>` | `ArrayDeque` | `list` | `Vec` | — | — | — | `stack of T` ✓ | — |
-| **Double-ended queue** | — | `ArrayDeque` | `deque` | `VecDeque` | — | — | — | — | `deque of T` (low pri) |
-| **Priority queue** | `PriorityQueue<T,P>` | `PriorityQueue` | `heapq` | `BinaryHeap` | — | — | — | — | `priorityqueue of T priority P` (med pri) |
+| **Double-ended queue** | — | `ArrayDeque` | `deque` | `VecDeque` | — | — | — | — | `deque of T` (**Deferred**) |
+| **Priority queue** | `PriorityQueue<T,P>` | `PriorityQueue` | `heapq` | `BinaryHeap` | — | — | — | — | `queue of T by P` (med pri) |
 | **Append-only log** | `ImmutableList<T>` | — | — | — | — | `list` (immutable) | `list` (cons) | — | `log of T` |
 | **Ordered sequence with random access** | `List<T>` | `ArrayList` | `list` | `Vec<T>` | — | — | — | — | `list of T` |
-| **Key-value map** | `Dictionary<K,V>` | `HashMap` | `dict` | `HashMap` | — | `map` | `Map<'K,'V>` | — | `map of K to V` |
+| **Key-value map** | `Dictionary<K,V>` | `HashMap` | `dict` | `HashMap` | — | `map` | `Map<'K,'V>` | — | `lookup of K to V` |
 | **Ring buffer** | — | `CircularFifoQueue`* | `deque(maxlen=N)` | — | — | — | — | — | Rejected† |
 | **Multimap** | `ILookup<K,V>` | `Multimap` (Guava) | — | — | — | — | `Map[K, List[V]]`‡ | — | Rejected§ |
 | **Non-empty guarantee** | — | — | — | — | `NOT NULL` | — | `NonEmpty` | `notempty`/`mincount 1` ✓ | — |

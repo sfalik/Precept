@@ -22,6 +22,24 @@ namespace Precept.Runtime;
 /// enforced by PRECEPT0002. Together these guarantee fault–diagnostic correspondence:
 /// if the compiler emits no errors, the evaluator should never fault.
 /// </remarks>
+// CATALOG-DRIVEN IMPLEMENTATION GUIDE
+//
+// Derive the following from catalogs rather than hardcoding:
+//
+//   Today (catalog metadata available):
+//     Constraint activation timing → Constraints.GetMeta(kind) + ConstraintMeta DU subtypes
+//     Modifier boundary validation → FieldModifierMeta.ApplicableTo, HasValue
+//     Accessor signatures          → TypeMeta.Accessors, TypeAccessor.ParameterType, RequiredTraits
+//
+//   Future (pending executable model design D8/R4):
+//     Operation dispatch  → Operations.FindUnary / FindCandidates
+//     Function dispatch   → Functions.GetMeta(kind)
+//     Action dispatch     → Actions.GetMeta(kind)
+//
+// Do NOT use Operations.Resolve() — that API does not exist.
+// Do NOT claim catalog-driven execution dispatch until delegate fields exist in catalog metadata.
+//
+// See: docs/language/catalog-system.md § Evaluator-catalog integration pattern
 public static class Evaluator
 {
     // ── Commit ──────────────────────────────────────────────────────

@@ -625,18 +625,19 @@ public sealed record StateTargetNode(
 public abstract record TypeRefNode(SourceSpan Span) : SyntaxNode(Span);
 
 public sealed record ScalarTypeRefNode(
-    SourceSpan Span, Token TypeName, TypeQualifierNode? Qualifier) : TypeRefNode(Span);
+    SourceSpan Span, Token TypeName,
+    ImmutableArray<TypeQualifierNode> Qualifiers) : TypeRefNode(Span);
 
 public sealed record CollectionTypeRefNode(
     SourceSpan Span, Token CollectionKind, Token ElementType,
-    TypeQualifierNode? Qualifier) : TypeRefNode(Span);
+    ImmutableArray<TypeQualifierNode> Qualifiers) : TypeRefNode(Span);
 
 public sealed record ChoiceTypeRefNode(
     SourceSpan Span, Language.Token? ElementType,
     ImmutableArray<Expression> Options) : TypeRefNode(Span);
 ```
 
-`ScalarTypeRefNode` covers `string`, `decimal`, `boolean`, `money`, etc. `CollectionTypeRefNode` covers `set of T`, `queue of T`, `stack of T` — `CollectionKind` is the `Set`/`Queue`/`Stack` token. `ChoiceTypeRefNode` covers `choice of string("A", "B", "C")` — `ElementType` is the `string | integer | decimal | number | boolean` token (null only on parse-error recovery).
+`ScalarTypeRefNode` covers `string`, `decimal`, `boolean`, `money`, `exchangerate`, etc. `CollectionTypeRefNode` covers `set of T`, `queue of T`, `stack of T` and carries qualifiers on the inner scalar type, so forms such as `set of money in 'USD'` and `queue of exchangerate in 'USD' to 'EUR'` stay attached to the element type. `ChoiceTypeRefNode` covers `choice of string("A", "B", "C")` — `ElementType` is the `string | integer | decimal | number | boolean` token (null only on parse-error recovery).
 
 #### TypeQualifier
 
@@ -645,7 +646,7 @@ public sealed record TypeQualifierNode(
     SourceSpan Span, Token Keyword, Expression Value) : SyntaxNode(Span);
 ```
 
-`Keyword` is `In` or `Of` — narrowing the type domain (e.g., `money in 'USD'`, `quantity of 'weight'`).
+`Keyword` is `In`, `Of`, or `To`. Type refs now carry `Qualifiers` as an `ImmutableArray<TypeQualifierNode>` rather than a single optional qualifier, so multi-qualifier forms such as `exchangerate in 'USD' to 'EUR'` are represented directly. Which qualifier prepositions are valid for a given type comes from the catalog (`Types.QualifierShape`), not from parser-local keyword lists.
 
 #### FieldModifier Hierarchy
 

@@ -22,9 +22,10 @@ public enum TypeCategory
 [Flags]
 public enum TypeTrait
 {
-    None              = 0,
-    Orderable         = 1 << 0,
+    None               = 0,
+    Orderable          = 1 << 0,
     EqualityComparable = 1 << 1,
+    ChoiceElement      = 1 << 2,  // valid as element type in 'choice of T(...)'
 }
 
 // ── QualifierAxis ──────────────────────────────────────────────────────────────

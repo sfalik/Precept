@@ -94,6 +94,8 @@ public static class Lexer
             _modeStack = new ModeState[MaxModeStackDepth];
             _modeStack[0] = new ModeState { Mode = LexerMode.Normal };
             _modeDepth = 1;
+            // Catalog-driven: Tokens.Keywords is the single source of truth for keyword
+            // recognition. Do not add parallel keyword arrays here — add to the Tokens catalog.
             _keywordLookup = Tokens.Keywords.GetAlternateLookup<ReadOnlySpan<char>>();
             _contentBuffer = new char[128];
             _contentLength = 0;

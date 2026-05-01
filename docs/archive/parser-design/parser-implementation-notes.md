@@ -202,3 +202,39 @@ Internal wrapper records replace the `NotImplementedException` stubs from PR 2:
 | PR 5 | From-scoped constructs, TransitionRow, outcomes, error sync, integration tests | 2192 → 2226 (+34) | ✅ |
 
 **Total:** 2046 → 2226 (+180 tests). Parser is fully functional — all 12 construct kinds parse, no remaining `NotImplementedException`.
+
+## PR 6: Whitespace-Insensitivity Repair (2026-04-30)
+
+### Design intent
+
+Whitespace inside a declaration is cosmetic. As codified in `docs/language/precept-language-spec.md` §0.1.5, Precept is keyword-anchored, not layout-sensitive: declarations may span multiple lines freely, `from` starts a transition row, and `->` starts a pipeline step. Newlines are not supposed to terminate declarations.
+
+### Original implementation oversight
+
+`NewLine` remained in `StructuralBoundaryTokens`, so the parser accidentally treated line breaks as hard declaration boundaries in places where the language design said they were only trivia. That silently broke multi-line declarations and event argument lists.
+
+### Active broken samples prior to fix
+
+- `samples/hiring-pipeline.precept`
+- `samples/insurance-claim.precept`
+- `samples/loan-application.precept`
+
+### Architectural fix
+
+`Parser.Parse()` now applies a flat-strip filter over the lexer output before constructing `ParseSession`, removing `NewLine` and `Comment` tokens from the parser-facing token array. `Compilation.Tokens` still retains the full original token stream so LSP consumers keep full-fidelity spans, semantic-token data, and comment visibility.
+
+### Why `Comment` is also filtered
+
+The parser is comment-blind by design. Comments belong to authoring/tooling fidelity, not syntax structure. Preserving them in `Compilation.Tokens` keeps `SemanticTokenType: "comment"` and other LSP-facing token consumers whole, while the parser operates over the declaration-only stream it actually reasons about.
+
+### Qualifier ambiguity resolution after newline stripping
+
+Once newlines no longer interrupted type parsing, `ParseTypeRef` could no longer rely on layout accidents to stop consuming tokens. In particular, forms like `in Draft modify ...` could be misread as a type qualifier instead of the next construct. The fix is catalog-derived lookahead in `TryPeekQualifierKeyword`: a 3-token lookahead that consults `Types.QualifierShape` as the primary source of truth, plus `AmbiguousQualifierPrepositions` derived from `Constructs.ByLeadingToken` to resolve `in`/`to` collisions with construct-leading prepositions. This is not a heuristic and does not impose placement restrictions; it adapts automatically as new constructs are added to the catalogs.
+
+### Multi-qualifier type refs
+
+The old AST shape stored only one qualifier on a scalar type ref, which silently broke valid forms such as `exchangerate in 'USD' to 'EUR'`. `ScalarTypeRefNode.Qualifier` was widened to `ScalarTypeRefNode.Qualifiers` (`ImmutableArray<TypeQualifierNode>`), and `CollectionTypeRefNode` received the same upgrade so qualified inner types support the same full shape.
+
+### `SkipTrivia()` removal
+
+With the flat-strip filter in place, `SkipTrivia()` became a true no-op. The method and all 10 call sites were deleted as part of the cleanup.

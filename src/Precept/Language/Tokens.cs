@@ -29,8 +29,12 @@ public static class Tokens
     // Shared arrays for common predecessor token sets used by ValidAfter.
     // These encode "which tokens can immediately precede this token in a valid program."
 
-    /// <summary>Declaration-starting keywords appear after newlines (line-oriented grammar).</summary>
-    private static readonly TokenKind[] VA_DeclStart = [TokenKind.NewLine];
+    /// <summary>
+    /// Declaration-starting keywords are keyword-anchored, not newline-following.
+    /// Whitespace is cosmetic (§0.1.5); NewLine tokens are stripped before the parser.
+    /// This set is advisory completion metadata, not a parse constraint.
+    /// </summary>
+    private static readonly TokenKind[] VA_DeclStart = [];
 
     /// <summary>Type keywords appear after 'as' (field type) or 'of' (collection inner type / qualifier).</summary>
     private static readonly TokenKind[] VA_TypeRef = [TokenKind.As, TokenKind.Of];
