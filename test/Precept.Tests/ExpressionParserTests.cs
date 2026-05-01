@@ -456,6 +456,16 @@ public class ExpressionParserTests
             .Which.Operator.Kind.Should().Be(TokenKind.GreaterThan);
     }
 
+    [Fact]
+    public void ParseExpression_Contains_ChainedNonAssociative()
+    {
+        // tags contains "a" contains "b" — contains is NonAssociative; parser emits
+        // NonAssociativeComparison diagnostic and stops after the first contains.
+        var tree = Parser.Parse(Lexer.Lex("""rule tags contains "a" contains "b" because "msg" """));
+        tree.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.NonAssociativeComparison),
+            "chaining 'contains' should emit NonAssociativeComparison (Slice 18)");
+    }
+
     // ── Interpolated strings (Slice 11) ───────────────────────────────────
 
     [Fact]
