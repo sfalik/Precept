@@ -448,4 +448,48 @@ public class ExpressionParserTests
             .Which.Value.Should().BeOfType<BinaryExpression>()
             .Which.Operator.Kind.Should().Be(TokenKind.Plus);
     }
+
+    // ── is set / is not set postfix operators (GAP-3) ──────────────────────
+
+    [Fact]
+    public void ParseExpression_IsSet()
+    {
+        var expr = ParseExpr("opt is set");
+        var isSet = expr.Should().BeOfType<IsSetExpression>().Subject;
+        isSet.Operand.Should().BeOfType<IdentifierExpression>()
+            .Which.Name.Text.Should().Be("opt");
+    }
+
+    [Fact]
+    public void ParseExpression_IsNotSet()
+    {
+        var expr = ParseExpr("opt is not set");
+        var isNotSet = expr.Should().BeOfType<IsNotSetExpression>().Subject;
+        isNotSet.Operand.Should().BeOfType<IdentifierExpression>()
+            .Which.Name.Text.Should().Be("opt");
+    }
+
+    [Fact]
+    public void ParseExpression_IsSet_InCondition()
+    {
+        // "opt is set and x > 0" → And(IsSet(opt), BinaryExpr(x > 0))
+        var expr = ParseExpr("opt is set and x > 0");
+        var and = expr.Should().BeOfType<BinaryExpression>().Subject;
+        and.Operator.Kind.Should().Be(TokenKind.And);
+        and.Left.Should().BeOfType<IsSetExpression>()
+            .Which.Operand.Should().BeOfType<IdentifierExpression>()
+            .Which.Name.Text.Should().Be("opt");
+    }
+
+    [Fact]
+    public void ParseExpression_IsNotSet_InCondition()
+    {
+        // "opt is not set or y < 5" → Or(IsNotSet(opt), BinaryExpr(y < 5))
+        var expr = ParseExpr("opt is not set or y < 5");
+        var or = expr.Should().BeOfType<BinaryExpression>().Subject;
+        or.Operator.Kind.Should().Be(TokenKind.Or);
+        or.Left.Should().BeOfType<IsNotSetExpression>()
+            .Which.Operand.Should().BeOfType<IdentifierExpression>()
+            .Which.Name.Text.Should().Be("opt");
+    }
 }

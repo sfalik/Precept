@@ -1343,6 +1343,25 @@ public static class Parser
                     continue;
                 }
 
+                // is set / is not set — postfix null-check (binding power 60, non-associative)
+                if (current.Kind == TokenKind.Is)
+                {
+                    if (minPrecedence > 60) break;
+                    Advance(); // consume 'is'
+                    if (Current().Kind == TokenKind.Not)
+                    {
+                        Advance(); // consume 'not'
+                        var setTok = Expect(TokenKind.Set);
+                        left = new IsNotSetExpression(SourceSpan.Covering(left.Span, setTok.Span), left);
+                    }
+                    else
+                    {
+                        var setTok = Expect(TokenKind.Set);
+                        left = new IsSetExpression(SourceSpan.Covering(left.Span, setTok.Span), left);
+                    }
+                    continue;
+                }
+
                 // Binary operator — check precedence table
                 if (!OperatorPrecedence.TryGetValue(current.Kind, out var opInfo))
                     break;
