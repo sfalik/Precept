@@ -16,7 +16,7 @@ namespace Precept.Tests;
 /// Purpose: catch regressions that unit tests miss — a parser fix that silently
 /// breaks a downstream construct will surface here before it ships.
 ///
-/// 21 of 28 sample files assert zero errors. The remaining 7 carry known pre-existing
+/// 23 of 28 sample files assert zero errors. The remaining 5 carry known pre-existing
 /// parser gaps (tracked below) that are outside the scope of slices 1–13.
 /// Slice 12 of the parser gap-fixes plan.
 /// </summary>
@@ -31,9 +31,9 @@ public class SampleFileIntegrationTests
     // gaps that pre-date slices 1–13 and are not fixed by them. Each entry is
     // annotated with the gap category and the specific error produced.
     //
-    // GAP-A: StateEnsureNode / EventEnsureNode lack post-condition when-guard support.
-    //   Syntax `ensure Cond when Guard because "msg"` emits ExpectedBecause at 'when'.
-    //   Files affected: insurance-claim.precept, loan-application.precept
+    // GAP-A (fixed Slice 14): 'ensure Cond when Guard because "msg"' now parses correctly.
+    //   insurance-claim.precept and loan-application.precept also use `.min` member access
+    //   (GAP-C), so they remain in this list under the GAP-C annotation.
     //
     // GAP-B: Field modifiers trailing a computed expression (`field X -> expr modifier`).
     //   The parser handles modifiers only before `->`, not after. Emits
@@ -43,12 +43,13 @@ public class SampleFileIntegrationTests
     //
     // GAP-C: Reserved keyword used as a collection member name (`.min` / `.max`).
     //   MemberAccessExpression parser expects Identifier after '.', rejects Min/Max tokens.
-    //   Files affected: building-access-badge-request.precept
+    //   Files affected: insurance-claim.precept, loan-application.precept,
+    //                   building-access-badge-request.precept
     private static readonly IReadOnlySet<string> KnownBrokenFiles =
         new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
-            "insurance-claim.precept",          // known pre-existing issue: GAP-A
-            "loan-application.precept",          // known pre-existing issue: GAP-A
+            "insurance-claim.precept",          // GAP-C: uses .min/.max member access
+            "loan-application.precept",          // GAP-C: uses .min/.max member access
             "sum-on-rhs-rule.precept",           // known pre-existing issue: GAP-B
             "invoice-line-item.precept",         // known pre-existing issue: GAP-B
             "transitive-ordering.precept",       // known pre-existing issue: GAP-B
@@ -125,7 +126,7 @@ public class SampleFileIntegrationTests
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         KnownBrokenFiles.Should().HaveCount(7,
-            "exactly 7 sample files have known pre-existing parser gaps");
+            "exactly 7 sample files have known pre-existing parser gaps (GAP-B × 4, GAP-C × 3)");
         KnownBrokenFiles.Should().BeSubsetOf(allFiles,
             "every entry in KnownBrokenFiles must be an actual sample file");
     }

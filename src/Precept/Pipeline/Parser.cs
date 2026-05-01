@@ -420,12 +420,23 @@ public static class Parser
         {
             Advance(); // consume 'ensure'
             var condition = ParseExpression(0);
-            var because = Expect(TokenKind.Because);
+
+            // Post-condition when-guard: `ensure Cond when Guard because "msg"` (spec §2.2)
+            // stashedGuard is a pre-ensure guard parsed before the 'ensure' keyword in the
+            // dispatch flow. If no stashed guard exists, consume a post-condition when-guard here.
+            Expression? guard = stashedGuard;
+            if (guard is null && Current().Kind == TokenKind.When)
+            {
+                Advance(); // consume 'when'
+                guard = ParseExpression(0);
+            }
+
+            Expect(TokenKind.Because);
             var message = ParseExpression(0);
 
             return new StateEnsureNode(
                 SourceSpan.Covering(start, message.Span),
-                preposition, anchor, stashedGuard, condition, message);
+                preposition, anchor, guard, condition, message);
         }
 
         // ── to-scoped construct parsers ───────────────────────────────────────
@@ -545,12 +556,21 @@ public static class Parser
         {
             Advance(); // consume 'ensure'
             var condition = ParseExpression(0);
-            var because = Expect(TokenKind.Because);
+
+            // Post-condition when-guard: `on Event ensure Cond when Guard because "msg"` (spec §2.2)
+            Expression? guard = stashedGuard;
+            if (guard is null && Current().Kind == TokenKind.When)
+            {
+                Advance(); // consume 'when'
+                guard = ParseExpression(0);
+            }
+
+            Expect(TokenKind.Because);
             var message = ParseExpression(0);
 
             return new EventEnsureNode(
                 SourceSpan.Covering(start, message.Span),
-                eventName, stashedGuard, condition, message);
+                eventName, guard, condition, message);
         }
 
         private EventHandlerNode ParseEventHandler(SourceSpan start, Token eventName)

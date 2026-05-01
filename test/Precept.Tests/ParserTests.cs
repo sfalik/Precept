@@ -518,6 +518,50 @@ public class ParserTests
         node.Guard.Should().NotBeNull();
     }
 
+    // ── Slice 14 (GAP-A): Post-condition when-guard on ensure ─────────────
+
+    [Fact]
+    public void Parse_StateEnsure_WithPostConditionWhenGuard()
+    {
+        // `ensure Cond when Guard because "msg"` — guard is post-condition (spec §2.2)
+        var tree = Parse("""in Active ensure amount > 0 when flagged because "msg" """);
+        tree.Diagnostics.Should().NotContain(d => d.Severity == Severity.Error);
+        var node = tree.Declarations[0].Should().BeOfType<StateEnsureNode>().Subject;
+        node.Guard.Should().NotBeNull();
+        node.Guard.Should().BeOfType<IdentifierExpression>()
+            .Which.Name.Text.Should().Be("flagged");
+        node.Condition.Should().BeOfType<BinaryExpression>();
+    }
+
+    [Fact]
+    public void Parse_StateEnsure_WithoutWhenGuard_Regression()
+    {
+        var tree = Parse("""in Active ensure amount > 0 because "msg" """);
+        tree.Diagnostics.Should().BeEmpty();
+        var node = tree.Declarations[0].Should().BeOfType<StateEnsureNode>().Subject;
+        node.Guard.Should().BeNull();
+    }
+
+    [Fact]
+    public void Parse_EventEnsure_WithPostConditionWhenGuard()
+    {
+        var tree = Parse("""on Submit ensure Amount > 0 when active because "msg" """);
+        tree.Diagnostics.Should().NotContain(d => d.Severity == Severity.Error);
+        var node = tree.Declarations[0].Should().BeOfType<EventEnsureNode>().Subject;
+        node.Guard.Should().NotBeNull();
+        node.Guard.Should().BeOfType<IdentifierExpression>()
+            .Which.Name.Text.Should().Be("active");
+    }
+
+    [Fact]
+    public void Parse_EventEnsure_WithoutWhenGuard_Regression()
+    {
+        var tree = Parse("""on Submit ensure Amount > 0 because "msg" """);
+        tree.Diagnostics.Should().BeEmpty();
+        var node = tree.Declarations[0].Should().BeOfType<EventEnsureNode>().Subject;
+        node.Guard.Should().BeNull();
+    }
+
     // ── Slice 4.4: EventHandler ────────────────────────────────────────────
 
     [Fact]
@@ -1432,9 +1476,8 @@ public class ParserTests
     [Fact]
     public void WSI_Integration_InsuranceClaim_HasExpectedDeclarationCounts()
     {
-        // insurance-claim.precept uses 'is set' expressions and 'in State ensure ... when ...'
-        // constructs that the current parser partially handles. We verify the key structural
-        // declarations are present (parser recovery works) rather than asserting zero diagnostics.
+        // insurance-claim.precept: GAP-A fixed (Slice 14) — ensure...when now parses.
+        // GAP-C remains (.min member access) — will be clean after Slice 16.
         var source = File.ReadAllText(Path.Combine(SamplesDir, "insurance-claim.precept"));
         var tree = Parser.Parse(Lexer.Lex(source));
 
@@ -1454,9 +1497,7 @@ public class ParserTests
     [Fact]
     public void WSI_Integration_LoanApplication_HasExpectedDeclarationCounts()
     {
-        // loan-application.precept uses 'in State ensure ... when ...' which the current
-        // parser emits a diagnostic for (When is a StructuralBoundaryToken that terminates
-        // the ensure condition, then Expect(Because) sees 'when' instead). Parser recovers.
+        // loan-application.precept: GAP-A fixed (Slice 14). GAP-C remains (.min).
         var source = File.ReadAllText(Path.Combine(SamplesDir, "loan-application.precept"));
         var tree = Parser.Parse(Lexer.Lex(source));
 
