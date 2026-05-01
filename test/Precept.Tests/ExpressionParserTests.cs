@@ -546,4 +546,47 @@ public class ExpressionParserTests
     }
 
     // ── Method calls (GAP-7, Slice 6) ─────────────────────────────────────
+
+    [Fact]
+    public void ParseExpression_MethodCall_NoArgs()
+    {
+        var expr = ParseExpr("obj.Method()");
+        var call = expr.Should().BeOfType<MethodCallExpression>().Subject;
+        call.MethodName.Should().Be("Method");
+        call.Arguments.Should().BeEmpty();
+        call.Receiver.Should().BeOfType<IdentifierExpression>()
+            .Which.Name.Text.Should().Be("obj");
+    }
+
+    [Fact]
+    public void ParseExpression_MethodCall_SingleArg()
+    {
+        var expr = ParseExpr("obj.Method(x)");
+        var call = expr.Should().BeOfType<MethodCallExpression>().Subject;
+        call.MethodName.Should().Be("Method");
+        call.Arguments.Should().HaveCount(1);
+        call.Arguments[0].Should().BeOfType<IdentifierExpression>()
+            .Which.Name.Text.Should().Be("x");
+    }
+
+    [Fact]
+    public void ParseExpression_MethodCall_MultipleArgs()
+    {
+        var expr = ParseExpr("obj.Method(x, y, z)");
+        var call = expr.Should().BeOfType<MethodCallExpression>().Subject;
+        call.MethodName.Should().Be("Method");
+        call.Arguments.Should().HaveCount(3);
+    }
+
+    [Fact]
+    public void ParseExpression_MethodCall_ChainedAccess()
+    {
+        // a.b.Method(x) → receiver is MemberAccessExpression(a, b), method = "Method"
+        var expr = ParseExpr("a.b.Method(x)");
+        var call = expr.Should().BeOfType<MethodCallExpression>().Subject;
+        call.MethodName.Should().Be("Method");
+        call.Arguments.Should().HaveCount(1);
+        call.Receiver.Should().BeOfType<MemberAccessExpression>()
+            .Which.Member.Text.Should().Be("b");
+    }
 }

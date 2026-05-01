@@ -1323,6 +1323,7 @@ public static class Parser
 
         [HandlesForm(ExpressionFormKind.MemberAccess)]
         [HandlesForm(ExpressionFormKind.BinaryOperation)]
+        [HandlesForm(ExpressionFormKind.MethodCall)]
         internal Expression ParseExpression(int minPrecedence)
         {
             var left = ParseAtom();
@@ -1363,6 +1364,34 @@ public static class Parser
                         left = new IsSetExpression(SourceSpan.Covering(left.Span, setTok.Span), left);
                     }
                     continue;
+                }
+
+                // Method call — '(' following a MemberAccessExpression (binding power 90)
+                if (current.Kind == TokenKind.LeftParen)
+                {
+                    if (left is MemberAccessExpression memberAccess)
+                    {
+                        if (minPrecedence > 90) break;
+                        Advance(); // consume '('
+                        var args = ImmutableArray.CreateBuilder<Expression>();
+                        if (Current().Kind != TokenKind.RightParen)
+                        {
+                            do
+                            {
+                                args.Add(ParseExpression(0));
+                            }
+                            while (Match(TokenKind.Comma));
+                        }
+                        var closeParen = Expect(TokenKind.RightParen);
+                        left = new MethodCallExpression(
+                            SourceSpan.Covering(left.Span, closeParen.Span),
+                            memberAccess.Object,
+                            memberAccess.Member.Text!,
+                            args.ToImmutable());
+                        continue;
+                    }
+                    // unreachable: identifiers resolve as FunctionCall in ParseAtom
+                    break;
                 }
 
                 // Binary operator — check precedence table
