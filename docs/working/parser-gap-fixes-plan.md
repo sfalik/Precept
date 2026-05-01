@@ -52,7 +52,7 @@ All 13 slices shipped on `spike/Precept-V2`. Test baseline: 2107 → 2482 (+375 
 | 15 | E | GAP-B: Modifiers after computed (`->`) field expressions (`ParseFieldDeclaration` rewrite) | ✅ Done |
 | 16 | F | GAP-C: Keyword-as-member-name (`Min`/`Max`) in `MemberAccess` handler | ✅ Done |
 | 17 | G2 | `is set` precedence audit: resolve 60 vs spec 40, sync parser and spec | ✅ Done |
-| 18 | G3 | `contains` chaining non-associativity test | ⏳ Pending |
+| 18 | G3 | `contains` chaining non-associativity test | ✅ Done |
 
 #### Phase 2b — Sequential (full DU, depends on 2a)
 
@@ -1557,7 +1557,7 @@ if (current.Kind == TokenKind.Dot)
 
 ---
 
-### Slice 18: Work Item G3 — `contains` Chaining Non-Associativity Test ⏳ PENDING
+### Slice 18: Work Item G3 — `contains` Chaining Non-Associativity Test ✅ DONE
 
 **Goal:** Add the missing `contains` chaining test that was identified in George's Phase 1 review.
 
