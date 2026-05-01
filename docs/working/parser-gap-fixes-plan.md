@@ -48,7 +48,7 @@ All 13 slices shipped on `spike/Precept-V2`. Test baseline: 2107 → 2482 (+375 
 
 | Slice | Work Item | Description | Status |
 |-------|-----------|-------------|--------|
-| 14 | D | GAP-A: `when`-guard on `ParseStateEnsure`/`ParseEventEnsure` (method bodies only, no AST changes) | ⏳ Pending |
+| 14 | D | GAP-A: `when`-guard on `ParseStateEnsure`/`ParseEventEnsure` (method bodies only, no AST changes) | ✅ Done |
 | 15 | E | GAP-B: Modifiers after computed (`->`) field expressions (`ParseFieldDeclaration` rewrite) | ⏳ Pending |
 | 16 | F | GAP-C: Keyword-as-member-name (`Min`/`Max`) in `MemberAccess` handler | ⏳ Pending |
 | 17 | G2 | `is set` precedence audit: resolve 60 vs spec 40, sync parser and spec | ⏳ Pending |
@@ -1164,7 +1164,7 @@ After Slice 16: `KnownBrokenFiles` in `SampleFileIntegrationTests.cs` must be em
 
 ---
 
-### Slice 14: Work Item D — GAP-A: `when`-guard on `ParseStateEnsure`/`ParseEventEnsure` ⏳ PENDING
+### Slice 14: Work Item D — GAP-A: `when`-guard on `ParseStateEnsure`/`ParseEventEnsure` ✅ DONE
 
 **Goal:** Fix the two broken sample files that use `ensure Cond when Guard because "msg"` syntax.
 
