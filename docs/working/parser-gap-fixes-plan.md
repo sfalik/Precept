@@ -40,9 +40,9 @@ All 13 slices shipped on `spike/Precept-V2`. Test baseline: 2107 → 2482 (+375 
 | 12 | Sample file integration tests (58 tests; GAP-A/B/C sentinel-gated) | ✅ Done |
 | 13 | ExpressionFormCoverageTests (reflection + round-trip) | ✅ Done |
 
-### Phase 2 — Extended Gap Resolution ✅ PHASE 2b COMPLETE
+### Phase 2 — Extended Gap Resolution ✅ PHASE 2c COMPLETE
 
-**Baseline:** 2247 tests passing (2240 passing + 7 intentional KnownBrokenFiles failures; Phase 1 exit). Post-Phase 2a: 2261 tests, 0 failing. Post-Phase 2b: 2274 tests, 0 failing.
+**Baseline:** 2247 tests passing (2240 passing + 7 intentional KnownBrokenFiles failures; Phase 1 exit). Post-Phase 2a: 2261 tests, 0 failing. Post-Phase 2b: 2274 tests, 0 failing. Post-Phase 2c: 2300 tests, 0 failing.
 
 #### Phase 2a — Parallel (independent, no catalog changes)
 
@@ -67,10 +67,10 @@ All 13 slices shipped on `spike/Precept-V2`. Test baseline: 2107 → 2482 (+375 
 
 | Slice | Work Item | Description | Status |
 |-------|-----------|-------------|--------|
-| 23 | C1 | Annotate `TypeChecker` with `[HandlesCatalogExhaustively]` + `[HandlesForm]` for all 11 forms | ⏳ Pending |
-| 24 | C2 | Annotate `GraphAnalyzer` similarly | ⏳ Pending |
-| 25 | G1 | Write `ExpressionFormCoverageTests.cs` (Slice 13 makeup) | ⏳ Pending |
-| 26 | C3–C5 | Flip PRECEPT0019 `Warning` → `Error`, remove `WarningsNotAsErrors`, verify build | ⏳ Pending |
+| 23 | C1 | Annotate `TypeChecker` with `[HandlesCatalogExhaustively]` + `[HandlesForm]` for all 11 forms | ✅ Done |
+| 24 | C2 | Annotate `GraphAnalyzer` similarly | ✅ Done |
+| 25 | G1 | Write `ExpressionFormCoverageTests.cs` (Slice 13 makeup) | ✅ Done |
+| 26 | C3–C5 | Flip PRECEPT0019 `Warning` → `Error`, remove `WarningsNotAsErrors`, verify build | ✅ Done |
 
 #### Phase 2d — Independent (structural, no functional dependencies)
 

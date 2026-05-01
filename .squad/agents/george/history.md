@@ -15,11 +15,21 @@
 - `HandlesCatalogExhaustivelyAttribute` must allow `Struct` targets for `ref struct` handlers, and `ref struct` types still cannot own static fields.
 - Verify real `TokenKind` names before writing metadata or tests; `dotnet build -q` can hide actionable diagnostics during failure analysis.
 - Multi-token presence operators are a proposal-scale catalog completeness gap, while keyword member names like `.min` / `.max` need dedicated parser handling in the `Dot` path.
-- **`ToFrozenDictionary` does not coerce value types upward**: when building `FrozenDictionary<TKey, TBase>` from a `TDerived` sequence, provide an explicit value selector `v => (TBase)v`; inference stops at the concrete type.
-- **DU catalog rule in practice**: when subtypes need different metadata fields (`Token` vs `Tokens`), use abstract record base + sealed subtypes. Never use a flat record with nullable fields to paper over the shape difference.
-- **Parser.OperatorPrecedence must be narrowed with `.OfType<SingleTokenOp>()`** after the DU change: postfix `MultiTokenOp` entries must be excluded from the binary-operator precedence table.
+- **`TypeChecker` and `GraphAnalyzer` are both `public static class`** — all stub methods must be `private static`. Reflection test must include `BindingFlags.Static` to find them, and the existing `ContainSingle` assertion must expand to `HaveCount(3)` once all three pipeline stages are annotated.
+- **ExpressionFormCoverageTests split**: the existing `test/Precept.Tests/ExpressionFormCoverageTests.cs` is the Layer 3 reflection+round-trip file (Slice 13); the new `test/Precept.Tests/Language/ExpressionFormCoverageTests.cs` is the Layer 2 per-kind catalog assertions (Slice 25) — different namespaces, no class name conflict.
+- **PRECEPT0019 promotion sequence**: annotate all consuming pipeline classes FIRST (verify zero PRECEPT0019 fires), THEN flip severity to Error and remove WarningsNotAsErrors. The pre-condition check is non-negotiable.
+
+
 
 ## Recent Updates
+
+### 2026-05-01 — Phase 2c (Slices 23–26) complete
+- `TypeChecker` annotated: `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]` + all 11 `[HandlesForm]` on `private static CheckExpression` stub.
+- `GraphAnalyzer` annotated: same pattern with `private static AnalyzeExpression` stub.
+- Reflection tests in `ExpressionFormCoverageTests` updated: `ContainSingle` → `HaveCount(3)`, `First()` → iterate all, `BindingFlags.Instance` → includes `BindingFlags.Static`.
+- New `test/Precept.Tests/Language/ExpressionFormCoverageTests.cs` created: 26 Layer 2 catalog-shape tests.
+- PRECEPT0019 promoted to `DiagnosticSeverity.Error`; `<WarningsNotAsErrors>` removed from `Precept.csproj`.
+- Full solution: 0 errors, 0 warnings. Test count: 2300 passing, 0 failing (+26 new tests vs 2274 baseline).
 
 ### 2026-05-01 — Phase 2b closeout recorded
 - Scribe recorded George-9's Phase 2b completion: the `OperatorMeta` DU restructure plus `ExpressionFormKind.PostfixOperation` landed with 2274 passing tests and 13 new tests added.
