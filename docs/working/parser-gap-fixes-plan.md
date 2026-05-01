@@ -72,6 +72,12 @@ All 13 slices shipped on `spike/Precept-V2`. Test baseline: 2107 → 2482 (+375 
 | 25 | G1 | Write `ExpressionFormCoverageTests.cs` (Slice 13 makeup) | ⏳ Pending |
 | 26 | C3–C5 | Flip PRECEPT0019 `Warning` → `Error`, remove `WarningsNotAsErrors`, verify build | ⏳ Pending |
 
+#### Phase 2d — Independent (structural, no functional dependencies)
+
+| Slice | Work Item | Description | Status |
+|-------|-----------|-------------|--------|
+| 27 | S1 | Split `Parser.cs` (1757 lines) into 3 partial files for AI agent manageability | ⏳ Pending |
+
 Shane's directive: no deferred items, no holes — all gaps resolved on this spike before type-checker work begins.
 
 ---
@@ -2298,3 +2304,262 @@ The `<TreatWarningsAsErrors>true</TreatWarningsAsErrors>` line remains. The `War
 | After Phase 2c (Slices 23–26) | ~2525–2530 | +11–16 | 6+ ExpressionFormCoverageTests (S25), misc annotation verification tests |
 
 **Target:** Phase 2 adds **30–50 new tests**. Exact count depends on theory granularity and whether annotation-verification tests are added for Slices 23–24.
+
+---
+
+### Slice 27: Work Item S1 — Parser.cs Structural Split (Partial Class/Struct) ⏳ PENDING
+
+**Goal:** Split `src/Precept/Pipeline/Parser.cs` (1757 lines) into three partial files so AI agents can read and reason about each section without loading the entire file.
+
+**Rationale:** At 1757 lines, `Parser.cs` exceeds the comfortable context window for agent-driven work. The expression parser (Pratt loop + atoms) is the most actively edited area in Phase 2 and is currently buried on line 1382. Splitting by logical grain — dispatch core, declaration grammar, expression grammar — gives each file a single, coherent responsibility and a manageable line count (~460 / ~1040 / ~310). This is a **zero-behavior-change structural refactor**: the compiler merges partial files into one type, so all behavior, tests, and API surface are identical.
+
+**Why `partial class/struct` and not a different mechanism:** `ParseSession` is a `ref struct`. All logic must remain as instance methods on the struct — you cannot extract it into separate classes without threading `ref ParseSession` parameters through every call chain (60+ methods). `partial struct` is the only viable split mechanism. See `.squad/decisions/inbox/frank-parser-split.md` for full rationale and structural rules.
+
+**Dependency:** Independent of all Phase 2a–2c slices. Can be implemented in any order relative to Slices 14–26. Should be done before type-checker work begins.
+
+---
+
+**Files to create / modify:**
+
+| File | Change |
+|------|--------|
+| `src/Precept/Pipeline/Parser.cs` | Modify — add `partial` to class and struct declarations; keep core shell (vocabulary, dispatch, BuildNode) |
+| `src/Precept/Pipeline/Parser.Declarations.cs` | **Create** — all declaration-level parsers (scoped constructs, slot system, type ref, field modifiers) |
+| `src/Precept/Pipeline/Parser.Expressions.cs` | **Create** — Pratt loop and atom parsers |
+
+---
+
+**Method inventory — `Parser.cs` (keep / primary declaration):**
+
+*Outer `Parser` static class (stays in `Parser.cs` — not on `ParseSession`):*
+
+| Symbol | Kind | Notes |
+|--------|------|-------|
+| `OperatorPrecedence` | static field | FrozenDictionary — catalog-derived |
+| `TypeKeywords` | static field | FrozenSet — catalog-derived |
+| `ModifierKeywords` | static field | FrozenSet — catalog-derived |
+| `StateModifierKeywords` | static field | FrozenSet — catalog-derived |
+| `ActionKeywords` | static field | FrozenSet — catalog-derived |
+| `StructuralBoundaryTokens` | static field | FrozenSet — boundary set |
+| `ExpressionBoundaryTokens` | static field | FrozenSet — derived |
+| `ChoiceElementTypeKeywords` | static field | FrozenSet — catalog-derived |
+| `AmbiguousQualifierPrepositions` | static field | FrozenDictionary — catalog-derived |
+| `Parse(TokenStream)` | static method | Public entry point |
+| `BuildNode(ConstructKind, SyntaxNode?[], SourceSpan)` | static method | Exhaustive ConstructKind switch |
+
+*`ParseSession` primary declaration (struct definition + core machinery):*
+
+| Method | Notes |
+|--------|-------|
+| `ParseSession(ImmutableArray<Token>)` | Constructor — primary declaration; keeps `[HandlesCatalogExhaustively]` attribute |
+| `Current()` | Token navigation |
+| `Peek(int)` | Token navigation |
+| `Advance()` | Token navigation |
+| `Match(TokenKind)` | Token navigation |
+| `Expect(TokenKind)` | Token navigation |
+| `IsAtEnd()` | Token navigation |
+| `EmitDiagnostic(DiagnosticCode, SourceSpan, params object?[])` | Diagnostic emission |
+| `ParseAll()` | Top-level dispatch loop |
+| `ParseDirectConstruct(ConstructKind)` | Dispatch helper |
+| `DisambiguateAndParse(Token)` | Dispatch helper |
+| `FindDisambiguatedConstruct(TokenKind, TokenKind)` | `private static` dispatch helper |
+| `EmitAmbiguityAndSync(Token)` | Dispatch helper |
+| `TryParseStashedGuard()` | Dispatch helper — calls `ParseExpression(0)` across file boundary (fine) |
+| `ParseStateTargetDirect()` | Called by `DisambiguateAndParse` |
+| `ParseEventTargetDirect()` | Called by `DisambiguateAndParse` |
+| `SyncToNextDeclaration()` | Called by `DisambiguateAndParse` and error-recovery paths |
+| `IsOutcomeAhead()` | Called by `DisambiguateAndParse` dispatch path |
+
+---
+
+**Method inventory — `Parser.Declarations.cs` (new file — partial class + partial struct):**
+
+*In-scoped construct parsers:*
+
+| Method |
+|--------|
+| `ParseAccessMode(SourceSpan, StateTargetNode, Expression?)` |
+| `ParseOmitDeclaration(SourceSpan, StateTargetNode, Expression?)` |
+| `ParseStateEnsure(SourceSpan, Token, StateTargetNode, Expression?)` |
+
+*To-scoped construct parsers:*
+
+| Method |
+|--------|
+| `ParseStateAction(SourceSpan, Token, StateTargetNode, Expression?)` |
+
+*From-scoped construct parsers:*
+
+| Method |
+|--------|
+| `ParseTransitionRow(SourceSpan, StateTargetNode, Expression?)` |
+| `ParseOutcomeNode()` |
+| `TryParseActionStatementWithRecovery()` |
+
+*On-scoped construct parsers:*
+
+| Method |
+|--------|
+| `ParseEventEnsure(SourceSpan, Token, Expression?)` |
+| `ParseEventHandler(SourceSpan, Token)` |
+| `ParseEventHandlerWithGuardCheck(SourceSpan, Token, Expression?)` |
+
+*Shared action helpers:*
+
+| Method |
+|--------|
+| `ParseFieldTargetDirect()` |
+| `ParseAccessModeKeywordDirect()` |
+| `ParseActionStatement()` |
+| `ParseAssignValueStatement(ActionMeta)` |
+| `ParseCollectionValueStatement(ActionMeta)` |
+| `ParseCollectionIntoStatement(ActionMeta)` |
+| `ParseFieldOnlyStatement(ActionMeta)` |
+
+*Non-disambiguated construct parsers:*
+
+| Method |
+|--------|
+| `ParsePreceptHeaderDeclaration()` |
+| `ParseFieldDeclaration()` |
+| `ParseStateDeclaration()` |
+| `ParseEventDeclaration()` |
+| `ParseRuleDeclaration()` |
+
+*Entry / list helpers:*
+
+| Method |
+|--------|
+| `ParseStateEntries()` |
+| `ParseIdentifierListTokens()` |
+| `ParseArgumentListInner()` |
+
+*Slot system:*
+
+| Method |
+|--------|
+| `ParseConstructSlots(ConstructMeta)` |
+| `InvokeSlotParser(ConstructSlotKind, bool)` |
+| `ParseIdentifierList(bool)` |
+| `ParseTypeExpression(bool)` |
+| `ParseModifierList(bool)` |
+| `ParseStateEntryList(bool)` |
+| `ParseArgumentList(bool)` |
+| `ParseComputeExpression(bool)` |
+| `ParseGuardClause(bool)` |
+| `ParseBecauseClause(bool)` |
+| `ParseRuleExpression(bool)` |
+| `ParseInitialMarker(bool)` |
+| `ParseActionChain(bool)` |
+| `ParseOutcome(bool)` |
+| `ParseStateTarget(bool)` |
+| `ParseEventTarget(bool)` |
+| `ParseEnsureClause(bool)` |
+| `ParseAccessModeKeyword(bool)` |
+| `ParseFieldTarget(bool)` |
+
+*Type reference and qualifier parsing:*
+
+| Method |
+|--------|
+| `TryPeekQualifierKeyword()` |
+| `ParseTypeRef()` |
+
+*Choice helpers:*
+
+| Method |
+|--------|
+| `ParseChoiceValue(Token)` |
+| `ConsumeThrough(TokenKind)` |
+
+*Field modifier parsing:*
+
+| Method |
+|--------|
+| `ParseFieldModifierNodes()` |
+
+*Utility:*
+
+| Method |
+|--------|
+| `GetLastSlotSpan(SyntaxNode?[], SourceSpan)` (`private static`) |
+
+---
+
+**Method inventory — `Parser.Expressions.cs` (new file — partial class + partial struct):**
+
+| Method | Notes |
+|--------|-------|
+| `ParseExpression(int)` | Pratt loop — carries `[HandlesForm]` attributes for MemberAccess, BinaryOperation, MethodCall, PostfixOperation |
+| `ParseAtom()` | Null-denotation dispatcher — carries `[HandlesForm]` attributes for Literal, Identifier, Grouped, UnaryOperation, Conditional, FunctionCall, ListLiteral |
+| `ParseInterpolatedString()` | Called by `ParseAtom` |
+| `ParseInterpolatedTypedConstant()` | Called by `ParseAtom` |
+| `ParseListLiteral()` | Called by `ParseAtom` |
+
+---
+
+**Implementation notes:**
+
+1. **Every partial file needs the full `partial` chain.** Each of the three files must declare both levels:
+   ```csharp
+   public static partial class Parser
+   {
+       internal ref partial struct ParseSession
+       {
+           // methods for this file
+       }
+   }
+   ```
+   The `partial` keyword must appear on both `Parser` and `ParseSession` in every file that contributes members.
+
+2. **Usings go in every file.** `using System.Collections.Frozen;`, `using System.Collections.Immutable;`, `using Precept.Language;`, `using Precept.Pipeline.SyntaxNodes;` must be repeated in each file.
+
+3. **`[HandlesCatalogExhaustively]` stays on the primary declaration only.** `[Precept.HandlesCatalogExhaustively(typeof(ExpressionFormKind))]` is on `ParseSession`'s primary declaration in `Parser.cs`. Do NOT duplicate it in the other partial files. Duplicating a non-`AllowMultiple` attribute produces a compiler error or incorrect analyzer behavior.
+
+4. **`[HandlesForm]` attributes move with their methods.** `ParseExpression` and `ParseAtom` move to `Parser.Expressions.cs`. Their `[HandlesForm(...)]` attributes move with them — no action needed beyond the cut.
+
+5. **`BuildNode` stays outside `ParseSession` in `Parser.cs`.** It is a `static` method on the outer `Parser` class and does not move.
+
+6. **Slice 16 `KeywordsValidAsMemberName` correction.** The Slice 16 plan describes this as a `ParseSession` static field. That is wrong — `ref struct` cannot have static fields. `KeywordsValidAsMemberName` must be a static field on the outer `Parser` class (alongside `OperatorPrecedence`, `TypeKeywords`, etc.) in `Parser.cs`. The instance method `ExpectIdentifierOrKeywordAsMemberName()` is on `ParseSession` and goes in `Parser.Expressions.cs` (its caller, the `Dot` handler in `ParseExpression`, lives there). If Slice 16 lands before Slice 27, this correction is made during Slice 27. If Slice 27 lands first, apply the correction when Slice 16 is implemented.
+
+7. **Approximate line counts** (final will vary slightly by whitespace/comments):
+   - `Parser.cs`: ~460 lines
+   - `Parser.Declarations.cs`: ~1040 lines
+   - `Parser.Expressions.cs`: ~310 lines
+
+---
+
+**Tests:**
+
+No new tests. This is a purely structural refactor — the compiler sees one type from all three files, so no existing test can distinguish the single-file from the three-file form.
+
+**Verification:** Run the full `Precept.Tests` suite:
+
+```
+dotnet test test/Precept.Tests/
+```
+
+All tests must pass with the **same count as the baseline before this slice**. If any test fails, the split introduced a behavior change (e.g., a method was accidentally omitted or duplicated, or a `partial` declaration was mis-formed). Fix the split until the test count is identical.
+
+Also verify build is clean:
+
+```
+dotnet build src/Precept/
+```
+
+Zero errors, zero warnings.
+
+---
+
+**Acceptance criteria:**
+
+- `Parser.cs`, `Parser.Declarations.cs`, and `Parser.Expressions.cs` all exist in `src/Precept/Pipeline/`
+- All three files carry `public static partial class Parser` and `internal ref partial struct ParseSession` declarations
+- `[Precept.HandlesCatalogExhaustively(typeof(ExpressionFormKind))]` appears exactly once (in `Parser.cs`)
+- `dotnet build src/Precept/` — zero errors, zero warnings
+- `dotnet test test/Precept.Tests/` — all tests pass, count unchanged
+- Zero changes to any test file
+- Zero changes to any non-Parser production file
+- `git diff --stat` shows only: `Parser.cs` modified, `Parser.Declarations.cs` added, `Parser.Expressions.cs` added
+
+**Assignee:** George

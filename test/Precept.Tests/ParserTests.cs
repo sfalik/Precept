@@ -1522,14 +1522,15 @@ public class ParserTests
     [Fact]
     public void WSI_Integration_InsuranceClaim_HasExpectedDeclarationCounts()
     {
-        // insurance-claim.precept: GAP-A fixed (Slice 14) — ensure...when now parses.
-        // GAP-C remains (.min member access) — will be clean after Slice 16.
+        // insurance-claim.precept: GAP-A fixed (Slice 14), GAP-C fixed (Slice 16) — parses clean.
         var source = File.ReadAllText(Path.Combine(SamplesDir, "insurance-claim.precept"));
         var tree = Parser.Parse(Lexer.Lex(source));
 
         tree.Header.Should().NotBeNull();
         tree.Header!.Name.Text.Should().Be("InsuranceClaim");
 
+        tree.Diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty(
+            "insurance-claim.precept should parse with zero errors after GAP-A and GAP-C fixes");
         tree.Declarations.OfType<FieldDeclarationNode>().Should().HaveCount(8,
             "8 field declarations in insurance-claim.precept");
         tree.Declarations.OfType<StateDeclarationNode>().Should().HaveCount(6,
@@ -1543,13 +1544,15 @@ public class ParserTests
     [Fact]
     public void WSI_Integration_LoanApplication_HasExpectedDeclarationCounts()
     {
-        // loan-application.precept: GAP-A fixed (Slice 14). GAP-C remains (.min).
+        // loan-application.precept: GAP-A fixed (Slice 14), GAP-C fixed (Slice 16) — parses clean.
         var source = File.ReadAllText(Path.Combine(SamplesDir, "loan-application.precept"));
         var tree = Parser.Parse(Lexer.Lex(source));
 
         tree.Header.Should().NotBeNull();
         tree.Header!.Name.Text.Should().Be("LoanApplication");
 
+        tree.Diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty(
+            "loan-application.precept should parse with zero errors after GAP-A and GAP-C fixes");
         tree.Declarations.OfType<FieldDeclarationNode>()
             .Should().HaveCountGreaterThanOrEqualTo(7);
         tree.Declarations.OfType<StateDeclarationNode>()

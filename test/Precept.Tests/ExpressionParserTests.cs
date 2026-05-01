@@ -177,6 +177,59 @@ public class ExpressionParserTests
         ma.Member.Text.Should().Be("amount");
     }
 
+    // GAP-C fix: keywords min/max are valid as member names after '.'
+    [Fact]
+    public void ParseExpression_MemberAccess_KeywordMin_ParsesWithoutErrors()
+    {
+        // Parse a minimal precept that uses .min member access (GAP-C fix)
+        const string source = """
+            precept amounts
+            field total as decimal -> items.min
+            """;
+        var tree = Parser.Parse(Lexer.Lex(source));
+        tree.Diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty(
+            ".min member access should parse without errors (GAP-C fix)");
+    }
+
+    [Fact]
+    public void ParseExpression_MemberAccess_KeywordMax_ParsesWithoutErrors()
+    {
+        // Parse a minimal precept that uses .max member access (GAP-C fix)
+        const string source = """
+            precept amounts
+            field total as decimal -> items.max
+            """;
+        var tree = Parser.Parse(Lexer.Lex(source));
+        tree.Diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty(
+            ".max member access should parse without errors (GAP-C fix)");
+    }
+
+    [Fact]
+    public void ParseExpression_FunctionCall_KeywordMin_ParsesWithoutErrors()
+    {
+        // Parse a minimal precept that uses min() as a function call (GAP-C fix)
+        const string source = """
+            precept amounts
+            field total as decimal -> min(a, b)
+            """;
+        var tree = Parser.Parse(Lexer.Lex(source));
+        tree.Diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty(
+            "min(a, b) function call should parse without errors (GAP-C fix)");
+    }
+
+    [Fact]
+    public void ParseExpression_FunctionCall_KeywordMax_ParsesWithoutErrors()
+    {
+        // Parse a minimal precept that uses max() as a function call (GAP-C fix)
+        const string source = """
+            precept amounts
+            field total as decimal -> max(x, y, z)
+            """;
+        var tree = Parser.Parse(Lexer.Lex(source));
+        tree.Diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty(
+            "max(x, y, z) function call should parse without errors (GAP-C fix)");
+    }
+
     // ── Function call ──────────────────────────────────────────────────────
 
     [Fact]

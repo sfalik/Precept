@@ -127,6 +127,14 @@ public static class Parser
                         .SelectMany(c => c.Entry.DisambiguationTokens!.Value)
                         .ToFrozenSet());
 
+    /// <summary>
+    /// Token kinds that may appear as a member name after <c>.</c> even though they
+    /// are normally keywords. <c>min</c> and <c>max</c> are DSL aggregation keywords
+    /// but are also idiomatic member-accessor names on numeric sequences.
+    /// </summary>
+    internal static readonly FrozenSet<TokenKind> KeywordsValidAsMemberName =
+        new[] { TokenKind.Min, TokenKind.Max }.ToFrozenSet();
+
     // ════════════════════════════════════════════════════════════════════════════
     //  Public entry point
     // ════════════════════════════════════════════════════════════════════════════
@@ -195,6 +203,20 @@ public static class Parser
         }
 
         private bool IsAtEnd() => Current().Kind == TokenKind.EndOfSource;
+
+        /// <summary>
+        /// Like <see cref="Expect(TokenKind)"/> for an identifier, but also accepts
+        /// keyword tokens listed in <see cref="KeywordsValidAsMemberName"/> so that
+        /// <c>.min</c> and <c>.max</c> parse as member accesses rather than syntax errors.
+        /// </summary>
+        private Token ExpectIdentifierOrKeywordAsMemberName()
+        {
+            var cur = Current();
+            if (cur.Kind == TokenKind.Identifier || KeywordsValidAsMemberName.Contains(cur.Kind))
+                return Advance();
+            _diagnostics.Add(Diagnostics.Create(DiagnosticCode.ExpectedToken, cur.Span, TokenKind.Identifier, cur.Text));
+            return new Token(TokenKind.Identifier, string.Empty, cur.Span);
+        }
 
         private void EmitDiagnostic(DiagnosticCode code, SourceSpan span, params object?[] args)
         {
@@ -1401,7 +1423,8 @@ public static class Parser
                 {
                     if (minPrecedence > 80) break;
                     Advance(); // consume '.'
-                    var member = Expect(TokenKind.Identifier);
+                    // GAP-C fix: keywords valid as member names (e.g. .min, .max)
+                    var member = ExpectIdentifierOrKeywordAsMemberName();
                     left = new MemberAccessExpression(
                         SourceSpan.Covering(left.Span, member.Span), left, member);
                     continue;
@@ -1521,6 +1544,10 @@ public static class Parser
                     return ParseInterpolatedTypedConstant();
 
                 case TokenKind.Identifier:
+                // GAP-C fix: min/max are keywords but can also appear as function names
+                // in expression position: min(a, b) or max(a, b).
+                case TokenKind.Min:
+                case TokenKind.Max:
                 {
                     var name = Advance();
                     // Function call: name(args...)
