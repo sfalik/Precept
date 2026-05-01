@@ -1404,6 +1404,7 @@ public static class Parser
         [HandlesForm(ExpressionFormKind.UnaryOperation)]
         [HandlesForm(ExpressionFormKind.Conditional)]
         [HandlesForm(ExpressionFormKind.FunctionCall)]
+        [HandlesForm(ExpressionFormKind.ListLiteral)]
         private Expression ParseAtom()
         {
             var current = Current();
@@ -1500,6 +1501,9 @@ public static class Parser
                         condition, whenTrue, whenFalse);
                 }
 
+                case TokenKind.LeftBracket:
+                    return ParseListLiteral();
+
                 default:
                     EmitDiagnostic(DiagnosticCode.ExpectedToken, current.Span, "expression", current.Text);
                     return new IdentifierExpression(current.Span,
@@ -1559,6 +1563,27 @@ public static class Parser
 
             return new InterpolatedTypedConstantExpression(
                 SourceSpan.Covering(startToken.Span, endToken.Span), parts.ToImmutable());
+        }
+
+        private ListLiteralExpression ParseListLiteral()
+        {
+            var openBracket = Advance(); // consume '['
+            var elements = ImmutableArray.CreateBuilder<Expression>();
+
+            if (Current().Kind != TokenKind.RightBracket)
+            {
+                do
+                {
+                    if (Current().Kind == TokenKind.RightBracket) break; // trailing comma
+                    elements.Add(ParseExpression(0));
+                }
+                while (Match(TokenKind.Comma));
+            }
+
+            var closeBracket = Expect(TokenKind.RightBracket);
+            return new ListLiteralExpression(
+                SourceSpan.Covering(openBracket.Span, closeBracket.Span),
+                elements.ToImmutable());
         }
 
         // ── Helpers ───────────────────────────────────────────────────────────

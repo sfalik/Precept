@@ -492,4 +492,58 @@ public class ExpressionParserTests
             .Which.Operand.Should().BeOfType<IdentifierExpression>()
             .Which.Name.Text.Should().Be("opt");
     }
+
+    // ── List literals (GAP-6, Slice 5) ────────────────────────────────────
+
+    [Fact]
+    public void ParseExpression_ListLiteral_Empty()
+    {
+        var expr = ParseExpr("[]");
+        var list = expr.Should().BeOfType<ListLiteralExpression>().Subject;
+        list.Elements.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void ParseExpression_ListLiteral_SingleElement()
+    {
+        var expr = ParseExpr("[1]");
+        var list = expr.Should().BeOfType<ListLiteralExpression>().Subject;
+        list.Elements.Should().HaveCount(1);
+        list.Elements[0].Should().BeOfType<LiteralExpression>()
+            .Which.Value.Text.Should().Be("1");
+    }
+
+    [Fact]
+    public void ParseExpression_ListLiteral_MultipleElements()
+    {
+        var expr = ParseExpr("[1, 2, 3]");
+        var list = expr.Should().BeOfType<ListLiteralExpression>().Subject;
+        list.Elements.Should().HaveCount(3);
+    }
+
+    [Fact]
+    public void ParseExpression_ListLiteral_StringElements()
+    {
+        var expr = ParseExpr("[\"a\", \"b\"]");
+        var list = expr.Should().BeOfType<ListLiteralExpression>().Subject;
+        list.Elements.Should().HaveCount(2);
+        list.Elements[0].Should().BeOfType<LiteralExpression>()
+            .Which.Value.Kind.Should().Be(TokenKind.StringLiteral);
+        list.Elements[1].Should().BeOfType<LiteralExpression>()
+            .Which.Value.Kind.Should().Be(TokenKind.StringLiteral);
+    }
+
+    [Fact]
+    public void ParseExpression_ListLiteral_NestedExpressions()
+    {
+        var expr = ParseExpr("[a + 1, b * 2]");
+        var list = expr.Should().BeOfType<ListLiteralExpression>().Subject;
+        list.Elements.Should().HaveCount(2);
+        list.Elements[0].Should().BeOfType<BinaryExpression>()
+            .Which.Operator.Kind.Should().Be(TokenKind.Plus);
+        list.Elements[1].Should().BeOfType<BinaryExpression>()
+            .Which.Operator.Kind.Should().Be(TokenKind.Star);
+    }
+
+    // ── Method calls (GAP-7, Slice 6) ─────────────────────────────────────
 }
