@@ -26,7 +26,7 @@ Before identifying gaps, here is the full picture of what the 19 existing analyz
 | PRECEPT0016a–b | `Faults.GetMeta` | `Code` identity mismatch, `nameof()` required |
 | PRECEPT0017 | ALL `GetMeta` switches (generic) | `Kind` argument must match switch arm pattern — no copy-paste mismatches |
 | PRECEPT0018 | All `Precept.*` enums | Semantic enums must not put a real member at value 0 — guards against `default(T)` silent routing |
-| PRECEPT0019 | `[HandlesCatalogExhaustively]` classes | Pipeline stage coverage — every form must have a `[HandlesForm]` method handler |
+| PRECEPT0019 | `[HandlesCatalogExhaustively]` classes | Pipeline stage coverage — every form must have a `[HandlesCatalogMember]` method handler |
 
 ---
 
@@ -271,3 +271,4 @@ PRECEPT0020 is the right next slice because:
 2. **The failure mode is a startup throw** — not a silent corruption. Startup failures in the Language static field initializers are hard to debug because the stack trace goes through `FrozenDictionary` internals, not through the offending catalog arm.
 3. **The timing is right** — Phase 2b is about to restructure `OperatorMeta` into a DU. Locking down the existing `(Token.Kind, Arity)` invariant *before* that work makes Phase 2b safer.
 4. **Implementation is a direct extrapolation** — PRECEPT0009 is the template. The new element is token-kind extraction from `Tokens.GetMeta()` invocations, which is a small, well-scoped addition to the established analysis pattern.
+

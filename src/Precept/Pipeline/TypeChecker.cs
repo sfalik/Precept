@@ -29,17 +29,18 @@ public static class TypeChecker
 {
     public static SemanticIndex Check(SyntaxTree tree) => throw new NotImplementedException();
 
-    [HandlesForm(ExpressionFormKind.Literal)]
-    [HandlesForm(ExpressionFormKind.Identifier)]
-    [HandlesForm(ExpressionFormKind.Grouped)]
-    [HandlesForm(ExpressionFormKind.BinaryOperation)]
-    [HandlesForm(ExpressionFormKind.UnaryOperation)]
-    [HandlesForm(ExpressionFormKind.MemberAccess)]
-    [HandlesForm(ExpressionFormKind.Conditional)]
-    [HandlesForm(ExpressionFormKind.FunctionCall)]
-    [HandlesForm(ExpressionFormKind.MethodCall)]
-    [HandlesForm(ExpressionFormKind.ListLiteral)]
-    [HandlesForm(ExpressionFormKind.PostfixOperation)]
+    [HandlesCatalogMember(ExpressionFormKind.Literal)]
+    [HandlesCatalogMember(ExpressionFormKind.Identifier)]
+    [HandlesCatalogMember(ExpressionFormKind.Grouped)]
+    [HandlesCatalogMember(ExpressionFormKind.BinaryOperation)]
+    [HandlesCatalogMember(ExpressionFormKind.UnaryOperation)]
+    [HandlesCatalogMember(ExpressionFormKind.MemberAccess)]
+    [HandlesCatalogMember(ExpressionFormKind.Conditional)]
+    [HandlesCatalogMember(ExpressionFormKind.FunctionCall)]
+    [HandlesCatalogMember(ExpressionFormKind.MethodCall)]
+    [HandlesCatalogMember(ExpressionFormKind.ListLiteral)]
+    [HandlesCatalogMember(ExpressionFormKind.PostfixOperation)]
     private static void CheckExpression(Expression expression) =>
         throw new NotImplementedException("TypeChecker expression handling — Phase 3 implementation");
 }
+

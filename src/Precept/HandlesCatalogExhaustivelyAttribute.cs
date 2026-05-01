@@ -3,7 +3,7 @@ namespace Precept;
 /// <summary>
 /// Marks a pipeline class as requiring exhaustive coverage of every member in a catalog enum.
 /// PRECEPT0019 audits decorated classes: for each member of <paramref name="catalogEnum"/>,
-/// at least one method in this class must be annotated with <c>[HandlesForm(EnumType.Member)]</c>.
+/// at least one method in this class must be annotated with <c>[HandlesCatalogMember(EnumType.Member)]</c>.
 /// </summary>
 /// <remarks>
 /// This is the catalog-agnostic class marker for the annotation-bridge pattern.
@@ -24,3 +24,4 @@ public sealed class HandlesCatalogExhaustivelyAttribute : Attribute
     /// <summary>The catalog enum type whose members must all be handled.</summary>
     public Type CatalogEnum { get; }
 }
+

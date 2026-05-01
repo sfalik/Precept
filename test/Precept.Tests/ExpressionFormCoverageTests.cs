@@ -80,7 +80,7 @@ public class ExpressionFormCoverageTests
     }
 
     [Fact]
-    public void Parser_HandlesFormAnnotations_CoverAllExpressionFormKinds()
+    public void Parser_HandlesCatalogMemberAnnotations_CoverAllExpressionFormKinds()
     {
         var preceptAssembly = typeof(ExpressionFormKind).Assembly;
         var annotatedTypes = preceptAssembly.GetTypes()
@@ -93,7 +93,7 @@ public class ExpressionFormCoverageTests
             var handledKinds = annotatedType
                 .GetMethods(BindingFlags.Public | BindingFlags.NonPublic |
                             BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly)
-                .SelectMany(m => m.GetCustomAttributes<HandlesFormAttribute>())
+                .SelectMany(m => m.GetCustomAttributes<HandlesCatalogMemberAttribute>())
                 .Select(a => a.Kind)
                 .OfType<ExpressionFormKind>()
                 .ToHashSet();
@@ -101,7 +101,7 @@ public class ExpressionFormCoverageTests
             foreach (var kind in Enum.GetValues<ExpressionFormKind>())
             {
                 handledKinds.Should().Contain(kind,
-                    because: $"{annotatedType.Name} must have at least one [HandlesForm({kind})] annotation");
+                    because: $"{annotatedType.Name} must have at least one [HandlesCatalogMember({kind})] annotation");
             }
         }
     }
@@ -145,3 +145,4 @@ public class ExpressionFormCoverageTests
         expr.Should().BeOfType<MethodCallExpression>();
     }
 }
+

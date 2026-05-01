@@ -60,14 +60,14 @@ All 13 slices shipped on `spike/Precept-V2`. Test baseline: 2107 → 2482 (+375 
 |-------|-----------|-------------|--------|
 | 19 | A1 | Enum additions: `Arity.Postfix`, `OperatorKind.IsSet/IsNotSet`, `OperatorFamily.Presence` | ✅ Done |
 | 20 | A2/B | `OperatorMeta` → DU (`SingleTokenOp`/`MultiTokenOp`) + `ByToken`/`ByTokenSequence` restructure | ✅ Done |
-| 21 | A3 | `ExpressionFormKind.PostfixOperation` (11th member) + `[HandlesForm]` on `is`-handler | ✅ Done |
+| 21 | A3 | `ExpressionFormKind.PostfixOperation` (11th member) + `[HandlesCatalogMember]` on `is`-handler | ✅ Done |
 | 22 | A4 | Consumer call site audit — no stragglers; build clean, 2274 tests passing | ✅ Done |
 
 #### Phase 2c — Sequential (PRECEPT0019 promotion, depends on 2b)
 
 | Slice | Work Item | Description | Status |
 |-------|-----------|-------------|--------|
-| 23 | C1 | Annotate `TypeChecker` with `[HandlesCatalogExhaustively]` + `[HandlesForm]` for all 11 forms | ✅ Done |
+| 23 | C1 | Annotate `TypeChecker` with `[HandlesCatalogExhaustively]` + `[HandlesCatalogMember]` for all 11 forms | ✅ Done |
 | 24 | C2 | Annotate `GraphAnalyzer` similarly | ✅ Done |
 | 25 | G1 | Write `ExpressionFormCoverageTests.cs` (Slice 13 makeup) | ✅ Done |
 | 26 | C3–C5 | Flip PRECEPT0019 `Warning` → `Error`, remove `WarningsNotAsErrors`, verify build | ✅ Done |
@@ -275,12 +275,12 @@ if (current.Kind == TokenKind.Is)
 | `tools/Precept.Mcp/Tools/LanguageTool.cs` | `precept_language` response assembly | Add `expression_forms` section from `ExpressionForms.All`, grouped by `Category` |
 | `src/Precept.Analyzers/CatalogAnalysisHelpers.cs` | `CatalogEnumNames` list | Add `"ExpressionFormKind"` so PRECEPT0007 enforces exhaustive `GetMeta` switches at compile time |
 | `src/Precept/HandlesCatalogExhaustivelyAttribute.cs` | Existing file | Already exists — verify the stackable class-level catalog coverage marker shape before modifying if needed |
-| `src/Precept/Language/HandlesFormAttribute.cs` | Existing file | Already exists — verify the `[HandlesForm]` annotation attribute shape (`Kind`) before modifying if needed; call-sites still use typed enum literals such as `ExpressionFormKind.Identifier` |
-| `src/Precept.Analyzers/Precept0019PipelineCoverageExhaustiveness.cs` | Existing file | Modify PRECEPT0019 — fully generic analyzer: discovers any class marked with `[HandlesCatalogExhaustively(typeof(T))]`, reads enum `T`, and checks every member of `T` has at least one `[HandlesForm(X)]` method in that class; future catalogs require zero analyzer changes |
-| `src/Precept/Pipeline/Parser.cs` | ~10 expression handler methods + class declaration | Add `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]` on the class and `[HandlesForm(ExpressionFormKind.X)]` on each existing form handler; Slices 5 and 6 add annotations for the new forms they introduce |
-| `src/Precept/Pipeline/TypeChecker.cs` | Expression-handling methods + class declaration | Add `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]` on the class and `[HandlesForm(ExpressionFormKind.X)]` annotations to satisfy PRECEPT0019 |
-| `src/Precept/Pipeline/Evaluator.cs` | Expression-handling methods + class declaration | Add `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]` on the class and `[HandlesForm(ExpressionFormKind.X)]` annotations to satisfy PRECEPT0019 |
-| `src/Precept/Pipeline/GraphAnalyzer.cs` | Expression-handling methods + class declaration | Add `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]` on the class and `[HandlesForm(ExpressionFormKind.X)]` annotations to satisfy PRECEPT0019 |
+| `src/Precept/Language/HandlesCatalogMemberAttribute.cs` | Existing file | Already exists — verify the `[HandlesCatalogMember]` annotation attribute shape (`Kind`) before modifying if needed; call-sites still use typed enum literals such as `ExpressionFormKind.Identifier` |
+| `src/Precept.Analyzers/Precept0019PipelineCoverageExhaustiveness.cs` | Existing file | Modify PRECEPT0019 — fully generic analyzer: discovers any class marked with `[HandlesCatalogExhaustively(typeof(T))]`, reads enum `T`, and checks every member of `T` has at least one `[HandlesCatalogMember(X)]` method in that class; future catalogs require zero analyzer changes |
+| `src/Precept/Pipeline/Parser.cs` | ~10 expression handler methods + class declaration | Add `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]` on the class and `[HandlesCatalogMember(ExpressionFormKind.X)]` on each existing form handler; Slices 5 and 6 add annotations for the new forms they introduce |
+| `src/Precept/Pipeline/TypeChecker.cs` | Expression-handling methods + class declaration | Add `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]` on the class and `[HandlesCatalogMember(ExpressionFormKind.X)]` annotations to satisfy PRECEPT0019 |
+| `src/Precept/Pipeline/Evaluator.cs` | Expression-handling methods + class declaration | Add `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]` on the class and `[HandlesCatalogMember(ExpressionFormKind.X)]` annotations to satisfy PRECEPT0019 |
+| `src/Precept/Pipeline/GraphAnalyzer.cs` | Expression-handling methods + class declaration | Add `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]` on the class and `[HandlesCatalogMember(ExpressionFormKind.X)]` annotations to satisfy PRECEPT0019 |
 
 **What to create — `src/Precept/Language/ExpressionForms.cs`:**
 
@@ -343,7 +343,7 @@ public static class ExpressionForms
 
 **Analyzer registration (compile-time coverage enforcement):** Add `"ExpressionFormKind"` to `CatalogAnalysisHelpers.CatalogEnumNames` in `src/Precept.Analyzers/`. PRECEPT0007 already enforces exhaustive switches on all registered catalog enum names — once `ExpressionFormKind` is in that list, any future member added without a `GetMeta` switch arm is a compile-time error. No new analyzer infrastructure is needed. This is Layer 1 of the two-layer coverage pattern.
 
-**`HandlesCatalogExhaustivelyAttribute` + `HandlesFormAttribute` (annotation bridge, shipped in Slice 4):** Verify the existing `src/Precept/HandlesCatalogExhaustivelyAttribute.cs` and `src/Precept/Language/HandlesFormAttribute.cs` shapes before modifying them:
+**`HandlesCatalogExhaustivelyAttribute` + `HandlesCatalogMemberAttribute` (annotation bridge, shipped in Slice 4):** Verify the existing `src/Precept/HandlesCatalogExhaustivelyAttribute.cs` and `src/Precept/Language/HandlesCatalogMemberAttribute.cs` shapes before modifying them:
 
 ```csharp
 [AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
@@ -354,20 +354,20 @@ public sealed class HandlesCatalogExhaustivelyAttribute : Attribute
 }
 
 [AttributeUsage(AttributeTargets.Method, AllowMultiple = true)]
-public sealed class HandlesFormAttribute : Attribute
+public sealed class HandlesCatalogMemberAttribute : Attribute
 {
-    public HandlesFormAttribute(object kind) => Kind = kind;
+    public HandlesCatalogMemberAttribute(object kind) => Kind = kind;
     public object Kind { get; }
 }
 ```
 
-Method annotations still use typed enum literals at the call-site — e.g. `[HandlesForm(ExpressionFormKind.Identifier)]` — but the attribute constructor accepts `object` so the same attribute works for any catalog enum. Class-level coverage markers use `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]`; the attribute is stackable, so a future class handling multiple catalogs declares one attribute per catalog.
+Method annotations still use typed enum literals at the call-site — e.g. `[HandlesCatalogMember(ExpressionFormKind.Identifier)]` — but the attribute constructor accepts `object` so the same attribute works for any catalog enum. Class-level coverage markers use `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]`; the attribute is stackable, so a future class handling multiple catalogs declares one attribute per catalog.
 
-**PRECEPT0019 — Pipeline Coverage Analyzer:** Modify `src/Precept.Analyzers/Precept0019PipelineCoverageExhaustiveness.cs`. The analyzer is fully generic: it discovers every class marked with `[HandlesCatalogExhaustively(typeof(T))]`, reads the declared enum `T`, and verifies that every member of `T` has at least one `[HandlesForm(X)]`-decorated method in that same class. For the Slice 4 expression-form pass, that means `Parser`, `TypeChecker`, `Evaluator`, and `GraphAnalyzer` each declare `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]` and must cover every `ExpressionFormKind` member. Fires: `"{CatalogType}.{member} has no [HandlesForm] handler in {ClassName}"` (error). This is distinct from PRECEPT0007, which enforces `GetMeta` switch exhaustiveness. PRECEPT0019 is Layer 2 of the coverage enforcement pattern, and adding a future catalog requires zero analyzer changes.
+**PRECEPT0019 — Pipeline Coverage Analyzer:** Modify `src/Precept.Analyzers/Precept0019PipelineCoverageExhaustiveness.cs`. The analyzer is fully generic: it discovers every class marked with `[HandlesCatalogExhaustively(typeof(T))]`, reads the declared enum `T`, and verifies that every member of `T` has at least one `[HandlesCatalogMember(X)]`-decorated method in that same class. For the Slice 4 expression-form pass, that means `Parser`, `TypeChecker`, `Evaluator`, and `GraphAnalyzer` each declare `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]` and must cover every `ExpressionFormKind` member. Fires: `"{CatalogType}.{member} has no [HandlesCatalogMember] handler in {ClassName}"` (error). This is distinct from PRECEPT0007, which enforces `GetMeta` switch exhaustiveness. PRECEPT0019 is Layer 2 of the coverage enforcement pattern, and adding a future catalog requires zero analyzer changes.
 
-**Parser method annotations (shipped in Slice 4):** Add `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]` to `Parser`, then annotate the Parser's ~10 existing expression handler methods with `[HandlesForm(ExpressionFormKind.X)]`. Slices 5 and 6 will add `[HandlesForm(ExpressionFormKind.ListLiteral)]` and `[HandlesForm(ExpressionFormKind.MethodCall)]` respectively on the new methods they introduce.
+**Parser method annotations (shipped in Slice 4):** Add `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]` to `Parser`, then annotate the Parser's ~10 existing expression handler methods with `[HandlesCatalogMember(ExpressionFormKind.X)]`. Slices 5 and 6 will add `[HandlesCatalogMember(ExpressionFormKind.ListLiteral)]` and `[HandlesCatalogMember(ExpressionFormKind.MethodCall)]` respectively on the new methods they introduce.
 
-**Downstream stage annotations (shipped in Slice 4):** Add `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]` to `TypeChecker`, `Evaluator`, and `GraphAnalyzer`, then annotate their expression-handling methods with `[HandlesForm(ExpressionFormKind.X)]`. All four classes must be annotated in the same slice — PRECEPT0019 fires on all of them simultaneously.
+**Downstream stage annotations (shipped in Slice 4):** Add `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]` to `TypeChecker`, `Evaluator`, and `GraphAnalyzer`, then annotate their expression-handling methods with `[HandlesCatalogMember(ExpressionFormKind.X)]`. All four classes must be annotated in the same slice — PRECEPT0019 fires on all of them simultaneously.
 
 **Tests to write** (in `test/Precept.Tests/ExpressionFormCatalogTests.cs`, new file):
 
@@ -378,8 +378,8 @@ Method annotations still use typed enum literals at the call-site — e.g. `[Han
 | `ExpressionForms_IsLeftDenotation_CorrectForLedForms` | `BinaryOperation`, `MemberAccess`, `MethodCall` have `IsLeftDenotation = true` |
 | `ExpressionForms_IsLeftDenotation_CorrectForNudForms` | All remaining members have `IsLeftDenotation = false` |
 | `ExpressionForms_GetMeta_AllMembersHandled` | `Enum.GetValues<ExpressionFormKind>()` — `GetMeta()` does not throw for any member |
-| `PRECEPT0019_Fires_WhenFormKindHasNoHandler` | Analyzer emits PRECEPT0019 when a class marked with `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]` is missing a `[HandlesForm]` handler for an `ExpressionFormKind` member |
-| `PRECEPT0019_Passes_WhenAllFormKindsAnnotated` | Analyzer passes when each class marked with `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]` covers all `ExpressionFormKind` members with `[HandlesForm]` |
+| `PRECEPT0019_Fires_WhenFormKindHasNoHandler` | Analyzer emits PRECEPT0019 when a class marked with `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]` is missing a `[HandlesCatalogMember]` handler for an `ExpressionFormKind` member |
+| `PRECEPT0019_Passes_WhenAllFormKindsAnnotated` | Analyzer passes when each class marked with `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]` covers all `ExpressionFormKind` members with `[HandlesCatalogMember]` |
 
 **Regression anchors:** All existing catalog tests must pass unchanged. No modifications to any other catalog file.
 
@@ -659,13 +659,13 @@ New test class `ExpressionFormCoverageTests` in `test/Precept.Tests/Language/`:
 |------|-------|-------------|
 | `src/Precept/Language/ExpressionForms.cs` | 4 | **Create** — new 13th catalog |
 | `src/Precept/HandlesCatalogExhaustivelyAttribute.cs` | 4 | Modify — existing stackable class-level catalog coverage marker |
-| `src/Precept/Language/HandlesFormAttribute.cs` | 4 | Modify — existing `[HandlesForm]` annotation attribute |
+| `src/Precept/Language/HandlesCatalogMemberAttribute.cs` | 4 | Modify — existing `[HandlesCatalogMember]` annotation attribute |
 | `src/Precept.Analyzers/CatalogAnalysisHelpers.cs` | 4 | Modify — add `"ExpressionFormKind"` to `CatalogEnumNames` |
 | `src/Precept.Analyzers/Precept0019PipelineCoverageExhaustiveness.cs` | 4 | Modify — existing fully generic PRECEPT0019 catalog coverage analyzer |
-| `src/Precept/Pipeline/Parser.cs` | 1,2,3,4,5,6 | Modify — add atom cases, left-denotation handlers, ensure guard parsing, `[HandlesForm]` annotations |
-| `src/Precept/Pipeline/TypeChecker.cs` | 4 | Modify — add `[HandlesForm]` annotations |
-| `src/Precept/Pipeline/Evaluator.cs` | 4 | Modify — add `[HandlesForm]` annotations |
-| `src/Precept/Pipeline/GraphAnalyzer.cs` | 4 | Modify — add `[HandlesForm]` annotations |
+| `src/Precept/Pipeline/Parser.cs` | 1,2,3,4,5,6 | Modify — add atom cases, left-denotation handlers, ensure guard parsing, `[HandlesCatalogMember]` annotations |
+| `src/Precept/Pipeline/TypeChecker.cs` | 4 | Modify — add `[HandlesCatalogMember]` annotations |
+| `src/Precept/Pipeline/Evaluator.cs` | 4 | Modify — add `[HandlesCatalogMember]` annotations |
+| `src/Precept/Pipeline/GraphAnalyzer.cs` | 4 | Modify — add `[HandlesCatalogMember]` annotations |
 | `src/Precept/Pipeline/SyntaxNodes/Expressions/TypedConstantExpression.cs` | 1 | **Create** |
 | `src/Precept/Pipeline/SyntaxNodes/Expressions/InterpolatedTypedConstantExpression.cs` | 1 | **Create** |
 | `src/Precept/Language/Operators.cs` | 3 | Modify — add `Arity.Postfix = 3`, `OperatorKind.IsSet = 19`, `GetMeta()` arm for `IsSet` |
@@ -710,7 +710,7 @@ Slice 9 (contains tests)        ─── no dependencies, can parallelize
 Slice 1 (typed constants)       ─── no dependencies
 Slice 3 (is set)                ─── no dependencies
 Slice 4 (ExpressionForms catalog + annotation bridge) ─── no dependencies; prerequisite for Slices 5 and 6
-                                    (HandlesFormAttribute, PRECEPT0019, and annotation pass ship in this slice)
+                                    (HandlesCatalogMemberAttribute, PRECEPT0019, and annotation pass ship in this slice)
 Slice 5 (list literals)         ─── DEPENDS ON Slice 4 (ExpressionForms catalog must exist)
 Slice 6 (method calls)          ─── DEPENDS ON Slice 4 (ExpressionForms catalog must exist)
 
@@ -1150,7 +1150,7 @@ Method call is the same: it's syntactic structure for applying arguments to a ca
    │                    PHASE 2b: SEQUENTIAL                      │
    │  Slice 19 (A1: enum additions)                               │
    │  Slice 20 (A2/B: OperatorMeta DU + ByToken restructure)     │
-   │  Slice 21 (A3: PostfixOperation + [HandlesForm])             │
+   │  Slice 21 (A3: PostfixOperation + [HandlesCatalogMember])             │
    │  Slice 22 (A4: migrate consumer call sites)                  │
    └──────────────────────────────────────────────────────────────┘
                             │
@@ -1896,9 +1896,9 @@ private static readonly FrozenDictionary<TokenKind, int> OperatorPrecedence =
 
 ---
 
-### Slice 21: Work Item A3 — `ExpressionFormKind.PostfixOperation` (11th Member) + `[HandlesForm]` ⏳ PENDING
+### Slice 21: Work Item A3 — `ExpressionFormKind.PostfixOperation` (11th Member) + `[HandlesCatalogMember]` ⏳ PENDING
 
-**Goal:** Add the 11th `ExpressionFormKind` member (`PostfixOperation`) and annotate `ParseExpression`'s `is`-handler with `[HandlesForm(ExpressionFormKind.PostfixOperation)]`.
+**Goal:** Add the 11th `ExpressionFormKind` member (`PostfixOperation`) and annotate `ParseExpression`'s `is`-handler with `[HandlesCatalogMember(ExpressionFormKind.PostfixOperation)]`.
 
 **Rationale:** The `is set`/`is not set` handler in `ParseExpression` is a left-denotation (Pratt led) handler — a postfix operation form. Without this catalog member, `ExpressionForms` is missing a form and PRECEPT0019 cannot achieve green-with-zero-warnings (it currently fires for the missing `PostfixOperation` coverage). Once this member is added and annotated, all 11 forms are covered on `Parser`.
 
@@ -1910,7 +1910,7 @@ private static readonly FrozenDictionary<TokenKind, int> OperatorPrecedence =
 |------|----------|--------|
 | `src/Precept/Language/ExpressionForms.cs` | `ExpressionFormKind` enum | Add `PostfixOperation = 11` after `ListLiteral` |
 | `src/Precept/Language/ExpressionForms.cs` | `ExpressionForms.GetMeta()` switch | Add arm for `PostfixOperation` |
-| `src/Precept/Pipeline/Parser.cs` | `ParseExpression` method annotations | Add `[HandlesForm(ExpressionFormKind.PostfixOperation)]` |
+| `src/Precept/Pipeline/Parser.cs` | `ParseExpression` method annotations | Add `[HandlesCatalogMember(ExpressionFormKind.PostfixOperation)]` |
 | `test/Precept.Tests/ExpressionFormCatalogTests.cs` | `ExpressionForms_All_HasExpectedCount` | Update count assertion: 10 → 11 |
 
 **`ExpressionFormKind` enum addition:**
@@ -1932,16 +1932,16 @@ ExpressionFormKind.PostfixOperation => new(
 
 ```csharp
 // Before:
-[HandlesForm(ExpressionFormKind.MemberAccess)]
-[HandlesForm(ExpressionFormKind.BinaryOperation)]
-[HandlesForm(ExpressionFormKind.MethodCall)]
+[HandlesCatalogMember(ExpressionFormKind.MemberAccess)]
+[HandlesCatalogMember(ExpressionFormKind.BinaryOperation)]
+[HandlesCatalogMember(ExpressionFormKind.MethodCall)]
 internal Expression ParseExpression(int minPrecedence)
 
 // After:
-[HandlesForm(ExpressionFormKind.MemberAccess)]
-[HandlesForm(ExpressionFormKind.BinaryOperation)]
-[HandlesForm(ExpressionFormKind.MethodCall)]
-[HandlesForm(ExpressionFormKind.PostfixOperation)]   // is set / is not set
+[HandlesCatalogMember(ExpressionFormKind.MemberAccess)]
+[HandlesCatalogMember(ExpressionFormKind.BinaryOperation)]
+[HandlesCatalogMember(ExpressionFormKind.MethodCall)]
+[HandlesCatalogMember(ExpressionFormKind.PostfixOperation)]   // is set / is not set
 internal Expression ParseExpression(int minPrecedence)
 ```
 
@@ -1964,7 +1964,7 @@ Once this annotation is added, all 11 `ExpressionFormKind` members are covered o
 **Acceptance criteria:**
 - `ExpressionFormKind.PostfixOperation = 11` exists
 - `ExpressionForms.All.Count == 11`
-- `ParseExpression` has `[HandlesForm(ExpressionFormKind.PostfixOperation)]`
+- `ParseExpression` has `[HandlesCatalogMember(ExpressionFormKind.PostfixOperation)]`
 - PRECEPT0019 fires zero times for `Parser` — verify: `dotnet build src/Precept/ -v q` shows no PRECEPT0019
 - All existing `ExpressionFormCatalogTests` pass; count assertion updated to 11
 
@@ -2012,13 +2012,13 @@ if (meta is SingleTokenOp singleToken)
 
 ---
 
-### Slice 23: Work Item C1 — Annotate `TypeChecker` with `[HandlesCatalogExhaustively]` + `[HandlesForm]` ⏳ PENDING
+### Slice 23: Work Item C1 — Annotate `TypeChecker` with `[HandlesCatalogExhaustively]` + `[HandlesCatalogMember]` ⏳ PENDING
 
-**Goal:** Add `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]` to `TypeChecker` and `[HandlesForm]` annotations for all 11 `ExpressionFormKind` members.
+**Goal:** Add `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]` to `TypeChecker` and `[HandlesCatalogMember]` annotations for all 11 `ExpressionFormKind` members.
 
-**Rationale:** PRECEPT0019 is currently a Warning suppressed by `<WarningsNotAsErrors>PRECEPT0019</WarningsNotAsErrors>`. Before flipping to Error (Slice 26), all pipeline classes that declare `[HandlesCatalogExhaustively]` must have full `[HandlesForm]` coverage. `TypeChecker` currently has neither marker — adding the class marker without full coverage would immediately fire PRECEPT0019 for all 11 forms.
+**Rationale:** PRECEPT0019 is currently a Warning suppressed by `<WarningsNotAsErrors>PRECEPT0019</WarningsNotAsErrors>`. Before flipping to Error (Slice 26), all pipeline classes that declare `[HandlesCatalogExhaustively]` must have full `[HandlesCatalogMember]` coverage. `TypeChecker` currently has neither marker — adding the class marker without full coverage would immediately fire PRECEPT0019 for all 11 forms.
 
-`TypeChecker` is currently a stub that throws `NotImplementedException`. The `[HandlesForm]` annotations point to the stub method(s) that throw — accurately signaling "this form is designated for handling here (Phase 3 implementation pending)." This is not annotation abuse; it is the correct declaration of intent.
+`TypeChecker` is currently a stub that throws `NotImplementedException`. The `[HandlesCatalogMember]` annotations point to the stub method(s) that throw — accurately signaling "this form is designated for handling here (Phase 3 implementation pending)." This is not annotation abuse; it is the correct declaration of intent.
 
 **Dependencies:** Slice 21 (`PostfixOperation` exists — all 11 forms defined).
 
@@ -2027,7 +2027,7 @@ if (meta is SingleTokenOp singleToken)
 | File | Location | Change |
 |------|----------|--------|
 | `src/Precept/Pipeline/TypeChecker.cs` | Class declaration | Add `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]` |
-| `src/Precept/Pipeline/TypeChecker.cs` | Expression-handling method(s) | Add `[HandlesForm(ExpressionFormKind.X)]` for all 11 forms |
+| `src/Precept/Pipeline/TypeChecker.cs` | Expression-handling method(s) | Add `[HandlesCatalogMember(ExpressionFormKind.X)]` for all 11 forms |
 
 **Annotation pattern:**
 
@@ -2037,17 +2037,17 @@ internal sealed class TypeChecker
 {
     // ... existing code ...
 
-    [HandlesForm(ExpressionFormKind.Literal)]
-    [HandlesForm(ExpressionFormKind.Identifier)]
-    [HandlesForm(ExpressionFormKind.Grouped)]
-    [HandlesForm(ExpressionFormKind.BinaryOperation)]
-    [HandlesForm(ExpressionFormKind.UnaryOperation)]
-    [HandlesForm(ExpressionFormKind.MemberAccess)]
-    [HandlesForm(ExpressionFormKind.Conditional)]
-    [HandlesForm(ExpressionFormKind.FunctionCall)]
-    [HandlesForm(ExpressionFormKind.MethodCall)]
-    [HandlesForm(ExpressionFormKind.ListLiteral)]
-    [HandlesForm(ExpressionFormKind.PostfixOperation)]
+    [HandlesCatalogMember(ExpressionFormKind.Literal)]
+    [HandlesCatalogMember(ExpressionFormKind.Identifier)]
+    [HandlesCatalogMember(ExpressionFormKind.Grouped)]
+    [HandlesCatalogMember(ExpressionFormKind.BinaryOperation)]
+    [HandlesCatalogMember(ExpressionFormKind.UnaryOperation)]
+    [HandlesCatalogMember(ExpressionFormKind.MemberAccess)]
+    [HandlesCatalogMember(ExpressionFormKind.Conditional)]
+    [HandlesCatalogMember(ExpressionFormKind.FunctionCall)]
+    [HandlesCatalogMember(ExpressionFormKind.MethodCall)]
+    [HandlesCatalogMember(ExpressionFormKind.ListLiteral)]
+    [HandlesCatalogMember(ExpressionFormKind.PostfixOperation)]
     private TypeResult CheckExpression(Expression expression)
     {
         throw new NotImplementedException("TypeChecker expression handling — Phase 3 implementation");
@@ -2059,17 +2059,17 @@ internal sealed class TypeChecker
 
 **Acceptance criteria:**
 - `TypeChecker` has `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]`
-- All 11 `ExpressionFormKind` members covered by `[HandlesForm]` on `TypeChecker`
+- All 11 `ExpressionFormKind` members covered by `[HandlesCatalogMember]` on `TypeChecker`
 - PRECEPT0019 fires zero times for `TypeChecker`
 - No regressions
 
 ---
 
-### Slice 24: Work Item C2 — Annotate `GraphAnalyzer` with `[HandlesCatalogExhaustively]` + `[HandlesForm]` ⏳ PENDING
+### Slice 24: Work Item C2 — Annotate `GraphAnalyzer` with `[HandlesCatalogExhaustively]` + `[HandlesCatalogMember]` ⏳ PENDING
 
 **Goal:** Same pattern as Slice 23, applied to `GraphAnalyzer`.
 
-**Rationale:** `GraphAnalyzer` is the other unimplemented pipeline stub. Until it has `[HandlesCatalogExhaustively]` and full `[HandlesForm]` coverage, flipping PRECEPT0019 to Error would fire for all 11 forms on `GraphAnalyzer`. Slices 23 and 24 can be committed in the same pass.
+**Rationale:** `GraphAnalyzer` is the other unimplemented pipeline stub. Until it has `[HandlesCatalogExhaustively]` and full `[HandlesCatalogMember]` coverage, flipping PRECEPT0019 to Error would fire for all 11 forms on `GraphAnalyzer`. Slices 23 and 24 can be committed in the same pass.
 
 **Dependencies:** Slice 21 (`PostfixOperation` exists). Can be implemented in the same commit as Slice 23.
 
@@ -2078,7 +2078,7 @@ internal sealed class TypeChecker
 | File | Location | Change |
 |------|----------|--------|
 | `src/Precept/Pipeline/GraphAnalyzer.cs` | Class declaration | Add `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]` |
-| `src/Precept/Pipeline/GraphAnalyzer.cs` | Expression-handling method(s) | Add `[HandlesForm(ExpressionFormKind.X)]` for all 11 forms |
+| `src/Precept/Pipeline/GraphAnalyzer.cs` | Expression-handling method(s) | Add `[HandlesCatalogMember(ExpressionFormKind.X)]` for all 11 forms |
 
 **Annotation pattern:**
 
@@ -2086,17 +2086,17 @@ internal sealed class TypeChecker
 [HandlesCatalogExhaustively(typeof(ExpressionFormKind))]
 internal sealed class GraphAnalyzer
 {
-    [HandlesForm(ExpressionFormKind.Literal)]
-    [HandlesForm(ExpressionFormKind.Identifier)]
-    [HandlesForm(ExpressionFormKind.Grouped)]
-    [HandlesForm(ExpressionFormKind.BinaryOperation)]
-    [HandlesForm(ExpressionFormKind.UnaryOperation)]
-    [HandlesForm(ExpressionFormKind.MemberAccess)]
-    [HandlesForm(ExpressionFormKind.Conditional)]
-    [HandlesForm(ExpressionFormKind.FunctionCall)]
-    [HandlesForm(ExpressionFormKind.MethodCall)]
-    [HandlesForm(ExpressionFormKind.ListLiteral)]
-    [HandlesForm(ExpressionFormKind.PostfixOperation)]
+    [HandlesCatalogMember(ExpressionFormKind.Literal)]
+    [HandlesCatalogMember(ExpressionFormKind.Identifier)]
+    [HandlesCatalogMember(ExpressionFormKind.Grouped)]
+    [HandlesCatalogMember(ExpressionFormKind.BinaryOperation)]
+    [HandlesCatalogMember(ExpressionFormKind.UnaryOperation)]
+    [HandlesCatalogMember(ExpressionFormKind.MemberAccess)]
+    [HandlesCatalogMember(ExpressionFormKind.Conditional)]
+    [HandlesCatalogMember(ExpressionFormKind.FunctionCall)]
+    [HandlesCatalogMember(ExpressionFormKind.MethodCall)]
+    [HandlesCatalogMember(ExpressionFormKind.ListLiteral)]
+    [HandlesCatalogMember(ExpressionFormKind.PostfixOperation)]
     private GraphResult AnalyzeExpression(Expression expression)
     {
         throw new NotImplementedException("GraphAnalyzer expression handling — Phase 3 implementation");
@@ -2108,7 +2108,7 @@ internal sealed class GraphAnalyzer
 
 **Acceptance criteria:**
 - `GraphAnalyzer` has `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]`
-- All 11 `ExpressionFormKind` members covered by `[HandlesForm]` on `GraphAnalyzer`
+- All 11 `ExpressionFormKind` members covered by `[HandlesCatalogMember]` on `GraphAnalyzer`
 - PRECEPT0019 fires zero times for `GraphAnalyzer`
 - `dotnet build src/Precept/ -v q` — zero PRECEPT0019 warnings across all classes
 - No regressions
@@ -2229,14 +2229,14 @@ public class ExpressionFormCoverageTests
 
 **Goal:** Promote PRECEPT0019 from an informational warning to a build error. Remove the suppression. Verify the build is green with full enforcement active.
 
-**Rationale:** PRECEPT0019 was intentionally left as `Warning` + `WarningsNotAsErrors` suppression in Phase 1 because `TypeChecker` and `GraphAnalyzer` lacked annotations. After Slices 23 and 24, all pipeline classes have full `[HandlesForm]` coverage. The suppression is now a semantic lie — it implies there are known acceptable uncovered forms, which is false. Remove it and make enforcement real.
+**Rationale:** PRECEPT0019 was intentionally left as `Warning` + `WarningsNotAsErrors` suppression in Phase 1 because `TypeChecker` and `GraphAnalyzer` lacked annotations. After Slices 23 and 24, all pipeline classes have full `[HandlesCatalogMember]` coverage. The suppression is now a semantic lie — it implies there are known acceptable uncovered forms, which is false. Remove it and make enforcement real.
 
 **Prerequisites — must ALL be verified before applying changes:**
 
 1. `ExpressionFormKind.PostfixOperation` exists (Slice 21) ✓
-2. `[HandlesForm(ExpressionFormKind.PostfixOperation)]` on `ParseExpression` (Slice 21) ✓
-3. `TypeChecker` annotated with full `[HandlesForm]` coverage (Slice 23) ✓
-4. `GraphAnalyzer` annotated with full `[HandlesForm]` coverage (Slice 24) ✓
+2. `[HandlesCatalogMember(ExpressionFormKind.PostfixOperation)]` on `ParseExpression` (Slice 21) ✓
+3. `TypeChecker` annotated with full `[HandlesCatalogMember]` coverage (Slice 23) ✓
+4. `GraphAnalyzer` annotated with full `[HandlesCatalogMember]` coverage (Slice 24) ✓
 5. `ExpressionFormCoverageTests.cs` all tests passing (Slice 25) ✓
 6. `dotnet build src/Precept/ -v q` — **zero** PRECEPT0019 warnings ✓
 
@@ -2280,7 +2280,7 @@ The `<TreatWarningsAsErrors>true</TreatWarningsAsErrors>` line remains. The `War
 - `<WarningsNotAsErrors>PRECEPT0019</WarningsNotAsErrors>` removed from `Precept.csproj`
 - `dotnet build src/Precept/` — zero errors, zero warnings
 - `dotnet test` — all tests pass
-- PRECEPT0019 is now a build gate: any future unannotated pipeline class or missing `[HandlesForm]` causes a build failure
+- PRECEPT0019 is now a build gate: any future unannotated pipeline class or missing `[HandlesCatalogMember]` causes a build failure
 
 ---
 
@@ -2298,7 +2298,7 @@ The `<TreatWarningsAsErrors>true</TreatWarningsAsErrors>` line remains. The `War
 8. ✅ **`Arity.Postfix = 3` exists** in the `Arity` enum
 9. ✅ **`ExpressionFormKind.PostfixOperation = 11` exists** with correct catalog metadata: `IsLeftDenotation = true`, `LeadTokens = [TokenKind.Is]`, `Category = ExpressionCategory.Composite`
 10. ✅ **`ExpressionFormCoverageTests.cs` exists and all tests pass** — Layer 2 (test-time) coverage assertion is in place alongside Layer 1 (compile-time) PRECEPT0007 enforcement
-11. ✅ **`TypeChecker` and `GraphAnalyzer` annotated with `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]`** and full `[HandlesForm]` coverage for all 11 forms
+11. ✅ **`TypeChecker` and `GraphAnalyzer` annotated with `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]`** and full `[HandlesCatalogMember]` coverage for all 11 forms
 12. ✅ **Spec §2.1 `is set`/`is not set` precedence matches implementation** — spec was updated to 60 in Slice 17 (G2). §2.1 table now correctly shows `| 60 | \`is\` (\`is set\` / \`is not set\`) | presence test | left |`. No parser change needed.
 13. ✅ **No deferred items, no holes** — `CONTRIBUTING.md` "done" definition met; spike branch is clear for type-checker work to begin
 14. ✅ **Phase 2e complete** — `TokenMeta.IsValidAsMemberName` flag added and `KeywordsValidAsMemberName` derived from catalog (Slice 29); PRECEPT0021 and PRECEPT0022 analyzers implemented, tested, and producing zero diagnostics on the current codebase (Slices 30–31); PRECEPT0023 implemented with corrected invariants (Slice 32; see note below)
@@ -2503,8 +2503,8 @@ The `<TreatWarningsAsErrors>true</TreatWarningsAsErrors>` line remains. The `War
 
 | Method | Notes |
 |--------|-------|
-| `ParseExpression(int)` | Pratt loop — carries `[HandlesForm]` attributes for MemberAccess, BinaryOperation, MethodCall, PostfixOperation |
-| `ParseAtom()` | Null-denotation dispatcher — carries `[HandlesForm]` attributes for Literal, Identifier, Grouped, UnaryOperation, Conditional, FunctionCall, ListLiteral |
+| `ParseExpression(int)` | Pratt loop — carries `[HandlesCatalogMember]` attributes for MemberAccess, BinaryOperation, MethodCall, PostfixOperation |
+| `ParseAtom()` | Null-denotation dispatcher — carries `[HandlesCatalogMember]` attributes for Literal, Identifier, Grouped, UnaryOperation, Conditional, FunctionCall, ListLiteral |
 | `ParseInterpolatedString()` | Called by `ParseAtom` |
 | `ParseInterpolatedTypedConstant()` | Called by `ParseAtom` |
 | `ParseListLiteral()` | Called by `ParseAtom` |
@@ -2529,7 +2529,7 @@ The `<TreatWarningsAsErrors>true</TreatWarningsAsErrors>` line remains. The `War
 
 3. **`[HandlesCatalogExhaustively]` stays on the primary declaration only.** `[Precept.HandlesCatalogExhaustively(typeof(ExpressionFormKind))]` is on `ParseSession`'s primary declaration in `Parser.cs`. Do NOT duplicate it in the other partial files. Duplicating a non-`AllowMultiple` attribute produces a compiler error or incorrect analyzer behavior.
 
-4. **`[HandlesForm]` attributes move with their methods.** `ParseExpression` and `ParseAtom` move to `Parser.Expressions.cs`. Their `[HandlesForm(...)]` attributes move with them — no action needed beyond the cut.
+4. **`[HandlesCatalogMember]` attributes move with their methods.** `ParseExpression` and `ParseAtom` move to `Parser.Expressions.cs`. Their `[HandlesCatalogMember(...)]` attributes move with them — no action needed beyond the cut.
 
 5. **`BuildNode` stays outside `ParseSession` in `Parser.cs`.** It is a `static` method on the outer `Parser` class and does not move.
 
@@ -2997,3 +2997,4 @@ Every time a new catalog enum is added, the following step **must** be completed
 **Concrete step for Phase 2e:** When implementing Phase 2e slices, add the inline comment shown above to `CatalogEnumNames` if it is not already present. No other code change is needed — the existing list is current.
 
 **Ownership:** George (runtime dev) adds the comment during Phase 2e. Future catalog additions: whoever adds the new catalog is responsible for updating this set.
+

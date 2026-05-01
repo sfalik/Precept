@@ -9,15 +9,16 @@ namespace Precept.Language;
 /// <remarks>
 /// The constructor accepts <c>object</c> so that any catalog enum value can be passed.
 /// At the call site, callers write the typed enum literal for full IntelliSense support:
-/// <code>[HandlesForm(ExpressionFormKind.Literal)]</code>
+/// <code>[HandlesCatalogMember(ExpressionFormKind.Literal)]</code>
 /// The analyzer matches the runtime type of <see cref="Kind"/> against the class marker's
 /// declared <c>CatalogEnum</c> type to pair them correctly.
 /// </remarks>
 [AttributeUsage(AttributeTargets.Method, AllowMultiple = true)]
-public sealed class HandlesFormAttribute : Attribute
+public sealed class HandlesCatalogMemberAttribute : Attribute
 {
-    public HandlesFormAttribute(object kind) => Kind = kind;
+    public HandlesCatalogMemberAttribute(object kind) => Kind = kind;
 
     /// <summary>The catalog enum member this method handles.</summary>
     public object Kind { get; }
 }
+

@@ -11,7 +11,7 @@ namespace Precept.Analyzers;
 ///
 /// For every class decorated with <c>[HandlesCatalogExhaustively(typeof(T))]</c>, verifies that
 /// each member of enum <c>T</c> has at least one method in that class annotated with
-/// <c>[HandlesForm(T.Member)]</c>.
+/// <c>[HandlesCatalogMember(T.Member)]</c>.
 ///
 /// This is catalog-agnostic: adding a new catalog enum and decorating pipeline classes with the
 /// class marker automatically enrolls them in coverage enforcement — no analyzer changes needed.
@@ -24,17 +24,17 @@ public sealed class Precept0019PipelineCoverageExhaustiveness : DiagnosticAnalyz
     private static readonly DiagnosticDescriptor Rule = new(
         DiagnosticId,
         title: "Pipeline class must handle every catalog enum member",
-        messageFormat: "{0} is missing [HandlesForm] coverage for {1} member(s): {2}",
+        messageFormat: "{0} is missing [HandlesCatalogMember] coverage for {1} member(s): {2}",
         category: "Precept.Pipeline",
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
         description:
             "Classes decorated with [HandlesCatalogExhaustively(typeof(T))] must have at least one " +
-            "method annotated with [HandlesForm(T.X)] for every member of enum T. " +
+            "method annotated with [HandlesCatalogMember(T.X)] for every member of enum T. " +
             "Missing members indicate a pipeline gap that will cause runtime failures.");
 
     private const string ClassMarkerName = "HandlesCatalogExhaustivelyAttribute";
-    private const string MethodMarkerName = "HandlesFormAttribute";
+    private const string MethodMarkerName = "HandlesCatalogMemberAttribute";
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
         ImmutableArray.Create(Rule);
@@ -71,7 +71,7 @@ public sealed class Precept0019PipelineCoverageExhaustiveness : DiagnosticAnalyz
                 .Select(f => f.Name)
                 .ToImmutableHashSet();
 
-            // Collect all [HandlesForm(T.X)] annotations across methods in this class
+            // Collect all [HandlesCatalogMember(T.X)] annotations across methods in this class
             // where the enum value's type matches the declared catalog enum.
             var coveredMembers = new HashSet<string>();
             foreach (var member in classSymbol.GetMembers().OfType<IMethodSymbol>())
@@ -120,3 +120,4 @@ public sealed class Precept0019PipelineCoverageExhaustiveness : DiagnosticAnalyz
     private static bool IsMethodMarker(AttributeData attr) =>
         attr.AttributeClass?.Name == MethodMarkerName;
 }
+

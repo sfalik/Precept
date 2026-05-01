@@ -25,10 +25,10 @@ public static partial class Parser
 
         // ── Expression parser (Pratt) ─────────────────────────────────────────
 
-        [HandlesForm(ExpressionFormKind.MemberAccess)]
-        [HandlesForm(ExpressionFormKind.BinaryOperation)]
-        [HandlesForm(ExpressionFormKind.MethodCall)]
-        [HandlesForm(ExpressionFormKind.PostfixOperation)]
+        [HandlesCatalogMember(ExpressionFormKind.MemberAccess)]
+        [HandlesCatalogMember(ExpressionFormKind.BinaryOperation)]
+        [HandlesCatalogMember(ExpressionFormKind.MethodCall)]
+        [HandlesCatalogMember(ExpressionFormKind.PostfixOperation)]
         internal Expression ParseExpression(int minPrecedence)
         {
             var left = ParseAtom();
@@ -135,13 +135,13 @@ public static partial class Parser
             return left;
         }
 
-        [HandlesForm(ExpressionFormKind.Literal)]
-        [HandlesForm(ExpressionFormKind.Identifier)]
-        [HandlesForm(ExpressionFormKind.Grouped)]
-        [HandlesForm(ExpressionFormKind.UnaryOperation)]
-        [HandlesForm(ExpressionFormKind.Conditional)]
-        [HandlesForm(ExpressionFormKind.FunctionCall)]
-        [HandlesForm(ExpressionFormKind.ListLiteral)]
+        [HandlesCatalogMember(ExpressionFormKind.Literal)]
+        [HandlesCatalogMember(ExpressionFormKind.Identifier)]
+        [HandlesCatalogMember(ExpressionFormKind.Grouped)]
+        [HandlesCatalogMember(ExpressionFormKind.UnaryOperation)]
+        [HandlesCatalogMember(ExpressionFormKind.Conditional)]
+        [HandlesCatalogMember(ExpressionFormKind.FunctionCall)]
+        [HandlesCatalogMember(ExpressionFormKind.ListLiteral)]
         private Expression ParseAtom()
         {
             var current = Current();
@@ -328,3 +328,4 @@ public static partial class Parser
         }
     }
 }
+

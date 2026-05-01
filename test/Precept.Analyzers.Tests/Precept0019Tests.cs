@@ -7,7 +7,7 @@ namespace Precept.Analyzers.Tests;
 /// <summary>
 /// Tests for PRECEPT0019 — Pipeline Coverage Exhaustiveness.
 /// Verifies that classes marked with [HandlesCatalogExhaustively(typeof(T))]
-/// emit PRECEPT0019 when any member of T lacks a [HandlesForm] annotation.
+/// emit PRECEPT0019 when any member of T lacks a [HandlesCatalogMember] annotation.
 /// </summary>
 public class Precept0019Tests
 {
@@ -25,9 +25,9 @@ public sealed class HandlesCatalogExhaustivelyAttribute : Attribute
 }
 
 [AttributeUsage(AttributeTargets.Method, AllowMultiple = true)]
-public sealed class HandlesFormAttribute : Attribute
+public sealed class HandlesCatalogMemberAttribute : Attribute
 {
-    public HandlesFormAttribute(object kind) => Kind = kind;
+    public HandlesCatalogMemberAttribute(object kind) => Kind = kind;
     public object Kind { get; }
 }
 
@@ -37,15 +37,15 @@ public enum WidgetKind { Alpha = 1, Beta = 2, Gamma = 3 }
     // ── True positives ────────────────────────────────────────────────────────
 
     /// <summary>
-    /// TP1: Class missing [HandlesForm] for two of three enum members → PRECEPT0019.
+    /// TP1: Class missing [HandlesCatalogMember] for two of three enum members → PRECEPT0019.
     /// </summary>
     private const string TP1_MissingHandlers = @"
 [HandlesCatalogExhaustively(typeof(WidgetKind))]
 public class MyPipeline
 {
-    [HandlesForm(WidgetKind.Alpha)]
+    [HandlesCatalogMember(WidgetKind.Alpha)]
     public void HandleAlpha() { }
-    // Beta and Gamma have no [HandlesForm] annotation
+    // Beta and Gamma have no [HandlesCatalogMember] annotation
 }
 ";
 
@@ -65,14 +65,14 @@ public class MyPipeline
     }
 
     /// <summary>
-    /// TP2: Struct missing all [HandlesForm] annotations → PRECEPT0019.
+    /// TP2: Struct missing all [HandlesCatalogMember] annotations → PRECEPT0019.
     /// Verifies the attribute works on structs (ParseSession pattern).
     /// </summary>
     private const string TP2_StructMissingHandlers = @"
 [HandlesCatalogExhaustively(typeof(WidgetKind))]
 public struct MyParseSession
 {
-    // No [HandlesForm] annotations at all
+    // No [HandlesCatalogMember] annotations at all
     public void ParseSomething() { }
 }
 ";
@@ -94,19 +94,19 @@ public struct MyParseSession
     // ── True negatives ────────────────────────────────────────────────────────
 
     /// <summary>
-    /// TN1: All enum members have at least one [HandlesForm] method → no PRECEPT0019.
+    /// TN1: All enum members have at least one [HandlesCatalogMember] method → no PRECEPT0019.
     /// </summary>
     private const string TN1_AllHandled = @"
 [HandlesCatalogExhaustively(typeof(WidgetKind))]
 public class MyPipeline
 {
-    [HandlesForm(WidgetKind.Alpha)]
+    [HandlesCatalogMember(WidgetKind.Alpha)]
     public void HandleAlpha() { }
 
-    [HandlesForm(WidgetKind.Beta)]
+    [HandlesCatalogMember(WidgetKind.Beta)]
     public void HandleBeta() { }
 
-    [HandlesForm(WidgetKind.Gamma)]
+    [HandlesCatalogMember(WidgetKind.Gamma)]
     public void HandleGamma() { }
 }
 ";
@@ -121,15 +121,15 @@ public class MyPipeline
     }
 
     /// <summary>
-    /// TN2: Multiple [HandlesForm] on a single method — all covered → no PRECEPT0019.
+    /// TN2: Multiple [HandlesCatalogMember] on a single method — all covered → no PRECEPT0019.
     /// </summary>
     private const string TN2_MultipleAnnotationsOnOneMethod = @"
 [HandlesCatalogExhaustively(typeof(WidgetKind))]
 public class MyPipeline
 {
-    [HandlesForm(WidgetKind.Alpha)]
-    [HandlesForm(WidgetKind.Beta)]
-    [HandlesForm(WidgetKind.Gamma)]
+    [HandlesCatalogMember(WidgetKind.Alpha)]
+    [HandlesCatalogMember(WidgetKind.Beta)]
+    [HandlesCatalogMember(WidgetKind.Gamma)]
     public void HandleAll() { }
 }
 ";
@@ -163,3 +163,4 @@ public class UnannotatedPipeline
         diagnostics.Should().BeEmpty();
     }
 }
+
