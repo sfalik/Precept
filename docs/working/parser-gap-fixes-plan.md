@@ -79,6 +79,15 @@ All 13 slices shipped on `spike/Precept-V2`. Test baseline: 2107 → 2482 (+375 
 | 27 | S1 | Split `Parser.cs` (1757 lines) into 3 partial files for AI agent manageability | ⏳ Pending |
 | 28 | A5 | PRECEPT0020 — Operators `ByToken` / `OperatorPrecedence` collision analyzer | ⏳ Pending |
 
+#### Phase 2e — Analyzer Gap Closure (Slices 29–32)
+
+| Slice | Work Item | Description | Status |
+|-------|-----------|-------------|--------|
+| 29 | S2 | `KeywordsValidAsMemberName` → `IsValidAsMemberName` flag on `TokenMeta` (catalog cleanup) | ⏳ Pending |
+| 30 | A6 | PRECEPT0021 — Tokens duplicate `Text` check | ⏳ Pending |
+| 31 | A7 | PRECEPT0022 — OperatorMeta inline Token reference | ⏳ Pending |
+| 32 | A8 | PRECEPT0023 — OperatorMeta DU shape invariants (deferred — depends on Phase 2b completion) | ⏳ Pending (deferred) |
+
 Shane's directive: no deferred items, no holes — all gaps resolved on this spike before type-checker work begins.
 
 ---
@@ -2292,6 +2301,7 @@ The `<TreatWarningsAsErrors>true</TreatWarningsAsErrors>` line remains. The `War
 11. **`TypeChecker` and `GraphAnalyzer` annotated with `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]`** and full `[HandlesForm]` coverage for all 11 forms
 12. **Spec §2.1 `is set`/`is not set` precedence matches implementation** — either spec updated to 60 (recommended) or parser updated to 40, with a comment in `Parser.cs` linking the implementation binding power to the catalog entry
 13. **No deferred items, no holes** — `CONTRIBUTING.md` "done" definition met; spike branch is clear for type-checker work to begin
+14. **Phase 2e complete** — `TokenMeta.IsValidAsMemberName` flag added and `KeywordsValidAsMemberName` derived from catalog (Slice 29); PRECEPT0021 and PRECEPT0022 analyzers implemented, tested, and producing zero diagnostics on the current codebase (Slices 30–31); PRECEPT0023 tracked and ready to implement once Phase 2b ships (Slice 32)
 
 ---
 
@@ -2655,3 +2665,333 @@ Run `dotnet test test/Precept.Analyzers.Tests/` — all existing analyzer tests 
 - `dotnet build` — zero errors, zero warnings
 
 **Assignee:** George
+
+---
+
+## Phase 2e — Analyzer Gap Closure (Slices 29–32)
+
+---
+
+### Slice 29: `KeywordsValidAsMemberName` → `IsValidAsMemberName` Flag on `TokenMeta` ⏳ PENDING
+
+**Goal:** Move per-token domain knowledge out of a hardcoded `FrozenSet` in `Parser.cs` and into a `TokenMeta` flag, so that future keywords valid as member names are declared at the catalog level.
+
+**Rationale:** `Parser.KeywordsValidAsMemberName` is a hardcoded `FrozenSet<TokenKind> { Min, Max }`. The fact that `Min` and `Max` are valid in member-name position is per-token domain knowledge — it belongs in `TokenMeta`, not scattered through parse logic. If a future keyword (e.g., `Count`, `First`, `Last`) should also be valid as a member name, a developer must know to find and update this set; the catalog gives no hint. Adding `IsValidAsMemberName: bool` to `TokenMeta` and deriving the set from `Tokens.All` makes the catalog self-describing and makes `KeywordsValidAsMemberName` a zero-maintenance derivation. This follows the metadata-driven architecture: derive vocabulary from catalog; do not scatter hardcoded lists. Existing behavior is correct — this is a catalog consistency improvement, not a bug fix.
+
+**Dependency:** Independent. Can run before or after Phase 2b. Slice 16 has already landed and `KeywordsValidAsMemberName` is in use; this slice updates the derivation without touching any consumer.
+
+---
+
+**Files to create / modify:**
+
+| File | Change |
+|------|--------|
+| `src/Precept/Language/Tokens.cs` | Add `IsValidAsMemberName: bool` property (default `false`) to `TokenMeta`; set to `true` on `Min` and `Max` arms in `GetMeta()` |
+| `src/Precept/Pipeline/Parser.cs` | Replace hardcoded `new[] { TokenKind.Min, TokenKind.Max }.ToFrozenSet()` with `Tokens.All.Where(t => t.IsValidAsMemberName).Select(t => t.Kind).ToFrozenSet()` |
+| `test/Precept.Tests/` (existing `TokensTests.cs` or equivalent) | Update any `TokenMeta` construction tests that assert on parameter count; add new flag-verification tests |
+
+---
+
+**`TokenMeta` change (in `Tokens.cs`):**
+
+```csharp
+// Add IsValidAsMemberName with default false:
+public sealed record TokenMeta(TokenKind Kind, string? Text, TokenCategory Category, ..., bool IsValidAsMemberName = false);
+```
+
+**`GetMeta` arm changes (two arms only):**
+
+```csharp
+TokenKind.Min => new(kind, "min", Cat_Qnt, ..., IsValidAsMemberName: true),
+TokenKind.Max => new(kind, "max", Cat_Qnt, ..., IsValidAsMemberName: true),
+```
+
+**`Parser.cs` derivation change:**
+
+```csharp
+// Before:
+internal static readonly FrozenSet<TokenKind> KeywordsValidAsMemberName =
+    new[] { TokenKind.Min, TokenKind.Max }.ToFrozenSet();
+
+// After:
+internal static readonly FrozenSet<TokenKind> KeywordsValidAsMemberName =
+    Tokens.All.Where(t => t.IsValidAsMemberName).Select(t => t.Kind).ToFrozenSet();
+```
+
+---
+
+**Tests to add:**
+
+| Test Method | Verifies |
+|-------------|----------|
+| `TokenMeta_Min_IsValidAsMemberName_True` | `Tokens.GetMeta(TokenKind.Min).IsValidAsMemberName == true` |
+| `TokenMeta_Max_IsValidAsMemberName_True` | `Tokens.GetMeta(TokenKind.Max).IsValidAsMemberName == true` |
+| `TokenMeta_AllOtherKeywords_IsValidAsMemberName_False` | All `TokenKind` members except `Min` and `Max` have `IsValidAsMemberName == false` (theory test) |
+| `Parser_KeywordsValidAsMemberName_ContainsMinAndMax` | `Parser.KeywordsValidAsMemberName.SetEquals(new[] { TokenKind.Min, TokenKind.Max })` — derivation produces correct set |
+
+**Regression anchors:** Slice 16 acceptance tests (`Parse_MemberAccess_MinKeywordAsMemberName`, `Parse_MemberAccess_MaxKeywordAsMemberName`) must pass unchanged. All existing `ExpressionParserTests` member-access tests.
+
+---
+
+**Acceptance criteria:**
+
+- `TokenMeta.IsValidAsMemberName` property exists with default `false`
+- `Tokens.GetMeta(TokenKind.Min).IsValidAsMemberName == true`
+- `Tokens.GetMeta(TokenKind.Max).IsValidAsMemberName == true`
+- All other `TokenMeta` entries have `IsValidAsMemberName == false`
+- `Parser.KeywordsValidAsMemberName` is derived from `Tokens.All.Where(t => t.IsValidAsMemberName)` — no hardcoded `{ Min, Max }` array
+- All Slice 16 member-access tests pass unchanged
+- `dotnet build` — zero errors, zero warnings
+- `dotnet test` — all tests pass
+
+**Assignee:** George
+
+---
+
+### Slice 30: PRECEPT0021 — Tokens Duplicate Text ⏳ PENDING
+
+**Goal:** Add a Roslyn analyzer that catches duplicate `Text` values across `TokenMeta` arms in `Tokens.GetMeta` at compile time, before they silently corrupt the lexer's keyword-to-token mapping.
+
+**Rationale:** Every keyword `TokenMeta` has a `Text` field — the lexer's keyword string (e.g., `"field"`, `"state"`, `"=="`). If two keyword tokens share the same `Text`, the lexer's internal keyword→TokenKind lookup silently returns the first-registered token for all matches, making the second token permanently unreachable. Unlike `ByToken` collisions (which throw at startup), this failure mode is **silent** — parse results are wrong with no diagnostic and no startup exception. The Tokens catalog is the largest catalog (50+ members) and the most frequent target for new keyword additions; duplicate text is an easy copy-paste error with severe consequences. Detection uses `ResolveStringConstant` (already in `CatalogAnalysisHelpers`) and follows the same per-arm collection + compilation-end reporting pattern established by PRECEPT0020. See `docs/working/analyzer-recommendations.md` § Gap B and § PRECEPT0021 for full rationale.
+
+**Dependency:** Slice 28 (establishes the per-arm collection + compilation-end pattern; not a compile dependency, but Slice 30 is a direct extrapolation of PRECEPT0020's analysis shape). Can be implemented in parallel once the pattern is understood.
+
+---
+
+**Files to create / modify:**
+
+| File | Change |
+|------|--------|
+| `src/Precept.Analyzers/Precept0021TokensDuplicateText.cs` | **Create** — new `[DiagnosticAnalyzer]` implementing PRECEPT0021 |
+| `test/Precept.Analyzers.Tests/Precept0021TokensDuplicateTextTests.cs` | **Create** — unit tests |
+
+---
+
+**Invariant enforced:**
+
+| Sub-rule | ID | Invariant | Severity |
+|----------|----|-----------|----------|
+| Duplicate keyword text | PRECEPT0021 | No two `TokenMeta` arms may have the same non-empty `Text` value | Error |
+
+**Exclusion rule:** Arms where `Text` is `null` or `""` are skipped — non-keyword tokens (`Identifier`, `NumberLiteral`, `StringLiteral`, `Comment`, `NewLine`, `EndOfSource`) carry null or empty text and must not be flagged.
+
+---
+
+**Method inventory — `Precept0021TokensDuplicateText.cs`:**
+
+| Symbol | Kind | Notes |
+|--------|------|-------|
+| `DiagnosticId` | const string | `"PRECEPT0021"` |
+| `Rule` | static field | `DiagnosticDescriptor`, category `"Precept.Language"`, severity `Error` |
+| `SupportedDiagnostics` | override property | `ImmutableArray.Create(Rule)` |
+| `Initialize(AnalysisContext)` | override method | `RegisterCompilationStartAction` → registers `SwitchExpression` action + `RegisterCompilationEndAction` |
+| `Collect(OperationAnalysisContext, ConcurrentBag<TokenTextArmInfo>)` | private static | Scopes to `GetMeta(TokenKind)` via `TryGetCatalogSwitchKind`; per arm: calls `ResolveStringConstant` on the `Text` positional arg (second arg); skips null/empty; adds to bag |
+| `CrossCheck(CompilationAnalysisContext, ConcurrentBag<TokenTextArmInfo>)` | private static | Groups by text value; reports the second (and subsequent) occurrence for each duplicated text string |
+| `TokenTextArmInfo` | private sealed class | `ArmCase: string`, `Text: string`, `Location: Location` |
+
+**Key implementation note — `Text` argument extraction:**
+
+The `Text` parameter is the second positional argument to `TokenMeta(TokenKind kind, string? text, ...)`. Use `ResolveStringConstant` (from `CatalogAnalysisHelpers`) on this argument. If the result is `null` or `""`, skip the arm.
+
+---
+
+**Tests — `Precept0021TokensDuplicateTextTests.cs`:**
+
+| Test | What it verifies |
+|------|-----------------|
+| `GivenTokensWithAllDistinctText_NoDiagnostic` | Baseline — current `Tokens.GetMeta` produces zero diagnostics |
+| `GivenArmWithNullText_NoDiagnostic` | Null `Text` arms (e.g., `Identifier`) are skipped cleanly |
+| `GivenArmWithEmptyText_NoDiagnostic` | Empty string `Text` arms are skipped cleanly |
+| `GivenTwoArmsWithSameText_ReportsPRECEPT0021` | Injected collision: two arms with `"all"` — reports PRECEPT0021 on the second arm |
+| `GivenThreeArmsWithSameText_ReportsTwice` | Three arms sharing the same text — reports PRECEPT0021 on second and third arms |
+
+**Regression anchors:** Run `dotnet test test/Precept.Analyzers.Tests/` — all existing analyzer tests must remain green. Run against `src/Precept/Language/Tokens.cs` — zero diagnostics (current catalog has no duplicate text values).
+
+---
+
+**Acceptance criteria:**
+
+- `Precept0021TokensDuplicateText.cs` exists and compiles
+- PRECEPT0021 fires when two arms share the same non-empty `Text` — confirmed by unit tests
+- Null/empty `Text` arms are skipped cleanly — confirmed by unit tests
+- Running against `src/Precept/Language/Tokens.cs` produces zero diagnostics (current catalog is clean)
+- All existing analyzer tests pass (`dotnet test test/Precept.Analyzers.Tests/`)
+- `dotnet build` — zero errors, zero warnings
+
+**Assignee:** George
+
+---
+
+### Slice 31: PRECEPT0022 — OperatorMeta Inline Token Reference ⏳ PENDING
+
+**Goal:** Add a Roslyn analyzer that enforces `Operators.GetMeta` arms reference their `Token` field via `Tokens.GetMeta(TokenKind.X)` rather than inline `new TokenMeta(...)` construction, completing the "no inline Token" invariant uniformly across all catalogs.
+
+**Rationale:** PRECEPT0008c (Types), PRECEPT0011e (Modifiers), and PRECEPT0013a (Actions) all enforce that `Token` references in catalog entries use `Tokens.GetMeta(TokenKind.X)` rather than inline `new TokenMeta(...)`. The Operators catalog has no equivalent enforcement. All current `Operators.GetMeta` arms already use `Tokens.GetMeta(TokenKind.X)` correctly, so this is low risk — but it completes the invariant uniformly across all catalogs. If a future arm introduced an inline `Token`, semantic token coloring or hover behavior could silently diverge from the canonical `Tokens` catalog entry without a compile-time diagnostic. See `docs/working/analyzer-recommendations.md` § Gap C and § PRECEPT0022 for full rationale.
+
+**Priority:** Low / opportunistic — the existing Operators catalog is clean; this closes a consistency gap.
+
+**Dependency:** Slice 28 (same analysis infrastructure pattern). After Phase 2b ships, review the `Token` field extraction logic — `OperatorMeta`'s `Token` field will be restructured into the `SingleTokenOp`/`MultiTokenOp` DU — and update the analyzer's extraction path if needed.
+
+---
+
+**Files to create / modify:**
+
+| File | Change |
+|------|--------|
+| `src/Precept.Analyzers/Precept0022OperatorMetaInlineToken.cs` | **Create** — new `[DiagnosticAnalyzer]` implementing PRECEPT0022 |
+| `test/Precept.Analyzers.Tests/Precept0022OperatorMetaInlineTokenTests.cs` | **Create** — unit tests |
+
+---
+
+**Invariant enforced:**
+
+| Sub-rule | ID | Invariant | Severity |
+|----------|----|-----------|----------|
+| Inline Token reference | PRECEPT0022 | Every `OperatorMeta` arm's `Token` argument must be `Tokens.GetMeta(TokenKind.X)`, not `new TokenMeta(...)` | Warning |
+
+**Severity rationale:** Warning — consistent with PRECEPT0008c, PRECEPT0011e, and PRECEPT0013a (the existing inline-Token rules for Types, Modifiers, and Actions all use Warning).
+
+---
+
+**Method inventory — `Precept0022OperatorMetaInlineToken.cs`:**
+
+| Symbol | Kind | Notes |
+|--------|------|-------|
+| `DiagnosticId` | const string | `"PRECEPT0022"` |
+| `Rule` | static field | `DiagnosticDescriptor`, category `"Precept.Language"`, severity `Warning` |
+| `SupportedDiagnostics` | override property | `ImmutableArray.Create(Rule)` |
+| `Initialize(AnalysisContext)` | override method | `RegisterOperationAction` on `OperationKind.ObjectCreation` |
+| `Analyze(OperationAnalysisContext)` | private static | Scopes to `GetMeta(OperatorKind)` switch arms via `TryGetCatalogSwitchKind`; for each `IObjectCreationOperation` constructing `OperatorMeta`: checks whether the `Token` constructor argument is `IObjectCreationOperation` (inline — report PRECEPT0022) or `IInvocationOperation` (catalog call — clean) |
+
+**Implementation analog:** PRECEPT0008c, PRECEPT0011e, PRECEPT0013a — direct extrapolation of the existing inline-Token detection pattern to the Operators catalog.
+
+---
+
+**Tests — `Precept0022OperatorMetaInlineTokenTests.cs`:**
+
+| Test | What it verifies |
+|------|-----------------|
+| `GivenOperatorsWithAllCatalogTokenRefs_NoDiagnostic` | Baseline — current `Operators.GetMeta` produces zero diagnostics |
+| `GivenOperatorArmWithInlineToken_ReportsPRECEPT0022` | Arm with `new TokenMeta(TokenKind.And, "and", ...)` instead of `Tokens.GetMeta(TokenKind.And)` — reports PRECEPT0022 |
+| `GivenOperatorArmWithCatalogTokenRef_NoDiagnostic` | Arm using `Tokens.GetMeta(TokenKind.And)` — no warning |
+
+**Regression anchors:** Run `dotnet test test/Precept.Analyzers.Tests/` — all existing analyzer tests must remain green. Run against `src/Precept/Language/Operators.cs` — zero diagnostics (current catalog uses catalog calls only).
+
+---
+
+**Acceptance criteria:**
+
+- `Precept0022OperatorMetaInlineToken.cs` exists and compiles
+- PRECEPT0022 fires when an `OperatorMeta` arm uses `new TokenMeta(...)` — confirmed by unit tests
+- Running against `src/Precept/Language/Operators.cs` produces zero diagnostics (current catalog is clean)
+- All existing analyzer tests pass (`dotnet test test/Precept.Analyzers.Tests/`)
+- `dotnet build` — zero errors, zero warnings
+
+**Assignee:** George
+
+---
+
+### Slice 32: PRECEPT0023 — OperatorMeta DU Shape Invariants ⏳ PENDING (deferred — depends on Phase 2b completion)
+
+> ⚠️ **Deferred.** This slice is tracked here for completeness but **must not be implemented until Phase 2b (Slices 19–22) is complete.** The `SingleTokenOp`/`MultiTokenOp` DU must exist before this analyzer can be written. Do not begin until George confirms Slices 19–22 are done.
+
+**Goal:** Add a Roslyn analyzer that enforces structural invariants on the `SingleTokenOp`/`MultiTokenOp` DU introduced by Phase 2b — preventing multi-token operator definitions that would cause `ByTokenSequence` startup failures or lexer prefix ambiguity at compile time.
+
+**Rationale:** After Phase 2b restructures `OperatorMeta` into `SingleTokenOp`/`MultiTokenOp`, the `ByTokenSequence` dictionary indexes operators by lead token. If two `MultiTokenOp` entries share the same lead token, `ByTokenSequence` throws at startup. If a `MultiTokenOp.Tokens` sequence has only one element, that arm should have been a `SingleTokenOp`. If a `SingleTokenOp` lead token equals any `MultiTokenOp` lead token, the parser cannot determine which lookup to apply. These structural invariants should be caught at compile time, not at runtime. See `docs/working/analyzer-recommendations.md` § Gap D and § PRECEPT0023 for full rationale.
+
+**Dependency:** **Phase 2b (Slices 19–22) MUST be complete.** The `SingleTokenOp`/`MultiTokenOp` DU must exist and be the canonical `OperatorMeta` shape before this analyzer is meaningful.
+
+---
+
+**Files to create / modify:**
+
+| File | Change |
+|------|--------|
+| `src/Precept.Analyzers/Precept0023OperatorMetaDuShape.cs` | **Create** — new `[DiagnosticAnalyzer]` implementing PRECEPT0023a, PRECEPT0023b, PRECEPT0023c |
+| `test/Precept.Analyzers.Tests/Precept0023OperatorMetaDuShapeTests.cs` | **Create** — unit tests |
+
+---
+
+**Invariants enforced:**
+
+| Sub-rule | ID | Invariant | Severity |
+|----------|----|-----------|----------|
+| Under-populated multi-token | PRECEPT0023a | `MultiTokenOp.Tokens` must have at least 2 elements — a 1-token sequence is a `SingleTokenOp` | Error |
+| Lead token prefix ambiguity | PRECEPT0023b | No `SingleTokenOp` lead token may equal any `MultiTokenOp` lead token — causes parser prefix ambiguity | Error |
+| Duplicate multi-token lead | PRECEPT0023c | No two `MultiTokenOp` entries may share the same lead token — would make `ByTokenSequence` throw at startup | Error |
+
+---
+
+**Method inventory — `Precept0023OperatorMetaDuShape.cs` (sketch — exact shape depends on Phase 2b DU API):**
+
+| Symbol | Kind | Notes |
+|--------|------|-------|
+| `DiagnosticId_UnderPopulatedMulti` | const string | `"PRECEPT0023a"` |
+| `DiagnosticId_LeadTokenAmbiguity` | const string | `"PRECEPT0023b"` |
+| `DiagnosticId_DuplicateMultiLead` | const string | `"PRECEPT0023c"` |
+| `Rule_a`, `Rule_b`, `Rule_c` | static fields | `DiagnosticDescriptor`, category `"Precept.Language"`, severity `Error` |
+| `SupportedDiagnostics` | override property | All three rules |
+| `Initialize(AnalysisContext)` | override method | `RegisterCompilationStartAction` + `RegisterCompilationEndAction` (same pattern as PRECEPT0020) |
+| `Collect(...)` | private static | Per arm: detect `SingleTokenOp` vs. `MultiTokenOp` DU subtype; extract lead token; collect into two bags |
+| `CrossCheck(...)` | private static | Apply PRECEPT0023a–c logic and report at compilation end |
+
+**Review note after Phase 2b ships:** Verify the DU subtype names, constructor shapes, and token extraction methods match what Phase 2b actually produces. The sketch above uses anticipated names; the final analyzer must use the actual Phase 2b API surface.
+
+---
+
+**Tests — `Precept0023OperatorMetaDuShapeTests.cs` (sketch — finalize after Phase 2b):**
+
+| Test | What it verifies |
+|------|-----------------|
+| `GivenCleanOperatorsDuShape_NoDiagnostic` | Baseline — post-Phase-2b catalog produces zero diagnostics |
+| `GivenMultiTokenOpWithOneToken_ReportsPRECEPT0023a` | `MultiTokenOp` with `Tokens.Length == 1` — reports under-populated error |
+| `GivenSingleTokenOpMatchingMultiTokenLeadToken_ReportsPRECEPT0023b` | Lead-token collision between `SingleTokenOp` and `MultiTokenOp` — reports ambiguity error |
+| `GivenTwoMultiTokenOpsWithSameLeadToken_ReportsPRECEPT0023c` | Two `MultiTokenOp` entries sharing lead token — reports ByTokenSequence collision error |
+
+**Regression anchors:** All existing analyzer tests pass. Run against Phase-2b-updated `Operators.cs` — zero diagnostics on the clean catalog.
+
+---
+
+**Acceptance criteria:**
+
+- `Precept0023OperatorMetaDuShape.cs` exists and compiles against the Phase 2b DU shape
+- PRECEPT0023a fires on a 1-element `MultiTokenOp.Tokens` — confirmed by unit tests
+- PRECEPT0023b fires on `SingleTokenOp`/`MultiTokenOp` lead-token collision — confirmed by unit tests
+- PRECEPT0023c fires on two `MultiTokenOp` entries sharing lead token — confirmed by unit tests
+- Running against post-Phase-2b `Operators.cs` produces zero diagnostics
+- All existing analyzer tests pass
+- `dotnet build` — zero errors, zero warnings
+
+**Assignee:** George *(start only after Phase 2b — Slices 19–22 — is confirmed complete)*
+
+---
+
+### 🔧 Process Note: `CatalogAnalysisHelpers.CatalogEnumNames` — Manual Maintenance Required
+
+> This is a **process discipline item**, not a numbered slice. No implementation is required beyond adding an inline comment.
+
+**Location:** `src/Precept.Analyzers/CatalogAnalysisHelpers.cs`
+
+**What it is:** `CatalogAnalysisHelpers.CatalogEnumNames` is a hardcoded `HashSet<string>` that `TryGetCatalogSwitchKind` uses to identify catalog switch expressions:
+
+```csharp
+private static readonly HashSet<string> CatalogEnumNames = new()
+{
+    "TypeKind", "TokenKind", "OperatorKind", "OperationKind",
+    "ModifierKind", "FunctionKind", "ActionKind", "ConstructKind",
+    "DiagnosticCode", "FaultCode", "ExpressionFormKind",
+    // Keep in sync with docs/language/catalog-system.md catalog table
+};
+```
+
+**The gap:** This list must be updated manually whenever a new catalog enum is added. `ExpressionFormKind` was the 13th catalog added in Phase 1 and required a manual update to this set. A future 14th catalog will require the same step. An analyzer cannot enforce its own constants (meta-circularity), so the fix is process-level.
+
+**Required action — new-catalog checklist item:**
+
+Every time a new catalog enum is added, the following step **must** be completed:
+
+> Add the new enum's type name (string) to `CatalogAnalysisHelpers.CatalogEnumNames` in `src/Precept.Analyzers/CatalogAnalysisHelpers.cs`.
+
+**Concrete step for Phase 2e:** When implementing Phase 2e slices, add the inline comment shown above to `CatalogEnumNames` if it is not already present. No other code change is needed — the existing list is current.
+
+**Ownership:** George (runtime dev) adds the comment during Phase 2e. Future catalog additions: whoever adds the new catalog is responsible for updating this set.
