@@ -15,6 +15,10 @@
 
 ## Recent Updates
 
+### 2026-05-01T20:10:18Z — HandlesCatalogMember closeout recorded
+- Ran the hard-gate 7-day archive pass because `decisions.md` was 562768 bytes before merge, then merged George-7's rename inbox note, wrote orchestration/session logs, and cleared the processed inbox file.
+- Health report: `decisions.md` 562768B -> 573372B; inbox processed 1; history summarization remained at 0 files.
+
 ### 2026-05-01T06:40:00Z - Annotation-bridge inbox verification recorded
 - Verified `.squad/decisions.md` already contains the canonical annotation-bridge entry sourced from `frank-class-marker` and `george-annotation-bridge-plan`, so the inbox merge itself was a no-op.
 - Wrote verification orchestration/session logs, confirmed there is no open PR on `spike/Precept-V2`, and summarized oversized Frank/Scribe histories back under threshold.

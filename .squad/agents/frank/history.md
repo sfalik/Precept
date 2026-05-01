@@ -19,6 +19,10 @@
 
 ## Recent Updates
 
+### 2026-05-01T20:10:18Z — Rename implementation landed
+- George-7 completed the mechanical propagation of Frank's catalog-agnostic annotation rename: active code, analyzer, tests, and docs now use `[HandlesCatalogMember]`.
+- Future architecture guidance should treat `[HandlesForm]` as retired terminology preserved only in historical notes and archived design context.
+
 ### 2026-05-01 — Annotation rename and scope audit closed out
 - Scribe merged `frank-handlesform-rename.md` into `decisions.md`; the durable per-member annotation name is `[HandlesCatalogMember]`, paired with `[HandlesCatalogExhaustively]`.
 - Frank-9's full catalog-enum sweep found no currently-missing distributed-dispatch annotations anywhere in the codebase; centralized switch sites remain correctly covered by CS8509 instead.

@@ -1,3 +1,39 @@
+# Decision: HandlesCatalogMember rename propagation complete
+
+**Date:** 2026-05-01  
+**Agent:** george-7  
+**Commit:** `08fdf85`  
+**Status:** Completed
+
+George completed the mechanical rename from `[HandlesForm]` to `[HandlesCatalogMember]` across the attribute definition, every active call site, PRECEPT0019, tests, and docs with no behavior change.
+
+## Scope
+- Rename the shared handler annotation to `[HandlesCatalogMember]` so distributed-dispatch exhaustiveness stays catalog-agnostic and symmetric with `[HandlesCatalogExhaustively]`.
+- Propagate the new name through parser/type-checker/graph-analyzer coverage points, analyzer enforcement, tests, and working docs so the retired `[HandlesForm]` name remains historical context only.
+
+## Changed Files
+- `src/Precept/Language/HandlesCatalogMemberAttribute.cs` (renamed from `HandlesFormAttribute.cs`)
+- `src/Precept/HandlesCatalogExhaustivelyAttribute.cs`
+- `src/Precept/Pipeline/Parser.Expressions.cs`
+- `src/Precept/Pipeline/TypeChecker.cs`
+- `src/Precept/Pipeline/GraphAnalyzer.cs`
+- `src/Precept.Analyzers/Precept0019PipelineCoverageExhaustiveness.cs`
+- `test/Precept.Tests/ExpressionFormCoverageTests.cs`
+- `test/Precept.Analyzers.Tests/Precept0019Tests.cs`
+- `docs/working/parser-gap-fixes-plan.md`
+- `docs/working/analyzer-recommendations.md`
+
+## Validation
+- `dotnet build src/Precept/ --no-restore` ✅
+- `dotnet build tools/Precept.LanguageServer/ --no-restore` ✅
+- `dotnet test test/Precept.Tests/ --no-build` ✅ (2424 passed)
+- `dotnet test test/Precept.LanguageServer.Tests/ --no-build` ✅ (0 discovered; existing warning)
+
+## Notes
+- Background batch completed before closeout; no further follow-up is recorded in this pass.
+
+---
+
 # Parser Coverage Assertion Against ExpressionFormKind
 
 **Date:** 2026-05-01  
