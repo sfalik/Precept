@@ -12,6 +12,67 @@
 
 ---
 
+### 2026-05-01T18:17:13Z: Parser.cs partial split approved for Slice 27
+
+**By:** Scribe
+
+**Status:** Merged, deduplicated, inbox cleared (1 file)
+
+**Merged sources:** `frank-parser-split`.
+
+- `partial class Parser` + `partial ref struct ParseSession` is the approved zero-behavior-change split mechanism; `ParseSession` being a `ref struct` rules out helper-class alternatives because they would force `ref` threading through 60+ methods.
+- The structural seam is locked as three files: `Parser.cs` for shell/vocabulary/dispatch, `Parser.Declarations.cs` for declaration grammar and slot/type machinery, and `Parser.Expressions.cs` for the Pratt loop, atom parsers, and expression helpers.
+- Attribute placement is part of the contract: `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]` stays only on the primary `ParseSession` declaration, `[HandlesForm(...)]` moves with the methods in `Parser.Expressions.cs`, and static vocabulary remains on the outer `Parser` class.
+- Durable implementation caveat for Slice 27 and Slice 16: `ref struct` types cannot own static fields, so `KeywordsValidAsMemberName` belongs on `Parser`, while `ExpectIdentifierOrKeywordAsMemberName()` stays on `ParseSession` beside the `Dot` handler.
+
+---
+
+### 2026-05-01T18:17:13Z: Parser-gap Slice 4 corrections and recording directive synchronized
+
+**By:** Scribe
+
+**Status:** Merged, deduplicated, inbox cleared (3 files; blockers normalized into one record)
+
+**Merged sources:** `copilot-directive-record-problems`, `frank-plan-review`, `george-plan-b1b4-fixes`.
+
+- Shane's directive is now durable: when implementation uncovers problems, agents must write them into the working plan or decisions inbox instead of leaving them only in ephemeral output.
+- Frank blocked Slice 4 on four exact plan defects: two existing attribute files incorrectly marked `Create`, the wrong analyzer filename/status, and a stale `HandlesFormAttribute.Value` snippet that did not match the real API.
+- George corrected `docs/working/parser-gap-fixes-plan.md` so `HandlesCatalogExhaustivelyAttribute.cs`, `HandlesFormAttribute.cs`, and `Precept0019PipelineCoverageExhaustiveness.cs` are treated as existing files, and the code sample now uses `.Kind`.
+- This record supersedes earlier stale ledger wording: the canonical annotation bridge remains generic `[HandlesCatalogExhaustively(typeof(T))]` + `[HandlesForm(kind)]`, not a parameterless `HandlesExpressionForms` marker.
+
+---
+
+### 2026-05-01T18:17:13Z: Multi-token presence operators escalated to proposal-scope catalog work
+
+**By:** Scribe
+
+**Status:** Merged, deduplicated, inbox cleared (2 files; scope pending owner decision)
+
+**Merged sources:** `frank-multi-token-operator-scope`, `george-multi-token-operator-scope`.
+
+- Both analyses agree `is set` / `is not set` are real semantic operators with precedence, operand constraints, result typing, and documentation surface, so leaving them as uncataloged parser special-cases is a catalog-completeness bug rather than a parser-correctness bug.
+- Shared implementation obligations are now explicit: add postfix-aware operator metadata, introduce `Arity.Postfix`, keep `.` and method-call `(` outside `Operators.All` as structural forms, and prevent the duplicate-key crash that would occur if both presence operators keyed `Operators.ByToken` on `(TokenKind.Is, Postfix)`.
+- Frank recommends treating this as GitHub-issue/design-review work rather than a hotfix and prefers a full-fidelity catalog representation plus `ExpressionFormKind.PostfixOperation`; George supplied the bounded call-site inventory and the `ByToken` hazard that must be handled in the same commit.
+- Carry-forward state: proposal scope and rationale are locked, but the final `OperatorMeta` shape still needs owner sign-off.
+
+---
+
+### 2026-05-01T18:17:13Z: Parser-gap implementation batch synchronized through Slice 13
+
+**By:** Scribe
+
+**Status:** Merged, deduplicated, inbox cleared (10 files; implementation batch normalized)
+
+**Merged sources:** `george-phase2a-complete`, `george-slice1-done`, `george-slice2-done`, `george-slice3-done`, `george-slice4-done`, `george-slice7-done`, `george-slices56-done`, `soup-nazi-slices-8-11-done`, `soup-nazi-slice12-done`, `soup-nazi-slice13-done`.
+
+- George's branch reports now durably capture typed constants and interpolated typed constants, stateless event-handler post-condition `ensure` guards, Pratt support for `is set` / `is not set`, the `ExpressionFormKind` catalog + PRECEPT0019 annotation bridge, list literals, method calls, and the ensure-grammar spec correction.
+- George also marked the broader parser-gap Phase 2A branch complete, so the slice reports above should be treated as the current implementation baseline rather than isolated point fixes.
+- Soup Nazi's reports add regression coverage for comparison/contains operators, collection mutation actions, interpolated strings, sample-file integration, and reflection-backed expression-form coverage assertions.
+- Slice 12 makes the remaining parser debt explicit instead of implicit: 21 sample files parse cleanly, while 7 stay in known-broken sentinels for three gaps still outside the completed slice batch — state/event ensure `when` guards, post-expression field modifiers, and reserved-keyword member names such as `.min` / `.max`.
+- Validation stayed green across the slice reports and reached 2424 passing tests after the event-handler ensure-guard addition, while PRECEPT0019 finished green once list literals and method calls were annotated.
+
+---
+
 ### 2026-05-01T06:21:31Z: Annotation-bridge enforcement pattern recorded
 
 **By:** Scribe
@@ -27,6 +88,7 @@
 - The durable design rule is to analyze stable metadata and attributes rather than parser implementation internals, so coverage enforcement survives refactors to switches, dictionaries, or helper methods.
 
 ---
+
 ### 2026-05-01T06:21:31Z: Parser-gap plan audit and coverage slice synchronized
 
 **By:** Scribe
@@ -40,6 +102,7 @@
 - George's audit found the remaining plan hygiene fixes still worth carrying forward: add `src/Precept/Language/Operators.cs` to Slice 3's file inventory and remove or correct the dead `frank-expression-form-catalog-placement.md` reference. The previous missing-coverage-slice gap is now closed by Slice 13.
 
 ---
+
 ### 2026-04-29T05:34:09Z: Collection type expansion follow-up recorded
 
 **By:** Scribe
@@ -72,8 +135,6 @@
 
 - `docs/language/README.md` now indexes the new reference in the Documents table and reading order so collection guidance is discoverable from the language-doc hub.
 
-
-
 ---
 
 ### 2026-04-29T04:47:14Z: Vision→spec migration completed and vision archived
@@ -97,8 +158,6 @@
 - Slice 3–4 then removed the two stale contradictions (`with` still listed as a structural preposition, and "root editability" wording left over from retired `write all` semantics), archived `docs/language/precept-language-vision.md` to `docs/archive/language-design/precept-language-vision.md`, updated the spec Status table, and swept 12 cross-references so the archived path never existed half-wired on the branch.
 
 - Net result: the language spec is now the single canonical language document, the vision is preserved as archive material only, and the earlier archive-readiness audit remains the durable rationale for why this migration sequence was necessary.
-
-
 
 ---
 
@@ -124,8 +183,6 @@
 
 - Net result: the spec now clearly states the no-runtime-faults promise, while the philosophy gap is durably recorded as a flag for Shane rather than an auto-applied philosophy change.
 
-
-
 ---
 
 ### 2026-04-29T03:09:18Z: PRECEPT0018 correctness gate closed and test backfill recorded
@@ -147,8 +204,6 @@
 - George's follow-up commit `e7a643d` closed Frank's B1 finding and the two advisory anchors by adding TP7–TP9 and EC6–EC7 in `test/Precept.Analyzers.Tests/Precept0018Tests.cs`; analyzer tests rose to 230 while core tests stayed 2044.
 
 - Net result: PRECEPT0018 is now durably recorded as implemented and correctness-cleared, with no post-review code changes beyond the missing regression tests.
-
-
 
 ---
 
@@ -174,8 +229,6 @@
 
 - Net result: the plan is now at v3, blockers are cleared, and George can implement from the updated plan.
 
-
-
 ---
 
 ### 2026-04-29T01:09:17Z: Catalog extensibility audit and parser design evaluation recorded
@@ -200,8 +253,6 @@
 
 - Frank's vision-versus-spec audit found two live contradictions (`with` still listed as a structural preposition in the vision doc, and stale “root editability” wording after `write all` removal) and concluded the vision doc should not be archived until its language-identity material is migrated into the spec.
 
-
-
 ---
 
 ### 2026-04-29T00:43:25Z: Parser remediation review batch approved and synchronized
@@ -223,8 +274,6 @@
 - Cross-surface consistency was re-aligned before the review closed: 8 inconsistencies were fixed across the spec, parser reference, slot comments, and token metadata so secondary sources match catalog-first primaries.
 
 - Coverage for the 6 remediation slices is approved at 2034/2034 passing tests. The audit fixed the stale ConstructSlotKind count, replaced the obsolete StateDeclaration slot-count assertion with an exact slot-shape fact, and added EventDeclaration_HasInitialMarkerSlot as the new catalog regression anchor.
-
-
 
 ---
 
@@ -248,8 +297,6 @@
 
 - George's follow-through landed: `ConstructKind.AccessMode` now ends with `SlotGuardClause`, `DiagnosticCode.RedundantAccessMode` has catalog metadata, the stale `write all` description is removed, a regression test pins guard-slot presence/position, and the suite stayed green at 1809 passing tests.
 
-
-
 ---
 
 ### 2026-04-28T05:08:10Z: Access-mode and parser-design inbox batch canonicalized
@@ -271,8 +318,6 @@
 - Parser extensibility direction is validation-first, not generator-first: fail loudly when catalog metadata is incomplete, keep `_slotParsers` exhaustive, give rule bodies their own `RuleExpression` slot, keep `ensure` and `because` separate, and reject pre-event `when` on `from ... on` with a diagnostic instead of silently expanding the language surface.
 
 - Design-loop status is now explicit: the v7 parser working doc remains the implementation-plan anchor, while language-simplification proposals were recorded as analysis input and only owner-approved surface changes should be treated as canonical.
-
-
 
 ---
 
@@ -296,8 +341,6 @@
 
 - Canonical follow-through: language docs, samples, and downstream tooling must all treat field-level `writable` as the only stateless mutability opt-in.
 
-
-
 ---
 
 ### 2026-04-28T00:00:00Z: Combined Design v2 Structural Revision
@@ -316,8 +359,6 @@
 
 - Motivation: Shifted from reference spec to design doc genre, making decisions and rationale explicit and readable.
 
-
-
 ---
 
 ### 2026-04-28T00:00:00Z: Combined Design v2 Gap Patch Complete
@@ -333,8 +374,6 @@
 - Locked: three action shapes, precomputed constraint activation, closed proof strategies, explicit proof/fault chain ownership, five implementation action items.
 
 - No philosophy gaps surfaced; all changes are implementation domain only.
-
-
 
 ---
 
@@ -361,8 +400,6 @@
 - Validation rerun passed: all three MCP config surfaces parse cleanly, schemas stay separated (`mcpServers` for CLI/plugin, `servers` for VS Code), and no directly related stale live reference remains.
 
 - Team pattern locked: dual-surface config work is only considered landed when the config artifact and at least one directly related doc land together.
-
-
 
 ---
 
@@ -391,8 +428,6 @@
 - Soup Nazi's test-plan bar stands: helper tests plus analyzer suites total about 298 cases, with the accepted blind spot limited to spread elements inside shared static arrays and guarded by declaration-site validation/regression anchors.
 
 - Owner directive stands: lexer token classification must converge on fully catalog-driven behavior; implementation tactics may vary, but the architectural target is no-exceptions catalog authority.
-
-
 
 ---
 
@@ -455,8 +490,6 @@
 - The consolidated review's correctness and metadata-gap items are recorded as completed in the source/design pass.
 
 - Remaining work is concentrated in tooling-generation drift, broader analyzer expansion (PRECEPT0007-PRECEPT0014), snapshot/golden catalog tests, and generated matrix coverage.
-
-
 
 ---
 
@@ -540,8 +573,6 @@
 
 - **coordinator-design-doc-mandatory-reads:** Directive — every agent spawn for implementation work MUST include relevant design docs as required reading. Triggered by George implementing OperatorTable without reading catalog-system.md.
 
-
-
 ---
 
 ### 2026-05-18T00:25:00Z: README DSL Hero Image Width Contract
@@ -579,7 +610,3 @@ The README DSL hero remains an image-based branded treatment, but it must now be
 - GitHub page-geometry research still matters: the repo shell tops out around **1280px** and the README/article frame around **1012px**, but the displayed README image for this treatment clamps earlier at about **830px**.
 
 - Do not rely on custom CSS, sanitizer-sensitive HTML, or viewport-specific image swapping as a stable README contract.
-
-
-
----
