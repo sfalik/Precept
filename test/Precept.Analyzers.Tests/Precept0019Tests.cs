@@ -58,7 +58,7 @@ public class MyPipeline
         diagnostics.Should().ContainSingle();
         var d = diagnostics[0];
         d.Id.Should().Be("PRECEPT0019");
-        d.Severity.Should().Be(DiagnosticSeverity.Warning);
+        d.Severity.Should().Be(DiagnosticSeverity.Error);
         d.GetMessage().Should().Contain("MyPipeline");
         d.GetMessage().Should().Contain("Beta");
         d.GetMessage().Should().Contain("Gamma");
@@ -86,7 +86,7 @@ public struct MyParseSession
         diagnostics.Should().ContainSingle();
         var d = diagnostics[0];
         d.Id.Should().Be("PRECEPT0019");
-        d.Severity.Should().Be(DiagnosticSeverity.Warning);
+        d.Severity.Should().Be(DiagnosticSeverity.Error);
         d.GetMessage().Should().Contain("MyParseSession");
         d.GetMessage().Should().Contain("3"); // 3 missing members
     }

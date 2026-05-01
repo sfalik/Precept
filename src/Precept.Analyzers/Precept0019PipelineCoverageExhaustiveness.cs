@@ -26,7 +26,7 @@ public sealed class Precept0019PipelineCoverageExhaustiveness : DiagnosticAnalyz
         title: "Pipeline class must handle every catalog enum member",
         messageFormat: "{0} is missing [HandlesForm] coverage for {1} member(s): {2}",
         category: "Precept.Pipeline",
-        defaultSeverity: DiagnosticSeverity.Warning,
+        defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
         description:
             "Classes decorated with [HandlesCatalogExhaustively(typeof(T))] must have at least one " +
