@@ -130,13 +130,13 @@ namespace Precept.Language
     }
 
     [Fact]
-    public async Task GivenTwoMultiTokenOpsWithSameLeadToken_ReportsPRECEPT0023c()
+    public async Task GivenTwoMultiTokenOpsWithSameFullSequence_ReportsPRECEPT0023c()
     {
         var source = OperatorStubs + @"
         public static OperatorMeta GetMeta(OperatorKind kind) => kind switch
         {
-            OperatorKind.IsSet    => new MultiTokenOp(kind, [Tokens.GetMeta(TokenKind.Is), Tokens.GetMeta(TokenKind.Set)], ""Is Set"", Arity.Binary, Associativity.Left, 20, OperatorFamily.Presence),
-            OperatorKind.IsNotSet => new MultiTokenOp(kind, [Tokens.GetMeta(TokenKind.Is), Tokens.GetMeta(TokenKind.Not), Tokens.GetMeta(TokenKind.Set)], ""Is Not Set"", Arity.Binary, Associativity.Left, 30, OperatorFamily.Presence),
+            OperatorKind.IsSet  => new MultiTokenOp(kind, [Tokens.GetMeta(TokenKind.Is), Tokens.GetMeta(TokenKind.Set)], ""Is Set"", Arity.Binary, Associativity.Left, 60, OperatorFamily.Presence),
+            OperatorKind.Extra1 => new MultiTokenOp(kind, [Tokens.GetMeta(TokenKind.Is), Tokens.GetMeta(TokenKind.Set)], ""Also Is Set"", Arity.Binary, Associativity.Left, 60, OperatorFamily.Presence),
             _ => throw new System.ArgumentOutOfRangeException(nameof(kind)),
         };
 " + CloseBrace;
@@ -145,8 +145,28 @@ namespace Precept.Language
         diagnostics
             .Where(d => d.Id == PRECEPT0023OperatorsDUShapeInvariants.DiagnosticId_MultiLeadCollision)
             .Should().ContainSingle()
-            .Which.GetMessage().Should().Contain("IsNotSet")
-                .And.Contain("Is")
+            .Which.GetMessage().Should().Contain("Extra1")
+                .And.Contain("Is,Set")
                 .And.Contain("IsSet");
+    }
+
+    [Fact]
+    public async Task GivenTwoMultiTokenOpsWithSameLeadButDifferentFullSequence_NoDiagnostic()
+    {
+        // IsSet=[Is,Set] and IsNotSet=[Is,Not,Set] share lead token Is but have distinct full sequences.
+        // This is the real catalog pattern — must produce zero PRECEPT0023c diagnostics.
+        var source = OperatorStubs + @"
+        public static OperatorMeta GetMeta(OperatorKind kind) => kind switch
+        {
+            OperatorKind.IsSet    => new MultiTokenOp(kind, [Tokens.GetMeta(TokenKind.Is), Tokens.GetMeta(TokenKind.Set)], ""Is Set"", Arity.Binary, Associativity.Left, 60, OperatorFamily.Presence),
+            OperatorKind.IsNotSet => new MultiTokenOp(kind, [Tokens.GetMeta(TokenKind.Is), Tokens.GetMeta(TokenKind.Not), Tokens.GetMeta(TokenKind.Set)], ""Is Not Set"", Arity.Binary, Associativity.Left, 60, OperatorFamily.Presence),
+            _ => throw new System.ArgumentOutOfRangeException(nameof(kind)),
+        };
+" + CloseBrace;
+
+        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<PRECEPT0023OperatorsDUShapeInvariants>(source);
+        diagnostics
+            .Where(d => d.Id == PRECEPT0023OperatorsDUShapeInvariants.DiagnosticId_MultiLeadCollision)
+            .Should().BeEmpty();
     }
 }

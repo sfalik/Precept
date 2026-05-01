@@ -16,9 +16,9 @@ namespace Precept.Analyzers;
 /// PRECEPT0023b: No <c>SingleTokenOp</c> lead token may equal any <c>MultiTokenOp</c>
 ///     lead token. This causes operator disambiguation ambiguity at parse time.
 ///
-/// PRECEPT0023c: No two <c>MultiTokenOp</c> entries may share the same lead token.
-///     The parser indexes multi-token operators by their lead token for lookahead —
-///     duplicates break the index.
+/// PRECEPT0023c: No two <c>MultiTokenOp</c> entries may have the same full token sequence.
+///     The <c>ByTokenSequence</c> index uses the full (TokenKind, TokenKind?, TokenKind?) tuple
+///     as its key — duplicate full sequences cause a startup throw.
 ///
 /// Scope: Only fires for <c>GetMeta(OperatorKind)</c> switches in <c>Precept.Language</c>.
 /// </summary>
@@ -49,13 +49,13 @@ public sealed class PRECEPT0023OperatorsDUShapeInvariants : DiagnosticAnalyzer
 
     private static readonly DiagnosticDescriptor MultiLeadCollisionRule = new(
         DiagnosticId_MultiLeadCollision,
-        title: "Duplicate lead token among MultiTokenOp entries",
-        messageFormat: "OperatorKind.{0} duplicates the MultiTokenOp lead token '{1}' already used by OperatorKind.{2} — may cause parser lookahead ambiguity",
+        title: "Duplicate full token sequence among MultiTokenOp entries",
+        messageFormat: "OperatorKind.{0} duplicates the MultiTokenOp full token sequence '{1}' already used by OperatorKind.{2} — causes ByTokenSequence startup collision",
         category: "Precept.Language",
-        defaultSeverity: DiagnosticSeverity.Warning,
+        defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
-        description: "Multiple multi-token operators sharing the same lead token can cause parser lookahead ambiguity. " +
-                     "Consider using distinct lead tokens or ensuring the full token sequences are unambiguous.");
+        description: "No two MultiTokenOp entries may have the same full token sequence. " +
+                     "Identical sequences cause a startup throw in ByTokenSequence's dictionary construction.");
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
         ImmutableArray.Create(TooFewTokensRule, SingleMultiCollisionRule, MultiLeadCollisionRule);
@@ -85,6 +85,7 @@ public sealed class PRECEPT0023OperatorsDUShapeInvariants : DiagnosticAnalyzer
 
         var singleLeadTokens = new Dictionary<string, (string armCase, Location location)>();
         var multiLeadTokens = new Dictionary<string, (string armCase, Location location)>();
+        var multiFullSequences = new Dictionary<string, (string armCase, Location location)>();
 
         foreach (var arm in switchOp.Arms)
         {
@@ -118,21 +119,25 @@ public sealed class PRECEPT0023OperatorsDUShapeInvariants : DiagnosticAnalyzer
                     continue;
                 }
 
-                // Extract lead token (first element) from MultiTokenOp
+                // Extract lead token (first element) — recorded for PRECEPT0023b cross-check
                 var leadToken = ExtractTokenKindFromGetMeta(elements[0]);
-                if (leadToken != null)
+                if (leadToken != null && !multiLeadTokens.ContainsKey(leadToken))
+                    multiLeadTokens[leadToken] = (armCaseName, creation.Syntax.GetLocation());
+
+                // PRECEPT0023c: Check for duplicate full token sequences
+                var sequenceKey = BuildFullSequenceKey(elements);
+                if (sequenceKey != null)
                 {
-                    // PRECEPT0023c: Check for duplicate MultiTokenOp lead tokens
-                    if (multiLeadTokens.TryGetValue(leadToken, out var existingMulti))
+                    if (multiFullSequences.TryGetValue(sequenceKey, out var existingMulti))
                     {
                         ctx.ReportDiagnostic(Diagnostic.Create(
                             MultiLeadCollisionRule,
                             creation.Syntax.GetLocation(),
-                            armCaseName, leadToken, existingMulti.armCase));
+                            armCaseName, sequenceKey, existingMulti.armCase));
                     }
                     else
                     {
-                        multiLeadTokens[leadToken] = (armCaseName, creation.Syntax.GetLocation());
+                        multiFullSequences[sequenceKey] = (armCaseName, creation.Syntax.GetLocation());
                     }
                 }
             }
@@ -191,6 +196,22 @@ public sealed class PRECEPT0023OperatorsDUShapeInvariants : DiagnosticAnalyzer
         if (firstArg == null) return null;
 
         return CatalogAnalysisHelpers.ResolveEnumFieldName(firstArg.Value);
+    }
+
+    /// <summary>
+    /// Builds a comma-joined key from all token kinds in a MultiTokenOp element list,
+    /// e.g. "Is,Set" or "Is,Not,Set". Returns null if any element cannot be resolved.
+    /// </summary>
+    private static string? BuildFullSequenceKey(System.Collections.Generic.List<IOperation> elements)
+    {
+        var parts = new System.Collections.Generic.List<string>(elements.Count);
+        foreach (var element in elements)
+        {
+            var tokenKind = ExtractTokenKindFromGetMeta(element);
+            if (tokenKind == null) return null;
+            parts.Add(tokenKind);
+        }
+        return string.Join(",", parts);
     }
 
     private static IObjectCreationOperation? FindObjectCreation(IOperation op)
