@@ -8692,4 +8692,80 @@ Full-text search of `docs/language/precept-language-spec.md` for both `OperatorF
 **Why:** LanguageTool.cs requires the MCP layer to exist first. MCP is not yet implemented in this codebase, so LanguageTool.cs has no surface to plug into. This is not a deferral — it is a dependency on future infrastructure. Not a gap in the Phase 2 plan.
 **Impact:** Acceptance gate for Phase 2 does NOT include LanguageTool.cs. The gate remains the existing 13 points.
 
+### 2026-05-01: Analyzer slices 28–32 added to plan
 
+**By:** Frank (via Shane directive)
+
+**What:** Shane approved all 4 analyzer recommendations (PRECEPT0020–0023) + 2 hardcoded-pattern items from `analyzer-recommendations.md`. All added to `parser-gap-fixes-plan.md` as Slices 28–32 under new Phase 2e. Process note for `CatalogAnalysisHelpers.CatalogEnumNames` also appended. Acceptance gate expanded to 14 points.
+
+**Why:** Shane's directive: no gaps, everything in the plan.
+
+**Details:**
+
+- **Slice 28** (already present in plan, Phase 2d): PRECEPT0020 — Operators `ByToken`/`OperatorPrecedence` collision analyzer. Full spec was already appended in a prior session.
+- **Slice 29** (new, Phase 2e): `TokenMeta.IsValidAsMemberName` flag + catalog-driven derivation of `KeywordsValidAsMemberName`. Catalog cleanup, not an analyzer.
+- **Slice 30** (new, Phase 2e): PRECEPT0021 — Tokens duplicate `Text` check. Error severity. Silent failure mode (lexer non-determinism).
+- **Slice 31** (new, Phase 2e): PRECEPT0022 — OperatorMeta inline Token reference. Warning severity (consistent with PRECEPT0008c/0011e/0013a).
+- **Slice 32** (new, Phase 2e, deferred): PRECEPT0023 — OperatorMeta DU shape invariants (PRECEPT0023a/b/c). Blocked on Phase 2b completion. Tracked now, implement after George finishes Slices 19–22.
+- **Process note** (new, Phase 2e): `CatalogAnalysisHelpers.CatalogEnumNames` manual maintenance — process discipline item, not a slice. New-catalog checklist must include updating this set.
+
+# Phase 2b Decision Notes — OperatorMeta DU Restructure
+
+**Date:** 2026-05-01  
+**Author:** George  
+**Branch:** spike/Precept-V2  
+**Slices:** 19–22
+
+---
+
+## Decision: FrozenDictionary covariance requires explicit value selector
+
+When building `FrozenDictionary<TKey, TBase>` from a filtered sequence of `TDerived`
+(where `TDerived : TBase`), `ToFrozenDictionary` infers the value type as `TDerived` — not
+`TBase`. C# generic type inference never widens. The fix is to provide a value selector with
+an explicit cast: `.ToFrozenDictionary(k => ..., v => (TBase)v)`.
+
+This was the only compile error after the initial DU implementation. Applies to both:
+- `Operators.ByToken`: `.OfType<SingleTokenOp>().ToFrozenDictionary(..., m => (OperatorMeta)m)`
+- `Operators._byTokenSequence`: `.OfType<MultiTokenOp>().ToFrozenDictionary(..., m => (OperatorMeta)m)`
+
+## Decision: Parser.OperatorPrecedence must be narrowed to SingleTokenOp
+
+`Parser.OperatorPrecedence` builds from `Operators.All.Where(op => op.Arity == Arity.Binary)`.
+After the DU, `Operators.All` includes `MultiTokenOp` entries with `Arity.Postfix`. The
+`Arity.Binary` filter would pass them if ever set to `Binary`. More importantly, `MultiTokenOp`
+has no `.Token` property — accessing `op.Token.Kind` on a base-typed variable is a compile
+error. The fix is to narrow the source: `.OfType<SingleTokenOp>().Where(op => op.Arity == Arity.Binary)`.
+
+## Decision: ByToken returns OperatorMeta, not SingleTokenOp
+
+The public API `ByToken` is typed as `FrozenDictionary<(TokenKind, Arity), OperatorMeta>`.
+While the values are always `SingleTokenOp` at runtime, returning the base type maintains
+API stability for consumers that only need base-class properties (Kind, Precedence, Associativity).
+Callers that need `Token` must pattern-match: `if (meta is SingleTokenOp sop) sop.Token`.
+
+## Decision: ByTokenSequence uses params TokenKind[] with 3-tuple key
+
+The sequence key `(TokenKind, TokenKind?, TokenKind?)` covers all current multi-token operators
+(2-token `is set`, 3-token `is not set`) and any future additions up to 3 tokens. The params
+overload `ByTokenSequence(params TokenKind[] tokens)` lets callers write natural call syntax:
+`Operators.ByTokenSequence(TokenKind.Is, TokenKind.Set)`.
+
+If a 4-token sequence is ever needed, the key type must change. That is an acceptable deferred
+cost given that no 4-token operator exists in the spec.
+
+## File paths confirmed
+
+- `src/Precept/Language/Operator.cs` — contains `Arity`, `OperatorFamily`, `Associativity`, and the `OperatorMeta` DU types
+- `src/Precept/Language/OperatorKind.cs` — contains `OperatorKind` enum
+- `src/Precept/Language/Operators.cs` — contains `Operators` static class (`GetMeta`, `All`, `ByToken`, `ByTokenSequence`)
+- `src/Precept/Language/ExpressionForms.cs` — contains `ExpressionFormKind`, `ExpressionFormMeta`, `ExpressionForms`
+- `src/Precept/Pipeline/Parser.cs` — single file (1757+ lines), `OperatorPrecedence` at ~line 34, `[HandlesForm]` at ~line 1406
+
+## Test count baseline correction
+
+The plan doc said "2482 tests at Phase 1 exit". The actual count at Phase 1 exit (commit caca30f
+and related) was **2247 total: 2240 passing + 7 intentional KnownBrokenFiles failures**.
+Phase 2a corrected those 7 → 2261 passing, 0 failing.
+Phase 2b added 13 new tests (8 in OperatorsTests, 3 in ExpressionFormCatalogTests, 2 theory
+case additions) → **2274 passing, 0 failing**.
