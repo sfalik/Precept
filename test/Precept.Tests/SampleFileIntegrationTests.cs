@@ -16,9 +16,8 @@ namespace Precept.Tests;
 /// Purpose: catch regressions that unit tests miss — a parser fix that silently
 /// breaks a downstream construct will surface here before it ships.
 ///
-/// 23 of 28 sample files assert zero errors. The remaining 5 carry known pre-existing
-/// parser gaps (tracked below) that are outside the scope of slices 1–13.
-/// Slice 12 of the parser gap-fixes plan.
+/// 24 of 28 sample files assert zero errors. The remaining 4 carry known pre-existing
+/// parser gaps (tracked below). Slice 12 of the parser gap-fixes plan.
 /// </summary>
 public class SampleFileIntegrationTests
 {
@@ -35,33 +34,30 @@ public class SampleFileIntegrationTests
     //   insurance-claim.precept and loan-application.precept also use `.min` member access
     //   (GAP-C), so they remain in this list under the GAP-C annotation.
     //
-    // GAP-B: Field modifiers trailing a computed expression (`field X -> expr modifier`).
-    //   The parser handles modifiers only before `->`, not after. Emits
-    //   ExpectedDeclarationKeyword when a modifier follows the expression.
-    //   Files affected: sum-on-rhs-rule.precept, invoice-line-item.precept,
-    //                   transitive-ordering.precept, travel-reimbursement.precept
+    // GAP-B (fixed Slice 15): Field modifiers after computed expression now parsed correctly.
+    //   sum-on-rhs-rule, invoice-line-item, transitive-ordering now clean.
+    //   travel-reimbursement: GAP-B is fixed BUT ALSO uses min() as a function call
+    //   (keyword-as-function-name, same root cause as GAP-C).
     //
-    // GAP-C: Reserved keyword used as a collection member name (`.min` / `.max`).
-    //   MemberAccessExpression parser expects Identifier after '.', rejects Min/Max tokens.
+    // GAP-C: Reserved keyword used as a collection member name (`.min` / `.max`)
+    //   or function name (`min(...)`, `max(...)`).
+    //   MemberAccess/Atom parsers expect Identifier, reject Min/Max tokens.
     //   Files affected: insurance-claim.precept, loan-application.precept,
-    //                   building-access-badge-request.precept
+    //                   building-access-badge-request.precept, travel-reimbursement.precept
     private static readonly IReadOnlySet<string> KnownBrokenFiles =
         new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
-            "insurance-claim.precept",          // GAP-C: uses .min/.max member access
-            "loan-application.precept",          // GAP-C: uses .min/.max member access
-            "sum-on-rhs-rule.precept",           // known pre-existing issue: GAP-B
-            "invoice-line-item.precept",         // known pre-existing issue: GAP-B
-            "transitive-ordering.precept",       // known pre-existing issue: GAP-B
-            "travel-reimbursement.precept",      // known pre-existing issue: GAP-B
-            "building-access-badge-request.precept", // known pre-existing issue: GAP-C
+            "insurance-claim.precept",           // GAP-C: uses .min/.max member access
+            "loan-application.precept",           // GAP-C: uses .min/.max member access
+            "building-access-badge-request.precept", // GAP-C: uses .min/.max member access
+            "travel-reimbursement.precept",       // GAP-C: uses min() as function call (keyword-as-identifier)
         };
 
     // ── Main integration theory — zero-error gate ─────────────────────────
 
     /// <summary>
-    /// 21 sample files parse with zero error-severity diagnostics.
-    /// The 7 known-broken files are excluded; see KnownBrokenFiles above.
+    /// 24 sample files parse with zero error-severity diagnostics.
+    /// The 4 known-broken files are excluded; see KnownBrokenFiles above.
     /// </summary>
     [Theory]
     [MemberData(nameof(GetCleanSampleFiles))]
@@ -92,7 +88,7 @@ public class SampleFileIntegrationTests
     // ── Gap regression — known-broken files do produce expected errors ─────
 
     /// <summary>
-    /// Verifies that the 7 known-broken files still produce parse errors.
+    /// Verifies that the 4 known-broken files still produce parse errors.
     /// If this test fails for a file, that file's gap is fixed and it should
     /// be removed from KnownBrokenFiles and added back to the clean set.
     /// </summary>
@@ -119,14 +115,14 @@ public class SampleFileIntegrationTests
     }
 
     [Fact]
-    public void KnownBrokenFiles_AccountForExactly7OfThe28Samples()
+    public void KnownBrokenFiles_AccountForExactly4OfThe28Samples()
     {
         var allFiles = Directory.GetFiles(SamplesDir, "*.precept")
             .Select(Path.GetFileName)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        KnownBrokenFiles.Should().HaveCount(7,
-            "exactly 7 sample files have known pre-existing parser gaps (GAP-B × 4, GAP-C × 3)");
+        KnownBrokenFiles.Should().HaveCount(4,
+            "exactly 4 sample files have known pre-existing parser gaps (GAP-C × 4)");
         KnownBrokenFiles.Should().BeSubsetOf(allFiles,
             "every entry in KnownBrokenFiles must be an actual sample file");
     }

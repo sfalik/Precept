@@ -75,6 +75,52 @@ public class ParserTests
         field.ComputedExpression.Should().BeOfType<BinaryExpression>();
     }
 
+    // ── Slice 15 (GAP-B): Modifiers after computed expression ─────────────
+
+    [Fact]
+    public void Parse_FieldDeclaration_ModifierAfterComputedExpression()
+    {
+        var tree = Parse("field Net as number -> Total - Tax positive");
+        tree.Diagnostics.Should().NotContain(d => d.Severity == Severity.Error);
+        var field = tree.Declarations[0].Should().BeOfType<FieldDeclarationNode>().Subject;
+        field.ComputedExpression.Should().NotBeNull().And.BeOfType<BinaryExpression>();
+        field.Modifiers.Should().HaveCount(1);
+        field.Modifiers[0].Should().BeOfType<FlagModifierNode>()
+            .Which.Keyword.Kind.Should().Be(TokenKind.Positive);
+    }
+
+    [Fact]
+    public void Parse_FieldDeclaration_MultipleTrailingModifiers()
+    {
+        var tree = Parse("field X as number -> expr nonnegative positive");
+        tree.Diagnostics.Should().NotContain(d => d.Severity == Severity.Error);
+        var field = tree.Declarations[0].Should().BeOfType<FieldDeclarationNode>().Subject;
+        field.Modifiers.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public void Parse_FieldDeclaration_PreAndPostModifiers()
+    {
+        var tree = Parse("field X as number optional -> expr positive");
+        tree.Diagnostics.Should().NotContain(d => d.Severity == Severity.Error);
+        var field = tree.Declarations[0].Should().BeOfType<FieldDeclarationNode>().Subject;
+        field.Modifiers.Should().HaveCount(2, "optional (pre) + positive (post)");
+        field.Modifiers[0].Should().BeOfType<FlagModifierNode>()
+            .Which.Keyword.Kind.Should().Be(TokenKind.Optional);
+        field.Modifiers[1].Should().BeOfType<FlagModifierNode>()
+            .Which.Keyword.Kind.Should().Be(TokenKind.Positive);
+    }
+
+    [Fact]
+    public void Parse_FieldDeclaration_PreModifiersOnly_Regression()
+    {
+        var tree = Parse("field X as number nonnegative positive");
+        tree.Diagnostics.Should().BeEmpty();
+        var field = tree.Declarations[0].Should().BeOfType<FieldDeclarationNode>().Subject;
+        field.Modifiers.Should().HaveCount(2);
+        field.ComputedExpression.Should().BeNull();
+    }
+
     // ── StateDeclaration ───────────────────────────────────────────────────
 
     [Fact]

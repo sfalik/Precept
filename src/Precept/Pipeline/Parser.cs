@@ -792,13 +792,46 @@ public static class Parser
 
         private FieldDeclarationNode ParseFieldDeclaration()
         {
-            var meta = Constructs.GetMeta(ConstructKind.FieldDeclaration);
             var start = Current().Span;
             Advance(); // consume 'field'
-            var slots = ParseConstructSlots(meta);
-            var lastSpan = GetLastSlotSpan(slots, start);
-            return (FieldDeclarationNode)BuildNode(ConstructKind.FieldDeclaration, slots,
-                SourceSpan.Covering(start, lastSpan));
+
+            // [0] Name(s)
+            var nameTokens = ParseIdentifierListTokens();
+
+            // [1] Type — 'as Type'
+            Expect(TokenKind.As);
+            var type = ParseTypeRef();
+
+            // [2a] Pre-expression modifiers (e.g. optional, default N, min N, max N)
+            var preModifiers = ParseFieldModifierNodes();
+
+            // [3] Optional computed expression: '-> Expr'
+            Expression? computed = null;
+            ImmutableArray<FieldModifierNode> postModifiers = [];
+            if (Current().Kind == TokenKind.Arrow)
+            {
+                Advance(); // consume '->'
+                computed = ParseExpression(0);
+
+                // [2b] Post-expression modifiers — GAP-B fix (e.g. nonnegative, positive after ->)
+                postModifiers = ParseFieldModifierNodes();
+            }
+
+            var allModifiers = preModifiers.AddRange(postModifiers);
+
+            SourceSpan lastSpan;
+            if (postModifiers.Length > 0)
+                lastSpan = postModifiers[^1].Span;
+            else if (computed is not null)
+                lastSpan = computed.Span;
+            else if (preModifiers.Length > 0)
+                lastSpan = preModifiers[^1].Span;
+            else
+                lastSpan = type.Span;
+
+            return new FieldDeclarationNode(
+                SourceSpan.Covering(start, lastSpan),
+                nameTokens, type, allModifiers, computed);
         }
 
         private StateDeclarationNode ParseStateDeclaration()
