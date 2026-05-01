@@ -23,6 +23,13 @@
 
 ## Recent Updates
 
+### 2026-05-01 — Phase 2d (Slice 27) complete
+- `Parser.cs` split into three `partial` files: `Parser.cs` (~504 lines, core shell + dispatch), `Parser.Declarations.cs` (~1012 lines, all declaration/scope-level parsers), `Parser.Expressions.cs` (~330 lines, Pratt loop + atom parsers + `ExpectIdentifierOrKeywordAsMemberName`).
+- Both `public static partial class Parser` and `internal ref partial struct ParseSession` declared in every file.
+- `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]` present exactly once (primary declaration in `Parser.cs`).
+- `KeywordsValidAsMemberName` confirmed as static field on outer `Parser` class (not on `ref struct`); `ExpectIdentifierOrKeywordAsMemberName()` moved to `Parser.Expressions.cs` alongside its only caller (`ParseExpression`).
+- Zero behavior change. Build: 0 errors, 0 warnings. Test count: 2300 passing, 0 failing.
+
 ### 2026-05-01 — Phase 2c (Slices 23–26) complete
 - `TypeChecker` annotated: `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]` + all 11 `[HandlesForm]` on `private static CheckExpression` stub.
 - `GraphAnalyzer` annotated: same pattern with `private static AnalyzeExpression` stub.
