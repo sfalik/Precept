@@ -51,7 +51,7 @@ All 13 slices shipped on `spike/Precept-V2`. Test baseline: 2107 → 2482 (+375 
 | 14 | D | GAP-A: `when`-guard on `ParseStateEnsure`/`ParseEventEnsure` (method bodies only, no AST changes) | ✅ Done |
 | 15 | E | GAP-B: Modifiers after computed (`->`) field expressions (`ParseFieldDeclaration` rewrite) | ✅ Done |
 | 16 | F | GAP-C: Keyword-as-member-name (`Min`/`Max`) in `MemberAccess` handler | ✅ Done |
-| 17 | G2 | `is set` precedence audit: resolve 60 vs spec 40, sync parser and spec | ⏳ Pending |
+| 17 | G2 | `is set` precedence audit: resolve 60 vs spec 40, sync parser and spec | ✅ Done |
 | 18 | G3 | `contains` chaining non-associativity test | ⏳ Pending |
 
 #### Phase 2b — Sequential (full DU, depends on 2a)
@@ -1518,7 +1518,7 @@ if (current.Kind == TokenKind.Dot)
 
 ---
 
-### Slice 17: Work Item G2 — `is set` Precedence Audit ⏳ PENDING
+### Slice 17: Work Item G2 — `is set` Precedence Audit ✅ DONE
 
 **Goal:** Resolve the discrepancy between the current implementation precedence (60) and spec §2.1 (40) for `is set`/`is not set`. Produce a definitive resolution and sync parser and spec.
 
