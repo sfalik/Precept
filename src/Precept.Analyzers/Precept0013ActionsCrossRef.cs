@@ -129,13 +129,14 @@ public sealed class PRECEPT0013ActionsCrossRef : DiagnosticAnalyzer
 
             var syntaxNode = syntaxRefs[0].GetSyntax();
 
-            // RS1030: use context.SemanticModel rather than Compilation.GetSemanticModel().
+            // RS1030: use the operation's SemanticModel rather than Compilation.GetSemanticModel().
             // If the field declaration lives in a different syntax tree we cannot resolve
             // it from this context; assume non-empty to avoid false positives.
-            if (syntaxNode.SyntaxTree != ctx.SemanticModel.SyntaxTree)
+            var semanticModel = ctx.Operation.SemanticModel;
+            if (semanticModel == null || syntaxNode.SyntaxTree != semanticModel.SyntaxTree)
                 return;
 
-            var model = ctx.SemanticModel;
+            var model = semanticModel;
 
             // Walk ALL descendants to find the deepest array/collection operation.
             IOperation? best = null;

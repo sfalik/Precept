@@ -144,5 +144,14 @@ public class ExpressionFormCoverageTests
         var expr = ParseExpr("obj.Method(x)");
         expr.Should().BeOfType<MethodCallExpression>();
     }
+
+    // M3
+    [Fact]
+    public void ParseExpression_PostfixOperation_IsSet_ReturnsCorrectNodeType()
+    {
+        var expr = ParseExpr("opt is set");
+        expr.Should().BeOfType<IsSetExpression>(
+            because: "parsing 'opt is set' must produce an IsSetExpression (PostfixOperation form)");
+    }
 }
 

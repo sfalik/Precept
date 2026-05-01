@@ -556,6 +556,19 @@ public class ExpressionParserTests
             .Which.Name.Text.Should().Be("opt");
     }
 
+    // M5
+    [Fact]
+    public void ParseExpression_IsSet_Chained_ParsesAsNestedIsSet()
+    {
+        // "x is set is set" — postfix operators have no binary chaining guard;
+        // the parser silently produces IsSetExpression(IsSetExpression(x)).
+        // This pins the defined behavior so regressions are caught.
+        var expr = ParseExpr("x is set is set");
+        var outer = expr.Should().BeOfType<IsSetExpression>().Subject;
+        outer.Operand.Should().BeOfType<IsSetExpression>(
+            "chaining 'is set is set' nests the inner IsSetExpression as the operand of the outer one");
+    }
+
     // ── List literals (GAP-6, Slice 5) ────────────────────────────────────
 
     [Fact]

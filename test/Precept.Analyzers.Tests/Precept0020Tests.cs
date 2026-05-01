@@ -180,4 +180,25 @@ namespace Precept.Language
 
         await AnalyzerTestHelper.AnalyzeAsync<PRECEPT0020OperatorsTokenCollision>(source);
     }
+
+    // M4
+    [Fact]
+    public async Task GivenSingleAndMultiTokenOpsWithSameLeadToken_NoPRECEPT0020()
+    {
+        // MultiTokenOp [Or, And] shares lead token Or with SingleTokenOp Or.
+        // PRECEPT0020 must NOT fire — it skips MultiTokenOp arms (PRECEPT0023b handles that).
+        var source = OperatorStubs + @"
+    public static class Operators
+    {
+        public static OperatorMeta GetMeta(OperatorKind kind) => kind switch
+        {
+            OperatorKind.Or     => new SingleTokenOp(kind, Tokens.GetMeta(TokenKind.Or),   ""Or"",  Arity.Binary, Associativity.Left, 10, OperatorFamily.Logical),
+            OperatorKind.Extra1 => new MultiTokenOp(kind, [Tokens.GetMeta(TokenKind.Or), Tokens.GetMeta(TokenKind.And)], ""OrAnd"", Arity.Binary, Associativity.Left, 20, OperatorFamily.Logical),
+            _ => throw new System.ArgumentOutOfRangeException(nameof(kind)),
+        };
+    }
+" + CloseBrace;
+        var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<PRECEPT0020OperatorsTokenCollision>(source);
+        diagnostics.Where(d => d.Id.StartsWith("PRECEPT0020")).Should().BeEmpty();
+    }
 }

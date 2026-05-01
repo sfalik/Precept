@@ -107,6 +107,13 @@ public class OperatorsTests
         Operators.GetMeta(kind).Arity.Should().Be(Arity.Binary);
     }
 
+    // M1
+    [Theory]
+    [InlineData(OperatorKind.IsSet)]
+    [InlineData(OperatorKind.IsNotSet)]
+    public void GetMeta_PostfixOperators_HavePostfixArity(OperatorKind kind)
+        => Operators.GetMeta(kind).Arity.Should().Be(Arity.Postfix);
+
     // ── Precedence (from language spec § 2.1) ───────────────────────────────────
 
     [Theory]
@@ -132,6 +139,13 @@ public class OperatorsTests
     {
         Operators.GetMeta(kind).Precedence.Should().Be(expectedPrecedence);
     }
+
+    // M6
+    [Theory]
+    [InlineData(OperatorKind.IsSet,    60)]
+    [InlineData(OperatorKind.IsNotSet, 60)]
+    public void GetMeta_PostfixOperators_Precedence_MatchesSpec(OperatorKind kind, int expected)
+        => Operators.GetMeta(kind).Precedence.Should().Be(expected);
 
     // ── Associativity ───────────────────────────────────────────────────────────
 
@@ -335,5 +349,25 @@ public class OperatorsTests
     public void ByTokenSequence_Unknown_ReturnsNull()
     {
         Operators.ByTokenSequence(TokenKind.Is, TokenKind.And).Should().BeNull();
+    }
+
+    // M2
+    [Fact]
+    public void IsSet_Tokens_IsIsSet()
+    {
+        var op = (MultiTokenOp)Operators.GetMeta(OperatorKind.IsSet);
+        op.Tokens.Should().HaveCount(2);
+        op.Tokens[0].Kind.Should().Be(TokenKind.Is);
+        op.Tokens[1].Kind.Should().Be(TokenKind.Set);
+    }
+
+    [Fact]
+    public void IsNotSet_Tokens_IsIsNotSet()
+    {
+        var op = (MultiTokenOp)Operators.GetMeta(OperatorKind.IsNotSet);
+        op.Tokens.Should().HaveCount(3);
+        op.Tokens[0].Kind.Should().Be(TokenKind.Is);
+        op.Tokens[1].Kind.Should().Be(TokenKind.Not);
+        op.Tokens[2].Kind.Should().Be(TokenKind.Set);
     }
 }
