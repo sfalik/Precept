@@ -8503,3 +8503,193 @@ These are complementary layers:
 - **Soup Nazi-2:** Implementation Status table added to plan doc top
 - **Soup Nazi-3:** Reviewer notes annotated with Phase 1/2 status banners
 - **Frank-7:** Phase 2 synthesis — Slices 14–26 appended to `docs/working/parser-gap-fixes-plan.md`
+
+## Session: Phase 2 Gap Audit + Pre-Implementation Clearance
+# Phase 2 Gap Audit
+**Author:** Frank (Lead Architect / Language Designer)  
+**Date:** 2026-05-01  
+**Scope:** Phase 2 plan (Slices 14–26) + acceptance gate (13 points)  
+**Directive:** No deferred items, no GitHub issues, no holes before type-checker work begins.
+
+---
+
+## Phase 2 Gap Audit
+
+### ✅ Fully Covered
+
+**Frank's original review findings:**
+- **GAP-A (when-guard)** → Slice 14: complete parse fix, no AST record change needed (Guard already present), 4 tests, SampleFileIntegrationTests update. George's design confirmed the slot-bypass approach is clean.
+- **`is set` precedence mismatch (60 vs spec 40)** → Slice 17: recommends confirming 60 as canonical and updating spec §2.1. Acceptable resolution.
+- **PRECEPT0019 suppressed + downstream annotations missing** → Slices 23–26: TypeChecker, GraphAnalyzer annotated; suppression removed; severity flipped. Correct sequencing.
+- **`OperatorKind.IsSet` / `Arity.Postfix` not in catalog** → Slices 19–22: Full DU, new catalog entries, call-site migration. George's design is thorough and complete.
+- **Dead `IdentifierExpression` branch** → confirmed resolved in Phase 1 Slice 6 with comment at line 1400 ("unreachable: identifiers resolve as FunctionCall in ParseAtom"). ✅
+- **`MethodCallExpression` precedence 90 (plan said 80)** → George's review accepted 90 as correct ("method call binds tighter, which is correct"). Functionally covered — see Gap 4 below for the remaining doc-level item.
+- **Slice 13 (ExpressionFormCoverageTests) not delivered** → Slice 25: Full test class specified with 5+ tests covering count, GetMeta, led/nud flags, and lead-token invariants.
+
+**George's additional findings:**
+- **AG-1 (`because` return value unused)** → George's Slice 14 design calls `Expect(TokenKind.Because)` directly without `var because =`. ✅
+- **GAP-B root cause (slot bypass)** → Slice 15: complete `ParseFieldDeclaration` dedicated method. ✅
+- **GAP-C scope (only Min/Max, not count/length/sum)** → Slice 16: `KeywordsValidAsMemberName` FrozenSet with exactly `{Min, Max}`. ✅
+- **AG-2 (`OperatorPrecedence` Postfix exclusion)** → Slice 20 adds `.OfType<SingleTokenOp>()` before `.Where(op => op.Arity == Arity.Binary)`. Correct — postfix operators excluded automatically. ✅
+- **AG-4 (`ByToken_CountMatchesAll` test update)** → Slice 20 call-site migration table explicitly covers this test. ✅
+
+**Language surface propagation:**
+- **TextMate grammar** → No new keywords: `is`, `set`, `not` already in grammar. No regeneration needed. ✅
+- **Sample files** → All sample file fixes (GAP-A/B/C) covered in Slices 14–16. After Slice 16, `KnownBrokenFiles` = empty, all 28 files clean. ✅
+- **Spec §2.1 `is set`/`is not set` precedence** → Slice 17 resolves 40 vs 60 discrepancy and requires a comment in `Parser.cs` linking implementation to catalog. ✅
+
+**Build / analyzer correctness:**
+- **`[HandlesCatalogExhaustively]` catching new exhaustiveness issues** → Slices 19+20 must be atomic (enum additions without GetMeta arms → PRECEPT0007 build error). Plan calls this out explicitly. ✅
+- **`OperatorMeta.Token` call sites** → Slice 20 lists all 5 call sites (Parser.cs ~38, Operators.cs ByToken, OperatorsTests.cs × 3) with exact migration patterns. ✅
+- **PRECEPT0017 analyzer** → Unaffected by DU. George confirmed first constructor argument is `Kind` in both `SingleTokenOp` and `MultiTokenOp`. ✅
+- **`TypeChecker`/`GraphAnalyzer` stubs with `[HandlesForm]`** → The analyzer checks that a method with the attribute exists; it does not validate the method body. Annotating `NotImplementedException` stubs is correct and is explicitly called out in Slice 23. ✅
+- **`OperatorPrecedence` construction after DU** → Filter chain becomes `.OfType<SingleTokenOp>().Where(op => op.Arity == Arity.Binary)`. Postfix ops excluded by `.Where`. No explicit `!= Arity.Postfix` clause needed. Plan documents this. ✅
+
+**Acceptance gate — reachability:**
+- Points 1–5, 7–12 each have owning slices with explicit acceptance criteria. ✅
+
+---
+
+### ⚠️ Gaps Found
+
+#### Gap 1 — CRITICAL: `LanguageTool.cs` not in Phase 2 plan
+
+**What's missing:** The plan's Phase 1 Scope section explicitly listed "`LanguageTool.cs` — add `expression_forms` section to `precept_language` output" as in-scope for Slice 4. Frank's Phase 1 review noted it as "not a plan violation — the MCP tool infrastructure doesn't exist yet (only `PingTool.cs`)." Phase 2 adds `OperatorKind.IsSet/IsNotSet`, `OperatorFamily.Presence`, `Arity.Postfix`, and `ExpressionFormKind.PostfixOperation` to catalogs — but no Phase 2 slice creates `LanguageTool.cs`.
+
+**Impact:** When Phase 2 is "done," the MCP `precept_language` tool will still not exist. New catalog entries (11 expression forms, 20 operators, new operator family) are invisible to MCP consumers, AI grounding, and LS hover. The `catalog-system.md` Completeness Principle is violated in the MCP surface layer. Shane's "no deferred items" directive is explicitly violated — this was deferred in Phase 1 and Phase 2 doesn't close it.
+
+**Resolution:** Add a new slice (suggest Slice 15.5, between Phase 2a and 2b, or as a standalone Phase 2d) to create `tools/Precept.Mcp/Tools/LanguageTool.cs` with `precept_language` output:  
+- `operators` section (grouped by `OperatorFamily`, covering all 20 entries after Slice 20)  
+- `expression_forms` section (all 11 entries after Slice 21)  
+- `tokens`, `types`, `constructs` sections from existing catalogs  
+
+The slice should include `Precept.Mcp.Tests` coverage for the new tool, a `precept_language` schema test, and acceptance that `precept_language` returns non-empty output with correct operator count (20) and form count (11). This slice can be ordered after Slice 21 (all catalog entries finalized) but before Slice 26 (PRECEPT0019 flip).
+
+---
+
+#### Gap 2 — MODERATE: `Precept0019Tests.cs` severity assertions break on Slice 26
+
+**What's missing:** `test/Precept.Analyzers.Tests/Precept0019Tests.cs` lines 61 and 89 assert `d.Severity.Should().Be(DiagnosticSeverity.Warning)` (TP1 `TP1_MissingFormHandlers_Reports` and TP2 `TP2_StructMissingHandlers_Reports`). Slice 26 changes `defaultSeverity` from `Warning` to `Error` in `Precept0019PipelineCoverageExhaustiveness.cs`. After this flip, both TP tests will fail with "expected Warning but got Error."
+
+**Impact:** Phase 2 acceptance gate point 1 ("all tests pass") will fail after Slice 26 unless `Precept0019Tests.cs` is updated.
+
+**Resolution:** Add to Slice 26's "Files to modify" table:
+
+| File | Location | Change |
+|------|----------|--------|
+| `test/Precept.Analyzers.Tests/Precept0019Tests.cs` | TP1 line 61 | `DiagnosticSeverity.Warning` → `DiagnosticSeverity.Error` |
+| `test/Precept.Analyzers.Tests/Precept0019Tests.cs` | TP2 line 89 | `DiagnosticSeverity.Warning` → `DiagnosticSeverity.Error` |
+
+---
+
+#### Gap 3 — MODERATE: Acceptance gate point 6 has no owning slice
+
+**What's missing:** Acceptance gate point 6 says: "convert `KnownBrokenSampleFile_StillHasParserErrors` to an assertion that the list is empty, or remove." After Slice 16 empties `KnownBrokenFiles`, this Theory (backed by `GetKnownBrokenSampleFiles()` which returns empty) produces zero test cases. While xUnit v2 does not hard-fail on an empty theory, leaving a dead test method and a data source method returning empty is technical debt that violates the gate's explicit requirement. No slice (14, 15, or 16) explicitly owns this conversion.
+
+**Impact:** Acceptance gate point 6 is not reachable by any current slice. The method `KnownBrokenSampleFile_StillHasParserErrors` and its data provider `GetKnownBrokenSampleFiles()` will remain as dead-weight after Slice 16.
+
+**Resolution:** Add to Slice 16's acceptance criteria and test-change table:
+
+> When `KnownBrokenFiles` is empty: convert `KnownBrokenSampleFile_StillHasParserErrors` to a `[Fact]` that asserts `KnownBrokenFiles.Count == 0` (confirms the sentinel set stays empty over time). Remove `GetKnownBrokenSampleFiles()` data method. Update `KnownBrokenFiles_AccountForExactly7OfThe28Samples` to assert `HaveCount(0)` and rename it accordingly.
+
+---
+
+#### Gap 4 — MINOR: Method call binding power (90) lacks spec-reference comment
+
+**What's missing:** Frank's original action item 3 (pre-implementation review) says: "Add a comment on the `80` constant: `// Precedence 80 — matches dot-access. Spec §2.1, structural grammar, not an operator.`" The implementation uses 90 (not 80). Slice 17 requires: "A comment in `Parser.cs` `Is` handler references the catalog: `// Precedence 60 — matches Operators.GetMeta(OperatorKind.IsSet).Precedence. Spec §2.1.`" No equivalent comment is specified for the method call handler's `90` constant.
+
+**Impact:** Minor — code clarity, not functional. But inconsistency: `is set` (60) will have a catalog reference; method call (90) will not. The plan's Scope section originally called out this cleanup.
+
+**Resolution:** Add to Slice 17's "Files to modify" table (or any Phase 2a slice):
+
+| File | Location | Change |
+|------|----------|--------|
+| `src/Precept/Pipeline/Parser.cs` | `ParseExpression` `LeftParen` handler, `if (minPrecedence > 90) break;` | Add comment: `// Precedence 90 — method call binds tighter than dot-access (80). Structural grammar, not a catalog operator. Spec §2.1.` |
+
+---
+
+### ❓ Questions / Ambiguities
+
+**Q1: Does the grammar generator consume `OperatorFamily`?**
+
+George's design comments on `OperatorFamily.Presence`: "the tmLanguage `keyword.operator.presence.precept` scope can't be distinguished from `keyword.operator.membership.precept` by family alone." This implies the grammar generator assigns TextMate scopes based on `OperatorFamily`. If so, adding `Presence = 5` could affect grammar generation — specifically, the generator must produce a `keyword.operator.presence.precept` scope rule for `is`/`set`/`not`. The plan says "TextMate grammar is not affected (no new keywords being added)" — but this is about token-level keywords, not operator-family-level scoping. **Clarify before Slice 19:** does the grammar generator use `OperatorFamily` for scope assignment? If yes, add a grammar-regeneration step to Slice 21.
+
+**Q2: Slices 19+20 "single atomic commit" — git workflow implications?**
+
+The plan states "Slices 19 and 20 must be implemented as a single atomic commit (or Slice 19 enum additions committed together with the Slice 20 DU in one pass)." This is correct from a build-integrity standpoint (PRECEPT0007 will fire if enum members exist without GetMeta arms). But in the context of the spike branch (not a PR workflow), the implementer should be clear: commit Slices 19+20 together as one git commit on the branch, not as two separate commits. Not a plan gap, but worth confirming with George before he starts Phase 2b.
+
+**Q3: `OperatorFamily.Presence` — spec documentation?**
+
+The `OperatorFamily` enum is an internal C# type, not a spec-level concept. If the spec §2.1 documents operator families anywhere (as a table or concept), adding `Presence = 5` needs a spec update. If `OperatorFamily` is purely implementation-internal classification (for grammar generator + LS scope assignment), no spec update is needed. The plan doesn't address this either way. Confirm the scope of spec coverage for `OperatorFamily`.
+
+---
+
+### Verdict
+
+**GAPS FOUND — 4 items need attention**
+
+| # | Gap | Severity | Owning Slice |
+|---|-----|----------|-------------|
+| 1 | `LanguageTool.cs` not in Phase 2 — deferred from Phase 1 Slice 4 | **CRITICAL** | New slice required (Phase 2d, post-Slice 21) |
+| 2 | `Precept0019Tests.cs` severity assertions break on Slice 26 flip | **MODERATE** | Slice 26 (add 2 lines to "Files to modify") |
+| 3 | Empty-Theory handling for `KnownBrokenSampleFile_StillHasParserErrors` — acceptance gate point 6 has no owner | **MODERATE** | Slice 16 (add explicit conversion step) |
+| 4 | Method call binding power (90) has no spec-reference comment | **MINOR** | Slice 17 (add one comment line to table) |
+
+Gap 1 is the only one that requires a new slice. Gaps 2–4 are addenda to existing slices.
+
+**If Gap 1 is resolved (LanguageTool.cs slice added) and Gaps 2–4 are patched into their owning slices, the plan is COMPREHENSIVE and all 13 acceptance gate points become reachable.**
+
+
+# Pre-Implementation Q&A — Phase 2 Blockers
+
+**Author:** George  
+**Date:** 2026-05-01  
+**Requested by:** Shane  
+**Status:** Resolved — all three questions answered from source inspection
+
+---
+
+## Q1: Does adding `OperatorFamily.Presence = 5` require a grammar regeneration pass?
+
+**Verdict: NO — no grammar regeneration pass is required.**
+
+Exhaustive search of all `.cs`, `.ts`, and `.js` files in the repository found no grammar generator source file. `docs/compiler/tooling-surface.md` documents this explicitly: "Grammar generator source: Path TBD — confirm in `tools/Precept.VsCode/` or `tools/scripts/`" and lists it as Open Question #1. The `operators` section of `tools/Precept.VsCode/syntaxes/precept.tmLanguage.json` is currently hardcoded regex patterns (`==|!=|>=|<=`, `[+\-*/%]`, etc.) — not a generated output. The `OperatorFamily` enum docstring in `src/Precept/Language/Operator.cs` does say it is "used by the grammar generator, LS semantic tokens, and MCP vocabulary to assign different scopes to operator groups" — this describes the intended design, not currently-runnable code. Furthermore, the `is set` / `is not set` operators are keyword operators; the individual tokens `Is`, `Not`, and `Set` are already classified as keywords in the grammar via their `TokenMeta.TextMateScope` values, so adding `OperatorFamily.Presence` changes no currently-active grammar scope assignment. When the grammar generator is eventually implemented, it will need a scope mapping for `Presence` (e.g., `keyword.operator.presence.precept`), but that is a future concern, not a Slice 17/19 requirement.
+
+---
+
+## Q2: Must Slices 19 and 20 be committed atomically?
+
+**Verdict: REQUIRED — single commit or back-to-back with no build between them.**
+
+`PRECEPT0007GetMetaExhaustiveness.cs` (`src/Precept.Analyzers/`) fires as a Roslyn analyzer (`DiagnosticSeverity.Error`) on any `GetMeta` switch expression in `Precept.Language` that does not have an explicit arm for every member of its discriminant enum. The discriminant allow-list in `CatalogAnalysisHelpers.cs` (line 57–62) explicitly includes `"OperatorKind"`. This means: the moment `OperatorKind.IsSet = 19` and `OperatorKind.IsNotSet = 20` are added to the enum (Slice 19), any `dotnet build` before `Operators.GetMeta()` has the corresponding arms (Slice 20) will produce PRECEPT0007 build errors. The `[HandlesCatalogExhaustively]` attribute is not in play here — the analyzer detects catalog switches by method name (`GetMeta`) + namespace (`Precept.Language`) + switch input type (member of `CatalogEnumNames`), with no opt-in attribute required. **Recommendation: combine Slices 19 and 20 into a single atomic commit.** If sequential commits are preferred for history clarity, 20 must immediately follow 19 with no build pass between them.
+
+---
+
+## Q3: Is `OperatorFamily` a spec-level concept?
+
+**Verdict: INTERNAL ONLY — no spec update needed for `Presence = 5`.**
+
+Full-text search of `docs/language/precept-language-spec.md` for both `OperatorFamily` and `family` found zero matches to the `OperatorFamily` enum. The word "family" appears in the spec only in the context of dimension families (`of 'length'`, `of 'currency'` qualifiers) — unrelated to operators. Broader search of `docs/` found `OperatorFamily` only in `docs/language/catalog-system.md` (supporting-enum table) and `docs/working/parser-gap-fixes-plan.md` (the working implementation plan). It is not mentioned in `docs/language/precept-language-spec.md`, `docs/compiler-and-runtime-design.md §13`, or any other normative spec document. `OperatorFamily` is a purely internal classification axis used by the grammar generator, LS semantic tokens, and MCP vocabulary. No spec section (including §2.1 operator tables) references it. Adding `Presence = 5` requires no spec update.
+
+---
+
+## Source Evidence
+
+| Claim | Source |
+|---|---|
+| `OperatorFamily` used by grammar generator | `src/Precept/Language/Operator.cs` line 6–8 (doc comment) |
+| Grammar generator source "path TBD" | `docs/compiler/tooling-surface.md` — Status table + Open Question #1 |
+| `tmLanguage.json` operators section is hardcoded regex | `tools/Precept.VsCode/syntaxes/precept.tmLanguage.json` `"operators"` repository entry |
+| `OperatorKind` in PRECEPT0007 allow-list | `src/Precept.Analyzers/CatalogAnalysisHelpers.cs` lines 57–62 |
+| PRECEPT0007 fires on missing arms | `src/Precept.Analyzers/Precept0007GetMetaExhaustiveness.cs` |
+| `OperatorFamily` absent from spec | `docs/language/precept-language-spec.md` — full-text search, no match |
+| `OperatorFamily` in catalog-system doc only | `docs/language/catalog-system.md` supporting-enum table |
+
+
+### 2026-05-01: LanguageTool.cs — not in scope (MCP layer not yet implemented)
+**By:** Shane (owner)
+**What:** `LanguageTool.cs` (MCP vocabulary tool — `precept_language` endpoint) is not part of the current spike because the MCP layer it depends on does not exist yet in this codebase.
+**Why:** LanguageTool.cs requires the MCP layer to exist first. MCP is not yet implemented in this codebase, so LanguageTool.cs has no surface to plug into. This is not a deferral — it is a dependency on future infrastructure. Not a gap in the Phase 2 plan.
+**Impact:** Acceptance gate for Phase 2 does NOT include LanguageTool.cs. The gate remains the existing 13 points.
+
+
