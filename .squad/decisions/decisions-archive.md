@@ -1,7 +1,7 @@
 # Technical Review: Elaine's `lookup`/`queue` Surface Proposals
 
-**By:** Frank  
-**Date:** 2025-07-17  
+**By:** Frank
+**Date:** 2025-07-17
 **Status:** Recommendations delivered — pending owner sign-off
 
 ---
@@ -80,15 +80,17 @@ The `containskey` and `removekey` tokens can be removed from the lexer's keyword
 
 ---
 
+---
+
 # Decision: README Image Link Fixes
 
-**Date:** 2026-04-07  
-**Owner:** J. Peterman (Brand/DevRel)  
+**Date:** 2026-04-07
+**Owner:** J. Peterman (Brand/DevRel)
 **Status:** Completed
 
 ## Problem
 README.md contained two broken image references that used incorrect relative paths:
-- `brand/readme-hero.svg` 
+- `brand/readme-hero.svg`
 - `brand/readme-hero-dsl.png`
 
 These links pointed to `./brand/` but the actual assets are in `./design/brand/`.
@@ -112,11 +114,13 @@ The README's narrative around the hero example remains valid: it correctly notes
 
 ---
 
+---
+
 # Decision: README Hero DSL PNG Rendering
 
-**Author:** Elaine (UX)  
-**Date:** 2025-07-21  
-**Status:** Proposed  
+**Author:** Elaine (UX)
+**Date:** 2025-07-21
+**Status:** Proposed
 **Scope:** brand/readme-hero-dsl.png
 
 ## Context
@@ -144,6 +148,8 @@ If the hero snippet changes, re-render with:
 
 ---
 
+---
+
 # One-shot: install puppeteer, screenshot, remove
 npm install --no-save puppeteer
 node -e "<screenshot script>"  # see commit for full script
@@ -151,6 +157,8 @@ npm uninstall puppeteer && rm package.json package-lock.json && rm -rf node_modu
 ```
 
 Future improvement: automate this as a build script or CI step.
+
+---
 
 ---
 
@@ -173,12 +181,16 @@ Future improvement: automate this as a build script or CI step.
 
 ---
 
+---
+
 # Decision: Issue #22 Design Fidelity Directive
 
 **Date:** 2026-04-08
 **By:** Shane (user directive)
 
 When implementing issue #22, if anything the team is going to implement strays from the design docs or seems ambiguous, they must stop and ask rather than guess. Design understanding is a prerequisite before coding starts.
+
+---
 
 ---
 
@@ -226,6 +238,8 @@ Use `customer-profile.precept`, `fee-schedule.precept`, `payment-method.precept`
 
 ---
 
+---
+
 # Decision: Slice 7 Test Coverage — Known Gaps (Deferred)
 
 **Date:** 2026-04-08
@@ -238,6 +252,8 @@ Three coverage gaps identified during Slice 7 test writing and explicitly deferr
 3. `PreceptInstance.WorkflowName` mismatch on stateless Inspect not covered.
 
 These are known gaps, recorded for future test pass. Not blocking Slice 7 merge.
+
+---
 
 ---
 
@@ -260,6 +276,8 @@ These are known gaps, recorded for future test pass. Not blocking Slice 7 merge.
 ## Rationale
 
 The combined-design-v2 doc had accumulated all review feedback, innovations callouts, and section expansions across multiple review rounds. The short doc's only unique content was the type strategy reasoning, which v2 now carries. Keeping both docs would create a drift risk with no benefit.
+
+---
 
 ---
 
@@ -316,12 +334,16 @@ These don't cross because no runtime operation needs them — the prohibition is
 
 ---
 
+---
+
 # Design Evaluation: Per-Field `readonly` Modifier as Access Default Inversion
 
 **Author:** Frank (Lead/Architect & Language Designer)
 **Date:** 2025-07-14
 **Requested by:** Shane
 **Verdict:** **Reject**
+
+---
 
 ---
 
@@ -388,11 +410,15 @@ Six surveys were not consulted in the initial grounding. Each was read against t
 
 ---
 
+---
+
 # Doc Audit: `writable` Field Modifier — Findings & Decisions
 
-**Date:** 2025-04-27  
-**Author:** Frank (Lead/Architect)  
+**Date:** 2025-04-27
+**Author:** Frank (Lead/Architect)
 **Scope:** All 32 files in `docs/` audited for `writable` modifier language change
+
+---
 
 ---
 
@@ -402,6 +428,8 @@ Six surveys were not consulted in the initial grounding. Each was read against t
 **Reviewer:** Soup Nazi (Tester)
 **Scope:** `writable` field modifier — full catalog + regression + MCP audit
 **Test run:** 1793 tests (includes 10 new `WritableSurfaceTests` added during investigation), 0 failed, 0 skipped ✅
+
+---
 
 ---
 
@@ -430,12 +458,14 @@ Treat `docs/HowWeGotHere.md` as a retrospective historical narrative, not as a l
 
 ---
 
+---
+
 # Precept V2 — Exhaustive Parser & Lexer Test Coverage Audit
 
-**Branch:** `spike/Precept-V2`  
-**Requested by:** @soup-nazi  
-**Date:** 2025-07  
-**Baseline:** 2107 passing, 0 failing  
+**Branch:** `spike/Precept-V2`
+**Requested by:** @soup-nazi
+**Date:** 2025-07
+**Baseline:** 2107 passing, 0 failing
 **Constraint:** `Compiler.Compile()` unusable (TypeChecker throws `NotImplementedException`). All parser tests use `Lexer.Lex()` + `Parser.Parse()` directly. TypeChecker-level diagnostics are blocked.
 
 ---
@@ -716,62 +746,62 @@ Columns: **Construct** · **Positive Test?** · **Negative Test?** · **File(s)*
 Ordered by: parser correctness > spec contract > sample-file blast radius > implementation cost.
 
 ### Priority 1 — GAP-2: `in/to/from State ensure Condition when Guard` (Parser BUG)
-**Severity:** Critical — parser bug producing false diagnostic on spec-valid syntax  
-**Spec:** §2.2 — `ensure BoolExpr ("when" BoolExpr)? ("because" StringExpr)?`  
-**Root cause:** `ParseExpr()` is called first; `when` is a `StructuralBoundaryToken`, so it terminates the condition early. Then `Expect(Because)` sees `when` and emits `MissingBecause`. The `when` guard clause after `ensure` is never parsed.  
-**Blast radius:** `insurance-claim.precept` line 28, `loan-application.precept` line 25. Both integration tests explicitly work around this failure with reduced assertion scope.  
-**Fix:** After `ParseExpr()` completes the condition, check if current token is `When`; if so, parse guard into a `GuardNode`; then optionally parse `because`.  
+**Severity:** Critical — parser bug producing false diagnostic on spec-valid syntax
+**Spec:** §2.2 — `ensure BoolExpr ("when" BoolExpr)? ("because" StringExpr)?`
+**Root cause:** `ParseExpr()` is called first; `when` is a `StructuralBoundaryToken`, so it terminates the condition early. Then `Expect(Because)` sees `when` and emits `MissingBecause`. The `when` guard clause after `ensure` is never parsed.
+**Blast radius:** `insurance-claim.precept` line 28, `loan-application.precept` line 25. Both integration tests explicitly work around this failure with reduced assertion scope.
+**Fix:** After `ParseExpr()` completes the condition, check if current token is `When`; if so, parse guard into a `GuardNode`; then optionally parse `because`.
 **Tests needed:** `Parse_StateEnsure_In_WithConditionAndGuard`, `Parse_StateEnsure_To_WithConditionAndGuard`, `Parse_StateEnsure_From_WithConditionAndGuard`
 
 ---
 
 ### Priority 2 — GAP-1: `TypedConstant` atom in expression parser (Parser BUG)
-**Severity:** Critical — typed constant literals produce parser error/fallthrough in expression context  
-**Spec:** §2.1 null-denotation table — `TypedConstant` token → `TypedConstantExpression`  
-**Root cause:** `ParseAtom()` has no case for `TokenKind.TypedConstant` or `TokenKind.TypedConstantStart`. The lexer produces these tokens correctly (confirmed by `LexerTests`), but the parser doesn't consume them.  
-**Blast radius:** Any precept using typed constant literals in expressions (`'2026-04-23'`, `'USD'`, etc.). Blocks `fee-schedule.precept`, `computed-tax-net.precept`, and any sample file with temporal/domain typed constant expressions.  
-**Fix:** Add `TypedConstant` case in `ParseAtom()` producing `TypedConstantExpression`; add `TypedConstantStart` case that reassembles interpolated typed constant using the same loop as interpolated strings.  
+**Severity:** Critical — typed constant literals produce parser error/fallthrough in expression context
+**Spec:** §2.1 null-denotation table — `TypedConstant` token → `TypedConstantExpression`
+**Root cause:** `ParseAtom()` has no case for `TokenKind.TypedConstant` or `TokenKind.TypedConstantStart`. The lexer produces these tokens correctly (confirmed by `LexerTests`), but the parser doesn't consume them.
+**Blast radius:** Any precept using typed constant literals in expressions (`'2026-04-23'`, `'USD'`, etc.). Blocks `fee-schedule.precept`, `computed-tax-net.precept`, and any sample file with temporal/domain typed constant expressions.
+**Fix:** Add `TypedConstant` case in `ParseAtom()` producing `TypedConstantExpression`; add `TypedConstantStart` case that reassembles interpolated typed constant using the same loop as interpolated strings.
 **Tests needed:** `ParseExpr_TypedConstantLiteral_ProducesTypedConstantExpression`, `ParseExpr_InterpolatedTypedConstant_ProducesInterpolatedTypedConstantExpression`
 
 ---
 
 ### Priority 3 — GAP-3: `is set` / `is not set` postfix expressions
-**Severity:** Critical (known gap)  
-**Spec:** §2.1 — postfix at precedence 40, alongside `contains`  
-**Root cause:** `ParseExpr()` left-denotation likely doesn't handle `Is` token followed by `Set` / `Not Set`. No `IsSetExpression` AST node produced.  
-**Blast radius:** `insurance-claim.precept` line 28 (`DecisionNote is set`), `loan-application.precept` line 62 (`Approve.Note is set`), `customer-profile.precept` line 17 (`Email is set`). `SyntaxReference.NullNarrowing` test references the string but doesn't parse it.  
+**Severity:** Critical (known gap)
+**Spec:** §2.1 — postfix at precedence 40, alongside `contains`
+**Root cause:** `ParseExpr()` left-denotation likely doesn't handle `Is` token followed by `Set` / `Not Set`. No `IsSetExpression` AST node produced.
+**Blast radius:** `insurance-claim.precept` line 28 (`DecisionNote is set`), `loan-application.precept` line 62 (`Approve.Note is set`), `customer-profile.precept` line 17 (`Email is set`). `SyntaxReference.NullNarrowing` test references the string but doesn't parse it.
 **Tests needed:** `ParseExpr_IsSet_ProducesIsSetExpression`, `ParseExpr_IsNotSet_ProducesNegatedIsSetExpression`
 
 ---
 
 ### Priority 4 — GAP-4: `contains` infix expression
-**Severity:** High  
-**Spec:** §2.1 — infix at precedence 40  
-**Blast radius:** `hiring-pipeline.precept` line 53 (`PendingInterviewers contains RecordInterviewFeedback.Interviewer`), `insurance-claim.precept` line 62.  
+**Severity:** High
+**Spec:** §2.1 — infix at precedence 40
+**Blast radius:** `hiring-pipeline.precept` line 53 (`PendingInterviewers contains RecordInterviewFeedback.Interviewer`), `insurance-claim.precept` line 62.
 **Tests needed:** `ParseExpr_Contains_ProducesContainsExpression`, precedence test vs `and`/`or`
 
 ---
 
 ### Priority 5 — GAP-17: `<`, `<=`, `>=`, `==`, `!=` comparison operators
-**Severity:** High — multiple operators completely untested in expression parser  
-**Spec:** §2.1 — all standard comparisons at precedence 30  
-**Blast radius:** `loan-application.precept` (`CreditScore >= 300`), `customer-profile.precept` (`MarketingOptIn == false`), all sample files using non-`>` comparisons in rules or guards.  
+**Severity:** High — multiple operators completely untested in expression parser
+**Spec:** §2.1 — all standard comparisons at precedence 30
+**Blast radius:** `loan-application.precept` (`CreditScore >= 300`), `customer-profile.precept` (`MarketingOptIn == false`), all sample files using non-`>` comparisons in rules or guards.
 **Tests needed:** `[Theory][InlineData("<")][InlineData("<=")][InlineData(">=")][InlineData("==")][InlineData("!=")]` — one theory covering all five missing operators
 
 ---
 
 ### Priority 6 — GAP-10: Interpolated string expression
-**Severity:** High  
-**Spec:** §2.5 — `StringStart`/`StringMiddle`/`StringEnd` reassembly loop  
-**Blast radius:** Any `"string with {Field}"` expression in action statements. Multiple sample files use interpolated strings in `reject` messages and `set` expressions.  
+**Severity:** High
+**Spec:** §2.5 — `StringStart`/`StringMiddle`/`StringEnd` reassembly loop
+**Blast radius:** Any `"string with {Field}"` expression in action statements. Multiple sample files use interpolated strings in `reject` messages and `set` expressions.
 **Tests needed:** `ParseExpr_InterpolatedString_ProducesInterpolatedStringExpression`, test with multiple interpolation segments
 
 ---
 
 ### Priority 7 — GAP-5/6/7/8: `remove`, `enqueue`, `dequeue`, `push`, `pop` action statements
-**Severity:** High (5 related gaps)  
-**Spec:** §2.2 action statement grammar  
-**Blast radius:** `hiring-pipeline.precept` (`remove`, `enqueue`), `insurance-claim.precept` (`remove`), any sample using queue/stack collections.  
+**Severity:** High (5 related gaps)
+**Spec:** §2.2 action statement grammar
+**Blast radius:** `hiring-pipeline.precept` (`remove`, `enqueue`), `insurance-claim.precept` (`remove`), any sample using queue/stack collections.
 **Tests needed (per action):**
 - `Parse_Action_Remove_ProducesRemoveActionNode`
 - `Parse_Action_Enqueue_ProducesEnqueueActionNode`
@@ -782,24 +812,24 @@ Ordered by: parser correctness > spec contract > sample-file blast radius > impl
 ---
 
 ### Priority 8 — GAP-12: List literal expression `[a, b, c]`
-**Severity:** High  
-**Spec:** §2.1 — `LeftBracket` null-denotation → `ListLiteralExpression`  
-**Blast radius:** `default []` on collection fields; any expression initializing or comparing a set/queue/stack.  
+**Severity:** High
+**Spec:** §2.1 — `LeftBracket` null-denotation → `ListLiteralExpression`
+**Blast radius:** `default []` on collection fields; any expression initializing or comparing a set/queue/stack.
 **Tests needed:** `ParseExpr_EmptyList`, `ParseExpr_NonEmptyList`, `ParseExpr_NestedList` (if supported)
 
 ---
 
 ### Priority 9 — GAP-15: `~=` and `!~` case-insensitive operators
-**Severity:** High  
-**Spec:** §2.1 — comparison operators at precedence 30  
-**Blast radius:** Any DSL doing case-insensitive string matching. Catalog confirmed in `OperatorsTests`, tokens confirmed in `LexerTests`. Missing parser layer.  
+**Severity:** High
+**Spec:** §2.1 — comparison operators at precedence 30
+**Blast radius:** Any DSL doing case-insensitive string matching. Catalog confirmed in `OperatorsTests`, tokens confirmed in `LexerTests`. Missing parser layer.
 **Tests needed:** `ParseExpr_CaseInsensitiveEquals_ProducesCorrectNode`, `ParseExpr_CaseInsensitiveNotEquals`
 
 ---
 
 ### Priority 10 — GAP-13: `NonAssociativeComparison` diagnostic
-**Severity:** High  
-**Spec:** §2.7 — parse-stage error when a second comparison is chained: `a > b > c`  
+**Severity:** High
+**Spec:** §2.7 — parse-stage error when a second comparison is chained: `a > b > c`
 **Tests needed:** `ParseExpr_ChainedComparison_EmitsNonAssociativeComparison` — verifies both that a diagnostic is emitted AND that parsing recovers cleanly
 
 ---
@@ -910,3 +940,194 @@ All TypeChecker-level validations (§3 of the spec) are blocked by `NotImplement
 | `RuntimeTests.cs` | Runtime evaluation | ~? tests |
 
 **Total baseline:** 2107 tests, 0 failing.
+
+---
+
+# Soup Nazi — Full Test Coverage Review: spike/Precept-V2
+
+**Date:** 2025-07-14
+**Reviewer:** Soup Nazi (Tester)
+**Branch:** `spike/Precept-V2`
+**Test runs:** `dotnet test test/Precept.Tests/ --no-build` + `dotnet test test/Precept.Analyzers.Tests/ --no-build`
+
+---
+
+## Test Run Results
+
+| Suite | Passed | Failed | Skipped |
+|-------|--------|--------|---------|
+| `Precept.Tests` | 2424 | 0 | 0 |
+| `Precept.Analyzers.Tests` | 254 | 0 | 0 |
+| `Precept.LanguageServer.Tests` | 0 | 0 | 0 (empty — pre-existing) |
+| `Precept.Mcp.Tests` | 0 | 0 | 0 (empty — pre-existing) |
+
+No test failures. No skipped tests introduced by this branch.
+
+---
+
+## Skipped Tests
+
+None. No `[Fact(Skip = ...)]` or `[Theory(Skip = ...)]` entries added in this branch.
+
+---
+
+## Missing Tests
+
+**M1: [OperatorsTests] IsSet/IsNotSet Arity not asserted as Postfix**
+
+`Arity.Postfix = 3` is a NEW enum value added in this branch. `GetMeta_UnaryOperators_HaveUnaryArity` and `GetMeta_BinaryOperators_HaveBinaryArity` pin those enum values in tests — but there's no `GetMeta_PostfixOperators_HavePostfixArity` equivalent for `OperatorKind.IsSet` and `OperatorKind.IsNotSet`. The parser dispatch logic depends on arity to tell prefix from postfix from binary. If `Postfix` is ever changed or a new IsSet-family operator gets the wrong arity, nothing catches it. Required:
+
+```csharp
+[Theory]
+[InlineData(OperatorKind.IsSet)]
+[InlineData(OperatorKind.IsNotSet)]
+public void GetMeta_PostfixOperators_HavePostfixArity(OperatorKind kind)
+    => Operators.GetMeta(kind).Arity.Should().Be(Arity.Postfix);
+```
+
+---
+
+**M2: [OperatorsTests] IsSet/IsNotSet Tokens sequence not directly asserted**
+
+The DU's core new data — the `Tokens` property — is never directly read in tests. `ByTokenSequence_IsSet_Resolves` and `ByTokenSequence_IsNotSet_Resolves` prove the lookup works, but they exercise the FrozenDictionary index, not the source `Tokens` list. If `IsSet.Tokens` were `[Is, Set, Set]` the lookup might still work but the shape would be wrong. Required:
+
+```csharp
+[Fact]
+public void IsSet_Tokens_IsIsSet()
+{
+    var op = (MultiTokenOp)Operators.GetMeta(OperatorKind.IsSet);
+    op.Tokens.Should().HaveCount(2);
+    op.Tokens[0].Kind.Should().Be(TokenKind.Is);
+    op.Tokens[1].Kind.Should().Be(TokenKind.Set);
+}
+
+[Fact]
+public void IsNotSet_Tokens_IsIsNotSet()
+{
+    var op = (MultiTokenOp)Operators.GetMeta(OperatorKind.IsNotSet);
+    op.Tokens.Should().HaveCount(3);
+    op.Tokens[0].Kind.Should().Be(TokenKind.Is);
+    op.Tokens[1].Kind.Should().Be(TokenKind.Not);
+    op.Tokens[2].Kind.Should().Be(TokenKind.Set);
+}
+```
+
+---
+
+**M3: [ExpressionFormCoverageTests (root)] PostfixOperation missing from parse round-trip Theory**
+
+`ParseExpression_ReturnsCorrectNodeTypeForForm` covers all 10 other `ExpressionFormKind` members (Literal×2, Identifier, Grouped, BinaryOperation, UnaryOperation, MemberAccess, ListLiteral via Theory; Conditional, FunctionCall, MethodCall as separate Facts), but `PostfixOperation` is absent. The mapping from form enum member → concrete AST node type is the whole point of that test — an incomplete Theory is incomplete coverage. `ExpressionParserTests.ParseExpression_IsSet` tests the parser behavior in isolation, but that's not the same as coverage in `ExpressionFormCoverageTests`, which is the exhaustiveness test. Required:
+
+```csharp
+[Fact]
+public void ParseExpression_PostfixOperation_IsSet_ReturnsCorrectNodeType()
+{
+    var expr = ParseExpr("opt is set");
+    expr.Should().BeOfType<IsSetExpression>(
+        because: "parsing 'opt is set' must produce an IsSetExpression (PostfixOperation form)");
+}
+```
+
+---
+
+**M4: [Precept0020Tests] No PRECEPT0020 non-fire test for switch with MultiTokenOp arms**
+
+The PRECEPT0020 analyzer comment says "MultiTokenOp arms are skipped." That invariant is unverified in tests. `GivenOperatorWithInlineToken_DoesNotCrash` (which is a SingleTokenOp with an inline token, not a MultiTokenOp) is often cited as the robustness test, but it does not exercise the MultiTokenOp skip path at all. If the `if (creation.Type?.Name != "SingleTokenOp") continue;` guard were removed, `GivenOperatorWithInlineToken_DoesNotCrash` would still pass (it would just try to extract a `Token` named arg from the MultiTokenOp constructor and return null). Required: a switch containing a `MultiTokenOp` arm that WOULD collide with a `SingleTokenOp` if Multi were not skipped — and assert zero PRECEPT0020 diagnostics.
+
+```csharp
+[Fact]
+public async Task GivenSingleAndMultiTokenOpsWithSameLeadToken_NoPRECEPT0020()
+{
+    // MultiTokenOp [Or, Set] shares lead token Or with SingleTokenOp Or.
+    // PRECEPT0020 must not fire — it skips MultiTokenOp arms (PRECEPT0023b handles that).
+    var source = OperatorStubs + @"
+    public static OperatorMeta GetMeta(OperatorKind kind) => kind switch
+    {
+        OperatorKind.Or     => new SingleTokenOp(kind, Tokens.GetMeta(TokenKind.Or),   ""Or"",  Arity.Binary, Associativity.Left, 10, OperatorFamily.Logical),
+        OperatorKind.Extra1 => new MultiTokenOp(kind, [Tokens.GetMeta(TokenKind.Or), Tokens.GetMeta(TokenKind.And)], ""OrAnd"", Arity.Binary, Associativity.Left, 20, OperatorFamily.Logical),
+        _ => throw new System.ArgumentOutOfRangeException(nameof(kind)),
+    };
+" + CloseBrace;
+    var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<PRECEPT0020OperatorsTokenCollision>(source);
+    diagnostics.Where(d => d.Id.StartsWith("PRECEPT0020")).Should().BeEmpty();
+}
+```
+
+---
+
+**M5: [ExpressionParserTests] No test for chained postfix presence operator behavior**
+
+`IsSet` and `IsNotSet` are `NonAssociative`. The contains-chaining non-associativity test exists (Slice 18 in ExpressionParserTests). But there's no test for `x is set is set` or `x is set is not set`. What does the parser do? It should either emit a diagnostic (consistent with the binary non-associativity rule) or cleanly stop. Either behavior is valid but must be pinned. This is especially important because `is set` has a different parsing path (led via `PostfixOperation`) than binary operators, so the non-associativity guard may not fire the same way. Required: one test clarifying the behavior:
+
+```csharp
+[Fact]
+public void ParseExpression_IsSet_Chained_BehaviorIsDefined()
+{
+    // "x is set is set" — behavior must be defined: either diagnostic or clean stop.
+    // Pin whichever behavior the parser implements so regressions are caught.
+    var tree = Parser.Parse(Lexer.Lex("rule x is set is set because \"test\""));
+    // Assert the expected outcome here (error or no-error + truncated parse)
+}
+```
+
+---
+
+**M6: [OperatorsTests] IsSet/IsNotSet not pinned in Precedence_MatchesSpec**
+
+`Precedence_MatchesSpec` is a Theory that pins every SingleTokenOp's precedence value. It covers all 18 SingleTokenOp entries. But `IsSet` (precedence 60) and `IsNotSet` (precedence 60) are `MultiTokenOp` entries and are absent from it. The precedence of postfix presence operators relative to arithmetic (60 > 50) and comparison (60 > 30) is a spec-level decision that should be regression-tested. Required:
+
+```csharp
+[Theory]
+[InlineData(OperatorKind.IsSet,    60)]
+[InlineData(OperatorKind.IsNotSet, 60)]
+public void GetMeta_PostfixOperators_Precedence_MatchesSpec(OperatorKind kind, int expected)
+    => Operators.GetMeta(kind).Precedence.Should().Be(expected);
+```
+
+---
+
+## Passing Observations
+
+**P1:** All 2424 `Precept.Tests` pass. All 254 `Precept.Analyzers.Tests` pass. Zero failures.
+
+**P2:** No `[Fact(Skip)]` or `[Theory(Skip)]` entries added in this branch. Zero skips. Clean.
+
+**P3:** PRECEPT0019 — 5 tests: 2 true-positives (class + struct with missing handlers), 3 true-negatives (all handled, multi-annotation, no class marker). Solid diagnostic boundary coverage.
+
+**P4:** PRECEPT0020 — 5 tests: both 0020a (by-token collision) and 0020b (precedence collision) have TP and TN cases, plus a combined case. The inline-token crash guard is also covered.
+
+**P5:** PRECEPT0021 — 4 tests: distinct texts, null text handled, two-arm duplicate, three-arm duplicate (two diagnostics). The null-text skip behavior is verified.
+
+**P6:** PRECEPT0022 — 3 tests: all-catalog-reference baseline, single inline offender, multiple inline offenders. Good.
+
+**P7:** PRECEPT0023 — 6 tests: valid multi-token baseline, 0023a with 1 token, 0023a with 0 tokens, 0023b single/multi lead collision, 0023c duplicate full sequence, and the critical real-catalog pattern (IsSet + IsNotSet share lead but different sequences → no 0023c). The last test proves the invariant doesn't fire on the actual catalog shape.
+
+**P8:** GAP-A (when-guard on ensure): parse tests for `StateEnsure` and `EventEnsure` with and without guard. Regression anchors ensure the no-guard case still works. Sample file integration (insurance-claim, loan-application) confirms the fix holds in realistic precepts.
+
+**P9:** GAP-B (modifiers after computed expressions): 5 tests covering single trailing modifier, multiple trailing, pre+post, pre-only regression. Pre-modifier-only regression confirms the fix didn't break the pre-modifier path.
+
+**P10:** GAP-C (keywords as member/function names): `.min`, `.max` member access and `min()`, `max()` function call tests exist. Sample file integration confirms the fix in context. `TokenMetaMemberNameTests` pins the catalog-derived membership.
+
+**P11:** Expression form additions: `is set`, `is not set`, list literals, method calls, typed constants, interpolated typed constants — all have happy-path parse tests with AST node type assertions.
+
+**P12:** ExpressionFormKind catalog (11 members): count, GetMeta exhaustiveness, HoverDocs, IsLeftDenotation for all forms (Theory), Category for all forms (Theory), PostfixOperation special shape (3 standalone Facts). Comprehensive.
+
+**P13:** Annotation bridge: `ExpressionFormCoverageTests` (root) uses reflection to verify `[HandlesCatalogExhaustively]` exists on 3 types and that all `[HandlesCatalogMember]` annotations collectively cover every `ExpressionFormKind`. This is the xUnit-level mirror of PRECEPT0019 for the ExpressionFormKind catalog specifically.
+
+**P14:** `[HandlesForm] → [HandlesCatalogMember]` rename: the reflection-based `ExpressionFormCoverageTests` directly accesses `HandlesCatalogMemberAttribute` — if the rename were incomplete or the attribute class were missing, these tests would fail. Rename is de facto tested.
+
+**P15:** `Precept.LanguageServer.Tests` and `Precept.Mcp.Tests` are empty (no test files). This is pre-existing — not a regression from this branch. Nothing new was added to them that needs testing.
+
+---
+
+## Verdict
+
+```
+VERDICT: BLOCKED — 6 missing tests, 0 skipped
+```
+
+M1 and M6 are required to close the OperatorsTests gap on the new `Arity.Postfix` enum value and the new MultiTokenOp precedence data. M3 makes `ExpressionFormCoverageTests` live up to its name. M4 protects the MultiTokenOp skip invariant that PRECEPT0020 relies on. M5 defines the behavior of chained postfix presence operators — right now it's undefined in tests. M2 directly pins the DU shape that the PRECEPT0023 analyzer is designed to protect.
+
+All six are straightforward to add. No implementation changes needed. Write the tests, get them to green, and resubmit.
+
+No soup for you.

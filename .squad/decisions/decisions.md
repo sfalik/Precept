@@ -1,8 +1,8 @@
 # Decision: HandlesCatalogMember rename propagation complete
 
-**Date:** 2026-05-01  
-**Agent:** george-7  
-**Commit:** `08fdf85`  
+**Date:** 2026-05-01
+**Agent:** george-7
+**Commit:** `08fdf85`
 **Status:** Completed
 
 George completed the mechanical rename from `[HandlesForm]` to `[HandlesCatalogMember]` across the attribute definition, every active call site, PRECEPT0019, tests, and docs with no behavior change.
@@ -34,11 +34,15 @@ George completed the mechanical rename from `[HandlesForm]` to `[HandlesCatalogM
 
 ---
 
+---
+
+---
+
 # Parser Coverage Assertion Against ExpressionFormKind
 
-**Date:** 2026-05-01  
-**Author:** Frank (Lead Architect)  
-**Status:** Exploration / Recommendation  
+**Date:** 2026-05-01
+**Author:** Frank (Lead Architect)
+**Status:** Exploration / Recommendation
 **Triggered by:** Shane's observation that the parser can assert coverage against the catalog
 
 ---
@@ -95,7 +99,7 @@ The pattern is an xUnit test that iterates `ExpressionForms.All` and asserts eac
 public void Parser_Covers_All_ExpressionFormKinds()
 {
     var coveredForms = new HashSet<ExpressionFormKind>();
-    
+
     // Nud forms: verify ParseAtom handles them
     foreach (var form in ExpressionForms.All.Where(f => !f.IsLeftDenotation))
     {
@@ -105,7 +109,7 @@ public void Parser_Covers_All_ExpressionFormKinds()
             because: $"nud form {form.Kind} must declare its lead tokens for parser coverage");
         coveredForms.Add(form.Kind);
     }
-    
+
     // Led forms: verify the Pratt loop handles them
     foreach (var form in ExpressionForms.All.Where(f => f.IsLeftDenotation))
     {
@@ -117,7 +121,7 @@ public void Parser_Covers_All_ExpressionFormKinds()
             because: $"led form {form.Kind} must declare its lead tokens for parser coverage");
         coveredForms.Add(form.Kind);
     }
-    
+
     // The actual coverage assertion
     var allForms = Enum.GetValues<ExpressionFormKind>().ToHashSet();
     coveredForms.Should().BeEquivalentTo(allForms,
@@ -136,7 +140,7 @@ public void Parser_Covers_All_ExpressionFormKinds()
 /// </summary>
 public static IReadOnlyList<TokenKind> GetLeadTokens(ExpressionFormKind kind) => kind switch
 {
-    ExpressionFormKind.Literal        => [TokenKind.NumberLiteral, TokenKind.StringLiteral, 
+    ExpressionFormKind.Literal        => [TokenKind.NumberLiteral, TokenKind.StringLiteral,
                                           TokenKind.True, TokenKind.False, TokenKind.StringStart],
     ExpressionFormKind.Identifier     => [TokenKind.Identifier],
     ExpressionFormKind.Grouped        => [TokenKind.LeftParen],
@@ -330,6 +334,10 @@ public void ParseAtom_Handles_All_Nud_Form_LeadTokens()
 
 ---
 
+---
+
+---
+
 # Collection Iteration Research — Frank
 
 **Date:** 2026-04-29
@@ -418,13 +426,26 @@ The pressure is ordered:
 **Approach:** Add `all`, `any`, `none` as bounded quantifier predicates on collection fields, using an element-binding syntax.
 
 ```precept
+
+---
+
+---
+
 # Universal: every element satisfies
 rule Items.all(item, item > 0)
     because "All line items must have positive amounts"
 
+---
+
+---
+
 # Existential: at least one satisfies
 from Submitted on Approve when Reviewers.any(r, r == Approve.ReviewerName)
     -> ...
+
+---
+
+---
 
 # Negated universal: no element satisfies
 rule Participants.none(p, p == "")
@@ -479,11 +500,24 @@ from UnderReview on Approve when none PendingInterviewers each == ""
 **Approach:** Extend the collection member access surface with aggregate methods that take predicate arguments.
 
 ```precept
+
+---
+
+---
+
 # Aggregate boolean
 rule Items.all(> 0) because "All items must be positive"
 
+---
+
+---
+
 # Aggregate numeric
 field Total as decimal -> Items.sum(.amount)
+
+---
+
+---
 
 # Conditional count
 rule Items.count(> 100) >= 3 because "At least 3 items must exceed $100"
@@ -543,6 +577,10 @@ Rationale:
 | CEL | `all`, `exists`, `exists_one`, `filter`, `map` as parse-time macros | Non-Turing-complete; macros not functions; no user-defined macros | High — same constraint-evaluation context, same bounded-evaluation philosophy |
 | OPA/Rego | `some x in xs { pred }`, `all x in xs { pred }`, set comprehensions | Logic-programming with unification; more expressive but less readable for non-developers | Medium — expressiveness model is right, syntax model is wrong for Precept's audience |
 | SQL | `EXISTS (subquery)`, `value op ANY (subquery)`, `value op ALL (subquery)` | Subquery-based; relational not collection-oriented | Low — wrong paradigm, but `ALL`/`ANY` as keywords validates the quantifier concept |
+
+---
+
+---
 
 ---
 
@@ -759,14 +797,31 @@ Rules relating a scalar aggregate of a collection to a threshold or another fiel
 **Approach:** Extend the existing field-constraint vocabulary with new keywords that express collection-level properties declaratively, exactly as `mincount`/`maxcount`/`nonnegative`/`notempty` work for their respective types today.
 
 ```precept
+
+---
+
+---
+
 # Uniqueness — elements must be distinct
 field Approvers as set of string unique
+
+---
+
+---
 
 # Collection notempty — at least one element required (alias for mincount 1)
 field LineItems as set of number notempty
 
+---
+
+---
+
 # Cross-collection subset
 field SelectedOptions as set of string subset AvailableOptions
+
+---
+
+---
 
 # Cross-collection disjoint
 field PrimaryContacts as set of string disjoint BackupContacts
@@ -795,17 +850,34 @@ field PrimaryContacts as set of string disjoint BackupContacts
 **Approach:** Use quantifier predicates in `rule` and `ensure` expressions. This is the same design as Option A from the parallel loop research — included here for completeness of the constraint picture.
 
 ```precept
+
+---
+
+---
+
 # All elements satisfy a predicate
 rule Items.all(item, item > 0)
     because "All line items must have positive amounts"
+
+---
+
+---
 
 # At least one element satisfies
 rule Reviewers.any(reviewer, reviewer != "")
     because "At least one reviewer must be named"
 
+---
+
+---
+
 # State-scoped element constraint
 in Review ensure Scores.all(score, score >= 1 and score <= 5)
     because "All review scores must be between 1 and 5"
+
+---
+
+---
 
 # Guard with quantifier
 from Submitted on Approve when PendingApprovals.all(p, p != "")
@@ -919,6 +991,10 @@ For every collection rule that requires runtime checking, the compiler must:
 
 ---
 
+---
+
+---
+
 # Readability Review: combined-design-v2.md (2026-07-17)
 
 **Reviewer:** Elaine (UX Designer)
@@ -940,6 +1016,10 @@ The rewrite succeeds. §1 opens with a problem statement and architectural commi
 ## Decision
 
 This doc is ready to serve as the architectural foundation for per-stage design docs (starting with the parser). The concerns above are improvements, not blockers — the parser concern is the most urgent because that's the immediate next use case.
+
+---
+
+---
 
 ---
 
@@ -1023,6 +1103,10 @@ Replace "lowered expression nodes and action plans" with a concrete specificatio
 ---
 
 *This review is direct because the timing demands it. Addressing these three items now — before the parser, type checker, and evaluator are built — is nearly free. Addressing them after implementation begins is expensive. The architecture is sound. These are the gaps that would bite us.*
+
+---
+
+---
 
 ---
 
@@ -1187,6 +1271,10 @@ Neither of these requires abandoning the conservative default. The proposal conf
 
 ---
 
+---
+
+---
+
 # George — Technical Review: combined-design-v2.md
 
 **Date:** 2026-04-28
@@ -1307,6 +1395,10 @@ However, the doc has **critical implementation-readiness gaps for the Parser** (
 
 ---
 
+---
+
+---
+
 # Calculated Field Arrow Direction: `<-` vs `->` Analysis
 
 **Author:** Frank (Lead/Architect & Language Designer)
@@ -1366,7 +1458,7 @@ The `->` introduces the action chain after a state target in `to`/`from` scoped 
 The lexer is catalog-driven. `->` lives in the `Tokens` catalog as:
 
 - **TokenKind:** `Arrow` (line 145 of `TokenKind.cs`)
-- **Text:** `"->"` 
+- **Text:** `"->"`
 - **Category:** `TokenCategory.Structural` (not `Operator` — this is a deliberate classification; `Cat_Str`, line 328 of `Tokens.cs`)
 - **TextMateScope:** `keyword.operator.arrow.precept`
 - **SemanticTokenType:** `operator`
@@ -1485,9 +1577,17 @@ Compare the two:
 
 ---
 
+---
+
+---
+
 # Current (->)
 field Tax as number nonnegative -> Subtotal * TaxRate
 field Net as number positive -> Subtotal - Tax
+
+---
+
+---
 
 ---
 
@@ -1622,6 +1722,10 @@ The right-pointing arrow:
 
 ---
 
+---
+
+---
+
 # Design Session Round 1: Catalog-Driven Parser Full Vision
 
 **By:** Frank
@@ -1651,6 +1755,10 @@ Round 1 of a 3-round design session requested by Shane. The prior analysis walke
 ## What Round 2 Should Challenge
 
 See `## For George` section in the design doc. Key areas: `Entries` replacing `LeadingToken` (breaking catalog change), `when` guard uniformity assumption, slot parser `SyntaxNode?` return type fragility, factory dictionary vs. switch, anchor/guard injection coupling, and clean-slate re-estimate.
+
+---
+
+---
 
 ---
 
@@ -1747,11 +1855,15 @@ None. All decisions locked and documented above.
 
 ---
 
+---
+
+---
+
 # Frank — `writable` Field Modifier Review
 
-**Date:** 2026-04-27  
-**Branch:** `precept-architecture`  
-**Commits reviewed:** 28535e4 (catalog + docs), 54672c8 (samples + tests)  
+**Date:** 2026-04-27
+**Branch:** `precept-architecture`
+**Commits reviewed:** 28535e4 (catalog + docs), 54672c8 (samples + tests)
 **Verdict:** BLOCKED
 
 ---
@@ -1763,7 +1875,7 @@ One blocker. Three minor doc defects. Everything else is well-executed. Fix B1, 
 ---
 
 ## B1 — `Constructs.AccessMode.LeadingToken` incorrectly changed to `TokenKind.In`
-**Severity:** Blocker  
+**Severity:** Blocker
 **File:** `src/Precept/Language/Constructs.cs`, line 107
 
 `AccessMode.LeadingToken` was changed from `TokenKind.Write` to `TokenKind.In`. This is wrong and the impact is non-trivial: `Parser.cs` is a stub throwing `NotImplementedException`. The real parser has not been written yet. `parser.md` line 138 states: "The dispatch table is a direct map from `ConstructMeta.LeadingToken` to parse methods." A Parser.cs implementer following the catalog will build:
@@ -1781,7 +1893,7 @@ The `UsageExample = "in Draft write Amount"` and the description are accurate an
 ---
 
 ## M1 — Stale `edit` terminology in spec §1.1 token table
-**Severity:** Minor  
+**Severity:** Minor
 **File:** `docs/language/precept-language-spec.md`, lines 47 and 111
 
 Two entries in the §1.1 token vocabulary table carry v1 `edit` terminology:
@@ -1798,7 +1910,7 @@ Two entries in the §1.1 token vocabulary table carry v1 `edit` terminology:
 ---
 
 ## M2 — catalog-system.md field modifier count comment stale
-**Severity:** Minor  
+**Severity:** Minor
 **File:** `docs/language/catalog-system.md`, line 740
 
 The code sample comment reads `// ── Field modifiers (14) ─────────────────────────────────`. There are now 15 field modifiers. The summary table at line 716 correctly says 15. The `ModifierKind.cs` group comment correctly says `field (15)`. The inline doc comment is the only laggard.
@@ -1845,6 +1957,10 @@ The code sample comment reads `// ── Field modifiers (14) ──────
 4. `docs/language/catalog-system.md` line 740 — `(14)` → `(15)`.
 
 Items 2–4 are doc-only and may land in the same commit as item 1.
+
+---
+
+---
 
 ---
 
@@ -1957,10 +2073,14 @@ fixes at design time.
 
 ---
 
+---
+
+---
+
 # Soup Nazi — Writable Coverage Review
-**Date:** 2026-04-27  
-**Reviewer:** Soup Nazi (Tester)  
-**Scope:** `writable` field modifier — test coverage audit  
+**Date:** 2026-04-27
+**Reviewer:** Soup Nazi (Tester)
+**Scope:** `writable` field modifier — test coverage audit
 **Test run:** 1783 tests, 0 failed, 0 skipped ✅
 
 ---
@@ -2018,25 +2138,25 @@ DiagnosticCode.WritableOnEventArg,
 
 ## Good Observations
 
-**G1: ModifiersTests — 7 new/updated tests are correct.**  
+**G1: ModifiersTests — 7 new/updated tests are correct.**
 Count invariants updated (28→29 total, 14→15 field, 25→26 structural), `Writable_AppliesToAnyType`, `Writable_IsStructuralFlag`, `Writable_TokenTextIsWritable`, and `FlagModifiers_HasValueIsFalse` theory updated — all well-formed. The "empty = any type" semantics are correctly documented in the assertion message.
 
-**G2: Dynamic exhaustiveness net is solid.**  
+**G2: Dynamic exhaustiveness net is solid.**
 `GetMeta_ReturnsForEveryModifierKind`, `All_ContainsEveryKindExactlyOnce`, and the three `Create_*` theories all use `Enum.GetValues<>()` — new entries are covered without code changes. `WritableOnEventArg` is not orphaned; it passes the Create factory tests today.
 
-**G3: TokensTests uses dynamic count — no hardcoded token count to update.**  
+**G3: TokensTests uses dynamic count — no hardcoded token count to update.**
 `All_ContainsExactlyAsManyEntries_AsEnumValues` derives its expected count from the enum. `AllKeywords_HaveTextMateScope` and `AllKeywords_HaveSemanticTokenType` cover `TokenKind.Writable` automatically (it is `Cat_Decl`, which is included in both token-property checks). No action needed.
 
-**G4: Sample files are clean.**  
+**G4: Sample files are clean.**
 All 6 migrated samples place `writable` only on non-computed fields:
-- `computed-tax-net.precept`: Subtotal, TaxRate writable; Tax, Net (computed) — no `writable`. ✅  
-- `fee-schedule.precept`: BaseFee, DiscountPercent, MinimumCharge writable; TaxRate, CurrencyCode locked. ✅  
-- `invoice-line-item.precept`: Description, UnitPrice, Quantity, DiscountPercent writable; Subtotal through LineTotal (all computed) — no `writable`. ✅  
-- `sum-on-rhs-rule.precept`: Total, Tax, Fee writable; Net (computed) — no `writable`. ✅  
-- `transitive-ordering.precept`: High, Mid, Low writable; Spread (computed) — no `writable`. ✅  
+- `computed-tax-net.precept`: Subtotal, TaxRate writable; Tax, Net (computed) — no `writable`. ✅
+- `fee-schedule.precept`: BaseFee, DiscountPercent, MinimumCharge writable; TaxRate, CurrencyCode locked. ✅
+- `invoice-line-item.precept`: Description, UnitPrice, Quantity, DiscountPercent writable; Subtotal through LineTotal (all computed) — no `writable`. ✅
+- `sum-on-rhs-rule.precept`: Total, Tax, Fee writable; Net (computed) — no `writable`. ✅
+- `transitive-ordering.precept`: High, Mid, Low writable; Spread (computed) — no `writable`. ✅
 - `payment-method.precept`: IsDefault, Nickname writable; no computed fields. ✅
 
-**G5: Hover description coverage is implicit.**  
+**G5: Hover description coverage is implicit.**
 `GetMeta_ReturnsForEveryModifierKind` asserts `Description.NotBeNullOrEmpty` for every `ModifierKind` — `Writable` is covered without a dedicated test.
 
 ---
@@ -2289,6 +2409,10 @@ Both fixes are one-liners or near-one-liners. No soup until then.
 
 ---
 
+---
+
+---
+
 # Decision: Access-mode shorthand grammar and AST split
 
 **Date:** 2026-04-28
@@ -2378,6 +2502,10 @@ v8 fixes applied per George's review: 4 targeted edits (omit guard diagnostic, s
 
 
 v8 approved after fix verification — proceed to Phase 2.
+
+---
+
+---
 
 ---
 
@@ -2561,6 +2689,10 @@ v8 is substantially correct — the OmitDeclaration split is clean, the FieldTar
 
 ---
 
+---
+
+---
+
 # Deep Re-Review: Catalog Extensibility CS8509 Enforcement
 
 **Reviewer:** Frank (Lead/Architect)
@@ -2667,10 +2799,14 @@ After these fixes, every catalog enum switch in the parser will use the same pat
 
 ---
 
+---
+
+---
+
 # Enum Deviation Review — `feature/catalog-extensibility`
 
-**From:** Frank (Lead/Architect)  
-**Date:** 2026-04-28  
+**From:** Frank (Lead/Architect)
+**Date:** 2026-04-28
 **Re:** Two deviations reported by George post-implementation
 
 ---
@@ -2776,7 +2912,7 @@ The branch does not merge until George resolves the following numbered items. **
 
 ---
 
-**`RoutingFamily.None` does not block merge.  
+**`RoutingFamily.None` does not block merge.
 `#pragma disable CS8524` does not block merge.**
 
 Fix B1–B3, push, and request re-review.
@@ -2793,8 +2929,8 @@ Fix B1–B3, push, and request re-review.
 
 ## Frank — Final Re-Review Verdict
 
-**Date:** 2026-04-28  
-**Branch:** feature/catalog-extensibility  
+**Date:** 2026-04-28
+**Branch:** feature/catalog-extensibility
 **Commit reviewed:** 5e5b2f958b041f199c7360c79feb49f6c7e02ba4
 
 ---
@@ -2807,14 +2943,14 @@ Fix B1–B3, push, and request re-review.
 
 Every blocking item from both prior review documents is closed.
 
-**B1 — `ActionSyntaxShape.None = 0` removed:** ✅  
+**B1 — `ActionSyntaxShape.None = 0` removed:** ✅
 `ActionSyntaxShape` now has exactly 4 members with no explicit integer assignments:
 ```csharp
 public enum ActionSyntaxShape { AssignValue, CollectionValue, CollectionInto, FieldOnly }
 ```
 C# auto-assigns 0–3. No sentinel. Note: `AssignValue = 0` now occupies the zero slot formerly held by `None`. This means a default-initialized `ActionMeta.SyntaxShape` silently resolves to `AssignValue` rather than an obvious error sentinel. This is a minor structural note — it doesn't undermine CS8509 enforcement (all 8 catalog entries explicitly declare their `SyntaxShape`, and no route through the outer switch bypasses the inner switches), but it's worth recording: if a future `ActionMeta` entry is added with `SyntaxShape` accidentally omitted from the constructor, the `Enum.IsDefined` test will pass silently because `AssignValue = 0` is defined. **Not a blocker**, but the team should remain aware that `None = 0`'s safety-net role is not fully replicated by the current arrangement.
 
-**B2 — `ActionSyntaxShape.None` arm removed from outer switch:** ✅  
+**B2 — `ActionSyntaxShape.None` arm removed from outer switch:** ✅
 `ParseActionStatement` outer switch is a clean 4-arm exhaustive switch:
 ```csharp
 return meta.SyntaxShape switch
@@ -2827,25 +2963,25 @@ return meta.SyntaxShape switch
 ```
 `#pragma CS8524` tightly scoped. No wildcard. No sentinel arm.
 
-**B3 — `ParseAssignValueStatement` inner switch:** ✅  
+**B3 — `ParseAssignValueStatement` inner switch:** ✅
 All 8 `ActionKind` members covered with explicit named arms. `Set` is the valid arm; `Add`, `Remove`, `Enqueue`, `Dequeue`, `Push`, `Pop`, `Clear` each throw with identity-specific messages. No wildcard. `#pragma CS8524` tightly scoped.
 
-**B4 — `ParseCollectionValueStatement` inner switch:** ✅  
+**B4 — `ParseCollectionValueStatement` inner switch:** ✅
 All 8 `ActionKind` members covered. `Add`, `Remove`, `Enqueue`, `Push` are valid; `Set`, `Dequeue`, `Pop`, `Clear` throw. No wildcard. `#pragma CS8524` tightly scoped.
 
-**B5 — `ParseCollectionIntoStatement` inner switch:** ✅  
+**B5 — `ParseCollectionIntoStatement` inner switch:** ✅
 All 8 `ActionKind` members covered. `Dequeue`, `Pop` are valid; `Set`, `Add`, `Remove`, `Enqueue`, `Push`, `Clear` throw. No wildcard. `#pragma CS8524` tightly scoped.
 
-**B6 — `ParseFieldOnlyStatement` inner switch:** ✅  
+**B6 — `ParseFieldOnlyStatement` inner switch:** ✅
 All 8 `ActionKind` members covered. `Clear` is the valid arm; `Set`, `Add`, `Remove`, `Enqueue`, `Dequeue`, `Push`, `Pop` throw. No wildcard. `#pragma CS8524` tightly scoped.
 
-**B7 — `InvokeSlotParser`:** ✅  
+**B7 — `InvokeSlotParser`:** ✅
 `_ => throw` removed. All 17 `ConstructSlotKind` members have explicit named arms. `#pragma CS8524` tightly scoped. Comment updated to accurately state "CS8509 enforces named-value coverage here; #pragma CS8524 suppresses unnamed-integer noise" — no longer a false claim.
 
-**Test fix — `Actions_ActionSyntaxShape_AllMembersHaveValue`:** ✅  
+**Test fix — `Actions_ActionSyntaxShape_AllMembersHaveValue`:** ✅
 `NotBe((ActionSyntaxShape)0)` replaced with `Enum.IsDefined(meta.SyntaxShape).Should().BeTrue(...)`. This is the correct assertion now that no `None = 0` sentinel exists to distinguish "unset" from the first real member. The test guards against raw integer values outside the defined set.
 
-**Actions.cs — 8 ActionMeta entries:** ✅  
+**Actions.cs — 8 ActionMeta entries:** ✅
 All 8 `ActionKind` entries carry a non-zero, explicitly-set `SyntaxShape`: `Set → AssignValue`, `Add/Remove/Enqueue/Push → CollectionValue`, `Dequeue/Pop → CollectionInto`, `Clear → FieldOnly`. No entry is missing a shape declaration.
 
 ---
@@ -2866,6 +3002,10 @@ The same chain holds for all 4 inner switches depending on which `SyntaxShape` t
 The only remaining caveat is the observation under B1: if a developer adds a new `ActionMeta` and omits `SyntaxShape` entirely (relying on default initialization), it silently routes to `AssignValue` (value 0) rather than producing an obvious test failure. This is a test-time gap, not a compile-time gap, and does not affect CS8509 enforcement. The `Enum.IsDefined` test will pass in that scenario. A future hardening option is to add explicit `= 1, 2, 3, 4` numbering so 0 becomes undefined, but that is not required for this merge.
 
 **All 7 blocking items closed. No open findings. Branch is approved for merge.**
+
+---
+
+---
 
 ---
 
@@ -2928,6 +3068,10 @@ Wait — correction: `_ =>` in a switch expression **does** suppress CS8509 beca
 | `#pragma disable CS8524` | ✅ | Independent from CS8509; tightly scoped; `TreatWarningsAsErrors` makes CS8509 a build error |
 
 **The catalog extensibility contract is intact:** adding a new `ConstructKind` or `ActionKind` (or `ActionSyntaxShape` / `RoutingFamily`) member produces CS8509 build errors at every incomplete switch. George's deviations are structurally sound.
+
+---
+
+---
 
 ---
 
@@ -3294,6 +3438,10 @@ These are the catalog enums where the first semantic member currently sits at im
 
 ---
 
+---
+
+---
+
 # Spike Mode Is First-Class
 
 **By:** Frank (Lead/Architect)
@@ -3314,11 +3462,15 @@ Spike mode is first-class. It must be activated deliberately, enforced consisten
 
 ---
 
+---
+
+---
+
 # Zero-Slot Enum Audit — `src/Precept/`
 
-**Reviewer:** Frank  
-**Date:** 2026-04-28  
-**Scope:** All `enum` declarations in `src/Precept/` audited for named semantic values at position 0  
+**Reviewer:** Frank
+**Date:** 2026-04-28
+**Scope:** All `enum` declarations in `src/Precept/` audited for named semantic values at position 0
 **Trigger:** `ActionSyntaxShape` fix (explicit 1-based values); Shane asked "are there others?"
 
 ---
@@ -3342,17 +3494,17 @@ public enum Severity
 }
 ```
 
-**Where switched on:**  
-`Compiler.cs:34` — `diagnostics.Any(d => d.Severity == Severity.Error)` sets `HasErrors`.  
+**Where switched on:**
+`Compiler.cs:34` — `diagnostics.Any(d => d.Severity == Severity.Error)` sets `HasErrors`.
 Every diagnostic consumer in the language server and MCP tools compares against `Severity.Error` or `Severity.Warning`.
 
-**Zero-default consequence:**  
+**Zero-default consequence:**
 `Diagnostic` is a `readonly record struct`. `default(Diagnostic)` gives `Severity = Info`. A bug in any new diagnostic factory path that passes `default` for severity (e.g., `new Diagnostic(default, stage, code, msg, span)`) silently downgrades all errors to informational. `Compiler.HasErrors` returns `false`. The pipeline passes. Invalid precepts compile clean. This is the most dangerous silent failure mode in the codebase — it bypasses the correctness gate entirely.
 
-**Current protection:**  
+**Current protection:**
 `Diagnostics.Create(code, span)` is the sole factory and always derives severity from `DiagnosticMeta`. But the struct is publicly constructible without it.
 
-**Recommended fix:**  
+**Recommended fix:**
 ```csharp
 public enum Severity
 {
@@ -3378,13 +3530,13 @@ public enum DiagnosticStage
 }
 ```
 
-**Where switched on:**  
+**Where switched on:**
 Stage is carried in every `Diagnostic` struct and in `DiagnosticMeta`. The language server and MCP vocabulary filter diagnostics by stage for display ordering and category attribution. A zero-default stage misattributes the diagnostic to `Lex` regardless of what pipeline stage produced it.
 
-**Zero-default consequence:**  
+**Zero-default consequence:**
 Same struct-constructibility exposure as `Severity`. Less catastrophic (wrong attribution, not wrong severity), but still wrong: a type-check error silently appears as a lex error in tooling output.
 
-**Recommended fix:**  
+**Recommended fix:**
 ```csharp
 public enum DiagnosticStage
 {
@@ -3407,13 +3559,13 @@ public enum ConstraintStatus { Satisfied, Violated, Unresolvable }
 //                             ^= 0  ← RISK
 ```
 
-**Where switched on:**  
+**Where switched on:**
 `ConstraintResult.Status` is the per-constraint evaluation output returned by `InspectFire` and `InspectUpdate`. MCP tool `precept_inspect` surfaces this directly to callers. UI and agent consumers branch on `Satisfied` vs. `Violated` to decide whether constraints are blocking.
 
-**Zero-default consequence:**  
+**Zero-default consequence:**
 `ConstraintResult` is a reference-type record, so accidental zero-construction is less likely than with a struct. The risk is in the evaluator implementation (currently `throw new NotImplementedException()`). When the evaluator is implemented, any code path that constructs a `ConstraintResult` without explicitly setting `Status` (possible in collection initializers, factory patterns, or test scaffolding) silently marks a **violated constraint as satisfied**. This is a direct correctness failure in the constraint enforcement model — the entire point of Precept.
 
-**Recommended fix:**  
+**Recommended fix:**
 ```csharp
 public enum ConstraintStatus { Satisfied = 1, Violated = 2, Unresolvable = 3 }
 ```
@@ -3429,13 +3581,13 @@ public enum Prospect { Certain, Possible, Impossible }
 //                     ^= 0  ← RISK
 ```
 
-**Where switched on:**  
+**Where switched on:**
 `RowInspection.Prospect` and `EventInspection.OverallProspect` are the first-match routing certainty signals returned from inspection. MCP `precept_inspect` uses these to tell callers which rows will fire, which might fire, and which cannot. A wrong `Certain` on an impossible row leads agents and UIs to present incorrect state-transition forecasts.
 
-**Zero-default consequence:**  
+**Zero-default consequence:**
 Same analysis as `ConstraintStatus`. The evaluator is a stub. When implemented, an uninitialized `Prospect` field silently presents an impossible row as **certain to fire** — the most misleading possible output from inspection.
 
-**Recommended fix:**  
+**Recommended fix:**
 ```csharp
 public enum Prospect { Certain = 1, Possible = 2, Impossible = 3 }
 ```
@@ -3449,13 +3601,13 @@ public enum FieldAccessMode { Read, Write }
 //                            ^= 0  ← RISK
 ```
 
-**Where switched on:**  
+**Where switched on:**
 `FieldSnapshot.Mode` and `FieldAccessInfo.Mode` in runtime inspection. Callers use this to decide whether to render a field as editable in UIs or allow write operations in the runtime API.
 
-**Zero-default consequence:**  
+**Zero-default consequence:**
 Zero-initialized mode = `Read`. A field that should be writable in the current state silently appears read-only. Write attempts are blocked without error. This is a subtle behavioral correctness failure — not a crash, not a thrown exception, just wrong behavior in the access model.
 
-**Recommended fix:**  
+**Recommended fix:**
 ```csharp
 public enum FieldAccessMode { Read = 1, Write = 2 }
 ```
@@ -3474,13 +3626,13 @@ public enum TypeKind
 }
 ```
 
-**Where switched on:**  
+**Where switched on:**
 `Types.GetMeta(TypeKind kind)` has a `_ => throw ArgumentOutOfRangeException` wildcard — an **unnamed** zero would throw. But `String` is a **named** member at 0. An uninitialized `TypeKind` in the type checker (currently a stub) would silently treat any untyped expression node as `String`. Type compatibility checks, operation lookup, and accessor validation would all pass for `String` when the actual type is unknown.
 
-**Current protection:**  
+**Current protection:**
 The TypeChecker is `throw new NotImplementedException()`. No live dispatch today.
 
-**Recommended fix:**  
+**Recommended fix:**
 ```csharp
 public enum TypeKind
 {
@@ -3546,7 +3698,7 @@ The broader problem is that the 1-based-for-semantic-enums policy was never writ
 **Recommended policy going forward:**
 
 > Every enum where ALL members are semantically meaningful (no structural "nothing" at 0) should use explicit 1-based integer values. The zero slot is unnamed. `default(Kind) = (Kind)0` throws or is structurally detectable.
-> 
+>
 > Enums with an explicit `None = 0` sentinel are correct as-is — that IS the intended zero behavior.
 
 This policy, if encoded in a Roslyn analyzer or code review checklist, would have caught every risk identified in this audit at definition time.
@@ -3557,11 +3709,15 @@ This policy, if encoded in a Roslyn analyzer or code review checklist, would hav
 
 ---
 
+---
+
+---
+
 # Decision: ActionSyntaxShape — Explicit 1-Based Integer Values
 
-**Date:** 2026-04-28  
-**Author:** George (Runtime Dev)  
-**Branch:** `precept-architecture`  
+**Date:** 2026-04-28
+**Author:** George (Runtime Dev)
+**Branch:** `precept-architecture`
 **Commit:** `de2005a`
 
 ## Decision
@@ -3600,12 +3756,16 @@ Serialized integer values for `ActionSyntaxShape` (if any external system ever p
 
 ---
 
+---
+
+---
+
 # George → Frank: B1–B7 Fixed — Re-review Requested
 
-**From:** George (Runtime Dev)  
-**Date:** 2026-04-28  
-**Branch:** `feature/catalog-extensibility`  
-**Commit:** `5e5b2f9`  
+**From:** George (Runtime Dev)
+**Date:** 2026-04-28
+**Branch:** `feature/catalog-extensibility`
+**Commit:** `5e5b2f9`
 **Re:** Frank's BLOCKED verdicts in `frank-enum-deviation-review.md` and `frank-deep-deviation-review.md`
 
 ---
@@ -3667,8 +3827,12 @@ dotnet build src/Precept/Precept.csproj  → succeeded, 0 errors, 0 warnings
 dotnet test test/Precept.Tests/          → Passed! 2044/2044
 ```
 
-Every catalog enum switch in the parser now follows the `BuildNode` gold standard:  
+Every catalog enum switch in the parser now follows the `BuildNode` gold standard:
 explicit arms for all named members · `#pragma CS8524` to suppress unnamed-integer noise · no wildcard · CS8509 active.
+
+---
+
+---
 
 ---
 
@@ -3726,10 +3890,14 @@ Parser internal only. No grammar, language server, MCP, or sample changes needed
 
 ---
 
+---
+
+---
+
 # Decision: All Semantic Zero-Slot Enums Use Explicit 1-Based Values
 
-**Date:** 2026-04-28  
-**Author:** George (Runtime Dev)  
+**Date:** 2026-04-28
+**Author:** George (Runtime Dev)
 **Status:** Implemented — commit `d300b26` on `precept-architecture`
 
 ---
@@ -3802,11 +3970,15 @@ New enums in `src/Precept/` where all members are semantically meaningful must s
 
 ---
 
+---
+
+---
+
 # Decision: Map Access Syntax
 
-**Date:** 2026-04-29  
-**Author:** Frank (Lead Language Designer)  
-**Status:** Advisory — pending owner decision  
+**Date:** 2026-04-29
+**Author:** Frank (Lead Language Designer)
+**Status:** Advisory — pending owner decision
 **Context:** Shane asked whether `CoverageLimits.get(CheckCoverage.CoverageType)` is too C#-like or fits Precept's grammar.
 
 ---
@@ -3909,14 +4081,27 @@ CoverageLimits at CheckCoverage.CoverageType
 ### Usage in all three contexts
 
 ```precept
+
+---
+
+---
+
 # Rule expression
 rule CoverageLimits at CheckCoverage.CoverageType >= 50000
     because "Each coverage type must meet minimum threshold"
+
+---
+
+---
 
 # Action body
 from Active on CheckCoverage when CoverageLimits containskey CheckCoverage.CoverageType
     -> set CurrentLimit = CoverageLimits at CheckCoverage.CoverageType
     -> no transition
+
+---
+
+---
 
 # Event guard
 from Active on AdjustCoverage
@@ -3931,6 +4116,10 @@ from Active on AdjustCoverage
 - New left-denotation entry: `At` at binding power 40 → `MapAccessExpression(left, ParseExpression(40))`
 - Type checker: left must be `map of K to V`, right must be assignable to `K`, result type is `V`
 - Proof engine: `at` requires a `containskey` guard in scope for the same map and key expression (new proof obligation: `KeyPresence`)
+
+---
+
+---
 
 ---
 
@@ -4089,6 +4278,10 @@ CoverageLimits at CheckCoverage.CoverageType
 
 ---
 
+---
+
+---
+
 # Decision: Map Access Keyword — `for` vs `at`
 
 **By:** Frank (Lead Language Designer)
@@ -4153,10 +4346,14 @@ The only counterargument for `at` is familiarity for developers who know `dict.a
 
 ---
 
+---
+
+---
+
 # Decision Record: `map` Access Keyword — Working Syntax `for`, Decision Open
 
-**By:** Frank  
-**Date:** 2026-04-29  
+**By:** Frank
+**Date:** 2026-04-29
 **Status:** Open — pending owner sign-off
 
 ## Summary
@@ -4224,6 +4421,11 @@ superseded by `each` — `each` is grammatically correct where `all` would be br
 **Question:** Should the negated existential quantifier be `no` or `none`?
 
 ```precept
+
+---
+
+---
+
 # Under consideration:
 rule no a in Amounts (a < 0) because "No negative amounts permitted"
 rule none a in Amounts (a < 0) because "No negative amounts permitted"
@@ -4335,11 +4537,15 @@ collision is non-issue parsing. No change to the approved syntax.
 
 ---
 
+---
+
+---
+
 # Decision: `ordered` as Collection Modifier vs `sortedset` as Named Type
 
-**Date:** 2026-04-29  
-**Author:** Frank (Lead/Architect)  
-**Status:** Pending owner sign-off  
+**Date:** 2026-04-29
+**Author:** Frank (Lead/Architect)
+**Status:** Pending owner sign-off
 **Verdict:** `sortedset` as a named type is correct. `ordered` stays scoped to `choice(...)` inner types. Do not introduce a collection-level `ordered` modifier.
 
 ---
@@ -4349,8 +4555,17 @@ collision is non-issue parsing. No change to the approved syntax.
 Shane proposed reusing the existing `ordered` keyword at the collection level:
 
 ```precept
+
+---
+
+---
+
 # Instead of:
 field ApprovalLevels as sortedset of string
+
+---
+
+---
 
 # Shane's proposal:
 field ApprovalLevels as set of string ordered
@@ -4479,11 +4694,15 @@ The `ordered` modifier has one meaning, one valid application site, and zero amb
 
 ---
 
+---
+
+---
+
 # Decision: `sorted` as Collection-Level Modifier vs `sortedset` as Named Type
 
-**Date:** 2026-04-29  
-**Author:** Frank (Lead/Architect)  
-**Status:** Pending owner sign-off  
+**Date:** 2026-04-29
+**Author:** Frank (Lead/Architect)
+**Status:** Pending owner sign-off
 **Verdict:** `sortedset` as a named type remains correct. `sorted` as a collection-level modifier is rejected. The grammar collision is gone — but the deeper objections survive the keyword swap.
 
 ---
@@ -4569,11 +4788,31 @@ Compare the semantics carefully:
 
 ```precept
 field Tags as set of string notempty maxcount 10
+
+---
+
+---
+
 # → still a hash-backed set; notempty and maxcount are constraints on values
+
+---
+
+---
+
 # → if you remove those modifiers, you still have the same underlying type
 
 field Tags as set of string sorted
+
+---
+
+---
+
 # → tree-backed set; sorted iteration; safe .min/.max
+
+---
+
+---
+
 # → if you remove `sorted`, you have a fundamentally different type
 ```
 
@@ -4673,6 +4912,10 @@ The remaining objections are not merely grammar preferences. They reflect struct
 5. **Precedent is unanimous.** Every static type system that solved this problem chose named types. The modifier approach is a query-time pattern; it does not transfer to declaration-time type design.
 
 **Recommendation:** Keep `sortedset of T` in the §Proposed Additional Types section at Medium priority. Keep `sorted` out of the modifier vocabulary. If Shane disagrees with this verdict after reviewing the category-break and type-discriminator arguments, schedule a design review — but do not accept `sorted` as a modifier on the basis of modifier-consistency alone.
+
+---
+
+---
 
 ---
 
@@ -4803,11 +5046,15 @@ The second `ScalarType` (after `priority`) must be orderable — numeric types, 
 
 ---
 
+---
+
+---
+
 # Collection Surface Re-evaluation: Three Challenges Answered
 
-**Date:** 2026-04-29  
-**Author:** Frank (Lead/Architect)  
-**Status:** Pending owner sign-off  
+**Date:** 2026-04-29
+**Author:** Frank (Lead/Architect)
+**Status:** Pending owner sign-off
 **Scope:** Response to Shane's three challenges following the `sorted`-modifier rejection and `bag`/`list` analysis
 
 ---
@@ -5009,10 +5256,14 @@ In this taxonomy, there are no "base types" — every type IS its contract. `que
 
 ---
 
+---
+
+---
+
 # `list of T` — Oversight Acknowledgment and Full Evaluation
 
-**By:** Frank  
-**Date:** 2026-04-29  
+**By:** Frank
+**Date:** 2026-04-29
 **Status:** Decision — Low priority; add to doc as evaluated candidate (not reject, not high)
 
 ---
@@ -5166,11 +5417,15 @@ This is not a reject — ring buffer was rejected on philosophy grounds (silent 
 
 ---
 
+---
+
+---
+
 # Decision: `sortedset of T` — Value Assessment
 
-**Date:** 2026-04-29  
-**Author:** Frank (Lead/Architect)  
-**Status:** Pending owner sign-off  
+**Date:** 2026-04-29
+**Author:** Frank (Lead/Architect)
+**Status:** Pending owner sign-off
 **Verdict:** Reject. `set of T notempty` covers every legitimate use case. No Precept construct can observe sorted iteration order. The benefit claimed for `sortedset` is owned entirely by `notempty`, not by sorted storage.
 
 ---
@@ -5220,9 +5475,19 @@ This framing is wrong about which ingredient provides the safety. The `notempty`
 
 ```precept
 field ApprovalLevels as sortedset of choice("team-lead", "director", "vp", "cfo") ordered notempty
+
+---
+
+---
+
 # .max is always safe
 
 field ApprovalLevels as set of choice("team-lead", "director", "vp", "cfo") ordered notempty
+
+---
+
+---
+
 # .max is also always safe — identical proof obligation
 ```
 
@@ -5287,6 +5552,10 @@ If Precept ever adds ordered-iteration constructs, the design review at that tim
 **Recommendation:** Move `sortedset of T` from Candidate 1 in the Proposed Additional Types section to a `### Rejected:` subsection, alongside `ringbuffer`, `bounded collection`, and `multimap`. Update the Priority Summary table. Remove from the Rollout plan. Note the rejection in the comparison table. Remove the Open Question about `ascending`/`descending` keyword reuse for `sortedset`.
 
 **Impact on collection taxonomy:** The "Sorted membership" family described in prior decisions becomes an empty family. The correct collection taxonomy for Precept's surface does not include a sorted-membership category. If a future ordered-iteration construct arrives and makes sorted order observable, `sortedset` can be re-evaluated at that time with an actual consuming construct to justify it.
+
+---
+
+---
 
 ---
 
@@ -5520,10 +5789,14 @@ PriceQualifier    :=  in '<currency>/<unit>'
 
 ---
 
+---
+
+---
+
 # `choice(...)` Design Analysis
 
-**By:** Frank, Lead Architect  
-**Date:** 2026-04-29  
+**By:** Frank, Lead Architect
+**Date:** 2026-04-29
 **Status:** Consolidated — key decisions locked by owner 2026-04-29
 
 **Owner decision (2026-04-29):** `set ChoiceField = stringVariable` → **TypeMismatch**. Choice is a sealed type. String variables cannot be assigned to choice fields. Only choice-typed sources (with subset-compatible value sets) and compile-time string literals in the declared set are valid.
@@ -5571,6 +5844,10 @@ from Active on SetPriority
     -> set Priority = SetPriority.Level   # valid: structurally equivalent types
     -> no transition
 
+---
+
+---
+
 # Comparison also valid — identical sequence, same rank
 from Active on SetPriority when SetPriority.Level > Priority
     -> set Priority = SetPriority.Level
@@ -5578,6 +5855,11 @@ from Active on SetPriority when SetPriority.Level > Priority
 ```
 
 ```precept
+
+---
+
+---
+
 # Subset arg — different choice set → still a type error
 event Promote(Target as choice("medium", "high") ordered)  # ≢ choice("low","medium","high") — different set
 -> set Priority = Promote.Target   # TypeMismatch
@@ -5617,14 +5899,31 @@ The `of` keyword here is the same connector used in `set of T` — it specifies 
 **Concrete syntax (Option B):**
 
 ```precept
+
+---
+
+---
+
 # String choice (current behavior preserved)
 field Status as choice("draft", "active", "closed") default "draft"
+
+---
+
+---
 
 # Integer choice — explicit codes
 field ErrorCode as choice of integer(0, 404, 500) default 0
 
+---
+
+---
+
 # Decimal choice — fixed rate tier
 field TaxRate as choice of decimal(0.0, 0.05, 0.10, 0.20) default 0.0
+
+---
+
+---
 
 # Event arg with typed choice
 event SetErrorCode(Code as choice of integer(0, 404, 500))
@@ -5696,10 +5995,10 @@ This is a substantial language expansion. It changes the language's identity mod
 | `set of string` | A **collection of string values** — the field IS the set | Zero to N values |
 | `choice("a","b","c")` | A **single string value** constrained to a domain | Exactly one value |
 
-A `set of string` field answers: *"what values does this entity currently hold?"*  
+A `set of string` field answers: *"what values does this entity currently hold?"*
 A `choice("a","b","c")` field answers: *"what is this entity's current status/category/mode?"*
 
-`Tags contains "urgent"` is a runtime test — the answer changes as tags are added/removed.  
+`Tags contains "urgent"` is a runtime test — the answer changes as tags are added/removed.
 `Status contains "active"` would mean... what? Either: "is the current value of Status equal to 'active'?" (that's `Status == "active"`, not `contains`) or "is 'active' a declared member of the Status type?" (always compile-time knowable for literals).
 
 There is no runtime use case for `contains` on a scalar choice field.
@@ -5768,7 +6067,7 @@ Named types. Requires a dedicated proposal explicitly revisiting §0.4 Property 
 
 ## Addendum: The `''` Notation Question (Revisited)
 
-**Date:** 2026-04-29  
+**Date:** 2026-04-29
 **Occasion:** Shane's UX disambiguation argument — not addressed in the original analysis.
 
 ---
@@ -5861,7 +6160,7 @@ Option B doesn't create a case where `''` becomes appropriate for choice values.
 
 ## Fresh Assessment — Outside the Box
 
-**Date:** 2026-04-30  
+**Date:** 2026-04-30
 **Occasion:** Shane's challenge to re-examine the premise — not just refine the existing options.
 
 ---
@@ -5888,11 +6187,15 @@ Here is the sharp test. Does this compile?
 field Status as string writable
 field Priority as choice("Low","Medium","High") default "Low"
 
+---
+
+---
+
 # Can I do this?
 set Priority = Status
 ```
 
-If yes: `choice` is a constrained string. Runtime enforcement. Detection dressed up as a type.  
+If yes: `choice` is a constrained string. Runtime enforcement. Detection dressed up as a type.
 If no: `choice` is a sealed vocabulary type. Compile-time blocked. Prevention.
 
 `choice` only justifies its existence over `string + rule` if the answer is **no.**
@@ -6034,15 +6337,28 @@ Without both, `choice` is a better-surfaced `string + rule` — useful ergonomic
 The thing I want to say plainly: **the current design is incomplete, not wrong.** The mechanism is correct. The abstraction is correct. But without the spec commitment to blocking string variable assignment, `choice` is partially prevention and partially detection, and we've been arguing about the wrong things as a result. Seal the type, add the diagnostic, document the rule. The rest of the design — structural equivalence, subset subtyping, named vocabulary shorthand as future work — follows cleanly from that one commitment.
 
 ```precept
+
+---
+
+---
+
 # What the sealed vocabulary model looks like in practice
 
 field Priority as choice("Low","Medium","High","Critical") default "Low"
 field Notes as string writable
 
+---
+
+---
+
 # These compile:
 set Priority = "High"                                # literal — verified at compile time
 set Priority = EscalationEvent.Level                 # Level as choice("Low","Medium","High","Critical") — same set
 set Priority = EscalationEvent.Target                # Target as choice("High","Critical") — subset, valid
+
+---
+
+---
 
 # These are type errors:
 set Priority = Notes                                 # StringAssignedToChoice — blocked
@@ -6056,7 +6372,7 @@ The language surface doesn't change. The prevention guarantee becomes honest.
 
 ## Consolidated Design Update — 2026-04-29
 
-**Date:** 2026-04-29  
+**Date:** 2026-04-29
 **Occasion:** Owner design session synthesis — Shane's consolidated input on five open questions.
 
 ---
@@ -6089,20 +6405,36 @@ An event arg of type `choice(A)` is valid as the source for assignment to a fiel
 ```precept
 field Priority as choice("Low", "Medium", "High") default "Low"
 
+---
+
+---
+
 # Valid — {"Low","Medium"} ⊆ {"Low","Medium","High"}
 event Triage(Level as choice("Low", "Medium"))
 from Active on Triage
     -> set Priority = Triage.Level    # OK: every Level value is in Priority's set
+
+---
+
+---
 
 # Valid — {"High"} ⊆ {"Low","Medium","High"}
 event MarkUrgent(Level as choice("High"))
 from Active on MarkUrgent
     -> set Priority = MarkUrgent.Level  # OK
 
+---
+
+---
+
 # TYPE ERROR — "Critical" ∉ {"Low","Medium","High"}
 event Escalate(Level as choice("Medium", "Critical"))
 from Active on Escalate
     -> set Priority = Escalate.Level   # TypeMismatch: "Critical" not in field's declared set
+
+---
+
+---
 
 # TYPE ERROR — superset: field may hold "Low" which isn't in arg's set
 event StrictEscalate(Level as choice("Medium", "High", "Critical"))
@@ -6126,6 +6458,11 @@ For ordinal comparison (`<`, `>`, `<=`, `>=`, `.min`, `.max`) between two choice
 
 ```precept
 field Priority as choice("Low", "Medium", "High") ordered default "Low"
+
+---
+
+---
+
 # Declared ranks: Low=1, Medium=2, High=3
 ```
 
@@ -6140,10 +6477,19 @@ field Priority as choice("Low", "Medium", "High") ordered default "Low"
 **Assignment vs. comparison:** The subtype relation (§2) governs assignment. The order-preserving subsequence rule governs ordinal comparison. A choice arg can be assignable to a field (subset ✓) but still not support ordinal comparison (rank conflict). Both checks are static.
 
 ```precept
+
+---
+
+---
+
 # Concrete example — assignment valid, ordinal comparison valid
 event Triage(Level as choice("Low", "Medium") ordered)
 from Active on Triage when Triage.Level < Priority
     -> set Priority = Triage.Level    # both valid: subset ✓, order-preserving ✓
+
+---
+
+---
 
 # Assignment valid, ordinal comparison TypeMismatch (reversed order)
 event InvertedTriage(Level as choice("Medium", "Low") ordered)
@@ -6154,12 +6500,32 @@ from Active on InvertedTriage when InvertedTriage.Level < Priority  # TypeMismat
 **Declaration order universally — for all types.** String choice and all typed choice (`integer`, `decimal`, `number`) use declaration order as the rank definition. There are no special cases for natural numeric order. The author controls rank by how they write the list. If natural numeric order is desired, list values numerically — and they agree by construction.
 
 ```precept
+
+---
+
+---
+
 # Declaration order = rank order for all types
 field ErrorCode as choice of integer(200, 404, 500) ordered default 200
+
+---
+
+---
+
 # Ranks: 200=1, 404=2, 500=3 — author listed ascending; natural and declared order agree
 
 field SeverityCode as choice of integer(500, 404, 200) ordered default 500
+
+---
+
+---
+
 # Ranks: 500=1, 404=2, 200=3 — deliberately reversed; the author controls this
+
+---
+
+---
+
 # 500 < 404 < 200 by declared rank
 ```
 
@@ -6184,20 +6550,45 @@ ChoiceValueExpr   := StringLiteral | IntegerLiteral | DecimalLiteral | NumberLit
 **Concrete syntax for all types:**
 
 ```precept
+
+---
+
+---
+
 # String choice — unchanged
 field Status as choice("draft", "active", "closed") default "draft"
+
+---
+
+---
 
 # Integer choice — HTTP status codes, numeric tiers
 field ErrorCode as choice of integer(200, 404, 500) ordered default 200
 
+---
+
+---
+
 # Decimal choice — exact rate tiers (base-10 precision required)
 field TaxRate as choice of decimal(0.00, 0.05, 0.10, 0.20) default 0.00
+
+---
+
+---
 
 # Number choice — threshold picker (IEEE 754 precision acceptable for this domain)
 field AlertThreshold as choice of number(1500, 2500, 5000) default 2500
 
+---
+
+---
+
 # Boolean choice — full domain declared explicitly
 field IsActive as choice of boolean(true, false) default true
+
+---
+
+---
 
 # Event arg using typed choice — subset subtype applies
 event SetCode(Code as choice of integer(200, 404))
@@ -6231,7 +6622,17 @@ from Active on SetRate
 **The problem this creates for business values:** Lexicographic ordering is almost always wrong for severity, tier, or priority fields.
 
 ```
+
+---
+
+---
+
 # Lexicographic — "High" < "Low" < "Medium"
+
+---
+
+---
+
 # A comparison Priority > "Low" returns true when Priority == "High" — backwards
 ```
 
@@ -6309,10 +6710,14 @@ This question is independent of the subset subtype model (§2), which governs ch
 
 ---
 
+---
+
+---
+
 # Decision Record: Choice Field Diagnostic Messages
 
-**By:** Elaine  
-**Date:** 2026-04-29  
+**By:** Elaine
+**Date:** 2026-04-29
 **Status:** Pending owner sign-off
 
 ---
@@ -6437,10 +6842,18 @@ The element types are compatible (both `string`, or both `integer`, etc.) — th
 ```precept
 field Priority as choice("Low", "Medium", "High") default "Low"
 
+---
+
+---
+
 # "Critical" is not in {"Low","Medium","High"}
 event Escalate(Level as choice("Low", "Medium", "Critical"))
 from Active on Escalate
     -> set Priority = Escalate.Level   # ChoiceArgOutsideFieldSet
+
+---
+
+---
 
 # "Critical" and "Urgent" both outside the field's set
 event Triage(Level as choice("Low", "Medium", "High", "Critical", "Urgent"))
@@ -6543,7 +6956,16 @@ Rank is determined by position in the `choice(...)` declaration. Two ordered cho
 **Examples that trigger this:**
 ```precept
 field Priority as choice("Low", "Medium", "High") ordered default "Low"
+
+---
+
+---
+
 # Declared ranks: Low=1, Medium=2, High=3
+
+---
+
+---
 
 # Rank conflict: in this arg, Medium=1 and Low=2 — inverted from the field
 event Escalate(Level as choice("Medium", "Low") ordered)
@@ -6633,10 +7055,14 @@ For `choice of integer` and `choice of decimal` values, no string quotes are use
 
 ---
 
+---
+
+---
+
 # Design Consultation: `lookup` and `queue by P` Language Surface
 
-**By:** Elaine  
-**Date:** 2026-07-17  
+**By:** Elaine
+**Date:** 2026-07-17
 **Status:** Pending owner sign-off
 
 ---
@@ -6754,10 +7180,14 @@ rule each claim in ClaimQueue (claim.value.length > 5)
 
 ---
 
+---
+
+---
+
 # Design Decision: `priorityqueue` Backing Structure and Tiebreak Guarantee
 
-**By:** Frank + George  
-**Date:** 2026-04-29  
+**By:** Frank + George
+**Date:** 2026-04-29
 **Status:** Pending owner sign-off
 
 ---
@@ -6839,10 +7269,14 @@ The bucket model is the implementation. The spec exposes the contract only.
 
 ---
 
+---
+
+---
+
 # Design Advisory: `priorityqueue` Syntax Alternatives
 
-**By:** Frank  
-**Date:** 2026-04-29  
+**By:** Frank
+**Date:** 2026-04-29
 **Status:** Pending owner decision
 
 ---
@@ -6963,6 +7397,10 @@ Owner to pick one:
 
 ---
 
+---
+
+---
+
 # Frank — whitespace-insensitivity docs sync
 
 Date: 2026-04-30
@@ -6990,6 +7428,10 @@ This is the enduring design intent of Precept's keyword-led surface:
 - No layout traps: reformatting, copy-paste, and code generation do not change meaning.
 - Tooling-friendly parsing: statement kind and boundaries come from keywords, not indentation analysis.
 - Human readability: long compound declarations can wrap across lines without becoming fragile.
+
+---
+
+---
 
 ---
 
@@ -7067,6 +7509,10 @@ This is the enduring design intent of Precept's keyword-led surface:
 
 ---
 
+---
+
+---
+
 # Owner Decision: choice of T — Explicit Element Type Required
 
 **By:** Shane (owner)
@@ -7100,6 +7546,10 @@ A new diagnostic is needed: choice(...) without of T → error pointing the auth
 
 ---
 
+---
+
+---
+
 # WSI Test Coverage: Findings and Coverage Gaps
 
 **Date:** 2026-04-30
@@ -7120,7 +7570,7 @@ MCP regression (`precept_compile`) could not be run — that tool is not yet imp
 
 ### GAP-1: `ParseAtom()` does not handle `TypedConstant` tokens
 
-**Category:** Parser correctness / qualifier expressions  
+**Category:** Parser correctness / qualifier expressions
 **Severity:** Low (by design, but undocumented)
 
 Single-quoted strings (`'USD'`) lex as `TypedConstant` (TokenKind 116–119). `ParseAtom()` in `Parser.cs` handles `StringLiteral` but not `TypedConstant`. Qualifier values written with single quotes produce an `ExpectedToken` diagnostic; the parse result is structurally broken.
@@ -7135,7 +7585,7 @@ Single-quoted strings (`'USD'`) lex as `TypedConstant` (TokenKind 116–119). `P
 
 ### GAP-2: `StateEnsure` with `when` guard clause not implemented
 
-**Category:** Parser completeness  
+**Category:** Parser completeness
 **Severity:** High (blocks sample files)
 
 Grammar form `in State ensure Condition when Guard because "msg"` is present in `insurance-claim.precept` and `loan-application.precept`. The parser terminates the condition expression at `when`, then `Expect(Because)` fails. Both sample files produce parser diagnostics on `StateEnsure` blocks with guards.
@@ -7148,7 +7598,7 @@ Grammar form `in State ensure Condition when Guard because "msg"` is present in 
 
 ### GAP-3: `is set` / `is not set` membership expressions may be incomplete
 
-**Category:** Parser completeness  
+**Category:** Parser completeness
 **Severity:** Medium
 
 `insurance-claim.precept` contains `field.expression is set` / `field.expression is not set` expressions. The parser may not recognize `is` as a postfix or infix operator for null/set-membership checks. These appear to contribute diagnostics in the sample file parse.
@@ -7159,7 +7609,7 @@ Grammar form `in State ensure Condition when Guard because "msg"` is present in 
 
 ### GAP-4: `TypeChecker.Check()` is not implemented
 
-**Category:** Test infrastructure / pipeline completeness  
+**Category:** Test infrastructure / pipeline completeness
 **Severity:** Medium (blocks `Compiler.Compile()` in tests)
 
 `TypeChecker.Check()` at `src/Precept/Pipeline/TypeChecker.cs` line 26 throws `NotImplementedException`. Any test using `Compiler.Compile()` throws. Tests must use `Lexer.Lex()` + `Parser.Parse()` directly, which bypasses type checking entirely.
@@ -7172,7 +7622,7 @@ Grammar form `in State ensure Condition when Guard because "msg"` is present in 
 
 ### GAP-5: MCP `precept_compile` not implemented
 
-**Category:** MCP tool coverage  
+**Category:** MCP tool coverage
 **Severity:** Medium (blocks regression protocol)
 
 The project's canonical regression protocol requires 4 rounds of `precept_compile` to verify WSI behavior end-to-end. `tools/Precept.Mcp/Tools/` contains only `PingTool.cs`. None of the 5 MCP tools described in the custom instructions exist yet.
@@ -7220,6 +7670,10 @@ The project's canonical regression protocol requires 4 rounds of `precept_compil
 
 ---
 
+---
+
+---
+
 # Frank gap analysis inbox
 
 Date: 2026-05-01
@@ -7253,6 +7707,10 @@ Requested by: Shane
 - GAP-1 and GAP-3 share the same immediate parser root: the Pratt parser's atom/led coverage does not match the spec's literal/operator surface.
 - GAP-2 is a grammar-shape drift: AST and samples expect guarded ensures, but parser recognition only handles the older/stale placement.
 - Fixing these gaps should unblock the two broken sample files, and also expose one adjacent issue: guarded `on ... ensure ... when ...` uses the same broken ensure shape and should be fixed in the same pass.
+
+---
+
+---
 
 ---
 
@@ -7536,10 +7994,14 @@ Pragmatic sequencing: **GAP-2 immediately** (five lines, zero design risk), **GA
 
 ---
 
+---
+
+---
+
 # Parser Gap Fixes — Catalog Compliance Audit Decision
 
-**By:** Frank  
-**Date:** 2026-05-01  
+**By:** Frank
+**Date:** 2026-05-01
 **Context:** Audit of `docs/working/parser-gap-fixes-plan.md` against catalog-driven architecture
 
 ## Decision
@@ -7567,6 +8029,10 @@ Implementer should add spec-reference comments on the two hardcoded precedence c
 ## Future Watch
 
 If additional multi-token operators enter the language (beyond `is set`/`is not set`), the `Operators` catalog should be extended with a `Postfix` arity and multi-token support. Until then, the single-operator exception with a spec-reference comment is acceptable.
+
+---
+
+---
 
 ---
 
@@ -7614,6 +8080,10 @@ An operator must exist in the Operators catalog even if the parser doesn't read 
 
 ---
 
+---
+
+---
+
 # Decision: Catalog Vision Ordering — Strengthened Wording
 
 **Date:** 2026-05-01
@@ -7642,10 +8112,14 @@ The principle was implicitly present in the document's existing "Completeness Pr
 
 ---
 
+---
+
+---
+
 # Decision: Expression Form Catalog Placement — Separate vs. Extend Constructs
 
-**By:** Frank  
-**Date:** 2026-05-01  
+**By:** Frank
+**Date:** 2026-05-01
 **Status:** Recommendation (awaiting owner decision)
 
 ---
@@ -7754,7 +8228,7 @@ Supporting types:
    - `Slots = []` (always empty — expression forms don't have typed positional slots)
    - `Entries = [...]` (maybe? but expression forms don't disambiguate via leading-token dispatch)
    - `RoutingFamily = ???` (needs a new value like `Expression`, or stays `None`)
-   
+
    Meanwhile, expression-form-specific metadata (`IsLeftDenotation`, `Category`) would need to be either:
    - **Added as nullable fields to ConstructMeta** — violates the "flat record with inapplicable fields" anti-pattern explicitly called out in catalog-system.md
    - **ConstructMeta becomes a DU** — possible, but then you have `DeclarationConstructMeta` and `ExpressionFormMeta` subtypes sharing an abstract base with only Name/Description/UsageExample. At that point you've reinvented two catalogs with shared plumbing but forced into one enum.
@@ -7800,10 +8274,14 @@ The analysis is clear enough that I don't see a remaining open question. If Shan
 
 ---
 
+---
+
+---
+
 # Decision: Expression Forms Do Not Get a Catalog
 
-**By:** Frank  
-**Date:** 2026-05-01  
+**By:** Frank
+**Date:** 2026-05-01
 **Status:** Ruling (architectural)
 
 ## The Question
@@ -7844,10 +8322,14 @@ The catalog system's Completeness Principle asks: "If I enumerated every catalog
 
 ---
 
+---
+
+---
+
 # Decision: Expression Forms Belong in the Catalog (Revised)
 
-**By:** Frank  
-**Date:** 2026-05-01  
+**By:** Frank
+**Date:** 2026-05-01
 **Status:** Revision — supersedes `frank-expression-forms-catalog-boundary.md`
 
 ## Prior Position (Withdrawn)
@@ -7940,12 +8422,16 @@ Should expression forms be a separate 13th catalog (`ExpressionForms`) or an ext
 
 ---
 
+---
+
+---
+
 # Parser vs. Spec: Full Audit — Frank
 
-> **Date:** 2026-05-01  
-> **Branch:** spike/Precept-V2  
-> **Auditor:** Frank  
-> **Scope:** Exhaustive spec-vs-implementation review of `src/Precept/Pipeline/Parser.cs` against  
+> **Date:** 2026-05-01
+> **Branch:** spike/Precept-V2
+> **Auditor:** Frank
+> **Scope:** Exhaustive spec-vs-implementation review of `src/Precept/Pipeline/Parser.cs` against
 > `docs/language/precept-language-spec.md`, all 28 sample files, and the expression node inventory.
 
 ---
@@ -8020,17 +8506,17 @@ Type checker validation (§3.8) says:
 - List literals are ONLY valid in `default` clauses (`ListLiteralOutsideDefault` fires elsewhere)
 - Element types must match the collection's declared element type
 
-**What the parser does:**  
+**What the parser does:**
 `ParseAtom()` has no `case TokenKind.LeftBracket`. Encountering `[` falls into the `default` arm, emits an `ExpectedToken` diagnostic, and returns a missing `IdentifierExpression`.
 
-**What's also missing:**  
+**What's also missing:**
 No `ListLiteralExpression` record type in `src/Precept/Pipeline/SyntaxNodes/`. The entire AST representation is absent.
 
 **Sample reference:** None of the 28 sample files use list literal defaults currently. However, the feature is spec-described and necessary for fields like `field Tags as set of string default ["important", "new"]`.
 
-**Fix recommendation:**  
-1. Add `case TokenKind.LeftBracket:` to `ParseAtom()` — parse comma-separated expressions until `RightBracket`.  
-2. Create `ListLiteralExpression(SourceSpan Span, ImmutableArray<Expression> Elements) : Expression(Span)`.  
+**Fix recommendation:**
+1. Add `case TokenKind.LeftBracket:` to `ParseAtom()` — parse comma-separated expressions until `RightBracket`.
+2. Create `ListLiteralExpression(SourceSpan Span, ImmutableArray<Expression> Elements) : Expression(Span)`.
 3. Add type-checker validation for `ListLiteralOutsideDefault` and element type checking.
 
 **Priority: Medium.** No sample breakage today, but the feature is fully spec-described and unimplemented at both parser and AST layers.
@@ -8047,27 +8533,27 @@ No `ListLiteralExpression` record type in `src/Precept/Pipeline/SyntaxNodes/`. T
 |                   if IdentifierExpression → CallExpression; else → diagnostic |
 ```
 
-**What the parser does:**  
+**What the parser does:**
 After the Pratt loop processes `.identifier` into a `MemberAccessExpression`, the next iteration checks:
 1. `ExpressionBoundaryTokens.Contains(current.Kind)` — no (`LeftParen` is not a boundary)
-2. `current.Kind == TokenKind.Dot` — no  
-3. `OperatorPrecedence.TryGetValue(current.Kind, ...)` — no (`LeftParen` is not in the operators catalog)  
+2. `current.Kind == TokenKind.Dot` — no
+3. `OperatorPrecedence.TryGetValue(current.Kind, ...)` — no (`LeftParen` is not in the operators catalog)
 4. Loop breaks, returning `MemberAccessExpression` without consuming `(`
 
 The `(` is then left over as the next token, which causes a downstream parse error.
 
 `CallExpression` (bare function call `name(args)`) IS handled correctly in `ParseAtom()` for the `Identifier` case. Only the chained `obj.method(args)` form is broken.
 
-**What's also missing:**  
+**What's also missing:**
 No `MethodCallExpression` record type in `src/Precept/Pipeline/SyntaxNodes/`. The AST representation is absent.
 
 **Sample reference:** None of the 28 sample files currently use `obj.method(args)` syntax. The spec-described use case is temporal types: `someInstant.inZone(tz)` and `someDatetime.inZone(tz)`. These are the only method-call-on-accessor forms in §3.6.
 
-**Fix recommendation:**  
-1. Add a `LeftParen` handler in the Pratt left-denotation loop (after the `Dot` handler), guarded by `minPrecedence <= 80`:  
-   - If `left is MemberAccessExpression` → parse arg list → return `MethodCallExpression`  
-   - If `left is IdentifierExpression` → parse arg list → return `CallExpression` (this would subsume the `ParseAtom` `Identifier` branch for consistency)  
-   - Else → emit `InvalidCallTarget` diagnostic  
+**Fix recommendation:**
+1. Add a `LeftParen` handler in the Pratt left-denotation loop (after the `Dot` handler), guarded by `minPrecedence <= 80`:
+   - If `left is MemberAccessExpression` → parse arg list → return `MethodCallExpression`
+   - If `left is IdentifierExpression` → parse arg list → return `CallExpression` (this would subsume the `ParseAtom` `Identifier` branch for consistency)
+   - Else → emit `InvalidCallTarget` diagnostic
 2. Create `MethodCallExpression(SourceSpan Span, Expression Target, ImmutableArray<Expression> Args) : Expression(Span)`.
 
 **Priority: Medium.** No sample breakage today. Temporal method calls require this. If temporal types are exercised, this gap becomes High.
@@ -8085,7 +8571,7 @@ on Identifier ensure BoolExpr ("when" BoolExpr)? ("because" StringExpr)?
 ```
 Both `when` and `because` are marked optional with `?`.
 
-**What the parser does:**  
+**What the parser does:**
 `ParseStateEnsure()` and `ParseEventEnsure()` both call `Expect(TokenKind.Because)`, which emits a diagnostic if `because` is absent. This matches design principle 9 ("Mandatory rationale — the `because` clause is syntactically required on every rule and ensure").
 
 **What the rule declaration shows:**
@@ -8094,10 +8580,10 @@ rule BoolExpr ("when" BoolExpr)? because StringExpr
 ```
 `because` is NOT optional for `rule` — it has no `?`.
 
-**Assessment:**  
+**Assessment:**
 This is a **spec authoring error** introduced at `50a459c` (2026-04-28) when the grammar was reorganized to support post-condition guards. The `?` on `because` was likely inadvertent — it may have been copied from the `when` clause that was intentionally made optional. Design principle 9 is explicit that `because` is always required. All 28 sample files use `because` without exception. The parser is correct; the spec needs correcting.
 
-**Fix recommendation:**  
+**Fix recommendation:**
 Correct the spec grammar at §2.2 to remove `?` from `because`:
 ```
 (in|to|from) StateTarget ensure BoolExpr ("when" BoolExpr)? because StringExpr
@@ -8230,26 +8716,26 @@ Weighting spec sections by language surface area:
 
 ### Fix Immediately (Sprint-Blocking)
 
-**GAP-3: `is set` / `is not set`** — Critical  
+**GAP-3: `is set` / `is not set`** — Critical
 Used in 11 of 28 sample files. A foundational presence-testing form for `optional` fields. Unimplemented at every layer: not in `Operators.All`, not in the Pratt loop, no `IsSetExpression` AST type. Zero test coverage. Customer-Profile, Building-Access, Insurance-Claim, Loan-Application, Library-Checkout, Library-Hold, Restaurant-Waitlist, IT-Helpdesk, Utility-Outage, Event-Registration, and Clinic-Appointment all produce parse errors.
 
-**GAP-2: Post-condition guard on ensures**  — Critical  
+**GAP-2: Post-condition guard on ensures**  — Critical
 Used in 2 of 28 sample files directly, with the form `ensure COND when GUARD because "msg"`. The current parser supports only the OLD pre-condition form `when GUARD ensure COND`. The spec was updated 2026-04-28 to match the samples; the parser was not. ParseStateEnsure() and ParseEventEnsure() need a post-condition `when` check after `ParseExpression(0)`.
 
-**GAP-1: TypedConstant tokens in ParseAtom** — High  
+**GAP-1: TypedConstant tokens in ParseAtom** — High
 `TypedConstant` and `TypedConstantStart` produce no AST node; they hit the `default` arm of `ParseAtom()` and emit `ExpectedToken`. Typed constants are the ONLY mechanism for non-primitive literal values (dates, money, currency, quantity, duration, period, etc.). Without this, all business-domain and temporal types are unusable in expressions. No `TypedConstantExpression` or `InterpolatedTypedConstantExpression` AST type exists.
 
 ### Fix Soon (Next Sprint)
 
-**GAP-6: List literal expressions** — Medium  
+**GAP-6: List literal expressions** — Medium
 Needed for collection fields with `default` values (`field Tags as set of string default ["a", "b"]`). Currently no sample uses this, but it's a spec-complete feature. `ParseAtom()` needs a `LeftBracket` case; `ListLiteralExpression` AST type must be created.
 
-**GAP-7: Method calls on member access** — Medium  
+**GAP-7: Method calls on member access** — Medium
 Required for temporal `.inZone(tz)` calls. Currently no sample exercises temporal types. `LeftParen` handler needed in Pratt left-denotation after `MemberAccessExpression`; `MethodCallExpression` AST type must be created.
 
 ### Spec Correction Required (Not a Code Fix)
 
-**GAP-8: `because` optional in spec grammar** — Low (spec defect)  
+**GAP-8: `because` optional in spec grammar** — Low (spec defect)
 The `?` on `("because" StringExpr)?` in the §2.2 ensure grammar is a spec authoring error. Design principle 9 is explicit: `because` is mandatory on every constraint. The spec must be corrected to `because StringExpr` (no `?`) to align with the parser, the samples, and the design philosophy. This is my defect to fix as spec steward.
 
 ---
@@ -8281,11 +8767,15 @@ Before marking any of these gaps as fixed, the test suite must have:
 
 ---
 
+---
+
+---
+
 # Decision: Parser Gap Fixes Implementation Plan
 
-> **Date:** 2026-05-01  
-> **Author:** Frank  
-> **Status:** Authored — awaiting George implementation  
+> **Date:** 2026-05-01
+> **Author:** Frank
+> **Status:** Authored — awaiting George implementation
 > **Artifact:** `docs/working/parser-gap-fixes-plan.md`
 
 ---
@@ -8332,17 +8822,21 @@ Before marking any of these gaps as fixed, the test suite must have:
 
 ---
 
+---
+
+---
+
 # George — Architectural Concerns from Parser Gap Plan Review
 
-> **Date:** 2026-05-01  
-> **Source:** George's review of `docs/working/parser-gap-fixes-plan.md`  
+> **Date:** 2026-05-01
+> **Source:** George's review of `docs/working/parser-gap-fixes-plan.md`
 > **Status:** Inbox — pending merge into decisions.md
 
 ---
 
 ## Concern 1: `BuildNode` Exhaustive Switch Creates Hidden Constructor Obligations
 
-**Category:** Architecture / Compilation blocker  
+**Category:** Architecture / Compilation blocker
 **Affects:** GAP-2 (Slice 2)
 
 `Parser.cs` contains `BuildNode` — a static exhaustive switch over all `ConstructKind` values. Two arms (`StateEnsure`, `EventEnsure`) construct `StateEnsureNode` and `EventEnsureNode` directly. These arms are never called at runtime (the live parse path goes through `ParseStateEnsure()` / `ParseEventEnsure()` directly), but they exist as dead code to keep the switch exhaustive (CS8524 enforcement).
@@ -8357,7 +8851,7 @@ Before marking any of these gaps as fixed, the test suite must have:
 
 ## Concern 2: `ParseAtom()` Preempts Pratt Loop — Spec Left-Denotation Table Has a Dead Branch
 
-**Category:** Spec/code consistency  
+**Category:** Spec/code consistency
 **Affects:** GAP-7 (Slice 5)
 
 The spec's left-denotation table (§2.1, line 712) says: `(` → if `IdentifierExpression` → `CallExpression`. But `ParseAtom()` eagerly consumes `identifier(args)` as `CallExpression` before the Pratt loop runs. The `IdentifierExpression` branch in the Pratt `LeftParen` handler will never fire.
@@ -8375,7 +8869,7 @@ This is a known pattern in Pratt parsers ("null-denotation preemption"), but it 
 
 ## Concern 3: Existing Integration Tests That Accept GAP Diagnostics Need Retrofit Tracking
 
-**Category:** Test debt  
+**Category:** Test debt
 **Affects:** Post-GAP-2 and post-GAP-3 test hygiene
 
 Two existing tests were written to be tolerant of current parser gaps:
@@ -8390,7 +8884,7 @@ These tests must be retrofitted to assert `tree.Diagnostics.Should().BeEmpty()` 
 
 ## Concern 4: `contains` Spec Node Name Diverges from Implementation
 
-**Category:** Spec accuracy (minor)  
+**Category:** Spec accuracy (minor)
 **Affects:** Slice 8 (contains tests), future spec readers
 
 Spec §2.1 left-denotation table (line 707) says `Contains → ContainsExpression(left, ParseExpression(40))`. No `ContainsExpression` type exists — the implementation produces `BinaryExpression(Contains, left, right)` via the standard Pratt binary path.
@@ -8403,11 +8897,15 @@ This is a silent divergence. The spec describes a named node type that was never
 
 _End of George's architectural concerns inbox item._
 
+---
+
+---
+
 # Decision: Full-Vision Annotation-Bridge Pattern
 
-**Author:** Frank  
-**Date:** 2026-05-01  
-**Status:** Designed — ready for implementation integration  
+**Author:** Frank
+**Date:** 2026-05-01
+**Status:** Designed — ready for implementation integration
 
 ## Summary
 
@@ -8415,10 +8913,10 @@ Replaces the narrow MVP `[HandlesExpressionForms]` (parameterless, ExpressionFor
 
 ## Class Marker
 
-**Name:** `HandlesCatalogExhaustivelyAttribute`  
-**Location:** `src/Precept/HandlesCatalogExhaustivelyAttribute.cs`  
-**Parameter:** `Type catalogEnum` — the catalog enum whose members must all be handled  
-**AllowMultiple:** `true` — a class may handle multiple catalog enums  
+**Name:** `HandlesCatalogExhaustivelyAttribute`
+**Location:** `src/Precept/HandlesCatalogExhaustivelyAttribute.cs`
+**Parameter:** `Type catalogEnum` — the catalog enum whose members must all be handled
+**AllowMultiple:** `true` — a class may handle multiple catalog enums
 
 ```csharp
 [HandlesCatalogExhaustively(typeof(ExpressionFormKind))]
@@ -8442,9 +8940,9 @@ public sealed class Evaluator { ... }
 
 ## Method Marker
 
-**Name:** `HandlesFormAttribute`  
-**Location:** `src/Precept/Language/HandlesFormAttribute.cs`  
-**Parameter:** `object kind` — accepts any enum value  
+**Name:** `HandlesFormAttribute`
+**Location:** `src/Precept/Language/HandlesFormAttribute.cs`
+**Parameter:** `object kind` — accepts any enum value
 
 ```csharp
 [HandlesForm(ExpressionFormKind.Literal)]
@@ -8463,9 +8961,9 @@ private TypedExpression EvaluateArithmetic(...) { ... }
 
 ## PRECEPT0019 — Pipeline Coverage Exhaustiveness
 
-**Location:** `src/Precept.Analyzers/Precept0019PipelineCoverageExhaustiveness.cs`  
-**Category:** `Precept.Pipeline`  
-**Severity:** Error  
+**Location:** `src/Precept.Analyzers/Precept0019PipelineCoverageExhaustiveness.cs`
+**Category:** `Precept.Pipeline`
+**Severity:** Error
 
 **Discovery algorithm (generic):**
 1. `RegisterSymbolAction` on `SymbolKind.NamedType`
@@ -8541,10 +9039,15 @@ These are complementary layers:
 - **Frank-7:** Phase 2 synthesis — Slices 14–26 appended to `docs/working/parser-gap-fixes-plan.md`
 
 ## Session: Phase 2 Gap Audit + Pre-Implementation Clearance
+
+---
+
+---
+
 # Phase 2 Gap Audit
-**Author:** Frank (Lead Architect / Language Designer)  
-**Date:** 2026-05-01  
-**Scope:** Phase 2 plan (Slices 14–26) + acceptance gate (13 points)  
+**Author:** Frank (Lead Architect / Language Designer)
+**Date:** 2026-05-01
+**Scope:** Phase 2 plan (Slices 14–26) + acceptance gate (13 points)
 **Directive:** No deferred items, no GitHub issues, no holes before type-checker work begins.
 
 ---
@@ -8594,10 +9097,10 @@ These are complementary layers:
 
 **Impact:** When Phase 2 is "done," the MCP `precept_language` tool will still not exist. New catalog entries (11 expression forms, 20 operators, new operator family) are invisible to MCP consumers, AI grounding, and LS hover. The `catalog-system.md` Completeness Principle is violated in the MCP surface layer. Shane's "no deferred items" directive is explicitly violated — this was deferred in Phase 1 and Phase 2 doesn't close it.
 
-**Resolution:** Add a new slice (suggest Slice 15.5, between Phase 2a and 2b, or as a standalone Phase 2d) to create `tools/Precept.Mcp/Tools/LanguageTool.cs` with `precept_language` output:  
-- `operators` section (grouped by `OperatorFamily`, covering all 20 entries after Slice 20)  
-- `expression_forms` section (all 11 entries after Slice 21)  
-- `tokens`, `types`, `constructs` sections from existing catalogs  
+**Resolution:** Add a new slice (suggest Slice 15.5, between Phase 2a and 2b, or as a standalone Phase 2d) to create `tools/Precept.Mcp/Tools/LanguageTool.cs` with `precept_language` output:
+- `operators` section (grouped by `OperatorFamily`, covering all 20 entries after Slice 20)
+- `expression_forms` section (all 11 entries after Slice 21)
+- `tokens`, `types`, `constructs` sections from existing catalogs
 
 The slice should include `Precept.Mcp.Tests` coverage for the new tool, a `precept_language` schema test, and acceptance that `precept_language` returns non-empty output with correct operator count (20) and form count (11). This slice can be ordered after Slice 21 (all catalog entries finalized) but before Slice 26 (PRECEPT0019 flip).
 
@@ -8675,12 +9178,15 @@ Gap 1 is the only one that requires a new slice. Gaps 2–4 are addenda to exist
 
 **If Gap 1 is resolved (LanguageTool.cs slice added) and Gaps 2–4 are patched into their owning slices, the plan is COMPREHENSIVE and all 13 acceptance gate points become reachable.**
 
+---
+
+---
 
 # Pre-Implementation Q&A — Phase 2 Blockers
 
-**Author:** George  
-**Date:** 2026-05-01  
-**Requested by:** Shane  
+**Author:** George
+**Date:** 2026-05-01
+**Requested by:** Shane
 **Status:** Resolved — all three questions answered from source inspection
 
 ---
@@ -8745,11 +9251,15 @@ Full-text search of `docs/language/precept-language-spec.md` for both `OperatorF
 - **Slice 32** (new, Phase 2e, deferred): PRECEPT0023 — OperatorMeta DU shape invariants (PRECEPT0023a/b/c). Blocked on Phase 2b completion. Tracked now, implement after George finishes Slices 19–22.
 - **Process note** (new, Phase 2e): `CatalogAnalysisHelpers.CatalogEnumNames` manual maintenance — process discipline item, not a slice. New-catalog checklist must include updating this set.
 
+---
+
+---
+
 # Phase 2b Decision Notes — OperatorMeta DU Restructure
 
-**Date:** 2026-05-01  
-**Author:** George  
-**Branch:** spike/Precept-V2  
+**Date:** 2026-05-01
+**Author:** George
+**Branch:** spike/Precept-V2
 **Slices:** 19–22
 
 ---
@@ -8806,10 +9316,14 @@ Phase 2a corrected those 7 → 2261 passing, 0 failing.
 Phase 2b added 13 new tests (8 in OperatorsTests, 3 in ExpressionFormCatalogTests, 2 theory
 case additions) → **2274 passing, 0 failing**.
 
+---
+
+---
+
 # Decision Note — Phase 2c Complete (Slices 23–26)
 
-**Date:** 2026-05-01  
-**Author:** George  
+**Date:** 2026-05-01
+**Author:** George
 **Branch:** spike/Precept-V2
 
 ---
@@ -8857,11 +9371,15 @@ Phase 2c closes the PRECEPT0019 promotion work. All four slices landed in a sing
 - PRECEPT0019 severity: `DiagnosticSeverity.Error`
 - `<WarningsNotAsErrors>`: removed
 
+---
+
+---
+
 # Decision Note: Phase 2d Complete — Parser.cs Structural Split
 
-**Date:** 2026-05-01  
-**Author:** George (Runtime Developer)  
-**Branch:** spike/Precept-V2  
+**Date:** 2026-05-01
+**Author:** George (Runtime Developer)
+**Branch:** spike/Precept-V2
 **Slice:** 27 (Work Item S1)
 
 ---
@@ -8894,3 +9412,282 @@ Sliced `src/Precept/Pipeline/Parser.cs` (~1757 lines) into three `partial` files
 ## Phase 2d status
 
 Phase 2d (Slice 27) is the only slice in this phase. Phase 2d is now complete.
+
+---
+
+---
+
+# Full Architecture Review — spike/Precept-V2
+
+**Reviewer:** Frank (Lead Architect)
+**Branch:** `spike/Precept-V2`
+**Commits reviewed:** 36ccec4..4831cb3 (full branch vs main)
+**Build:** ✅ Clean (1 pre-existing RS1030 warning in PRECEPT0013)
+**Tests:** ✅ 2678 passing (2424 Precept.Tests + 254 Precept.Analyzers.Tests), 0 failures
+
+---
+
+## 1. Annotation Bridge Architecture (PRECEPT0019)
+
+### Files Reviewed
+- `src/Precept/HandlesCatalogExhaustivelyAttribute.cs`
+- `src/Precept/Language/HandlesCatalogMemberAttribute.cs`
+- `src/Precept.Analyzers/Precept0019PipelineCoverageExhaustiveness.cs`
+- `src/Precept/Pipeline/Parser.cs` (class marker on `ParseSession`)
+- `src/Precept/Pipeline/TypeChecker.cs` (class marker + 11 member annotations)
+- `src/Precept/Pipeline/GraphAnalyzer.cs` (class marker + 11 member annotations)
+
+### Assessment
+
+The annotation bridge is clean and catalog-agnostic as specified. The class marker accepts `Type catalogEnum` — any enum can opt in. Method markers use `object kind` for call-site type safety without analyzer rewrites.
+
+PRECEPT0019 correctly:
+- Extracts `typeof(T)` from the class marker
+- Collects all enum fields with constant values
+- Resolves method marker arguments by matching `arg.Type` against the catalog enum
+- Reports missing members with clear diagnostic formatting
+- Is registered as `DiagnosticSeverity.Error` (was previously Warning, promoted per Slice 26)
+
+Parser coverage: `ParseSession` (ref partial struct) has both `ParseExpression` and `ParseAtom` annotated, covering all 11 `ExpressionFormKind` members across the two methods. TypeChecker and GraphAnalyzer have placeholder methods with all 11 annotations each — correct forward-declarations for Phase 3.
+
+---
+
+## 2. Catalog Integrity Analyzers (PRECEPT0020–0023)
+
+### PRECEPT0020 — Operators Token Collision
+
+Two sub-rules (0020a: `(Token.Kind, Arity)` key collision; 0020b: binary `Token.Kind` collision). Both correctly:
+- Scope to `OperatorKind` switches via `TryGetCatalogSwitchKind`
+- Skip `MultiTokenOp` arms (correct — those are PRECEPT0023's domain)
+- Extract token kind via `Tokens.GetMeta(TokenKind.X)` invocation walking
+- Report against the creation syntax location (not the arm)
+
+### PRECEPT0021 — Tokens Duplicate Text
+
+- Correctly skips null `Text` (synthetic tokens like `SetType`, `Identifier`)
+- Uses `ResolveStringConstant` which handles nameof, const fields, and string literals
+- Only fires for `TokenKind` switches
+
+### PRECEPT0022 — Operators Inline Token Reference
+
+- Detects `new TokenMeta(...)` construction where `Tokens.GetMeta(TokenKind.X)` is required
+- Clean single-purpose analyzer — no false-positive risk from DU subtype checks
+
+### PRECEPT0023 — OperatorMeta DU Shape Invariants
+
+Three sub-rules:
+- **0023a:** MultiTokenOp < 2 tokens → Error. Correct.
+- **0023b:** SingleTokenOp vs MultiTokenOp lead-token collision. Cross-checks single/multi dictionaries post-loop. Correct.
+- **0023c:** Duplicate full token sequences. Uses `BuildFullSequenceKey` joining all tokens. Correctly checks the full sequence (e.g., "Is,Set" vs "Is,Not,Set"), not just the lead token. The diagnostic name says "MultiLeadCollision" but the invariant checks the **full sequence** — naming is slightly misleading but functionally correct.
+
+### CatalogAnalysisHelpers
+
+Shared infrastructure is well-factored:
+- `TryGetCatalogSwitchKind` correctly guards scope (method named "GetMeta", in `Precept.Language`, known enum type)
+- `EnumerateCollectionElements` handles both collection expressions and array initializers
+- `UnwrapConversions` handles implicit conversion chains
+- `FlagsEnumContains` supports single-ref, bitwise-OR-tree, and constant-folded forms
+
+---
+
+## 3. Parser Fixes
+
+### GAP-A: `when` guard on StateEnsure/EventEnsure
+
+`ParseStateEnsure` and `ParseEventEnsure` both implement post-condition `when` guards correctly:
+- Check if `stashedGuard` exists (pre-ensure guard from outer dispatch)
+- Only consume `when` if no stashed guard — prevents double-guard ambiguity
+- Guard comes **after** the condition expression, before `because` — matches spec §2.2
+
+### GAP-B: Modifiers after computed field expressions
+
+Verified via `ExpressionBoundaryTokens` and the Pratt loop's natural termination on boundary tokens. The parser correctly stops expression parsing when it encounters modifier keywords because they're in `ExpressionBoundaryTokens` via `Constructs.LeadingTokens`. No explicit handling needed — clean by construction.
+
+### GAP-C: Keyword-as-member-name and keyword-as-function-call
+
+Two complementary fixes:
+1. `ExpectIdentifierOrKeywordAsMemberName()` — accepts tokens in `KeywordsValidAsMemberName` after `.`
+2. `ParseAtom` — `case TokenKind.Min: case TokenKind.Max:` falls through to identifier/function-call handling
+
+Both correct. The keyword-as-function-call case handles `min(a, b)` / `max(a, b)` in expression position.
+
+### is/is-not-set, method call, list literal, TypedConstant
+
+- `is set` / `is not set`: Correctly uses separate `IsSetExpression`/`IsNotSetExpression` nodes. Precedence 60 matches `Operators.GetMeta(OperatorKind.IsSet).Precedence`. Non-associative by break-on-entry (`minPrecedence > 60`).
+- Method call: Detects `LeftParen` following `MemberAccessExpression` at binding power 90. Correct.
+- List literal: Dispatches from `ParseAtom` via `TokenKind.LeftBracket`. Correct.
+- TypedConstant/InterpolatedTypedConstant: Both handled in `ParseAtom` correctly.
+
+---
+
+## 4. ExpressionFormKind Catalog
+
+### Members (11 total — correct)
+1. Literal, 2. Identifier, 3. Grouped, 4. BinaryOperation, 5. UnaryOperation,
+6. MemberAccess, 7. Conditional, 8. FunctionCall, 9. MethodCall, 10. ListLiteral,
+11. PostfixOperation
+
+### Metadata Shape
+`ExpressionFormMeta` record carries: Kind, Category, IsLeftDenotation, LeadTokens, HoverDocs. All fields populated. LeadTokens empty for led forms, non-empty for nud forms — structurally enforced by the Layer 2 test.
+
+### Coverage Tests
+Two test classes provide layered enforcement:
+- `Tests.Language.ExpressionFormCoverageTests` — Layer 2: count, GetMeta completeness, HoverDocs, IsLeftDenotation, LeadTokens contract
+- `Tests.ExpressionFormCoverageTests` — Layer 3: catalog completeness, annotation bridge xUnit mirror, parse round-trips
+
+---
+
+## 5. OperatorMeta DU Shape
+
+Clean discriminated union:
+- `OperatorMeta` (abstract base) → `SingleTokenOp` / `MultiTokenOp`
+- `MultiTokenOp` carries `IReadOnlyList<TokenMeta> Tokens` with `LeadToken => Tokens[0]`
+- `ByToken` FrozenDictionary indexed by `(TokenKind, Arity)` — excludes MultiTokenOp
+- `ByTokenSequence` FrozenDictionary indexed by `(TokenKind, TokenKind?, TokenKind?)` — covers MultiTokenOp
+- `BuildSequenceKey` correctly handles 2-token and 3-token sequences
+
+Precedence values consistent: IsSet/IsNotSet at 60, matching arithmetic multiplication level. This is correct per spec §2.1 — presence checks bind tighter than comparisons but at the same level as multiplicative arithmetic.
+
+---
+
+## 6. TokenMeta.IsValidAsMemberName
+
+- Property added to `TokenMeta` record with `bool IsValidAsMemberName = false` default
+- Set to `true` on `TokenKind.Min` and `TokenKind.Max` only
+- `Parser.KeywordsValidAsMemberName` derived from `Tokens.All.Where(t => t.IsValidAsMemberName).Select(t => t.Kind).ToFrozenSet()`
+- No hardcoded `{ Min, Max }` array remains — pure catalog derivation
+- Tests: `TokenMetaMemberNameTests` covers true/false/theory cases
+- `SetType` handled correctly: `Text: null`, `TextMateScope: null`, `SemanticTokenType: null` — parser-synthesized token with no tooling metadata. Excluded from `Keywords` FrozenDictionary via explicit `m.Kind != TokenKind.SetType` filter. This prevents the `Text: null` duplicate-text false positive that would otherwise fire.
+
+---
+
+## 7. Parser Split
+
+Three partial files with clean responsibility separation:
+- `Parser.cs` — vocabulary FrozenDictionaries, boundary sets, `Parse()` entry point, `ParseSession` struct definition, token navigation
+- `Parser.Declarations.cs` — construct parsers (state ensure, event ensure, access mode, omit, transition row, outcomes, action statements)
+- `Parser.Expressions.cs` — Pratt expression parser (ParseExpression led loop, ParseAtom nud switch, interpolation parsers, list literal)
+
+No duplication detected. The `HandlesCatalogExhaustively` attribute lives on `ParseSession` in `Parser.cs`; the `HandlesCatalogMember` annotations are distributed across `Parser.Expressions.cs` methods. This is correct — the ref partial struct spans files.
+
+---
+
+## 8. Documentation Accuracy
+
+`docs/language/catalog-system.md` § Exhaustiveness Enforcement Strategies:
+- Correctly describes both strategies (CS8509 vs annotation bridge)
+- Decision rule table is clear and actionable
+- Phase 3 note correctly defers TypeChecker/ProofEngine dispatch decision
+- Consumer table for current CS8509 sites is accurate (`ConstructKind`, `ActionKind`, etc.)
+
+---
+
+## Findings
+
+### Blockers
+
+None.
+
+### Guidance
+
+- **G1:** [`src/Precept.Analyzers/Precept0023OperatorsDUShapeInvariants.cs:30`] The constant `DiagnosticId_MultiLeadCollision = "PRECEPT0023c"` and field name `MultiLeadCollisionRule` use "lead" in their identifiers, but the invariant actually checks the **full token sequence** (not just the lead). Consider renaming to `DiagnosticId_MultiSequenceCollision` / `MultiSequenceCollisionRule` for clarity. The diagnostic message is correct — only the code-level naming is misleading.
+
+- **G2:** [`src/Precept.Analyzers/CatalogAnalysisHelpers.cs:57-62`] `CatalogEnumNames` is missing `ConstraintKind` and `ProofRequirementKind`. Both have `GetMeta` switches in `Precept.Language`. Currently their switches use discard arms (`_ =>`), so PRECEPT0007 would flag them anyway if they were included. When those catalogs drop the discard arm (expected in Phase 3), they should be added to `CatalogEnumNames` to enable PRECEPT0007 coverage. Track this as a Phase 3 prerequisite.
+
+- **G3:** [`src/Precept.Analyzers/Precept0013ActionsCrossRef.cs:136`] Pre-existing RS1030 warning (`Compilation.GetSemanticModel()` inside analyzer). Not introduced on this branch, but should be addressed eventually — Roslyn best practice violation.
+
+### Observations
+
+- **O1:** TypeChecker and GraphAnalyzer currently throw `NotImplementedException` — the `[HandlesCatalogMember]` annotations are forward declarations. This is correct by design (Phase 3 work); PRECEPT0019 validates the annotation set at compile time regardless of implementation status.
+
+- **O2:** The `contains` chaining test (Slice 18) correctly validates `NonAssociativeComparison` diagnostic for `a contains b contains c` via the Pratt loop's non-associativity detection in lines 113-126 of `Parser.Expressions.cs`. Binding power 40 is correct per catalog.
+
+- **O3:** The test count increased from ~2000 (pre-spike) to 2678 — a ~34% test growth proportional to the implementation surface. Healthy ratio.
+
+- **O4:** `ExpressionFormKind` is enumerated 1–11 (no zero slot). This is consistent with the other catalog enums that use `PRECEPT0018SemanticEnumZeroSlot` to enforce meaningful zero absence.
+
+---
+
+## VERDICT: APPROVED — 0 blockers, 3 guidance items
+
+The annotation bridge architecture is sound, catalog-agnostic, and correctly enforced at `DiagnosticSeverity.Error`. The four new analyzers (PRECEPT0020–0023) cover real invariants that would otherwise manifest as startup crashes. Parser fixes are correct and well-tested. The ExpressionFormKind catalog and OperatorMeta DU are structurally complete. Documentation is accurate. The 3 guidance items are naming clarity and forward-looking hygiene — none block merge.
+
+This branch is ready to merge to main.
+
+---
+
+---
+
+# George: G2 + G3 Fix — RS1030 and Phase 3 CatalogEnumNames TODO
+
+**Date:** 2026-05-01
+**Branch:** spike/Precept-V2
+**Commit:** 27f5eff
+**Requested by:** Shane (Frank's architecture review items G2 and G3)
+
+---
+
+## G3 — RS1030: `Compilation.GetSemanticModel()` in PRECEPT0013
+
+### Problem
+
+`PRECEPT0013ActionsCrossRef.CheckEmptyAllowedIn` was acquiring a semantic model via
+`compilation.GetSemanticModel(syntaxNode.SyntaxTree)`. Roslyn best practice RS1030
+says analyzers must use the context-provided semantic model, not acquire one manually
+from the compilation object. The violation was in the field-resolution path: when
+`AllowedIn` referenced a shared static field, the code followed the field's declaring
+syntax and called `compilation.GetSemanticModel()` to get operations for the
+initializer.
+
+The `compilation` object was flowing in from a `RegisterCompilationStartAction` closure
+purely to support this one call.
+
+### Fix
+
+1. Replaced `RegisterCompilationStartAction` wrapper with direct `RegisterOperationAction`
+   on `context` — the only reason for the wrapper was to capture `compilation`.
+2. Removed `Compilation compilation` parameter from `Analyze` and `CheckEmptyAllowedIn`.
+3. In `CheckEmptyAllowedIn`, added a guard:
+   ```csharp
+   if (syntaxNode.SyntaxTree != ctx.SemanticModel.SyntaxTree)
+       return; // Different tree — assume non-empty to avoid false positives.
+   var model = ctx.SemanticModel;
+   ```
+
+### Tradeoff accepted
+
+If a shared `AllowedIn` field is declared in a different file than the `GetMeta` switch,
+the check skips it (assumes non-empty, no diagnostic). In practice, all `ActionKind`
+catalog code lives in a single file (`Actions.cs`), so the guard never fires. The
+alternative — accepting RS1030 for a theoretical multi-file edge case — was rejected.
+
+---
+
+## G2 — Phase 3 TODO: `ConstraintKind` / `ProofRequirementKind` in `CatalogEnumNames`
+
+### Problem
+
+`ConstraintKind` and `ProofRequirementKind` are both catalog enums but are absent from
+`CatalogEnumNames` in `CatalogAnalysisHelpers.cs`. Adding them now would cause
+PRECEPT0007 to fire on the existing discard arms (`_ =>`) in their `GetMeta` switches,
+breaking the build. The prerequisite is that those discard arms be removed first (Phase 3
+work).
+
+### Fix
+
+Added a TODO comment at the `CatalogEnumNames` definition capturing the Phase 3
+prerequisite and citing the review item:
+
+```csharp
+// Phase 3: Add ConstraintKind and ProofRequirementKind once their GetMeta switches
+// drop the discard arm (_ =>). Currently excluded to avoid PRECEPT0007 violations
+// on the existing fallback arms. See frank-full-review-spike-v2.md G2.
+```
+
+### Decision
+
+No runtime or logic change — comment only. When Phase 3 removes the discard arms, the
+enums should be added to `CatalogEnumNames` in the same commit so PRECEPT0007 coverage
+enforcement takes effect immediately.
+
+---
