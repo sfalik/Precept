@@ -49,7 +49,7 @@ All 13 slices shipped on `spike/Precept-V2`. Test baseline: 2107 → 2482 (+375 
 | Slice | Work Item | Description | Status |
 |-------|-----------|-------------|--------|
 | 14 | D | GAP-A: `when`-guard on `ParseStateEnsure`/`ParseEventEnsure` (method bodies only, no AST changes) | ✅ Done |
-| 15 | E | GAP-B: Modifiers after computed (`->`) field expressions (`ParseFieldDeclaration` rewrite) | ⏳ Pending |
+| 15 | E | GAP-B: Modifiers after computed (`->`) field expressions (`ParseFieldDeclaration` rewrite) | ✅ Done |
 | 16 | F | GAP-C: Keyword-as-member-name (`Min`/`Max`) in `MemberAccess` handler | ⏳ Pending |
 | 17 | G2 | `is set` precedence audit: resolve 60 vs spec 40, sync parser and spec | ⏳ Pending |
 | 18 | G3 | `contains` chaining non-associativity test | ⏳ Pending |
@@ -1314,7 +1314,7 @@ on Identifier ensure BoolExpr ["when" BoolExpr] because StringExpr
 
 ---
 
-### Slice 15: Work Item E — GAP-B: Modifiers after Computed (`->`) Expressions ⏳ PENDING
+### Slice 15: Work Item E — GAP-B: Modifiers after Computed (`->`) Expressions ✅ DONE
 
 **Goal:** Fix the 4 broken sample files that use `field Name as Type -> expr modifier` syntax.
 
