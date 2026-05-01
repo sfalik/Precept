@@ -15,8 +15,24 @@
 - Multi-qualifier scalar types should be modeled as immutable collections, not stacked nullable singletons.
 - Parser-facing type properties that reflect durable language truth belong in catalog traits (`TypeTrait.ChoiceElement`), not hand-maintained token lists.
 - A slice is only complete when docs, diagnostics, tests, and samples all still agree on the contract.
+- Record signature changes require a construction-site audit across the ENTIRE file including dead-code exhaustive switch arms — not just the live parse methods. BuildNode's exhaustive switch creates silent obligations whenever a record gains a constructor parameter.
 
 ## Recent Updates
+
+### 2026-05-01 — Parser-gap plan audit and coverage design synchronized
+- Updated `docs/working/parser-gap-fixes-plan.md` to add Slice 13 (`ExpressionFormCoverageTests`), move `LeadTokens` onto `ExpressionFormMeta`, and register `ExpressionFormKind` for PRECEPT0007 coverage in `CatalogAnalysisHelpers`.
+- Locked the annotation bridge into Slice 4: `HandlesFormAttribute` + PRECEPT0019 now ship with the catalog and annotate `Parser`, `TypeChecker`, `Evaluator`, and `GraphAnalyzer`, while Slice 13 remains the parser-routing assertion layer.
+- Remaining plan hygiene items to carry forward: add `src/Precept/Language/Operators.cs` to Slice 3 inventory and fix the dead `frank-expression-form-catalog-placement.md` reference.
+
+
+### 2026-05-01 — Frank's parser-gap plan reviewed (APPROVED WITH CONCERNS)
+- Confirmed all method signatures, line numbers, token IDs, and Pratt loop topology are accurate.
+- Found critical compilation blocker: `BuildNode`'s dead-code arms for `StateEnsure` (line 1553) and `EventEnsure` (line 1576) construct the records directly and will break compilation when GAP-2 adds `PostConditionGuard`. Must update both arms in the same commit as the record changes.
+- Flagged dead code in GAP-7: `left is IdentifierExpression` in the Pratt `LeftParen` handler is unreachable because `ParseAtom()` eagerly consumes `identifier(args)` before the loop runs. Spec-literal but functionally dead.
+- Flagged existing tests (`WSI_Integration_InsuranceClaim`, `WSI_Integration_LoanApplication`) that currently accept diagnostics due to GAP-2/GAP-3 — these must be retrofitted to assert zero diagnostics after fixes land.
+- Minor: `contains` chaining test missing (should emit `NonAssociativeComparison` diagnostic); Slice 11 duplicates `SamplesDir` infrastructure rather than extending existing `ParserTests.cs` section.
+- Rule reinforced: shared record signature changes require a full construction-site audit across the ENTIRE file (including dead-code exhaustive switch arms), not just the live parse methods.
+- Rule reinforced: A slice is only complete when docs, diagnostics, tests, and samples all still agree on the contract.
 
 ### 2026-05-01 — GAP-1/2/3 parser analysis recorded
 - Inbox analysis on `ParseAtom()`, inline `ensure ... when ...`, and multi-token presence operators was merged into `.squad/decisions/decisions.md`.

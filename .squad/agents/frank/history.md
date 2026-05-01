@@ -27,6 +27,13 @@
 
 ## Recent Updates
 
+### 2026-05-01 — Annotation-bridge coverage design recorded
+- Recommended an annotation-bridge pattern for expression-form parser coverage: parser handlers declare ownership with `HandlesFormAttribute` rather than forcing analyzers to decode Pratt control flow.
+- Locked the preferred enforcement stack as PRECEPT0007 for catalog completeness, PRECEPT0019 for handler-claim completeness, and xUnit for end-to-end parser coverage.
+- Chose the class-level PRECEPT0019 marker as parameterless `[HandlesExpressionForms]` in `src/Precept/HandlesExpressionFormsAttribute.cs`, with method-level `[HandlesForm(ExpressionFormKind.X)]` attributes carrying per-form claims.
+- Rejected parser-structure-coupled analysis as the wrong maintenance tradeoff; durable enforcement should consume stable metadata and annotations.
+
+
 ### 2026-05-01 — Parser coverage assertion follow-on locked
 - Decision merged to canonical squad ledgers: parser coverage against `ExpressionFormKind` is worth doing, but as a follow-on slice rather than an expansion of the current parser-gap slice.
 - Durable recommendation: use two-layer enforcement — catalog-side `GetLeadTokens(ExpressionFormKind)` exhaustive switch for CS8509 compile-time pressure plus an xUnit assertion that parser dispatch handles every declared lead token.

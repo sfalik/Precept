@@ -107,6 +107,12 @@ Team cast on 2026-04-04: Frank (Lead), George (Runtime), Kramer (Tooling), Elain
 
 ## Recent Updates
 
+### 2026-05-01T06:21:31Z - Annotation-bridge design batch recorded
+- Ran the hard-gate 7-day archive pass because `decisions.md` exceeded 51200B before merge.
+- Merged 6 inbox files into 2 canonical decision entries, wrote orchestration/session logs for frank-6 / george-2 / george-3, updated Frank and George histories, and cleared the processed inbox files.
+- Health report: `decisions.md` 53785B -> 38562B; no `history.md` crossed the 15 KB summarization threshold after propagation.
+
+
 ### 2026-05-01T06:04:34Z - Parser coverage assertion exploration recorded
 - Ran the hard-gate 7-day decision archive pass (archived 1 active entries) because decisions.md was 518013B before merge.
 - Merged 1 unique Frank inbox record into canonical decisions, cleared 1 inbox file, and wrote the Frank orchestration/session logs for the parser coverage assertion batch.
