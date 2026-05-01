@@ -122,3 +122,16 @@
 ### 2026-04-29 — Parser remediation coverage audit recorded
 - Coverage audit for parser remediation slices R1-R6 is now recorded as approved with 2034/2034 tests passing.
 - Durable regression anchors now include the updated ConstructSlotKind count, the exact StateDeclaration slot-shape fact, and the EventDeclaration initial-marker slot fact.
+
+### 2026-05-01 — 6 coverage gaps from full review implemented (M1–M6)
+
+- Wrote all 6 tests identified in `soup-nazi-full-review-spike-v2.md` and confirmed green: 2432 Precept.Tests + 255 Analyzers.Tests, zero failures.
+- **M1** (`GetMeta_PostfixOperators_HavePostfixArity`): pins `Arity.Postfix` for `IsSet` and `IsNotSet`. Without this, the new enum value has zero arity coverage.
+- **M2** (`IsSet_Tokens_IsIsSet`, `IsNotSet_Tokens_IsIsNotSet`): directly reads the `Tokens` list from the `MultiTokenOp` DU subtype. `ByTokenSequence` tests only probe the FrozenDictionary index; these probe the source shape that the index is built from.
+- **M3** (`ParseExpression_PostfixOperation_IsSet_ReturnsCorrectNodeType`): adds `PostfixOperation` to the exhaustive parse-round-trip Fact in `ExpressionFormCoverageTests.cs`. The form was absent from the coverage table despite being a named `ExpressionFormKind` member.
+- **M4** (`GivenSingleAndMultiTokenOpsWithSameLeadToken_NoPRECEPT0020`): verifies the PRECEPT0020 MultiTokenOp skip invariant. If the `if (creation.Type?.Name != "SingleTokenOp") continue;` guard were removed, this test would catch it. Used the existing `OperatorStubs` + `CloseBrace` pattern.
+- **M5** (`ParseExpression_IsSet_Chained_ParsesAsNestedIsSet`): determined by reading parser source that `x is set is set` loops twice through the `is`-token branch (no non-associativity guard fires for postfix ops) and produces `IsSetExpression(IsSetExpression(x))` — no diagnostic. Test pins that behavior via `ParseExpr` + nested BeOfType assertions.
+- **M6** (`GetMeta_PostfixOperators_Precedence_MatchesSpec`): pins precedence 60 for both `IsSet` and `IsNotSet`. The existing `Precedence_MatchesSpec` Theory covered all 18 `SingleTokenOp` entries but none of the 2 `MultiTokenOp` entries.
+- **Also fixed**: pre-existing build regression in `Precept0013ActionsCrossRef.cs` introduced by commit `27f5eff`. `OperationAnalysisContext` does NOT have `SemanticModel`; the correct property is `ctx.Operation.SemanticModel`. Fixed with a null-guard to handle the nullable return.
+- Learning: `OperationAnalysisContext` and `SyntaxNodeAnalysisContext` have different available properties. `SemanticModel` is on `SyntaxNodeAnalysisContext`; for operation analyzers, use `ctx.Operation.SemanticModel` (which is nullable — always null-guard before use).
+
