@@ -41,9 +41,18 @@
 - Recommended slice order: D (GAP-A) → E (GAP-B) → F (GAP-C) → A+B (DU catalog) → C (severity flip). Do gap fixes first — they are independent of catalog changes and unblock all 7 broken sample files fastest.
 - `OperatorFamily.Presence = 5` should be added alongside `Membership = 4` for `is set`/`is not set` — semantically distinct from collection membership (`contains`). Presence operators test value absence/presence on optional fields; membership operators test element inclusion in collections. The distinction enables clean tmLanguage scoping.
 
-## Recent Updates
+### 2026-05-XX — Phase 2a: Slices 14–18 complete (GAP-A, GAP-B, GAP-C fixes, spec/test coverage)
 
-### 2026-05-01 — Slice 2: EventHandlerNode PostConditionGuard (GAP-2)
+- **Slice 14 (GAP-A):** Added when-guard parsing to `ParseStateEnsure` and `ParseEventEnsure`. After parsing the condition expression, checks for `TokenKind.When` and consumes an optional guard clause before `Expect(TokenKind.Because)`. +4 tests.
+- **Slice 15 (GAP-B):** Replaced slot-based `ParseFieldDeclaration` dispatch with a dedicated method that collects pre-expression AND post-expression modifiers, combining them into `allModifiers`. Removed sum-on-rhs-rule, invoice-line-item, transitive-ordering from KnownBrokenFiles. +4 tests.
+- **Slice 16 (GAP-C):** Added `KeywordsValidAsMemberName: FrozenSet<TokenKind>` `{Min, Max}` on `Parser`. Added `ExpectIdentifierOrKeywordAsMemberName()` helper to `ParseSession`. Replaced `Expect(TokenKind.Identifier)` in Dot handler with the new helper. Added `TokenKind.Min`/`Max` cases in `ParseAtom()` for function-call position (`min(a, b)`). KnownBrokenFiles → 0; all 28 sample files parse with zero errors. +4 tests.
+- **Slice 17 (spec audit):** Updated `precept-language-spec.md` §2.1 precedence table: `is set`/`is not set` from 40 → 60 (parser was correct; spec was wrong). Added spec-reference comments in `Parser.cs` `Is` handler and `LeftParen` handler.
+- **Slice 18 (test):** Added `ParseExpression_Contains_ChainedNonAssociative` to `ExpressionParserTests.cs`. Verifies that `tags contains "a" contains "b"` emits `NonAssociativeComparison`. +1 test.
+- **Baseline → final:** 2247 → 2261 tests (+14 net across all 5 slices).
+- **Cross-gap contamination lesson:** insurance-claim and loan-application had BOTH GAP-A AND GAP-C. travel-reimbursement had BOTH GAP-B AND GAP-C (min() in function-call position, not just .min in member-access position). The plan underestimated cross-gap contamination in sample files. Always verify KnownBrokenFiles against ACTUAL errors after each fix, not just against the expected gap category.
+- **min/max function-call fix needed:** Plan only described `ExpectIdentifierOrKeywordAsMemberName()` for dot-access. But `min(...)` requires a separate fix in `ParseAtom()` — adding `TokenKind.Min`/`Max` cases that mirror the `Identifier` case. The plan spec was incomplete; implementation surfaced the gap.
+
+
 - Added `Expression? PostConditionGuard` to `EventHandlerNode` record in `src/Precept/Pipeline/SyntaxNodes/EventHandlerNode.cs`.
 - Extended `ParseEventHandlerWithGuardCheck` in `Parser.cs`: after the action-loop exits, checks for `TokenKind.Ensure`, advances past it, calls `ParseExpression(0)` for the guard, passes it to the `EventHandlerNode` constructor. `Ensure` was already in `StructuralBoundaryTokens`, so expression parsing inside actions correctly stops at `ensure` — no boundary set change needed.
 - Fixed `BuildNode` `EventHandler` arm to pass `null` as 4th argument (PostConditionGuard) — this was the Risk #1 compilation blocker.
