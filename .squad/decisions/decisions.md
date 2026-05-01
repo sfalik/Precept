@@ -8769,3 +8769,92 @@ and related) was **2247 total: 2240 passing + 7 intentional KnownBrokenFiles fai
 Phase 2a corrected those 7 → 2261 passing, 0 failing.
 Phase 2b added 13 new tests (8 in OperatorsTests, 3 in ExpressionFormCatalogTests, 2 theory
 case additions) → **2274 passing, 0 failing**.
+
+# Decision Note — Phase 2c Complete (Slices 23–26)
+
+**Date:** 2026-05-01  
+**Author:** George  
+**Branch:** spike/Precept-V2
+
+---
+
+## What Shipped
+
+Phase 2c closes the PRECEPT0019 promotion work. All four slices landed in a single pass with no deferred items.
+
+### Slice 23 — TypeChecker [HandlesForm] coverage
+- `TypeChecker.cs` received `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]` on the class.
+- `private static void CheckExpression(Expression expression)` stub added with all 11 `[HandlesForm]` annotations.
+- Both `TypeChecker` and `GraphAnalyzer` are `public static class` — stubs are `private static`, not instance methods.
+
+### Slice 24 — GraphAnalyzer [HandlesForm] coverage
+- `GraphAnalyzer.cs` received the same class attribute.
+- `private static void AnalyzeExpression(Expression expression)` stub with all 11 `[HandlesForm]` annotations.
+
+### Slice 25 — ExpressionFormCoverageTests Layer 2
+- New file: `test/Precept.Tests/Language/ExpressionFormCoverageTests.cs` (namespace `Precept.Tests.Language`).
+- 26 tests: count assertion, per-kind GetMeta + HoverDocs theories (11 each), IsLeftDenotation correctness for led/nud forms, LeadTokens contract.
+- Existing `test/Precept.Tests/ExpressionFormCoverageTests.cs` (Layer 3 reflection+round-trip) updated: `ContainSingle` → `HaveCount(3)`, added `BindingFlags.Static` to method search, changed from `First()` to iterating all annotated types.
+
+### Slice 26 — PRECEPT0019 promoted to Error
+- `defaultSeverity` flipped from `DiagnosticSeverity.Warning` to `DiagnosticSeverity.Error`.
+- `<WarningsNotAsErrors>PRECEPT0019</WarningsNotAsErrors>` and its comment removed from `Precept.csproj`.
+- `Precept0019Tests.cs` TP1+TP2 severity assertions updated to `DiagnosticSeverity.Error`.
+- Pre-condition (zero PRECEPT0019 warnings before flip) verified explicitly.
+
+---
+
+## Key Design Decisions
+
+**Static class stubs require `BindingFlags.Static`** — The PRECEPT0019 analyzer uses Roslyn's symbol model (not reflection) and finds static methods fine. The xUnit reflection test in `ExpressionFormCoverageTests` however used `BindingFlags.Instance` only, which would silently miss static-class annotations. Fixed.
+
+**Three-type annotation contract** — `ParseSession`, `TypeChecker`, and `GraphAnalyzer` each carry `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]`. The reflection test now asserts `HaveCount(3)`. When Phase 3 adds more pipeline stages they must update this count.
+
+**Layer split preserved** — `test/Precept.Tests/ExpressionFormCoverageTests.cs` = Layer 3 (reflection bridge + parse round-trips). `test/Precept.Tests/Language/ExpressionFormCoverageTests.cs` = Layer 2 (catalog shape, per-kind metadata). `test/Precept.Tests/ExpressionFormCatalogTests.cs` = Layer 1 (enum + GetMeta). All three coexist in different namespaces.
+
+---
+
+## Exit State
+
+- Build: 0 errors, 0 warnings (pre-existing RS1030 in `Precept.Analyzers.csproj` is unrelated)
+- Tests: 2300 passing, 0 failing (+26 vs Phase 2b baseline of 2274)
+- PRECEPT0019 severity: `DiagnosticSeverity.Error`
+- `<WarningsNotAsErrors>`: removed
+
+# Decision Note: Phase 2d Complete — Parser.cs Structural Split
+
+**Date:** 2026-05-01  
+**Author:** George (Runtime Developer)  
+**Branch:** spike/Precept-V2  
+**Slice:** 27 (Work Item S1)
+
+---
+
+## What was done
+
+Sliced `src/Precept/Pipeline/Parser.cs` (~1757 lines) into three `partial` files:
+
+| File | Lines | Contents |
+|------|-------|----------|
+| `Parser.cs` | ~504 | Core shell: outer `Parser` static class statics (vocabulary FrozenSets/FrozenDictionaries), `Parse()` entry point, `BuildNode()`, and `ParseSession` primary declaration with constructor, token navigation, dispatch loop, and `IsOutcomeAhead`/`SyncToNextDeclaration` |
+| `Parser.Declarations.cs` | ~1012 | All declaration-level and scope-level parsers: in/to/from/on-scoped constructs, action helpers, non-disambiguated parsers, slot system, type reference parsing, choice helpers, field modifier parsing, `GetLastSlotSpan` |
+| `Parser.Expressions.cs` | ~330 | Pratt loop (`ParseExpression`), atom dispatcher (`ParseAtom`), interpolated string/typed-constant parsers, list literal parser, and `ExpectIdentifierOrKeywordAsMemberName` |
+
+## Key structural rules applied
+
+- `public static partial class Parser` and `internal ref partial struct ParseSession` declared in all three files.
+- `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]` present exactly once — on the primary `ParseSession` declaration in `Parser.cs`.
+- `[HandlesForm(...)]` attributes moved with their methods (`ParseExpression` and `ParseAtom` to `Parser.Expressions.cs`).
+- `KeywordsValidAsMemberName` is a static field on the outer `Parser` class (confirmed correct — `ref struct` cannot have static fields).
+- `ExpectIdentifierOrKeywordAsMemberName()` moved to `Parser.Expressions.cs` (alongside its only caller, the `Dot` handler in `ParseExpression`).
+- `BuildNode` stays in `Parser.cs` as a `static` method on the outer `Parser` class.
+
+## Verification
+
+- Build: `dotnet build src/Precept/ -v q` — 0 errors, 0 warnings.
+- Tests: `dotnet test test/Precept.Tests/ --no-build` — 2300 passing, 0 failing.
+- `git diff --stat` shows exactly 3 parser files: `Parser.cs` modified, `Parser.Declarations.cs` added, `Parser.Expressions.cs` added.
+
+## Phase 2d status
+
+Phase 2d (Slice 27) is the only slice in this phase. Phase 2d is now complete.
