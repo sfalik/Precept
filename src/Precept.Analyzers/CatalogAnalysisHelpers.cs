@@ -58,7 +58,7 @@ internal static class CatalogAnalysisHelpers
     {
         "TypeKind", "TokenKind", "OperatorKind", "OperationKind",
         "ModifierKind", "FunctionKind", "ActionKind", "ConstructKind",
-        "DiagnosticCode", "FaultCode",
+        "DiagnosticCode", "FaultCode", "ExpressionFormKind",
     };
 
     /// <summary>

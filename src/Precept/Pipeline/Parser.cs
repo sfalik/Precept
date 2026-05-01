@@ -148,6 +148,7 @@ public static class Parser
     //  ParseSession — mutable cursor state for a single parse pass
     // ════════════════════════════════════════════════════════════════════════════
 
+    [Precept.HandlesCatalogExhaustively(typeof(ExpressionFormKind))]
     internal ref struct ParseSession
     {
         private readonly ImmutableArray<Token> _tokens;
@@ -1320,6 +1321,8 @@ public static class Parser
 
         // ── Expression parser (Pratt) ─────────────────────────────────────────
 
+        [HandlesForm(ExpressionFormKind.MemberAccess)]
+        [HandlesForm(ExpressionFormKind.BinaryOperation)]
         internal Expression ParseExpression(int minPrecedence)
         {
             var left = ParseAtom();
@@ -1395,6 +1398,12 @@ public static class Parser
             return left;
         }
 
+        [HandlesForm(ExpressionFormKind.Literal)]
+        [HandlesForm(ExpressionFormKind.Identifier)]
+        [HandlesForm(ExpressionFormKind.Grouped)]
+        [HandlesForm(ExpressionFormKind.UnaryOperation)]
+        [HandlesForm(ExpressionFormKind.Conditional)]
+        [HandlesForm(ExpressionFormKind.FunctionCall)]
         private Expression ParseAtom()
         {
             var current = Current();

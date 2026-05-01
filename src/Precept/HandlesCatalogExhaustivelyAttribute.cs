@@ -16,7 +16,7 @@ namespace Precept;
 /// public sealed class Parser { ... }
 /// </code>
 /// </example>
-[AttributeUsage(AttributeTargets.Class, Inherited = false, AllowMultiple = true)]
+[AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct, Inherited = false, AllowMultiple = true)]
 public sealed class HandlesCatalogExhaustivelyAttribute : Attribute
 {
     public HandlesCatalogExhaustivelyAttribute(Type catalogEnum) => CatalogEnum = catalogEnum;

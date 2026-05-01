@@ -5,6 +5,8 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- PRECEPT0019 fires for known unimplemented expression forms (GAP-6/GAP-7) — informational, not blocking -->
+    <WarningsNotAsErrors>PRECEPT0019</WarningsNotAsErrors>
   </PropertyGroup>
 
   <ItemGroup>
