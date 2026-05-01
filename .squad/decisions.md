@@ -12,6 +12,20 @@
 
 ---
 
+### 2026-05-01T20:06:10Z: Catalog-member annotation rename locked; no exhaustiveness gaps found
+
+**By:** Scribe
+
+**Status:** Merged, deduplicated, inbox cleared (1 file)
+
+**Merged sources:** `frank-handlesform-rename`.
+
+- Frank-10's rename is now canonical squad state: use `[HandlesCatalogMember]` for per-member claims alongside `[HandlesCatalogExhaustively(typeof(T))]`; legacy `[HandlesForm]` wording is retained only as historical rename context.
+- Historical ledger wording was updated inline so earlier Slice 4, Slice 27, and annotation-bridge records stay readable after the rename without implying the old attribute still exists.
+- Frank-9's full sweep of catalog enum types found no currently-unannotated distributed-dispatch gaps: existing consumers already line up with the correct enforcement mode, with CS8509 retained for centralized switches and `[HandlesCatalogExhaustively]` reserved for real distributed handlers.
+
+---
+
 ### 2026-05-01T19:50:46Z: Phase 2 acceptance gate fully closed
 
 **By:** Scribe
@@ -50,7 +64,7 @@
 
 - `partial class Parser` + `partial ref struct ParseSession` is the approved zero-behavior-change split mechanism; `ParseSession` being a `ref struct` rules out helper-class alternatives because they would force `ref` threading through 60+ methods.
 - The structural seam is locked as three files: `Parser.cs` for shell/vocabulary/dispatch, `Parser.Declarations.cs` for declaration grammar and slot/type machinery, and `Parser.Expressions.cs` for the Pratt loop, atom parsers, and expression helpers.
-- Attribute placement is part of the contract: `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]` stays only on the primary `ParseSession` declaration, `[HandlesForm(...)]` moves with the methods in `Parser.Expressions.cs`, and static vocabulary remains on the outer `Parser` class.
+- Attribute placement is part of the contract: `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]` stays only on the primary `ParseSession` declaration, `[HandlesCatalogMember(...)]` (renamed from `[HandlesForm(...)]`) moves with the methods in `Parser.Expressions.cs`, and static vocabulary remains on the outer `Parser` class.
 - Durable implementation caveat for Slice 27 and Slice 16: `ref struct` types cannot own static fields, so `KeywordsValidAsMemberName` belongs on `Parser`, while `ExpectIdentifierOrKeywordAsMemberName()` stays on `ParseSession` beside the `Dot` handler.
 
 ---
@@ -64,9 +78,9 @@
 **Merged sources:** `copilot-directive-record-problems`, `frank-plan-review`, `george-plan-b1b4-fixes`.
 
 - Shane's directive is now durable: when implementation uncovers problems, agents must write them into the working plan or decisions inbox instead of leaving them only in ephemeral output.
-- Frank blocked Slice 4 on four exact plan defects: two existing attribute files incorrectly marked `Create`, the wrong analyzer filename/status, and a stale `HandlesFormAttribute.Value` snippet that did not match the real API.
-- George corrected `docs/working/parser-gap-fixes-plan.md` so `HandlesCatalogExhaustivelyAttribute.cs`, `HandlesFormAttribute.cs`, and `Precept0019PipelineCoverageExhaustiveness.cs` are treated as existing files, and the code sample now uses `.Kind`.
-- This record supersedes earlier stale ledger wording: the canonical annotation bridge remains generic `[HandlesCatalogExhaustively(typeof(T))]` + `[HandlesForm(kind)]`, not a parameterless `HandlesExpressionForms` marker.
+- Frank blocked Slice 4 on four exact plan defects: two existing attribute files incorrectly marked `Create`, the wrong analyzer filename/status, and a stale `HandlesCatalogMemberAttribute.Kind` snippet (then named `HandlesFormAttribute.Value`) that did not match the real API.
+- George corrected `docs/working/parser-gap-fixes-plan.md` so `HandlesCatalogExhaustivelyAttribute.cs`, `HandlesCatalogMemberAttribute.cs` (renamed from `HandlesFormAttribute.cs`), and `Precept0019PipelineCoverageExhaustiveness.cs` are treated as existing files, and the code sample now uses `.Kind`.
+- This record supersedes earlier stale ledger wording: the canonical annotation bridge remains generic `[HandlesCatalogExhaustively(typeof(T))]` + `[HandlesCatalogMember(kind)]` (renamed from `[HandlesForm(kind)]`), not a parameterless `HandlesExpressionForms` marker.
 
 ---
 
@@ -109,9 +123,9 @@
 
 **Merged sources:** `frank-annotation-bridge`, `george-annotation-bridge-plan`, `frank-class-marker`.
 
-- Frank designed an annotation-bridge pattern for expression-form coverage: parser handlers advertise their responsibility with `HandlesFormAttribute` instead of forcing an analyzer to reverse-engineer Pratt control flow.
-- George's plan update locks that annotation bridge into Slice 4 rather than a follow-on: `HandlesFormAttribute` lives beside `ExpressionForms`, PRECEPT0019 checks handler coverage across `Parser`, `TypeChecker`, `Evaluator`, and `GraphAnalyzer`, and Slice 13 stays the parser-routing assertion layer.
-- Frank also locked the class-level opt-in marker for PRECEPT0019: use parameterless `[HandlesExpressionForms]` on pipeline classes from `src/Precept/HandlesExpressionFormsAttribute.cs`, while `[HandlesForm(ExpressionFormKind.X)]` stays on methods to claim specific form coverage.
+- Frank designed an annotation-bridge pattern for expression-form coverage: parser handlers advertise their responsibility with `HandlesCatalogMemberAttribute` (renamed from `HandlesFormAttribute`) instead of forcing an analyzer to reverse-engineer Pratt control flow.
+- George's plan update locks that annotation bridge into Slice 4 rather than a follow-on: `HandlesCatalogMemberAttribute` (renamed from `HandlesFormAttribute`) lives beside `ExpressionForms`, PRECEPT0019 checks handler coverage across `Parser`, `TypeChecker`, `Evaluator`, and `GraphAnalyzer`, and Slice 13 stays the parser-routing assertion layer.
+- Frank also locked the class-level opt-in marker for PRECEPT0019: use parameterless `[HandlesExpressionForms]` on pipeline classes from `src/Precept/HandlesExpressionFormsAttribute.cs`, while `[HandlesCatalogMember(ExpressionFormKind.X)]` (renamed from `[HandlesForm(ExpressionFormKind.X)]`) stays on methods to claim specific form coverage.
 - Recommended enforcement is now three-layered: PRECEPT0007 keeps `ExpressionFormKind` exhaustiveness on catalog metadata, PRECEPT0019 checks that every form is claimed by handler annotations, and xUnit coverage tests verify end-to-end parser behavior.
 - The durable design rule is to analyze stable metadata and attributes rather than parser implementation internals, so coverage enforcement survives refactors to switches, dictionaries, or helper methods.
 

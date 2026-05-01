@@ -22,7 +22,13 @@
 
 
 
+- Mechanical rename convention: when annotation semantics are catalog-agnostic, prefer universal naming (`[HandlesCatalogMember]`) over domain-specific aliases (`[HandlesForm]`) so analyzer contracts stay symmetric with `[HandlesCatalogExhaustively]`.
+
 ## Recent Updates
+
+### 2026-05-01 — Annotation rename propagated to implementation context
+- Scribe recorded the attribute rename closeout: future parser/type-checker/analyzer work should use `[HandlesCatalogMember]` rather than the retired `[HandlesForm]` name.
+- Frank-9's sweep found no additional catalog-enum dispatchers that currently need exhaustiveness annotations, so implementation follow-ons stay limited to new distributed handlers introduced by future commits.
 
 ### 2026-05-01 — Scribe closeout: gate fully closed
 - `.squad/decisions/inbox/george-phase2-gate-closed.md` was merged into `decisions.md`, orchestration/session closeout logs were written, and George's Phase 2 acceptance gate is now durably closed across the squad record.
@@ -77,3 +83,4 @@
 ### 2026-05-01 — Parser-gap branch state summarized
 - Branch work through Slice 13 is durably recorded: typed constants, event-handler ensure guards, presence-operator Pratt support, expression-form catalog/coverage, list literals, method calls, spec fixups, and the regression suites from Slices 8–13 are all in place.
 - Remaining known-broken sample sentinels still point at three separate gaps: state/event ensure `when` guards, post-expression field modifiers, and keyword member names (`.min` / `.max`).
+

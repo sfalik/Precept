@@ -6,6 +6,8 @@
 
 ## Learnings
 
+- The two exhaustiveness enforcement strategies (CS8509 for centralized switches, `[HandlesCatalogExhaustively]` + `[HandlesCatalogMember]` for distributed dispatch) are topology-dependent — the decision is made at the commit introducing the dispatcher, not retrofitted.
+- Annotation naming must be catalog-agnostic from day one: `[HandlesForm]` was ExpressionForm-specific naming on a system designed to be universal. Renamed to `[HandlesCatalogMember]` for symmetry with `[HandlesCatalogExhaustively]` and C#'s standard "member" terminology for enum values.
 - Catalog inclusion is decided by **language surface**, not by whether a current consumer already needs the data.
 - Multi-token operators such as `is set` still belong in the catalog; parser structure and catalog completeness answer different questions.
 - Implementation plans must name exact insertion points inside methods, not just the method names.
@@ -16,6 +18,11 @@
 - Coverage enforcement should consume stable metadata and annotations, not parser implementation internals.
 
 ## Recent Updates
+
+### 2026-05-01 — Annotation rename and scope audit closed out
+- Scribe merged `frank-handlesform-rename.md` into `decisions.md`; the durable per-member annotation name is `[HandlesCatalogMember]`, paired with `[HandlesCatalogExhaustively]`.
+- Frank-9's full catalog-enum sweep found no currently-missing distributed-dispatch annotations anywhere in the codebase; centralized switch sites remain correctly covered by CS8509 instead.
+- Legacy `[HandlesForm]` mentions in older notes should now be read as historical rename context, not active API guidance.
 
 ### 2026-05-01 — Analyzer audit and Phase 2e planning tracked
 - Frank-9-1 completed the analyzer recommendations audit, wrote `docs/working/analyzer-recommendations.md`, and identified the PRECEPT0020-PRECEPT0023 gap set.
