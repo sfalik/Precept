@@ -63,8 +63,8 @@ internal static class CatalogAnalysisHelpers
         "ModifierKind", "FunctionKind", "ActionKind", "ConstructKind",
         "DiagnosticCode", "FaultCode", "ExpressionFormKind",
         // TODO Phase 3: uncomment once GetMeta switches drop the discard arm (_ =>)
-        // "ConstraintKind",
-        // "ProofRequirementKind",
+        // TODO: "ConstraintKind",
+        // TODO: "ProofRequirementKind",
     };
 
     /// <summary>
