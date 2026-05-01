@@ -540,6 +540,48 @@ public class ParserTests
         node.Actions.Should().HaveCount(2);
     }
 
+    // ── Slice 2 (GAP-2): EventHandler post-condition guard ────────────────
+
+    [Fact]
+    public void Parse_EventWithEnsureGuard()
+    {
+        var tree = Parse("""on Submit -> set status = "done" ensure status == "done" """);
+        tree.Diagnostics.Should().BeEmpty();
+        var node = tree.Declarations[0].Should().BeOfType<EventHandlerNode>().Subject;
+        node.EventName.Text.Should().Be("Submit");
+        node.Actions.Should().HaveCount(1);
+        node.PostConditionGuard.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void Parse_EventWithEnsureGuard_ComplexExpr()
+    {
+        var tree = Parse("on Approve -> set approved = true ensure approved == true and amount > 0");
+        tree.Diagnostics.Should().BeEmpty();
+        var node = tree.Declarations[0].Should().BeOfType<EventHandlerNode>().Subject;
+        node.PostConditionGuard.Should().NotBeNull();
+        node.PostConditionGuard.Should().BeOfType<BinaryExpression>();
+    }
+
+    [Fact]
+    public void Parse_EventWithoutEnsureGuard()
+    {
+        var tree = Parse("on UpdateName -> set name = newName");
+        tree.Diagnostics.Should().BeEmpty();
+        var node = tree.Declarations[0].Should().BeOfType<EventHandlerNode>().Subject;
+        node.PostConditionGuard.Should().BeNull();
+    }
+
+    [Fact]
+    public void Parse_EventWithEnsureGuard_AndActions()
+    {
+        var tree = Parse("on Submit -> set status = done -> set processed = true ensure status == done");
+        tree.Diagnostics.Should().BeEmpty();
+        var node = tree.Declarations[0].Should().BeOfType<EventHandlerNode>().Subject;
+        node.Actions.Should().HaveCount(2);
+        node.PostConditionGuard.Should().NotBeNull();
+    }
+
     // ════════════════════════════════════════════════════════════════════════
     //  PR 5 — From-Scoped Constructs, TransitionRow, Outcomes, Error Sync
     // ════════════════════════════════════════════════════════════════════════

@@ -816,9 +816,10 @@ on Identifier ensure BoolExpr ("when" BoolExpr)? because StringExpr
 ```
 on Identifier
 ("->" ActionStatement)*
+("ensure" BoolExpr)?
 ```
 
-Event hooks without a `when`/`ensure` continuation are parsed as stateless event hooks with an arrow-prefixed action chain.
+Event hooks without a `when`/`ensure` continuation are parsed as stateless event hooks with an arrow-prefixed action chain. The optional `ensure` clause at the end of the action chain declares a post-condition guard — a boolean expression that must hold after all mutations in the handler are applied.
 
 #### State action
 

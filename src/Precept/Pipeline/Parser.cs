@@ -574,10 +574,17 @@ public static class Parser
                 actions.Add(ParseActionStatement());
             }
 
-            var lastSpan = actions[^1].Span;
+            Expression? postConditionGuard = null;
+            if (Current().Kind == TokenKind.Ensure)
+            {
+                Advance(); // consume 'ensure'
+                postConditionGuard = ParseExpression(0);
+            }
+
+            var lastSpan = postConditionGuard?.Span ?? actions[^1].Span;
             return new EventHandlerNode(
                 SourceSpan.Covering(start, lastSpan),
-                eventName, actions.ToImmutable());
+                eventName, actions.ToImmutable(), postConditionGuard);
         }
 
         // ── Shared parsing helpers for disambiguated constructs ───────────────
@@ -1698,7 +1705,8 @@ public static class Parser
 
         ConstructKind.EventHandler => new EventHandlerNode(span,
             ((SyntaxNode)slots[0]!).AsToken(),
-            slots[1]?.AsStatements() ?? []),
+            slots[1]?.AsStatements() ?? [],
+            null), // PostConditionGuard — always null in slot-based path (dead code)
     };
 #pragma warning restore CS8524
 }
