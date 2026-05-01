@@ -33,6 +33,7 @@ public static class Parser
     /// </summary>
     internal static readonly FrozenDictionary<TokenKind, (int Precedence, bool RightAssociative)> OperatorPrecedence =
         Operators.All
+            .OfType<SingleTokenOp>()
             .Where(op => op.Arity == Arity.Binary)
             .ToFrozenDictionary(
                 op => op.Token.Kind,

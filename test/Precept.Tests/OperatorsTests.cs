@@ -60,14 +60,15 @@ public class OperatorsTests
     [InlineData(OperatorKind.Contains, "contains")]
     public void GetMeta_TokenTextMatchesSymbol(OperatorKind kind, string expectedText)
     {
-        Operators.GetMeta(kind).Token.Text.Should().Be(expectedText);
+        var meta = (SingleTokenOp)Operators.GetMeta(kind);
+        meta.Token.Text.Should().Be(expectedText);
     }
 
     [Fact]
     public void GetMeta_MinusAndNegate_ShareSameToken()
     {
-        var minus = Operators.GetMeta(OperatorKind.Minus);
-        var negate = Operators.GetMeta(OperatorKind.Negate);
+        var minus  = (SingleTokenOp)Operators.GetMeta(OperatorKind.Minus);
+        var negate = (SingleTokenOp)Operators.GetMeta(OperatorKind.Negate);
 
         minus.Token.Kind.Should().Be(negate.Token.Kind);
         minus.Arity.Should().Be(Arity.Binary);
@@ -228,9 +229,8 @@ public class OperatorsTests
     [Fact]
     public void ByToken_CountMatchesAll()
     {
-        // All has 18 entries. ByToken has 18 entries too — Minus and Negate
-        // share TokenKind.Minus but differ on Arity, so both have unique keys.
-        Operators.ByToken.Count.Should().Be(Operators.All.Count);
+        // ByToken only contains SingleTokenOp entries (18); MultiTokenOp entries use ByTokenSequence.
+        Operators.ByToken.Count.Should().Be(Operators.All.OfType<SingleTokenOp>().Count());
     }
 
     [Fact]
@@ -253,7 +253,7 @@ public class OperatorsTests
     [Fact]
     public void ByToken_RoundTrip_AllEntriesRetrievable()
     {
-        foreach (var meta in Operators.All)
+        foreach (var meta in Operators.All.OfType<SingleTokenOp>())
         {
             Operators.ByToken.TryGetValue((meta.Token.Kind, meta.Arity), out var found)
                 .Should().BeTrue($"{meta.Kind} should be in ByToken");
@@ -283,5 +283,57 @@ public class OperatorsTests
         var arrowInUnary  = Operators.ByToken.ContainsKey((TokenKind.Arrow, Arity.Unary));
         arrowInBinary.Should().BeFalse("Arrow '->' is not a binary expression operator");
         arrowInUnary.Should().BeFalse("Arrow '->' is not a unary expression operator");
+    }
+
+    // ── DU shape: MultiTokenOp ──────────────────────────────────────────────────
+
+    [Fact]
+    public void Operators_All_CountIs20()
+    {
+        Operators.All.Should().HaveCount(20);
+    }
+
+    [Fact]
+    public void Operators_SingleTokenOp_CountIs18()
+    {
+        Operators.All.OfType<SingleTokenOp>().Should().HaveCount(18);
+    }
+
+    [Fact]
+    public void Operators_MultiTokenOp_CountIs2()
+    {
+        Operators.All.OfType<MultiTokenOp>().Should().HaveCount(2);
+    }
+
+    [Fact]
+    public void OperatorMeta_IsSet_IsMultiTokenOp()
+    {
+        Operators.GetMeta(OperatorKind.IsSet).Should().BeOfType<MultiTokenOp>();
+    }
+
+    [Fact]
+    public void OperatorMeta_IsNotSet_IsMultiTokenOp()
+    {
+        Operators.GetMeta(OperatorKind.IsNotSet).Should().BeOfType<MultiTokenOp>();
+    }
+
+    [Fact]
+    public void ByTokenSequence_IsSet_Resolves()
+    {
+        Operators.ByTokenSequence(TokenKind.Is, TokenKind.Set)?.Kind
+            .Should().Be(OperatorKind.IsSet);
+    }
+
+    [Fact]
+    public void ByTokenSequence_IsNotSet_Resolves()
+    {
+        Operators.ByTokenSequence(TokenKind.Is, TokenKind.Not, TokenKind.Set)?.Kind
+            .Should().Be(OperatorKind.IsNotSet);
+    }
+
+    [Fact]
+    public void ByTokenSequence_Unknown_ReturnsNull()
+    {
+        Operators.ByTokenSequence(TokenKind.Is, TokenKind.And).Should().BeNull();
     }
 }

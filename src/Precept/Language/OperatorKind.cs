@@ -33,4 +33,8 @@ public enum OperatorKind
 
     // ── Arithmetic (unary) ─────────────────────────────────────────
     Negate                    = 18,
+
+    // ── Presence (postfix) ─────────────────────────────────────────
+    IsSet                     = 19,
+    IsNotSet                  = 20,
 }
