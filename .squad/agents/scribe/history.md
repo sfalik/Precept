@@ -107,6 +107,11 @@ Team cast on 2026-04-04: Frank (Lead), George (Runtime), Kramer (Tooling), Elain
 
 ## Recent Updates
 
+### 2026-05-01T06:04:34Z - Parser coverage assertion exploration recorded
+- Ran the hard-gate 7-day decision archive pass (archived 1 active entries) because decisions.md was 518013B before merge.
+- Merged 1 unique Frank inbox record into canonical decisions, cleared 1 inbox file, and wrote the Frank orchestration/session logs for the parser coverage assertion batch.
+- Health report: decisions.md 518013B -> 535361B; no history.md crossed the 15 KB summarization threshold after propagation.
+
 ### 2026-04-29T05:00:52Z - Collection iteration/rules research recorded
 - Wrote orchestration logs for frank-6 and frank-7 plus the session log for the paired collection research batch.
 - Archived 0 decision entries older than 7 days, merged 2 inbox records into canonical `decisions.md` entries, and cleared the processed inbox files.

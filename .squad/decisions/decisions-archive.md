@@ -1,3 +1,85 @@
+# Technical Review: Elaine's `lookup`/`queue` Surface Proposals
+
+**By:** Frank  
+**Date:** 2025-07-17  
+**Status:** Recommendations delivered — pending owner sign-off
+
+---
+
+## Proposal 1 — Replace `containskey` with `contains`
+
+**Verdict: APPROVED.**
+
+No grammar ambiguity. `contains` is an infix expression operator at precedence 40 (spec §2.1). It parses as `ContainsExpression(left, ParseExpression(40))`. The left operand is resolved to a field type by the type checker, not the parser. Extending the type checker's `contains` validation table from `{set, queue, stack}` to `{set, queue, stack, lookup}` is a pure type-checker change. The parser sees `Expr contains Expr` regardless of whether the left side is a set or a lookup.
+
+If someone passes a `V`-typed expression to `F contains Expr` on a `lookup of K to V`, the type checker fires `TypeMismatch` — the expected type is `K`, the actual type is `V`. The diagnostic message should say "contains on lookup tests key membership; expected type K, got V." This is clean — no new diagnostic code needed, just a message template specialization.
+
+The `-key` suffix is purely cosmetic disambiguation. No parser production, no proof obligation, no evaluator branch depends on the distinction between `contains` and `containskey`. The type checker already knows the collection kind from the field's declared type. The suffix duplicates information the type system already has.
+
+---
+
+## Proposal 2 — Replace `removekey` with `remove`
+
+**Verdict: APPROVED.**
+
+Parser: no changes required. The `ActionStatement` grammar is already `remove Identifier Expr`. The parser emits the same AST node regardless of whether the field is `set of T` or `lookup of K to V`. Type checker resolves the field type and validates that the expression matches `T` (for set) or `K` (for lookup). This is a type-checker-only extension.
+
+Proof obligation: confirmed identical to `set`. `remove` on `set` is no-op-if-absent — no guard required, no emptiness proof needed. `removekey` on `lookup` has the same semantics (spec: "removekey requires no guard — no-op if absent, like remove on set"). Unifying the keyword preserves this guarantee. No new proof obligation category.
+
+The `-key` suffix is not load-bearing anywhere. No pipeline stage, no evaluator branch, no proof rule depends on it. It exists only because the original `collection-types.md` design mirrored .NET's `Dictionary.ContainsKey`/`Dictionary.Remove` API naming. That's API naming leaking into a DSL surface — exactly what Precept's language design is supposed to prevent.
+
+---
+
+## Proposal 3 — Use `by` at the dequeue-capture site
+
+**Verdict: APPROVED WITH MODIFICATION.**
+
+### Analysis of filter-condition ambiguity
+
+The concern I raised previously: `dequeue ClaimQueue into CurrentClaim by CurrentSeverity` could be misread as "dequeue the item BY this severity" (a filter/selection condition) rather than "dequeue and capture the severity INTO this field."
+
+Is this a real parsing ambiguity? **No.** The parser grammar for dequeue is:
+
+```
+dequeue Identifier (into Identifier (by Identifier)?)?
+```
+
+There is no conditional-dequeue production. The parser has no `by` + expression continuation that would create a grammatical fork. The `by` keyword in this position is unambiguously a capture binding — the parser cannot misparse it.
+
+Is it a reader-misparse risk? **Mildly.** A business author encountering `dequeue F into X by Y` for the first time might momentarily wonder whether `by Y` means "select by Y" or "capture Y." But this is a first-encounter learning cost, not an ongoing ambiguity. Once learned, the pattern is stable.
+
+### Weighing the arguments
+
+**Elaine's consistency argument** (spec Principle 5 — keyword-anchored readability): The `by` keyword appears at declaration (`queue of T by P`), at enqueue (`enqueue F Expr by Priority`), and now at dequeue (`dequeue F into X by Y`). The same keyword, the same role (introducing the priority axis), in all three action contexts. An author who writes `enqueue F X by P` one line above will instinctively reach for `by` at dequeue. Encountering `priority` there is a vocabulary seam — two words for one concept within the same type.
+
+**My filter-reading concern**: Theoretical. No grammar production creates ambiguity. No current or planned Precept feature introduces conditional dequeue. If conditional dequeue were ever needed, it would use `when` (the language's universal guard keyword), not `by`. The `by` keyword is already claimed for priority-axis role connection — overloading it for a future filter condition would itself be the design error.
+
+**Verdict:** Elaine's consistency argument is stronger. Principle 5 says "statement kind is identified by its opening keyword sequence" — and within that, vocabulary consistency across the lifecycle of a single type is the natural corollary. `by` at declaration, `by` at enqueue, `by` at dequeue. The fork was unjustified.
+
+### The modification
+
+The accessor (`.priority`) and quantifier binding (`.priority`) remain as nouns. This is correct and Elaine explicitly preserves it. `by` is a preposition introducing a role at action sites. `.priority` is a noun naming a property at access sites. Different grammatical roles, same underlying concept. No seam.
+
+---
+
+## Summary Table
+
+| Proposal | Verdict | Conditions |
+|---|---|---|
+| `contains` replaces `containskey` | **Approved** | Type checker emits `TypeMismatch` if `V`-typed arg supplied; diagnostic message should name the key/value distinction |
+| `remove` replaces `removekey` | **Approved** | No-op-if-absent semantics preserved; no new proof obligation |
+| `by` replaces `priority` at dequeue-capture | **Approved** | Accessor (`.priority`) and quantifier binding (`.priority`) retain noun form |
+
+---
+
+## Implementation Notes
+
+All three changes are type-checker-only and catalog-metadata updates. No parser grammar changes. No new AST node types. The `Actions` catalog entry for `remove` gains `lookup` in its applicable-types metadata. The `Operations` catalog entry for `contains` gains `lookup` in its valid-lhs-types list. The dequeue action grammar already supports an optional trailing identifier — the keyword text changes from `priority` to `by`.
+
+The `containskey` and `removekey` tokens can be removed from the lexer's keyword table entirely (they are not yet implemented — this is pre-implementation design). The `priority` keyword at action sites is similarly pre-implementation.
+
+---
+
 # Decision: README Image Link Fixes
 
 **Date:** 2026-04-07  
@@ -27,8 +109,6 @@ Updated both image references in README.md to use the correct path prefix:
 
 ## Notes
 The README's narrative around the hero example remains valid: it correctly notes that GitHub cannot render the styled DSL treatment, so the README displays the rendered contract (`readme-hero-dsl.png`) alongside copyable DSL source code. The path fix enables both assets to load correctly in GitHub's markdown renderer.
-
----
 
 ---
 
@@ -74,8 +154,6 @@ Future improvement: automate this as a build script or CI step.
 
 ---
 
----
-
 # Steinbrenner Final Point Decision
 
 - Date: 2026-04-05
@@ -95,16 +173,12 @@ Future improvement: automate this as a build script or CI step.
 
 ---
 
----
-
 # Decision: Issue #22 Design Fidelity Directive
 
 **Date:** 2026-04-08
 **By:** Shane (user directive)
 
 When implementing issue #22, if anything the team is going to implement strays from the design docs or seems ambiguous, they must stop and ask rather than guess. Design understanding is a prerequisite before coding starts.
-
----
 
 ---
 
@@ -152,8 +226,6 @@ Use `customer-profile.precept`, `fee-schedule.precept`, `payment-method.precept`
 
 ---
 
----
-
 # Decision: Slice 7 Test Coverage — Known Gaps (Deferred)
 
 **Date:** 2026-04-08
@@ -166,8 +238,6 @@ Three coverage gaps identified during Slice 7 test writing and explicitly deferr
 3. `PreceptInstance.WorkflowName` mismatch on stateless Inspect not covered.
 
 These are known gaps, recorded for future test pass. Not blocking Slice 7 merge.
-
----
 
 ---
 
@@ -190,8 +260,6 @@ These are known gaps, recorded for future test pass. Not blocking Slice 7 merge.
 ## Rationale
 
 The combined-design-v2 doc had accumulated all review feedback, innovations callouts, and section expansions across multiple review rounds. The short doc's only unique content was the type strategy reasoning, which v2 now carries. Keeping both docs would create a drift risk with no benefit.
-
----
 
 ---
 
@@ -248,16 +316,12 @@ These don't cross because no runtime operation needs them — the prohibition is
 
 ---
 
----
-
 # Design Evaluation: Per-Field `readonly` Modifier as Access Default Inversion
 
 **Author:** Frank (Lead/Architect & Language Designer)
 **Date:** 2025-07-14
 **Requested by:** Shane
 **Verdict:** **Reject**
-
----
 
 ---
 
@@ -324,15 +388,11 @@ Six surveys were not consulted in the initial grounding. Each was read against t
 
 ---
 
----
-
 # Doc Audit: `writable` Field Modifier — Findings & Decisions
 
 **Date:** 2025-04-27  
 **Author:** Frank (Lead/Architect)  
 **Scope:** All 32 files in `docs/` audited for `writable` modifier language change
-
----
 
 ---
 
@@ -367,10 +427,6 @@ Treat `docs/HowWeGotHere.md` as a retrospective historical narrative, not as a l
 ## Applied To
 
 - `docs/HowWeGotHere.md`
-
----
-
----
 
 ---
 

@@ -1,3 +1,299 @@
+# Parser Coverage Assertion Against ExpressionFormKind
+
+**Date:** 2026-05-01  
+**Author:** Frank (Lead Architect)  
+**Status:** Exploration / Recommendation  
+**Triggered by:** Shane's observation that the parser can assert coverage against the catalog
+
+---
+
+## Executive Summary
+
+The parser CAN meaningfully assert coverage against `ExpressionFormKind`, but the enforcement level is **test-time**, not compile-time. This adds real value — it guarantees that adding a new expression form to the catalog without adding parser support becomes a failing test. It does NOT require changes to `ExpressionFormMeta`'s shape and should be a **follow-on slice** (not expand Slice 4).
+
+---
+
+## Analysis
+
+### The Structural Problem
+
+The parser dispatches on **tokens**, not on expression form kinds. This is fundamental to how Pratt parsers work:
+
+```csharp
+// ParseAtom — dispatches on TokenKind
+switch (current.Kind)
+{
+    case TokenKind.NumberLiteral:    // → Literal form
+    case TokenKind.StringLiteral:   // → Literal form (same form, different token)
+    case TokenKind.Identifier:      // → Identifier OR FunctionCall (lookahead decides)
+    case TokenKind.LeftParen:       // → Grouped form
+    case TokenKind.Not:             // → UnaryOperation form
+    case TokenKind.Minus:           // → UnaryOperation form
+    case TokenKind.If:              // → Conditional form
+    ...
+}
+
+// Led loop — dispatches on TokenKind
+if (current.Kind == TokenKind.Dot) { /* MemberAccess */ }
+if (OperatorPrecedence.TryGetValue(current.Kind, ...)) { /* BinaryOperation */ }
+```
+
+The relationship between tokens and expression forms is **many-to-one** (multiple tokens → one form) and sometimes **one-to-many with lookahead** (Identifier token → Identifier OR FunctionCall, depending on `(`). This means you cannot write:
+
+```csharp
+// IMPOSSIBLE: compile-time exhaustive switch on ExpressionFormKind in the parser
+ExpressionFormKind form = ??? // No way to derive this BEFORE parsing
+switch (form) { ... }         // CS8509 requires knowing the key first
+```
+
+The parser must read tokens to DISCOVER which form it's building. The form kind is an OUTPUT of parsing, not an input to routing.
+
+### Question 1: What Would Catalog-Driven Coverage Look Like?
+
+**Recommended approach: A test-time structural assertion.**
+
+The pattern is an xUnit test that iterates `ExpressionForms.All` and asserts each member has parser support. The assertion doesn't run the parser — it verifies that the parser's dispatch tables and switch arms collectively cover every catalog member.
+
+```csharp
+[Fact]
+public void Parser_Covers_All_ExpressionFormKinds()
+{
+    var coveredForms = new HashSet<ExpressionFormKind>();
+    
+    // Nud forms: verify ParseAtom handles them
+    foreach (var form in ExpressionForms.All.Where(f => !f.IsLeftDenotation))
+    {
+        // Each nud form must map to at least one token case in ParseAtom
+        var tokens = form.LeadTokens; // new ExpressionFormMeta field
+        tokens.Should().NotBeEmpty(
+            because: $"nud form {form.Kind} must declare its lead tokens for parser coverage");
+        coveredForms.Add(form.Kind);
+    }
+    
+    // Led forms: verify the Pratt loop handles them
+    foreach (var form in ExpressionForms.All.Where(f => f.IsLeftDenotation))
+    {
+        // BinaryOperation: covered if OperatorPrecedence has entries
+        // MemberAccess: covered if Dot handling exists
+        // MethodCall: covered when implemented
+        var tokens = form.LeadTokens;
+        tokens.Should().NotBeEmpty(
+            because: $"led form {form.Kind} must declare its lead tokens for parser coverage");
+        coveredForms.Add(form.Kind);
+    }
+    
+    // The actual coverage assertion
+    var allForms = Enum.GetValues<ExpressionFormKind>().ToHashSet();
+    coveredForms.Should().BeEquivalentTo(allForms,
+        because: "every ExpressionFormKind must have parser support");
+}
+```
+
+**But the stronger version** — the one that provides real enforcement — is a compile-time exhaustive switch in a *coverage witness method*:
+
+```csharp
+// In ExpressionForms.cs (the catalog itself)
+/// <summary>
+/// Coverage witness: the C# compiler (CS8509) refuses to build if any
+/// ExpressionFormKind member is added without updating this switch.
+/// The returned tokens are the parser's dispatch keys for this form.
+/// </summary>
+public static IReadOnlyList<TokenKind> GetLeadTokens(ExpressionFormKind kind) => kind switch
+{
+    ExpressionFormKind.Literal        => [TokenKind.NumberLiteral, TokenKind.StringLiteral, 
+                                          TokenKind.True, TokenKind.False, TokenKind.StringStart],
+    ExpressionFormKind.Identifier     => [TokenKind.Identifier],
+    ExpressionFormKind.Grouped        => [TokenKind.LeftParen],
+    ExpressionFormKind.UnaryOperation => [TokenKind.Not, TokenKind.Minus],
+    ExpressionFormKind.Conditional    => [TokenKind.If],
+    ExpressionFormKind.FunctionCall   => [TokenKind.Identifier], // disambiguated by lookahead
+    ExpressionFormKind.ListLiteral    => [TokenKind.LeftBracket],
+    // Led forms — tokens that trigger them in the left-denotation loop
+    ExpressionFormKind.BinaryOperation => Operators.All
+        .Where(op => op.Arity == Arity.Binary)
+        .Select(op => op.Token.Kind).Distinct().ToArray(),
+    ExpressionFormKind.MemberAccess    => [TokenKind.Dot],
+    ExpressionFormKind.MethodCall      => [TokenKind.LeftParen], // after member access
+};
+```
+
+**THIS is the bridge.** The exhaustive switch lives in the catalog, keyed on `ExpressionFormKind`. CS8509 fires at compile time. The returned `LeadTokens` connect the catalog to the parser's token-based dispatch. A test then verifies that for every non-led form, at least one of its `LeadTokens` appears as a case in `ParseAtom`'s switch.
+
+### Question 2: Where Does IsLeftDenotation Fit?
+
+`IsLeftDenotation` already partitions expression forms into nud vs. led. The parser could use this to verify its OWN structure:
+
+```csharp
+// Structural assertion: every led form's tokens appear in the Pratt loop dispatch
+var ledForms = ExpressionForms.All.Where(f => f.IsLeftDenotation);
+foreach (var form in ledForms)
+{
+    // Assert: the led loop handles form.LeadTokens
+}
+```
+
+**However, the parser should NOT derive its routing from `IsLeftDenotation` at runtime.** The Pratt loop's structure is inherently:
+
+1. Call `ParseAtom()` (handles all nud forms)
+2. Loop: check for led-triggering tokens (dot, operators)
+
+This is the correct Pratt structure. Having the parser read `IsLeftDenotation` to decide "should I route this to ParseAtom or the led loop?" would be backwards — the parser already knows by construction. `IsLeftDenotation` is metadata for CONSUMERS (hover docs, MCP vocabulary, coverage tests), not for the parser's own routing logic.
+
+**Verdict:** `IsLeftDenotation` informs the coverage test's assertion structure (nud forms → check ParseAtom, led forms → check Pratt loop), but does not drive runtime routing.
+
+### Question 3: Compile-Time vs. Test-Time vs. Runtime Assertion
+
+| Level | Mechanism | What It Catches | Verdict |
+|-------|-----------|-----------------|---------|
+| **Compile-time** | Exhaustive switch in `GetLeadTokens(ExpressionFormKind)` | New enum member added without declaring its tokens | ✅ **YES — achievable and recommended** |
+| **Test-time** | xUnit test iterating `ExpressionForms.All` against parser dispatch | New form with tokens declared but parser switch/loop not updated | ✅ **YES — the second layer** |
+| **Runtime** | Startup assertion | Same as test-time but fails in production | ❌ **Overkill — test-time is sufficient** |
+
+**Recommended: Two-layer enforcement.**
+
+1. **Compile-time (CS8509):** The `GetLeadTokens` exhaustive switch in the catalog forces you to declare tokens for any new `ExpressionFormKind` member. You literally cannot add a member without the compiler demanding you specify how it enters the parser.
+
+2. **Test-time (xUnit):** A test verifies that for each form's declared `LeadTokens`, the parser actually handles them. This catches the case where you add the catalog entry but forget to update `ParseAtom` or the led loop.
+
+Together: you cannot add a form without declaring its tokens (compile-time), and you cannot declare tokens without the parser handling them (test-time). **Full coverage guarantee.**
+
+### Question 4: Impact on Gap Fixes Plan
+
+**Recommendation: Do NOT expand Slice 4. Add a follow-on Slice (4b or new Slice after 4).**
+
+Rationale:
+- Slice 4 as currently scoped creates the catalog, `ExpressionFormMeta`, and `ExpressionFormKind`. That's already a meaningful deliverable with its own test surface.
+- Coverage assertion requires the `GetLeadTokens` method (or a `LeadTokens` field in `ExpressionFormMeta`) which is straightforward but conceptually distinct — it bridges the catalog to parser internals.
+- The coverage test itself needs the parser gaps (GAP-6 list literals, GAP-7 method calls) to be FIXED first, or it must be written to explicitly acknowledge known gaps. Sequencing it after Slices 5-6 is cleaner.
+
+**Impact on `ExpressionFormMeta` shape:** Yes, one addition needed.
+
+Current planned shape:
+```csharp
+public record ExpressionFormMeta(
+    ExpressionFormKind Kind,
+    ExpressionFormCategory Category,
+    bool IsLeftDenotation,
+    string HoverDocs);
+```
+
+With coverage assertion:
+```csharp
+public record ExpressionFormMeta(
+    ExpressionFormKind Kind,
+    ExpressionFormCategory Category,
+    bool IsLeftDenotation,
+    string HoverDocs,
+    IReadOnlyList<TokenKind> LeadTokens);  // NEW: parser coverage bridge
+```
+
+Alternatively, `LeadTokens` can be a computed method (`GetLeadTokens`) rather than a stored field — either works for CS8509 enforcement. I lean toward the method approach because it keeps the `ExpressionFormMeta` record clean and puts the exhaustive switch (the real enforcement mechanism) in a visually distinct location.
+
+### Question 5: Honest Assessment — Real Value or Theater?
+
+**This is genuinely valuable, not theater.** Here's why:
+
+The **meaningful coverage guarantee** is: *you cannot add a new expression form to Precept's language description without the build system demanding you wire it into the parser.*
+
+Without this assertion, adding `ExpressionFormKind.ListLiteral` to the catalog (which we're about to do) would compile and pass all tests — even if nobody updates `ParseAtom` to handle `[`. The catalog would claim the language has list literals, but the parser would reject them. That's exactly the kind of silent drift that catalogs are supposed to prevent.
+
+**What it does NOT prevent:** It doesn't prevent a form's parser implementation from being wrong. It ensures the parser HANDLES the form — not that it handles it correctly. Correctness is the job of behavioral tests.
+
+**The coverage guarantee in plain English:**
+- "Every expression form the catalog describes is wired into the parser" — YES, enforced.
+- "The parser correctly implements every expression form" — NO, that requires behavioral tests (which exist separately).
+
+This is the same level of guarantee that CS8509 gives everywhere else in the catalog system: the exhaustive switch forces you to CONSIDER every member. It doesn't force you to consider it correctly. But forcing consideration is 90% of the battle — most bugs come from forgetting, not from misunderstanding.
+
+**Not theater because:** The catalog already has a consumer (the parser) that MUST handle every member. The assertion makes that implicit requirement explicit and enforced. That's what catalogs DO.
+
+---
+
+## Recommended Approach (Summary)
+
+1. **Add `GetLeadTokens(ExpressionFormKind)` exhaustive switch** to `ExpressionForms.cs` — compile-time coverage via CS8509.
+2. **Add xUnit test** that verifies parser dispatch tables handle all declared `LeadTokens` — test-time gap detection.
+3. **Keep `ExpressionFormMeta` shape unchanged** — use a method rather than a field for `LeadTokens`.
+4. **Sequence as follow-on slice** after Slice 4 (catalog creation) and after Slices 5-6 (GAP-6/GAP-7 fixes), so the coverage test passes clean on merge.
+5. **Do NOT attempt runtime routing from catalog metadata** — the Pratt parser's structure is correct as-is; the catalog informs validation, not dispatch.
+
+---
+
+## Code Sketch: Complete Pattern
+
+```csharp
+// ═══════════════════════════════════════════════════════════════════════
+// In src/Precept/Language/ExpressionForms.cs
+// ═══════════════════════════════════════════════════════════════════════
+
+/// <summary>
+/// Parser coverage bridge: maps each expression form to the token(s) that
+/// trigger its parsing. CS8509 enforces exhaustiveness at compile time.
+/// </summary>
+public static IReadOnlyList<TokenKind> GetLeadTokens(ExpressionFormKind kind) => kind switch
+{
+    ExpressionFormKind.Literal        => [TokenKind.NumberLiteral, TokenKind.StringLiteral,
+                                          TokenKind.True, TokenKind.False, TokenKind.StringStart],
+    ExpressionFormKind.Identifier     => [TokenKind.Identifier],
+    ExpressionFormKind.Grouped        => [TokenKind.LeftParen],
+    ExpressionFormKind.UnaryOperation => [TokenKind.Not, TokenKind.Minus],
+    ExpressionFormKind.Conditional    => [TokenKind.If],
+    ExpressionFormKind.FunctionCall   => [TokenKind.Identifier],
+    ExpressionFormKind.ListLiteral    => [TokenKind.LeftBracket],
+    ExpressionFormKind.BinaryOperation => Operators.All
+        .Where(op => op.Arity == Arity.Binary)
+        .Select(op => op.Token.Kind).Distinct().ToArray(),
+    ExpressionFormKind.MemberAccess   => [TokenKind.Dot],
+    ExpressionFormKind.MethodCall     => [TokenKind.LeftParen],
+};
+
+// ═══════════════════════════════════════════════════════════════════════
+// In test/Precept.Tests/ExpressionFormCoverageTests.cs
+// ═══════════════════════════════════════════════════════════════════════
+
+[Fact]
+public void Every_ExpressionFormKind_Has_LeadTokens_Declared()
+{
+    // CS8509 already enforces this at compile-time via GetLeadTokens,
+    // but this test makes the contract visible in test output.
+    foreach (var kind in Enum.GetValues<ExpressionFormKind>())
+    {
+        var tokens = ExpressionForms.GetLeadTokens(kind);
+        tokens.Should().NotBeEmpty(
+            because: $"{kind} must declare at least one lead token for parser coverage");
+    }
+}
+
+[Fact]
+public void ParseAtom_Handles_All_Nud_Form_LeadTokens()
+{
+    var nudForms = ExpressionForms.All.Where(f => !f.IsLeftDenotation);
+    foreach (var form in nudForms)
+    {
+        var tokens = ExpressionForms.GetLeadTokens(form.Kind);
+        foreach (var token in tokens)
+        {
+            // Parse a minimal expression starting with this token kind
+            // and verify it produces a non-error AST node.
+            var source = GetMinimalSourceForToken(token);
+            var result = Compiler.Compile($"precept Test\nfield x as number\nrule {source} because \"test\"");
+            result.Diagnostics.Should().NotContain(d => d.Code == DiagnosticCode.ExpectedToken,
+                because: $"ParseAtom must handle {token} (form: {form.Kind})");
+        }
+    }
+}
+```
+
+---
+
+## Open Questions for Shane
+
+1. **Slice sequencing preference:** Should the coverage slice (4b) go immediately after Slice 4 (accepting that it will initially mark GAP-6/GAP-7 forms as `// TODO: pending implementation`), or after Slices 5-6 when all parser gaps are fixed?
+
+2. **Method vs. field:** `GetLeadTokens` as a method (my recommendation) keeps the record clean but means `LeadTokens` aren't queryable from `ExpressionForms.All` without calling the method. If MCP consumers want to report "which tokens trigger list literals?" they'd call the method. Is that acceptable, or should it be a field on `ExpressionFormMeta`?
+
+---
+
 # Collection Iteration Research — Frank
 
 **Date:** 2026-04-29
@@ -6504,88 +6800,6 @@ The bucket model is the implementation. The spec exposes the contract only.
 | Min-heap augmented with insertion counter | Harder to inspect, harder to serialize, no performance gain for typical k-small business-domain usage |
 | `ImmutableSortedDictionary` | Allocation overhead unjustified; Version immutability is achieved by copy-on-write at the operation boundary |
 | `SortedList<TPriority, Queue<TElement>>` | Viable optimization for k ≤ ~20 — may be used as a hidden implementation choice after profiling, but not a design decision |
-
----
-
-# Technical Review: Elaine's `lookup`/`queue` Surface Proposals
-
-**By:** Frank  
-**Date:** 2025-07-17  
-**Status:** Recommendations delivered — pending owner sign-off
-
----
-
-## Proposal 1 — Replace `containskey` with `contains`
-
-**Verdict: APPROVED.**
-
-No grammar ambiguity. `contains` is an infix expression operator at precedence 40 (spec §2.1). It parses as `ContainsExpression(left, ParseExpression(40))`. The left operand is resolved to a field type by the type checker, not the parser. Extending the type checker's `contains` validation table from `{set, queue, stack}` to `{set, queue, stack, lookup}` is a pure type-checker change. The parser sees `Expr contains Expr` regardless of whether the left side is a set or a lookup.
-
-If someone passes a `V`-typed expression to `F contains Expr` on a `lookup of K to V`, the type checker fires `TypeMismatch` — the expected type is `K`, the actual type is `V`. The diagnostic message should say "contains on lookup tests key membership; expected type K, got V." This is clean — no new diagnostic code needed, just a message template specialization.
-
-The `-key` suffix is purely cosmetic disambiguation. No parser production, no proof obligation, no evaluator branch depends on the distinction between `contains` and `containskey`. The type checker already knows the collection kind from the field's declared type. The suffix duplicates information the type system already has.
-
----
-
-## Proposal 2 — Replace `removekey` with `remove`
-
-**Verdict: APPROVED.**
-
-Parser: no changes required. The `ActionStatement` grammar is already `remove Identifier Expr`. The parser emits the same AST node regardless of whether the field is `set of T` or `lookup of K to V`. Type checker resolves the field type and validates that the expression matches `T` (for set) or `K` (for lookup). This is a type-checker-only extension.
-
-Proof obligation: confirmed identical to `set`. `remove` on `set` is no-op-if-absent — no guard required, no emptiness proof needed. `removekey` on `lookup` has the same semantics (spec: "removekey requires no guard — no-op if absent, like remove on set"). Unifying the keyword preserves this guarantee. No new proof obligation category.
-
-The `-key` suffix is not load-bearing anywhere. No pipeline stage, no evaluator branch, no proof rule depends on it. It exists only because the original `collection-types.md` design mirrored .NET's `Dictionary.ContainsKey`/`Dictionary.Remove` API naming. That's API naming leaking into a DSL surface — exactly what Precept's language design is supposed to prevent.
-
----
-
-## Proposal 3 — Use `by` at the dequeue-capture site
-
-**Verdict: APPROVED WITH MODIFICATION.**
-
-### Analysis of filter-condition ambiguity
-
-The concern I raised previously: `dequeue ClaimQueue into CurrentClaim by CurrentSeverity` could be misread as "dequeue the item BY this severity" (a filter/selection condition) rather than "dequeue and capture the severity INTO this field."
-
-Is this a real parsing ambiguity? **No.** The parser grammar for dequeue is:
-
-```
-dequeue Identifier (into Identifier (by Identifier)?)?
-```
-
-There is no conditional-dequeue production. The parser has no `by` + expression continuation that would create a grammatical fork. The `by` keyword in this position is unambiguously a capture binding — the parser cannot misparse it.
-
-Is it a reader-misparse risk? **Mildly.** A business author encountering `dequeue F into X by Y` for the first time might momentarily wonder whether `by Y` means "select by Y" or "capture Y." But this is a first-encounter learning cost, not an ongoing ambiguity. Once learned, the pattern is stable.
-
-### Weighing the arguments
-
-**Elaine's consistency argument** (spec Principle 5 — keyword-anchored readability): The `by` keyword appears at declaration (`queue of T by P`), at enqueue (`enqueue F Expr by Priority`), and now at dequeue (`dequeue F into X by Y`). The same keyword, the same role (introducing the priority axis), in all three action contexts. An author who writes `enqueue F X by P` one line above will instinctively reach for `by` at dequeue. Encountering `priority` there is a vocabulary seam — two words for one concept within the same type.
-
-**My filter-reading concern**: Theoretical. No grammar production creates ambiguity. No current or planned Precept feature introduces conditional dequeue. If conditional dequeue were ever needed, it would use `when` (the language's universal guard keyword), not `by`. The `by` keyword is already claimed for priority-axis role connection — overloading it for a future filter condition would itself be the design error.
-
-**Verdict:** Elaine's consistency argument is stronger. Principle 5 says "statement kind is identified by its opening keyword sequence" — and within that, vocabulary consistency across the lifecycle of a single type is the natural corollary. `by` at declaration, `by` at enqueue, `by` at dequeue. The fork was unjustified.
-
-### The modification
-
-The accessor (`.priority`) and quantifier binding (`.priority`) remain as nouns. This is correct and Elaine explicitly preserves it. `by` is a preposition introducing a role at action sites. `.priority` is a noun naming a property at access sites. Different grammatical roles, same underlying concept. No seam.
-
----
-
-## Summary Table
-
-| Proposal | Verdict | Conditions |
-|---|---|---|
-| `contains` replaces `containskey` | **Approved** | Type checker emits `TypeMismatch` if `V`-typed arg supplied; diagnostic message should name the key/value distinction |
-| `remove` replaces `removekey` | **Approved** | No-op-if-absent semantics preserved; no new proof obligation |
-| `by` replaces `priority` at dequeue-capture | **Approved** | Accessor (`.priority`) and quantifier binding (`.priority`) retain noun form |
-
----
-
-## Implementation Notes
-
-All three changes are type-checker-only and catalog-metadata updates. No parser grammar changes. No new AST node types. The `Actions` catalog entry for `remove` gains `lookup` in its applicable-types metadata. The `Operations` catalog entry for `contains` gains `lookup` in its valid-lhs-types list. The dequeue action grammar already supports an optional trailing identifier — the keyword text changes from `priority` to `by`.
-
-The `containskey` and `removekey` tokens can be removed from the lexer's keyword table entirely (they are not yet implemented — this is pre-implementation design). The `priority` keyword at action sites is similarly pre-implementation.
 
 ---
 
