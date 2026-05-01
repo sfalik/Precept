@@ -46,15 +46,11 @@ public sealed class PRECEPT0013ActionsCrossRef : DiagnosticAnalyzer
     {
         context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
         context.EnableConcurrentExecution();
-        context.RegisterCompilationStartAction(compilationCtx =>
-        {
-            var compilation = compilationCtx.Compilation;
-            compilationCtx.RegisterOperationAction(
-                ctx => Analyze(ctx, compilation), OperationKind.SwitchExpression);
-        });
+        context.RegisterOperationAction(
+            ctx => Analyze(ctx), OperationKind.SwitchExpression);
     }
 
-    private static void Analyze(OperationAnalysisContext ctx, Compilation compilation)
+    private static void Analyze(OperationAnalysisContext ctx)
     {
         var switchOp = (ISwitchExpressionOperation)ctx.Operation;
 
@@ -74,7 +70,7 @@ public sealed class PRECEPT0013ActionsCrossRef : DiagnosticAnalyzer
             if (creation == null) continue;
 
             CheckInlineToken(ctx, creation, armCaseName);
-            CheckEmptyAllowedIn(ctx, creation, armCaseName, compilation);
+            CheckEmptyAllowedIn(ctx, creation, armCaseName);
         }
     }
 
@@ -105,8 +101,7 @@ public sealed class PRECEPT0013ActionsCrossRef : DiagnosticAnalyzer
     private static void CheckEmptyAllowedIn(
         OperationAnalysisContext ctx,
         IObjectCreationOperation creation,
-        string armCaseName,
-        Compilation compilation)
+        string armCaseName)
     {
         var arg = CatalogAnalysisHelpers.GetNamedArgument(creation, "AllowedIn");
 
@@ -133,7 +128,14 @@ public sealed class PRECEPT0013ActionsCrossRef : DiagnosticAnalyzer
                 return; // Can't resolve — assume non-empty.
 
             var syntaxNode = syntaxRefs[0].GetSyntax();
-            var model = compilation.GetSemanticModel(syntaxNode.SyntaxTree);
+
+            // RS1030: use context.SemanticModel rather than Compilation.GetSemanticModel().
+            // If the field declaration lives in a different syntax tree we cannot resolve
+            // it from this context; assume non-empty to avoid false positives.
+            if (syntaxNode.SyntaxTree != ctx.SemanticModel.SyntaxTree)
+                return;
+
+            var model = ctx.SemanticModel;
 
             // Walk ALL descendants to find the deepest array/collection operation.
             IOperation? best = null;
