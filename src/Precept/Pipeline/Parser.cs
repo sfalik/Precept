@@ -74,27 +74,58 @@ public static class Parser
             .Select(a => a.Token.Kind)
             .ToFrozenSet();
 
-    /// <summary>
-    /// Tokens that always terminate expression parsing — declaration boundaries,
-    /// clause introducers, and structural tokens.
-    /// </summary>
+    // ════════════════════════════════════════════════════════════════════════════
+    //  Structural sets — derived from catalog or structurally motivated
+    //
+    //  BEFORE ADDING A NEW FrozenSet<TokenKind> HERE: check whether a catalog
+    //  already encodes this distinction. Catalog sources:
+    //    - Constructs.ByLeadingToken         — leading tokens per construct
+    //    - ConstructEntry.DisambiguationTokens — disambiguation verbs per construct
+    //    - Modifiers / Actions / Types / Operators — their respective token sets
+    //  Derive; never hardcode a parallel copy of catalog knowledge.
+    // ════════════════════════════════════════════════════════════════════════════
+
+    // NewLine is intentionally absent: whitespace is cosmetic (§0.1.5).
+    // NewLine tokens never reach Parser.Parse() — they are stripped by the pre-parse
+    // filter at the Parse() call site (direct ParseSession construction bypasses this).
+    // The Pratt loop additionally terminates at NewLine via the !OperatorPrecedence
+    // fallthrough — belt-and-suspenders, not load-bearing.
     private static readonly FrozenSet<TokenKind> StructuralBoundaryTokens = new[]
     {
         TokenKind.When, TokenKind.Because, TokenKind.Arrow, TokenKind.Ensure,
-        TokenKind.EndOfSource, TokenKind.NewLine,
+        TokenKind.EndOfSource,
     }.ToFrozenSet();
 
     internal static readonly FrozenSet<TokenKind> ExpressionBoundaryTokens =
         StructuralBoundaryTokens.Union(Constructs.LeadingTokens).ToFrozenSet();
 
     /// <summary>
-    /// The five primitive types allowed as element types in a <c>choice of T(...)</c> declaration.
+    /// Types valid as element types in a <c>choice of T(...)</c> declaration.
+    /// Derived from <see cref="TypeTrait.ChoiceElement"/> — never hardcoded.
     /// </summary>
-    internal static readonly FrozenSet<TokenKind> ChoiceElementTypeKeywords = new[]
-    {
-        TokenKind.StringType, TokenKind.IntegerType, TokenKind.DecimalType,
-        TokenKind.NumberType, TokenKind.BooleanType,
-    }.ToFrozenSet();
+    internal static readonly FrozenSet<TokenKind> ChoiceElementTypeKeywords =
+        Types.ByToken
+            .Where(kvp => kvp.Value.Traits.HasFlag(TypeTrait.ChoiceElement))
+            .Select(kvp => kvp.Key)
+            .ToFrozenSet();
+
+    /// <summary>
+    /// Maps qualifier-preposition tokens that are also construct-leading tokens to their
+    /// catalog-derived disambiguation verb sets. Derived from <see cref="Constructs.ByLeadingToken"/>
+    /// + <see cref="DisambiguationEntry.DisambiguationTokens"/> — never hardcoded.
+    ///   In → {Ensure, Modify, Omit}
+    ///   To → {Arrow, Ensure}
+    /// </summary>
+    internal static readonly FrozenDictionary<TokenKind, FrozenSet<TokenKind>>
+        AmbiguousQualifierPrepositions =
+            new[] { TokenKind.In, TokenKind.To }
+                .Where(Constructs.ByLeadingToken.ContainsKey)
+                .ToFrozenDictionary(
+                    k => k,
+                    k => Constructs.ByLeadingToken[k]
+                        .Where(c => c.Entry.DisambiguationTokens is { IsDefaultOrEmpty: false })
+                        .SelectMany(c => c.Entry.DisambiguationTokens!.Value)
+                        .ToFrozenSet());
 
     // ════════════════════════════════════════════════════════════════════════════
     //  Public entry point
@@ -102,7 +133,14 @@ public static class Parser
 
     public static SyntaxTree Parse(TokenStream tokens)
     {
-        var session = new ParseSession(tokens.Tokens);
+        // The parser is comment-blind and whitespace-insensitive by design (§0.1.5).
+        // NewLine and Comment are stripped here; full-fidelity token data lives in
+        // Compilation.Tokens for LSP and other consumers that need it.
+        // NOTE: direct ParseSession construction (e.g. in tests) bypasses this filter.
+        var parseTokens = tokens.Tokens
+            .Where(t => t.Kind is not TokenKind.NewLine and not TokenKind.Comment)
+            .ToImmutableArray();
+        var session = new ParseSession(parseTokens);
         return session.ParseAll();
     }
 
@@ -157,12 +195,6 @@ public static class Parser
 
         private bool IsAtEnd() => Current().Kind == TokenKind.EndOfSource;
 
-        private void SkipTrivia()
-        {
-            while (Current().Kind is TokenKind.NewLine or TokenKind.Comment)
-                Advance();
-        }
-
         private void EmitDiagnostic(DiagnosticCode code, SourceSpan span, params object?[] args)
         {
             _diagnostics.Add(Diagnostics.Create(code, span, args));
@@ -175,19 +207,15 @@ public static class Parser
             PreceptHeaderNode? header = null;
             var declarations = ImmutableArray.CreateBuilder<Declaration>();
 
-            SkipTrivia();
-
             // Parse optional precept header
             if (!IsAtEnd() && Current().Kind == TokenKind.Precept)
             {
                 header = ParsePreceptHeaderDeclaration();
-                SkipTrivia();
             }
 
             // Main dispatch loop
             while (!IsAtEnd())
             {
-                SkipTrivia();
                 if (IsAtEnd()) break;
 
                 var token = Current();
@@ -409,12 +437,10 @@ public static class Parser
             var actions = ImmutableArray.CreateBuilder<Statement>();
             actions.Add(first);
 
-            SkipTrivia();
             while (Current().Kind == TokenKind.Arrow && !IsOutcomeAhead())
             {
                 Advance(); // consume '->'
                 actions.Add(ParseActionStatement());
-                SkipTrivia();
             }
 
             var lastSpan = actions[^1].Span;
@@ -444,19 +470,16 @@ public static class Parser
 
             // Parse action chain: -> action -> action -> ... -> outcome
             var actions = ImmutableArray.CreateBuilder<Statement>();
-            SkipTrivia();
             while (Current().Kind == TokenKind.Arrow && !IsOutcomeAhead())
             {
                 Advance(); // consume '->'
                 var action = TryParseActionStatementWithRecovery();
                 if (action is not null)
                     actions.Add(action);
-                SkipTrivia();
             }
 
             // Parse outcome
             OutcomeNode outcome;
-            SkipTrivia();
             if (Current().Kind == TokenKind.Arrow)
             {
                 Advance(); // consume '->'
@@ -544,12 +567,10 @@ public static class Parser
             var actions = ImmutableArray.CreateBuilder<Statement>();
             actions.Add(first);
 
-            SkipTrivia();
             while (Current().Kind == TokenKind.Arrow && !IsOutcomeAhead())
             {
                 Advance(); // consume '->'
                 actions.Add(ParseActionStatement());
-                SkipTrivia();
             }
 
             var lastSpan = actions[^1].Span;
@@ -1064,6 +1085,41 @@ public static class Parser
 
         // ── Type reference parsing ────────────────────────────────────────────
 
+        /// <summary>
+        /// Returns true when the current token introduces a type qualifier rather than
+        /// a declaration boundary. Called only when the current type's <see cref="QualifierShape"/>
+        /// is non-null — callers must guard with a catalog check before entering the qualifier loop.
+        /// </summary>
+        /// <remarks>
+        /// Qualifier values are currently atomic (literal or identifier). If compound qualifier
+        /// values are added, revisit this lookahead.
+        /// </remarks>
+        private bool TryPeekQualifierKeyword()
+        {
+            var cur = Current();
+
+            // Only Of, In, To can introduce a qualifier
+            if (cur.Kind is not (TokenKind.Of or TokenKind.In or TokenKind.To))
+                return false;
+
+            // 'of' is never a declaration leader — always a qualifier
+            if (cur.Kind == TokenKind.Of)
+                return true;
+
+            // 'in' / 'to' may be declaration leaders — disambiguate
+            if (!AmbiguousQualifierPrepositions.ContainsKey(cur.Kind))
+                return true; // not a construct leader in any context — it's a qualifier
+
+            var valueToken = Peek(1);
+            // Literal value → unambiguously a qualifier (e.g. in 'USD', to 'EUR')
+            if (valueToken.Kind is not TokenKind.Identifier and not TokenKind.Any)
+                return true;
+
+            // Identifier or 'any': check whether the token after it is a disambiguation verb
+            var afterValue = Peek(2);
+            return !AmbiguousQualifierPrepositions[cur.Kind].Contains(afterValue.Kind);
+        }
+
         private TypeRefNode ParseTypeRef()
         {
             var current = Current();
@@ -1074,9 +1130,25 @@ public static class Parser
                 var collectionToken = Advance();
                 Expect(TokenKind.Of);
                 var elemToken = Advance(); // element type
+
+                // Parse qualifiers on the element type if catalog permits them
+                var qualifiers = ImmutableArray.CreateBuilder<TypeQualifierNode>();
+                if (Types.ByToken.TryGetValue(elemToken.Kind, out var elemMeta) && elemMeta.QualifierShape is not null)
+                {
+                    while (TryPeekQualifierKeyword())
+                    {
+                        var qualKw = Advance();
+                        var qualVal = ParseExpression(0);
+                        qualifiers.Add(new TypeQualifierNode(
+                            SourceSpan.Covering(qualKw.Span, qualVal.Span), qualKw, qualVal));
+                    }
+                }
+
+                var builtQualifiers = qualifiers.ToImmutable();
+                var endSpan = builtQualifiers.Length > 0 ? builtQualifiers[^1].Span : elemToken.Span;
                 return new CollectionTypeRefNode(
-                    SourceSpan.Covering(collectionToken.Span, elemToken.Span),
-                    collectionToken, elemToken, null);
+                    SourceSpan.Covering(collectionToken.Span, endSpan),
+                    collectionToken, elemToken, builtQualifiers);
             }
 
             if (current.Kind == TokenKind.ChoiceType)
@@ -1122,25 +1194,32 @@ public static class Parser
             if (TypeKeywords.Contains(current.Kind))
             {
                 var typeToken = Advance();
-                TypeQualifierNode? qualifier = null;
-                // Check for qualifier: in/of
-                if (Current().Kind == TokenKind.In || Current().Kind == TokenKind.Of)
+
+                // Consult catalog: only types with a QualifierShape accept qualifiers.
+                // TryPeekQualifierKeyword() handles the in/to ambiguity within qualified types.
+                var qualifiers = ImmutableArray.CreateBuilder<TypeQualifierNode>();
+                if (Types.ByToken.TryGetValue(typeToken.Kind, out var typeMeta) && typeMeta.QualifierShape is not null)
                 {
-                    var qualKw = Advance();
-                    var qualVal = ParseExpression(0);
-                    qualifier = new TypeQualifierNode(
-                        SourceSpan.Covering(qualKw.Span, qualVal.Span), qualKw, qualVal);
+                    while (TryPeekQualifierKeyword())
+                    {
+                        var qualKw = Advance();
+                        var qualVal = ParseExpression(0);
+                        qualifiers.Add(new TypeQualifierNode(
+                            SourceSpan.Covering(qualKw.Span, qualVal.Span), qualKw, qualVal));
+                    }
                 }
-                var span = qualifier is not null
-                    ? SourceSpan.Covering(typeToken.Span, qualifier.Span)
+
+                var builtQualifiers = qualifiers.ToImmutable();
+                var span = builtQualifiers.Length > 0
+                    ? SourceSpan.Covering(typeToken.Span, builtQualifiers[^1].Span)
                     : typeToken.Span;
-                return new ScalarTypeRefNode(span, typeToken, qualifier);
+                return new ScalarTypeRefNode(span, typeToken, builtQualifiers);
             }
 
             // Unknown type — emit diagnostic and return a placeholder
             EmitDiagnostic(DiagnosticCode.ExpectedToken, current.Span, "type", current.Text);
             return new ScalarTypeRefNode(current.Span,
-                new Token(TokenKind.Identifier, current.Text, current.Span), null);
+                new Token(TokenKind.Identifier, current.Text, current.Span), ImmutableArray<TypeQualifierNode>.Empty);
         }
 
         // ── Choice helpers ────────────────────────────────────────────────────
@@ -1315,6 +1394,14 @@ public static class Parser
                 case TokenKind.StringStart:
                     return ParseInterpolatedString();
 
+                // Typed constant literal: 'USD', '2026-04-15'
+                case TokenKind.TypedConstant:
+                    return new TypedConstantExpression(current.Span, Advance());
+
+                // Interpolated typed constant: 'Hello {name}'
+                case TokenKind.TypedConstantStart:
+                    return ParseInterpolatedTypedConstant();
+
                 case TokenKind.Identifier:
                 {
                     var name = Advance();
@@ -1416,6 +1503,33 @@ public static class Parser
             parts.Add(new TextInterpolationPart(endToken.Span, endToken));
 
             return new InterpolatedStringExpression(
+                SourceSpan.Covering(startToken.Span, endToken.Span), parts.ToImmutable());
+        }
+
+        private InterpolatedTypedConstantExpression ParseInterpolatedTypedConstant()
+        {
+            var parts = ImmutableArray.CreateBuilder<InterpolationPart>();
+            var startToken = Advance(); // consume TypedConstantStart
+            parts.Add(new TextInterpolationPart(startToken.Span, startToken));
+
+            while (Current().Kind != TokenKind.TypedConstantEnd && !IsAtEnd())
+            {
+                // Parse expression hole
+                var expr = ParseExpression(0);
+                parts.Add(new ExpressionInterpolationPart(expr.Span, expr));
+
+                // Parse middle text segment if present
+                if (Current().Kind == TokenKind.TypedConstantMiddle)
+                {
+                    var mid = Advance();
+                    parts.Add(new TextInterpolationPart(mid.Span, mid));
+                }
+            }
+
+            var endToken = Current().Kind == TokenKind.TypedConstantEnd ? Advance() : Current();
+            parts.Add(new TextInterpolationPart(endToken.Span, endToken));
+
+            return new InterpolatedTypedConstantExpression(
                 SourceSpan.Covering(startToken.Span, endToken.Span), parts.ToImmutable());
         }
 

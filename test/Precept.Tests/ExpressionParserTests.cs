@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Linq;
 using FluentAssertions;
 using Precept.Language;
 using Precept.Pipeline;
@@ -272,5 +273,46 @@ public class ExpressionParserTests
         bin.Operator.Kind.Should().Be(TokenKind.Minus);
         bin.Right.Should().BeOfType<LiteralExpression>()
             .Which.Value.Text.Should().Be("1"); // positive "1", not "-1"
+    }
+
+    // ── Typed constant literals ────────────────────────────────────────────
+
+    [Fact]
+    public void ParseExpression_TypedConstant_Simple()
+    {
+        var expr = ParseExpr("'USD'");
+        var tc = expr.Should().BeOfType<TypedConstantExpression>().Subject;
+        tc.Value.Kind.Should().Be(TokenKind.TypedConstant);
+        tc.Value.Text.Should().Be("USD");
+    }
+
+    [Fact]
+    public void ParseExpression_TypedConstant_Date()
+    {
+        var expr = ParseExpr("'2026-04-15'");
+        var tc = expr.Should().BeOfType<TypedConstantExpression>().Subject;
+        tc.Value.Kind.Should().Be(TokenKind.TypedConstant);
+        tc.Value.Text.Should().Be("2026-04-15");
+    }
+
+    [Fact]
+    public void ParseExpression_TypedConstant_Interpolated()
+    {
+        var expr = ParseExpr("'Hello {name}'");
+        var itc = expr.Should().BeOfType<InterpolatedTypedConstantExpression>().Subject;
+        itc.Parts.Should().HaveCountGreaterThan(1);
+        itc.Parts.Should().ContainItemsAssignableTo<InterpolationPart>();
+        itc.Parts.OfType<ExpressionInterpolationPart>().Should().HaveCount(1);
+    }
+
+    [Fact]
+    public void ParseExpression_TypedConstant_InFieldDefault()
+    {
+        var tokens = Lexer.Lex("""field Amt as money default 'USD'""");
+        var tree = Parser.Parse(tokens);
+        tree.Diagnostics.Should().BeEmpty("typed constant in default should parse without errors");
+        var field = tree.Declarations[0].Should().BeOfType<FieldDeclarationNode>().Subject;
+        var modifier = field.Modifiers[0].Should().BeOfType<ValueModifierNode>().Subject;
+        modifier.Value.Should().BeOfType<TypedConstantExpression>();
     }
 }
