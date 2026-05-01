@@ -96,6 +96,22 @@ This inverts the traditional compiler model:
 
 The twelve catalogs are expressions of this principle — not the principle itself. The principle is: **if something is domain knowledge, it is metadata; if it is metadata, it has a declared shape; if shapes vary by kind, the shape is a discriminated union.** Pipeline stages, tooling, and consumers derive from the metadata — they never maintain parallel copies or encode domain knowledge in their own logic.
 
+### Vision precedes consumers
+
+The catalog-driven architecture means: **describe the language completely in metadata, then consumers derive from it.** The vision precedes the consumers — not the other way around.
+
+This ordering is non-negotiable. The catalog is not built bottom-up from consumer demand. It is built top-down from language reality. If something IS the language — if it appears in `.precept` files, if it carries semantics, if it would appear in a complete description of Precept — it gets cataloged. Period. Whether any consumer currently reads that metadata is irrelevant to the cataloging decision.
+
+**"No consumer currently uses it" is never a valid argument against cataloging something that IS the language.** This argument inverts the architectural vision. It says: "build the spec from what consumers happen to need today." That is the traditional compiler model — domain knowledge scattered across implementations, maintained as parallel copies, accruing drift. It is exactly what the catalog system exists to prevent.
+
+The correct reasoning is:
+
+1. **Is it language surface?** → Catalog it.
+2. **Do consumers exist that read it?** → Irrelevant to step 1. Consumers will derive from it when they need it. The catalog is ready before the consumer arrives.
+3. **Does cataloging it have "value" today?** → Yes. Completeness IS the value. A machine-readable spec with gaps is not a spec — it is a collection of implementation notes.
+
+Future agents, reviewers, and architects: if you find yourself arguing "but nothing reads this yet" as grounds to reject a catalog entry, you are repeating the mistake this principle exists to prevent. Stop. Re-read this section. The catalog describes the language. The language is not defined by what consumers happen to query.
+
 ### The decision framework
 
 When evaluating whether something belongs in a catalog:
@@ -110,6 +126,8 @@ When evaluating whether something belongs in a catalog:
 **Anti-pattern: "small enum = bare."** Size is irrelevant. `AccessMode` has 3 values but each has distinct behavioral semantics (`IsPresent`, `IsWritable`) that consumers need. The question is never "how many members?" — it's "do consumers hardcode per-member knowledge that should be metadata?"
 
 **Anti-pattern: "flat record with inapplicable fields."** If a flat metadata record has fields that are meaningless for some members, that's a signal for a DU — not a signal to reject cataloging. The DU ensures each subtype carries exactly the fields its consumers need.
+
+**Anti-pattern: "no consumer currently uses it."** The absence of a current consumer is not evidence against cataloging. It is evidence that the catalog is ahead of the consumers — which is the correct ordering. The catalog is the machine-readable language specification. A spec does not omit sections because no reader has asked about them yet. If the element is language surface, it is cataloged — consumer demand is not a prerequisite.
 
 ### Enforcement
 
@@ -1376,13 +1394,122 @@ As catalogs are implemented, each pipeline stage gets thinner — domain knowled
 |-------|--------------|----------------|
 | **Lexer** | Already uses `Tokens.Keywords` for keyword classification | Minimal further impact. Operator scan priority derivable from `Operators.All` sorted by `Token.Text.Length` descending. |
 | **Parser** | Hand-coded vocabulary tables + recursive descent grammar | Vocabulary tables — operator precedence, type keyword mappings, modifier/action recognition sets (~40–50% of language knowledge decisions) — migrate to catalog-derived frozen dictionaries at startup. Grammar productions stay hand-written. Construct slots enable test generation and LS completions. When a new type, modifier, operator, or action is added to a catalog, the parser adapts automatically — no parser edit needed. |
-| **TypeChecker** | Hand-coded modifier validation, function dispatch, operator dispatch | Significant: modifier applicability → `Modifiers.GetMeta().ApplicableTo`, function validation → `Functions.GetMeta()`, operation legality → `Operations.Resolve()`, type keyword resolution → `Types.All` frozen dictionary, proof obligation kinds → `ProofRequirements.GetMeta()`. The type checker's `switch` forests shrink to catalog lookups. |
-| **GraphAnalyzer** | Hand-coded state reachability, modifier semantics | Moderate: state modifier structural semantics (`AllowsOutgoing`, `RequiresDominator`, `PreventsBackEdge`) are catalog metadata on `StateModifierMeta`. Graph algorithms (reachability, dominator trees, SCC) remain generic machinery. |
+| **TypeChecker** | Hand-coded modifier validation, function dispatch, operator dispatch | Significant: modifier applicability/exclusivity → `FieldModifierMeta.ApplicableTo`, `ModifierMeta.MutuallyExclusiveWith`; modifier subsumption → `FieldModifierMeta.Subsumes`; access-mode semantics → `AccessModifierMeta.IsPresent`, `IsWritable`; anchor scope/target → `AnchorModifierMeta.Scope`, `Target`; function resolution → `Functions.FindByName(name)`, `FunctionMeta.Overloads`, `FunctionOverload.Match`; operator resolution → `Operations.FindUnary(op, type)`, `Operations.FindCandidates(op, lhs, rhs)`; type widening/traits/qualifiers/implied modifiers → `TypeMeta.WidensTo`, `Traits`, `QualifierShape`, `ImpliedModifiers`, `Accessors`; action legality → `ActionMeta.ApplicableTo`, `AllowedIn`, `SyntaxShape`, `ValueRequired`, `IntoSupported`; proof obligations → `ProofRequirements.GetMeta()`. The type checker's `switch` forests shrink to catalog lookups. |
+| **GraphAnalyzer** | Hand-coded state reachability, modifier semantics | Moderate: state modifier structural semantics (`AllowsOutgoing`, `RequiresDominator`, `PreventsBackEdge`) are catalog metadata on `StateModifierMeta`. Event modifier graph requirements → `EventModifierMeta.RequiredAnalysis`. Graph algorithms (reachability, dominator trees, SCC) remain generic machinery. |
 | **ProofEngine** | Hand-coded proof obligations per operator | Significant: `ProofRequirement[]` on `BinaryOperationMeta`, `FunctionOverload`, `TypeAccessor`, and `ActionMeta` carry all proof obligations as metadata. `ProofRequirements.GetMeta(kind)` dispatches obligation instances — no hardcoded per-kind obligation lists. |
-| **PreceptBuilder** | Hand-coded constraint bucketing | `Constraints.GetMeta(kind)` routes each `ConstraintDescriptor` into the correct activation bucket. `ConstraintMeta.StateAnchored` groups state-scoped constraints without per-member conditionals. No hardcoded activation-timing switch. |
-| **Evaluator** | Not yet implemented | Execution delegate design deferred pending working copy API design. When implemented: operation execution dispatches via `Operations.Resolve()`; function execution dispatches via `Functions.GetMeta()`; constraint activation timing reads `Constraints.GetMeta()`; modifier boundary validation reads `FieldModifierMeta.ApplicableTo`/`HasValue`. Action execution delegates deferred until working copy API designed. The evaluator's core loop (expression tree walking, working copy, atomicity) remains hand-written. |
+| **PreceptBuilder** | Hand-coded constraint bucketing | `Constraints.GetMeta(kind)` routes each `ConstraintDescriptor` into the correct activation bucket. Pattern-match on `ConstraintMeta` DU subtypes (`Invariant`, `StateResident`, `StateEntry`, `StateExit`, `EventPrecondition`) — not the `ConstraintKind` enum directly. `ConstraintMeta.StateAnchored` groups the three state-scoped subtypes for shared graph-analysis paths. No hardcoded activation-timing switch. Currently implemented in `Precept.From(Compilation)` — no dedicated `PreceptBuilder` class yet. |
+| **Evaluator** | Not yet implemented | **Today:** constraint activation timing → `Constraints.GetMeta(kind)`; modifier boundary validation → `FieldModifierMeta.ApplicableTo`/`HasValue`; accessor metadata → `TypeMeta.Accessors`. **Future (pending executable model design D8/R4):** operation dispatch → `Operations.FindUnary`/`FindCandidates`; function dispatch → `Functions.GetMeta(kind)`; action dispatch → `Actions.GetMeta(kind)`. Do not use `Operations.Resolve()` — that API does not exist. Do not claim catalog-driven execution dispatch until delegate fields exist in catalog metadata. The evaluator's core loop (expression tree walking, working copy, atomicity) remains hand-written. |
 
 Pattern: domain knowledge → metadata. Stages → generic machinery that reads catalogs.
+
+### Parser-catalog integration pattern
+
+The parser is the most common site for accidentally re-encoding catalog knowledge as hardcoded sets. The rule: **before writing any `FrozenSet<TokenKind>` or lookahead condition in the parser, check whether the catalog already encodes the distinction.**
+
+| Parser need | Catalog source |
+|---|---|
+| Which tokens lead a construct | `Constructs.ByLeadingToken.Keys` |
+| Which tokens disambiguate constructs with the same leader | `DisambiguationEntry.DisambiguationTokens` (via `ConstructMeta.Entries`) |
+| Which tokens are valid modifier keywords | `Modifiers.All.OfType<FieldModifierMeta>().Select(m => m.Token.Kind)` |
+| Which tokens are type keywords | `Types.ByToken.Keys` |
+| Which tokens are action keywords | `Actions.All.Select(a => a.Token.Kind)` |
+| Operator precedence and associativity | `Operators.All` |
+
+**Canonical example — `in`/`to` qualifier disambiguation:**
+
+```csharp
+// Derived from Constructs.ByLeadingToken — never hardcoded.
+// Maps each qualifier-preposition token that is also a declaration leader to the
+// catalog-derived set of its disambiguation verbs.
+//   In → {Ensure, Modify, Omit}
+//   To → {Arrow, Ensure}
+internal static readonly FrozenDictionary<TokenKind, FrozenSet<TokenKind>>
+    AmbiguousQualifierPrepositions =
+        new[] { TokenKind.In, TokenKind.To }
+            .Where(Constructs.ByLeadingToken.ContainsKey)
+            .ToFrozenDictionary(
+                k => k,
+                k => Constructs.ByLeadingToken[k]
+                    .Where(c => c.Entry.DisambiguationTokens is { IsDefaultOrEmpty: false })
+                    .SelectMany(c => c.Entry.DisambiguationTokens!.Value)
+                    .ToFrozenSet());
+```
+
+When a new `in`-construct is added to the catalog (e.g., `in State flag Field`), its disambiguation token is automatically included in `AmbiguousQualifierPrepositions` — the parser adapts for free. No parser edit required.
+
+**The failure mode to avoid:** a hardcoded `FrozenSet<TokenKind>` in the parser that encodes `{Modify, Omit, Ensure}` directly. This is catalog knowledge in the wrong layer — it becomes stale the moment a new construct is added.
+
+---
+
+### TypeChecker-catalog integration pattern
+
+Before writing any `switch` on modifier, type, function, operator, or action identity in the type checker, check whether the catalog already carries the distinction as metadata.
+
+| TypeChecker need | Catalog source |
+|---|---|
+| Modifier applicability to a type | `FieldModifierMeta.ApplicableTo` |
+| Modifier mutual exclusion | `ModifierMeta.MutuallyExclusiveWith` |
+| Modifier subsumption | `FieldModifierMeta.Subsumes` |
+| Access-mode semantics | `AccessModifierMeta.IsPresent`, `IsWritable` |
+| Anchor scope and target | `AnchorModifierMeta.Scope`, `Target` |
+| Function name resolution | `Functions.FindByName(name)` → `FunctionMeta.Overloads` → `FunctionOverload.Match` |
+| Operator resolution | `Operations.FindUnary(op, operandType)` / `Operations.FindCandidates(op, lhs, rhs)` |
+| Type widening compatibility | `TypeMeta.WidensTo` |
+| Type traits (orderable, equality, choice-element) | `TypeMeta.Traits` |
+| Type qualifier shape | `TypeMeta.QualifierShape` |
+| Implied modifiers for a type | `TypeMeta.ImpliedModifiers` |
+| Field accessor signatures | `TypeMeta.Accessors`, `TypeAccessor.ParameterType`, `TypeAccessor.RequiredTraits` |
+| Action legality and shape | `ActionMeta.ApplicableTo`, `AllowedIn`, `SyntaxShape`, `ValueRequired`, `IntoSupported` |
+| Proof obligations (all sources) | `BinaryOperationMeta.ProofRequirements`, `FunctionOverload.ProofRequirements`, `TypeAccessor.ProofRequirements`, `ActionMeta.ProofRequirements` |
+
+**The failure mode:** `switch (modifierKind) { case ModifierKind.Nonnegative: /* check applies to number */ ... }` or `switch (typeKind) { case TypeKind.Integer: ... }`. These are catalog-known facts displaced into stage logic. Use `FieldModifierMeta.ApplicableTo` and `TypeMeta.Traits` instead.
+
+---
+
+### GraphAnalyzer-catalog integration pattern
+
+Before hardcoding state or event modifier semantics into graph algorithms, check catalogs:
+
+| GraphAnalyzer need | Catalog source |
+|---|---|
+| Whether a state modifier allows outgoing transitions | `StateModifierMeta.AllowsOutgoing` |
+| Whether a state modifier requires a dominator state | `StateModifierMeta.RequiresDominator` |
+| Whether a state modifier prevents back-edges | `StateModifierMeta.PreventsBackEdge` |
+| Which graph analysis an event modifier triggers | `EventModifierMeta.RequiredAnalysis` (e.g. `GraphAnalysisKind.InitialEventCompatibility`) |
+| Modifier metadata lookup | `Modifiers.GetMeta(kind)` → pattern-match on `StateModifierMeta` / `EventModifierMeta` |
+
+Graph algorithms themselves (reachability, dominator trees, SCCs) are generic machinery and stay hand-written. Only the *meaning* of each modifier is catalog-driven.
+
+---
+
+### ProofEngine-catalog integration pattern
+
+Proof obligations are declared in catalog metadata — never hardcoded per operator/function/accessor/action. Before writing obligation lists for any construct:
+
+| ProofEngine need | Catalog source |
+|---|---|
+| Obligations for a binary operator | `BinaryOperationMeta.ProofRequirements` |
+| Obligations for a function overload | `FunctionOverload.ProofRequirements` |
+| Obligations for a type accessor | `TypeAccessor.ProofRequirements` |
+| Obligations for an action | `ActionMeta.ProofRequirements` |
+| Obligation dispatch by kind | `ProofRequirements.GetMeta(kind)` |
+
+Subject shape (what the obligation applies to) is encoded in the requirement instance (`ParamSubject`, `SelfSubject`, etc.) — do not hardcode per-requirement subject logic.
+
+---
+
+### Evaluator-catalog integration pattern
+
+| Evaluator need | Catalog source | Status |
+|---|---|---|
+| Constraint activation timing | `Constraints.GetMeta(kind)` → `ConstraintMeta` DU subtype | Available now |
+| Modifier boundary validation | `FieldModifierMeta.ApplicableTo`, `HasValue` | Available now |
+| Accessor signatures | `TypeMeta.Accessors`, `TypeAccessor.ParameterType`, `RequiredTraits` | Available now |
+| Operation dispatch | `Operations.FindUnary` / `FindCandidates` | Deferred (D8/R4) |
+| Function dispatch | `Functions.GetMeta(kind)` | Deferred (D8/R4) |
+| Action dispatch | `Actions.GetMeta(kind)` | Deferred (D8/R4) |
+
+Do not use `Operations.Resolve()` — that API does not exist. Do not claim catalog-driven execution dispatch until delegate fields exist in catalog metadata.
 
 ---
 

@@ -7276,3 +7276,879 @@ Pragmatic sequencing: **GAP-2 immediately** (five lines, zero design risk), **GA
 - **GAP-2 and EventEnsure**: These two fixes share the identical pattern and must land in the same commit. `ParseStateEnsure` and `ParseEventEnsure` are parallel implementations that drifted.
 - **GAP-1 and GAP-3**: Both require `ParseAtom()` changes. If landed in the same pass, a single test sweep covers both.
 - **GAP-3 catalog work**: The multi-token operator shape decision (if Frank requires a catalog extension) could also affect future operators with compound syntax. That design decision should be scoped and resolved before touching `OperatorMeta`.
+
+---
+
+### 2026-05-01T00-37-25Z: User directive
+**By:** Shane (via Copilot)
+**What:** The sample files are incomplete. Do NOT use sample file presence/absence to determine what the language supports or doesn't support. The spec (docs/language/precept-language-spec.md) is the source of truth for language support decisions.
+**Why:** User request — captured for team memory
+
+---
+
+# Parser Gap Fixes — Catalog Compliance Audit Decision
+
+**By:** Frank  
+**Date:** 2026-05-01  
+**Context:** Audit of `docs/working/parser-gap-fixes-plan.md` against catalog-driven architecture
+
+## Decision
+
+The parser gap fixes plan is **catalog-compliant** with two minor deviations that require comments, not redesign.
+
+## Key Findings
+
+1. **All 11 slices are catalog-compliant or N/A.** No slice introduces hardcoded keyword lists, parallel vocabulary copies, or vocabulary decisions that bypass catalog metadata.
+
+2. **Two hardcoded precedence constants flagged as ⚠️ partial compliance:**
+   - Slice 3 (`is set`): hardcodes precedence `40`. Multi-token postfix operator doesn't fit current `OperatorMeta` (single-token model).
+   - Slice 5 (method call): hardcodes precedence `80`. Matches existing dot-access handler pattern (also hardcoded `80`).
+
+3. **No new catalog entries needed.** All tokens, diagnostics, operators, and constructs referenced by the plan already exist.
+
+## Architectural Boundary Clarified
+
+Expression-level grammar (atoms, multi-token left-denotations) is **structural grammar**, not catalog vocabulary. The `Constructs` catalog covers declaration-level grammar forms. Expression AST nodes (`TypedConstantExpression`, `ListLiteralExpression`, `IsSetExpression`, `MethodCallExpression`) are parser output — they do not belong in the `Constructs` catalog. This is consistent with all existing expression nodes (`LiteralExpression`, `BinaryExpression`, `CallExpression`, etc.).
+
+## Action Required
+
+Implementer should add spec-reference comments on the two hardcoded precedence constants. No other catalog-related changes needed.
+
+## Future Watch
+
+If additional multi-token operators enter the language (beyond `is set`/`is not set`), the `Operators` catalog should be extended with a `Postfix` arity and multi-token support. Until then, the single-operator exception with a spec-reference comment is acceptable.
+
+---
+
+# Decision: Catalog Compliance Verdict on Parser Gap Fixes
+
+**By:** Frank (Lead/Architect)
+**Date:** 2026-05-01
+**Triggered by:** Shane's direct challenge on catalog compliance of the parser-gap-fixes plan
+
+## Verdict
+
+**I was partially wrong.** The original audit cleared all 11 slices as catalog-compliant with only spec-reference comments needed. After rigorous re-examination, **GAP-3 (`is set`/`is not set`) requires a catalog addition** before implementation. GAP-1, GAP-2, GAP-6, GAP-7, and all test slices remain genuinely compliant.
+
+## The Error
+
+The original audit conflated "does the parser need to read from it?" with "does it need to exist in the catalog?" These are different questions:
+
+- The parser handles prefix/postfix operators structurally (hardcoded precedence in `ParseAtom()` / left-denotation handlers) — this is pre-existing pattern for `Not` (25) and `Negate` (65).
+- The catalog's job is not just to feed the parser. It is the language specification in machine-readable form. Consumers include MCP vocabulary, LS hover, AI grounding, and documentation generation.
+
+`is set` is a language-surface operator with defined precedence, arity, and semantics. Omitting it from `Operators.All` means MCP `precept_language` output is incomplete — an AI grounding on Precept would see 18 operators but not `is set`. That violates the Completeness Principle.
+
+## Required Catalog Changes
+
+1. Add `Arity.Postfix = 3` to the `Arity` enum
+2. Add `OperatorKind.IsSet = 19` to the `OperatorKind` enum
+3. Add `Operators.GetMeta(OperatorKind.IsSet)` entry: `Arity.Postfix`, `Precedence: 40`, `OperatorFamily.Membership`, `IsKeywordOperator: true`, `Token: Tokens.GetMeta(TokenKind.Is)`
+
+These are small, focused additions — one enum value, one arity member, one switch arm.
+
+## What Does NOT Need to Change
+
+- `OperatorMeta` does NOT need a `MultiTokenSequence` field — `Token` points to `TokenKind.Is` (lead token), multi-token parsing is grammar shape
+- `Operations` catalog does NOT need `IsSet` entries — presence testing is structural, not a typed operation
+- No new catalog axis needed for expression forms — expression AST nodes are internal pipeline types
+
+## Architectural Principle Established
+
+**The boundary between catalog-driven and hand-written parse logic:**
+
+- **Vocabulary** (what exists and its properties) → always cataloged: tokens, operators, types, constructs, etc.
+- **Grammar shape** (how the parser assembles tokens into AST nodes) → structural, hand-written: expression atom handlers, left-denotation handlers, declaration parsing methods
+
+An operator must exist in the Operators catalog even if the parser doesn't read from it for precedence. Expression AST node types are grammar output, not vocabulary — they don't need catalog entries.
+
+---
+
+# Decision: Catalog Vision Ordering — Strengthened Wording
+
+**Date:** 2026-05-01
+**Author:** Frank (Lead Architect)
+**Requested by:** Shane
+
+## What Changed
+
+`docs/language/catalog-system.md` received two additions in § Architectural Identity:
+
+1. **New subsection: "Vision precedes consumers"** — inserted between the existing architectural identity prose and the decision framework. States the vision → consumers ordering explicitly, directly forecloses the "no consumer currently uses it" argument by name, provides the correct 3-step reasoning, and addresses future agents/architects directly.
+
+2. **New anti-pattern in the decision framework:** `"no consumer currently uses it"` — joins the existing "small enum = bare" and "flat record with inapplicable fields" anti-patterns. Names the bad argument, explains why it inverts the vision, and states the correct rule.
+
+## Why
+
+This principle emerged from an architectural debate where I (Frank) initially argued that expression forms didn't need a catalog because "no consumer currently uses it." Shane challenged this as a violation of the catalog-driven vision itself. He was right. The catalog IS the machine-readable spec — consumers derive from it. The vision precedes the consumers.
+
+The principle was implicitly present in the document's existing "Completeness Principle" statement, but it was weak enough that a reasonable architect could (and did) argue around it by appealing to "consumer value." The new wording makes the principle impossible to misread and names the specific bad argument that must never be repeated.
+
+## Scope of Changes
+
+- `docs/language/catalog-system.md` — two additions (subsection + anti-pattern)
+- `README.md` — no changes needed (doesn't discuss catalog architecture)
+- `docs/philosophy.md` — no changes needed (discusses product identity, not catalog mechanics)
+
+---
+
+# Decision: Expression Form Catalog Placement — Separate vs. Extend Constructs
+
+**By:** Frank  
+**Date:** 2026-05-01  
+**Status:** Recommendation (awaiting owner decision)
+
+---
+
+## Metadata Shape Comparison
+
+### Current ConstructMeta (actual fields)
+
+```csharp
+public sealed record ConstructMeta(
+    ConstructKind                        Kind,
+    string                               Name,
+    string                               Description,
+    string                               UsageExample,
+    ConstructKind[]                      AllowedIn,          // semantic nesting contexts
+    IReadOnlyList<ConstructSlot>         Slots,              // typed positional slots (IdentifierList, TypeExpression, etc.)
+    ImmutableArray<DisambiguationEntry>  Entries,            // leading token(s) + disambiguation tokens
+    RoutingFamily                        RoutingFamily,      // Header | Direct | StateScoped | EventScoped
+    string?                              SnippetTemplate);
+```
+
+Supporting types:
+- `ConstructSlot(ConstructSlotKind Kind, bool IsRequired, string? Description)` — 17 slot kinds
+- `DisambiguationEntry(TokenKind LeadingToken, ImmutableArray<TokenKind>? DisambiguationTokens, ConstructSlotKind? LeadingTokenSlot)` — parser routing
+- `RoutingFamily` — 4-value enum for parser dispatch strategy
+
+### Projected ExpressionFormMeta (what expression forms need)
+
+```csharp
+public sealed record ExpressionFormMeta(
+    ExpressionFormKind   Kind,
+    string               Name,
+    string               Description,
+    string               UsageExample,
+    ExpressionCategory   Category,            // Atom | Composite | Invocation
+    bool                 IsLeftDenotation,     // Pratt parser role: nud vs. led
+    string?              HoverDescription);
+```
+
+Supporting types:
+- `ExpressionCategory` — 3-value enum (Atom, Composite, Invocation)
+
+### Field-by-Field Compatibility
+
+| Field | ConstructMeta | ExpressionFormMeta | Compatible? |
+|-------|--------------|-------------------|-------------|
+| Kind | ConstructKind | ExpressionFormKind | ❌ Different enum |
+| Name | ✓ | ✓ | ✅ Same |
+| Description | ✓ | ✓ | ✅ Same |
+| UsageExample | ✓ | ✓ | ✅ Same |
+| AllowedIn | ConstructKind[] | N/A | ❌ Inapplicable to expressions |
+| Slots | IReadOnlyList\<ConstructSlot\> | N/A | ❌ Inapplicable to expressions |
+| Entries | ImmutableArray\<DisambiguationEntry\> | N/A | ❌ Inapplicable to expressions |
+| RoutingFamily | Header/Direct/StateScoped/EventScoped | N/A | ❌ Inapplicable to expressions |
+| SnippetTemplate | string? | N/A | ⚠️ Possibly useful but different semantics |
+| Category | N/A | ExpressionCategory | ❌ Inapplicable to constructs |
+| IsLeftDenotation | N/A | bool | ❌ Inapplicable to constructs |
+| HoverDescription | N/A | string? | ⚠️ Could be added to ConstructMeta but isn't there |
+
+**Summary:** 4 shared fields (Kind identity, Name, Description, UsageExample). 5 Construct-specific fields. 2–3 ExpressionForm-specific fields. The domain-specific field sets have **zero overlap.**
+
+---
+
+## Option A: Separate 13th Catalog (`ExpressionFormKind` / `ExpressionFormMeta`)
+
+### Pros
+
+1. **Metadata shapes are genuinely incompatible.** Constructs carry `AllowedIn`, `Slots`, `Entries`, `RoutingFamily` — all about declaration-level parsing and disambiguation. Expression forms carry `Category` and `IsLeftDenotation` — about the Pratt expression parser. There is no field that makes sense in both contexts. A shared record would require either (a) 5+ nullable fields inapplicable to half the members, or (b) a DU. The catalog-system.md explicitly calls out "flat record with inapplicable fields" as an anti-pattern (§ Decision Framework, anti-pattern 2).
+
+2. **Each catalog stays focused and narrow.** ConstructMeta describes "line-level declaration shapes the parser routes via leading-token dispatch." ExpressionFormMeta describes "expression shapes the Pratt parser assembles within a construct's expression slots." Different parser subsystems, different routing mechanisms, different consumer questions. One asks "what line-level form is this?" The other asks "what expression shape is this?"
+
+3. **MCP `precept_language` output stays readable.** Constructs are presentation-grouped by nesting scope (top-level, state-scoped, event-scoped). Expression forms are grouped by category (atoms, composites, invocations). Mixing them in one section forces either interleaving or awkward sub-grouping. Separate sections give each a natural presentation order.
+
+4. **Grammar generator has cleaner boundaries.** The grammar generator for declaration-level patterns reads Constructs (leading tokens, disambiguation sequences). The grammar generator for expression-level patterns would read ExpressionForms (to generate token-pattern matches for atoms and left-denotation triggers). These are different TextMate scope assignments in different grammar regions. Separate catalogs map cleanly to separate generator passes.
+
+5. **LS completions/hover filtering is trivial.** When the cursor is inside an expression slot, the LS offers expression-form-relevant completions. When at line start, it offers construct-level completions. Separate catalogs mean separate iteration — no filtering needed. If combined, the LS must filter ConstructKind members to determine "is this an expression form or a declaration construct?" at every completion site.
+
+6. **CS8509 enforcement stays precise.** Each catalog's exhaustive switch covers exactly its own domain. A new expression form triggers "fill the ExpressionForms switch." A new declaration construct triggers "fill the Constructs switch." If combined, a single switch covers both — but the handler logic differs so dramatically (slots vs. left-denotation) that the switch arms have nothing in common.
+
+### Cons
+
+1. **13th catalog = one more catalog to maintain.** New plumbing: an enum, a meta record, a static class with `GetMeta` switch + `All` property. ~60–100 lines of boilerplate. Modest cost.
+
+2. **Not a sprawl smell — but worth noting.** The catalog-system.md explicitly says "If a thirteenth aspect of the language emerges that isn't covered by these twelve, it needs a catalog." Expression forms are that thirteenth aspect. The system was designed to accommodate this. Still, 13 catalogs is more to document and explain.
+
+3. **Consumers that want "all grammar shapes" must query both.** A hypothetical consumer that asks "enumerate everything the parser can produce" would need `Constructs.All` + `ExpressionForms.All`. In practice, no consumer currently asks this question — they ask either "what declaration forms exist?" or "what expression shapes exist?" — but it's worth noting.
+
+4. **No risk of inconsistency between catalogs.** Expression forms and constructs are conceptually adjacent but don't share identity members, don't cross-reference each other, and don't have overlapping enum values. There's no synchronization obligation.
+
+---
+
+## Option B: Extend Constructs (add expression form members to `ConstructKind`)
+
+### Pros
+
+1. **Reuses existing infrastructure.** No new enum, no new meta record, no new static class. Just add ~13 members to `ConstructKind` and fill the switch. ~100 lines added to an existing file.
+
+2. **Single "grammar shapes" catalog.** Conceptual argument: both constructs and expression forms are "shapes the parser produces." One catalog covers all parser output shapes. Consumers asking "what can the parser produce?" iterate one `All`.
+
+3. **Consumers already know the API.** MCP, LS, grammar generator already iterate `Constructs.All`. No new API surface to learn or document.
+
+### Cons
+
+1. **Metadata shapes don't fit.** Adding expression forms to `ConstructMeta` means every expression form member would have:
+   - `AllowedIn = []` (always empty — no semantic nesting for expressions)
+   - `Slots = []` (always empty — expression forms don't have typed positional slots)
+   - `Entries = [...]` (maybe? but expression forms don't disambiguate via leading-token dispatch)
+   - `RoutingFamily = ???` (needs a new value like `Expression`, or stays `None`)
+   
+   Meanwhile, expression-form-specific metadata (`IsLeftDenotation`, `Category`) would need to be either:
+   - **Added as nullable fields to ConstructMeta** — violates the "flat record with inapplicable fields" anti-pattern explicitly called out in catalog-system.md
+   - **ConstructMeta becomes a DU** — possible, but then you have `DeclarationConstructMeta` and `ExpressionFormMeta` subtypes sharing an abstract base with only Name/Description/UsageExample. At that point you've reinvented two catalogs with shared plumbing but forced into one enum.
+
+2. **ConstructKind loses focus.** Currently: 12 members, all declaration-level grammar forms. Adding 13 expression forms makes it 25 members where half the members use completely different metadata. The enum's identity shifts from "declaration shapes" to "everything the parser can produce" — which is less useful to any specific consumer.
+
+3. **MCP output becomes harder to read.** The `precept_language` output would list `FieldDeclaration`, `StateDeclaration`, ... `NumericLiteral`, `BinaryOperation` in one section. Consumers (especially AI/LLM grounding) lose the clear separation between "what declarations can you write?" and "what expressions can you write?"
+
+4. **Filtering burden on every consumer.** Every consumer that wants only constructs (LS at line-start, grammar generator for declaration patterns) must filter out expression form members. Every consumer that wants only expression forms (LS inside expressions, grammar generator for expression patterns) must filter out constructs. This is the exact problem separate catalogs solve for free.
+
+5. **RoutingFamily becomes incoherent.** The enum currently describes declaration-level parser dispatch: Header, Direct, StateScoped, EventScoped. Expression forms use a different dispatch mechanism entirely (Pratt parser's nud/led). Adding `Expression` to RoutingFamily conflates two unrelated parser subsystems into one classification axis.
+
+6. **The DU escape hatch proves the point.** If you need a DU to make it work (because the shapes don't fit a flat record), you've proven the shapes are different enough to warrant separation. A DU inside a single catalog is strictly more complex than two simple catalogs with flat records.
+
+---
+
+## Recommendation: Option A — Separate 13th Catalog
+
+### The decisive factor: metadata shape incompatibility
+
+This is not a close call. The domain-specific fields have **zero overlap:**
+
+- Constructs need: `AllowedIn`, `Slots` (17 slot kinds), `Entries` (disambiguation tokens), `RoutingFamily`
+- Expression forms need: `Category`, `IsLeftDenotation`
+
+Option B requires either nullable fields (anti-pattern) or a DU (proving the shapes are separate). Both are more complex than simply having two catalogs with right-sized flat records.
+
+### Secondary factors (all pointing the same direction)
+
+- Consumers always want one or the other, never both merged
+- MCP output is cleaner with separate sections
+- Grammar generator has naturally separate passes (declaration patterns vs. expression patterns)
+- The LS filtering story is trivial with separate catalogs, annoying with a combined one
+- `catalog-system.md` line 66 explicitly anticipated a 13th catalog
+
+### The "conceptual kin" argument doesn't carry weight
+
+Yes, both are "parser output shapes." But `TypeMeta` and `OperatorMeta` are also both "things that appear in expressions" and they're separate catalogs. The architectural principle is: **catalogs are grouped by metadata shape and consumer query pattern**, not by abstract conceptual kinship. Two things can be conceptually related and still belong in separate catalogs because their metadata and consumers differ.
+
+### Open question (none — this is ready to decide)
+
+The analysis is clear enough that I don't see a remaining open question. If Shane sees a consumer pattern I'm missing — one that genuinely needs constructs and expression forms merged and iterated together — that would reopen it. But I don't see one.
+
+---
+
+# Decision: Expression Forms Do Not Get a Catalog
+
+**By:** Frank  
+**Date:** 2026-05-01  
+**Status:** Ruling (architectural)
+
+## The Question
+
+Should expression forms (the AST node types the parser produces for expressions) be cataloged as a 13th catalog axis?
+
+## Ruling: No
+
+Expression forms are **structural grammar output**, not **language vocabulary**. They do not get a catalog. The boundary between catalog and parser is not arbitrary — it is the vocabulary/structure distinction.
+
+## The Test (Reusable Rule)
+
+**If the element is a named vocabulary member whose existence, per-member metadata, and enumeration serve downstream consumers → catalog it.**
+
+**If the element is a structural assembly rule that produces an AST shape for downstream consumers to pattern-match on → it stays in the parser.**
+
+More concretely:
+
+1. **Would `MCP precept_language` enumerate it?** Operators yes (users need to know `is set` exists). Expression forms no (users don't need "here are all AST node shapes").
+2. **Does each member carry distinct per-member metadata that consumers read?** Operators yes (precedence, arity, associativity, family, hover docs). Expression forms no — the metadata IS the C# record shape itself.
+3. **Would adding a new member require consumers to adapt?** Adding a new operator requires the type checker to know its type rules (via `Operations` catalog). Adding a new expression form (e.g., `ListLiteralExpression`) requires consumers to add a `case` branch — which they'd need regardless of whether a catalog existed.
+
+## Why This Is Not Arbitrary
+
+The catalog system's Completeness Principle asks: "If I enumerated every catalog's `All` property, would I have a complete description of Precept?" Expression forms fail this test from the other direction — they are an *implementation artifact* of the parser, not a *description of the language*. A complete description of Precept includes "the `is set` operator exists with postfix arity." It does not include "the parser produces a `BinaryExpression` node."
+
+## The GAP-3 Contrast
+
+`is set` is an **operator** — a named vocabulary member. It has precedence (postfix), arity (unary), a family (membership), hover documentation, and MCP enumerates it. It belongs in `Operators.All` because consumers need its metadata.
+
+`ListLiteralExpression` is an **AST node shape** — the parser's output when it encounters `[a, b, c]`. No consumer asks "what metadata does a list literal have?" They pattern-match on the node type and inspect its children. The `[` and `]` tokens are already in `Tokens`; the grammar rule for assembling them is parser logic.
+
+## Cross-References
+
+- `docs/language/catalog-system.md` § Architectural Identity, § Pipeline Stage Impact
+- `src/Precept/Pipeline/Parser.cs` — expression parser (Pratt loop + ParseAtom)
+- `src/Precept/Pipeline/SyntaxNodes/Expressions/` — the expression AST node hierarchy
+
+---
+
+# Decision: Expression Forms Belong in the Catalog (Revised)
+
+**By:** Frank  
+**Date:** 2026-05-01  
+**Status:** Revision — supersedes `frank-expression-forms-catalog-boundary.md`
+
+## Prior Position (Withdrawn)
+
+I previously ruled that expression forms are "structural grammar output, not language vocabulary" and therefore don't get a catalog. I was wrong. The reasoning was:
+
+1. "No consumer asks 'enumerate all expression forms'" — an argument about current consumer state, not about whether the concept is language surface.
+2. "The metadata IS the C# record shape itself" — confuses the implementation artifact with the language concept.
+3. "Expression forms are structure, not vocabulary" — a distinction the catalog system itself doesn't honor. The **Constructs catalog already catalogs parser output shapes** (FieldDeclaration, TransitionRow, StateEnsure). These are structurally identical in nature to expression forms — grammar shapes the parser produces. I was applying a vocabulary/structure split that the system contradicts at the declaration level.
+
+## What Changed My Position
+
+Re-reading catalog-system.md honestly:
+
+- **Completeness Principle:** "If something is part of the Precept language, it gets cataloged." Expression forms are unambiguously part of the language. `[a, b, c]` as a list literal, `amount + fee` as a binary operation, `len(items)` as a function call — these appear in every `.precept` file.
+- **The decision framework, criterion 1:** "Is it language surface? Does it appear in .precept files... or represent a concept that would appear in a complete description of the Precept language?" Yes on both counts.
+- **Line 66:** "If a thirteenth aspect of the language emerges that isn't covered by these twelve, it needs a catalog." Expression forms are that thirteenth aspect.
+- **The Constructs precedent:** Constructs catalogs *grammar forms / declaration shapes* — things like `FieldDeclaration`, `TransitionRow`. These are parser output shapes. Expression forms are the same kind of thing at the expression level. The principled distinction I claimed doesn't exist.
+
+The real test that broke my position: **Why is `ConstructKind.TransitionRow` cataloged but `ExpressionForm.BinaryOperation` is not?** Both are parser output shapes. Both carry metadata consumers could use. Both are language surface. The only answer is "we got to one and not the other." That's not a principle — it's a gap.
+
+## Revised Ruling: Expression Forms Get a Catalog
+
+Expression forms are language surface. Under the catalog-driven vision, they belong in a 13th catalog (or possibly absorbed as a Constructs expansion, depending on shape fit).
+
+## What It Would Look Like
+
+```csharp
+public enum ExpressionFormKind
+{
+    // ── Atoms ──────────────────────────────────────────────────────
+    NumericLiteral,        // 42, 3.14
+    StringLiteral,         // "hello"
+    BooleanLiteral,        // true, false
+    TypedConstant,         // status.Active, color.Red
+    Identifier,            // fieldName
+    ListLiteral,           // [a, b, c]
+    Interpolation,         // "Hello {name}"
+    Parenthesized,         // (expr)
+
+    // ── Composite ──────────────────────────────────────────────────
+    BinaryOperation,       // left op right
+    UnaryOperation,        // not expr, expr is set
+    MemberAccess,          // obj.field
+
+    // ── Invocation ─────────────────────────────────────────────────
+    FunctionCall,          // len(items), min(a, b)
+    MethodCall,            // collection.contains(x)
+}
+
+public sealed record ExpressionFormMeta(
+    ExpressionFormKind     Kind,
+    string                 Name,
+    string                 Description,
+    string                 UsageExample,
+    ExpressionCategory     Category,         // Atom, Composite, Invocation
+    bool                   IsLeftDenotation,  // false for atoms, true for binary/member/method
+    string?                HoverDescription);
+
+public enum ExpressionCategory { Atom, Composite, Invocation }
+```
+
+## What It Would Enable
+
+| Consumer | Benefit |
+|----------|---------|
+| MCP `precept_language` | Enumerates all expression forms — AI/LLM tools know exactly what expression shapes the language supports |
+| LS completions | Context-sensitive expression suggestions (e.g., "in a guard clause, you can use these expression forms") |
+| LS hover | Hover on `[` shows "List literal — constructs a list value from elements" |
+| Grammar generator | Expression-level token patterns derive from the catalog |
+| AI grounding | Complete language description — no blind spots in expression grammar |
+| Documentation | Auto-generated expression reference |
+| Parser validation | Parser can assert coverage against the catalog — every ExpressionFormKind has a ParseAtom or left-denotation handler |
+
+## The Parser Relationship
+
+The parser does NOT need to read from this catalog at runtime (just as it doesn't read from Constructs at runtime — routing is compiled in). But the catalog serves as:
+
+1. **Completeness enforcement:** CS8509 ensures every expression form has metadata.
+2. **Enumeration surface:** MCP/LS iterate `ExpressionForms.All` rather than maintaining parallel lists.
+3. **Single atomic propagation:** Adding a new expression form (e.g., range literal) means adding a Kind member, filling the switch, and every consumer picks it up.
+
+## Design Question (For Shane)
+
+Should expression forms be a separate 13th catalog (`ExpressionForms`) or an extension of `Constructs` (which is already "grammar forms")? The metadata shape differs enough (no `Slots`, no `RoutingFamily`, but yes `IsLeftDenotation` and `Category`) that a separate catalog feels cleaner — but the conceptual kinship is real.
+
+## Lesson Recorded
+
+"No consumer currently uses it" is never a valid argument against cataloging something that IS the language. The catalog-driven vision means: describe the language completely, then consumers derive from it. The vision precedes the consumers — not the other way around.
+
+---
+
+# Parser vs. Spec: Full Audit — Frank
+
+> **Date:** 2026-05-01  
+> **Branch:** spike/Precept-V2  
+> **Auditor:** Frank  
+> **Scope:** Exhaustive spec-vs-implementation review of `src/Precept/Pipeline/Parser.cs` against  
+> `docs/language/precept-language-spec.md`, all 28 sample files, and the expression node inventory.
+
+---
+
+## Executive Summary
+
+The parser on `spike/Precept-V2` (2107 tests, 0 failures) correctly implements the declaration grammar and most of the expression grammar. Three previously-identified critical gaps (GAP-1/2/3) remain. This audit found **three additional gaps** (GAP-6/7/8) plus one spec-quality defect.
+
+The branch is **not production-ready** with the current gaps. GAP-2 and GAP-3 together break 13 of 28 sample files:
+- 11 files use `is set` / `is not set` (GAP-3 — no parser handling at all)
+- 2 files use `in State ensure Condition when Guard because "..."` (GAP-2 — post-condition guard unhandled; expression parse partially succeeds then fails at `Expect(Because)` seeing `when`)
+
+Both are parse-time failures, not type-checker failures. The sample files produce diagnostics where they should produce clean trees.
+
+---
+
+## GAP-2 Spec History Finding
+
+**Verdict: The spec was updated on 2026-04-28, matching a form the samples already used. The parser was never updated.**
+
+Detailed timeline from `git log --format="%H %s %cd" --date=short -- docs/language/precept-language-spec.md`:
+
+| Commit | Date | Spec grammar (ensure) |
+|--------|------|----------------------|
+| `1c352fa` | 2026-04-25 | `StateTarget ("when" BoolExpr)? ensure BoolExpr because StringExpr` |
+| `50a459c` | 2026-04-28 | `StateTarget ensure BoolExpr ("when" BoolExpr)? ("because" StringExpr)?` |
+
+The **2026-04-25 spec** placed `when` BEFORE `ensure` (pre-condition stashed guard). The **2026-04-28 spec** moved `when` to AFTER the condition (post-condition guard), and simultaneously made `because` optional with `?`.
+
+The samples were already using the post-condition form before the spec changed. At `1c352fa`, `insurance-claim.precept` had:
+```
+in Approved ensure DecisionNote != null when FraudFlag because "..."
+```
+
+This is the post-condition form — `ensure COND when GUARD` — which matched neither the spec at the time nor the parser then or now.
+
+**The parser has never supported post-condition guards on ensures.** `TryParseStashedGuard()` handles `when` appearing between the state target and the disambiguation verb (`in Draft when Condition ensure ...`), which is the OLD spec form. The samples require the NEW spec form. Both forms coexisted in production code at different times. The spec caught up to the samples on 2026-04-28; the parser has not.
+
+The user's belief — "added in the last few days" — is **confirmed for the spec change**. The samples had it longer. This has been broken since the samples were authored.
+
+---
+
+## Complete Gap Table (New Gaps Only — GAP-6 through GAP-8)
+
+| ID | Priority | Construct / Feature | Parser Gap |
+|----|----------|---------------------|-----------|
+| GAP-6 | Medium | List literal expressions `[1, 2, 3]` | `ParseAtom()` has no `LeftBracket` case; `ListLiteralExpression` AST node does not exist |
+| GAP-7 | Medium | Method calls on member access `field.method(args)` | Pratt left-denotation has no `LeftParen` handler after `MemberAccessExpression`; `MethodCallExpression` AST node does not exist |
+| GAP-8 | Low | `because` optional vs. required for ensures | Spec §2.2 shows `("because" StringExpr)?` (optional); parser uses `Expect(Because)` in both `ParseStateEnsure()` and `ParseEventEnsure()` (required). Likely a spec authoring error — design principle 9 says `because` is mandatory. No practical impact because all samples use `because`. |
+
+---
+
+## Per-Gap Detail
+
+---
+
+### GAP-6 — List Literal Expressions
+
+**Spec reference:** §1.3 "List literals", §3.8 "List literal validation"
+
+**Spec says:**
+```
+ListLiteral  :=  '[' (Expr (',' Expr)*)? ']'
+
+[1, 2, 3]   → LeftBracket, NumberLiteral, Comma, NumberLiteral, Comma, NumberLiteral, RightBracket
+["a", "b"]  → LeftBracket, StringLiteral, Comma, StringLiteral, RightBracket
+[]          → LeftBracket, RightBracket
+```
+The spec's null-denotation table (§2.1) lists `LeftBracket → ListLiteralExpression`.
+
+Type checker validation (§3.8) says:
+- List literals are ONLY valid in `default` clauses (`ListLiteralOutsideDefault` fires elsewhere)
+- Element types must match the collection's declared element type
+
+**What the parser does:**  
+`ParseAtom()` has no `case TokenKind.LeftBracket`. Encountering `[` falls into the `default` arm, emits an `ExpectedToken` diagnostic, and returns a missing `IdentifierExpression`.
+
+**What's also missing:**  
+No `ListLiteralExpression` record type in `src/Precept/Pipeline/SyntaxNodes/`. The entire AST representation is absent.
+
+**Sample reference:** None of the 28 sample files use list literal defaults currently. However, the feature is spec-described and necessary for fields like `field Tags as set of string default ["important", "new"]`.
+
+**Fix recommendation:**  
+1. Add `case TokenKind.LeftBracket:` to `ParseAtom()` — parse comma-separated expressions until `RightBracket`.  
+2. Create `ListLiteralExpression(SourceSpan Span, ImmutableArray<Expression> Elements) : Expression(Span)`.  
+3. Add type-checker validation for `ListLiteralOutsideDefault` and element type checking.
+
+**Priority: Medium.** No sample breakage today, but the feature is fully spec-described and unimplemented at both parser and AST layers.
+
+---
+
+### GAP-7 — Method Calls on Member Access (`obj.method(args)`)
+
+**Spec reference:** §2.1 left-denotation table
+
+**Spec says:**
+```
+| `(` (LeftParen) | If left is MemberAccessExpression → MethodCallExpression;
+|                   if IdentifierExpression → CallExpression; else → diagnostic |
+```
+
+**What the parser does:**  
+After the Pratt loop processes `.identifier` into a `MemberAccessExpression`, the next iteration checks:
+1. `ExpressionBoundaryTokens.Contains(current.Kind)` — no (`LeftParen` is not a boundary)
+2. `current.Kind == TokenKind.Dot` — no  
+3. `OperatorPrecedence.TryGetValue(current.Kind, ...)` — no (`LeftParen` is not in the operators catalog)  
+4. Loop breaks, returning `MemberAccessExpression` without consuming `(`
+
+The `(` is then left over as the next token, which causes a downstream parse error.
+
+`CallExpression` (bare function call `name(args)`) IS handled correctly in `ParseAtom()` for the `Identifier` case. Only the chained `obj.method(args)` form is broken.
+
+**What's also missing:**  
+No `MethodCallExpression` record type in `src/Precept/Pipeline/SyntaxNodes/`. The AST representation is absent.
+
+**Sample reference:** None of the 28 sample files currently use `obj.method(args)` syntax. The spec-described use case is temporal types: `someInstant.inZone(tz)` and `someDatetime.inZone(tz)`. These are the only method-call-on-accessor forms in §3.6.
+
+**Fix recommendation:**  
+1. Add a `LeftParen` handler in the Pratt left-denotation loop (after the `Dot` handler), guarded by `minPrecedence <= 80`:  
+   - If `left is MemberAccessExpression` → parse arg list → return `MethodCallExpression`  
+   - If `left is IdentifierExpression` → parse arg list → return `CallExpression` (this would subsume the `ParseAtom` `Identifier` branch for consistency)  
+   - Else → emit `InvalidCallTarget` diagnostic  
+2. Create `MethodCallExpression(SourceSpan Span, Expression Target, ImmutableArray<Expression> Args) : Expression(Span)`.
+
+**Priority: Medium.** No sample breakage today. Temporal method calls require this. If temporal types are exercised, this gap becomes High.
+
+---
+
+### GAP-8 — `because` Clause Optional vs. Required (Spec Inconsistency)
+
+**Spec reference:** §2.2 "State/event ensure" grammar
+
+**Spec says (current, post `50a459c`):**
+```
+(in|to|from) StateTarget ensure BoolExpr ("when" BoolExpr)? ("because" StringExpr)?
+on Identifier ensure BoolExpr ("when" BoolExpr)? ("because" StringExpr)?
+```
+Both `when` and `because` are marked optional with `?`.
+
+**What the parser does:**  
+`ParseStateEnsure()` and `ParseEventEnsure()` both call `Expect(TokenKind.Because)`, which emits a diagnostic if `because` is absent. This matches design principle 9 ("Mandatory rationale — the `because` clause is syntactically required on every rule and ensure").
+
+**What the rule declaration shows:**
+```
+rule BoolExpr ("when" BoolExpr)? because StringExpr
+```
+`because` is NOT optional for `rule` — it has no `?`.
+
+**Assessment:**  
+This is a **spec authoring error** introduced at `50a459c` (2026-04-28) when the grammar was reorganized to support post-condition guards. The `?` on `because` was likely inadvertent — it may have been copied from the `when` clause that was intentionally made optional. Design principle 9 is explicit that `because` is always required. All 28 sample files use `because` without exception. The parser is correct; the spec needs correcting.
+
+**Fix recommendation:**  
+Correct the spec grammar at §2.2 to remove `?` from `because`:
+```
+(in|to|from) StateTarget ensure BoolExpr ("when" BoolExpr)? because StringExpr
+on Identifier ensure BoolExpr ("when" BoolExpr)? because StringExpr
+```
+This restores consistency with design principle 9 and `rule` declaration grammar.
+
+**Priority: Low.** Parser behavior is correct. This is a spec defect, not a parser defect. Flag to spec steward (me).
+
+---
+
+## AST Design Observation — `ContainsExpression` vs. `BinaryExpression`
+
+**Not a gap; an AST design deviation from spec nomenclature.**
+
+The spec §2.1 left-denotation table specifies `ContainsExpression(left, ParseExpression(40))` for the `contains` operator. The parser produces `BinaryExpression(left, containsToken, right)` — `contains` uses the standard Pratt binary path because it IS in `Operators.All` with `Arity.Binary`.
+
+No `ContainsExpression` type exists in the codebase.
+
+This is functional: downstream stages (type checker, evaluator) can discriminate `contains` by checking `BinaryExpression.Operator.Kind == TokenKind.Contains`. There is no behavioral gap. However, the spec and implementation use different AST node names. The spec should be updated to say `BinaryExpression(Contains, ...)` or the codebase should add a `ContainsExpression` subtype for semantic clarity.
+
+This is a documentation/design-consistency issue, not a parser correctness issue.
+
+---
+
+## Overall Parser Coverage Assessment
+
+### Expression atoms (§2.1 null-denotation)
+
+| Atom | Spec | Parser | Status |
+|------|------|--------|--------|
+| `Identifier` | §2.1 | `ParseAtom()` | ✓ |
+| `NumberLiteral` | §2.1 | `ParseAtom()` | ✓ |
+| `True` / `False` | §2.1 | `ParseAtom()` | ✓ |
+| `StringLiteral` | §2.1 | `ParseAtom()` | ✓ |
+| `StringStart` (interpolated string) | §2.1 | `ParseInterpolatedString()` | ✓ |
+| `TypedConstant` | §2.1 | ✗ Missing | **GAP-1** |
+| `TypedConstantStart` (interpolated typed constant) | §2.1 | ✗ Missing | **GAP-1** |
+| `LeftBracket` (list literal) | §2.1 | ✗ Missing | **GAP-6** |
+| `LeftParen` (parenthesized) | §2.1 | `ParseAtom()` | ✓ |
+| `Not` (prefix) | §2.1 | `ParseAtom()` | ✓ |
+| `Minus` (unary negate + constant fold) | §2.1 | `ParseAtom()` | ✓ |
+| `If` (conditional) | §2.1 | `ParseAtom()` | ✓ |
+
+**Atom coverage: 9/12 = 75%.** All three missing atoms are spec-defined types that don't exist in the AST layer.
+
+### Expression operators (§2.1 left-denotation)
+
+| Operator | Spec | Parser | Status |
+|----------|------|--------|--------|
+| `or`, `and` | §2.1 | `OperatorPrecedence` | ✓ |
+| `==` `!=` `~=` `!~` `<` `>` `<=` `>=` | §2.1 | `OperatorPrecedence` | ✓ |
+| `contains` | §2.1 | `OperatorPrecedence` (as `BinaryExpression`) | ✓ (AST deviation) |
+| `is` (`is set` / `is not set`) | §2.1 | ✗ Not in `Operators.All`; no Pratt case | **GAP-3** |
+| `+` `-` (infix) | §2.1 | `OperatorPrecedence` | ✓ |
+| `*` `/` `%` | §2.1 | `OperatorPrecedence` | ✓ |
+| `.` (member access) | §2.1 | Pratt special case | ✓ |
+| `(` after `IdentifierExpression` | §2.1 | `ParseAtom()` `Identifier` case | ✓ |
+| `(` after `MemberAccessExpression` | §2.1 | ✗ No Pratt left-denotation for `LeftParen` | **GAP-7** |
+
+**Operator coverage: 7/9 = 78%.** The two missing operators are `is set`/`is not set` (GAP-3, Critical) and method calls on member access (GAP-7, Medium).
+
+### Declaration grammar (§2.2)
+
+| Construct | Spec | Parser | Status |
+|-----------|------|--------|--------|
+| `field` declaration | §2.2 | `ParseFieldDeclaration()` | ✓ |
+| `state` declaration (with modifiers) | §2.2 | `ParseStateDeclaration()` | ✓ |
+| `event` declaration (with args, initial) | §2.2 | `ParseEventDeclaration()` | ✓ |
+| `rule` declaration (with when guard) | §2.2 | `ParseRuleDeclaration()` | ✓ |
+| `in State ensure Cond when Guard because "msg"` | §2.2 | ✗ Post-condition guard not parsed | **GAP-2** |
+| `in State when Guard ensure Cond because "msg"` | OLD §2.2 | `TryParseStashedGuard()` | ✓ (OLD form works) |
+| `in State ensure Cond because "msg"` | §2.2 | `ParseStateEnsure()` | ✓ |
+| `in State modify Field readonly/editable (when Guard)?` | §2.2 | `ParseAccessMode()` | ✓ |
+| `in State omit Field` | §2.2 | `ParseOmitDeclaration()` | ✓ |
+| `to State ensure ...` | §2.2 | disambiguated via `StateEnsure` | ✓ (same GAP-2 for post-cond) |
+| `to State -> actions` (entry action) | §2.2 | `ParseStateAction()` | ✓ |
+| `from State on Event (when Guard)? -> actions -> outcome` | §2.2 | `ParseTransitionRow()` | ✓ |
+| `from State ensure ...` | §2.2 | disambiguated via `StateEnsure` | ✓ (same GAP-2 for post-cond) |
+| `from State -> actions` (exit action) | §2.2 | `ParseStateAction()` | ✓ |
+| `on Event ensure Cond when Guard because "msg"` | §2.2 | ✗ Post-condition guard not parsed | **GAP-2** |
+| `on Event -> actions` (event handler) | §2.2 | `ParseEventHandlerWithGuardCheck()` | ✓ |
+| `from any on Event -> actions -> outcome` | §2.2 | `ParseStateTargetDirect()` handles `any` | ✓ |
+| `in any ensure/modify/omit` | §2.2 | `ParseStateTargetDirect()` handles `any` | ✓ |
+| Multi-name field/state declarations | §2.2 | `ParseIdentifierListTokens()` | ✓ |
+| Action vocabulary (all 8 actions) | §2.2 | `ParseActionStatement()` dispatch | ✓ |
+| Outcome vocabulary (transition/no transition/reject) | §2.2 | `ParseOutcomeNode()` | ✓ |
+
+**Declaration grammar coverage: ~95%.** GAP-2 affects all 4 ensure variants (`in`, `to`, `from`, `on`) for post-condition guards.
+
+### Type references (§2.3)
+
+| Type form | Spec | Parser | Status |
+|-----------|------|--------|--------|
+| All scalar types (string, number, integer, decimal, boolean, temporal, business-domain) | §2.3 | `ParseTypeRef()` via `TypeKeywords` | ✓ |
+| Collection types (`set/queue/stack of T`) | §2.3 | `ParseTypeRef()` | ✓ |
+| Type qualifiers (`in 'USD'`, `of 'length'`) | §2.3 | `TryPeekQualifierKeyword()` loop | ✓ |
+| `choice of T(...)` with values | §2.3 | `ParseTypeRef()` + `ParseChoiceValue()` | ✓ |
+| Negative literals in choice values | §2.3 | `ParseChoiceValue()` constant fold | ✓ |
+
+**Type reference coverage: 100%.**
+
+### Field modifiers (§2.4)
+
+| Modifier | Spec | Parser | Status |
+|----------|------|--------|--------|
+| `optional`, `writable`, `ordered` (flags) | §2.4 | `ParseFieldModifierNodes()` | ✓ |
+| `nonnegative`, `positive`, `nonzero`, `notempty` (flags) | §2.4 | `ParseFieldModifierNodes()` | ✓ |
+| `default Expr`, `min Expr`, `max Expr` (value-bearing) | §2.4 | `ParseFieldModifierNodes()` | ✓ |
+| `minlength`, `maxlength`, `mincount`, `maxcount`, `maxplaces` | §2.4 | `ParseFieldModifierNodes()` | ✓ |
+| Computed expression `-> Expr` | §2.2/§2.4 | `ParseComputeExpression()` | ✓ |
+
+**Field modifier coverage: 100%.**
+
+### Overall percentage estimate
+
+Weighting spec sections by language surface area:
+- Expression atoms: 75% (3 of 12 missing — GAP-1 × 2, GAP-6)
+- Expression operators: 78% (2 of 9 missing — GAP-3, GAP-7)
+- Declaration grammar: 95% (GAP-2 affects 4 ensure variants)
+- Type references: 100%
+- Field modifiers: 100%
+- Action vocabulary: 100%
+
+**Overall: approximately 88% of the spec is correctly and completely implemented.** The remaining 12% is not evenly distributed — it is concentrated in three critical expression-layer gaps that affect the most common sample patterns.
+
+---
+
+## Recommendations: Fix Immediately vs. Defer
+
+### Fix Immediately (Sprint-Blocking)
+
+**GAP-3: `is set` / `is not set`** — Critical  
+Used in 11 of 28 sample files. A foundational presence-testing form for `optional` fields. Unimplemented at every layer: not in `Operators.All`, not in the Pratt loop, no `IsSetExpression` AST type. Zero test coverage. Customer-Profile, Building-Access, Insurance-Claim, Loan-Application, Library-Checkout, Library-Hold, Restaurant-Waitlist, IT-Helpdesk, Utility-Outage, Event-Registration, and Clinic-Appointment all produce parse errors.
+
+**GAP-2: Post-condition guard on ensures**  — Critical  
+Used in 2 of 28 sample files directly, with the form `ensure COND when GUARD because "msg"`. The current parser supports only the OLD pre-condition form `when GUARD ensure COND`. The spec was updated 2026-04-28 to match the samples; the parser was not. ParseStateEnsure() and ParseEventEnsure() need a post-condition `when` check after `ParseExpression(0)`.
+
+**GAP-1: TypedConstant tokens in ParseAtom** — High  
+`TypedConstant` and `TypedConstantStart` produce no AST node; they hit the `default` arm of `ParseAtom()` and emit `ExpectedToken`. Typed constants are the ONLY mechanism for non-primitive literal values (dates, money, currency, quantity, duration, period, etc.). Without this, all business-domain and temporal types are unusable in expressions. No `TypedConstantExpression` or `InterpolatedTypedConstantExpression` AST type exists.
+
+### Fix Soon (Next Sprint)
+
+**GAP-6: List literal expressions** — Medium  
+Needed for collection fields with `default` values (`field Tags as set of string default ["a", "b"]`). Currently no sample uses this, but it's a spec-complete feature. `ParseAtom()` needs a `LeftBracket` case; `ListLiteralExpression` AST type must be created.
+
+**GAP-7: Method calls on member access** — Medium  
+Required for temporal `.inZone(tz)` calls. Currently no sample exercises temporal types. `LeftParen` handler needed in Pratt left-denotation after `MemberAccessExpression`; `MethodCallExpression` AST type must be created.
+
+### Spec Correction Required (Not a Code Fix)
+
+**GAP-8: `because` optional in spec grammar** — Low (spec defect)  
+The `?` on `("because" StringExpr)?` in the §2.2 ensure grammar is a spec authoring error. Design principle 9 is explicit: `because` is mandatory on every constraint. The spec must be corrected to `because StringExpr` (no `?`) to align with the parser, the samples, and the design philosophy. This is my defect to fix as spec steward.
+
+---
+
+## Test Coverage Gaps (Separate from Parser Gaps)
+
+The following parser behaviors have **zero test coverage**:
+- TypedConstant atoms (GAP-1)
+- `IsSetExpression` / `is not set` (GAP-3)
+- Post-condition guard on ensures (GAP-2)
+- List literal parsing (GAP-6)
+- Method call on member access (GAP-7)
+
+`ExpressionParserTests.cs` covers numeric, string, boolean, interpolated string, binary operators, unary operators, conditional, member access, and function calls. It does not cover any of the above.
+
+Before marking any of these gaps as fixed, the test suite must have:
+- `ParseExpression_TypedConstantLiteral` — `'2026-01-01'` produces `TypedConstantExpression`
+- `ParseExpression_InterpolatedTypedConstant` — `'Hello {Name}'` produces segments
+- `ParseExpression_IsSet` — `Field is set` produces `IsSetExpression(Field, IsSet=true)`
+- `ParseExpression_IsNotSet` — `Field is not set` produces `IsSetExpression(Field, IsSet=false)`
+- `ParseDeclaration_StateEnsure_PostConditionGuard` — `in State ensure Cond when Guard because "msg"`
+- `ParseDeclaration_EventEnsure_PostConditionGuard` — `on Event ensure Cond when Guard because "msg"`
+- `ParseExpression_ListLiteral` — `[1, 2, 3]` produces `ListLiteralExpression`
+- `ParseExpression_MethodCallOnMember` — `field.method(arg)` produces `MethodCallExpression`
+
+---
+
+*This audit is complete and final. All gaps are either confirmed existing (GAP-1/2/3), newly identified (GAP-6/7/8), or a spec defect (GAP-8). No implementation work was performed — this document is the design review input for remediation planning.*
+
+---
+
+# Decision: Parser Gap Fixes Implementation Plan
+
+> **Date:** 2026-05-01  
+> **Author:** Frank  
+> **Status:** Authored — awaiting George implementation  
+> **Artifact:** `docs/working/parser-gap-fixes-plan.md`
+
+---
+
+## Key Decisions Made
+
+### 1. GAP-2 Fix Strategy: Don't Remove `When` from Boundary Tokens
+
+**Decision:** The fix for post-condition guards (`ensure Cond when Guard`) does NOT touch `StructuralBoundaryTokens`. The expression parser correctly terminates at `when`; the ensure-parsing methods then check for `when` after the condition is parsed and consume the guard.
+
+**Rationale:** Removing `When` from boundary tokens would break every other context where `when` terminates an expression (rules, access modes, transition guards). The boundary is correct — the ensure parser simply wasn't checking for the optional post-condition guard.
+
+### 2. `PostConditionGuard` as Separate Field (Not Reusing `StashedGuard`)
+
+**Decision:** `StateEnsureNode` and `EventEnsureNode` get a new `Expression? PostConditionGuard` parameter alongside the existing `StashedGuard`. Both coexist.
+
+**Rationale:** The stashed guard (`in Draft when Cond ensure ...`) and post-condition guard (`ensure Cond when Guard`) have different structural positions and different diagnostic implications. Downstream passes need to distinguish them. If both are present simultaneously, that's likely an authoring error worth diagnosing — keeping them separate enables that.
+
+### 3. `LeftParen` Left-Denotation Preserves `ParseAtom()` Call Path
+
+**Decision:** The new `LeftParen` handler in the Pratt loop does NOT subsume the existing `Identifier → (` handling in `ParseAtom()`. Both paths remain.
+
+**Rationale:** The `ParseAtom()` path is a fast path for simple function calls (`min(a, b)`) that avoids entering the Pratt loop at all. The left-denotation path covers chained method calls (`a.b(c)`) where the left operand is already parsed. Removing the `ParseAtom()` path would force all function calls through the Pratt loop with an unnecessary `IdentifierExpression` allocation before converting to `CallExpression`.
+
+### 4. Sample File Tests Depend on All Parser Fixes
+
+**Decision:** Slice 11 (sample file integration tests) is explicitly last in the dependency order. Tests are written with the expectation that all 28 files parse clean.
+
+**Rationale:** Writing the test with "known failure" exceptions creates maintenance burden and obscures real regressions. Better to implement all fixes first, then add the integration tests as a lock on the completed state.
+
+### 5. No New `DiagnosticCode` Entries
+
+**Decision:** The plan does not add any new diagnostic codes. Error cases in new code use existing `ExpectedToken` code.
+
+**Rationale:** `ExpectedToken` is the parser's general-purpose "didn't find what I expected" diagnostic. More specific diagnostics (e.g., `InvalidCallTarget` for calling a non-callable) are type-checker concerns, and TypeChecker is blocked on this branch.
+
+---
+
+## Scope Boundaries
+
+- **In:** Parser.cs changes, new AST nodes, expression/parser tests, spec §2.2 fix
+- **Out:** TypeChecker, evaluator, runtime, language server, MCP tools, catalogs, grammar generator
+- **No tooling sync needed** — all referenced tokens already exist in catalogs
+
+---
+
+# George — Architectural Concerns from Parser Gap Plan Review
+
+> **Date:** 2026-05-01  
+> **Source:** George's review of `docs/working/parser-gap-fixes-plan.md`  
+> **Status:** Inbox — pending merge into decisions.md
+
+---
+
+## Concern 1: `BuildNode` Exhaustive Switch Creates Hidden Constructor Obligations
+
+**Category:** Architecture / Compilation blocker  
+**Affects:** GAP-2 (Slice 2)
+
+`Parser.cs` contains `BuildNode` — a static exhaustive switch over all `ConstructKind` values. Two arms (`StateEnsure`, `EventEnsure`) construct `StateEnsureNode` and `EventEnsureNode` directly. These arms are never called at runtime (the live parse path goes through `ParseStateEnsure()` / `ParseEventEnsure()` directly), but they exist as dead code to keep the switch exhaustive (CS8524 enforcement).
+
+**The architectural obligation:** Every time a parser record gains or loses a constructor parameter, `BuildNode` must be audited. The exhaustive switch demands this even for dead-code arms. This is invisible to the implementer who is reading the record definition and the live `Parse*` method — `BuildNode` is two screens away.
+
+**Proposed decision:** Add to the implementation workflow: "When modifying a parser AST record's constructor, audit `BuildNode` for that record's `ConstructKind` arm before compiling." This should become a standing instruction in CONTRIBUTING.md or the implementation checklist for parser changes.
+
+**Immediate fix for GAP-2:** Add `null` for `PostConditionGuard` in both dead-code `BuildNode` arms in the same commit as the record changes. See reviewer notes in the plan for exact code.
+
+---
+
+## Concern 2: `ParseAtom()` Preempts Pratt Loop — Spec Left-Denotation Table Has a Dead Branch
+
+**Category:** Spec/code consistency  
+**Affects:** GAP-7 (Slice 5)
+
+The spec's left-denotation table (§2.1, line 712) says: `(` → if `IdentifierExpression` → `CallExpression`. But `ParseAtom()` eagerly consumes `identifier(args)` as `CallExpression` before the Pratt loop runs. The `IdentifierExpression` branch in the Pratt `LeftParen` handler will never fire.
+
+This is a known pattern in Pratt parsers ("null-denotation preemption"), but it creates a silent divergence between the spec's formal description and the parser's behavior. The spec describes the conceptual grammar; the implementation shortcuts it for a common case.
+
+**Options for resolution:**
+1. Add a comment in the spec §2.1 left-denotation table noting that `IdentifierExpression → CallExpression` is handled in the null-denotation path (ParseAtom) as an optimization.
+2. Remove the shortcut from `ParseAtom()` and let all function calls flow through the Pratt loop. (Not recommended — adds complexity for no gain.)
+3. Leave the spec as-is and add a comment in the implementation acknowledging the dead branch.
+
+**Recommended:** Option 1 or 3. Spec note or code comment — either way, document it so future maintainers don't spend time wondering why the spec branch is unreachable.
+
+---
+
+## Concern 3: Existing Integration Tests That Accept GAP Diagnostics Need Retrofit Tracking
+
+**Category:** Test debt  
+**Affects:** Post-GAP-2 and post-GAP-3 test hygiene
+
+Two existing tests were written to be tolerant of current parser gaps:
+- `WSI_Integration_InsuranceClaim_HasExpectedDeclarationCounts` — accepts diagnostics because `is set` and `ensure ... when ...` are broken
+- `WSI_Integration_LoanApplication_HasExpectedDeclarationCounts` — explicitly comments that GAP-2 produces a diagnostic
+
+These tests must be retrofitted to assert `tree.Diagnostics.Should().BeEmpty()` after GAP-2 (Slice 2) and GAP-3 (Slice 3) land. If they aren't updated, they remain as permanently-passing acceptance of broken behavior — a trap for future regressions.
+
+**Proposed decision:** Establish a convention: when a test is written to be "gap-tolerant" (explicitly accepts diagnostics it shouldn't), add a `// TODO(GAP-N): remove when GAP-N is fixed` comment citing the specific gap. This makes the retrofit obligation discoverable.
+
+---
+
+## Concern 4: `contains` Spec Node Name Diverges from Implementation
+
+**Category:** Spec accuracy (minor)  
+**Affects:** Slice 8 (contains tests), future spec readers
+
+Spec §2.1 left-denotation table (line 707) says `Contains → ContainsExpression(left, ParseExpression(40))`. No `ContainsExpression` type exists — the implementation produces `BinaryExpression(Contains, left, right)` via the standard Pratt binary path.
+
+This is a silent divergence. The spec describes a named node type that was never created; the implementation reuses `BinaryExpression`. Frank's tests correctly verify `BinaryExpression`, but a future reader of the spec might create a `ContainsExpression` type unnecessarily.
+
+**Proposed fix:** Update spec §2.1 line 707 to say `BinaryExpression(Contains, ParseExpression(40))`, matching the other binary operator rows.
+
+---
+
+_End of George's architectural concerns inbox item._

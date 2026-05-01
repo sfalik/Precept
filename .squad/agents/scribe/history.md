@@ -163,3 +163,7 @@ Team cast on 2026-04-04: Frank (Lead), George (Runtime), Kramer (Tooling), Elain
 - Wrote orchestration and session logs for Frank's GitHub issue review across proposals #8-#13.
 - Merged 4 decision inbox item(s) into .squad/decisions.md, cleared .squad/decisions/inbox/, updated affected histories, and archived 0 older decision entries.
 
+
+### 2026-05-01T05:51:14Z — Catalog vision wording batch recorded
+- Logged Frank's catalog-vision wording pass, ran the 7-day decision archive gate, merged 11 unique inbox records, and cleared 11 processed inbox files.
+- Health: decisions.md 459991B -> 518013B, decisions-archive.md now 57602B, duplicates skipped 0, and no history.md file required summarization.

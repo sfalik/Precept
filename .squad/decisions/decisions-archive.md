@@ -371,3 +371,486 @@ Treat `docs/HowWeGotHere.md` as a retrospective historical narrative, not as a l
 ---
 
 ---
+
+---
+
+# Precept V2 — Exhaustive Parser & Lexer Test Coverage Audit
+
+**Branch:** `spike/Precept-V2`  
+**Requested by:** @soup-nazi  
+**Date:** 2025-07  
+**Baseline:** 2107 passing, 0 failing  
+**Constraint:** `Compiler.Compile()` unusable (TypeChecker throws `NotImplementedException`). All parser tests use `Lexer.Lex()` + `Parser.Parse()` directly. TypeChecker-level diagnostics are blocked.
+
+---
+
+## Executive Summary
+
+Exhaustive cross-reference of every construct in `docs/language/precept-language-spec.md` against all 23 test files and all 28 sample files in `samples/`.
+
+| Severity | Count | Description |
+|----------|------:|-------------|
+| **Critical** | 2 | Known parser bugs producing wrong diagnostics on spec-valid input |
+| **High** | 15 | Spec-defined constructs with zero parser tests; all have sample-file usage |
+| **Medium** | 14 | Constructs with test gaps: missing variants, edge cases, or partial coverage |
+| **Low / Blocked** | 7 | Edge cases, TypeChecker-stage validations, or trivial diagnostic variants |
+| **Total Gaps** | **38** | Out of ~75 distinct parse-level constructs inventoried |
+
+Sample file parse coverage: **3 clean / 2 partial / 23 untested** (of 28 total).
+
+---
+
+## Coverage Matrix
+
+Columns: **Construct** · **Positive Test?** · **Negative Test?** · **File(s)** · **Severity** · **Notes**
+
+### 1 · Precept Header
+
+| Construct | ✅ Positive | ❌ Negative | Test File | Sev | Notes |
+|-----------|------------|------------|-----------|-----|-------|
+| `precept Name` header | ✅ | ✅ (missing name) | `ParserTests.cs` | — | Well-covered |
+
+---
+
+### 2 · Top-Level Declarations
+
+| Construct | ✅ Positive | ❌ Negative | Test File | Sev | Notes |
+|-----------|------------|------------|-----------|-----|-------|
+| `field Name as TypeRef Modifiers?` | ✅ | ✅ | `ParserTests`, `SlotParserTests` | — | Well-covered |
+| `field Name as TypeRef -> Expr` (computed) | ✅ | — | `ParserTests` | — | Computed field happy path covered |
+| `field N1, N2 as TypeRef` (multi-name) | ✅ | — | `ParserTests` | — | Multi-name shorthand covered |
+| `state Name (modifiers)?` | ✅ | — | `ParserTests`, `SlotParserTests` | — | Well-covered |
+| `state N1, N2` (multi-name) | — | — | — | **Medium** | No test for multiple states in single decl |
+| `event Name (Args)? initial?` | ✅ | — | `ParserTests`, `SlotParserTests` | — | Single-name form covered |
+| `event N1, N2` (multi-name) | — | — | — | **Medium** | No test for `event Submit, Cancel` shorthand |
+| `rule BoolExpr because "msg"` | ✅ | ✅ (missing `because`) | `ParserTests` | — | Well-covered |
+| `rule BoolExpr when Guard because "msg"` | ✅ | — | `ParserTests` | — | Guard form covered |
+
+---
+
+### 3 · In-State Declarations (`in State ...`)
+
+| Construct | ✅ Positive | ❌ Negative | Test File | Sev | Notes |
+|-----------|------------|------------|-----------|-----|-------|
+| `in State ensure Condition because "msg"` | ✅ | — | `ParserTests` (Slice 4.2) | — | Simple form covered |
+| `in State ensure Condition when Guard because "msg"` | ❌ BUG | ❌ BUG | `ParserTests` (known failure) | **Critical** | **GAP-2**: Parser terminates condition at `when`, then `Expect(Because)` sees `when` and emits bogus diagnostic. Used in `insurance-claim.precept` line 28, `loan-application.precept` line 25. |
+| `in State modify FieldTarget readonly/editable` | ✅ | ✅ | `ParserTests` (Slice 4.1, 4.2) | — | Well-covered |
+| `in State modify ... when Guard` (pre/post guard) | ✅ | — | `ParserTests` | — | Guard on modify covered |
+| `in State omit FieldTarget` | ✅ | ✅ | `ParserTests` | — | Well-covered |
+
+---
+
+### 4 · To-State Declarations (`to State ...`)
+
+| Construct | ✅ Positive | ❌ Negative | Test File | Sev | Notes |
+|-----------|------------|------------|-----------|-----|-------|
+| `to State ensure Condition because "msg"` | ✅ | — | `ParserTests` (Slice 4.3) | — | Simple form covered |
+| `to State ensure Condition when Guard because "msg"` | — | — | — | **Medium** | No test for guard-bearing to-ensure. Spec §2.2 defines this form. |
+| `to State -> ActionList` | ✅ | — | `ParserTests` (Slice 4.3) | — | Well-covered |
+| `to State -> ActionList when Guard` | ✅ | — | `ParserTests` | — | Guard form covered |
+
+---
+
+### 5 · From-State Declarations (`from State ...`)
+
+| Construct | ✅ Positive | ❌ Negative | Test File | Sev | Notes |
+|-----------|------------|------------|-----------|-----|-------|
+| `from State ensure Condition because "msg"` | ✅ | — | `ParserTests` (Slice 5.1) | — | Simple form covered |
+| `from State ensure Condition when Guard because "msg"` | — | — | — | **Medium** | No test for guard-bearing from-ensure. Same spec form as GAP-2. |
+| `from State -> ActionList` | ✅ | — | `ParserTests` (Slice 5.1) | — | Covered |
+| `from any on Event -> Outcome` | ✅ (no-transition) | — | `ParserTests` (Slice 5.1) | **Medium** | `from any` tested only with `no transition`. No test for `from any -> transition X` or `from any -> reject "msg"`. |
+
+---
+
+### 6 · On-Event Declarations (`on Event ...`)
+
+| Construct | ✅ Positive | ❌ Negative | Test File | Sev | Notes |
+|-----------|------------|------------|-----------|-----|-------|
+| `on Event ensure Condition because "msg"` | ✅ | — | `ParserTests` (Slice 4.4) | — | Simple form covered |
+| `on Event ensure Condition when Guard because "msg"` | ✅ | — | `ParserTests` | — | Guard form covered |
+| `on Event -> ActionList` | ✅ | — | `ParserTests` (Slice 4.4) | — | Well-covered |
+
+---
+
+### 7 · Transition Rows (`from State on Event ...`)
+
+| Construct | ✅ Positive | ❌ Negative | Test File | Sev | Notes |
+|-----------|------------|------------|-----------|-----|-------|
+| `from State on Event -> Outcome` | ✅ | — | `ParserTests` (Slice 5.1) | — | Well-covered |
+| `from State on Event when Guard -> Outcome` | ✅ | — | `ParserTests` | — | Guard form covered |
+| `from State on Event -> Actions -> Outcome` | ✅ | — | `ParserTests` | — | Actions before outcome covered |
+| `-> transition StateName` outcome | ✅ | — | `ParserTests` | — | Covered |
+| `-> no transition` outcome | ✅ | — | `ParserTests` | — | Covered |
+| `-> reject "msg"` outcome | ✅ | — | `ParserTests` | — | Covered |
+| `from any on Event -> ...` — all outcomes | Partial | — | `ParserTests` | **Medium** | `no transition` tested; `transition X` and `reject "msg"` with `any` not tested |
+
+---
+
+### 8 · Action Statements
+
+| Construct | ✅ Positive | ❌ Negative | Test File | Sev | Notes |
+|-----------|------------|------------|-----------|-----|-------|
+| `set F = Expr` | ✅ | — | `ParserTests` (Slice 4.3) | — | Covered |
+| `add F Expr` | ✅ | — | `ParserTests` | — | Covered |
+| `remove F Expr` | — | — | — | **High** | **GAP-6**: No parser test. Used in `hiring-pipeline.precept` (line 54), `insurance-claim.precept` (line 49). |
+| `enqueue F Expr` | — | — | — | **High** | **GAP-7**: No parser test. `ActionsTests` covers catalog entry only. |
+| `dequeue F` | — | — | — | **High** | **GAP-5 (partial)**: No parser test for dequeue without `into`. |
+| `dequeue F into G` | — | — | — | **High** | **GAP-5**: No parser test for `into` clause. `IntoSupported` flag verified in catalog only. |
+| `push F Expr` | — | — | — | **High** | **GAP-7 (push variant)**: No parser test. |
+| `pop F` | — | — | — | **High** | **GAP-8**: No parser test for pop without `into`. |
+| `pop F into G` | — | — | — | **High** | No parser test for `into` clause on pop. |
+| `clear F` | ✅ | — | `ParserTests` (Slice 4.3) | — | Covered |
+
+---
+
+### 9 · Expression Atoms
+
+| Construct | ✅ Positive | ❌ Negative | Test File | Sev | Notes |
+|-----------|------------|------------|-----------|-----|-------|
+| Identifier | ✅ | — | `ExpressionParserTests` | — | Covered |
+| Integer literal | ✅ | — | `ExpressionParserTests` | — | Covered |
+| Decimal literal | ✅ | — | `ExpressionParserTests` | — | Covered |
+| Exponent literal (`1.5e2`) | — | — | — | **Low** | Lexer covers it; no expression-parse test for exponent form |
+| Boolean literal (`true`/`false`) | ✅ | — | `ExpressionParserTests` | — | Covered |
+| String literal (plain) | ✅ | — | `ExpressionParserTests` | — | Covered |
+| Interpolated string (`"Hello {Name}"`) | — | — | — | **High** | **GAP-10**: No expression-parser test for `StringStart`/`StringMiddle`/`StringEnd` reassembly into `InterpolatedStringExpression`. Lexer tests only. Used in multiple sample files. |
+| Typed constant (`'2026-04-23'`) | — | — | — | **Critical** | **GAP-1**: `ParseAtom()` has no case for `TypedConstant` token. Expression parser will emit error or fall through. Used in `fee-schedule.precept` (implicit), any file with temporal/domain typed constants in expressions. |
+| Interpolated typed constant (`'amount {N}'`) | — | — | — | **High** | **GAP-11**: No expression-parser test for `TypedConstantStart`/`Middle`/`End` reassembly. Depends on GAP-1 fix. |
+| List literal (`[1, 2, 3]`) | — | — | — | **High** | **GAP-12**: No expression-parser test for `LeftBracket` → `ListLiteralExpression`. Spec §2.1 null-denotation table includes it. Used in `default` clauses for collection fields. |
+| Parenthesized expression | ✅ | — | `ExpressionParserTests` | — | Covered |
+| Negative literal folding (`-1`, `-3.14`) | ✅ | — | `ExpressionParserTests` | — | Covered |
+
+---
+
+### 10 · Expression Operators
+
+| Construct | ✅ Positive | ❌ Negative | Test File | Sev | Notes |
+|-----------|------------|------------|-----------|-----|-------|
+| `+` addition | ✅ | — | `ExpressionParserTests` | — | Covered |
+| `-` subtraction | ✅ | — | `ExpressionParserTests` | — | Covered |
+| `*` multiplication | ✅ | — | `ExpressionParserTests` | — | Covered |
+| `/` division | — | — | — | **Medium** | `OperatorsTests` covers catalog; no `ParseExpr("a / b")` test |
+| `%` modulo | — | — | — | **High** | **GAP-16**: No `ParseExpr("a % b")` test. Catalog and lexer tested only. |
+| `>` greater-than | ✅ | — | `ExpressionParserTests` | — | Covered |
+| `<` less-than | — | — | — | **High** | **GAP-17 (partial)**: Only `>` is tested. No `ParseExpr("a < b")` test. |
+| `>=` greater-than-or-equal | — | — | — | **High** | **GAP-17**: No test. Used in `loan-application.precept` (`CreditScore >= 300`). |
+| `<=` less-than-or-equal | — | — | — | **High** | **GAP-17**: No test. |
+| `==` equals | — | — | — | **High** | **GAP-17**: No test. Used in `customer-profile.precept` (`MarketingOptIn == false`). |
+| `!=` not-equals | — | — | — | **High** | **GAP-17**: No test. |
+| `~=` case-insensitive equals | — | — | — | **High** | **GAP-15**: No `ParseExpr("name ~= 'john'")` test. Catalog and lexer tested only. |
+| `!~` case-insensitive not-equals | — | — | — | **High** | **GAP-15**: No test. |
+| `and` | ✅ | — | `ExpressionParserTests` | — | Covered |
+| `or` | ✅ | — | `ExpressionParserTests` | — | Covered |
+| `not` (prefix) | ✅ | — | `ExpressionParserTests` | — | Covered |
+| `is set` (postfix) | — | — | — | **Critical** | **GAP-3 (known)**: No expression-parser test. Used in `insurance-claim.precept` (line 28), `loan-application.precept` (line 62), `customer-profile.precept` (line 17). |
+| `is not set` (postfix) | — | — | — | **Critical** | **GAP-3 (known)**: No expression-parser test. |
+| `contains` (infix) | — | — | — | **High** | **GAP-4**: No expression-parser test for `set contains value`. Used in `hiring-pipeline.precept` (line 53), `insurance-claim.precept` (line 62). |
+| Non-associative comparison diagnostic | — | ❌ | — | **High** | **GAP-13**: No test for `a == b == c` producing `NonAssociativeComparison` diagnostic. Listed as parse-stage code in `DiagnosticsTests`. |
+
+---
+
+### 11 · Expression Forms (Structural)
+
+| Construct | ✅ Positive | ❌ Negative | Test File | Sev | Notes |
+|-----------|------------|------------|-----------|-----|-------|
+| Member access (`obj.field`) | ✅ | — | `ExpressionParserTests` | — | Covered |
+| Function call (`f(a, b)`) | ✅ | — | `ExpressionParserTests` | — | Covered |
+| Method call (`obj.method(args)`) | — | — | — | **Medium** | **GAP-29**: No test for left-denotation `MemberAccessExpression → (` → `MethodCallExpression`. Used by collection accessors `.count`, `.peek`, `.min`, `.max`. |
+| `InvalidCallTarget` diagnostic | — | ❌ | — | **Medium** | **GAP-14**: No test for `(a + b)(x)` producing `InvalidCallTarget` diagnostic. |
+| Conditional (`if E then E else E`) | ✅ | — | `ExpressionParserTests` | — | Covered |
+| Precedence (arithmetic before logical) | ✅ | — | `ExpressionParserTests` | — | Covered |
+| Boundary at `when` | ✅ | — | `ExpressionParserTests` | — | Covered |
+| Boundary at `because` | ✅ | — | `ExpressionParserTests` | — | Covered |
+
+---
+
+### 12 · Type References
+
+| Construct | ✅ Positive | ❌ Negative | Test File | Sev | Notes |
+|-----------|------------|------------|-----------|-----|-------|
+| Scalar: `string`, `boolean`, `integer`, `decimal`, `number` | ✅ | — | `SlotParserTests` | — | Covered |
+| Temporal: `date`, `time`, `instant`, `duration`, `period`, `timezone`, `zoneddatetime`, `datetime` | — | — | — | **Medium** | No parse test for `field D as date`. `SlotParserTests` covers `ParseTypeExpression` but only for selected scalar types. Catalog tests cover these as `TypeKind` entries. |
+| Domain: `money`, `currency`, `quantity`, `unitofmeasure`, `dimension`, `price`, `exchangerate` | Partial | — | `ParserTests` (WSI qualifier tests) | **Medium** | `money in 'USD'` and `exchangerate from 'USD' to 'EUR'` tested via WSI tests. `currency`, `quantity`, `unitofmeasure`, `dimension`, `price` have no PARSE tests. |
+| `set of T` collection type | ✅ | — | `SlotParserTests` | — | Covered |
+| `queue of T` collection type | — | — | — | **Medium** | No parse test for `field Q as queue of string`. |
+| `stack of T` collection type | — | — | — | **Medium** | No parse test for `field S as stack of string`. |
+| `choice of T(v1, v2, ...)` type | ✅ | ✅ | `SlotParserTests` | — | Well-covered including diagnostic cases |
+| Type qualifier `in 'unit'` | ✅ | — | `ParserTests` (WSI tests) | — | Covered for money/exchangerate |
+| Type qualifier `of 'family'` | ✅ | — | `ParserTests` (WSI tests) | — | Covered for exchangerate/price |
+| Type qualifier `to 'unit'` (exchange) | ✅ | — | `ParserTests` (WSI tests) | — | Covered |
+| Case-insensitive collection `set of ~string` | — | — | — | **Medium** | **GAP-26**: No parser test for `Tilde` before `string` in collection inner-type position. |
+
+---
+
+### 13 · Field Modifiers (in `ModifierList`)
+
+| Construct | ✅ Positive | ❌ Negative | Test File | Sev | Notes |
+|-----------|------------|------------|-----------|-----|-------|
+| `optional` flag | Partial | — | `SlotParserTests` | **Medium** | **GAP-24**: `ModifiersTests` covers catalog; `SlotParserTests` parses modifier lists but no test asserting `optional` produces a `FlagModifierNode`. |
+| `writable` flag | Partial | — | `WritableSurfaceTests` | **Medium** | **GAP-25**: `WritableSurfaceTests` tests lexing and compiler throw. No PARSE test asserting `FieldDeclarationNode.Modifiers` contains `FlagModifierNode(writable)`. |
+| `nonnegative` flag | ✅ | — | `SlotParserTests` | — | Covered |
+| `positive` flag | ✅ | — | `SlotParserTests` | — | Covered |
+| `nonzero` flag | — | — | — | **Medium** | No parse test. Catalog covered in `ModifiersTests`. |
+| `notempty` flag | — | — | — | **Medium** | No parse test. Catalog covered. Used in `DescriptorsTests`. |
+| `ordered` flag | — | — | — | **Medium** | **GAP-23**: No parse test. Used in choice-field context. |
+| `default Expr` value-bearing | Partial | — | `ParserTests` (WSI) | **Medium** | **GAP-18**: WSI test checks modifier count but not the expression node. No unit test for `default` producing `DefaultModifierNode` with correct expression. |
+| `min Expr` value-bearing | — | — | — | **Medium** | **GAP-19**: No parse test. Used in `payment-method.precept`, `fee-schedule.precept`. |
+| `max Expr` value-bearing | — | — | — | **Medium** | **GAP-19**: No parse test. Used in `payment-method.precept`, `fee-schedule.precept`. |
+| `minlength Expr` value-bearing | — | — | — | **Medium** | **GAP-20**: No parse test. |
+| `maxlength Expr` value-bearing | — | — | — | **Medium** | **GAP-20**: No parse test. |
+| `mincount Expr` value-bearing | — | — | — | **Medium** | **GAP-21**: No parse test. |
+| `maxcount Expr` value-bearing | — | — | — | **Medium** | **GAP-21**: No parse test. |
+| `maxplaces Expr` value-bearing | — | — | — | **Medium** | **GAP-22**: No parse test. Used in `fee-schedule.precept`, `invoice-line-item.precept`. Integration test via `insurance-claim.precept` (partial). |
+
+---
+
+### 14 · State Modifiers
+
+| Construct | ✅ Positive | ❌ Negative | Test File | Sev | Notes |
+|-----------|------------|------------|-----------|-----|-------|
+| `initial` state modifier | ✅ | — | `SlotParserTests`, `ParserTests` | — | Covered |
+| `terminal` state modifier | ✅ | — | `SlotParserTests`, `ParserTests` | — | Covered |
+| `required` state modifier | — | — | — | **Medium** | **GAP-31**: No parse test. Catalog covered in `ModifiersTests`. |
+| `irreversible` state modifier | — | — | — | **Medium** | **GAP-31**: No parse test. |
+| `success` state modifier | — | — | — | **Medium** | **GAP-31**: No parse test. |
+| `warning` state modifier | — | — | — | **Medium** | **GAP-31**: No parse test. |
+| `error` state modifier | — | — | — | **Medium** | **GAP-31**: No parse test. Used in `trafficlight.precept` (integration-tested but no modifier assertion). |
+
+---
+
+### 15 · Lexer-Level Constructs
+
+| Construct | ✅ Positive | ❌ Negative | Test File | Sev | Notes |
+|-----------|------------|------------|-----------|-----|-------|
+| String literal | ✅ | ✅ | `LexerTests` | — | Well-covered |
+| Interpolated string (`"Hello {Name}"`) | ✅ | ✅ | `LexerTests` | — | Well-covered at lexer level |
+| Typed constant (`'value'`) | ✅ | ✅ | `LexerTests` | — | Well-covered at lexer level |
+| Interpolated typed constant | ✅ | ✅ | `LexerTests` | — | Well-covered at lexer level |
+| Number literals (int, decimal, exponent) | ✅ | — | `LexerTests` | — | Well-covered |
+| All operators and punctuation | ✅ | — | `LexerTests` | — | Well-covered |
+| Comments (`# ...`) | ✅ | — | `LexerTests` | — | Covered |
+| Newlines / whitespace | ✅ | — | `LexerTests` | — | Covered |
+| Identifier rules | ✅ | ✅ | `LexerTests` | — | Covered including reserved words |
+| Error recovery | ✅ | — | `LexerTests` | — | Covered |
+| Nesting depth limit (8 levels) | — | ❌ | — | **Low** | **GAP-36**: Spec §1.7 defines max 8 interpolation nesting depth. No test enforcing `UnterminatedInterpolation` at depth 9. |
+| `UnescapedBraceInLiteral` diagnostic | — | ❌ | — | **Low** | **GAP-37**: `DiagnosticsTests` lists this as a parse code. No lexer test for bare `}` inside a literal. |
+
+---
+
+### 16 · Parser Diagnostic Coverage
+
+| Diagnostic Code | ✅ Produced by Test? | Test File | Sev | Notes |
+|-----------------|---------------------|-----------|-----|-------|
+| `UnexpectedToken` | ✅ | `ParserTests` | — | Error recovery tests produce this |
+| `MissingBecause` | ✅ | `ParserTests` | — | `Parse_RuleDeclaration_MissingBecause` |
+| `MissingOutcome` | ✅ | `ParserTests` | — | Error recovery covered |
+| `PreEventGuard` | ✅ | `ParserTests` | — | Covered |
+| `StashedGuard` | ✅ | `ParserTests` (Slice 4.4) | — | EventHandler stashed-guard diagnostic |
+| `ChoiceMissingElementType` | ✅ | `SlotParserTests` | — | Covered |
+| `ChoiceElementTypeMismatch` | ✅ | `SlotParserTests` | — | Covered |
+| `EmptyChoice` | — | ❌ | — | **Low** | **GAP-34**: `choice of string()` form. Distinct from `ChoiceMissingElementType`. |
+| `NonAssociativeComparison` | — | ❌ | — | **High** | **GAP-13**: Listed as parse-stage in `DiagnosticsTests`. No test producing it. |
+| `InvalidCallTarget` | — | ❌ | — | **Medium** | **GAP-14**: No test producing `(expr)(args)` call-target error. |
+| `UnexpectedKeyword` | — | ❌ | — | **Low** | **GAP-35**: Listed as parse-stage in `DiagnosticsTests`. No test producing it. |
+
+---
+
+## Top 10 Highest-Priority Gaps
+
+Ordered by: parser correctness > spec contract > sample-file blast radius > implementation cost.
+
+### Priority 1 — GAP-2: `in/to/from State ensure Condition when Guard` (Parser BUG)
+**Severity:** Critical — parser bug producing false diagnostic on spec-valid syntax  
+**Spec:** §2.2 — `ensure BoolExpr ("when" BoolExpr)? ("because" StringExpr)?`  
+**Root cause:** `ParseExpr()` is called first; `when` is a `StructuralBoundaryToken`, so it terminates the condition early. Then `Expect(Because)` sees `when` and emits `MissingBecause`. The `when` guard clause after `ensure` is never parsed.  
+**Blast radius:** `insurance-claim.precept` line 28, `loan-application.precept` line 25. Both integration tests explicitly work around this failure with reduced assertion scope.  
+**Fix:** After `ParseExpr()` completes the condition, check if current token is `When`; if so, parse guard into a `GuardNode`; then optionally parse `because`.  
+**Tests needed:** `Parse_StateEnsure_In_WithConditionAndGuard`, `Parse_StateEnsure_To_WithConditionAndGuard`, `Parse_StateEnsure_From_WithConditionAndGuard`
+
+---
+
+### Priority 2 — GAP-1: `TypedConstant` atom in expression parser (Parser BUG)
+**Severity:** Critical — typed constant literals produce parser error/fallthrough in expression context  
+**Spec:** §2.1 null-denotation table — `TypedConstant` token → `TypedConstantExpression`  
+**Root cause:** `ParseAtom()` has no case for `TokenKind.TypedConstant` or `TokenKind.TypedConstantStart`. The lexer produces these tokens correctly (confirmed by `LexerTests`), but the parser doesn't consume them.  
+**Blast radius:** Any precept using typed constant literals in expressions (`'2026-04-23'`, `'USD'`, etc.). Blocks `fee-schedule.precept`, `computed-tax-net.precept`, and any sample file with temporal/domain typed constant expressions.  
+**Fix:** Add `TypedConstant` case in `ParseAtom()` producing `TypedConstantExpression`; add `TypedConstantStart` case that reassembles interpolated typed constant using the same loop as interpolated strings.  
+**Tests needed:** `ParseExpr_TypedConstantLiteral_ProducesTypedConstantExpression`, `ParseExpr_InterpolatedTypedConstant_ProducesInterpolatedTypedConstantExpression`
+
+---
+
+### Priority 3 — GAP-3: `is set` / `is not set` postfix expressions
+**Severity:** Critical (known gap)  
+**Spec:** §2.1 — postfix at precedence 40, alongside `contains`  
+**Root cause:** `ParseExpr()` left-denotation likely doesn't handle `Is` token followed by `Set` / `Not Set`. No `IsSetExpression` AST node produced.  
+**Blast radius:** `insurance-claim.precept` line 28 (`DecisionNote is set`), `loan-application.precept` line 62 (`Approve.Note is set`), `customer-profile.precept` line 17 (`Email is set`). `SyntaxReference.NullNarrowing` test references the string but doesn't parse it.  
+**Tests needed:** `ParseExpr_IsSet_ProducesIsSetExpression`, `ParseExpr_IsNotSet_ProducesNegatedIsSetExpression`
+
+---
+
+### Priority 4 — GAP-4: `contains` infix expression
+**Severity:** High  
+**Spec:** §2.1 — infix at precedence 40  
+**Blast radius:** `hiring-pipeline.precept` line 53 (`PendingInterviewers contains RecordInterviewFeedback.Interviewer`), `insurance-claim.precept` line 62.  
+**Tests needed:** `ParseExpr_Contains_ProducesContainsExpression`, precedence test vs `and`/`or`
+
+---
+
+### Priority 5 — GAP-17: `<`, `<=`, `>=`, `==`, `!=` comparison operators
+**Severity:** High — multiple operators completely untested in expression parser  
+**Spec:** §2.1 — all standard comparisons at precedence 30  
+**Blast radius:** `loan-application.precept` (`CreditScore >= 300`), `customer-profile.precept` (`MarketingOptIn == false`), all sample files using non-`>` comparisons in rules or guards.  
+**Tests needed:** `[Theory][InlineData("<")][InlineData("<=")][InlineData(">=")][InlineData("==")][InlineData("!=")]` — one theory covering all five missing operators
+
+---
+
+### Priority 6 — GAP-10: Interpolated string expression
+**Severity:** High  
+**Spec:** §2.5 — `StringStart`/`StringMiddle`/`StringEnd` reassembly loop  
+**Blast radius:** Any `"string with {Field}"` expression in action statements. Multiple sample files use interpolated strings in `reject` messages and `set` expressions.  
+**Tests needed:** `ParseExpr_InterpolatedString_ProducesInterpolatedStringExpression`, test with multiple interpolation segments
+
+---
+
+### Priority 7 — GAP-5/6/7/8: `remove`, `enqueue`, `dequeue`, `push`, `pop` action statements
+**Severity:** High (5 related gaps)  
+**Spec:** §2.2 action statement grammar  
+**Blast radius:** `hiring-pipeline.precept` (`remove`, `enqueue`), `insurance-claim.precept` (`remove`), any sample using queue/stack collections.  
+**Tests needed (per action):**
+- `Parse_Action_Remove_ProducesRemoveActionNode`
+- `Parse_Action_Enqueue_ProducesEnqueueActionNode`
+- `Parse_Action_Dequeue_WithoutInto`, `Parse_Action_Dequeue_WithInto`
+- `Parse_Action_Push_ProducesPushActionNode`
+- `Parse_Action_Pop_WithoutInto`, `Parse_Action_Pop_WithInto`
+
+---
+
+### Priority 8 — GAP-12: List literal expression `[a, b, c]`
+**Severity:** High  
+**Spec:** §2.1 — `LeftBracket` null-denotation → `ListLiteralExpression`  
+**Blast radius:** `default []` on collection fields; any expression initializing or comparing a set/queue/stack.  
+**Tests needed:** `ParseExpr_EmptyList`, `ParseExpr_NonEmptyList`, `ParseExpr_NestedList` (if supported)
+
+---
+
+### Priority 9 — GAP-15: `~=` and `!~` case-insensitive operators
+**Severity:** High  
+**Spec:** §2.1 — comparison operators at precedence 30  
+**Blast radius:** Any DSL doing case-insensitive string matching. Catalog confirmed in `OperatorsTests`, tokens confirmed in `LexerTests`. Missing parser layer.  
+**Tests needed:** `ParseExpr_CaseInsensitiveEquals_ProducesCorrectNode`, `ParseExpr_CaseInsensitiveNotEquals`
+
+---
+
+### Priority 10 — GAP-13: `NonAssociativeComparison` diagnostic
+**Severity:** High  
+**Spec:** §2.7 — parse-stage error when a second comparison is chained: `a > b > c`  
+**Tests needed:** `ParseExpr_ChainedComparison_EmitsNonAssociativeComparison` — verifies both that a diagnostic is emitted AND that parsing recovers cleanly
+
+---
+
+## Sample File Parse Coverage
+
+### Well-Tested (clean parse, multiple assertions)
+
+| File | Tests | What's Verified |
+|------|------:|----------------|
+| `crosswalk-signal.precept` | 4 | No diagnostics, header, declaration count (5), AccessModeNodes, TransitionRows |
+| `trafficlight.precept` | 4 | No diagnostics, header, declaration count (5), AccessModeNodes, TransitionRows |
+| `hiring-pipeline.precept` | 4 | No diagnostics (WSI), header, declaration count (5), TransitionRows |
+
+### Partial Coverage (known parse failures, counts only)
+
+| File | Tests | What's Verified | Known Failures |
+|------|------:|----------------|----------------|
+| `insurance-claim.precept` | 1 | Declaration counts only (8 fields verified) | GAP-2 (`in Approved ensure ... when`), GAP-3 (`is set`) |
+| `loan-application.precept` | 1 | Declaration counts only | GAP-2 (`in UnderReview ensure ... when`) |
+
+### No Parse Coverage (23 files)
+
+The following sample files are never loaded by a test. Each has a note on which features it would exercise:
+
+| File | Key Constructs to Exercise |
+|------|---------------------------|
+| `apartment-rental-application.precept` | Complex lifecycle, `from any`, multiple ensure |
+| `building-access-badge-request.precept` | Multi-step workflow, guards, computed fields |
+| `clinic-appointment-scheduling.precept` | Temporal types, `date`/`time` fields, `duration` |
+| `computed-tax-net.precept` | Computed fields (`->`), `positive`, `nonnegative`, `min`/`max`, `writable` |
+| `customer-profile.precept` | Stateless precept, `is set` (GAP-3), `==` (GAP-17), `choice of string(...)` with `writable` |
+| `event-registration.precept` | Multi-state, `enqueue`/`dequeue` (GAP-5/7), `from any` |
+| `fee-schedule.precept` | `maxplaces` (GAP-22), `nonnegative`, `max`, stateless precept, `writable` |
+| `invoice-line-item.precept` | Typed constants in expressions (GAP-1), `maxplaces`, computed fields |
+| `it-helpdesk-ticket.precept` | Complex workflow, `remove` (GAP-6), ensures with guards |
+| `library-book-checkout.precept` | Queue operations (GAP-7), `dequeue into` (GAP-5), `push`/`pop` |
+| `library-hold-request.precept` | Queue operations, `enqueue` |
+| `maintenance-work-order.precept` | Complex lifecycle, choice fields, multiple actions |
+| `parcel-locker-pickup.precept` | Set operations, `contains` (GAP-4) |
+| `payment-method.precept` | `min`/`max` modifiers (GAP-19), `optional`, `writable`, stateless precept |
+| `refund-request.precept` | Complex rules, `is set` (GAP-3), guards |
+| `restaurant-waitlist.precept` | Queue operations (GAP-7), `push`/`pop` (GAP-8), `from any` |
+| `subscription-cancellation-retention.precept` | `~=` (GAP-15), complex rules |
+| `sum-on-rhs-rule.precept` | Sum-on-RHS rules, `positive`, computed fields |
+| `transitive-ordering.precept` | Rule transitivity, `positive`, computed fields, no states |
+| `travel-reimbursement.precept` | Money type qualifiers, `in 'USD'`, typed constants |
+| `utility-outage-report.precept` | Complex workflow, multiple modifiers |
+| `vehicle-service-appointment.precept` | Date/time fields, temporal types |
+| `warranty-repair-request.precept` | Ensures with guards, `is set`, choice fields |
+
+---
+
+## Recommendations
+
+### R1 — Fix parser bugs before writing new tests (Priority 1 and 2 first)
+GAP-2 (ensure+guard) and GAP-1 (TypedConstant atom) are parser bugs, not test gaps. Fix the production code first; then the tests become regression anchors. Fixing GAP-2 will immediately unblock the `insurance-claim.precept` and `loan-application.precept` integration tests from partial to full coverage.
+
+### R2 — Add a sample-file integration theory to `ParserTests.cs`
+Add a `[Theory][InlineData("filename.precept")]` test that loads each sample file, parses it, and asserts `diagnostics.Should().BeEmpty()`. This catches regressions without per-construct knowledge. Once GAP-1 and GAP-2 are fixed, all 28 sample files should pass this test. Use the existing pattern from Slice 5.3 (`Parse_SampleFile_HasNoParseErrors`).
+
+### R3 — Add `ExpressionParserTests` batch for missing operators
+All five missing comparison operators (GAP-17) and both case-insensitive operators (GAP-15) can be covered with a single `[Theory][InlineData(...)]` test. Similarly for `%` (GAP-16). Combine into `ParseExpr_BinaryOperator_Coverage_Theory` to avoid test sprawl.
+
+### R4 — Add action statement tests for collection-mutating actions
+`remove`, `enqueue`, `dequeue (into)`, `push`, `pop (into)` are five related gaps (GAP-5/6/7/8). One file — `ActionStatementParserTests.cs` — can cover all six action keywords with positive + negative tests (missing target, missing value, malformed `into` clause).
+
+### R5 — Add value-bearing modifier tests to `SlotParserTests.cs`
+`default`, `min`, `max`, `minlength`, `maxlength`, `mincount`, `maxcount`, `maxplaces` (GAP-18–22) are all value-bearing modifiers with no dedicated parse tests. A `[Theory]` over the modifier keywords with representative expression forms would cover them efficiently.
+
+### R6 — Add tests for remaining state modifier keywords
+`required`, `irreversible`, `success`, `warning`, `error` (GAP-31) each need a `ParseStateModifierList_*` test in `SlotParserTests.cs`. These are low-effort: copy the `ParseStateModifierList_Terminal` pattern.
+
+### R7 — Test `is set`, `contains`, list literals, and interpolated strings together
+GAP-3, GAP-4, GAP-10, GAP-12 are all expression-layer features that can be added to `ExpressionParserTests.cs` without any production code fixes (except GAP-3 and GAP-10 may require parser support). Audit the Pratt parser's `ParseAtom()` and left-denotation table before writing tests — confirm which of these are already wired and just untested vs. which need production changes.
+
+### R8 — Scope TypeChecker tests as a separate milestone
+All TypeChecker-level validations (§3 of the spec) are blocked by `NotImplementedException`. Do not attempt to write TypeChecker tests until the implementation is underway. Track them separately — they are not a test-writing problem yet.
+
+---
+
+## Appendix: Test File Inventory
+
+| File | Domain | Count |
+|------|--------|------:|
+| `ParserTests.cs` | Parser integration, declarations, slices 4–6 | ~200 tests |
+| `ExpressionParserTests.cs` | Pratt parser, atoms, operators, precedence | ~35 tests |
+| `SlotParserTests.cs` | Individual slot parsers: types, modifiers, guards | ~60 tests |
+| `LexerTests.cs` | Token production, interpolation, typed constants | ~45 tests |
+| `DiagnosticsTests.cs` | Catalog exhaustiveness, stage assignments, codes | ~20 tests |
+| `ActionsTests.cs` | Action catalog metadata | ~15 tests |
+| `OperatorsTests.cs` | Operator catalog, qualifier dispatch | ~40+ tests |
+| `OperationsTests.cs` | Operation catalog, binary/unary DU | ~40+ tests |
+| `TokensTests.cs` | Token catalog, categories, TextMate scopes | ~30 tests |
+| `ModifiersTests.cs` | Modifier catalog exhaustiveness | ~20 tests |
+| `ConstraintsTests.cs` | Constraint catalog | ~15 tests |
+| `FunctionsTests.cs` | Function catalog | ~20 tests |
+| `ConstructsTests.cs` | Construct catalog (declarations) | ~15 tests |
+| `TypesTests.cs` | Type catalog | ~15 tests |
+| `FaultsTests.cs` | Fault catalog | ~15 tests |
+| `SyntaxReferenceTests.cs` | DSL reference string completeness | ~10 tests |
+| `WritableSurfaceTests.cs` | `writable` modifier surface | ~5 tests |
+| `ProofRequirementTests.cs` | ProofRequirement DU instances | ~15 tests |
+| `ProofRequirementCatalogTests.cs` | ProofRequirements catalog | ~12 tests |
+| `DescriptorsTests.cs` | Runtime descriptor records | ~15 tests |
+| `GraphAnalyzerTests.cs` | Dependency graph analysis | ~? tests |
+| `ProofEngineTests.cs` | Proof engine dispatch | ~? tests |
+| `RuntimeTests.cs` | Runtime evaluation | ~? tests |
+
+**Total baseline:** 2107 tests, 0 failing.
