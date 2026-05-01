@@ -12,6 +12,34 @@
 
 ---
 
+### 2026-05-01T19:50:46Z: Phase 2 acceptance gate fully closed
+
+**By:** Scribe
+
+**Status:** Merged, deduplicated, inbox cleared (1 file)
+
+**Merged sources:** `george-phase2-gate-closed`.
+
+- George's final gate-closure batch is now durably recorded: PRECEPT0023c checks duplicate full token sequences rather than duplicate lead tokens, the diagnostic is promoted to Error, and the `IsSet` / `IsNotSet` false-positive case is locked by regression coverage.
+- The remaining docs gate was verification-only: `docs/language/precept-language-spec.md` §2.1 already had precedence `60` for `is set` / `is not set`, so the acceptance checklist closed without another spec edit.
+- Phase 2 is now fully closed as team state: all 14 acceptance-gate items are satisfied, `docs/working/parser-gap-fixes-plan.md` marks the gate resolved, and validation stands at 2678 passing tests with 0 failures and 0 warnings.
+
+---
+
+### 2026-05-01T19:50:46Z: Lexer exhaustiveness annotation scope resolved
+
+**By:** Scribe
+
+**Status:** Merged, deduplicated, inbox cleared (1 file)
+
+**Merged sources:** `frank-lexer-exhaustiveness`.
+
+- Frank closed the annotation-scope question for the lexer: `Lexer` produces `TokenKind` values from catalog-driven lookup tables and never dispatches on `TokenKind`, so `[HandlesCatalogExhaustively]` would be the wrong contract.
+- The correct safety net already exists in catalog metadata and lookup tables (`Tokens.Keywords`, operator tables, punctuation tables); production coverage stays catalog-driven rather than method-annotation-driven.
+- The real follow-up remains the future evaluator implementation: when D8/R4 introduces expression-form dispatch in `Evaluator`, that same commit must add `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]` plus per-form handler annotations.
+
+---
+
 ### 2026-05-01T18:17:13Z: Parser.cs partial split approved for Slice 27
 
 **By:** Scribe
