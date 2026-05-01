@@ -609,14 +609,6 @@ The rewrite succeeds. §1 opens with a problem statement and architectural commi
 
 This doc is ready to serve as the architectural foundation for per-stage design docs (starting with the parser). The concerns above are improvements, not blockers — the parser concern is the most urgent because that's the immediate next use case.
 
-
-
----
-
-
-
----
-
 ---
 
 # Design Review: combined-design-v2.md — Soundness, Completeness, Innovation
@@ -699,14 +691,6 @@ Replace "lowered expression nodes and action plans" with a concrete specificatio
 ---
 
 *This review is direct because the timing demands it. Addressing these three items now — before the parser, type checker, and evaluator are built — is nearly free. Addressing them after implementation begins is expensive. The architecture is sound. These are the gaps that would bite us.*
-
-
-
----
-
-
-
----
 
 ---
 
@@ -869,14 +853,6 @@ If the underlying concern is verbosity in stateless precepts that happen to have
 
 Neither of these requires abandoning the conservative default. The proposal conflates "reduce boilerplate" with "invert the safety model." Only the former is a real problem; the latter is the wrong solution.
 
-
-
----
-
-
-
----
-
 ---
 
 # George — Technical Review: combined-design-v2.md
@@ -996,14 +972,6 @@ However, the doc has **critical implementation-readiness gaps for the Parser** (
 - Could it emit round-trip parse tests (text -> AST -> text) per construct automatically?
 - How does this interact with the generic AST proposal — if AST nodes are generic/generated, do tests follow?
 - What is the boundary between generated test scaffolding and hand-authored test logic?
-
-
-
----
-
-
-
----
 
 ---
 
@@ -1320,14 +1288,6 @@ The right-pointing arrow:
 | `invoice-line-item.precept` | `samples/invoice-line-item.precept:16–20` | Multi-step computed field chains |
 | `travel-reimbursement.precept` | `samples/travel-reimbursement.precept:14` | Computed field with modifier interleaving |
 
-
-
----
-
-
-
----
-
 ---
 
 # Design Session Round 1: Catalog-Driven Parser Full Vision
@@ -1359,14 +1319,6 @@ Round 1 of a 3-round design session requested by Shane. The prior analysis walke
 ## What Round 2 Should Challenge
 
 See `## For George` section in the design doc. Key areas: `Entries` replacing `LeadingToken` (breaking catalog change), `when` guard uniformity assumption, slot parser `SyntaxNode?` return type fragility, factory dictionary vs. switch, anchor/guard injection coupling, and clean-slate re-estimate.
-
-
-
----
-
-
-
----
 
 ---
 
@@ -1460,14 +1412,6 @@ All `docs/working/` files (historical records — must not be updated per audit 
 ## Open Questions / Escalations
 
 None. All decisions locked and documented above.
-
-
-
----
-
-
-
----
 
 ---
 
@@ -1569,14 +1513,6 @@ The code sample comment reads `// ── Field modifiers (14) ──────
 4. `docs/language/catalog-system.md` line 740 — `(14)` → `(15)`.
 
 Items 2–4 are doc-only and may land in the same commit as item 1.
-
-
-
----
-
-
-
----
 
 ---
 
@@ -1686,14 +1622,6 @@ which option is chosen once parser implementation begins.
 Per George's charter: no implementation work until Frank's sign-off on the design. These bugs
 are discovered in design review — the right time. The parser is still a stub. These are zero-cost
 fixes at design time.
-
-
-
----
-
-
-
----
 
 ---
 
@@ -2029,8 +1957,6 @@ Both fixes are one-liners or near-one-liners. No soup until then.
 
 ---
 
----
-
 # Decision: Access-mode shorthand grammar and AST split
 
 **Date:** 2026-04-28
@@ -2120,14 +2046,6 @@ v8 fixes applied per George's review: 4 targeted edits (omit guard diagnostic, s
 
 
 v8 approved after fix verification — proceed to Phase 2.
-
-
-
----
-
-
-
----
 
 ---
 
@@ -2309,14 +2227,6 @@ v8 is substantially correct — the OmitDeclaration split is clean, the FieldTar
 **What:** While on the `precept-architecture` spike branch, no new branches and no PRs are to be created. All commits go directly to `precept-architecture`. Agents must never run `git checkout -b` or `gh pr create` during a spike session.
 **Why:** User request — spike branches are exploratory; PRs and sub-branches add noise and process overhead that doesn't belong in a spike.
 
-
-
----
-
-
-
----
-
 ---
 
 # Deep Re-Review: Catalog Extensibility CS8509 Enforcement
@@ -2422,14 +2332,6 @@ I then dismissed this because `InvokeSlotParser` operates on `ConstructSlotKind`
 **Gap 5 is a correctness/honesty issue** — the code claims CS8509 enforcement but the wildcard defeats it. Whether it's in formal plan scope or not, the misleading comment must be resolved.
 
 After these fixes, every catalog enum switch in the parser will use the same pattern: explicit arms for all named members, `#pragma CS8524` to suppress unnamed-integer noise, no wildcard. CS8509 will fire on every new enum member. The plan's central goal will be achieved.
-
-
-
----
-
-
-
----
 
 ---
 
@@ -2633,14 +2535,6 @@ The only remaining caveat is the observation under B1: if a developer adds a new
 
 **All 7 blocking items closed. No open findings. Branch is approved for merge.**
 
-
-
----
-
-
-
----
-
 ---
 
 # Deviation Review: George's Catalog Extensibility Implementation
@@ -2702,14 +2596,6 @@ Wait — correction: `_ =>` in a switch expression **does** suppress CS8509 beca
 | `#pragma disable CS8524` | ✅ | Independent from CS8509; tightly scoped; `TreatWarningsAsErrors` makes CS8509 a build error |
 
 **The catalog extensibility contract is intact:** adding a new `ConstructKind` or `ActionKind` (or `ActionSyntaxShape` / `RoutingFamily`) member produces CS8509 build errors at every incomplete switch. George's deviations are structurally sound.
-
-
-
----
-
-
-
----
 
 ---
 
@@ -3074,14 +2960,6 @@ These are the catalog enums where the first semantic member currently sits at im
 
 *Frank — 2026-04-28. This document is implementation-ready. George: follow § 6 for file paths, § 7 for tests, § 8 for rollout order. No ambiguity should remain.*
 
-
-
----
-
-
-
----
-
 ---
 
 # Spike Mode Is First-Class
@@ -3101,14 +2979,6 @@ These are the catalog enums where the first semantic member currently sits at im
 ## Architectural decision
 
 Spike mode is first-class. It must be activated deliberately, enforced consistently, and closed out explicitly. Exploratory work does not bypass process; it follows its own process.
-
-
-
----
-
-
-
----
 
 ---
 
@@ -3353,14 +3223,6 @@ This policy, if encoded in a Roslyn analyzer or code review checklist, would hav
 
 *Report written by Frank. Fix `Severity` + `DiagnosticStage` first — they are in a live struct with a correctness gate. Fix `ConstraintStatus`, `Prospect`, and `FieldAccessMode` before the evaluator is implemented. Flag `TypeKind` as a pre-TypeChecker task.*
 
-
-
----
-
-
-
----
-
 ---
 
 # Decision: ActionSyntaxShape — Explicit 1-Based Integer Values
@@ -3403,14 +3265,6 @@ Serialized integer values for `ActionSyntaxShape` (if any external system ever p
 ## Test Change
 
 `Actions_ActionSyntaxShape_AllMembersHaveValue` (used `Enum.IsDefined`) was replaced by `Actions_ActionSyntaxShape_AllMembersAreNonZero` (asserts `(int)s > 0`). The new assertion directly enforces the 1-based invariant; the old assertion was weakened the moment `None=0` was removed, because `Enum.IsDefined(AssignValue)` is trivially true regardless of its integer value.
-
-
-
----
-
-
-
----
 
 ---
 
@@ -3484,14 +3338,6 @@ dotnet test test/Precept.Tests/          → Passed! 2044/2044
 Every catalog enum switch in the parser now follows the `BuildNode` gold standard:  
 explicit arms for all named members · `#pragma CS8524` to suppress unnamed-integer noise · no wildcard · CS8509 active.
 
-
-
----
-
-
-
----
-
 ---
 
 # Decision: Catalog Extensibility Implementation Complete (PR #138)
@@ -3545,14 +3391,6 @@ This gives CS8509-style protection: adding a new ConstructKind forces updating b
 ## Cross-Surface Impact
 
 Parser internal only. No grammar, language server, MCP, or sample changes needed.
-
-
-
----
-
-
-
----
 
 ---
 
@@ -3762,7 +3600,6 @@ from Active on AdjustCoverage
 - Type checker: left must be `map of K to V`, right must be assignable to `K`, result type is `V`
 - Proof engine: `at` requires a `containskey` guard in scope for the same map and key expression (new proof obligation: `KeyPresence`)
 
-
 ---
 
 # Advisory: Map Access Keyword — `at` vs `for`
@@ -3918,7 +3755,6 @@ The marginal English fluency advantage of `for` in rule and guard contexts does 
 CoverageLimits at CheckCoverage.CoverageType
 ```
 
-
 ---
 
 # Decision: Map Access Keyword — `for` vs `at`
@@ -3982,7 +3818,6 @@ Reasons:
 4. **Avoids programmer connotation.** `at` suggests array indexing. `for` suggests relational lookup — which is what map access semantically *is* in a business-rule language.
 
 The only counterargument for `at` is familiarity for developers who know `dict.at(key)` from C++ or similar. But Precept optimizes for domain readability (§0.1.5), not programmer familiarity.
-
 
 ---
 
@@ -4166,7 +4001,6 @@ and determiners are the right word class for this syntactic position. `each`/`an
 is a coherent grammatical family. Alloy confirms the precedent. The `no transition`
 collision is non-issue parsing. No change to the approved syntax.
 
-
 ---
 
 # Decision: `ordered` as Collection Modifier vs `sortedset` as Named Type
@@ -4310,7 +4144,6 @@ The reasons are conclusive and mutually reinforcing:
 The `ordered` modifier has one meaning, one valid application site, and zero ambiguity today. The correct response to Shane's question is: those two `ordered` keywords are doing different things and belong at different semantic levels. Conflating them would be an architectural regression.
 
 **Recommendation:** Keep `sortedset of T` in the candidate section at Medium priority. Keep `ordered` scoped to `choice(...)`. Do not introduce a collection-level `ordered` modifier now or in the future without a new design review.
-
 
 ---
 
@@ -4509,7 +4342,6 @@ The remaining objections are not merely grammar preferences. They reflect struct
 
 **Recommendation:** Keep `sortedset of T` in the §Proposed Additional Types section at Medium priority. Keep `sorted` out of the modifier vocabulary. If Shane disagrees with this verdict after reviewing the category-break and type-discriminator arguments, schedule a design review — but do not accept `sorted` as a modifier on the basis of modifier-consistency alone.
 
-
 ---
 
 # Decision: Priorityqueue Design — Five Open Questions Resolved
@@ -4636,7 +4468,6 @@ The second `ScalarType` (after `priority`) must be orderable — numeric types, 
 3. **Priority constraints:** Can field modifiers apply to the priority type? (e.g., `priorityqueue of string priority integer min 1 max 5`) — and if so, where do they attach syntactically?
 4. **Dequeue semantics:** Does `dequeue ClaimQueue into CurrentClaim` discard the priority, or is there a way to capture it? (e.g., `dequeue ClaimQueue into CurrentClaim priority CurrentPriority`)
 5. **Grammar alignment with `map`:** Both `priorityqueue of T priority P` and `map of K to V` are two-type-parameter collections. Should the grammar production be generalized, or kept as separate productions?
-
 
 ---
 
@@ -4844,7 +4675,6 @@ In this taxonomy, there are no "base types" — every type IS its contract. `que
 
 **Net result:** Two prior arguments needed sharpening (the semantic enrichment distinction and the kill-shot formulation). One argument was too strong as stated (`sorted` valid on exactly one kind). The verdicts — `sortedset` as named type, `sorted` as modifier rejected, `bag` acceptable vocabulary, unified-bag model rejected — all stand.
 
-
 ---
 
 # `list of T` — Oversight Acknowledgment and Full Evaluation
@@ -5002,7 +4832,6 @@ This is not a reject — ring buffer was rejected on philosophy grounds (silent 
 - [ ] Update Priority Summary table to include `list of T` at Low priority (below `deque`)
 - [ ] Note in `log of T` candidate: the positional read overlap with `list` is deliberate — `log` covers the common case (immutable ordered history + read-by-index) and `list` is evaluated separately for the mutable-sequence use case
 
-
 ---
 
 # Decision: `sortedset of T` — Value Assessment
@@ -5126,7 +4955,6 @@ If Precept ever adds ordered-iteration constructs, the design review at that tim
 **Recommendation:** Move `sortedset of T` from Candidate 1 in the Proposed Additional Types section to a `### Rejected:` subsection, alongside `ringbuffer`, `bounded collection`, and `multimap`. Update the Priority Summary table. Remove from the Rollout plan. Note the rejection in the comparison table. Remove the Open Question about `ascending`/`descending` keyword reuse for `sortedset`.
 
 **Impact on collection taxonomy:** The "Sorted membership" family described in prior decisions becomes an empty family. The correct collection taxonomy for Precept's surface does not include a sorted-membership category. If a future ordered-iteration construct arrives and makes sorted order observable, `sortedset` can be re-evaluated at that time with an actual consuming construct to justify it.
-
 
 ---
 
@@ -5357,7 +5185,6 @@ PriceQualifier    :=  in '<currency>/<unit>'
 4. **One stale reference to resolve.** Open Question 8 in collection-types.md mentions `percentage` as a business-domain type. No such type appears in `business-domain-types.md`. Either `percentage` was planned and not designed yet, or the reference is stale. Shane should clarify.
 
 **Do not update the doc until Shane approves.**
-
 
 ---
 
@@ -6147,3 +5974,996 @@ This question is independent of the subset subtype model (§2), which governs ch
 | Does `set Priority = someStringVariable` compile? | **OPEN.** Recommendation: TypeMismatch (sealed vocabulary). Requires owner sign-off. | **Open** |
 | Should Option C (named types) be introduced? | Not in this cluster. Requires separate proposal explicitly addressing §0.4 Property 4. | Deferred |
 | Should `vocabulary` shorthand be proposed as authoring ergonomics? | Worth a dedicated follow-on proposal. Macro expansion at parse time; no type system change. Preserves §0.4 Property 4. | Deferred |
+
+---
+
+# Decision Record: Choice Field Diagnostic Messages
+
+**By:** Elaine  
+**Date:** 2026-04-29  
+**Status:** Pending owner sign-off
+
+---
+
+## What This Covers
+
+Five distinct diagnostics for violations of a `choice` field's type contract. `TypeMismatch` was rejected as the error code for these — it is too generic to be actionable. Every one of these violations has a different cause and a different fix. The messages should reflect that.
+
+These diagnostics assume the locked design decisions from Frank's choice analysis (2026-04-29):
+- `choice` is a sealed type — only choice-typed sources and compile-time literals in the declared set are assignment-compatible
+- Subset subtype: `choice(A) <: choice(B)` iff `A ⊆ B`
+- `choice of T` is valid for `string`, `integer`, `decimal`, `number`, `boolean`
+- `ordered` is the capability gate for ordinal comparison (`<`, `>`, `<=`, `>=`) on all element types
+- Order-preserving subsequence is required for ordinal comparison across two ordered choice values
+
+**Audience context:** The primary author of a `.precept` file is a business analyst or domain expert. Messages must use plain language — no type-theory terminology. The message should tell the user what to do, not just what went wrong.
+
+**Valid-values display rule:** When the field's declared set has ≤5 members, include all values in the primary message. When >5 members, show the first 3 and the remaining count (e.g., `"Low", "Medium", "High", and 2 more`). The hover detail always shows the full set regardless of size.
+
+---
+
+## Category 1 — Non-choice type assigned to choice field
+
+**Fires when:** A value that is not choice-typed is assigned to a choice field. Covers string variables, integer variables, decimal variables, booleans, collections, money, dates — any non-choice source.
+
+**Examples that trigger this:**
+```precept
+field Priority as choice("Low", "Medium", "High") default "Low"
+field Notes as string writable
+
+set Priority = Notes           # NonChoiceAssignedToChoice
+set Priority = SomeIntegerVar  # NonChoiceAssignedToChoice
+set Priority = true            # NonChoiceAssignedToChoice
+```
+
+---
+
+### Diagnostic: `NonChoiceAssignedToChoice`
+
+**Severity:** Error
+
+**Message template:**
+```
+'{0}' is a {1} value and cannot be assigned to '{2}' — valid values are {3}
+```
+
+| Placeholder | Binds to | Example |
+|---|---|---|
+| `{0}` | Source expression text | `Notes` |
+| `{1}` | Source type name | `string` |
+| `{2}` | Target field name | `Priority` |
+| `{3}` | Formatted valid values (field's declared set, truncated if >5 members) | `"Low", "Medium", "High"` |
+
+**Rendered example:**
+> `'Notes' is a string value and cannot be assigned to 'Priority' — valid values are "Low", "Medium", "High"`
+
+**Secondary / hover detail:**
+> `Priority` is a choice field — it only accepts specific values from its declared set: `"Low"`, `"Medium"`, `"High"`. The variable `Notes` is a `string` and could hold any text, including values not in this set. The compiler cannot verify at build time that `Notes` will only ever contain a valid value.
+>
+> To fix this:
+> - Assign a literal value directly: `set Priority = "High"`
+> - Or declare the source as a compatible choice type: `Notes as choice("Low", "Medium", "High")`
+
+**Quick-fix hint:** `Assign a literal value, or change the source declaration to a compatible choice type`
+
+---
+
+## Category 2 — Choice literal not in field's set
+
+**Fires when:** A compile-time literal (string or numeric) is used in an assignment to a choice field, but the literal is not a member of the field's declared set. The value is known at compile time — this is a definitive membership failure.
+
+**Examples that trigger this:**
+```precept
+field Priority as choice("Low", "Medium", "High") default "Low"
+field ErrorCode as choice of integer(0, 404, 500)
+
+set Priority = "Critical"     # ChoiceLiteralNotInSet — "Critical" is not in the set
+set ErrorCode = 999            # ChoiceLiteralNotInSet — 999 is not in the set
+```
+
+---
+
+### Diagnostic: `ChoiceLiteralNotInSet`
+
+**Severity:** Error
+
+**Message template:**
+```
+{0} is not a valid value for '{1}' — valid values are {2}
+```
+
+| Placeholder | Binds to | Example |
+|---|---|---|
+| `{0}` | The rejected literal, as written in source | `"Critical"` or `999` |
+| `{1}` | Target field name | `Priority` |
+| `{2}` | Formatted valid values (field's declared set, truncated if >5 members) | `"Low", "Medium", "High"` |
+
+**Rendered example (string choice):**
+> `"Critical" is not a valid value for 'Priority' — valid values are "Low", "Medium", "High"`
+
+**Rendered example (integer choice):**
+> `999 is not a valid value for 'ErrorCode' — valid values are 0, 404, 500`
+
+**Secondary / hover detail (string example):**
+> `Priority` accepts: `"Low"`, `"Medium"`, `"High"`. The value `"Critical"` is not in this set.
+>
+> To fix this:
+> - Use one of the declared values: `set Priority = "High"`
+> - Or add `"Critical"` to the field declaration: `field Priority as choice("Low", "Medium", "High", "Critical")`
+
+**Quick-fix hint:** `Replace the literal with a declared value, or add it to the field's declared set`
+
+---
+
+## Category 3 — Choice arg values outside field's set
+
+**Fires when:** A choice-typed arg or field is assigned to a choice field, but the source's value set is not a subset of the target field's declared set. One or more values in the source could flow into the field that the field does not accept.
+
+The element types are compatible (both `string`, or both `integer`, etc.) — this is a membership violation, not an element type conflict (that is Category 4).
+
+**Examples that trigger this:**
+```precept
+field Priority as choice("Low", "Medium", "High") default "Low"
+
+# "Critical" is not in {"Low","Medium","High"}
+event Escalate(Level as choice("Low", "Medium", "Critical"))
+from Active on Escalate
+    -> set Priority = Escalate.Level   # ChoiceArgOutsideFieldSet
+
+# "Critical" and "Urgent" both outside the field's set
+event Triage(Level as choice("Low", "Medium", "High", "Critical", "Urgent"))
+from Active on Triage
+    -> set Priority = Triage.Level     # ChoiceArgOutsideFieldSet
+```
+
+---
+
+### Diagnostic: `ChoiceArgOutsideFieldSet`
+
+**Severity:** Error
+
+**Message template:**
+```
+'{0}' includes values not in '{1}': {2}. Valid values are {3}
+```
+
+| Placeholder | Binds to | Example |
+|---|---|---|
+| `{0}` | Source arg or field reference | `Escalate.Level` |
+| `{1}` | Target field name | `Priority` |
+| `{2}` | All values from source that are not in the target set (comma-separated) | `"Critical"` or `"Critical", "Urgent"` |
+| `{3}` | Formatted valid values (target field's declared set, truncated if >5 members) | `"Low", "Medium", "High"` |
+
+Note: `{2}` shows **all** out-of-set values, not just the first. Business analysts need the complete list to decide whether to narrow the arg or expand the field.
+
+**Rendered example (single out-of-set value):**
+> `'Escalate.Level' includes values not in 'Priority': "Critical". Valid values are "Low", "Medium", "High"`
+
+**Rendered example (multiple out-of-set values):**
+> `'Triage.Level' includes values not in 'Priority': "Critical", "Urgent". Valid values are "Low", "Medium", "High"`
+
+**Secondary / hover detail (single value example):**
+> `Priority` accepts: `"Low"`, `"Medium"`, `"High"`. The arg `Escalate.Level` is declared as `choice("Low", "Medium", "Critical")`, which includes `"Critical"` — a value `Priority` does not accept. If `Escalate.Level` were assigned as-is, a `"Critical"` value could enter `Priority`'s field, violating the declared contract.
+>
+> To fix this:
+> - Narrow the arg to values `Priority` accepts: `Level as choice("Low", "Medium")`
+> - Or add the value to the field: `field Priority as choice("Low", "Medium", "High", "Critical")`
+
+**Quick-fix hint:** `Remove out-of-set values from the arg declaration, or add them to the field's declared set`
+
+---
+
+## Category 4 — Choice element type mismatch
+
+**Fires when:** Source and target are both choice-typed, but their element types differ. `choice of integer` is a fundamentally different type from `choice of string` — no implicit conversion exists, and there is no value overlap.
+
+**Examples that trigger this:**
+```precept
+field Status as choice("Draft", "Active", "Closed")    # choice of string
+
+event SetCode(Code as choice of integer(1, 2, 3))
+from Active on SetCode
+    -> set Status = SetCode.Code    # ChoiceElementTypeMismatch
+
+field ErrorCode as choice of integer(0, 404, 500)
+field Level as choice of decimal(0.5, 1.0, 2.5)
+set ErrorCode = Level               # ChoiceElementTypeMismatch
+```
+
+---
+
+### Diagnostic: `ChoiceElementTypeMismatch`
+
+**Severity:** Error
+
+**Message template:**
+```
+'{0}' is a choice of {1} and cannot be assigned to '{2}' — '{2}' holds choice of {3} values
+```
+
+| Placeholder | Binds to | Example |
+|---|---|---|
+| `{0}` | Source expression text | `SetCode.Code` |
+| `{1}` | Source element type | `integer` |
+| `{2}` | Target field name | `Status` |
+| `{3}` | Target element type | `string` |
+
+**Rendered example:**
+> `'SetCode.Code' is a choice of integer and cannot be assigned to 'Status' — 'Status' holds choice of string values`
+
+**Secondary / hover detail:**
+> `Status` is declared as `choice("Draft", "Active", "Closed")` — a choice of string values. `SetCode.Code` is declared as `choice of integer(1, 2, 3)`. These choice types carry fundamentally different kinds of values and have no compatible assignment path.
+>
+> To fix this:
+> - Declare the arg with the correct element type: `Code as choice("Draft", "Active", "Closed")`
+> - Or use a separate field for the numeric code alongside the string-choice field
+
+**Quick-fix hint:** `Change the arg type to match the field's element type`
+
+---
+
+## Category 5 — Ordered rank conflict
+
+**Fires when:** Ordinal comparison (`<`, `>`, `<=`, `>=`) is attempted between two `ordered` choice values whose declared sequences assign different ranks to one or more shared values. The subset relation may still hold (assignment can be valid), but ordinal comparison requires rank consistency — and the sequences conflict.
+
+Rank is determined by position in the `choice(...)` declaration. Two ordered choice types have a rank conflict when they share a value but place it at a different relative position.
+
+**Examples that trigger this:**
+```precept
+field Priority as choice("Low", "Medium", "High") ordered default "Low"
+# Declared ranks: Low=1, Medium=2, High=3
+
+# Rank conflict: in this arg, Medium=1 and Low=2 — inverted from the field
+event Escalate(Level as choice("Medium", "Low") ordered)
+from Active when Escalate.Level > Priority  # ChoiceRankConflict — "Medium" and "Low" have inverted ranks
+    -> set Priority = Escalate.Level
+```
+
+`choice("Medium", "Low") ordered` declares Medium=rank1, Low=rank2. `choice("Low", "Medium", "High") ordered` declares Low=rank1, Medium=rank2. The shared values `"Low"` and `"Medium"` have inverted relative ranks. `Escalate.Level > Priority` would mean opposite things depending on which sequence is used — so comparison is disallowed.
+
+Note: assignment (`set Priority = Escalate.Level`) is separately governed by the subset subtype rule. It may still be valid (subset check passes: `{"Medium","Low"} ⊆ {"Low","Medium","High"}`). `ChoiceRankConflict` fires only on the comparison — not on the assignment.
+
+---
+
+### Diagnostic: `ChoiceRankConflict`
+
+**Severity:** Error
+
+**Message template:**
+```
+'{0}' and '{1}' cannot be compared — their declared rank sequences conflict at {2}
+```
+
+| Placeholder | Binds to | Example |
+|---|---|---|
+| `{0}` | Left operand name | `Escalate.Level` |
+| `{1}` | Right operand name | `Priority` |
+| `{2}` | First conflicting value found (quoted) | `"Medium"` |
+
+**Rendered example:**
+> `'Escalate.Level' and 'Priority' cannot be compared — their declared rank sequences conflict at "Medium"`
+
+**Secondary / hover detail:**
+> `Priority` is declared as `choice("Low", "Medium", "High") ordered` — `"Low"` is rank 1, `"Medium"` is rank 2, `"High"` is rank 3. `Escalate.Level` is declared as `choice("Medium", "Low") ordered` — `"Medium"` is rank 1, `"Low"` is rank 2.
+>
+> The relative order of `"Medium"` and `"Low"` is inverted between the two declarations. Using `>` or `<` here would give opposite results depending on which ordering applies — so the comparison is not allowed.
+>
+> To fix this, align the arg's declaration with the field's ordering:
+> ```precept
+> event Escalate(Level as choice("Low", "Medium") ordered)
+> ```
+> With this declaration, `"Low"` is rank 1 and `"Medium"` is rank 2 in both types — comparison is well-defined.
+
+**Quick-fix hint:** `Reorder the arg's declared values to match the field's rank sequence`
+
+---
+
+## Design Notes
+
+### Why five separate diagnostics instead of one
+
+The five categories require different fixes:
+
+| Category | Source of problem | Fix |
+|---|---|---|
+| Non-choice type | Source is not choice-typed | Change source declaration to a compatible choice type |
+| Literal not in set | The specific value doesn't exist in the field | Change the literal, or add the value to the field's declared set |
+| Arg values outside set | Source choice type has extra values the field won't accept | Narrow the arg's declared set, or expand the field's declared set |
+| Element type mismatch | Choice types carry different underlying value kinds | Align element types across source and target |
+| Rank conflict | Ordering sequences are incompatible for ordinal comparison | Reorder the arg's declaration to match the field's rank sequence |
+
+A single `TypeMismatch` diagnostic cannot surface this guidance. The fix for Category 1 ("declare your arg as choice") is wrong advice for Category 2 ("change the literal value"). Separate diagnostics give the right fix for each failure mode.
+
+### Valid-values display thresholds (implementation note)
+
+All messages that show the field's declared set follow the same rule:
+- **≤5 members:** Show all values inline: `"Low", "Medium", "High"`
+- **>5 members:** Show the first 3 and a count: `"Low", "Medium", "High", and 2 more`
+- **Hover detail:** Always shows the full set regardless of size
+
+For `choice of integer` and `choice of decimal` values, no string quotes are used: `0, 404, 500`.
+
+### Category 5 fires on comparison only
+
+`ChoiceRankConflict` fires only on ordinal comparison operators (`<`, `>`, `<=`, `>=`). Assignment is separately governed by the subset subtype rule — `ChoiceArgOutsideFieldSet` covers membership violations on assignment. An arg can be assignment-compatible with a field (its values are a subset) but still trigger `ChoiceRankConflict` when comparison is attempted with conflicting rank sequences. The two checks are independent.
+
+---
+
+## Summary Table
+
+| Diagnostic | Severity | Cat. | Message Template | Fires on |
+|---|---|---|---|---|
+| `NonChoiceAssignedToChoice` | Error | 1 | `'{0}' is a {1} value and cannot be assigned to '{2}' — valid values are {3}` | Non-choice type (string, integer, boolean, etc.) assigned to a choice field |
+| `ChoiceLiteralNotInSet` | Error | 2 | `{0} is not a valid value for '{1}' — valid values are {2}` | Compile-time literal not in the field's declared set |
+| `ChoiceArgOutsideFieldSet` | Error | 3 | `'{0}' includes values not in '{1}': {2}. Valid values are {3}` | Choice-typed source has values outside the target field's declared set |
+| `ChoiceElementTypeMismatch` | Error | 4 | `'{0}' is a choice of {1} and cannot be assigned to '{2}' — '{2}' holds choice of {3} values` | Source and target are both choice-typed but with different element types |
+| `ChoiceRankConflict` | Error | 5 | `'{0}' and '{1}' cannot be compared — their declared rank sequences conflict at {2}` | Ordinal comparison between two ordered choice values with conflicting rank sequences |
+
+---
+
+# Design Consultation: `lookup` and `queue by P` Language Surface
+
+**By:** Elaine  
+**Date:** 2026-07-17  
+**Status:** Pending owner sign-off
+
+---
+
+## Issue 1 — `containskey` and `removekey`: Drop the `-key` suffix
+
+**Verdict: Replace both with `contains` and `remove`.**
+
+These compound words read like .NET API method names, not natural language. A business author writing a coverage rule does not think "containskey" — they think "contains." The `-key` suffix is defensive disambiguation that the type checker can handle implicitly: a `lookup of K to V` only has keys as membership targets. There are no "value-side" membership or removal operations. The type system knows from context that the argument is a key.
+
+This aligns lookup directly with `set`:
+
+| Operation | `set of T` | `lookup of K to V` (current) | `lookup of K to V` (proposed) |
+|---|---|---|---|
+| Membership | `F contains X` | `F containskey X` | `F contains X` |
+| Removal | `remove F X` | `removekey F X` | `remove F X` |
+
+**Before:**
+```precept
+when CoverageLimits containskey CheckCoverage.CoverageType
+    -> set CurrentLimit = CoverageLimits for CheckCoverage.CoverageType
+
+-> removekey CoverageLimits SomeCoverageType
+```
+
+**After:**
+```precept
+when CoverageLimits contains CheckCoverage.CoverageType
+    -> set CurrentLimit = CoverageLimits for CheckCoverage.CoverageType
+
+-> remove CoverageLimits SomeCoverageType
+```
+
+"When CoverageLimits contains this coverage type" is clean English. "Remove CoverageLimits SomeCoverageType" is identical in surface form to `remove MissingDocuments ReceiveDocument.Name` already in the sample canon.
+
+**There is no ambiguity to resolve.** A lookup does not support value-side membership tests or removal — only key-side. The type checker knows the type; the keyword does not need to repeat that knowledge. This is the same principle that lets `set.contains` work without `set.containsvalue`.
+
+---
+
+## Issue 2 — Asymmetry diagnosis: the `by`/`priority` naming fork
+
+**The specific source:** Within the priority queue type, `by` and `priority` both refer to the same concept (the ordering dimension), but they appear as different words depending on syntactic context. An author learns two words for one idea:
+
+| Context | Word used |
+|---|---|
+| Declaration: `queue of string by integer descending` | `by` |
+| Enqueue: `enqueue ClaimQueue X by FileClaim.Severity` | `by` |
+| Dequeue capture: `dequeue ClaimQueue into X priority Y` | `priority` |
+| Accessor: `ClaimQueue.priority` | `priority` |
+| Quantifier member: `each claim in ClaimQueue (claim.priority …)` | `priority` |
+
+The fork is: `by` for input operations (declaration, enqueue), `priority` for output operations (dequeue capture, accessor, quantifier). An author who just wrote `enqueue ClaimQueue "ABC" by severity` and then writes `dequeue ClaimQueue into X` will reach for `by` to capture the ordering value — because that's the word they used a line above. Encountering `priority` there introduces a naming seam.
+
+**Is it resolvable?** Partially. There are two directions:
+
+**Option A — unify on `by` at the dequeue site (recommended):**
+```precept
+-> dequeue ClaimQueue into CurrentClaim by CurrentSeverity
+```
+Enqueue and dequeue both use `by` as their role connector. The accessor (`.priority`) and quantifier member (`.priority`) remain noun-form, which is grammatically appropriate there and doesn't read strangely.
+
+**Option B — unify on `priority` everywhere:**
+```precept
+-> enqueue ClaimQueue X priority FileClaim.Severity
+```
+This was the original design before `by` was introduced. Shane explicitly likes `by` at declaration. Revisiting it requires reopening a locked decision.
+
+**Recommendation: Option A.** Change the dequeue capture keyword from `priority` to `by`. This makes `by` the connective at both enqueue and dequeue action sites, consistent with the declaration. The accessor and quantifier member names (`priority`) stay as nouns.
+
+Updated table after both fixes:
+
+| Operation | Proposed surface |
+|---|---|
+| Declare | `field F as queue of string by integer descending` |
+| Enqueue | `enqueue F Expr by Priority` |
+| Dequeue (with capture) | `dequeue F into X by Y` |
+| Dequeue (value only) | `dequeue F into X` |
+| Accessor | `F.peek` / `F.priority` |
+| Quantifier member | `x.priority` / `x.value` |
+
+The remaining fork (`by` at action sites, `priority` as noun) is grammatically natural and is not a usability problem. "Enqueue *by* severity" and "the `.priority` of the front element" are different grammatical roles for the same underlying concept — the first is a preposition introducing a role, the second is a noun naming a property. This is not a seam.
+
+**What the asymmetry is not:** The intentional differences between lookup and priority queue — different verbs, different access patterns, different membership semantics — are not the source of the feeling. Those differences exist because the types are genuinely different. The `by`/`priority` fork is the specific site of the problem because it exists *within a single type*.
+
+---
+
+## Issue 3 — Quantifier variable shape difference (flagged, not blocking)
+
+This was not raised but is a genuine learnable-but-surprising edge. In a regular `queue of T`, iterating with `each x in Q` binds `x` to the raw element value (type T). In a `queue of T by P`, iterating with `each x in Q` binds `x` to a pair with `.value` (type T) and `.priority` (type P).
+
+Same iteration syntax — different variable shape. An author who is familiar with regular queue iteration and writes:
+
+```precept
+rule each claim in ClaimQueue (claim.length > 5)   # ← intuitive but wrong
+```
+
+will get a type error because `claim` is a pair, not a string. The correct form is:
+
+```precept
+rule each claim in ClaimQueue (claim.value.length > 5)
+```
+
+**This is not a blocking design flaw.** The declaration `queue of T by P` is a visible signal that this is a pair type, and the error message can be teachable ("ClaimQueue elements have a `.value` and a `.priority` — use `claim.value` to access the string"). But it should be called out as a learner friction point worth addressing in diagnostics and documentation, not just through type errors.
+
+---
+
+## Summary
+
+| Issue | Recommendation | Status |
+|---|---|---|
+| `containskey` | Replace with `contains` | Proposed |
+| `removekey` | Replace with `remove` | Proposed |
+| `by`/`priority` fork | Change dequeue capture from `priority` to `by` | Proposed |
+| Quantifier variable shape | No design change; address in diagnostics and docs | Flagged |
+
+---
+
+# Design Decision: `priorityqueue` Backing Structure and Tiebreak Guarantee
+
+**By:** Frank + George  
+**Date:** 2026-04-29  
+**Status:** Pending owner sign-off
+
+---
+
+## Decision
+
+The `priorityqueue of T priority P` type uses `SortedDictionary<TPriority, Queue<TElement>>` as its backing structure, with two mandatory modifications. The language spec guarantees **stable (insertion-order) tiebreaking** for elements with equal priority.
+
+---
+
+## Why .NET `PriorityQueue<T,P>` Cannot Be the Direct Backing Type
+
+`System.Collections.Generic.PriorityQueue<TElement, TPriority>` explicitly documents:
+
+> *"The order in which elements of equal priority are dequeued is not specified."*
+
+"Unspecified" = non-deterministic. Non-determinism breaks Precept's inspectability guarantee — the proof engine cannot reason about which element `.peek` returns when there are ties. `PriorityQueue<T,P>` is ruled out as the direct backing type.
+
+---
+
+## Approved Structure
+
+`SortedDictionary<TPriority, Queue<TElement>>` with a thin wrapper class.
+
+Each distinct priority value maps to a FIFO `Queue<TElement>`. Elements at equal priority dequeue in insertion order. The operations:
+
+| Operation | Complexity | Notes |
+|---|---|---|
+| `enqueue` | O(log k) | k = distinct priority values |
+| `dequeue` | O(log k) | Min/max key + Queue.Dequeue |
+| `.peek` / `.peekpriority` | O(log k) | First/Last key + Queue.Peek |
+| `.count` | O(1) | Separately maintained counter |
+| Quantifier iteration | O(n) | All elements across all buckets |
+
+---
+
+## Mandatory Modifications
+
+### 1. Separate element counter
+
+The wrapper maintains a dedicated `int _count`, incremented on `enqueue` and decremented on `dequeue`/`clear`. Do not sum bucket sizes for `.count`. The `.count > 0` guard is evaluated on every `.peek`, `.peekpriority`, and `dequeue` — O(1) is required.
+
+### 2. Declaration-derived comparers (correctness requirement)
+
+**Never use `Comparer<T>.Default` for ordered `choice of T` priority types.**
+
+`choice of string("normal", "high") ordered` has declaration-position rank: `"normal"` = 0, `"high"` = 1. Natural string ordering gives `"high" < "normal"` alphabetically — the inverse of intent. Using the default comparer would silently dequeue `"normal"` first when `"high"` should be first.
+
+The Precept builder must select the comparer strategy at build time based on the priority field's `TypeKind`:
+
+- `TypeKind.Integer`, `TypeKind.Decimal`, `TypeKind.Number` — `Comparer<T>.Default`
+- `TypeKind.Choice` with `ordered` modifier — declaration-position rank comparer, built from choice member list as a `FrozenDictionary<string, int>` rank map
+- `TypeKind.Choice` without `ordered` — compile error (`P` must satisfy `TypeTrait.Orderable`)
+
+The rank comparer is constructed once at build time, never at evaluation time.
+
+---
+
+## Language Spec Guarantee
+
+The spec states: **"When multiple elements share the same priority, they are dequeued in the order they were enqueued (insertion-order tiebreaking)."**
+
+The bucket model is the implementation. The spec exposes the contract only.
+
+**`.peek` and `.peekpriority`** always reflect the field's *declared direction*. The per-operation direction override at the dequeue site (e.g., `dequeue F ascending into X priority Y`) selects which end of the sorted structure to dequeue from for that operation only — it does not reorder the queue and does not affect what `.peek` returns. This is a known limitation: there is no `.peekascending`/`.peekdescending` accessor pair.
+
+**`.count`** returns total elements across all priority groups. Quantifiers iterate all elements across all groups — not just the front group.
+
+---
+
+## Alternatives Rejected
+
+| Alternative | Why rejected |
+|---|---|
+| `System.Collections.Generic.PriorityQueue<T,P>` | Non-deterministic tiebreaking — violates inspectability |
+| Min-heap augmented with insertion counter | Harder to inspect, harder to serialize, no performance gain for typical k-small business-domain usage |
+| `ImmutableSortedDictionary` | Allocation overhead unjustified; Version immutability is achieved by copy-on-write at the operation boundary |
+| `SortedList<TPriority, Queue<TElement>>` | Viable optimization for k ≤ ~20 — may be used as a hidden implementation choice after profiling, but not a design decision |
+
+---
+
+# Technical Review: Elaine's `lookup`/`queue` Surface Proposals
+
+**By:** Frank  
+**Date:** 2025-07-17  
+**Status:** Recommendations delivered — pending owner sign-off
+
+---
+
+## Proposal 1 — Replace `containskey` with `contains`
+
+**Verdict: APPROVED.**
+
+No grammar ambiguity. `contains` is an infix expression operator at precedence 40 (spec §2.1). It parses as `ContainsExpression(left, ParseExpression(40))`. The left operand is resolved to a field type by the type checker, not the parser. Extending the type checker's `contains` validation table from `{set, queue, stack}` to `{set, queue, stack, lookup}` is a pure type-checker change. The parser sees `Expr contains Expr` regardless of whether the left side is a set or a lookup.
+
+If someone passes a `V`-typed expression to `F contains Expr` on a `lookup of K to V`, the type checker fires `TypeMismatch` — the expected type is `K`, the actual type is `V`. The diagnostic message should say "contains on lookup tests key membership; expected type K, got V." This is clean — no new diagnostic code needed, just a message template specialization.
+
+The `-key` suffix is purely cosmetic disambiguation. No parser production, no proof obligation, no evaluator branch depends on the distinction between `contains` and `containskey`. The type checker already knows the collection kind from the field's declared type. The suffix duplicates information the type system already has.
+
+---
+
+## Proposal 2 — Replace `removekey` with `remove`
+
+**Verdict: APPROVED.**
+
+Parser: no changes required. The `ActionStatement` grammar is already `remove Identifier Expr`. The parser emits the same AST node regardless of whether the field is `set of T` or `lookup of K to V`. Type checker resolves the field type and validates that the expression matches `T` (for set) or `K` (for lookup). This is a type-checker-only extension.
+
+Proof obligation: confirmed identical to `set`. `remove` on `set` is no-op-if-absent — no guard required, no emptiness proof needed. `removekey` on `lookup` has the same semantics (spec: "removekey requires no guard — no-op if absent, like remove on set"). Unifying the keyword preserves this guarantee. No new proof obligation category.
+
+The `-key` suffix is not load-bearing anywhere. No pipeline stage, no evaluator branch, no proof rule depends on it. It exists only because the original `collection-types.md` design mirrored .NET's `Dictionary.ContainsKey`/`Dictionary.Remove` API naming. That's API naming leaking into a DSL surface — exactly what Precept's language design is supposed to prevent.
+
+---
+
+## Proposal 3 — Use `by` at the dequeue-capture site
+
+**Verdict: APPROVED WITH MODIFICATION.**
+
+### Analysis of filter-condition ambiguity
+
+The concern I raised previously: `dequeue ClaimQueue into CurrentClaim by CurrentSeverity` could be misread as "dequeue the item BY this severity" (a filter/selection condition) rather than "dequeue and capture the severity INTO this field."
+
+Is this a real parsing ambiguity? **No.** The parser grammar for dequeue is:
+
+```
+dequeue Identifier (into Identifier (by Identifier)?)?
+```
+
+There is no conditional-dequeue production. The parser has no `by` + expression continuation that would create a grammatical fork. The `by` keyword in this position is unambiguously a capture binding — the parser cannot misparse it.
+
+Is it a reader-misparse risk? **Mildly.** A business author encountering `dequeue F into X by Y` for the first time might momentarily wonder whether `by Y` means "select by Y" or "capture Y." But this is a first-encounter learning cost, not an ongoing ambiguity. Once learned, the pattern is stable.
+
+### Weighing the arguments
+
+**Elaine's consistency argument** (spec Principle 5 — keyword-anchored readability): The `by` keyword appears at declaration (`queue of T by P`), at enqueue (`enqueue F Expr by Priority`), and now at dequeue (`dequeue F into X by Y`). The same keyword, the same role (introducing the priority axis), in all three action contexts. An author who writes `enqueue F X by P` one line above will instinctively reach for `by` at dequeue. Encountering `priority` there is a vocabulary seam — two words for one concept within the same type.
+
+**My filter-reading concern**: Theoretical. No grammar production creates ambiguity. No current or planned Precept feature introduces conditional dequeue. If conditional dequeue were ever needed, it would use `when` (the language's universal guard keyword), not `by`. The `by` keyword is already claimed for priority-axis role connection — overloading it for a future filter condition would itself be the design error.
+
+**Verdict:** Elaine's consistency argument is stronger. Principle 5 says "statement kind is identified by its opening keyword sequence" — and within that, vocabulary consistency across the lifecycle of a single type is the natural corollary. `by` at declaration, `by` at enqueue, `by` at dequeue. The fork was unjustified.
+
+### The modification
+
+The accessor (`.priority`) and quantifier binding (`.priority`) remain as nouns. This is correct and Elaine explicitly preserves it. `by` is a preposition introducing a role at action sites. `.priority` is a noun naming a property at access sites. Different grammatical roles, same underlying concept. No seam.
+
+---
+
+## Summary Table
+
+| Proposal | Verdict | Conditions |
+|---|---|---|
+| `contains` replaces `containskey` | **Approved** | Type checker emits `TypeMismatch` if `V`-typed arg supplied; diagnostic message should name the key/value distinction |
+| `remove` replaces `removekey` | **Approved** | No-op-if-absent semantics preserved; no new proof obligation |
+| `by` replaces `priority` at dequeue-capture | **Approved** | Accessor (`.priority`) and quantifier binding (`.priority`) retain noun form |
+
+---
+
+## Implementation Notes
+
+All three changes are type-checker-only and catalog-metadata updates. No parser grammar changes. No new AST node types. The `Actions` catalog entry for `remove` gains `lookup` in its applicable-types metadata. The `Operations` catalog entry for `contains` gains `lookup` in its valid-lhs-types list. The dequeue action grammar already supports an optional trailing identifier — the keyword text changes from `priority` to `by`.
+
+The `containskey` and `removekey` tokens can be removed from the lexer's keyword table entirely (they are not yet implemented — this is pre-implementation design). The `priority` keyword at action sites is similarly pre-implementation.
+
+---
+
+# Design Advisory: `priorityqueue` Syntax Alternatives
+
+**By:** Frank  
+**Date:** 2026-04-29  
+**Status:** Pending owner decision
+
+---
+
+## Context
+
+Shane found `priorityqueue of T priority P` verbose. This advisory surveys four alternative syntax forms and makes a recommendation. The decision is not yet locked.
+
+Current design (baseline for comparison):
+
+```precept
+field ClaimQueue as priorityqueue of string priority integer descending
+
+-> enqueue ClaimQueue FileClaim.ClaimId priority FileClaim.Severity
+-> dequeue ClaimQueue into CurrentClaim priority CurrentPriority
+```
+
+---
+
+## Grounding Constraint
+
+The `priority` connector at action sites is not decoration — it is the parser's discriminator between a plain `enqueue F val` (queue) and a two-arg `enqueue F val priority p` (priorityqueue). Dropping it without a replacement forces type-driven grammar (the parser must look up `F`'s declared type to know if the second arg is valid), which violates Precept's principle that statement kind is identified by its opening keyword sequence.
+
+Any option that drops the connector entirely is off the table. Replace it — don't remove it.
+
+---
+
+## Option 1 — `ranked of T by P dir` + `at` connector (Recommended)
+
+```precept
+field ClaimQueue as ranked of string by integer descending
+
+-> enqueue ClaimQueue FileClaim.ClaimId at FileClaim.Severity
+-> dequeue ClaimQueue into CurrentClaim at CurrentPriority
+```
+
+**Gains:** `ranked` is shorter and reads naturally ("a ranked queue of strings, by integer, descending"). `by` is a natural English role connector — consistent with `map of K to V` pattern. `at` is symmetric and brief at both action sites.
+
+**Costs:** 1 new reserved keyword (`ranked`), 2 new contextual keywords (`by`, `at`).
+
+**Open risk:** If `list of T` eventually uses `at` for positional insert (`insert F at N Expr`), there is a contextual collision. Fallback: use `with` instead of `at` — "enqueue ClaimId *with* severity 5" — which has no collision risk and reads naturally.
+
+---
+
+## Option 2 — `ranked of T by P dir`, action sites unchanged
+
+```precept
+field ClaimQueue as ranked of string by integer descending
+
+-> enqueue ClaimQueue FileClaim.ClaimId priority FileClaim.Severity
+-> dequeue ClaimQueue into CurrentClaim priority CurrentPriority
+```
+
+**Gains:** Only the declaration is shortened. Zero change to the action surface — no regression risk. `ranked by` is still a natural read.
+
+**Costs:** 1 new reserved keyword (`ranked`), 1 new contextual keyword (`by`). `priority` still appears at every enqueue and dequeue — partial relief only.
+
+---
+
+## Option 3 — Fold into `queue`: `queue of T by P dir`
+
+```precept
+field ClaimQueue as queue of string by integer descending
+
+-> enqueue ClaimQueue FileClaim.ClaimId by FileClaim.Severity
+-> dequeue ClaimQueue into CurrentClaim by CurrentPriority
+```
+
+**Gains:** Zero new reserved keywords — only `by` as a new contextual keyword.
+
+**Costs:** FIFO and priority-ordered are fundamentally different ordering contracts, not a modifier on the same type. An author who misses the `by` clause will misunderstand which element `.peek` returns. The proof engine needs different dequeue-order reasoning for both — a hidden type discriminator under one keyword. Documentation forks. Does not scale: would imply `stack of T by P` also becomes valid.
+
+**Verdict:** Not recommended. The semantic split is a real user-experience problem.
+
+---
+
+## Option 4 — Positional args (drop connectors entirely)
+
+```precept
+-> enqueue ClaimQueue FileClaim.ClaimId FileClaim.Severity   # no connector
+-> dequeue ClaimQueue into CurrentClaim CurrentPriority       # no connector
+```
+
+**Gains:** Maximum brevity.
+
+**Costs:** Type-driven grammar — the parser cannot distinguish `enqueue F A` (queue) from `enqueue F A B` (priorityqueue) without type lookup. `dequeue F into A B` — genuine parsing ambiguity. Readability regression: `-> enqueue ClaimQueue "ABC123" 5` gives the reader no signal that `5` is a priority. Violates Precept's "keyword-anchored readability" principle.
+
+**Verdict:** Off the table. Grammar regression is a hard blocker.
+
+---
+
+## Recommendation
+
+**Go with Option 1** (`ranked of T by P` + `at` connector) unless the `at` collision with future `list of T` is a confirmed blocker, in which case substitute `with` for `at`:
+
+```precept
+field ClaimQueue as ranked of string by integer descending
+
+-> enqueue ClaimQueue FileClaim.ClaimId with FileClaim.Severity
+-> dequeue ClaimQueue into CurrentClaim with CurrentPriority
+```
+
+"Enqueue ClaimId *with* severity 5" and "dequeue into X *with* captured priority" both parse cleanly as English. `with` is not currently in the Precept lexer, so there is no collision risk anywhere.
+
+**If only the declaration keyword is the pain point** (Option 2), the action surface can remain unchanged. This is the minimal-risk path.
+
+---
+
+## Decision Needed
+
+Owner to pick one:
+
+1. `ranked of T by P dir` + `at` connector (Option 1)
+2. `ranked of T by P dir` + `with` connector (Option 1 variant)
+3. `ranked of T by P dir`, keep `priority` at action sites (Option 2)
+4. Keep current `priorityqueue of T priority P` design as-is
+5. Other direction
+
+---
+
+# Frank — whitespace-insensitivity docs sync
+
+Date: 2026-04-30
+Requested by: Shane
+
+## Decision
+
+The language docs now treat whitespace-insensitivity as an explicit language guarantee, not an implementation accident.
+
+## Locked points
+
+1. "Line-oriented" means keyword-anchored structure, not newline-delimited syntax.
+2. Declarations may span multiple lines freely; whitespace, including newlines, is cosmetic within a declaration.
+3. Inside transitions, `from` starts a new row and `->` starts a new pipeline step; those keywords, not newlines, are the structural separators.
+4. Parser docs must describe the whitespace fix as a trivia-filter architecture: `Parser.Parse()` strips `NewLine` and `Comment` before `ParseSession`, while `Compilation.Tokens` retains the full token stream for tooling consumers.
+5. Qualifier parsing is catalog-driven. `Types.QualifierShape` is the source of truth, with ambiguous-preposition handling derived from construct metadata rather than heuristics.
+6. Type-ref docs must model multi-qualifier forms directly (`Qualifiers`, not `Qualifier`) for both scalar and collection inner types.
+7. Collection docs should demonstrate readable two-line declarations where long `queue of T by P` forms benefit from line wrapping, and should show qualified inner types as valid collection element forms.
+
+## Why
+
+This is the enduring design intent of Precept's keyword-led surface:
+
+- AI-safe authoring: no layout state required to recover structure.
+- No layout traps: reformatting, copy-paste, and code generation do not change meaning.
+- Tooling-friendly parsing: statement kind and boundaries come from keywords, not indentation analysis.
+- Human readability: long compound declarations can wrap across lines without becoming fragile.
+
+---
+
+# WSI Implementation Decisions (Slices 2–5)
+
+**Date:** 2026-04-30
+**Author:** George (Runtime Dev)
+
+---
+
+## Decision 1: SkipTrivia() removal is safe — parse stream is already trivia-free
+
+**What:** Removed all 7 remaining `SkipTrivia()` call sites from `ParseStateAction`, `ParseTransitionRow`, and `ParseEventHandlerWithGuardCheck`. The method definition had already been deleted in the partial Slice 2 work.
+
+**Why:** With Slice 1's pre-parse filter in place (`tokens.Where(t => t.Kind is not TokenKind.NewLine and not TokenKind.Comment)`), no trivia ever enters the ParseSession token array. Calling `SkipTrivia()` was a no-op before the filter and a compile error after the definition was removed.
+
+**Implication:** Direct `new ParseSession(...)` construction (e.g., in `ExpressionParserTests.cs`) bypasses the filter. Those tests don't inject NewLine tokens so they are unaffected — but callers must be aware that ParseSession itself makes no trivia guarantees.
+
+---
+
+## Decision 2: `NewLine` removed from `StructuralBoundaryTokens`; comment is the authority
+
+**What:** Removed `TokenKind.NewLine` from `StructuralBoundaryTokens`. Added a comment block explaining the belt-and-suspenders layering: (1) pre-parse filter is primary; (2) the Pratt loop terminates at NewLine via the `!OperatorPrecedence` fallthrough as secondary; (3) `StructuralBoundaryTokens` must not add redundant entries for tokens that never arrive.
+
+**Why:** Keeping `NewLine` in the boundary set was harmless with the filter in place but was misleading documentation — it implied NewLine could arrive. Removing it makes the set self-consistent: every member is a real structural token that can arrive during parsing.
+
+---
+
+## Decision 3: `VA_DeclStart` cleared; advisory metadata updated
+
+**What:** `VA_DeclStart` in `Tokens.cs` changed from `[TokenKind.NewLine]` to `[]`. Comment updated to reflect that declaration keywords are keyword-anchored (not newline-following), and that this array is advisory completion metadata, not a parse constraint.
+
+**Why:** The old comment ("Declaration-starting keywords appear after newlines") was accurate for the old grammar but became false documentation once the pre-parse filter was added. Advisory metadata that contradicts the grammar model misleads tooling consumers.
+
+---
+
+## Decision 4: `TypeQualifierNode? Qualifier` → `ImmutableArray<TypeQualifierNode> Qualifiers`
+
+**What:** Both `ScalarTypeRefNode` and `CollectionTypeRefNode` now carry `ImmutableArray<TypeQualifierNode> Qualifiers` (empty array for no qualifiers) instead of a nullable single-qualifier.
+
+**Why:** The `exchangerate` type requires two qualifiers (`in 'USD' to 'EUR'`). A single nullable field cannot model this. The array is the structurally correct representation; empty is the no-qualifier case.
+
+**TypeChecker stub:** The TypeChecker is a stub so no downstream semantic code consumed `.Qualifier`. This provided safe migration ground, but the audit was done anyway — no call sites referenced `.Qualifier` outside of Parser.cs itself.
+
+---
+
+## Decision 5: `AmbiguousQualifierPrepositions` derived from catalog at class init
+
+**What:** A new `FrozenDictionary<TokenKind, FrozenSet<TokenKind>> AmbiguousQualifierPrepositions` static field maps `In → {Modify, Omit, Ensure}` and `To → {Arrow, Ensure}`, derived entirely from `Constructs.ByLeadingToken` and `DisambiguationEntry.DisambiguationTokens`.
+
+**Why:** These are the construct-leading tokens that share a preposition with type qualifiers. If hardcoded, they would drift when new constructs are added. Being catalog-derived, the disambiguation automatically updates when `Constructs.cs` does.
+
+---
+
+## Decision 6: `QualifierShape` gating is load-bearing before `TryPeekQualifierKeyword()`
+
+**What:** `ParseTypeRef` checks `typeMeta.QualifierShape is not null` (from catalog) before entering the qualifier while-loop. `TryPeekQualifierKeyword()` is never called for types that don't accept qualifiers.
+
+**Why:** Without this gate, the parser would attempt qualifier disambiguation after `as string` and could incorrectly consume `in StateName` as a qualifier. The catalog is the authority on which types accept qualifiers — the gate makes this explicit and prevents greedy over-parsing.
+
+---
+
+## Decision 7: `TypeTrait.ChoiceElement` trait drives `ChoiceElementTypeKeywords`
+
+**What:** Added `ChoiceElement = 1 << 2` to the `TypeTrait` flags enum. Applied to `String`, `Boolean`, `Integer`, `Decimal`, `Number`. Replaced the hardcoded `ChoiceElementTypeKeywords` FrozenSet with a catalog-derived one: `Types.ByToken.Where(kvp => kvp.Value.Traits.HasFlag(TypeTrait.ChoiceElement)).Select(kvp => kvp.Key).ToFrozenSet()`.
+
+**Why:** The old hardcoded set was a parallel copy of catalog knowledge. Adding a future type that should be a valid choice element would require two edits. With the trait, one edit to `Types.GetMeta()` is sufficient. Zero behavior change — the 5 types are the same.
+
+---
+
+## Build & Test Status
+
+- `dotnet build src/Precept/Precept.csproj` — green, 0 errors, 0 warnings
+- `dotnet test` — 2080 Precept.Tests + 230 Precept.Analyzers.Tests, all pass
+
+---
+
+# Owner Decision: choice of T — Explicit Element Type Required
+
+**By:** Shane (owner)
+**Date:** 2026-04-29
+**Status:** Locked
+
+## Decision
+
+choice(...) without an explicit of T element type qualifier is a compile error.
+Every choice declaration must explicitly name its element type:
+
+`precept
+field Status as choice of string("draft", "active", "closed") default "draft"
+field Priority as choice of string("Low", "Medium", "High") ordered default "Low"
+field ErrorCode as choice of integer(0, 404, 500) default 0
+field TaxRate as choice of decimal(0.0, 0.05, 0.10, 0.20) default 0.0
+`
+
+There is no implicit default to string. The shorthand choice("a","b","c") is removed.
+
+## Rationale
+
+- Consistency: all choice declarations have the same shape regardless of element type
+- Clarity: the type is always visible — no implicit defaulting
+- Reinforces the sealed-type mental model: the author explicitly declares a typed vocabulary
+- No ambiguity for readers or tooling
+
+## Diagnostic
+
+A new diagnostic is needed: choice(...) without of T → error pointing the author to add the element type.
+
+---
+
+# WSI Test Coverage: Findings and Coverage Gaps
+
+**Date:** 2026-04-30
+**Author:** Soup Nazi (Tester)
+**Scope:** Parser Whitespace-Insensitivity Slices 1–5 test coverage
+
+---
+
+## Summary
+
+27 new tests added to `test/Precept.Tests/ParserTests.cs` covering the 9 required WSI categories. All 27 pass. Total suite: 2107 passing, 0 failing.
+
+MCP regression (`precept_compile`) could not be run — that tool is not yet implemented (only `precept_ping` exists in `tools/Precept.Mcp/Tools/`).
+
+---
+
+## Gaps and Findings
+
+### GAP-1: `ParseAtom()` does not handle `TypedConstant` tokens
+
+**Category:** Parser correctness / qualifier expressions  
+**Severity:** Low (by design, but undocumented)
+
+Single-quoted strings (`'USD'`) lex as `TypedConstant` (TokenKind 116–119). `ParseAtom()` in `Parser.cs` handles `StringLiteral` but not `TypedConstant`. Qualifier values written with single quotes produce an `ExpectedToken` diagnostic; the parse result is structurally broken.
+
+**Impact:** Any user writing `field Rate as money in 'USD'` gets a diagnostic. Must use `"USD"` (double-quoted).
+
+**Recommendation:** Either:
+- Extend `ParseAtom()` to handle `TypedConstant` where a string value is expected, or
+- Document explicitly in the language spec / error message that qualifier values must be double-quoted string literals, not typed constants.
+
+---
+
+### GAP-2: `StateEnsure` with `when` guard clause not implemented
+
+**Category:** Parser completeness  
+**Severity:** High (blocks sample files)
+
+Grammar form `in State ensure Condition when Guard because "msg"` is present in `insurance-claim.precept` and `loan-application.precept`. The parser terminates the condition expression at `when`, then `Expect(Because)` fails. Both sample files produce parser diagnostics on `StateEnsure` blocks with guards.
+
+**Impact:** Two of the three primary sample files have parse errors. `hiring-pipeline.precept` is the only sample that parses cleanly.
+
+**Recommendation:** Track as a first-class parser gap. Add `when` branch to `StateEnsure` parsing to recognize and attach the guard clause.
+
+---
+
+### GAP-3: `is set` / `is not set` membership expressions may be incomplete
+
+**Category:** Parser completeness  
+**Severity:** Medium
+
+`insurance-claim.precept` contains `field.expression is set` / `field.expression is not set` expressions. The parser may not recognize `is` as a postfix or infix operator for null/set-membership checks. These appear to contribute diagnostics in the sample file parse.
+
+**Recommendation:** Confirm whether `is set` is in the language spec. If specified, add `Is` to `OperatorPrecedence` or handle it as a postfix sentinel in `ParseAtom()`/`ParseExpression()`.
+
+---
+
+### GAP-4: `TypeChecker.Check()` is not implemented
+
+**Category:** Test infrastructure / pipeline completeness  
+**Severity:** Medium (blocks `Compiler.Compile()` in tests)
+
+`TypeChecker.Check()` at `src/Precept/Pipeline/TypeChecker.cs` line 26 throws `NotImplementedException`. Any test using `Compiler.Compile()` throws. Tests must use `Lexer.Lex()` + `Parser.Parse()` directly, which bypasses type checking entirely.
+
+**Impact:** All existing parser tests — including the 27 new WSI tests — can only assert structural correctness. Type-mismatch, unresolved-reference, and other type-level correctness properties cannot be tested until TypeChecker is implemented.
+
+**Recommendation:** Implement TypeChecker or at minimum provide a stub that returns cleanly. The existing test suite at 2107 tests has zero type-checking coverage by definition.
+
+---
+
+### GAP-5: MCP `precept_compile` not implemented
+
+**Category:** MCP tool coverage  
+**Severity:** Medium (blocks regression protocol)
+
+The project's canonical regression protocol requires 4 rounds of `precept_compile` to verify WSI behavior end-to-end. `tools/Precept.Mcp/Tools/` contains only `PingTool.cs`. None of the 5 MCP tools described in the custom instructions exist yet.
+
+**Impact:** The MCP regression gate defined in the WSI test charter cannot be executed. The 4 regression inputs from this session should be preserved as smoke tests when `precept_compile` ships:
+
+1. Multi-line field with default → zero errors
+2. `field Rate as exchangerate in "USD" to "EUR"` → qualifiers parsed correctly, zero errors
+3. `field Rates as list of exchangerate in "USD" to "EUR"` → collection element qualifiers parsed, zero errors
+4. `in Draft modify Status to "active"` → `in Draft` parsed as state context, NOT as qualifier
+
+---
+
+## Tests Added
+
+| Test | Category | Status |
+|------|----------|--------|
+| `WSI_Slice1_NewlinesBetweenFields_Parsed` | Multi-line whitespace | ✅ Pass |
+| `WSI_Slice1_MultiLineFieldWithDefault_Parsed` | Multi-line whitespace | ✅ Pass |
+| `WSI_Slice1_MultiLineFieldWithConstraint_Parsed` | Multi-line whitespace | ✅ Pass |
+| `WSI_Slice1_CommentOnSameLineAsDecl_Filtered` | Comment filtering | ✅ Pass |
+| `WSI_Slice1_CommentBetweenFields_Filtered` | Comment filtering | ✅ Pass |
+| `WSI_Slice1_CommentAtEndOfBlock_Filtered` | Comment filtering | ✅ Pass |
+| `WSI_Qualifier_ExchangeRate_TwoQualifiers` | Multi-qualifier parsing | ✅ Pass |
+| `WSI_Qualifier_Price_TwoQualifiers` | Multi-qualifier parsing | ✅ Pass |
+| `WSI_Qualifier_MultilineWithComments_Parsed` | Multi-qualifier parsing | ✅ Pass |
+| `WSI_Qualifier_InKeyword_IsQualifierWhenFollowedByCurrency` | Qualifier disambiguation | ✅ Pass |
+| `WSI_Qualifier_InDraftModify_IsNotQualifier` | Qualifier disambiguation | ✅ Pass |
+| `WSI_Qualifier_InWithAmbiguousVerb_TreatedAsBoundary` | Qualifier disambiguation | ✅ Pass |
+| `WSI_CollectionQualifier_SetOfMoney_SingleElementQualifier` | Collection qualifiers | ✅ Pass |
+| `WSI_CollectionQualifier_ListOfExchangeRate_TwoElementQualifiers` | Collection qualifiers | ✅ Pass |
+| `WSI_CollectionQualifier_SetOfPrice_TwoElementQualifiers` | Collection qualifiers | ✅ Pass |
+| `WSI_Negative_PureStringField_NoQualifiers` | Negative cases | ✅ Pass |
+| `WSI_Negative_InStateModify_NoQualifiersOnField` | Negative cases | ✅ Pass |
+| `WSI_Negative_FieldWithOnlyWhitespace_ParsesCleanly` | Negative cases | ✅ Pass |
+| `WSI_TokenStream_NewlineTokens_PresentInOriginalStream` | Token stream regression | ✅ Pass |
+| `WSI_TokenStream_CommentTokens_PresentInOriginalStream` | Token stream regression | ✅ Pass |
+| `WSI_TokenStream_ParseSession_SeesFilteredTokens` | Token stream regression | ✅ Pass |
+| `WSI_Integration_SampleFile_ParsesWithNoErrors` (hiring-pipeline only) | Integration sample files | ✅ Pass |
+| `WSI_Integration_InsuranceClaim_ParsesStructurally` | Integration sample files | ✅ Pass (known diagnostics) |
+| `WSI_Integration_LoanApplication_ParsesStructurally` | Integration sample files | ✅ Pass (known diagnostics) |
+| `WSI_ChoiceElement_CatalogRegression_ExactlyFiveTypes` | ChoiceElementTypeKeywords catalog | ✅ Pass |
+| `WSI_ChoiceElement_CatalogRegression_OnlyPrimitiveTypes` | ChoiceElementTypeKeywords catalog | ✅ Pass |
+| `WSI_ChoiceElement_CatalogRegression_ContainsExpectedKinds` | ChoiceElementTypeKeywords catalog | ✅ Pass |

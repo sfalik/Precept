@@ -15,6 +15,12 @@
 
 ## Recent Updates
 
+
+### 2026-05-01 — WSI verification batch recorded
+- Added 27 parser-focused whitespace-insensitivity tests and finished green at 2107 passing tests.
+- Durable gaps are now logged in `decisions.md`: `TypedConstant` atom handling, `StateEnsure when`, membership-expression completeness, missing `TypeChecker.Check()`, and missing MCP `precept_compile` support.
+- Future MCP smoke inputs were preserved for the day the compile tool ships.
+
 ### 2026-04-28 — Parser remediation coverage audit (R1–R6)
 - Audited all 6 remediation slices. Behavioral coverage was complete; two tests were broken by the remediation itself (not by the audit).
 - B1: `InvokeSlotParser_SwitchIsExhaustive` had stale count (16) after R4 added `InitialMarker`. Fixed to 17.
@@ -42,6 +48,22 @@
 ### 2026-04-24 — Precept.Next coverage audit and slice support
 - Identified the compile-time blockers that prevented deeper TypeChecker test work: hollow model shapes and missing diagnostic codes.
 - Added targeted Faults and OperatorTable/binary-expression coverage while documenting what remained untestable until scaffolding was fixed.
+
+### 2026-04-30 — WSI Slices 1–5 test coverage added
+
+- Added 27 new tests to `test/Precept.Tests/ParserTests.cs` across 9 categories: multi-line whitespace, comment filtering, multi-qualifier parsing, qualifier disambiguation, collection qualifiers, negative cases, token stream regression, integration sample files, and ChoiceElementTypeKeywords catalog regression.
+- Final test count: 2107 passing, 0 failing.
+- Key DSL quirks discovered:
+  - DSL comments use `#` (hash), NOT `//`. The lexer only recognizes `#`; `//` lexes as two `Slash` operators.
+  - Single-quoted strings (`'USD'`) lex as `TypedConstant` (not `StringLiteral`). `ParseAtom()` does not handle `TypedConstant` — qualifier values must use double-quoted strings (`"USD"`).
+  - `Compiler.Compile()` is unusable in tests — `TypeChecker.Check()` throws `NotImplementedException`. Tests must use `Lexer.Lex()` + `Parser.Parse()` directly.
+- Key coverage gaps filed to inbox (`soup-nazi-wsi-tests.md`):
+  - `ParseAtom()` can't handle `TypedConstant` (GAP-1)
+  - `StateEnsure` with `when` guard clause not implemented — blocks insurance-claim and loan-application sample file parse (GAP-2)
+  - `is set`/`is not set` membership expressions may be incomplete (GAP-3)
+  - `TypeChecker` not implemented — zero type-checking test coverage system-wide (GAP-4)
+  - MCP `precept_compile` not implemented — blocks regression protocol (GAP-5)
+- MCP regression skipped: only `precept_ping` exists in `tools/Precept.Mcp/Tools/`. The 4 regression inputs are documented in the gap report as smoke tests for when `precept_compile` ships.
 
 ### 2026-04-29 — Parser remediation coverage audit recorded
 - Coverage audit for parser remediation slices R1-R6 is now recorded as approved with 2034/2034 tests passing.
