@@ -12,6 +12,33 @@
 
 ---
 
+### 2026-05-02T20:05:35Z: GAP-040 bag `countof` parameter locked to DU accessor metadata
+
+**By:** Scribe
+
+**Status:** Merged, deduplicated, inbox cleared (1 file)
+
+**Merged sources:** `frank-gap040-decision`.
+
+- GAP-040 is locked to the metadata-driven path: `bag.countof(...)` must stop pretending its parameter is `integer` and instead use a dedicated `ElementParameterAccessor` DU subtype whose parameter resolves to the bag element type.
+- The flat `ParameterType` axis is now explicitly treated as a three-shape problem (`no parameter`, `fixed parameter type`, `element-type parameter`); the element-type case does not get a boolean flag or `TypeKind.Element` sentinel because both would create illegal or non-language-level states.
+- Downstream consumers should pattern-match on the accessor subtype, keep MCP/tooling serialization as a thin projection of that metadata, and update bag-accessor assertions so `countof` renders as an element-typed accessor rather than `integer`.
+
+---
+### 2026-05-02T20:05:34Z: Frank type-checker review response accepted and locked
+
+**By:** Scribe
+
+**Status:** Merged, deduplicated, inbox cleared (1 file)
+
+**Merged sources:** `frank-typechecker-review-response`.
+
+- Frank formally accepted 5 of George's 6 findings, with Finding 5 reclassified as a non-finding because GAP-032 (`pow(integer, integer)` proof requirements) was already fixed.
+- The response locks all 5 implementation pre-requisites as mandatory before or during the slice plan: no new operation indexes, a pre-Slice 0 shape commit, array-primary field storage plus a derived frozen name map, `ActionSecondaryRole` stamping for `TypedInputAction`, and per-slice `[HandlesCatalogMember]` stub migration.
+- The revised checker plan also records durable shape choices for the remaining open design points: `ContentValidation` becomes a DU, resolution must always return partial typed results via `TypedErrorExpression`, qualifier propagation lives on typed binary expressions, and `MethodCallExpression` / interpolated forms are assigned explicit slice ownership.
+
+---
+
 ### 2026-05-02T19:49:00Z: GAP-035 choice literal dispatch locked to ChoiceLiteralTokens metadata
 
 **By:** Scribe

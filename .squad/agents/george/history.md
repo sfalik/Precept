@@ -56,6 +56,11 @@
 
 ## Recent Updates
 
+### 2026-05-02 — Frank accepted George's type checker review
+- Frank accepted 5 of George's 6 findings on the type-checker design review; the remaining item was reclassified as a non-finding because GAP-032 was already closed.
+- Frank's response resolves all 5 pre-requisites George surfaced: existing `FindCandidates`/`FindUnary` stay canonical, pre-Slice 0 shape records are now mandatory, field storage stays array-primary with a derived frozen name index, `TypedInputAction` gains an explicit secondary-role discriminator, and `[HandlesCatalogMember]` ownership must migrate from the stub to real handlers slice by slice.
+- The revised plan also locks explicit follow-through for partial-result error recovery, qualifier propagation, `ContentValidation` as a DU, and concrete slice ownership for method calls plus interpolated forms.
+
 ### 2026-05-02 — Historical Summary (compacted)
 - Archived older update entries to `history-archive.md` until `george` history returned to the active-size target.
 - Durable themes retained in active history: current ownership, catalog-driven parser/runtime rules, and the newest implementation/audit outcomes.
