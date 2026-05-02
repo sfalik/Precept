@@ -567,7 +567,7 @@ add Charges $50 EUR     # TypeMismatch — expected money in 'USD', got money in
 | `Of` | `of` | Collection inner type connector |
 | `By` | `by` | Ordering key connector in `log of T by P` and `queue of T by P` (contextual keyword) |
 | `Tilde` | `~` | Case-insensitive modifier — collection inner type (`set of ~string`) or scalar field type qualifier (`field Email as ~string`) |
-| `Append` | `append` | Append action keyword for log |
+| `Append` | `append` | Add an element to the end of a log or list field |
 | `Into` | `into` | Dequeue/pop target keyword |
 | `Contains` | `contains` | Membership operator |
 | `Mincount` | `mincount` | Minimum count constraint |
@@ -577,7 +577,7 @@ add Charges $50 EUR     # TypeMismatch — expected money in 'USD', got money in
 | `LookupType` | `lookup` | Lookup collection type |
 | `To` | `to` | Key-to-value connector in `lookup of K to V` (contextual keyword) |
 | `Put` | `put` | Put action keyword for lookup |
-| `For` | `for` | Key-access expression keyword for lookup (contextual keyword) |
+| `For` | `for` | Lookup key accessor (`F for K`) — requires a `when F contains K` guard. The compiler raises `KeyPresenceSafety` if the guard is absent. |
 | `Insert` | `insert` | Insert action keyword for list |
 | `At` | `at` | Position keyword in `insert F Expr at N` / `remove F at N` (contextual keyword) |
 | `Ascending` | `ascending` | Sort direction modifier (contextual keyword in type position) |

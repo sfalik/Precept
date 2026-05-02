@@ -1,0 +1,45 @@
+info: ModelContextProtocol.Server.StdioServerTransport[857250842]
+      Server (stream) (Precept.Mcp) transport reading messages.
+info: ModelContextProtocol.Server.StdioServerTransport[537887087]
+      Server (stream) (Precept.Mcp) transport message parsing failed.
+      System.Text.Json.JsonException: 'C' is an invalid start of a value. Path: $ | LineNumber: 0 | BytePositionInLine: 0.
+       ---> System.Text.Json.JsonReaderException: 'C' is an invalid start of a value. LineNumber: 0 | BytePositionInLine: 0.
+         at System.Text.Json.ThrowHelper.ThrowJsonReaderException(Utf8JsonReader& json, ExceptionResource resource, Byte nextByte, ReadOnlySpan`1 bytes)
+         at System.Text.Json.Utf8JsonReader.ConsumeValue(Byte marker)
+         at System.Text.Json.Utf8JsonReader.ReadFirstToken(Byte first)
+         at System.Text.Json.Utf8JsonReader.ReadSingleSegment()
+         at System.Text.Json.Utf8JsonReader.Read()
+         at System.Text.Json.Serialization.JsonConverter`1.ReadCore(Utf8JsonReader& reader, T& value, JsonSerializerOptions options, ReadStack& state)
+         --- End of inner exception stack trace ---
+         at System.Text.Json.ThrowHelper.ReThrowWithPath(ReadStack& state, JsonReaderException ex)
+         at System.Text.Json.Serialization.JsonConverter`1.ReadCore(Utf8JsonReader& reader, T& value, JsonSerializerOptions options, ReadStack& state)
+         at System.Text.Json.Serialization.Metadata.JsonTypeInfo`1.Deserialize(Utf8JsonReader& reader, ReadStack& state)
+         at System.Text.Json.Serialization.Metadata.JsonTypeInfo`1.DeserializeAsObject(Utf8JsonReader& reader, ReadStack& state)
+         at System.Text.Json.JsonSerializer.ReadFromSpanAsObject(ReadOnlySpan`1 utf8Json, JsonTypeInfo jsonTypeInfo, Nullable`1 actualByteCount)
+         at System.Text.Json.JsonSerializer.ReadFromSpanAsObject(ReadOnlySpan`1 json, JsonTypeInfo jsonTypeInfo)
+         at System.Text.Json.JsonSerializer.Deserialize(String json, JsonTypeInfo jsonTypeInfo)
+         at ModelContextProtocol.Server.StreamServerTransport.ReadMessagesAsync()
+info: ModelContextProtocol.Server.StdioServerTransport[1221292038]
+      Server (stream) (Precept.Mcp) transport completed reading messages.
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Production
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: C:\Users\Shane.Falik\source\repos\precept-architecture
+info: ModelContextProtocol.Server.McpServer[570385771]
+      Server (Precept.Mcp 1.0.0.0) method 'initialize' request handler called.
+info: Microsoft.Hosting.Lifetime[0]
+      Application is shutting down...
+warn: ModelContextProtocol.Server.McpServer[975074943]
+      Server (Precept.Mcp 1.0.0.0), Client (test 1) method 'initialize' request handler failed in 26.1463ms.
+      System.OperationCanceledException: The operation was canceled.
+         at System.Threading.CancellationToken.ThrowOperationCanceledException()
+         at System.Threading.CancellationToken.ThrowIfCancellationRequested()
+         at ModelContextProtocol.McpSessionHandler.SendMessageAsync(JsonRpcMessage message, CancellationToken cancellationToken)
+         at ModelContextProtocol.McpSessionHandler.HandleRequestAsync(JsonRpcRequest request, CancellationToken cancellationToken)
+         at ModelContextProtocol.McpSessionHandler.HandleMessageCoreAsync(JsonRpcMessage message, CancellationToken cancellationToken)
+info: ModelContextProtocol.Server.StdioServerTransport[1375634372]
+      Server (stream) (Precept.Mcp) shutting down.
+info: ModelContextProtocol.Server.StdioServerTransport[1256455528]
+      Server (stream) (Precept.Mcp) shut down.

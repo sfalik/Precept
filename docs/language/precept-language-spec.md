@@ -269,7 +269,7 @@ Every token the lexer can produce. Organized by category to match the `TokenKind
 |-------|------|---------|
 | `All` | `all` | Universal quantifier / `modify all` / `omit all` (state-scoped) |
 | `Any` | `any` | Quantifier keyword (`any item in Coll (pred)`) / state wildcard (`in any`, `from any`) |
-| `Each` | `each` | Quantifier keyword (v2). `each`/`any`/`no` form the quantifier keyword group. `each` is quantifier-only. |
+| `Each` | `each` | Universal quantifier — true when every element in the collection satisfies the predicate. Usage: `each item in Collection (item > 0)` |
 | `No` (quantifier role) | `no` | Quantifier keyword (`no item in Coll (pred)`) — dual role with `no transition` outcome keyword. Disambiguation by lookahead: followed by `Identifier in CollectionRef (` → quantifier; otherwise → `no transition`. |
 
 #### Keywords: State Modifiers (v2)
@@ -1594,13 +1594,28 @@ The type checker emits diagnostics for root causes only. When `ErrorType` is flo
 |------|----------|-----------------|------------|
 | `CaseInsensitiveFieldRequiresTildeEquals` (66) | Error | `'{0}' is declared ~string (case-insensitive). Use ~= instead of == to avoid treating values like 'admin@example.com' and 'Admin@example.com' as different.` | `{0}` = field/expression name |
 | `CaseInsensitiveFieldRequiresTildeNotEquals` | Error | `'{0}' is declared ~string (case-insensitive). Use !~ instead of != (`!~` returns true when values are not equal under case-insensitive comparison).` | `{0}` = field/expression name |
-| `CaseInsensitiveValueInCaseSensitiveContains` | Error | `'{0}' is ~string but '{1}' is {2} (case-sensitive). A value stored in one case may not be found. Either change '{1}' to {3}, or use a quantifier: \`any e in {1} (e ~= {0})\`.` | `{0}` = CI value/field name, `{1}` = CS collection name, `{2}` = collection type (e.g., `set of string`), `{3}` = CI collection type (e.g., `set of ~string`) |
+| `CaseInsensitiveValueInCaseSensitiveContains` | Error | `'{0}' is ~string (case-insensitive) but '{1}' is {2} (case-sensitive). A case-sensitive collection will not find values that differ only in case.` | `{0}` = CI value/field name, `{1}` = CS collection name, `{2}` = collection type (e.g., `set of string`), `{3}` = CI collection type (e.g., `set of ~string`) |
 | `CaseInsensitiveFieldRequiresTildeStartsWith` | Error | `'{0}' is declared ~string (case-insensitive). Use ~startsWith instead of startsWith to avoid treating values as having different prefixes.` | `{0}` = field name |
 | `CaseInsensitiveFieldRequiresTildeEndsWith` | Error | `'{0}' is declared ~string (case-insensitive). Use ~endsWith instead of endsWith to avoid treating values as having different suffixes.` | `{0}` = field name |
 
 > **`notempty` redirect for `CaseInsensitiveFieldRequiresTildeEquals`.** When the right-hand operand is an empty string literal (`""`), append to the message: `To require a non-empty value, declare the field \`notempty\` instead: \`field {0} as ~string notempty\`.`
 
 > **Code 66 reassignment.** `CaseInsensitiveStringOnNonCollection` (code 66) exists in `DiagnosticCode.cs` and was defined in anticipation of scalar `~string`, but was **never emitted** by the parser. When scalar `~string` ships, code 66 is **reassigned** to `CaseInsensitiveFieldRequiresTildeEquals`. The numeric value 66 is retained. No member is deleted, no ordinal shifts. Existing code references to `DiagnosticCode.CaseInsensitiveStringOnNonCollection` will fail to compile — update them to `DiagnosticCode.CaseInsensitiveFieldRequiresTildeEquals`.
+
+> **FixHint for `CaseInsensitiveValueInCaseSensitiveContains`.** `Change '{1}' to {3} for case-insensitive membership, or use: any e in {1} (e ~= {0})`
+
+#### Collection-safety diagnostics
+
+| Code | Severity | Message template | Parameters |
+|------|----------|-----------------|------------|
+| `KeyPresenceSafety` (99) | Error | `"'{0}' may not contain key '{1}' — add a 'when {0} contains {1}' guard before this access"` | `{0}` = lookup field name, `{1}` = key expression |
+| `IndexBoundsGuard` (100) | Error | `"'{0}' access at index '{1}' is not bounds-checked — add a 'when {0}.count > {1}' guard"` | `{0}` = collection field, `{1}` = index expression |
+| `KeyUniquenessGuard` (101) | Error | `"Key '{1}' may already exist in '{0}' — add a 'when not ({0} contains {1})' guard before appending"` | `{0}` = log-by field, `{1}` = key expression |
+| `InvalidQuantifierTarget` (102) | Error | `"'{0}' is not a collection field — quantifiers (each/any/no) require a collection field"` | `{0}` = field name |
+| `BindingShadowsField` (103) | Error | `"Binding variable '{0}' shadows a field with the same name — rename the binding to avoid confusion"` | `{0}` = binding variable name |
+| `MissingOrderingKey` (104) | Error | `"'{0}' requires a 'by P' ordering key — use '{0} of T by P'"` | `{0}` = type keyword (`log` or `queue`) |
+| `CollectionInnerTypeError` (105) | Error | `"Expected a {0} value, but '{1}' holds elements of type {2}"` | `{0}` = expected type, `{1}` = collection field, `{2}` = actual element type |
+| `QuantifierPredicateNotBoolean` (106) | Error | `"Quantifier predicate must be a boolean expression, but this resolves to {0}"` | `{0}` = actual resolved type |
 
 ---
 

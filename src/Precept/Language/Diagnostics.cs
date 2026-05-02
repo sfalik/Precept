@@ -30,7 +30,7 @@ public static class Diagnostics
             FixHint: "Use \\\", \\\\, \\n, or \\t as valid escape sequences in text values"),
         DiagnosticCode.UnrecognizedTypedConstantEscape => new(nameof(DiagnosticCode.UnrecognizedTypedConstantEscape), DiagnosticStage.Lex,   Severity.Error,   "'\\{0}' is not a valid escape in a single-quoted value — use \\' for a quote, or \\\\ for a backslash",                                DiagnosticCategory.Structure,
             FixHint: "Use \\' or \\\\ as valid escape sequences in single-quoted values"),
-        DiagnosticCode.UnescapedBraceInLiteral         => new(nameof(DiagnosticCode.UnescapedBraceInLiteral),         DiagnosticStage.Lex,   Severity.Error,   "Use '}}}}' to include a literal }} in this value — a single }} starts a field reference",                                               DiagnosticCategory.Structure,
+        DiagnosticCode.UnescapedBraceInLiteral         => new(nameof(DiagnosticCode.UnescapedBraceInLiteral),         DiagnosticStage.Lex,   Severity.Error,   "Use '}}}}' to include a literal }} in this value — a single }} closes an interpolation, so it must be doubled",                        DiagnosticCategory.Structure,
             FixHint: "Double the brace: write }}}} to include a literal }} in the text value"),
 
         // ── Parse ────────────────────────────────────────────────────────────────
@@ -123,7 +123,7 @@ public static class Diagnostics
             FixHint: "Restructure the computed fields to break the circular dependency"),
         DiagnosticCode.ConflictingAccessModes         => new(nameof(DiagnosticCode.ConflictingAccessModes),         DiagnosticStage.Type,  Severity.Error,   "Field '{0}' has conflicting access modes in state '{1}'",                                                                              DiagnosticCategory.Structure,
             FixHint: "Ensure each field has at most one access mode per state"),
-        DiagnosticCode.RedundantAccessMode            => new(nameof(DiagnosticCode.RedundantAccessMode),            DiagnosticStage.Type,  Severity.Warning, "Access mode declaration for field '{0}' in state '{1}' is redundant and has no effect",                                               DiagnosticCategory.Structure,
+        DiagnosticCode.RedundantAccessMode            => new(nameof(DiagnosticCode.RedundantAccessMode),            DiagnosticStage.Type,  Severity.Error,   "The '{0}' access mode for field '{1}' in state '{2}' is redundant — the effective mode is already '{0}'",                             DiagnosticCategory.Structure,
             RelatedCodes: [DiagnosticCode.ConflictingAccessModes],
             FixHint: "Remove the declaration — it restates the field's default access"),
         DiagnosticCode.WritableOnEventArg             => new(nameof(DiagnosticCode.WritableOnEventArg),             DiagnosticStage.Type,  Severity.Error,   "The 'writable' modifier cannot appear on event argument '{0}'",                                                                        DiagnosticCategory.Structure,
@@ -160,7 +160,7 @@ public static class Diagnostics
             FixHint: "Event arguments are only accessible in 'on EventName' clauses and the transition body"),
         DiagnosticCode.InvalidInterpolationCoercion   => new(nameof(DiagnosticCode.InvalidInterpolationCoercion),   DiagnosticStage.Type,  Severity.Error,   "A {0} value cannot appear inside a text interpolation",                                                                                DiagnosticCategory.TypeSystem,
             FixHint: "Convert this value to text before interpolating, or remove it from the text literal"),
-        DiagnosticCode.UnresolvedTypedConstant        => new(nameof(DiagnosticCode.UnresolvedTypedConstant),        DiagnosticStage.Type,  Severity.Error,   "Cannot determine the type of '{0}' — no type context available",                                                                       DiagnosticCategory.TypeSystem,
+        DiagnosticCode.UnresolvedTypedConstant        => new(nameof(DiagnosticCode.UnresolvedTypedConstant),        DiagnosticStage.Type,  Severity.Error,   "Cannot determine the type of '{0}' — the content does not match any known value pattern",                                             DiagnosticCategory.TypeSystem,
             FixHint: "Place this constant where the type is unambiguous, such as in a typed field assignment"),
         DiagnosticCode.InvalidTypedConstantContent    => new(nameof(DiagnosticCode.InvalidTypedConstantContent),    DiagnosticStage.Type,  Severity.Error,   "'{0}' is not a valid {1} value",                                                                                                       DiagnosticCategory.TypeSystem),
         DiagnosticCode.DefaultForwardReference        => new(nameof(DiagnosticCode.DefaultForwardReference),        DiagnosticStage.Type,  Severity.Error,   "Default value for '{0}' cannot reference '{1}', which is declared later",                                                              DiagnosticCategory.Structure,
