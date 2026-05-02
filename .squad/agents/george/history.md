@@ -22,7 +22,11 @@
 
 
 
-- Mechanical rename convention: when annotation semantics are catalog-agnostic, prefer universal naming (`[HandlesCatalogMember]`) over domain-specific aliases (`[HandlesForm]`) so analyzer contracts stay symmetric with `[HandlesCatalogExhaustively]`.
+- **Catalog-derived set for keyword-as-function-name tokens**: The correct pattern for `ParseAtom` keyword-function ambiguity is a pre-switch check against a `FrozenSet<TokenKind>` derived at startup from `Functions.All` ∩ `Tokens.Keywords`. This avoids hardcoded switch arms and auto-extends to future functions whose names collide with keywords. The check must precede the switch entirely (not use goto-case or fallthrough) to avoid code duplication.
+- **Edit no-ops in shared worktrees**: When working on a shared branch, a file may already carry the expected changes from a parallel commit. My `edit` to `Parser.Expressions.cs` was a no-op because `ea18430` (GAP-031) already included the ParseAtom restructure. Only `Parser.cs` was actually new. Verify with `git diff HEAD` before committing to confirm the actual change scope.
+
+
+
 - **RS1030 pattern**: When an analyzer follows a field reference to its declaring syntax to get operations (e.g., checking if a shared array is empty), use `ctx.SemanticModel` if `syntaxNode.SyntaxTree == ctx.SemanticModel.SyntaxTree`, and return early (assume non-empty) if not — never call `compilation.GetSemanticModel()` inside an analyzer. The `CompilationStartAction` wrapper is only needed when per-compilation state must be built up; if the only use was to capture `compilation` for `GetSemanticModel`, remove it entirely and register the `OperationAction` directly.
 - **RS1030 + CatalogEnumNames**: `ConstraintKind` and `ProofRequirementKind` cannot be added to `CatalogEnumNames` until their `GetMeta` switches drop the discard arm; adding them prematurely causes PRECEPT0007 to fire on those fallback arms. Track this as a Phase 3 prerequisite via a TODO comment.
 
