@@ -41,7 +41,7 @@ Pre-TypeChecker audit — exhaustive consistency check of language docs, catalog
 | GAP-027 | `Tokens.cs` `Notempty` description reads "String constraint: non-empty" but spec §1.1 says "String or collection constraint: non-empty" | Doc-Catalog | Fixed | 7 |
 | GAP-028 | `Functions.cs` `sqrt` has `Integer` and `Decimal` overloads but spec §3.7 explicitly says integer/decimal inputs are type errors | Doc-Catalog | Fixed | 7 |
 | GAP-029 | `IsOutcomeAhead()` hardcodes `{Transition, No, Reject}` instead of deriving from `TokenCategory.Outcome` | Catalog-Impl | Fixed | 8 |
-| GAP-030 | `ParseAtom` hardcodes `case TokenKind.Min: case TokenKind.Max:` for keyword-as-function-name instead of deriving from `Functions.ByName` ∩ `Tokens.Keywords` | Catalog-Impl | Unresolved | 8 |
+| GAP-030 | `ParseAtom` hardcodes `case TokenKind.Min: case TokenKind.Max:` for keyword-as-function-name instead of deriving from `Functions.ByName` ∩ `Tokens.Keywords` | Catalog-Impl | Fixed | 8 |
 | GAP-031 | Unary/postfix binding powers hardcoded in `Parser.Expressions.cs` (`not`→25, negate→65, `is set`→60) instead of reading from `Operators.ByToken`/`ByTokenSequence` | Catalog-Impl | Fixed | 8 |
 | GAP-032 | `Functions.cs` `pow(integer, integer)` overload missing `ProofRequirement` for `exp >= 0`; spec §0.6 item 4 explicitly lists this alongside `sqrt` as a non-negative proof obligation | Doc-Catalog | Fixed | 8 |
 | GAP-033 | `ModifierKind.cs` `Notempty` XML doc comment reads "Flag: string is non-empty" — stale after GAP-025 expanded applicability to string + 8 collection types (analogous to GAP-027 in Tokens.cs) | Doc-Catalog | Fixed | 8 |
@@ -902,7 +902,7 @@ private bool IsOutcomeAhead() => OutcomeTokens.Contains(Peek(1).Kind);
 
 ## GAP-030: `ParseAtom` hardcodes `TokenKind.Min`/`TokenKind.Max` as function-call-capable keyword tokens
 
-**Status:** Unresolved  
+**Status:** Fixed  
 **Category:** Catalog-Impl  
 **Location:** `src/Precept/Pipeline/Parser.Expressions.cs` lines ~178–202  
 **Found in iteration:** 8
