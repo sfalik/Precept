@@ -37,6 +37,8 @@ public static class GraphAnalyzer
     [HandlesCatalogMember(ExpressionFormKind.MethodCall)]
     [HandlesCatalogMember(ExpressionFormKind.ListLiteral)]
     [HandlesCatalogMember(ExpressionFormKind.PostfixOperation)]
+    [HandlesCatalogMember(ExpressionFormKind.Quantifier)]
+    [HandlesCatalogMember(ExpressionFormKind.CIFunctionCall)]
     private static void AnalyzeExpression(Expression expression) =>
         throw new NotImplementedException("GraphAnalyzer expression handling — Phase 3 implementation");
 }

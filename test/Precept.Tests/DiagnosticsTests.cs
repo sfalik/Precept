@@ -215,7 +215,21 @@ public class DiagnosticsTests
         DiagnosticCode.UnguardedCollectionAccess,
         DiagnosticCode.UnguardedCollectionMutation,
         DiagnosticCode.NonOrderableCollectionExtreme,
-        DiagnosticCode.CaseInsensitiveStringOnNonCollection,
+        DiagnosticCode.CaseInsensitiveFieldRequiresTildeEquals,
+        // ── Type (CI enforcement) ────────────────────────────────────────────────
+        DiagnosticCode.CaseInsensitiveFieldRequiresTildeNotEquals,
+        DiagnosticCode.CaseInsensitiveValueInCaseSensitiveContains,
+        DiagnosticCode.CaseInsensitiveFieldRequiresTildeStartsWith,
+        DiagnosticCode.CaseInsensitiveFieldRequiresTildeEndsWith,
+        // ── Type (collection safety — new) ───────────────────────────────────────
+        DiagnosticCode.KeyPresenceSafety,
+        DiagnosticCode.IndexBoundsGuard,
+        DiagnosticCode.KeyUniquenessGuard,
+        DiagnosticCode.InvalidQuantifierTarget,
+        DiagnosticCode.BindingShadowsField,
+        DiagnosticCode.MissingOrderingKey,
+        DiagnosticCode.CollectionInnerTypeError,
+        DiagnosticCode.QuantifierPredicateNotBoolean,
         // ── Type (business-domain) ───────────────────────────────────────────────
         DiagnosticCode.MaxPlacesExceeded,
         DiagnosticCode.QualifierMismatch,

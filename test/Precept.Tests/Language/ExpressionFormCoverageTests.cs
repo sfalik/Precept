@@ -19,7 +19,7 @@ public class ExpressionFormCoverageTests
     [Fact]
     public void ExpressionForms_All_HasExpectedCount()
     {
-        ExpressionForms.All.Count.Should().Be(11);
+        ExpressionForms.All.Count.Should().Be(13);
     }
 
     // ── Per-kind GetMeta exhaustiveness ──────────────────────────────────────

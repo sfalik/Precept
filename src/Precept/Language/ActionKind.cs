@@ -23,4 +23,13 @@ public enum ActionKind
 
     // ── Universal (collections + optional scalars) ──────────────────
     Clear   = 8,
+
+    // ── New collection actions ───────────────────────────────────────
+    Append      = 9,
+    AppendBy    = 10,
+    Insert      = 11,
+    RemoveAt    = 12,
+    Put         = 13,
+    EnqueueBy   = 14,
+    DequeueBy   = 15,
 }

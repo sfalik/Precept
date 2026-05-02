@@ -37,4 +37,5 @@ public sealed record FunctionMeta(
     FunctionCategory Category,
     string? UsageExample = null,
     string? SnippetTemplate = null,
-    string? HoverDescription = null);
+    string? HoverDescription = null,
+    bool HasCIVariant = false);

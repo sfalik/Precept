@@ -199,8 +199,12 @@ public static class Diagnostics
             PreventsFault: FaultCode.CollectionEmptyOnMutation),
         DiagnosticCode.NonOrderableCollectionExtreme  => new(nameof(DiagnosticCode.NonOrderableCollectionExtreme),  DiagnosticStage.Type,  Severity.Error,   "'.{1}' requires an orderable element type — '{0}' elements have no natural ordering",                                                  DiagnosticCategory.TypeSystem,
             FixHint: "Change the collection element type to an orderable type, or use .count instead"),
-        DiagnosticCode.CaseInsensitiveStringOnNonCollection => new(nameof(DiagnosticCode.CaseInsensitiveStringOnNonCollection), DiagnosticStage.Type, Severity.Error, "~string is only valid as a collection inner type — use string for field declarations",                                               DiagnosticCategory.TypeSystem,
-            FixHint: "Use '~string' only as a collection element type, e.g., 'set of ~string'"),
+        DiagnosticCode.CaseInsensitiveFieldRequiresTildeEquals => new(
+            nameof(DiagnosticCode.CaseInsensitiveFieldRequiresTildeEquals),
+            DiagnosticStage.Type, Severity.Error,
+            "'{0}' is declared ~string (case-insensitive). Use ~= instead of == to avoid treating values like 'admin@example.com' and 'Admin@example.com' as different.",
+            DiagnosticCategory.TypeSystem,
+            FixHint: "Replace == with ~= for case-insensitive string comparison"),
 
         // ── Type (business-domain) ───────────────────────────────────────────────
         DiagnosticCode.MaxPlacesExceeded              => new(nameof(DiagnosticCode.MaxPlacesExceeded),              DiagnosticStage.Type,  Severity.Error,   "Value has {0} decimal places, but field '{1}' allows at most {2}",                                                                     DiagnosticCategory.BusinessDomain,
@@ -276,6 +280,87 @@ public static class Diagnostics
             FixHint: "Add an initial event that assigns all required fields, or make the fields optional"),
         DiagnosticCode.InitialEventMissingAssignments => new(nameof(DiagnosticCode.InitialEventMissingAssignments), DiagnosticStage.Type,  Severity.Error,   "Initial event '{0}' does not assign required field(s): {1}",                                                                           DiagnosticCategory.Structure,
             FixHint: "Add 'set <field>' actions to the initial event body for each required field"),
+
+        // ── Type (CI enforcement) ─────────────────────────────────────────────
+        DiagnosticCode.CaseInsensitiveFieldRequiresTildeNotEquals => new(
+            nameof(DiagnosticCode.CaseInsensitiveFieldRequiresTildeNotEquals),
+            DiagnosticStage.Type, Severity.Error,
+            "'{0}' is declared ~string (case-insensitive). Use !~ instead of != (!~ returns true when values are not equal under case-insensitive comparison).",
+            DiagnosticCategory.TypeSystem,
+            FixHint: "Replace != with !~ for case-insensitive string inequality"),
+
+        DiagnosticCode.CaseInsensitiveValueInCaseSensitiveContains => new(
+            nameof(DiagnosticCode.CaseInsensitiveValueInCaseSensitiveContains),
+            DiagnosticStage.Type, Severity.Error,
+            "'{0}' is ~string (case-insensitive) but '{1}' is {2} (case-sensitive). A case-sensitive collection will not find values that differ only in case.",
+            DiagnosticCategory.TypeSystem,
+            FixHint: "Change '{1}' to {3} for case-insensitive membership, or use: any e in {1} (e ~= {0})"),
+
+        DiagnosticCode.CaseInsensitiveFieldRequiresTildeStartsWith => new(
+            nameof(DiagnosticCode.CaseInsensitiveFieldRequiresTildeStartsWith),
+            DiagnosticStage.Type, Severity.Error,
+            "'{0}' is declared ~string (case-insensitive). Use ~startsWith instead of startsWith to avoid treating values as having different prefixes.",
+            DiagnosticCategory.TypeSystem,
+            FixHint: "Replace startsWith with ~startsWith for case-insensitive prefix matching"),
+
+        DiagnosticCode.CaseInsensitiveFieldRequiresTildeEndsWith => new(
+            nameof(DiagnosticCode.CaseInsensitiveFieldRequiresTildeEndsWith),
+            DiagnosticStage.Type, Severity.Error,
+            "'{0}' is declared ~string (case-insensitive). Use ~endsWith instead of endsWith to avoid treating values as having different suffixes.",
+            DiagnosticCategory.TypeSystem,
+            FixHint: "Replace endsWith with ~endsWith for case-insensitive suffix matching"),
+
+        DiagnosticCode.KeyPresenceSafety => new(
+            nameof(DiagnosticCode.KeyPresenceSafety),
+            DiagnosticStage.Type, Severity.Error,
+            "'{0}' may not contain key '{1}' — add a 'when {0} contains {1}' guard before this access",
+            DiagnosticCategory.Safety,
+            PreventsFault: FaultCode.CollectionEmptyOnAccess),
+
+        DiagnosticCode.IndexBoundsGuard => new(
+            nameof(DiagnosticCode.IndexBoundsGuard),
+            DiagnosticStage.Type, Severity.Error,
+            "'{0}' access at index '{1}' is not bounds-checked — add a 'when {0}.count > {1}' guard",
+            DiagnosticCategory.Safety,
+            PreventsFault: FaultCode.CollectionEmptyOnAccess),
+
+        DiagnosticCode.KeyUniquenessGuard => new(
+            nameof(DiagnosticCode.KeyUniquenessGuard),
+            DiagnosticStage.Type, Severity.Error,
+            "Key '{1}' may already exist in '{0}' — add a 'when not ({0} contains {1})' guard before appending",
+            DiagnosticCategory.Safety,
+            PreventsFault: FaultCode.CollectionEmptyOnMutation),
+
+        DiagnosticCode.InvalidQuantifierTarget => new(
+            nameof(DiagnosticCode.InvalidQuantifierTarget),
+            DiagnosticStage.Type, Severity.Error,
+            "'{0}' is not a collection field — quantifiers (each/any/no) require a collection field",
+            DiagnosticCategory.TypeSystem),
+
+        DiagnosticCode.BindingShadowsField => new(
+            nameof(DiagnosticCode.BindingShadowsField),
+            DiagnosticStage.Type, Severity.Error,
+            "Binding variable '{0}' shadows a field with the same name — rename the binding to avoid confusion",
+            DiagnosticCategory.Naming),
+
+        DiagnosticCode.MissingOrderingKey => new(
+            nameof(DiagnosticCode.MissingOrderingKey),
+            DiagnosticStage.Type, Severity.Error,
+            "'{0}' requires a 'by P' ordering key — use '{0} of T by P'",
+            DiagnosticCategory.Structure),
+
+        DiagnosticCode.CollectionInnerTypeError => new(
+            nameof(DiagnosticCode.CollectionInnerTypeError),
+            DiagnosticStage.Type, Severity.Error,
+            "Expected a {0} value, but '{1}' holds elements of type {2}",
+            DiagnosticCategory.TypeSystem,
+            PreventsFault: FaultCode.TypeMismatch),
+
+        DiagnosticCode.QuantifierPredicateNotBoolean => new(
+            nameof(DiagnosticCode.QuantifierPredicateNotBoolean),
+            DiagnosticStage.Type, Severity.Error,
+            "Quantifier predicate must be a boolean expression, but this resolves to {0}",
+            DiagnosticCategory.TypeSystem),
 
         _ => throw new ArgumentOutOfRangeException(nameof(code), code, null),
     };

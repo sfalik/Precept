@@ -38,6 +38,14 @@ public enum TypeKind
     Queue         = 23,
     Stack         = 24,
 
+    // ── New collection types ────────────────────────────────────────
+    Log      = 27,
+    LogBy    = 28,
+    Bag      = 29,
+    List     = 30,
+    QueueBy  = 31,
+    Lookup   = 32,
+
     // ── Special ────────────────────────────────────────────────────
     Error         = 25,
     StateRef      = 26,

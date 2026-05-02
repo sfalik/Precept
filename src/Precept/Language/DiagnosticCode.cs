@@ -76,7 +76,7 @@ public enum DiagnosticCode
     UnguardedCollectionAccess          =  63,
     UnguardedCollectionMutation        =  64,
     NonOrderableCollectionExtreme      =  65,
-    CaseInsensitiveStringOnNonCollection = 66,
+    CaseInsensitiveFieldRequiresTildeEquals = 66,
 
     // ── Type (business-domain) ───────────────────────────
     MaxPlacesExceeded                  =  67,
@@ -121,4 +121,20 @@ public enum DiagnosticCode
     RequiredFieldsNeedInitialEvent     =  93,
     /// <summary>An initial event does not assign all required fields.</summary>
     InitialEventMissingAssignments     =  94,
+
+    // ── Type (CI enforcement) ─────────────────────────────────────────────
+    CaseInsensitiveFieldRequiresTildeNotEquals  =  95,
+    CaseInsensitiveValueInCaseSensitiveContains =  96,
+    CaseInsensitiveFieldRequiresTildeStartsWith =  97,
+    CaseInsensitiveFieldRequiresTildeEndsWith   =  98,
+
+    // ── Type (collection safety — new) ────────────────────────────────────
+    KeyPresenceSafety               =  99,
+    IndexBoundsGuard                = 100,
+    KeyUniquenessGuard              = 101,
+    InvalidQuantifierTarget         = 102,
+    BindingShadowsField             = 103,
+    MissingOrderingKey              = 104,
+    CollectionInnerTypeError        = 105,
+    QuantifierPredicateNotBoolean   = 106,
 }

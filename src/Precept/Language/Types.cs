@@ -99,6 +99,106 @@ public static class Types
             ]),
     ];
 
+    private static readonly TypeAccessor[] LogAccessors =
+    [
+        CollectionCountAccessor,
+        new TypeAccessor("first", "First (oldest) element",
+            ProofRequirements:
+            [
+                new NumericProofRequirement(new SelfSubject(CollectionCountAccessor), OperatorKind.GreaterThan, 0m,
+                    "Log must be non-empty"),
+            ]),
+        new TypeAccessor("last", "Last (most recent) element",
+            ProofRequirements:
+            [
+                new NumericProofRequirement(new SelfSubject(CollectionCountAccessor), OperatorKind.GreaterThan, 0m,
+                    "Log must be non-empty"),
+            ]),
+        new TypeAccessor("at", "Element at zero-based position N",
+            ParameterType: TypeKind.Integer,
+            ProofRequirements:
+            [
+                new NumericProofRequirement(new SelfSubject(CollectionCountAccessor), OperatorKind.GreaterThan, 0m,
+                    "Index must be within bounds"),
+            ]),
+    ];
+
+    private static readonly TypeAccessor[] LogByAccessors =
+    [
+        CollectionCountAccessor,
+        new TypeAccessor("first", "Entry with minimum ordering key",
+            ProofRequirements:
+            [
+                new NumericProofRequirement(new SelfSubject(CollectionCountAccessor), OperatorKind.GreaterThan, 0m,
+                    "Log must be non-empty"),
+            ]),
+        new TypeAccessor("last", "Entry with maximum ordering key",
+            ProofRequirements:
+            [
+                new NumericProofRequirement(new SelfSubject(CollectionCountAccessor), OperatorKind.GreaterThan, 0m,
+                    "Log must be non-empty"),
+            ]),
+        new TypeAccessor("at", "Nth entry in ordering key order (zero-based)",
+            ParameterType: TypeKind.Integer,
+            ProofRequirements:
+            [
+                new NumericProofRequirement(new SelfSubject(CollectionCountAccessor), OperatorKind.GreaterThan, 0m,
+                    "Index must be within bounds"),
+            ]),
+    ];
+
+    private static readonly TypeAccessor[] BagAccessors =
+    [
+        CollectionCountAccessor,
+        new TypeAccessor("countof", "Count of a specific element (0 if absent)", ParameterType: TypeKind.Integer),
+    ];
+
+    private static readonly TypeAccessor[] ListAccessors =
+    [
+        CollectionCountAccessor,
+        new TypeAccessor("first", "First element",
+            ProofRequirements:
+            [
+                new NumericProofRequirement(new SelfSubject(CollectionCountAccessor), OperatorKind.GreaterThan, 0m,
+                    "List must be non-empty"),
+            ]),
+        new TypeAccessor("last", "Last element",
+            ProofRequirements:
+            [
+                new NumericProofRequirement(new SelfSubject(CollectionCountAccessor), OperatorKind.GreaterThan, 0m,
+                    "List must be non-empty"),
+            ]),
+        new TypeAccessor("at", "Element at zero-based position N",
+            ParameterType: TypeKind.Integer,
+            ProofRequirements:
+            [
+                new NumericProofRequirement(new SelfSubject(CollectionCountAccessor), OperatorKind.GreaterThan, 0m,
+                    "Index must be within bounds"),
+            ]),
+    ];
+
+    private static readonly TypeAccessor[] QueueByAccessors =
+    [
+        CollectionCountAccessor,
+        new TypeAccessor("peek", "Element value of the front (best-ordered) item",
+            ProofRequirements:
+            [
+                new NumericProofRequirement(new SelfSubject(CollectionCountAccessor), OperatorKind.GreaterThan, 0m,
+                    "Queue must be non-empty"),
+            ]),
+        new TypeAccessor("peekby", "Ordering value of the front (best-ordered) item",
+            ProofRequirements:
+            [
+                new NumericProofRequirement(new SelfSubject(CollectionCountAccessor), OperatorKind.GreaterThan, 0m,
+                    "Queue must be non-empty"),
+            ]),
+    ];
+
+    private static readonly TypeAccessor[] LookupAccessors =
+    [
+        CollectionCountAccessor,
+    ];
+
     // ════════════════════════════════════════════════════════════════════════════
     //  GetMeta — exhaustive switch
     // ════════════════════════════════════════════════════════════════════════════
@@ -431,6 +531,72 @@ public static class Types
             DisplayName: "stack",
             HoverDescription: "A last-in first-out collection. Use push and pop actions. Supports .count and .peek accessors.",
             UsageExample: "field RepairSteps as stack of string"
+        ),
+
+        TypeKind.Log => new(
+            kind, Tokens.GetMeta(TokenKind.LogType),
+            "Append-only ordered log (insertion order)",
+            TypeCategory.Collection,
+            Accessors: LogAccessors,
+            DisplayName: "log",
+            HoverDescription: "An append-only ordered log. Use append action. Supports .count, .first, .last, and .at(N) accessors. No clear action — append-only.",
+            UsageExample: "field AuditTrail as log of string",
+            NotemptyApplicable: true
+        ),
+
+        TypeKind.LogBy => new(
+            kind, Tokens.GetMeta(TokenKind.LogType),
+            "Append-only ordered log keyed by an ordering value (P unique)",
+            TypeCategory.Collection,
+            Accessors: LogByAccessors,
+            DisplayName: "log by",
+            HoverDescription: "An append-only log ordered by an external key P. Use 'append F Expr by P'. P must be unique across entries. Supports .count, .first, .last, and .at(N) accessors.",
+            UsageExample: "field AuditLog as log of string by instant",
+            NotemptyApplicable: true
+        ),
+
+        TypeKind.Bag => new(
+            kind, Tokens.GetMeta(TokenKind.BagType),
+            "Unordered multiset (element plus count)",
+            TypeCategory.Collection,
+            Accessors: BagAccessors,
+            DisplayName: "bag",
+            HoverDescription: "An unordered collection that tracks element frequency. Use add and remove actions. Supports .count and .countof(E) accessors.",
+            UsageExample: "field CartItems as bag of string",
+            NotemptyApplicable: true
+        ),
+
+        TypeKind.List => new(
+            kind, Tokens.GetMeta(TokenKind.ListType),
+            "Ordered list with index access and mutable positions",
+            TypeCategory.Collection,
+            Accessors: ListAccessors,
+            DisplayName: "list",
+            HoverDescription: "An ordered list with positional access and insertion. Use append, insert, remove at actions. Supports .count, .first, .last, and .at(N) accessors.",
+            UsageExample: "field ApprovalChain as list of string",
+            NotemptyApplicable: true
+        ),
+
+        TypeKind.QueueBy => new(
+            kind, Tokens.GetMeta(TokenKind.QueueType),
+            "Priority queue ordered by an ordering key P",
+            TypeCategory.Collection,
+            Accessors: QueueByAccessors,
+            DisplayName: "queue by",
+            HoverDescription: "A priority queue ordered by an external key P. Use enqueue by / dequeue actions. Supports .count, .peek, and .peekby accessors.",
+            UsageExample: "field ClaimQueue as queue of string by integer",
+            NotemptyApplicable: true
+        ),
+
+        TypeKind.Lookup => new(
+            kind, Tokens.GetMeta(TokenKind.LookupType),
+            "Key-value map (keys unique, F for K access)",
+            TypeCategory.Collection,
+            Accessors: LookupAccessors,
+            DisplayName: "lookup",
+            HoverDescription: "A key-value map with unique keys. Use put and remove actions. Access values with 'F for K'. Supports .count accessor.",
+            UsageExample: "field CoverageLimits as lookup of string to decimal",
+            NotemptyApplicable: false
         ),
 
         // ── Special ────────────────────────────────────────────────────

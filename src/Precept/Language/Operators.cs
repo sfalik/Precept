@@ -146,6 +146,12 @@ public static class Operators
             HoverDescription: "Tests whether an optional field has not been assigned a value. True if the field is absent.",
             UsageExample: "field is not set"),
 
+        OperatorKind.LookupAccess => new SingleTokenOp(
+            kind, Tokens.GetMeta(TokenKind.For),
+            "Lookup key access",
+            Arity.Binary, Associativity.Left, Precedence: 40, OperatorFamily.Membership,
+            IsKeywordOperator: true),
+
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
     };
 

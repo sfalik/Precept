@@ -174,4 +174,31 @@ public enum TokenKind
     EndOfSource = 121,
     NewLine     = 122,
     Comment     = 123,
+
+    // ── New collection type keywords ────────────────────────────────
+    BagType      = 124,   // "bag"
+    ListType     = 125,   // "list"
+    LogType      = 126,   // "log"
+    LookupType   = 127,   // "lookup"
+
+    // ── New ordering / indexing keywords ───────────────────────────
+    By           = 128,   // "by"
+    At           = 129,   // "at"
+    Ascending    = 130,   // "ascending"
+    Descending   = 131,   // "descending"
+
+    // ── New action keywords ─────────────────────────────────────────
+    Append       = 132,   // "append"
+    Insert       = 133,   // "insert"
+    Put          = 134,   // "put"
+
+    // ── New quantifier keyword ──────────────────────────────────────
+    Each         = 135,   // "each"
+
+    // ── New lookup access operator ──────────────────────────────────
+    For          = 136,   // "for"  — infix key accessor: F for K
+
+    // ── New member-name tokens (valid as identifiers after dot) ────
+    Countof      = 137,   // "countof"
+    Peekby       = 138,   // "peekby"
 }

@@ -142,6 +142,8 @@ public static partial class Parser
         [HandlesCatalogMember(ExpressionFormKind.Conditional)]
         [HandlesCatalogMember(ExpressionFormKind.FunctionCall)]
         [HandlesCatalogMember(ExpressionFormKind.ListLiteral)]
+        [HandlesCatalogMember(ExpressionFormKind.Quantifier)]
+        [HandlesCatalogMember(ExpressionFormKind.CIFunctionCall)]
         private Expression ParseAtom()
         {
             var current = Current();

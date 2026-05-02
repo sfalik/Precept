@@ -37,4 +37,7 @@ public enum OperatorKind
     // ── Presence (postfix) ─────────────────────────────────────────
     IsSet                     = 19,
     IsNotSet                  = 20,
+
+    // ── Lookup ─────────────────────────────────────────────────────
+    LookupAccess = 21,   // F for K — lookup key access
 }

@@ -42,7 +42,7 @@ public class ActionsTests
     [Fact]
     public void Total_Count()
     {
-        Actions.All.Should().HaveCount(8);
+        Actions.All.Should().HaveCount(15);
     }
 
     // ── All entries have valid TokenMeta instances ─────────────────────────────
@@ -65,6 +65,11 @@ public class ActionsTests
     [InlineData(ActionKind.Remove)]
     [InlineData(ActionKind.Enqueue)]
     [InlineData(ActionKind.Push)]
+    [InlineData(ActionKind.Append)]
+    [InlineData(ActionKind.AppendBy)]
+    [InlineData(ActionKind.Insert)]
+    [InlineData(ActionKind.Put)]
+    [InlineData(ActionKind.EnqueueBy)]
     public void ValueRequired_Actions(ActionKind kind)
     {
         Actions.GetMeta(kind).ValueRequired.Should().BeTrue($"{kind} requires a value expression");
@@ -74,6 +79,8 @@ public class ActionsTests
     [InlineData(ActionKind.Dequeue)]
     [InlineData(ActionKind.Pop)]
     [InlineData(ActionKind.Clear)]
+    [InlineData(ActionKind.RemoveAt)]
+    [InlineData(ActionKind.DequeueBy)]
     public void NoValueRequired_Actions(ActionKind kind)
     {
         Actions.GetMeta(kind).ValueRequired.Should().BeFalse($"{kind} takes no value");
@@ -84,18 +91,19 @@ public class ActionsTests
     [Theory]
     [InlineData(ActionKind.Dequeue)]
     [InlineData(ActionKind.Pop)]
+    [InlineData(ActionKind.DequeueBy)]
     public void IntoSupported_Actions(ActionKind kind)
     {
         Actions.GetMeta(kind).IntoSupported.Should().BeTrue($"{kind} supports 'into' clause");
     }
 
     [Fact]
-    public void OnlyDequeueAndPop_SupportInto()
+    public void OnlyDequeuePopAndDequeueBy_SupportInto()
     {
         var withInto = Actions.All.Where(a => a.IntoSupported).ToList();
-        withInto.Should().HaveCount(2);
+        withInto.Should().HaveCount(3);
         withInto.Select(a => a.Kind).Should()
-            .BeEquivalentTo([ActionKind.Dequeue, ActionKind.Pop]);
+            .BeEquivalentTo([ActionKind.Dequeue, ActionKind.Pop, ActionKind.DequeueBy]);
     }
 
     // ── Mutually exclusive: ValueRequired and IntoSupported ─────────────────────
@@ -112,26 +120,40 @@ public class ActionsTests
 
     // ── Applicability: Set actions ──────────────────────────────────────────────
 
-    [Theory]
-    [InlineData(ActionKind.Add)]
-    [InlineData(ActionKind.Remove)]
-    public void SetCollectionActions_ApplyToSetOnly(ActionKind kind)
+    [Fact]
+    public void Add_AppliesToSetAndBag()
     {
-        var meta = Actions.GetMeta(kind);
-        meta.ApplicableTo.Should().HaveCount(1);
-        meta.ApplicableTo[0].Kind.Should().Be(TypeKind.Set);
+        var meta = Actions.GetMeta(ActionKind.Add);
+        meta.ApplicableTo.Should().HaveCount(2);
+        meta.ApplicableTo.Select(t => t.Kind).Should().BeEquivalentTo([TypeKind.Set, TypeKind.Bag]);
+    }
+
+    [Fact]
+    public void Remove_AppliesToSetBagListAndLookup()
+    {
+        var meta = Actions.GetMeta(ActionKind.Remove);
+        meta.ApplicableTo.Should().HaveCount(4);
+        meta.ApplicableTo.Select(t => t.Kind).Should()
+            .BeEquivalentTo([TypeKind.Set, TypeKind.Bag, TypeKind.List, TypeKind.Lookup]);
     }
 
     // ── Applicability: Queue actions ────────────────────────────────────────────
 
-    [Theory]
-    [InlineData(ActionKind.Enqueue)]
-    [InlineData(ActionKind.Dequeue)]
-    public void QueueActions_ApplyToQueueOnly(ActionKind kind)
+    [Fact]
+    public void Enqueue_AppliesToQueueOnly()
     {
-        var meta = Actions.GetMeta(kind);
+        var meta = Actions.GetMeta(ActionKind.Enqueue);
         meta.ApplicableTo.Should().HaveCount(1);
         meta.ApplicableTo[0].Kind.Should().Be(TypeKind.Queue);
+    }
+
+    [Fact]
+    public void Dequeue_AppliesToQueueAndQueueBy()
+    {
+        var meta = Actions.GetMeta(ActionKind.Dequeue);
+        meta.ApplicableTo.Should().HaveCount(2);
+        meta.ApplicableTo.Select(t => t.Kind).Should()
+            .BeEquivalentTo([TypeKind.Queue, TypeKind.QueueBy]);
     }
 
     // ── Applicability: Stack actions ────────────────────────────────────────────
@@ -161,13 +183,14 @@ public class ActionsTests
     public void Clear_AppliesToCollectionsAndOptional()
     {
         var meta = Actions.GetMeta(ActionKind.Clear);
-        meta.ApplicableTo.Should().HaveCount(4);
+        meta.ApplicableTo.Should().HaveCount(7);
 
         var typeTargets = meta.ApplicableTo.OfType<TypeTarget>()
             .Where(t => t is not ModifiedTypeTarget)
             .Select(t => t.Kind)
             .ToList();
-        typeTargets.Should().BeEquivalentTo([TypeKind.Set, TypeKind.Queue, TypeKind.Stack]);
+        typeTargets.Should().BeEquivalentTo(
+            [TypeKind.Set, TypeKind.Queue, TypeKind.Stack, TypeKind.Bag, TypeKind.List, TypeKind.QueueBy]);
     }
 
     [Fact]
@@ -199,26 +222,26 @@ public class ActionsTests
     // ── Grouping invariants ─────────────────────────────────────────────────────
 
     [Fact]
-    public void FiveActions_RequireValue()
+    public void TenActions_RequireValue()
     {
-        Actions.All.Count(a => a.ValueRequired).Should().Be(5);
+        Actions.All.Count(a => a.ValueRequired).Should().Be(10);
     }
 
     [Fact]
-    public void TwoActions_SupportInto()
+    public void ThreeActions_SupportInto()
     {
-        Actions.All.Count(a => a.IntoSupported).Should().Be(2);
+        Actions.All.Count(a => a.IntoSupported).Should().Be(3);
     }
 
     [Fact]
-    public void OneAction_HasNoValueAndNoInto()
+    public void TwoActions_HasNoValueAndNoInto()
     {
-        // clear: no value, no into
+        // clear + removeAt: no value, no into
         var neither = Actions.All
             .Where(a => !a.ValueRequired && !a.IntoSupported)
             .ToList();
-        neither.Should().HaveCount(1);
-        neither[0].Kind.Should().Be(ActionKind.Clear);
+        neither.Should().HaveCount(2);
+        neither.Select(a => a.Kind).Should().BeEquivalentTo([ActionKind.Clear, ActionKind.RemoveAt]);
     }
 
     // ── Token is object reference to Tokens catalog ─────────────────────────────
@@ -291,8 +314,12 @@ public class ActionsTests
     [Fact]
     public void AllActions_ProofRequirements_DefaultEmpty()
     {
-        // Dequeue and Pop carry non-empty proof requirements (M4); all others default to empty
-        var actionsWithRequirements = new HashSet<ActionKind> { ActionKind.Dequeue, ActionKind.Pop };
+        // Dequeue, Pop, Insert, RemoveAt, and DequeueBy carry non-empty proof requirements; all others default to empty
+        var actionsWithRequirements = new HashSet<ActionKind>
+        {
+            ActionKind.Dequeue, ActionKind.Pop,
+            ActionKind.Insert, ActionKind.RemoveAt, ActionKind.DequeueBy,
+        };
         foreach (var meta in Actions.All.Where(a => !actionsWithRequirements.Contains(a.Kind)))
         {
             meta.ProofRequirements.Should().BeEmpty(
@@ -323,6 +350,7 @@ public class ActionsTests
         {
             ActionKind.Set, ActionKind.Add, ActionKind.Remove,
             ActionKind.Enqueue, ActionKind.Push, ActionKind.Clear,
+            ActionKind.Append, ActionKind.AppendBy, ActionKind.Put, ActionKind.EnqueueBy,
         };
         foreach (var kind in nonMutating)
         {
@@ -342,13 +370,16 @@ public class ActionsTests
     }
 
     [Fact]
-    public void Actions_ByTokenKind_ContainsAllActionKinds()
+    public void Actions_ByTokenKind_ContainsAllPrimaryActionKinds()
     {
-        Actions.ByTokenKind.Should().HaveCount(8);
-        foreach (var meta in Actions.All)
+        // ByTokenKind only includes primary actions (PrimaryActionKind == null).
+        // Secondary kinds (AppendBy, RemoveAt, EnqueueBy, DequeueBy) share tokens with primaries.
+        var primaryActions = Actions.All.Where(m => m.PrimaryActionKind == null).ToList();
+        Actions.ByTokenKind.Should().HaveCount(primaryActions.Count);
+        foreach (var meta in primaryActions)
         {
             Actions.ByTokenKind.Should().ContainKey(meta.Token.Kind,
-                $"ByTokenKind must contain entry for {meta.Kind}");
+                $"ByTokenKind must contain entry for primary action {meta.Kind}");
             Actions.ByTokenKind[meta.Token.Kind].Kind.Should().Be(meta.Kind);
         }
     }

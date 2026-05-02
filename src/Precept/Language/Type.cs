@@ -119,7 +119,8 @@ public record TypeMeta(
     ModifierKind[]?              ImpliedModifiers = null,
     IReadOnlyList<TypeAccessor>? Accessors        = null,
     string?                      HoverDescription = null,
-    string?                      UsageExample     = null
+    string?                      UsageExample     = null,
+    bool                         NotemptyApplicable = true
 )
 {
     /// <summary>Lossless implicit widening targets. Empty for most types.</summary>

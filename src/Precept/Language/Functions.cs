@@ -217,7 +217,8 @@ public static class Functions
         FunctionCategory.String,
         UsageExample: "startsWith(email, \"info@\")",
         SnippetTemplate: "startsWith(${1:str}, ${2:prefix})",
-        HoverDescription: "Returns true if the text value begins with the given prefix. Case-sensitive."),
+        HoverDescription: "Returns true if the text value begins with the given prefix. Case-sensitive.",
+        HasCIVariant: true),
 
         FunctionKind.EndsWith => new(kind, "endsWith", "Case-sensitive suffix test",
         [
@@ -226,7 +227,8 @@ public static class Functions
         FunctionCategory.String,
         UsageExample: "endsWith(email, \".com\")",
         SnippetTemplate: "endsWith(${1:str}, ${2:suffix})",
-        HoverDescription: "Returns true if the text value ends with the given suffix. Case-sensitive."),
+        HoverDescription: "Returns true if the text value ends with the given suffix. Case-sensitive.",
+        HasCIVariant: true),
 
         FunctionKind.ToLower => new(kind, "toLower", "Lowercase (invariant culture)",
         [

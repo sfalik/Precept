@@ -302,15 +302,15 @@ public class OperatorsTests
     // ── DU shape: MultiTokenOp ──────────────────────────────────────────────────
 
     [Fact]
-    public void Operators_All_CountIs20()
+    public void Operators_All_CountIs21()
     {
-        Operators.All.Should().HaveCount(20);
+        Operators.All.Should().HaveCount(21);
     }
 
     [Fact]
-    public void Operators_SingleTokenOp_CountIs18()
+    public void Operators_SingleTokenOp_CountIs19()
     {
-        Operators.All.OfType<SingleTokenOp>().Should().HaveCount(18);
+        Operators.All.OfType<SingleTokenOp>().Should().HaveCount(19);
     }
 
     [Fact]

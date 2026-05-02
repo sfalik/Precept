@@ -303,10 +303,15 @@ public static partial class Parser
 #pragma warning disable CS8524 // unnamed ActionSyntaxShape values are unreachable — CS8509 enforces named-value coverage
             return meta.SyntaxShape switch
             {
-                ActionSyntaxShape.AssignValue     => ParseAssignValueStatement(meta),
-                ActionSyntaxShape.CollectionValue => ParseCollectionValueStatement(meta),
-                ActionSyntaxShape.CollectionInto  => ParseCollectionIntoStatement(meta),
-                ActionSyntaxShape.FieldOnly       => ParseFieldOnlyStatement(meta),
+                ActionSyntaxShape.AssignValue       => ParseAssignValueStatement(meta),
+                ActionSyntaxShape.CollectionValue   => ParseCollectionValueStatement(meta),
+                ActionSyntaxShape.CollectionInto    => ParseCollectionIntoStatement(meta),
+                ActionSyntaxShape.FieldOnly         => ParseFieldOnlyStatement(meta),
+                ActionSyntaxShape.CollectionValueBy => ParseCollectionValueByStatement(meta),
+                ActionSyntaxShape.InsertAt          => ParseInsertAtStatement(meta),
+                ActionSyntaxShape.RemoveAtIndex     => ParseRemoveAtIndexStatement(meta),
+                ActionSyntaxShape.PutKeyValue       => ParsePutKeyValueStatement(meta),
+                ActionSyntaxShape.CollectionIntoBy  => ParseCollectionIntoByStatement(meta),
             };
 #pragma warning restore CS8524
         }
@@ -321,14 +326,21 @@ public static partial class Parser
 #pragma warning disable CS8524 // unnamed ActionKind values are unreachable — CS8509 enforces named-value coverage
             return meta.Kind switch
             {
-                ActionKind.Set     => new SetStatement(span, field, value),
-                ActionKind.Add     => throw new InvalidOperationException($"ActionKind.Add does not belong to the AssignValue shape"),
-                ActionKind.Remove  => throw new InvalidOperationException($"ActionKind.Remove does not belong to the AssignValue shape"),
-                ActionKind.Enqueue => throw new InvalidOperationException($"ActionKind.Enqueue does not belong to the AssignValue shape"),
-                ActionKind.Dequeue => throw new InvalidOperationException($"ActionKind.Dequeue does not belong to the AssignValue shape"),
-                ActionKind.Push    => throw new InvalidOperationException($"ActionKind.Push does not belong to the AssignValue shape"),
-                ActionKind.Pop     => throw new InvalidOperationException($"ActionKind.Pop does not belong to the AssignValue shape"),
-                ActionKind.Clear   => throw new InvalidOperationException($"ActionKind.Clear does not belong to the AssignValue shape"),
+                ActionKind.Set      => new SetStatement(span, field, value),
+                ActionKind.Add      => throw new InvalidOperationException($"ActionKind.Add does not belong to the AssignValue shape"),
+                ActionKind.Remove   => throw new InvalidOperationException($"ActionKind.Remove does not belong to the AssignValue shape"),
+                ActionKind.Enqueue  => throw new InvalidOperationException($"ActionKind.Enqueue does not belong to the AssignValue shape"),
+                ActionKind.Dequeue  => throw new InvalidOperationException($"ActionKind.Dequeue does not belong to the AssignValue shape"),
+                ActionKind.Push     => throw new InvalidOperationException($"ActionKind.Push does not belong to the AssignValue shape"),
+                ActionKind.Pop      => throw new InvalidOperationException($"ActionKind.Pop does not belong to the AssignValue shape"),
+                ActionKind.Clear    => throw new InvalidOperationException($"ActionKind.Clear does not belong to the AssignValue shape"),
+                ActionKind.Append   => throw new InvalidOperationException($"ActionKind.Append does not belong to the AssignValue shape"),
+                ActionKind.AppendBy => throw new InvalidOperationException($"ActionKind.AppendBy does not belong to the AssignValue shape"),
+                ActionKind.Insert   => throw new InvalidOperationException($"ActionKind.Insert does not belong to the AssignValue shape"),
+                ActionKind.RemoveAt => throw new InvalidOperationException($"ActionKind.RemoveAt does not belong to the AssignValue shape"),
+                ActionKind.Put      => throw new InvalidOperationException($"ActionKind.Put does not belong to the AssignValue shape"),
+                ActionKind.EnqueueBy => throw new InvalidOperationException($"ActionKind.EnqueueBy does not belong to the AssignValue shape"),
+                ActionKind.DequeueBy => throw new InvalidOperationException($"ActionKind.DequeueBy does not belong to the AssignValue shape"),
             };
 #pragma warning restore CS8524
         }
@@ -342,14 +354,21 @@ public static partial class Parser
 #pragma warning disable CS8524 // unnamed ActionKind values are unreachable — CS8509 enforces named-value coverage
             return meta.Kind switch
             {
-                ActionKind.Add     => new AddStatement(span, field, value),
-                ActionKind.Remove  => new RemoveStatement(span, field, value),
-                ActionKind.Enqueue => new EnqueueStatement(span, field, value),
-                ActionKind.Push    => new PushStatement(span, field, value),
-                ActionKind.Set     => throw new InvalidOperationException($"ActionKind.Set does not belong to the CollectionValue shape"),
-                ActionKind.Dequeue => throw new InvalidOperationException($"ActionKind.Dequeue does not belong to the CollectionValue shape"),
-                ActionKind.Pop     => throw new InvalidOperationException($"ActionKind.Pop does not belong to the CollectionValue shape"),
-                ActionKind.Clear   => throw new InvalidOperationException($"ActionKind.Clear does not belong to the CollectionValue shape"),
+                ActionKind.Add      => new AddStatement(span, field, value),
+                ActionKind.Remove   => new RemoveStatement(span, field, value),
+                ActionKind.Enqueue  => new EnqueueStatement(span, field, value),
+                ActionKind.Push     => new PushStatement(span, field, value),
+                ActionKind.Append   => new AppendStatement(span, field, value),
+                ActionKind.Set      => throw new InvalidOperationException($"ActionKind.Set does not belong to the CollectionValue shape"),
+                ActionKind.Dequeue  => throw new InvalidOperationException($"ActionKind.Dequeue does not belong to the CollectionValue shape"),
+                ActionKind.Pop      => throw new InvalidOperationException($"ActionKind.Pop does not belong to the CollectionValue shape"),
+                ActionKind.Clear    => throw new InvalidOperationException($"ActionKind.Clear does not belong to the CollectionValue shape"),
+                ActionKind.AppendBy => throw new InvalidOperationException($"ActionKind.AppendBy does not belong to the CollectionValue shape"),
+                ActionKind.Insert   => throw new InvalidOperationException($"ActionKind.Insert does not belong to the CollectionValue shape"),
+                ActionKind.RemoveAt => throw new InvalidOperationException($"ActionKind.RemoveAt does not belong to the CollectionValue shape"),
+                ActionKind.Put      => throw new InvalidOperationException($"ActionKind.Put does not belong to the CollectionValue shape"),
+                ActionKind.EnqueueBy => throw new InvalidOperationException($"ActionKind.EnqueueBy does not belong to the CollectionValue shape"),
+                ActionKind.DequeueBy => throw new InvalidOperationException($"ActionKind.DequeueBy does not belong to the CollectionValue shape"),
             };
 #pragma warning restore CS8524
         }
@@ -369,14 +388,21 @@ public static partial class Parser
 #pragma warning disable CS8524 // unnamed ActionKind values are unreachable — CS8509 enforces named-value coverage
             return meta.Kind switch
             {
-                ActionKind.Dequeue => new DequeueStatement(span, field, into),
-                ActionKind.Pop     => new PopStatement(span, field, into),
-                ActionKind.Set     => throw new InvalidOperationException($"ActionKind.Set does not belong to the CollectionInto shape"),
-                ActionKind.Add     => throw new InvalidOperationException($"ActionKind.Add does not belong to the CollectionInto shape"),
-                ActionKind.Remove  => throw new InvalidOperationException($"ActionKind.Remove does not belong to the CollectionInto shape"),
-                ActionKind.Enqueue => throw new InvalidOperationException($"ActionKind.Enqueue does not belong to the CollectionInto shape"),
-                ActionKind.Push    => throw new InvalidOperationException($"ActionKind.Push does not belong to the CollectionInto shape"),
-                ActionKind.Clear   => throw new InvalidOperationException($"ActionKind.Clear does not belong to the CollectionInto shape"),
+                ActionKind.Dequeue   => new DequeueStatement(span, field, into),
+                ActionKind.Pop       => new PopStatement(span, field, into),
+                ActionKind.DequeueBy => new DequeueByStatement(span, field, into),
+                ActionKind.Set      => throw new InvalidOperationException($"ActionKind.Set does not belong to the CollectionInto shape"),
+                ActionKind.Add      => throw new InvalidOperationException($"ActionKind.Add does not belong to the CollectionInto shape"),
+                ActionKind.Remove   => throw new InvalidOperationException($"ActionKind.Remove does not belong to the CollectionInto shape"),
+                ActionKind.Enqueue  => throw new InvalidOperationException($"ActionKind.Enqueue does not belong to the CollectionInto shape"),
+                ActionKind.Push     => throw new InvalidOperationException($"ActionKind.Push does not belong to the CollectionInto shape"),
+                ActionKind.Clear    => throw new InvalidOperationException($"ActionKind.Clear does not belong to the CollectionInto shape"),
+                ActionKind.Append   => throw new InvalidOperationException($"ActionKind.Append does not belong to the CollectionInto shape"),
+                ActionKind.AppendBy => throw new InvalidOperationException($"ActionKind.AppendBy does not belong to the CollectionInto shape"),
+                ActionKind.Insert   => throw new InvalidOperationException($"ActionKind.Insert does not belong to the CollectionInto shape"),
+                ActionKind.RemoveAt => throw new InvalidOperationException($"ActionKind.RemoveAt does not belong to the CollectionInto shape"),
+                ActionKind.Put      => throw new InvalidOperationException($"ActionKind.Put does not belong to the CollectionInto shape"),
+                ActionKind.EnqueueBy => throw new InvalidOperationException($"ActionKind.EnqueueBy does not belong to the CollectionInto shape"),
             };
 #pragma warning restore CS8524
         }
@@ -389,16 +415,90 @@ public static partial class Parser
 #pragma warning disable CS8524 // unnamed ActionKind values are unreachable — CS8509 enforces named-value coverage
             return meta.Kind switch
             {
-                ActionKind.Clear   => new ClearStatement(span, field),
-                ActionKind.Set     => throw new InvalidOperationException($"ActionKind.Set does not belong to the FieldOnly shape"),
-                ActionKind.Add     => throw new InvalidOperationException($"ActionKind.Add does not belong to the FieldOnly shape"),
-                ActionKind.Remove  => throw new InvalidOperationException($"ActionKind.Remove does not belong to the FieldOnly shape"),
-                ActionKind.Enqueue => throw new InvalidOperationException($"ActionKind.Enqueue does not belong to the FieldOnly shape"),
-                ActionKind.Dequeue => throw new InvalidOperationException($"ActionKind.Dequeue does not belong to the FieldOnly shape"),
-                ActionKind.Push    => throw new InvalidOperationException($"ActionKind.Push does not belong to the FieldOnly shape"),
-                ActionKind.Pop     => throw new InvalidOperationException($"ActionKind.Pop does not belong to the FieldOnly shape"),
+                ActionKind.Clear    => new ClearStatement(span, field),
+                ActionKind.Set      => throw new InvalidOperationException($"ActionKind.Set does not belong to the FieldOnly shape"),
+                ActionKind.Add      => throw new InvalidOperationException($"ActionKind.Add does not belong to the FieldOnly shape"),
+                ActionKind.Remove   => throw new InvalidOperationException($"ActionKind.Remove does not belong to the FieldOnly shape"),
+                ActionKind.Enqueue  => throw new InvalidOperationException($"ActionKind.Enqueue does not belong to the FieldOnly shape"),
+                ActionKind.Dequeue  => throw new InvalidOperationException($"ActionKind.Dequeue does not belong to the FieldOnly shape"),
+                ActionKind.Push     => throw new InvalidOperationException($"ActionKind.Push does not belong to the FieldOnly shape"),
+                ActionKind.Pop      => throw new InvalidOperationException($"ActionKind.Pop does not belong to the FieldOnly shape"),
+                ActionKind.Append   => throw new InvalidOperationException($"ActionKind.Append does not belong to the FieldOnly shape"),
+                ActionKind.AppendBy => throw new InvalidOperationException($"ActionKind.AppendBy does not belong to the FieldOnly shape"),
+                ActionKind.Insert   => throw new InvalidOperationException($"ActionKind.Insert does not belong to the FieldOnly shape"),
+                ActionKind.RemoveAt => throw new InvalidOperationException($"ActionKind.RemoveAt does not belong to the FieldOnly shape"),
+                ActionKind.Put      => throw new InvalidOperationException($"ActionKind.Put does not belong to the FieldOnly shape"),
+                ActionKind.EnqueueBy => throw new InvalidOperationException($"ActionKind.EnqueueBy does not belong to the FieldOnly shape"),
+                ActionKind.DequeueBy => throw new InvalidOperationException($"ActionKind.DequeueBy does not belong to the FieldOnly shape"),
             };
 #pragma warning restore CS8524
+        }
+
+        // ── New collection shape parsers ──────────────────────────────────────────
+
+        private Statement ParseCollectionValueByStatement(ActionMeta meta)
+        {
+            var kw = Advance();
+            var field = Expect(TokenKind.Identifier);
+            var value = ParseExpression(0);
+            Expect(TokenKind.By);
+            var key = ParseExpression(0);
+            var span = SourceSpan.Covering(kw.Span, key.Span);
+            return meta.Kind switch
+            {
+                ActionKind.AppendBy  => new AppendByStatement(span, field, value, key),
+                ActionKind.EnqueueBy => new EnqueueByStatement(span, field, value, key),
+                _ => throw new InvalidOperationException($"ActionKind.{meta.Kind} does not belong to the CollectionValueBy shape"),
+            };
+        }
+
+        private Statement ParseInsertAtStatement(ActionMeta meta)
+        {
+            var kw = Advance();
+            var field = Expect(TokenKind.Identifier);
+            var value = ParseExpression(0);
+            Expect(TokenKind.At);
+            var index = ParseExpression(0);
+            var span = SourceSpan.Covering(kw.Span, index.Span);
+            return new InsertStatement(span, field, value, index);
+        }
+
+        private Statement ParseRemoveAtIndexStatement(ActionMeta meta)
+        {
+            var kw = Advance();
+            var field = Expect(TokenKind.Identifier);
+            var index = ParseExpression(0);
+            var span = SourceSpan.Covering(kw.Span, index.Span);
+            return new RemoveAtStatement(span, field, index);
+        }
+
+        private Statement ParsePutKeyValueStatement(ActionMeta meta)
+        {
+            var kw = Advance();
+            var field = Expect(TokenKind.Identifier);
+            var key = ParseExpression(0);
+            var value = ParseExpression(0);
+            var span = SourceSpan.Covering(kw.Span, value.Span);
+            return new PutStatement(span, field, key, value);
+        }
+
+        private Statement ParseCollectionIntoByStatement(ActionMeta meta)
+        {
+            var kw = Advance();
+            var field = Expect(TokenKind.Identifier);
+            Token? into = null;
+            if (Current().Kind == TokenKind.Into)
+            {
+                Advance();
+                into = Expect(TokenKind.Identifier);
+            }
+            var endSpan = into?.Span ?? field.Span;
+            var span = SourceSpan.Covering(kw.Span, endSpan);
+            return meta.Kind switch
+            {
+                ActionKind.DequeueBy => new DequeueByStatement(span, field, into),
+                _ => throw new InvalidOperationException($"ActionKind.{meta.Kind} does not belong to the CollectionIntoBy shape"),
+            };
         }
 
         // ── Construct parsers (non-disambiguated) ─────────────────────────────

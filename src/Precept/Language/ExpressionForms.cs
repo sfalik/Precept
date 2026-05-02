@@ -27,6 +27,10 @@ public enum ExpressionFormKind
 
     // Postfix — left-denotation presence checks
     PostfixOperation = 11,
+
+    // Quantifier and CI function call forms
+    Quantifier       = 12,
+    CIFunctionCall   = 13,
 }
 
 /// <summary>
@@ -79,6 +83,12 @@ public static class ExpressionForms
         ExpressionFormKind.MethodCall       => new(kind, ExpressionCategory.Invocation, true,  [TokenKind.LeftParen],     "A method call on an expression: target.method(args)."),
         ExpressionFormKind.ListLiteral      => new(kind, ExpressionCategory.Collection, false, [TokenKind.LeftBracket],   "A list literal: [elem, elem, ...]."),
         ExpressionFormKind.PostfixOperation => new(kind, ExpressionCategory.Composite,  true,  [TokenKind.Is],            "A postfix presence-check operation: expr is set / expr is not set."),
+        ExpressionFormKind.Quantifier    => new(kind, ExpressionCategory.Composite, false,
+            [TokenKind.Each, TokenKind.Any, TokenKind.No],
+            "A bounded quantifier: each/any/no binding in collection (predicate)."),
+        ExpressionFormKind.CIFunctionCall => new(kind, ExpressionCategory.Invocation, false,
+            [TokenKind.Tilde],
+            "A case-insensitive function call: ~startsWith(subject, prefix) or ~endsWith(subject, suffix). Both arguments are required."),
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
     };
 

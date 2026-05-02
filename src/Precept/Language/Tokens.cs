@@ -383,6 +383,50 @@ public static class Tokens
         TokenKind.Comment     => new(kind, null, Cat_Str, "Comment",
             TextMateScope: "comment.line.precept", SemanticTokenType: "comment"),
 
+        // ── New Collection type keywords ────────────────────────────────
+        TokenKind.BagType     => new(kind, "bag",        Cat_Type, "Bag collection type",
+            TextMateScope: "storage.type.precept", SemanticTokenType: "type", ValidAfter: VA_TypeRef),
+        TokenKind.ListType    => new(kind, "list",       Cat_Type, "List collection type",
+            TextMateScope: "storage.type.precept", SemanticTokenType: "type", ValidAfter: VA_TypeRef),
+        TokenKind.LogType     => new(kind, "log",        Cat_Type, "Log collection type",
+            TextMateScope: "storage.type.precept", SemanticTokenType: "type", ValidAfter: VA_TypeRef),
+        TokenKind.LookupType  => new(kind, "lookup",     Cat_Type, "Lookup collection type",
+            TextMateScope: "storage.type.precept", SemanticTokenType: "type", ValidAfter: VA_TypeRef),
+
+        // ── New ordering / indexing keywords ───────────────────────────
+        TokenKind.By          => new(kind, "by",         Cat_Prep, "Ordering key preposition",
+            TextMateScope: "keyword.control.precept", SemanticTokenType: "keyword"),
+        TokenKind.At          => new(kind, "at",         Cat_Prep, "Index position preposition",
+            TextMateScope: "keyword.control.precept", SemanticTokenType: "keyword"),
+        TokenKind.Ascending   => new(kind, "ascending",  Cat_Decl, "Ascending sort order",
+            TextMateScope: "keyword.declaration.precept", SemanticTokenType: "keyword"),
+        TokenKind.Descending  => new(kind, "descending", Cat_Decl, "Descending sort order",
+            TextMateScope: "keyword.declaration.precept", SemanticTokenType: "keyword"),
+
+        // ── New action keywords ─────────────────────────────────────────
+        TokenKind.Append      => new(kind, "append",     Cat_Act,  "Log/list append action",
+            TextMateScope: "keyword.other.action.precept", SemanticTokenType: "keyword", ValidAfter: VA_AfterArrow),
+        TokenKind.Insert      => new(kind, "insert",     Cat_Act,  "List insert action",
+            TextMateScope: "keyword.other.action.precept", SemanticTokenType: "keyword", ValidAfter: VA_AfterArrow),
+        TokenKind.Put         => new(kind, "put",        Cat_Act,  "Lookup put action",
+            TextMateScope: "keyword.other.action.precept", SemanticTokenType: "keyword", ValidAfter: VA_AfterArrow),
+
+        // ── New quantifier keyword ──────────────────────────────────────
+        TokenKind.Each        => new(kind, "each",       Cat_Qnt,  "Bounded quantifier: each element",
+            TextMateScope: "keyword.other.quantifier.precept", SemanticTokenType: "keyword"),
+
+        // ── New lookup access operator ──────────────────────────────────
+        TokenKind.For         => new(kind, "for",        Cat_Prep, "Lookup key access infix operator",
+            TextMateScope: "keyword.control.precept", SemanticTokenType: "keyword"),
+
+        // ── New member-name tokens ─────────────────────────────────────
+        TokenKind.Countof     => new(kind, "countof",    Cat_Cns,  "Bag element count accessor",
+            TextMateScope: "keyword.other.precept", SemanticTokenType: "keyword",
+            IsValidAsMemberName: true),
+        TokenKind.Peekby      => new(kind, "peekby",     Cat_Cns,  "Priority queue ordering-key peek accessor",
+            TextMateScope: "keyword.other.precept", SemanticTokenType: "keyword",
+            IsValidAsMemberName: true),
+
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
     };
 

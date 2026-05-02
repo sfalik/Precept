@@ -9,7 +9,8 @@ public abstract record TypeRefNode(SourceSpan Span) : SyntaxNode(Span);
 public sealed record ScalarTypeRefNode(
     SourceSpan Span,
     Language.Token TypeName,
-    ImmutableArray<TypeQualifierNode> Qualifiers) : TypeRefNode(Span);
+    ImmutableArray<TypeQualifierNode> Qualifiers,
+    bool CaseInsensitive = false) : TypeRefNode(Span);
 
 /// <summary><c>as set of string</c>, <c>as queue of integer</c>, <c>as set of ~string</c></summary>
 public sealed record CollectionTypeRefNode(
@@ -30,3 +31,30 @@ public sealed record TypeQualifierNode(
     SourceSpan Span,
     Language.Token Keyword,
     Expression Value) : SyntaxNode(Span);
+
+public enum SortDirection { Ascending = 1, Descending = 2 }
+
+public sealed record LogByTypeRefNode(
+    SourceSpan Span,
+    Language.Token ElementType,
+    Language.Token OrderingKeyType,
+    bool CaseInsensitive,
+    ImmutableArray<TypeQualifierNode> Qualifiers
+) : TypeRefNode(Span);
+
+public sealed record QueueByTypeRefNode(
+    SourceSpan Span,
+    Language.Token ElementType,
+    Language.Token OrderingKeyType,
+    SortDirection SortDirection,
+    bool CaseInsensitive,
+    ImmutableArray<TypeQualifierNode> Qualifiers
+) : TypeRefNode(Span);
+
+public sealed record LookupTypeRefNode(
+    SourceSpan Span,
+    Language.Token KeyType,
+    Language.Token ValueType,
+    bool CaseInsensitive,
+    ImmutableArray<TypeQualifierNode> Qualifiers
+) : TypeRefNode(Span);
