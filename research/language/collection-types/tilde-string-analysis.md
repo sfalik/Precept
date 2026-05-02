@@ -353,11 +353,9 @@ Every analysis here assumes the enforcement model: `==`/`!=` on a `~string` oper
 
 **`~string < string`, `~string > string`, `~string <= string`, `~string >= string` — ordering operators:**
 
-This is a known gap. The `string` type does not support ordering operators (`<`, `>`, `<=`, `>=`) — they are already a type error on all strings regardless of CI status (see `primitive-types.md`: "Relational comparison (`<`, `>`, `<=`, `>=`) is not available on `string`"). A `~string` field inherits this restriction — ordering is not available, full stop.
+**Revised — see `### Ordering operators — revised assessment` below.** The prior claim that ordering operators are not available on `string` was incorrect. `<`, `>`, `<=`, `>=` ARE valid on `string` — they perform ordinal, case-sensitive lexicographic comparison. This was confirmed as the correct language spec behavior; `primitive-types.md` has been corrected accordingly. See the revised assessment section for the full analysis of what this means for `~string` and the enforcement model.
 
-There is no `~<` operator and none is needed. The ordering gap is not opened by `~string` — it pre-exists for all `string` fields and is not affected by the CI modifier. The enforcement model needs no ordering-operator clause. Authors sorting strings use `set of ~string` with `.min`/`.max`, not scalar ordering operators.
-
-**Conclusion:** The enforcement model for comparison operators is complete for the equality surface. No ordering operator clause needed. The only specification requirement is that the `~string` check fires on both operand positions of `==` and `!=`, not only on the left.
+**Conclusion:** The enforcement model for comparison operators is complete for the equality surface. No ordering operator clause is needed (the revised assessment explains why). The only specification requirement is that the `~string` check fires on both operand positions of `==` and `!=`, not only on the left.
 
 ---
 
@@ -705,7 +703,7 @@ These two rules together close the enforcement model. Every other composition su
 
 **What is deliberately left outside the enforcement model:**
 
-- Ordering operators (`<`, `>`) — not applicable to `string` at all; no gap.
+- Ordering operators (`<`, `>`, `<=`, `>=`) — valid on `string` (ordinal/CS lexicographic); `~string` does not change their semantics; no enforcement check needed. See `### Ordering operators — revised assessment` below for the full corrected analysis.
 - `dequeue into`, `pop into`, `dequeue into by` — these produce a typed value from a collection; the type of the output is the collection's inner type. If the collection is `queue of ~string`, the output value will be `~string`-typed; if `queue of string`, it will be `string`-typed. The enforcement model handles comparisons on those output values through rule 1 above.
 - Event argument type boundaries — if a `~string` field is passed as a `string`-typed event argument, the CI obligation is not propagated across that boundary. This is the accepted tradeoff documented in the assignment compatibility section.
 
@@ -716,3 +714,62 @@ The prior analysis deferred due to lack of empirical usage evidence. The design 
 If the owner locks in scalar `~string` but omits the contains cross-collection rule, the feature ships with a known enforcement gap that will catch authors by surprise in exactly the scenario described in this analysis. That is the worse outcome: the feature signals safety without providing it. Either ship the full two-rule model or don't ship scalar `~string` yet.
 
 **Minimum condition for locking in:** Both rules (equality enforcement + contains cross-check) must be in scope for the same implementation slice. They are not separable — rule 1 without rule 2 is misleading.
+
+---
+
+### Ordering operators — revised assessment
+
+**Prior claim (incorrect):** "Ordering operators (`<`, `>`) — not applicable to `string` at all; no gap."
+
+**Corrected state:** Ordering operators (`<`, `>`, `<=`, `>=`) are valid on `string`. They perform ordinal, case-sensitive lexicographic comparison (code-point order on UTF-16). This is the correct language spec behavior — confirmed via `docs/language/precept-language-spec.md` and now reflected in `docs/language/primitive-types.md`, which previously carried the incorrect claim. The prior analysis in this file relied on that documentation error.
+
+**Actual semantics:** `string < string → boolean` (ordinal, CS, lexicographic). `"A" < "a"` is `true`; `"Z" < "a"` is `true` because uppercase code points are numerically lower than lowercase ones in Unicode. This is deterministic and has no locale-sensitive behavior.
+
+---
+
+#### What this means for `~string`
+
+`Email < "m"` where `Email` is declared `~string` is valid, and the comparison uses ordinal, case-sensitive lexicographic ordering. This creates a surface asymmetry: equality comparisons on a `~string` field must use `~=`/`!~` (CI), but ordering comparisons always use ordinal CS semantics. There is no `~<` operator, and the locked decision from `§ Case-Insensitive Comparison: Design rationale` confirms none will be added.
+
+Three options were evaluated:
+
+| Option | Description | Verdict |
+|--------|-------------|---------|
+| **Allow unchanged** | `<`/`>` on `~string` valid, ordinal/CS semantics, documented explicitly | **Correct** |
+| Compile error | `<`/`>` on `~string` is an error with no available remedy | Rejected |
+| Warning | Allow but warn that ordering is CS on a CI-declared field | Rejected |
+
+**Recommendation: allow unchanged.** The argument:
+
+1. **No CI ordering variant exists, and none will be added.** The enforcement model is about substituting a correct form for a wrong one: `==` → `~=` (there exists a CI equality operator). For ordering operators, no CI counterpart exists. A compile error on `~string <` without a remedy traps authors who have a legitimate need to range-check a CI-declared field (`CouponCode < "M"` to bucket by alphabetic range, `Email > "a"` to filter records). Making the only available operator an error — with no `~<` in sight — is not enforcement; it is obstruction.
+
+2. **`~string` declares CI equality semantics, not CI semantics for all operations.** The enforcement model targets the equality surface because that is where CS/CI is a meaningful, author-visible choice (`==` vs `~=`). Ordering on strings is always ordinal — there is no "CI version of less-than" with different results an author might intend. The `~` modifier signals "compare membership and equality case-insensitively." It does not signal "forbid every operation that does not have a CI counterpart."
+
+3. **The inconsistency is real but not dangerous.** `Email < "m"` on a `~string` field produces a correct, deterministic result. The semantics are the same as `<` on any `string`. The `~string` modifier adds no ambiguity to the ordering operators — it only matters where `==` vs `~=` creates a meaningful behavioral distinction.
+
+4. **Precept's no-hidden-behavior commitment is satisfied by explicit documentation.** The behavior is not hidden if the docs state it plainly. The requirement is that `<`/`>` on a `~string` field is documented as ordinal/CS, not suppressed silently.
+
+---
+
+#### What the enforcement model needs
+
+**No implementation change.** The enforcement model already covers:
+- Rule 1: `==`/`!=` on any `~string` field → error (require `~=`/`!~`)
+- Rule 2: `contains`/`for` mismatch between CI value and CS collection → error
+
+Ordering operators require no new rule. The type checker treats `<`/`>` on `~string` fields identically to `<`/`>` on `string` fields — the CI flag is irrelevant to ordering operations.
+
+---
+
+#### What the documentation needs
+
+1. **`docs/language/primitive-types.md` (`~string` section):** Add a note that `<`/`>` on a `~string` field uses ordinal (CS) semantics — the `~` modifier applies only to equality operators, not to ordering. *(This companion documentation update is the only action item.)*
+
+2. **This analysis (done):** The prior claim "ordering operators not applicable to `string` at all — no gap" is corrected. The new accurate statement: "Ordering operators are valid on `string` (ordinal/CS lexicographic); `~string` does not alter their semantics; no enforcement check needed; document explicitly."
+
+---
+
+#### Updated enforcement model clause
+
+> **Ordering operators (`<`, `>`, `<=`, `>=`) on `~string` fields:** Valid. Semantics are ordinal, case-sensitive lexicographic ordering — identical to ordering on a plain `string` field. The `~` modifier does not affect ordering semantics. No enforcement check. Authors must understand that CI equality semantics do not extend to ordering; the docs must state this explicitly.
+

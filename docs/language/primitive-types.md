@@ -48,8 +48,12 @@ field Notes as string optional
 | `string != string` | `boolean` | Ordinal, case-sensitive. |
 | `string ~= string` | `boolean` | Ordinal, case-insensitive (`OrdinalIgnoreCase`). |
 | `string !~ string` | `boolean` | Ordinal, case-insensitive not-equals. |
+| `string < string`  | `boolean` | Ordinal, case-sensitive. Lexicographic ordering. |
+| `string > string`  | `boolean` | Ordinal, case-sensitive. Lexicographic ordering. |
+| `string <= string` | `boolean` | Ordinal, case-sensitive. Lexicographic ordering. |
+| `string >= string` | `boolean` | Ordinal, case-sensitive. Lexicographic ordering. |
 
-Relational comparison (`<`, `>`, `<=`, `>=`) is not available on `string`. Arithmetic (`-`, `*`, `/`, `%`) is a type error. Logical operators are a type error.
+Arithmetic (`-`, `*`, `/`, `%`) is a type error. Logical operators are a type error.
 
 **Member access:**
 
@@ -71,6 +75,8 @@ field Labels as set of ~string   # OrdinalIgnoreCase — "Apple" and "apple" are
 ```
 
 The `~` prefix selects `StringComparer.OrdinalIgnoreCase` as the collection's comparer, which governs membership, deduplication, and ordering consistently. `set of ~string` supports `.min`/`.max` (OrdinalIgnoreCase ordering is deterministic). `field Name as ~string` is a type error (`CaseInsensitiveStringOnNonCollection`).
+
+**Ordering operators on `~string` fields (future scalar use):** When scalar `~string` fields are supported, `<`/`>`/`<=`/`>=` on a `~string` field use ordinal, case-sensitive lexicographic ordering — the same semantics as on any `string` field. The `~` modifier applies only to equality operators (`==`/`!=` → required to use `~=`/`!~`). There is no CI ordering variant; case-insensitive ordering is not part of the Precept operator surface.
 
 ---
 
@@ -352,7 +358,7 @@ Numeric literals do not carry an inherent lane. Context determines the type.
 
 | Type | `==` `!=` | `~=` `!~` | `<` `>` `<=` `>=` | `+` `-` `*` `/` `%` | `and` `or` `not` | `.length` / `.count` |
 |---|---|---|---|---|---|---|
-| `string` | ✓ ordinal | ✓ ordinal ignore-case | ✗ | `+` only (concat) | ✗ | `.length → integer` |
+| `string` | ✓ ordinal | ✓ ordinal ignore-case | ✓ ordinal, lex | `+` only (concat) | ✗ | `.length → integer` |
 | `integer` | ✓ | ✗ type error | ✓ | ✓ (stays integer) | ✗ | — |
 | `decimal` | ✓ exact | ✗ type error | ✓ exact | ✓ (stays decimal) | ✗ | — |
 | `number` | ✓ IEEE 754 | ✗ type error | ✓ IEEE 754 | ✓ (stays number) | ✗ | — |
