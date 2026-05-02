@@ -9,7 +9,7 @@ Pre-TypeChecker audit — exhaustive consistency check of language docs, catalog
 - Obvious gap → agent rubber-ducks, applies fix, status = **Fixed**
 - Non-obvious gap → full analysis written, status = **Unresolved** (owner resolves on second pass)
 
-**Audit status: OPEN — 35 gaps total, 34 Fixed, 1 Unresolved (Iter 9 Catalog-Impl audit)**
+**Audit status: CLOSED — 42 gaps total, 42 Fixed, 0 Unresolved (GAP-035, GAP-040, GAP-042 resolved 2026-05-02)**
 
 ---
 
@@ -36,6 +36,7 @@ Pre-TypeChecker audit — exhaustive consistency check of language docs, catalog
 | GAP-017 | `Arrow` (`->`) categorized as `Structural` in `Tokens.cs` but spec §1.1 places it in the Operators table | Catalog-Impl | Fixed | 5 |
 | GAP-018 | Spec §1.1 `NumberLiteral` row description omits exponent notation documented in §1.3 and implemented in the lexer | Doc-Spec | Fixed | 5 |
 | GAP-019 | `UnexpectedKeyword` (11) and `InvalidCallTarget` (12) listed in spec §2.7 as active parser diagnostics but never emitted by the parser | Doc-Impl | Fixed | 6/7 |
+| GAP-020 | `contains` associativity: spec §2.1 says `left`, `Operators.cs` enforces `NonAssociative`; left-denotation binding was ParseExpression(40) instead of ParseExpression(41) | Doc-Catalog | Fixed | 6 |
 | GAP-025 | GAP-003 incomplete — `Modifiers.cs` `Notempty` applicability still `StringOnly`; spec §3.8 requires string + 8 collection types | Doc-Catalog | Fixed | 7 |
 | GAP-026 | `Modifiers.cs` `CollectionTypes` array stale — `mincount`/`maxcount` applicability missing 6 new TypeKind members | Doc-Catalog | Fixed | 7 |
 | GAP-027 | `Tokens.cs` `Notempty` description reads "String constraint: non-empty" but spec §1.1 says "String or collection constraint: non-empty" | Doc-Catalog | Fixed | 7 |
@@ -46,7 +47,14 @@ Pre-TypeChecker audit — exhaustive consistency check of language docs, catalog
 | GAP-032 | `Functions.cs` `pow(integer, integer)` overload missing `ProofRequirement` for `exp >= 0`; spec §0.6 item 4 explicitly lists this alongside `sqrt` as a non-negative proof obligation | Doc-Catalog | Fixed | 8 |
 | GAP-033 | `ModifierKind.cs` `Notempty` XML doc comment reads "Flag: string is non-empty" — stale after GAP-025 expanded applicability to string + 8 collection types (analogous to GAP-027 in Tokens.cs) | Doc-Catalog | Fixed | 8 |
 | GAP-034 | `ParseTypeRef` hardcodes `is TokenKind.Set or TokenKind.QueueType or …` (6-kind collection test) instead of deriving from `Types.All.Where(Collection && not Lookup)` | Catalog-Impl | Fixed | 9 |
-| GAP-035 | `ParseChoiceValue` hardcodes `is TokenKind.IntegerType or TokenKind.DecimalType or TokenKind.NumberType` for "numeric choice type" — no catalog property captures this semantic | Catalog-Impl | Unresolved | 9 |
+| GAP-035 | `ParseChoiceValue` hardcodes `is TokenKind.IntegerType or TokenKind.DecimalType or TokenKind.NumberType` for "numeric choice type" — no catalog property captures this semantic | Catalog-Impl | Fixed | 9 |
+| GAP-036 | Spec §3.8 `clear F` action validation table omits `optional` fields; §1.2 explicitly names `clear` as the removal mechanism for optional fields | Doc-Doc | Fixed | 9 |
+| GAP-037 | `Modifiers.cs` `Writable` hover description references retired `write` verb: "in State write Field" should be "in State modify Field editable/readonly" | Doc-Catalog | Fixed | 9 |
+| GAP-038 | Spec §2.1 left-denotation table for `For` shows `ParseExpression(40)` but left-associative at level 40 requires `ParseExpression(41)`; implementation is correct | Doc-Impl | Fixed | 9 |
+| GAP-039 | Spec §3.8 `append F Expr` and `enqueue F Expr` rows include `log of T by P` and `queue of T by P` as valid targets, but catalog excludes these — explicit key form required | Doc-Catalog | Fixed | 9 |
+| GAP-040 | `Types.cs` `BagAccessors.countof` has `ParameterType: TypeKind.Integer` but spec says `countof(E)` takes element `E` of type `T` (the bag's element type), not integer | Doc-Catalog | Fixed | 9 |
+| GAP-041 | Spec §3.8 quantifier predicate validation table names `TypeMismatch` for non-boolean predicate but dedicated `QuantifierPredicateNotBoolean` (code 106) exists in both catalog files | Doc-Catalog | Fixed | 9 |
+| GAP-042 | Parser `ParseActionStatement` dispatch has dead branches for `CollectionValueBy`, `CollectionIntoBy`, and `RemoveAtIndex`; variant actions are excluded from `Actions.ByTokenKind` so these shapes never reach dispatch | Catalog-Impl | Fixed | 9 |
 | GAP-021 | `is set`/`is not set` associativity: spec §2.1 says `left`, catalog says `NonAssociative (postfix)` | Doc-Impl | Fixed | 6 |
 | GAP-022 | Spec §2.1 null-denotation table names `StringLiteralExpression` — a node that does not exist; implementation uses `LiteralExpression` | Doc-Impl | Fixed | 6 |
 | GAP-023 | Spec §2.1 precedence table has `is` row (60) appearing before `+/-` row (50); two rows at level 60 without ordering explanation | Doc-Spec | Fixed | 6 |
@@ -1406,6 +1414,306 @@ if (current.Kind is TokenKind.Set or TokenKind.QueueType or TokenKind.StackType
 
 The six token kinds listed are exactly the non-Lookup collection-type leaders — the set of all `TypeMeta` entries where `Category == TypeCategory.Collection` and the token kind is not `TokenKind.LookupType`. That invariant is already encoded in `Types.All`; the parser needs only to derive it. If a new collection type is added to the catalog, this `if` guard must be updated manually, or the new type will fall through to an error/fallback.
 
+**Rubber-Duck Analysis:**  
+`SimpleCollectionTypeLeaders` is a natural derived set — it's exactly `Types.All` filtered by `Category == TypeCategory.Collection && Token.Kind != TokenKind.LookupType`. The catalog encodes this relationship already. The Lookup exclusion is correct because `lookup of K to V` uses a two-param grammar handled by the dedicated `if (current.Kind == TokenKind.LookupType)` branch first. A new collection type added to `Types.cs` will automatically appear in `SimpleCollectionTypeLeaders` without any parser change. Fix is mechanical: define the `FrozenSet` and replace the `is` disjunction with `.Contains()`.
+
+**Resolution:**  
+Fixed. Added `SimpleCollectionTypeLeaders` static `FrozenSet<TokenKind>` to `Parser.cs` (lines 164–176), derived from `Types.All` filtered by `Category == TypeCategory.Collection && Token.Kind != TokenKind.LookupType`. Updated `ParseTypeRef()` in `Parser.Declarations.cs` (line ~997) to use `SimpleCollectionTypeLeaders.Contains(current.Kind)` instead of the hardcoded 6-kind `is` disjunction.
+
+---
+
+## GAP-035: `ParseChoiceValue` hardcodes numeric type check with no catalog property
+
+**Status:** Fixed  
+**Category:** Catalog-Impl  
+**Location:** `src/Precept/Pipeline/Parser.Declarations.cs` `ParseChoiceValue()`, line ~1148  
+**Found in iteration:** 9
+
+**Description:**  
+`ParseChoiceValue` determines how to parse a choice literal value based on the element type. For the numeric case (integer, decimal, number), it allows an optional leading minus sign followed by a number literal. The check is:
+
+```csharp
+if (elemToken.Kind is TokenKind.IntegerType or TokenKind.DecimalType or TokenKind.NumberType)
+```
+
+This is a hardcoded three-member disjunction that encodes "is this a numeric choice element type?" There is no `TypeTrait.Numeric` or equivalent catalog property that captures this semantic. If a new numeric type were added to the catalog, this `if` guard would require a manual update, violating the metadata-driven architecture principle.
+
+**Rubber-Duck Analysis:**  
+The root issue is that `TypeTrait` has no `Numeric` flag. `TypeTrait.ChoiceElement` marks which types can appear as choice element types at all, but does not distinguish numeric from non-numeric within that subset. Two valid approaches:
+
+1. **Add `TypeTrait.Numeric` to the catalog** — mark Integer, Decimal, Number with this flag; let `ParseChoiceValue` derive a `FrozenSet<TokenKind> NumericChoiceElementTypes` from `Types.ByToken.Where(Traits.HasFlag(TypeTrait.Numeric))`. This is the metadata-driven approach and keeps the parser consistent with the catalog-first design.
+
+2. **Accept the hardcode as a permanent documented exception** — the numeric type set is small and stable; adding a new numeric primitive is a foundational language change warranting manual review of all consumers. The three-way `is` disjunction is self-documenting and stable.
+
+Owner judgment required on whether `TypeTrait.Numeric` is worth introducing as a general catalog trait.
+
+**Resolution:**  
+Unresolved. Owner should decide: (a) add `TypeTrait.Numeric` to the `TypeTrait` enum, mark Integer/Decimal/Number types with it, and derive `NumericChoiceElementTypes` in `Parser.cs` for use in `ParseChoiceValue`; or (b) accept the three-way `is` disjunction as a stable, documented hardcode with a comment citing the design rationale.
+
+**Frank's Analysis:**  
+**Decision: Option 2 — add `ChoiceLiteralTokens: IReadOnlyList<TokenKind>?` to `TypeMeta`.** Not the trait flag; not a documented exception.
+
+George's analysis described one hardcoded check but the method has two: the numeric-path branch guard (`IntegerType | DecimalType | NumberType`) AND the `elemToken.Kind switch` over String/Boolean below it. `TypeTrait.NumericLiteral` eliminates only the first — the second switch stays, leaving the method half-catalog, half-identity. Only `ChoiceLiteralTokens` eliminates both.
+
+`ChoiceLiteralTokens` is a nullable `IReadOnlyList<TokenKind>` on `TypeMeta`, null for all non-choice-element types (zero churn), populated for the five valid element types: `String → [StringLiteral]`, `Boolean → [True, False]`, `Integer/Decimal/Number → [NumberLiteral]`. The parser derives both the signed-prefix path and the `isValid` check from this field — no `elemToken.Kind is ...` identity anywhere in the method.
+
+`TypeTrait.ChoiceElement` is unchanged: it remains the validation gate for `ChoiceElementTypeKeywords`. `ChoiceLiteralTokens` fills the parse-time dispatch gap. Full decision with implementation brief in `.squad/decisions/inbox/frank-gap035-decision.md`.
+
+---
+
+<!-- Iteration 9 complete: 9 gaps filed — GAP-034(Fixed — ParseTypeRef hardcoded 6-kind collection test replaced with catalog-derived SimpleCollectionTypeLeaders FrozenSet), GAP-035 (Unresolved — ParseChoiceValue hardcodes numeric type check; TypeTrait.Numeric would be needed for a catalog-driven fix), GAP-036 (Fixed — spec §3.8 clear F row extended to include optional fields per §1.2), GAP-037 (Fixed — Modifiers.cs Writable hover updated from retired 'write' verb to v3 'modify ... editable/readonly' syntax), GAP-038 (Fixed — spec §2.1 For left-denotation corrected from ParseExpression(40) to ParseExpression(41) for left-associativity), GAP-039 (Unresolved — spec §3.8 append/enqueue tables claim log-by/queue-by accept simple form but catalog requires explicit 'by'; need owner decision), GAP-040 (Unresolved — BagAccessors.countof has ParameterType: TypeKind.Integer but should be element type T; TypeAccessor design limitation), GAP-041 (Fixed — spec §3.8 quantifier predicate table updated from TypeMismatch to QuantifierPredicateNotBoolean), GAP-042 (Unresolved — parser dispatch has dead branches for CollectionValueBy/CollectionIntoBy/RemoveAtIndex; variant actions excluded from ByTokenKind). C# changes: Modifiers.cs Writable hover description updated. Spec changes: §2.1 For ParseExpression value, §3.8 clear F optional row, §3.8 quantifier predicate diagnostic name. Final state: 42 gaps total, 38 Fixed, 4 Unresolved. -->
+
+---
+
+## GAP-036: Spec §3.8 `clear F` action validation table omits `optional` fields
+
+**Status:** Fixed  
+**Category:** Doc-Doc  
+**Location:** `docs/language/precept-language-spec.md` §3.8 (line ~1505); `src/Precept/Language/Actions.cs` `ClearApplicable`  
+**Found in iteration:** 9
+
+**Description:**  
+Spec §3.8 action validation table, `clear F` row:
+
+> `| clear F | set of T, queue of T, stack of T, bag of T, list of T, queue of T by P | — | Not valid on log of T, log of T by P, or lookup of K to V (v3) |`
+
+The "field type required" column lists only collection types. `optional T` fields are missing.
+
+However, spec §1.2 explicitly states:
+> "The `null` literal is removed entirely — `optional` fields use `is set`/`is not set` for presence testing and **`clear` for value removal**."
+
+The `Actions.cs` catalog correctly includes `ModifiedTypeTarget(null, [ModifierKind.Optional])` in `ClearApplicable` — meaning `clear F` applies to any optional field regardless of its underlying type. The §3.8 action table is inconsistent with §1.2 and with the catalog.
+
+**Rubber-Duck Analysis:**  
+Section §1.2 is authoritative: `clear` on optional fields is the designed mechanism for removing a value, replacing the banned `null` literal. The catalog correctly implements this. The §3.8 action table was written before the optional-field applicability was added to the catalog, or was never updated to reflect §1.2. The fix is a targeted row extension — adding `optional T` to the "field type required" column of the `clear F` row with a note about semantics.
+
+**Resolution:**  
+Fixed. Extended the `clear F` row in spec §3.8 action validation table to include `optional T` in the field type required column, with a parenthetical explaining the semantics (resets to "not set").
+
+---
+
+## GAP-037: `Modifiers.cs` `Writable` hover description references retired `write` verb
+
+**Status:** Fixed  
+**Category:** Doc-Catalog  
+**Location:** `src/Precept/Language/Modifiers.cs` line 138  
+**Found in iteration:** 9
+
+**Description:**  
+`Modifiers.cs` `ModifierKind.Writable` hover description (line 138):
+
+```csharp
+HoverDescription: "The field is directly editable. Without this modifier, the field is read-only by default. Use 'in State write Field' to override per state."
+```
+
+The phrase "in State write Field" describes the v2 access mode syntax. In v3, `write` is no longer a reserved keyword (spec §1.2: "The access mode verbs `write`/`read` are removed entirely in favor of the `modify` verb + adjective pattern. `write` and `read` are no longer reserved — they are ordinary identifiers in v3."). The correct v3 syntax is `in State modify F editable` or `in State modify F readonly`.
+
+**Rubber-Duck Analysis:**  
+This is a stale doc string in the catalog that was written when `write` was still the access mode verb (v2) and was never updated when the verb was retired in v3. The hover description appears in language server tooltips, completions, and MCP `precept_language` output. Anyone reading the hover would see the old v2 syntax and attempt to use `in State write Field`, which would fail because `write` is no longer a keyword. The fix is a one-sentence update with zero behavior impact.
+
+**Resolution:**  
+Fixed. Updated `Modifiers.cs` line 138 hover description: replaced "Use 'in State write Field'" with "Use 'in State modify Field editable/readonly'".
+
+---
+
+## GAP-038: Spec §2.1 `For` left-denotation shows `ParseExpression(40)` but left-associativity requires `ParseExpression(41)`
+
+**Status:** Fixed  
+**Category:** Doc-Impl  
+**Location:** `docs/language/precept-language-spec.md` §2.1 left-denotation table, `For` row (line ~738)  
+**Found in iteration:** 9
+
+**Description:**  
+Spec §2.1 left-denotation table:
+
+> `| For | BinaryExpression(LookupAccess, ParseExpression(40)) — lookup field access … |`
+
+The precedence table (same section) shows `for` at level 40 with `left` associativity. For a left-associative binary operator at level `P`, the standard Pratt parser encoding requires the right-operand to be parsed with `ParseExpression(P + 1)` = `ParseExpression(41)` — this prevents the right-hand side from absorbing another `for` at the same level, producing left-to-right grouping.
+
+With `ParseExpression(40)`, a second `for` (level 40) would satisfy `40 >= 40` and be consumed right-associatively, giving `A for (B for C)`. With `ParseExpression(41)`, the second `for` fails `40 >= 41` and is left unconsumed, producing `(A for B) for C`.
+
+The implementation in `Parser.Expressions.cs` correctly uses `nextMinPrec = Precedence + 1 = 41` for non-right-associative operators (via `int nextMinPrec = opInfo.RightAssociative ? opInfo.Precedence : opInfo.Precedence + 1`). The spec entry is a typo — it should read `ParseExpression(41)`, consistent with `Contains` which is at the same level and correctly shows `ParseExpression(41)`.
+
+**Rubber-Duck Analysis:**  
+Typo in the spec. `Contains` (also level 40, non-associative) correctly shows `ParseExpression(41)`. The `For` row was likely written by analogy but the `+1` was accidentally dropped. No behavior impact — the implementation is correct. Doc-only fix.
+
+**Resolution:**  
+Fixed. Updated spec §2.1 left-denotation table `For` row from `ParseExpression(40)` to `ParseExpression(41)`.
+
+---
+
+## GAP-039: Spec §3.8 `append`/`enqueue` action tables include by-type targets that catalog excludes
+
+**Status:** Fixed  
+**Category:** Doc-Catalog  
+**Location:** `docs/language/precept-language-spec.md` §3.8 (lines ~1500–1507); `src/Precept/Language/Actions.cs` `ActionKind.Append`, `ActionKind.Enqueue`  
+**Found in iteration:** 9
+
+**Description:**  
+Spec §3.8 action validation table:
+
+> `| append F Expr | log of T, log of T by P, list of T | T | … |`
+> `| enqueue F Expr | queue of T, queue of T by P | T | … |`
+
+Spec also adds: "without `by`, ordering key is derived from the element (v3)" for `enqueue`.
+
+However, the `Actions.cs` catalog:
+- `ActionKind.Append.ApplicableTo` = `[TypeKind.Log, TypeKind.List]` — excludes `TypeKind.LogBy`
+- `ActionKind.Enqueue.ApplicableTo` = `[TypeKind.Queue]` — excludes `TypeKind.QueueBy`
+
+For `log of T by P` and `queue of T by P`, the explicit-key forms (`append F Expr by Expr`, `enqueue F Expr by Expr`) are the catalog-defined mechanism. The spec's "ordering key derived from element" note implies automatic key derivation, but there is no mechanism for this in the current implementation.
+
+**Rubber-Duck Analysis:**  
+Two interpretations:
+
+1. **Spec over-documents an unimplemented feature** — the "ordering key derived from element" note describes a capability that was planned but not implemented. For a `log of T by P`, the key type `P` may differ from the element type `T` (e.g., `log of string by instant`), making automatic derivation impossible in general. The catalog correctly excludes the by-types from simple append/enqueue. Fix: remove `log of T by P` from the `append F Expr` row and `queue of T by P` from the `enqueue F Expr` row in the spec.
+
+2. **Catalog is missing a feature** — simple `append F Expr` on a `log of T by P` field is valid when `T == P`, with the element itself as the ordering key. The catalog should add `TypeKind.LogBy` to `Append.ApplicableTo` and `TypeKind.QueueBy` to `Enqueue.ApplicableTo`. This requires a TypeChecker check that `T == P` for the simple form.
+
+The catalog's `AppendBy` hover explicitly says "Requires 'when not (F contains P)' guard" — implying the key is always user-supplied, not derived. This supports interpretation 1.
+
+**Resolution:**  
+Fixed. Owner decision: the key is always required for keyed collections — automatic key derivation is not implemented and not planned. Removed `log of T by P` from the `append F Expr` valid-types column and `queue of T by P` from the `enqueue F Expr` valid-types column in spec §3.8. Corrected the `enqueue F Expr by Expr` note to remove the "ordering key derived from element" claim. Catalog (`Actions.cs`) was already correct and unchanged.
+
+**Keyed-form confirmation (post-fix):**  
+Owner confirmed: `append F Expr by Expr` and `enqueue F Expr by Expr` DO support `log of T by P` and `queue of T by P` respectively — the explicit key is always required. Verified that spec §3.8 keyed-form rows are correct:
+- `append F Expr by Expr` → valid target `log of T by P` ✅
+- `enqueue F Expr by Expr` → valid target `queue of T by P` ✅
+
+No spec or catalog changes were needed for the keyed forms — they were already accurate after the original fix pass.
+
+---
+
+## GAP-040: `BagAccessors.countof` has `ParameterType: TypeKind.Integer` but parameter should be element type `T`
+
+**Status:** Fixed  
+**Category:** Doc-Catalog  
+**Location:** `src/Precept/Language/Types.cs` line ~153; `docs/language/precept-language-spec.md` §3.6 member access table  
+**Found in iteration:** 9
+
+**Description:**  
+`Types.cs` `BagAccessors` (line ~153):
+
+```csharp
+new TypeAccessor("countof", "Count of a specific element (0 if absent)", ParameterType: TypeKind.Integer),
+```
+
+Spec §3.6 member access table:
+
+> `| bag of T | countof(E) | integer | returns how many times E appears in the bag (v3) |`
+
+The parameter `E` in `countof(E)` is a bag element of type `T` — the bag's own element type. Using `ParameterType: TypeKind.Integer` is incorrect: for a `bag of string`, `countof(E)` accepts a `string` argument, not an integer. The return type is `integer`, but the parameter type is `T`.
+
+By contrast, `at(N)` accessors (e.g., in `ListAccessors`) correctly use `ParameterType: TypeKind.Integer` because position `N` is always an integer index. The `countof` entry appears to be a copy-paste of the `at` accessor's `ParameterType` field.
+
+**Frank's Design Decision (2026-05-02 — approved by Shane):**  
+Introduce a new `ElementParameterAccessor : TypeAccessor` sealed record — the subtype IS the metadata, mirroring how `FixedReturnAccessor` works for the return-type axis.
+
+```csharp
+public sealed record ElementParameterAccessor(
+    string    Name,
+    string    Description,
+    TypeTrait RequiredTraits = TypeTrait.None,
+    ProofRequirement[]? ProofRequirements = null
+) : TypeAccessor(Name, Description, null, RequiredTraits, ProofRequirements);
+```
+
+`BagAccessors.countof` becomes `new ElementParameterAccessor("countof", "Count of a specific element (0 if absent)")`.
+
+Type checker pattern match:
+```csharp
+accessor switch
+{
+    ElementParameterAccessor => resolveAgainstElementType,
+    _ when accessor.ParameterType is { } fixedType => resolveAgainstFixedType,
+    _ => noParameter,
+}
+```
+
+Option 1 (`ParameterIsElementType: bool` flag) was rejected: creates illegal state when combined with `ParameterType`. Option 2 (`TypeKind.Element` sentinel) was rejected: poisons the `TypeKind` catalog enum with a non-type meta-level instruction. Audit confirmed only `countof` is wrong — `at()` (integer index) and `inZone()` (timezone) are correctly typed.
+
+**Resolution:**  
+Fixed (2026-05-02). Added `ElementParameterAccessor : TypeAccessor` sealed record to `src/Precept/Language/Type.cs` after `FixedReturnAccessor`. Changed `BagAccessors.countof` in `src/Precept/Language/Types.cs` from `new TypeAccessor(... ParameterType: TypeKind.Integer)` to `new ElementParameterAccessor(...)`. No MCP serialization changes required — `tools/Precept.Mcp/Tools/` contains only `PingTool.cs`. Added tests: `Bag_CountofAccessor_IsElementParameterAccessor` (verifies subtype and null `ParameterType`) and `SequentialCollectionAccessors_AtAccessor_HasIntegerParameterType` (regression: at() still integer-typed).
+
+---
+
+## GAP-041: Spec §3.8 quantifier predicate table names `TypeMismatch` for non-boolean predicate but dedicated code 106 exists
+
+**Status:** Fixed  
+**Category:** Doc-Catalog  
+**Location:** `docs/language/precept-language-spec.md` §3.8 (line ~1455); `src/Precept/Language/DiagnosticCode.cs` (line ~106); `src/Precept/Language/Diagnostics.cs` (line ~360)  
+**Found in iteration:** 9
+
+**Description:**  
+Spec §3.8 quantifier predicate validation table:
+
+> `| Predicate must be boolean | BoolExpr in quantifier resolves to non-boolean type | TypeMismatch |`
+
+However, `DiagnosticCode.cs` defines:
+
+```csharp
+QuantifierPredicateNotBoolean = 106,
+```
+
+And `Diagnostics.cs` provides a full metadata entry for this code:
+
+```csharp
+DiagnosticCode.QuantifierPredicateNotBoolean => new(
+    nameof(DiagnosticCode.QuantifierPredicateNotBoolean),
+    DiagnosticStage.Type, Severity.Error,
+    "Quantifier predicate must be a boolean expression, but this resolves to {0}",
+    DiagnosticCategory.TypeSystem),
+```
+
+Code 106 is a dedicated diagnostic for exactly this case — it has a specific message template that mentions the resolved type. If the type checker emits code 106 for non-boolean predicates, the spec table is wrong to name `TypeMismatch` (code 18). `TypeMismatch` is a general-purpose diagnostic; code 106 is precise.
+
+**Rubber-Duck Analysis:**  
+The dedicated `QuantifierPredicateNotBoolean` (106) code supersedes the general `TypeMismatch` for this case. The spec table was written using `TypeMismatch` as a placeholder or from an earlier design where the dedicated code didn't exist. The fix is mechanical: update the spec table cell from `TypeMismatch` to `QuantifierPredicateNotBoolean`. This does not require reading the TypeChecker to verify — the existence of a dedicated code with an appropriate message is sufficient evidence that it is (or is intended to be) the diagnostic emitted for this case.
+
+**Resolution:**  
+Fixed. Updated spec §3.8 quantifier predicate validation table: replaced `TypeMismatch` with `QuantifierPredicateNotBoolean` in the "Predicate must be boolean" row.
+
+---
+
+## GAP-042: Parser `ParseActionStatement` dispatch has dead branches for variant-action SyntaxShapes
+
+**Status:** Fixed  
+**Category:** Catalog-Impl  
+**Location:** `src/Precept/Pipeline/Parser.Declarations.cs` `ParseActionStatement()` SyntaxShape dispatch; private methods `ParseCollectionValueByStatement`, `ParseCollectionIntoByStatement`, `ParseRemoveAtIndexStatement`  
+**Found in iteration:** 9
+
+**Description:**  
+`ParseActionStatement()` dispatches based on `meta.SyntaxShape`, where `meta` comes from `Actions.ByTokenKind`. `Actions.ByTokenKind` excludes variant actions (those where `PrimaryActionKind != null`):
+
+```csharp
+public static FrozenDictionary<TokenKind, ActionMeta> ByTokenKind { get; } =
+    All.Where(m => m.PrimaryActionKind == null)
+       .ToFrozenDictionary(m => m.Token.Kind);
+```
+
+Three `SyntaxShape` values are exclusively used by variant actions:
+- `CollectionValueBy` — only `AppendBy` (primary: Append) and `EnqueueBy` (primary: Enqueue)
+- `CollectionIntoBy` — only `DequeueBy` (primary: Dequeue)
+- `RemoveAtIndex` — only `RemoveAt` (primary: Remove)
+
+Since variant actions are never in `ByTokenKind`, these three SyntaxShape branches in the dispatch switch are dead code. The corresponding private methods `ParseCollectionValueByStatement`, `ParseCollectionIntoByStatement`, and `ParseRemoveAtIndexStatement` are also dead — they can never be called through `ParseActionStatement`.
+
+The actual handling of the `by`/`at` forms is implemented inline within the primary action parsers:
+- `ParseCollectionValueStatement`: after parsing value, checks `Current().Kind == TokenKind.By` for append/enqueue; checks `Current().Kind == TokenKind.At` for remove
+- `ParseCollectionIntoStatement`: after parsing `into G?`, checks `Current().Kind == TokenKind.By` for dequeue
+
+**Rubber-Duck Analysis:**  
+The inline approach is the correct design for this parser: `by`/`at` disambiguation happens post-value, after the primary action and its mandatory operand have been consumed. The dedicated `ParseCollectionValueByStatement` etc. were created as infrastructure but superseded by the inline dispatch. Two options:
+
+1. **Remove the dead code** — remove `ParseCollectionValueByStatement`, `ParseCollectionIntoByStatement`, `ParseRemoveAtIndexStatement`, and their dead dispatch branches. The inline approach is correct and sufficient. This eliminates confusion.
+
+2. **Leave as documented infrastructure** — the dispatch switch documents the full SyntaxShape taxonomy for future consumers (e.g., a tool that reads `ActionMeta.SyntaxShape` to understand the grammar). The dead code serves as forward compatibility scaffolding.
+
+Note: `ParseInsertAtStatement` and `ParsePutKeyValueStatement` are NOT dead — `Insert` and `Put` have `PrimaryActionKind == null` and are dispatched via `ByTokenKind`.
+
+**Resolution:**  
+Fixed (2026-05-02). Shane's decision: delete the dead code entirely. Removed the three dead dispatch arms (`CollectionValueBy`, `RemoveAtIndex`, `CollectionIntoBy`) from `ParseActionStatement`'s switch and deleted `ParseCollectionValueByStatement`, `ParseRemoveAtIndexStatement`, and `ParseCollectionIntoByStatement` methods. Replaced the now-incomplete named-value switch with a discard arm `_ => throw new InvalidOperationException(...)` that documents the unreachability, removing the need for `#pragma warning disable CS8524`. Confirmed `ParseInsertAtStatement` and `ParsePutKeyValueStatement` are untouched. All 2713 tests pass — no behavior change.
+
 `LookupType` is correctly excluded: `lookup of K to V` uses a different multi-keyword syntax (handled by the preceding `if (current.Kind == TokenKind.LookupType)` branch at lines ~965–992).
 
 **Rubber-Duck Analysis:**  
@@ -1481,7 +1789,23 @@ The current proxy `TypeTrait.Orderable & TypeCategory.Scalar` would work today (
 
 **Ownership:** Requires a catalog design decision before a fix can be applied. No C# changes made this iteration.
 
-<!-- Iteration 9 complete: George's Catalog-Impl audit of lexer + parser. Lexer fully catalog-driven — no violations. Prior fixes verified: GAP-029 (IsOutcomeAhead uses OutcomeKeywords.Contains ✅), GAP-030 (KeywordsUsableAsFunctionNames derived from Functions.All ∩ Tokens.Keywords ✅), GAP-031 (binding powers read from Operators.ByToken/ByTokenSequence ✅), GAP-032 (PPowIntExp ProofRequirement on integer pow overload ✅), GAP-033 (ModifierKind.cs Notempty comment updated ✅). New gaps: GAP-034 (Fixed — ParseTypeRef hardcoded 6-token collection-type guard → SimpleCollectionTypeLeaders derived from Types.All(Collection, not Lookup)), GAP-035 (Unresolved — ParseChoiceValue hardcodes IntegerType|DecimalType|NumberType for numeric choice literal; no catalog property encodes "accepts NumberLiteral"; requires owner decision on TypeTrait.NumericLiteral or LiteralTokenKind). Status: 35 gaps total, 34 Fixed, 1 Unresolved. -->
+**Frank's Analysis:**  
+**Decision: Option 2 (refined) — add `ChoiceLiteralTokens: IReadOnlyList<TokenKind>?` to `TypeMeta`.** Not `TypeTrait.NumericLiteral`; not a documented exception.
+
+This method has **two** hardcoded dispatches, not one. The first is the numeric-path guard (`IntegerType | DecimalType | NumberType`). The second is the `elemToken.Kind switch` over String and Boolean below it (lines 1176–1181). `TypeTrait.NumericLiteral` eliminates only the first; the second switch stays, leaving the method half-catalog, half-identity. Only `ChoiceLiteralTokens` resolves both simultaneously.
+
+`ChoiceLiteralTokens` is a nullable `IReadOnlyList<TokenKind>?` on `TypeMeta` (null default — zero churn on the ~25 non-choice types). Populated for all five `ChoiceElement` types: `String → [StringLiteral]`, `Boolean → [True, False]`, `Integer/Decimal/Number → [NumberLiteral]`. The signed-prefix path becomes `literalTokens.Contains(TokenKind.NumberLiteral)`. The `isValid` switch becomes `literalTokens?.Contains(cur.Kind) == true`. No `elemToken.Kind is ...` identity anywhere in the method.
+
+`TypeTrait.ChoiceElement` is unchanged — it remains the validation gate for `ChoiceElementTypeKeywords`. `ChoiceLiteralTokens` fills the parse-time dispatch gap. These serve different pipeline stages and both belong in the catalog.
+
+Option 3 (documented exception) fails the architecture test: the catalog-system doc explicitly states that "consumers hardcoding per-member knowledge that should be metadata" is the smell, and a parser switch on enum identity to apply per-member parse behavior is exactly that smell. The "stable small set" argument misapplies the documented-exception bar.
+
+Full decision and implementation brief in `.squad/decisions/inbox/frank-gap035-decision.md`.
+
+**Resolution:**  
+Fixed (2026-05-02). Added `ChoiceLiteralTokens: IReadOnlyList<TokenKind>?` (default null) to `TypeMeta` in `src/Precept/Language/Type.cs`. Populated on all 5 choice-element types in `src/Precept/Language/Types.cs`: `String → [StringLiteral]`, `Boolean → [True, False]`, `Integer/Decimal/Number → [NumberLiteral]`. Refactored `ParseChoiceValue` in `Parser.Declarations.cs` to look up `ChoiceLiteralTokens` via `Types.ByToken` — both the signed-numeric guard (`literalTokens?.Contains(TokenKind.NumberLiteral) == true`) and the `isValid` check (`literalTokens?.Contains(cur.Kind) == true`) are now catalog-derived. No `elemToken.Kind is ...` identity anywhere in the method. Added 9 tests: `NumericChoiceElementTypes_HaveNumberLiteralInChoiceLiteralTokens`, `StringChoiceElementType_HasStringLiteralInChoiceLiteralTokens`, `BooleanChoiceElementType_HasTrueAndFalseInChoiceLiteralTokens`, `NonChoiceElementTypes_HaveNullChoiceLiteralTokens`, `AllChoiceElementTypes_HaveNonNullChoiceLiteralTokens`, plus 5 parser round-trip tests for all element types including signed literals and error diagnostics.
+
+<!-- Iteration 9 complete: George's Catalog-Impl audit of lexer + parser.Lexer fully catalog-driven — no violations. Prior fixes verified: GAP-029 (IsOutcomeAhead uses OutcomeKeywords.Contains ✅), GAP-030 (KeywordsUsableAsFunctionNames derived from Functions.All ∩ Tokens.Keywords ✅), GAP-031 (binding powers read from Operators.ByToken/ByTokenSequence ✅), GAP-032 (PPowIntExp ProofRequirement on integer pow overload ✅), GAP-033 (ModifierKind.cs Notempty comment updated ✅). New gaps: GAP-034 (Fixed — ParseTypeRef hardcoded 6-token collection-type guard → SimpleCollectionTypeLeaders derived from Types.All(Collection, not Lookup)), GAP-035 (Unresolved — ParseChoiceValue hardcodes IntegerType|DecimalType|NumberType for numeric choice literal; no catalog property encodes "accepts NumberLiteral"; requires owner decision on TypeTrait.NumericLiteral or LiteralTokenKind). Status: 35 gaps total, 34 Fixed, 1 Unresolved. -->
 
 ## Schema Reference
 

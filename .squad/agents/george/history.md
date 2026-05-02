@@ -7,6 +7,12 @@
 
 ## Learnings
 
+### 2026-05-02 — GAP-035, GAP-040, GAP-042 implementation
+
+- **`TypeMeta.ChoiceLiteralTokens`** (`IReadOnlyList<TokenKind>?`, null default): the catalog field that drives `ParseChoiceValue` dispatch. Null on all ~25 non-choice types — zero churn. Populated for the 5 `ChoiceElement` types: `Integer/Decimal/Number → [NumberLiteral]`, `String → [StringLiteral]`, `Boolean → [True, False]`. The signed-numeric path is `literalTokens?.Contains(NumberLiteral) == true`; the general validity check is `literalTokens?.Contains(cur.Kind) == true`. No `elemToken.Kind is ...` identity switch anywhere in the method. Both dispatches (numeric guard AND the elemToken.Kind switch below it) were eliminated together — Frank was right that catching only the first one would leave the method half-catalog.
+- **`ElementParameterAccessor` DU subtype** — mirrors `FixedReturnAccessor` pattern for the parameter axis. No `ParameterType` on base record (passes `null`). Type checker pattern-matches: `ElementParameterAccessor => resolveAgainstElementType`, `_ when accessor.ParameterType is { } => resolveAgainstFixed`, `_ => noParameter`. The DU subtype IS the metadata — illegal state between `ParameterType` and a flag is structurally impossible. `countof` was a copy-paste bug from `at()` (integer index). MCP tools only contain PingTool; no DTO updates required.
+- **GAP-042 dead code removal**: variant actions (`PrimaryActionKind != null`) are excluded from `Actions.ByTokenKind` by design. `CollectionValueBy`, `RemoveAtIndex`, and `CollectionIntoBy` SyntaxShape arms in `ParseActionStatement` were dead and their private methods unreachable. The actual `by`/`at` handling was already inline in `ParseCollectionValueStatement` and `ParseCollectionIntoStatement`. Deleted the 3 methods and 3 arms, replaced the incomplete named-value switch with a discard `_ => throw InvalidOperationException(...)`. Pragma `CS8524` removed (discard covers unnamed values too). Zero behavior change — all 2713 tests pass.
+
 ### 2026-05-02 — Type Checker Design Review (Frank's analysis)
 
 - **`Operations.BinaryIndex` / `UnaryIndex` / `FindCandidates` / `FindUnary` already exist.** Frank proposed `BinaryBySignature`/`UnaryBySignature` as new additions — they are already implemented under these names. Critical difference: `BinaryIndex` returns `BinaryOperationMeta[]` (array), not a single entry. Money/money and quantity/quantity disambiguation requires multi-candidate handling in the checker.

@@ -2173,4 +2173,107 @@ public class ParserTests
         var row = tree.Declarations[0].Should().BeOfType<TransitionRowNode>().Subject;
         row.Outcome.Should().BeOfType<NoTransitionOutcomeNode>();
     }
+
+    // ════════════════════════════════════════════════════════════════════════════
+    //  GAP-035: ParseChoiceValue catalog-driven dispatch
+    // ════════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void GAP035_ChoiceOfString_ParsesStringLiterals()
+    {
+        var tree = Parse("field Status as choice of string(\"active\", \"inactive\")");
+        tree.Diagnostics.Should().BeEmpty();
+        var typeRef = tree.Declarations[0].Should().BeOfType<FieldDeclarationNode>()
+            .Subject.Type.Should().BeOfType<ChoiceTypeRefNode>().Subject;
+        typeRef.ElementType.Should().NotBeNull();
+        typeRef.ElementType!.Value.Kind.Should().Be(TokenKind.StringType);
+        typeRef.Options.Should().HaveCount(2);
+        typeRef.Options[0].Should().BeOfType<LiteralExpression>()
+            .Which.Value.Kind.Should().Be(TokenKind.StringLiteral);
+    }
+
+    [Fact]
+    public void GAP035_ChoiceOfBoolean_ParsesTrueAndFalse()
+    {
+        var tree = Parse("field Flag as choice of boolean(true, false)");
+        tree.Diagnostics.Should().BeEmpty();
+        var typeRef = tree.Declarations[0].Should().BeOfType<FieldDeclarationNode>()
+            .Subject.Type.Should().BeOfType<ChoiceTypeRefNode>().Subject;
+        typeRef.ElementType!.Value.Kind.Should().Be(TokenKind.BooleanType);
+        typeRef.Options.Should().HaveCount(2);
+        typeRef.Options[0].Should().BeOfType<LiteralExpression>()
+            .Which.Value.Kind.Should().Be(TokenKind.True);
+        typeRef.Options[1].Should().BeOfType<LiteralExpression>()
+            .Which.Value.Kind.Should().Be(TokenKind.False);
+    }
+
+    [Fact]
+    public void GAP035_ChoiceOfInteger_ParsesNumberLiterals()
+    {
+        var tree = Parse("field Priority as choice of integer(1, 2, 3)");
+        tree.Diagnostics.Should().BeEmpty();
+        var typeRef = tree.Declarations[0].Should().BeOfType<FieldDeclarationNode>()
+            .Subject.Type.Should().BeOfType<ChoiceTypeRefNode>().Subject;
+        typeRef.ElementType!.Value.Kind.Should().Be(TokenKind.IntegerType);
+        typeRef.Options.Should().HaveCount(3);
+        typeRef.Options.Should().AllSatisfy(o =>
+            o.Should().BeOfType<LiteralExpression>()
+             .Which.Value.Kind.Should().Be(TokenKind.NumberLiteral));
+    }
+
+    [Fact]
+    public void GAP035_ChoiceOfInteger_AcceptsSignedLiterals()
+    {
+        var tree = Parse("field Delta as choice of integer(-10, 0, 10)");
+        tree.Diagnostics.Should().BeEmpty();
+        var typeRef = tree.Declarations[0].Should().BeOfType<FieldDeclarationNode>()
+            .Subject.Type.Should().BeOfType<ChoiceTypeRefNode>().Subject;
+        typeRef.Options.Should().HaveCount(3);
+        typeRef.Options[0].Should().BeOfType<LiteralExpression>()
+            .Which.Value.Text.Should().Be("-10");
+        typeRef.Options[1].Should().BeOfType<LiteralExpression>()
+            .Which.Value.Text.Should().Be("0");
+        typeRef.Options[2].Should().BeOfType<LiteralExpression>()
+            .Which.Value.Text.Should().Be("10");
+    }
+
+    [Fact]
+    public void GAP035_ChoiceOfDecimal_AcceptsDecimalLiterals()
+    {
+        var tree = Parse("field Rate as choice of decimal(0.1, 0.5, 1.0)");
+        tree.Diagnostics.Should().BeEmpty();
+        var typeRef = tree.Declarations[0].Should().BeOfType<FieldDeclarationNode>()
+            .Subject.Type.Should().BeOfType<ChoiceTypeRefNode>().Subject;
+        typeRef.ElementType!.Value.Kind.Should().Be(TokenKind.DecimalType);
+        typeRef.Options.Should().HaveCount(3);
+    }
+
+    [Fact]
+    public void GAP035_ChoiceOfNumber_AcceptsSignedDecimal()
+    {
+        var tree = Parse("field Score as choice of number(-1.5, 0.0, 1.5)");
+        tree.Diagnostics.Should().BeEmpty();
+        var typeRef = tree.Declarations[0].Should().BeOfType<FieldDeclarationNode>()
+            .Subject.Type.Should().BeOfType<ChoiceTypeRefNode>().Subject;
+        typeRef.ElementType!.Value.Kind.Should().Be(TokenKind.NumberType);
+        typeRef.Options.Should().HaveCount(3);
+        typeRef.Options[0].Should().BeOfType<LiteralExpression>()
+            .Which.Value.Text.Should().Be("-1.5");
+    }
+
+    [Fact]
+    public void GAP035_ChoiceOfString_WrongLiteral_EmitsDiagnostic()
+    {
+        var tree = Parse("field Status as choice of string(42)");
+        tree.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.ChoiceElementTypeMismatch),
+            "integer literal is not valid for choice of string");
+    }
+
+    [Fact]
+    public void GAP035_ChoiceOfBoolean_WrongLiteral_EmitsDiagnostic()
+    {
+        var tree = Parse("field Flag as choice of boolean(\"yes\")");
+        tree.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.ChoiceElementTypeMismatch),
+            "string literal is not valid for choice of boolean");
+    }
 }

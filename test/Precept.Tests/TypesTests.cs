@@ -595,7 +595,7 @@ public class TypesTests
         accessors[0].Name.Should().Be("count");
     }
 
-    // ── New types are all Collection category ────────────────────────────────
+    // ── New collection types are all Collection category ────────────────────────
 
     [Theory]
     [InlineData(TypeKind.Log)]
@@ -608,5 +608,86 @@ public class TypesTests
     {
         Types.GetMeta(kind).Category.Should().Be(TypeCategory.Collection,
             $"{kind} is a collection type");
+    }
+
+    // ── GAP-035: ChoiceLiteralTokens catalog field ───────────────────────────────
+
+    [Theory]
+    [InlineData(TypeKind.Integer, TokenKind.NumberLiteral)]
+    [InlineData(TypeKind.Decimal, TokenKind.NumberLiteral)]
+    [InlineData(TypeKind.Number,  TokenKind.NumberLiteral)]
+    public void NumericChoiceElementTypes_HaveNumberLiteralInChoiceLiteralTokens(TypeKind kind, TokenKind expectedToken)
+    {
+        var tokens = Types.GetMeta(kind).ChoiceLiteralTokens;
+        tokens.Should().NotBeNull($"{kind} carries TypeTrait.ChoiceElement and needs ChoiceLiteralTokens");
+        tokens!.Should().ContainSingle().Which.Should().Be(expectedToken);
+    }
+
+    [Fact]
+    public void StringChoiceElementType_HasStringLiteralInChoiceLiteralTokens()
+    {
+        var tokens = Types.GetMeta(TypeKind.String).ChoiceLiteralTokens;
+        tokens.Should().NotBeNull("string carries TypeTrait.ChoiceElement");
+        tokens!.Should().ContainSingle().Which.Should().Be(TokenKind.StringLiteral);
+    }
+
+    [Fact]
+    public void BooleanChoiceElementType_HasTrueAndFalseInChoiceLiteralTokens()
+    {
+        var tokens = Types.GetMeta(TypeKind.Boolean).ChoiceLiteralTokens;
+        tokens.Should().NotBeNull("boolean carries TypeTrait.ChoiceElement");
+        tokens!.Should().BeEquivalentTo(new[] { TokenKind.True, TokenKind.False },
+            "boolean choice values are the true and false keywords");
+    }
+
+    [Theory]
+    [InlineData(TypeKind.Date)]
+    [InlineData(TypeKind.Money)]
+    [InlineData(TypeKind.Set)]
+    [InlineData(TypeKind.Bag)]
+    [InlineData(TypeKind.Error)]
+    public void NonChoiceElementTypes_HaveNullChoiceLiteralTokens(TypeKind kind)
+    {
+        Types.GetMeta(kind).ChoiceLiteralTokens.Should().BeNull(
+            $"{kind} does not carry TypeTrait.ChoiceElement and should have null ChoiceLiteralTokens");
+    }
+
+    [Fact]
+    public void AllChoiceElementTypes_HaveNonNullChoiceLiteralTokens()
+    {
+        var choiceElementTypes = Types.All.Where(m => m.Traits.HasFlag(TypeTrait.ChoiceElement)).ToList();
+        choiceElementTypes.Should().NotBeEmpty("there are 5 choice-element types");
+        foreach (var meta in choiceElementTypes)
+        {
+            meta.ChoiceLiteralTokens.Should().NotBeNull(
+                $"{meta.Kind} has TypeTrait.ChoiceElement and must have populated ChoiceLiteralTokens");
+            meta.ChoiceLiteralTokens!.Should().NotBeEmpty(
+                $"{meta.Kind}.ChoiceLiteralTokens must contain at least one literal token kind");
+        }
+    }
+
+    // ── GAP-040: ElementParameterAccessor and BagAccessors.countof ──────────────
+
+    [Fact]
+    public void Bag_CountofAccessor_IsElementParameterAccessor()
+    {
+        var countof = Types.GetMeta(TypeKind.Bag).Accessors.Single(a => a.Name == "countof");
+        countof.Should().BeOfType<ElementParameterAccessor>(
+            "countof(E) takes a bag element of type T — not a fixed integer parameter");
+        countof.ParameterType.Should().BeNull(
+            "ElementParameterAccessor passes null as ParameterType to the base record");
+    }
+
+    [Theory]
+    [InlineData(TypeKind.Log)]
+    [InlineData(TypeKind.LogBy)]
+    [InlineData(TypeKind.List)]
+    public void SequentialCollectionAccessors_AtAccessor_HasIntegerParameterType(TypeKind kind)
+    {
+        var at = Types.GetMeta(kind).Accessors.Single(a => a.Name == "at");
+        at.Should().NotBeOfType<ElementParameterAccessor>(
+            "at(N) takes an integer index, not the element type");
+        at.ParameterType.Should().Be(TypeKind.Integer,
+            $"{kind}.at(N) always takes an integer zero-based position index");
     }
 }

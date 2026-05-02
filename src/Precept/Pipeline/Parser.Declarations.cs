@@ -307,11 +307,12 @@ public static partial class Parser
                 ActionSyntaxShape.CollectionValue   => ParseCollectionValueStatement(meta),
                 ActionSyntaxShape.CollectionInto    => ParseCollectionIntoStatement(meta),
                 ActionSyntaxShape.FieldOnly         => ParseFieldOnlyStatement(meta),
-                ActionSyntaxShape.CollectionValueBy => ParseCollectionValueByStatement(meta),
                 ActionSyntaxShape.InsertAt          => ParseInsertAtStatement(meta),
-                ActionSyntaxShape.RemoveAtIndex     => ParseRemoveAtIndexStatement(meta),
                 ActionSyntaxShape.PutKeyValue       => ParsePutKeyValueStatement(meta),
-                ActionSyntaxShape.CollectionIntoBy  => ParseCollectionIntoByStatement(meta),
+                // CollectionValueBy, RemoveAtIndex, and CollectionIntoBy are variant-action shapes
+                // (PrimaryActionKind != null). Variant actions are excluded from Actions.ByTokenKind,
+                // so these arms are structurally unreachable from ParseActionStatement.
+                _ => throw new InvalidOperationException($"ActionSyntaxShape.{meta.SyntaxShape} is a variant-action shape unreachable from Actions.ByTokenKind"),
             };
 #pragma warning restore CS8524
         }
@@ -472,22 +473,6 @@ public static partial class Parser
 
         // ── New collection shape parsers ──────────────────────────────────────────
 
-        private Statement ParseCollectionValueByStatement(ActionMeta meta)
-        {
-            var kw = Advance();
-            var field = Expect(TokenKind.Identifier);
-            var value = ParseExpression(0);
-            Expect(TokenKind.By);
-            var key = ParseExpression(0);
-            var span = SourceSpan.Covering(kw.Span, key.Span);
-            return meta.Kind switch
-            {
-                ActionKind.AppendBy  => new AppendByStatement(span, field, value, key),
-                ActionKind.EnqueueBy => new EnqueueByStatement(span, field, value, key),
-                _ => throw new InvalidOperationException($"ActionKind.{meta.Kind} does not belong to the CollectionValueBy shape"),
-            };
-        }
-
         private Statement ParseInsertAtStatement(ActionMeta meta)
         {
             var kw = Advance();
@@ -499,16 +484,6 @@ public static partial class Parser
             return new InsertStatement(span, field, value, index);
         }
 
-        private Statement ParseRemoveAtIndexStatement(ActionMeta meta)
-        {
-            var kw = Advance();
-            var field = Expect(TokenKind.Identifier);
-            Expect(TokenKind.At); // consume 'at' before index
-            var index = ParseExpression(0);
-            var span = SourceSpan.Covering(kw.Span, index.Span);
-            return new RemoveAtStatement(span, field, index);
-        }
-
         private Statement ParsePutKeyValueStatement(ActionMeta meta)
         {
             var kw = Advance();
@@ -518,25 +493,6 @@ public static partial class Parser
             var value = ParseExpression(0);
             var span = SourceSpan.Covering(kw.Span, value.Span);
             return new PutStatement(span, field, key, value);
-        }
-
-        private Statement ParseCollectionIntoByStatement(ActionMeta meta)
-        {
-            var kw = Advance();
-            var field = Expect(TokenKind.Identifier);
-            Token? into = null;
-            if (Current().Kind == TokenKind.Into)
-            {
-                Advance();
-                into = Expect(TokenKind.Identifier);
-            }
-            var endSpan = into?.Span ?? field.Span;
-            var span = SourceSpan.Covering(kw.Span, endSpan);
-            return meta.Kind switch
-            {
-                ActionKind.DequeueBy => new DequeueByStatement(span, field, into),
-                _ => throw new InvalidOperationException($"ActionKind.{meta.Kind} does not belong to the CollectionIntoBy shape"),
-            };
         }
 
         // ── Construct parsers (non-disambiguated) ─────────────────────────────
@@ -1135,17 +1091,24 @@ public static partial class Parser
         // ── Choice helpers ────────────────────────────────────────────────────
 
         /// <summary>
-        /// Parses a single choice value literal that must match the declared element type.
-        /// Emits <see cref="DiagnosticCode.ChoiceElementTypeMismatch"/> if the literal kind
-        /// doesn't match. Numeric element types (integer, decimal, number) all accept
-        /// <see cref="TokenKind.NumberLiteral"/> — subtype discrimination is deferred to the type stage.
+        /// Parses a single choice option literal for an element type declared as <paramref name="elemToken"/>.
+        /// Emits <see cref="DiagnosticCode.ChoiceElementTypeMismatch"/> and produces a recovery node when the token
+        /// doesn't match. Valid literal kinds are derived from <see cref="TypeMeta.ChoiceLiteralTokens"/> — no
+        /// per-type identity switch. Numeric element types (integer, decimal, number) also accept an optional
+        /// leading minus for signed literals; this path is detected by whether <c>ChoiceLiteralTokens</c>
+        /// contains <see cref="TokenKind.NumberLiteral"/>.
         /// </summary>
         private Expression ParseChoiceValue(Token elemToken)
         {
             var cur = Current();
 
-            // For numeric element types, absorb an optional leading minus and fold into a signed literal.
-            if (elemToken.Kind is TokenKind.IntegerType or TokenKind.DecimalType or TokenKind.NumberType)
+            // Derive valid literal token kinds from the catalog — no elemToken.Kind identity switch.
+            var literalTokens = Types.ByToken.TryGetValue(elemToken.Kind, out var elemMeta)
+                ? elemMeta.ChoiceLiteralTokens
+                : null;
+
+            // Numeric element types accept an optional leading minus sign for signed literals.
+            if (literalTokens?.Contains(TokenKind.NumberLiteral) == true)
             {
                 Token? minusToken = null;
                 if (cur.Kind == TokenKind.Minus)
@@ -1173,12 +1136,7 @@ public static partial class Parser
                 return new LiteralExpression(cur.Span, cur);
             }
 
-            bool isValid = elemToken.Kind switch
-            {
-                TokenKind.StringType  => cur.Kind == TokenKind.StringLiteral,
-                TokenKind.BooleanType => cur.Kind is TokenKind.True or TokenKind.False,
-                _                     => false,
-            };
+            bool isValid = literalTokens?.Contains(cur.Kind) == true;
 
             if (!isValid)
             {

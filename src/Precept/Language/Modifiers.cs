@@ -135,7 +135,7 @@ public static class Modifiers
             kind, Tokens.GetMeta(TokenKind.Writable),
             "Field is directly editable; read-only by default without this modifier",
             ModifierCategory.Structural, AnyType,
-            HoverDescription: "The field is directly editable. Without this modifier, the field is read-only by default. Use 'in State write Field' to override per state."),
+            HoverDescription: "The field is directly editable. Without this modifier, the field is read-only by default. Use 'in State modify Field editable/readonly' to override per state."),
 
         // ── State modifiers ─────────────────────────────────────────────────────
         ModifierKind.InitialState => new StateModifierMeta(

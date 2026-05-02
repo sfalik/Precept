@@ -735,7 +735,7 @@ The parser always runs to end-of-source. On malformed input it emits diagnostics
 | `And` | `BinaryExpression(And, ParseExpression(20))` |
 | `==` `!=` `~=` `!~` `<` `>` `<=` `>=` | `BinaryExpression(op, ParseExpression(31))` |
 | `Contains` | `BinaryExpression(Contains, ParseExpression(41))` |
-| `For` | `BinaryExpression(LookupAccess, ParseExpression(40))` — lookup field access; left operand is the `lookup of K to V` field, right is the key expression `K`; result type is `V` |
+| `For` | `BinaryExpression(LookupAccess, ParseExpression(41))` — lookup field access; left operand is the `lookup of K to V` field, right is the key expression `K`; result type is `V` |
 | `Is` | `IsSetExpression` — consumes optional `Not`, then `Set` |
 | `+` `-` (infix) | `BinaryExpression(op, ParseExpression(50))` |
 | `*` `/` `%` | `BinaryExpression(op, ParseExpression(60))` |
@@ -1452,7 +1452,7 @@ Enforcement fires in all expression positions where `==`/`!=`/`contains`/`starts
 
 | Check | Fires when | Diagnostic |
 |-------|-----------|------------|
-| Predicate must be boolean | `BoolExpr` in quantifier resolves to non-boolean type | `TypeMismatch` |
+| Predicate must be boolean | `BoolExpr` in quantifier resolves to non-boolean type | `QuantifierPredicateNotBoolean` |
 | Collection must be a collection field | `CollectionRef` in quantifier resolves to a non-collection type | `InvalidQuantifierTarget` |
 | Binding variable is reserved keyword | Binding variable name is in the reserved keyword set | `ExpectedIdentifier` |
 | `~string` enforcement applies inside predicate | Binding variable is `~string` (collection inner type), used with `==`/`!=`/`startsWith`/`endsWith` | Existing enforcement diagnostics (`CaseInsensitiveFieldRequiresTildeEquals`, etc.) |
@@ -1497,13 +1497,13 @@ Modifiers are constraints on field/arg values. The type checker validates applic
 | `add F Expr` | `set of T`, `bag of T` | `T` | — |
 | `remove F Expr` | `set of T`, `bag of T`, `list of T`, `lookup of K to V` | `T` (set/bag/list), `K` (lookup) | For lookup, removes the entry with key `Expr`; see `remove F at N` for list indexed removal |
 | `remove F at N` | `list of T` | — | `N` is a zero-based `integer` index; removes the element at that position (v3) |
-| `enqueue F Expr` | `queue of T`, `queue of T by P` | `T` | — |
-| `enqueue F Expr by Expr` | `queue of T by P` | `T`, then `P` | Explicit ordering key; without `by`, ordering key is derived from the element (v3) |
+| `enqueue F Expr` | `queue of T` | `T` | — |
+| `enqueue F Expr by Expr` | `queue of T by P` | `T`, then `P` | Explicit ordering key required; simple `enqueue F Expr` is not valid on `queue of T by P` (v3) |
 | `dequeue F (into G)? (by H)?` | `queue of T`, `queue of T by P` | — | If `into G`, `G` must be type `T`. If `by H` (priority queue), `H` must be type `P` — dequeues the entry whose key matches `H`. Requires emptiness proof (`UnguardedCollectionMutation`) (v3) |
 | `push F Expr` | `stack of T` | `T` | — |
 | `pop F (into G)?` | `stack of T` | — | If `into G`, `G` must be type `T`. Requires emptiness proof (`UnguardedCollectionMutation`) |
-| `clear F` | `set of T`, `queue of T`, `stack of T`, `bag of T`, `list of T`, `queue of T by P` | — | Not valid on `log of T`, `log of T by P`, or `lookup of K to V` (v3) |
-| `append F Expr` | `log of T`, `log of T by P`, `list of T` | `T` | Appends to the end of the log or list (v3) |
+| `clear F` | `set of T`, `queue of T`, `stack of T`, `bag of T`, `list of T`, `queue of T by P`; any `optional` field | — | On `optional` fields, resets the field to "not set" (see §1.2). Not valid on `log of T`, `log of T by P`, or `lookup of K to V` (v3) |
+| `append F Expr` | `log of T`, `list of T` | `T` | Appends to the end of the log or list (v3) |
 | `append F Expr by Expr` | `log of T by P` | `T`, then `P` | Explicit ordering key for log-by append (v3) |
 | `insert F Expr at N` | `list of T` | `T`, then `integer` | `N` is a zero-based index; inserts before element at position `N` (v3) |
 | `put F K = V` | `lookup of K to V` | `K`, then `V` | Upserts the entry with key `K`; inserts if absent, replaces if present (v3) |

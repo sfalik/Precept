@@ -150,7 +150,7 @@ public static class Types
     private static readonly TypeAccessor[] BagAccessors =
     [
         CollectionCountAccessor,
-        new TypeAccessor("countof", "Count of a specific element (0 if absent)", ParameterType: TypeKind.Integer),
+        new ElementParameterAccessor("countof", "Count of a specific element (0 if absent)"),
     ];
 
     private static readonly TypeAccessor[] ListAccessors =
@@ -214,7 +214,8 @@ public static class Types
             Accessors: [new FixedReturnAccessor("length", TypeKind.Integer, "Character count")],
             DisplayName: "string",
             HoverDescription: "A variable-length text value. Use double quotes for literal text and {Field} for interpolated values.",
-            UsageExample: "field CandidateName as string optional maxlength 100"
+            UsageExample: "field CandidateName as string optional maxlength 100",
+            ChoiceLiteralTokens: [TokenKind.StringLiteral]
         ),
 
         TypeKind.Boolean => new(
@@ -224,7 +225,8 @@ public static class Types
             Traits: TypeTrait.EqualityComparable | TypeTrait.ChoiceElement,
             DisplayName: "boolean",
             HoverDescription: "A true or false value. Used for flags, toggles, and condition results.",
-            UsageExample: "field DepositPaid as boolean default false"
+            UsageExample: "field DepositPaid as boolean default false",
+            ChoiceLiteralTokens: [TokenKind.True, TokenKind.False]
         ),
 
         TypeKind.Integer => new(
@@ -235,7 +237,8 @@ public static class Types
             WidensTo: IntegerWidens,
             DisplayName: "integer",
             HoverDescription: "A whole number with arbitrary precision. Use for counts, identifiers, and exact discrete values.",
-            UsageExample: "field ReopenCount as integer default 0 nonnegative"
+            UsageExample: "field ReopenCount as integer default 0 nonnegative",
+            ChoiceLiteralTokens: [TokenKind.NumberLiteral]
         ),
 
         TypeKind.Decimal => new(
@@ -245,7 +248,8 @@ public static class Types
             Traits: TypeTrait.Orderable | TypeTrait.EqualityComparable | TypeTrait.ChoiceElement,
             DisplayName: "decimal",
             HoverDescription: "A fixed-point decimal number. Preserves exact fractional precision — use for financial amounts and percentages.",
-            UsageExample: "field TaxRate as decimal default 0.1 nonnegative maxplaces 4"
+            UsageExample: "field TaxRate as decimal default 0.1 nonnegative maxplaces 4",
+            ChoiceLiteralTokens: [TokenKind.NumberLiteral]
         ),
 
         TypeKind.Number => new(
@@ -255,7 +259,8 @@ public static class Types
             Traits: TypeTrait.Orderable | TypeTrait.EqualityComparable | TypeTrait.ChoiceElement,
             DisplayName: "number",
             HoverDescription: "A floating-point number. Loses precision in exchange for flexibility. Use approximate() or round() to bridge back to decimal.",
-            UsageExample: "field CreditScore as number default 0 nonnegative"
+            UsageExample: "field CreditScore as number default 0 nonnegative",
+            ChoiceLiteralTokens: [TokenKind.NumberLiteral]
         ),
 
         TypeKind.Choice => new(

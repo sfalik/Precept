@@ -99,6 +99,17 @@ public sealed record FixedReturnAccessor(
     QualifierAxis ReturnsQualifier = QualifierAxis.None
 ) : TypeAccessor(Name, Description, ParameterType, RequiredTraits, ProofRequirements);
 
+/// <summary>
+/// An accessor whose parameter is the owning collection's element type.
+/// Example: <c>bag.countof(element)</c> — the element is typed as the bag's T.
+/// </summary>
+public sealed record ElementParameterAccessor(
+    string    Name,
+    string    Description,
+    TypeTrait RequiredTraits = TypeTrait.None,
+    ProofRequirement[]? ProofRequirements = null
+) : TypeAccessor(Name, Description, null, RequiredTraits, ProofRequirements);
+
 // ── TypeMeta ───────────────────────────────────────────────────────────────────
 
 /// <summary>
@@ -120,7 +131,20 @@ public record TypeMeta(
     IReadOnlyList<TypeAccessor>? Accessors        = null,
     string?                      HoverDescription = null,
     string?                      UsageExample     = null,
-    bool                         NotemptyApplicable = true
+    bool                         NotemptyApplicable = true,
+    /// <summary>
+    /// The <see cref="TokenKind"/> values that are valid literal tokens for a choice option of
+    /// this element type. <c>null</c> for all non-choice-element types. Populated for the five
+    /// types that carry <see cref="TypeTrait.ChoiceElement"/>:
+    /// <list type="bullet">
+    ///   <item><c>integer</c>, <c>decimal</c>, <c>number</c> → <c>[NumberLiteral]</c></item>
+    ///   <item><c>string</c> → <c>[StringLiteral]</c></item>
+    ///   <item><c>boolean</c> → <c>[True, False]</c></item>
+    /// </list>
+    /// The parser derives both the signed-prefix path and the literal validity check from this
+    /// field — no per-type identity switch in <c>ParseChoiceValue</c>.
+    /// </summary>
+    IReadOnlyList<TokenKind>?    ChoiceLiteralTokens = null
 )
 {
     /// <summary>Lossless implicit widening targets. Empty for most types.</summary>
