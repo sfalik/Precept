@@ -75,6 +75,16 @@ public static partial class Parser
             .Select(a => a.Token.Kind)
             .ToFrozenSet();
 
+    /// <summary>
+    /// Token kinds that are outcome keywords (<c>transition</c>, <c>no</c>, <c>reject</c>).
+    /// Derived from <see cref="Tokens.All"/> filtered by <see cref="TokenCategory.Outcome"/>.
+    /// </summary>
+    internal static readonly FrozenSet<TokenKind> OutcomeKeywords =
+        Tokens.All
+            .Where(m => m.Categories.Contains(TokenCategory.Outcome))
+            .Select(m => m.Kind)
+            .ToFrozenSet();
+
     // ════════════════════════════════════════════════════════════════════════════
     //  Structural sets — derived from catalog or structurally motivated
     //
@@ -120,6 +130,16 @@ public static partial class Parser
         Tokens.All.Where(t => t.IsValidAsMemberName).Select(t => t.Kind).ToFrozenSet();
 
     /// <summary>
+    /// All token kinds that the lexer recognizes as keywords.
+    /// Catalog-derived from <see cref="Tokens.Keywords"/> values.
+    /// Used in expression-position fallback to distinguish a keyword misused as a value
+    /// (→ <see cref="DiagnosticCode.UnexpectedKeyword"/>) from an entirely unknown token
+    /// (→ <see cref="DiagnosticCode.ExpectedToken"/>).
+    /// </summary>
+    internal static readonly FrozenSet<TokenKind> AllKeywordKinds =
+        Tokens.Keywords.Values.ToFrozenSet();
+
+    /// <summary>
     /// Function names that have a CI variant (e.g. <c>~startsWith</c>, <c>~endsWith</c>).
     /// Catalog-derived from <see cref="FunctionMeta.HasCIVariant"/>. Never hardcoded.
     /// </summary>
@@ -128,6 +148,18 @@ public static partial class Parser
             .Where(f => f.HasCIVariant)
             .Select(f => f.Name)
             .ToFrozenSet(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Keyword token kinds whose lexeme also appears as a built-in function name in
+    /// <see cref="Functions.ByName"/>. Derived from <see cref="Functions.All"/> ∩
+    /// <see cref="Tokens.Keywords"/>. Drives the identifier/function-call atom branch
+    /// in <c>ParseAtom</c> — no hardcoded <see cref="TokenKind"/> checks needed there.
+    /// </summary>
+    internal static readonly FrozenSet<TokenKind> KeywordsUsableAsFunctionNames =
+        Functions.All
+            .Where(f => Tokens.Keywords.ContainsKey(f.Name))
+            .Select(f => Tokens.Keywords[f.Name])
+            .ToFrozenSet();
 
     /// <summary>
     /// All preposition tokens that may introduce a type qualifier.
@@ -410,7 +442,7 @@ public static partial class Parser
         private bool IsOutcomeAhead()
         {
             var next = Peek(1);
-            return next.Kind is TokenKind.Transition or TokenKind.No or TokenKind.Reject;
+            return OutcomeKeywords.Contains(next.Kind);
         }
 
         private void SyncToNextDeclaration()
