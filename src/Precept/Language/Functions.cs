@@ -29,6 +29,7 @@ public static class Functions
     // Named parameters for overloads that carry a proof requirement — the same instance
     // must appear in both Parameters and ParamSubject to satisfy reference-equality (PRECEPT0005).
     private static readonly ParameterMeta PSqrtNumber  = new(TypeKind.Number,  "value");
+    private static readonly ParameterMeta PPowIntExp   = new(TypeKind.Integer, "exp");
 
     // ════════════════════════════════════════════════════════════════════════════
     //  GetMeta — exhaustive switch
@@ -162,7 +163,12 @@ public static class Functions
         FunctionKind.Pow => new(kind, "pow",
             "Raise base to integer exponent (same type as base)",
         [
-            new([new(TypeKind.Integer, "base"), new(TypeKind.Integer, "exp")], TypeKind.Integer),
+            new([new(TypeKind.Integer, "base"), PPowIntExp], TypeKind.Integer,
+                ProofRequirements:
+                [
+                    new NumericProofRequirement(new ParamSubject(PPowIntExp), OperatorKind.GreaterThanOrEqual, 0m,
+                        "Exponent must be non-negative for integer pow"),
+                ]),
             new([new(TypeKind.Decimal, "base"), new(TypeKind.Integer, "exp")], TypeKind.Decimal),
             new([new(TypeKind.Number,  "base"), new(TypeKind.Integer, "exp")], TypeKind.Number),
         ],

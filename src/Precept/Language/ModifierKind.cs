@@ -18,7 +18,7 @@ public enum ModifierKind
     Positive    =  4,
     /// <summary>Flag: value ≠ 0.</summary>
     Nonzero     =  5,
-    /// <summary>Flag: string is non-empty.</summary>
+    /// <summary>Flag: string or collection is non-empty (string + 8 collection types; Lookup excluded).</summary>
     Notempty    =  6,
     /// <summary>Value: default value expression.</summary>
     Default     =  7,

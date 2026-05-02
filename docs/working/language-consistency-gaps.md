@@ -40,7 +40,7 @@ Pre-TypeChecker audit — exhaustive consistency check of language docs, catalog
 | GAP-026 | `Modifiers.cs` `CollectionTypes` array stale — `mincount`/`maxcount` applicability missing 6 new TypeKind members | Doc-Catalog | Fixed | 7 |
 | GAP-027 | `Tokens.cs` `Notempty` description reads "String constraint: non-empty" but spec §1.1 says "String or collection constraint: non-empty" | Doc-Catalog | Fixed | 7 |
 | GAP-028 | `Functions.cs` `sqrt` has `Integer` and `Decimal` overloads but spec §3.7 explicitly says integer/decimal inputs are type errors | Doc-Catalog | Fixed | 7 |
-| GAP-029 | `IsOutcomeAhead()` hardcodes `{Transition, No, Reject}` instead of deriving from `TokenCategory.Outcome` | Catalog-Impl | Unresolved | 8 |
+| GAP-029 | `IsOutcomeAhead()` hardcodes `{Transition, No, Reject}` instead of deriving from `TokenCategory.Outcome` | Catalog-Impl | Fixed | 8 |
 | GAP-030 | `ParseAtom` hardcodes `case TokenKind.Min: case TokenKind.Max:` for keyword-as-function-name instead of deriving from `Functions.ByName` ∩ `Tokens.Keywords` | Catalog-Impl | Unresolved | 8 |
 | GAP-031 | Unary/postfix binding powers hardcoded in `Parser.Expressions.cs` (`not`→25, negate→65, `is set`→60) instead of reading from `Operators.ByToken`/`ByTokenSequence` | Catalog-Impl | Fixed | 8 |
 | GAP-032 | `Functions.cs` `pow(integer, integer)` overload missing `ProofRequirement` for `exp >= 0`; spec §0.6 item 4 explicitly lists this alongside `sqrt` as a non-negative proof obligation | Doc-Catalog | Fixed | 8 |
@@ -863,7 +863,7 @@ Fixed. Updated `docs/language/precept-language-spec.md` §1.1 Literals table `Nu
 
 ## GAP-029: `IsOutcomeAhead()` hardcodes outcome token set instead of deriving from `TokenCategory.Outcome`
 
-**Status:** Unresolved  
+**Status:** Fixed  
 **Category:** Catalog-Impl  
 **Location:** `src/Precept/Pipeline/Parser.cs` lines ~420–425  
 **Found in iteration:** 8
