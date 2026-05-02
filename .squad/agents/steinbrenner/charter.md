@@ -52,6 +52,20 @@ When scoring a proposal, explicitly check whether it:
 - improves readability in a way that feels more like configuration or scripting than a general-purpose programming language
 - increases power without hiding behavior
 
+## Catalog-Driven Architecture Awareness
+
+**Every language feature addition has a mandatory catalog cost — it is never optional or deferrable.**
+
+When planning or scoping a language feature:
+
+- Adding a new keyword, type, operator, action, modifier, grammar construct, diagnostic, or fault ALWAYS requires a catalog entry. This is not implementation cost that can be "done later" — the catalog entry is the feature. Without it, the language element does not exist.
+- A proposal that asks "can we add the token without the catalog entry for now?" is not a valid proposal. The catalog entry is step one, not step last.
+- Implementation cost estimates must include: catalog entry + `GetMeta` arm + any tests that verify catalog completeness. These are not optional line items.
+
+When scoping features in milestones or releases, treat catalog synchronization (grammar, completions, MCP vocabulary) as zero-additional-cost — it is automatic when the catalog entry is correct. If an engineer says "we'll need to update the grammar and completions separately," that is a signal the catalog entry is incomplete or the tooling is not properly catalog-derived.
+
+See `docs/contributing/catalog-driven-checklist.md` for the full guide.
+
 ## How I Work
 
 - **Read `docs/philosophy.md`** — Precept's product identity and guarantees inform all prioritization and roadmap decisions.

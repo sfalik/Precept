@@ -283,6 +283,24 @@ Earlier in the project, implementation plans lived as standalone markdown files 
 
 The evolved process keeps the implementation checklist in the PR body (ephemeral by nature) and the durable decisions in spec docs (updated at merge time). Existing implementation plan files in `docs/` are historical artifacts that remain as reference but aren't the template for new work.
 
+## Catalog-Driven Architecture
+
+Precept uses a **metadata-driven architecture.** Domain knowledge is declared as structured metadata in catalogs. Pipeline stages are generic machinery that reads it. This is not a style preference — it is the architectural identity of the system.
+
+The canonical statement of this principle is [`docs/language/catalog-system.md § Architectural Identity`](docs/language/catalog-system.md#architectural-identity-metadata-driven). Read it before making any decision about what gets cataloged, what stays bare, or how pipeline stages consume language knowledge.
+
+The operational companion — a reviewer checklist and implementer guide — is [`docs/contributing/catalog-driven-checklist.md`](docs/contributing/catalog-driven-checklist.md). Every contributor and reviewer should internalize it.
+
+**Core rules (non-negotiable):**
+
+- Every new token, keyword, type, operator, action, modifier, constraint, grammar construct, diagnostic, or fault is a catalog entry. No language element exists as a bare constant, inline set, or ad-hoc condition.
+- Operator precedence derives from the Operators catalog — never hardcoded inline.
+- Keyword membership (lexer lookup, `KeywordsValidAsMemberName`) derives from `Tokens.All` — no parallel lists.
+- Parser disambiguation derives from catalog metadata — no manual `FrozenSet<TokenKind>` or hardcoded token sets.
+- No pipeline stage switches on a catalog member's enum identity to apply per-member behavior. That behavior is metadata and belongs in the catalog entry.
+
+**When a reviewer offers a non-catalog solution alongside a catalog solution, the non-catalog option should not exist.** If the catalog can express the requirement — and it almost always can — the non-catalog approach is not an option to weigh. It is wrong. The only valid exception is a documented structural limitation of the catalog system itself, stated with explicit reasoning.
+
 ## Build & Test
 
 Precept is built with .NET 10.0 and TypeScript.

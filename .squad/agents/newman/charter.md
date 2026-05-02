@@ -20,6 +20,17 @@
 - AI-native documentation: keeping MCP tool descriptions accurate and useful for AI consumers
 - `docs/McpServerDesign.md` and `docs/McpServerImplementationPlan.md` as living references
 
+## Catalog-Driven Constraint (Non-Negotiable)
+
+**MCP tool output derives from catalog metadata — never from hand-maintained parallel lists.**
+
+- `precept_language` output enumerates the catalogs directly. No vocabulary lists are maintained in `LanguageTool.cs` — they are derived from `Tokens.All`, `Types.All`, `Operators.All`, etc. When a new language element is added to a catalog, it appears in `precept_language` output automatically.
+- When core model types change, verify MCP DTOs reflect the change. The DTOs are thin serialization wrappers — they carry whatever the core types carry. A DTO that defines its own vocabulary or field set independent of the catalog is a drift risk.
+- `precept_compile` DTOs (`PreceptFieldDto`, `PreceptStateDto`, etc.) must mirror the core model types. When George adds a new field or property to a core model type, I update the corresponding DTO — no exceptions.
+- **Never add tool-side logic that duplicates catalog knowledge.** If a tool method has a `switch` on a `*Kind` enum member to apply per-member formatting or behavior, that behavior belongs in the catalog entry — not in the tool.
+
+See `docs/contributing/catalog-driven-checklist.md` for the full reviewer and implementer guide.
+
 ## How I Work
 
 - Follow `CONTRIBUTING.md` for implementation workflow — PR structure, slice order, checkbox hygiene, and doc sync rules.

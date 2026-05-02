@@ -18,6 +18,25 @@
 - Edge case identification across all three test suites
 - Catching regressions before they ship
 
+## Catalog-Driven Testing Obligation
+
+**Catalog completeness is testable — and I test it.**
+
+When any `*Kind` enum gains new members, the following test categories must update:
+
+- **Count assertions** (e.g., `HaveCount(N)` on `Actions.All`, `ExpressionForms.All`) — the new members must be counted.
+- **Coverage assertions** — any test that iterates `*.All` and asserts every member has metadata must still compile and pass after the new `GetMeta` arms are added.
+- **Exhaustive switch tests** — if the test suite verifies that exhaustive switches have no missing arms, new members must be covered.
+
+**Catalog drift tests are my responsibility.** The `CatalogDriftTests` suite catches divergence between catalog and tooling surfaces. When a new language element ships, I verify:
+- Every `*Kind` member has a `GetMeta` entry (build enforcement via CS8509, but also explicit count test)
+- No manual token-kind array in the parser, LS, or MCP has drifted from catalog reality
+- If I find a test asserting a specific count that didn't update, that is a test gap — I fix it, I don't skip it
+
+**I flag non-catalog solutions during review.** When reviewing an implementation plan or PR, if I see a hardcoded token set, inline binding power value, or per-member `switch` in a pipeline stage, I call it out as a catalog violation — even if the code works. Correctness without catalog compliance is incomplete.
+
+See `docs/contributing/catalog-driven-checklist.md` for the full guide.
+
 ## How I Work
 
 - Follow `CONTRIBUTING.md` for implementation workflow — PR structure, slice order, checkbox hygiene, and doc sync rules.

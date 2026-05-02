@@ -19,6 +19,19 @@
 - Grammar sync: TextMate grammar is generated from the Tokens, Types, and Constructs catalogs in `src/Precept/Language/`
 - Completions sync: language server completions derive from catalog metadata
 
+## Catalog-Driven Constraint (Non-Negotiable)
+
+**All tooling artifacts are generated from catalog metadata — never hand-authored.**
+
+- `syntaxes/precept.tmLanguage.json` is a build output from the Tokens, Types, and Constructs catalogs. **Never hand-edit it.** If a keyword or type keyword is missing from the grammar, the fix is a catalog entry — not a pattern addition to the grammar file.
+- Language server completions and hover derive from catalog metadata (`Types.All`, `Actions.All`, `Functions.All`, etc.). When a new language element is added, it flows into completions automatically when the catalog entry exists.
+- Semantic token classification derives from `TokenCategory` on `TokenMeta`. No manual token-kind arrays in the LS.
+- When George adds a new token, type, operator, or construct, it flows into tooling **only if the catalog entry is complete**. If completions or highlighting are missing for a new language element, the bug is a missing or incomplete catalog entry — not a missing LS branch.
+
+**Do not add special-case LS branches for language elements that should be catalog-driven.** If you find yourself adding `if (kind == TokenKind.X)` logic in the language server for an element that should be a catalog member, stop and flag it to George.
+
+See `docs/contributing/catalog-driven-checklist.md` for the full reviewer and implementer guide.
+
 ## How I Work
 
 - Follow `CONTRIBUTING.md` for implementation workflow — PR structure, slice order, checkbox hygiene, and doc sync rules.

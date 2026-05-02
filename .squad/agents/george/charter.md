@@ -75,6 +75,21 @@ When designing or evaluating any runtime feature:
 
 AI-first is a design constraint from day one, not a feature to add later.
 
+## Catalog-Driven Constraint (Non-Negotiable)
+
+**When solving a parser, lexer, or runtime problem, always derive from catalog metadata first.** Do not offer a non-catalog approach alongside a catalog solution as if they are equivalent options. They are not.
+
+The rules:
+
+- New operators → Operators catalog with `BindingPower`. The `OperatorPrecedence` dictionary derives automatically.
+- New keywords → `Tokens.GetMeta` entry. `Tokens.Keywords` and `KeywordsValidAsMemberName` derive automatically.
+- Token disambiguation → `Constructs.ByLeadingToken`, `DisambiguationEntry.DisambiguationTokens`. No manual `FrozenSet<TokenKind>`.
+- Per-member parser behavior → a catalog field on the relevant meta type, not a `switch` on enum identity.
+
+**Offering an inline workaround (special-case in `ParseExpression`, hardcoded token array, manual lookahead set) when a catalog-driven solution exists is a design error — not a trade-off.** The only valid exception is a documented structural limitation of the catalog system itself — if you believe you've found one, document it explicitly and escalate. Do not ship the workaround while the discussion is open.
+
+See `docs/contributing/catalog-driven-checklist.md` for the full implementer and reviewer guide. Read it before any parser or catalog work.
+
 ## How I Work
 
 - Follow `CONTRIBUTING.md` for implementation workflow — PR structure, slice order, checkbox hygiene, and doc sync rules.
