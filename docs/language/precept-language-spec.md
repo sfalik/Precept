@@ -197,6 +197,8 @@ Every token the lexer can produce. Organized by category to match the `TokenKind
 | `Writable` | `writable` | Field writable-baseline modifier — marks a non-computed field as directly editable by default across all states (v2) |
 | `Because` | `because` | Reason clause |
 | `Initial` | `initial` | Initial state marker |
+| `Ascending` | `ascending` | Sort direction modifier — ascending order for `queue of T by P` and `log of T by P` (v3) |
+| `Descending` | `descending` | Sort direction modifier — descending order for `queue of T by P` (v3) |
 
 #### Keywords: Prepositions
 
@@ -208,6 +210,9 @@ Every token the lexer can produce. Organized by category to match the `TokenKind
 | `On` | `on` | Event trigger (`on Event ensure ...`, `from State on Event ...`) |
 | `Of` | `of` | Collection inner type (`set of string`) |
 | `Into` | `into` | Dequeue/pop target (`dequeue Queue into Field`) |
+| `By` | `by` | Ordering key preposition — `log of T by P`, `queue of T by P`, `append ... by P`, `enqueue ... by P` (v3) |
+| `At` | `at` | Index position preposition — `insert F Expr at N`, `remove F at N` (v3) |
+| `For` | `for` | Lookup key access infix operator — `F for K` (v3) |
 
 #### Keywords: Control
 
@@ -230,6 +235,9 @@ Every token the lexer can produce. Organized by category to match the `TokenKind
 | `Push` | `push` | Stack push action |
 | `Pop` | `pop` | Stack pop action |
 | `Clear` | `clear` | Collection clear action |
+| `Append` | `append` | Log/list append action (v3) |
+| `Insert` | `insert` | List indexed insert action (v3) |
+| `Put` | `put` | Lookup upsert action (v3) |
 
 #### Keywords: Outcomes
 
@@ -290,7 +298,7 @@ Every token the lexer can produce. Organized by category to match the `TokenKind
 | `Nonnegative` | `nonnegative` | Number/integer constraint: value >= 0 |
 | `Positive` | `positive` | Number/integer constraint: value > 0 |
 | `Nonzero` | `nonzero` | Number/integer constraint: value != 0 |
-| `Notempty` | `notempty` | String constraint: non-empty |
+| `Notempty` | `notempty` | String or collection constraint: non-empty |
 | `Min` | `min` | Numeric minimum constraint / built-in function (dual-use) |
 | `Max` | `max` | Numeric maximum constraint / built-in function (dual-use) |
 | `Minlength` | `minlength` | String minimum length constraint |
@@ -299,6 +307,8 @@ Every token the lexer can produce. Organized by category to match the `TokenKind
 | `Maxcount` | `maxcount` | Collection maximum count constraint |
 | `Maxplaces` | `maxplaces` | Decimal maximum decimal places constraint |
 | `Ordered` | `ordered` | Choice ordinal comparison constraint |
+| `Countof` | `countof` | Bag element-count accessor — valid as a member name after `.` (v3) |
+| `Peekby` | `peekby` | Priority-queue ordering-key peek accessor — valid as a member name after `.` (v3) |
 
 #### Keywords: Types
 
@@ -313,6 +323,10 @@ Every token the lexer can produce. Organized by category to match the `TokenKind
 | `SetType` | `set` | Set collection type (dual-use with action keyword) |
 | `QueueType` | `queue` | Queue collection type |
 | `StackType` | `stack` | Stack collection type |
+| `BagType` | `bag` | Bag collection type (v3) |
+| `ListType` | `list` | List collection type (v3) |
+| `LogType` | `log` | Log collection type (v3) |
+| `LookupType` | `lookup` | Lookup collection type (v3) |
 
 #### Keywords: Temporal Types (v2)
 
@@ -386,7 +400,7 @@ Every token the lexer can produce. Organized by category to match the `TokenKind
 
 | Token | Produced when |
 |-------|---------------|
-| `NumberLiteral` | Digit sequence, optionally with one `.` followed by more digits |
+| `NumberLiteral` | Digit sequence; optionally followed by a decimal part (`.` + more digits) and/or an exponent part (`e`/`E`, optional sign, digits) — see §1.3 for the full grammar |
 | `StringLiteral` | `"..."` with no `{` interpolation (emitted as a single token) |
 | `StringStart` | `"...{` — text before the first interpolation opening |
 | `StringMiddle` | `}...{` — text between interpolation segments |
@@ -434,11 +448,12 @@ The complete v2 reserved keyword set:
 precept  field  as  default  optional  writable  rule  because
 state  initial  terminal  required  irreversible  event  ensure
 success  warning  error
-in  to  from  on  when  any  all  each  of
-set  add  remove  enqueue  dequeue  push  pop  clear  into
+in  to  from  on  when  any  all  each  of  by  at  for
+set  add  remove  enqueue  dequeue  push  pop  clear  into  append  insert  put
 transition  no  reject
 omit  modify  readonly  editable
 string  number  boolean  integer  decimal  choice  maxplaces  ordered
+bag  list  log  lookup
 date  time  instant  duration  period  timezone  zoneddatetime  datetime
 money  currency  quantity  unitofmeasure  dimension  price  exchangerate
 true  false
@@ -446,13 +461,14 @@ and  or  not  contains  is
 if  then  else
 nonnegative  positive  nonzero  notempty
 min  max  minlength  maxlength  mincount  maxcount
+ascending  descending  countof  peekby
 ```
 
 **v2 additions** (not in v1): `optional`, `writable`, `omit`, `clear`, `nonzero`, `is`, `integer`, `decimal`, `choice`, `maxplaces`, `ordered`, `terminal`, `required`, `irreversible`, `success`, `warning`, `error`, `date`, `time`, `instant`, `duration`, `period`, `timezone`, `zoneddatetime`, `datetime`, `money`, `currency`, `quantity`, `unitofmeasure`, `dimension`, `price`, `exchangerate`, `each`.
 
 > **Quantifier keywords:** `each` (v2), `any`, and `no` serve as quantifier keywords in expression position when followed by `Identifier in CollectionRef (`. `each` is quantifier-only. `any` also appears as state wildcard (`in any`, `from any`). `no` also appears in `no transition`. Disambiguation is by lookahead at the parser level — the lexer emits a single token kind for each.
 
-**v3 additions** (not in v2): `modify`, `readonly`, `editable`. The access mode verbs `write`/`read` are removed entirely in favor of the `modify` verb + adjective pattern. `write` and `read` are no longer reserved — they are ordinary identifiers in v3.
+**v3 additions** (not in v2): `modify`, `readonly`, `editable`, `bag`, `list`, `log`, `lookup`, `by`, `at`, `for`, `ascending`, `descending`, `append`, `insert`, `put`, `countof`, `peekby`. The access mode verbs `write`/`read` are removed entirely in favor of the `modify` verb + adjective pattern. `write` and `read` are no longer reserved — they are ordinary identifiers in v3.
 
 **v3 removals:** `write` and `read` are not reserved in v3. The `modify` verb + `readonly`/`editable` adjective pattern replaces them. Both are ordinary identifiers in v3; no special parser recognition is needed.
 
@@ -678,15 +694,16 @@ The parser always runs to end-of-source. On malformed input it emits diagnostics
 | 20 | `and` | logical conjunction | left |
 | 25 (prefix) | `not` | logical negation | right (prefix) |
 | 30 | `==` `!=` `~=` `!~` `<` `>` `<=` `>=` | comparison | non-associative |
-| 40 | `contains` | collection membership | left |
-| 60 | `is` (`is set` / `is not set`) | presence test | left |
+| 40 | `contains` | collection membership | non-associative |
+| 40 | `for` | lookup key access (infix) | left |
 | 50 | `+` `-` (infix) | additive arithmetic | left |
 | 60 | `*` `/` `%` | multiplicative arithmetic | left |
+| 60 | `is` (`is set` / `is not set`) | presence test (postfix) | non-associative |
 | 65 (prefix) | `-` (unary) | negation | right (prefix) |
 | 80 | `.` | member access | left |
 | 80 | `(` (postfix) | function/method call | left |
 
-**Non-associative comparisons:** `A == B == C` is a parse error. The parser detects when the left operand is already a comparison expression and emits a `NonAssociativeComparison` diagnostic. (The right-binding power of 31 prevents right-associativity; the explicit left-operand check prevents left-associative chaining.)
+**Non-associative operators:** Comparison operators (`==`, `!=`, etc.) and `contains` are non-associative — chaining (`A == B == C`, `A contains B contains C`) is a parse error. The parser detects when the left operand is already a non-associative binary expression and emits a `NonAssociativeComparison` diagnostic. (Right-binding powers P+1 prevent right-chaining; the explicit left-operand check prevents left-chaining.) **Postfix `is set`/`is not set`** are non-associative — a presence-test result is a `boolean`, not a collection, so chaining is always a type error regardless. At precedence 60 they share a level with `*`/`/`/`%`; the Pratt `nextMinPrec = 61` when parsing a multiplicative right operand ensures `A * B is set` parses as `(A * B) is set`, not `A * (B is set)`.
 
 *Implementation note:* The expression parser uses Pratt parsing (top-down operator precedence). `ParseExpression(int minBp)` parses a complete expression, stopping when it encounters a token whose left-binding power is ≤ `minBp`.
 
@@ -697,7 +714,7 @@ The parser always runs to end-of-source. On malformed input it emits diagnostics
 | `Identifier` | `IdentifierExpression` |
 | `NumberLiteral` | `LiteralExpression` |
 | `True` / `False` | `LiteralExpression` |
-| `StringLiteral` | `StringLiteralExpression` |
+| `StringLiteral` | `LiteralExpression` |
 | `StringStart` | `InterpolatedStringExpression` (reassembly loop) |
 | `TypedConstant` | `TypedConstantExpression` |
 | `TypedConstantStart` | `InterpolatedTypedConstantExpression` (reassembly loop) |
@@ -717,7 +734,8 @@ The parser always runs to end-of-source. On malformed input it emits diagnostics
 | `Or` | `BinaryExpression(Or, ParseExpression(10))` |
 | `And` | `BinaryExpression(And, ParseExpression(20))` |
 | `==` `!=` `~=` `!~` `<` `>` `<=` `>=` | `BinaryExpression(op, ParseExpression(31))` |
-| `Contains` | `BinaryExpression(Contains, ParseExpression(40))` |
+| `Contains` | `BinaryExpression(Contains, ParseExpression(41))` |
+| `For` | `BinaryExpression(LookupAccess, ParseExpression(40))` — lookup field access; left operand is the `lookup of K to V` field, right is the key expression `K`; result type is `V` |
 | `Is` | `IsSetExpression` — consumes optional `Not`, then `Set` |
 | `+` `-` (infix) | `BinaryExpression(op, ParseExpression(50))` |
 | `*` `/` `%` | `BinaryExpression(op, ParseExpression(60))` |
@@ -804,11 +822,17 @@ from StateTarget on Identifier ("when" BoolExpr)?
 ActionStatement  :=  set Identifier "=" Expr
                   |  add Identifier Expr
                   |  remove Identifier Expr
+                  |  remove Identifier "at" Expr
                   |  enqueue Identifier Expr
-                  |  dequeue Identifier ("into" Identifier)?
+                  |  enqueue Identifier Expr "by" Expr
+                  |  dequeue Identifier ("into" Identifier)? ("by" Identifier)?
                   |  push Identifier Expr
                   |  pop Identifier ("into" Identifier)?
                   |  clear Identifier
+                  |  append Identifier Expr
+                  |  append Identifier Expr "by" Expr
+                  |  insert Identifier Expr "at" Expr
+                  |  put Identifier Expr "=" Expr
 
 Outcome  :=  transition Identifier
           |  no transition
@@ -917,6 +941,13 @@ ScalarType  :=  ~string | string | number | integer | decimal | boolean
              |  dimension | price | exchangerate
 
 CollectionType  :=  (set | queue | stack) of ScalarType TypeQualifier?
+                |   bag of ScalarType
+                |   list of ScalarType
+                |   log of ScalarType
+                |   log of ScalarType by ScalarType
+                |   queue of ScalarType by ScalarType DirectionModifier?
+                |   lookup of ScalarType to ScalarType
+DirectionModifier  :=  ascending | descending
 ChoiceType        :=  choice "of" ChoiceElementType "(" ChoiceValueExpr ("," ChoiceValueExpr)* ")"
 ChoiceElementType :=  string | integer | decimal | number | boolean
 ChoiceValueExpr   :=  StringLiteral | NumberLiteral | BooleanLiteral
@@ -945,7 +976,7 @@ Field modifiers appear after the type reference and before any computed expressi
 | `nonnegative` | flag | Value ≥ 0 |
 | `positive` | flag | Value > 0 |
 | `nonzero` | flag | Value ≠ 0 |
-| `notempty` | flag | String is non-empty |
+| `notempty` | flag | String is non-empty; collection contains at least one element (equivalent to `mincount 1`) |
 | `default` _Expr_ | value | Default value |
 | `min` _Expr_ | value | Minimum value |
 | `max` _Expr_ | value | Maximum value |
@@ -1000,6 +1031,13 @@ These are unambiguous top-level declaration starters. Continuation tokens (`when
 | Unrecognized keyword in declaration position | `UnexpectedKeyword` | Error | "'{0}' cannot appear inside a {1}" |
 | Chained comparison (`A == B == C`) | `NonAssociativeComparison` | Error | "Comparisons like == and < cannot be chained — {0}" |
 | Non-callable expression followed by `(` | `InvalidCallTarget` | Error | "Only built-in functions can be called this way — '{0}' is not a function name" |
+| `omit` access mode with `when` guard | `OmitDoesNotSupportGuard` | Error | "'omit' is an unconditional structural exclusion — 'when' guards are not allowed" |
+| `on Event ->` handler with `when` guard | `EventHandlerDoesNotSupportGuard` | Error | "Event handlers ('on Event -> action') do not support 'when' guards — guards are only valid on event ensures and transition rows" |
+| `when` guard placed before `on Event` on a transition row | `PreEventGuardNotAllowed` | Error | "A 'when' guard before the event target is not supported on transition rows — place the guard after 'on Event'" |
+| Transition row has no outcome | `ExpectedOutcome` | Error | "Expected a transition outcome ('-> transition State', '-> no transition', or '-> reject Message') but none was found" |
+| `choice of T()` with empty argument list | `EmptyChoice` | Error | "A choice type must have at least one value" |
+| `choice(...)` without `of T` | `ChoiceMissingElementType` | Error | "A choice type requires an explicit element type — use 'choice of string(...)', 'choice of integer(...)', etc." |
+| Literal kind does not match choice element type | `ChoiceElementTypeMismatch` | Error | "Expected a {0} literal — this choice is declared as 'choice of {0}'" |
 
 ---
 
@@ -1144,7 +1182,7 @@ Fields, states, and events are all declared at the top level. They are visible e
 |----------|------|
 | **Type** | The collection field's inner type. If `Tags` is `set of ~string`, the binding variable is `~string`. If `ClaimQueue` is `queue of T by P`, the binding variable is a two-field projection (`.value` → `T`, `.by` → `P`). |
 | **Scope** | Strictly within the `(` … `)` predicate expression. Not visible outside the quantifier. |
-| **Shadowing** | If a field with the same name exists at global scope, the binding variable shadows it inside the predicate. Warning: `BindingShadowsField`. |
+| **Shadowing** | If a field with the same name exists at global scope, the binding variable shadows it inside the predicate. Error: `BindingShadowsField` — rename the binding to avoid confusion. |
 | **Keyword collision** | If the binding variable name is a reserved keyword, it is a parse error (`ExpectedIdentifier` with message `'{0}' is a reserved keyword and cannot be used as a binding variable`). |
 | **CI inheritance** | If the collection is `set of ~string`, the binding variable is `~string`, so all `~string` enforcement rules apply inside the predicate. `each item in Tags (item == "admin")` where `Tags` is `set of ~string` triggers `CaseInsensitiveFieldRequiresTildeEquals` on `item == "admin"`. |
 
@@ -1279,17 +1317,37 @@ The `then` and `else` branches must have compatible types (same type, or one wid
 
 **Collection and core accessors:**
 
-| Object type | Member | Result type |
-|-------------|--------|-------------|
-| `set of T` | `count` | `integer` |
-| `set of T` (T orderable) | `min` | `T` |
-| `set of T` (T orderable) | `max` | `T` |
-| `queue of T` | `count` | `integer` |
-| `queue of T` | `peek` | `T` |
-| `stack of T` | `count` | `integer` |
-| `stack of T` | `peek` | `T` |
-| `string` | `length` | `integer` |
-| Event arg reference (`EventName.ArgName`) | — | arg's declared type |
+| Object type | Member | Result type | Proof |
+|-------------|--------|-------------|-------|
+| `set of T` | `count` | `integer` | |
+| `set of T` (T orderable) | `min` | `T` | |
+| `set of T` (T orderable) | `max` | `T` | |
+| `queue of T` | `count` | `integer` | |
+| `queue of T` | `peek` | `T` | |
+| `queue of T by P` | `count` | `integer` | |
+| `queue of T by P` | `peek` | `T` | |
+| `queue of T by P` | `peekby` | `P` | returns the ordering key of the next-to-dequeue element (v3) |
+| `stack of T` | `count` | `integer` | |
+| `stack of T` | `peek` | `T` | |
+| `bag of T` | `count` | `integer` | |
+| `bag of T` | `countof(E)` | `integer` | returns how many times `E` appears in the bag (v3) |
+| `list of T` | `count` | `integer` | |
+| `list of T` | `first` | `T` | |
+| `list of T` | `last` | `T` | |
+| `list of T` | `at(N)` | `T` | returns the element at zero-based index `N` (v3) |
+| `log of T` | `count` | `integer` | |
+| `log of T` | `first` | `T` | earliest entry |
+| `log of T` | `last` | `T` | most recent entry |
+| `log of T` | `at(N)` | `T` | returns the entry at zero-based index `N` (v3) |
+| `log of T by P` | `count` | `integer` | |
+| `log of T by P` | `first` | `T` | entry with smallest `P` value |
+| `log of T by P` | `last` | `T` | entry with largest `P` value |
+| `log of T by P` | `at(N)` | `T` | returns the entry at zero-based index `N` (v3) |
+| `lookup of K to V` | `count` | `integer` | |
+| `string` | `length` | `integer` | |
+| Event arg reference (`EventName.ArgName`) | — | arg's declared type | |
+
+> **Lookup field access:** To retrieve the value for key `K` from a `lookup of K to V` field `F`, use the infix `for` operator: `F for K` — result type is `V`. This is an expression-level operator (precedence 40), not a dot-member accessor.
 
 **Temporal accessors** — see the [temporal type system](temporal-type-system.md) for the full per-type accessor tables. Summary: `date` has `.year`, `.month`, `.day`, `.dayOfWeek` → `integer`. `time` has `.hour`, `.minute`, `.second` → `integer`. `instant` has only `.inZone(tz)` → `zoneddatetime` (no skip-level accessors). `duration` has `.totalDays`, `.totalHours`, `.totalMinutes`, `.totalSeconds` → `number`. `period` has `.years`, `.months`, `.weeks`, `.days`, `.hours`, `.minutes`, `.seconds` → `integer`; `.hasDateComponent`, `.hasTimeComponent` → `boolean`; `.basis` → `string`; `.dimension` → `dimension`. `zoneddatetime` has `.instant`, `.timezone`, `.datetime`, `.date`, `.time` and integer component accessors. `datetime` has `.date`, `.time`, `.inZone(tz)`, and integer component accessors.
 
@@ -1330,7 +1388,7 @@ Functions are validated against a closed catalog. There are no user-defined func
 | `round(value, places)` | `(numeric, integer) → decimal` | `decimal` | `places` must be non-negative integer; **explicit bridge: number→decimal** |
 | `approximate(value)` | `(decimal) → number` | `number` | **Explicit bridge: decimal→number**; makes precision loss visible |
 | `pow(base, exp)` | `(numeric, integer) → numeric` | Same numeric type as `base` | `exp` must be non-negative for integer lane |
-| `sqrt(value)` | `(numeric) → number` | `number` | Number-lane only; proof engine checks non-negativity |
+| `sqrt(value)` | `(number) → number` | `number` | Number-lane only; `decimal` and `integer` inputs are type errors (no .NET `Math.Sqrt` overload for `decimal`; use `approximate(value)` to convert first). Proof engine checks non-negativity. |
 | `trim(value)` | `(string) → string` | `string` | — |
 | `startsWith(s, prefix)` | `(string, string) → boolean` | `boolean` | Case-sensitive. Compile error when first arg is `~string` — use `~startsWith` instead. See `CaseInsensitiveFieldRequiresTildeStartsWith`. |
 | `endsWith(s, suffix)` | `(string, string) → boolean` | `boolean` | Case-sensitive. Compile error when first arg is `~string` — use `~endsWith` instead. See `CaseInsensitiveFieldRequiresTildeEndsWith`. |
@@ -1436,13 +1494,19 @@ Modifiers are constraints on field/arg values. The type checker validates applic
 | Action | Field type required | Value type required | Additional checks |
 |--------|--------------------|--------------------|-------------------|
 | `set F = Expr` | Any scalar | Assignable to field type | Field must not be computed |
-| `add F Expr` | `set of T` | `T` | — |
-| `remove F Expr` | `set of T` | `T` | — |
-| `enqueue F Expr` | `queue of T` | `T` | — |
-| `dequeue F (into G)?` | `queue of T` | — | If `into G`, `G` must be type `T`. Requires emptiness proof (`UnguardedCollectionMutation`) |
+| `add F Expr` | `set of T`, `bag of T` | `T` | — |
+| `remove F Expr` | `set of T`, `bag of T`, `list of T`, `lookup of K to V` | `T` (set/bag/list), `K` (lookup) | For lookup, removes the entry with key `Expr`; see `remove F at N` for list indexed removal |
+| `remove F at N` | `list of T` | — | `N` is a zero-based `integer` index; removes the element at that position (v3) |
+| `enqueue F Expr` | `queue of T`, `queue of T by P` | `T` | — |
+| `enqueue F Expr by Expr` | `queue of T by P` | `T`, then `P` | Explicit ordering key; without `by`, ordering key is derived from the element (v3) |
+| `dequeue F (into G)? (by H)?` | `queue of T`, `queue of T by P` | — | If `into G`, `G` must be type `T`. If `by H` (priority queue), `H` must be type `P` — dequeues the entry whose key matches `H`. Requires emptiness proof (`UnguardedCollectionMutation`) (v3) |
 | `push F Expr` | `stack of T` | `T` | — |
 | `pop F (into G)?` | `stack of T` | — | If `into G`, `G` must be type `T`. Requires emptiness proof (`UnguardedCollectionMutation`) |
-| `clear F` | Any collection | — | — |
+| `clear F` | `set of T`, `queue of T`, `stack of T`, `bag of T`, `list of T`, `queue of T by P` | — | Not valid on `log of T`, `log of T by P`, or `lookup of K to V` (v3) |
+| `append F Expr` | `log of T`, `log of T by P`, `list of T` | `T` | Appends to the end of the log or list (v3) |
+| `append F Expr by Expr` | `log of T by P` | `T`, then `P` | Explicit ordering key for log-by append (v3) |
+| `insert F Expr at N` | `list of T` | `T`, then `integer` | `N` is a zero-based index; inserts before element at position `N` (v3) |
+| `put F K = V` | `lookup of K to V` | `K`, then `V` | Upserts the entry with key `K`; inserts if absent, replaces if present (v3) |
 
 Type errors: applying a set operation to a non-set field, a queue operation to a non-queue field, etc.
 
@@ -1534,89 +1598,40 @@ The type checker emits diagnostics for root causes only. When `ErrorType` is flo
 
 ### 3.10 Diagnostic Catalog
 
-#### Existing codes (already in `DiagnosticCode.cs`)
+**Canonical sources:**
+- [`src/Precept/Language/DiagnosticCode.cs`](../../src/Precept/Language/DiagnosticCode.cs) — enum; ordinals are stable across versions
+- [`src/Precept/Language/Diagnostics.cs`](../../src/Precept/Language/Diagnostics.cs) — exhaustive `GetMeta` switch; message templates, severities, stages, fix hints, related codes, fault-prevention links
 
-| Code | Severity | Message template | Fires when |
-|------|----------|------------------|------------|
-| `UndeclaredField` | Error | "Field '{0}' is not declared" | Identifier in expression context doesn't match any field |
-| `TypeMismatch` | Error | "Expected a {0} value here, but got '{1}'" | Type incompatibility in any expression context |
-| `NullInNonNullableContext` | Error | "'{0}' requires a value and cannot be empty here" | Optional field used where value is required |
-| `InvalidMemberAccess` | Error | "'.{0}' is not available on {1} fields" | Dot access on unsupported type |
-| `FunctionArityMismatch` | Error | "'{0}' takes {1} inputs, but {2} were provided" | Wrong number of function arguments |
-| `FunctionArgConstraintViolation` | Error | "Value {0} for '{1}' is not valid: {2}" | Function arg violates constraint |
+Do not duplicate code-level data here — the catalog is the source of truth. For schema, design rationale, and the `FaultCode → DiagnosticCode` chain, see [`docs/compiler/diagnostic-system.md`](../compiler/diagnostic-system.md).
 
-#### New codes
+#### Diagnostic groups
 
-| Code | Severity | Message template | Fires when |
-|------|----------|------------------|------------|
-| `DuplicateFieldName` | Error | "Field '{0}' is already declared" | Two field declarations with same name |
-| `DuplicateStateName` | Error | "State '{0}' is already declared" | Duplicate state entry |
-| `DuplicateEventName` | Error | "Event '{0}' is already declared" | Duplicate event declaration |
-| `DuplicateArgName` | Error | "Argument '{0}' is already declared on event '{1}'" | Duplicate arg in same event |
-| `UndeclaredState` | Error | "State '{0}' is not declared" | Reference to non-existent state |
-| `UndeclaredEvent` | Error | "Event '{0}' is not declared" | Reference to non-existent event |
-| `UndeclaredFunction` | Error | "'{0}' is not a recognized function" | Unknown function name in call |
-| `MultipleInitialStates` | Error | "Only one state can be marked 'initial' — '{0}' and '{1}' both are" | Two or more initial states |
-| `NoInitialState` | Error | "This precept has states but none is marked 'initial'" | Stateful precept without initial |
-| `InvalidModifierForType` | Error | "The '{0}' constraint does not apply to {1} fields" | Modifier on inapplicable type |
-| `InvalidModifierBounds` | Error | "{0} ({1}) cannot exceed {2} ({3})" | min > max, minlength > maxlength, etc. |
-| `InvalidModifierValue` | Error | "The value for '{0}' must be {1}" | Negative count/length, non-integer maxplaces |
-| `DuplicateModifier` | Error | "The '{0}' constraint is already applied to this field" | Same modifier twice |
-| `RedundantModifier` | Warning | "'{0}' is unnecessary — '{1}' already implies it" | nonnegative + positive |
-| `ComputedFieldNotWritable` | Error | "Field '{0}' is computed and cannot be assigned" | `set` targeting computed field, `modify ... editable` access mode on computed field, or `writable` modifier on computed field |
-| `ComputedFieldWithDefault` | Error | "Field '{0}' is computed and cannot have a default value" | Both `->` and `default` |
-| `CircularComputedField` | Error | "Computed field '{0}' has a circular dependency: {1}" | Self-reference or transitive cycle in computed field dependency graph |
-| `ConflictingAccessModes` | Error | "Field '{0}' has conflicting access modes in state '{1}'" | modify + omit same field same state |
-| `RedundantAccessMode` | Error | "The '{0}' access mode for field '{1}' in state '{2}' is redundant — the effective mode is already '{0}'" | `in S modify F editable` where F has `writable`; `in S modify F readonly` where F lacks `writable`; `in S modify F readonly when Guard` where F lacks `writable` |
-| `WritableOnEventArg` | Error | "The 'writable' modifier cannot appear on event argument '{0}'" | `writable` on an event arg declaration |
-| `ListLiteralOutsideDefault` | Error | "List values can only appear in default clauses" | `[...]` outside default position |
-| `DuplicateChoiceValue` | Error | "Choice value '{0}' is duplicated" | Repeated value in choice set |
-| `EmptyChoice` | Error | "A choice type must have at least one value" | `choice of T()` with no args |
-| `ChoiceMissingElementType` | Error | "A choice type requires an explicit element type — use 'choice of string(...)', 'choice of integer(...)', etc." | `choice(...)` without `of T` |
-| `ChoiceElementTypeMismatch` | Error | "Expected a {0} literal — this choice is declared as 'choice of {0}'" | Literal kind doesn't match declared element type, or `choice of integer` arg to `choice of string` field |
-| `NonChoiceAssignedToChoice` | Error | "Field '{0}' is a choice type — only choice-compatible values can be assigned to it" | Non-choice source assigned to choice field |
-| `ChoiceLiteralNotInSet` | Error | "'{0}' is not a declared value of '{1}'" | Literal not in field's declared set |
-| `ChoiceArgOutsideFieldSet` | Error | "Argument choice includes '{0}', which is not in field '{1}'" | Arg choice has values outside field's set |
-| `ChoiceRankConflict` | Error | "The order of values in this argument conflicts with the declared order of '{0}'" | Arg choice sequence is not an order-preserving subsequence of field's sequence |
-| `CollectionOperationOnScalar` | Error | "'{0}' is a {1} operation, but '{2}' is not a {1}" | add/remove on non-set, etc. |
-| `ScalarOperationOnCollection` | Error | "'{0}' cannot be used with collection field '{1}'" | set = on collection field |
-| `IsSetOnNonOptional` | Error | "'{0}' always has a value — 'is set' only works on optional fields" | is set / is not set on required field |
-| `EventArgOutOfScope` | Error | "Event '{0}' arguments are not accessible here" | Event.Arg access outside transition/ensure/stateless event |
-| `InvalidInterpolationCoercion` | Error | "A {0} value cannot appear inside a text interpolation" | Collection in `{...}` inside string |
-| `UnresolvedTypedConstant` | Error | "Cannot determine the type of '{0}' — the content does not match any known value pattern" | Typed constant shape doesn't match any family |
-| `AmbiguousTypedConstant` | Error | "'{0}' could be a {1} or {2} — add context to disambiguate" | Multi-member family, no context to narrow |
-| `DefaultForwardReference` | Error | "Default value for '{0}' cannot reference '{1}', which is declared later" | Field default references later field |
-| `EventHandlerInStatefulPrecept` | Error | "Event handlers cannot appear in a precept with state declarations" | `on Event ->` mixed with `state` declarations |
+Codes are grouped by semantic domain. Parse-stage codes (9–16) are also covered in §2.7.
 
-#### `~string` enforcement diagnostics
+| Group | Stage | Ordinals | Subsystem doc |
+|---|---|---|---|
+| Lex errors | Lex | 1–8 | — |
+| Parse errors | Parse | 9–16 | §2.7 |
+| Symbol resolution | Type | 17–30 | — |
+| State machine | Type | 31–32 | — |
+| Modifier validity | Type | 33–37 | — |
+| Computed fields | Type | 38–40 | — |
+| Access modes | Type | 41–43 | — |
+| Typed constants & choice syntax | Type / Parse | 44–46, 52–54, 85–91 | — |
+| Lifecycle validation | Type | 92–94 | — |
+| Temporal types | Type | 55–62 | [temporal-type-system.md](temporal-type-system.md) |
+| Collection safety | Type | 63–65, 99–106 | [collection-types.md](collection-types.md) |
+| Case-insensitive string | Type | 66, 95–98 | — |
+| Business-domain types | Type | 67–77 | [business-domain-types.md](business-domain-types.md) |
+| Value safety | Type | 78–79 | — |
+| Graph analysis | Graph | 80–81 | — |
+| Proof engine | Proof | 82–84 | — |
 
-| Code | Severity | Message template | Parameters |
-|------|----------|-----------------|------------|
-| `CaseInsensitiveFieldRequiresTildeEquals` (66) | Error | `'{0}' is declared ~string (case-insensitive). Use ~= instead of == to avoid treating values like 'admin@example.com' and 'Admin@example.com' as different.` | `{0}` = field/expression name |
-| `CaseInsensitiveFieldRequiresTildeNotEquals` | Error | `'{0}' is declared ~string (case-insensitive). Use !~ instead of != (`!~` returns true when values are not equal under case-insensitive comparison).` | `{0}` = field/expression name |
-| `CaseInsensitiveValueInCaseSensitiveContains` | Error | `'{0}' is ~string (case-insensitive) but '{1}' is {2} (case-sensitive). A case-sensitive collection will not find values that differ only in case.` | `{0}` = CI value/field name, `{1}` = CS collection name, `{2}` = collection type (e.g., `set of string`), `{3}` = CI collection type (e.g., `set of ~string`) |
-| `CaseInsensitiveFieldRequiresTildeStartsWith` | Error | `'{0}' is declared ~string (case-insensitive). Use ~startsWith instead of startsWith to avoid treating values as having different prefixes.` | `{0}` = field name |
-| `CaseInsensitiveFieldRequiresTildeEndsWith` | Error | `'{0}' is declared ~string (case-insensitive). Use ~endsWith instead of endsWith to avoid treating values as having different suffixes.` | `{0}` = field name |
+#### Design notes
 
-> **`notempty` redirect for `CaseInsensitiveFieldRequiresTildeEquals`.** When the right-hand operand is an empty string literal (`""`), append to the message: `To require a non-empty value, declare the field \`notempty\` instead: \`field {0} as ~string notempty\`.`
+**Choice type parse-stage codes.** `EmptyChoice` (46), `ChoiceMissingElementType` (90), and `ChoiceElementTypeMismatch` (88) carry ordinals in the choice group but are `DiagnosticStage.Parse` — they are detected during `ParseTypeRef()` before type-checker context exists. See §2.7 for the full parse-stage diagnostic table.
 
-> **Code 66 reassignment.** `CaseInsensitiveStringOnNonCollection` (code 66) exists in `DiagnosticCode.cs` and was defined in anticipation of scalar `~string`, but was **never emitted** by the parser. When scalar `~string` ships, code 66 is **reassigned** to `CaseInsensitiveFieldRequiresTildeEquals`. The numeric value 66 is retained. No member is deleted, no ordinal shifts. Existing code references to `DiagnosticCode.CaseInsensitiveStringOnNonCollection` will fail to compile — update them to `DiagnosticCode.CaseInsensitiveFieldRequiresTildeEquals`.
-
-> **FixHint for `CaseInsensitiveValueInCaseSensitiveContains`.** `Change '{1}' to {3} for case-insensitive membership, or use: any e in {1} (e ~= {0})`
-
-#### Collection-safety diagnostics
-
-| Code | Severity | Message template | Parameters |
-|------|----------|-----------------|------------|
-| `KeyPresenceSafety` (99) | Error | `"'{0}' may not contain key '{1}' — add a 'when {0} contains {1}' guard before this access"` | `{0}` = lookup field name, `{1}` = key expression |
-| `IndexBoundsGuard` (100) | Error | `"'{0}' access at index '{1}' is not bounds-checked — add a 'when {0}.count > {1}' guard"` | `{0}` = collection field, `{1}` = index expression |
-| `KeyUniquenessGuard` (101) | Error | `"Key '{1}' may already exist in '{0}' — add a 'when not ({0} contains {1})' guard before appending"` | `{0}` = log-by field, `{1}` = key expression |
-| `InvalidQuantifierTarget` (102) | Error | `"'{0}' is not a collection field — quantifiers (each/any/no) require a collection field"` | `{0}` = field name |
-| `BindingShadowsField` (103) | Error | `"Binding variable '{0}' shadows a field with the same name — rename the binding to avoid confusion"` | `{0}` = binding variable name |
-| `MissingOrderingKey` (104) | Error | `"'{0}' requires a 'by P' ordering key — use '{0} of T by P'"` | `{0}` = type keyword (`log` or `queue`) |
-| `CollectionInnerTypeError` (105) | Error | `"Expected a {0} value, but '{1}' holds elements of type {2}"` | `{0}` = expected type, `{1}` = collection field, `{2}` = actual element type |
-| `QuantifierPredicateNotBoolean` (106) | Error | `"Quantifier predicate must be a boolean expression, but this resolves to {0}"` | `{0}` = actual resolved type |
-
+**Code 66 — `~string` operator reassignment.** `CaseInsensitiveStringOnNonCollection` (ordinal 66) was reserved in anticipation of scalar `~string` but was never emitted by the parser. When scalar `~string` ships, ordinal 66 is **reassigned** to `CaseInsensitiveFieldRequiresTildeEquals`. The numeric value is retained; no ordinals shift. Existing source references to `DiagnosticCode.CaseInsensitiveStringOnNonCollection` will not compile — update them to `DiagnosticCode.CaseInsensitiveFieldRequiresTildeEquals`.
 ---
 
 ## 3A. Language Semantics
