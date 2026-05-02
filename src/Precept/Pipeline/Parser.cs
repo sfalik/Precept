@@ -111,24 +111,6 @@ public static partial class Parser
             .ToFrozenSet();
 
     /// <summary>
-    /// Maps qualifier-preposition tokens that are also construct-leading tokens to their
-    /// catalog-derived disambiguation verb sets. Derived from <see cref="Constructs.ByLeadingToken"/>
-    /// + <see cref="DisambiguationEntry.DisambiguationTokens"/> — never hardcoded.
-    ///   In → {Ensure, Modify, Omit}
-    ///   To → {Arrow, Ensure}
-    /// </summary>
-    internal static readonly FrozenDictionary<TokenKind, FrozenSet<TokenKind>>
-        AmbiguousQualifierPrepositions =
-            new[] { TokenKind.In, TokenKind.To }
-                .Where(Constructs.ByLeadingToken.ContainsKey)
-                .ToFrozenDictionary(
-                    k => k,
-                    k => Constructs.ByLeadingToken[k]
-                        .Where(c => c.Entry.DisambiguationTokens is { IsDefaultOrEmpty: false })
-                        .SelectMany(c => c.Entry.DisambiguationTokens!.Value)
-                        .ToFrozenSet());
-
-    /// <summary>
     /// Token kinds that may appear as a member name after <c>.</c> even though they
     /// are normally keywords. <c>min</c> and <c>max</c> are DSL aggregation keywords
     /// but are also idiomatic member-accessor names on numeric sequences.
@@ -158,6 +140,24 @@ public static partial class Parser
             .SelectMany(t => t.QualifierShape!.Slots)
             .Select(s => s.Preposition)
             .ToFrozenSet();
+
+    /// <summary>
+    /// Maps qualifier-preposition tokens that are also construct-leading tokens to their
+    /// catalog-derived disambiguation verb sets. Seed is <see cref="QualifierPrepositionTokens"/>
+    /// filtered to those that also appear as construct leaders — never hardcoded.
+    ///   In → {Ensure, Modify, Omit}
+    ///   To → {Arrow, Ensure}
+    /// </summary>
+    internal static readonly FrozenDictionary<TokenKind, FrozenSet<TokenKind>>
+        AmbiguousQualifierPrepositions =
+            QualifierPrepositionTokens
+                .Where(Constructs.ByLeadingToken.ContainsKey)
+                .ToFrozenDictionary(
+                    k => k,
+                    k => Constructs.ByLeadingToken[k]
+                        .Where(c => c.Entry.DisambiguationTokens is { IsDefaultOrEmpty: false })
+                        .SelectMany(c => c.Entry.DisambiguationTokens!.Value)
+                        .ToFrozenSet());
 
     // ════════════════════════════════════════════════════════════════════════════
     //  Public entry point
