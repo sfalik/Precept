@@ -1,4 +1,4 @@
-# Collection Types
+﻿# Collection Types
 
 ---
 
@@ -7,31 +7,44 @@
 | Property | Value |
 |---|---|
 | Doc maturity | Draft |
-| Implementation state | Partially implemented — set/queue/stack surface shipped; §Proposed Extensions are proposals, not yet implemented |
-| Scope | Three collection kinds: `set of T`, `queue of T`, `stack of T`; actions, accessors, constraints, emptiness safety, membership, inner type system |
+| Implementation state | Partially implemented — set/queue/stack surface shipped; `log of T`, `log of T by P`, `bag of T`, `list of T`, `queue of T by P`, and `lookup of K to V` approved and locked on spike; §Proposed Extensions are proposals, not yet implemented |
+| Scope | Nine collection kinds: `set of T`, `queue of T`, `stack of T`, `log of T`, `log of T by P`, `bag of T`, `list of T`, `queue of T by P`, `lookup of K to V`; actions, accessors, constraints, emptiness safety, membership, inner type system |
 | Related | [Primitive Types](primitive-types.md) · [Language Spec](precept-language-spec.md) §§2.3, 3.6, 3.8 · [Type Checker](../compiler/type-checker.md) |
 
 ---
 
 ## Overview
 
-Precept has three collection types. Each wraps a scalar inner type, provides a fixed set of mutation actions, and enforces structural safety through the proof engine. There are no user-defined collection types, no nested collections, and no collection-of-collection types.
+Precept has nine collection types. Each wraps a scalar inner type (or two scalar types for `queue of T by P` and `lookup of K to V`), provides a fixed set of mutation actions, and enforces structural safety through the proof engine. There are no user-defined collection types, no nested collections, and no collection-of-collection types.
 
 | Kind | Ordering | Duplicates | Use case | Example |
 |------|----------|------------|----------|---------|
 | `set of T` | Unordered | No | Tags, categories, membership sets | `field Tags as set of string` |
 | `queue of T` | FIFO | Yes | Work queues, waiting lists, processing pipelines | `field AgentQueue as queue of string` |
 | `stack of T` | LIFO | Yes | Undo logs, step histories, nested contexts | `field RepairSteps as stack of string` |
+| `log of T` | Insertion order (append-only) | Yes | Audit trails, event histories, compliance records | `field AuditTrail as log of string` |
+| `log of T by P` | P order (append-only, P unique) | No (P unique) | Compliance records with external ordering keys | `field AuditLog as log of string by instant` |
+| `bag of T` | Unordered | Yes (per-element count) | Inventory, shopping carts, frequency counting | `field CartItems as bag of string` |
+| `list of T` | Insertion order (mutable positions) | Yes | Approval chains, ordered steps | `field ApprovalChain as list of string` |
+| `queue of T by P` | P order (priority/ordered) | Yes (stable FIFO tiebreak) | Priority work queues, triage systems | `field ClaimQueue as queue of string by integer` |
+| `lookup of K to V` | By key | No (keys unique, values may repeat) | Config tables, fee schedules, per-category settings | `field CoverageLimits as lookup of string to decimal` |
 
 **Grammar:**
 
 ```
 CollectionType  :=  (set | queue | stack) of ScalarType
+                |   bag of ScalarType
+                |   list of ScalarType
+                |   log of ScalarType
+                |   log of ScalarType by ScalarType
+                |   queue of ScalarType by ScalarType DirectionModifier?
+                |   lookup of ScalarType to ScalarType
+DirectionModifier := ascending | descending
 ```
 
 The inner type `T` must be a scalar type — any primitive type (`string`, `integer`, `decimal`, `number`, `boolean`, `choice`) or the special `~string` variant. Collections of collections are not supported.
 
-**Common surface:** All three kinds share `.count`, `contains`, `clear`, `mincount`/`maxcount` constraints, and list literal defaults. Kind-specific operations are documented per section below.
+**Common surface:** All nine kinds share `.count`. `set`, `queue`, `stack`, `bag`, `log`, and `list` share `contains` for value membership. `lookup` uses `contains` for key membership; `queue of T by P` uses `contains` for value membership. `set`, `queue`, `stack`, `bag`, `log`, and `list` support `mincount`/`maxcount` constraints and list literal defaults (except `queue of T by P` and `lookup of K to V` — see per-type constraint notes). `clear` applies to `set`, `queue`, `stack`, `bag`, and `list` only — not log types (append-only) and not `lookup` (has per-key `remove`). Kind-specific operations are documented per section below.
 
 ---
 
@@ -226,12 +239,183 @@ from InRepair on UndoLastStep
 
 ---
 
+## `log of T`
+
+**Declaration:**
+
+```precept
+field AuditTrail     as log of string
+field AssessmentNotes as log of string
+field StatusHistory  as log of string
+field EventLog       as log of instant
+field AuditTrail     as log of string notempty
+```
+
+**Behavior:** Append-only ordered sequence. Elements can be added but never removed. The append-only invariant guarantees `.count` is monotonically non-decreasing — the proof engine uses this to discharge non-emptiness proofs after any `append`. Models audit trails, event histories, and compliance records where immutability is a structural requirement, not a convention.
+
+**Actions:**
+
+| Action | Syntax | Behavior |
+|--------|--------|----------|
+| `append` | `append F Expr` | Add element to the end of the log. Always safe — no precondition. |
+
+No removal operations exist by design. `clear`, `remove`, and all other mutation actions are type errors on a log field.
+
+```precept
+from any on any
+    -> append AuditTrail "{CurrentState} -> {Event.Name}"
+    -> no transition
+
+from InReview on AddNote
+    -> append AssessmentNotes AddNote.Text
+    -> no transition
+```
+
+**Accessors:**
+
+| Member | Returns | Proof requirement | Notes |
+|--------|---------|-------------------|-------|
+| `.count` | `integer` | None | Always safe — returns 0 for empty log. |
+| `.first` | `T` | `.count > 0` guard required | First (oldest) element. Obligation: `UnguardedCollectionAccess`. Discharged statically by `notempty`. |
+| `.last` | `T` | `.count > 0` guard required | Last (most recent) element. Obligation: `UnguardedCollectionAccess`. Discharged statically by `notempty`. |
+| `.at(N)` | `T` | `N >= 0 and N < F.count` | Element at zero-based position `N`. Obligation: `UnguardedCollectionAccess`. |
+
+```precept
+from Review on Examine when AuditTrail.count > 0
+    -> set FirstEntry = AuditTrail.first
+    -> set LastEntry  = AuditTrail.last
+    -> no transition
+from Review on Examine
+    -> reject "Audit trail is empty"
+```
+
+```precept
+from Audit on GetEntry when AuditTrail.count > GetEntry.Index and GetEntry.Index >= 0
+    -> set Entry = AuditTrail.at(GetEntry.Index)
+    -> no transition
+```
+
+**Constraints:** `notempty`, `mincount N`, `maxcount N`, `optional`, `default [...]`. `notempty` statically discharges `.first` and `.last` access safety — no per-access `.count > 0` guard needed when the field is declared `notempty`.
+
+**Proof engine implications:** `append` is always safe. `.first`/`.last` require `.count > 0` (same obligation as `.peek` on queue/stack). `.at(N)` requires an index-bounds guard: `N >= 0 and N < F.count`. The append-only invariant lets the proof engine conclude `.count > 0` after any `append` — subsequent `.first`/`.last` accesses in the same action block are safe without a separate guard.
+
+**Backing type:** Custom `ImmutableLog<T>` — pair-of-stacks (Okasaki functional queue) using two `ImmutableStack<T>` instances (front + back). O(1) `append`, O(1) `.last`, amortized O(1) `.first`, O(n) `.at(index)`. Structural sharing across snapshots.
+
+**Type errors:**
+
+| Expression | Diagnostic |
+|---|---|
+| `add LogField Expr` | `CollectionOperationOnScalar` — `add` is a set operation |
+| `remove LogField Expr` | `CollectionOperationOnScalar` — `remove` is a set operation |
+| `enqueue LogField Expr` | `CollectionOperationOnScalar` — `enqueue` is a queue operation |
+| `push LogField Expr` | `CollectionOperationOnScalar` — `push` is a stack operation |
+| `clear LogField` | `CollectionOperationOnScalar` — `clear` is not valid on an append-only log |
+| `set LogField = Expr` | `ScalarOperationOnCollection` |
+| `append LogField Expr` where `Expr` type ≠ `T` | `TypeMismatch` |
+
+---
+
+## `log of T by P`
+
+**Declaration:**
+
+```precept
+field ComplianceLog as log of string  by instant
+field AuditLog      as log of string  by integer
+field EventHistory  as log of string  by integer
+```
+
+**Behavior:** Append-only ordered log where entries are ordered by an external ordering key `P`, not by insertion order. `P` must be **unique** across all entries. Uniqueness is a precondition on `append`: authors write a `when not (F contains P)` guard to discharge it. Without the guard the proof engine raises `UnguardedCollectionAccess`; if the guard is present and evaluates false at runtime the transition rejects. The compiler cannot prove uniqueness statically in general — the same pattern as emptiness-guarded accessors.
+
+Models compliance records and audit logs where entries carry an external ordering key (timestamp from an external system, regulatory sequence number, business priority ID) and the log must be readable in key order. `P` values are expected to arrive mostly in order (new `P` > current max), with occasional out-of-order entries. `P` must be orderable — numeric types and `choice of T(...) ordered`.
+
+**Actions:**
+
+| Action | Syntax | Behavior |
+|--------|--------|----------|
+| `append F Expr by P` | `append ComplianceLog entry by RecordEvent.Timestamp` | Add entry at P-ordered position. `Expr` must be type `T`; `P` must match the declared ordering key type. Precondition: `P` not already in log. Write `when not (F contains P)` guard — proof engine raises `UnguardedCollectionAccess` if absent. |
+
+```precept
+from Active on RecordEvent
+    when not (ComplianceLog contains RecordEvent.Timestamp)
+    -> append ComplianceLog RecordEvent.Description by RecordEvent.Timestamp
+    -> no transition
+from Active on RecordEvent
+    -> reject "Duplicate timestamp — entry already recorded"
+
+from Filing on SubmitEntry
+    when not (AuditLog contains SubmitEntry.SequenceNumber)
+    -> append AuditLog SubmitEntry.Payload by SubmitEntry.SequenceNumber
+    -> no transition
+from Filing on SubmitEntry
+    -> reject "Duplicate sequence number"
+```
+
+**Accessors:**
+
+| Member | Returns | Proof requirement | Notes |
+|--------|---------|-------------------|-------|
+| `.count` | `integer` | None | Always safe. |
+| `.first` | `T` | `.count > 0` guard required | Entry with minimum `P` value. Obligation: `UnguardedCollectionAccess`. |
+| `.last` | `T` | `.count > 0` guard required | Entry with maximum `P` value. Obligation: `UnguardedCollectionAccess`. |
+| `.at(N)` | `T` | `N >= 0 and N < F.count` | Nth entry in `P` order (zero-based). Obligation: `UnguardedCollectionAccess`. |
+
+```precept
+from Audit on GetOldest when ComplianceLog.count > 0
+    -> set OldestEntry = ComplianceLog.first
+    -> no transition
+from Audit on GetOldest
+    -> reject "Compliance log is empty"
+```
+
+**Constraints:** `notempty`, `mincount N`, `maxcount N`, `optional`. `notempty` statically discharges `.first`/`.last` access safety. No `default [...]` — list literals do not carry ordering keys.
+
+**Backing type:** Custom immutable sorted linked list with P-order insertion and cached head + tail pointers. O(1) in-order append (new `P` > current max — the overwhelmingly common case for timestamps), O(k) near-tail out-of-order insertion, O(n) worst-case. O(1) `.first`/`.last`, O(n) `.at(index)`. Structural sharing: in-order append shares entire prefix.
+
+**Uniqueness enforcement:** `P` uniqueness is a precondition on `append`, not a runtime fault. Authors write `when not (F contains P)` (P-type argument → key membership) to guard the transition; the proof engine raises `UnguardedCollectionAccess` if the guard is absent. If the guard evaluates false at runtime the transition rejects — consistent with all other preconditions in Precept.
+
+The uniqueness check has **the same complexity as the append itself** — it piggybacks on the position-finding scan at no additional cost:
+
+- **Common case (P > current max):** Compare P to the cached tail pointer. If `P > tail.P`, uniqueness is proven in O(1) — a duplicate cannot exist beyond the current max. The `contains` guard is O(1) and the append is O(1).
+- **Out-of-order case:** The scan back from the tail to find the insertion position already traverses existing P values in sorted order. Uniqueness is verified during that same O(k) traversal — no second pass.
+
+`ImmutableSortedDictionary<P, T>` would require O(log n) `ContainsKey` even for the common in-order case. The custom sorted linked list is therefore strictly better on the uniqueness check performance as well as on append.
+
+**Distinction from `queue of T by P`:**
+
+| Property | `log of T by P` | `queue of T by P` |
+|---|---|---|
+| Removal | None — append-only, entries are permanent | `dequeue` removes the front element |
+| `P` uniqueness | Required — `when not (F contains P)` precondition; transition rejects if guard fails | Not required — stable FIFO tiebreak |
+| `.at(N)` | Available | Not available |
+| Purpose | Permanent ordered compliance record | Ordered work queue |
+
+**Type errors:**
+
+| Expression | Diagnostic |
+|---|---|
+| `add LogField Expr` | `CollectionOperationOnScalar` |
+| `clear LogField` | `CollectionOperationOnScalar` — not valid on an append-only log |
+| `set LogField = Expr` | `ScalarOperationOnCollection` |
+| `append LogField Expr` (missing `by`) | `MissingOrderingKey` — `log of T by P` requires a `by P` clause on every `append` |
+| `append LogField Expr by P` where `Expr` type ≠ `T` | `TypeMismatch` |
+| `append LogField Expr by P` where `P` expression type ≠ declared ordering type | `TypeMismatch` |
+
+---
+
 ## Inner Type System
 
-The inner type `T` in `set of T`, `queue of T`, or `stack of T` must be a scalar type. The collection grammar is:
+The inner type `T` in any Precept collection must be a scalar type. For two-type-parameter collections (`queue of T by P`, `lookup of K to V`), both type parameters must be scalar types. The collection grammar is:
 
 ```
 CollectionType    :=  (set | queue | stack) of ScalarType
+                  |   bag of ScalarType
+                  |   list of ScalarType
+                  |   log of ScalarType
+                  |   log of ScalarType by ScalarType
+                  |   queue of ScalarType by ScalarType DirectionModifier?
+                  |   lookup of ScalarType to ScalarType
+DirectionModifier :=  ascending | descending
 ScalarType        :=  string | ~string | integer | decimal | number | boolean
                   |   ChoiceType
                   |   date | time | datetime | instant | duration
@@ -270,7 +454,7 @@ field Labels as set of ~string   # OrdinalIgnoreCase — "Apple" and "apple" are
 
 **`~string` is collection-only.** `field Name as ~string` is a compile-time error: `CaseInsensitiveStringOnNonCollection`. The `~` prefix is only valid immediately after `of` in a collection type position.
 
-**`~string` in queue and stack.** While `~string` is most meaningful for sets (where deduplication and membership benefit from case-insensitive comparison), it is also valid as the inner type for `queue of ~string` and `stack of ~string`. The `contains` operator on these collections uses `OrdinalIgnoreCase` matching.
+**`~string` in queue, stack, and log.** While `~string` is most meaningful for sets (where deduplication and membership benefit from case-insensitive comparison), it is also valid as the inner type for `queue of ~string`, `stack of ~string`, and `log of ~string`. The `contains` operator on these collections uses `OrdinalIgnoreCase` matching.
 
 ### Temporal and Business-Domain Inner Types
 
@@ -375,12 +559,28 @@ add Charges $50 EUR     # TypeMismatch — expected money in 'USD', got money in
 | `SetType` | `set` | Set collection type (dual-use with action keyword `set`) |
 | `QueueType` | `queue` | Queue collection type |
 | `StackType` | `stack` | Stack collection type |
+| `LogType` | `log` | Log collection type |
 | `Of` | `of` | Collection inner type connector |
+| `By` | `by` | Ordering key connector in `log of T by P` and `queue of T by P` (contextual keyword) |
 | `Tilde` | `~` | Case-insensitive inner type prefix |
+| `Append` | `append` | Append action keyword for log |
 | `Into` | `into` | Dequeue/pop target keyword |
 | `Contains` | `contains` | Membership operator |
 | `Mincount` | `mincount` | Minimum count constraint |
 | `Maxcount` | `maxcount` | Maximum count constraint |
+| `BagType` | `bag` | Bag collection type |
+| `ListType` | `list` | List collection type |
+| `LookupType` | `lookup` | Lookup collection type |
+| `To` | `to` | Key-to-value connector in `lookup of K to V` (contextual keyword) |
+| `Put` | `put` | Put action keyword for lookup |
+| `For` | `for` | Key-access expression keyword for lookup (contextual keyword) |
+| `Insert` | `insert` | Insert action keyword for list |
+| `At` | `at` | Position keyword in `insert F at N` (contextual keyword) |
+| `RemoveAt` | `remove-at` | Remove-at-index action keyword for list |
+| `Ascending` | `ascending` | Sort direction modifier (contextual keyword in type position) |
+| `Descending` | `descending` | Sort direction modifier (contextual keyword in type position) |
+| `Countof` | `countof` | Per-element count accessor on bag |
+| `Peekby` | `peekby` | Ordering-value peek accessor on `queue of T by P` |
 
 **`set` disambiguation:** The lexer always emits `TokenKind.Set` for the word `set`. In `ParseTypeRef()`, when followed by `of`, the parser treats it as the collection type `SetType`. Outside type position, `set` is the action keyword for scalar field assignment.
 
@@ -402,6 +602,13 @@ when Tags contains "urgent"
 | `set of T` | `T` (or widens to `T`) | `boolean` |
 | `queue of T` | `T` | `boolean` |
 | `stack of T` | `T` | `boolean` |
+| `log of T` | `T` | `boolean` |
+| `log of T by P` | `T` | `boolean` — value membership |
+| `log of T by P` | `P` | `boolean` — key (P) membership; use this to guard `append` |
+| `bag of T` | `T` | `boolean` — value membership (count ≥ 1) |
+| `list of T` | `T` | `boolean` |
+| `queue of T by P` | `T` | `boolean` — value membership |
+| `lookup of K to V` | `K` | `boolean` — key membership |
 | non-collection | — | type error |
 
 **Case sensitivity:** `contains` on `set of string` is case-sensitive (ordinal). `contains` on `set of ~string` is case-insensitive (`OrdinalIgnoreCase`). `contains` on `queue of ~string` and `stack of ~string` is also case-insensitive.
@@ -422,6 +629,15 @@ Precept enforces emptiness safety through proof obligations. Operations that wou
 | `SetField.max` | `SetField.count > 0` | `UnguardedCollectionAccess` |
 | `QueueField.peek` | `QueueField.count > 0` | `UnguardedCollectionAccess` |
 | `StackField.peek` | `StackField.count > 0` | `UnguardedCollectionAccess` |
+| `LogField.first` | `LogField.count > 0` | `UnguardedCollectionAccess` |
+| `LogField.last` | `LogField.count > 0` | `UnguardedCollectionAccess` |
+| `LogField.at(N)` | `N >= 0 and N < LogField.count` | `UnguardedCollectionAccess` |
+| `ListField.first` | `ListField.count > 0` | `UnguardedCollectionAccess` |
+| `ListField.last` | `ListField.count > 0` | `UnguardedCollectionAccess` |
+| `ListField.at(N)` | `N >= 0 and N < ListField.count` | `UnguardedCollectionAccess` |
+| `QueueByPField.peek` | `QueueByPField.count > 0` | `UnguardedCollectionAccess` |
+| `QueueByPField.peekby` | `QueueByPField.count > 0` | `UnguardedCollectionAccess` |
+| `LookupField for K` | `LookupField contains K` | `KeyPresenceSafety` |
 
 ### Mutation proof obligations
 
@@ -440,7 +656,15 @@ Precept enforces emptiness safety through proof obligations. Operations that wou
 | `contains` | Returns `false` on empty — no fault possible. |
 | `add`, `remove` | No-op on irrelevant input — no fault possible. |
 | `enqueue`, `push` | Always succeeds — adds to any collection. |
+| `append` on `log of T` | Always succeeds — append-only, no precondition. |
+| `append` on `log of T by P` | Precondition: `P` not already in log. Write `when not (F contains P)` guard — see Emptiness Safety § Proof obligations. |
 | `clear` | No-op on empty — no fault possible. |
+| `add`, `remove` (bag) | `add` always safe. `remove` is no-op when element count is 0 — no fault possible. |
+| `append`, `remove` (list) | `append` always safe. `remove` (first-occurrence) is no-op if absent — no fault possible. |
+| `insert at N`, `remove-at N` (list) | Require index-bounds guard: `N >= 0 and N <= F.count` for `insert`, `N >= 0 and N < F.count` for `remove-at`. |
+| `enqueue` (queue of T by P) | Always safe — no precondition. |
+| `put`, `remove` (lookup) | Both always safe — `put` creates or overwrites; `remove` is no-op if absent. |
+| `F for K` (lookup) | Requires `F contains K` guard. Obligation: `KeyPresenceSafety`. |
 
 ### Guard pattern
 
@@ -455,7 +679,9 @@ from Accepting on SeatNextParty
     -> reject "No party is currently waiting"
 ```
 
-The proof engine recognizes `F.count > 0` in the `when` clause as sufficient proof for all `.peek`, `.min`, `.max`, `dequeue`, and `pop` operations on `F` within that transition row's action block. This is structurally guaranteed — if the guard is satisfied, the collection is non-empty, and the operation is safe.
+The proof engine recognizes `F.count > 0` in the `when` clause as sufficient proof for all `.peek`, `.min`, `.max`, `.first`, `.last`, `dequeue`, and `pop` operations on `F` within that transition row's action block. This is structurally guaranteed — if the guard is satisfied, the collection is non-empty, and the operation is safe.
+
+For `lookup of K to V`, the analogous pattern is key-presence: `F contains K` in the `when` clause discharges `KeyPresenceSafety` for `F for K` in the same row's action block.
 
 **Philosophy:** Emptiness safety connects to the language's totality guarantee (§0.11 of the spec): every expression evaluates to a result, never to an undefined or fault state. The compiler proves emptiness safety or emits a diagnostic. Runtime fault checks exist only as defensive redundancy for paths the compiler has already proven unreachable.
 
@@ -465,10 +691,11 @@ The proof engine recognizes `F.count > 0` in the `when` clause as sufficient pro
 
 | Constraint | Applicable to | Meaning |
 |---|---|---|
-| `mincount N` | `set`, `queue`, `stack` | Collection must contain at least N elements |
-| `maxcount N` | `set`, `queue`, `stack` | Collection must contain at most N elements |
+| `notempty` | `set`, `queue`, `stack`, `log`, `bag`, `list`, `queue of T by P` | Collection must contain at least one element. Statically discharges `.min`/`.max`/`.peek`/`.peekby`/`.first`/`.last` access safety. Equivalent to `mincount 1`. |
+| `mincount N` | `set`, `queue`, `stack`, `log`, `bag`, `list`, `queue of T by P`, `lookup` | Collection must contain at least N elements |
+| `maxcount N` | `set`, `queue`, `stack`, `log`, `bag`, `list`, `queue of T by P`, `lookup` | Collection must contain at most N elements |
 | `optional` | any field type (including collections) | Field may be unset; requires `is set` guard before use |
-| `default [...]` | `set`, `queue`, `stack` | Initial value — list literal of scalar elements |
+| `default [...]` | `set`, `queue`, `stack`, `log`, `bag`, `list` | Initial value — list literal of scalar elements. Not applicable to `queue of T by P` (two-axis elements) or `lookup of K to V` (key-value pairs require explicit key syntax). |
 
 **Constraint validation rules:**
 
@@ -478,9 +705,9 @@ The proof engine recognizes `F.count > 0` in the `when` clause as sufficient pro
 | Negative `mincount` or `maxcount` | `InvalidModifierValue` |
 | Duplicate modifier | `DuplicateModifier` |
 | `mincount`/`maxcount` on scalar field | `InvalidModifierForType` |
-| `min`/`max`/`nonnegative`/`notempty`/`minlength`/`maxlength`/`maxplaces` on collection field | `InvalidModifierForType` |
+| `min`/`max`/`nonnegative`/`minlength`/`maxlength`/`maxplaces` on collection field | `InvalidModifierForType` |
 
-**Scalar constraints do not apply to collections.** `notempty`, `min`, `max`, `minlength`, `maxlength`, `maxplaces`, `nonnegative`, `positive`, `nonzero`, and `ordered` are all type errors when applied as field-level modifiers on collection fields (e.g., `field Tags as set of string ordered` is invalid). Collections have their own constraint vocabulary: `mincount` and `maxcount`. Note that `ordered` on the *inner `choice of T(...)` type* is valid — `field Priorities as set of choice of string("low", "medium", "high") ordered` declares an ordered-choice inner type, not a collection-level modifier.
+**Scalar constraints do not apply to collections.** `min`, `max`, `minlength`, `maxlength`, `maxplaces`, `nonnegative`, `positive`, `nonzero`, and `ordered` are all type errors when applied as field-level modifiers on collection fields (e.g., `field Tags as set of string ordered` is invalid). Collections have their own constraint vocabulary: `notempty`, `mincount`, and `maxcount`. Note that `ordered` on the *inner `choice of T(...)` type* is valid — `field Priorities as set of choice of string("low", "medium", "high") ordered` declares an ordered-choice inner type, not a collection-level modifier.
 
 ---
 
@@ -504,7 +731,7 @@ field InitialQueue as queue of string default ["first"]
 | List in non-default position | List literal used outside a `default` clause | `ListLiteralOutsideDefault` |
 | Empty list as default | Valid — initializes an empty collection | — |
 
-**Design:** List literals are deliberately restricted to `default` clauses. They are not general-purpose expressions — you cannot assign a list literal via `set` or use one in a `when` guard. This keeps the action surface focused on element-level operations (`add`, `remove`, `enqueue`, `push`) rather than bulk replacement.
+**Design:** List literals are deliberately restricted to `default` clauses. They are not general-purpose expressions — you cannot assign a list literal via `set` or use one in a `when` guard. This keeps the action surface focused on element-level operations (`add`, `remove`, `enqueue`, `push`, `append`) rather than bulk replacement.
 
 ---
 
@@ -520,23 +747,30 @@ set Message = "Tags: {Tags}"        # InvalidInterpolationCoercion
 set Message = "Tag count: {Tags.count}"
 ```
 
-This restriction exists because collections have no canonical string representation — they are unordered (set) or ordered-by-insertion (queue, stack), and the language does not define a serialization format for them.
+This restriction exists because collections have no canonical string representation — they are unordered (set) or ordered-by-insertion or append-only (queue, stack, log), and the language does not define a serialization format for them.
 
 ---
 
 ## Action Summary
 
-| Action | Set | Queue | Stack | Value | Proof |
-|--------|-----|-------|-------|-------|-------|
-| `add F Expr` | ✓ | ✗ | ✗ | `T` | — |
-| `remove F Expr` | ✓ | ✗ | ✗ | `T` | — |
-| `enqueue F Expr` | ✗ | ✓ | ✗ | `T` | — |
-| `dequeue F` | ✗ | ✓ | ✗ | — | `.count > 0` |
-| `dequeue F into G` | ✗ | ✓ | ✗ | — | `.count > 0` |
-| `push F Expr` | ✗ | ✗ | ✓ | `T` | — |
-| `pop F` | ✗ | ✗ | ✓ | — | `.count > 0` |
-| `pop F into G` | ✗ | ✗ | ✓ | — | `.count > 0` |
-| `clear F` | ✓ | ✓ | ✓ | — | — |
+| Action | Set | Queue | Stack | Log | Bag | List | Queue/P | Lookup | Value | Proof |
+|--------|-----|-------|-------|-----|-----|------|---------|--------|-------|-------|
+| `add F Expr` | ✓ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | `T` | — |
+| `remove F Expr` | ✓ | ✗ | ✗ | ✗ | ✓ (decrement) | ✓ (first-occurrence) | ✗ | ✗ | `T` | — |
+| `enqueue F Expr` | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | `T` | — |
+| `enqueue F Expr by P` | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | `T`, `P` | — |
+| `dequeue F` | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | — | `.count > 0` |
+| `dequeue F into G` | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | — | `.count > 0` |
+| `dequeue F into G by H` | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | — | `.count > 0` |
+| `push F Expr` | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | `T` | — |
+| `pop F` | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | — | `.count > 0` |
+| `pop F into G` | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | — | `.count > 0` |
+| `append F Expr` | ✗ | ✗ | ✗ | ✓ | ✗ | ✓ | ✗ | ✗ | `T` | — |
+| `insert F at N Expr` | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | `T` | index-bounds |
+| `remove-at F N` | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | — | index-bounds |
+| `put F K = V` | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | `K`, `V` | — |
+| `remove F K` (lookup) | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | `K` | — |
+| `clear F` | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✗ | — | — |
 
 **Cross-kind errors:** Applying an action to the wrong collection kind emits `CollectionOperationOnScalar`. Applying a collection action to a scalar field emits `CollectionOperationOnScalar`. Applying a scalar action (`set =`) to a collection field emits `ScalarOperationOnCollection`.
 
@@ -544,143 +778,43 @@ This restriction exists because collections have no canonical string representat
 
 ## Accessor Summary
 
-| Member | Set | Queue | Stack | Returns | Proof |
-|--------|-----|-------|-------|---------|-------|
-| `.count` | ✓ | ✓ | ✓ | `integer` | — |
-| `.min` | ✓ (T orderable) | ✗ | ✗ | `T` | `.count > 0` |
-| `.max` | ✓ (T orderable) | ✗ | ✗ | `T` | `.count > 0` |
-| `.peek` | ✗ | ✓ | ✓ | `T` | `.count > 0` |
+| Member | Set | Queue | Stack | Log | Bag | List | Queue/P | Lookup | Returns | Proof |
+|--------|-----|-------|-------|-----|-----|------|---------|--------|---------|-------|
+| `.count` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | `integer` | — |
+| `.min` | ✓ (T orderable) | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | `T` | `.count > 0` |
+| `.max` | ✓ (T orderable) | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | `T` | `.count > 0` |
+| `.peek` | ✗ | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | ✗ | `T` | `.count > 0` |
+| `.peekby` | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | `P` | `.count > 0` |
+| `.first` | ✗ | ✗ | ✗ | ✓ | ✗ | ✓ | ✗ | ✗ | `T` | `.count > 0` |
+| `.last` | ✗ | ✗ | ✗ | ✓ | ✗ | ✓ | ✗ | ✗ | `T` | `.count > 0` |
+| `.at(N)` | ✗ | ✗ | ✗ | ✓ | ✗ | ✓ | ✗ | ✗ | `T` | `N >= 0 and N < F.count` |
+| `.countof(E)` | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | `integer` | — |
+| `F for K` | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | `V` | `F contains K` |
 
 ---
 
-## Proposed Extensions
+## `bag of T`
 
-> **These are design proposals, not shipped features.** They represent research findings from the collection iteration (frank-6) and collection rules (frank-7) investigations. No syntax below is implemented. All proposals are subject to design review and owner approval before implementation.
-
-### Quantifier Predicates
-
-**Motivation:** The current collection surface provides membership testing (`contains`) and cardinality (`.count`, `mincount`, `maxcount`), but no way to express constraints over the *elements* of a collection. Business rules like "all items must be positive" or "at least one reviewer matches the submitter" require element-level predicates.
-
-**Research basis:** CEL (Common Expression Language) provides 5 parse-time macros — `all`, `exists`, `exists_one`, `filter`, `map` — all non-Turing-complete, expanding at parse time over finite collections. OPA/Rego uses universal/existential quantification over sets. SQL uses `ALL`/`ANY`/`EXISTS` over subqueries.
-
-**Recommendation:** Bounded quantifier predicates only — `each`, `any`, `no`. No general loops, no `map`/`filter`/`reduce`.
-
-**Rationale:** Quantifiers are logical predicates over finite collections, not iteration constructs. They are provably terminating — the collection is finite and no mutation occurs during evaluation. This distinguishes them from general iteration, which the language philosophy explicitly excludes (§0.4.1 "No iteration constructs").
-
-**Approved syntax:**
+**Declaration:**
 
 ```precept
-# Universal — all elements must satisfy predicate
-rule each item in Items (item > 0) because "All items must be positive"
-
-# Existential — at least one element satisfies predicate
-when any r in Reviewers (r == Approve.ReviewerName)
-
-# Negated existential — no element satisfies predicate
-rule no a in Amounts (a < 0) because "No negative amounts permitted"
-
-# Compound guard — predicate scopes cleanly within parens
-from Submitted on Approve
-    when any r in Reviewers (r == Approve.ReviewerName) and MissingDocuments.count == 0
-    -> set ApprovedBy = Approve.ReviewerName
-    -> transition Approved
+field CartItems      as bag of string
+field Ingredients    as bag of string
+field DiagnosisCodes as bag of string
+field ItemQuantities as bag of integer
 ```
 
-**Syntax form:** `quantifier binding in Collection (predicate)` — the binding variable is a bare identifier named by the author and locally scoped to the parenthesized predicate. The predicate is a boolean expression.
+**Behavior:** Multiset (unordered collection with duplicates). Each element has an associated count. Adding an element increments its count; removing decrements (removing when count is 1 deletes the element). An element with count 0 is absent.
 
-**Grammar sketch:**
+**Actions:**
 
-```
-QuantifierExpr  :=  QuantifierKind Identifier in CollectionField '(' BoolExpr ')'
-QuantifierKind  :=  each | any | no
-```
-
-**Lexer note:** `any` is already a reserved keyword in the Precept lexer. `each` and `no` require new lexer entries. The previously reserved `all` keyword is superseded by `each` — `each` is grammatically correct ("each item in Items") where `all` would be broken English ("all item in Items").
-
-**Decided (Q2 — three keywords):** The language ships `each`, `any`, `no` as three distinct keywords. Three keywords are more discoverable and read more naturally in business rules. `no` reads better than `not any` in business rule context.
-
-**Decided (Q3 — named binding):** The quantifier syntax uses author-named binding variables (`item`, `r`, `a`). Named bindings are explicit and avoid nesting ambiguity. A fixed `it` pronoun creates scoping problems if quantifiers are ever nested.
-
-**What is deliberately held back:** `map`, `filter`, `reduce`, `sum`, and any transformation that produces a new collection or aggregate value. These require structured collection element types (a larger feature surface) and would cross the line from predicate into computation.
-
-**Philosophy compatibility:** Quantifiers are bounded predicates — they assert a property of every/some/no element in a finite collection. They do not mutate state, do not introduce loop variables, and terminate in bounded time. They are consistent with §0.4.1 IF the spec is amended to explicitly distinguish bounded predicates from general iteration. This is an open question (see below).
-
-### Additional Field Constraints
-
-**Research basis:** Survey of FluentAssertions, Zod, Valibot, FluentValidation, OPA/Rego, Bean Validation (JSR-380), and SQL constraints. A 6-category taxonomy was developed:
-
-1. **Cardinality** — `mincount`/`maxcount` (already shipped)
-2. **Membership/value** — `contains` (already shipped)
-3. **Element-shape (quantified predicates)** — requires quantifiers (proposed above)
-4. **Ordering** — relative order of elements (partial path: `choice of T(...) ordered` as an inner type already enables element-level comparison via declaration-position rank, making `.min`/`.max` valid and enabling quantifier predicates like `each x in Items (x >= "medium")` over ordered-choice sets; the remaining gap is ordering *constraints* on element sequences — e.g., "elements must be monotonically increasing" — which has no path yet)
-5. **Cross-collection** — relationships between two collection fields
-6. **Aggregate-relational** — `.count`, `.min`, `.max` in rule expressions (already shipped)
-
-**Proposed 3-layer rollout:**
-
-**Layer A (first priority): Field constraint keywords** — ~70% coverage with zero new expression constructs.
-
-| Keyword | Applicable to | Meaning | Proof engine |
-|---|---|---|---|
-| `unique` | `queue`, `stack` | No duplicate elements permitted | Obligation diagnostic. Redundant (tautological) on `set` — compiler may warn. |
-| `notempty` | `set`, `queue`, `stack` | Collection must contain at least one element. Equivalent to `mincount 1`. | Statically verifiable in many cases. |
-| `subset` | `set of T` × `set of T` | All elements of this set are in the target set | Static when T is `choice`-typed; obligation diagnostic for `string`. |
-| `disjoint` | `set of T` × `set of T` | No elements of this set are in the target set | Same provability boundary as `subset`. |
-
-**`unique` on `set`:** Sets already enforce uniqueness by definition. Applying `unique` to a `set` field is semantically redundant. The recommended behavior is a compiler warning (`RedundantModifier`) — parallel to `nonnegative` + `positive` on the same numeric field.
-
-**`notempty` on collections:** `notempty` is currently a string-only constraint. Extending it to collections creates a natural parallel — `notempty` means "this thing must not be empty," whether it's a string (`.length > 0`) or a collection (`.count > 0`). The alternative is to continue requiring `mincount 1`, which works but is verbose for the most common cardinality constraint.
-
-**`subset`/`disjoint` form (open question):** These could be field modifiers in the declaration (`field Selected as set of string subset AllowedValues`) or rule expressions in the body (`rule Selected subset AllowedValues`). The declaration form is more concise; the rule form is more flexible (can reference computed or conditional relationships).
-
-**Layer B (second priority): Quantifier predicates** — `each`/`any`/`no` as described above.
-
-**Layer C (deferred): Dedicated `check` blocks** — readability-only sugar, no new capability beyond what rules + quantifiers provide. Deferred until the need becomes clear from real-world usage.
-
-### Open Questions
-
-1. **Philosophy compatibility of quantifiers.** Does §0.4.1 "No iteration constructs" philosophically allow bounded quantifiers? Should the spec be amended to explicitly distinguish bounded predicates from general iteration? The distinction is meaningful — quantifiers assert truth over a finite domain, they don't iterate — but the current spec wording doesn't draw this line.
-
-2. **Quantifier priority.** Should quantifiers ship before or after proof engine / graph analyzer work that's already in flight? Quantifiers introduce proof obligations — the compiler must verify that the predicate holds for all elements, or emit a diagnostic. This work depends on the proof engine's ability to reason about collection elements.
-
-3. **Collection `notempty` keyword.** Should `notempty` on a collection reuse the same keyword as string `notempty`, or get a distinct keyword? Reusing the keyword creates a natural parallel ("`notempty` means non-empty, regardless of what it's applied to"). A distinct keyword avoids potential confusion if the semantics diverge in the future.
-
-4. **`unique` on `set` type.** Should `unique` on a `set` produce a warning (redundant — sets can't have duplicates) or silently accept? A warning is parallel to `RedundantModifier` for numeric constraints. Silent acceptance is more forgiving but allows conceptual mistakes to pass unnoticed.
-
-5. **Cross-collection constraint form.** Should `subset`/`disjoint` be field modifiers (in the declaration) or rule expressions (in rule/ensure/when bodies)? Field modifiers are concise and declarative. Rule expressions are more flexible — they can be conditional, they can reference event args, and they can compose with boolean logic.
-
-6. **Proposal granularity.** One combined proposal for all collection extensions, or two separate increments — quantifiers as one, field-level constraints as another? The 3-layer recommendation suggests separate increments (Layer A ships first, Layer B second), but the formal proposal structure is TBD.
-
-7. **Collection type expansion.** After quantifier predicates and field constraints ship, which collection type — if any — should be next? The §Proposed Additional Types section below surveys candidates. Before any of these could become a formal GitHub issue, the following research would be needed: (a) a concrete corpus of `.precept` files that cannot express a real business rule without the proposed type, (b) a proof engine impact assessment for the type's mutation operations, (c) an inner type compatibility analysis (which scalar types are valid, which are type errors), and (d) a philosophy review confirming the type reads as domain declaration, not general-purpose programming.
-
-8. ~~Temporal and business-domain types as inner types~~ — **Resolved.** The `ScalarType` production now includes all temporal and business-domain types. `percentage` was a stale reference — this type does not exist in the business-domain type system. See §Temporal and Business-Domain Inner Types for the full expansion. Locked Decision.
-
----
-
-## Proposed Additional Types
-
-> **This is research and proposal, not shipped behavior.** The candidates below were evaluated against external collection systems and filtered through Precept's philosophy: prevention not detection, deterministic inspectability, proof engine safety, keyword-anchored flat statements, business-analyst readability, and non-Turing-completeness. No syntax below is implemented.
-
-### Evaluation Criteria
-
-Every candidate must pass all six filters before advancing:
-
-1. **Unlocks a business rule** that `set`/`queue`/`stack` cannot express today
-2. **Deterministic and inspectable** — no hidden ordering surprises, no ambient state
-3. **Proof engine can reason about safety** — access patterns are statically verifiable
-4. **Fits Precept's keyword-anchored flat-statement style** — no nested expressions or builder chains
-5. **Business analyst readable** — the keyword name communicates behavior without documentation
-6. **Non-Turing-complete** — finite, bounded operations; no unbounded recursion or general iteration
-
-### Candidate 1: `bag of T` (multiset)
-
-**What it is:** Like `set` but allows duplicate elements. Each element has an associated count. Supports `add` (increment count), `remove` (decrement count), `.countof(element)` accessor.
-
-**Business scenario:** An inventory system tracks item quantities. A shopping cart allows multiple units of the same SKU. A claims processor counts how many times a particular diagnosis code appears.
+| Action | Syntax | Behavior |
+|--------|--------|----------|
+| `add` | `add F Expr` | Increment count of `Expr` in `F`. Always safe — no precondition. |
+| `remove` | `remove F Expr` | Decrement count of `Expr`. If count reaches 0, element is removed. No-op if element absent. |
+| `clear` | `clear F` | Remove all elements. |
 
 ```precept
-field CartItems as bag of string
-
 from Shopping on AddItem
     -> add CartItems AddItem.SKU
     -> no transition
@@ -693,92 +827,134 @@ rule CartItems.countof("hazmat-item") <= 3
     reason "No more than 3 hazardous items per order"
 ```
 
-**Proof engine implications:** `.countof(element)` always returns a non-negative integer (0 if absent) — always safe, no proof obligation. `.count` returns total element count including duplicates. The proof engine must understand that `remove` on a bag decrements rather than deletes (the element persists until count reaches 0).
+**Accessors:**
 
-**Grammar fit:**
-
-```
-field F as bag of T
-```
-
-Natural keyword — "bag" is the established mathematical term for multiset, and is more intuitive to a business analyst than "multiset."
-
-**Action surface:** Reuses `add`, `remove`, `clear`. New accessor: `.countof(element)` — returns integer count of a specific element.
-
-**Priority:** **High.** This unlocks counting and quantity-tracking rules that `set` (which collapses duplicates) and `queue`/`stack` (which don't expose per-element counts) cannot express. Many real business domains need "how many of X" as a first-class concept.
-
-### Candidate 2: `list of T`
-
-**What it is:** An ordered sequence with stable positions, duplicates allowed, and index access. Differs from all existing types:
-- `queue` — ordered, but FIFO-only, no random access
-- `stack` — ordered, but LIFO-only, no random access
-- `log` — ordered + positional read, but append-only (no removal)
-- `set` — unordered, no duplicates
-- `bag` — unordered, duplicates allowed
-
-`list` is the only type with: ordered positions + arbitrary insertion AND arbitrary positional removal.
-
-**Business scenario:** An approval chain where reviewers can recuse themselves — ordered sequence, arbitrary removal by value or position. Ordered step lists where steps can be retracted. Any domain where sequence matters and elements can be withdrawn.
-
-**Proof engine implications:**
-- `.at(N)` — tractable. Requires index-bounds guard (`when Items.count > N`), same pattern as emptiness guards on `.peek`, extended to two-sided bounds check. Author supplies the guard; proof engine discharges from it.
-- `insert` / `remove-at` — **shift subsequent positions**. Once element at index 1 is removed, every proof about "element at index 3" is stale. `log`'s append-only invariant gives the proof engine stable positions. `list`'s arbitrary mutation does not. Per-access index-bounds safety is achievable; cross-mutation positional invariants are not. This is a real cost.
-
-**Grammar fit:**
-
-```
-field F as list of T
-```
-
-Clean. Reuses `of`. No new declaration keywords.
-
-**Action surface:** `append`, `insert F at N Expr` (insert at position), `remove F Expr` (first-occurrence removal), `remove-at F N` (positional removal), `clear`. Accessors: `.at(N)`, `.first`, `.last`, `.count`.
-
-**Relation to `bag` and `log`:**
-- vs `bag`: orthogonal. `bag` tracks frequencies (unordered); `list` tracks positions (ordered). Neither subsumes the other.
-- vs `log`: deliberate non-overlap. `log` covers "immutable record that accumulates" — positional read (`.at(N)`, `.first`, `.last`) IS in `log`. `list` adds the one thing `log` prohibits: arbitrary removal. If `log` satisfies real positional-read use cases in practice, the incremental case for `list` weakens.
-
-**Priority:** **Low.** Not a reject — no philosophy violation (unlike ring buffer's silent eviction). But the genuine incremental territory over `log` is narrow (arbitrary removal), the proof cost of positional-mutation is real, and mutable-ordered-list business scenarios are rarer than `bag`/`log`/`lookup` frequency. Right sequencing: evaluate after `log` ships.
-
-### Candidate 3: `deque of T`
-
-**What it is:** Double-ended queue. Supports push/pop at both front and back.
-
-**Business scenario:** A customer service queue that supports both normal FIFO processing and priority escalation to the front. A browser-history model that adds to the back and can trim from either end.
+| Member | Returns | Proof requirement | Notes |
+|--------|---------|-------------------|-------|
+| `.count` | `integer` | None | Total element count including all duplicates (sum of all per-element counts). Always safe. |
+| `.countof(Expr)` | `integer` | None | Count of a specific element. Returns 0 if absent. Always safe. |
+| `contains` | `boolean` | None | Value membership (returns `true` if count ≥ 1). Always safe. |
 
 ```precept
-field ServiceQueue as deque of string
+from Reviewing on CheckHazmat when CartItems.countof("hazmat-item") > 0
+    -> set HazmatCount = CartItems.countof("hazmat-item")
+    -> no transition
+```
 
-from Active on EnqueueNormal
-    -> push-back ServiceQueue EnqueueNormal.CustomerId
+**Constraints:** `notempty`, `mincount N`, `maxcount N`, `optional`, `default [T, T, ...]`. `notempty` enforces `.count >= 1` (state-entry constraint). No `.first`/`.last`/`.peek` — bag is unordered, no positional accessors.
+
+**Proof engine implications:** No new proof obligations beyond count-based. `.countof(Expr)` is always safe (returns 0 if absent). The proof engine must understand `remove` decrements rather than unconditionally deletes — element persists until count reaches 0. Sequential action tracking: proof engine tracks how `add`/`remove` changes `.count` within a transition row.
+
+**Backing type:** `ImmutableDictionary<T, int>` mapping each element to its count. `add` = `SetItem(k, count+1)`, `remove` = count > 1 ? `SetItem(k, count-1)` : `Remove(k)`. O(log n) all ops.
+
+**Type errors:**
+
+| Scenario | Error |
+|---|---|
+| `add F Expr` where `Expr` type ≠ `T` | `TypeMismatch` |
+| `.countof(Expr)` where `Expr` type ≠ `T` | `TypeMismatch` |
+| `enqueue BagField Expr` | `CollectionOperationOnScalar` — `enqueue` is a queue operation |
+| `set BagField = Expr` | `ScalarOperationOnCollection` |
+
+---
+
+## `list of T`
+
+**Declaration:**
+
+```precept
+field ApprovalChain   as list of string
+field ProcessingSteps as list of string
+field Waypoints       as list of string
+field PriorityItems   as list of integer
+```
+
+**Behavior:** Ordered sequence with stable positions. Duplicates allowed. Supports arbitrary insertion and removal by position or value. Differs from `log` (append-only) by supporting arbitrary removal; differs from `queue`/`stack` by supporting positional access without consuming elements.
+
+**Actions:**
+
+| Action | Syntax | Behavior |
+|--------|--------|----------|
+| `append` | `append F Expr` | Add `Expr` to the end of `F`. Always safe. |
+| `insert at N` | `insert F at N Expr` | Insert `Expr` at zero-based position `N`, shifting subsequent elements. Precondition: `N >= 0 and N <= F.count`. Author writes guard; proof engine raises `UnguardedCollectionAccess` if absent. |
+| `remove` | `remove F Expr` | Remove first occurrence of `Expr`. No-op if absent. |
+| `remove-at` | `remove-at F N` | Remove element at zero-based position `N`, shifting subsequent elements. Precondition: `N >= 0 and N < F.count`. Author writes guard; proof engine raises `UnguardedCollectionAccess` if absent. |
+| `clear` | `clear F` | Remove all elements. |
+
+```precept
+from Draft on AddReviewer
+    -> append ApprovalChain AddReviewer.ReviewerId
     -> no transition
 
-from Active on Escalate
-    -> push-front ServiceQueue Escalate.CustomerId
+from Draft on RemoveReviewer when ApprovalChain contains RemoveReviewer.ReviewerId
+    -> remove ApprovalChain RemoveReviewer.ReviewerId
     -> no transition
 
-from Active on ServeNext when ServiceQueue.count > 0
-    -> pop-front ServiceQueue into CurrentCustomer
-    -> transition Serving
+from Active on GetNextReviewer when ApprovalChain.count > 0
+    -> set CurrentReviewer = ApprovalChain.first
+    -> no transition
 ```
 
-**Proof engine implications:** Same emptiness obligations as queue/stack — `pop-front` and `pop-back` require `.count > 0`. Two peek variants: `.peekfront` and `.peekback`, each requiring the same guard.
+**Accessors:**
 
-**Grammar fit:**
+| Member | Returns | Proof requirement | Notes |
+|--------|---------|-------------------|-------|
+| `.count` | `integer` | None | Always safe. |
+| `.first` | `T` | `.count > 0` guard required | First element. Obligation: `UnguardedCollectionAccess`. Discharged statically by `notempty`. |
+| `.last` | `T` | `.count > 0` guard required | Last element. Obligation: `UnguardedCollectionAccess`. Discharged statically by `notempty`. |
+| `.at(N)` | `T` | `N >= 0 and N < F.count` | Element at zero-based position `N`. Obligation: `UnguardedCollectionAccess`. |
 
+```precept
+from Active on InspectChain when ApprovalChain.count > 0
+    -> set FirstReviewer = ApprovalChain.first
+    -> set LastReviewer  = ApprovalChain.last
+    -> no transition
+
+from Active on GetReviewer when ApprovalChain.count > GetReviewer.Index and GetReviewer.Index >= 0
+    -> set Reviewer = ApprovalChain.at(GetReviewer.Index)
+    -> no transition
 ```
-field F as deque of T
+
+**Constraints:** `notempty`, `mincount N`, `maxcount N`, `optional`, `default [T, T, ...]`. `notempty` statically discharges `.first`/`.last` access obligations.
+
+**Proof engine implications:** Index-bounds obligations (`UnguardedCollectionAccess`) for `.at(N)`, `insert at N`, and `remove-at N`. Author writes `when N >= 0 and N < F.count` (or `N <= F.count` for `insert at`) guard; proof engine raises `UnguardedCollectionAccess` if absent. Sequential action tracking: proof engine tracks count changes from `insert`, `remove`, `remove-at`, and `clear` within a transition row and re-verifies subsequent access guards against updated count. Positional stability across mutations (e.g., after `remove-at 0`, positions shift) is the author's responsibility — the proof engine proves access safety, not value-level positional invariants.
+
+**Backing type:** `ImmutableList<T>` (.NET) — AVL tree with structural sharing. O(log n) insert, remove, index access. O(1) `.count`.
+
+**Type errors:**
+
+| Scenario | Error |
+|---|---|
+| `insert F at N Expr` where `N` type is not `integer` | `TypeMismatch` |
+| `.at(N)` where `N` type is not `integer` | `TypeMismatch` |
+| `append F Expr` where `Expr` type ≠ `T` | `TypeMismatch` |
+| `insert F at N Expr` where `Expr` type ≠ `T` | `TypeMismatch` |
+| `set ListField = Expr` | `ScalarOperationOnCollection` |
+
+---
+
+## `queue of T by P`
+
+**Declaration:**
+
+```precept
+field ClaimQueue  as queue of string by choice of string("critical", "high", "normal", "low") ordered
+field WorkItems   as queue of string by integer ascending
+field ScoredQueue as queue of string by integer descending
+field TriageQueue as queue of string by integer
 ```
 
-**Action surface:** New keywords required: `push-front`, `push-back`, `pop-front`, `pop-back`. New accessors: `.peekfront`, `.peekback`. This is 4 new action keywords and 2 new accessors — a significant surface expansion.
+**Behavior:** A queue where elements are dequeued by ordering value rather than insertion order. Each element has two axes: a value (type `T`) and an ordering key (type `P`). The ordering type `P` must be orderable (numeric or `choice of T(...) ordered`). Dequeue always removes the element with the best ordering value according to the declared sort direction. When multiple elements share the same ordering value, they are dequeued in the order they were enqueued — **insertion-order (stable) tiebreaking**. This is a language guarantee, not an implementation detail.
 
-**Priority:** **Deferred.** The double-ended access pattern is rare in business-rule domains. Most real scenarios are either FIFO (queue) or LIFO (stack). The escalation pattern can be modeled with two separate queues (priority + normal) or a `queue of T by P`. The keyword surface cost is high relative to the business-rule unlock (`push-front`, `push-back`, `pop-front`, `pop-back` = 4 new action keywords). Re-evaluate after `queue of T by P` ships and real usage confirms a gap that priority queuing cannot fill.
+**Actions:**
 
-### Candidate 4: `queue of T by P`
-
-**What it is:** A queue where elements are dequeued by ordering value rather than insertion order. Each element has two axes: a value (type `T`) and an ordering key (type `P`). The ordering type `P` must be orderable (numeric or `choice of T(...) ordered`). Dequeue always removes the element with the best ordering value according to the declared sort direction.
-
-**Business scenario:** A claims triage system where claims are processed by severity. A work-item queue where urgent items bypass the normal order.
+| Action | Syntax | Behavior |
+|--------|--------|----------|
+| `enqueue` | `enqueue F Expr by P` | Add element `Expr` with ordering value `P`. Always safe — no precondition. |
+| `dequeue` | `dequeue F` | Remove and discard the front (best-ordered) element. Precondition: `F.count > 0`. Obligation: `UnguardedCollectionMutation`. |
+| `dequeue into` | `dequeue F into G` | Remove front element; store value in field `G` (type `T`). Precondition: `F.count > 0`. Obligation: `UnguardedCollectionMutation`. |
+| `dequeue into by` | `dequeue F into G by H` | Remove front element; store value in `G` (type `T`) and ordering value in `H` (type `P`). Precondition: `F.count > 0`. Obligation: `UnguardedCollectionMutation`. |
+| `clear` | `clear F` | Remove all elements. |
 
 ```precept
 field ClaimQueue as queue of string
@@ -792,6 +968,46 @@ from Processing on ProcessNext when ClaimQueue.count > 0
     -> dequeue ClaimQueue into CurrentClaim by CurrentSeverity
     -> transition Reviewing
 ```
+
+```precept
+from Processing on CheckNext when ClaimQueue.count > 0
+    -> set NextClaimId  = ClaimQueue.peek
+    -> set NextSeverity = ClaimQueue.peekby
+    -> no transition
+```
+
+**Accessors:**
+
+| Member | Returns | Proof requirement | Notes |
+|--------|---------|-------------------|-------|
+| `.count` | `integer` | None | Total number of elements across all ordering groups. Always safe. |
+| `.peek` | `T` | `.count > 0` guard required | Element value of the front (best-ordered) item. Obligation: `UnguardedCollectionAccess`. |
+| `.peekby` | `P` | `.count > 0` guard required | Ordering value of the front (best-ordered) item. Obligation: `UnguardedCollectionAccess`. |
+
+```precept
+from Triage on Inspect when ClaimQueue.count > 0
+    -> set TopClaim    = ClaimQueue.peek
+    -> set TopSeverity = ClaimQueue.peekby
+    -> no transition
+from Triage on Inspect
+    -> reject "No claims in queue"
+```
+
+**Constraints:** `notempty`, `mincount N`, `maxcount N`, `optional`. No `default [...]` — elements have two axes (T and P); list literal syntax would be ambiguous. `notempty` statically discharges `.peek`/`.peekby` access obligations.
+
+**Proof engine implications:** Emptiness obligations identical to `queue`. The ordering value introduces a secondary type requirement — the `by` argument on `enqueue` must match the declared ordering type `P`, and `P` must satisfy `TypeTrait.Orderable`. The proof engine must understand that dequeue order is by ordering value (respecting direction), not insertion, which affects reasoning about which element `.peek` and `.peekby` return. The direction modifier is a static property of the field declaration.
+
+**Backing type:** `SortedDictionary<TPriority, Queue<TElement>>` (each ordering bucket is a FIFO queue) with a separately maintained element counter. For `ordered choice of T` ordering types, the comparer is built from declaration-position rank at build time. .NET's `PriorityQueue<T,P>` cannot be used directly — it explicitly does not guarantee tiebreak order.
+
+**Type errors:**
+
+| Scenario | Error |
+|---|---|
+| `enqueue F Expr by P` where `Expr` type ≠ `T` | `TypeMismatch` |
+| `enqueue F Expr by P` where `P` expression type ≠ declared ordering type | `TypeMismatch` |
+| `dequeue F into G` where `G` type ≠ `T` | `TypeMismatch` |
+| `.peek` or `.peekby` without `count > 0` guard | `UnguardedCollectionAccess` |
+| `P` type is not orderable (does not satisfy `TypeTrait.Orderable`) | `TypeTrait.Orderable` violation |
 
 #### Sort Direction
 
@@ -828,13 +1044,6 @@ If no direction modifier is specified, the default is `ascending`.
 | `.peek` | `T` | `.count > 0` | Element value of the front (best-ordered) item |
 | `.peekby` | `P` | `.count > 0` | Ordering value of the front (best-ordered) item |
 | `.count` | `integer` | — | Number of elements in the queue |
-
-```precept
-from Processing on CheckNext when ClaimQueue.count > 0
-    -> set NextClaimId  = ClaimQueue.peek
-    -> set NextSeverity = ClaimQueue.peekby
-    -> no transition
-```
 
 **Design rationale:** Two separate accessors (`.peek` and `.peekby`) rather than a tuple or compound return. This is consistent with Precept's flat accessor model — every accessor returns a single scalar value. The declaration maps directly onto the two accessors: `queue of T by P` → `.peek` returns `T`, `.peekby` returns `P`.
 
@@ -915,18 +1124,6 @@ OrderedQueueDecl :=
 
 Where `DirectionModifier` defaults to `ascending` if omitted.
 
-**Proof engine implications:** Emptiness obligations identical to `queue`. The ordering value introduces a secondary type requirement — the `by` argument on `enqueue` must match the declared ordering type `P`, and `P` must satisfy `TypeTrait.Orderable`. The proof engine must understand that dequeue order is by ordering value (respecting direction), not insertion, which affects reasoning about which element `.peek` and `.peekby` return. The direction modifier is a static property of the field declaration.
-
-**Tiebreak guarantee:** When multiple elements share the same ordering value, they are dequeued in the order they were enqueued — **insertion-order (stable) tiebreaking**. This is a language guarantee, not an implementation detail. `.count` returns the total number of elements across all ordering groups. Quantifier predicates iterate all elements, not just those at the front ordering value.
-
-**Direction override note:** `.peek` and `.peekby` always reflect the field's declared direction. Direction is fixed at declaration — there is no per-operation override.
-
-**Implementation note:** `.NET`'s `PriorityQueue<TElement, TPriority>` cannot be the direct backing type — it explicitly does not guarantee tiebreak order. The approved backing structure is `SortedDictionary<TPriority, Queue<TElement>>` (each ordering bucket is a FIFO queue) with a separately maintained element counter. For `ordered choice of T` ordering types, the comparer must be built from declaration-position rank at build time — natural string ordering gives the wrong result.
-
-**Action surface:** Extends `enqueue` with required `by` clause. Extends `dequeue into` with optional `by` capture clause. Adds `ascending`/`descending` as direction modifiers (contextual keywords in type-position only). Reuses `clear`, `.count`. Adds `.peekby` accessor. `by`, `ascending`, `descending` are contextual keywords.
-
-**Priority:** **Medium.** Ordered-queue processing is a real business pattern, and the two-type-parameter grammar generalizes cleanly with `lookup`. The proof surface is manageable — emptiness obligations are identical to `queue`, and direction is a static property. The quantifier binding shape (`.value`/`.by`) sets a precedent for all future two-type-parameter collections.
-
 #### Resolved Design Questions
 
 The following questions from frank-14 are now resolved:
@@ -949,52 +1146,31 @@ The following questions from frank-14 are now resolved:
 
 2. **`ascending`/`descending` keyword reuse.** These keywords may also be relevant for future ordering features beyond `queue of T by P`. Should they be reserved broadly as ordering modifiers, or scoped specifically to priority queue declarations?
 
-### Candidate 5: `log of T`
+---
 
-**What it is:** An append-only ordered sequence. Elements can be added but never removed. Supports `.count`, positional read (`.at(index)`), `.last`, and `.first`. Models audit trails, event histories, and compliance records.
+## `lookup of K to V`
 
-**Business scenario:** A loan application must maintain an immutable record of all status changes for regulatory compliance. An insurance claim tracks every assessment note chronologically.
-
-```precept
-field AuditTrail as log of string
-
-from any on any
-    -> append AuditTrail "{CurrentState} -> {Event.Name}: {Event.Reason}"
-    -> no transition
-
-rule AuditTrail.count > 0
-    reason "Every entity must have at least one audit entry"
-
-from Review on Examine when AuditTrail.count > 0
-    -> set LastAction = AuditTrail.last
-    -> no transition
-```
-
-**Proof engine implications:** `append` is always safe (no precondition). `.last` and `.first` require `.count > 0` (same obligation pattern as `.peek`). `.at(index)` requires `index >= 0 and index < F.count` — this introduces an index-bounds proof obligation, which is a new category of safety proof. The append-only invariant simplifies reasoning: the proof engine knows that `.count` is monotonically non-decreasing within an event.
-
-**Grammar fit:**
-
-```
-field F as log of T
-```
-
-"Log" is immediately understandable to a business analyst — "this is the audit log."
-
-**Action surface:** One new keyword: `append`. New accessors: `.first`, `.last`, `.at(index)`. No removal operations exist by design.
-
-**Priority:** **High.** Append-only audit trails are a pervasive business requirement across regulated industries (finance, insurance, healthcare). No existing collection type can model "add but never remove" — `queue` allows `dequeue`, `stack` allows `pop`, and `set` allows `remove`. The `log` type makes the immutability guarantee structural, which is exactly Precept's philosophy of prevention over detection.
-
-**Note on `list of T` overlap:** The positional-read accessors — `.at(N)`, `.first`, `.last` — appear in both `log` and the separately evaluated `list of T` candidate. The overlap is deliberate: `log` covers the common case — read-only positional access on an accumulating record with a stable, monotonically growing index space. `list of T` is the separate evaluation for mutable ordered sequences, adding the one operation `log` prohibits: arbitrary positional removal. If `log` satisfies real positional-read use cases in practice, the incremental case for `list` weakens.
-
-### Candidate 6: `lookup of K to V`
-
-**What it is:** A key-value association. Each key maps to exactly one value. Supports set-by-key, get-by-key, contains-key, and remove-by-key.
-
-**Business scenario:** A policy record maps coverage types to their limits. A fee schedule maps transaction types to fee amounts. A configuration entity maps setting names to values.
+**Declaration:**
 
 ```precept
-field CoverageLimits as lookup of string to decimal
+field CoverageLimits  as lookup of string to decimal
+field FeeSchedule     as lookup of string to decimal
+field ConfigSettings  as lookup of string to string
+field CategoryCounts  as lookup of string to integer
+```
 
+**Behavior:** Key-value association. Each key maps to exactly one value. Keys are unique — `put` with an existing key overwrites. `remove` on an absent key is a no-op. Value access via `for` keyword requires a key-presence guard.
+
+**Actions:**
+
+| Action | Syntax | Behavior |
+|--------|--------|----------|
+| `put` | `put F K = V` | Set key `K` to value `V`. Always safe — creates or overwrites. |
+| `remove` | `remove F K` | Remove entry with key `K`. No-op if absent. Always safe. |
+
+Value access (`F for K`) is an expression (not an action) — used in `set` and `when` clauses. Precondition: `F contains K`. Author writes `when F contains K` guard; proof engine raises `KeyPresenceSafety` if absent.
+
+```precept
 from Draft on SetCoverage
     -> put CoverageLimits SetCoverage.CoverageType = SetCoverage.Limit
     -> no transition
@@ -1003,25 +1179,213 @@ from Active on CheckCoverage when CoverageLimits contains CheckCoverage.Coverage
     -> set CurrentLimit = CoverageLimits for CheckCoverage.CoverageType
     -> no transition
 
+from Active on RemoveCoverage
+    -> remove CoverageLimits RemoveCoverage.CoverageType
+    -> no transition
+
 rule CoverageLimits.count <= 10
     reason "No more than 10 coverage types per policy"
 ```
 
-**Proof engine implications:** `F for key` requires a `contains` guard — same pattern as emptiness proofs but keyed. This is a new proof obligation category: key-presence safety. `put` is always safe (creates or overwrites). `remove` requires no guard (no-op if absent, like `remove` on `set`). The proof engine must track key-presence from `contains` guards in `when` clauses.
+**Accessors:**
+
+| Member | Returns | Proof requirement | Notes |
+|--------|---------|-------------------|-------|
+| `.count` | `integer` | None | Number of key-value pairs. Always safe. |
+| `F for K` | `V` | `F contains K` guard required | Value at key `K`. Obligation: `KeyPresenceSafety`. |
+| `contains K` | `boolean` | None | Key membership (type `K` argument). Always safe — returns `false` if lookup is empty. |
+
+```precept
+from Active on ApplyFee when FeeSchedule contains ApplyFee.TransactionType
+    -> set ApplicableFee = FeeSchedule for ApplyFee.TransactionType
+    -> no transition
+from Active on ApplyFee
+    -> reject "No fee defined for this transaction type"
+```
+
+**Constraints:** `notempty`, `mincount N`, `maxcount N`, `optional`. No `default [...]` — key-value pairs require explicit key syntax not supported in list-literal form.
+
+**Proof engine implications:** New obligation category: **key-presence safety** (`KeyPresenceSafety`). `F for K` is guarded by `F contains K` in a `when` clause — same structural pattern as emptiness-guarded accessors but keyed rather than count-based. The proof engine must track key-presence from `contains` guards in `when` clauses and propagate that information to `for` access in the same transition row's actions. `put` and `remove` are always safe.
+
+**Backing type:** `ImmutableDictionary<K, V>`. O(log n) all ops. `put` = `SetItem`, `remove` = `Remove` (no-op if absent per .NET contract).
+
+**Type errors:**
+
+| Scenario | Error |
+|---|---|
+| `put F K = V` where `K` type does not match declared `K` | `TypeMismatch` |
+| `put F K = V` where `V` type does not match declared `V` | `TypeMismatch` |
+| `F for K` where `K` type does not match declared `K` | `TypeMismatch` |
+| `contains K` where argument type does not match declared `K` | `TypeMismatch` |
+| `F for K` without `F contains K` guard | `KeyPresenceSafety` |
+| `K` or `V` is not a scalar type | `CollectionInnerTypeError` |
+
+---
+
+## Proposed Extensions
+
+> **These are design proposals, not shipped features.** They represent research findings from the collection iteration (frank-6) and collection rules (frank-7) investigations. No syntax below is implemented. All proposals are subject to design review and owner approval before implementation.
+
+### Quantifier Predicates
+
+**Motivation:** The current collection surface provides membership testing (`contains`) and cardinality (`.count`, `mincount`, `maxcount`), but no way to express constraints over the *elements* of a collection. Business rules like "all items must be positive" or "at least one reviewer matches the submitter" require element-level predicates.
+
+**Research basis:** CEL (Common Expression Language) provides 5 parse-time macros — `all`, `exists`, `exists_one`, `filter`, `map` — all non-Turing-complete, expanding at parse time over finite collections. OPA/Rego uses universal/existential quantification over sets. SQL uses `ALL`/`ANY`/`EXISTS` over subqueries.
+
+**Recommendation:** Bounded quantifier predicates only — `each`, `any`, `no`. No general loops, no `map`/`filter`/`reduce`.
+
+**Rationale:** Quantifiers are logical predicates over finite collections, not iteration constructs. They are provably terminating — the collection is finite and no mutation occurs during evaluation. This distinguishes them from general iteration, which the language philosophy explicitly excludes (§0.4.1 "No iteration constructs").
+
+**Approved syntax:**
+
+```precept
+# Universal — all elements must satisfy predicate
+rule each item in Items (item > 0) because "All items must be positive"
+
+# Existential — at least one element satisfies predicate
+when any r in Reviewers (r == Approve.ReviewerName)
+
+# Negated existential — no element satisfies predicate
+rule no a in Amounts (a < 0) because "No negative amounts permitted"
+
+# Compound guard — predicate scopes cleanly within parens
+from Submitted on Approve
+    when any r in Reviewers (r == Approve.ReviewerName) and MissingDocuments.count == 0
+    -> set ApprovedBy = Approve.ReviewerName
+    -> transition Approved
+```
+
+**Syntax form:** `quantifier binding in Collection (predicate)` — the binding variable is a bare identifier named by the author and locally scoped to the parenthesized predicate. The predicate is a boolean expression.
+
+**Grammar sketch:**
+
+```
+QuantifierExpr  :=  QuantifierKind Identifier in CollectionField '(' BoolExpr ')'
+QuantifierKind  :=  each | any | no
+```
+
+**Lexer note:** `any` is already a reserved keyword in the Precept lexer. `each` and `no` require new lexer entries. The previously reserved `all` keyword is superseded by `each` — `each` is grammatically correct ("each item in Items") where `all` would be broken English ("all item in Items").
+
+**Decided (Q2 — three keywords):** The language ships `each`, `any`, `no` as three distinct keywords. Three keywords are more discoverable and read more naturally in business rules. `no` reads better than `not any` in business rule context.
+
+**Decided (Q3 — named binding):** The quantifier syntax uses author-named binding variables (`item`, `r`, `a`). Named bindings are explicit and avoid nesting ambiguity. A fixed `it` pronoun creates scoping problems if quantifiers are ever nested.
+
+**What is deliberately held back:** `map`, `filter`, `reduce`, `sum`, and any transformation that produces a new collection or aggregate value. These require structured collection element types (a larger feature surface) and would cross the line from predicate into computation.
+
+**Philosophy compatibility:** Quantifiers are bounded predicates — they assert a property of every/some/no element in a finite collection. They do not mutate state, do not introduce loop variables, and terminate in bounded time. They are consistent with §0.4.1 IF the spec is amended to explicitly distinguish bounded predicates from general iteration. This is an open question (see below).
+
+### Additional Field Constraints
+
+**Research basis:** Survey of FluentAssertions, Zod, Valibot, FluentValidation, OPA/Rego, Bean Validation (JSR-380), and SQL constraints. A 6-category taxonomy was developed:
+
+1. **Cardinality** — `mincount`/`maxcount` (already shipped)
+2. **Membership/value** — `contains` (already shipped)
+3. **Element-shape (quantified predicates)** — requires quantifiers (proposed above)
+4. **Ordering** — relative order of elements (partial path: `choice of T(...) ordered` as an inner type already enables element-level comparison via declaration-position rank, making `.min`/`.max` valid and enabling quantifier predicates like `each x in Items (x >= "medium")` over ordered-choice sets; the remaining gap is ordering *constraints* on element sequences — e.g., "elements must be monotonically increasing" — which has no path yet)
+5. **Cross-collection** — relationships between two collection fields
+6. **Aggregate-relational** — `.count`, `.min`, `.max` in rule expressions (already shipped)
+
+**Proposed 3-layer rollout:**
+
+**Layer A (first priority): Field constraint keywords**
+
+| Keyword | Applicable to | Meaning | Proof engine |
+|---|---|---|---|
+| `notempty` | `set`, `queue`, `stack` | Collection must contain at least one element. Equivalent to `mincount 1`. | Statically verifiable in many cases. |
+
+**`notempty` on collections:** `notempty` is currently a string-only constraint. Extending it to collections creates a natural parallel — `notempty` means "this thing must not be empty," whether it's a string (`.length > 0`) or a collection (`.count > 0`). The alternative is to continue requiring `mincount 1`, which works but is verbose for the most common cardinality constraint.
+
+**Layer B (second priority): Quantifier predicates** — `each`/`any`/`no` as described above.
+
+
+### Open Questions
+
+1. ~~Philosophy compatibility of quantifiers.~~ — **Resolved.** §0.4.1 amended to explicitly distinguish bounded predicates from general iteration. Quantifiers (`each`/`any`/`no`) are permitted: they are declarative truth assertions over statically-declared finite collections, producing a single boolean value with no loop variable, no mutation, and no fixpoint reasoning required. The amendment lands in the same PR as the quantifier feature. See `docs/language/precept-language-spec.md` §0.4.1. Locked Decision.
+
+2. ~~Quantifier priority.~~ — **Resolved.** Parser support ships first, independent of proof engine work. TypeChecker, GraphAnalyzer, and Evaluator support are implemented in sequence afterward. Shane's decision: we are not gating quantifier parser support on Phase 3 completion. Locked Decision.
+
+3. ~~Collection `notempty` keyword.~~ — **Resolved.** `notempty` is reused for collections. The semantics are genuinely parallel — non-empty regardless of type — and a single keyword reinforces that consistency. Locked Decision.
+
+4. ~~`unique` on collections.~~ — **Rejected.** `unique` on `queue`/`stack` requires a composite backing structure (.NET's `ImmutableQueue`/`ImmutableStack` don't enforce uniqueness natively). On `set` it is redundant — sets already enforce uniqueness, so the modifier signals a conceptual mistake at best. On `queue of T by P` the semantics are ambiguous (unique on T, P, or the pair?). No clear value in any case. Locked Decision.
+
+5. ~~Cross-collection constraint form (`subset`/`disjoint`).~~ — **Rejected.** Quantifier predicates (`each`/`any`/`no`) already express subset and disjoint constraints as rules. The only scenario where `subset`/`disjoint` keywords would add value over quantifiers is a runtime-configured reference set, but in that case the constraint is still runtime-enforced — no static proof advantage exists. Two ways to say the same thing with no added guarantee. Locked Decision.
+
+6. ~~Proposal granularity.~~ — **Resolved.** `notempty` on collections and quantifier predicates (`each`/`any`/`no`) ship together in a single proposal on the `spike/Precept-V2` branch. No layered increment separation. Locked Decision.
+
+7. ~~Collection type expansion.~~ — **Resolved.** All non-deferred, non-rejected proposed types ship on `spike/Precept-V2`: `bag of T`, `log of T`, `lookup of K to V`, `queue of T by P`, `list of T`, and `log of T by P`. `deque of T` remains deferred. Rejected types (`sortedset`, `ringbuffer`, `multimap`, `capacity modifier`) remain out. Locked Decision.
+
+8. ~~Temporal and business-domain types as inner types~~ — **Resolved.** The `ScalarType` production now includes all temporal and business-domain types. `percentage` was a stale reference — this type does not exist in the business-domain type system. See §Temporal and Business-Domain Inner Types for the full expansion. Locked Decision.
+
+---
+
+## Proposed Additional Types
+
+> **This is research and proposal, not shipped behavior.** The candidates below were evaluated against external collection systems and filtered through Precept's philosophy: prevention not detection, deterministic inspectability, proof engine safety, keyword-anchored flat statements, business-analyst readability, and non-Turing-completeness. No syntax below is implemented.
+
+### Evaluation Criteria
+
+Every candidate must pass all six filters before advancing:
+
+1. **Unlocks a business rule** that `set`/`queue`/`stack` cannot express today
+2. **Deterministic and inspectable** — no hidden ordering surprises, no ambient state
+3. **Proof engine can reason about safety** — access patterns are statically verifiable
+4. **Fits Precept's keyword-anchored flat-statement style** — no nested expressions or builder chains
+5. **Business analyst readable** — the keyword name communicates behavior without documentation
+6. **Non-Turing-complete** — finite, bounded operations; no unbounded recursion or general iteration
+
+### ~~Candidate 1: `bag of T` (multiset)~~
+
+> Promoted to canonical design — see [§bag of T](#bag-of-t) above.
+
+### ~~Candidate 2: `list of T`~~
+
+> Promoted to canonical design — see [§list of T](#list-of-t) above.
+
+### Candidate 3: `deque of T`
+
+**What it is:** Double-ended queue. Supports push/pop at both front and back.
+
+**Business scenario:** A customer service queue that supports both normal FIFO processing and priority escalation to the front. A browser-history model that adds to the back and can trim from either end.
+
+```precept
+field ServiceQueue as deque of string
+
+from Active on EnqueueNormal
+    -> push-back ServiceQueue EnqueueNormal.CustomerId
+    -> no transition
+
+from Active on Escalate
+    -> push-front ServiceQueue Escalate.CustomerId
+    -> no transition
+
+from Active on ServeNext when ServiceQueue.count > 0
+    -> pop-front ServiceQueue into CurrentCustomer
+    -> transition Serving
+```
+
+**Proof engine implications:** Same emptiness obligations as queue/stack — `pop-front` and `pop-back` require `.count > 0`. Two peek variants: `.peekfront` and `.peekback`, each requiring the same guard.
 
 **Grammar fit:**
 
 ```
-field F as lookup of K to V
+field F as deque of T
 ```
 
-Introduces `to` as a type-position keyword connecting key and value types. Both `K` and `V` must be scalar types. The `to` keyword is new in this context but reads naturally.
+**Action surface:** New keywords required: `push-front`, `push-back`, `pop-front`, `pop-back`. New accessors: `.peekfront`, `.peekback`. This is 4 new action keywords and 2 new accessors — a significant surface expansion.
 
-> **Locked Decision — Access keyword: `for`.** Lookup value access uses the infix keyword `for`: `CoverageLimits for CheckCoverage.CoverageType`. Considered: `at`. Rejected: `at` would create ambiguity with future temporal constructs and reads less naturally with lookup field names in business context.
+**Priority:** **Deferred.** The double-ended access pattern is rare in business-rule domains. Most real scenarios are either FIFO (queue) or LIFO (stack). The escalation pattern can be modeled with two separate queues (priority + normal) or a `queue of T by P`. The keyword surface cost is high relative to the business-rule unlock (`push-front`, `push-back`, `pop-front`, `pop-back` = 4 new action keywords). Re-evaluate after `queue of T by P` ships and real usage confirms a gap that priority queuing cannot fill.
 
-**Action surface:** New keywords: `put`, `remove`, `for` (infix key-access keyword). `contains` (membership test) reuses the existing set operator — the type checker validates the argument against key type `K`. `remove` reuses the existing set action — no-op if key absent. `.count` reuses existing accessor. `.keys` and `.values` could return sets for use in `contains` and quantifier expressions.
+### ~~Candidate 4: `queue of T by P`~~
 
-**Priority:** **High.** Key-value association is fundamental to business modeling. Configuration tables, fee schedules, lookup mappings, and per-category settings are everywhere. Today, modeling these in Precept requires either multiple parallel fields or external application logic — both of which break the one-file-complete-rules guarantee. A `lookup` type keeps the association inside the contract.
+> Promoted to canonical design — see [§queue of T by P](#queue-of-t-by-p) above.
+
+### ~~Candidate 5: `log of T`~~
+
+> Promoted to canonical design — see [§log of T](#log-of-t) and [§log of T by P](#log-of-t-by-p) above.
+
+### ~~Candidate 6: `lookup of K to V`~~
+
+> Promoted to canonical design — see [§lookup of K to V](#lookup-of-k-to-v) above.
 
 ### Rejected: Ring Buffer / Circular Buffer
 
@@ -1103,20 +1467,21 @@ If Precept ever adds ordered-iteration constructs that make sorted order observa
 
 | Candidate | Priority | Rationale |
 |---|---|---|
-| `bag of T` | **High** | Unlocks quantity tracking — pervasive in commerce, inventory, counting rules |
-| `log of T` | **High** | Unlocks append-only audit trails — pervasive in regulated industries, aligns perfectly with prevention philosophy |
-| `lookup of K to V` | **High** | Unlocks key-value association — pervasive in configuration, fee schedules, coverage tables |
+| `bag of T` | **Approved** | Promoted to canonical design — see §bag of T |
+| `list of T` | **Approved** | Promoted to canonical design — see §list of T |
+| `queue of T by P` | **Approved** | Promoted to canonical design — see §queue of T by P |
+| `lookup of K to V` | **Approved** | Promoted to canonical design — see §lookup of K to V |
+| `log of T` | **Approved** | Promoted to canonical design — see §log of T and §log of T by P |
+| `log of T by P` | **Approved** | Promoted to canonical design — see §log of T by P |
 | `sortedset of T` | **Reject** | No Precept construct observes iteration order; `.min`/`.max` safety is owned by `notempty` alone; `set notempty` is proof-identical |
-| `queue of T by P` | **Medium** | Real pattern; two-type-parameter grammar generalizes with `lookup`; proof surface manageable (emptiness + static direction) |
 | `deque of T` | **Deferred** | Rare in business-rule domains; escalation pattern covered by priority queuing (`queue of T by P`); re-evaluate after `queue of T by P` ships |
-| `list of T` | **Low** | Narrow incremental territory over `log`; mutable-ordered-list use cases rarer than bag/log/lookup; evaluate after `log` ships |
 | `ringbuffer of T` | **Reject** | Silent eviction violates inspectability — implicit mutation the proof engine cannot track |
 | `capacity` modifier | **Reject** | Synonym for `maxcount` — language surface cost with no capability gain |
 | `multimap of K to V` | **Reject** | Nested collection semantics Precept explicitly excludes — use explicit set fields + constraints |
 
 ### Recommended Rollout
 
-1. **First:** `bag` and `log` — highest business-rule unlock per complexity dollar; `bag` extends the existing set action surface minimally, `log` introduces one new keyword (`append`) and aligns with audit/compliance requirements
+1. **First:** `bag` — highest business-rule unlock per complexity dollar; extends the existing set action surface minimally
 2. **Second:** `lookup` — highest structural value but largest surface expansion (new type connector `to`, new proof obligation category for key-presence)
 3. **Evaluate:** `queue of T by P` — two-type-parameter design resolved; evaluate after `lookup` ships since `by`/`to` share the role-connector pattern. `deque` deferred — insufficient business-rule pressure
 
@@ -1131,14 +1496,14 @@ If Precept ever adds ordered-iteration constructs that make sorted order observa
 | **Unordered unique set** | `HashSet<T>` | `HashSet` | `set` | `HashSet` | — | — | `Set<'T>` | `set of T` ✓ | — |
 | **Sorted unique set** | `SortedSet<T>` | `TreeSet` | — | `BTreeSet` | — | — | `Set<'T>` (sorted) | — | Rejected¶ |
 | **Insertion-order set** | — | `LinkedHashSet` | — | `IndexSet`* | — | — | — | — | Not proposed†† |
-| **Multiset / bag** | — | — | `Counter` | — | `MULTISET` | — | — | — | `bag of T` |
+| **Multiset / bag** | — | — | `Counter` | — | `MULTISET` | — | — | `bag of T` ✓ | — |
 | **FIFO queue** | `Queue<T>` | `ArrayDeque` | `deque` | `VecDeque` | — | — | — | `queue of T` ✓ | — |
 | **LIFO stack** | `Stack<T>` | `ArrayDeque` | `list` | `Vec` | — | — | — | `stack of T` ✓ | — |
 | **Double-ended queue** | — | `ArrayDeque` | `deque` | `VecDeque` | — | — | — | — | `deque of T` (**Deferred**) |
-| **Priority queue** | `PriorityQueue<T,P>` | `PriorityQueue` | `heapq` | `BinaryHeap` | — | — | — | — | `queue of T by P` (med pri) |
-| **Append-only log** | `ImmutableList<T>` | — | — | — | — | `list` (immutable) | `list` (cons) | — | `log of T` |
-| **Ordered sequence with random access** | `List<T>` | `ArrayList` | `list` | `Vec<T>` | — | — | — | — | `list of T` |
-| **Key-value map** | `Dictionary<K,V>` | `HashMap` | `dict` | `HashMap` | — | `map` | `Map<'K,'V>` | — | `lookup of K to V` |
+| **Priority queue** | `PriorityQueue<T,P>` | `PriorityQueue` | `heapq` | `BinaryHeap` | — | — | — | `queue of T by P` ✓ | — |
+| **Append-only log** | `ImmutableList<T>` | — | — | — | — | `list` (immutable) | `list` (cons) | `log of T` ✓, `log of T by P` ✓ | — |
+| **Ordered sequence with random access** | `List<T>` | `ArrayList` | `list` | `Vec<T>` | — | — | — | `list of T` ✓ | — |
+| **Key-value map** | `Dictionary<K,V>` | `HashMap` | `dict` | `HashMap` | — | `map` | `Map<'K,'V>` | `lookup of K to V` ✓ | — |
 | **Ring buffer** | — | `CircularFifoQueue`* | `deque(maxlen=N)` | — | — | — | — | — | Rejected† |
 | **Multimap** | `ILookup<K,V>` | `Multimap` (Guava) | — | — | — | — | `Map[K, List[V]]`‡ | — | Rejected§ |
 | **Non-empty guarantee** | — | — | — | — | `NOT NULL` | — | `NonEmpty` | `notempty`/`mincount 1` ✓ | — |
