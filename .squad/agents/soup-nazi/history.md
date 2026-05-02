@@ -28,3 +28,8 @@
 ### 2026-05-01 — Full-surface review summary compressed
 - Historical branch review work already established the sample integration gate, parser remediation anchors, whitespace-insensitivity regression layer, and the broad gap matrix that drove the spike's later test additions.
 - Earlier detailed notes were summarized here to keep the active history compact while preserving durable testing patterns and the branch's executed outcomes.
+
+### 2026-05-02T21:58:21Z — Canonical type checker batch closed
+- Soup-Nazi's checker test-strategy review is now part of the implementation baseline: expect roughly 450-550 tests, 3 non-negotiable validation gates, and 4 high-risk areas to anchor the slice-by-slice rollout.
+- The canonical checker design is now implementation-ready after Frank's response to George; treat the test review as required follow-through, not advisory commentary.
+- Future checker slices should keep error recovery, scope/binding behavior, qualifier-sensitive operations, and cross-consumer regression coverage explicitly pinned in tests.

@@ -1,14 +1,92 @@
 # Squad Decisions
 
-
-
 ---
-
-
 
 ## ACTIVE DECISIONS — Current Sprint
 
+---
 
+### 2026-05-02T21:58:21Z: GAP-046 design locked to dedicated CI FunctionKind entries
+
+**By:** Scribe
+
+**Status:** Recovered from merged inbox, deduplicated, inbox cleared (1 file)
+
+**Merged sources:** frank-gap046-design.
+
+- GAP-046 is now durably locked to the catalog-complete path: add FunctionKind.TildeStartsWith / FunctionKind.TildeEndsWith plus FunctionMeta.CIVariantOf so CI functions exist as real function metadata rather than only as HasCIVariant side effects.
+- Parser behavior stays intentionally unchanged; the ~ null-denotation path still derives CI-capable names from base-function HasCIVariant, while hover/completion/MCP follow-through must project from the new CI entries themselves.
+- The open downstream checker concern remains explicit: calling ~startsWith / ~endsWith with a non-~string first argument still needs a future diagnostic decision when the real CIFunctionCallExpression handler lands.
+
+---
+
+### 2026-05-02T21:58:20Z: Canonical checker review resolutions D-15 through D-25 recorded
+
+**By:** Scribe
+
+**Status:** Recovered from merged inbox, deduplicated, inbox cleared (1 file)
+
+**Merged sources:** frank-george-canonical-response.
+
+- Frank's canonical response now has its own durable ledger record: widening is single-hop only, binary fallback order is deterministic (left, right, both), numeric literals stay bottom-up with context retry, event handlers get event-arg scope, and identifier resolution priority is bindings > args > fields.
+- The response also locks the remaining checker-shape decisions George forced open: FieldScopeMode gates forward references, function overload resolution follows one deterministic pipeline, Slice 6 stays unsplit, TypedTransitionRow.ResolvedArgs stays rejected as anti-mirroring, and TypedEditDeclaration is placeholder-only for future stateless-edit work.
+- Net result: all 11 checker slices are implementation-ready with no unresolved design blockers.
+
+---
+
+### 2026-05-02T21:58:19Z: Research validation integration pattern and Slice 4 range check locked
+
+**By:** Scribe
+
+**Status:** Recovered from merged inbox, deduplicated, inbox cleared (1 file)
+
+**Merged sources:** frank-research-crossref.
+
+- Research-validation artifacts are now durably patterned: the full validation file lives in research/language/, the design doc cites it in a `## Research Validation` section, the working draft stays in docs/working/ but is marked superseded, and research/language/README.md indexes the validation set.
+- The same decision also adds out-of-range numeric literal checking to checker Slice 4: once expectedType resolves a literal, the checker validates the value against the representable range exposed by type metadata.
+- This establishes a reusable design-validation workflow instead of leaving research cross-reference work as one-off process drift.
+
+---
+
+### 2026-05-02T21:58:18Z: GAP-035, GAP-040, and GAP-042 implementation batch recorded
+
+**By:** Scribe
+
+**Status:** Recovered from merged inbox, deduplicated, inbox cleared (1 file)
+
+**Merged sources:** george-gap035-040-042.
+
+- George's implementation batch now durably records the shipped parser/catalog work: TypeMeta.ChoiceLiteralTokens drives ParseChoiceValue, BagAccessors.countof uses ElementParameterAccessor, and the dead variant-action dispatch arms for CollectionValueBy, RemoveAtIndex, and CollectionIntoBy were deleted rather than scaffolded.
+- The execution record preserves the test impact that the earlier design-only summaries did not: GAP-035 added choice-literal metadata/parser tests, GAP-040 added accessor-shape regressions, and GAP-042 remained a zero-behavior-change cleanup that stayed green across all 2713 existing tests.
+- Durable parser rule: variant-action syntax shapes do not justify unreachable helper methods or dispatch arms; if Actions.ByTokenKind cannot route there, the parser must throw rather than pretend to construct a live statement node.
+
+---
+
+### 2026-05-02T21:58:17Z: GAP-046 implementation completed and consumer follow-through pinned
+
+**By:** Scribe
+
+**Status:** Recovered from merged inbox, deduplicated, inbox cleared (1 file)
+
+**Merged sources:** george-gap046-complete.
+
+- George shipped the GAP-046 implementation exactly on Frank's approved design path: FunctionKind.TildeStartsWith / TildeEndsWith, FunctionMeta.CIVariantOf, CI hover cross-reference text, the §3.7 catalog footnote, and the matching function-test count updates all landed green.
+- The implementation record locks the downstream consumer contracts: LS CI completions derive from Functions.All.Where(f => f.CIVariantOf != null), future MCP language output projects a ciVariantOf field from the same metadata, and the eventual checker handler resolves CI calls through Functions.ByName["~" + name].
+- Parser Tilde handling, TypeChecker logic, and diagnostics all remain intentionally unchanged in this slice; the implementation is catalog/tooling surface completion, not a new parser or checker behavior change.
+
+---
+
+### 2026-05-02T21:58:16Z: Iteration 10 doc/catalog and catalog/impl audits synchronized
+
+**By:** Scribe
+
+**Status:** Recovered from merged inbox, deduplicated, inbox cleared (2 files; cross-audit merge normalized)
+
+**Merged sources:** frank-iteration10-audit, george-iteration10-audit.
+
+- Frank's doc/catalog pass and George's catalog/impl pass now sit in one durable audit trail: GAP-043/044/045 were fixed inline in docs, GAP-047 remains the open spec-underdocuments-domain-overloads issue, and the earlier GAP-046 catalog gap is now closed by the shipped implementation.
+- George's follow-on audit closes two more implementation drifts: ParseCollectionIntoStatement must throw on unreachable DequeueBy, and Modifiers now exposes an O(1) ByFieldToken index so parser modifier dispatch matches the rest of the catalog-driven parser surface.
+- The combined carry-forward rule is explicit: parser-facing catalogs need direct metadata indexes, and variant-action dead arms can hide in nested sub-switches just as easily as at top-level dispatch.
 
 ---
 

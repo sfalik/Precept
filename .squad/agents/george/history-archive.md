@@ -126,3 +126,124 @@ Archived updates moved from `history.md` during Scribe summarization.
 ### 2026-05-01T20:10:18Z — HandlesCatalogMember rename shipped
 - George-7 mechanically renamed `[HandlesForm]` to `[HandlesCatalogMember]` across the shared attribute, distributed-dispatch call sites, PRECEPT0019, tests, and docs in commit `08fdf85` on `spike/Precept-V2`.
 - Validation closed green at `2424/2424` tests passing; treat remaining `[HandlesForm]` mentions in old notes as historical rename context only.
+
+---
+
+## Archive Batch — 2026-05-02T21:58:21Z (scribe compaction)
+
+---
+
+## Recent Updates
+
+### 2026-05-02 — Frank accepted George's type checker review
+- Frank accepted 5 of George's 6 findings on the type-checker design review; the remaining item was reclassified as a non-finding because GAP-032 was already closed.
+- Frank's response resolves all 5 pre-requisites George surfaced: existing `FindCandidates`/`FindUnary` stay canonical, pre-Slice 0 shape records are now mandatory, field storage stays array-primary with a derived frozen name index, `TypedInputAction` gains an explicit secondary-role discriminator, and `[HandlesCatalogMember]` ownership must migrate from the stub to real handlers slice by slice.
+- The revised plan also locks explicit follow-through for partial-result error recovery, qualifier propagation, `ContentValidation` as a DU, and concrete slice ownership for method calls plus interpolated forms.
+
+### 2026-05-02 — Historical Summary (compacted)
+- Archived older update entries to `history-archive.md` until `george` history returned to the active-size target.
+- Durable themes retained in active history: current ownership, catalog-driven parser/runtime rules, and the newest implementation/audit outcomes.
+- Use the archive for the full slice-by-slice closeout trail and earlier review context.
+
+### 2026-05-02 — Active implementation snapshot
+- Detailed GAP-032, Iteration 8 audit, GAP-019 implementation, and rename-shipping notes were moved to `history-archive.md` to bring active context back under the size gate.
+- Active durable baseline: `pow(integer, integer)` proof requirements are fixed, GAP-019a/019b are shipped, and the Iteration 8 audit still defines the remaining parser catalog-derivation follow-ons before real TypeChecker/Evaluator implementation begins.
+- The newest type-checker-design review adds the current checker guardrails: pre-Slice 0 `SemanticIndex` shapes, array-primary field ordering, existing `Operations` multi-candidate lookup usage, `SecondaryRole` stamping, and disciplined `[HandlesCatalogMember]` stub migration.
+
+### 2026-05-02 — Iteration 10 Catalog-Impl Audit (GAP-060, GAP-061)
+
+- **Variant-action dead arms can hide in sub-switches, not just the top-level dispatch.** GAP-042 cleared the three dead arms from ParseActionStatement's top-level switch. GAP-060 found the same pattern one level down in ParseCollectionIntoStatement's bottom switch: ActionKind.DequeueBy was emitting a real DequeueByStatement instead of throwing. Rule: any arm for a variant action (PrimaryActionKind != null) inside any shape-specific method must be throw — not a constructor call.
+- **Modifiers was the last catalog without an O(1) parser-facing token index.** GAP-061 added Modifiers.ByFieldToken (FrozenDictionary of TokenKind to FieldModifierMeta) to replace a LINQ linear scan in ParseFieldModifierNodes. Pattern: all five major parser-facing catalogs (Actions.ByTokenKind, Types.ByToken, Constructs.ByLeadingToken, Operators.ByToken, Modifiers.ByFieldToken) now have FrozenDictionary token-keyed lookup. The scope is intentionally narrow — only FieldModifierMeta, matching the actual lookup need in ParseFieldModifierNodes.
+- **All Iteration 9 regression points confirmed clean:** GAP-029/030/031/034/035/040/042 — no regressions.
+- **Build environment quirk (shared env):** dotnet build (full solution) fails transiently on .msCoverageSourceRootsMapping_* file locks — a file-lock collision with another process. dotnet build src/Precept/Precept.csproj and dotnet test test/Precept.Tests/ --no-restore both work cleanly. Use targeted build + --no-restore for the inner loop on this machine.
+
+---
+
+## Archive Batch — 2026-05-02T21:58:21Z (final active-history compaction)
+
+---
+
+## Core Context
+
+- Owns code-level feasibility, runtime implementation detail, and architecture-to-code translation across parser, checker, analyzer, and tooling surfaces.
+- Co-owns language research/design grounding with Frank and converts approved language decisions into implementable parser/catalog structures.
+- Historical summary: closed catalog extensibility hardening, PRECEPT0018 analyzer enforcement, parser whitespace-insensitivity, typed constants, event-handler ensure guards, presence-operator Pratt support, the expression-form catalog/annotation bridge, list literals, method calls, the sample/coverage regression layer, and Phase 2a+2b of the parser-gap fix plan (GAP-A/B/C + OperatorMeta DU restructure).
+- Current ownership: GAP-019a (`InvalidCallTarget`) and GAP-019b (`UnexpectedKeyword`) diagnostic emission now implemented and tested.
+
+## Learnings
+
+### 2026-05-02 — GAP-035, GAP-040, GAP-042 implementation
+
+- **`TypeMeta.ChoiceLiteralTokens`** (`IReadOnlyList<TokenKind>?`, null default): the catalog field that drives `ParseChoiceValue` dispatch. Null on all ~25 non-choice types — zero churn. Populated for the 5 `ChoiceElement` types: `Integer/Decimal/Number → [NumberLiteral]`, `String → [StringLiteral]`, `Boolean → [True, False]`. The signed-numeric path is `literalTokens?.Contains(NumberLiteral) == true`; the general validity check is `literalTokens?.Contains(cur.Kind) == true`. No `elemToken.Kind is ...` identity switch anywhere in the method. Both dispatches (numeric guard AND the elemToken.Kind switch below it) were eliminated together — Frank was right that catching only the first one would leave the method half-catalog.
+- **`ElementParameterAccessor` DU subtype** — mirrors `FixedReturnAccessor` pattern for the parameter axis. No `ParameterType` on base record (passes `null`). Type checker pattern-matches: `ElementParameterAccessor => resolveAgainstElementType`, `_ when accessor.ParameterType is { } => resolveAgainstFixed`, `_ => noParameter`. The DU subtype IS the metadata — illegal state between `ParameterType` and a flag is structurally impossible. `countof` was a copy-paste bug from `at()` (integer index). MCP tools only contain PingTool; no DTO updates required.
+- **GAP-042 dead code removal**: variant actions (`PrimaryActionKind != null`) are excluded from `Actions.ByTokenKind` by design. `CollectionValueBy`, `RemoveAtIndex`, and `CollectionIntoBy` SyntaxShape arms in `ParseActionStatement` were dead and their private methods unreachable. The actual `by`/`at` handling was already inline in `ParseCollectionValueStatement` and `ParseCollectionIntoStatement`. Deleted the 3 methods and 3 arms, replaced the incomplete named-value switch with a discard `_ => throw InvalidOperationException(...)`. Pragma `CS8524` removed (discard covers unnamed values too). Zero behavior change — all 2713 tests pass.
+
+### 2026-05-02 — GAP-046: FunctionKind.TildeStartsWith/TildeEndsWith
+
+- **CI functions needed `FunctionKind` enum entries.** `~startsWith` and `~endsWith` were in the spec §3.7 function table but had no catalog entries. Added `TildeStartsWith = 22` and `TildeEndsWith = 23` to `FunctionKind.cs`, with full `FunctionMeta` entries in `Functions.cs` including type signature `(string, string) → Boolean`.
+- **`CIVariantOf: FunctionKind?` on `FunctionMeta`.** The new field expresses the CI→base relationship as catalog metadata — the inverse of `HasCIVariant` on the base function. Consumers should pattern-match `CIVariantOf != null` to identify CI entries rather than testing for `~` prefix. Downstream note: Kramer should use `Functions.All.Where(f => f.CIVariantOf != null)` for completions after `~`, NOT `HasCIVariant`.
+- **`Names_AreLowerCamelCase` regex update.** The test checked `^[a-z][a-zA-Z]*$` — doesn't allow the tilde. Updated to `^~?[a-z][a-zA-Z]*$`. The leading `~` is intentional and part of the function's canonical surface name in the language.
+- **Four test count updates required.** `Total_Count` (21→23), `Total_OverloadCount` (47→49), `ByName_UniqueNames` (20→22), and the name regex. Enum insertion between 20 (Mid) and 21 (Now) is fine — `Enum.GetValues` returns by numeric value, so ordering stays ascending.
+- **Parser zero-change gate held.** `CICapableFunctionNames` derives from `HasCIVariant` on base functions — the new CI-variant entries have `HasCIVariant: false` (they ARE the CI form, not the base). No parser churn.
+
+
+
+- **`Operations.BinaryIndex` / `UnaryIndex` / `FindCandidates` / `FindUnary` already exist.** Frank proposed `BinaryBySignature`/`UnaryBySignature` as new additions — they are already implemented under these names. Critical difference: `BinaryIndex` returns `BinaryOperationMeta[]` (array), not a single entry. Money/money and quantity/quantity disambiguation requires multi-candidate handling in the checker.
+- **SemanticIndex record type definitions must be committed BEFORE any slice implementation begins ("pre-Slice 0").** Without the full record shape in place, no slice test can compile.
+- **7 AST expression node types missing from Frank's Resolve pseudocode:** `IsSetExpression`, `IsNotSetExpression`, `CIFunctionCallExpression`, `MethodCallExpression`, `InterpolatedStringExpression`, `InterpolatedTypedConstantExpression`, `TypedConstantExpression`. All exist in `SyntaxNodes/Expressions/`. The core Resolve function is ~250-350 lines, not ~100.
+- **GAP-032 (`pow` ProofRequirement) was fixed 2026-05-02** — Frank flagged it as an open gap but it is already closed.
+- **Field ordering in SemanticIndex:** `ImmutableDictionary<string, TypedField>` loses declaration order. Preferred pattern: `ImmutableArray<TypedField>` primary + derived `FrozenDictionary` secondary (same pattern as `Functions.ByName`).
+- **`[HandlesCatalogMember]` stub migration:** Each slice implementing a real expression form must REMOVE the annotation from the stub `CheckExpression()` and re-apply it to the real handler. Omitting this causes PRECEPT0019 duplicate-coverage diagnostics.
+- **`TypedInputAction.SecondaryExpression` needs a role discriminator** (Index / Key / Priority) — a single nullable with a comment is insufficient for the Evaluator.
+- **`InterpolatedStringExpression` / `InterpolatedTypedConstantExpression` have no slice in Frank's plan.** Assign to Slice 8 or define as Slice 8a.
+- **`ContentValidation` shape for Gap 1 needs a DU** — a flat `string Pattern` hides a per-type switch between regex, NodaTime parse-delegate, and closed-set membership validation strategies.
+
+- Spec grammar, parser enforcement, docs, tests, and samples must all agree before a slice is considered complete.
+- Durable language truth belongs in catalogs/metadata; avoid hardcoded parallel tables in parser or tooling code.
+- Shared record or catalog signature changes require a full construction-site and call-site audit, including dead-code exhaustive switch arms.
+- Pratt handlers for tokens that are not in `OperatorPrecedence` must be inserted before the `TryGetValue` guard or they are silently swallowed.
+- Use compiler/analyzer exhaustiveness intentionally: CS8509 for switch coverage, PRECEPT0007 for catalog metadata, PRECEPT0019 for handler coverage.
+- `HandlesCatalogExhaustivelyAttribute` must allow `Struct` targets for `ref struct` handlers, and `ref struct` types still cannot own static fields.
+- Verify real `TokenKind` names before writing metadata or tests; `dotnet build -q` can hide actionable diagnostics during failure analysis.
+- Multi-token presence operators are a proposal-scale catalog completeness gap, while keyword member names like `.min` / `.max` need dedicated parser handling in the `Dot` path.
+- **`TypeChecker` and `GraphAnalyzer` are both `public static class`** — all stub methods must be `private static`. Reflection test must include `BindingFlags.Static` to find them, and the existing `ContainSingle` assertion must expand to `HaveCount(3)` once all three pipeline stages are annotated.
+- **ExpressionFormCoverageTests split**: the existing `test/Precept.Tests/ExpressionFormCoverageTests.cs` is the Layer 3 reflection+round-trip file (Slice 13); the new `test/Precept.Tests/Language/ExpressionFormCoverageTests.cs` is the Layer 2 per-kind catalog assertions (Slice 25) — different namespaces, no class name conflict.
+- **PRECEPT0019 promotion sequence**: annotate all consuming pipeline classes FIRST (verify zero PRECEPT0019 fires), THEN flip severity to Error and remove WarningsNotAsErrors. The pre-condition check is non-negotiable.
+- **PRECEPT0023c analyzer invariant**: `ByTokenSequence` is keyed by the full `(TokenKind, TokenKind?, TokenKind?)` tuple — NOT by the lead token alone. `IsSet=[Is,Set]` and `IsNotSet=[Is,Not,Set]` share the lead token `Is` but are structurally valid because their full sequences differ. An analyzer checking "no two MultiTokenOps share the same lead token" will fire false positives on this real catalog pattern. Always key the uniqueness check on the full sequence, not the first element.
+
+
+
+- **Catalog-derived set for keyword-as-function-name tokens**: The correct pattern for `ParseAtom` keyword-function ambiguity is a pre-switch check against a `FrozenSet<TokenKind>` derived at startup from `Functions.All` ∩ `Tokens.Keywords`. This avoids hardcoded switch arms and auto-extends to future functions whose names collide with keywords. The check must precede the switch entirely (not use goto-case or fallthrough) to avoid code duplication.
+- **Edit no-ops in shared worktrees**: When working on a shared branch, a file may already carry the expected changes from a parallel commit. My `edit` to `Parser.Expressions.cs` was a no-op because `ea18430` (GAP-031) already included the ParseAtom restructure. Only `Parser.cs` was actually new. Verify with `git diff HEAD` before committing to confirm the actual change scope.
+
+
+
+- **RS1030 pattern**: When an analyzer follows a field reference to its declaring syntax to get operations (e.g., checking if a shared array is empty), use `ctx.SemanticModel` if `syntaxNode.SyntaxTree == ctx.SemanticModel.SyntaxTree`, and return early (assume non-empty) if not — never call `compilation.GetSemanticModel()` inside an analyzer. The `CompilationStartAction` wrapper is only needed when per-compilation state must be built up; if the only use was to capture `compilation` for `GetSemanticModel`, remove it entirely and register the `OperationAction` directly.
+- **RS1030 + CatalogEnumNames**: `ConstraintKind` and `ProofRequirementKind` cannot be added to `CatalogEnumNames` until their `GetMeta` switches drop the discard arm; adding them prematurely causes PRECEPT0007 to fire on those fallback arms. Track this as a Phase 3 prerequisite via a TODO comment.
+
+## Learnings (continued)
+
+- **Dapr Actor model maps tightly to Precept's execution semantics.** Dapr's turn-based single-threaded access per actor ID is exactly what Precept's immutable-Version, single-event-at-a-time model requires. No concurrent writes to the same instance are possible by construction.
+- **The compiled `Precept` definition must be cached per pod, not per actor.** The `Precept` object is "thread-safe, shareable, cacheable" by design — mirroring CEL's Program. In a Dapr deployment, a static `ConcurrentDictionary<string, Precept>` keyed by definition hash per pod is the correct caching strategy. Recompiling per actor activation would be expensive and pointless.
+- **JSON deserialization into `object?` is a silent correctness trap.** Precept field values travel as `IReadOnlyDictionary<string, object?>`. When Dapr state stores roundtrip these through JSON, System.Text.Json returns `JsonElement` for number and boolean fields — not `int`, `bool`, `decimal`. Guard expressions evaluated against these will silently fail or produce wrong results. A typed deserialization shim keyed from `FieldDescriptor.Type` is required before guards can be trusted.
+- **Dapr Workflow is the wrong model for Precept instances.** The replay/event-sourcing model is designed for orchestration workflows that span multiple services and need unbounded history. Precept instances need a compact current-state snapshot, not a growing event log. The mismatch is fundamental: Precept evaluates against a point-in-time state; Dapr Workflow reconstructs state by replaying the full event sequence from the beginning.
+- **State store model is viable but requires external concurrency protection.** OCC via ETags catches concurrent writes but doesn't prevent the race — it just forces a retry. For semantically correct single-event-at-a-time processing, actor placement (which pins an instance to one node at a time) is strictly better than hoping OCC retries are rare.
+- **Actor reminders can drive time-based Precept transitions**, because reminders persist across actor deactivation and fire even on cold-start. A reminder registered with the event name as its identifier can call `Fire(eventName)` on reactivation.
+- **The `Restore()` contract is the Dapr-state boundary.** Every actor activation that pulls state from the store should call `Restore(stateName, fieldDictionary)` before any `Fire()` or `Update()`. `Restore` validates the persisted data against the current definition, handles schema evolution, and recomputes computed fields. Skipping it is a correctness defect.
+
+- **Named `ParameterMeta` constants are required for proof obligations** — the same instance must appear in both the overload's `Parameters` list and the `NumericProofRequirement`'s `ParamSubject` to satisfy PRECEPT0005 reference-equality. Inline `new(...)` construction at call sites will silently create two distinct instances and break the proof engine's subject-resolution. Always define a `private static readonly ParameterMeta P<Name>` constant and share it.
+
+## Recent Updates
+
+### 2026-05-02T21:58:21Z — Canonical type checker review accepted
+- George's canonical checker review is now durable: Frank accepted 5 concerns and 3 missing items, rejected transitive widening, and updated docs/compiler/type-checker.md so the plan is implementation-ready end-to-end.
+- The active guardrails George surfaced remain locked: pre-Slice 0 semantic-model shapes come first, field storage stays array-primary with a derived frozen lookup, operation resolution uses existing multi-candidate Operations APIs, TypedInputAction needs an explicit secondary-role discriminator, and real expression handlers must take over [HandlesCatalogMember] ownership from the stub slice by slice.
+- Kramer and Soup-Nazi inputs now sit beside the checker plan: tooling stays derivation-first (no mirrored ResolvedArgs cache), and the checker implementation is expected to satisfy the 450-550 test envelope plus the 3 non-negotiable test gates.
+
+### 2026-05-02 — Active implementation snapshot
+- Iteration 10 catalog-impl audit findings (GAP-060 and GAP-061) remain part of the live parser baseline: variant-action arms inside shape-specific methods must throw, and parser-facing catalogs should expose O(1) token-keyed indexes.
+- The checker/evaluator start point is now explicit: partial-result error recovery, qualifier propagation, event-arg scope in event handlers, and interpolated/method-call slice ownership are no longer open design questions.
+
+### 2026-05-02 — Historical Summary (recompacted)
+- Older recent-update detail was moved to history-archive.md during Scribe closeout to keep active context under the 15 KB gate.
+- Use the archive for the Phase 2 closeout trail, rename-shipping notes, and earlier parser/analyzer implementation history.

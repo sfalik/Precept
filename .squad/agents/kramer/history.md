@@ -110,3 +110,8 @@
 - Semantic tokens already ~90% catalog-driven via `BuildSemanticTypeMap()`. Hover ~80% catalog-driven (function hover is the gap).
 - Recommended drift tests over grammar auto-generation; incremental per-catalog migration over big-bang rewrite; keeping regex-based context detection until Construct Slot Model matures.
 - Decision inbox: `.squad/decisions/inbox/kramer-catalog-metadata-tooling-review.md`
+
+### 2026-05-02T21:58:21Z — Canonical type checker batch closed
+- Kramer's tooling review is now durably linked to the canonical checker plan: no tooling-level blockers, 2 medium LS-derivable gaps, and 7 recommendations remain the consumer-facing follow-through list.
+- Frank accepted the placeholder-only TypedEditDeclaration direction and rejected mirroring ResolvedArgs on TypedTransitionRow as anti-mirroring, preserving the rule that tooling should derive from the canonical typed model rather than cached duplicate payloads.
+- The checker design is now implementation-ready; future LS/hover/completion work should project from the typed model and catalog metadata once the real checker slices land.
