@@ -143,7 +143,7 @@ namespace Precept.Language
 
         var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<PRECEPT0023OperatorsDUShapeInvariants>(source);
         diagnostics
-            .Where(d => d.Id == PRECEPT0023OperatorsDUShapeInvariants.DiagnosticId_MultiLeadCollision)
+            .Where(d => d.Id == PRECEPT0023OperatorsDUShapeInvariants.DiagnosticId_MultiSequenceCollision)
             .Should().ContainSingle()
             .Which.GetMessage().Should().Contain("Extra1")
                 .And.Contain("Is,Set")
@@ -166,7 +166,7 @@ namespace Precept.Language
 
         var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<PRECEPT0023OperatorsDUShapeInvariants>(source);
         diagnostics
-            .Where(d => d.Id == PRECEPT0023OperatorsDUShapeInvariants.DiagnosticId_MultiLeadCollision)
+            .Where(d => d.Id == PRECEPT0023OperatorsDUShapeInvariants.DiagnosticId_MultiSequenceCollision)
             .Should().BeEmpty();
     }
 }

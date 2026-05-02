@@ -27,7 +27,7 @@ public sealed class PRECEPT0023OperatorsDUShapeInvariants : DiagnosticAnalyzer
 {
     public const string DiagnosticId_TooFewTokens        = "PRECEPT0023a";
     public const string DiagnosticId_SingleMultiCollision = "PRECEPT0023b";
-    public const string DiagnosticId_MultiLeadCollision  = "PRECEPT0023c";
+    public const string DiagnosticId_MultiSequenceCollision = "PRECEPT0023c";
 
     private static readonly DiagnosticDescriptor TooFewTokensRule = new(
         DiagnosticId_TooFewTokens,
@@ -47,8 +47,8 @@ public sealed class PRECEPT0023OperatorsDUShapeInvariants : DiagnosticAnalyzer
         isEnabledByDefault: true,
         description: "SingleTokenOp and MultiTokenOp must not share the same lead token. This causes operator disambiguation ambiguity at parse time.");
 
-    private static readonly DiagnosticDescriptor MultiLeadCollisionRule = new(
-        DiagnosticId_MultiLeadCollision,
+    private static readonly DiagnosticDescriptor MultiSequenceCollisionRule = new(
+        DiagnosticId_MultiSequenceCollision,
         title: "Duplicate full token sequence among MultiTokenOp entries",
         messageFormat: "OperatorKind.{0} duplicates the MultiTokenOp full token sequence '{1}' already used by OperatorKind.{2} — causes ByTokenSequence startup collision",
         category: "Precept.Language",
@@ -58,7 +58,7 @@ public sealed class PRECEPT0023OperatorsDUShapeInvariants : DiagnosticAnalyzer
                      "Identical sequences cause a startup throw in ByTokenSequence's dictionary construction.");
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
-        ImmutableArray.Create(TooFewTokensRule, SingleMultiCollisionRule, MultiLeadCollisionRule);
+        ImmutableArray.Create(TooFewTokensRule, SingleMultiCollisionRule, MultiSequenceCollisionRule);
 
     public override void Initialize(AnalysisContext context)
     {
@@ -131,7 +131,7 @@ public sealed class PRECEPT0023OperatorsDUShapeInvariants : DiagnosticAnalyzer
                     if (multiFullSequences.TryGetValue(sequenceKey, out var existingMulti))
                     {
                         ctx.ReportDiagnostic(Diagnostic.Create(
-                            MultiLeadCollisionRule,
+                            MultiSequenceCollisionRule,
                             creation.Syntax.GetLocation(),
                             armCaseName, sequenceKey, existingMulti.armCase));
                     }

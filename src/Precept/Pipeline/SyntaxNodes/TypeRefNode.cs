@@ -11,12 +11,13 @@ public sealed record ScalarTypeRefNode(
     Language.Token TypeName,
     ImmutableArray<TypeQualifierNode> Qualifiers) : TypeRefNode(Span);
 
-/// <summary><c>as set of string</c>, <c>as queue of integer</c></summary>
+/// <summary><c>as set of string</c>, <c>as queue of integer</c>, <c>as set of ~string</c></summary>
 public sealed record CollectionTypeRefNode(
     SourceSpan Span,
     Language.Token CollectionKind,
     Language.Token ElementType,
-    ImmutableArray<TypeQualifierNode> Qualifiers) : TypeRefNode(Span);
+    ImmutableArray<TypeQualifierNode> Qualifiers,
+    bool CaseInsensitive = false) : TypeRefNode(Span);
 
 /// <summary><c>as choice of string("A", "B", "C")</c></summary>
 public sealed record ChoiceTypeRefNode(

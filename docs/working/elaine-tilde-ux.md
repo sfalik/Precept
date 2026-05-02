@@ -199,3 +199,125 @@ The feature is the right design for the right audience. Domain experts who write
 **The mixed-collection enforcement rule (Frank's Rule 2) must ship in the same slice.** Frank is right: Rule 1 without Rule 2 creates the false impression of safety. A feature that signals protection while leaving the most dangerous composition case unguarded is worse than no feature at all.
 
 The syntax (`~string`) is correct. The enforcement model (Option 3) is correct. The error messages need work. Ship it right.
+
+---
+
+## Elaine's Final Review
+**Date:** 2026-05-01
+
+### Verdict: Issues Found
+
+I reviewed `docs/language/primitive-types.md` (`~string` section), `docs/language/collection-types.md` (Quantifier Predicates, Constraint Catalog), and `docs/language/precept-language-spec.md` (§3.7, §3.8, §3.10) against my prior recommendations in this document.
+
+The core design is sound and the error messages are improved. But two blocking contradictions between canonical docs, plus three un-adopted prior recommendations, mean this is not yet ready to hand to implementers.
+
+---
+
+**1. §3.8 modifier table contradicts collection-types.md on `notempty` — BLOCKING**
+
+Location: `precept-language-spec.md` §3.8, Modifier validation table.
+
+The table reads:
+
+> `notempty` | Applicable to: `string` | Error when applied to: `number`, `integer`, `decimal`, `boolean`, `choice`, **collections**
+
+`collection-types.md` Constraint Catalog reads the opposite:
+
+> `notempty` | `set`, `queue`, `stack`, `log`, `bag`, `list`, `queue of T by P` | Collection must contain at least one element.
+
+An author reading §3.8 will believe `field AuditTrail as log of string notempty` is a compile error. It is not — it is precisely the recommended usage. This is the first place a new author is likely to look up modifier rules; they will be taught wrong. The §3.8 table is a stale v1 snapshot that predates the v2 collection surface. Fix: update the `notempty` row to list all applicable collection kinds, or split it into scalar and collection rows.
+
+The same table has a secondary inconsistency: `mincount`/`maxcount` lists only `set`, `queue`, `stack`, where collection-types.md applies them to all eight non-lookup kinds. Same root cause; fix in the same pass.
+
+---
+
+**2. Empty-string guidance absent from `CaseInsensitiveFieldRequiresTildeEquals` — IMPORTANT**
+
+Location: `primitive-types.md` enforcement rule 1; `precept-language-spec.md` §3.10.
+
+My prior review required: *"When the right operand is `""`, append: 'To require a non-empty value, declare the field with `notempty` instead: `field Email as ~string notempty`.' "* This was not adopted. The approved message reads:
+
+> `'Email' is declared ~string (case-insensitive). Use ~= instead of == to avoid treating 'admin@example.com' and 'Admin@example.com' as different values.`
+
+For `ensures Email == ""` this message tells the author to write `ensures Email ~= ""`, which is technically correct and practically confusing — case-insensitive semantics are irrelevant for an empty-string check. The author follows the instruction and ends up with a form that reads wrong to them. The `notempty` redirect is the exit ramp that turns a confusing correction into a teaching moment. Its absence means authors will write `~= ""` in production.
+
+---
+
+**3. `CaseInsensitiveValueInCaseSensitiveContains` alternative path still too abstract — IMPORTANT**
+
+Location: `primitive-types.md` enforcement rule 3; `precept-language-spec.md` §3.10.
+
+Approved message ends with:
+
+> "Either change 'Roles' to `set of ~string`, or use a quantifier to test membership explicitly."
+
+My prior review specifically said: *"quantifier predicates are not everyday vocabulary"* and recommended a concrete syntax example (`any e in AdminEmails (e ~= Email)`). The abstract phrasing "use a quantifier to test membership explicitly" gives the author a category name but no path to writing it. The author must then discover quantifier syntax elsewhere — and the quantifier section in collection-types.md is deep in a long document with no direct pointer from this error. This is the hardest error in the feature for authors to resolve; it deserves the most concrete possible guidance.
+
+---
+
+**4. Implementation model and diagnostic code notes mixed into user documentation — IMPORTANT**
+
+Location: `primitive-types.md`, `~string` section, final two paragraphs.
+
+The `~string` section ends with:
+
+> **Implementation model.** `~string` does not introduce a new `TypeKind`. It is `TypeKind.String` with a `CaseInsensitive = true` flag... `ScalarTypeRefNode` must gain a `CaseInsensitive` property...
+
+> **Diagnostic code 66 reassignment.** `CaseInsensitiveStringOnNonCollection` (code 66) exists in `DiagnosticCode.cs` and was **never emitted** by the parser...
+
+These are implementer notes. A compliance officer or operations lead reading this section to understand whether to use `~string` on their Email field will hit compiler internals before they reach the section break. `primitive-types.md` is an author-facing document. These notes belong in `precept-language-spec.md` §3 (where the diagnostic code reassignment note already appears verbatim in §3.10) or in an implementer design note. They are already fully captured in the spec. Remove or relocate them from the author doc.
+
+---
+
+**5. No "when to reach for `~string`" guidance — IMPORTANT**
+
+Location: `primitive-types.md`, `~string` section.
+
+The section documents the feature fully as a reference, but never tells authors when to use it. There is no framing like: *"Reach for `~string` when a field represents an identifier that should match regardless of how it was entered — email addresses, coupon codes, department codes, country codes."*
+
+More importantly: the refactoring scenario is undocumented. An author who writes `field Email as string`, ships the precept, and later refactors to `field Email as ~string` will receive a cascade of `CaseInsensitiveFieldRequiresTildeEquals` errors across every guard in the file. From their perspective, they made one change and the compiler lit up everywhere. There is no guidance that this cascade is expected and is the compiler correctly surfacing previously invisible semantic gaps. Without that framing, the cascade reads as punishment for a reasonable upgrade.
+
+A short "Before you add `~string`" callout — *"Adding `~string` to an existing field will require updating every `==` and `!=` comparison on that field. The compiler will show you each one. This is expected — those comparisons were silently case-sensitive before."* — would prevent significant author frustration.
+
+---
+
+**6. `!~` semantics unexplained in its error message — MINOR**
+
+Location: `precept-language-spec.md` §3.10, `CaseInsensitiveFieldRequiresTildeNotEquals` message.
+
+Approved message: *"Use `!~` instead of `!=` to avoid treating 'admin@example.com' and 'Admin@example.com' as different values."*
+
+My prior review noted: *"the not-equals direction is slightly less intuitive than equals for CI semantics"* and requested a parenthetical. `!~` is a symbol most authors have never seen. The message gives the fix but not the meaning. A one-clause addition — *"`!~` returns true when the two values are not equal under case-insensitive comparison"* — removes the ambiguity. Low cost, real clarity improvement for the `!=` case specifically.
+
+---
+
+**7. `choice of ~string` exclusion: no diagnostic named — MINOR**
+
+Location: `primitive-types.md`, `~string` section.
+
+*"`choice of ~string` is excluded"* is documented with the correct explanation and workaround (`toLower` at ingestion). But no diagnostic code is listed for what the author actually sees. Unlike the three enforcement diagnostics (which are named inline), this exclusion is anonymous. An author who hits this error cannot search the diagnostic catalog for it. Either name the diagnostic that fires or confirm it falls through to a generic parse error — and if the latter, say so explicitly.
+
+---
+
+**8. Quantifier cross-reference absent from `CaseInsensitiveValueInCaseSensitiveContains` — MINOR**
+
+Location: `precept-language-spec.md` §3.10; `primitive-types.md` enforcement rule 3.
+
+Both the spec and the primitive-types doc reference "a quantifier" as an alternative fix path. Neither links to the quantifier syntax documentation in collection-types.md. The quantifier section is deep in a long document with no heading anchor listed anywhere in the error message context. Authors who encounter this error and want to take the quantifier path have no pointer. Even a bare parenthetical — *(see collection-types.md § Quantifier Predicates)* — closes the gap.
+
+---
+
+### Summary table
+
+| # | Location | Issue | Severity |
+|---|----------|-------|----------|
+| 1 | spec §3.8 modifier table | `notempty` listed as error on collections; `mincount`/`maxcount` list incomplete | **Blocking** |
+| 2 | primitive-types `~string` rule 1; spec §3.10 | Empty-string `notempty` redirect absent from error message | **Important** |
+| 3 | primitive-types `~string` rule 3; spec §3.10 | `CaseInsensitiveValueInCaseSensitiveContains` alternative path abstract, no syntax example | **Important** |
+| 4 | primitive-types `~string` section (bottom) | Implementer notes (`TypeKind`, diagnostic code 66) mixed into author doc | **Important** |
+| 5 | primitive-types `~string` section | No "when to use" guidance; refactoring cascade scenario undocumented | **Important** |
+| 6 | spec §3.10 `CaseInsensitiveFieldRequiresTildeNotEquals` | `!~` semantics not explained in error message | Minor |
+| 7 | primitive-types `~string` choice exclusion | No diagnostic code named for `choice of ~string` exclusion error | Minor |
+| 8 | spec §3.10; primitive-types rule 3 | No cross-reference to quantifier syntax from the quantifier-as-alternative mention | Minor |
+
+Issues 1 through 5 should be resolved before the implementation plan is written. Issues 6 through 8 are pre-ship, not pre-plan.

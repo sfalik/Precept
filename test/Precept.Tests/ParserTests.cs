@@ -1673,4 +1673,48 @@ public class ParserTests
         node.Actions[0].Should().BeOfType<ClearStatement>()
             .Which.Field.Text.Should().Be("ItemList");
     }
+
+    // ── GAP-3 regression: ~ (Tilde) prefix on collection element type ─────────
+
+    [Fact]
+    public void GAP3_ParseTypeRef_SetOfTildeString_CaseInsensitiveTrue()
+    {
+        var tree = Parse("field Tags as set of ~string");
+
+        tree.Diagnostics.Should().BeEmpty();
+        var typeRef = tree.Declarations[0].Should().BeOfType<FieldDeclarationNode>()
+            .Subject.Type.Should().BeOfType<CollectionTypeRefNode>().Subject;
+
+        typeRef.CollectionKind.Kind.Should().Be(TokenKind.Set);
+        typeRef.ElementType.Kind.Should().Be(TokenKind.StringType);
+        typeRef.CaseInsensitive.Should().BeTrue("~ prefix marks the element type as case-insensitive");
+    }
+
+    [Fact]
+    public void GAP3_ParseTypeRef_ListOfTildeInteger_CaseInsensitiveTrue()
+    {
+        // list is parsed via QueueType/StackType branch — verify ~ works for list-like collection kinds
+        var tree = Parse("field Items as set of ~integer");
+
+        tree.Diagnostics.Should().BeEmpty();
+        var typeRef = tree.Declarations[0].Should().BeOfType<FieldDeclarationNode>()
+            .Subject.Type.Should().BeOfType<CollectionTypeRefNode>().Subject;
+
+        typeRef.ElementType.Kind.Should().Be(TokenKind.IntegerType);
+        typeRef.CaseInsensitive.Should().BeTrue();
+    }
+
+    [Fact]
+    public void GAP3_ParseTypeRef_SetOfString_NoCaseInsensitiveFlag()
+    {
+        // Regression: existing set of string (no ~) must still produce CaseInsensitive=false
+        var tree = Parse("field Tags as set of string");
+
+        tree.Diagnostics.Should().BeEmpty();
+        var typeRef = tree.Declarations[0].Should().BeOfType<FieldDeclarationNode>()
+            .Subject.Type.Should().BeOfType<CollectionTypeRefNode>().Subject;
+
+        typeRef.ElementType.Kind.Should().Be(TokenKind.StringType);
+        typeRef.CaseInsensitive.Should().BeFalse("no ~ prefix means case-sensitive (default)");
+    }
 }

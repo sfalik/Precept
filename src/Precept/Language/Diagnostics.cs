@@ -267,6 +267,16 @@ public static class Diagnostics
             FixHint: "Add a guard that ensures the value is nonnegative, e.g., 'when Value >= 0'",
             PreventsFault: FaultCode.SqrtOfNegative),
 
+        // ── Type (lifecycle validation) ──────────────────────────────────────────
+        DiagnosticCode.AmbiguousTypedConstant         => new(nameof(DiagnosticCode.AmbiguousTypedConstant),         DiagnosticStage.Type,  Severity.Error,   "Typed constant '{0}' is ambiguous between {1} and {2}",                                                                                DiagnosticCategory.TypeSystem,
+            FixHint: "Add an explicit 'as <type>' annotation or place the constant where the type is unambiguous"),
+        DiagnosticCode.EventHandlerInStatefulPrecept  => new(nameof(DiagnosticCode.EventHandlerInStatefulPrecept),  DiagnosticStage.Type,  Severity.Error,   "Event handler '{0}' is not valid in a stateful precept",                                                                               DiagnosticCategory.Structure,
+            FixHint: "Move the handler into a 'from <state> on <event>' transition row"),
+        DiagnosticCode.RequiredFieldsNeedInitialEvent => new(nameof(DiagnosticCode.RequiredFieldsNeedInitialEvent), DiagnosticStage.Type,  Severity.Error,   "Required field(s) {0} have no initial event to assign them",                                                                           DiagnosticCategory.Structure,
+            FixHint: "Add an initial event that assigns all required fields, or make the fields optional"),
+        DiagnosticCode.InitialEventMissingAssignments => new(nameof(DiagnosticCode.InitialEventMissingAssignments), DiagnosticStage.Type,  Severity.Error,   "Initial event '{0}' does not assign required field(s): {1}",                                                                           DiagnosticCategory.Structure,
+            FixHint: "Add 'set <field>' actions to the initial event body for each required field"),
+
         _ => throw new ArgumentOutOfRangeException(nameof(code), code, null),
     };
 

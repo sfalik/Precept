@@ -191,3 +191,193 @@ But the inverse concern is real: if `CaseInsensitiveStringOnNonCollection` is RE
 5. **Explicitly exclude `choice of ~string`.** One sentence in the spec. Prevents author confusion.
 
 With these five amendments in place, the lock-in is defensible. Frank's core analysis on assignment compatibility, the two-rule enforcement model, the type model, the lookup semantics, and the diagnostics inventory is solid. The implementation scope is genuine — medium, not trivial — and the "minimum condition: both rules or neither" constraint is the right guardrail.
+
+---
+
+## George's Final Review
+**Date:** 2026-05-01
+
+The design docs have incorporated the previous round's feedback. The core model is sound. But I found twelve issues a developer will hit when they sit down to implement. Four of them are blocking — the implementation cannot proceed correctly without resolution. The rest will cause confusion, incorrect code, or subtle bugs.
+
+---
+
+### Blocking
+
+**1. `each` is absent from the spec's token vocabulary (§1.1) and reserved keyword list (§1.2)**
+
+*Location:* `precept-language-spec.md` §1.1 and §1.2; `collection-types.md` §Quantifier Predicates
+
+`collection-types.md` explicitly states: "`each` and `no` require new lexer entries." The spec's token vocabulary (§1.1) has no `Each` entry. The reserved keyword list (§1.2) has `no` (already there for `no transition`) but no `each`. An implementer extending the lexer looks at §1.1 as the ground truth for `TokenKind` entries and reserved keyword registration. The absence of `Each` means they'll add it without any spec guidance on its token category or the keyword string mapping. If `each` is accidentally left unreserved, authors can name fields `each`, which breaks any precept that uses quantifier predicates — silently, after the fact.
+
+*Recommended resolution:* Add `Each | each | Context: quantifier predicate` to §1.1 token vocabulary (Quantifiers/Modifiers category) and add `each` to the §1.2 reserved keyword list, with a note marking it as a quantifier addition alongside `any`/`no`.
+
+---
+
+**2. Quantifier predicate grammar and type-checking are entirely absent from the spec**
+
+*Location:* `precept-language-spec.md` §2.1, §2.2, §3.5, §3.8; `collection-types.md` §Quantifier Predicates
+
+The `QuantifierExpr` grammar exists only in `collection-types.md`. The spec — which is the ground truth for the parser and type checker — has none of it. Concretely:
+
+- **§2.1 null-denotation table** has no entries for `Each`, `Any` (in quantifier/expression role), or `No` (in quantifier role). The parser that reads this table will not know to emit a `QuantifierExpression` node when it sees `each item in Tags (...)`.
+- **§2.2 grammar** has no `QuantifierExpr` production. The `in` keyword used inside `each item in Field (...)` is currently spec'd only as a declaration-level preposition. The parser dispatches `in` at the declaration level (transition rows, ensures, access mode) — it has no handling for `in` appearing mid-expression as a quantifier separator.
+- **§3.5 scope rules** say nothing about the binding variable. An implementer adding quantifier predicate type-checking has no spec guidance on: (a) what scope the binding variable is visible in, (b) whether it shadows field names, (c) whether its type is always the collection's inner type.
+- **§3.8 semantic checks** have no section on quantifier predicate validation — no type rule saying "the predicate must produce `boolean`", no mention of binding variable resolution.
+
+This is not a matter of a few missing sentences. The spec omits an entire grammar production, its null-denotation dispatch, its scope model, and its type-checking rules. An implementer working from the spec alone cannot implement quantifier predicates at all.
+
+*Recommended resolution:* Add a `QuantifierExpr` null-denotation entry to §2.1. Add the grammar production to §2.2 (or cross-reference `collection-types.md` §Quantifier Predicates explicitly as normative). Add binding variable scope rules to §3.5. Add quantifier predicate type-checking rules to §3.8.
+
+---
+
+**3. `notempty` on collections: direct contradiction between spec §3.8 and `collection-types.md`**
+
+*Location:* `precept-language-spec.md` §3.8 modifier validation table; `collection-types.md` §Constraint Catalog
+
+The spec §3.8 modifier validation table says:
+
+| `notempty` | Applicable to: `string` | Error when applied to: collections |
+
+`collection-types.md` §Constraint Catalog says `notempty` is applicable to `set`, `queue`, `stack`, `log`, `bag`, `list`, and `queue of T by P` — with specific semantics ("statically discharges `.min`/`.max`/`.peek`/`.first`/`.last` access obligations").
+
+These are directly contradictory. An implementer writing the modifier-type validation check reads §3.8 (the ground truth for the type checker) and concludes that `field Tags as set of string notempty` is a compile error. That would be wrong.
+
+*Recommended resolution:* Correct §3.8's `notempty` row to say: applicable to `string` and all collection kinds; error when applied to numeric types, `boolean`, `choice`.
+
+---
+
+**4. Diagnostic message templates for all five `~string` diagnostics use hardcoded examples, not parameterized templates**
+
+*Location:* `precept-language-spec.md` §3.10 `~string` enforcement diagnostics table
+
+Every existing diagnostic in §3.10 uses `{0}`, `{1}`, etc. placeholder notation:
+- `"Field '{0}' is not declared"` — `{0}` = field name
+- `"Expected a {0} value here, but got '{1}'"` — `{0}` = type name, `{1}` = expression
+
+The five new `~string` diagnostics use hardcoded example field names:
+- `CaseInsensitiveFieldRequiresTildeEquals`: `'Email' is declared ~string (case-insensitive). Use ~= instead of ==...`
+- `CaseInsensitiveFieldRequiresTildeNotEquals`: same pattern, `Email` hardcoded
+- `CaseInsensitiveValueInCaseSensitiveContains`: `'Email' is ~string but 'Roles' is set of string...`
+- `CaseInsensitiveFieldRequiresTildeStartsWith`: `'Email' is declared ~string...`
+- `CaseInsensitiveFieldRequiresTildeEndsWith`: same
+
+An implementer cannot write `string.Format(template, ...)` calls without knowing: how many parameters each diagnostic takes, which parameter is the field name, which parameter is the collection name. As written, these look like static strings — but they must be parameterized or the error message will always say "Email" regardless of the actual field. The `CaseInsensitiveValueInCaseSensitiveContains` case has *two* names (`Email` and `Roles`) that need to be parameters.
+
+*Recommended resolution:* Rewrite all five message templates using `{0}`, `{1}` placeholder notation and document what each placeholder represents, consistent with the existing-codes format.
+
+---
+
+### Important
+
+**5. Tilde token responsibility: lexer spec and parser spec contradict each other**
+
+*Location:* `precept-language-spec.md` §1.1 (Operators section) and §2.1 (null-denotation table)
+
+§1.1 says: "A standalone `~` is valid immediately before `string` in a collection inner type position and as a scalar field type qualifier — **elsewhere it is a lexer error**."
+
+§2.1 null-denotation table says: "`Tilde` (when next token is `startsWith` or `endsWith` identifier) → `CIFunctionCallExpression`."
+
+The parser null-denotation table only fires when the parser *receives* a `Tilde` token. If the lexer rejects `~` in expression position as a lexer error, the parser never gets that token and the `~startsWith`/`~endsWith` production is unreachable. Either the lexer does *not* emit a lexer error for expression-position `~` (which the scan-priority list at §1.5 implicitly confirms — `~` is listed as producing `Tilde` with no contextual restriction), or the parser's `CIFunctionCallExpression` production is dead code. A developer implementing the lexer who reads §1.1 will write a context-check and break `~startsWith`/`~endsWith`.
+
+*Recommended resolution:* Correct §1.1 to say the `Tilde` token is always emitted by the lexer wherever `~` appears (consistent with §1.5 scan order). "Elsewhere it is a lexer error" should be removed. Invalid uses of `Tilde` are caught by the parser (in expression position, wrong identifier follows) and the type checker (in type position, scalar `~` before non-`string`).
+
+---
+
+**6. `Tilde` before wrong identifier in expression position: diagnostic not specified**
+
+*Location:* `precept-language-spec.md` §2.1 null-denotation table
+
+The null-denotation entry for `Tilde` ends with: "any other identifier after a lone `Tilde` in expression position is a **parse error**." "Parse error" is not sufficient specification. The §2.7 parser diagnostics table has several codes. Which one fires? `ExpectedToken`? If so, what are the `{0}` and `{1}` substitutions — what was expected and what was found? An implementer writing this error path needs to know the exact diagnostic code and message. There is no `_other_` catch-all row in the null-denotation table for the Tilde case specifically.
+
+*Recommended resolution:* Specify the diagnostic explicitly: "emits `ExpectedToken` with `{0}` = `startsWith or endsWith`, `{1}` = the actual identifier text, and highlights the `Tilde` + identifier span."
+
+---
+
+**7. `~string + ~string` concatenation result not specified in `primitive-types.md`**
+
+*Location:* `primitive-types.md` §`~string` (Type unification / Concatenation note); `precept-language-spec.md` §3.6 binary operators table
+
+`primitive-types.md`'s type unification table shows:
+- `~string` + `~string` → `~string` (for `if/then/else` selection)
+- `~string` + `string` → `~string` (for `if/then/else` selection)
+
+The concatenation note immediately below says: "The `+` concatenation operator follows a distinct rule: `~string + string → string`." It does **not** state `~string + ~string → string`.
+
+A developer reading `primitive-types.md` in isolation (which they will — the file is titled the canonical reference for these types) will see the `~string + ~string → ~string` entry in the unification table, not read the concatenation note carefully enough to realize it doesn't address both cases, and implement `~string + ~string → ~string` for the `+` operator. This is wrong. `spec §3.6` has the correct entry (`~string + ~string → string`), but the mismatch between the docs guarantees at least one developer will implement this incorrectly.
+
+*Recommended resolution:* Extend the concatenation note in `primitive-types.md` to explicitly cover both cases: "`~string + string → string` and `~string + ~string → string`."
+
+---
+
+**8. Code 66 reassignment: "reassigned" appears in three places but the concrete enum operation is never specified**
+
+*Location:* `primitive-types.md` §Implementation model; `collection-types.md` §`~string` inner type section; `precept-language-spec.md` §3.10 code-66 note
+
+All three docs say code 66 is "reassigned" to `CaseInsensitiveFieldRequiresTildeEquals`. None say what this means for the C# enum. Three possible interpretations:
+
+1. Rename `CaseInsensitiveStringOnNonCollection` → `CaseInsensitiveFieldRequiresTildeEquals` (keep value 66, change member name)
+2. Delete `CaseInsensitiveStringOnNonCollection` and add a new member `CaseInsensitiveFieldRequiresTildeEquals = 66`
+3. Add `CaseInsensitiveFieldRequiresTildeEquals` at the end of the enum and update `CaseInsensitiveStringOnNonCollection`'s value to something else
+
+Options 1 and 2 are both "reassignment" of the numeric value. Option 3 would change the numeric code 66 to a different diagnostic, which is not "reassignment" at all. The previous George review (this file, Gap 8) advocated "mark as `Removed`" — but that recommendation was in the context of the original analysis doc and does not appear to have propagated into the design docs. An implementer reading only the current docs faces three plausible interpretations.
+
+*Recommended resolution:* The docs should say: "Rename the enum member `CaseInsensitiveStringOnNonCollection` to `CaseInsensitiveFieldRequiresTildeEquals`. The numeric value 66 is retained. No enum member is deleted, no ordinal shifts. Existing code references to `DiagnosticCode.CaseInsensitiveStringOnNonCollection` will fail to compile — update them to `DiagnosticCode.CaseInsensitiveFieldRequiresTildeEquals`."
+
+---
+
+**9. `CollectionField` in quantifier grammar is an undefined production**
+
+*Location:* `collection-types.md` §Quantifier Predicates, grammar block
+
+The grammar says:
+
+```
+QuantifierExpr  :=  QuantifierKind Identifier in CollectionField '(' BoolExpr ')'
+```
+
+`CollectionField` is not defined anywhere. The examples show only bare field names (`Items`, `Reviewers`, `Tags`). But an implementer needs to know: is `CollectionField` a bare identifier only? Can it be `EventName.FieldName` where the field is a collection? Can it be a computed field reference? A member access chain? The grammar production needs to be either defined or restricted.
+
+This matters for error recovery: if an author writes `each item in Approve.Tags (...)` and `CollectionField` is restricted to bare identifiers, the error message should say "only field names are allowed here" — not a generic parse failure.
+
+*Recommended resolution:* Define `CollectionField` explicitly. Recommend: restrict to bare field names (`Identifier` only) in v1. State this restriction explicitly and add a diagnostic for member-access-in-quantifier-position.
+
+---
+
+**10. Quantifier binding variable: scope, keyword collision, and type derivation not specified anywhere**
+
+*Location:* `collection-types.md` §Quantifier Predicates; `precept-language-spec.md` §3.5
+
+The spec §3.5 scope rules define six expression contexts. Quantifier predicates are not one of them. As a result:
+
+- **Type derivation:** How does the type checker know the binding variable's type? The docs say "locally scoped to the parenthesized predicate" but never say its type is the collection's inner type. If `Tags` is `set of ~string`, is the binding variable `item` typed `string` or `~string`? This determines whether `item == "admin"` triggers `CaseInsensitiveFieldRequiresTildeEquals`.
+- **Shadowing:** If a field named `item` already exists, does `each item in Tags (item > 0)` shadow the field or is it a compile error?
+- **Keyword collision:** `each no in Tags (...)` — `no` is a reserved keyword. Is this a parse error or a scoping error?
+- **Leakage:** Is the binding variable visible outside the `(...)` parentheses? The docs say "locally scoped to the parenthesized predicate" which implies no, but that's stated in collection-types.md prose, not in the spec's scope model.
+
+*Recommended resolution:* Add a `QuantifierExpr` entry to §3.5 scope rules specifying: binding variable type = collection's inner type; binding variable cannot share a name with a keyword (parse error); binding variable shadows field names with a warning; binding variable scope is strictly the predicate expression between `(` and `)`.
+
+---
+
+### Minor
+
+**11. `contains` type rules in spec §3.6 are incomplete**
+
+*Location:* `precept-language-spec.md` §3.6 `contains` operator section
+
+The `contains` type rule table in §3.6 covers only `set of T`, `queue of T`, `stack of T`, and non-collection (type error). It does not cover `log of T`, `log of T by P` (which has two distinct membership checks — value membership and P-key membership), `bag of T`, `list of T`, `queue of T by P`, or `lookup of K to V`. All of these are documented in `collection-types.md` with their own `contains` semantics.
+
+An implementer implementing the type checker for `contains` from §3.6 alone will emit `TypeMismatch` on valid `log`/`bag`/`list`/`lookup` membership tests.
+
+*Recommended resolution:* Expand the §3.6 `contains` table to cover all nine collection kinds, matching the table already in `collection-types.md` §Membership Operator.
+
+---
+
+**12. `trim`, `toLower`, `toUpper`, `left`, `right`, `mid` with `~string` argument: validity not confirmed**
+
+*Location:* `precept-language-spec.md` §3.7 built-in function catalog; `primitive-types.md` §`~string`
+
+The function catalog lists `trim(s)` as `(string) → string`, `toLower(s)` as `(string) → string`, etc. `primitive-types.md` says "CI semantics do not apply to these functions; no enforcement check." But neither doc confirms that `~string` is a valid argument type for these `(string)` parameter functions.
+
+Since `~string` is bidirectionally assignment-compatible with `string`, `trim(Email)` where `Email` is `~string` should compile — but this is inference, not specification. An implementer might: (a) add an enforcement check for `~string → (string)` function arguments that shouldn't exist, (b) emit `TypeMismatch` incorrectly because the parameter is `(string)` and the argument is `~string`, or (c) assume `~string` is valid and not document the reason.
+
+*Recommended resolution:* Add one sentence to §3.7: "Functions that accept `(string)` parameters also accept `~string` arguments via the bidirectional assignment compatibility rule (§3.8). No enforcement diagnostic is emitted — CI semantics are not applicable to structural operations." This closes the question permanently.

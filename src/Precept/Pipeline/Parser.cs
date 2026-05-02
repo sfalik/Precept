@@ -137,6 +137,18 @@ public static partial class Parser
     internal static readonly FrozenSet<TokenKind> KeywordsValidAsMemberName =
         Tokens.All.Where(t => t.IsValidAsMemberName).Select(t => t.Kind).ToFrozenSet();
 
+    /// <summary>
+    /// All preposition tokens that may introduce a type qualifier.
+    /// Derived from <see cref="QualifierSlot.Preposition"/> across all <see cref="TypeMeta.QualifierShape"/>
+    /// entries — never hardcoded.
+    /// </summary>
+    internal static readonly FrozenSet<TokenKind> QualifierPrepositionTokens =
+        Types.All
+            .Where(t => t.QualifierShape is not null)
+            .SelectMany(t => t.QualifierShape!.Slots)
+            .Select(s => s.Preposition)
+            .ToFrozenSet();
+
     // ════════════════════════════════════════════════════════════════════════════
     //  Public entry point
     // ════════════════════════════════════════════════════════════════════════════

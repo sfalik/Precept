@@ -590,6 +590,95 @@ This declares a lookup whose key space uses `OrdinalIgnoreCase` equality. The la
 - `put CoverageLimits "MEDICAL" = 100` followed by `put CoverageLimits "medical" = 200` → the second `put` **overwrites** the first, because `"MEDICAL"` and `"medical"` are the same key under `OrdinalIgnoreCase`. The result is `CoverageLimits for "Medical"` returns `200` (or whatever the last `put` wrote). This is correct and desirable — it mirrors how `set of ~string` handles deduplication.
 - `CoverageLimits contains "Medical"` returns `true` if any case-variant of `"medical"` has been `put`.
 
+---
+
+## Frank's Final Design Review
+**Date:** 2026-05-01
+
+Read in full: `primitive-types.md`, `collection-types.md`, `precept-language-spec.md`. Cross-checked grammar productions, operator tables, type unification rules, enforcement rule coverage, and cross-feature interactions. The design is well-reasoned and the three-rule enforcement model is internally sound. I found no blocking issues. Three important gaps and four minor ones are documented below — all are spec coverage deficits that could cause an implementation to diverge from the intended behavior if the author follows only one document.
+
+---
+
+### Issues Found
+
+**1. Spec §3.6 `contains` operator table is missing the CI enforcement rule**
+**Location:** `precept-language-spec.md` § 3.6 — `contains`
+**Severity:** Important
+
+The spec's `contains` type-rules table shows `set of T | T → boolean`, `queue of T | T → boolean`, `stack of T | T → boolean`. There is no row, footnote, or reference documenting that `collection of string contains ~string` is a compile error (`CaseInsensitiveValueInCaseSensitiveContains`). This enforcement rule lives only in `primitive-types.md §~string`. An implementer working from the spec alone would write a `contains` type-check that passes when it should fail.
+
+**Recommended fix:** Add a row or enforcement note to the `contains` table in §3.6: "If the collection's inner/key type is `string` and the right operand is `~string`, emit `CaseInsensitiveValueInCaseSensitiveContains`." Cross-reference `primitive-types.md §~string` Enforcement Rule 3.
+
+---
+
+**2. Spec §3.6 `==`/`!=` operator row doesn't carve out `~string`**
+**Location:** `precept-language-spec.md` § 3.6 — Binary operators, `==`/`!=` row
+**Severity:** Important
+
+The `==`/`!=` row says "any T | same T → boolean". This implies `~string == ~string` and `~string == string` are valid expressions — but both are compile errors (`CaseInsensitiveFieldRequiresTildeEquals`). The enforcement rule is documented in `primitive-types.md` but absent from the operator table in §3.6. The `~=`/`!~` row correctly documents those as the required forms for `~string`, but without an explicit carve-out on the `==`/`!=` row, an implementer would allow the wrong operators.
+
+**Recommended fix:** Add a note to the `==`/`!=` row: "Exception: if either operand is `~string`, `==`/`!=` are compile errors — use `~=`/`!~` instead (`CaseInsensitiveFieldRequiresTildeEquals` / `CaseInsensitiveFieldRequiresTildeNotEquals`)."
+
+---
+
+**3. Spec §3.6 `+` operator: `string + ~string` combination is unspecified**
+**Location:** `precept-language-spec.md` § 3.6 — Binary operators, `+` rows for string
+**Severity:** Important
+
+The operator table documents three string concatenation cases: `string + string → string`, `~string + ~string → string`, `~string + string → string`. The case `string + ~string` is missing. This is directly author-reachable: `"Hello, " + EmailField` where `EmailField` is `~string` produces `string + ~string`. A strict match against the table finds no row — an implementer who table-drives the type check would emit a spurious type error on ordinary concatenation code.
+
+The correct result is `string` (same logic as `~string + string` — concatenation is transformation, CI qualifier does not survive). But the spec must document it.
+
+**Recommended fix:** Add a fourth row: `` `+` | `string` | `~string` | `string` | No (concatenation — CI qualifier not preserved) ``. The table is currently asymmetric on left/right string-type combinations.
+
+---
+
+**4. `primitive-types.md §~string` enforcement rule uses "field" where it should say "expression"**
+**Location:** `primitive-types.md` — `~string` Enforcement rules, Rule 1
+**Severity:** Minor
+
+Rule 1 says "`==` or `!=` on any `~string` **field** (either operand position) is a compile error." The word "field" is too narrow. The enforcement fires based on the *type* of the expression, not whether it's a bare field reference. An if/then/else expression whose result type is `~string` (e.g., `if Cond then EmailField else OtherEmail`) must also trigger CI enforcement at downstream comparison sites — the CI qualifier propagated through the conditional. Event args are separately called out as covered ("CI obligation applies at every comparison site that receives the arg"), but they're also not "fields."
+
+If an implementer reads "field" literally and implements the check as "field reference with CI flag = true" rather than "expression with type CaseInsensitive = true," they'd miss CI enforcement on if/then/else results.
+
+**Recommended fix:** Change "on any `~string` field (either operand position)" to "on any `~string`-typed expression (either operand position)." This aligns with the implementation model described later in the same section: CI is a property of the `ScalarTypeRefNode`, not of the field declaration site.
+
+---
+
+**5. `collection-types.md §Membership Operator` CI note omits `log of ~string`**
+**Location:** `collection-types.md` — Membership Operator section, "Case sensitivity" note
+**Severity:** Minor
+
+The case-sensitivity note at the end of the section reads: "`contains` on `set of string` is case-sensitive (ordinal). `contains` on `set of ~string` is case-insensitive. `contains` on `queue of ~string` and `stack of ~string` is also case-insensitive." The note omits `log of ~string`, even though the `~string` inner type subsection two paragraphs above explicitly states it is valid for `log` and uses `OrdinalIgnoreCase`. A reader scanning only the case-sensitivity note would conclude `log of ~string` has no CI behavior.
+
+**Recommended fix:** Extend the note: "…`contains` on `queue of ~string`, `stack of ~string`, and `log of ~string` is also case-insensitive."
+
+---
+
+**6. Spec §2.1 places type checker diagnostics in the parser section**
+**Location:** `precept-language-spec.md` § 2.1 — Null-denotation table, `Tilde` row
+**Severity:** Minor
+
+The `Tilde` null-denotation entry includes this parenthetical: "compile error otherwise (`CaseInsensitiveFieldRequiresTildeStartsWith` / `CaseInsensitiveFieldRequiresTildeEndsWith` if `startsWith`/`endsWith` was used without `~`)". Those diagnostics fire when `startsWith(~stringField, ...)` is called — that is a type checker check at a regular function call site, not a parser behavior. The parser section is describing what the parser does when it sees `~startsWith`; the enforcement for when it *doesn't* see `~` belongs in §3.6.
+
+**Recommended fix:** Remove the cross-diagnostic parenthetical from §2.1. Add a dedicated row in §3.6 (function call type rules): "Calling `startsWith`/`endsWith` with a `~string` first argument emits `CaseInsensitiveFieldRequiresTildeStartsWith`/`CaseInsensitiveFieldRequiresTildeEndsWith`."
+
+---
+
+**7. `collection-types.md §Quantifier Predicates` lexer note misstates status of `no`**
+**Location:** `collection-types.md` — Quantifier Predicates, "Lexer note"
+**Severity:** Minor
+
+The note says "`each` and `no` require new lexer entries." `no` is already a reserved keyword in the spec (§1.2: listed under outcomes, "Prefix for `no transition`"). It does not need a new lexer entry — it needs parser disambiguation (the same pattern as `set` in type vs. action position, and `min`/`max` in constraint vs. function position). `each` genuinely does require a new lexer entry. The incorrect claim about `no` could mislead the implementer into thinking there's a lexer conflict to resolve when there isn't one.
+
+**Recommended fix:** Change the note to: "`any` is already a reserved keyword. `each` requires a new lexer entry. `no` is already reserved (for `no transition`) and requires only parser disambiguation in the quantifier expression position — same dual-use pattern as `set` and `min`/`max`."
+
+---
+
+### Sign-off conditions
+
+Issues 1–3 should be resolved before implementation begins — all three would produce silent behavioral divergence from the design intent in a spec-driven implementation. Issues 4–7 are documentation clarifications that should land in the same edit pass as the implementation plan but do not block design approval.
+
 **Backing type implication — the novel constraint:**
 
 The current `lookup of K to V` backing type is `ImmutableDictionary<K, V>` (see collection-types.md). The default `ImmutableDictionary` uses the type's default equality comparer — for `string`, that is `StringComparer.Ordinal`. To support `lookup of ~string to V`, the dictionary must be created with `StringComparer.OrdinalIgnoreCase` as its key comparer.

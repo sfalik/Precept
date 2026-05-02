@@ -752,7 +752,7 @@ public static partial class Parser
 
         private SyntaxNode? ParseAccessModeKeyword(bool isOptional)
         {
-            if (Current().Kind is TokenKind.Readonly or TokenKind.Editable)
+            if (Tokens.AccessModeKeywords.Contains(Current().Kind))
                 return new TokenWrapper(Current().Span, Advance());
             if (!isOptional)
                 EmitDiagnostic(DiagnosticCode.ExpectedToken, Current().Span, "readonly or editable", Current().Text);
@@ -780,8 +780,8 @@ public static partial class Parser
         {
             var cur = Current();
 
-            // Only Of, In, To can introduce a qualifier
-            if (cur.Kind is not (TokenKind.Of or TokenKind.In or TokenKind.To))
+            // Only tokens that appear as qualifier prepositions in the type catalog can introduce a qualifier
+            if (!QualifierPrepositionTokens.Contains(cur.Kind))
                 return false;
 
             // 'of' is never a declaration leader — always a qualifier
@@ -811,6 +811,15 @@ public static partial class Parser
             {
                 var collectionToken = Advance();
                 Expect(TokenKind.Of);
+
+                // Check for ~ prefix (case-insensitive element type modifier, e.g. set of ~string)
+                var caseInsensitive = false;
+                if (Current().Kind == TokenKind.Tilde)
+                {
+                    Advance();
+                    caseInsensitive = true;
+                }
+
                 var elemToken = Advance(); // element type
 
                 // Parse qualifiers on the element type if catalog permits them
@@ -830,7 +839,7 @@ public static partial class Parser
                 var endSpan = builtQualifiers.Length > 0 ? builtQualifiers[^1].Span : elemToken.Span;
                 return new CollectionTypeRefNode(
                     SourceSpan.Covering(collectionToken.Span, endSpan),
-                    collectionToken, elemToken, builtQualifiers);
+                    collectionToken, elemToken, builtQualifiers, caseInsensitive);
             }
 
             if (current.Kind == TokenKind.ChoiceType)

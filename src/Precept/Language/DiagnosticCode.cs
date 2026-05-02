@@ -111,4 +111,14 @@ public enum DiagnosticCode
     ChoiceElementTypeMismatch          =  88,
     ChoiceRankConflict                 =  89,
     ChoiceMissingElementType           =  90,
+
+    // ── Type (lifecycle validation) ──────────────────────
+    /// <summary>A typed constant is ambiguous between two candidate types.</summary>
+    AmbiguousTypedConstant             =  91,
+    /// <summary>An event handler appears in a stateful precept context where it is not valid.</summary>
+    EventHandlerInStatefulPrecept      =  92,
+    /// <summary>Required fields exist but no initial event is defined to assign them.</summary>
+    RequiredFieldsNeedInitialEvent     =  93,
+    /// <summary>An initial event does not assign all required fields.</summary>
+    InitialEventMissingAssignments     =  94,
 }

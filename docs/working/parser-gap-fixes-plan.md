@@ -2920,7 +2920,7 @@ The `Text` parameter is the second positional argument to `TokenMeta(TokenKind k
 |----------|----|-----------|----------|
 | Under-populated multi-token | PRECEPT0023a | `MultiTokenOp.Tokens` must have at least 2 elements — a 1-token sequence is a `SingleTokenOp` | Error |
 | Lead token prefix ambiguity | PRECEPT0023b | No `SingleTokenOp` lead token may equal any `MultiTokenOp` lead token — causes parser prefix ambiguity | Error |
-| Duplicate multi-token lead | PRECEPT0023c | No two `MultiTokenOp` entries may share the same lead token — would make `ByTokenSequence` throw at startup | Error |
+| Duplicate full token sequence | PRECEPT0023c | No two `MultiTokenOp` entries may have the same full token sequence — would cause `ByTokenSequence` startup collision | Error |
 
 ---
 
@@ -2930,7 +2930,7 @@ The `Text` parameter is the second positional argument to `TokenMeta(TokenKind k
 |--------|------|-------|
 | `DiagnosticId_UnderPopulatedMulti` | const string | `"PRECEPT0023a"` |
 | `DiagnosticId_LeadTokenAmbiguity` | const string | `"PRECEPT0023b"` |
-| `DiagnosticId_DuplicateMultiLead` | const string | `"PRECEPT0023c"` |
+| `DiagnosticId_MultiSequenceCollision` | const string | `"PRECEPT0023c"` |
 | `Rule_a`, `Rule_b`, `Rule_c` | static fields | `DiagnosticDescriptor`, category `"Precept.Language"`, severity `Error` |
 | `SupportedDiagnostics` | override property | All three rules |
 | `Initialize(AnalysisContext)` | override method | `RegisterCompilationStartAction` + `RegisterCompilationEndAction` (same pattern as PRECEPT0020) |
@@ -2948,7 +2948,7 @@ The `Text` parameter is the second positional argument to `TokenMeta(TokenKind k
 | `GivenCleanOperatorsDuShape_NoDiagnostic` | Baseline — post-Phase-2b catalog produces zero diagnostics |
 | `GivenMultiTokenOpWithOneToken_ReportsPRECEPT0023a` | `MultiTokenOp` with `Tokens.Length == 1` — reports under-populated error |
 | `GivenSingleTokenOpMatchingMultiTokenLeadToken_ReportsPRECEPT0023b` | Lead-token collision between `SingleTokenOp` and `MultiTokenOp` — reports ambiguity error |
-| `GivenTwoMultiTokenOpsWithSameLeadToken_ReportsPRECEPT0023c` | Two `MultiTokenOp` entries sharing lead token — reports ByTokenSequence collision error |
+| `GivenTwoMultiTokenOpsWithSameFullSequence_ReportsPRECEPT0023c` | Two `MultiTokenOp` entries sharing full token sequence — reports `ByTokenSequence` collision error |
 
 **Regression anchors:** All existing analyzer tests pass. Run against Phase-2b-updated `Operators.cs` — zero diagnostics on the clean catalog.
 
@@ -2959,7 +2959,7 @@ The `Text` parameter is the second positional argument to `TokenMeta(TokenKind k
 - `Precept0023OperatorMetaDuShape.cs` exists and compiles against the Phase 2b DU shape
 - PRECEPT0023a fires on a 1-element `MultiTokenOp.Tokens` — confirmed by unit tests
 - PRECEPT0023b fires on `SingleTokenOp`/`MultiTokenOp` lead-token collision — confirmed by unit tests
-- PRECEPT0023c fires on two `MultiTokenOp` entries sharing lead token — confirmed by unit tests
+- PRECEPT0023c fires on two `MultiTokenOp` entries sharing full token sequence — confirmed by unit tests
 - Running against post-Phase-2b `Operators.cs` produces zero diagnostics
 - All existing analyzer tests pass
 - `dotnet build` — zero errors, zero warnings

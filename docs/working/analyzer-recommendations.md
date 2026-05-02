@@ -206,7 +206,7 @@ Not actionable until Phase 2b (`SingleTokenOp`/`MultiTokenOp` DU) ships. When it
 |----------|-----------|
 | PRECEPT0023a | `MultiTokenOp.ContinuationTokens` must be non-empty |
 | PRECEPT0023b | No `SingleTokenOp` lead token may equal any `MultiTokenOp` lead token (prefix ambiguity) |
-| PRECEPT0023c | No two `MultiTokenOp` entries share the same lead token (would make ByTokenSequence throw) |
+| PRECEPT0023c | No two `MultiTokenOp` entries may have the same full token sequence (would cause `ByTokenSequence` startup collision) |
 
 Defer until Phase 2b design is final.
 
