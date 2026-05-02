@@ -65,18 +65,56 @@ Arithmetic (`-`, `*`, `/`, `%`) is a type error. Logical operators are a type er
 
 **String interpolation:** `"Hello, {Name}"` — each `{expr}` is type-checked independently. Any scalar type is coercible to string inside `"..."` interpolation. Collections are a type error.
 
-**`~string` — case-insensitive collection inner type:**
+**`~string` — case-insensitive string:**
 
-`~string` is not a standalone field type — it is only valid as the inner type of a collection:
+`~string` is valid as a scalar field type and as the inner type of a collection. Storage is always case-preserving — the `~` modifier affects comparison and membership semantics only, never the stored value.
 
 ```precept
+field Email  as ~string           # scalar field — CI equality enforced by compiler
 field Tags   as set of string    # ordinal — "Apple" ≠ "apple", both can coexist
 field Labels as set of ~string   # OrdinalIgnoreCase — "Apple" and "apple" are the same element
 ```
 
-The `~` prefix selects `StringComparer.OrdinalIgnoreCase` as the collection's comparer, which governs membership, deduplication, and ordering consistently. `set of ~string` supports `.min`/`.max` (OrdinalIgnoreCase ordering is deterministic). `field Name as ~string` is a type error (`CaseInsensitiveStringOnNonCollection`).
+The `~` prefix selects `StringComparer.OrdinalIgnoreCase` for equality and membership operations. For collections, this governs deduplication and `.min`/`.max` ordering. For scalar fields, it carries a comparison obligation enforced at every use site.
 
-**Ordering operators on `~string` fields (future scalar use):** When scalar `~string` fields are supported, `<`/`>`/`<=`/`>=` on a `~string` field use ordinal, case-sensitive lexicographic ordering — the same semantics as on any `string` field. The `~` modifier applies only to equality operators (`==`/`!=` → required to use `~=`/`!~`). There is no CI ordering variant; case-insensitive ordering is not part of the Precept operator surface.
+**Enforcement rules (scalar `~string` fields):**
+
+Three rules apply when `field F as ~string` is declared. All three are required; the enforcement model is not separable.
+
+1. **Equality:** `==` or `!=` on any `~string` field (either operand position) is a compile error (`CaseInsensitiveFieldRequiresTildeEquals` / `CaseInsensitiveFieldRequiresTildeNotEquals`). Required forms: `~=` and `!~`.
+
+   > *`'Email' is declared ~string (case-insensitive). Use ~= instead of == to avoid treating 'admin@example.com' and 'Admin@example.com' as different values.`*
+
+2. **Prefix/suffix functions:** `startsWith(~string field, ...)` and `endsWith(~string field, ...)` are compile errors (`CaseInsensitiveFieldRequiresTildeStartsWith` / `CaseInsensitiveFieldRequiresTildeEndsWith`). Required forms: `~startsWith` and `~endsWith`.
+
+   > *`'Email' is declared ~string (case-insensitive). Use ~startsWith instead of startsWith to avoid treating 'admin@...' and 'Admin@...' as different prefixes.`*
+
+3. **CS collection contains CI value:** `collection of string contains ~string field` is a compile error (`CaseInsensitiveValueInCaseSensitiveContains`). Either change the collection to `collection of ~string`, or restructure using a quantifier with `~=`.
+
+   > *`'Email' is ~string but 'Roles' is set of string (case-sensitive). A value like 'Admin' stored as 'admin' would not be found. Either change 'Roles' to set of ~string, or use a quantifier to test membership explicitly.`*
+
+**CI operators (`~startsWith`, `~endsWith`):**
+
+| Operator | Syntax | Semantics |
+|----------|--------|-----------|
+| `~startsWith` | `~startsWith(field, prefix)` | `OrdinalIgnoreCase` prefix test — first arg must be `~string` |
+| `~endsWith` | `~endsWith(field, suffix)` | `OrdinalIgnoreCase` suffix test — first arg must be `~string` |
+
+**Event arg declarations:** `event Foo(Email as ~string)` is valid. The author is declaring CI comparison intent for how those args are to be used.
+
+**Type unification (if/then/else):**
+
+| Branches | Result |
+|---------|--------|
+| `~string` + `~string` | `~string` |
+| `~string` + `string` | `~string` (CI preserved — selection, not transformation) |
+| `string` + `string` | `string` |
+
+**String functions unaffected:** `trim`, `left`, `right`, `mid`, `toLower`, `toUpper` are always ordinal. CI semantics do not apply to these functions; no enforcement check.
+
+**Ordering operators:** `<`/`>`/`<=`/`>=` on a `~string` field use ordinal, case-sensitive lexicographic ordering — the same semantics as on any `string` field. The `~` modifier applies only to equality operators (`==`/`!=` → required to use `~=`/`!~`). There is no CI ordering variant; case-insensitive ordering is not part of the Precept operator surface.
+
+**`choice of ~string` is excluded.** `~string` is not a valid `ChoiceElementType`. `choice` guarantees the stored value IS the declared canonical string; `~string` never normalizes storage. These contracts are irreconcilable without new surface. Use `toLower(event.Arg)` at the ingestion boundary before assigning to a choice field.
 
 ---
 

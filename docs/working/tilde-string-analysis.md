@@ -15,6 +15,119 @@ Expanding `~string` to scalar fields is not recommended at this time. Auto-promo
 
 ---
 
+## Locked Design — Scalar ~string
+
+**Status:** Locked. All review gaps resolved by owner (Shane). This section is the canonical implementation reference; the analysis sections below are supporting rationale. Item 4 of the original `## Locked decisions` section ("`~string` is collection-only") is superseded by this section.
+
+---
+
+### What is valid
+
+```precept
+field Email  as ~string            # valid — scalar field type
+field Code   as ~string notempty   # valid — constraints compose normally
+event Login(Email as ~string)      # valid — event arg declaration
+field Labels as set of ~string     # valid — collection inner type (unchanged)
+```
+
+`~string` is valid as a scalar field type and as a collection inner type. Storage is always case-preserving — the `~` modifier affects comparison and membership semantics only, never the stored representation.
+
+---
+
+### Core enforcement rules (all three ship together)
+
+**Rule 1 — Equality:** `==` or `!=` on any `~string` field (either operand position) is a compile error.
+
+| Wrong | Correct |
+|-------|---------|
+| `Email == "admin@example.com"` | `Email ~= "admin@example.com"` |
+| `Email != someValue` | `Email !~ someValue` |
+
+- `CaseInsensitiveFieldRequiresTildeEquals` (for `==`), `CaseInsensitiveFieldRequiresTildeNotEquals` (for `!=`)
+- Fires when `~string` appears in either operand position
+- Message: *`'Email' is declared ~string (case-insensitive). Use ~= instead of == to avoid treating 'admin@example.com' and 'Admin@example.com' as different values.`*
+
+**Rule 2 — CS collection contains CI value:** `collection of string contains ~string field` is a compile error.
+
+- `CaseInsensitiveValueInCaseSensitiveContains`
+- Fires when: collection inner/key type is `string` (not `~string`) AND the right operand is a `~string` field
+- Applies to all collection kinds (`set`, `queue`, `stack`, `log`, `bag`, `list`) and `lookup` key access
+- Inverse direction (`collection of ~string contains string value`) is fine — no diagnostic
+- Message: *`'Email' is ~string but 'Roles' is set of string (case-sensitive). A value like 'Admin' stored as 'admin' would not be found. Either change 'Roles' to set of ~string, or use a quantifier to test membership explicitly.`*
+
+**Rule 3 — String prefix/suffix functions:** `startsWith(~string field, ...)` or `endsWith(~string field, ...)` is a compile error.
+
+| Wrong | Correct |
+|-------|---------|
+| `startsWith(Email, "admin@")` | `~startsWith(Email, "admin@")` |
+| `endsWith(Email, ".com")` | `~endsWith(Email, ".com")` |
+
+- `CaseInsensitiveFieldRequiresTildeStartsWith`, `CaseInsensitiveFieldRequiresTildeEndsWith`
+- Messages:
+  - *`'Email' is declared ~string (case-insensitive). Use ~startsWith instead of startsWith to avoid treating 'admin@...' and 'Admin@...' as different prefixes.`*
+  - *`'Email' is declared ~string (case-insensitive). Use ~endsWith instead of endsWith to avoid treating '.com' and '.COM' as different suffixes.`*
+
+---
+
+### New operators
+
+| Operator | Syntax | Semantics | Valid when |
+|----------|--------|-----------|-----------|
+| `~startsWith` | `~startsWith(field, prefix)` | `OrdinalIgnoreCase` prefix test | First arg is `~string` |
+| `~endsWith` | `~endsWith(field, suffix)` | `OrdinalIgnoreCase` suffix test | First arg is `~string` |
+
+Using `~startsWith`/`~endsWith` on a plain `string` field is a type error. Using `startsWith`/`endsWith` on a `~string` field is `CaseInsensitiveFieldRequiresTildeStartsWith`/`CaseInsensitiveFieldRequiresTildeEndsWith`.
+
+---
+
+### String functions unaffected
+
+`trim`, `left`, `right`, `mid`, `toLower`, `toUpper` — CI semantics do not apply. These functions are always ordinal. No enforcement check.
+
+---
+
+### Ordering operators — documented asymmetry, no enforcement
+
+`<`/`>`/`<=`/`>=` on a `~string` field use ordinal, case-sensitive lexicographic ordering — identical to `<`/`>` on a plain `string` field. No compile error; no `~<`/`~>` operators will be added. The `~` modifier declares CI equality intent only. Document explicitly; behavior is not hidden.
+
+---
+
+### Type unification (if/then/else)
+
+| Branches | Result type | Rationale |
+|---------|------------|-----------|
+| `~string` + `~string` | `~string` | |
+| `~string` + `string` | `~string` | CI preserved — selection, not transformation; `~=` on a CS value is a harmless no-op |
+| `string` + `string` | `string` | |
+
+---
+
+### Event arg declarations
+
+`event Foo(Email as ~string)` is valid. The author is declaring CI comparison intent for how those args are to be used. The CI obligation applies at every comparison site that receives the arg.
+
+---
+
+### Excluded: `choice of ~string`
+
+`~string` is **not** a valid `ChoiceElementType`. `choice of ~string("draft", "active")` is a type error. Storage invariant conflict: `choice` guarantees the stored value IS the declared canonical string; `~string` never normalizes storage. These contracts are irreconcilable without new surface. Boundary normalization (`toLower(event.Arg)` before assigning to a choice field) is the correct pattern.
+
+---
+
+### Implementation model
+
+**No new `TypeKind`.** `TypeKind.String` with `CaseInsensitive = true` flag on the type reference node. `ScalarTypeRefNode` must gain a `CaseInsensitive` property (currently only `CollectionTypeRefNode` has it).
+
+**Parser:** Additive change to `ParseTypeRef()` — new `~` path for scalar field declarations. Existing collection inner type path is unchanged. `CaseInsensitiveStringOnNonCollection` (code 66) is retired when this ships — it was the guard preventing scalar `~string`. Parser emits `ExpectedToken` for standalone `~` outside valid positions (unchanged).
+
+**Type checker:** Three enforcement rules above. The CI flag must be carried per field reference in `SemanticIndex`. All checks fire at the comparison site, not the declaration site.
+
+**Runtime:** `lookup of ~string to V` must be constructed with `ImmutableDictionary.Create(StringComparer.OrdinalIgnoreCase)`. This is the only runtime change — all other CI semantics are compile-time enforcement.
+
+**Diagnostic catalog:** Retire `CaseInsensitiveStringOnNonCollection` (code 66). Add: `CaseInsensitiveFieldRequiresTildeEquals`, `CaseInsensitiveFieldRequiresTildeNotEquals`, `CaseInsensitiveValueInCaseSensitiveContains`, `CaseInsensitiveFieldRequiresTildeStartsWith`, `CaseInsensitiveFieldRequiresTildeEndsWith`.
+
+---
+
 ## Question A: Is ~string the best syntax?
 
 ### Symbol coherence
@@ -772,4 +885,137 @@ Ordering operators require no new rule. The type checker treats `<`/`>` on `~str
 #### Updated enforcement model clause
 
 > **Ordering operators (`<`, `>`, `<=`, `>=`) on `~string` fields:** Valid. Semantics are ordinal, case-sensitive lexicographic ordering — identical to ordering on a plain `string` field. The `~` modifier does not affect ordering semantics. No enforcement check. Authors must understand that CI equality semantics do not extend to ordering; the docs must state this explicitly.
+
+---
+
+## startsWith / endsWith on ~string
+
+**Question:** When `startsWith(field, prefix)` or `endsWith(field, suffix)` is called where `field` is declared `~string`, should the function auto-promote to `OrdinalIgnoreCase`, silently stay case-sensitive, or require an explicit `~startsWith`/`~endsWith` operator?
+
+### The framework
+
+Two prior decisions establish the principled rule:
+
+- **Equality enforcement:** `==`/`!=` on a `~string` field is a compile error — the author must use `~=`/`!~`. Reason: an explicit CI alternative exists.
+- **CI collection promotion:** `set of ~string contains value` silently uses `OrdinalIgnoreCase`. Reason: no `~contains` operator exists; the declared type drives the comparer.
+
+The rule the two decisions jointly imply: **explicit CI form exists → enforce; no explicit CI form exists → the type's declared comparer is authoritative.**
+
+All three options below turn on whether `~startsWith`/`~endsWith` exist.
+
+---
+
+### Option A — Auto-promote
+
+`startsWith(~string field, prefix)` automatically uses `OrdinalIgnoreCase`. No new operators or tokens.
+
+**Analysis:** Falls on the promotion branch of the existing rule. Direct precedent: `set of ~string contains value`. No new language surface. The type checker inspects the `CaseInsensitive` flag on the first argument's resolved type and emits an `OrdinalIgnoreCase` evaluation; the field declaration is the only signal needed.
+
+**Downside:** CI behavior is invisible at the call site. Readers of `startsWith(Email, "admin@")` must know `Email` is `~string` to understand the semantics. This is accepted throughout the collection model but worth naming.
+
+---
+
+### Option B — Allow with asymmetry
+
+`startsWith`/`endsWith` always use `Ordinal` even on `~string` fields. Document the gap.
+
+**Analysis:** Least principled option. `~string` protects equality but leaves prefix/suffix matching in the pre-`~string` world — forcing authors back to `toLower(Email) startsWith toLower(prefix)`, exactly the mechanism-over-intent idiom `~=` was designed to eliminate. The `~string` declaration would be an incomplete guarantee. Given that domain-suffix, scheme, and role-prefix checks are canonical `startsWith`/`endsWith` uses, the "rare enough to ignore" argument doesn't hold. **Not recommended.**
+
+---
+
+### Option C — Explicit `~startsWith` / `~endsWith` operators
+
+Add `~startsWith` and `~endsWith` as new operator tokens. By the existing rule ("explicit CI form exists → enforce"), `startsWith`/`endsWith` on a `~string` field becomes a compile error: `CaseInsensitiveFieldRequiresTildeStartsWith` / `CaseInsensitiveFieldRequiresTildeEndsWith`. Mirrors the `==` → `~=` relationship exactly.
+
+**Analysis:** Maximally consistent with the equality enforcement model. Every string comparison operation on a `~string` field — equality, prefix, suffix — requires an explicit CI form at the call site. Nothing implicit.
+
+**Cost:** Two new operator tokens, two new diagnostic codes, catalog and grammar updates. Not large, but not zero. Authors must learn `~startsWith`/`~endsWith` exist and use them everywhere they apply a prefix/suffix test to a `~string` field.
+
+**Upside:** The enforcement model is complete and uniform. There is no "sometimes explicit, sometimes promoted" split to explain or qualify.
+
+---
+
+### Both A and C are principled
+
+Option A is principled because no explicit CI form exists → the declared type's comparer is authoritative.  
+Option C is principled because it *creates* that CI form, which then activates the enforcement branch.  
+The difference is a surface/enforcement tradeoff, not a correctness tradeoff. Option B breaks both branches of the rule.
+
+---
+
+### Recommendation
+
+**Option A**, unless the team wants full call-site explicitness for all scalar `~string` comparisons. Auto-promotion has zero surface cost and is consistent with the CI collection precedent. Option C is the stronger consistency story — every `~string` comparison is explicit — but it grows the operator surface and requires authors to adopt two new tokens.
+
+**Key question for Shane:** Do you want `startsWith` on a `~string` field to be a compile error requiring `~startsWith` (Option C — call-site explicitness everywhere, uniform enforcement), or is silent promotion acceptable here as it is for CI collections (Option A — no new operators, declared type drives behavior)?
+
+---
+
+## if/then/else type unification with ~string
+
+**Author:** Frank
+**Date:** 2026-07-14
+**Trigger:** George's Gap 4 — the prior composition analysis did not state the unification rule. One of the two options below must be locked before scalar `~string` ships.
+
+---
+
+### The question
+
+When one branch of `if/then/else` is `~string` and the other is `string`, what is the result type?
+
+```
+field Email as ~string
+
+if IsVip then Email else "guest@example.com"
+```
+
+---
+
+### Option 1 — CI dropped (`~string` + `string` → `string`)
+
+As soon as one branch is a plain `string`, the CI flag is dropped and the result is `string`. Analogy: concatenation — `Email + "@domain.com"` → `string`, not `~string`. The CI qualifier does not survive any operation that produces a new or combined value.
+
+**Consequence:** The expression above has type `string`. Comparing it with `==` compiles without error. But when `IsVip = true` and `Email = "ADMIN@EXAMPLE.COM"`, a subsequent `== "admin@example.com"` silently returns `false`. The CI protection was lost at the branch site — triggered by the most natural authoring choice (a plain string fallback). This is exactly the class of silent mismatch the enforcement model was designed to eliminate.
+
+---
+
+### Option 2 — CI preserved (`~string` + `string` → `~string`)
+
+If either branch is `~string`, the result is `~string`. Analogy: `optional` unification — `if cond then SomeField else null` → `optional`. A qualifier carried by any branch propagates to the result because that branch might win.
+
+**Consequence:** The expression above has type `~string`. Comparing it with `==` is a `CaseInsensitiveFieldRequiresTildeEquals` error — the author is forced to `~=`. When the `~string` branch wins, this is exactly correct. When the CS literal branch wins, `~=` is over-cautious but always correct: `OrdinalIgnoreCase` on a value that is already in canonical case is a harmless no-op.
+
+---
+
+### The decisive distinction: selection vs. transformation
+
+Concatenation transforms a value — the result is a new string with no lineage claim from its operands. `if/then/else` **selects** a value: when the `~string` branch wins, the result *is* `Email`, CI semantics intact. Dropping the CI qualifier at the branch site silently discards a protection that is still in force at the value's origin.
+
+The collection precedent supports this direction. `lookup of ~string to V` does not ask whether a given key happened to come from a CI field — the declared comparer applies uniformly. Analogously, a `~string`-typed branch taints the result because the CI path might be taken.
+
+---
+
+### Recommendation: Option 2 — CI preserved
+
+George recommended Option 1 without deep argument. The safety analysis reverses it. The enforcement model's purpose is to make silent case-sensitive comparisons on CI-declared values structurally impossible. Option 1 silently reintroduces exactly that bug — triggered by the most ordinary authoring pattern (a string literal fallback). Option 2 forces `~=` in all cases, which is always correct and never harmful. The asymmetry in authoring cost is negligible; the asymmetry in correctness is not.
+
+**Lock in:** `~string` + `~string` → `~string`; `~string` + `string` → `~string`; `string` + `string` → `string`.
+
+---
+
+## choice of ~string
+
+**Question:** Should `choice of ~string("draft", "active")` be valid — meaning membership validation and equality use `OrdinalIgnoreCase`?
+
+**For (Shane's inclination):** If `~string` is valid in scalar field position, excluding it from `choice of T` looks compositionally inconsistent. Authors ingesting external data (event args, API payloads) that may arrive in mixed case would benefit from declared-CI membership semantics rather than normalizing at every ingestion site.
+
+**Against:**
+
+*1. The storage invariant breaks.* `choice` works because the stored value IS the declared canonical string — that identity is what makes downstream equality, serialization, and ordered rank reliable. `~string` never normalizes storage: `"DRAFT"` stays `"DRAFT"`. Assign `"DRAFT"` to `choice of ~string("draft"`)`: does the runtime store `"DRAFT"` or normalize to `"draft"`? If it stores `"DRAFT"`, ordinal comparisons against `"draft"` will fail silently. If it normalizes, that contradicts the `~string` storage model, which has no normalization concept anywhere in Precept today. This isn't a design question that can be answered "later" — it determines the entire backing type contract.
+
+*2. The enforcement model can't compose.* Scalar `~string` works by requiring `~=` on equality and diagnosing `==` as an error. But `choice` doesn't have `~=` — it uses `==` only. For `choice of ~string`, the engine must either silently promote `==` to CI (invisible, contradicts every enforcement principle established for scalar `~string`) or make `==` on a CI choice an error pointing toward an operator that doesn't exist for the choice type. Neither is coherent without new surface.
+
+*3. George's control argument holds, and the workaround is trivial.* For literals embedded in guards and rules, the author controls both sides — CI is pure noise. For dynamic values, `set Status = toLower(event.StatusArg)` normalizes at the ingestion boundary in one line, leaving the choice field ordinal-clean downstream. This is already idiomatic Precept.
+
+**Recommendation: Exclude.** The storage invariant break is structurally blocking — this is not a syntax question but a type coherence question with no clean resolution inside the existing model. Add one sentence to the spec: `~string` is not a valid `ChoiceElementType`. CI membership on choice fields is a boundary-normalization problem, not a field-declaration problem.
 

@@ -437,7 +437,7 @@ Collections of collections (`set of set of string`) are not supported. All Prece
 
 ### `~string` — case-insensitive inner type
 
-`~string` is a special inner type variant, not a standalone field type. It selects `StringComparer.OrdinalIgnoreCase` as the collection's comparer, governing membership testing, deduplication (for sets), and ordering (for `.min`/`.max`) consistently.
+`~string` is valid as a collection inner type and as a scalar field type. As a collection inner type, it selects `StringComparer.OrdinalIgnoreCase` as the collection's comparer, governing membership testing, deduplication (for sets), and ordering (for `.min`/`.max`) consistently.
 
 ```precept
 field Tags   as set of string    # ordinal — "Apple" ≠ "apple", both coexist
@@ -452,7 +452,7 @@ field Labels as set of ~string   # OrdinalIgnoreCase — "Apple" and "apple" are
 | Deduplication | Case-sensitive | Case-insensitive |
 | `.min`/`.max` ordering | Ordinal | OrdinalIgnoreCase (deterministic) |
 
-**`~string` is collection-only.** `field Name as ~string` is a compile-time error: `CaseInsensitiveStringOnNonCollection`. The `~` prefix is only valid immediately after `of` in a collection type position.
+**`~string` as a scalar field type.** `field Email as ~string` is valid. The type checker enforces that equality comparisons (`==`/`!=`) are replaced with `~=`/`!~`, that `startsWith`/`endsWith` are replaced with `~startsWith`/`~endsWith`, and that a `~string` field is not tested against a case-sensitive collection with `contains`. See [Primitive Types](primitive-types.md) §`~string` for the full scalar enforcement rules, type unification, event arg declarations, and the `choice of ~string` exclusion.
 
 **`~string` in queue, stack, and log.** While `~string` is most meaningful for sets (where deduplication and membership benefit from case-insensitive comparison), it is also valid as the inner type for `queue of ~string`, `stack of ~string`, and `log of ~string`. The `contains` operator on these collections uses `OrdinalIgnoreCase` matching.
 

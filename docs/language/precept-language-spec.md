@@ -89,6 +89,8 @@ The following properties of Precept's execution model are language design choice
 
 1. **No loops.** The language has no iteration constructs. Expression trees are finite and acyclic. This eliminates the need for fixpoint computation and widening operators.
 
+   *Bounded quantifier predicates (`each`, `any`, `no`) are not iteration constructs.* A quantifier asserts a truth value over every, some, or no element in a statically-declared finite collection — producing a single boolean value, introducing no loop variable that carries state across elements, mutating nothing. Structurally, a quantifier over a finite collection unfolds to a finite conjunction or disjunction of its predicate: an acyclic expression tree, not a control-flow loop. The prohibition is on general iteration, recursion, and any construct that requires fixpoint reasoning to analyze. Quantifiers that assert bounded truths over finite domains without mutation require no fixpoint reasoning and are not in that category.
+
 2. **No control-flow branches.** A transition row is a flat sequence: evaluate a guard, execute assignments left-to-right, check rules and ensures. There are no `if` statements that split execution into paths that later reconverge. Conditional *expressions* (`if/then/else`) produce a single value — both branches are type-checked, exactly one is evaluated — but they do not create control-flow divergence.
 
 3. **No reconverging flow.** Because there are no loops or branches, there is no join point where two different states must be merged. Each assignment in a row sees the state left by all preceding assignments. This makes sequential flow analysis a linear walk, not a dataflow graph.
@@ -361,9 +363,9 @@ Every token the lexer can produce. Organized by category to match the `TokenKind
 | `Arrow` | `->` | Action chain / outcome separator |
 | `CaseInsensitiveEquals` | `~=` | Case-insensitive comparison (string-only) |
 | `CaseInsensitiveNotEquals` | `!~` | Case-insensitive not-equals (string-only) |
-| `Tilde` | `~` | Case-insensitive collection inner type prefix (`set of ~string`) |
+| `Tilde` | `~` | Case-insensitive modifier — collection inner type (`set of ~string`) or scalar field type qualifier (`field Email as ~string`) |
 
-**Scan order for operators:** Multi-character operators must be attempted before their single-character prefixes: `!~` before `!=` before `!` (if ever reintroduced), `~=` before `~`, `->` before `-`, `==` before `=`, `>=` before `>`, `<=` before `<`. A standalone `~` is only valid immediately before `string` in a collection inner type position — elsewhere it is a lexer error.
+**Scan order for operators:** Multi-character operators must be attempted before their single-character prefixes: `!~` before `!=` before `!` (if ever reintroduced), `~=` before `~`, `->` before `-`, `==` before `=`, `>=` before `>`, `<=` before `<`. A standalone `~` is valid immediately before `string` in a collection inner type position (`set of ~string`) and as a scalar field type qualifier (`field Email as ~string`) — elsewhere it is a lexer error.
 
 #### Punctuation
 
@@ -684,8 +686,8 @@ The parser always runs to end-of-source. On malformed input it emits diagnostics
 | Token | Production |
 |-------|------------|
 | `Identifier` | `IdentifierExpression` |
-| `NumberLiteral` | `NumberLiteralExpression` |
-| `True` / `False` | `BooleanLiteralExpression` |
+| `NumberLiteral` | `LiteralExpression` |
+| `True` / `False` | `LiteralExpression` |
 | `StringLiteral` | `StringLiteralExpression` |
 | `StringStart` | `InterpolatedStringExpression` (reassembly loop) |
 | `TypedConstant` | `TypedConstantExpression` |
@@ -704,7 +706,7 @@ The parser always runs to end-of-source. On malformed input it emits diagnostics
 | `Or` | `BinaryExpression(Or, ParseExpression(10))` |
 | `And` | `BinaryExpression(And, ParseExpression(20))` |
 | `==` `!=` `~=` `!~` `<` `>` `<=` `>=` | `BinaryExpression(op, ParseExpression(31))` |
-| `Contains` | `ContainsExpression(left, ParseExpression(40))` |
+| `Contains` | `BinaryExpression(Contains, ParseExpression(40))` |
 | `Is` | `IsSetExpression` — consumes optional `Not`, then `Set` |
 | `+` `-` (infix) | `BinaryExpression(op, ParseExpression(50))` |
 | `*` `/` `%` | `BinaryExpression(op, ParseExpression(60))` |
@@ -895,7 +897,7 @@ CollectionType  :=  (set | queue | stack) of ScalarType TypeQualifier?
 ChoiceType        :=  choice "of" ChoiceElementType "(" ChoiceValueExpr ("," ChoiceValueExpr)* ")"
 ChoiceElementType :=  string | integer | decimal | number | boolean
 ChoiceValueExpr   :=  StringLiteral | NumberLiteral | BooleanLiteral
-TypeQualifier   :=  (in | of) Expr
+TypeQualifier   :=  (in | of | to) Expr
 ```
 
 Type qualifiers narrow the value domain: `in '<unit>'` pins to a specific unit or currency, `of '<family>'` constrains to a dimension family. A field may use `in` or `of`, not both.
@@ -1185,6 +1187,7 @@ Event args are accessed via dotted notation: `EventName.ArgName`. The type check
 | `not` | `boolean` | `boolean` |
 | `-` (negate) | numeric | same numeric type |
 | `-` (negate) | `duration` | `duration` |
+| `-` (negate) | `period` | `period` (negates each component — preserves structural components) |
 | `-` (negate) | `money` | `money` (preserves currency) |
 | `-` (negate) | `quantity` | `quantity` (preserves unit/dimension) |
 | `-` (negate) | `price` | `price` (preserves currency/unit) |
