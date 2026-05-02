@@ -9,6 +9,8 @@ Pre-TypeChecker audit — exhaustive consistency check of language docs, catalog
 - Obvious gap → agent rubber-ducks, applies fix, status = **Fixed**
 - Non-obvious gap → full analysis written, status = **Unresolved** (owner resolves on second pass)
 
+**Audit status: COMPLETE — 28 gaps total, 28 Fixed, 0 Unresolved**
+
 ---
 
 ## Summary Table
@@ -34,10 +36,10 @@ Pre-TypeChecker audit — exhaustive consistency check of language docs, catalog
 | GAP-017 | `Arrow` (`->`) categorized as `Structural` in `Tokens.cs` but spec §1.1 places it in the Operators table | Catalog-Impl | Fixed | 5 |
 | GAP-018 | Spec §1.1 `NumberLiteral` row description omits exponent notation documented in §1.3 and implemented in the lexer | Doc-Spec | Fixed | 5 |
 | GAP-019 | `UnexpectedKeyword` (11) and `InvalidCallTarget` (12) listed in spec §2.7 as active parser diagnostics but never emitted by the parser | Doc-Impl | Fixed | 6/7 |
-| GAP-025 | GAP-003 incomplete — `Modifiers.cs` `Notempty` applicability still `StringOnly`; spec §3.8 requires string + 8 collection types | Doc-Catalog | Unresolved | 7 |
-| GAP-026 | `Modifiers.cs` `CollectionTypes` array stale — `mincount`/`maxcount` applicability missing 6 new TypeKind members | Doc-Catalog | Unresolved | 7 |
+| GAP-025 | GAP-003 incomplete — `Modifiers.cs` `Notempty` applicability still `StringOnly`; spec §3.8 requires string + 8 collection types | Doc-Catalog | Fixed | 7 |
+| GAP-026 | `Modifiers.cs` `CollectionTypes` array stale — `mincount`/`maxcount` applicability missing 6 new TypeKind members | Doc-Catalog | Fixed | 7 |
 | GAP-027 | `Tokens.cs` `Notempty` description reads "String constraint: non-empty" but spec §1.1 says "String or collection constraint: non-empty" | Doc-Catalog | Fixed | 7 |
-| GAP-028 | `Functions.cs` `sqrt` has `Integer` and `Decimal` overloads but spec §3.7 explicitly says integer/decimal inputs are type errors | Doc-Catalog | Unresolved | 7 |
+| GAP-028 | `Functions.cs` `sqrt` has `Integer` and `Decimal` overloads but spec §3.7 explicitly says integer/decimal inputs are type errors | Doc-Catalog | Fixed | 7 |
 | GAP-020 | `contains` associativity: spec §2.1 says `left`, `Operators.cs` enforces `NonAssociative`; spec left-denotation shows `ParseExpression(40)` instead of `ParseExpression(41)` | Doc-Impl | Fixed | 6 |
 | GAP-021 | `is set`/`is not set` associativity: spec §2.1 says `left`, catalog says `NonAssociative (postfix)` | Doc-Impl | Fixed | 6 |
 | GAP-022 | Spec §2.1 null-denotation table names `StringLiteralExpression` — a node that does not exist; implementation uses `LiteralExpression` | Doc-Impl | Fixed | 6 |
@@ -1054,7 +1056,7 @@ Unresolved. Owner should decide: (a) update spec §2.3 grammar to add `TypeQuali
 
 ## GAP-025: GAP-003 incomplete — `Modifiers.cs` `Notempty` applicability still `StringOnly`
 
-**Status:** Unresolved  
+**Status:** Fixed  
 **Category:** Doc-Catalog  
 **Location:** `src/Precept/Language/Modifiers.cs` lines 70–74; `docs/language/precept-language-spec.md` §3.8 (line 1470)  
 **Found in iteration:** 7
@@ -1077,13 +1079,13 @@ This is 9 types total (1 scalar + 8 collection kinds). `Lookup` is explicitly ex
 The GAP-003 author updated the spec and three supporting docs but did not update `Modifiers.cs`. The catalog is the machine-readable source that the TypeChecker will consume to enforce modifier applicability. A `notempty` on a `bag` field should be valid per the spec but the catalog currently marks it invalid. This is a TypeChecker-correctness issue. However, fixing it requires confirming the 9-type list is final (owner review recommended before TypeChecker work begins) and ensuring the `CollectionTypes` array is consistent (see GAP-026).
 
 **Resolution:**  
-Unresolved. Fix requires: (a) defining `StringAndCollectionTypes = [TypeKind.String, TypeKind.Set, TypeKind.Queue, TypeKind.Stack, TypeKind.Log, TypeKind.LogBy, TypeKind.Bag, TypeKind.List, TypeKind.QueueBy]` in `Modifiers.cs`; (b) changing `Notempty.ApplicableTo` to reference this new array. Owner should confirm the 9-type list and the Lookup exclusion before applying.
+Fixed (iter 7, Frank). Defined `StringAndCollectionTypes = [TypeKind.String, TypeKind.Set, TypeKind.Queue, TypeKind.Stack, TypeKind.Log, TypeKind.LogBy, TypeKind.Bag, TypeKind.List, TypeKind.QueueBy]` in `Modifiers.cs`. Updated `Notempty.ApplicableTo` to reference the new array. `Lookup` excluded per owner decision — lookup entries are defined at design time and cannot be empty at runtime. Tests updated: `StringModifiers_ApplyToStringOnly` theory no longer includes `Notempty`; new `Notempty_AppliesToStringAndCollectionTypes` fact verifies the 9-type set and the Lookup exclusion explicitly.
 
 ---
 
 ## GAP-026: `Modifiers.cs` `CollectionTypes` array stale — `mincount`/`maxcount` missing 6 new TypeKind members
 
-**Status:** Unresolved  
+**Status:** Fixed  
 **Category:** Doc-Catalog  
 **Location:** `src/Precept/Language/Modifiers.cs` lines 23–26; `docs/language/precept-language-spec.md` §3.8 (line 1473)  
 **Found in iteration:** 7
@@ -1105,7 +1107,7 @@ Six TypeKind members are missing: `Log` (27), `LogBy` (28), `Bag` (29), `List` (
 `CollectionTypes` was defined when only the original three collection types existed. The six new collection types added later were not added to this array. This is a pure catalog omission with no ambiguity — the spec explicitly lists all nine types. The fix is a mechanical array extension. TypeChecker implications are straightforward (mincount/maxcount on a `bag` field will currently be rejected; it should be allowed). Owner may want to apply this fix alongside GAP-025 for consistency.
 
 **Resolution:**  
-Unresolved. Fix: extend `CollectionTypes` to `[TypeKind.Set, TypeKind.Queue, TypeKind.Stack, TypeKind.Log, TypeKind.LogBy, TypeKind.Bag, TypeKind.List, TypeKind.QueueBy, TypeKind.Lookup]`. No other changes needed — `Mincount` and `Maxcount` already reference `CollectionTypes` by name.
+Fixed (iter 7, Frank). Extended `CollectionTypes` from 3 to 9 members: `[TypeKind.Set, TypeKind.Queue, TypeKind.Stack, TypeKind.Log, TypeKind.LogBy, TypeKind.Bag, TypeKind.List, TypeKind.QueueBy, TypeKind.Lookup]`. `Lookup` IS included per owner decision — constraining how many lookup entries exist at runtime is meaningful for `mincount`/`maxcount`. No other modifier references `CollectionTypes`. Tests updated: `CollectionModifiers_ApplyToSetQueueStack` renamed to `CollectionModifiers_ApplyToAllNineCollectionTypes` and now verifies all 9 members.
 
 ---
 
@@ -1137,7 +1139,7 @@ Fixed. Updated `Tokens.cs` line 225: `"String constraint: non-empty"` → `"Stri
 
 ## GAP-028: `Functions.cs` `sqrt` has `Integer` and `Decimal` overloads but spec §3.7 says integer/decimal inputs are type errors
 
-**Status:** Unresolved  
+**Status:** Fixed  
 **Category:** Doc-Catalog  
 **Location:** `src/Precept/Language/Functions.cs` lines 176–201; `docs/language/precept-language-spec.md` §3.7 (line 1391)  
 **Found in iteration:** 7
@@ -1159,11 +1161,11 @@ The integer and decimal overloads contradict the spec's explicit "type errors" c
 GAP-004 updated the spec §3.7 `sqrt` row to say "Number-lane only; decimal and integer inputs are type errors." But `Functions.cs` was not updated at that time — the same pattern as GAP-003 (doc fix without catalog fix). Two valid interpretations: (a) the Integer/Decimal overloads are catalog bugs — they should be removed to match the spec; (b) the spec is aspirational and the implementation intentionally widens `sqrt` to all numeric types with no conversion requirement. This is an owner judgment call: the spec reasoning ("no .NET Math.Sqrt for decimal; use approximate() first") suggests the restriction is deliberate. If upheld, remove the Integer and Decimal overloads from `Functions.cs`.
 
 **Resolution:**  
-Unresolved. Owner should confirm whether the integer/decimal overloads are intentional (widen sqrt to all numeric types) or a catalog omission that should be corrected to match the spec's number-only restriction.
+Fixed (iter 7, Frank). Removed the `Integer→Number` and `Decimal→Number` overloads from `FunctionKind.Sqrt` in `Functions.cs`. Only the `Number→Number` overload remains, matching spec §3.7 exactly. The `PSqrtInteger` and `PSqrtDecimal` static fields were also removed as they became unreferenced. Tests updated: `NumericFunction_OverloadCount(Sqrt, 3)` → `(Sqrt, 1)`; `Sqrt_AllOverloads_HaveNonNegativeRequirement` trimmed to `[InlineData(0)]` only; `Sqrt_RequirementCount_IsOnePerOverload` updated to assert 1 overload. Total overload count invariant updated: 49 → 47.
 
 ---
 
-<!-- Iteration 7 complete: Final pre-TypeChecker language consistency audit pass. Phase A verification — confirmed 22 of 24 prior gaps are genuinely fixed; identified 2 false-Fixed entries: GAP-017 (C# changes written in iter 5 but never applied — applied now in iter 7) and GAP-003 (docs updated but Modifiers.cs not updated — filed as new GAP-025). 4 new gaps filed: GAP-025 (Unresolved — GAP-003 incomplete; Modifiers.cs Notempty still StringOnly; spec §3.8 requires string + 8 collection types), GAP-026 (Unresolved — Modifiers.cs CollectionTypes array missing 6 new TypeKind members for mincount/maxcount applicability), GAP-027 (Fixed — Tokens.cs Notempty description "String constraint: non-empty" → "String or collection constraint: non-empty"), GAP-028 (Unresolved — Functions.cs sqrt has Integer/Decimal overloads but spec §3.7 says integer/decimal are type errors). GAP-019 closed: George implemented UnexpectedKeyword (11) and InvalidCallTarget (12) emission sites in Parser.Expressions.cs; DiagnosticCode.cs "reserved" comments removed. C# changes applied this iteration: Tokens.cs Arrow Cat_Str → Cat_Op, TwoCharOperators filter simplified (remove `or Structural`), TwoCharOperators doc comment updated, Notempty description updated. Audit scope: Tokens.cs, Modifiers.cs, Functions.cs, DiagnosticCode.cs, Diagnostics.cs, Parser.Expressions.cs, Parser.cs; spec §1.1, §2.7, §3.7, §3.8. 2 Fixed this iteration, 3 Unresolved filed (need owner judgment before TypeChecker work begins). -->
+<!-- Iteration 7 complete: Final pre-TypeChecker language consistency audit pass. Phase A verification — confirmed 22 of 24 prior gaps are genuinely fixed; identified 2 false-Fixed entries: GAP-017 (C# changes written in iter 5 but never applied — applied now in iter 7) and GAP-003 (docs updated but Modifiers.cs not updated — filed as new GAP-025). 4 new gaps filed: GAP-025 (Unresolved → Fixed in iter 7 by Frank — GAP-003 incomplete; Modifiers.cs Notempty ApplicableTo updated from StringOnly to StringAndCollectionTypes; spec §3.8 9-type set applied, Lookup excluded), GAP-026 (Unresolved → Fixed in iter 7 by Frank — Modifiers.cs CollectionTypes extended from 3 to 9 members; Lookup included for mincount/maxcount), GAP-027 (Fixed — Tokens.cs Notempty description updated), GAP-028 (Unresolved → Fixed in iter 7 by Frank — Functions.cs sqrt Integer/Decimal overloads removed per spec §3.7; sqrt is Number-lane only). C# changes applied this iteration: Tokens.cs Arrow Cat_Str → Cat_Op, TwoCharOperators filter simplified, Notempty description updated, Modifiers.cs CollectionTypes extended + StringAndCollectionTypes added + Notempty.ApplicableTo updated, Functions.cs sqrt Integer/Decimal overloads + PSqrtInteger/PSqrtDecimal fields removed. Tests updated: ModifiersTests.cs (StringModifiers_ApplyToStringOnly theory, CollectionModifiers renamed+extended, new Notempty_AppliesToStringAndCollectionTypes fact), FunctionsTests.cs (OverloadCount Sqrt 3→1, Total_OverloadCount 49→47, Sqrt_AllOverloads_HaveNonNegativeRequirement trimmed to overload 0 only, Sqrt_RequirementCount_IsOnePerOverload asserts 1 overload). Final state: 28 gaps total, 28 Fixed, 0 Unresolved. Pre-TypeChecker language consistency audit CLOSED. -->
 
 
 

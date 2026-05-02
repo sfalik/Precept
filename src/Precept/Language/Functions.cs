@@ -28,8 +28,6 @@ public static class Functions
 
     // Named parameters for overloads that carry a proof requirement — the same instance
     // must appear in both Parameters and ParamSubject to satisfy reference-equality (PRECEPT0005).
-    private static readonly ParameterMeta PSqrtInteger = new(TypeKind.Integer, "value");
-    private static readonly ParameterMeta PSqrtDecimal = new(TypeKind.Decimal, "value");
     private static readonly ParameterMeta PSqrtNumber  = new(TypeKind.Number,  "value");
 
     // ════════════════════════════════════════════════════════════════════════════
@@ -176,18 +174,6 @@ public static class Functions
         FunctionKind.Sqrt => new(kind, "sqrt",
             "Square root → number (proof engine checks non-negativity)",
         [
-            new([PSqrtInteger], TypeKind.Number,
-                ProofRequirements:
-                [
-                    new NumericProofRequirement(new ParamSubject(PSqrtInteger), OperatorKind.GreaterThanOrEqual, 0m,
-                        "Argument must be non-negative"),
-                ]),
-            new([PSqrtDecimal], TypeKind.Number,
-                ProofRequirements:
-                [
-                    new NumericProofRequirement(new ParamSubject(PSqrtDecimal), OperatorKind.GreaterThanOrEqual, 0m,
-                        "Argument must be non-negative"),
-                ]),
             new([PSqrtNumber], TypeKind.Number,
                 ProofRequirements:
                 [

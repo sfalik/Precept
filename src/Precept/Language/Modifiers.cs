@@ -23,6 +23,16 @@ public static class Modifiers
     private static readonly TypeTarget[] CollectionTypes =
     [
         new(TypeKind.Set), new(TypeKind.Queue), new(TypeKind.Stack),
+        new(TypeKind.Log), new(TypeKind.LogBy), new(TypeKind.Bag),
+        new(TypeKind.List), new(TypeKind.QueueBy), new(TypeKind.Lookup),
+    ];
+
+    private static readonly TypeTarget[] StringAndCollectionTypes =
+    [
+        new(TypeKind.String),
+        new(TypeKind.Set), new(TypeKind.Queue), new(TypeKind.Stack),
+        new(TypeKind.Log), new(TypeKind.LogBy), new(TypeKind.Bag),
+        new(TypeKind.List), new(TypeKind.QueueBy),
     ];
 
     private static readonly TypeTarget[] AnyType = []; // empty = applies to all types
@@ -69,9 +79,9 @@ public static class Modifiers
 
         ModifierKind.Notempty => new FieldModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Notempty),
-            "String is non-empty",
-            ModifierCategory.Structural, StringOnly,
-            HoverDescription: "The text field must not be an empty string. A field with notempty always has visible content."),
+            "String or collection is non-empty",
+            ModifierCategory.Structural, StringAndCollectionTypes,
+            HoverDescription: "The field must not be empty. For text fields, the string must have at least one character. For collection fields, the collection must have at least one element. Not applicable to lookup fields — lookup entries are defined at design time."),
 
         ModifierKind.Default => new FieldModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Default),

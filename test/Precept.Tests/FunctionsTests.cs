@@ -54,9 +54,9 @@ public class FunctionsTests
         // See catalog-system.md § 3 and spec § 3.7 for the derivation:
         // min(5) + max(5) + abs(5) + clamp(5) + floor(2) + ceil(2) +
         // truncate(2) + round(2) + roundPlaces(5) + approximate(1) +
-        // pow(3) + sqrt(3) + trim(1) + startsWith(1) + endsWith(1) +
-        // toLower(1) + toUpper(1) + left(1) + right(1) + mid(1) + now(1) = 49
-        Functions.All.Sum(m => m.Overloads.Count).Should().Be(49);
+        // pow(3) + sqrt(1) + trim(1) + startsWith(1) + endsWith(1) +
+        // toLower(1) + toUpper(1) + left(1) + right(1) + mid(1) + now(1) = 47
+        Functions.All.Sum(m => m.Overloads.Count).Should().Be(47);
     }
 
     // ── Every overload references valid types ───────────────────────────────────
@@ -147,7 +147,7 @@ public class FunctionsTests
     [InlineData(FunctionKind.RoundPlaces, 5)]
     [InlineData(FunctionKind.Approximate, 1)]
     [InlineData(FunctionKind.Pow, 3)]
-    [InlineData(FunctionKind.Sqrt, 3)]
+    [InlineData(FunctionKind.Sqrt, 1)]
     public void NumericFunction_OverloadCount(FunctionKind kind, int expectedCount)
     {
         Functions.GetMeta(kind).Overloads.Should().HaveCount(expectedCount);
@@ -467,9 +467,7 @@ public class FunctionsTests
     // M2 ── Sqrt proof requirements ────────────────────────────────────────────
 
     [Theory]
-    [InlineData(0)] // integer overload
-    [InlineData(1)] // decimal overload
-    [InlineData(2)] // number overload
+    [InlineData(0)] // number overload (only overload — integer/decimal removed per spec §3.7)
     public void Sqrt_AllOverloads_HaveNonNegativeRequirement(int overloadIndex)
     {
         var meta = Functions.GetMeta(FunctionKind.Sqrt);
@@ -486,7 +484,7 @@ public class FunctionsTests
     public void Sqrt_RequirementCount_IsOnePerOverload()
     {
         var meta = Functions.GetMeta(FunctionKind.Sqrt);
-        meta.Overloads.Should().HaveCount(3, "sqrt has 3 overloads");
+        meta.Overloads.Should().HaveCount(1, "sqrt has 1 overload — Number only (per spec §3.7; integer/decimal are type errors)");
         foreach (var overload in meta.Overloads)
         {
             overload.ProofRequirements.Should().HaveCount(1,

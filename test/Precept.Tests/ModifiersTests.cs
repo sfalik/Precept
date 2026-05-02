@@ -104,7 +104,6 @@ public class ModifiersTests
     }
 
     [Theory]
-    [InlineData(ModifierKind.Notempty)]
     [InlineData(ModifierKind.Minlength)]
     [InlineData(ModifierKind.Maxlength)]
     public void StringModifiers_ApplyToStringOnly(ModifierKind kind)
@@ -114,14 +113,33 @@ public class ModifiersTests
         meta.ApplicableTo[0].Kind.Should().Be(TypeKind.String);
     }
 
+    [Fact]
+    public void Notempty_AppliesToStringAndCollectionTypes()
+    {
+        var meta = (FieldModifierMeta)Modifiers.GetMeta(ModifierKind.Notempty);
+        meta.ApplicableTo.Select(t => t.Kind).Should().BeEquivalentTo(
+        [
+            TypeKind.String,
+            TypeKind.Set, TypeKind.Queue, TypeKind.Stack,
+            TypeKind.Log, TypeKind.LogBy, TypeKind.Bag,
+            TypeKind.List, TypeKind.QueueBy,
+        ], "notempty applies to strings and all collections except lookup");
+        meta.ApplicableTo.Select(t => t.Kind).Should().NotContain(TypeKind.Lookup,
+            "lookup entries are defined at design time and cannot be empty at runtime");
+    }
+
     [Theory]
     [InlineData(ModifierKind.Mincount)]
     [InlineData(ModifierKind.Maxcount)]
-    public void CollectionModifiers_ApplyToSetQueueStack(ModifierKind kind)
+    public void CollectionModifiers_ApplyToAllNineCollectionTypes(ModifierKind kind)
     {
         var meta = (FieldModifierMeta)Modifiers.GetMeta(kind);
-        meta.ApplicableTo.Select(t => t.Kind).Should()
-            .BeEquivalentTo([TypeKind.Set, TypeKind.Queue, TypeKind.Stack]);
+        meta.ApplicableTo.Select(t => t.Kind).Should().BeEquivalentTo(
+        [
+            TypeKind.Set, TypeKind.Queue, TypeKind.Stack,
+            TypeKind.Log, TypeKind.LogBy, TypeKind.Bag,
+            TypeKind.List, TypeKind.QueueBy, TypeKind.Lookup,
+        ], "mincount/maxcount apply to all 9 collection types including lookup");
     }
 
     [Fact]
