@@ -7,6 +7,18 @@
 
 ## Learnings
 
+### 2026-05-02 — Type Checker Design Review (Frank's analysis)
+
+- **`Operations.BinaryIndex` / `UnaryIndex` / `FindCandidates` / `FindUnary` already exist.** Frank proposed `BinaryBySignature`/`UnaryBySignature` as new additions — they are already implemented under these names. Critical difference: `BinaryIndex` returns `BinaryOperationMeta[]` (array), not a single entry. Money/money and quantity/quantity disambiguation requires multi-candidate handling in the checker.
+- **SemanticIndex record type definitions must be committed BEFORE any slice implementation begins ("pre-Slice 0").** Without the full record shape in place, no slice test can compile.
+- **7 AST expression node types missing from Frank's Resolve pseudocode:** `IsSetExpression`, `IsNotSetExpression`, `CIFunctionCallExpression`, `MethodCallExpression`, `InterpolatedStringExpression`, `InterpolatedTypedConstantExpression`, `TypedConstantExpression`. All exist in `SyntaxNodes/Expressions/`. The core Resolve function is ~250-350 lines, not ~100.
+- **GAP-032 (`pow` ProofRequirement) was fixed 2026-05-02** — Frank flagged it as an open gap but it is already closed.
+- **Field ordering in SemanticIndex:** `ImmutableDictionary<string, TypedField>` loses declaration order. Preferred pattern: `ImmutableArray<TypedField>` primary + derived `FrozenDictionary` secondary (same pattern as `Functions.ByName`).
+- **`[HandlesCatalogMember]` stub migration:** Each slice implementing a real expression form must REMOVE the annotation from the stub `CheckExpression()` and re-apply it to the real handler. Omitting this causes PRECEPT0019 duplicate-coverage diagnostics.
+- **`TypedInputAction.SecondaryExpression` needs a role discriminator** (Index / Key / Priority) — a single nullable with a comment is insufficient for the Evaluator.
+- **`InterpolatedStringExpression` / `InterpolatedTypedConstantExpression` have no slice in Frank's plan.** Assign to Slice 8 or define as Slice 8a.
+- **`ContentValidation` shape for Gap 1 needs a DU** — a flat `string Pattern` hides a per-type switch between regex, NodaTime parse-delegate, and closed-set membership validation strategies.
+
 - Spec grammar, parser enforcement, docs, tests, and samples must all agree before a slice is considered complete.
 - Durable language truth belongs in catalogs/metadata; avoid hardcoded parallel tables in parser or tooling code.
 - Shared record or catalog signature changes require a full construction-site and call-site audit, including dead-code exhaustive switch arms.
@@ -49,40 +61,7 @@
 - Durable themes retained in active history: current ownership, catalog-driven parser/runtime rules, and the newest implementation/audit outcomes.
 - Use the archive for the full slice-by-slice closeout trail and earlier review context.
 
-### 2026-05-02 — GAP-032: `pow(integer, integer)` ProofRequirement added
-
-- Added `PPowIntExp = new(TypeKind.Integer, "exp")` named constant alongside `PSqrtNumber` in the shared param section of `Functions.cs`.
-- Applied `NumericProofRequirement(new ParamSubject(PPowIntExp), OperatorKind.GreaterThanOrEqual, 0m, ...)` to the `Integer^Integer` overload only — Decimal and Number lanes excluded per spec §0.6 item 4.
-- Build: 0 errors, 0 warnings. Tests: 2690 passing, 0 failing.
-- GAP-032 marked Fixed in `docs/working/language-consistency-gaps.md`.
-
-### 2026-05-02 — Iteration 8: Runtime/Parser Implementation Audit— Parser Catalog Derivation (A), Type Checker Catalog Consumption (B), Lexer Token Classification (C), Evaluator Function/Operator Dispatch (D).
-- **TypeChecker**: Stub only (`HandlesCatalogMember` annotations, no logic). Nothing to audit; no violations possible.
-- **Evaluator**: Stub only (all methods `throw new NotImplementedException()`). Catalog-driven implementation guide is in place for D8/R4 phase. No violations.
-- **Lexer**: Fully catalog-driven. Keyword lookup via `Tokens.Keywords` (catalog). Operator scanning via `TwoCharOperators`, `SingleCharOperators`, `PunctuationChars` (all catalog-derived). No hardcoded lists found. Clean.
-- **Parser**: 3 new Catalog-Impl gaps found.
-  - **GAP-029** (`IsOutcomeAhead`): Hardcodes `{Transition, No, Reject}` — should derive from `TokenCategory.Outcome`.
-  - **GAP-030** (`ParseAtom` min/max cases): Hardcodes `case TokenKind.Min: case TokenKind.Max:` — should derive from `Functions.ByName` ∩ `Tokens.Keywords` as a catalog-driven `KeywordsUsableAsFunctionNames` set.
-  - **GAP-031** (unary/postfix binding powers): `not`→25, negate→65, `is set`→60 — all match catalog values but are not read from `Operators.ByToken`/`ByTokenSequence`. Should use named constants derived from catalog.
-- **Prior gap verification**: GAP-025 (`Notempty.ApplicableTo` → `StringAndCollectionTypes`) ✅, GAP-026 (`CollectionTypes` 9 members) ✅, GAP-028 (`sqrt` Number-only overload) ✅. All three confirmed correct in catalog.
-- **Final count**: 31 gaps total, 28 Fixed, 3 Unresolved.
-- **Learnings**: The `OperatorPrecedence` FrozenDictionary in `Parser.cs` correctly excludes unary operators from the binary-only table — but that means unary/postfix binding powers live as bare literals in ParseAtom/ParseExpression with no enforcement mechanism to detect catalog drift. The fix is catalog-derived `private static readonly int` constants on the outer `Parser` class (not `ParseSession` — ref struct can't own statics).
-
-### 2026-05-02 — GAP-019a/019b: InvalidCallTarget and UnexpectedKeyword implemented
-
-- **GAP-019a (`InvalidCallTarget`)**: The infix `LeftParen` branch in `Parser.Expressions.cs` previously had a `// unreachable` comment + silent `break`. `42(args)` and `(A+B)(args)` were silently swallowing the `(args)` tokens, causing cascading `ExpectedToken` errors. Fixed by emitting `DiagnosticCode.InvalidCallTarget` with a short expression description before the `break`.
-- **GAP-019b (`UnexpectedKeyword`)**: The `ParseAtom` default fallback previously always emitted `ExpectedToken`. Now it checks `AllKeywordKinds.Contains(current.Kind)` (catalog-derived from `Tokens.Keywords.Values`) and emits `UnexpectedKeyword` for keywords, `ExpectedToken` for non-keywords.
-- **`AllKeywordKinds`**: Added as a `FrozenSet<TokenKind>` to the outer `Parser` class (not `ParseSession` — `ref struct` cannot own static fields). Derived from `Tokens.Keywords.Values.ToFrozenSet()`. Fully catalog-driven.
-- **`DescribeCallTarget`**: Private static helper on `ParseSession` that returns a human-readable label for the non-callable expression in the diagnostic message.
-- **Test coverage**: 6 new tests added to `ExpressionParserTests.cs` covering both gaps and the regression case.
-- **Pre-existing WIP conflict**: A WIP change to `Tokens.cs` (Arrow: `Cat_Str` → `Cat_Op`) was in the workspace and broke the committed test `Arrow_IsStructural_NotExpressionOperator`. Reverted `Tokens.cs` to the committed state — the Arrow category change is out of scope for this task.
-- **Final validation**: 2692 passing tests, 0 failures.
-
-
-- George-8's follow-up on Frank's review is now durable: PRECEPT0013 dropped the RS1030 `Compilation.GetSemanticModel()` path and `CatalogAnalysisHelpers` carries the Phase 3 TODO for `ConstraintKind` / `ProofRequirementKind` coverage gating.
-- Soup-Nazi-4 then closed the 6 missing-test gaps from the full coverage review and fixed the RS1030 follow-on issue, pushing branch validation to 2687 passing tests.
-- Coordinator commit `4d988d8` added commented-out `ConstraintKind` / `ProofRequirementKind` entries in `CatalogEnumNames`; treat them as future activation context, not a live Phase 3 completion.
-
-### 2026-05-01T20:10:18Z — HandlesCatalogMember rename shipped
-- George-7 mechanically renamed `[HandlesForm]` to `[HandlesCatalogMember]` across the shared attribute, distributed-dispatch call sites, PRECEPT0019, tests, and docs in commit `08fdf85` on `spike/Precept-V2`.
-- Validation closed green at `2424/2424` tests passing; treat remaining `[HandlesForm]` mentions in old notes as historical rename context only.
+### 2026-05-02 — Active implementation snapshot
+- Detailed GAP-032, Iteration 8 audit, GAP-019 implementation, and rename-shipping notes were moved to `history-archive.md` to bring active context back under the size gate.
+- Active durable baseline: `pow(integer, integer)` proof requirements are fixed, GAP-019a/019b are shipped, and the Iteration 8 audit still defines the remaining parser catalog-derivation follow-ons before real TypeChecker/Evaluator implementation begins.
+- The newest type-checker-design review adds the current checker guardrails: pre-Slice 0 `SemanticIndex` shapes, array-primary field ordering, existing `Operations` multi-candidate lookup usage, `SecondaryRole` stamping, and disciplined `[HandlesCatalogMember]` stub migration.

@@ -43,6 +43,9 @@
 
 ## Recent Updates
 
+### 2026-05-02 — George review of type checker design
+- George reviewed `docs/working/type-checker-design-analysis.md` and flagged 6 concrete implementation issues: pre-Slice 0 `SemanticIndex` shapes, field-order preservation via array-primary storage, reuse of `Operations.FindCandidates` / `FindUnary` with qualifier disambiguation, 7 missing Resolve AST arms, `TypedInputAction.SecondaryExpression` needing an explicit `SecondaryRole`, and explicit slice/annotation coverage for interpolated forms plus `[HandlesCatalogMember]` stub migration.
+- He also confirmed GAP-032 is already closed, so `pow(integer, integer)` proof requirements should be treated as shipped rather than a live blocker in follow-on planning.
 ### 2026-05-02 — Historical Summary (fully compacted)
 - Detailed early-May review and audit entries were moved to `history-archive.md` to keep active context under the size gate.
 - Active durable takeaways: the annotation bridge is production-ready, PRECEPT0020–PRECEPT0023 remain the analyzer hardening path, and post-review parser/catalog audits should continue to prefer catalog-derived surfaces over hardcoded parser vocabulary.

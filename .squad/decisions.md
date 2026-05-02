@@ -12,6 +12,32 @@
 
 ---
 
+### 2026-05-02T19:49:00Z: GAP-035 choice literal dispatch locked to ChoiceLiteralTokens metadata
+
+**By:** Scribe
+
+**Status:** Merged, deduplicated, inbox cleared (1 late-arriving file)
+
+**Merged sources:** `frank-gap035-decision`.
+
+- GAP-035 is now locked to the catalog-complete path: add nullable `TypeMeta.ChoiceLiteralTokens` metadata rather than a `NumericLiteral` trait or a documented parser exception.
+- `ParseChoiceValue` must derive both the signed numeric branch and literal-token validity from `Types.ByToken[elemToken.Kind].ChoiceLiteralTokens`, eliminating both remaining `elemToken.Kind` identity switches from parser choice-literal dispatch.
+- `TypeTrait.ChoiceElement` remains the declaration-validation gate, while `ChoiceLiteralTokens` becomes the parse-time dispatch contract; couple them with an invariant test and mark GAP-035 fixed only after the parser rewrite is verified.
+
+---
+### 2026-05-02T19:48:45Z: TypeChecker pre-slice requirements and BinaryIndex semantics locked
+
+**By:** Scribe
+
+**Status:** Merged, deduplicated, inbox cleared (1 file)
+
+**Merged sources:** `george-typechecker-preslice-design`.
+
+- The checker now has a pre-Slice 0 contract: land the full shape-only `SemanticIndex` and typed-record hierarchy before numbered slices, and keep field storage array-primary with a derived frozen name index so declaration order survives.
+- Runtime lookup direction is locked to the existing `Operations.FindCandidates` / `FindUnary` APIs: `BinaryIndex` already returns multi-candidate arrays, so money/quantity overloads must disambiguate qualifier-matched entries and emit `QualifierMismatch` on failure.
+- `TypedInputAction.SecondaryExpression` must carry an explicit secondary-role discriminator for evaluator dispatch, and GAP-032 / `pow(integer, integer)` is recorded as already closed rather than a live blocker.
+
+---
 ### 2026-05-02T19:42:08Z: Collection-types plan review rounds R1/R2 synchronized
 
 **By:** Scribe
