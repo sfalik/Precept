@@ -637,8 +637,8 @@ from Active on RecordReading
 field Measurement as quantity
 field ExpectedDimension as dimension default 'length'
 
-rule MeasurementDimensionConsistency
-  Measurement.dimension == ExpectedDimension
+rule Measurement.dimension == ExpectedDimension
+  because "Measurement dimension must match the expected dimension"
 ```
 
 **Pattern 3 — Cross-field consistency** (two fields that must have the same dimension):
@@ -646,8 +646,8 @@ rule MeasurementDimensionConsistency
 field Input as quantity
 field Output as quantity
 
-rule InputOutputDimensionMatch
-  Input.dimension == Output.dimension
+rule Input.dimension == Output.dimension
+  because "Input and output must have the same dimension"
 ```
 
 **Teachable error messages:**
@@ -1815,29 +1815,22 @@ This document covers the design of the seven new business-domain types, the peri
 
 ## Diagnostic Code Reference
 
-> The codes below are part of the broader diagnostic system defined canonically in [precept-language-spec.md § 3.10 Diagnostic Catalog](precept-language-spec.md#310-diagnostic-catalog). If this section and the spec disagree on code name, severity, or message template, the spec is authoritative.
+**Canonical source:** [`src/Precept/Language/DiagnosticCode.cs`](../../src/Precept/Language/DiagnosticCode.cs) and [`src/Precept/Language/Diagnostics.cs`](../../src/Precept/Language/Diagnostics.cs). Business-domain type codes are 67–77 plus `MutuallyExclusiveQualifiers` (23); see [spec §3.10](precept-language-spec.md#310-diagnostic-catalog) for the full group reference.
 
-This proposal introduces business-domain diagnostic codes in the `DiagnosticCode` enum. These use the same symbolic naming convention as the core diagnostic system (`diagnostic-system.md`) — no numeric code prefixes. The exact `DiagnosticCode` → `DiagnosticMeta` wiring happens in the `Diagnostics` exhaustive switch during implementation; these are the category assignments.
-
-| Code | Phase | Condition | Triggering example |
-|---|---|---|---|
-| `QualifierMismatch` | Compile / Runtime boundary | `in` constraint violation — assigned value's currency or unit does not match the field's declared `in` qualifier | `set CostUsd = '100 EUR'` against `money in 'USD'`; open field assigned to `in`-constrained field without dimension-equality proof |
-| `DimensionCategoryMismatch` | Compile / Runtime boundary | `of` constraint violation — assigned value's dimension does not match the field's declared `of` category | `set F = '5 kg'` against `quantity of 'length'`; open `quantity` field assigned to `quantity of 'length'` without `when F.dimension == 'length'` proof |
-| `CrossCurrencyArithmetic` | Compile | Cross-currency arithmetic — `money` values with different currencies used in a single arithmetic expression | `CostUsd + CostEur` |
-| `CrossDimensionArithmetic` | Compile | Cross-dimension arithmetic — `quantity` values with incompatible dimensions in an arithmetic expression | `'5 kg' + '3 mi'` (mass ≠ length) |
-| `DenominatorUnitMismatch` | Compile | Denominator unit mismatch — the denominator of a `price` or compound `quantity` does not match the operand's unit | `price in 'USD/kg' * quantity in 'mi'` |
-| `DurationDenominatorMismatch` | Compile | `duration` against variable-length time denominator — `duration` cannot cancel `days`, `weeks`, `months`, or `years` denominators (D15) | `price in 'USD/days' * duration` |
-| `CompoundPeriodDenominator` | Compile | Compound period against single-unit denominator — `period in 'hours&minutes'` cannot cancel against a rate whose denominator is a single time unit | `period in 'hours&minutes' * price in 'USD/hours'` |
-| `MutuallyExclusiveQualifiers` | Parse | `in` and `of` on the same field declaration — mutually exclusive | `field X as quantity in 'kg' of 'mass'` |
-| `InvalidUnitString` | Compile / Runtime boundary | Invalid unit string for `unitofmeasure` field — structural characters (`/`, `*`) are not valid in an atomic unit value | `set SelectedUnit = 'kg/m'` |
-| `InvalidCurrencyCode` | Compile / Runtime boundary | Invalid ISO 4217 currency code | `'USDX'` used as a currency literal or `currency` field value |
-| `InvalidDimensionString` | Compile / Runtime boundary | Invalid dimension string — value is not a recognized UCUM dimension category; common case is passing a unit name (`'meters'`) where a dimension name (`'length'`) is required | `set AllowedDim = 'meters'` for `field AllowedDim as dimension` |
-| `MaxPlacesExceeded` | Compile / Runtime | `maxplaces` constraint violation — assigned value has more decimal places than allowed; fires at literal assignment (compile), event-arg input (runtime boundary), and arithmetic result `set` (runtime) | `'1.999 USD'` assigned to `money in 'USD'` (implicit `maxplaces 2`); `set Cost = round_result` where result has 3 places |
-
-**Phase key:**
-- `Compile` — type checker emits at parse/compile time; caught before fire/run
-- `Runtime boundary` — validated at `precept_fire`/`precept_update` input before the engine runs
-- `Runtime` — evaluated during `set` execution inside the engine
+| Code | Triggering pattern |
+|---|---|
+| `QualifierMismatch` | `set CostUsd = '100 EUR'` against `money in 'USD'` |
+| `DimensionCategoryMismatch` | `set F = '5 kg'` against `quantity of 'length'` |
+| `CrossCurrencyArithmetic` | `CostUsd + CostEur` (different currencies) |
+| `CrossDimensionArithmetic` | `'5 kg' + '3 mi'` (mass ≠ length) |
+| `DenominatorUnitMismatch` | `price in 'USD/kg' * quantity in 'mi'` |
+| `DurationDenominatorMismatch` | `price in 'USD/days' * duration` (variable-length denominator) |
+| `CompoundPeriodDenominator` | `period in 'hours&minutes' * price in 'USD/hours'` |
+| `MutuallyExclusiveQualifiers` | `field X as quantity in 'kg' of 'mass'` (only `price` supports both) |
+| `InvalidUnitString` | `set SelectedUnit = 'kg/m'` for an atomic-unit field |
+| `InvalidCurrencyCode` | `'USDX'` as a currency literal or `currency` field value |
+| `InvalidDimensionString` | `set AllowedDim = 'meters'` for a `dimension` field (use `'length'`) |
+| `MaxPlacesExceeded` | `'1.999 USD'` assigned to `money in 'USD'` (implicit `maxplaces 2`) |
 
 ---
 

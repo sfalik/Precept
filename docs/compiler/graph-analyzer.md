@@ -74,6 +74,8 @@ For each reachable state, the analyzer computes which events have declared trans
 
 ### Violation Detection
 
+**Canonical source:** [`src/Precept/Language/DiagnosticCode.cs`](../../src/Precept/Language/DiagnosticCode.cs) and [`src/Precept/Language/Diagnostics.cs`](../../src/Precept/Language/Diagnostics.cs). See [spec §3.10](../language/precept-language-spec.md#310-diagnostic-catalog) for the full group reference.
+
 | Violation | Condition |
 |---|---|
 | `TerminalOutgoingViolation` | Terminal state has outgoing transitions |

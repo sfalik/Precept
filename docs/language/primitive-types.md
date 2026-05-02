@@ -482,7 +482,7 @@ set Tier = if Category ~= "premium" then "Gold" else "Standard"
 | `min N` | `integer`, `decimal`, `number` | Value ≥ N |
 | `max N` | `integer`, `decimal`, `number` | Value ≤ N |
 | `maxplaces N` | `decimal` only | At most N decimal places. Validation constraint, not auto-rounding. |
-| `notempty` | `string` only | `.length > 0` |
+| `notempty` | `string`; also `set`, `queue`, `stack`, `log`, `bag`, `list`, `queue of T by P` | `.length > 0` on string; `.count ≥ 1` on collections (equivalent to `mincount 1`). See [collection-types.md §Constraint Catalog](collection-types.md#constraint-catalog). |
 | `minlength N` | `string` only | `.length ≥ N` |
 | `maxlength N` | `string` only | `.length ≤ N` |
 | `ordered` | `choice` only | Enables ordinal comparison by declaration position |
@@ -587,6 +587,39 @@ A function keeps its `decimal` overload if and only if the mathematical operatio
 ## Open Questions / Implementation Notes
 
 _TBD — open questions will be captured here as the type checker and evaluator implementation progresses._
+
+---
+
+## Teachable Error Messages
+
+**Canonical source:** [`src/Precept/Language/DiagnosticCode.cs`](../../src/Precept/Language/DiagnosticCode.cs) and [`src/Precept/Language/Diagnostics.cs`](../../src/Precept/Language/Diagnostics.cs). See [spec §3.10](precept-language-spec.md#310-diagnostic-catalog) for the full group reference.
+
+### Numeric type errors
+
+| Invalid code | What goes wrong |
+|---|---|
+| `sqrt(Score)` where `Score` is `decimal` | `sqrt` is `number`-lane only — `.NET Math.Sqrt` has no `decimal` overload. Use `sqrt(approximate(Score))` to cross the lane explicitly. |
+| `set Price = 3.14` where `Price` is `integer` | A fractional literal cannot widen to `integer` — the lanes are disjoint. Use `round`, `floor`, `ceil`, or `truncate` explicitly. |
+| `field Count as integer min 1 max 0` | `min` (1) exceeds `max` (0) — `InvalidModifierBounds`. Reverse them. |
+| `field Pct as decimal maxplaces -1` | Constraint value must be non-negative — `InvalidModifierValue`. |
+| `field Name as string maxplaces 2` | `maxplaces` only applies to `decimal` — `InvalidModifierForType`. |
+| `field Score as decimal nonnegative positive` | `positive` subsumes `nonnegative` — `RedundantModifier` (warning). Remove `nonnegative`. |
+| `field Total as decimal -> Amount * Rate` and `default 0` | A computed field cannot also have a default — `ComputedFieldWithDefault`. Remove the `default`. |
+
+### String / `~string` errors
+
+| Invalid code | What goes wrong |
+|---|---|
+| `Email == "admin@example.com"` where `Email` is `~string` | `==` treats values as case-sensitive, contradicting the `~string` declaration. Use `~=`. |
+| `Email != "admin@example.com"` where `Email` is `~string` | Same issue with `!=`. Use `!~`. |
+| `startsWith(Email, "admin")` where `Email` is `~string` | Case-sensitive prefix test on a CI field. Use `~startsWith`. |
+| `endsWith(Email, ".com")` where `Email` is `~string` | Use `~endsWith`. |
+
+### Unresolved literal
+
+| Invalid code | What goes wrong |
+|---|---|
+| `3.14` with no type context | No assignment target, peer, or function argument to resolve `decimal` vs `number`. Assign to a typed field or use in an expression where the peer type is known. |
 
 ---
 

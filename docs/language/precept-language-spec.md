@@ -941,10 +941,10 @@ ScalarType  :=  ~string | string | number | integer | decimal | boolean
              |  dimension | price | exchangerate
 
 CollectionType  :=  (set | queue | stack) of ScalarType TypeQualifier?
-                |   bag of ScalarType
-                |   list of ScalarType
-                |   log of ScalarType
-                |   log of ScalarType by ScalarType
+                |   bag of ScalarType TypeQualifier?
+                |   list of ScalarType TypeQualifier?
+                |   log of ScalarType TypeQualifier?
+                |   log of ScalarType by ScalarType TypeQualifier?
                 |   queue of ScalarType by ScalarType DirectionModifier?
                 |   lookup of ScalarType to ScalarType
 DirectionModifier  :=  ascending | descending
@@ -1028,9 +1028,9 @@ These are unambiguous top-level declaration starters. Continuation tokens (`when
 | Condition | Diagnostic Code | Severity | Description |
 |-----------|-----------------|----------|-------------|
 | Expected token not found | `ExpectedToken` | Error | "Expected {0} here, but found '{1}'" |
-| Unrecognized keyword in declaration position | `UnexpectedKeyword` | Error | "'{0}' cannot appear inside a {1}" |
+| Keyword token in expression/value slot | `UnexpectedKeyword` | Error | "'{0}' is a keyword and cannot be used as a value — expected an expression here" |
 | Chained comparison (`A == B == C`) | `NonAssociativeComparison` | Error | "Comparisons like == and < cannot be chained — {0}" |
-| Non-callable expression followed by `(` | `InvalidCallTarget` | Error | "Only built-in functions can be called this way — '{0}' is not a function name" |
+| Non-callable expression followed by `(` | `InvalidCallTarget` | Error | "'{0}' is not callable — only function names and member access expressions can be called (e.g., 'foo.method(args)')" |
 | `omit` access mode with `when` guard | `OmitDoesNotSupportGuard` | Error | "'omit' is an unconditional structural exclusion — 'when' guards are not allowed" |
 | `on Event ->` handler with `when` guard | `EventHandlerDoesNotSupportGuard` | Error | "Event handlers ('on Event -> action') do not support 'when' guards — guards are only valid on event ensures and transition rows" |
 | `when` guard placed before `on Event` on a transition row | `PreEventGuardNotAllowed` | Error | "A 'when' guard before the event target is not supported on transition rows — place the guard after 'on Event'" |

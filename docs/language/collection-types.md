@@ -622,7 +622,9 @@ when Tags contains "urgent"
 
 ## Emptiness Safety
 
-Precept enforces emptiness safety through proof obligations. Operations that would fault on an empty collection require the author to prove the collection is non-empty via a `.count > 0` guard in the enclosing `when` clause.
+**Canonical source for diagnostic codes:** [`src/Precept/Language/DiagnosticCode.cs`](../../src/Precept/Language/DiagnosticCode.cs) and [`src/Precept/Language/Diagnostics.cs`](../../src/Precept/Language/Diagnostics.cs). Collection safety codes are 63–65 and 99–106; see [spec §3.10](precept-language-spec.md#310-diagnostic-catalog) for the full group reference.
+
+Precept enforces emptiness safety through proof obligations.Operations that would fault on an empty collection require the author to prove the collection is non-empty via a `.count > 0` guard in the enclosing `when` clause.
 
 ### Access proof obligations
 
@@ -768,7 +770,7 @@ QuantifierKind  :=  each | any | no
 |----------|------|
 | **Type** | The collection's inner type. `set of ~string` → binding var is `~string`. `queue of T by P` → binding var is a two-field projection (`.value` → `T`, `.by` → `P`). |
 | **Scope** | Strictly within the `(` … `)` predicate expression — not visible outside the quantifier. |
-| **Shadowing** | If a field with the same name exists at global scope, the binding variable shadows it inside the predicate. Warning emitted: `BindingShadowsField`. |
+| **Shadowing** | If a field with the same name exists at global scope, the binding variable shadows it inside the predicate. Error: `BindingShadowsField` — rename the binding to avoid confusion. |
 | **Keyword collision** | Reserved keyword as binding variable name is a parse error (`ExpectedIdentifier`). |
 
 **Lexer note:** `any` is already a reserved keyword in the Precept lexer. `each` requires a new lexer entry. `no` is already reserved and requires disambiguation from `no transition` context; `any` is already reserved and requires disambiguation from its type modifier role. See §1.2 and §2.1 of the language spec for the disambiguation rules.
@@ -896,7 +898,7 @@ from Shopping on RemoveItem when CartItems contains RemoveItem.SKU
     -> no transition
 
 rule CartItems.countof("hazmat-item") <= 3
-    reason "No more than 3 hazardous items per order"
+    because "No more than 3 hazardous items per order"
 ```
 
 **Accessors:**
@@ -1144,14 +1146,14 @@ This is a meaningful design distinction: for single-type collections (`set`, `qu
 ```precept
 # Assert no low-severity claims are waiting in the queue
 rule no claim in ClaimQueue (claim.by == "low")
-    reason "Low-severity claims must not enter the processing queue"
+    because "Low-severity claims must not enter the processing queue"
 
 # Existential check on element value
 when any claim in ClaimQueue (claim.value == TargetClaimId)
 
 # Compound predicate across both axes
 rule no claim in ClaimQueue (claim.by == "critical" and claim.value == "")
-    reason "Critical claims must have a claim ID"
+    because "Critical claims must have a claim ID"
 ```
 
 When the ordering axis is choice-typed, the declaration is the constraint — no rule needed. An element with ordering value outside the declared choices is a type error at the `enqueue` site:
@@ -1256,7 +1258,7 @@ from Active on RemoveCoverage
     -> no transition
 
 rule CoverageLimits.count <= 10
-    reason "No more than 10 coverage types per policy"
+    because "No more than 10 coverage types per policy"
 ```
 
 **Accessors:**

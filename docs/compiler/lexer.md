@@ -117,6 +117,8 @@ The lexer derives **`Tokens.PunctuationChars`** — `FrozenDictionary<char, (Tok
 
 #### Diagnostics
 
+**Canonical source:** [`src/Precept/Language/DiagnosticCode.cs`](../../src/Precept/Language/DiagnosticCode.cs) and [`src/Precept/Language/Diagnostics.cs`](../../src/Precept/Language/Diagnostics.cs). See [spec §3.10](../language/precept-language-spec.md#310-diagnostic-catalog) for the full group reference.
+
 The lexer emits diagnostics via `Diagnostics.Create(DiagnosticCode, SourceSpan)`. The Diagnostics catalog owns the message templates — the lexer passes codes, not strings. All lex-stage codes: `InputTooLarge`, `UnterminatedStringLiteral`, `UnterminatedTypedConstant`, `UnterminatedInterpolation`, `InvalidCharacter`, `UnrecognizedStringEscape`, `UnrecognizedTypedConstantEscape`, `UnescapedBraceInLiteral`.
 
 ---

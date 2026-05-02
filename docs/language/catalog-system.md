@@ -925,7 +925,7 @@ The keyword `initial` appears on both states and events with different semantics
 
 ##### Field modifier applicability
 
-The applicability matrix is currently validated by ad-hoc logic in the type checker. The catalog makes it explicit: `nonnegative` applies to `Integer`, `Decimal`, `Number`; `notempty` applies to `String`; `mincount`/`maxcount` apply to `Set`, `Queue`, `Stack`; `maxplaces` applies to `Decimal` only; `ordered` applies to `Choice` only. The `HasValue` flag distinguishes value-carrying modifiers (`min 0`) from bare flags (`nonnegative`). `ApplicableTo` uses `TypeTarget[]` (see Supporting Types) for modifier-sensitive applicability.
+The applicability matrix is currently validated by ad-hoc logic in the type checker. The catalog makes it explicit: `nonnegative` applies to `Integer`, `Decimal`, `Number`; `notempty` applies to `String`, `Set`, `Queue`, `Stack`, `Log`, `Bag`, `List`, `Queue of T by P` (on collections it is equivalent to `mincount 1`); `mincount`/`maxcount` apply to `Set`, `Queue`, `Stack`; `maxplaces` applies to `Decimal` only; `ordered` applies to `Choice` only. The `HasValue` flag distinguishes value-carrying modifiers (`min 0`) from bare flags (`nonnegative`). `ApplicableTo` uses `TypeTarget[]` (see Supporting Types) for modifier-sensitive applicability.
 
 Field modifiers also apply in event arg positions (e.g., `event Submit(amount: money nonnegative)`). The modifier catalog declares type-level applicability; the *position* where a modifier can appear (field declaration vs event arg) is a parser/construct-level concern handled by the Constructs catalog.
 

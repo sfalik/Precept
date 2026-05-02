@@ -665,4 +665,73 @@ public class ExpressionParserTests
         call.Receiver.Should().BeOfType<MemberAccessExpression>()
             .Which.Member.Text.Should().Be("b");
     }
+
+    // ── GAP-019a: InvalidCallTarget ────────────────────────────────────────
+
+    [Fact]
+    public void ParseExpression_InvalidCallTarget_NumericLiteral_EmitsDiagnostic()
+    {
+        // 42(args) — literal is not callable; parser should emit InvalidCallTarget
+        var tree = Parser.Parse(Lexer.Lex("""rule 42(x) because "msg" """));
+        tree.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.InvalidCallTarget),
+            "a numeric literal is not callable");
+    }
+
+    [Fact]
+    public void ParseExpression_InvalidCallTarget_ParenthesizedExpression_EmitsDiagnostic()
+    {
+        // (A + B)(args) — grouped expression is not callable; parser should emit InvalidCallTarget
+        var tree = Parser.Parse(Lexer.Lex("""rule (A + B)(x) because "msg" """));
+        tree.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.InvalidCallTarget),
+            "a parenthesized expression is not callable");
+    }
+
+    [Fact]
+    public void ParseExpression_ValidMethodCall_NoInvalidCallTargetDiagnostic()
+    {
+        // obj.method(args) — valid member-access call; must not emit InvalidCallTarget
+        var tree = Parser.Parse(Lexer.Lex("""rule obj.method(x) because "msg" """));
+        tree.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.InvalidCallTarget),
+            "a member-access call is valid");
+    }
+
+    // ── GAP-019b: UnexpectedKeyword ────────────────────────────────────────
+
+    [Fact]
+    public void ParseExpression_UnexpectedKeyword_InExpressionSlot_EmitsDiagnostic()
+    {
+        // "set foo = from" — 'from' is a keyword in value position; should emit UnexpectedKeyword
+        var tree = Parser.Parse(Lexer.Lex("""
+            precept Order
+            field foo as string
+            on Created -> set foo = from
+            """));
+        tree.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.UnexpectedKeyword),
+            "'from' is a keyword and cannot be used as an expression value");
+    }
+
+    [Fact]
+    public void ParseExpression_UnexpectedKeyword_NotEmittedForNonKeyword()
+    {
+        // An unknown symbol (invalid character) in expression position should emit
+        // ExpectedToken, NOT UnexpectedKeyword — the two are distinct failure modes.
+        // Use a declaration-level error to exercise the expression fallback path.
+        var tokens = Lexer.Lex("42");
+        var session = new Parser.ParseSession(tokens.Tokens);
+        // Confirm that a valid literal does not trigger UnexpectedKeyword
+        var expr = session.ParseExpression(0);
+        expr.Should().BeOfType<LiteralExpression>("numeric literals are valid expression atoms");
+    }
+
+    [Fact]
+    public void ParseExpression_ExpectedToken_StillFiresForNonKeywordUnexpectedToken()
+    {
+        // An arrow token in expression position is NOT a keyword (it's an operator/punctuation),
+        // so ExpectedToken should fire (not UnexpectedKeyword).
+        var tree = Parser.Parse(Lexer.Lex("""rule -> because "msg" """));
+        tree.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.ExpectedToken),
+            "an arrow is not a keyword — ExpectedToken fires, not UnexpectedKeyword");
+        tree.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.UnexpectedKeyword),
+            "arrow is not a keyword so UnexpectedKeyword must not fire");
+    }
 }

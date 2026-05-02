@@ -15,8 +15,17 @@ public enum DiagnosticCode
     // ── Parse ────────────────────────────────────────────
     ExpectedToken                      =   9,
     NonAssociativeComparison           =  10,
-    UnexpectedKeyword                  =  11, // reserved — not currently emitted by the parser
-    InvalidCallTarget                  =  12, // reserved — not currently emitted by the parser
+    /// <summary>
+    /// A keyword token appears in an expression/value slot where an operand is expected.
+    /// Emitted by the parser when a reserved keyword is encountered as an atom in expression parsing.
+    /// </summary>
+    UnexpectedKeyword                  =  11,
+    /// <summary>
+    /// A well-formed expression is used as a call target but is not invocable.
+    /// Emitted by the parser when a non-callable expression (e.g., a literal or grouped expression)
+    /// is followed by <c>(</c> in infix position.
+    /// </summary>
+    InvalidCallTarget                  =  12,
     OmitDoesNotSupportGuard            =  13,
     EventHandlerDoesNotSupportGuard    =  14,
     PreEventGuardNotAllowed            =  15,
@@ -76,6 +85,11 @@ public enum DiagnosticCode
     UnguardedCollectionAccess          =  63,
     UnguardedCollectionMutation        =  64,
     NonOrderableCollectionExtreme      =  65,
+    /// <summary>
+    /// Ordinal 66 was originally <c>CaseInsensitiveStringOnNonCollection</c> (reserved for
+    /// scalar ~string, never emitted). When scalar ~string ships this ordinal is reassigned to
+    /// <c>CaseInsensitiveFieldRequiresTildeEquals</c>. Update any source references accordingly.
+    /// </summary>
     CaseInsensitiveFieldRequiresTildeEquals = 66,
 
     // ── Type (business-domain) ───────────────────────────

@@ -35,12 +35,13 @@ public static class Diagnostics
 
         // ── Parse ────────────────────────────────────────────────────────────────
         DiagnosticCode.ExpectedToken              => new(nameof(DiagnosticCode.ExpectedToken),              DiagnosticStage.Parse, Severity.Error,   "Expected {0} here, but found '{1}'",                                                                                                    DiagnosticCategory.Structure),
-        DiagnosticCode.UnexpectedKeyword          => new(nameof(DiagnosticCode.UnexpectedKeyword),          DiagnosticStage.Parse, Severity.Error,   "'{0}' cannot appear inside a {1}",                                                                                                     DiagnosticCategory.Structure),
+        DiagnosticCode.UnexpectedKeyword          => new(nameof(DiagnosticCode.UnexpectedKeyword),          DiagnosticStage.Parse, Severity.Error,   "'{0}' is a keyword and cannot be used as a value — expected an expression here",                                                        DiagnosticCategory.Structure,
+            FixHint: "Use a field name, literal value, or function call instead"),
         DiagnosticCode.NonAssociativeComparison   => new(nameof(DiagnosticCode.NonAssociativeComparison),   DiagnosticStage.Parse, Severity.Error,   "Comparisons like == and < cannot be chained — {0}",                                                                                    DiagnosticCategory.TypeSystem,
             FixHint: "Break the comparison into two separate conditions joined with 'and'"),
-        DiagnosticCode.InvalidCallTarget          => new(nameof(DiagnosticCode.InvalidCallTarget),          DiagnosticStage.Parse, Severity.Error,   "Only built-in functions can be called this way — '{0}' is not a function name",                                                         DiagnosticCategory.Naming,
+        DiagnosticCode.InvalidCallTarget          => new(nameof(DiagnosticCode.InvalidCallTarget),          DiagnosticStage.Parse, Severity.Error,   "'{0}' is not callable — only function names and member access expressions can be called (e.g., 'foo.method(args)')",                    DiagnosticCategory.Structure,
             RelatedCodes: [DiagnosticCode.UndeclaredFunction],
-            FixHint: "Use a recognized built-in function name like min(), max(), abs(), or round()"),
+            FixHint: "Use a built-in function name or a member access expression (e.g., 'field.property')"),
         DiagnosticCode.MutuallyExclusiveQualifiers => new(nameof(DiagnosticCode.MutuallyExclusiveQualifiers), DiagnosticStage.Type, Severity.Error,  "'in' and 'of' qualifiers cannot both appear on this type — only 'price' supports both",                                                DiagnosticCategory.TypeSystem,
             RelatedCodes: [DiagnosticCode.QualifierMismatch],
             FixHint: "Use 'in' for currency, 'of' for unit, or both only on 'price' types"),

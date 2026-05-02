@@ -186,6 +186,8 @@ The enum **is** the complete set of diagnostic rules. It is a closed set — you
 
 Member names are descriptive (`UndeclaredField`, not `PRECEPT201`). The string code emitted to LSP and MCP is derived from the member name via `nameof()` — no numbering scheme, no stage-bucketed ranges. The `DiagnosticStage` field on metadata already carries the stage; encoding it again in the code string is redundant.
 
+**Code 66 — `~string` operator reassignment.** `CaseInsensitiveStringOnNonCollection` (ordinal 66) was reserved in anticipation of scalar `~string` but was never emitted. When scalar `~string` ships, ordinal 66 is reassigned to `CaseInsensitiveFieldRequiresTildeEquals`. The numeric value is retained; no ordinals shift. Existing source references to `DiagnosticCode.CaseInsensitiveStringOnNonCollection` will not compile — update them to `DiagnosticCode.CaseInsensitiveFieldRequiresTildeEquals`.
+
 ---
 
 ## DiagnosticMeta and the Exhaustive Switch

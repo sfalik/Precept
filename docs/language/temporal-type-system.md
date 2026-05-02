@@ -403,6 +403,49 @@ field IncidentTimestamp as instant
 
 **Single-quoted literal:** `'2026-04-13T14:30:00Z'` — when context expects `instant`, the content is validated as an ISO 8601 UTC timestamp (must include trailing `Z`). Without `Z`: compile error. See Locked Decision #18.
 
+#### `now()` — current UTC instant
+
+`now()` is the sole way to construct an `instant` from the runtime environment. Signature: `() → instant`. It takes no arguments.
+
+**Why freestanding, not a dot accessor:** Following the dot-vs-function rule (Locked Decision #20): "If the value owns it, dot. If the operation is freestanding, function." `now()` does not operate on an existing value — it constructs a new `instant` from the environment. No value owns the current time; nothing to put before the dot. A hypothetical `Instant.current` would require a static member concept that does not exist in Precept's type system.
+
+**UTC-always:** `now()` always returns UTC. There is no `now(timezone)` overload and no "local now." Temporal zone-awareness in Precept is always explicit: if you need today's date in a specific timezone, you construct it: `now().inZone(tz).date`. This is consistent with Precept's structural prevention principle — timezone ambiguity cannot arise if the language only produces UTC instants natively.
+
+**Determinism:** `now()` is the canonical example of environment-relative determinism (Locked Decision #9). A precept rule containing `now()` will produce different results when fired at different times. This is accepted behavior — Precept guarantees internal consistency (same inputs, same outputs within a single fire) but cannot freeze the clock. When reviewing a precept rule that contains `now()`, the author is explicitly claiming "this rule's correctness depends on when it is evaluated."
+
+**Usage patterns:**
+
+```precept
+# Capture current instant on event
+-> set FiledAt = now()
+
+# Time-bounded obligation rule
+rule now() - IncidentAt <= '72 hours'
+  because "HIPAA: incident must be filed within 72 hours"
+
+# Today's date in a specific timezone
+-> set LocalDeadline = now().inZone(IncidentTimezone).date + '30 days'
+
+# Guard: only allow if incident was recent
+when now() - IncidentAt <= '30 days'
+```
+
+**Type rules:**
+
+| Expression | Result type | Notes |
+|---|---|---|
+| `now()` | `instant` | Always UTC |
+| `now() - instantField` | `duration` | Elapsed since that instant |
+| `now() + duration` | `instant` | Future instant |
+| `now().inZone(tz)` | `zoneddatetime` | Localize for calendar arithmetic or display |
+| `now().inZone(tz).date` | `date` | Today in timezone |
+| `now().inZone(tz).time` | `time` | Current time of day in timezone |
+
+**Locked Decision #21 — `now()` is UTC-only (no timezone overload):**
+- **Decision:** `now()` returns `instant` (UTC). No `now(timezone)` variant.
+- **Why:** Timezone-aware "now" is structurally `now().inZone(tz)` — two explicit steps. A `now(tz)` shorthand would return `zoneddatetime`, introducing a second return type from the same function name. Overload resolution by argument type is a complexity Precept avoids. The two-step form is explicit and composable.
+- **Alternatives rejected:** `now(tz) → zoneddatetime` — second return type, overload complexity. `today() → date` shorthand — redundant (`now().inZone(tz).date` is the right pattern); encourages timezone-implicit date construction.
+
 **Operators:**
 
 | Expression | Produces | Rationale |
@@ -1014,6 +1057,8 @@ The type of a quantity typed constant (`period` or `duration`) is determined by 
 
 #### Teachable error messages
 
+**Canonical source:** [`src/Precept/Language/DiagnosticCode.cs`](../../src/Precept/Language/DiagnosticCode.cs) and [`src/Precept/Language/Diagnostics.cs`](../../src/Precept/Language/Diagnostics.cs). Temporal type codes are 55–62; see [spec §3.10](precept-language-spec.md#310-diagnostic-catalog) for the full group reference.
+
 | Invalid code | Error message |
 |---|---|
 | `set X = '3 days'` (no type context) | Can't determine the type of `'3 days'` on its own. Provide context: `DueDate + '3 days'` or `FiledAt + '3 days'`. |
@@ -1376,7 +1421,7 @@ All temporal types support `optional`. All follow existing null propagation rule
 
 ### 20. Dot-vs-function rule — "If the value owns it, dot" (locked v4)
 
-- **Why:** This is a language-wide design principle, not just a temporal decision. Applied to temporal types: `myInstant.inZone(tz)` (the instant owns its mediation), `zdt.date` (the zoneddatetime owns its components), `myPeriod.years` (the period owns its structural components). Freestanding functions remain for operations that don't belong to any particular value: `abs()`, `min()`, `trim()`.
+- **Why:** This is a language-wide design principle, not just a temporal decision. Applied to temporal types: `myInstant.inZone(tz)` (the instant owns its mediation), `zdt.date` (the zoneddatetime owns its components), `myPeriod.years` (the period owns its structural components). Freestanding functions remain for operations that don't belong to any particular value: `abs()`, `min()`, `trim()`, `now()`.
 - **Alternatives rejected:** All operations as freestanding functions — v3 position (`toLocalDate(instant, tz)`). Loses IntelliSense discoverability (see Elaine's research). Functions don't chain naturally.
 - **Precedent:** NodaTime uses instance methods (`instant.InZone(tz)`, `zdt.LocalDateTime`). Java uses instance methods (`instant.atZone(tz)`, `zdt.toLocalDate()`). C# `System.DateTime` uses instance properties (`.Date`, `.TimeOfDay`). Dot access is the universal pattern.
 - **Tradeoff:** Dot chains can become long (`myInstant.inZone(tz).date.year`). Mitigated by set-to-variables pattern and intermediate field assignments.

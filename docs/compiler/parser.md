@@ -949,6 +949,8 @@ The parser reads token metadata indirectly through `TokenKind` values. It does n
 
 ### Diagnostics Catalog
 
+**Canonical source:** [`src/Precept/Language/DiagnosticCode.cs`](../../src/Precept/Language/DiagnosticCode.cs) and [`src/Precept/Language/Diagnostics.cs`](../../src/Precept/Language/Diagnostics.cs). See [spec §3.10](../language/precept-language-spec.md#310-diagnostic-catalog) for the full group reference; parse-stage codes are detailed in [spec §2.7](../language/precept-language-spec.md#27-parser-diagnostics).
+
 The parser emits diagnostics via `Diagnostics.Create(DiagnosticCode, SourceSpan, params object[])`. The Diagnostics catalog owns the message templates — the parser passes codes, not strings. All parse-stage codes:
 
 | Code | Condition |
