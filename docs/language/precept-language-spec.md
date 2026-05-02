@@ -268,7 +268,9 @@ Every token the lexer can produce. Organized by category to match the `TokenKind
 | Token | Text | Context |
 |-------|------|---------|
 | `All` | `all` | Universal quantifier / `modify all` / `omit all` (state-scoped) |
-| `Any` | `any` | State wildcard (`in any`, `from any`) |
+| `Any` | `any` | Quantifier keyword (`any item in Coll (pred)`) / state wildcard (`in any`, `from any`) |
+| `Each` | `each` | Quantifier keyword (v2). `each`/`any`/`no` form the quantifier keyword group. `each` is quantifier-only. |
+| `No` (quantifier role) | `no` | Quantifier keyword (`no item in Coll (pred)`) — dual role with `no transition` outcome keyword. Disambiguation by lookahead: followed by `Identifier in CollectionRef (` → quantifier; otherwise → `no transition`. |
 
 #### Keywords: State Modifiers (v2)
 
@@ -365,9 +367,9 @@ Every token the lexer can produce. Organized by category to match the `TokenKind
 | `CaseInsensitiveNotEquals` | `!~` | Case-insensitive not-equals (string-only) |
 | `Tilde` | `~` | Case-insensitive modifier — collection inner type (`set of ~string`) or scalar field type qualifier (`field Email as ~string`) |
 
-**Scan order for operators:** Multi-character operators must be attempted before their single-character prefixes: `!~` before `!=` before `!` (if ever reintroduced), `~=` before `~`, `->` before `-`, `==` before `=`, `>=` before `>`, `<=` before `<`. A standalone `~` is valid immediately before `string` in a collection inner type position (`set of ~string`) and as a scalar field type qualifier (`field Email as ~string`) — elsewhere it is a lexer error.
+**Scan order for operators:** Multi-character operators must be attempted before their single-character prefixes: `!~` before `!=` before `!` (if ever reintroduced), `~=` before `~`, `->` before `-`, `==` before `=`, `>=` before `>`, `<=` before `<`. The `Tilde` token is always emitted wherever `~` appears. Invalid uses (e.g., `~` before a non-`string` type, `~` before an identifier that is not `startsWith`/`endsWith`) are caught by the parser or type checker, not the lexer.
 
-**`~startsWith` and `~endsWith`** are not single tokens. They lex as two tokens: `Tilde` followed by the identifier `startsWith` or `endsWith`. The parser recognizes `Tilde` in null-denotation (prefix) position immediately before one of these identifiers as a CI function call. This is distinct from `~=` and `!~`, which are single compound tokens scanned as units. The Tilde token in expression prefix position is only valid before `startsWith`/`endsWith` identifiers — any other identifier after a lone `Tilde` in expression position is a parse error.
+**`~startsWith` and `~endsWith`** are not single tokens. They lex as two tokens: `Tilde` followed by the identifier `startsWith` or `endsWith`. The parser recognizes `Tilde` in null-denotation (prefix) position immediately before one of these identifiers as a CI function call. This is distinct from `~=` and `!~`, which are single compound tokens scanned as units. The Tilde token in expression prefix position is only valid before `startsWith`/`endsWith` identifiers. If `Tilde` in expression position is followed by any identifier other than `startsWith` or `endsWith`, the parser emits `ExpectedToken` with `{0}` = `'startsWith or endsWith'`, `{1}` = the actual identifier text, and highlights the `Tilde` + identifier span.
 
 #### Punctuation
 
@@ -432,7 +434,7 @@ The complete v2 reserved keyword set:
 precept  field  as  default  optional  writable  rule  because
 state  initial  terminal  required  irreversible  event  ensure
 success  warning  error
-in  to  from  on  when  any  all  of
+in  to  from  on  when  any  all  each  of
 set  add  remove  enqueue  dequeue  push  pop  clear  into
 transition  no  reject
 omit  modify  readonly  editable
@@ -446,7 +448,9 @@ nonnegative  positive  nonzero  notempty
 min  max  minlength  maxlength  mincount  maxcount
 ```
 
-**v2 additions** (not in v1): `optional`, `writable`, `omit`, `clear`, `nonzero`, `is`, `integer`, `decimal`, `choice`, `maxplaces`, `ordered`, `terminal`, `required`, `irreversible`, `success`, `warning`, `error`, `date`, `time`, `instant`, `duration`, `period`, `timezone`, `zoneddatetime`, `datetime`, `money`, `currency`, `quantity`, `unitofmeasure`, `dimension`, `price`, `exchangerate`.
+**v2 additions** (not in v1): `optional`, `writable`, `omit`, `clear`, `nonzero`, `is`, `integer`, `decimal`, `choice`, `maxplaces`, `ordered`, `terminal`, `required`, `irreversible`, `success`, `warning`, `error`, `date`, `time`, `instant`, `duration`, `period`, `timezone`, `zoneddatetime`, `datetime`, `money`, `currency`, `quantity`, `unitofmeasure`, `dimension`, `price`, `exchangerate`, `each`.
+
+> **Quantifier keywords:** `each` (v2), `any`, and `no` serve as quantifier keywords in expression position when followed by `Identifier in CollectionRef (`. `each` is quantifier-only. `any` also appears as state wildcard (`in any`, `from any`). `no` also appears in `no transition`. Disambiguation is by lookahead at the parser level — the lexer emits a single token kind for each.
 
 **v3 additions** (not in v2): `modify`, `readonly`, `editable`. The access mode verbs `write`/`read` are removed entirely in favor of the `modify` verb + adjective pattern. `write` and `read` are no longer reserved — they are ordinary identifiers in v3.
 
@@ -702,7 +706,8 @@ The parser always runs to end-of-source. On malformed input it emits diagnostics
 | `Not` | `UnaryExpression(Not, ParseExpression(25))` |
 | `Minus` | `UnaryExpression(Negate, ParseExpression(65))` |
 | `If` | `ConditionalExpression` (`if` Expr `then` Expr `else` Expr) |
-| `Tilde` (when next token is `startsWith` or `endsWith` identifier) | `CIFunctionCallExpression` — consumes the identifier and `(` Expr `,` Expr `)` to produce `~startsWith(arg1, arg2)` or `~endsWith(arg1, arg2)`. Return type: `boolean`. First argument must be `~string`; compile error otherwise (`CaseInsensitiveFieldRequiresTildeStartsWith` / `CaseInsensitiveFieldRequiresTildeEndsWith` if `startsWith`/`endsWith` was used without `~`; `TypeMismatch` if `~startsWith`/`~endsWith` is used with a plain `string` first arg). |
+| `Each` / `Any` (quantifier) / `No` (quantifier) — when followed by `Identifier in CollectionRef (` | `QuantifierExpression { Kind, BindingVar, Collection, Predicate }` — consumes `Identifier in CollectionRef ( BoolExpr )`. `any` and `no` are disambiguated by lookahead: if the token after `any`/`no` is `Identifier` followed by `in` followed by `CollectionRef` followed by `(`, parse as quantifier; otherwise `any` continues as type/state modifier, `no` continues as transition keyword. |
+| `Tilde` (when next token is `startsWith` or `endsWith` identifier) | `CIFunctionCallExpression` — consumes the identifier and `(` Expr `,` Expr `)` to produce `~startsWith(arg1, arg2)` or `~endsWith(arg1, arg2)`. Return type: `boolean`. First argument must be `~string`; type-checker errors otherwise (see §3.8 `~string` enforcement). |
 | _other_ | missing `IdentifierExpression` + diagnostic |
 
 #### Left-denotation (infix and postfix)
@@ -838,6 +843,18 @@ Event hooks without a `when`/`ensure` continuation are parsed as stateless event
 
 State actions support an optional `when` guard between the state target and the action chain. The guard is passed through to the AST node.
 
+#### Quantifier expression grammar
+
+```
+QuantifierExpr   :=  QuantifierKind Identifier in CollectionRef '(' BoolExpr ')'
+QuantifierKind   :=  each | any | no
+CollectionRef    :=  Identifier   (bare field name only in v1; member access is a parse error)
+```
+
+`CollectionRef` is restricted to a bare field name (`Identifier`) in v1. `event.FieldName` or computed expressions are not valid — emit `ExpectedFieldName` at the `in` position if a non-identifier follows.
+
+`QuantifierExpr` is a boolean-valued expression. It appears in all boolean expression positions: `when` guards, `rule` expressions, `ensure` expressions, and (recursively) inside other quantifier predicates. The binding variable (`Identifier`) is a fresh name introduced by the quantifier and scoped strictly to the parenthesized `BoolExpr`. See §3.5 for binding variable scope rules and §3.8 for type-checking rules.
+
 #### Access mode and omit declaration
 
 Two separate constructs govern per-state field access: `AccessMode` (modify + adjective + optional guard) and `OmitDeclaration` (omit, no guard). They share the `in` preposition but are distinct `ConstructKind`s with different slot sequences.
@@ -906,7 +923,7 @@ ChoiceValueExpr   :=  StringLiteral | NumberLiteral | BooleanLiteral
 TypeQualifier   :=  (in | of | to) Expr
 ```
 
-> **`~string` is not a valid `ChoiceElementType`.** The `choice` type guarantees the stored value IS the canonical declared string; `~string`'s storage-preserving model cannot be reconciled with this guarantee without new surface. Use `toLower()` normalization at the ingestion boundary before assigning to a choice field.
+> **`~string` is not a valid `ChoiceElementType`.** The `choice` type guarantees the stored value IS the canonical declared string; `~string`'s storage-preserving model cannot be reconciled with this guarantee without new surface. Use `toLower()` normalization at the ingestion boundary before assigning to a choice field. Attempting `choice of ~string(...)` produces an `ExpectedToken` parse error — `~string` is not in the `ChoiceElementType` grammar production.
 
 Type qualifiers narrow the value domain: `in '<unit>'` pins to a specific unit or currency, `of '<family>'` constrains to a dimension family. A field may use `in` or `of`, not both.
 
@@ -1119,6 +1136,18 @@ Fields, states, and events are all declared at the top level. They are visible e
 | Computed expression (`field X as T -> Expr`) | All field names except those that would form a dependency cycle (no self-reference, no mutual cycles) |
 | Modifier value expressions (`min N`, `max N`, etc.) | Only literal values — no field references |
 
+#### Quantifier binding variable scope
+
+`QuantifierExpr` introduces a binding variable scoped strictly to the predicate expression:
+
+| Property | Rule |
+|----------|------|
+| **Type** | The collection field's inner type. If `Tags` is `set of ~string`, the binding variable is `~string`. If `ClaimQueue` is `queue of T by P`, the binding variable is a two-field projection (`.value` → `T`, `.by` → `P`). |
+| **Scope** | Strictly within the `(` … `)` predicate expression. Not visible outside the quantifier. |
+| **Shadowing** | If a field with the same name exists at global scope, the binding variable shadows it inside the predicate. Warning: `BindingShadowsField`. |
+| **Keyword collision** | If the binding variable name is a reserved keyword, it is a parse error (`ExpectedIdentifier` with message `'{0}' is a reserved keyword and cannot be used as a binding variable`). |
+| **CI inheritance** | If the collection is `set of ~string`, the binding variable is `~string`, so all `~string` enforcement rules apply inside the predicate. `each item in Tags (item == "admin")` where `Tags` is `set of ~string` triggers `CaseInsensitiveFieldRequiresTildeEquals` on `item == "admin"`. |
+
 #### Event arg access
 
 Event args are accessed via dotted notation: `EventName.ArgName`. The type checker resolves this by:
@@ -1139,7 +1168,8 @@ Event args are accessed via dotted notation: `EventName.ArgName`. The type check
 | `+` | `string` | `string` | `string` | No (concatenation) |
 | `+` | `~string` | `~string` | `string` | No (concatenation — CI qualifier not preserved through transformation) |
 | `+` | `~string` | `string` | `string` | No (concatenation — CI qualifier not preserved) |
-| `==` `!=` | any T | same T | `boolean` | Yes — `integer` widens to `decimal` or `number`; `decimal` vs `number` is a type error (see §3.2) |
+| `+` | `string` | `~string` | `string` | No (concatenation — CI qualifier not preserved) |
+| `==` `!=` | any T (not `~string`) | same T | `boolean` | Yes — `integer` widens to `decimal` or `number`; `decimal` vs `number` is a type error (see §3.2). **Exception:** `~string == ~string` and `~string == string` are compile errors — see §3.8 `~string` enforcement. Use `~=` instead. |
 | `~=` `!~` | `string` or `~string` | `string` or `~string` | `boolean` | No — case-insensitive ordinal comparison (`OrdinalIgnoreCase`); type error on non-string operands |
 | `~startsWith` | `~string` | `string` | `boolean` | No — CI prefix test; compile error if first arg is not `~string` |
 | `~endsWith` | `~string` | `string` | `boolean` | No — CI suffix test; compile error if first arg is not `~string` |
@@ -1213,7 +1243,16 @@ Event args are accessed via dotted notation: `EventName.ArgName`. The type check
 | `set of T` | `T` (or widens to `T`) | `boolean` |
 | `queue of T` | `T` | `boolean` |
 | `stack of T` | `T` | `boolean` |
+| `log of T` | `T` | `boolean` — value membership |
+| `log of T by P` | `T` | `boolean` — value membership |
+| `log of T by P` | `P` | `boolean` — key (P-type argument) membership; use this to guard `append by P` |
+| `bag of T` | `T` | `boolean` — value present (count ≥ 1) |
+| `list of T` | `T` | `boolean` — value membership |
+| `queue of T by P` | `T` | `boolean` — value membership |
+| `lookup of K to V` | `K` | `boolean` — key membership |
 | non-collection | — | type error |
+
+**CI rules for `contains`:** `set of string contains ~string` → `CaseInsensitiveValueInCaseSensitiveContains` (the CI value may not be found in the CS collection). `set of ~string contains string` (or `~string`) → case-insensitive membership via `OrdinalIgnoreCase`. Same rules apply to all collection kinds above when the inner type is `~string`.
 
 #### `is set` / `is not set`
 
@@ -1304,6 +1343,8 @@ Functions are validated against a closed catalog. There are no user-defined func
 | `mid(s, start, length)` | `(string, integer, integer) → string` | `string` | 1-indexed substring (clamped); `start` and `length` must be positive `integer` |
 | `now()` | `() → instant` | `instant` | — |
 
+> **`~string` argument compatibility for string functions.** Functions accepting `(string)` parameters — `trim`, `toLower`, `toUpper`, `left`, `right`, `mid` — also accept `~string` arguments via the bidirectional assignment compatibility rule (§3.8). No enforcement diagnostic is emitted for these functions. CI semantics do not apply to structural operations — these functions operate on the stored value regardless of the `~` qualifier.
+
 **Lane bridge functions.** Two functions are the sole explicit bridges between numeric lanes: `approximate(decimal) → number` and `round(value, places) → decimal`. The rounding family (`floor`, `ceil`, `truncate`, `round` with no places) provide `decimal|number → integer`. No other mechanism crosses lane boundaries — `decimal * NumberField` without `approximate()` is a type error (see type-checker.md §4.2a).
 
 **Function validation checks:**
@@ -1349,6 +1390,15 @@ Enforcement fires in all expression positions where `==`/`!=`/`contains`/`starts
 
 `string` and `~string` are fully assignment-compatible in both directions. The enforcement is comparison-site only, never assignment-site.
 
+#### Quantifier predicate validation
+
+| Check | Fires when | Diagnostic |
+|-------|-----------|------------|
+| Predicate must be boolean | `BoolExpr` in quantifier resolves to non-boolean type | `TypeMismatch` |
+| Collection must be a collection field | `CollectionRef` in quantifier resolves to a non-collection type | `InvalidQuantifierTarget` |
+| Binding variable is reserved keyword | Binding variable name is in the reserved keyword set | `ExpectedIdentifier` |
+| `~string` enforcement applies inside predicate | Binding variable is `~string` (collection inner type), used with `==`/`!=`/`startsWith`/`endsWith` | Existing enforcement diagnostics (`CaseInsensitiveFieldRequiresTildeEquals`, etc.) |
+
 #### Modifier validation
 
 Modifiers are constraints on field/arg values. The type checker validates applicability:
@@ -1359,13 +1409,15 @@ Modifiers are constraints on field/arg values. The type checker validates applic
 | `nonnegative` | `integer`, `decimal`, `number` | `string`, `boolean`, `choice`, collections, temporal, domain |
 | `positive` | `integer`, `decimal`, `number` | (same as above) |
 | `nonzero` | `integer`, `decimal`, `number` | (same as above) |
-| `notempty` | `string` | `number`, `integer`, `decimal`, `boolean`, `choice`, collections |
+| `notempty` | `string`, `set`, `queue`, `stack`, `log`, `log of T by P`, `bag`, `list`, `queue of T by P` | `integer`, `decimal`, `number`, `boolean`, `choice`, `lookup of K to V` |
 | `min` / `max` | `integer`, `decimal`, `number` | `string`, `boolean`, collections |
 | `minlength` / `maxlength` | `string` | `number`, `integer`, `decimal`, `boolean`, collections |
-| `mincount` / `maxcount` | `set`, `queue`, `stack` | scalars |
+| `mincount` / `maxcount` | `set`, `queue`, `stack`, `log`, `log of T by P`, `bag`, `list`, `queue of T by P`, `lookup of K to V` | scalars |
 | `maxplaces` | `decimal` | `integer`, `number`, `string`, `boolean`, collections |
 | `ordered` | `choice` | all non-choice types |
 | `optional` | any field type | — (always valid) |
+
+> **`notempty` on collections:** On collection fields, `notempty` is equivalent to `mincount 1`. It statically discharges `.min`/`.max`/`.peek`/`.first`/`.last` access obligations — no per-access `.count > 0` guard is needed when the field is declared `notempty`. Not applicable to `lookup of K to V`, which has its own cardinality model.
 
 **Modifier value validation:**
 
@@ -1538,15 +1590,17 @@ The type checker emits diagnostics for root causes only. When `ErrorType` is flo
 
 #### `~string` enforcement diagnostics
 
-| Code | Severity | Message template | Fires when |
+| Code | Severity | Message template | Parameters |
 |------|----------|-----------------|------------|
-| `CaseInsensitiveFieldRequiresTildeEquals` (66) | Error | `'Email' is declared ~string (case-insensitive). Use ~= instead of == to avoid treating 'admin@example.com' and 'Admin@example.com' as different values.` | Either operand of `==` is `~string` |
-| `CaseInsensitiveFieldRequiresTildeNotEquals` | Error | `'Email' is declared ~string (case-insensitive). Use !~ instead of != to avoid treating 'admin@example.com' and 'Admin@example.com' as different values.` | Either operand of `!=` is `~string` |
-| `CaseInsensitiveValueInCaseSensitiveContains` | Error | `'Email' is ~string but 'Roles' is set of string (case-sensitive). A value like 'Admin' stored as 'admin' would not be found. Either change 'Roles' to set of ~string, or use a quantifier to test membership explicitly.` | Collection is case-sensitive (`set`/`list`/`log`/`queue`/`stack`/`bag` of `string`) and the value being tested is `~string` |
-| `CaseInsensitiveFieldRequiresTildeStartsWith` | Error | `'Email' is declared ~string (case-insensitive). Use ~startsWith instead of startsWith to avoid treating 'admin@...' and 'Admin@...' as different prefixes.` | First arg of `startsWith(s, ...)` call resolves to `~string` |
-| `CaseInsensitiveFieldRequiresTildeEndsWith` | Error | `'Email' is declared ~string (case-insensitive). Use ~endsWith instead of endsWith to avoid treating '.com' and '.COM' as different suffixes.` | First arg of `endsWith(s, ...)` call resolves to `~string` |
+| `CaseInsensitiveFieldRequiresTildeEquals` (66) | Error | `'{0}' is declared ~string (case-insensitive). Use ~= instead of == to avoid treating values like 'admin@example.com' and 'Admin@example.com' as different.` | `{0}` = field/expression name |
+| `CaseInsensitiveFieldRequiresTildeNotEquals` | Error | `'{0}' is declared ~string (case-insensitive). Use !~ instead of != (`!~` returns true when values are not equal under case-insensitive comparison).` | `{0}` = field/expression name |
+| `CaseInsensitiveValueInCaseSensitiveContains` | Error | `'{0}' is ~string but '{1}' is {2} (case-sensitive). A value stored in one case may not be found. Either change '{1}' to {3}, or use a quantifier: \`any e in {1} (e ~= {0})\`.` | `{0}` = CI value/field name, `{1}` = CS collection name, `{2}` = collection type (e.g., `set of string`), `{3}` = CI collection type (e.g., `set of ~string`) |
+| `CaseInsensitiveFieldRequiresTildeStartsWith` | Error | `'{0}' is declared ~string (case-insensitive). Use ~startsWith instead of startsWith to avoid treating values as having different prefixes.` | `{0}` = field name |
+| `CaseInsensitiveFieldRequiresTildeEndsWith` | Error | `'{0}' is declared ~string (case-insensitive). Use ~endsWith instead of endsWith to avoid treating values as having different suffixes.` | `{0}` = field name |
 
-> **Code 66 reassignment.** `CaseInsensitiveStringOnNonCollection` (code 66) exists in `DiagnosticCode.cs` and was defined in anticipation of scalar `~string`, but was **never emitted** by the parser — scalar `~string` in non-collection position fell into `ExpectedToken` instead. When scalar `~string` ships, code 66 is **reassigned** to `CaseInsensitiveFieldRequiresTildeEquals`. Since it was never emitted, no external artifacts reference it, making reassignment safe.
+> **`notempty` redirect for `CaseInsensitiveFieldRequiresTildeEquals`.** When the right-hand operand is an empty string literal (`""`), append to the message: `To require a non-empty value, declare the field \`notempty\` instead: \`field {0} as ~string notempty\`.`
+
+> **Code 66 reassignment.** `CaseInsensitiveStringOnNonCollection` (code 66) exists in `DiagnosticCode.cs` and was defined in anticipation of scalar `~string`, but was **never emitted** by the parser. When scalar `~string` ships, code 66 is **reassigned** to `CaseInsensitiveFieldRequiresTildeEquals`. The numeric value 66 is retained. No member is deleted, no ordinal shifts. Existing code references to `DiagnosticCode.CaseInsensitiveStringOnNonCollection` will fail to compile — update them to `DiagnosticCode.CaseInsensitiveFieldRequiresTildeEquals`.
 
 ---
 

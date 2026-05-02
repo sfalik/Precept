@@ -452,7 +452,7 @@ field Labels as set of ~string   # OrdinalIgnoreCase — "Apple" and "apple" are
 | Deduplication | Case-sensitive | Case-insensitive |
 | `.min`/`.max` ordering | Ordinal | OrdinalIgnoreCase (deterministic) |
 
-**`~string` as a scalar field type.** `field Email as ~string` is valid. The type checker enforces that equality comparisons (`==`/`!=`) are replaced with `~=`/`!~`, that `startsWith`/`endsWith` are replaced with `~startsWith`/`~endsWith`, and that a `~string` field is not tested against a case-sensitive collection with `contains`. See [Primitive Types](primitive-types.md) §`~string` for the full scalar enforcement rules, type unification, event arg declarations, and the `choice of ~string` exclusion.
+**`~string` as a scalar field type.** `field Email as ~string` is valid. The type checker enforces that equality comparisons (`==`/`!=`) are replaced with `~=`/`!~`, that `startsWith`/`endsWith` are replaced with `~startsWith`/`~endsWith`, and that a `~string` field is not tested against a case-sensitive collection with `contains`. When testing a `~string` value against a case-sensitive collection, use a quantifier: `any e in Roles (e ~= Email)`. See [Primitive Types](primitive-types.md) §`~string` for the full scalar enforcement rules, type unification, event arg declarations, and the `choice of ~string` exclusion.
 
 **`lookup of ~string to V`.** When the key type is `~string`, the lookup must be constructed with `ImmutableDictionary.Create(StringComparer.OrdinalIgnoreCase)`. Behavioral consequence: `put "MEDICAL" = 100` followed by `put "medical" = 200` is an **overwrite** (not an error) — the keys compare equal under `OrdinalIgnoreCase`, so the second `put` replaces the first. This is consistent with `set of ~string` deduplication and with `put` being an explicit upsert by design. `contains` on `lookup of ~string to V` uses `OrdinalIgnoreCase` for key membership, consistent with all other CI collection kinds.
 
@@ -615,7 +615,7 @@ when Tags contains "urgent"
 | `lookup of K to V` | `K` | `boolean` — key membership; when `K = ~string`, uses `OrdinalIgnoreCase` (consistent with all CI collection kinds) |
 | non-collection | — | type error |
 
-**Case sensitivity:** `contains` on `set of string` is case-sensitive (ordinal). `contains` on `set of ~string` is case-insensitive (`OrdinalIgnoreCase`). `contains` on `queue of ~string` and `stack of ~string` is also case-insensitive.
+**Case sensitivity:** `contains` on `set of string` is case-sensitive (ordinal). `contains` on `set of ~string` is case-insensitive (`OrdinalIgnoreCase`). `contains` on `queue of ~string`, `stack of ~string`, `log of ~string`, `log of ~string by P`, `bag of ~string`, and `list of ~string` is also case-insensitive — CI membership applies to all collection kinds when the inner type is `~string`.
 
 **No proof requirement.** `contains` on an empty collection returns `false` — it is always safe to call without a count guard.
 
@@ -713,6 +713,8 @@ For `lookup of K to V`, the analogous pattern is key-presence: `F contains K` in
 
 **Scalar constraints do not apply to collections.** `min`, `max`, `minlength`, `maxlength`, `maxplaces`, `nonnegative`, `positive`, `nonzero`, and `ordered` are all type errors when applied as field-level modifiers on collection fields (e.g., `field Tags as set of string ordered` is invalid). Collections have their own constraint vocabulary: `notempty`, `mincount`, and `maxcount`. Note that `ordered` on the *inner `choice of T(...)` type* is valid — `field Priorities as set of choice of string("low", "medium", "high") ordered` declares an ordered-choice inner type, not a collection-level modifier.
 
+> **Element-level constraints:** `notempty`, `mincount`, and `maxcount` constrain the collection as a whole. To constrain individual elements (e.g., "all items must be positive" or "no items may be empty"), use a quantifier predicate *(see [§ Quantifier Predicates](#quantifier-predicates) for syntax)*.
+
 ---
 
 ## Quantifier Predicates
@@ -750,6 +752,8 @@ from Submitted on Approve
 
 **Syntax form:** `quantifier binding in Collection (predicate)` — the binding variable is a bare identifier named by the author and locally scoped to the parenthesized predicate. The predicate is a boolean expression.
 
+**Binding variable type:** The binding variable has the collection's inner type. If the collection is `set of ~string`, the binding variable is `~string` — `~string` enforcement rules apply inside the predicate. For example, `each item in Tags (item == "admin")` where `Tags` is `set of ~string` triggers `CaseInsensitiveFieldRequiresTildeEquals` on `item == "admin"` — use `item ~= "admin"` instead.
+
 **Grammar:**
 
 ```
@@ -757,7 +761,18 @@ QuantifierExpr  :=  QuantifierKind Identifier in CollectionField '(' BoolExpr ')
 QuantifierKind  :=  each | any | no
 ```
 
-**Lexer note:** `any` is already a reserved keyword in the Precept lexer. `each` and `no` require new lexer entries. The previously reserved `all` keyword is superseded by `each` — `each` is grammatically correct ("each item in Items") where `all` would be broken English ("all item in Items").
+#### Binding variable rules
+
+| Property | Rule |
+|----------|------|
+| **Type** | The collection's inner type. `set of ~string` → binding var is `~string`. `queue of T by P` → binding var is a two-field projection (`.value` → `T`, `.by` → `P`). |
+| **Scope** | Strictly within the `(` … `)` predicate expression — not visible outside the quantifier. |
+| **Shadowing** | If a field with the same name exists at global scope, the binding variable shadows it inside the predicate. Warning emitted: `BindingShadowsField`. |
+| **Keyword collision** | Reserved keyword as binding variable name is a parse error (`ExpectedIdentifier`). |
+
+**Lexer note:** `any` is already a reserved keyword in the Precept lexer. `each` requires a new lexer entry. `no` is already reserved and requires disambiguation from `no transition` context; `any` is already reserved and requires disambiguation from its type modifier role. See §1.2 and §2.1 of the language spec for the disambiguation rules.
+
+**`CollectionRef` restriction (v1):** `CollectionRef` is restricted to a bare field name (`Identifier`) in v1. `each item in Event.Tags (...)` is a parse error — use `set Field = Event.Tags` in an action before the guard, or restructure. The parser emits `ExpectedFieldName` at the `in` position if a non-identifier follows.
 
 **Keyword decisions (locked):** The language ships `each`, `any`, `no` as three distinct keywords. Three keywords are more discoverable and read more naturally in business rules. `no` reads better than `not any` in business rule context.
 

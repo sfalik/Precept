@@ -77,21 +77,29 @@ field Labels as set of ~string   # OrdinalIgnoreCase — "Apple" and "apple" are
 
 The `~` prefix selects `StringComparer.OrdinalIgnoreCase` for equality and membership operations. For collections, this governs deduplication and `.min`/`.max` ordering. For scalar fields, it carries a comparison obligation enforced at every use site.
 
+#### When to use `~string`
+
+Reach for `~string` when a field represents an identifier that should match regardless of how it was entered: email addresses, coupon codes, department codes, username handles, country codes. The `~` modifier signals comparison intent — "this field is compared case-insensitively" — without changing storage.
+
+**Refactoring an existing `string` field to `~string`** will produce `CaseInsensitiveFieldRequiresTildeEquals` errors at every `==` and `!=` comparison on that field. This is expected — the compiler is surfacing comparisons that were previously silently case-sensitive. Each error site is a real semantic gap to address.
+
 **Enforcement rules (scalar `~string` fields):**
 
 Three rules apply when `field F as ~string` is declared. All three are required; the enforcement model is not separable.
 
-1. **Equality:** `==` or `!=` on any `~string` field (either operand position) is a compile error (`CaseInsensitiveFieldRequiresTildeEquals` / `CaseInsensitiveFieldRequiresTildeNotEquals`). Required forms: `~=` and `!~`.
+1. **Equality:** `==` or `!=` on any `~string`-typed expression (either operand position) is a compile error (`CaseInsensitiveFieldRequiresTildeEquals` / `CaseInsensitiveFieldRequiresTildeNotEquals`). Required forms: `~=` and `!~`.
 
-   > *`'Email' is declared ~string (case-insensitive). Use ~= instead of == to avoid treating 'admin@example.com' and 'Admin@example.com' as different values.`*
+   > *`'{0}' is declared ~string (case-insensitive). Use ~= instead of == to avoid treating values like 'admin@example.com' and 'Admin@example.com' as different.`*
+
+   When the right-hand operand is an empty string literal (`""`), the message additionally suggests `notempty`: *`To require a non-empty value, declare the field \`notempty\` instead: \`field {0} as ~string notempty\`.`*
 
 2. **Prefix/suffix functions:** `startsWith(~string field, ...)` and `endsWith(~string field, ...)` are compile errors (`CaseInsensitiveFieldRequiresTildeStartsWith` / `CaseInsensitiveFieldRequiresTildeEndsWith`). Required forms: `~startsWith` and `~endsWith`.
 
-   > *`'Email' is declared ~string (case-insensitive). Use ~startsWith instead of startsWith to avoid treating 'admin@...' and 'Admin@...' as different prefixes.`*
+   > *`'{0}' is declared ~string (case-insensitive). Use ~startsWith instead of startsWith to avoid treating values as having different prefixes.`* (`{0}` = field name)
 
-3. **CS collection contains CI value:** `collection of string contains ~string field` is a compile error (`CaseInsensitiveValueInCaseSensitiveContains`). Either change the collection to `collection of ~string`, or restructure using a quantifier with `~=`.
+3. **CS collection contains CI value:** `collection of string contains ~string field` is a compile error (`CaseInsensitiveValueInCaseSensitiveContains`). Either change the collection to `collection of ~string`, or use a quantifier: `any e in {1} (e ~= {0})`.
 
-   > *`'Email' is ~string but 'Roles' is set of string (case-sensitive). A value like 'Admin' stored as 'admin' would not be found. Either change 'Roles' to set of ~string, or use a quantifier to test membership explicitly.`*
+   > *`'{0}' is ~string but '{1}' is {2} (case-sensitive). A value stored in one case may not be found. Either change '{1}' to {3}, or use a quantifier: \`any e in {1} (e ~= {0})\`.`*
 
 **CI operators (`~startsWith`, `~endsWith`):**
 
@@ -110,19 +118,15 @@ Three rules apply when `field F as ~string` is declared. All three are required;
 | `~string` + `string` | `~string` (CI preserved — selection, not transformation) |
 | `string` + `string` | `string` |
 
-> **Concatenation is different.** The table above applies to `if/then/else` branch unification (selection). The `+` concatenation operator follows a distinct rule: `~string + string → string` — concatenation produces a new value with no lineage from its operands, so the CI qualifier does not survive. The `if/then/else` result IS one of the operands (selection), which is why CI is preserved; `+` creates a new string (transformation), which is why it is not.
+> **Concatenation is different.** The table above applies to `if/then/else` branch unification (selection). The `+` concatenation operator follows a distinct rule: `~string + string → string` and `~string + ~string → string` — concatenation produces a new value with no lineage from its operands, so the CI qualifier does not survive regardless of whether one or both operands are `~string`. The `if/then/else` result IS one of the operands (selection), which is why CI is preserved; `+` creates a new string (transformation), which is why it is not.
 
 **String functions unaffected:**`trim`, `left`, `right`, `mid`, `toLower`, `toUpper` are always ordinal. CI semantics do not apply to these functions; no enforcement check.
 
 **Ordering operators:** `<`/`>`/`<=`/`>=` on a `~string` field use ordinal, case-sensitive lexicographic ordering — the same semantics as on any `string` field. The `~` modifier applies only to equality operators (`==`/`!=` → required to use `~=`/`!~`). There is no CI ordering variant; case-insensitive ordering is not part of the Precept operator surface.
 
-**`choice of ~string` is excluded.** `~string` is not a valid `ChoiceElementType`. `choice` guarantees the stored value IS the declared canonical string; `~string` never normalizes storage. These contracts are irreconcilable without new surface. Use `toLower(event.Arg)` at the ingestion boundary before assigning to a choice field.
+**`choice of ~string` is excluded.** `~string` is not a valid `ChoiceElementType`. `choice` guarantees the stored value IS the declared canonical string; `~string` never normalizes storage. These contracts are irreconcilable without new surface. Use `toLower(event.Arg)` at the ingestion boundary before assigning to a choice field. Attempting `choice of ~string(...)` produces an `ExpectedToken` parse error — `~string` is simply not in the `ChoiceElementType` grammar production.
 
 **Assignment compatibility.** `string` values are assignable to `~string` fields, and `~string` values are assignable to `string` fields. The `~` modifier affects comparison obligations only — not the storage format. Storage is always case-preserving in both directions. Bidirectional assignment is always valid; the CI constraint layer activates only at comparison sites.
-
-**Implementation model.** `~string` does not introduce a new `TypeKind`. It is `TypeKind.String` with a `CaseInsensitive = true` flag on the type reference node. `ScalarTypeRefNode` must gain a `CaseInsensitive` property (currently only `CollectionTypeRefNode` has it). The parser change is additive: a new `Tilde`-handling path is added to `ParseTypeRef()` in the scalar branch — the existing collection inner type path is unchanged. The parser does not "remove a guard"; it adds a new code path.
-
-> **Diagnostic code 66 reassignment.** `CaseInsensitiveStringOnNonCollection` (code 66) exists in `DiagnosticCode.cs` and was defined in anticipation of scalar `~string`, but was **never emitted** by the parser — scalar `~string` fell into `ExpectedToken` instead. When scalar `~string` ships, code 66 is **reassigned** to `CaseInsensitiveFieldRequiresTildeEquals` (the primary equality enforcement diagnostic). Since code 66 was never emitted, no external artifacts reference it, making reassignment safe.
 
 ---
 
