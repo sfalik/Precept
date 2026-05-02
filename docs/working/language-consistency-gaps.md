@@ -9,7 +9,7 @@ Pre-TypeChecker audit — exhaustive consistency check of language docs, catalog
 - Obvious gap → agent rubber-ducks, applies fix, status = **Fixed**
 - Non-obvious gap → full analysis written, status = **Unresolved** (owner resolves on second pass)
 
-**Audit status: OPEN — 49 gaps total, 48 Fixed, 1 Unresolved (GAP-043–045 fixed inline 2026-05-02; GAP-046 fixed 2026-05-02; GAP-047 pending owner decision)**
+**Audit status: CLOSED — 49 gaps total, 49 Fixed, 0 Unresolved (GAP-043–047 fixed inline 2026-05-02)**
 
 ---
 
@@ -61,7 +61,7 @@ Pre-TypeChecker audit — exhaustive consistency check of language docs, catalog
 | GAP-044 | Spec §1.2 reserved keyword list missing `queue` and `stack` (present in §1.1 vocabulary and lexer) | Doc-Doc | Fixed | 10 |
 | GAP-045 | Spec §2.3 `ChoiceValueExpr` uses undefined terminal `BooleanLiteral`; actual tokens are `true`/`false` | Doc-Doc | Fixed | 10 |
 | GAP-046 | Spec §3.7 function table lists `~startsWith`/`~endsWith` as function-catalog entries but no `FunctionKind` member exists for them; CI variants live in `ExpressionForms` | Doc-Catalog | Fixed | 10 |
-| GAP-047 | Spec §3.7 `round(value,places)`, `min`, `max`, `abs`, `clamp` missing money/quantity overloads present in `Functions` catalog | Doc-Catalog | Unresolved | 10 |
+| GAP-047 | Spec §3.7 `round(value,places)`, `min`, `max`, `abs`, `clamp` missing money/quantity overloads present in `Functions` catalog | Doc-Catalog | Fixed | 10 |
 | GAP-021 | `is set`/`is not set` associativity: spec §2.1 says `left`, catalog says `NonAssociative (postfix)` | Doc-Impl | Fixed | 6 |
 | GAP-022 | Spec §2.1 null-denotation table names `StringLiteralExpression` — a node that does not exist; implementation uses `LiteralExpression` | Doc-Impl | Fixed | 6 |
 | GAP-023 | Spec §2.1 precedence table has `is` row (60) appearing before `+/-` row (50); two rows at level 60 without ordering explanation | Doc-Spec | Fixed | 6 |
@@ -75,12 +75,12 @@ Pre-TypeChecker audit — exhaustive consistency check of language docs, catalog
 
 ## GAP-001: `reason` keyword used instead of `because` in collection-types.md
 
-**Status:** Fixed  
+**Status:** Fixed
 **Category:** Doc-Spec  
 **Location:** `docs/language/collection-types.md` lines 899, 1147, 1154, 1259  
 **Found in iteration:** 1
 
-**Description:**  
+**Description:**
 Four rule examples in `collection-types.md` use `reason "..."` as the clause introducing the rule rationale:
 
 ```precept
@@ -1880,7 +1880,7 @@ ModifierKeywords (the parser-level FrozenSet) was correctly catalog-derived. But
 **Resolution:**  
 Added Modifiers.ByFieldToken (FrozenDictionary of TokenKind to FieldModifierMeta) built at startup from All.OfType<FieldModifierMeta>().ToFrozenDictionary(m => m.Token.Kind). Updated ParseFieldModifierNodes to use Modifiers.ByFieldToken.TryGetValue for O(1) dispatch. Added using System.Collections.Frozen to Modifiers.cs. All 2713 tests pass.
 
-<!-- Iteration 10 complete: Frank's catalog/spec/doc pass. Prior fixes confirmed: GAP-034 (SimpleCollectionTypeLeaders ✅), GAP-035 (ChoiceLiteralTokens ✅), GAP-036 (ClearApplicable includes optional ✅), GAP-037 (Writable hover updated ✅), GAP-039 (AppendBy→LogBy, EnqueueBy→QueueBy ✅), GAP-040 (countof ElementParameterAccessor ✅), GAP-041 (QuantifierPredicateNotBoolean ✅), GAP-042 (dead dispatch arms removed ✅). New gaps: GAP-043 (Fixed — catalog-system.md said 12 catalogs; ExpressionForms.cs is the 13th; updated catalog-system.md Status, inventory table, and prose), GAP-044 (Fixed — spec §1.2 keyword list omitted `queue` and `stack`; both present in §1.1 and lexer since v1; added to collection-types line), GAP-045 (Fixed — spec §2.3 ChoiceValueExpr used undefined terminal BooleanLiteral; fixed to `true | false` per actual token vocabulary), GAP-046 (Unresolved — spec §3.7 lists ~startsWith/~endsWith as function-catalog entries but FunctionKind has no CI members; CI variants are ExpressionFormKind.CIFunctionCall + HasCIVariant flag; owner must decide how to document or restructure), GAP-047 (Unresolved — spec §3.7 min/max/abs/clamp/round(places) tables omit money/quantity overloads present in Functions catalog; owner must decide spec expansion vs reference note). Status: 49 gaps total, 47 Fixed, 2 Unresolved. -->
+<!-- Iteration 10 complete: Frank's catalog/spec/doc pass. Prior fixes confirmed: GAP-034 (SimpleCollectionTypeLeaders ✅), GAP-035 (ChoiceLiteralTokens ✅), GAP-036 (ClearApplicable includes optional ✅), GAP-037 (Writable hover updated ✅), GAP-039 (AppendBy→LogBy, EnqueueBy→QueueBy ✅), GAP-040 (countof ElementParameterAccessor ✅), GAP-041 (QuantifierPredicateNotBoolean ✅), GAP-042 (dead dispatch arms removed ✅). New gaps: GAP-043 (Fixed — catalog-system.md said 12 catalogs; ExpressionForms.cs is the 13th; updated catalog-system.md Status, inventory table, and prose), GAP-044 (Fixed — spec §1.2 keyword list omitted `queue` and `stack`; both present in §1.1 and lexer since v1; added to collection-types line), GAP-045 (Fixed — spec §2.3 ChoiceValueExpr used undefined terminal BooleanLiteral; fixed to `true | false` per actual token vocabulary), GAP-046 (Fixed — CI variants now have dedicated FunctionKind/FunctionMeta entries and spec footnote), GAP-047 (Fixed — spec §3.7 expanded into explicit primitive-numeric/money/quantity rows with qualifier-preservation rules and round(places) bridge clarification). Status: 49 gaps total, 49 Fixed, 0 Unresolved. -->
 
 ---
 
@@ -1985,9 +1985,9 @@ Add `FunctionKind.TildeStartsWith = 22` and `FunctionKind.TildeEndsWith = 23` to
 
 ## GAP-047:Spec §3.7 function table missing money/quantity overloads for `min`, `max`, `abs`, `clamp`, `round(places)`
 
-**Status:** Unresolved  
-**Category:** Doc-Catalog  
-**Location:** `docs/language/precept-language-spec.md` §3.7; `src/Precept/Language/Functions.cs`  
+**Status:** Fixed
+**Category:** Doc-Catalog
+**Location:** `docs/language/precept-language-spec.md` §3.7; `src/Precept/Language/Functions.cs`
 **Found in iteration:** 10
 
 **Description:**  
@@ -2005,13 +2005,7 @@ The spec §3.7 section header states: "Functions are validated against a closed 
 
 Note: `round(value, places)` is additionally described in §3.7 as a "lane bridge function" (`(numeric, integer) → decimal`). For money/quantity, it is NOT a bridge — it rounds the amount while preserving the domain type. The "bridge" framing only applies to the numeric lane.
 
-**Rubber-Duck Analysis:**  
-The spec's §3.7 was written to cover the numeric-lane (integer/decimal/number) function surface. The business-domain-type overloads were added to the catalog later and not back-ported to the spec. Two resolutions:
+**Decision / Fix (2026-05-02 — Shane → Option A):**
+Expanded the §3.7 table into explicit primitive-numeric, money, and quantity sub-rows for `min`, `max`, `abs`, `clamp`, and `round(value, places)`. Added a note clarifying that primitive numeric widening applies only to `integer`/`decimal`/`number`, while `money` and `quantity` preserve their domain type and qualifier; for multi-argument overloads they must share the same qualifier. Clarified that `round(value, places)` is a bridge only within the primitive numeric lanes.
 
-1. **Expand §3.7 rows.** Add money/quantity overload rows (or sub-rows) for each of the five functions. Note qualifier-matching semantics for min/max/clamp/round.
-
-2. **Add a cross-reference note.** After the function table (or in a §3.7 subsection), add a paragraph: "For `money` and `quantity` arguments, `min`, `max`, `abs`, `clamp`, and `round(value, places)` apply with domain-type-preserving semantics. Arguments and result share the same qualifier (currency for money, unit for quantity). `round(money, places)` returns `money`, not `decimal`. See business-domain-types.md §Functions for full overload signatures."
-
-The `round(value, places)` "bridge" note in §3.7 also needs clarification — it applies only to the numeric lane.
-
-**Ownership:** Owner decision required — spec expansion vs. cross-reference note. No C# changes made this iteration.
+**Ownership:** Resolved by owner. Doc-only fix applied; no C# changes required.

@@ -1377,15 +1377,25 @@ Functions are validated against a closed catalog. There are no user-defined func
 
 | Function | Signature | Return type | Constraints |
 |----------|-----------|-------------|-------------|
-| `min(a, b)` | `(numeric, numeric) → numeric` | Common numeric type of args | — |
-| `max(a, b)` | `(numeric, numeric) → numeric` | Common numeric type of args | — |
-| `abs(value)` | `(numeric) → numeric` | Same numeric type as input | — |
-| `clamp(value, lo, hi)` | `(numeric, numeric, numeric) → numeric` | Common numeric type | — |
+| `min(a, b)` | `(integer\|decimal\|number, integer\|decimal\|number) → common numeric type` | Common numeric type of args | Primitive numeric widening only |
+|  | `(money, money) → money` | `money` | Both args must share the same currency qualifier; result preserves it |
+|  | `(quantity, quantity) → quantity` | `quantity` | Both args must share the same unit qualifier; result preserves it |
+| `max(a, b)` | `(integer\|decimal\|number, integer\|decimal\|number) → common numeric type` | Common numeric type of args | Primitive numeric widening only |
+|  | `(money, money) → money` | `money` | Both args must share the same currency qualifier; result preserves it |
+|  | `(quantity, quantity) → quantity` | `quantity` | Both args must share the same unit qualifier; result preserves it |
+| `abs(value)` | `(integer\|decimal\|number) → same type` | Same primitive numeric type as input | Primitive numeric lane only |
+|  | `(money) → money` | `money` | Result preserves the input currency qualifier |
+|  | `(quantity) → quantity` | `quantity` | Result preserves the input unit qualifier |
+| `clamp(value, lo, hi)` | `(integer\|decimal\|number, integer\|decimal\|number, integer\|decimal\|number) → common numeric type` | Common numeric type | Primitive numeric widening only |
+|  | `(money, money, money) → money` | `money` | `value`, `lo`, and `hi` must share the same currency qualifier; result preserves it |
+|  | `(quantity, quantity, quantity) → quantity` | `quantity` | `value`, `lo`, and `hi` must share the same unit qualifier; result preserves it |
 | `floor(value)` | `(decimal\|number) → integer` | `integer` | — |
 | `ceil(value)` | `(decimal\|number) → integer` | `integer` | — |
 | `truncate(value)` | `(decimal\|number) → integer` | `integer` | — |
 | `round(value)` | `(decimal\|number) → integer` | `integer` | Banker's rounding |
-| `round(value, places)` | `(numeric, integer) → decimal` | `decimal` | `places` must be non-negative integer; **explicit bridge: number→decimal** |
+| `round(value, places)` | `(integer\|decimal\|number, integer) → decimal` | `decimal` | `places` must be non-negative integer; **explicit bridge: number→decimal** within the primitive numeric lanes |
+|  | `(money, integer) → money` | `money` | `places` must be non-negative integer; result preserves the input currency qualifier |
+|  | `(quantity, integer) → quantity` | `quantity` | `places` must be non-negative integer; result preserves the input unit qualifier |
 | `approximate(value)` | `(decimal) → number` | `number` | **Explicit bridge: decimal→number**; makes precision loss visible |
 | `pow(base, exp)` | `(numeric, integer) → numeric` | Same numeric type as `base` | `exp` must be non-negative for integer lane |
 | `sqrt(value)` | `(number) → number` | `number` | Number-lane only; `decimal` and `integer` inputs are type errors (no .NET `Math.Sqrt` overload for `decimal`; use `approximate(value)` to convert first). Proof engine checks non-negativity. |
@@ -1405,7 +1415,9 @@ Functions are validated against a closed catalog. There are no user-defined func
 
 > **`~string` argument compatibility for string functions.** Functions accepting `(string)` parameters — `trim`, `toLower`, `toUpper`, `left`, `right`, `mid` — also accept `~string` arguments via the bidirectional assignment compatibility rule (§3.8). No enforcement diagnostic is emitted for these functions. CI semantics do not apply to structural operations — these functions operate on the stored value regardless of the `~` qualifier.
 
-**Lane bridge functions.** Two functions are the sole explicit bridges between numeric lanes: `approximate(decimal) → number` and `round(value, places) → decimal`. The rounding family (`floor`, `ceil`, `truncate`, `round` with no places) provide `decimal|number → integer`. No other mechanism crosses lane boundaries — `decimal * NumberField` without `approximate()` is a type error (see type-checker.md §4.2a).
+> **Primitive numeric shorthand in this table.** The primitive numeric lane consists of `integer`, `decimal`, and `number`, with the widening rules from §3.4. `money` and `quantity` are domain types, not members of that widening family: they use their own overload rows above, do not widen to primitive numerics or to each other, and preserve their qualifier in the result. Where multiple `money` or `quantity` arguments appear in one overload, those arguments must share the same qualifier.
+
+**Lane bridge functions.** Within the primitive numeric lanes (`integer`, `decimal`, `number`), two functions are the sole explicit bridges: `approximate(decimal) → number` and `round(value, places)` on primitive numeric inputs, which returns `decimal`. For `money` and `quantity`, `round(value, places)` is not a bridge — it rounds while preserving the domain type and qualifier. The rounding family (`floor`, `ceil`, `truncate`, `round` with no places) provide `decimal|number → integer`. No other mechanism crosses primitive numeric lane boundaries — `decimal * NumberField` without `approximate()` is a type error (see type-checker.md §4.2a).
 
 **Function validation checks:**
 
