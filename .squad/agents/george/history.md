@@ -10,8 +10,16 @@
 - GAP-060 and GAP-061 are durable parser hygiene rules: variant-action arms hidden inside shape-specific methods must throw when unreachable, and parser-facing catalogs should expose O(1) indexes for the token axis the parser actually queries.
 - CI function follow-through is now metadata-native: checker/tooling consumers resolve `~startsWith` and `~endsWith` through real FunctionKind/FunctionMeta entries rather than parser-side naming conventions alone.
 - Shared-environment build discipline matters: targeted build/test commands are more reliable than full-solution runs when external file locks interfere with the workspace.
+- **GAP-064 rule:** `CIFunctionCallExpression` stores only the bare name string — the TypeChecker will need a `Functions.ByCIVariantOf` reverse index (or a node design change) to resolve CI function calls to `FunctionKind`. Do not implement CI type-checking without first resolving this.
+- **GAP-065 rule:** `QualifierMatch.Same` enforcement is a real correctness hole. The catalog declares it; the TypeChecker must honor it. File as Slice 1 TypeChecker work, not a deferred item.
 
 ## Recent Updates
+
+### 2026-05-02 — Iteration 11 catalog-impl audit (GAP-062–067)
+- Filed 6 new gaps covering outcome dispatch, QueueBy sort direction, CIVariantOf dead metadata, QualifierMatch.Same enforcement missing, AllowedIn never enforced, and variant-action By/At dispatch using per-member identity.
+- Most significant: GAP-065 (QualifierMatch.Same is a real correctness gap — qualifier mismatch on min/max/abs/clamp/round silently passes), GAP-064 (no ByCIVariantOf reverse index — TypeChecker has no catalog path to resolve CIFunctionCallExpression), GAP-062 (no Outcomes catalog — ParseOutcomeNode hardcodes all three outcome shapes).
+- Three design questions need Shane input: (a) Outcomes catalog vs. inline parser, (b) ByCIVariantOf index vs. parser-level FunctionKind resolution, (c) QualifierMatch enforcement slice timing.
+- Full findings in `.squad/decisions/inbox/george-iter11-findings.md`.
 
 ### 2026-05-02T21:58:21Z — Canonical review accepted and compacted
 - Frank accepted George's checker review, resolved the open pre-requisites, and left transitive widening rejected; the canonical checker plan is now implementation-ready.

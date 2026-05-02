@@ -2134,3 +2134,89 @@ Expanded the §3.7 table into explicit primitive-numeric, money, and quantity su
 - **Decision:** Pending
 
 <!-- Iteration 11 complete: Frank doc/catalog audit pass. New unresolved gaps filed: GAP-048 (guarded ensures absent from Constructs metadata), GAP-049 (guarded state actions absent from Constructs metadata), GAP-050 (stateless event-hook trailing ensure has no construct/constraint catalog home), GAP-051 (spec §3A.3 misstates the constraint taxonomy), GAP-052 (`queue by` direction modifier lacks type metadata), GAP-053 (spec references nonexistent `ExpectedFieldName` diagnostic), GAP-054 (queue-by dequeue semantics diverge between spec and action catalog), GAP-055 (implicit notempty on identity types undocumented), GAP-056 (CI string-function rules are parameter-specific in spec but only function-level in catalog). Combined ledger state after iteration 11 passes: 64 gaps total, 49 Fixed, 15 Unresolved. -->
+
+
+---
+
+## GAP-062 — ParseOutcomeNode hardcodes per-member syntax dispatch without an Outcomes catalog
+
+- **Iteration:** 11
+- **Filed by:** George
+- **Category:** E
+- **Location:** src/Precept/Pipeline/Parser.Declarations.cs lines 146–168 (ParseOutcomeNode)
+- **Description:** The three outcome forms (	ransition StateName, 
+o transition, eject Expr) are dispatched via explicit if (current.Kind == TokenKind.Transition), if (current.Kind == TokenKind.No), if (current.Kind == TokenKind.Reject) checks, each with a distinct inline syntax shape. The Actions catalog expresses action-to-shape relationships via ActionSyntaxShape and Actions.ByTokenKind; no parallel Outcomes catalog or OutcomeSyntaxShape exists. The vocabulary is encoded (TokenCategory.Outcome on all three), but the per-member syntax logic is hardcoded inline.
+- **Impact:** Adding a new outcome kind requires editing the parser directly; no catalog metadata guards exhaustiveness or describes outcome syntax shapes for tooling or MCP consumers.
+- **Status:** Unresolved
+- **Decision:** Pending
+
+---
+
+## GAP-063 — Parser hardcodes TokenKind.Ascending/Descending for QueueBy without a catalog field
+
+- **Iteration:** 11
+- **Filed by:** George
+- **Category:** G
+- **Location:** src/Precept/Pipeline/Parser.Declarations.cs lines 998–1013 (inside ParseTypeRef → QueueBy branch)
+- **Description:** After parsing queue of T by P, the parser checks if (Current().Kind == TokenKind.Ascending) / lse if (Current().Kind == TokenKind.Descending) to set the SortDirection of the QueueByTypeRefNode. The QueueBy TypeMeta entry carries no SortDirectionTokens, AcceptsSortDirection, or equivalent field. Ascending/Descending exist in Tokens.cs under Cat_Decl but are not referenced by any catalog field on TypeMeta. This is also directly related to GAP-052 (doc/catalog layer): the spec has a direction modifier and the catalog has no direction slot.
+- **Impact:** The set {Ascending, Descending} is hardcoded in the parser and invisible to tooling, completions, and hover. Consistent with GAP-052 which documents the same absence at the doc/catalog layer.
+- **Status:** Unresolved
+- **Decision:** Pending (blocked on GAP-052 catalog resolution)
+
+---
+
+## GAP-064 — FunctionMeta.CIVariantOf never consumed; no Functions.ByCIVariantOf reverse index
+
+- **Iteration:** 11
+- **Filed by:** George
+- **Category:** F
+- **Location:** src/Precept/Language/Functions.cs (FunctionKind.TildeStartsWith, FunctionKind.TildeEndsWith); src/Precept/Pipeline/Parser.Expressions.cs (CIFunctionCallExpression construction)
+- **Description:** FunctionMeta.CIVariantOf is populated for TildeStartsWith (→ StartsWith) and TildeEndsWith (→ EndsWith). No consumer reads this field. The parser correctly derives CICapableFunctionNames from HasCIVariant, but creates CIFunctionCallExpression nodes that store only the bare function name token (e.g., text "startsWith"), not a resolved FunctionKind. When the TypeChecker is implemented it will need to map CIFunctionCallExpression.FuncName.Text to FunctionKind.TildeStartsWith/TildeEndsWith; the forward path uses CIVariantOf, but no derived Functions.ByCIVariantOf reverse index (mapping FunctionKind.StartsWith → FunctionKind.TildeStartsWith) exists in the catalog. The TypeChecker author has no documented path to complete this lookup from catalog metadata alone.
+- **Impact:** The CIVariantOf field is dead metadata. CI function type-checking will require either inventing the reverse-index pattern outside the catalog or building it ad-hoc in the TypeChecker.
+- **Status:** Unresolved
+- **Decision:** Pending — needs design: should Functions expose a ByCIVariantOf index, or should CIFunctionCallExpression store a resolved FunctionKind?
+
+---
+
+## GAP-065 — FunctionOverload.Match: QualifierMatch.Same never enforced
+
+- **Iteration:** 11
+- **Filed by:** George
+- **Category:** H
+- **Location:** src/Precept/Language/Functions.cs (FunctionKind.Min, Max, Abs, Clamp, RoundPlaces money/quantity overloads); src/Precept/Pipeline/TypeChecker.cs
+- **Description:** The FunctionOverload.Match: QualifierMatch? field carries QualifierMatch.Same on all money and quantity overloads of min, max, bs, clamp, and ound(value,places). This field promises that both arguments (or all arguments) must carry the same qualifier — e.g., min(price in 'USD', price in 'EUR') must be a type error. The TypeChecker is a stub (Check returns empty diagnostics) and does not read Match from any overload. No enforcement point exists anywhere in the pipeline.
+- **Impact:** Qualifier mismatches on min/max/abs/clamp/round silently pass the type checker. This is a real user-visible correctness gap once the TypeChecker is implemented; the catalog declares the contract but no pipeline stage discharges it.
+- **Status:** Unresolved
+- **Decision:** Pending (TypeChecker Phase 3 implementation)
+
+---
+
+## GAP-066 — ActionMeta.AllowedIn never enforced; Actions.EventBodyOnly is dead catalog constant
+
+- **Iteration:** 11
+- **Filed by:** George
+- **Category:** H (enforcement missing) + F (dead constant)
+- **Location:** src/Precept/Language/Actions.cs (private EventBodyOnly constant; all ActionKind entries' AllowedIn field); src/Precept/Pipeline/TypeChecker.cs
+- **Description:** ActionMeta.AllowedIn: ConstructKind[] describes which parse contexts each action is valid in (event, state action, transition row). The TypeChecker never reads this field. Additionally, private static readonly ConstructKind[] EventBodyOnly = [ConstructKind.EventDeclaration] is declared in Actions.cs but never assigned to any ActionKind entry — all actions use AllActionContexts. EventBodyOnly is dead code in the catalog.
+- **Impact:** Context-restriction enforcement (AllowedIn) is aspirational infrastructure with no consumer. EventBodyOnly is either a leftover from refactoring or an intended but unimplemented restriction — it cannot be determined without design intent from the owner.
+- **Status:** Unresolved
+- **Decision:** Pending — two sub-decisions: (a) should EventBodyOnly be applied to any action kind, and (b) when does TypeChecker enforce AllowedIn?
+
+---
+
+## GAP-067 — ParseCollectionValueStatement uses per-member ActionKind.X identity to detect By/At variants
+
+- **Iteration:** 11
+- **Filed by:** George
+- **Category:** E
+- **Location:** src/Precept/Pipeline/Parser.Declarations.cs lines 355, 365, 373 (ParseCollectionValueStatement)
+- **Description:** The parser detects variant-action disambiguation by checking specific ActionKind identities inline:
+  - if (meta.Kind == ActionKind.Remove && Current().Kind == TokenKind.At) → RemoveAt
+  - if (meta.Kind == ActionKind.Append && Current().Kind == TokenKind.By) → AppendBy
+  - if (meta.Kind == ActionKind.Enqueue && Current().Kind == TokenKind.By) → EnqueueBy
+  The Actions catalog already encodes these relationships via PrimaryActionKind on the variant entries (AppendBy.PrimaryActionKind = ActionKind.Append, EnqueueBy.PrimaryActionKind = ActionKind.Enqueue, RemoveAt.PrimaryActionKind = ActionKind.Remove). The parser could derive "does this action have a By-variant?" and "does this action have an At-variant?" from PrimaryActionKind + SyntaxShape. No derived Actions.ByPrimaryActionKind index exists to enable catalog-driven dispatch.
+- **Impact:** Adding a new variant action (e.g., a new XBy or XAt form) requires editing the parser at two locations: the catalog entry AND the hardcoded inline check. The catalog's PrimaryActionKind relationship is not consumed.
+- **Status:** Unresolved
+- **Decision:** Pending — requires a derived index (Actions.ByPrimaryActionKind) and a decision on whether the variant-action branching in ParseCollectionValueStatement should be fully catalog-driven.
+
+<!-- Iteration 11 catalog-impl audit complete. George. New unresolved gaps: GAP-062 (ParseOutcomeNode per-member dispatch / no Outcomes catalog), GAP-063 (QueueBy sort direction hardcoded), GAP-064 (CIVariantOf not consumed / no ByCIVariantOf index), GAP-065 (QualifierMatch.Same never enforced), GAP-066 (AllowedIn never enforced, EventBodyOnly dead constant), GAP-067 (variant-action dispatch uses per-member identity checks). Status: 64 gaps total, 49 Fixed, 15 Unresolved. -->
