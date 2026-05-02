@@ -614,7 +614,7 @@ when Tags contains "urgent"
 | `lookup of K to V` | `K` | `boolean` — key membership; when `K = ~string`, uses `OrdinalIgnoreCase` (consistent with all CI collection kinds) |
 | non-collection | — | type error |
 
-**Case sensitivity:** `contains` on `set of string` is case-sensitive (ordinal). `contains` on `set of ~string` is case-insensitive (`OrdinalIgnoreCase`). `contains` on `queue of ~string`, `stack of ~string`, `log of ~string`, `log of ~string by P`, `bag of ~string`, and `list of ~string` is also case-insensitive — CI membership applies to all collection kinds when the inner type is `~string`.
+**Case sensitivity:** `contains` on `set of string` is case-sensitive (ordinal). `contains` on `set of ~string` is case-insensitive (`OrdinalIgnoreCase`). `contains` on `queue of ~string`, `stack of ~string`, `log of ~string`, `log of ~string by P`, `bag of ~string`, and `list of ~string` is also case-insensitive — CI membership applies to all collection kinds when the inner type is `~string`. The full CI enforcement rules (including diagnostic codes) are defined canonically in [precept-language-spec.md § 3.8 Semantic Checks](precept-language-spec.md#38-semantic-checks).
 
 **No proof requirement.** `contains` on an empty collection returns `false` — it is always safe to call without a count guard.
 
@@ -691,6 +691,8 @@ For `lookup of K to V`, the analogous pattern is key-presence: `F contains K` in
 ---
 
 ## Constraint Catalog
+
+> The constraints below are defined canonically in [precept-language-spec.md § 3.3 Context-Sensitive Type Resolution](precept-language-spec.md#33-context-sensitive-type-resolution). This section shows per-type applicability and collection-specific validation rules. If this section and the spec disagree, the spec is authoritative.
 
 | Constraint | Applicable to | Meaning |
 |---|---|---|

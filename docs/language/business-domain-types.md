@@ -1815,6 +1815,8 @@ This document covers the design of the seven new business-domain types, the peri
 
 ## Diagnostic Code Reference
 
+> The codes below are part of the broader diagnostic system defined canonically in [precept-language-spec.md § 3.10 Diagnostic Catalog](precept-language-spec.md#310-diagnostic-catalog). If this section and the spec disagree on code name, severity, or message template, the spec is authoritative.
+
 This proposal introduces business-domain diagnostic codes in the `DiagnosticCode` enum. These use the same symbolic naming convention as the core diagnostic system (`diagnostic-system.md`) — no numeric code prefixes. The exact `DiagnosticCode` → `DiagnosticMeta` wiring happens in the `Diagnostics` exhaustive switch during implementation; these are the category assignments.
 
 | Code | Phase | Condition | Triggering example |
