@@ -33,12 +33,16 @@ Pre-TypeChecker audit — exhaustive consistency check of language docs, catalog
 | GAP-016 | Spec §3.10 incomplete — ~30 catalog codes undocumented in Diagnostic Catalog | Doc-Catalog | Fixed | 4 |
 | GAP-017 | `Arrow` (`->`) categorized as `Structural` in `Tokens.cs` but spec §1.1 places it in the Operators table | Catalog-Impl | Fixed | 5 |
 | GAP-018 | Spec §1.1 `NumberLiteral` row description omits exponent notation documented in §1.3 and implemented in the lexer | Doc-Spec | Fixed | 5 |
-| GAP-019 | `UnexpectedKeyword` (11) and `InvalidCallTarget` (12) listed in spec §2.7 as active parser diagnostics but never emitted by the parser | Doc-Impl | Unresolved | 6 |
+| GAP-019 | `UnexpectedKeyword` (11) and `InvalidCallTarget` (12) listed in spec §2.7 as active parser diagnostics but never emitted by the parser | Doc-Impl | Fixed | 6/7 |
+| GAP-025 | GAP-003 incomplete — `Modifiers.cs` `Notempty` applicability still `StringOnly`; spec §3.8 requires string + 8 collection types | Doc-Catalog | Unresolved | 7 |
+| GAP-026 | `Modifiers.cs` `CollectionTypes` array stale — `mincount`/`maxcount` applicability missing 6 new TypeKind members | Doc-Catalog | Unresolved | 7 |
+| GAP-027 | `Tokens.cs` `Notempty` description reads "String constraint: non-empty" but spec §1.1 says "String or collection constraint: non-empty" | Doc-Catalog | Fixed | 7 |
+| GAP-028 | `Functions.cs` `sqrt` has `Integer` and `Decimal` overloads but spec §3.7 explicitly says integer/decimal inputs are type errors | Doc-Catalog | Unresolved | 7 |
 | GAP-020 | `contains` associativity: spec §2.1 says `left`, `Operators.cs` enforces `NonAssociative`; spec left-denotation shows `ParseExpression(40)` instead of `ParseExpression(41)` | Doc-Impl | Fixed | 6 |
 | GAP-021 | `is set`/`is not set` associativity: spec §2.1 says `left`, catalog says `NonAssociative (postfix)` | Doc-Impl | Fixed | 6 |
 | GAP-022 | Spec §2.1 null-denotation table names `StringLiteralExpression` — a node that does not exist; implementation uses `LiteralExpression` | Doc-Impl | Fixed | 6 |
 | GAP-023 | Spec §2.1 precedence table has `is` row (60) appearing before `+/-` row (50); two rows at level 60 without ordering explanation | Doc-Spec | Fixed | 6 |
-| GAP-024 | `bag of T`, `list of T`, and `log of T` forms lack `TypeQualifier?` in spec §2.3 grammar but the parser accepts element-type qualifiers on all collection types | Doc-Impl | Unresolved | 6 |
+| GAP-024 | `bag of T`, `list of T`, and `log of T` forms lack `TypeQualifier?` in spec §2.3 grammar but the parser accepts element-type qualifiers on all collection types | Doc-Impl | Fixed | 6 |
 
 ---
 
@@ -811,7 +815,8 @@ All message templates sourced from `src/Precept/Language/Diagnostics.cs` (ground
 `Cat_Str` for `Arrow` was a bug. The `or TokenCategory.Structural` workaround in `TwoCharOperators` was the tell. Fixing `Arrow` to `Cat_Op` and removing the workaround makes all four sources consistent with zero behavior change to the lexer.
 
 **Resolution:**  
-Changed `Cat_Str` → `Cat_Op` for `TokenKind.Arrow` in `Tokens.cs`. Simplified `TwoCharOperators` filter from `c is TokenCategory.Operator or TokenCategory.Structural` to `c is TokenCategory.Operator` — the `or Structural` clause was the workaround and is no longer needed. No behavior change; `Arrow` was already correctly scanned as a two-char operator.
+Changed `Cat_Str` → `Cat_Op` for `TokenKind.Arrow` in `Tokens.cs`. Simplified `TwoCharOperators` filter from `c is TokenCategory.Operator or TokenCategory.Structural` to `c is TokenCategory.Operator` — the `or Structural` clause was the workaround and is no longer needed. Updated the `TwoCharOperators` doc comment to remove the `Structural` reference. No behavior change; `Arrow` was already correctly scanned as a two-char operator.  
+**Note (iteration 7):** The C# changes described above were written in iteration 5 but not applied at that time (see iteration 5 completion comment: "no C# edits"). Verified and applied in iteration 7.
 
 ---
 
@@ -855,7 +860,7 @@ Fixed. Updated `docs/language/precept-language-spec.md` §1.1 Literals table `Nu
 
 ## GAP-019: `UnexpectedKeyword` (11) and `InvalidCallTarget` (12) never emitted by the parser
 
-**Status:** Unresolved  
+**Status:** Fixed  
 **Category:** Doc-Impl  
 **Location:** `docs/language/precept-language-spec.md` §2.7 Parser Diagnostics table; `src/Precept/Language/DiagnosticCode.cs` lines 18–19  
 **Found in iteration:** 6
@@ -880,7 +885,13 @@ For `InvalidCallTarget` specifically: spec §2.1 left-denotation table says "`(`
 The "reserved" comments indicate these diagnostics were planned but deferred. The spec §2.7 placement implies they are active, creating a false expectation for tooling consumers. For `InvalidCallTarget`: the case is reachable — `42(args)` or `(A + B)(args)` reach the infix `LeftParen` branch with a non-MemberAccess left operand; the parser currently `break`s silently (the comment "unreachable: identifiers resolve as FunctionCall in ParseAtom" is inaccurate — non-identifier left operands do reach this branch). For `UnexpectedKeyword`: would fire when a declaration keyword appears in a context where it is not a valid construct leader. Fixing `InvalidCallTarget` requires a one-line C# change (add the diagnostic before the `break`). Fixing `UnexpectedKeyword` is harder — requires defining what "unexpected keyword in declaration position" means for each construct context.
 
 **Resolution:**  
-Unresolved. Options: (a) implement `InvalidCallTarget` in the infix `LeftParen` branch (one-line C# fix) and define `UnexpectedKeyword` emission sites; (b) annotate §2.7 with "(reserved — not yet implemented)" beside both rows to set accurate expectations. Owner should decide on priority.
+Fixed. Implemented by George (iteration 7). The `DiagnosticCode.cs` "reserved" comments were removed on both codes. Two emission sites added to the parser:
+
+1. **`InvalidCallTarget` (12)** — emitted in `Parser.Expressions.cs` at the infix `LeftParen` branch when `left` is not a `MemberAccessExpression` (e.g. `42(args)`, `(A + B)(args)`). The `DescribeCallTarget(left)` helper supplies the `{0}` substitution.
+
+2. **`UnexpectedKeyword` (11)** — emitted in `ParseAtom` default fallback when `AllKeywordKinds.Contains(current.Kind)` is true. `AllKeywordKinds` is catalog-derived (`Tokens.Keywords.Values.ToFrozenSet()`) and correctly covers all keyword categories while excluding structural, punctuation, operator, and identifier tokens.
+
+Diagnostic message templates in `Diagnostics.cs` match spec §2.7 exactly.
 
 ---
 
@@ -1003,10 +1014,12 @@ Fixed. Applied to `docs/language/precept-language-spec.md` §2.1 Precedence tabl
 
 ## GAP-024: `bag of T`, `list of T`, and `log of T` forms lack `TypeQualifier?` in spec §2.3 grammar but the parser accepts element-type qualifiers on all collection types
 
-**Status:** Unresolved  
+**Status:** Fixed  
 **Category:** Doc-Impl  
 **Location:** `docs/language/precept-language-spec.md` §2.3 CollectionType grammar; `src/Precept/Pipeline/Parser.Declarations.cs` `ParseTypeRef()` (collection-type branch)  
 **Found in iteration:** 6
+
+**Resolution:** Spec §2.3 updated to add `TypeQualifier?` to all four collection forms (`bag of ScalarType TypeQualifier?`, `list of ScalarType TypeQualifier?`, `log of ScalarType TypeQualifier?`, `log of ScalarType by ScalarType TypeQualifier?`). Parser was already correct — this was a spec notation gap. The qualifier constrains the element type, not the container, so it is orthogonal to all collection kinds. Owner (Shane) signed off 2026-05-02.
 
 **Description:**  
 Spec §2.3 CollectionType grammar explicitly includes `TypeQualifier?` only on `(set | queue | stack)` but omits it from the other forms:
@@ -1036,6 +1049,123 @@ Unresolved. Owner should decide: (a) update spec §2.3 grammar to add `TypeQuali
 ---
 
 <!-- Iteration 6 complete: 6 gaps filed — GAP-019 (Unresolved — `UnexpectedKeyword` (11) and `InvalidCallTarget` (12) listed in spec §2.7 as active parser diagnostics but DiagnosticCode.cs comments both as "reserved — not currently emitted"; parser silently breaks on non-callable `(` instead of emitting InvalidCallTarget), GAP-020 (Fixed — `contains` associativity: spec said `left` but catalog is `NonAssociative`; also fixed left-denotation right-binding from ParseExpression(40) to ParseExpression(41); updated non-associative note paragraph), GAP-021 (Fixed — `is set`/`is not set` associativity: spec said `left` for postfix operators; catalog and impl use NonAssociative; updated spec to say `non-associative (postfix)`), GAP-022 (Fixed — spec §2.1 null-denotation table named non-existent `StringLiteralExpression`; parser creates `LiteralExpression`; fixed spec table), GAP-023 (Fixed — spec §2.1 precedence table had `is` row (60) appearing before `+/-` row (50) out of order; two rows at level 60 with no interaction note; reordered table and added postfix explanation), GAP-024 (Unresolved — `bag of T`, `list of T`, `log of T` in spec §2.3 grammar lack TypeQualifier? but parser accepts qualifiers on all collection types via catalog-driven TryPeekQualifierKeyword()). Audit scope: full Parser.cs, Parser.Declarations.cs, Parser.Expressions.cs; spec §2.1–§2.7; Operators.cs catalog; Modifiers.cs catalog; DiagnosticCode.cs; SyntaxNodes/Expressions/ file inventory. 4 Fixed (doc-only), 2 Unresolved (need C# or owner judgment). No C# files modified. -->
+
+---
+
+## GAP-025: GAP-003 incomplete — `Modifiers.cs` `Notempty` applicability still `StringOnly`
+
+**Status:** Unresolved  
+**Category:** Doc-Catalog  
+**Location:** `src/Precept/Language/Modifiers.cs` lines 70–74; `docs/language/precept-language-spec.md` §3.8 (line 1470)  
+**Found in iteration:** 7
+
+**Description:**  
+GAP-003 updated four documentation locations to extend `notempty` from string-only to string + 8 collection types. However, `Modifiers.cs` itself was not updated. The catalog still reads:
+
+```csharp
+ModifierKind.Notempty => new(kind, "notempty",
+    ApplicableTo: StringOnly,  // StringOnly = [TypeKind.String]
+    ...),
+```
+
+Spec §3.8 (line 1470) is now authoritative:
+> `notempty` applies to: `string`, `set`, `queue`, `stack`, `log`, `log of T by P`, `bag`, `list`, `queue of T by P`
+
+This is 9 types total (1 scalar + 8 collection kinds). `Lookup` is explicitly excluded from `notempty` applicability (lookup entries are always present; "non-empty" is not meaningful).
+
+**Rubber-Duck Analysis:**  
+The GAP-003 author updated the spec and three supporting docs but did not update `Modifiers.cs`. The catalog is the machine-readable source that the TypeChecker will consume to enforce modifier applicability. A `notempty` on a `bag` field should be valid per the spec but the catalog currently marks it invalid. This is a TypeChecker-correctness issue. However, fixing it requires confirming the 9-type list is final (owner review recommended before TypeChecker work begins) and ensuring the `CollectionTypes` array is consistent (see GAP-026).
+
+**Resolution:**  
+Unresolved. Fix requires: (a) defining `StringAndCollectionTypes = [TypeKind.String, TypeKind.Set, TypeKind.Queue, TypeKind.Stack, TypeKind.Log, TypeKind.LogBy, TypeKind.Bag, TypeKind.List, TypeKind.QueueBy]` in `Modifiers.cs`; (b) changing `Notempty.ApplicableTo` to reference this new array. Owner should confirm the 9-type list and the Lookup exclusion before applying.
+
+---
+
+## GAP-026: `Modifiers.cs` `CollectionTypes` array stale — `mincount`/`maxcount` missing 6 new TypeKind members
+
+**Status:** Unresolved  
+**Category:** Doc-Catalog  
+**Location:** `src/Precept/Language/Modifiers.cs` lines 23–26; `docs/language/precept-language-spec.md` §3.8 (line 1473)  
+**Found in iteration:** 7
+
+**Description:**  
+`Modifiers.cs` defines:
+
+```csharp
+private static readonly TypeKind[] CollectionTypes = [TypeKind.Set, TypeKind.Queue, TypeKind.Stack];
+```
+
+This array drives `ApplicableTo` for `ModifierKind.Mincount` and `ModifierKind.Maxcount`. Spec §3.8 (line 1473) says `mincount`/`maxcount` applies to:
+
+> `set`, `queue`, `stack`, `log`, `log of T by P`, `bag`, `list`, `queue of T by P`, `lookup of K to V`
+
+Six TypeKind members are missing: `Log` (27), `LogBy` (28), `Bag` (29), `List` (30), `QueueBy` (31), `Lookup` (32). Note that `Lookup` IS included in `mincount`/`maxcount` (unlike `notempty` where it is excluded) — this is intentional per the spec.
+
+**Rubber-Duck Analysis:**  
+`CollectionTypes` was defined when only the original three collection types existed. The six new collection types added later were not added to this array. This is a pure catalog omission with no ambiguity — the spec explicitly lists all nine types. The fix is a mechanical array extension. TypeChecker implications are straightforward (mincount/maxcount on a `bag` field will currently be rejected; it should be allowed). Owner may want to apply this fix alongside GAP-025 for consistency.
+
+**Resolution:**  
+Unresolved. Fix: extend `CollectionTypes` to `[TypeKind.Set, TypeKind.Queue, TypeKind.Stack, TypeKind.Log, TypeKind.LogBy, TypeKind.Bag, TypeKind.List, TypeKind.QueueBy, TypeKind.Lookup]`. No other changes needed — `Mincount` and `Maxcount` already reference `CollectionTypes` by name.
+
+---
+
+## GAP-027: `Tokens.cs` `Notempty` description reads "String constraint: non-empty" but spec §1.1 says "String or collection constraint: non-empty"
+
+**Status:** Fixed  
+**Category:** Doc-Catalog  
+**Location:** `src/Precept/Language/Tokens.cs` line 225; `docs/language/precept-language-spec.md` §1.1 Keywords: Constraints table  
+**Found in iteration:** 7
+
+**Description:**  
+Spec §1.1 Keywords: Constraints table entry for `notempty`:
+> `String or collection constraint: non-empty`
+
+`Tokens.cs` catalog entry (line 225):
+```csharp
+TokenKind.Notempty => new(kind, "notempty", Cat_Cns, "String constraint: non-empty", ...)
+```
+
+The description field omits the collection applicability. This is the token description used by tooling consumers (hover text, MCP `precept_language` output, completions).
+
+**Rubber-Duck Analysis:**  
+The description was written before GAP-003 extended `notempty` to collections. When GAP-003 was resolved it updated 4 doc locations but missed this catalog description field. The fix is a one-word change with zero behavior impact.
+
+**Resolution:**  
+Fixed. Updated `Tokens.cs` line 225: `"String constraint: non-empty"` → `"String or collection constraint: non-empty"`.
+
+---
+
+## GAP-028: `Functions.cs` `sqrt` has `Integer` and `Decimal` overloads but spec §3.7 says integer/decimal inputs are type errors
+
+**Status:** Unresolved  
+**Category:** Doc-Catalog  
+**Location:** `src/Precept/Language/Functions.cs` lines 176–201; `docs/language/precept-language-spec.md` §3.7 (line 1391)  
+**Found in iteration:** 7
+
+**Description:**  
+Spec §3.7 function catalog row for `sqrt`:
+> `sqrt(value) | (number) → number | number | Number-lane only; decimal and integer inputs are type errors (no .NET Math.Sqrt overload for decimal; use approximate(value) to convert first)`
+
+`Functions.cs` defines three overloads for `FunctionKind.Sqrt`:
+```csharp
+new([PSqrtInteger], TypeKind.Number, ...),  // integer → Number
+new([PSqrtDecimal], TypeKind.Number, ...),  // decimal → Number
+new([PSqrtNumber],  TypeKind.Number, ...),  // number  → Number
+```
+
+The integer and decimal overloads contradict the spec's explicit "type errors" claim. If the TypeChecker uses these overloads, `sqrt(integer_field)` and `sqrt(decimal_field)` would succeed, silently accepting inputs the spec says are invalid.
+
+**Rubber-Duck Analysis:**  
+GAP-004 updated the spec §3.7 `sqrt` row to say "Number-lane only; decimal and integer inputs are type errors." But `Functions.cs` was not updated at that time — the same pattern as GAP-003 (doc fix without catalog fix). Two valid interpretations: (a) the Integer/Decimal overloads are catalog bugs — they should be removed to match the spec; (b) the spec is aspirational and the implementation intentionally widens `sqrt` to all numeric types with no conversion requirement. This is an owner judgment call: the spec reasoning ("no .NET Math.Sqrt for decimal; use approximate() first") suggests the restriction is deliberate. If upheld, remove the Integer and Decimal overloads from `Functions.cs`.
+
+**Resolution:**  
+Unresolved. Owner should confirm whether the integer/decimal overloads are intentional (widen sqrt to all numeric types) or a catalog omission that should be corrected to match the spec's number-only restriction.
+
+---
+
+<!-- Iteration 7 complete: Final pre-TypeChecker language consistency audit pass. Phase A verification — confirmed 22 of 24 prior gaps are genuinely fixed; identified 2 false-Fixed entries: GAP-017 (C# changes written in iter 5 but never applied — applied now in iter 7) and GAP-003 (docs updated but Modifiers.cs not updated — filed as new GAP-025). 4 new gaps filed: GAP-025 (Unresolved — GAP-003 incomplete; Modifiers.cs Notempty still StringOnly; spec §3.8 requires string + 8 collection types), GAP-026 (Unresolved — Modifiers.cs CollectionTypes array missing 6 new TypeKind members for mincount/maxcount applicability), GAP-027 (Fixed — Tokens.cs Notempty description "String constraint: non-empty" → "String or collection constraint: non-empty"), GAP-028 (Unresolved — Functions.cs sqrt has Integer/Decimal overloads but spec §3.7 says integer/decimal are type errors). GAP-019 closed: George implemented UnexpectedKeyword (11) and InvalidCallTarget (12) emission sites in Parser.Expressions.cs; DiagnosticCode.cs "reserved" comments removed. C# changes applied this iteration: Tokens.cs Arrow Cat_Str → Cat_Op, TwoCharOperators filter simplified (remove `or Structural`), TwoCharOperators doc comment updated, Notempty description updated. Audit scope: Tokens.cs, Modifiers.cs, Functions.cs, DiagnosticCode.cs, Diagnostics.cs, Parser.Expressions.cs, Parser.cs; spec §1.1, §2.7, §3.7, §3.8. 2 Fixed this iteration, 3 Unresolved filed (need owner judgment before TypeChecker work begins). -->
+
+
 
 ## Schema Reference
 

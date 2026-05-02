@@ -320,18 +320,18 @@ public class TokensTests
 
     // X17
     [Fact]
-    public void Arrow_IsStructural_NotExpressionOperator()
+    public void Arrow_IsOperator_NotStructural()
     {
-        // Arrow '->' is an action-chain separator, not an expression operator.
-        // It must not be categorized as Operator so consumers building operator
-        // tables never include it by mistake.
+        // Arrow '->' is the action-chain / outcome separator. Spec §1.1 places it in
+        // the Operators table. It must be categorized as Operator so TwoCharOperators
+        // and operator-driven consumers include it correctly (GAP-017 fix, iter 7).
         var meta = Tokens.GetMeta(TokenKind.Arrow);
-        meta.Categories.Should().Contain(TokenCategory.Structural,
-            "Arrow '->' is a structural separator");
-        meta.Categories.Should().NotContain(TokenCategory.Operator,
-            "Arrow is not an expression operator");
+        meta.Categories.Should().Contain(TokenCategory.Operator,
+            "spec §1.1 places Arrow '->' in the Operators table");
+        meta.Categories.Should().NotContain(TokenCategory.Structural,
+            "Arrow is not structural — recategorized to Operator (GAP-017 fix)");
         meta.Categories.Should().NotContain(TokenCategory.Punctuation,
-            "Arrow is not punctuation — it is structural");
+            "Arrow is not punctuation");
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────────────

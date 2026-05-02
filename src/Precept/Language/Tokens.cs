@@ -222,7 +222,7 @@ public static class Tokens
             TextMateScope: "keyword.other.constraint.precept", SemanticTokenType: "decorator", ValidAfter: VA_FieldModifier),
         TokenKind.Nonzero     => new(kind, "nonzero",     Cat_Cns, "Number/integer constraint: value != 0",
             TextMateScope: "keyword.other.constraint.precept", SemanticTokenType: "decorator", ValidAfter: VA_FieldModifier),
-        TokenKind.Notempty    => new(kind, "notempty",     Cat_Cns, "String constraint: non-empty",
+        TokenKind.Notempty    => new(kind, "notempty",     Cat_Cns, "String or collection constraint: non-empty",
             TextMateScope: "keyword.other.constraint.precept", SemanticTokenType: "decorator", ValidAfter: VA_FieldModifier),
         TokenKind.Min         => new(kind, "min",         Cat_Cns, "Numeric minimum value constraint",
             TextMateScope: "keyword.other.constraint.precept", SemanticTokenType: "decorator", ValidAfter: VA_ValuedConstraint,
@@ -334,7 +334,7 @@ public static class Tokens
             TextMateScope: "keyword.operator.precept", SemanticTokenType: "operator"),
         TokenKind.Percent             => new(kind, "%",  Cat_Op, "Modulo",
             TextMateScope: "keyword.operator.precept", SemanticTokenType: "operator"),
-        TokenKind.Arrow               => new(kind, "->", Cat_Str, "Action chain / outcome separator",
+        TokenKind.Arrow               => new(kind, "->", Cat_Op, "Action chain / outcome separator",
             TextMateScope: "keyword.operator.arrow.precept", SemanticTokenType: "operator"),
 
         // ── Punctuation ────────────────────────────────────────────
@@ -456,15 +456,15 @@ public static class Tokens
     /// <summary>
     /// Two-character operator table. Keys are <c>(first char, second char)</c> tuples;
     /// values are <c>(TokenKind, text)</c> pairs. Derived from <see cref="All"/> entries
-    /// whose <c>Text</c> is exactly two characters and whose categories include
-    /// <see cref="TokenCategory.Operator"/> or <see cref="TokenCategory.Structural"/>.
+    /// whose <c>Text</c> is exactly two characters and whose category includes
+    /// <see cref="TokenCategory.Operator"/>.
     /// Used by the lexer to resolve multi-character operators in a single table lookup
     /// (maximal-munch guarantee).
     /// </summary>
     public static FrozenDictionary<(char, char), (TokenKind Kind, string Text)> TwoCharOperators { get; } =
         All
             .Where(m => m.Text is { Length: 2 } && m.Categories.Any(c =>
-                c is TokenCategory.Operator or TokenCategory.Structural))
+                c is TokenCategory.Operator))
             .ToFrozenDictionary(m => (m.Text![0], m.Text[1]), m => (m.Kind, m.Text!));
 
     /// <summary>
