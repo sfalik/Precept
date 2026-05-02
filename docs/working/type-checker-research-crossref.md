@@ -1,5 +1,7 @@
 # Type Checker Design — Research Cross-Reference Analysis
 
+> **⚠️ SUPERSEDED:** This working draft has been promoted to [`research/language/type-checker-research-validation.md`](../../research/language/type-checker-research-validation.md) as of 2026-05-02. The canonical location is the durable reference; this file is preserved as design discussion record only.
+
 **Date:** 2026-05-02
 **Author:** Frank (Lead/Architect)
 **Source doc:** `docs/compiler/type-checker.md` (817 lines)

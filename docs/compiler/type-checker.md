@@ -66,24 +66,42 @@ The core of the checker. A single recursive function (~250–350 lines) that res
 ```
 TypedExpression Resolve(Expression expr, TypeKind? expectedType):
     match expr:
-        LiteralExpression              → resolve via context (expectedType)
-        IdentifierExpression           → symbol table lookup → TypedFieldRef or TypedArgRef
-        BinaryExpression               → resolve left/right, FindCandidates(op, L, R), disambiguate
-        UnaryExpression                → resolve operand, FindUnary(op, type)
-        FunctionCallExpression         → resolve args, Functions.ByName, overload match
-        MemberAccessExpression         → resolve object, TypeMeta.Accessors lookup
-        MethodCallExpression           → resolve receiver, TypeMeta accessor dispatch
-        ConditionalExpression          → resolve condition (boolean), unify branch types
-        QuantifierExpression           → resolve collection, push binding, resolve predicate (boolean)
-        GroupedExpression              → resolve inner
-        ListLiteralExpression          → resolve elements, check element type
-        IsSetExpression                → operand must be optional, result = boolean
-        IsNotSetExpression             → same
-        CIFunctionCallExpression       → ~string enforcement + function lookup
-        InterpolatedStringExpression   → resolve holes (must be scalar), result = string
-        InterpolatedTypedConstantExpr  → same + context-typed result
-        TypedConstantExpression        → context type propagation + content validation
+        LiteralExpression                       → resolve via context (expectedType)
+        IdentifierExpression                    → symbol table lookup → TypedFieldRef or TypedArgRef
+        BinaryExpression                        → resolve left/right, FindCandidates(op, L, R), disambiguate
+        UnaryExpression                         → resolve operand, FindUnary(op, type)
+        CallExpression                          → resolve args, Functions.ByName, overload match
+        MemberAccessExpression                  → resolve object, TypeMeta.Accessors lookup
+        MethodCallExpression                    → resolve receiver, TypeMeta accessor dispatch
+        ConditionalExpression                   → resolve condition (boolean), unify branch types
+        QuantifierExpression                    → resolve collection, push binding, resolve predicate (boolean)
+        ParenthesizedExpression                 → resolve inner
+        ListLiteralExpression                   → resolve elements, check element type
+        IsSetExpression                         → operand must be optional, result = boolean
+        IsNotSetExpression                      → same
+        CIFunctionCallExpression                → ~string enforcement + function lookup
+        InterpolatedStringExpression            → resolve holes (must be scalar), result = string
+        InterpolatedTypedConstantExpression     → same + context-typed result
+        TypedConstantExpression                 → context type propagation + content validation
 ```
+
+**Note:** `ExpressionFormKind` enum members (catalog names) differ from AST class names. The catalog classifies the *form*; the AST names the *syntax node*:
+
+| ExpressionFormKind | AST Class |
+|---|---|
+| `Literal` | `LiteralExpression`, `TypedConstantExpression`, `InterpolatedStringExpression`, `InterpolatedTypedConstantExpression` |
+| `Identifier` | `IdentifierExpression` |
+| `Grouped` | `ParenthesizedExpression` |
+| `BinaryOperation` | `BinaryExpression` |
+| `UnaryOperation` | `UnaryExpression` |
+| `MemberAccess` | `MemberAccessExpression` |
+| `Conditional` | `ConditionalExpression` |
+| `FunctionCall` | `CallExpression` |
+| `MethodCall` | `MethodCallExpression` |
+| `ListLiteral` | `ListLiteralExpression` |
+| `PostfixOperation` | `IsSetExpression` / `IsNotSetExpression` |
+| `Quantifier` | `QuantifierExpression` |
+| `CIFunctionCall` | `CIFunctionCallExpression` |
 
 This function has no per-type-kind branching for operators or functions. It doesn't know what `+` means for money vs integers — it asks the Operations catalog. It doesn't know what `min` accepts — it asks the Functions catalog. It doesn't know what `.count` returns — it asks the Types catalog.
 
@@ -252,6 +270,13 @@ public sealed record TypedEventHandler(
     ImmutableArray<TypedAction> Actions,
     EventHandlerNode Syntax
 );
+
+/// Placeholder for stateless-precept edit declarations (edit all / edit Field1, Field2).
+public sealed record TypedEditDeclaration(
+    ImmutableArray<string> EditableFields,  // empty = "all"
+    bool IsEditAll,
+    SyntaxNode Syntax
+);
 ```
 
 **`TypedTransitionRow.FromState` convention:** `null` means "any-state wildcard" — the row fires in any source state. This is a binary discriminator (named state vs wildcard) that will never gain a third case; a full DU would be over-abstraction. GraphAnalyzer filters "any-state rows" with `== null`.
@@ -419,6 +444,7 @@ public sealed record SemanticIndex(
     ImmutableArray<TypedAccessMode> AccessModes,
     ImmutableArray<TypedStateHook> StateHooks,
     ImmutableArray<TypedEventHandler> EventHandlers,
+    ImmutableArray<TypedEditDeclaration> EditDeclarations,
 
     // Dependency facts
     ImmutableArray<ComputedFieldDep> ComputedDeps,
@@ -449,13 +475,19 @@ internal sealed class CheckContext
     // Current scope (for Pass 2)
     public IReadOnlyDictionary<string, TypedArg>? CurrentEventArgs { get; set; }
     public int CurrentFieldIndex { get; set; } = -1;  // for "prior fields only" scope
+    public FieldScopeMode CurrentScope { get; set; } = FieldScopeMode.AllFields;
+
+    // Quantifier binding stack (for nested quantifiers)
+    public Stack<(string Name, TypeKind Type)> QuantifierBindings { get; } = new();
 
     // Diagnostics accumulator
     public List<Diagnostic> Diagnostics { get; } = [];
 }
+
+public enum FieldScopeMode { AllFields, PriorFieldsOnly }
 ```
 
-Scope is managed by setting `CurrentEventArgs` when entering a transition row or event-anchored ensure, and clearing it on exit. `CurrentFieldIndex` tracks the position in the field array for forward-reference prohibition in default value expressions.
+Scope is managed by setting `CurrentEventArgs` when entering a transition row, event handler, or event-anchored ensure, and clearing it on exit. `CurrentFieldIndex` tracks the position in the field array for forward-reference prohibition in default value expressions. `CurrentScope` controls whether identifier resolution enforces "prior fields only" (for computed/default expressions) or allows all fields (for guards, actions, rules). `QuantifierBindings` is a stack for nested quantifier variable scoping.
 
 ---
 
@@ -510,7 +542,101 @@ bool IsAssignable(TypeKind source, TypeKind target)
 }
 ```
 
+**Widening is single-hop only.** `WidensTo` arrays are designed to be complete for each type (e.g., `IntegerWidens = [Decimal, Number]` — integer reaches both directly). No transitive resolution.
+
 Used in: assignment validation, function overload matching, binary operation lookup fallback (try widened variants), default value validation, conditional branch unification.
+
+### Binary Operation Widening Fallback
+
+When `FindCandidates(op, leftType, rightType)` returns empty, the checker tries widened combinations in deterministic priority order:
+
+```
+ResolveOp(op, leftType, rightType):
+  1. candidates = FindCandidates(op, leftType, rightType)
+  2. if candidates.Length >= 1 → disambiguate (qualifier or single), done
+  3. Try LEFT widening only:
+     for each wt in Types.GetMeta(leftType).WidensTo:
+       candidates = FindCandidates(op, wt, rightType)
+       if candidates.Length >= 1 → disambiguate, done
+  4. Try RIGHT widening only:
+     for each wt in Types.GetMeta(rightType).WidensTo:
+       candidates = FindCandidates(op, leftType, wt)
+       if candidates.Length >= 1 → disambiguate, done
+  5. Try BOTH widening:
+     for each lwt in Types.GetMeta(leftType).WidensTo:
+       for each rwt in Types.GetMeta(rightType).WidensTo:
+         candidates = FindCandidates(op, lwt, rwt)
+         if candidates.Length >= 1 → disambiguate, done
+  6. Emit "NoMatchingOperation" diagnostic, return TypedErrorExpression
+```
+
+Priority: left-first → right-first → both. `WidensTo` array order is the tiebreaker (narrowest-first by convention).
+
+### Numeric Literal Context Resolution
+
+Bare numeric literals resolve to `integer` by default (bottom-up). When binary operation or function call resolution fails with a literal operand:
+
+1. Resolve both operands bottom-up (literal → integer)
+2. Try FindCandidates + widening fallback
+3. If failure AND one operand is a bare `LiteralExpression` → retry that operand with `expectedType` from the other side's resolved type
+4. If failure AND both are bare literals → both remain integer; emit diagnostic
+
+Context retry is the mechanism that makes `amount > 100` (where `amount: money`) work: initial resolution produces `(>, money, integer)` → no match → retry `100` with expectedType=money → `(>, money, money)` → match.
+
+**Implementation timing:** Slices 2–3 use bottom-up only. Slice 4 adds the context retry mechanism (part of `expectedType` propagation).
+
+### Function Overload Resolution
+
+```
+ResolveFunctionCall(name, resolvedArgs[]):
+  1. allOverloads = Functions.ByName[name].SelectMany(fm => fm.Overloads)
+  2. Filter by arity: keep only overloads where Parameters.Length == resolvedArgs.Length
+  3. For each remaining overload, score:
+     a. EXACT match:  all arg types == parameter types → score 0 (best)
+     b. WIDENED match: all args IsAssignable to params → score = count of widened args
+     c. NO match:     skip
+  4. If exactly one score-0 entry → select it.
+  5. If multiple score-0 → ambiguity error
+  6. If no score-0 but one or more widened → select lowest score
+  7. If no match → retry with context propagation for literal args, then:
+  8. If still no match → emit "NoMatchingOverload" diagnostic, return TypedErrorExpression
+```
+
+For context retry (step 7): if an argument is a bare `LiteralExpression`, re-resolve it with `expectedType` = each candidate's parameter type at that position. This handles `min(amount, 100)` where `amount: money` and `100` must resolve as money.
+
+### Accessor Return-Type Resolution
+
+When resolving `MemberAccessExpression` or `MethodCallExpression`, the return type and parameter type depend on the accessor DU subtype:
+
+```csharp
+(TypeKind returnType, TypeKind? paramType) = resolvedAccessor switch
+{
+    // Base TypeAccessor (peek, dequeue, pop): returns element type of owning collection
+    TypeAccessor a when a is not FixedReturnAccessor and a is not ElementParameterAccessor
+        => (owningField.ElementType!.Value, null),
+
+    // FixedReturnAccessor (date.year, date.month): returns accessor.Returns directly
+    FixedReturnAccessor f
+        => (f.Returns, f.ParameterType),
+
+    // ElementParameterAccessor (bag.countof(x)): return = integer, param = element type
+    ElementParameterAccessor e
+        => (TypeKind.Integer, owningField.ElementType!.Value),
+};
+```
+
+For `MethodCallExpression` (accessor with parameters), validate the argument type against `paramType`. If `paramType` is null, the accessor is property-style — a call syntax `field.accessor()` emits a diagnostic.
+
+### Identifier Resolution Priority
+
+When resolving an `IdentifierExpression`, check scopes in this order:
+
+1. **Quantifier bindings** (top of stack first — innermost binding wins)
+2. **Event args** (`CurrentEventArgs` if set)
+3. **Fields** (`FieldLookup`, gated by `CurrentScope` and `CurrentFieldIndex`)
+4. **Error:** emit "UnresolvedIdentifier" diagnostic, return `TypedErrorExpression`
+
+For step 3 with `CurrentScope == PriorFieldsOnly`: if the resolved field's index >= `CurrentFieldIndex`, emit "ForwardReferenceProhibited" diagnostic instead.
 
 ### Stub Strategy for Unimplemented Arms
 
@@ -606,6 +732,18 @@ Five stable rules, `FunctionMeta.HasCIVariant` already exists. The 5-rule enforc
 | 12 | Error recovery | Implicit | Always produce partial result; `TypedErrorExpression` replaces failed sub-exprs | Consistent with "accumulate diagnostics without abandoning" principle |
 | 13 | Interpolated string | No slice | `InterpolatedStringExpression` → Slice 3; `InterpolatedTypedConstantExpression` → Slice 4 | Not CI/string operations; belongs with general expression machinery |
 | 14 | MethodCallExpression | Not addressed | Accessor-style lookup via TypeMeta; Slice 3 | Current surface only has collection accessors (`queue.peek()`, etc.) |
+| 15 | Widening transitivity | Not addressed | Single-hop only; `WidensTo` arrays are complete per type | Transitive adds complexity and confusing errors; catalog arrays encode all reachable targets directly |
+| 16 | Binary op widening fallback | Not addressed | Left-first → right-first → both; `WidensTo` order is priority | Deterministic; narrowest-widen-first by array convention |
+| 17 | Numeric literal default | Not addressed | Integer default + one-retry context propagation (Slice 4) | Hybrid simplicity: bottom-up works for most cases, retry for context-sensitive |
+| 18 | EventHandler scope | Not addressed | Has event arg scope (same `CurrentEventArgs` pattern as transition rows) | `EventHandlerNode.EventName` names the event; args naturally in scope |
+| 19 | Forward-reference gate | Implicit | `FieldScopeMode` enum in CheckContext; check in identifier resolution | Generalizable scope restriction; fires at resolution time, not as separate validation |
+| 20 | Identifier resolution priority | Not addressed | Quantifier bindings > event args > fields | Innermost scope wins; shadowing is predictable and standard |
+| 21 | Function overload resolution | Not addressed | Arity filter → exact → widened → context retry for literals | Single deterministic algorithm; no ambiguity with current catalog |
+| 22 | Slice 6 split | George suggestion (6a/6b) | Rejected — keep as single slice | IsSet/IsNotSet is 10 lines; splitting adds overhead with no parallelism gain |
+| 23 | TypedTransitionRow.ResolvedArgs | Kramer R3 | Rejected — single dict lookup doesn't justify cached copies | Anti-mirroring: data already in `EventsByName[row.EventName].Args` |
+| 24 | TypedEditDeclaration | Kramer R4 | Placeholder record in Pre-Slice 0; full implementation deferred | Correct eventual shape for stateless-precept edit support |
+| 25 | ExpressionFormKind.Literal ownership | Not addressed | Migrates in Slice 2; Slices 3–4 add arms within handler | Single annotation unit; sub-form stubs live inside the real handler |
+| 26 | ErrorGuaranteed debug assertion | LOW (research cross-reference) | In-scope for Slice 10: debug/test-time assertion validates any SemanticIndex containing a `TypedErrorExpression` also contains ≥1 Error-severity Diagnostic | Zero production cost; catches orphaned error expressions where we produce `TypedErrorExpression` without emitting the corresponding diagnostic |
 
 ---
 
@@ -658,9 +796,11 @@ This is mechanical but mandatory per-slice to prevent CI failures.
 - `TypedExpression` DU (all subtypes including `TypedErrorExpression`)
 - `TypedAction` DU (3 shapes + `ActionSecondaryRole` enum)
 - `TypedTransitionRow`, `TypedEnsure`, `TypedRule`, `TypedAccessMode`, `TypedStateHook`, `TypedEventHandler`
+- `TypedEditDeclaration` placeholder (for future stateless-precept edit support)
 - `QualifierBinding` DU
-- `CheckContext` internal class
+- `CheckContext` internal class (including `FieldScopeMode`, `QuantifierBindings` stack)
 - `SemanticIndex` expanded with typed inventories and derived lookup indexes
+- Test infrastructure: `TypeCheck(string source) → SemanticIndex` and `TypeCheckExpr(string source) → TypedExpression` helpers in test project
 - **No logic, no behavioral tests** — build verification only
 - This commit unblocks all numbered slices
 
@@ -673,45 +813,48 @@ This is mechanical but mandatory per-slice to prevent CI failures.
 
 ### Slice 2: Scalar Expression Resolution — Binary & Unary Ops
 
-- `Resolve()` function with arms: `LiteralExpression`, `IdentifierExpression`, `BinaryExpression`, `UnaryExpression`, `GroupedExpression`
-- `Operations.FindCandidates()` + qualifier disambiguation logic
+- `Resolve()` function with arms: `LiteralExpression`, `IdentifierExpression`, `BinaryExpression`, `UnaryExpression`, `ParenthesizedExpression`
+- `Operations.FindCandidates()` + qualifier disambiguation logic + widening fallback
 - `Operations.FindUnary()` integration
 - ErrorType propagation
+- `FieldScopeMode` check in identifier resolution (forward-reference gate)
 - Stub arms for all other expression forms → `TypedErrorExpression`
-- **Stub migration:** Remove `Literal`, `Identifier`, `BinaryOperation`, `UnaryOperation`, `Grouped` from `CheckExpression` stub
+- **Stub migration:** Remove `Literal`, `Identifier`, `BinaryOperation`, `UnaryOperation`, `Grouped` from `CheckExpression` stub. Note: `Literal` ownership moves here; Slices 3–4 add arms *within* this handler for interpolated strings and typed constants.
 
 ### Slice 3: Functions, Accessors, Method Calls, Interpolated Strings
 
-- `FunctionCallExpression` → `Functions.ByName` lookup + overload resolution
-- `MemberAccessExpression` → field ref or TypeAccessor lookup
-- `MethodCallExpression` → resolve receiver, TypeMeta accessor dispatch
-- `InterpolatedStringExpression` → hole resolution, scalar check, result = `TypeKind.String`
+- `CallExpression` → `Functions.ByName` lookup + overload resolution (arity → exact → widened → context retry)
+- `MemberAccessExpression` → field ref or TypeAccessor lookup + return-type resolution via accessor DU
+- `MethodCallExpression` → resolve receiver, TypeMeta accessor dispatch, parameter-type validation
+- `InterpolatedStringExpression` → hole resolution, scalar check, result = `TypeKind.String` (add arm within `Literal` handler — no separate stub migration)
 - ProofRequirement recording from overload/accessor entries
-- **Stub migration:** Remove `FunctionCall`, `MethodCall`, `MemberAccess`, `InterpolatedString` from stub
+- **Stub migration:** Remove `FunctionCall`, `MethodCall`, `MemberAccess` from stub. `InterpolatedString` is already under the `Literal` handler from Slice 2.
 
 ### Slice 4: Typed Constants + Context-Sensitive Resolution
 
-- `TypedConstantExpression` → context type propagation + content validation (hardcoded dispatch if ContentValidation DU not yet landed)
-- `InterpolatedTypedConstantExpression` → same with interpolation holes
-- Numeric literal context resolution (propagate `expectedType` downward)
-- **Stub migration:** Remove `TypedConstant`, `InterpolatedTypedConstant` from stub (if tracked as separate forms)
+- `TypedConstantExpression` → context type propagation + content validation (hardcoded dispatch if ContentValidation DU not yet landed). Add arm within `Literal` handler — no separate stub migration.
+- `InterpolatedTypedConstantExpression` → same with interpolation holes (add arm within `Literal` handler)
+- Numeric literal context retry mechanism (`expectedType` propagation into binary ops and function calls)
+- **Out-of-range literal checking:** After resolving a numeric literal's type via `expectedType`, validate the literal's value against the type's representable range (`integer` → Int64 bounds, `decimal` → Decimal.MaxValue/MinValue, `number` → Double range with precision loss warning for integers > 2^53). ~10 lines of logic sourced from `TypeMeta` range metadata. Universal compiler practice per research validation.
+- **Stub migration:** None — `TypedConstant` and `InterpolatedTypedConstant` are sub-forms of `Literal`, which migrated in Slice 2. These slices add arms within the already-migrated handler.
 
-### Slice 5: Transition Row Normalization
+### Slice 5: Transition Row + EventHandler Normalization
 
 - Guard expression resolution (boolean result required)
 - Action chain resolution per `ActionSyntaxShape` → TypedAction DU
 - `SecondaryExpression` + `SecondaryRole` assignment
 - Transition target validation (state name lookup in symbol table)
 - Partial result policy: failed guard/action → `TypedErrorExpression`, row still emitted
-- Scope: set `CurrentEventArgs` when entering transition row
+- Scope: set `CurrentEventArgs` when entering transition row OR event handler (both name their event)
+- EventHandler scope: `EventHandlerNode.EventName` → lookup event args → set `CurrentEventArgs` → resolve actions + post-condition guard → clear `CurrentEventArgs`
 
 ### Slice 6: Structural Validation
 
 - `IsSetExpression` / `IsNotSetExpression` → operand must be optional field, result = boolean
 - Computed field dependency graph + cycle detection (DFS)
 - Choice field validation (values valid for type, no duplicates, subset/ordering)
-- Forward-reference prohibition (default expressions reference only prior fields)
-- **Stub migration:** Remove `IsSet`, `IsNotSet` from stub; potentially delete `CheckExpression()` if last annotations removed
+- Forward-reference prohibition (default expressions reference only prior fields — belt-and-suspenders validation; the primary gate fires in identifier resolution via `FieldScopeMode`)
+- **Stub migration:** Remove `PostfixOperation` from stub (covers both `IsSetExpression` and `IsNotSetExpression` AST nodes). If this is the last annotation, delete `CheckExpression()` stub entirely.
 
 ### Slice 7: Modifier Validation
 
@@ -732,8 +875,9 @@ This is mechanical but mandatory per-slice to prevent CI failures.
 
 ### Slice 9: Quantifiers + List Literals
 
-- `QuantifierExpression` → binding variable scoping (push/pop), predicate must be boolean, collection operand validation
+- `QuantifierExpression` → push `(bindingName, bindingType)` onto `QuantifierBindings` stack, resolve predicate (must be boolean), resolve collection operand (must be collection type), pop binding on exit
 - `ListLiteralExpression` → element type unification, result = inferred collection type
+- Binding shadowing: quantifier bindings shadow event args and fields (resolution priority: bindings > args > fields)
 - **Stub migration:** Remove `Quantifier`, `ListLiteral` from stub
 
 ### Slice 10: Final Assembly
@@ -741,6 +885,7 @@ This is mechanical but mandatory per-slice to prevent CI failures.
 - `CheckContext` → immutable `SemanticIndex` transformation
 - Array-to-frozen-dict derivation for lookup indexes
 - Dependency fact extraction (computed-field deps, constraint-field refs)
+- ErrorGuaranteed debug assertion: validate that any SemanticIndex containing a `TypedErrorExpression` anywhere in its trees also contains ≥1 Error-severity Diagnostic (debug/test-time only — zero production cost) [D-26]
 - Integration tests: full `.precept` files from `samples/` → complete `SemanticIndex` with all inventories populated
 - Anti-mirroring rule enforcement test
 
@@ -780,6 +925,10 @@ Slice 10 (Final Assembly + Integration)  ← depends on all
 
 3. **`~string` CI enforcement cataloging** — currently acceptable as 5-rule checker logic. If the CI surface grows beyond 5 rules, revisit whether `CIEnforcementDiagnostic?` belongs on `BinaryOperationMeta`.
 
+4. **Precision Propagation Awareness for Decimal Arithmetic** — MEDIUM PRIORITY (future). Research finding: The exact decimal arithmetic survey documents critical precision behaviors: division can produce inexact results (silently rounded in .NET `Decimal`); multiplication accumulates scale (`scale_a + scale_b`), which can overflow the 96-bit mantissa; trailing zeros may be lost when mantissa reduction is needed; division by zero throws `OverflowException`, not a special value. The type checker currently resolves `decimal / decimal → decimal` and `decimal * decimal → decimal` without noting that these operations have different precision characteristics than addition. The ProofEngine handles overflow obligations, but the type checker has no mechanism to warn about precision-lossy operations. **Resolution:** This is a ProofEngine concern, not a type checker concern — and the design correctly places it there. The type checker spec explicitly states that precision propagation is NOT its responsibility (see § Deliberate Exclusions: "No proof obligation discharge"). If we ever add `ProofRequirement.PrecisionWarning` to the catalog metadata for division operations, the type checker would record it automatically through the existing `BinaryOperationMeta.ProofRequirements` mechanism. No design change needed — just document the boundary.
+
+5. **CandidateTypes on TypedErrorExpression** — LOW PRIORITY (post-v1). Consider adding an optional `ImmutableArray<TypeKind>? CandidateTypes` to `TypedErrorExpression` in a future enhancement. When `FindCandidates` returns entries but none matches qualifier/widening constraints, recording what *would* have matched enables the language server to provide "did you mean?" suggestions. This is not needed for Slices 2–10 (the LS can fall back to context-based completions), but is a known future lane for richer error recovery and diagnostic UX.
+
 ---
 
 ## Deliberate Exclusions
@@ -788,6 +937,47 @@ Slice 10 (Final Assembly + Integration)  ← depends on all
 - **No proof obligation discharge:** ProofRequirement *recording* happens here (from catalog entries); ProofRequirement *discharge* is the ProofEngine's responsibility.
 - **No runtime planning:** Descriptor production and execution plan compilation are the Precept Builder's responsibility.
 - **No qualifier runtime identity:** The checker validates qualifier *compatibility* structurally; the Evaluator handles qualifier *values* at runtime.
+
+---
+
+## Research Validation
+
+**Full analysis:** [`research/language/type-checker-research-validation.md`](../../research/language/type-checker-research-validation.md)
+
+Validated 2026-05-02 against 16 compiler architecture surveys and 11 language theory references.
+
+### Well-Grounded Decisions (8)
+
+| Decision | Precedent |
+|----------|-----------|
+| 2-pass architecture (registration → checking) | Roslyn, TypeScript, Go, Kotlin K2 |
+| ErrorType propagation + always-produce-partial-results | Roslyn, TypeScript, Rust, Kotlin K2 |
+| Diagnostic accumulation without abandoning | Roslyn, TypeScript, Go, Dafny |
+| Context-sensitive literal typing via `expectedType` | Kotlin, Rust, Swift, GHC |
+| Immutable output artifact (SemanticIndex) | Roslyn, TypeScript, Rust |
+| Proof requirement recording separated from discharge | SPARK Ada, Dafny, Liquid Haskell |
+| Widening/subtyping via `TypeMeta.WidensTo` | C# platform alignment, Kotlin literal subtypes |
+| Array-primary + FrozenDictionary secondary | Roslyn, Go, TypeScript dual-representation |
+
+### Justified Divergences (5)
+
+| Divergence | Rationale |
+|------------|-----------|
+| Flat semantic inventory (no per-tree SemanticModel) | Single-file DSL — lazy resolution adds complexity without benefit at this scale |
+| No query system / no on-demand resolution | <500 declarations — query overhead exceeds computation cost |
+| Catalog-driven checker (~70% catalog / ~30% structural) | Core architectural identity — closed type system fully described by metadata |
+| Qualifier disambiguation as ~15 lines | Qualifiers are runtime values, not type-level parameters — full unit algebra inappropriate |
+| No numeric literal defaulting | Every expression resolves within a typed declaration context — no untyped positions exist |
+
+### Research Gaps Incorporated
+
+| Priority | Gap | Action |
+|----------|-----|--------|
+| **HIGH** | Out-of-range literal checking | Added to Slice 4 — validate numeric literal value against resolved type's representable range |
+| Lower | Precision propagation for decimal arithmetic | Confirmed as ProofEngine concern — no type checker change needed |
+| Lower | Temporal type cross-validation | Catalog entries handle temporal safety generically — cross-reference note only |
+| Lower | Structured error recovery (CandidateTypes on TypedErrorExpression) | Post-v1 LS enhancement |
+| **IN-SCOPE** | ErrorGuaranteed pattern (debug assertion) | Promoted to Slice 10 — debug/test-time invariant validation, zero production cost (D-26) |
 
 ---
 
@@ -802,6 +992,8 @@ Slice 10 (Final Assembly + Integration)  ← depends on all
 | Design discussion record (original analysis) | `docs/working/type-checker-design-analysis.md` |
 | Design discussion record (implementer review) | `docs/working/george-type-checker-review.md` |
 | Design discussion record (response) | `docs/working/frank-response-to-george-review.md` |
+| Design discussion record (canonical review) | `docs/working/george-canonical-design-review.md` |
+| Design discussion record (canonical response) | `docs/working/frank-response-to-george-canonical-review.md` |
 
 ---
 
@@ -811,7 +1003,8 @@ Slice 10 (Final Assembly + Integration)  ← depends on all
 |---|---|
 | `src/Precept/Pipeline/TypeChecker.cs` | Type checker implementation — `TypeChecker` static class with `Check(SyntaxTree)` entry point |
 | `src/Precept/Pipeline/SemanticIndex.cs` | `SemanticIndex` — flat semantic inventory artifact |
-| `src/Precept/Catalogs/Operations.cs` | `FindCandidates()` at line 1153, `FindUnary()`, `BinaryIndex` at line 1111 |
-| `src/Precept/Catalogs/Functions.cs` | `ByName` frozen dictionary for function overload resolution |
-| `src/Precept/Catalogs/Types.cs` | `GetMeta()` → `TypeMeta` with `.Accessors`, `.WidensTo` |
-| `src/Precept/Catalogs/Modifiers.cs` | Modifier applicability, mutual exclusivity, subsumption metadata |
+| `src/Precept/Language/Operations.cs` | `FindCandidates()` at line 1153, `FindUnary()` at line 1145, `BinaryIndex` at line 1111 |
+| `src/Precept/Language/Functions.cs` | `ByName` frozen dictionary at line 298 for function overload resolution |
+| `src/Precept/Language/Types.cs` | `GetMeta()` → `TypeMeta` with `.Accessors`, `.WidensTo` |
+| `src/Precept/Language/Modifiers.cs` | Modifier applicability, mutual exclusivity, subsumption metadata |
+| `src/Precept/Language/ExpressionForms.cs` | `ExpressionFormKind` enum — form classification axis for `[HandlesCatalogMember]` |

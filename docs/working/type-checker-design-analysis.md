@@ -879,6 +879,30 @@ Slices 5, 6, and 7 can be developed in parallel after Slice 4. Slice 7 only depe
 
 ---
 
+## 6. Open Questions
+
+These are unresolved design decisions that must be answered before the relevant TypeChecker slice is implemented. They are documented here so they surface at implementation time rather than mid-slice.
+
+### OQ-1: DiagnosticCode for `~startsWith`/`~endsWith` with non-`~string` first argument
+
+**Context:** The spec §3.7 says: *"First argument must be a `~string` field; compile error otherwise."* The existing diagnostics 97/98 (`CaseInsensitiveFieldRequiresTildeStartsWith`, `CaseInsensitiveFieldRequiresTildeEndsWith`) cover the **inverse** direction: plain `startsWith`/`endsWith` called with a `~string` first argument — pointing the user toward the CI form.
+
+No `DiagnosticCode` exists for the **forward direction**: `~startsWith`/`~endsWith` called with a plain `string` first argument (the caller used the CI form but passed a non-CI-qualified field).
+
+**Decision required before Slice 8 (`~string` CI enforcement):**
+
+| Option | Description | Consequence |
+|--------|-------------|-------------|
+| **A — Error** | Add a new `DiagnosticCode` (e.g., `TildeStartsWithRequiresCIString` / `TildeEndsWithRequiresCIString`). The TypeChecker emits it when the first arg resolves to plain `string`. | Fully enforces §3.7 spec text. Requires two new `DiagnosticCode` members and catalog/doc entries. |
+| **B — Warning** | Change §3.7 spec text from "compile error" to "compiler warning." Emit as a warning-level diagnostic. | Softer enforcement — callers aren't blocked. May be more ergonomic for prototyping. Requires spec update. |
+| **C — Skip enforcement** | Remove the §3.7 "compile error" language entirely. CI functions work the same regardless of whether the first arg is `~string`. | Simplifies the checker but removes a protection the spec currently promises. Requires spec update. |
+
+**Flagged by:** Frank (GAP-046 design brief, §10 Open Design Note). Shane sign-off required before implementing.
+
+**Owned by:** George (Slice 8 implementation).
+
+---
+
 ## Key Architectural Insight
 
 > **The type checker is a metadata resolution engine with structural scaffolding, not a structural validator with metadata lookups.**

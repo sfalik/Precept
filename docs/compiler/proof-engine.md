@@ -134,6 +134,8 @@ TBD — design rationale section to be populated during implementation. Key deci
 5. Initial-state satisfiability: confirm this check is blocked on `TypeChecker.Check` being implemented (needs resolved initial field values and initial-state constraint expressions).
 6. `ConstraintInfluenceMap`: confirm this is produced by the ProofEngine (influence analysis) or by the Precept Builder (reorganization). Current design doc places it under `ProofLedger`.
 
+7. **Precision Propagation Awareness for Decimal Arithmetic** — MEDIUM PRIORITY (future). The exact decimal arithmetic survey (`research/architecture/compiler/proof-engine-interval-arithmetic-survey.md`) documents critical precision behaviors: division can produce inexact results (silently rounded in .NET `Decimal`); multiplication accumulates scale (`scale_a + scale_b`), which can overflow the 96-bit mantissa; trailing zeros may be lost when mantissa reduction is needed; division by zero throws `OverflowException`, not a special value. The type checker design explicitly places precision propagation as a ProofEngine concern (see `docs/compiler/type-checker.md` § Open Questions #4 and § Deliberate Exclusions). If we add `ProofRequirement.PrecisionWarning` to the `BinaryOperationMeta` catalog metadata for division/multiplication operations, the type checker would record it automatically through existing `BinaryOperationMeta.ProofRequirements`, and the ProofEngine would then need a strategy to evaluate precision-lossy obligations. Consider whether this warrants a fifth proof strategy or fits within the existing four-strategy framework.
+
 ---
 
 ## Deliberate Exclusions

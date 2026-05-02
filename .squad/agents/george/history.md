@@ -1,4 +1,4 @@
-## Core Context
+﻿## Core Context
 
 - Owns code-level feasibility, runtime implementation detail, and architecture-to-code translation across parser, checker, analyzer, and tooling surfaces.
 - Co-owns language research/design grounding with Frank and converts approved language decisions into implementable parser/catalog structures.
@@ -13,6 +13,17 @@
 - **GAP-064 rule:** `CIFunctionCallExpression` stores only the bare name string — the TypeChecker will need a `Functions.ByCIVariantOf` reverse index (or a node design change) to resolve CI function calls to `FunctionKind`. Do not implement CI type-checking without first resolving this.
 - **GAP-065 rule:** `QualifierMatch.Same` enforcement is a real correctness hole. The catalog declares it; the TypeChecker must honor it. File as Slice 1 TypeChecker work, not a deferred item.
 
+## Recent Updates
+
+### 2026-05-02T18:39:02-04:00 — Pipeline cross-review produced
+
+- Completed implementer's review of Frank's two catalog-bias analyses (type checker and parser) in `docs/working/george-catalog-driven-pipeline-review.md`.
+- **Key factual correction on Pratt loop:** Frank claimed `is set`/`is not set` hardcode precedence. Source (Parser.Expressions.cs:60) reads from `Operators.ByTokenSequence(...)` — already catalog-driven. Only `.` = 80 and `(` = 90 are real hardcodes.
+- **Split-modifier blocker confirmed:** `ParseFieldDeclaration` pre/post compute-expression modifiers require new catalog metadata before unification through `ParseConstructSlots` is safe. Frank P1 → my P2 until design settled.
+- **Inline kind-identity checks missed by Frank:** `ParseCollectionValueStatement` lines 355/365/373 and `ParseCollectionIntoStatement` line 415 do `meta.Kind == ActionKind.X` mid-parse. Requires `ActionMeta.VariantTriggerToken?` or equivalent catalog field.
+- **Ordering dependency table produced:** 8 explicit sequencing constraints: `TypeMeta.LiteralRange?` before Slice 4, `ActionMeta.TypedActionShape` before Slice 5, `ScopeRule` before Slice 3, uniform action-shape nodes before Slice 5 checker implementation.
+- **Cross-cutting connections:** precomputed-table pattern bridges parser and checker; action-statement unification connects parser P1 and checker Slice 5; TypeParseShape DU benefits checker Pass 1; outcomes gap (GAP-062) is shared blind spot in both of Frank's documents.
+- `TypeMeta.LiteralRange?` and `ContentValidation DU` remain unaddressed by Frank — still outstanding Slice 4 blockers.
 ## Recent Updates
 
 ### 2026-05-02T22:22:24Z — Iteration 11 audit session recorded

@@ -6,6 +6,7 @@
 
 ## Learnings
 
+- Time-cost arguments must be calibrated to actual team velocity. When the team builds with AI and the original parser took 2 days, citing "1-2 weeks" for a rebuild is indefensible. Distinguish time cost (AI collapses it) from design risk (AI doesn't solve open design questions) and regression risk (AI helps iterate but can't eliminate implicit knowledge loss). The surviving argument for incremental over rebuild is risk profile, not schedule.
 - Research validation now has a durable pattern: validation artifacts live in research/language/, design docs cite them via `## Research Validation`, working drafts are marked superseded in place, and research/language/README.md indexes the promoted validations.
 - The canonical checker design is implementation-ready only with its locked shape constraints intact: pre-Slice 0 typed records first, array-primary field ordering, single-hop widening, deterministic overload resolution, and slice-by-slice `[HandlesCatalogMember]` migration from stub to real handlers.
 - Kramer's R3 objection is durable architecture: do not mirror event-arg data into TypedTransitionRow.ResolvedArgs; derive from canonical typed models instead.
@@ -13,7 +14,12 @@
 - Iteration 10 audits added two lasting parser rules: variant-action arms inside shape-specific parser methods must throw when unreachable, and every parser-facing catalog should expose an O(1) metadata index keyed to the lookup axis the parser actually uses.
 - GAP-047 is the durable reminder that spec shorthand like "numeric" must stay scoped to primitive numeric lanes when domain types such as money and quantity have qualifier-preserving overloads.
 
-## Recent Updates
+## Recent Updates
+
+### 2026-05-02T19:11:32-04:00 — Spec challenge response: implicit-knowledge argument withdrawn
+- Shane challenged the `implicit grammar knowledge'' regression argument: if the parser was built from spec with AI, a rebuild from the same spec reproduces the same result; any divergence is a spec gap, not a reason to preserve code.
+- Conceded fully. The regression argument is dead. Path C recommendation now rests solely on the three unsolved design gaps (stashed-guard, split-modifier, variant-action). If those are resolved on paper or shown to be spec-covered, Path C has no remaining case.
+- Response written to docs/working/frank-spec-challenge-response.md.
 
 ### 2026-05-02T22:22:24Z — Iteration 11 audit session recorded
 - Scribe merged Frank's iteration-11 findings into the canonical ledger, cleared all current decision inbox files, and wrote the audit closeout logs.

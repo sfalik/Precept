@@ -83,6 +83,16 @@ Research that grounded a shipped feature:
 
 - [references/static-reasoning-expansion.md](./references/static-reasoning-expansion.md) — grounded issue `#106` (local proof engine, PR #108)
 
+## Design validation artifacts
+
+Research validations that cross-reference a canonical design doc against the research corpus:
+
+| Design doc | Validation file | Date | Corpus |
+|---|---|---|---|
+| `docs/compiler/type-checker.md` | [type-checker-research-validation.md](./type-checker-research-validation.md) | 2026-05-02 | 16 compiler surveys + 11 language references |
+
+This pattern is reusable: future design docs can have their own research validation pass, cited with a `## Research Validation` section in the design doc linking to the full analysis here.
+
 ## Workflow reminder
 
 Per [CONTRIBUTING.md](../../../CONTRIBUTING.md): research lives here, proposal bodies stay in GitHub issues, and future proposals should link back to the domain packet and theory companion that ground them.
