@@ -2,6 +2,7 @@ using System.Collections.Frozen;
 using System.Collections.Immutable;
 using Precept.Language;
 using Precept.Pipeline.SyntaxNodes;
+using Precept.Pipeline.SyntaxNodes.Expressions;
 
 namespace Precept.Pipeline;
 
@@ -246,6 +247,62 @@ public static partial class Parser
 
                 case TokenKind.LeftBracket:
                     return ParseListLiteral();
+
+                // CI function call: ~startsWith(subject, arg) / ~endsWith(subject, arg)
+                case TokenKind.Tilde:
+                {
+                    var tilde = Advance();
+                    if (Current().Kind != TokenKind.Identifier
+                        || !CICapableFunctionNames.Contains(Current().Text!))
+                    {
+                        EmitDiagnostic(DiagnosticCode.ExpectedToken, Current().Span, "CI function name", Current().Text);
+                        return new IdentifierExpression(tilde.Span,
+                            new Token(TokenKind.Identifier, string.Empty, tilde.Span));
+                    }
+                    var funcName = Advance();
+                    Expect(TokenKind.LeftParen);
+                    var subject = ParseExpression(0);
+                    Expect(TokenKind.Comma);
+                    var argument = ParseExpression(0);
+                    var close = Expect(TokenKind.RightParen);
+                    return new CIFunctionCallExpression(
+                        SourceSpan.Covering(tilde.Span, close.Span), funcName, subject, argument);
+                }
+
+                // Quantifier: each B in C (pred)
+                case TokenKind.Each:
+                {
+                    var quantToken = Advance();
+                    var binding = Expect(TokenKind.Identifier);
+                    Expect(TokenKind.In);
+                    var collToken = Expect(TokenKind.Identifier);
+                    var collection = new IdentifierExpression(collToken.Span, collToken);
+                    Expect(TokenKind.LeftParen);
+                    var predicate = ParseExpression(0);
+                    var rp = Expect(TokenKind.RightParen);
+                    return new QuantifierExpression(
+                        SourceSpan.Covering(quantToken.Span, rp.Span), quantToken, binding, collection, predicate);
+                }
+
+                // any / no: quantifier in expression position only when followed by "B in"
+                case TokenKind.Any:
+                case TokenKind.No:
+                {
+                    if (Peek(1).Kind == TokenKind.Identifier && Peek(2).Kind == TokenKind.In)
+                    {
+                        var quantToken = Advance();
+                        var binding = Expect(TokenKind.Identifier);
+                        Expect(TokenKind.In);
+                        var collToken = Expect(TokenKind.Identifier);
+                        var collection = new IdentifierExpression(collToken.Span, collToken);
+                        Expect(TokenKind.LeftParen);
+                        var predicate = ParseExpression(0);
+                        var rp = Expect(TokenKind.RightParen);
+                        return new QuantifierExpression(
+                            SourceSpan.Covering(quantToken.Span, rp.Span), quantToken, binding, collection, predicate);
+                    }
+                    goto default;
+                }
 
                 default:
                     EmitDiagnostic(DiagnosticCode.ExpectedToken, current.Span, "expression", current.Text);

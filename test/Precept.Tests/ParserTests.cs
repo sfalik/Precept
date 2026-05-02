@@ -5,6 +5,7 @@ using FluentAssertions;
 using Precept.Language;
 using Precept.Pipeline;
 using Precept.Pipeline.SyntaxNodes;
+using Precept.Pipeline.SyntaxNodes.Expressions;
 using Xunit;
 
 namespace Precept.Tests;
@@ -1716,5 +1717,460 @@ public class ParserTests
 
         typeRef.ElementType.Kind.Should().Be(TokenKind.StringType);
         typeRef.CaseInsensitive.Should().BeFalse("no ~ prefix means case-sensitive (default)");
+    }
+
+    // ════════════════════════════════════════════════════════════════════════════
+    //  Slice 10 — Scalar ~string type ref
+    // ════════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Slice10_ScalarTildeString_Parses()
+    {
+        var tree = Parse("field Email as ~string");
+
+        tree.Diagnostics.Should().BeEmpty();
+        var typeRef = tree.Declarations[0].Should().BeOfType<FieldDeclarationNode>()
+            .Subject.Type.Should().BeOfType<ScalarTypeRefNode>().Subject;
+
+        typeRef.TypeName.Kind.Should().Be(TokenKind.StringType);
+        typeRef.CaseInsensitive.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Slice10_ScalarTildeNonString_EmitsDiagnostic()
+    {
+        var tree = Parse("field X as ~integer");
+
+        tree.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.ExpectedToken));
+    }
+
+    [Fact]
+    public void Slice10_ScalarNoTilde_CaseInsensitiveFalse()
+    {
+        var tree = Parse("field Name as string");
+
+        tree.Diagnostics.Should().BeEmpty();
+        var typeRef = tree.Declarations[0].Should().BeOfType<FieldDeclarationNode>()
+            .Subject.Type.Should().BeOfType<ScalarTypeRefNode>().Subject;
+
+        typeRef.TypeName.Kind.Should().Be(TokenKind.StringType);
+        typeRef.CaseInsensitive.Should().BeFalse();
+    }
+
+    // ════════════════════════════════════════════════════════════════════════════
+    //  Slice 11 — New collection type refs
+    // ════════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Slice11_BagOf_Parses()
+    {
+        var tree = Parse("field Items as bag of string");
+
+        tree.Diagnostics.Should().BeEmpty();
+        var typeRef = tree.Declarations[0].Should().BeOfType<FieldDeclarationNode>()
+            .Subject.Type.Should().BeOfType<CollectionTypeRefNode>().Subject;
+
+        typeRef.CollectionKind.Kind.Should().Be(TokenKind.BagType);
+        typeRef.ElementType.Kind.Should().Be(TokenKind.StringType);
+        typeRef.CaseInsensitive.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Slice11_ListOf_Parses()
+    {
+        var tree = Parse("field Steps as list of string");
+
+        tree.Diagnostics.Should().BeEmpty();
+        var typeRef = tree.Declarations[0].Should().BeOfType<FieldDeclarationNode>()
+            .Subject.Type.Should().BeOfType<CollectionTypeRefNode>().Subject;
+
+        typeRef.CollectionKind.Kind.Should().Be(TokenKind.ListType);
+        typeRef.ElementType.Kind.Should().Be(TokenKind.StringType);
+    }
+
+    [Fact]
+    public void Slice11_LogOf_Parses()
+    {
+        var tree = Parse("field History as log of string");
+
+        tree.Diagnostics.Should().BeEmpty();
+        var typeRef = tree.Declarations[0].Should().BeOfType<FieldDeclarationNode>()
+            .Subject.Type.Should().BeOfType<CollectionTypeRefNode>().Subject;
+
+        typeRef.CollectionKind.Kind.Should().Be(TokenKind.LogType);
+        typeRef.ElementType.Kind.Should().Be(TokenKind.StringType);
+    }
+
+    [Fact]
+    public void Slice11_LogOfBy_Parses()
+    {
+        var tree = Parse("field Ledger as log of string by integer");
+
+        tree.Diagnostics.Should().BeEmpty();
+        var typeRef = tree.Declarations[0].Should().BeOfType<FieldDeclarationNode>()
+            .Subject.Type.Should().BeOfType<LogByTypeRefNode>().Subject;
+
+        typeRef.ElementType.Kind.Should().Be(TokenKind.StringType);
+        typeRef.OrderingKeyType.Kind.Should().Be(TokenKind.IntegerType);
+        typeRef.CaseInsensitive.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Slice11_QueueByAscending_Parses()
+    {
+        var tree = Parse("field Tasks as queue of string by integer ascending");
+
+        tree.Diagnostics.Should().BeEmpty();
+        var typeRef = tree.Declarations[0].Should().BeOfType<FieldDeclarationNode>()
+            .Subject.Type.Should().BeOfType<QueueByTypeRefNode>().Subject;
+
+        typeRef.ElementType.Kind.Should().Be(TokenKind.StringType);
+        typeRef.OrderingKeyType.Kind.Should().Be(TokenKind.IntegerType);
+        typeRef.SortDirection.Should().Be(SortDirection.Ascending);
+    }
+
+    [Fact]
+    public void Slice11_QueueByDescending_Parses()
+    {
+        var tree = Parse("field Tasks as queue of string by integer descending");
+
+        tree.Diagnostics.Should().BeEmpty();
+        var typeRef = tree.Declarations[0].Should().BeOfType<FieldDeclarationNode>()
+            .Subject.Type.Should().BeOfType<QueueByTypeRefNode>().Subject;
+
+        typeRef.SortDirection.Should().Be(SortDirection.Descending);
+    }
+
+    [Fact]
+    public void Slice11_QueueByDefaultDirection_IsAscending()
+    {
+        var tree = Parse("field Tasks as queue of string by integer");
+
+        tree.Diagnostics.Should().BeEmpty();
+        var typeRef = tree.Declarations[0].Should().BeOfType<FieldDeclarationNode>()
+            .Subject.Type.Should().BeOfType<QueueByTypeRefNode>().Subject;
+
+        typeRef.SortDirection.Should().Be(SortDirection.Ascending);
+    }
+
+    [Fact]
+    public void Slice11_LookupOf_Parses()
+    {
+        var tree = Parse("field Index as lookup of string to integer");
+
+        tree.Diagnostics.Should().BeEmpty();
+        var typeRef = tree.Declarations[0].Should().BeOfType<FieldDeclarationNode>()
+            .Subject.Type.Should().BeOfType<LookupTypeRefNode>().Subject;
+
+        typeRef.KeyType.Kind.Should().Be(TokenKind.StringType);
+        typeRef.ValueType.Kind.Should().Be(TokenKind.IntegerType);
+        typeRef.CaseInsensitive.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Slice11_LookupOfCIKey_Parses()
+    {
+        var tree = Parse("field Index as lookup of ~string to integer");
+
+        tree.Diagnostics.Should().BeEmpty();
+        var typeRef = tree.Declarations[0].Should().BeOfType<FieldDeclarationNode>()
+            .Subject.Type.Should().BeOfType<LookupTypeRefNode>().Subject;
+
+        typeRef.KeyType.Kind.Should().Be(TokenKind.StringType);
+        typeRef.ValueType.Kind.Should().Be(TokenKind.IntegerType);
+        typeRef.CaseInsensitive.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Slice11_BagOfTildeString_Parses()
+    {
+        var tree = Parse("field Emails as bag of ~string");
+
+        tree.Diagnostics.Should().BeEmpty();
+        var typeRef = tree.Declarations[0].Should().BeOfType<FieldDeclarationNode>()
+            .Subject.Type.Should().BeOfType<CollectionTypeRefNode>().Subject;
+
+        typeRef.CollectionKind.Kind.Should().Be(TokenKind.BagType);
+        typeRef.ElementType.Kind.Should().Be(TokenKind.StringType);
+        typeRef.CaseInsensitive.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Slice11_LookupMissingToClause_EmitsDiagnostic()
+    {
+        var tree = Parse("field X as lookup of string");
+
+        tree.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.ExpectedToken));
+    }
+
+    // ════════════════════════════════════════════════════════════════════════════
+    //  Slice 12 — New action statements
+    // ════════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Slice12_AppendStatement_Parses()
+    {
+        var tree = Parse("from Draft on Log -> append History \"entry\" -> no transition");
+
+        tree.Diagnostics.Should().BeEmpty();
+        var stmt = tree.Declarations[0].Should().BeOfType<TransitionRowNode>()
+            .Subject.Actions[0].Should().BeOfType<AppendStatement>().Subject;
+
+        stmt.Field.Text.Should().Be("History");
+    }
+
+    [Fact]
+    public void Slice12_AppendByStatement_Parses()
+    {
+        var tree = Parse("from Draft on Log -> append Ledger \"entry\" by 42 -> no transition");
+
+        tree.Diagnostics.Should().BeEmpty();
+        var stmt = tree.Declarations[0].Should().BeOfType<TransitionRowNode>()
+            .Subject.Actions[0].Should().BeOfType<AppendByStatement>().Subject;
+
+        stmt.Field.Text.Should().Be("Ledger");
+        stmt.Value.Should().BeOfType<LiteralExpression>();
+        stmt.Key.Should().BeOfType<LiteralExpression>();
+    }
+
+    [Fact]
+    public void Slice12_InsertAtStatement_Parses()
+    {
+        var tree = Parse("from Draft on Add -> insert Items \"val\" at 0 -> no transition");
+
+        tree.Diagnostics.Should().BeEmpty();
+        var stmt = tree.Declarations[0].Should().BeOfType<TransitionRowNode>()
+            .Subject.Actions[0].Should().BeOfType<InsertStatement>().Subject;
+
+        stmt.Field.Text.Should().Be("Items");
+        stmt.Value.Should().BeOfType<LiteralExpression>();
+        stmt.Index.Should().BeOfType<LiteralExpression>();
+    }
+
+    [Fact]
+    public void Slice12_RemoveAtStatement_Parses()
+    {
+        var tree = Parse("from Draft on Del -> remove Items at 2 -> no transition");
+
+        tree.Diagnostics.Should().BeEmpty();
+        var stmt = tree.Declarations[0].Should().BeOfType<TransitionRowNode>()
+            .Subject.Actions[0].Should().BeOfType<RemoveAtStatement>().Subject;
+
+        stmt.Field.Text.Should().Be("Items");
+        stmt.Index.Should().BeOfType<LiteralExpression>()
+            .Which.Value.Text.Should().Be("2");
+    }
+
+    [Fact]
+    public void Slice12_RemoveStatement_WithoutAt_StillProducesRemoveStatement()
+    {
+        var tree = Parse("from Draft on Remove -> remove Tags \"foo\" -> no transition");
+
+        tree.Diagnostics.Should().BeEmpty();
+        var stmt = tree.Declarations[0].Should().BeOfType<TransitionRowNode>()
+            .Subject.Actions[0].Should().BeOfType<RemoveStatement>().Subject;
+
+        stmt.Field.Text.Should().Be("Tags");
+    }
+
+    [Fact]
+    public void Slice12_PutStatement_Parses()
+    {
+        var tree = Parse("from Draft on Set -> put Index \"key\" = 99 -> no transition");
+
+        tree.Diagnostics.Should().BeEmpty();
+        var stmt = tree.Declarations[0].Should().BeOfType<TransitionRowNode>()
+            .Subject.Actions[0].Should().BeOfType<PutStatement>().Subject;
+
+        stmt.Field.Text.Should().Be("Index");
+        stmt.Key.Should().BeOfType<LiteralExpression>();
+        stmt.Value.Should().BeOfType<LiteralExpression>()
+            .Which.Value.Text.Should().Be("99");
+    }
+
+    [Fact]
+    public void Slice12_EnqueueByStatement_Parses()
+    {
+        var tree = Parse("from Draft on Enqueue -> enqueue Queue \"item\" by 5 -> no transition");
+
+        tree.Diagnostics.Should().BeEmpty();
+        var stmt = tree.Declarations[0].Should().BeOfType<TransitionRowNode>()
+            .Subject.Actions[0].Should().BeOfType<EnqueueByStatement>().Subject;
+
+        stmt.Field.Text.Should().Be("Queue");
+        stmt.Value.Should().BeOfType<LiteralExpression>();
+        stmt.Priority.Should().BeOfType<LiteralExpression>()
+            .Which.Value.Text.Should().Be("5");
+    }
+
+    [Fact]
+    public void Slice12_EnqueueStatement_WithoutBy_StillProducesEnqueueStatement()
+    {
+        var tree = Parse("from Draft on Enqueue -> enqueue ItemQueue \"x\" -> no transition");
+
+        tree.Diagnostics.Should().BeEmpty();
+        tree.Declarations[0].Should().BeOfType<TransitionRowNode>()
+            .Subject.Actions[0].Should().BeOfType<EnqueueStatement>();
+    }
+
+    [Fact]
+    public void Slice12_DequeueByStatement_WithIntoAndBy_Parses()
+    {
+        var tree = Parse("from Draft on Dequeue -> dequeue Queue into result by priority -> no transition");
+
+        tree.Diagnostics.Should().BeEmpty();
+        var stmt = tree.Declarations[0].Should().BeOfType<TransitionRowNode>()
+            .Subject.Actions[0].Should().BeOfType<DequeueByStatement>().Subject;
+
+        stmt.Field.Text.Should().Be("Queue");
+        stmt.IntoField.Should().NotBeNull();
+        stmt.IntoField!.Value.Text.Should().Be("result");
+    }
+
+    [Fact]
+    public void Slice12_DequeueStatement_WithoutBy_StillProducesDequeueStatement()
+    {
+        var tree = Parse("from Draft on Dequeue -> dequeue ItemQueue -> no transition");
+
+        tree.Diagnostics.Should().BeEmpty();
+        tree.Declarations[0].Should().BeOfType<TransitionRowNode>()
+            .Subject.Actions[0].Should().BeOfType<DequeueStatement>();
+    }
+
+    [Fact]
+    public void Slice12_PutMissingAssign_EmitsDiagnostic()
+    {
+        var tree = Parse("from Draft on Set -> put Index \"key\" 99 -> no transition");
+
+        tree.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.ExpectedToken));
+    }
+
+    // ════════════════════════════════════════════════════════════════════════════
+    //  Slice 13 — CI function call expressions
+    // ════════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Slice13_TildeStartsWith_InWhenGuard_Parses()
+    {
+        var tree = Parse("from Draft on Submit when ~startsWith(Name, \"Dr\") -> no transition");
+
+        tree.Diagnostics.Should().BeEmpty();
+        var row = tree.Declarations[0].Should().BeOfType<TransitionRowNode>().Subject;
+        var ci = row.Guard.Should().BeOfType<CIFunctionCallExpression>().Subject;
+
+        ci.FunctionName.Text.Should().Be("startsWith");
+        ci.Subject.Should().BeOfType<IdentifierExpression>()
+            .Which.Name.Text.Should().Be("Name");
+        ci.Argument.Should().BeOfType<LiteralExpression>();
+    }
+
+    [Fact]
+    public void Slice13_TildeEndsWith_InGuard_Parses()
+    {
+        var tree = Parse("from Draft on Submit when ~endsWith(Email, \".org\") -> no transition");
+
+        tree.Diagnostics.Should().BeEmpty();
+        var ci = tree.Declarations[0].Should().BeOfType<TransitionRowNode>()
+            .Subject.Guard.Should().BeOfType<CIFunctionCallExpression>().Subject;
+
+        ci.FunctionName.Text.Should().Be("endsWith");
+    }
+
+    [Fact]
+    public void Slice13_TildeStartsWith_BothFieldsPopulated()
+    {
+        var tree = Parse("from Draft on Submit when ~startsWith(Prefix, \"A\") -> no transition");
+
+        tree.Diagnostics.Should().BeEmpty();
+        var ci = tree.Declarations[0].Should().BeOfType<TransitionRowNode>()
+            .Subject.Guard.Should().BeOfType<CIFunctionCallExpression>().Subject;
+
+        ci.Subject.Should().BeOfType<IdentifierExpression>();
+        ci.Argument.Should().BeOfType<LiteralExpression>();
+    }
+
+    [Fact]
+    public void Slice13_TildeOnNonFunction_EmitsDiagnostic()
+    {
+        var tree = Parse("from Draft on Submit when ~nonExistentFn(X, \"y\") -> no transition");
+
+        tree.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.ExpectedToken));
+    }
+
+    // ════════════════════════════════════════════════════════════════════════════
+    //  Slice 14 — Quantifier expressions
+    // ════════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Slice14_EachQuantifier_Parses()
+    {
+        var tree = Parse("from Draft on Submit when each r in Reviewers (r > 0) -> no transition");
+
+        tree.Diagnostics.Should().BeEmpty();
+        var q = tree.Declarations[0].Should().BeOfType<TransitionRowNode>()
+            .Subject.Guard.Should().BeOfType<QuantifierExpression>().Subject;
+
+        q.Quantifier.Kind.Should().Be(TokenKind.Each);
+        q.Binding.Text.Should().Be("r");
+        q.Collection.Should().BeOfType<IdentifierExpression>()
+            .Which.Name.Text.Should().Be("Reviewers");
+        q.Predicate.Should().BeOfType<BinaryExpression>();
+    }
+
+    [Fact]
+    public void Slice14_AnyQuantifier_Parses()
+    {
+        var tree = Parse("from Draft on Submit when any r in Reviewers (r > 0) -> no transition");
+
+        tree.Diagnostics.Should().BeEmpty();
+        var q = tree.Declarations[0].Should().BeOfType<TransitionRowNode>()
+            .Subject.Guard.Should().BeOfType<QuantifierExpression>().Subject;
+
+        q.Quantifier.Kind.Should().Be(TokenKind.Any);
+    }
+
+    [Fact]
+    public void Slice14_NoQuantifier_Parses()
+    {
+        var tree = Parse("from Draft on Submit when no r in Reviewers (r > 0) -> no transition");
+
+        tree.Diagnostics.Should().BeEmpty();
+        var q = tree.Declarations[0].Should().BeOfType<TransitionRowNode>()
+            .Subject.Guard.Should().BeOfType<QuantifierExpression>().Subject;
+
+        q.Quantifier.Kind.Should().Be(TokenKind.No);
+        q.Binding.Text.Should().Be("r");
+    }
+
+    [Fact]
+    public void Slice14_ForInfix_Parses()
+    {
+        var tree = Parse("from Draft on Get when Index for \"key\" == 1 -> no transition");
+
+        tree.Diagnostics.Should().BeEmpty();
+        var guard = tree.Declarations[0].Should().BeOfType<TransitionRowNode>().Subject.Guard;
+        var bin = guard.Should().BeOfType<BinaryExpression>().Subject;
+        bin.Left.Should().BeOfType<BinaryExpression>()
+            .Which.Operator.Kind.Should().Be(TokenKind.For);
+    }
+
+    [Fact]
+    public void Slice14_AnyAsStateWildcard_NotAffected()
+    {
+        var tree = Parse("from any on Submit -> no transition");
+
+        tree.Diagnostics.Should().NotContain(d => d.Severity == Severity.Error);
+        var row = tree.Declarations[0].Should().BeOfType<TransitionRowNode>().Subject;
+        row.FromState.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void Slice14_NoTransitionOutcome_NotAffected()
+    {
+        var tree = Parse("from Draft on Submit -> no transition");
+
+        tree.Diagnostics.Should().BeEmpty();
+        var row = tree.Declarations[0].Should().BeOfType<TransitionRowNode>().Subject;
+        row.Outcome.Should().BeOfType<NoTransitionOutcomeNode>();
     }
 }

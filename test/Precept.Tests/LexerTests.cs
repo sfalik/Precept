@@ -926,4 +926,65 @@ public class LexerTests
 
         stream.Diagnostics.Should().BeEmpty();
     }
+
+    // ════════════════════════════════════════════════════════════════════════════
+    //  Slice 9 — New collection type keywords and quantifier keywords
+    // ════════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Lex_EachKeyword_ProducesEachToken()
+    {
+        var stream = Lexer.Lex("each");
+
+        stream.Tokens[0].Kind.Should().Be(TokenKind.Each);
+        stream.Tokens[0].Text.Should().Be("each");
+        stream.Diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Lex_ForKeyword_ProducesForToken()
+    {
+        var stream = Lexer.Lex("for");
+
+        stream.Tokens[0].Kind.Should().Be(TokenKind.For);
+        stream.Tokens[0].Text.Should().Be("for");
+        stream.Diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Lex_ToKeyword_ProducesToToken()
+    {
+        // 'to' already existed at value 14; verify it still lexes correctly
+        var stream = Lexer.Lex("to");
+
+        stream.Tokens[0].Kind.Should().Be(TokenKind.To);
+        stream.Tokens[0].Text.Should().Be("to");
+        stream.Diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Lex_ToInsideIdentifier_DoesNotProduceSpuriousToken()
+    {
+        // "total" starts with "to" but must be a single Identifier token
+        var stream = Lexer.Lex("total");
+
+        stream.Tokens[0].Kind.Should().Be(TokenKind.Identifier);
+        stream.Tokens[0].Text.Should().Be("total");
+        stream.Diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Lex_RemoveWithoutAt_IsSimpleCollectionValueSyntax()
+    {
+        // "remove F E" — no 'at', so the three tokens are Remove + Identifier + Identifier
+        var stream = Lexer.Lex("remove Items entry");
+
+        stream.Tokens.Select(t => t.Kind).Should().Equal(
+            TokenKind.Remove,
+            TokenKind.Identifier,
+            TokenKind.Identifier,
+            TokenKind.EndOfSource);
+
+        stream.Diagnostics.Should().BeEmpty();
+    }
 }

@@ -138,6 +138,16 @@ public static partial class Parser
         Tokens.All.Where(t => t.IsValidAsMemberName).Select(t => t.Kind).ToFrozenSet();
 
     /// <summary>
+    /// Function names that have a CI variant (e.g. <c>~startsWith</c>, <c>~endsWith</c>).
+    /// Catalog-derived from <see cref="FunctionMeta.HasCIVariant"/>. Never hardcoded.
+    /// </summary>
+    internal static readonly FrozenSet<string> CICapableFunctionNames =
+        Functions.All
+            .Where(f => f.HasCIVariant)
+            .Select(f => f.Name)
+            .ToFrozenSet(StringComparer.Ordinal);
+
+    /// <summary>
     /// All preposition tokens that may introduce a type qualifier.
     /// Derived from <see cref="QualifierSlot.Preposition"/> across all <see cref="TypeMeta.QualifierShape"/>
     /// entries — never hardcoded.

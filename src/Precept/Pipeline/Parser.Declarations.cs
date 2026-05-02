@@ -349,7 +349,33 @@ public static partial class Parser
         {
             var kw = Advance();
             var field = Expect(TokenKind.Identifier);
+
+            // remove F at N → RemoveAtStatement — check BEFORE parsing value expression
+            if (meta.Kind == ActionKind.Remove && Current().Kind == TokenKind.At)
+            {
+                Advance(); // consume 'at'
+                var index = ParseExpression(0);
+                return new RemoveAtStatement(SourceSpan.Covering(kw.Span, index.Span), field, index);
+            }
+
             var value = ParseExpression(0);
+
+            // append F E by P → AppendByStatement — check AFTER parsing value
+            if (meta.Kind == ActionKind.Append && Current().Kind == TokenKind.By)
+            {
+                Advance(); // consume 'by'
+                var key = ParseExpression(0);
+                return new AppendByStatement(SourceSpan.Covering(kw.Span, key.Span), field, value, key);
+            }
+
+            // enqueue F E by P → EnqueueByStatement — check AFTER parsing value
+            if (meta.Kind == ActionKind.Enqueue && Current().Kind == TokenKind.By)
+            {
+                Advance(); // consume 'by'
+                var key = ParseExpression(0);
+                return new EnqueueByStatement(SourceSpan.Covering(kw.Span, key.Span), field, value, key);
+            }
+
             var span = SourceSpan.Covering(kw.Span, value.Span);
 #pragma warning disable CS8524 // unnamed ActionKind values are unreachable — CS8509 enforces named-value coverage
             return meta.Kind switch
@@ -383,6 +409,16 @@ public static partial class Parser
                 Advance();
                 into = Expect(TokenKind.Identifier);
             }
+
+            // dequeue F [into G] by H → DequeueByStatement; H is syntactic only, not stored in node
+            if (meta.Kind == ActionKind.Dequeue && Current().Kind == TokenKind.By)
+            {
+                Advance(); // consume 'by'
+                var byKey = Advance(); // consume key identifier
+                var deqBySpan = SourceSpan.Covering(kw.Span, byKey.Span);
+                return new DequeueByStatement(deqBySpan, field, into);
+            }
+
             var endSpan = into?.Span ?? field.Span;
             var span = SourceSpan.Covering(kw.Span, endSpan);
 #pragma warning disable CS8524 // unnamed ActionKind values are unreachable — CS8509 enforces named-value coverage
@@ -467,6 +503,7 @@ public static partial class Parser
         {
             var kw = Advance();
             var field = Expect(TokenKind.Identifier);
+            Expect(TokenKind.At); // consume 'at' before index
             var index = ParseExpression(0);
             var span = SourceSpan.Covering(kw.Span, index.Span);
             return new RemoveAtStatement(span, field, index);
@@ -477,6 +514,7 @@ public static partial class Parser
             var kw = Advance();
             var field = Expect(TokenKind.Identifier);
             var key = ParseExpression(0);
+            Expect(TokenKind.Assign); // consume '=' between key and value
             var value = ParseExpression(0);
             var span = SourceSpan.Covering(kw.Span, value.Span);
             return new PutStatement(span, field, key, value);
@@ -906,8 +944,56 @@ public static partial class Parser
         {
             var current = Current();
 
-            // "set" in type position: lexer emits Set, parser reinterprets
-            if (current.Kind == TokenKind.Set || current.Kind == TokenKind.QueueType || current.Kind == TokenKind.StackType)
+            // ~string scalar type: field Email as ~string
+            if (current.Kind == TokenKind.Tilde)
+            {
+                var tildeTok = Advance(); // consume '~'
+                if (Current().Kind != TokenKind.StringType)
+                {
+                    EmitDiagnostic(DiagnosticCode.ExpectedToken, Current().Span, TokenKind.StringType, Current().Text);
+                    return new ScalarTypeRefNode(tildeTok.Span,
+                        new Token(TokenKind.StringType, string.Empty, tildeTok.Span),
+                        ImmutableArray<TypeQualifierNode>.Empty, CaseInsensitive: true);
+                }
+                var strToken = Advance();
+                return new ScalarTypeRefNode(
+                    SourceSpan.Covering(tildeTok.Span, strToken.Span),
+                    strToken, ImmutableArray<TypeQualifierNode>.Empty, CaseInsensitive: true);
+            }
+
+            // lookup of K to V — new two-param collection type
+            if (current.Kind == TokenKind.LookupType)
+            {
+                var lookupToken = Advance();
+                Expect(TokenKind.Of);
+
+                var caseInsensitive = false;
+                if (Current().Kind == TokenKind.Tilde)
+                {
+                    Advance();
+                    caseInsensitive = true;
+                }
+
+                var keyToken = Advance(); // key type
+
+                if (Current().Kind != TokenKind.To)
+                {
+                    EmitDiagnostic(DiagnosticCode.ExpectedToken, Current().Span, TokenKind.To, Current().Text);
+                    return new LookupTypeRefNode(
+                        SourceSpan.Covering(lookupToken.Span, keyToken.Span),
+                        keyToken, new Token(TokenKind.Identifier, string.Empty, Current().Span),
+                        caseInsensitive, ImmutableArray<TypeQualifierNode>.Empty);
+                }
+                Advance(); // consume 'to'
+                var valueToken = Advance(); // value type
+                return new LookupTypeRefNode(
+                    SourceSpan.Covering(lookupToken.Span, valueToken.Span),
+                    keyToken, valueToken, caseInsensitive, ImmutableArray<TypeQualifierNode>.Empty);
+            }
+
+            // Collection type refs: set|queue|stack|bag|list|log of T [by P] [ascending|descending]
+            if (current.Kind is TokenKind.Set or TokenKind.QueueType or TokenKind.StackType
+                             or TokenKind.BagType or TokenKind.ListType or TokenKind.LogType)
             {
                 var collectionToken = Advance();
                 Expect(TokenKind.Of);
@@ -936,6 +1022,38 @@ public static partial class Parser
                 }
 
                 var builtQualifiers = qualifiers.ToImmutable();
+
+                // "log of T by P" → LogByTypeRefNode
+                if (collectionToken.Kind == TokenKind.LogType && Current().Kind == TokenKind.By)
+                {
+                    Advance(); // consume 'by'
+                    var orderingKeyToken = Advance();
+                    return new LogByTypeRefNode(
+                        SourceSpan.Covering(collectionToken.Span, orderingKeyToken.Span),
+                        elemToken, orderingKeyToken, caseInsensitive, builtQualifiers);
+                }
+
+                // "queue of T by P [ascending|descending]" → QueueByTypeRefNode
+                if (collectionToken.Kind == TokenKind.QueueType && Current().Kind == TokenKind.By)
+                {
+                    Advance(); // consume 'by'
+                    var orderingKeyToken = Advance();
+                    var lastSpan = orderingKeyToken.Span;
+                    var sortDirection = SortDirection.Ascending; // default
+                    if (Current().Kind == TokenKind.Ascending)
+                    {
+                        lastSpan = Advance().Span;
+                    }
+                    else if (Current().Kind == TokenKind.Descending)
+                    {
+                        lastSpan = Advance().Span;
+                        sortDirection = SortDirection.Descending;
+                    }
+                    return new QueueByTypeRefNode(
+                        SourceSpan.Covering(collectionToken.Span, lastSpan),
+                        elemToken, orderingKeyToken, sortDirection, caseInsensitive, builtQualifiers);
+                }
+
                 var endSpan = builtQualifiers.Length > 0 ? builtQualifiers[^1].Span : elemToken.Span;
                 return new CollectionTypeRefNode(
                     SourceSpan.Covering(collectionToken.Span, endSpan),
