@@ -9,7 +9,7 @@ Pre-TypeChecker audit — exhaustive consistency check of language docs, catalog
 - Obvious gap → agent rubber-ducks, applies fix, status = **Fixed**
 - Non-obvious gap → full analysis written, status = **Unresolved** (owner resolves on second pass)
 
-**Audit status: CLOSED — 49 gaps total, 49 Fixed, 0 Unresolved (GAP-043–047 fixed inline 2026-05-02)**
+**Audit status: OPEN — 64 gaps total, 49 Fixed, 15 Unresolved (Iteration 11 doc/catalog pass: GAP-048–056; Iteration 11 catalog-impl pass: GAP-062–067)**
 
 ---
 
@@ -62,6 +62,21 @@ Pre-TypeChecker audit — exhaustive consistency check of language docs, catalog
 | GAP-045 | Spec §2.3 `ChoiceValueExpr` uses undefined terminal `BooleanLiteral`; actual tokens are `true`/`false` | Doc-Doc | Fixed | 10 |
 | GAP-046 | Spec §3.7 function table lists `~startsWith`/`~endsWith` as function-catalog entries but no `FunctionKind` member exists for them; CI variants live in `ExpressionForms` | Doc-Catalog | Fixed | 10 |
 | GAP-047 | Spec §3.7 `round(value,places)`, `min`, `max`, `abs`, `clamp` missing money/quantity overloads present in `Functions` catalog | Doc-Catalog | Fixed | 10 |
+| GAP-048 | Spec allows guarded state/event ensures, but `Constructs` metadata has no guard slot for either ensure form | Doc-Catalog | Unresolved | 11 |
+| GAP-049 | Spec allows guarded state actions, but `Constructs.StateAction` has no `GuardClause` slot | Doc-Catalog | Unresolved | 11 |
+| GAP-050 | Spec's stateless event hook includes trailing `ensure`, but no construct/constraint catalog member models it | Doc-Catalog | Unresolved | 11 |
+| GAP-051 | Spec §3A.3 calls rejection one of "four constraint kinds"; `ConstraintKind` has five members and no rejection kind | Doc-Catalog | Unresolved | 11 |
+| GAP-052 | Spec grammar gives `queue of T by P` an optional `ascending`/`descending` modifier; `Types` metadata has no direction slot | Doc-Catalog | Unresolved | 11 |
+| GAP-053 | Spec quantifier grammar says non-field targets emit `ExpectedFieldName`, but no such diagnostic exists in the catalog | Doc-Catalog | Unresolved | 11 |
+| GAP-054 | Spec says `dequeue ... by H` selects a keyed queue entry; action catalog does not model that selector semantics | Doc-Catalog | Unresolved | 11 |
+| GAP-055 | Identity types carry implicit `notempty` in `Types` metadata, but the spec never documents that intrinsic modifier behavior | Doc-Catalog | Unresolved | 11 |
+| GAP-056 | Spec's `~string` function rules are parameter-specific, but `Functions` metadata only links CI variants at the function level | Doc-Catalog | Unresolved | 11 |
+| GAP-062 | `ParseOutcomeNode` hardcodes per-member syntax dispatch for 3 outcome kinds; no `Outcomes` catalog exists (cf. `Actions.ActionSyntaxShape`) | Catalog-Impl | Unresolved | 11 |
+| GAP-063 | Parser hardcodes `TokenKind.Ascending`/`Descending` inline for QueueBy sort direction; `TypeMeta` for `QueueBy` has no `SortDirectionTokens` field | Catalog-Impl | Unresolved | 11 |
+| GAP-064 | `FunctionMeta.CIVariantOf` defined but never consumed; no `Functions.ByCIVariantOf` reverse index; TypeChecker will have no catalog-derived path to resolve `CIFunctionCallExpression` → `FunctionKind` | Catalog-Impl | Unresolved | 11 |
+| GAP-065 | `FunctionOverload.Match: QualifierMatch.Same` on money/quantity overloads of min/max/abs/clamp/round never enforced — TypeChecker stub has no enforcement path | Catalog-Impl | Unresolved | 11 |
+| GAP-066 | `ActionMeta.AllowedIn` never enforced; `Actions.EventBodyOnly` private constant declared but never assigned to any `ActionKind` entry (dead catalog constant) | Catalog-Impl | Unresolved | 11 |
+| GAP-067 | `ParseCollectionValueStatement` uses per-member `ActionKind.X` identity checks to detect `By`-variant and `At`-variant actions; `PrimaryActionKind` in the catalog already encodes this relationship | Catalog-Impl | Unresolved | 11 |
 | GAP-021 | `is set`/`is not set` associativity: spec §2.1 says `left`, catalog says `NonAssociative (postfix)` | Doc-Impl | Fixed | 6 |
 | GAP-022 | Spec §2.1 null-denotation table names `StringLiteralExpression` — a node that does not exist; implementation uses `LiteralExpression` | Doc-Impl | Fixed | 6 |
 | GAP-023 | Spec §2.1 precedence table has `is` row (60) appearing before `+/-` row (50); two rows at level 60 without ordering explanation | Doc-Spec | Fixed | 6 |
@@ -2009,3 +2024,113 @@ Note: `round(value, places)` is additionally described in §3.7 as a "lane bridg
 Expanded the §3.7 table into explicit primitive-numeric, money, and quantity sub-rows for `min`, `max`, `abs`, `clamp`, and `round(value, places)`. Added a note clarifying that primitive numeric widening applies only to `integer`/`decimal`/`number`, while `money` and `quantity` preserve their domain type and qualifier; for multi-argument overloads they must share the same qualifier. Clarified that `round(value, places)` is a bridge only within the primitive numeric lanes.
 
 **Ownership:** Resolved by owner. Doc-only fix applied; no C# changes required.
+
+---
+
+## GAP-048 — Guarded ensures are specified but not modeled by construct metadata
+- **Iteration:** 11
+- **Filed by:** Frank
+- **Category:** A
+- **Location:** spec §2.2 "State/event ensure"; spec §3A.1 "Ensures" vs. `src/Precept/Language/Constructs.cs`
+- **Description:** The spec grammar allows `(in|to|from) StateTarget ensure BoolExpr ("when" BoolExpr)? because StringExpr` and `on Identifier ensure BoolExpr ("when" BoolExpr)? because StringExpr`, and §3A.1 gives guarded ensure examples. The construct catalog defines `ConstructKind.StateEnsure` with slots `[StateTarget, EnsureClause]` and `ConstructKind.EventEnsure` with `[EventTarget, EnsureClause]`; neither includes `GuardClause`.
+- **Impact:** Catalog-driven grammar/help/completion surfaces cannot represent a spec-promised form. The spec says guarded ensures are legal; the construct catalog says nothing about them.
+- **Status:** Unresolved
+- **Decision:** Pending
+
+---
+
+## GAP-049 — Spec allows guarded state actions, but `Constructs.StateAction` has no guard slot
+- **Iteration:** 11
+- **Filed by:** Frank
+- **Category:** A
+- **Location:** spec §2.2 "State action" vs. `src/Precept/Language/Constructs.cs`
+- **Description:** Spec §2.2 defines state actions as `(to|from) StateTarget ("when" BoolExpr)? ("->" ActionStatement)*` and explicitly says the guard is passed through to the AST node. The construct catalog entry for `ConstructKind.StateAction` exposes only `[StateTarget, ActionChain]` and its description/example omit any guard surface.
+- **Impact:** The catalog does not model a documented declaration shape, so tooling derived from `Constructs` cannot faithfully surface or validate guarded entry/exit hooks.
+- **Status:** Unresolved
+- **Decision:** Pending
+
+---
+
+## GAP-050 — Stateless event-hook `ensure` exists in the spec, but not in the construct or constraint catalogs
+- **Iteration:** 11
+- **Filed by:** Frank
+- **Category:** A
+- **Location:** spec §2.2 "Stateless event hook" vs. `src/Precept/Language/Constructs.cs`, `src/Precept/Language/Constraints.cs`, `src/Precept/Language/ConstraintKind.cs`
+- **Description:** The spec grammar for stateless event hooks permits an optional trailing `("ensure" BoolExpr)?`, and the prose describes it as a post-condition guard evaluated after the handler's mutations. `ConstructKind.EventHandler` exposes only `[EventTarget, ActionChain]`. The constraint catalog has `EventPrecondition`, but no event-postcondition or handler-postcondition form.
+- **Impact:** This is a spec-level language surface with no catalog home. Catalog-driven consumers cannot discover it, describe it, or map it to a constraint kind.
+- **Status:** Unresolved
+- **Decision:** Pending
+
+---
+
+## GAP-051 — Spec §3A.3 misstates the constraint taxonomy
+- **Iteration:** 11
+- **Filed by:** Frank
+- **Category:** C
+- **Location:** spec §3A.3 "Constraint Violation Subject Attribution" vs. `src/Precept/Language/ConstraintKind.cs`, `src/Precept/Language/Constraint.cs`
+- **Description:** Spec §3A.3 says "The four constraint kinds have distinct attribution" and lists event ensures, rules, state ensures, and transition rejections. The catalog defines five `ConstraintKind` members: `Invariant`, `StateResident`, `StateEntry`, `StateExit`, and `EventPrecondition`. `reject` is not a constraint kind in the catalog at all; it is an outcome surface. The spec also collapses the three state-ensure anchors into one bucket where the catalog keeps them distinct.
+- **Impact:** The semantic write-up no longer maps cleanly to the catalog taxonomy. Readers cannot tell whether rejection is a constraint surface or an outcome, and the three state ensure forms lose their catalog-level distinction.
+- **Status:** Unresolved
+- **Decision:** Likely spec correction — enumerate the five cataloged constraint kinds and discuss rejection separately from constraints.
+
+---
+
+## GAP-052 — `queue of T by P` direction is documented in grammar but absent from type metadata
+- **Iteration:** 11
+- **Filed by:** Frank
+- **Category:** A
+- **Location:** spec §2.3 `CollectionType` / `DirectionModifier` vs. `src/Precept/Language/Types.cs`, `src/Precept/Language/Type.cs`
+- **Description:** The spec grammar defines `queue of ScalarType by ScalarType DirectionModifier?` with `DirectionModifier := ascending | descending`. The token catalog includes `ascending` and `descending`, but `TypeMeta` for `TypeKind.QueueBy` has no property, qualifier slot, or other metadata capturing sort direction, default direction, or whether direction is even part of the type surface.
+- **Impact:** A catalog-driven consumer can discover the tokens, but not the semantic fact that they belong to `queue by` declarations. The spec promises a typed surface the type catalog cannot describe.
+- **Status:** Unresolved
+- **Decision:** Pending
+
+---
+
+## GAP-053 — Quantifier grammar references `ExpectedFieldName`, but the diagnostic catalog has no such code
+- **Iteration:** 11
+- **Filed by:** Frank
+- **Category:** A
+- **Location:** spec §2.2 "Quantifier expression grammar" vs. `src/Precept/Language/DiagnosticCode.cs`, `src/Precept/Language/Diagnostics.cs`
+- **Description:** The spec says `CollectionRef` is a bare field name only in v1 and instructs the compiler to "emit `ExpectedFieldName` at the `in` position if a non-identifier follows." No `DiagnosticCode.ExpectedFieldName` member exists, no `Diagnostics.GetMeta` arm exists for it, and §2.7's parser-diagnostic table does not list it.
+- **Impact:** The spec names a compile-time error that the diagnostic catalog cannot produce. Consumers relying on the catalog cannot map this promised error to a stable diagnostic code.
+- **Status:** Unresolved
+- **Decision:** Pending
+
+---
+
+## GAP-054 — Queue-by dequeue semantics disagree between the spec and the action catalog
+- **Iteration:** 11
+- **Filed by:** Frank
+- **Category:** C
+- **Location:** spec §2.2 `ActionStatement`; spec §3.8 "Action statement validation" vs. `src/Precept/Language/Actions.cs`, `src/Precept/Language/Action.cs`
+- **Description:** Spec §3.8 says `dequeue F (into G)? (by H)?` on `queue of T by P` uses `by H` as a selector: `H` has type `P`, and the action dequeues the entry whose key matches `H`. The action catalog models a distinct `ActionKind.DequeueBy` / `ActionSyntaxShape.CollectionIntoBy` form, but it does not carry selector metadata; its hover text instead describes `by` as capturing the ordering value. The catalog and spec do not describe the same operation.
+- **Impact:** User-visible queue-by behavior is ambiguous across spec, hover, and downstream catalog consumers. Fix work will require a design call on what `by` actually means for `dequeue`.
+- **Status:** Unresolved
+- **Decision:** Pending
+
+---
+
+## GAP-055 — Intrinsic `notempty` behavior on identity types is cataloged but undocumented in the spec
+- **Iteration:** 11
+- **Filed by:** Frank
+- **Category:** B
+- **Location:** `src/Precept/Language/Types.cs` (`TypeKind.Timezone`, `Currency`, `UnitOfMeasure`, `Dimension`) vs. spec §2.4 / §3.8
+- **Description:** The type catalog assigns `ImpliedModifiers: [ModifierKind.Notempty]` to `timezone`, `currency`, `unitofmeasure`, and `dimension`. Their hover docs describe them as intrinsically non-empty identity values. The spec's modifier catalog and semantic-check sections never document any type-level implied `notempty` behavior for these types.
+- **Impact:** The catalog carries real enforcement semantics that a spec reader cannot discover. This is user-visible if these types reject empty values without an explicit `notempty` modifier on the declaration.
+- **Status:** Unresolved
+- **Decision:** Pending
+
+---
+
+## GAP-056 — `~string` function rules are parameter-specific in the spec, but only function-level in the catalog
+- **Iteration:** 11
+- **Filed by:** Frank
+- **Category:** A
+- **Location:** spec §3.7 function table and CI notes; spec §3.8 `~string` enforcement vs. `src/Precept/Language/Function.cs`, `src/Precept/Language/Functions.cs`
+- **Description:** The spec says `startsWith`/`endsWith` enforcement is about the first argument specifically, `~startsWith`/`~endsWith` require the first argument to be `~string`, and other string functions (`trim`, `toLower`, `toUpper`, `left`, `right`, `mid`) accept `~string` without CI enforcement. The function catalog models only `HasCIVariant` / `CIVariantOf` at the whole-function level. The overloads themselves remain plain `(string, string)` / `(string)` and carry no metadata identifying the CI-sensitive parameter or marking CI-transparent functions.
+- **Impact:** The spec describes parameter-level semantics that cannot be derived from the function catalog. CI enforcement still depends on out-of-band knowledge rather than catalog metadata.
+- **Status:** Unresolved
+- **Decision:** Pending
+
+<!-- Iteration 11 complete: Frank doc/catalog audit pass. New unresolved gaps filed: GAP-048 (guarded ensures absent from Constructs metadata), GAP-049 (guarded state actions absent from Constructs metadata), GAP-050 (stateless event-hook trailing ensure has no construct/constraint catalog home), GAP-051 (spec §3A.3 misstates the constraint taxonomy), GAP-052 (`queue by` direction modifier lacks type metadata), GAP-053 (spec references nonexistent `ExpectedFieldName` diagnostic), GAP-054 (queue-by dequeue semantics diverge between spec and action catalog), GAP-055 (implicit notempty on identity types undocumented), GAP-056 (CI string-function rules are parameter-specific in spec but only function-level in catalog). Combined ledger state after iteration 11 passes: 64 gaps total, 49 Fixed, 15 Unresolved. -->
