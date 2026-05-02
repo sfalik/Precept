@@ -533,4 +533,80 @@ public class TypesTests
             "instant exposes only .inZone(timezone) — no component accessors");
         meta.Accessors![0].Name.Should().Be("inZone");
     }
+
+    // ── NotemptyApplicable — new collection types ────────────────────────────
+
+    [Theory]
+    [InlineData(TypeKind.Log)]
+    [InlineData(TypeKind.LogBy)]
+    [InlineData(TypeKind.Bag)]
+    [InlineData(TypeKind.List)]
+    [InlineData(TypeKind.QueueBy)]
+    public void NewCollectionTypes_NotemptyApplicable_True(TypeKind kind)
+    {
+        Types.GetMeta(kind).NotemptyApplicable.Should().BeTrue(
+            $"{kind} supports the notempty modifier");
+    }
+
+    [Fact]
+    public void Lookup_NotemptyApplicable_False()
+    {
+        Types.GetMeta(TypeKind.Lookup).NotemptyApplicable.Should().BeFalse(
+            "lookup uses key presence proof, not notempty");
+    }
+
+    // ── Accessor shapes — new collection types ───────────────────────────────
+
+    [Theory]
+    [InlineData(TypeKind.Log)]
+    [InlineData(TypeKind.LogBy)]
+    [InlineData(TypeKind.List)]
+    public void LogListLogBy_HaveFirstLastAtAndCount(TypeKind kind)
+    {
+        var accessors = Types.GetMeta(kind).Accessors;
+        accessors.Should().Contain(a => a.Name == "count");
+        accessors.Should().Contain(a => a.Name == "first");
+        accessors.Should().Contain(a => a.Name == "last");
+        accessors.Should().Contain(a => a.Name == "at");
+    }
+
+    [Fact]
+    public void Bag_HasCountAndCountof()
+    {
+        var accessors = Types.GetMeta(TypeKind.Bag).Accessors;
+        accessors.Should().Contain(a => a.Name == "count");
+        accessors.Should().Contain(a => a.Name == "countof");
+    }
+
+    [Fact]
+    public void QueueBy_HasCountPeekAndPeekby()
+    {
+        var accessors = Types.GetMeta(TypeKind.QueueBy).Accessors;
+        accessors.Should().Contain(a => a.Name == "count");
+        accessors.Should().Contain(a => a.Name == "peek");
+        accessors.Should().Contain(a => a.Name == "peekby");
+    }
+
+    [Fact]
+    public void Lookup_HasCountOnly()
+    {
+        var accessors = Types.GetMeta(TypeKind.Lookup).Accessors;
+        accessors.Should().HaveCount(1);
+        accessors[0].Name.Should().Be("count");
+    }
+
+    // ── New types are all Collection category ────────────────────────────────
+
+    [Theory]
+    [InlineData(TypeKind.Log)]
+    [InlineData(TypeKind.LogBy)]
+    [InlineData(TypeKind.Bag)]
+    [InlineData(TypeKind.List)]
+    [InlineData(TypeKind.QueueBy)]
+    [InlineData(TypeKind.Lookup)]
+    public void NewCollectionTypes_HaveCollectionCategory(TypeKind kind)
+    {
+        Types.GetMeta(kind).Category.Should().Be(TypeCategory.Collection,
+            $"{kind} is a collection type");
+    }
 }

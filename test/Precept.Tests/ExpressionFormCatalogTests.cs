@@ -127,4 +127,53 @@ public class ExpressionFormCatalogTests
         ExpressionForms.GetMeta(ExpressionFormKind.PostfixOperation).Category
             .Should().Be(ExpressionCategory.Composite);
     }
+
+    // ── Quantifier form ────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Quantifier_IsNotLeftDenotation()
+    {
+        ExpressionForms.GetMeta(ExpressionFormKind.Quantifier).IsLeftDenotation
+            .Should().BeFalse("Quantifier starts a new expression (nud)");
+    }
+
+    [Fact]
+    public void Quantifier_CategoryIsComposite()
+    {
+        ExpressionForms.GetMeta(ExpressionFormKind.Quantifier).Category
+            .Should().Be(ExpressionCategory.Composite);
+    }
+
+    [Fact]
+    public void Quantifier_LeadTokens_ContainsEachAnyNo()
+    {
+        var meta = ExpressionForms.GetMeta(ExpressionFormKind.Quantifier);
+        meta.LeadTokens.Should().BeEquivalentTo(
+            [TokenKind.Each, TokenKind.Any, TokenKind.No],
+            "each/any/no introduce quantifier expressions");
+    }
+
+    // ── CIFunctionCall form ────────────────────────────────────────────────────
+
+    [Fact]
+    public void CIFunctionCall_IsNotLeftDenotation()
+    {
+        ExpressionForms.GetMeta(ExpressionFormKind.CIFunctionCall).IsLeftDenotation
+            .Should().BeFalse("CIFunctionCall starts a new expression (nud)");
+    }
+
+    [Fact]
+    public void CIFunctionCall_CategoryIsInvocation()
+    {
+        ExpressionForms.GetMeta(ExpressionFormKind.CIFunctionCall).Category
+            .Should().Be(ExpressionCategory.Invocation);
+    }
+
+    [Fact]
+    public void CIFunctionCall_LeadToken_IsTilde()
+    {
+        var meta = ExpressionForms.GetMeta(ExpressionFormKind.CIFunctionCall);
+        meta.LeadTokens.Should().ContainSingle()
+            .Which.Should().Be(TokenKind.Tilde, "~ introduces a CI function call");
+    }
 }

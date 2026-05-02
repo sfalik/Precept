@@ -370,4 +370,34 @@ public class OperatorsTests
         op.Tokens[1].Kind.Should().Be(TokenKind.Not);
         op.Tokens[2].Kind.Should().Be(TokenKind.Set);
     }
+
+    // ── LookupAccess (new) ─────────────────────────────────────────────────────
+
+    [Fact]
+    public void LookupAccess_IsSingleTokenOp()
+    {
+        Operators.GetMeta(OperatorKind.LookupAccess).Should().BeOfType<SingleTokenOp>();
+    }
+
+    [Fact]
+    public void LookupAccess_TokenIs_For()
+    {
+        var op = (SingleTokenOp)Operators.GetMeta(OperatorKind.LookupAccess);
+        op.Token.Kind.Should().Be(TokenKind.For);
+    }
+
+    [Fact]
+    public void LookupAccess_IsKeywordOperator()
+    {
+        var op = (SingleTokenOp)Operators.GetMeta(OperatorKind.LookupAccess);
+        op.IsKeywordOperator.Should().BeTrue("LookupAccess uses 'for' keyword syntax");
+    }
+
+    [Fact]
+    public void LookupAccess_IsBinaryLeftAssociative()
+    {
+        var op = (SingleTokenOp)Operators.GetMeta(OperatorKind.LookupAccess);
+        op.Arity.Should().Be(Arity.Binary);
+        op.Associativity.Should().Be(Associativity.Left);
+    }
 }

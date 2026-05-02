@@ -572,4 +572,29 @@ public class FunctionsTests
                 $"sqrt({overload.Parameters[0].Kind}) parameter should be named 'value'");
         }
     }
+
+    // ── HasCIVariant — case-insensitive function support ─────────────────────
+
+    [Theory]
+    [InlineData(FunctionKind.StartsWith)]
+    [InlineData(FunctionKind.EndsWith)]
+    public void StartsWith_EndsWith_HasCIVariant_True(FunctionKind kind)
+    {
+        Functions.GetMeta(kind).HasCIVariant.Should().BeTrue(
+            $"{kind} supports ~{Functions.GetMeta(kind).Name}(...) case-insensitive variant");
+    }
+
+    [Fact]
+    public void AllOtherFunctions_HasCIVariant_False()
+    {
+        var ciVariants = Functions.All
+            .Where(m => m.Kind != FunctionKind.StartsWith && m.Kind != FunctionKind.EndsWith)
+            .ToList();
+
+        foreach (var meta in ciVariants)
+        {
+            meta.HasCIVariant.Should().BeFalse(
+                $"{meta.Kind} does not have a CI variant");
+        }
+    }
 }
