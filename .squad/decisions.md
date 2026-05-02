@@ -12,6 +12,120 @@
 
 ---
 
+### 2026-05-02T19:42:08Z: Collection-types plan review rounds R1/R2 synchronized
+
+**By:** Scribe
+
+**Status:** Merged, deduplicated, inbox cleared (12 files; multi-pass review normalized)
+
+**Merged sources:** `frank-review-r1`, `george-review-r1`, `soup-review-r1`, `frank-review-r2`, `george-review-r2`, `soup-review-r2`, `frank-review-2`, `george-review-2`, `soup-review-2`, `frank-plan-v3-complete`, `frank-plan-v4-complete`, `frank-plan-v5-complete`.
+
+- R1/R2 review passes converged on the same mandatory corrections: add `TokenKind.To` end-to-end, align codes 95–98 names and stage ownership with the spec, remove the spurious `ExpressionFormKind.LookupAccess` plan work, and route every proposed test into real existing files rather than phantom catch-all test files.
+- The revision chain now preserves exact downstream obligations: update `DiagnosticsTests.cs` stage-group member data, fix hardcoded token counts and member-name regressions for `countof` / `peekby`, keep prefix `~startsWith` / `~endsWith` syntax correct, and spell out the `Countof` / `Peekby` member-name exceptions wherever token metadata is asserted.
+- Durable planning rule: every slice must name real file targets, update existing hardcoded counts and member-data helpers, and keep plan/spec/catalog terminology synchronized before implementation begins.
+
+---
+
+### 2026-05-02T19:42:07Z: Collection-types final blocker stack and revision path recorded
+
+**By:** Scribe
+
+**Status:** Merged, deduplicated, inbox cleared (6 files; final-review stack normalized)
+
+**Merged sources:** `frank-final-review`, `george-final-review`, `soup-final-review`, `frank-final-plan-revision-v2`, `frank-plan-revision-complete`, `elaine-final-review`.
+
+**Deduplicated/skipped:** `frank-plan-review`.
+
+- The final review stack agrees the plan is close but still blocked by surgical hazards rather than design rework: PRECEPT0019 parser annotations for new expression forms, wrong pseudocode symbols (`TokenKind.Assign`, `Statement(SourceSpan)`, `BinaryExpression`), missing updates to real test inventories, and incorrect parser-routing assumptions around `for` and `remove ... at`.
+- Frank's revision passes also cleaned the plan spine itself: stale Phase 3/runtime scope was removed, dependency ordering was narrowed to the real slice ranges, and the catalog-first lookup-access direction stayed explicit with `for` pinned to a dedicated binding tier instead of vague pseudo-constants.
+- Elaine's final UX pass downgraded remaining hover/MCP copy issues to follow-on tooling polish, so the plan now reads as mechanically repairable rather than conceptually blocked.
+
+---
+
+### 2026-05-02T19:42:06Z: Collection-types catalog and parser design decisions locked
+
+**By:** Scribe
+
+**Status:** Merged, deduplicated, inbox cleared (11 files; architecture questions normalized)
+
+**Merged sources:** `george-plan-review`, `frank-b1-analysis`, `copilot-b1-decision`, `frank-b2-analysis`, `frank-b2-catalog-exhaustive`, `frank-b2-reanalysis`, `frank-rubber-duck-exhaustively`, `frank-c3-verdict`, `frank-g5-rubber-duck`, `frank-countof-peekby-naming`, `frank-slice9-correction`.
+
+- B1 is now locked to the catalog-complete path: keep secondary action kinds in `Actions.All`, add `ActionMeta.PrimaryActionKind`, and derive `ByTokenKind` from primary actions only so startup stays crash-free without hiding real language surface from catalog consumers.
+- B2 is resolved as explicit switch-arm maintenance, not by stretching `[HandlesCatalogExhaustively]` onto `ActionSyntaxShape` or `ConstructSlotKind`; the annotation bridge remains the right tool for distributed handler coverage, not local parser shape switches.
+- C3/G5/slice-9 clarifications are durable: `remove F at N` is handled before value parsing rather than via unreachable shape routing, `AppendBy` disambiguation stays syntactic instead of adding redundant catalog metadata, lexer keyword recognition remains fully catalog-driven, and `countof` / `peekby` stay as member-name-legal compound accessors.
+
+---
+
+### 2026-05-02T19:42:05Z: Collection-types documentation and wording corrections merged
+
+**By:** Scribe
+
+**Status:** Merged, deduplicated, inbox cleared (4 files)
+
+**Merged sources:** `docs-audit`, `elaine-review-2`, `elaine-spec-fixes-complete`, `elaine-catalog-fixes-complete`.
+
+- The documentation audit locks the reference pattern: spec summaries are acceptable only when they explicitly defer to canonical type docs; the highest drift-risk duplication surfaces remain diagnostics and repeated `contains` semantics, which must cross-reference the spec instead of silently forking it.
+- Elaine's doc/hover blockers were closed in both spec and catalog text: collection type descriptions, `append` wording, and the missing codes 99–106 diagnostics are now recorded as corrected rather than still implicit TODOs.
+- Durable doc-sync rule for this workstream: language-surface wording changes are only done when spec, hover/catalog text, and the plan's referenced diagnostic tables all agree on the same user-facing story.
+
+---
+
+### 2026-05-02T19:42:04Z: Diagnostics semantics and emission for codes 11 and 12 locked
+
+**By:** Scribe
+
+**Status:** Merged, deduplicated, inbox cleared (5 files)
+
+**Merged sources:** `elaine-diagnostics-review`, `elaine-diagnostic-distinction`, `frank-diagnostic-activation`, `frank-gap-019-024-analysis`, `george-diagnostic-emission`.
+
+- `UnexpectedKeyword` and `InvalidCallTarget` are now durably treated as distinct parse failures: the former is a declaration keyword in value-expression position, while the latter is a non-callable expression followed by `(...)`.
+- The recorded contract is parse-stage Error severity, catalog/spec wording sync, catalog-derived keyword detection from `Tokens.Keywords.Values`, and an explicit `InvalidCallTarget` emit in the infix `LeftParen` branch rather than a silent break.
+- The paired GAP-024 analysis stays with this bundle because it locked the same architectural principle: bag/list/log TypeQualifier support belongs in the spec surface, not as a parser rollback, since qualifier semantics are orthogonal to collection kind.
+
+---
+
+### 2026-05-02T19:42:03Z: Language-consistency gap fixes batch recorded
+
+**By:** Scribe
+
+**Status:** Merged, deduplicated, inbox cleared (12 files; gap-fix stream normalized)
+
+**Merged sources:** `frank-gap024-resolved`, `frank-gap-025-026-028-fixed`, `frank-gap029-fixed`, `frank-gap031-fixed`, `george-gap030-fixed`, `george-gap032-fixed`, `frank-gap033-fixed`, `ink-gap-code-fixes`, `frank-iter7-results`, `frank-iter8-catalog-results`, `george-iter8-results`, `frank-g1-rename`.
+
+- The gap ledger now durably records closed fixes across spec, catalog, parser, and runtime surfaces: GAP-024 spec support for TypeQualifier on bag/list/log, GAP-025/026/028 catalog mismatches, GAP-029/030/031 parser hardcodes replaced with catalog-derived sets/lookups, GAP-032 proof requirements for `pow(integer, integer)`, and GAP-033 stale `Notempty` documentation.
+- Iteration 7 and Iteration 8 converge on the same architectural rule: parser vocabulary and precedence helpers must derive from catalog metadata, while structural constructs such as `.` and `(` may remain intentional non-catalog hardcodes because they are grammar structure rather than surfaced operators.
+- PRECEPT0023c's `MultiLead` → `MultiSequence` rename and Ink's wider gap-fix batch now sit in the same durable audit trail; remaining unresolved items are downstream TypeChecker/Evaluator work, not unknown language-surface decisions.
+
+---
+
+### 2026-05-02T19:42:02Z: Dapr hosting research and bounded-quantifier philosophy note merged
+
+**By:** Scribe
+
+**Status:** Merged, deduplicated, inbox cleared (4 files)
+
+**Merged sources:** `frank-dapr-research`, `george-dapr-research`, `frank-philosophy-q1-amendment`, `frank-subset-disjoint-squash`.
+
+- Both Dapr analyses converge on the same only-credible distributed-hosting shape: actor-hosted Precept instances with a pod-level compiled-definition cache, typed rehydration before guard evaluation, and `Restore()` as the state-store boundary; workflows remain the wrong semantic fit for Precept entity execution.
+- Frank's proposed §0.4.1 amendment stays an owner-review item only: bounded quantifiers are philosophically compatible because they unfold over statically finite collections, but philosophy text must not change without explicit sign-off.
+- Frank's `subset` / `disjoint` verdict is now durable alongside that philosophy note: keep them only for `set of <choice>` where the compiler can prove the closed-domain guarantee, and squash them for open types where quantifiers already cover the runtime-only case.
+
+---
+
+### 2026-05-02T19:42:01Z: Collection-types implementation notes through slices 1 to 14 recorded
+
+**By:** Scribe
+
+**Status:** Merged, deduplicated, inbox cleared (2 files; working-state snapshot preserved)
+
+**Merged sources:** `impl-notes-slices-1-7b`, `impl-notes-slices-8-14`.
+
+- The implementation snapshot now durably records tokens 124–138, the `countof` / `peekby` member-name exceptions, `for` reuse as the lookup-access token, `~string` scalar parsing, and the observation that several planned catalog/AST steps were effectively already landed by the time slices were written up.
+- The notes also preserve important corrections to stale assumptions: `to` already existed as `TokenKind` 14, slice 8 catalog/AST work had effectively been completed earlier, and parser/action tests must use real transition-row context instead of pseudo snippets.
+- Treat these notes as execution-trail context rather than final plan truth; the review-normalized entries above remain the authoritative gate for follow-on work.
+
+---
+
 ### 2026-05-01T20:06:10Z: Catalog-member annotation rename locked; no exhaustiveness gaps found
 
 **By:** Scribe
@@ -532,88 +646,6 @@
 - The consolidated review's correctness and metadata-gap items are recorded as completed in the source/design pass.
 
 - Remaining work is concentrated in tooling-generation drift, broader analyzer expansion (PRECEPT0007-PRECEPT0014), snapshot/golden catalog tests, and generated matrix coverage.
-
----
-
-### 2026-04-25T12:00:00Z: Full catalog-system review — 10-item metadata-driven design review (owner sign-off)
-
-**By:** Scribe
-
-**Status:** Merged from 17 inbox files (6 reviews + 5 owner gap resolutions + 6 recommendations)
-
-
-
-**Context:** Full team review of `docs/language/catalog-system.md` — the metadata-driven catalog architecture design doc. Reviews by Frank (architecture + completeness + pipeline + source-of-truth), George (pipeline feasibility), Kramer (tooling), Newman (AI/MCP), Soup Nazi (testing). Owner (Shane) dispositioned all gaps and design questions.
-
-
-
-**Key owner decisions (Shane sign-off, anti-AI-bias lens):**
-
-- **DQ1–DQ2:** `AllowedIn ConstructKind[]` added to both `ConstructMeta` and `ActionMeta` — uniform nesting/context pattern across both catalogs. LS completions filter by parent construct kind.
-
-- **DQ3:** Period dimension legality declared as `DimensionProofRequirement` (new `ProofRequirement` subtype) on `BinaryOperationMeta` entries for `date ± period` and `time ± period`. New `PeriodDimension` enum (`Any`, `Date`, `Time`).
-
-- **DQ4:** Qualifier-to-accessor identity declared via `QualifierAxis` enum and `ReturnsQualifier` field on `FixedReturnAccessor` — `.currency` on `money` returns the field's currency qualifier value.
-
-- **Gap 1 (Type Accessors):** `TypeAccessor` DU — base record (inner-type return for `.peek`/`.min`/`.max`) + `FixedReturnAccessor` sealed subtype (fixed `Returns: TypeKind` for `.count`/`.currency`/`.inZone(tz)`). New `TypeTrait` flags enum (`Orderable`). New `TypeMeta.Traits` and `TypeMeta.Accessors` fields.
-
-- **Gap 2 (Unary Operations):** `OperationMeta` becomes abstract base with `UnaryOperationMeta` and `BinaryOperationMeta` sealed subtypes. Separate frozen-dictionary indexes. 8 unary operations declared.
-
-- **Gap 3 (Widening):** `TypeMeta.WidensTo TypeKind[]` — only `integer → [Decimal, Number]`. `decimal → number` is NOT implicit (requires `approximate()`).
-
-- **Gap 4 (Subsumption + Implied Modifiers):** `ModifierMeta.Subsumes ModifierKind[]` (e.g., `Positive.Subsumes = [Nonnegative, Nonzero]`). `TypeMeta.ImpliedModifiers ModifierKind[]` (e.g., `ExchangeRate.ImpliedModifiers = [Positive]`). Roslyn analyzer enforces consistency.
-
-- **Gap 5 (Business-type function overloads):** `round`, `min`, `max`, `abs` extended to `money` and `quantity` with `QualifierMatch.Same`. `FunctionOverload` gains `QualifierMatch?` field.
-
-- **Gap 6 (clear dual-target + TypeTarget DU):** `ActionMeta.ApplicableTo` migrates from `TypeKind[]` to `TypeTarget[]`. New DU: `TypeTarget(TypeKind)` base + `ModifiedTypeTarget(TypeKind?, ModifierKind[] RequiredModifiers)` sealed subtype. `clear` targets `[Set, Queue, Stack, ModifiedTypeTarget(null, [Optional])]`.
-
-- **Gap 7 (ProofRequirement system):** `ParameterMeta(TypeKind)` replaces raw `TypeKind[]` in `FunctionOverload.Parameters` and `BinaryOperationMeta.Lhs/Rhs`. `ProofSubject` DU (`ParamSubject` + `SelfSubject`). `ProofRequirement` DU (`NumericProofRequirement` + `PresenceProofRequirement` + `DimensionProofRequirement`). 8 proof obligations declared. Roslyn analyzer enforces valid subject placements.
-
-- **Modifier DU:** 5-subtype `ModifierMeta` hierarchy — `FieldModifierMeta`, `StateModifierMeta`, `EventModifierMeta`, `AccessModifierMeta`, `AnchorModifierMeta`. Absorbs 4 bare enums (`StateModifierKind`, `AccessMode`, `EnsureAnchor`, `StateActionAnchor`). Each subtype carries exactly the metadata its consumers need.
-
-- **FunctionMeta evaluation delegates:** `FunctionDispatch` record with `Func<ReadOnlySpan<object?>, object?> Execute` delegate + `Overload` reference. `FunctionMeta.Dispatches` field. Eliminates parallel switch in evaluator.
-
-- **TokenMeta cross-references:** `TypeKind?` and `OperatorKind?` optional fields on `TokenMeta` — compile-time-verified bridge from tokens to their semantic catalog entries.
-
-- **Newman's syntaxReference:** Structured `syntaxReference` JSON object in MCP `precept_language` output — line-oriented grammar, comments, identifiers, string/number literals, whitespace, null-narrowing, conventional declaration ordering.
-
-
-
-**Review corpus (retained for reference, not duplicated here):**
-
-- **frank-catalog-completeness-review:** 10 catalogs confirmed sufficient, no 11th needed. 10 candidate categories evaluated and rejected. Types catalog needs accessor metadata enrichment. Modifiers catalog scope includes event args.
-
-- **frank-catalog-metadata-pipeline-review:** Pipeline feasibility per stage. Parser: vocabulary tables (~40-50%) migrate to frozen dictionaries; grammar stays hand-written. Type checker: ~80% catalog-driveable. Lexer: ~85% already catalog-driven. Proof engine: obligations catalog-driven, strategies algorithmic. Evaluator: dispatch via catalogs, execution logic procedural. String elimination audit: already string-minimal. Cross-catalog dependency graph acyclic.
-
-- **frank-catalog-source-of-truth-analysis:** 8 priority-ranked gaps across all 10 catalogs. Type accessors (gap 1) is highest impact — 30+ accessors across all types. Unary operations unrepresentable in binary-only schema. Widening, subsumption, business-type overloads, clear dual-target, dequeue/pop emptiness all identified.
-
-- **frank-metadata-resolver-architecture:** Dual-layer (declarative + resolver delegate) pattern analysis. Resolvers justified for TypeAccessor and FunctionOverload (generic/polymorphic behavior). 5 of 8 gaps better solved by richer declarative fields. Serialization boundary clean — declarative layer sufficient for all non-compiler consumers.
-
-- **frank-qualifier-propagation-architecture:** QualifierMatch design validated. Four propagation patterns (Homogeneous ±, Scalar scaling, Dimensional cancellation, Same-type ratio). Qualifier propagation is type-checker logic, not catalog data. `Operations.Resolve` returns `OperationMeta?` not `Type?`. MoneyDivideMoney polymorphism: two OperationKind entries recommended.
-
-- **frank-typechecker-implementation-plan:** 16-slice implementation plan with dependency graph. 5 new files (~2500 LOC impl), 5 test files. 13 new DiagnosticCodes. Sequential gates at slices 1, 2, 4, 5. Parallelizable groups identified.
-
-- **george-catalog-metadata-pipeline-review:** Independent feasibility assessment. Lexer: already catalog-driven. Parser: partially feasible (lookup tables yes, productions no). Type checker: biggest win (~60-70% migrates). Graph analyzer: mostly graph-generic. Proof engine: obligations catalog-driven, strategies algorithmic. Evaluator: dispatch feasible, execution logic not.
-
-- **kramer-catalog-metadata-tooling-review:** 14 hardcoded LS completion lists mapped to catalog replacements. 12 TextMate grammar alternations mapped to catalog derivation. Semantic tokens ~90% catalog-driven. Hover: function signatures from FunctionMeta.Overloads. Drift tests over auto-generation recommended.
-
-- **newman-catalog-metadata-ai-review:** `precept_language` covers ~40% of AI needs. Critical gaps: no operation legality table, no widening rules, no modifier applicability matrix, no accessor documentation. Serialization: single response, catalog-keyed grouping, `$type` tagged unions. `syntaxReference` for meta-grammar. One-shot complete language, no per-catalog endpoints.
-
-- **shane-catalog-dq-resolution:** DQ1 (AllowedIn on ConstructMeta), DQ2 (AllowedIn on ActionMeta), DQ3 (DimensionProofRequirement), DQ4 (QualifierAxis + ReturnsQualifier on FixedReturnAccessor).
-
-- **shane-catalog-gap-resolution-1-4:** TypeAccessor DU, OperationMeta DU, widening rules, modifier subsumption + implied modifiers. Full TypeMeta shape decided.
-
-- **shane-catalog-gap-resolution-5-6:** Business-type function overloads with QualifierMatch. TypeTarget DU replacing TypeKind[] on ApplicableTo. ActionMeta.ApplicableTo with clear dual-target.
-
-- **shane-catalog-gap-resolution-7:** ProofRequirement system — ParameterMeta, ProofSubject DU, ProofRequirement DU, 8 proof obligations, Roslyn analyzer enforcement rules.
-
-- **shane-modifier-du-and-review-synthesis:** 5-subtype Modifier DU absorbing 4 bare enums + 10 consolidated review insights with disposition (5 consensus, 3 pending → decided, 2 already resolved).
-
-- **soup-nazi-binary-null-context-test-gap:** Binary sub-expression null-context test strategy for Slice 5. OperatorTable unit tests primary surface. Integration uses field+field not field+literal. Typed-context paths deferred to first assignment surface.
-
-- **soup-nazi-catalog-metadata-test-review:** ~15,500 auto-generated test cases projected. Operations matrix (13,520 cells) is P0. Per-catalog snapshot golden files. Exhaustive matrix before old logic replaced. Cross-catalog referential integrity. Non-negotiable: no catalog without snapshot test.
-
-- **coordinator-design-doc-mandatory-reads:** Directive — every agent spawn for implementation work MUST include relevant design docs as required reading. Triggered by George implementing OperatorTable without reading catalog-system.md.
 
 ---
 
