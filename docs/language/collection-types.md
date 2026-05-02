@@ -579,8 +579,7 @@ add Charges $50 EUR     # TypeMismatch — expected money in 'USD', got money in
 | `Put` | `put` | Put action keyword for lookup |
 | `For` | `for` | Key-access expression keyword for lookup (contextual keyword) |
 | `Insert` | `insert` | Insert action keyword for list |
-| `At` | `at` | Position keyword in `insert F at N` (contextual keyword) |
-| `RemoveAt` | `remove-at` | Remove-at-index action keyword for list |
+| `At` | `at` | Position keyword in `insert F Expr at N` / `remove F at N` (contextual keyword) |
 | `Ascending` | `ascending` | Sort direction modifier (contextual keyword in type position) |
 | `Descending` | `descending` | Sort direction modifier (contextual keyword in type position) |
 | `Countof` | `countof` | Per-element count accessor on bag |
@@ -665,7 +664,7 @@ Precept enforces emptiness safety through proof obligations. Operations that wou
 | `clear` | No-op on empty — no fault possible. |
 | `add`, `remove` (bag) | `add` always safe. `remove` is no-op when element count is 0 — no fault possible. |
 | `append`, `remove` (list) | `append` always safe. `remove` (first-occurrence) is no-op if absent — no fault possible. |
-| `insert at N`, `remove-at N` (list) | Require index-bounds guard: `N >= 0 and N <= F.count` for `insert`, `N >= 0 and N < F.count` for `remove-at`. |
+| `insert F Expr at N`, `remove F at N` (list) | Require index-bounds guard: `N >= 0 and N <= F.count` for `insert`, `N >= 0 and N < F.count` for `remove`. |
 | `enqueue` (queue of T by P) | Always safe — no precondition. |
 | `put`, `remove` (lookup) | Both always safe — `put` creates or overwrites; `remove` is no-op if absent. |
 | `F for K` (lookup) | Requires `F contains K` guard. Obligation: `KeyPresenceSafety`. |
@@ -837,8 +836,8 @@ This restriction exists because collections have no canonical string representat
 | `pop F` | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | — | `.count > 0` |
 | `pop F into G` | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | — | `.count > 0` |
 | `append F Expr` | ✗ | ✗ | ✗ | ✓ | ✗ | ✓ | ✗ | ✗ | `T` | — |
-| `insert F at N Expr` | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | `T` | index-bounds |
-| `remove-at F N` | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | — | index-bounds |
+| `insert F Expr at N` | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | `T` | index-bounds |
+| `remove F at N` | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | — | index-bounds |
 | `put F K = V` | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | `K`, `V` | — |
 | `remove F K` (lookup) | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | `K` | — |
 | `clear F` | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✗ | — | — |
@@ -947,9 +946,9 @@ field PriorityItems   as list of integer
 | Action | Syntax | Behavior |
 |--------|--------|----------|
 | `append` | `append F Expr` | Add `Expr` to the end of `F`. Always safe. |
-| `insert at N` | `insert F at N Expr` | Insert `Expr` at zero-based position `N`, shifting subsequent elements. Precondition: `N >= 0 and N <= F.count`. Author writes guard; proof engine raises `UnguardedCollectionAccess` if absent. |
+| `insert at N` | `insert F Expr at N` | Insert `Expr` at zero-based position `N`, shifting subsequent elements. Precondition: `N >= 0 and N <= F.count`. Author writes guard; proof engine raises `UnguardedCollectionAccess` if absent. |
 | `remove` | `remove F Expr` | Remove first occurrence of `Expr`. No-op if absent. |
-| `remove-at` | `remove-at F N` | Remove element at zero-based position `N`, shifting subsequent elements. Precondition: `N >= 0 and N < F.count`. Author writes guard; proof engine raises `UnguardedCollectionAccess` if absent. |
+| `remove at N` | `remove F at N` | Remove element at zero-based position `N`, shifting subsequent elements. Precondition: `N >= 0 and N < F.count`. Author writes guard; proof engine raises `UnguardedCollectionAccess` if absent. Parser distinguishes `remove F at N` from `remove F Expr` by the trailing `at` keyword immediately after the field token. |
 | `clear` | `clear F` | Remove all elements. |
 
 ```precept
@@ -988,7 +987,7 @@ from Active on GetReviewer when ApprovalChain.count > GetReviewer.Index and GetR
 
 **Constraints:** `notempty`, `mincount N`, `maxcount N`, `optional`, `default [T, T, ...]`. `notempty` statically discharges `.first`/`.last` access obligations.
 
-**Proof engine implications:** Index-bounds obligations (`UnguardedCollectionAccess`) for `.at(N)`, `insert at N`, and `remove-at N`. Author writes `when N >= 0 and N < F.count` (or `N <= F.count` for `insert at`) guard; proof engine raises `UnguardedCollectionAccess` if absent. Sequential action tracking: proof engine tracks count changes from `insert`, `remove`, `remove-at`, and `clear` within a transition row and re-verifies subsequent access guards against updated count. Positional stability across mutations (e.g., after `remove-at 0`, positions shift) is the author's responsibility — the proof engine proves access safety, not value-level positional invariants.
+**Proof engine implications:** Index-bounds obligations (`UnguardedCollectionAccess`) for `.at(N)`, `insert F Expr at N`, and `remove F at N`. Author writes `when N >= 0 and N < F.count` (or `N <= F.count` for `insert`) guard; proof engine raises `UnguardedCollectionAccess` if absent. Sequential action tracking: proof engine tracks count changes from `insert`, `remove`, `remove at N`, and `clear` within a transition row and re-verifies subsequent access guards against updated count. Positional stability across mutations (e.g., after `remove Items at 0`, positions shift) is the author's responsibility — the proof engine proves access safety, not value-level positional invariants.
 
 **Backing type:** `ImmutableList<T>` (.NET) — AVL tree with structural sharing. O(log n) insert, remove, index access. O(1) `.count`.
 
@@ -996,10 +995,10 @@ from Active on GetReviewer when ApprovalChain.count > GetReviewer.Index and GetR
 
 | Scenario | Error |
 |---|---|
-| `insert F at N Expr` where `N` type is not `integer` | `TypeMismatch` |
+| `insert F Expr at N` where `N` type is not `integer` | `TypeMismatch` |
 | `.at(N)` where `N` type is not `integer` | `TypeMismatch` |
 | `append F Expr` where `Expr` type ≠ `T` | `TypeMismatch` |
-| `insert F at N Expr` where `Expr` type ≠ `T` | `TypeMismatch` |
+| `insert F Expr at N` where `Expr` type ≠ `T` | `TypeMismatch` |
 | `set ListField = Expr` | `ScalarOperationOnCollection` |
 
 ---
