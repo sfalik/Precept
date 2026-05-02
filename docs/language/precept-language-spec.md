@@ -453,7 +453,7 @@ set  add  remove  enqueue  dequeue  push  pop  clear  into  append  insert  put
 transition  no  reject
 omit  modify  readonly  editable
 string  number  boolean  integer  decimal  choice  maxplaces  ordered
-bag  list  log  lookup
+queue  stack  bag  list  log  lookup
 date  time  instant  duration  period  timezone  zoneddatetime  datetime
 money  currency  quantity  unitofmeasure  dimension  price  exchangerate
 true  false
@@ -950,7 +950,7 @@ CollectionType  :=  (set | queue | stack) of ScalarType TypeQualifier?
 DirectionModifier  :=  ascending | descending
 ChoiceType        :=  choice "of" ChoiceElementType "(" ChoiceValueExpr ("," ChoiceValueExpr)* ")"
 ChoiceElementType :=  string | integer | decimal | number | boolean
-ChoiceValueExpr   :=  StringLiteral | NumberLiteral | BooleanLiteral
+ChoiceValueExpr   :=  StringLiteral | NumberLiteral | true | false
 TypeQualifier   :=  (in | of | to) Expr
 ```
 

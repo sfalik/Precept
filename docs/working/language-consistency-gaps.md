@@ -57,6 +57,11 @@ Pre-TypeChecker audit — exhaustive consistency check of language docs, catalog
 | GAP-042 | Parser `ParseActionStatement` dispatch has dead branches for `CollectionValueBy`, `CollectionIntoBy`, and `RemoveAtIndex`; variant actions are excluded from `Actions.ByTokenKind` so these shapes never reach dispatch | Catalog-Impl | Fixed | 9 |
 | GAP-060 | `ParseCollectionIntoStatement` bottom switch has `ActionKind.DequeueBy => new DequeueByStatement(...)` — a live constructor call on a structurally unreachable variant-action arm; should be a `throw` like all other mismatched cases | Catalog-Impl | Fixed | 10 |
 | GAP-061 | `Modifiers` catalog lacks `ByFieldToken` O(1) index (analogous to `Actions.ByTokenKind`); `ParseFieldModifierNodes` compensated with a LINQ linear scan through the full modifier list | Catalog-Impl | Fixed | 10 |
+| GAP-043 | `catalog-system.md` inventory and prose say 12 catalogs; `ExpressionForms.cs` declares itself "The 13th catalog" | Doc-Doc | Fixed | 10 |
+| GAP-044 | Spec §1.2 reserved keyword list missing `queue` and `stack` (present in §1.1 vocabulary and lexer) | Doc-Doc | Fixed | 10 |
+| GAP-045 | Spec §2.3 `ChoiceValueExpr` uses undefined terminal `BooleanLiteral`; actual tokens are `true`/`false` | Doc-Doc | Fixed | 10 |
+| GAP-046 | Spec §3.7 function table lists `~startsWith`/`~endsWith` as function-catalog entries but no `FunctionKind` member exists for them; CI variants live in `ExpressionForms` | Doc-Catalog | Unresolved | 10 |
+| GAP-047 | Spec §3.7 `round(value,places)`, `min`, `max`, `abs`, `clamp` missing money/quantity overloads present in `Functions` catalog | Doc-Catalog | Unresolved | 10 |
 | GAP-021 | `is set`/`is not set` associativity: spec §2.1 says `left`, catalog says `NonAssociative (postfix)` | Doc-Impl | Fixed | 6 |
 | GAP-022 | Spec §2.1 null-denotation table names `StringLiteralExpression` — a node that does not exist; implementation uses `LiteralExpression` | Doc-Impl | Fixed | 6 |
 | GAP-023 | Spec §2.1 precedence table has `is` row (60) appearing before `+/-` row (50); two rows at level 60 without ordering explanation | Doc-Spec | Fixed | 6 |
@@ -1874,3 +1879,136 @@ ModifierKeywords (the parser-level FrozenSet) was correctly catalog-derived. But
 
 **Resolution:**  
 Added Modifiers.ByFieldToken (FrozenDictionary of TokenKind to FieldModifierMeta) built at startup from All.OfType<FieldModifierMeta>().ToFrozenDictionary(m => m.Token.Kind). Updated ParseFieldModifierNodes to use Modifiers.ByFieldToken.TryGetValue for O(1) dispatch. Added using System.Collections.Frozen to Modifiers.cs. All 2713 tests pass.
+
+<!-- Iteration 10 complete: Frank's catalog/spec/doc pass. Prior fixes confirmed: GAP-034 (SimpleCollectionTypeLeaders ✅), GAP-035 (ChoiceLiteralTokens ✅), GAP-036 (ClearApplicable includes optional ✅), GAP-037 (Writable hover updated ✅), GAP-039 (AppendBy→LogBy, EnqueueBy→QueueBy ✅), GAP-040 (countof ElementParameterAccessor ✅), GAP-041 (QuantifierPredicateNotBoolean ✅), GAP-042 (dead dispatch arms removed ✅). New gaps: GAP-043 (Fixed — catalog-system.md said 12 catalogs; ExpressionForms.cs is the 13th; updated catalog-system.md Status, inventory table, and prose), GAP-044 (Fixed — spec §1.2 keyword list omitted `queue` and `stack`; both present in §1.1 and lexer since v1; added to collection-types line), GAP-045 (Fixed — spec §2.3 ChoiceValueExpr used undefined terminal BooleanLiteral; fixed to `true | false` per actual token vocabulary), GAP-046 (Unresolved — spec §3.7 lists ~startsWith/~endsWith as function-catalog entries but FunctionKind has no CI members; CI variants are ExpressionFormKind.CIFunctionCall + HasCIVariant flag; owner must decide how to document or restructure), GAP-047 (Unresolved — spec §3.7 min/max/abs/clamp/round(places) tables omit money/quantity overloads present in Functions catalog; owner must decide spec expansion vs reference note). Status: 49 gaps total, 47 Fixed, 2 Unresolved. -->
+
+---
+
+## GAP-043: `catalog-system.md` says 12 catalogs; `ExpressionForms.cs` declares itself "The 13th catalog"
+
+**Status:** Fixed  
+**Category:** Doc-Doc  
+**Location:** `docs/language/catalog-system.md` (Status line, inventory table, all "twelve" prose); `src/Precept/Language/ExpressionForms.cs` (file doc comment)  
+**Found in iteration:** 10
+
+**Description:**  
+`catalog-system.md` consistently describes the catalog system as containing twelve catalogs. The Status metadata says "all 12 catalogs in `src/Precept/`"; the Overview says "Twelve catalogs — ten describing what the language IS, two describing how it reports failures"; the inventory table has twelve rows; the Completeness Principle section says "Twelve catalogs in two groups"; the "Derive, never duplicate" section says "The twelve catalogs cover...". A "thirteenth aspect" escape hatch is mentioned at the end of the inventory: "If a thirteenth aspect of the language emerges that isn't covered by these twelve, it needs a catalog."
+
+However, `src/Precept/Language/ExpressionForms.cs` has existed as exactly that: the thirteenth catalog. Its file-level doc comment explicitly reads "The 13th catalog." It defines `ExpressionFormKind` with 13 members (Literal, Identifier, Grouped, BinaryOperation, UnaryOperation, MemberAccess, Conditional, FunctionCall, MethodCall, ListLiteral, PostfixOperation, Quantifier, CIFunctionCall) and follows the full catalog pattern (Kind enum, `GetMeta()` switch, `All` property). It is not in the "Enums that remain bare" table. The escape hatch was triggered and the catalog was added, but the doc was never updated.
+
+**Rubber-Duck Analysis:**  
+The `ExpressionFormKind` enum lists are NOT in the "bare enums" table and follow the full catalog pattern including an exhaustive `GetMeta()` switch. The doc comment "The 13th catalog" is authoritative. The fix is purely documentary — the implementation is correct, the doc is stale. `ExpressionForms` belongs in the Language Definition group (after Constructs, before Constraints) since it describes expression grammar forms, which are a language-IS surface.
+
+**Resolution:**  
+Fixed (2026-05-02). Updated `catalog-system.md`:
+- Status line: "all 12 catalogs" → "all 13 catalogs"
+- Overview paragraph: "Twelve catalogs — ten describing..." → "Thirteen catalogs — eleven describing..."
+- Vision section: "Twelve catalogs cover the complete language surface" → "Thirteen catalogs cover the complete language surface"
+- Consumer table: "All 12 catalogs" → "All 13 catalogs"; "All 8 language definition catalogs" → "All 9 language definition catalogs"
+- Inventory: "Twelve catalogs in two groups" → "Thirteen catalogs in two groups"; added ExpressionForms as #9 in Language Definition (between Constructs and Constraints); renumbered Constraints → 10, ProofRequirements → 11, Diagnostics → 12, Faults → 13
+- Escape hatch: "thirteenth aspect" → "fourteenth aspect"; "these twelve" → "these thirteen"
+- Architectural Identity section: "The twelve catalogs are expressions" → "The thirteen catalogs are expressions"
+- Derive, never duplicate: "The twelve catalogs cover..." → "The thirteen catalogs cover..." (added "expression forms" to the enumerated list)
+
+---
+
+## GAP-044: Spec §1.2 reserved keyword list missing `queue` and `stack`
+
+**Status:** Fixed  
+**Category:** Doc-Doc  
+**Location:** `docs/language/precept-language-spec.md` §1.2, collection-types keyword line (before fix: `bag  list  log  lookup`)  
+**Found in iteration:** 10
+
+**Description:**  
+The §1.2 "complete v2 reserved keyword set" code block is missing `queue` and `stack`. Both are present in the §1.1 token vocabulary table as `QueueType | queue | Queue collection type` and `StackType | stack | Stack collection type`. Both are assigned token ordinals (70 and 71) in `TokenKind.cs`. Both appear in `Tokens.cs` with `Cat_Type` category and are therefore included in the `Tokens.Keywords` dictionary used by the lexer. They have been reserved keywords since v1 — not in v2 additions, not in v3 additions, and not in v1/v2/v3 removals. The §1.2 list erroneously omits them.
+
+**Rubber-Duck Analysis:**  
+The v3 additions line in §1.2 correctly lists `bag list log lookup` as added in v3. `queue` and `stack` predate v3 and predate the v2 additions list. They appear to have been omitted from the §1.2 keyword block when the block was first written — possibly because `set` (their peer collection type keyword) is dual-use and appears on the actions line, and the author did not notice `queue`/`stack` were absent from the type keyword line. The fix is to add them to the collection-types line.
+
+**Resolution:**  
+Fixed (2026-05-02). Changed `bag  list  log  lookup` to `queue  stack  bag  list  log  lookup` in the §1.2 code block. `queue` and `stack` now precede `bag`/`list`/`log`/`lookup` matching their token ordinal order (70, 71 before 124–127).
+
+---
+
+## GAP-045: Spec §2.3 `ChoiceValueExpr` uses undefined terminal `BooleanLiteral`
+
+**Status:** Fixed  
+**Category:** Doc-Doc  
+**Location:** `docs/language/precept-language-spec.md` §2.3 grammar, `ChoiceValueExpr` production (line 953)  
+**Found in iteration:** 10
+
+**Description:**  
+The `ChoiceValueExpr` grammar production in §2.3 reads:
+```
+ChoiceValueExpr   :=  StringLiteral | NumberLiteral | BooleanLiteral
+```
+`BooleanLiteral` is used as a terminal here, but no `BooleanLiteral` token kind exists anywhere in the spec or in `TokenKind.cs`. The boolean literal tokens are `True` and `False` (token texts: `true`, `false`). The §2.1 null-denotation table correctly lists `True / False` as producing a `LiteralExpression`. The `ChoiceLiteralTokens` property on `TypeMeta` (added by GAP-035) encodes `Boolean → [True, False]`. `BooleanLiteral` is inconsistent with all other grammar productions that refer to keyword terminals by their token text.
+
+**Rubber-Duck Analysis:**  
+`StringLiteral` and `NumberLiteral` in this production are genuine token kind names (they represent the opaque non-keyword literal token kinds produced by the lexer). `BooleanLiteral` is NOT a token kind — it's a made-up composite name. The correct notation matching the rest of the spec is the keyword text `true | false`. This is a purely cosmetic doc inconsistency; no implementation is affected.
+
+**Resolution:**  
+Fixed (2026-05-02). Changed `ChoiceValueExpr := StringLiteral | NumberLiteral | BooleanLiteral` to `ChoiceValueExpr := StringLiteral | NumberLiteral | true | false`.
+
+---
+
+## GAP-046: Spec §3.7 lists `~startsWith`/`~endsWith` as function-catalog entries; no `FunctionKind` exists for them
+
+**Status:** Unresolved  
+**Category:** Doc-Catalog  
+**Location:** `docs/language/precept-language-spec.md` §3.7 function catalog table; `src/Precept/Language/FunctionKind.cs`; `src/Precept/Language/ExpressionForms.cs`  
+**Found in iteration:** 10
+
+**Description:**  
+Spec §3.7 opens with "Functions are validated against a closed catalog" and presents a table including `~startsWith(s, prefix)` and `~endsWith(s, suffix)` alongside 21 regular functions. This implies they are members of the Functions catalog (`FunctionKind` enum). However, `FunctionKind.cs` has 21 members — none for CI variants of startsWith/endsWith. The CI function mechanism is expressed in two places:
+
+1. `Functions.cs`: `StartsWith` and `EndsWith` both have `HasCIVariant: true` on their `FunctionMeta`, signaling that the `~` prefix form exists.
+2. `ExpressionForms.cs`: `ExpressionFormKind.CIFunctionCall` (value 13, the final member of the 13th catalog) describes CI function calls with `LeadToken: TokenKind.Tilde` and category `Invocation`.
+
+So `~startsWith` and `~endsWith` are handled as an `ExpressionFormKind.CIFunctionCall` node referencing a base function with `HasCIVariant == true` — not as distinct `FunctionKind` members. The spec's placement of them in the "Functions are validated against a closed catalog" section creates a false implication that they have their own `FunctionKind` entries.
+
+**Rubber-Duck Analysis:**  
+Two valid resolutions exist:
+
+1. **Add a spec note.** In §3.7, add a note explaining that `~startsWith` and `~endsWith` are not `FunctionKind` enum members but are CI invocation variants, handled via `ExpressionFormKind.CIFunctionCall` and the `HasCIVariant` flag on their base functions. Keep them in the table for discoverability but annotate with "(CI variant — `ExpressionForms` catalog, not `Functions` catalog)".
+
+2. **Add `FunctionKind` members.** Add `CIStartsWith` and `CIEndsWith` to `FunctionKind` and populate `Functions.cs` entries for them, removing the need for the hybrid ExpressionForms approach. This would make the spec's framing accurate. However, it would require redesigning how the type checker dispatches CI function calls (currently via `HasCIVariant` flag, not distinct `FunctionKind` entries).
+
+The current design is internally consistent — `ExpressionFormKind.CIFunctionCall` + `HasCIVariant` is a deliberate choice that avoids duplicating function metadata. The spec text is the gap, not the implementation.
+
+**Ownership:** Owner decision required. No C# changes made this iteration.
+
+---
+
+## GAP-047: Spec §3.7 function table missing money/quantity overloads for `min`, `max`, `abs`, `clamp`, `round(places)`
+
+**Status:** Unresolved  
+**Category:** Doc-Catalog  
+**Location:** `docs/language/precept-language-spec.md` §3.7; `src/Precept/Language/Functions.cs`  
+**Found in iteration:** 10
+
+**Description:**  
+The `Functions` catalog (`Functions.cs`) defines money and quantity overloads for five functions that the spec §3.7 table documents only with numeric (integer/decimal/number) signatures:
+
+| Function | Spec §3.7 signature | Catalog also has |
+|----------|--------------------|--------------------|
+| `min(a, b)` | `(numeric, numeric) → numeric` | `(money, money) → money (QualifierMatch.Same)`, `(quantity, quantity) → quantity (QualifierMatch.Same)` |
+| `max(a, b)` | `(numeric, numeric) → numeric` | `(money, money) → money (QualifierMatch.Same)`, `(quantity, quantity) → quantity (QualifierMatch.Same)` |
+| `abs(value)` | `numeric → numeric` | `money → money`, `quantity → quantity` |
+| `clamp(v, lo, hi)` | `(numeric, numeric, numeric) → numeric` | `(money, money, money) → money (QualifierMatch.Same)`, `(quantity, quantity, quantity) → quantity (QualifierMatch.Same)` |
+| `round(value, places)` | `(numeric, integer) → decimal` | `(money, integer) → money`, `(quantity, integer) → quantity` |
+
+The spec §3.7 section header states: "Functions are validated against a closed catalog." Readers relying solely on §3.7 will not know that `min(price1, price2)` is legal, that `round(amount, 2)` returns money (not decimal), or that `clamp(qty, lo, hi)` requires all three arguments share the same qualifier.
+
+Note: `round(value, places)` is additionally described in §3.7 as a "lane bridge function" (`(numeric, integer) → decimal`). For money/quantity, it is NOT a bridge — it rounds the amount while preserving the domain type. The "bridge" framing only applies to the numeric lane.
+
+**Rubber-Duck Analysis:**  
+The spec's §3.7 was written to cover the numeric-lane (integer/decimal/number) function surface. The business-domain-type overloads were added to the catalog later and not back-ported to the spec. Two resolutions:
+
+1. **Expand §3.7 rows.** Add money/quantity overload rows (or sub-rows) for each of the five functions. Note qualifier-matching semantics for min/max/clamp/round.
+
+2. **Add a cross-reference note.** After the function table (or in a §3.7 subsection), add a paragraph: "For `money` and `quantity` arguments, `min`, `max`, `abs`, `clamp`, and `round(value, places)` apply with domain-type-preserving semantics. Arguments and result share the same qualifier (currency for money, unit for quantity). `round(money, places)` returns `money`, not `decimal`. See business-domain-types.md §Functions for full overload signatures."
+
+The `round(value, places)` "bridge" note in §3.7 also needs clarification — it applies only to the numeric lane.
+
+**Ownership:** Owner decision required — spec expansion vs. cross-reference note. No C# changes made this iteration.

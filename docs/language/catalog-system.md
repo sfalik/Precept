@@ -7,16 +7,16 @@
 | Property | Value |
 |---|---|
 | Doc maturity | Draft |
-| Implementation state | Implemented — all 12 catalogs in `src/Precept/`; team review complete (2026-04-25) |
+| Implementation state | Implemented — all 13 catalogs in `src/Precept/`; team review complete (2026-04-25) |
 | Related | `docs/compiler/diagnostic-system.md` · `docs/runtime/fault-system.md` · `docs/compiler-and-runtime-design.md` |
 
 ## Overview
 
-The catalog system is the **authoritative machine-readable definition of the Precept language.** Twelve catalogs — ten describing what the language IS, two describing how it reports failures — form a closed, compiler-enforced registry. This document defines the catalog pattern, the twelve-catalog inventory, their shapes, cross-catalog derivation relationships, and future opportunities.
+The catalog system is the **authoritative machine-readable definition of the Precept language.** Thirteen catalogs — eleven describing what the language IS, two describing how it reports failures — form a closed, compiler-enforced registry. This document defines the catalog pattern, the thirteen-catalog inventory, their shapes, cross-catalog derivation relationships, and future opportunities.
 
 ## Vision: Metadata for the Entire Language
 
-Every aspect of Precept — its keywords, types, functions, operators, operations, modifiers, actions, grammar forms, constraints, proof requirements, diagnostics, and faults — is defined as structured metadata in a static, compiler-enforced catalog. Twelve catalogs cover the complete language surface. Their union IS the language specification in machine-readable form.
+Every aspect of Precept — its keywords, types, functions, operators, operations, modifiers, actions, grammar forms, expression forms, constraints, proof requirements, diagnostics, and faults — is defined as structured metadata in a static, compiler-enforced catalog. Thirteen catalogs cover the complete language surface. Their union IS the language specification in machine-readable form.
 
 Every consumer reads from these catalogs:
 
@@ -28,8 +28,8 @@ Every consumer reads from these catalogs:
 | LS hover | Type documentation, function signatures, operator descriptions |
 | LS semantic tokens | Token categories |
 | Type checker | Modifier applicability, function signatures, operation legality |
-| AI grounding | All 12 catalogs — complete language knowledge |
-| Reference docs | All 8 language definition catalogs |
+| AI grounding | All 13 catalogs — complete language knowledge |
+| Reference docs | All 9 language definition catalogs |
 
 No consumer maintains its own parallel copy. Adding a language feature to an enum is the single atomic act that propagates it to every surface. The compiler refuses to build if any member is missing metadata.
 
@@ -39,7 +39,7 @@ No consumer maintains its own parallel copy. Adding a language feature to an enu
 
 The test: **if I enumerated every catalog's `All` property, would I have a complete description of Precept?** The catalogs needed are those whose union covers the entire language surface.
 
-Twelve catalogs in two groups.
+Thirteen catalogs in two groups.
 
 **Language Definition (what the language IS):**
 
@@ -53,17 +53,18 @@ Twelve catalogs in two groups.
 | 6 | **Modifiers** | Declaration-attached modifiers — field constraints, state lifecycle, event modifiers, access modes, anchors (DU with 5 subtypes) |
 | 7 | **Actions** | State-machine action verbs |
 | 8 | **Constructs** | Grammar forms / declaration shapes |
-| 9 | **Constraints** | Constraint declaration forms — invariant, state-anchored, event precondition (DU as identity) |
-| 10 | **ProofRequirements** | Proof obligation kinds — numeric, presence, dimension, modifier, qualifier compatibility (DU as identity) |
+| 9 | **ExpressionForms** | Expression grammar forms — expression node kinds (literal, identifier, binary op, function call, quantifier, CI function call, etc.) |
+| 10 | **Constraints** | Constraint declaration forms — invariant, state-anchored, event precondition (DU as identity) |
+| 11 | **ProofRequirements** | Proof obligation kinds — numeric, presence, dimension, modifier, qualifier compatibility (DU as identity) |
 
 **Failure Modes (how it tells you what's wrong):**
 
 | # | Catalog | What it covers |
 |---|---------|----------------|
-| 11 | **Diagnostics** | Compile-time rules |
-| 12 | **Faults** | Runtime failure modes |
+| 12 | **Diagnostics** | Compile-time rules |
+| 13 | **Faults** | Runtime failure modes |
 
-If a thirteenth aspect of the language emerges that isn't covered by these twelve, it needs a catalog. The system is complete when the catalogs are.
+If a fourteenth aspect of the language emerges that isn't covered by these thirteen, it needs a catalog. The system is complete when the catalogs are.
 
 ### Enums that remain bare
 
@@ -94,7 +95,7 @@ This inverts the traditional compiler model:
 | What tests verify | Implementation behavior | Metadata completeness and correctness |
 | What consumers read | Their own parallel copies | The single source of truth |
 
-The twelve catalogs are expressions of this principle — not the principle itself. The principle is: **if something is domain knowledge, it is metadata; if it is metadata, it has a declared shape; if shapes vary by kind, the shape is a discriminated union.** Pipeline stages, tooling, and consumers derive from the metadata — they never maintain parallel copies or encode domain knowledge in their own logic.
+The thirteen catalogs are expressions of this principle — not the principle itself. The principle is: **if something is domain knowledge, it is metadata; if it is metadata, it has a declared shape; if shapes vary by kind, the shape is a discriminated union.** Pipeline stages, tooling, and consumers derive from the metadata — they never maintain parallel copies or encode domain knowledge in their own logic.
 
 ### Vision precedes consumers
 
@@ -135,7 +136,7 @@ The exhaustive switch is the enforcement — the C# compiler refuses to build if
 
 ### Derive, never duplicate
 
-The twelve catalogs cover vocabulary, types, functions, operators, operations, modifiers, actions, grammar constructs, constraints, proof requirements, compile-time rules, and runtime failure modes. Their union is the language. Every downstream artifact — grammar, completions, hover, MCP output, documentation — derives from catalog metadata. No consumer maintains a parallel copy. Adding a language feature to an enum is the single atomic act that propagates it to every surface.
+The thirteen catalogs cover vocabulary, types, functions, operators, operations, modifiers, actions, grammar constructs, expression forms, constraints, proof requirements, compile-time rules, and runtime failure modes. Their union is the language. Every downstream artifact — grammar, completions, hover, MCP output, documentation — derives from catalog metadata. No consumer maintains a parallel copy. Adding a language feature to an enum is the single atomic act that propagates it to every surface.
 
 ## Pattern Definition
 
@@ -312,10 +313,10 @@ All four are `DiagnosticSeverity.Error` with `isEnabledByDefault: true`. Combine
 
 | Layer | Mechanism | What it enforces | Scope |
 |-------|-----------|-----------------|-------|
-| **Compiler** | CS8509 (exhaustive switch) | Every enum member has a metadata entry | All 12 catalogs |
+| **Compiler** | CS8509 (exhaustive switch) | Every enum member has a metadata entry | All 13 catalogs |
 | **Roslyn** | PRECEPT0001–PRECEPT0004 | Output values go through the factory; cross-catalog linkage is present | Diagnostics and Faults only |
 
-Most catalogs (Tokens, Types, Functions, Operators, Operations, Modifiers, Actions, Constructs, Constraints, ProofRequirements) have no output type with metadata-derived strings — `GetMeta()` and `All` are their entire surface. The compiler layer alone covers them. The Roslyn layer is specific to the two failure-mode catalogs whose output types carry strings that must stay within the registry.
+Most catalogs (Tokens, Types, Functions, Operators, Operations, Modifiers, Actions, Constructs, ExpressionForms, Constraints, ProofRequirements) have no output type with metadata-derived strings — `GetMeta()` and `All` are their entire surface. The compiler layer alone covers them. The Roslyn layer is specific to the two failure-mode catalogs whose output types carry strings that must stay within the registry.
 
 ### Future Rules
 
@@ -1040,7 +1041,25 @@ public enum ConstructSlotKind { ... }
 
 `AllowedIn` declares where a construct can appear: empty means the construct is valid at precept body level (top-level declarations); populated means the construct is only valid nested inside one of the listed parent construct kinds. `LeadingToken` identifies the keyword that starts the construct — used by the grammar generator to emit keyword-anchored rules from catalog metadata. LS completions use `AllowedIn` to filter context-sensitive suggestions: "which constructs have the current cursor's parent construct kind in their `AllowedIn`?"
 
-#### 9. Constraints (✅ Implemented)
+#### 9. ExpressionForms (✅ Implemented)
+
+Expression grammar forms — the 13-member taxonomy of what the Pratt parser can construct and what role each form plays (null-denotation atom vs. left-denotation extension).
+
+| Part | Type |
+|------|------|
+| Kind enum | `ExpressionFormKind` (13 members) |
+| Meta record | `ExpressionFormMeta(Kind, Category, IsLeftDenotation, LeadTokens, HoverDocs)` |
+| Supporting type | `ExpressionCategory` (4 members: `Atom`, `Composite`, `Invocation`, `Collection`) |
+| Catalog class | `ExpressionForms` — `GetMeta()`, `All` |
+| Output type | None |
+
+**Members:**
+
+`Literal`, `Identifier`, `Grouped` (atoms — null-denotation); `BinaryOperation`, `UnaryOperation`, `MemberAccess`, `Conditional`, `PostfixOperation` (composites); `FunctionCall`, `MethodCall`, `CIFunctionCall` (invocations); `ListLiteral` (collection); `Quantifier`
+
+**Consumers:** parser coverage enforcement (via `[HandlesCatalogMember]`/`[HandlesCatalogExhaustively]` annotations), MCP vocabulary, reference documentation.
+
+#### 10. Constraints (✅ Implemented)
 
 The five constraint declaration forms. Each form has a distinct activation shape: invariants are always active; state-anchored constraints activate on state entry, residency, or exit; event preconditions fire before an event executes.
 
@@ -1073,7 +1092,7 @@ The `StateAnchored` intermediate layer allows consumers to check `meta is Constr
 
 **Consumers:** plan router (constraint bucket assignment), evaluator (activation timing), MCP vocabulary, LS hover.
 
-#### 10. ProofRequirements (✅ Implemented)
+#### 11. ProofRequirements (✅ Implemented)
 
 The five proof obligation kinds that catalog entries can declare. Used by the proof engine to determine what must be proven before an operation, function, accessor, or action can execute.
 
@@ -1105,7 +1124,7 @@ public abstract record ProofRequirementMeta(ProofRequirementKind Kind, string De
 
 ### Failure Mode Catalogs
 
-#### 11. Diagnostics (✅ Implemented)
+#### 12. Diagnostics (✅ Implemented)
 
 Compile-time rules — every error and warning the pipeline can produce. Currently 78 members across Lex (8), Parse (5), Type (35+16+2), Graph (2), and Proof (3) stages.
 
@@ -1119,7 +1138,7 @@ Compile-time rules — every error and warning the pipeline can produce. Current
 
 `DiagnosticCategory` describes *what* a diagnostic is about, complementing `DiagnosticStage` which describes *when* it fires. Used by the language server for filtering, documentation generation, and AI grounding.
 
-#### 12. Faults (✅ Implemented)
+#### 13. Faults (✅ Implemented)
 
 Runtime failure modes — every fault the evaluator can produce. Currently 13 members. Each `FaultCode` carries a `[StaticallyPreventable(DiagnosticCode)]` attribute linking it to the compile-time rule that should prevent that site.
 
@@ -1345,7 +1364,7 @@ Currency codes and measurement units are validated at type-check time, but they 
 
 ## Syntax Reference
 
-The 12 catalogs cover the language's *vocabulary* exhaustively. The language also has *grammar meta-rules* — singular facts about how source text is structured — that consumers need but that have no per-member enum. These are language-level constants, not catalogs.
+The 13 catalogs cover the language's *vocabulary* exhaustively. The language also has *grammar meta-rules* — singular facts about how source text is structured — that consumers need but that have no per-member enum. These are language-level constants, not catalogs.
 
 `SyntaxReference` is a static class with typed properties, part of the same metadata-driven source of truth:
 
@@ -1383,7 +1402,7 @@ The test of completeness: every cell should trace back to a catalog, never to ha
 | Consumer surface | Catalogs read | How |
 |------------------|---------------|-----|
 | **TextMate grammar** | Constructs → Tokens → Types | **Generated** from catalog metadata. Construct slot arrays generate patterns; token keywords generate keyword alternations; type keywords via `Types.All` filtered by `Token.Text`. No hand-maintained alternation lists. Tests verify the generator produces correct output. |
-| **MCP `precept_language`** | All 12 catalogs' `.All` + `SyntaxReference` | Union of all catalog enumerations IS the language spec. MCP tool iterates each and serializes. `SyntaxReference` adds grammar meta-rules. |
+| **MCP `precept_language`** | All 13 catalogs' `.All` + `SyntaxReference` | Union of all catalog enumerations IS the language spec. MCP tool iterates each and serializes. `SyntaxReference` adds grammar meta-rules. |
 | **LS completions** | Tokens + Types + Functions + Modifiers + Actions | **Generated** from catalog metadata. Context-filtered: type position → `Types.All`; expression → `Functions.All`; after type → `Modifiers.All` filtered by `ApplicableTo`; event body → `Actions.All`. No hand-maintained completion lists. |
 | **LS hover** | Types + Functions + Operators + Operations + Constraints | Per-member descriptions from catalog metadata. `ConstraintMeta.Description` populates hover for `rule`/`ensure` declarations. |
 | **LS semantic tokens** | Tokens (via `TokenMeta.Categories`) | Token categories map directly to semantic token types |
@@ -1393,8 +1412,8 @@ The test of completeness: every cell should trace back to a catalog, never to ha
 | **Proof engine** | ProofRequirements | `ProofRequirements.GetMeta(kind)` dispatches proof obligation instances by kind. `ProofRequirementMeta.QualifierCompatibility` identifies dual-subject obligations without per-kind conditionals. |
 | **Evaluator dispatch** | Functions + Operations + Constraints | Evaluator dispatches by operation kind and function kind. `Constraints.GetMeta()` drives constraint activation timing — no hardcoded per-kind activation logic. Execution delegate design deferred pending working copy API design. |
 | **Runtime boundary validation** | Modifiers | `FieldModifierMeta.ApplicableTo` and `HasValue` drive boundary checks. No `switch` on `ModifierKind`. |
-| **Reference documentation** | All 10 language definition catalogs + `SyntaxReference` | **Generated** from catalog metadata. Tables, syntax sections, grammar reference all derived from `All` properties. |
-| **AI grounding** | All 12 catalogs + `SyntaxReference` | Complete, always-accurate language reference — AI grounded on catalog output cannot hallucinate features |
+| **Reference documentation** | All 11 language definition catalogs + `SyntaxReference` | **Generated** from catalog metadata. Tables, syntax sections, grammar reference all derived from `All` properties. |
+| **AI grounding** | All 13 catalogs + `SyntaxReference` | Complete, always-accurate language reference — AI grounded on catalog output cannot hallucinate features |
 
 No consumer surface maintains its own parallel list. Every fact comes from a catalog `All` property, `GetMeta()` call, or `SyntaxReference` property. TextMate grammar, LS completions, and reference documentation are **generated** from catalogs — not hand-maintained. Tests verify the generators produce correct output.
 
@@ -1584,7 +1603,7 @@ _TBD — open questions will be captured here as catalog consumers are implement
 | Document | Relationship |
 |---|---|
 | [Compiler and Runtime Design](../compiler-and-runtime-design.md) | Architectural grounding — metadata-driven identity established here |
-| [Diagnostic System](../compiler/diagnostic-system.md) | Catalog 11 — `DiagnosticCode` + `DiagnosticMeta` shapes defined there |
-| [Fault System](../runtime/fault-system.md) | Catalog 12 — `FaultCode` + `FaultMeta` shapes; StaticallyPreventable chain |
+| [Diagnostic System](../compiler/diagnostic-system.md) | Catalog 12 — `DiagnosticCode` + `DiagnosticMeta` shapes defined there |
+| [Fault System](../runtime/fault-system.md) | Catalog 13 — `FaultCode` + `FaultMeta` shapes; StaticallyPreventable chain |
 | [Language Spec](precept-language-spec.md) | Consumers of catalog metadata for each pipeline stage |
 | [Primitive Types](primitive-types.md) | `Types` catalog is the machine-readable version of primitive type rules |
