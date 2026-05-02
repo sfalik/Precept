@@ -427,7 +427,9 @@ public static partial class Parser
             {
                 ActionKind.Dequeue   => new DequeueStatement(span, field, into),
                 ActionKind.Pop       => new PopStatement(span, field, into),
-                ActionKind.DequeueBy => new DequeueByStatement(span, field, into),
+                // DequeueBy is a variant action (PrimaryActionKind != null) — excluded from Actions.ByTokenKind
+                // and carries shape CollectionIntoBy, not CollectionInto. This arm is structurally unreachable.
+                ActionKind.DequeueBy => throw new InvalidOperationException("ActionKind.DequeueBy is a variant-action shape unreachable from ParseCollectionIntoStatement"),
                 ActionKind.Set      => throw new InvalidOperationException($"ActionKind.Set does not belong to the CollectionInto shape"),
                 ActionKind.Add      => throw new InvalidOperationException($"ActionKind.Add does not belong to the CollectionInto shape"),
                 ActionKind.Remove   => throw new InvalidOperationException($"ActionKind.Remove does not belong to the CollectionInto shape"),
@@ -1169,10 +1171,9 @@ public static partial class Parser
             while (ModifierKeywords.Contains(Current().Kind))
             {
                 var modToken = Advance();
-                // Check if this is a value-bearing modifier
-                var modMeta = Modifiers.All.OfType<FieldModifierMeta>()
-                    .FirstOrDefault(m => m.Token.Kind == modToken.Kind);
-                if (modMeta?.HasValue == true)
+                // Catalog-derived: Modifiers.ByFieldToken is the O(1) index from
+                // TokenKind → FieldModifierMeta. No linear scan.
+                if (Modifiers.ByFieldToken.TryGetValue(modToken.Kind, out var modMeta) && modMeta.HasValue)
                 {
                     var value = ParseExpression(0);
                     modifiers.Add(new ValueModifierNode(

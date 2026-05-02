@@ -9,7 +9,7 @@ Pre-TypeChecker audit — exhaustive consistency check of language docs, catalog
 - Obvious gap → agent rubber-ducks, applies fix, status = **Fixed**
 - Non-obvious gap → full analysis written, status = **Unresolved** (owner resolves on second pass)
 
-**Audit status: CLOSED — 42 gaps total, 42 Fixed, 0 Unresolved (GAP-035, GAP-040, GAP-042 resolved 2026-05-02)**
+**Audit status: OPEN — 49 gaps total, 47 Fixed, 2 Unresolved (GAP-043–045 fixed inline 2026-05-02; GAP-046–047 pending owner decision)**
 
 ---
 
@@ -55,6 +55,8 @@ Pre-TypeChecker audit — exhaustive consistency check of language docs, catalog
 | GAP-040 | `Types.cs` `BagAccessors.countof` has `ParameterType: TypeKind.Integer` but spec says `countof(E)` takes element `E` of type `T` (the bag's element type), not integer | Doc-Catalog | Fixed | 9 |
 | GAP-041 | Spec §3.8 quantifier predicate validation table names `TypeMismatch` for non-boolean predicate but dedicated `QuantifierPredicateNotBoolean` (code 106) exists in both catalog files | Doc-Catalog | Fixed | 9 |
 | GAP-042 | Parser `ParseActionStatement` dispatch has dead branches for `CollectionValueBy`, `CollectionIntoBy`, and `RemoveAtIndex`; variant actions are excluded from `Actions.ByTokenKind` so these shapes never reach dispatch | Catalog-Impl | Fixed | 9 |
+| GAP-060 | `ParseCollectionIntoStatement` bottom switch has `ActionKind.DequeueBy => new DequeueByStatement(...)` — a live constructor call on a structurally unreachable variant-action arm; should be a `throw` like all other mismatched cases | Catalog-Impl | Fixed | 10 |
+| GAP-061 | `Modifiers` catalog lacks `ByFieldToken` O(1) index (analogous to `Actions.ByTokenKind`); `ParseFieldModifierNodes` compensated with a LINQ linear scan through the full modifier list | Catalog-Impl | Fixed | 10 |
 | GAP-021 | `is set`/`is not set` associativity: spec §2.1 says `left`, catalog says `NonAssociative (postfix)` | Doc-Impl | Fixed | 6 |
 | GAP-022 | Spec §2.1 null-denotation table names `StringLiteralExpression` — a node that does not exist; implementation uses `LiteralExpression` | Doc-Impl | Fixed | 6 |
 | GAP-023 | Spec §2.1 precedence table has `is` row (60) appearing before `+/-` row (50); two rows at level 60 without ordering explanation | Doc-Spec | Fixed | 6 |
@@ -1828,3 +1830,47 @@ Each gap uses this template:
 - `Doc-Catalog` — a doc names a token/type/action/operator/function/code not in the C# catalog, or vice versa
 - `Catalog-Impl` — a catalog entry is unused/unreachable in the lexer or parser
 - `Doc-Impl` — documented syntax is not implemented (or implementation diverges from docs)
+
+
+---
+
+## GAP-060: Dead DequeueBy arm in ParseCollectionIntoStatement
+
+**Status:** Fixed  
+**Category:** Catalog-Impl  
+**Location:** src/Precept/Pipeline/Parser.Declarations.cs line 430 (pre-fix)  
+**Found in iteration:** 10
+
+**Description:**  
+ParseCollectionIntoStatement's bottom switch contained a live constructor arm for ActionKind.DequeueBy. This arm is structurally unreachable for two independent reasons:
+
+1. DequeueBy is a variant action (PrimaryActionKind: ActionKind.Dequeue). Variant actions are excluded from Actions.ByTokenKind by the m.PrimaryActionKind == null filter. ParseActionStatement dispatches exclusively via ByTokenKind, so no ActionMeta with Kind == ActionKind.DequeueBy ever enters the call chain.
+2. Even if DequeueBy were reachable, its SyntaxShape is CollectionIntoBy, not CollectionInto. The switch in ParseActionStatement routes CollectionIntoBy shapes to the discard _ => throw arm, not to ParseCollectionIntoStatement.
+
+The arm emitted a real DequeueByStatement instead of the throw that all other mismatched-kind cases use, making the code appear to handle a path that cannot be reached.
+
+**Rubber-Duck Analysis:**  
+Tracing the execution path: token 'dequeue' -> ByTokenKind['dequeue'] returns ActionKind.Dequeue meta (not DequeueBy). Dequeue.SyntaxShape == CollectionInto -> calls ParseCollectionIntoStatement(Dequeue). Inside, the inline guard handles the 'dequeue ... by H' variant. The bottom switch runs for bare dequeue and pop. ActionKind.DequeueBy cannot appear as meta.Kind here. The arm was added during GAP-042 cleanup but not converted to a throw like the other out-of-place cases.
+
+**Resolution:**  
+Changed ActionKind.DequeueBy => new DequeueByStatement(span, field, into) to ActionKind.DequeueBy => throw new InvalidOperationException("ActionKind.DequeueBy is a variant-action shape unreachable from ParseCollectionIntoStatement"). All 2713 tests pass.
+
+---
+
+## GAP-061: Modifiers catalog lacks ByFieldToken O(1) index; parser used linear LINQ scan
+
+**Status:** Fixed  
+**Category:** Catalog-Impl  
+**Location:** src/Precept/Language/Modifiers.cs; src/Precept/Pipeline/Parser.Declarations.cs (method ParseFieldModifierNodes)  
+**Found in iteration:** 10
+
+**Description:**  
+ParseFieldModifierNodes needed to resolve a modifier TokenKind to its FieldModifierMeta (specifically to read HasValue and dispatch to ParseExpression for value-bearing modifiers). Because Modifiers had no token-keyed index, the parser compensated with a LINQ linear scan through all 29 ModifierKind entries, filtered to FieldModifierMeta, searching by token kind.
+
+Every other catalog that the parser dispatches on has an O(1) lookup index: Actions.ByTokenKind, Types.ByToken, Constructs.ByLeadingToken, Operators.ByToken. Modifiers was the only catalog missing this pattern.
+
+**Rubber-Duck Analysis:**  
+ModifierKeywords (the parser-level FrozenSet) was correctly catalog-derived. But once inside the while-loop, the dispatcher had no O(1) path to FieldModifierMeta. The catalog's GetMeta(kind) takes ModifierKind, not TokenKind, providing no shortcut. The fix is to add the secondary index as a static property, consistent with the established catalog-impl pattern.
+
+**Resolution:**  
+Added Modifiers.ByFieldToken (FrozenDictionary of TokenKind to FieldModifierMeta) built at startup from All.OfType<FieldModifierMeta>().ToFrozenDictionary(m => m.Token.Kind). Updated ParseFieldModifierNodes to use Modifiers.ByFieldToken.TryGetValue for O(1) dispatch. Added using System.Collections.Frozen to Modifiers.cs. All 2713 tests pass.

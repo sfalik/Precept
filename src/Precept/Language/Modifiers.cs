@@ -1,3 +1,5 @@
+using System.Collections.Frozen;
+
 namespace Precept.Language;
 
 /// <summary>
@@ -227,4 +229,22 @@ public static class Modifiers
 
     public static IReadOnlyList<ModifierMeta> All { get; } =
         Enum.GetValues<ModifierKind>().Select(GetMeta).ToArray();
+
+    // ════════════════════════════════════════════════════════════════════════════
+    //  ByFieldToken — O(1) lookup: TokenKind → FieldModifierMeta
+    //
+    //  Mirrors Actions.ByTokenKind and Types.ByToken for parser-facing dispatch.
+    //  Only FieldModifierMeta entries appear here — state, event, access, and
+    //  anchor modifiers are never looked up by token kind in ParseFieldModifierNodes.
+    // ════════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// O(1) lookup from token kind to field modifier metadata.
+    /// Used by <c>ParseFieldModifierNodes</c> to resolve a modifier token to its
+    /// <see cref="FieldModifierMeta"/> without a linear scan. Mirrors
+    /// <see cref="Language.Actions.ByTokenKind"/> for the modifier domain.
+    /// </summary>
+    public static FrozenDictionary<TokenKind, FieldModifierMeta> ByFieldToken { get; } =
+        All.OfType<FieldModifierMeta>()
+           .ToFrozenDictionary(m => m.Token.Kind);
 }
