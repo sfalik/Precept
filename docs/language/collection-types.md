@@ -6,9 +6,9 @@
 
 | Property | Value |
 |---|---|
-| Doc maturity | Draft |
-| Implementation state | Partially implemented — set/queue/stack surface shipped; `log of T`, `log of T by P`, `bag of T`, `list of T`, `queue of T by P`, and `lookup of K to V` approved and locked on spike; §Proposed Extensions are proposals, not yet implemented |
-| Scope | Nine collection kinds: `set of T`, `queue of T`, `stack of T`, `log of T`, `log of T by P`, `bag of T`, `list of T`, `queue of T by P`, `lookup of K to V`; actions, accessors, constraints, emptiness safety, membership, inner type system |
+| Doc maturity | Canonical Design |
+| Implementation state | Partially implemented — `set`/`queue`/`stack` surface shipped; `log of T`, `log of T by P`, `bag of T`, `list of T`, `queue of T by P`, and `lookup of K to V` approved and locked on `spike/Precept-V2`; `quantifier predicates` (`each`/`any`/`no`) and `notempty` on collections approved and locked on `spike/Precept-V2`, not yet implemented |
+| Scope | Nine collection kinds: `set of T`, `queue of T`, `stack of T`, `log of T`, `log of T by P`, `bag of T`, `list of T`, `queue of T by P`, `lookup of K to V`; actions, accessors, constraints, emptiness safety, membership, inner type system; quantifier predicates (`each`/`any`/`no`) |
 | Related | [Primitive Types](primitive-types.md) · [Language Spec](precept-language-spec.md) §§2.3, 3.6, 3.8 · [Type Checker](../compiler/type-checker.md) |
 
 ---
@@ -715,6 +715,58 @@ For `lookup of K to V`, the analogous pattern is key-presence: `F contains K` in
 
 ---
 
+## Quantifier Predicates
+
+**Status:** Locked design — approved for `spike/Precept-V2`. Parser support ships first, independent of proof engine work. Not yet implemented.
+
+**Philosophy compatibility:** §0.4.1 of the language spec explicitly carves out bounded predicates from the no-iteration rule.
+
+**Motivation:** The collection surface provides membership testing (`contains`) and cardinality (`.count`, `mincount`, `maxcount`), but no way to express constraints over the *elements* of a collection. Business rules like "all items must be positive" or "at least one reviewer matches the submitter" require element-level predicates.
+
+**Research basis:** CEL (Common Expression Language) provides 5 parse-time macros — `all`, `exists`, `exists_one`, `filter`, `map` — all non-Turing-complete, expanding at parse time over finite collections. OPA/Rego uses universal/existential quantification over sets. SQL uses `ALL`/`ANY`/`EXISTS` over subqueries.
+
+**Design:** Bounded quantifier predicates only — `each`, `any`, `no`. No general loops, no `map`/`filter`/`reduce`.
+
+**Rationale:** Quantifiers are logical predicates over finite collections, not iteration constructs. They are provably terminating — the collection is finite and no mutation occurs during evaluation. This distinguishes them from general iteration, which the language philosophy explicitly excludes (§0.4.1 "No iteration constructs").
+
+**Approved syntax:**
+
+```precept
+# Universal — all elements must satisfy predicate
+rule each item in Items (item > 0) because "All items must be positive"
+
+# Existential — at least one element satisfies predicate
+when any r in Reviewers (r == Approve.ReviewerName)
+
+# Negated existential — no element satisfies predicate
+rule no a in Amounts (a < 0) because "No negative amounts permitted"
+
+# Compound guard — predicate scopes cleanly within parens
+from Submitted on Approve
+    when any r in Reviewers (r == Approve.ReviewerName) and MissingDocuments.count == 0
+    -> set ApprovedBy = Approve.ReviewerName
+    -> transition Approved
+```
+
+**Syntax form:** `quantifier binding in Collection (predicate)` — the binding variable is a bare identifier named by the author and locally scoped to the parenthesized predicate. The predicate is a boolean expression.
+
+**Grammar:**
+
+```
+QuantifierExpr  :=  QuantifierKind Identifier in CollectionField '(' BoolExpr ')'
+QuantifierKind  :=  each | any | no
+```
+
+**Lexer note:** `any` is already a reserved keyword in the Precept lexer. `each` and `no` require new lexer entries. The previously reserved `all` keyword is superseded by `each` — `each` is grammatically correct ("each item in Items") where `all` would be broken English ("all item in Items").
+
+**Keyword decisions (locked):** The language ships `each`, `any`, `no` as three distinct keywords. Three keywords are more discoverable and read more naturally in business rules. `no` reads better than `not any` in business rule context.
+
+**Named binding (locked):** The quantifier syntax uses author-named binding variables (`item`, `r`, `a`). Named bindings are explicit and avoid nesting ambiguity. A fixed `it` pronoun creates scoping problems if quantifiers are ever nested.
+
+**What is deliberately held back:** `map`, `filter`, `reduce`, `sum`, and any transformation that produces a new collection or aggregate value. These require structured collection element types (a larger feature surface) and would cross the line from predicate into computation.
+
+---
+
 ## List Literal Defaults
 
 Collections support list literal syntax `[...]` for default values. List literals are only valid in the `default` clause position.
@@ -1226,105 +1278,9 @@ from Active on ApplyFee
 
 ---
 
-## Proposed Extensions
+## Deferred and Rejected Types
 
-> **These are design proposals, not shipped features.** They represent research findings from the collection iteration (frank-6) and collection rules (frank-7) investigations. No syntax below is implemented. All proposals are subject to design review and owner approval before implementation.
-
-### Quantifier Predicates
-
-**Motivation:** The current collection surface provides membership testing (`contains`) and cardinality (`.count`, `mincount`, `maxcount`), but no way to express constraints over the *elements* of a collection. Business rules like "all items must be positive" or "at least one reviewer matches the submitter" require element-level predicates.
-
-**Research basis:** CEL (Common Expression Language) provides 5 parse-time macros — `all`, `exists`, `exists_one`, `filter`, `map` — all non-Turing-complete, expanding at parse time over finite collections. OPA/Rego uses universal/existential quantification over sets. SQL uses `ALL`/`ANY`/`EXISTS` over subqueries.
-
-**Recommendation:** Bounded quantifier predicates only — `each`, `any`, `no`. No general loops, no `map`/`filter`/`reduce`.
-
-**Rationale:** Quantifiers are logical predicates over finite collections, not iteration constructs. They are provably terminating — the collection is finite and no mutation occurs during evaluation. This distinguishes them from general iteration, which the language philosophy explicitly excludes (§0.4.1 "No iteration constructs").
-
-**Approved syntax:**
-
-```precept
-# Universal — all elements must satisfy predicate
-rule each item in Items (item > 0) because "All items must be positive"
-
-# Existential — at least one element satisfies predicate
-when any r in Reviewers (r == Approve.ReviewerName)
-
-# Negated existential — no element satisfies predicate
-rule no a in Amounts (a < 0) because "No negative amounts permitted"
-
-# Compound guard — predicate scopes cleanly within parens
-from Submitted on Approve
-    when any r in Reviewers (r == Approve.ReviewerName) and MissingDocuments.count == 0
-    -> set ApprovedBy = Approve.ReviewerName
-    -> transition Approved
-```
-
-**Syntax form:** `quantifier binding in Collection (predicate)` — the binding variable is a bare identifier named by the author and locally scoped to the parenthesized predicate. The predicate is a boolean expression.
-
-**Grammar sketch:**
-
-```
-QuantifierExpr  :=  QuantifierKind Identifier in CollectionField '(' BoolExpr ')'
-QuantifierKind  :=  each | any | no
-```
-
-**Lexer note:** `any` is already a reserved keyword in the Precept lexer. `each` and `no` require new lexer entries. The previously reserved `all` keyword is superseded by `each` — `each` is grammatically correct ("each item in Items") where `all` would be broken English ("all item in Items").
-
-**Decided (Q2 — three keywords):** The language ships `each`, `any`, `no` as three distinct keywords. Three keywords are more discoverable and read more naturally in business rules. `no` reads better than `not any` in business rule context.
-
-**Decided (Q3 — named binding):** The quantifier syntax uses author-named binding variables (`item`, `r`, `a`). Named bindings are explicit and avoid nesting ambiguity. A fixed `it` pronoun creates scoping problems if quantifiers are ever nested.
-
-**What is deliberately held back:** `map`, `filter`, `reduce`, `sum`, and any transformation that produces a new collection or aggregate value. These require structured collection element types (a larger feature surface) and would cross the line from predicate into computation.
-
-**Philosophy compatibility:** Quantifiers are bounded predicates — they assert a property of every/some/no element in a finite collection. They do not mutate state, do not introduce loop variables, and terminate in bounded time. They are consistent with §0.4.1 IF the spec is amended to explicitly distinguish bounded predicates from general iteration. This is an open question (see below).
-
-### Additional Field Constraints
-
-**Research basis:** Survey of FluentAssertions, Zod, Valibot, FluentValidation, OPA/Rego, Bean Validation (JSR-380), and SQL constraints. A 6-category taxonomy was developed:
-
-1. **Cardinality** — `mincount`/`maxcount` (already shipped)
-2. **Membership/value** — `contains` (already shipped)
-3. **Element-shape (quantified predicates)** — requires quantifiers (proposed above)
-4. **Ordering** — relative order of elements (partial path: `choice of T(...) ordered` as an inner type already enables element-level comparison via declaration-position rank, making `.min`/`.max` valid and enabling quantifier predicates like `each x in Items (x >= "medium")` over ordered-choice sets; the remaining gap is ordering *constraints* on element sequences — e.g., "elements must be monotonically increasing" — which has no path yet)
-5. **Cross-collection** — relationships between two collection fields
-6. **Aggregate-relational** — `.count`, `.min`, `.max` in rule expressions (already shipped)
-
-**Proposed 3-layer rollout:**
-
-**Layer A (first priority): Field constraint keywords**
-
-| Keyword | Applicable to | Meaning | Proof engine |
-|---|---|---|---|
-| `notempty` | `set`, `queue`, `stack` | Collection must contain at least one element. Equivalent to `mincount 1`. | Statically verifiable in many cases. |
-
-**`notempty` on collections:** `notempty` is currently a string-only constraint. Extending it to collections creates a natural parallel — `notempty` means "this thing must not be empty," whether it's a string (`.length > 0`) or a collection (`.count > 0`). The alternative is to continue requiring `mincount 1`, which works but is verbose for the most common cardinality constraint.
-
-**Layer B (second priority): Quantifier predicates** — `each`/`any`/`no` as described above.
-
-
-### Open Questions
-
-1. ~~Philosophy compatibility of quantifiers.~~ — **Resolved.** §0.4.1 amended to explicitly distinguish bounded predicates from general iteration. Quantifiers (`each`/`any`/`no`) are permitted: they are declarative truth assertions over statically-declared finite collections, producing a single boolean value with no loop variable, no mutation, and no fixpoint reasoning required. The amendment lands in the same PR as the quantifier feature. See `docs/language/precept-language-spec.md` §0.4.1. Locked Decision.
-
-2. ~~Quantifier priority.~~ — **Resolved.** Parser support ships first, independent of proof engine work. TypeChecker, GraphAnalyzer, and Evaluator support are implemented in sequence afterward. Shane's decision: we are not gating quantifier parser support on Phase 3 completion. Locked Decision.
-
-3. ~~Collection `notempty` keyword.~~ — **Resolved.** `notempty` is reused for collections. The semantics are genuinely parallel — non-empty regardless of type — and a single keyword reinforces that consistency. Locked Decision.
-
-4. ~~`unique` on collections.~~ — **Rejected.** `unique` on `queue`/`stack` requires a composite backing structure (.NET's `ImmutableQueue`/`ImmutableStack` don't enforce uniqueness natively). On `set` it is redundant — sets already enforce uniqueness, so the modifier signals a conceptual mistake at best. On `queue of T by P` the semantics are ambiguous (unique on T, P, or the pair?). No clear value in any case. Locked Decision.
-
-5. ~~Cross-collection constraint form (`subset`/`disjoint`).~~ — **Rejected.** Quantifier predicates (`each`/`any`/`no`) already express subset and disjoint constraints as rules. The only scenario where `subset`/`disjoint` keywords would add value over quantifiers is a runtime-configured reference set, but in that case the constraint is still runtime-enforced — no static proof advantage exists. Two ways to say the same thing with no added guarantee. Locked Decision.
-
-6. ~~Proposal granularity.~~ — **Resolved.** `notempty` on collections and quantifier predicates (`each`/`any`/`no`) ship together in a single proposal on the `spike/Precept-V2` branch. No layered increment separation. Locked Decision.
-
-7. ~~Collection type expansion.~~ — **Resolved.** All non-deferred, non-rejected proposed types ship on `spike/Precept-V2`: `bag of T`, `log of T`, `lookup of K to V`, `queue of T by P`, `list of T`, and `log of T by P`. `deque of T` remains deferred. Rejected types (`sortedset`, `ringbuffer`, `multimap`, `capacity modifier`) remain out. Locked Decision.
-
-8. ~~Temporal and business-domain types as inner types~~ — **Resolved.** The `ScalarType` production now includes all temporal and business-domain types. `percentage` was a stale reference — this type does not exist in the business-domain type system. See §Temporal and Business-Domain Inner Types for the full expansion. Locked Decision.
-
----
-
-## Proposed Additional Types
-
-> **This is research and proposal, not shipped behavior.** The candidates below were evaluated against external collection systems and filtered through Precept's philosophy: prevention not detection, deterministic inspectability, proof engine safety, keyword-anchored flat statements, business-analyst readability, and non-Turing-completeness. No syntax below is implemented.
+> The following collection types were evaluated and either deferred or rejected. They are preserved as a design record.
 
 ### Evaluation Criteria
 
@@ -1336,14 +1292,6 @@ Every candidate must pass all six filters before advancing:
 4. **Fits Precept's keyword-anchored flat-statement style** — no nested expressions or builder chains
 5. **Business analyst readable** — the keyword name communicates behavior without documentation
 6. **Non-Turing-complete** — finite, bounded operations; no unbounded recursion or general iteration
-
-### ~~Candidate 1: `bag of T` (multiset)~~
-
-> Promoted to canonical design — see [§bag of T](#bag-of-t) above.
-
-### ~~Candidate 2: `list of T`~~
-
-> Promoted to canonical design — see [§list of T](#list-of-t) above.
 
 ### Candidate 3: `deque of T`
 
@@ -1378,18 +1326,6 @@ field F as deque of T
 **Action surface:** New keywords required: `push-front`, `push-back`, `pop-front`, `pop-back`. New accessors: `.peekfront`, `.peekback`. This is 4 new action keywords and 2 new accessors — a significant surface expansion.
 
 **Priority:** **Deferred.** The double-ended access pattern is rare in business-rule domains. Most real scenarios are either FIFO (queue) or LIFO (stack). The escalation pattern can be modeled with two separate queues (priority + normal) or a `queue of T by P`. The keyword surface cost is high relative to the business-rule unlock (`push-front`, `push-back`, `pop-front`, `pop-back` = 4 new action keywords). Re-evaluate after `queue of T by P` ships and real usage confirms a gap that priority queuing cannot fill.
-
-### ~~Candidate 4: `queue of T by P`~~
-
-> Promoted to canonical design — see [§queue of T by P](#queue-of-t-by-p) above.
-
-### ~~Candidate 5: `log of T`~~
-
-> Promoted to canonical design — see [§log of T](#log-of-t) and [§log of T by P](#log-of-t-by-p) above.
-
-### ~~Candidate 6: `lookup of K to V`~~
-
-> Promoted to canonical design — see [§lookup of K to V](#lookup-of-k-to-v) above.
 
 ### Rejected: Ring Buffer / Circular Buffer
 
@@ -1469,25 +1405,13 @@ If Precept ever adds ordered-iteration constructs that make sorted order observa
 
 ### Priority Summary
 
-| Candidate | Priority | Rationale |
+| Candidate | Status | Rationale |
 |---|---|---|
-| `bag of T` | **Approved** | Promoted to canonical design — see §bag of T |
-| `list of T` | **Approved** | Promoted to canonical design — see §list of T |
-| `queue of T by P` | **Approved** | Promoted to canonical design — see §queue of T by P |
-| `lookup of K to V` | **Approved** | Promoted to canonical design — see §lookup of K to V |
-| `log of T` | **Approved** | Promoted to canonical design — see §log of T and §log of T by P |
-| `log of T by P` | **Approved** | Promoted to canonical design — see §log of T by P |
-| `sortedset of T` | **Reject** | No Precept construct observes iteration order; `.min`/`.max` safety is owned by `notempty` alone; `set notempty` is proof-identical |
-| `deque of T` | **Deferred** | Rare in business-rule domains; escalation pattern covered by priority queuing (`queue of T by P`); re-evaluate after `queue of T by P` ships |
-| `ringbuffer of T` | **Reject** | Silent eviction violates inspectability — implicit mutation the proof engine cannot track |
-| `capacity` modifier | **Reject** | Synonym for `maxcount` — language surface cost with no capability gain |
-| `multimap of K to V` | **Reject** | Nested collection semantics Precept explicitly excludes — use explicit set fields + constraints |
-
-### Recommended Rollout
-
-1. **First:** `bag` — highest business-rule unlock per complexity dollar; extends the existing set action surface minimally
-2. **Second:** `lookup` — highest structural value but largest surface expansion (new type connector `to`, new proof obligation category for key-presence)
-3. **Evaluate:** `queue of T by P` — two-type-parameter design resolved; evaluate after `lookup` ships since `by`/`to` share the role-connector pattern. `deque` deferred — insufficient business-rule pressure
+| `deque of T` | **Deferred** | Rare in business-rule domains; escalation covered by `queue of T by P`; re-evaluate after priority queuing ships |
+| `sortedset of T` | **Rejected** | No Precept construct observes iteration order; `set of T notempty` is proof-identical |
+| `ringbuffer of T` | **Rejected** | Silent eviction violates inspectability — implicit mutation the proof engine cannot track |
+| `capacity` modifier | **Rejected** | Synonym for `maxcount` — language surface cost with no capability gain |
+| `multimap of K to V` | **Rejected** | Nested collection semantics Precept explicitly excludes |
 
 ---
 
@@ -1511,15 +1435,15 @@ If Precept ever adds ordered-iteration constructs that make sorted order observa
 | **Ring buffer** | — | `CircularFifoQueue`* | `deque(maxlen=N)` | — | — | — | — | — | Rejected† |
 | **Multimap** | `ILookup<K,V>` | `Multimap` (Guava) | — | — | — | — | `Map[K, List[V]]`‡ | — | Rejected§ |
 | **Non-empty guarantee** | — | — | — | — | `NOT NULL` | — | `NonEmpty` | `notempty`/`mincount 1` ✓ | — |
-| **Element uniqueness** | inherent in sets | inherent in sets | inherent in sets | inherent in sets | `UNIQUE` | — | inherent in sets | inherent in `set` ✓ | `unique` on queue/stack |
+| **Element uniqueness** | inherent in sets | inherent in sets | inherent in sets | inherent in sets | `UNIQUE` | — | inherent in sets | inherent in `set` ✓ | — |
 | **Cardinality constraints** | — | — | — | — | `CHECK` | `.size()` | — | `mincount`/`maxcount` ✓ | — |
-| **Element predicates** | LINQ `.All`/`.Any` | Streams | comprehensions | `.iter().all()`/`.any()` | `ALL`/`ANY`/`EXISTS` | `.all()`/`.exists()` | `forall`/`exists` | — | `all`/`any`/`none` |
-| **Subset/disjoint** | `.IsSubsetOf` | `.containsAll` | `<=`/`.isdisjoint` | `.is_subset` | — | — | `Set.isSubset` | — | `subset`/`disjoint` |
+| **Element predicates** | LINQ `.All`/`.Any` | Streams | comprehensions | `.iter().all()`/`.any()` | `ALL`/`ANY`/`EXISTS` | `.all()`/`.exists()` | `forall`/`exists` | `each`/`any`/`no` (approved, spike/Precept-V2) | — |
+| **Subset/disjoint** | `.IsSubsetOf` | `.containsAll` | `<=`/`.isdisjoint` | `.is_subset` | — | — | `Set.isSubset` | — | — |
 
 \* `IndexSet` is from the `indexmap` crate, not Rust std. `CircularFifoQueue` is from Apache Commons Collections.
 † Ring buffer rejected: silent eviction on full `enqueue` violates inspectability — use `queue` + `maxcount` + explicit `dequeue`.
 ‡ Scala `Map[K, List[V]]` is the idiomatic multimap encoding, not a dedicated type.
-§ Multimap rejected: nested collection semantics Precept explicitly excludes — use explicit set fields + `subset`/`disjoint` constraints.
+§ Multimap rejected: nested collection semantics Precept explicitly excludes. `subset`/`disjoint` keywords rejected: quantifier predicates (`each`/`any`/`no`) already express subset and disjoint constraints as rules.
 ¶ Sorted unique set rejected: no Precept construct observes sorted iteration order; `.min`/`.max` safety is owned by `notempty` alone; `set of T notempty` is proof-identical.
 †† Insertion-order sets conflate two concerns (uniqueness + temporal ordering) in a way that makes proof-engine reasoning ambiguous — the "order" has no semantic meaning the engine can verify. Precept's `queue` (explicit FIFO) and `set` (explicit uniqueness) are the correct decomposition.
 
