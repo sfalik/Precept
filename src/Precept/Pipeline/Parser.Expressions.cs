@@ -54,11 +54,10 @@ public static partial class Parser
                     continue;
                 }
 
-                // is set / is not set — postfix null-check (binding power 60, non-associative)
-                // Precedence 60 — matches Operators.GetMeta(OperatorKind.IsSet).Precedence. Spec §2.1.
+                // is set / is not set — postfix presence check (non-associative)
                 if (current.Kind == TokenKind.Is)
                 {
-                    if (minPrecedence > 60) break;
+                    if (minPrecedence > Operators.ByTokenSequence(TokenKind.Is, TokenKind.Set)!.Precedence) break;
                     Advance(); // consume 'is'
                     if (Current().Kind == TokenKind.Not)
                     {
@@ -99,7 +98,10 @@ public static partial class Parser
                             args.ToImmutable());
                         continue;
                     }
-                    // unreachable: identifiers resolve as FunctionCall in ParseAtom
+                    // Non-MemberAccess call target: 42(args), (A+B)(args), etc.
+                    // Identifiers are converted to CallExpression in ParseAtom, so this
+                    // branch is reached only for genuinely non-callable expressions.
+                    EmitDiagnostic(DiagnosticCode.InvalidCallTarget, left.Span, DescribeCallTarget(left));
                     break;
                 }
 
@@ -149,6 +151,32 @@ public static partial class Parser
         {
             var current = Current();
 
+            // Identifiers and keyword tokens that are also function names are handled
+            // uniformly: advance, then decide call vs. reference based on whether '('
+            // follows. KeywordsUsableAsFunctionNames is catalog-derived (Functions.All
+            // ∩ Tokens.Keywords) — no hardcoded TokenKind.Min / TokenKind.Max here.
+            if (current.Kind == TokenKind.Identifier || KeywordsUsableAsFunctionNames.Contains(current.Kind))
+            {
+                var name = Advance();
+                if (Current().Kind == TokenKind.LeftParen)
+                {
+                    Advance(); // consume '('
+                    var args = ImmutableArray.CreateBuilder<Expression>();
+                    if (Current().Kind != TokenKind.RightParen)
+                    {
+                        do
+                        {
+                            args.Add(ParseExpression(0));
+                        }
+                        while (Match(TokenKind.Comma));
+                    }
+                    var closeParen = Expect(TokenKind.RightParen);
+                    return new CallExpression(
+                        SourceSpan.Covering(name.Span, closeParen.Span), name, args.ToImmutable());
+                }
+                return new IdentifierExpression(name.Span, name);
+            }
+
             switch (current.Kind)
             {
                 case TokenKind.NumberLiteral:
@@ -171,37 +199,10 @@ public static partial class Parser
                 case TokenKind.TypedConstantStart:
                     return ParseInterpolatedTypedConstant();
 
-                case TokenKind.Identifier:
-                // GAP-C fix: min/max are keywords but can also appear as function names
-                // in expression position: min(a, b) or max(a, b).
-                case TokenKind.Min:
-                case TokenKind.Max:
-                {
-                    var name = Advance();
-                    // Function call: name(args...)
-                    if (Current().Kind == TokenKind.LeftParen)
-                    {
-                        Advance(); // consume '('
-                        var args = ImmutableArray.CreateBuilder<Expression>();
-                        if (Current().Kind != TokenKind.RightParen)
-                        {
-                            do
-                            {
-                                args.Add(ParseExpression(0));
-                            }
-                            while (Match(TokenKind.Comma));
-                        }
-                        var closeParen = Expect(TokenKind.RightParen);
-                        return new CallExpression(
-                            SourceSpan.Covering(name.Span, closeParen.Span), name, args.ToImmutable());
-                    }
-                    return new IdentifierExpression(name.Span, name);
-                }
-
                 case TokenKind.Not:
                 {
                     var op = Advance();
-                    var operand = ParseExpression(25); // not precedence
+                    var operand = ParseExpression(Operators.ByToken[(TokenKind.Not, Arity.Unary)].Precedence);
                     return new UnaryExpression(
                         SourceSpan.Covering(op.Span, operand.Span), op, operand);
                 }
@@ -209,7 +210,7 @@ public static partial class Parser
                 case TokenKind.Minus:
                 {
                     var op = Advance();
-                    var operand = ParseExpression(65); // negate precedence
+                    var operand = ParseExpression(Operators.ByToken[(TokenKind.Minus, Arity.Unary)].Precedence);
                     // Constant-fold: -<NumberLiteral> → signed LiteralExpression
                     if (operand is LiteralExpression { Value.Kind: TokenKind.NumberLiteral } lit)
                     {
@@ -305,7 +306,10 @@ public static partial class Parser
                 }
 
                 default:
-                    EmitDiagnostic(DiagnosticCode.ExpectedToken, current.Span, "expression", current.Text);
+                    if (AllKeywordKinds.Contains(current.Kind))
+                        EmitDiagnostic(DiagnosticCode.UnexpectedKeyword, current.Span, current.Text);
+                    else
+                        EmitDiagnostic(DiagnosticCode.ExpectedToken, current.Span, "expression", current.Text);
                     return new IdentifierExpression(current.Span,
                         new Token(TokenKind.Identifier, string.Empty, current.Span));
             }
@@ -385,6 +389,18 @@ public static partial class Parser
                 SourceSpan.Covering(openBracket.Span, closeBracket.Span),
                 elements.ToImmutable());
         }
+
+        /// <summary>
+        /// Returns a short, human-readable description of an expression for use in
+        /// <see cref="DiagnosticCode.InvalidCallTarget"/> messages.
+        /// </summary>
+        private static string DescribeCallTarget(Expression expr) => expr switch
+        {
+            LiteralExpression lit       => lit.Value.Text ?? lit.Value.Kind.ToString().ToLowerInvariant(),
+            IdentifierExpression id     => id.Name.Text ?? "identifier",
+            ParenthesizedExpression     => "(expression)",
+            _                           => "expression",
+        };
     }
 }
 

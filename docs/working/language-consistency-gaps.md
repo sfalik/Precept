@@ -9,7 +9,7 @@ Pre-TypeChecker audit — exhaustive consistency check of language docs, catalog
 - Obvious gap → agent rubber-ducks, applies fix, status = **Fixed**
 - Non-obvious gap → full analysis written, status = **Unresolved** (owner resolves on second pass)
 
-**Audit status: COMPLETE — 28 gaps total, 28 Fixed, 0 Unresolved**
+**Audit status: OPEN — 33 gaps total, 28 Fixed, 5 Unresolved (Iter 8 runtime/parser audit + catalog audit)**
 
 ---
 
@@ -40,7 +40,12 @@ Pre-TypeChecker audit — exhaustive consistency check of language docs, catalog
 | GAP-026 | `Modifiers.cs` `CollectionTypes` array stale — `mincount`/`maxcount` applicability missing 6 new TypeKind members | Doc-Catalog | Fixed | 7 |
 | GAP-027 | `Tokens.cs` `Notempty` description reads "String constraint: non-empty" but spec §1.1 says "String or collection constraint: non-empty" | Doc-Catalog | Fixed | 7 |
 | GAP-028 | `Functions.cs` `sqrt` has `Integer` and `Decimal` overloads but spec §3.7 explicitly says integer/decimal inputs are type errors | Doc-Catalog | Fixed | 7 |
-| GAP-020 | `contains` associativity: spec §2.1 says `left`, `Operators.cs` enforces `NonAssociative`; spec left-denotation shows `ParseExpression(40)` instead of `ParseExpression(41)` | Doc-Impl | Fixed | 6 |
+| GAP-029 | `IsOutcomeAhead()` hardcodes `{Transition, No, Reject}` instead of deriving from `TokenCategory.Outcome` | Catalog-Impl | Unresolved | 8 |
+| GAP-030 | `ParseAtom` hardcodes `case TokenKind.Min: case TokenKind.Max:` for keyword-as-function-name instead of deriving from `Functions.ByName` ∩ `Tokens.Keywords` | Catalog-Impl | Unresolved | 8 |
+| GAP-031 | Unary/postfix binding powers hardcoded in `Parser.Expressions.cs` (`not`→25, negate→65, `is set`→60) instead of reading from `Operators.ByToken`/`ByTokenSequence` | Catalog-Impl | Fixed | 8 |
+| GAP-032 | `Functions.cs` `pow(integer, integer)` overload missing `ProofRequirement` for `exp >= 0`; spec §0.6 item 4 explicitly lists this alongside `sqrt` as a non-negative proof obligation | Doc-Catalog | Fixed | 8 |
+| GAP-033 | `ModifierKind.cs` `Notempty` XML doc comment reads "Flag: string is non-empty" — stale after GAP-025 expanded applicability to string + 8 collection types (analogous to GAP-027 in Tokens.cs) | Doc-Catalog | Fixed | 8 |
+| GAP-020 |`contains` associativity: spec §2.1 says `left`, `Operators.cs` enforces `NonAssociative`; spec left-denotation shows `ParseExpression(40)` instead of `ParseExpression(41)` | Doc-Impl | Fixed | 6 |
 | GAP-021 | `is set`/`is not set` associativity: spec §2.1 says `left`, catalog says `NonAssociative (postfix)` | Doc-Impl | Fixed | 6 |
 | GAP-022 | Spec §2.1 null-denotation table names `StringLiteralExpression` — a node that does not exist; implementation uses `LiteralExpression` | Doc-Impl | Fixed | 6 |
 | GAP-023 | Spec §2.1 precedence table has `is` row (60) appearing before `+/-` row (50); two rows at level 60 without ordering explanation | Doc-Spec | Fixed | 6 |
@@ -855,6 +860,216 @@ Fixed. Updated `docs/language/precept-language-spec.md` §1.1 Literals table `Nu
 ---
 
 ---
+
+## GAP-029: `IsOutcomeAhead()` hardcodes outcome token set instead of deriving from `TokenCategory.Outcome`
+
+**Status:** Unresolved  
+**Category:** Catalog-Impl  
+**Location:** `src/Precept/Pipeline/Parser.cs` lines ~420–425  
+**Found in iteration:** 8
+
+**Description:**  
+`IsOutcomeAhead()` hard-checks exactly three `TokenKind` values:
+
+```csharp
+private bool IsOutcomeAhead()
+{
+    var next = Peek(1);
+    return next.Kind is TokenKind.Transition or TokenKind.No or TokenKind.Reject;
+}
+```
+
+The catalog already encodes these as `TokenCategory.Outcome` (`Cat_Out`) in `Tokens.cs`. These three tokens are the complete and only outcome tokens today — so the hardcoded set and the catalog-derived set are identical. But the hardcoding violates the catalog-derivation rule: if a new outcome token is added to the catalog, `IsOutcomeAhead()` silently fails to track it.
+
+**Catalog reference:** `Tokens.All` / `TokenCategory.Outcome`
+
+**Fix:**  
+Add a catalog-derived static set to `Parser.cs`:
+
+```csharp
+private static readonly FrozenSet<TokenKind> OutcomeTokens =
+    Tokens.All.Where(t => t.Categories.Contains(TokenCategory.Outcome))
+              .Select(t => t.Kind).ToFrozenSet();
+```
+
+Update `IsOutcomeAhead()` to:
+
+```csharp
+private bool IsOutcomeAhead() => OutcomeTokens.Contains(Peek(1).Kind);
+```
+
+---
+
+## GAP-030: `ParseAtom` hardcodes `TokenKind.Min`/`TokenKind.Max` as function-call-capable keyword tokens
+
+**Status:** Unresolved  
+**Category:** Catalog-Impl  
+**Location:** `src/Precept/Pipeline/Parser.Expressions.cs` lines ~178–202  
+**Found in iteration:** 8
+
+**Description:**  
+`ParseAtom` has these explicit cases for keywords that are also function names:
+
+```csharp
+case TokenKind.Identifier:
+// GAP-C fix: min/max are keywords but can also appear as function names
+// in expression position: min(a, b) or max(a, b).
+case TokenKind.Min:
+case TokenKind.Max:
+```
+
+`min` and `max` are constraint keywords (`TokenKind.Min`/`TokenKind.Max`, `Cat_Cns`) that the lexer emits when it sees those words. They are simultaneously function names in `Functions.ByName`. The catalog contains both facts; the parser can derive the intersection. If a future function is added whose name collides with a keyword token (e.g., a hypothetical `now` becoming a DSL-recognized keyword), the parser would not handle it without a manual code change.
+
+`IsValidAsMemberName` (which drives `KeywordsValidAsMemberName`) covers the `.min`/`.max` member-access case — not the `min(a, b)` function-call case. There is no catalog-derived set today for "keyword tokens that are also callable as functions."
+
+**Catalog reference:** `Functions.ByName` ∩ `Tokens.Keywords`
+
+**Fix:**  
+Add a catalog-derived set to `Parser.cs`:
+
+```csharp
+/// <summary>
+/// Keyword tokens whose text also appears as a function name in <see cref="Functions.ByName"/>.
+/// Catalog-derived. Drives the function-call atom branch in ParseAtom.
+/// </summary>
+internal static readonly FrozenSet<TokenKind> KeywordsUsableAsFunctionNames =
+    Functions.All
+        .Where(f => Tokens.Keywords.ContainsKey(f.Name))
+        .Select(f => Tokens.Keywords[f.Name])
+        .ToFrozenSet();
+```
+
+Restructure `ParseAtom` to check `KeywordsUsableAsFunctionNames.Contains(current.Kind)` rather than hard-matching `TokenKind.Min` / `TokenKind.Max`. The cleanest approach is to check the set before the switch statement and fall through to the identifier/call branch.
+
+---
+
+## GAP-031: Unary and postfix operator binding powers hardcoded instead of catalog-derived
+
+**Status:** Fixed  
+**Category:** Catalog-Impl  
+**Location:** `src/Precept/Pipeline/Parser.Expressions.cs` lines ~61, ~207, ~215  
+**Found in iteration:** 8
+
+**Description:**  
+Three operator binding powers are hardcoded numeric literals in the expression parser, even though `Operators.All` already carries the canonical values:
+
+| Location | Hardcoded value | Catalog source | Catalog value |
+|----------|----------------|----------------|---------------|
+| `ParseExpression` line ~61 (`is set` postfix guard) | `60` | `Operators.ByTokenSequence(TokenKind.Is, TokenKind.Set)!.Precedence` | `60` |
+| `ParseAtom` line ~207 (`not` unary binding power) | `25` | `Operators.ByToken[(TokenKind.Not, Arity.Unary)].Precedence` | `25` |
+| `ParseAtom` line ~215 (`negate` unary binding power) | `65` | `Operators.ByToken[(TokenKind.Minus, Arity.Unary)].Precedence` | `65` |
+
+All three values currently match the catalog. The risk is catalog drift: if an operator's precedence is adjusted in `Operators.cs`, the parser won't track it. The `is set` case has a comment acknowledging the catalog value but still uses a literal. The `not`/`negate` cases have no such acknowledgment.
+
+Note: member-access (`80`) and method-call (`90`) binding powers are NOT in the operator catalog (dot and parenthesis are grammar-structural, not `Operators.All` members) — those are legitimate hardcoding.
+
+**Catalog reference:** `Operators.ByToken[(TokenKind, Arity.Unary)]`, `Operators.ByTokenSequence`
+
+**Fix:**  
+Replace the three numeric literals with catalog lookups, captured as `private static readonly int` constants at the top of the `ParseSession` or the outer `Parser` class to avoid per-call overhead:
+
+```csharp
+// In Parser.cs static fields (outer class — ref struct cannot own statics):
+private static readonly int PrecedenceIsSet   = (int)Operators.ByTokenSequence(TokenKind.Is, TokenKind.Set)!.Precedence;
+private static readonly int PrecedenceNot     = Operators.ByToken[(TokenKind.Not,   Arity.Unary)].Precedence;
+private static readonly int PrecedenceNegate  = Operators.ByToken[(TokenKind.Minus, Arity.Unary)].Precedence;
+```
+
+Then replace `60`, `25`, `65` with `PrecedenceIsSet`, `PrecedenceNot`, `PrecedenceNegate` in `Parser.Expressions.cs`.
+
+---
+
+## GAP-032: `Functions.cs` `pow(integer, integer)` missing `ProofRequirement` for `exp >= 0`
+
+**Status:** Fixed  
+**Category:** Doc-Catalog  
+**Location:** `src/Precept/Language/Functions.cs` (Pow entry, lines ~162–172); `docs/language/precept-language-spec.md` §0.6 item 4  
+**Found in iteration:** 8
+
+**Description:**  
+Spec §0.6 item 4 explicitly lists `pow(integer, integer)` exponents as a non-negative proof obligation, paired with `sqrt` inputs:
+
+> **Non-negative proof obligations** such as `sqrt` inputs and `pow(integer, integer)` exponents. The compiler requires a provable non-negative path — via `nonnegative` constraint, a rule, an ensure, or a guard — before accepting the expression.
+
+The `sqrt` entry in `Functions.cs` correctly carries a `NumericProofRequirement`:
+
+```csharp
+FunctionKind.Sqrt => new(kind, "sqrt", ...,
+[
+    new([PSqrtNumber], TypeKind.Number,
+        ProofRequirements:
+        [
+            new NumericProofRequirement(new ParamSubject(PSqrtNumber), OperatorKind.GreaterThanOrEqual, 0m,
+                "Argument must be non-negative"),
+        ]),
+],
+```
+
+The `pow` entry has NO `ProofRequirements` on any overload:
+
+```csharp
+FunctionKind.Pow => new(kind, "pow", ...,
+[
+    new([new(TypeKind.Integer, "base"), new(TypeKind.Integer, "exp")], TypeKind.Integer),
+    new([new(TypeKind.Decimal, "base"), new(TypeKind.Integer, "exp")], TypeKind.Decimal),
+    new([new(TypeKind.Number,  "base"), new(TypeKind.Integer, "exp")], TypeKind.Number),
+],
+```
+
+The integer-base overload specifically requires a proof obligation: `pow(-3, -2)` would produce `1/9`, which cannot be represented as an integer. Negative exponents of integer bases are mathematically undefined in integer arithmetic.
+
+**Rubber-Duck Analysis:**  
+The spec is explicit and unambiguous. The `sqrt` entry is the reference pattern — the proof engine reads `ProofRequirements` from the catalog to enforce non-negativity at compile time. The `pow` entry is missing this on the `Integer^Integer` overload. The Decimal and Number overloads produce fractional results with negative exponents (which are representable), but the spec singles out `pow(integer, integer)` — so only the Integer overload needs the proof obligation.
+
+**Fix:**  
+Add `ProofRequirements` to the `Integer^Integer` overload:
+
+```csharp
+new([new(TypeKind.Integer, "base"), new(TypeKind.Integer, "exp")], TypeKind.Integer,
+    ProofRequirements:
+    [
+        new NumericProofRequirement(new ParamSubject(new(TypeKind.Integer, "exp")),
+            OperatorKind.GreaterThanOrEqual, 0m,
+            "Exponent must be non-negative for integer pow"),
+    ]),
+```
+
+To avoid inline construction, define a named param constant `PPowExp = new(TypeKind.Integer, "exp")` at the top of the Numeric section (analogous to `PSqrtNumber`) and reference it in both the overload signature and the `NumericProofRequirement`.
+
+---
+
+## GAP-033: `ModifierKind.cs` `Notempty` XML doc comment stale after GAP-025 fix
+
+**Status:** Fixed  
+**Category:** Doc-Catalog  
+**Location:** `src/Precept/Language/ModifierKind.cs` line 22  
+**Found in iteration:** 8  
+**Severity:** Low (dev-facing XML comment only; no runtime impact)
+
+**Description:**  
+The `Notempty` enum member in `ModifierKind.cs` carries this XML doc comment:
+
+```csharp
+/// <summary>Flag: string is non-empty.</summary>
+Notempty    =  6,
+```
+
+GAP-025 (resolved in iteration 7) expanded `Notempty.ApplicableTo` from `StringOnly` to `StringAndCollectionTypes` — a named array covering `String` + 8 collection types. GAP-027 updated the description in `Tokens.cs` from "String constraint: non-empty" to "String or collection constraint: non-empty." The analogous update was not applied to `ModifierKind.cs`.
+
+This is the same pattern as GAP-027 (Tokens.cs description), resolved in iteration 7 — but in the enum file rather than the tokens catalog. The XML doc comment is the only surface affected; the C# catalog metadata (`ApplicableTo`) is already correct.
+
+**Fix:**  
+Update line 22 of `ModifierKind.cs`:
+
+```csharp
+// before
+/// <summary>Flag: string is non-empty.</summary>
+
+// after
+/// <summary>Flag: string or collection is non-empty.</summary>
+```
+
+<!-- Iteration 8 complete: George's runtime/parser implementation audit. TypeChecker stub — no violations. Evaluator stub (all NotImplementedException) — no violations. Lexer fully catalog-driven — no violations. Parser: 3 new Catalog-Impl gaps found (GAP-029 IsOutcomeAhead hardcodes outcome token set; GAP-030 ParseAtom hardcodes min/max as function-call keywords; GAP-031 unary/postfix binding powers 25/65/60 hardcoded). Prior gap fixes confirmed: GAP-025 (Notempty.ApplicableTo → StringAndCollectionTypes ✅), GAP-026 (CollectionTypes 9 members ✅), GAP-028 (sqrt Number-only ✅). Frank's 6-dimension catalog/spec audit: 2 additional gaps found (GAP-032 pow missing ProofRequirement; GAP-033 ModifierKind.cs Notempty comment stale). Status: 33 gaps total, 28 Fixed, 5 Unresolved. -->
 
 <!-- Iteration 5 complete: 2 gaps filed — GAP-017 (Unresolved — Arrow categorized as Cat_Str in Tokens.cs but spec §1.1, TokenKind.cs grouping, TextMateScope, and SemanticTokenType all say operator; TwoCharOperators filter has a redundant `or Structural` clause to compensate; no C# edits), GAP-018 (Fixed — spec §1.1 NumberLiteral row description omitted exponent notation documented in §1.3 and implemented in the lexer). Audit scope: all 138 TokenKind members, full Lexer.cs (ScanWord, ScanNumber, ScanStringContent, ScanTypedConstantContent, ScanComment, EmitNewLine, TryScanOperator, TryScanPunctuation), Tokens.Keywords/TwoCharOperators/SingleCharOperators/PunctuationChars derived tables, spec §1.1 and §1.3. All 138 TokenKind members accounted for in the lexer; zero unused members found; SetType correctly parser-synthesized and excluded from keyword lookup; ~string correctly scans as Tilde + StringType; ~= and !~ correctly scan as single compound tokens; -> correctly scans as Arrow (maximal munch via TwoCharOperators); case-sensitivity confirmed (FrozenDictionary ordinal); IsValidAsMemberName tokens (min, max, countof, peekby) lexed as keywords, parser handles dual-use. No C# files modified. -->
 
