@@ -295,3 +295,424 @@ The following are established and should not be re-litigated in derived proposal
 6. **Storage is always case-preserving.** `~string` — whether as a collection inner type or a future scalar field type — affects comparison and membership semantics, never the stored value. A stored `"Admin@Example.COM"` is retrieved as `"Admin@Example.COM"` regardless of how comparisons on it are evaluated.
 
 7. **The `~` token is a lexer-level primitive.** `CaseInsensitiveEquals: ~=`, `CaseInsensitiveNotEquals: !~`, and `Tilde: ~` are three distinct tokens. Scan order ensures `~=` is attempted before `~`, so `x ~= y` never tokenizes as `x ~ = y`. A standalone `~` outside a collection inner type position is a lexer error — this rule must be preserved even if scalar `~string` is added.
+
+---
+
+## Composition Analysis
+
+**Author:** Frank (Senior Language Designer)
+**Branch:** `spike/Precept-V2`
+**Date:** 2026-05-28
+**Trigger:** Owner is revisiting the deferral of scalar `~string` and considering locking in Option 3 (enforcement). This section is the full composition audit that was missing from the prior analysis — every surface the type must touch if it ships.
+
+---
+
+### Summary
+
+Scalar `~string` under the enforcement model (Option 3) is compositionally sound on most surfaces: assignment is bidirectional with no storage change, non-comparison operations are unaffected, and the `~=`/`!~` requirement maps cleanly onto the existing diagnostic infrastructure. The one genuine crack in the enforcement model is the **mixed-collection case**: a `~string` scalar value flowing into a `contains` test against a `set of string` (or vice versa) uses the collection's comparer, not the value's type — and the collection's comparer is case-sensitive. The enforcement model as described catches `==`/`!=` on a `~string` field directly; it does not catch a `~string` value being fed to a case-sensitive `contains`. This is the most dangerous composition gap. The ordering operator gap (`<`, `>`) is real but lower severity — authors are already on ordinal ordering for string comparisons everywhere, so the inconsistency is expected and bounded. The `lookup of ~string to V` key type introduces a novel runtime constraint (the dictionary must use `OrdinalIgnoreCase` as its key comparer) that has no precedent in the current collection backing type model. None of these gaps are blockers — each has a defined resolution — but collectively they mean that locking in scalar `~string` today commits the type checker, the diagnostic catalog, the backing type for `lookup`, and three language specification sections simultaneously.
+
+---
+
+### Assignment compatibility
+
+**`string` → `~string` field (`set Email = event.StringArg`):** Fine. Storage is case-preserving regardless of the field's type modifier. The assignment copies the raw UTF-16 value; no normalization, no folding. The type checker permits this because `~string` is `string` with an added comparison obligation — it is not a narrower storage type. This is the intended model. The analogy: assigning to a `notempty` field does not require the assigned value to be provably non-empty at the assignment site (that is a constraint violation, caught separately) — the type still accepts assignment from a plain non-empty `string`.
+
+**`~string` → `string` field (`set Alias = Email`):** Fine. A `~string` value is structurally a `string` at the storage level. Assigning it to a `string`-declared field drops the comparison obligation. The receiving field has no CI requirement; that is the author's responsibility. This direction is asymmetric with respect to obligation: the CI intent is lost at the destination, but there is no way to propagate it without making every `string` field aware of how its value originated — which would be a whole-program analysis, not a local type check.
+
+**`~string` → `~string` field:** Fine and the cleanest case. Both sides have the same comparison obligation. No friction anywhere.
+
+**String literal → `~string` field (`set Email = "admin@example.com"`):** Fine. A string literal is `string`; assignment to `~string` follows the `string → ~string` rule above. No constraint check needed at the assignment site.
+
+**`~string` field as event argument (where the event arg is declared `string`):** Fine by the same asymmetric assignability rule. The value is passed as a `string`; the CI obligation does not follow the value through the call boundary. This is the same loss-of-intent that occurs in any assignment from `~string` to `string`, and the resolution is the same: it is the author's responsibility at the receiving side.
+
+**`~string` field as source in `default` initialization:** Fine. `field Email as ~string default "admin@example.com"` — the default is a string literal assigned to a `~string` field, identical to the literal-assignment case above.
+
+**Summary:** Assignment compatibility is simple because `~string` is not a different storage representation — it is `string` with a comparison obligation. The type checker must permit all assignment directions (both `string → ~string` and `~string → string`) without error, and add the comparison obligation check only at the comparison site, not the assignment site.
+
+---
+
+### Comparison operators
+
+Every analysis here assumes the enforcement model: `==`/`!=` on a `~string` operand are compile errors; `~=`/`!~` are the required forms.
+
+**`~string == string` (error):** The left operand is a `~string` field. `==` is prohibited. Error: `CaseInsensitiveFieldRequiresTildeEquals`. Teaching message: "Field `Email` is declared `~string` (case-insensitive). Use `~=` instead of `==` to compare it."
+
+**`string == ~string` (error — right operand):** The enforcement check must also cover the right-operand position. An author could write `"admin@example.com" == Email` and the error should be symmetric. The diagnostic is the same: `CaseInsensitiveFieldRequiresTildeEquals`. The type checker must detect `~string` in either operand position of `==`/`!=`.
+
+**`~string == ~string` (error — both CI):** Both sides require `~=`. Same error. There is no reason to special-case this — if one CI field is compared to another CI field using `==`, the result would still be case-sensitive, which is the wrong semantic.
+
+**`~string ~= string` (correct, fine):** This is the intended expression. The `~=` operator is always `OrdinalIgnoreCase` regardless of operand type — it does not need the type to be `~string`. The `~string` obligation is satisfied.
+
+**`~string ~= ~string` (correct, fine):** Both sides are CI-declared. The comparison is CI. Semantically ideal. Fine.
+
+**`string ~= ~string` (fine — `~=` always CI regardless):** The `~=` operator applies `OrdinalIgnoreCase` regardless of whether the operands are `~string` or `string`. An author comparing a plain `string` to a `~string` field with `~=` is doing the right thing. No error. This is an important symmetry property: `~=` is defined on `(string, string)` operands (see `OperationKind.StringCaseInsensitiveEqualsString`), and `~string` values are `string` at the operation level. The enforcement check is not on the operator — it is on the field declaration when `==` is used.
+
+**`~string != string` (error):** `!=` is the CS inequality operator. Same enforcement: `CaseInsensitiveFieldRequiresTildeNotEquals`.
+
+**`~string !~ string` (correct):** The CI not-equals operator. Satisfies the obligation. Fine.
+
+**`~string < string`, `~string > string`, `~string <= string`, `~string >= string` — ordering operators:**
+
+This is a known gap. The `string` type does not support ordering operators (`<`, `>`, `<=`, `>=`) — they are already a type error on all strings regardless of CI status (see `primitive-types.md`: "Relational comparison (`<`, `>`, `<=`, `>=`) is not available on `string`"). A `~string` field inherits this restriction — ordering is not available, full stop.
+
+There is no `~<` operator and none is needed. The ordering gap is not opened by `~string` — it pre-exists for all `string` fields and is not affected by the CI modifier. The enforcement model needs no ordering-operator clause. Authors sorting strings use `set of ~string` with `.min`/`.max`, not scalar ordering operators.
+
+**Conclusion:** The enforcement model for comparison operators is complete for the equality surface. No ordering operator clause needed. The only specification requirement is that the `~string` check fires on both operand positions of `==` and `!=`, not only on the left.
+
+---
+
+### Contains operator — the dangerous case
+
+This is the critical composition tension. The `contains` operator's semantics are determined by the **collection's** inner type, not the value being tested. If the collection is `set of string`, `contains` is case-sensitive — full stop, regardless of what the right operand's type is. The type checker today only checks that the value's type is compatible with the collection's inner type (both are `string`), and `string` is assignment-compatible with `~string` and vice versa.
+
+**`set of string contains ~string value` — the dangerous case:**
+
+```precept
+field AdminEmails as set of string   # ordinal key comparer
+field Email       as ~string
+
+when AdminEmails contains Email      # compiles — but this is a CS contains of a CI value!
+```
+
+The semantics: `AdminEmails` uses `string` equality internally. `contains` iterates the set using `OrdinalIgnoreCase` only if the inner type is `~string`. Since the inner type is `string`, the comparer is ordinal case-sensitive. The `~string` type of `Email` is invisible to the `contains` operator — the collection decides the comparison mode.
+
+**Impact:** `"Admin@Example.COM"` will not match `"admin@example.com"` in the set. The bug is silent — the code compiles, the logic is wrong.
+
+**Should the compiler detect this?** Yes. This is exactly the class of silent semantic bug that the enforcement model is designed to catch. The mismatch is structurally detectable: the left operand is a collection with a CS inner type, and the right operand is a `~string` field. The intended semantics (CI comparison) are declared on the value; the actual semantics (CS comparison) are imposed by the collection. These are detectably incompatible.
+
+**Proposed diagnostic:** `CaseInsensitiveValueInCaseSensitiveContains` (warning or error — see below). Teaching message: "Field `Email` is declared `~string` (case-insensitive), but `AdminEmails` is a `set of string` (case-sensitive). The `contains` test will use case-sensitive comparison — `\"admin@example.com\"` and `\"Admin@Example.COM\"` are treated as different values. Either declare `AdminEmails as set of ~string` or use an explicit `~=` in a quantifier predicate."
+
+**Severity:** Error. This is not "stylistically inconsistent" — it is a provably wrong semantic that the author almost certainly did not intend. The enforcement model's job is to make this structurally impossible, not just warned about.
+
+---
+
+**`set of ~string contains string value` — OrdinalIgnoreCase contains, plain string value:**
+
+```precept
+field Tags   as set of ~string
+field Prefix as string
+
+when Tags contains Prefix
+```
+
+The collection uses `OrdinalIgnoreCase`. The value being tested is a plain `string`. This is fine — no mismatch. The `contains` semantics are CI because the collection declared them so. The value's type does not need to be `~string` for the operation to be correct. No diagnostic needed.
+
+---
+
+**`set of ~string contains ~string value` — fully consistent:**
+
+The canonical case. Both collection and value agree on CI semantics. Fine.
+
+---
+
+**`queue of string contains ~string value` — same as set of string case:**
+
+The `contains` operator on `queue of string` is case-sensitive. Same dangerous mismatch. Same diagnostic applies: `CaseInsensitiveValueInCaseSensitiveContains`.
+
+---
+
+**`queue of ~string contains ~string value` — fully consistent:** Fine.
+
+---
+
+**`log of ~string contains ~string value` — fully consistent:** Fine.
+
+---
+
+**`log of string contains ~string value`:** Same dangerous case — the log's comparer is CS. Same diagnostic.
+
+---
+
+**`bag of string contains ~string value`:** Same — the bag uses the inner type's equality for `contains`. Same diagnostic.
+
+---
+
+**`bag of ~string contains ~string value`:** Fine.
+
+---
+
+**`list of string contains ~string value`:** Same dangerous case. Same diagnostic.
+
+---
+
+**`lookup of string to V contains ~string key` — case-sensitive key lookup with CI key:**
+
+```precept
+field CoverageLimits as lookup of string to decimal
+field CoverageType   as ~string
+
+when CoverageLimits contains CoverageType   # CS key lookup with a CI key
+```
+
+The `contains` on a `lookup of string to V` checks key membership using the dictionary's key equality — which is case-sensitive when the key type is `string`. A `~string` field value being used as the lookup key will miss case-variant entries. Same dangerous mismatch, same diagnostic family. However, the diagnostic message should be tailored for the lookup case: "Field `CoverageType` is declared `~string`, but `CoverageLimits` is a `lookup of string to decimal` (case-sensitive keys). Key lookup will use case-sensitive comparison."
+
+This also applies to `F for K` (value access): if `CoverageType` is `~string` and the lookup key type is `string`, both the `contains` guard and the `for` access should trigger the diagnostic.
+
+---
+
+**`lookup of ~string to V contains string key` — CI key lookup with plain string key:**
+
+The `lookup of ~string to V` uses `OrdinalIgnoreCase` for key equality (see below). Passing a plain `string` as the lookup key is fine — the comparer is determined by the collection, not the key argument's type. No diagnostic needed.
+
+---
+
+**Cross-collection diagnostic rule (complete):**
+
+The type checker must check `contains` (and `lookup for K`) expressions for the following mismatch:
+- Left operand is a collection with a `string` (not `~string`) inner type (or key type for `lookup`)
+- Right operand is a `~string` field (or expression resolving to a `~string` field)
+→ Emit `CaseInsensitiveValueInCaseSensitiveContains` (Error)
+
+The inverse direction (CI collection, plain string value) is fine and requires no diagnostic.
+
+---
+
+### `~string` as a lookup key type
+
+**Declaration:**
+
+```precept
+field CoverageLimits as lookup of ~string to decimal
+```
+
+This declares a lookup whose key space uses `OrdinalIgnoreCase` equality. The language semantics must be:
+- `put CoverageLimits "MEDICAL" = 100` followed by `put CoverageLimits "medical" = 200` → the second `put` **overwrites** the first, because `"MEDICAL"` and `"medical"` are the same key under `OrdinalIgnoreCase`. The result is `CoverageLimits for "Medical"` returns `200` (or whatever the last `put` wrote). This is correct and desirable — it mirrors how `set of ~string` handles deduplication.
+- `CoverageLimits contains "Medical"` returns `true` if any case-variant of `"medical"` has been `put`.
+
+**Backing type implication — the novel constraint:**
+
+The current `lookup of K to V` backing type is `ImmutableDictionary<K, V>` (see collection-types.md). The default `ImmutableDictionary` uses the type's default equality comparer — for `string`, that is `StringComparer.Ordinal`. To support `lookup of ~string to V`, the dictionary must be created with `StringComparer.OrdinalIgnoreCase` as its key comparer.
+
+This is not automatically handled. `ImmutableDictionary<string, V>` with the default comparer will not give `OrdinalIgnoreCase` semantics even if the declared key type is `~string`. The runtime evaluator must detect the `~string` key type and create `ImmutableDictionary.Create(StringComparer.OrdinalIgnoreCase)` instead of the default.
+
+This is the **only place in the entire type system where a runtime backing type must be parameterized differently based on the `~string` flag.** It is a contained change — one call site in the evaluator's collection factory method — but it is a real implementation requirement that does not exist anywhere else in the current codebase.
+
+The type checker must also ensure that `~string` is not valid as the value type `V` of a lookup — there is no meaningful CI semantic for values, only for keys. `lookup of string to ~string` should be a type error: `CaseInsensitiveStringOnNonCollectionKey`. (A value in a lookup is just stored and retrieved; comparison semantics on the value are irrelevant for lookup purposes.)
+
+Wait — actually this needs more thought. If someone declares `lookup of string to ~string`, that means the values are `~string`-typed. From the scalar enforcement perspective, when a value is retrieved via `CoverageLimits for someKey`, the returned type would be `~string`, and subsequent comparisons on it would require `~=`. Is this valid? It's logically coherent under the enforcement model. But it's also strange: values in a lookup are not searched over using a comparer — they're just returned. The `~string` value type on a lookup would only matter if you assigned the retrieved value to a field. At that point it would follow the normal `~string → string` or `~string → ~string` assignment rules. **Conclusion: `lookup of string to ~string` is fine under the enforcement model — the type propagates normally.** No need to prohibit it.
+
+For the key type position specifically: `lookup of ~string to V` is valid and meaningful. The CI flag on the key type changes the comparer. All other collection types that could have `~string` as an inner type already handle this at the comparer level (e.g., `set of ~string`). `lookup of ~string to V` is a direct extension of the same pattern.
+
+**`countof` accessor:** `lookup` does not have `.countof` — that's `bag`. No issue here.
+
+**Summary for lookup:**
+- `lookup of ~string to V` is valid, meaningful, and requires `OrdinalIgnoreCase` key comparer at runtime.
+- `put` with case-variant keys overwrites, which is correct and expected.
+- The runtime evaluator needs one new code path to select `OrdinalIgnoreCase` when the key type is `~string`.
+- This is the only implementation surface where the `~string` flag affects a backing type selection.
+
+---
+
+### Rules and ensures
+
+**`rule Email == "admin@example.com"` where Email is `~string` — error at rule site:**
+
+Yes. The enforcement model applies everywhere `==` appears on a `~string` field — in guards, in rules, in ensures, in conditional expressions. A rule using `==` on a `~string` field is the same error as any other `==` on a `~string` field. Teaching message: "Rule expression uses `==` on `~string` field `Email`. Use `~=` for case-insensitive comparison."
+
+**`ensures Email ~= SubmitForm.Email` — fine:**
+
+Correct usage. The ensure uses `~=`; the obligation is satisfied.
+
+**`rule no a in Addresses (a == Email)` where Email is `~string` and Addresses is `list of string`:**
+
+Two issues compound here. The quantifier binding `a` has type `string` (from `list of string`). `Email` is `~string`. The `==` operator is used. This triggers:
+1. `CaseInsensitiveFieldRequiresTildeEquals` — `Email` is `~string` compared with `==`.
+2. Potentially also `CaseInsensitiveValueInCaseSensitiveContains` is not directly triggered here (this is `==` not `contains`), but the `==` error is.
+
+If rewritten as `a ~= Email`, both issues resolve: `~=` satisfies the `~string` comparison obligation, and `~=` is `OrdinalIgnoreCase` regardless of whether `a` is `string` or `~string`.
+
+**`ensures Email == ""` — empty-check special case:**
+
+This is the subtle one. An empty string check (`Email == ""`) is conceptually not a CI comparison — there is only one empty string, and it is both ordinal-equal and CI-equal to `""`. The author could argue: "I'm checking for emptiness, not comparing a business value. `==` should be fine here."
+
+The enforcement model as described does not special-case this. `Email == ""` where `Email` is `~string` would be a `CaseInsensitiveFieldRequiresTildeEquals` error. The correct form is `Email ~= ""`, which works — `"" ~= ""` is true under any string comparer.
+
+**Should empty-string be special-cased?** No. The reason:
+1. Correctness: `"" ~= ""` is always true, so the correct form compiles and works.
+2. Complexity: adding an "except empty string literal" carve-out to the enforcement rule creates a leaky abstraction — what about `Email ~= SomeOtherEmptyField` where the other field might be empty? The special case cannot be generalized without whole-value-range analysis.
+3. Alternatives: the `notempty` constraint is the idiomatic Precept way to express non-emptiness. `field Email as ~string notempty` makes the emptiness constraint structural — no `== ""` check needed at all.
+4. Teaching opportunity: the error message can note that `~=` also works for empty checks: "Use `~=` for all equality comparisons on `~string` fields — including empty-string checks: `Email ~= \"\"` is equivalent."
+
+**`ensures Email == ""` conclusion:** Error, same as any other `==` on `~string`. Not special-cased. The teaching message should mention the `notempty` constraint and the `~=` alternative.
+
+---
+
+### String operations
+
+**`.length` on `~string` field:** Unaffected. `.length` returns `integer` (UTF-16 code unit count). There is no CI vs. CS distinction in a length measurement. Fine.
+
+**String interpolation `"Hello {Email}"` where Email is `~string`:** Fine. The interpolation coerces the field value to its string representation. There is no comparison in interpolation; the `~string` constraint is irrelevant. The stored value is case-preserving — `"Hello Admin@Example.COM"` is what you get.
+
+**`+` concatenation (`Email + "@domain.com"`):** Fine. Concatenation does not involve comparison semantics. The result type is `string` (not `~string` — concatenation always produces a plain `string`). This is correct: the result of concatenating a `~string` and a literal has no inherent CI obligation. An author who wants the result to be CI-compared must use `~=` explicitly.
+
+**All non-comparison operations:** Length, interpolation, concatenation — all fine and unaffected. The `~string` modifier is purely a comparison-obligation marker; it does not affect any non-comparison operation.
+
+---
+
+### `notempty` and `optional` interactions
+
+**`field Email as ~string notempty`:**
+
+Valid. `notempty` on a scalar `string`/`~string` field means the stored value must be non-empty (`""` is rejected). This constraint is purely about the stored value's length — it has no interaction with CI comparison semantics. The `notempty` check is: `value.Length > 0`. No case sensitivity involved.
+
+`notempty` + `~string` is a natural and useful combination. An email field that is both non-empty and CI-compared is a common requirement.
+
+**`field Email as ~string optional`:**
+
+Valid. `optional` means the field may be unset (null in backing storage). The `is set` / `is not set` guards are unaffected by CI semantics — presence testing has nothing to do with comparison. Authors must guard with `Email is set` before comparing `Email ~= someValue`, exactly as they would with any `optional` field.
+
+There is one subtle interaction: `Email is set and Email ~= "admin@example.com"` — this is the correct pattern. The `is set` guard does not satisfy the `~=` requirement; the `~=` is still explicitly required. No issue — the guards are orthogonal obligations.
+
+**`Email is set` guard — unaffected by CI:**
+
+`is set` tests presence, not value. CI semantics are irrelevant. Fine.
+
+**`notempty` as an alternative to `== ""`:**
+
+As noted in the Rules section, `field Email as ~string notempty` structurally prevents empty strings without requiring any `== ""` or `~= ""` check. This is the idiomatic Precept pattern — prefer a structural constraint over a repeated guard expression. The enforcement model does not need to special-case empty-string comparisons because `notempty` is the better tool.
+
+---
+
+### Type compatibility model
+
+**Is `~string` a subtype of `string`, a supertype, or a sibling with bidirectional assignability?**
+
+Neither subtype nor supertype in the traditional sense. `~string` is `string` with an additional comparison obligation. The correct model is:
+
+> `~string` is `TypeKind.String` with a boolean flag `CaseInsensitive = true`. It is not a distinct `TypeKind` member.
+
+This is exactly how the current `CollectionTypeRefNode` represents it — `CaseInsensitive = false` (default) for `set of string`, `CaseInsensitive = true` for `set of ~string`. The flag is a property of the type reference at the declaration site, not a new kind.
+
+For scalar fields, the parallel representation would be `ScalarTypeRefNode` with a `CaseInsensitive = true` flag when the parser sees `field Email as ~string`. The type checker resolves this to `TypeKind.String` with CI = true.
+
+**Assignability rules:**
+
+- `~string` is assignable to `string`: always (drop the CI obligation; the storage is compatible).
+- `string` is assignable to `~string`: always (gain the CI obligation; the caller must use `~=` at comparison sites).
+- `~string` is assignable to `~string`: always.
+
+These are the only assignability rules needed. There is no covariance or contravariance complexity — both types have the same backing representation.
+
+**Type unification in binary expressions:**
+
+When the type checker unifies `~string` and `string` in a binary expression (e.g., `Email ~= someStringField`):
+- The operator `~=` accepts `(string, string)` → `boolean`. Both `~string` and `string` are `TypeKind.String` — the unification succeeds.
+- The operator `==` accepts `(string, string)` → `boolean`. Same unification — but the enforcement check fires separately: if either operand is `~string`-typed, `==` is an error.
+
+The type unification itself is simple and orthogonal to the enforcement check. The enforcement check is a post-unification semantic rule: "if the resolved operation is `==` or `!=` AND any operand has `CaseInsensitive = true`, emit `CaseInsensitiveFieldRequiresTildeEquals`."
+
+**Does the type checker need a new type node?**
+
+No new `TypeKind` enum member is needed. `TypeKind.String` remains the storage type. The `CaseInsensitive` flag lives on the type reference node (already established in `CollectionTypeRefNode`; would be extended to `ScalarTypeRefNode`). The semantic index must propagate this flag from the field declaration to the expression type at every use site.
+
+The key implementation question is: does `SemanticIndex` (the type-checked representation) carry the CI flag per field, or is it reconstructed from the syntax tree on demand? Given that the semantic index is the output of the type checker and the input to all downstream tools, it must carry the CI flag per field reference. The simplest representation: the field metadata in `SemanticIndex` carries a `bool CaseInsensitive` alongside the `TypeKind`.
+
+---
+
+### Diagnostics inventory
+
+Every new diagnostic required if scalar `~string` is locked in under the enforcement model:
+
+| Code | Severity | Stage | Trigger | Teaching message |
+|------|----------|-------|---------|-----------------|
+| `CaseInsensitiveFieldRequiresTildeEquals` | Error | Type | `==` operator where either operand is a `~string` field | "Field `{0}` is declared `~string` (case-insensitive). Use `~=` instead of `==` to compare it — `==` is case-sensitive." |
+| `CaseInsensitiveFieldRequiresTildeNotEquals` | Error | Type | `!=` operator where either operand is a `~string` field | "Field `{0}` is declared `~string` (case-insensitive). Use `!~` instead of `!=` to compare it — `!=` is case-sensitive." |
+| `CaseInsensitiveValueInCaseSensitiveContains` | Error | Type | `contains` (or `lookup for K`) where the collection/lookup has a `string` (not `~string`) inner/key type and the right operand is a `~string` field | "Field `{0}` is declared `~string`, but `{1}` uses case-sensitive `string` for its {2} type. The `contains` test will use case-sensitive comparison — declare `{1} as {3} of ~string` for case-insensitive membership, or restructure the comparison." |
+
+The `CaseInsensitiveStringOnNonCollection` diagnostic already exists (code 66) and currently fires when `field Name as ~string` appears as a scalar field declaration. **This diagnostic must be removed or suppressed** when scalar `~string` is unlocked — it is the exact guard that currently prevents scalar `~string` from compiling. Its removal is a breaking change to the diagnostic set; anything checking for code 66 in tests or tooling must be updated.
+
+Three diagnostics total are net-new. The existing `CaseInsensitiveStringOnNonCollection` is removed (or retired with a `Removed` marker in the catalog).
+
+**Fix hints for `CaseInsensitiveValueInCaseSensitiveContains`:**
+- If the collection is under the author's control: "Change the field declaration to `set of ~string` for case-insensitive membership."
+- If the value is the variable: "Remove the `~string` modifier from field `{0}` if case-sensitive comparison is intended, or restructure using a quantifier with `~=`."
+
+---
+
+### What locking in now means
+
+#### Language spec (`docs/language/precept-language-spec.md`)
+
+- **§1.1 Operators table:** The `Tilde` token description currently says "only valid immediately before `string` in a collection inner type position." This must be amended to: "valid as the case-insensitive modifier in a collection inner type position (`set of ~string`) **and** as a scalar field type modifier (`field Name as ~string`)."
+- **§1.2 Reserved keywords:** No change needed — `~` is already a token, not a keyword.
+- **§3 Type Checker (when implemented):** The type checker spec must document the `~string` enforcement rule: `==`/`!=` on any `~string` field is a compile error; `~=`/`!~` are required. This rule must also cover the `contains`/`for` cross-collection mismatch.
+
+#### Primitive types doc (`docs/language/primitive-types.md`)
+
+- **`~string` section (currently "collection-only"):** This section says explicitly: "`~string` is not a standalone field type — it is only valid as the inner type of a collection." This must be rewritten to describe the scalar field use case: `field Email as ~string` is now valid; it carries a comparison obligation requiring `~=`/`!~`.
+- The operator table for `string` must note that on a `~string`-declared field, `==` and `!=` are compile errors and `~=`/`!~` are required.
+- The `CaseInsensitiveStringOnNonCollection` diagnostic in the type errors section must be removed and replaced with the new enforcement diagnostics.
+
+#### Collection types doc (`docs/language/collection-types.md`)
+
+- **Inner type system section:** The sentence "**`~string` is collection-only.** `field Name as ~string` is a compile-time error: `CaseInsensitiveStringOnNonCollection`" must be removed or amended to describe the new scalar field behavior.
+- **Membership operator section:** The `contains` type rules table must add a row documenting the `CaseInsensitiveValueInCaseSensitiveContains` mismatch diagnostic for `set of string contains ~string value`.
+- **`lookup of K to V` section:** Must note that `lookup of ~string to V` selects `OrdinalIgnoreCase` as the key comparer, and `put` with a case-variant key overwrites the existing entry.
+- **`~string` in queue, stack, and log:** Existing coverage is correct; no change needed for those cases.
+
+#### Type checker implementation (`src/Precept/Pipeline/TypeChecker.cs`)
+
+The type checker is currently a stub (Phase 3 — `throw new NotImplementedException()`). When implemented, it must:
+
+1. **Parse/resolve scalar `~string`:** `ScalarTypeRefNode` must accept `CaseInsensitive = true` when the parser sees `field X as ~string`. The parser currently emits `CaseInsensitiveStringOnNonCollection` for this case via `DiagnosticCode.CaseInsensitiveStringOnNonCollection`. That check must be removed.
+
+2. **Semantic index field entry:** The field metadata must carry `bool CaseInsensitive`. Every reference to a `~string` field in expression nodes must be annotated with this flag by the type checker.
+
+3. **Binary expression enforcement:** In the `BinaryOperation` expression form check, after resolving the operation (which will succeed — both types are `TypeKind.String`), add: if `op == == || op == !=` AND (left is CI OR right is CI), emit the appropriate `CaseInsensitiveFieldRequiresTildeEquals`/`CaseInsensitiveFieldRequiresTildeNotEquals` diagnostic.
+
+4. **`contains` / `for` cross-check:** In the `contains` expression check, after resolving the collection's inner/key type: if the collection's inner/key type is `string` (not CI) AND the value argument is `~string` (CI), emit `CaseInsensitiveValueInCaseSensitiveContains`.
+
+5. **Lookup `for` cross-check:** Same logic as `contains` but for the `F for K` key access expression.
+
+#### Diagnostics catalog (`src/Precept/Language/DiagnosticCode.cs` and `Diagnostics.cs`)
+
+- **Remove (retire):** `CaseInsensitiveStringOnNonCollection` (code 66). Mark as `Removed` in the catalog with a description of when it was retired.
+- **Add:** `CaseInsensitiveFieldRequiresTildeEquals`
+- **Add:** `CaseInsensitiveFieldRequiresTildeNotEquals`
+- **Add:** `CaseInsensitiveValueInCaseSensitiveContains`
+
+#### Runtime evaluator (`src/Precept/Runtime/Evaluator.cs`)
+
+One implementation change: when creating a `lookup of ~string to V` collection, the evaluator must use `ImmutableDictionary.Create(StringComparer.OrdinalIgnoreCase)` instead of the default constructor. This is the only runtime change required — everything else is compile-time enforcement that prevents reaching invalid runtime states.
+
+#### Parser (`src/Precept/Pipeline/Parser.Declarations.cs`)
+
+The parser currently sets `caseInsensitive = true` only inside the collection inner type path (after `of`). The `CaseInsensitiveStringOnNonCollection` diagnostic is emitted when `~string` appears outside that path. The parser change is: remove the out-of-collection-context error for `~string`, and instead parse `field X as ~string` as a valid scalar field declaration with `CaseInsensitive = true` on the resulting `ScalarTypeRefNode`. The enforcement moves to the type checker.
+
+#### Implementation scope assessment
+
+- **Parser change:** Small. One guard removed, one path extended to produce a CI-flagged `ScalarTypeRefNode`.
+- **Diagnostic catalog change:** Small. Three additions, one retirement.
+- **Type checker change:** Medium. Two new enforcement rules (equality operator check, contains cross-check). The type checker is not yet implemented (stub), so these are design-time additions to the implementation contract — they go into `precept-language-spec.md §3` and will be implemented in Phase 3.
+- **Evaluator change:** Small. One new dictionary construction path for `lookup of ~string to V`.
+- **Documentation change:** Medium. Three doc files need substantive edits. The primitive-types section is the most critical (rewrites the `~string` section from scratch).
+
+**Overall: Medium.** Not trivial — touches parser, type checker contract, runtime, diagnostics catalog, and three documentation files — but no architectural changes, no new grammar constructs, no new AST node types. Every change is an extension of an existing pattern, not a new pattern.
+
+---
+
+### Recommendation
+
+**The enforcement model is not complete as described.** The mixed-collection case is a genuine enforcement gap: a `~string` value flowing into a `contains` test against a case-sensitive collection compiles without error and silently produces case-sensitive membership semantics. This is the exact class of bug the feature is meant to prevent.
+
+**The minimum coherent set of enforcement rules (not over-engineered, not under-specified):**
+
+1. **Equality operator rule:** `==` and `!=` on any `~string` field (either operand position) are compile errors. Required forms: `~=` and `!~`. This is the rule described in the prior analysis.
+
+2. **Contains cross-collection rule:** `contains` (and `lookup for K`) where the collection has a `string` (not `~string`) inner/key type and the value argument is a `~string` field is a compile error. This is the new rule the prior analysis did not cover.
+
+These two rules together close the enforcement model. Every other composition surface either (a) has no comparison semantics (assignment, `.length`, interpolation, concatenation) and is therefore outside the enforcement scope, or (b) already behaves correctly without enforcement (CI collection with plain string value — the comparer is determined by the collection).
+
+**What is deliberately left outside the enforcement model:**
+
+- Ordering operators (`<`, `>`) — not applicable to `string` at all; no gap.
+- `dequeue into`, `pop into`, `dequeue into by` — these produce a typed value from a collection; the type of the output is the collection's inner type. If the collection is `queue of ~string`, the output value will be `~string`-typed; if `queue of string`, it will be `string`-typed. The enforcement model handles comparisons on those output values through rule 1 above.
+- Event argument type boundaries — if a `~string` field is passed as a `string`-typed event argument, the CI obligation is not propagated across that boundary. This is the accepted tradeoff documented in the assignment compatibility section.
+
+**Is locking in now the right call?**
+
+The prior analysis deferred due to lack of empirical usage evidence. The design is clear; the implementation scope is medium. If the owner is willing to commit to the full two-rule enforcement model (including the contains cross-collection diagnostic), locking in now is defensible. The enforcement model is coherent, the implementation scope is bounded, and the documentation changes are identified.
+
+If the owner locks in scalar `~string` but omits the contains cross-collection rule, the feature ships with a known enforcement gap that will catch authors by surprise in exactly the scenario described in this analysis. That is the worse outcome: the feature signals safety without providing it. Either ship the full two-rule model or don't ship scalar `~string` yet.
+
+**Minimum condition for locking in:** Both rules (equality enforcement + contains cross-check) must be in scope for the same implementation slice. They are not separable — rule 1 without rule 2 is misleading.
