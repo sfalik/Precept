@@ -38,4 +38,5 @@ public sealed record FunctionMeta(
     string? UsageExample = null,
     string? SnippetTemplate = null,
     string? HoverDescription = null,
-    bool HasCIVariant = false);
+    bool HasCIVariant = false,
+    FunctionKind? CIVariantOf = null);

@@ -88,7 +88,7 @@ public static class ExpressionForms
             "A bounded quantifier: each/any/no binding in collection (predicate)."),
         ExpressionFormKind.CIFunctionCall => new(kind, ExpressionCategory.Invocation, false,
             [TokenKind.Tilde],
-            "A case-insensitive function call: ~startsWith(subject, prefix) or ~endsWith(subject, suffix). Both arguments are required."),
+            "A case-insensitive function call: ~startsWith(subject, prefix) or ~endsWith(subject, suffix). Both arguments are required. Semantic metadata lives in FunctionKind.TildeStartsWith and FunctionKind.TildeEndsWith (Functions catalog)."),
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
     };
 

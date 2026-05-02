@@ -1394,6 +1394,8 @@ Functions are validated against a closed catalog. There are no user-defined func
 | `endsWith(s, suffix)` | `(string, string) → boolean` | `boolean` | Case-sensitive. Compile error when first arg is `~string` — use `~endsWith` instead. See `CaseInsensitiveFieldRequiresTildeEndsWith`. |
 | `~startsWith(s, prefix)` | `(~string, string) → boolean` | `boolean` | CI prefix test using `OrdinalIgnoreCase`. First arg must be `~string`; compile error otherwise. |
 | `~endsWith(s, suffix)` | `(~string, string) → boolean` | `boolean` | CI suffix test using `OrdinalIgnoreCase`. First arg must be `~string`; compile error otherwise. |
+
+> **CI functions and the catalog.** `~startsWith` and `~endsWith` have dedicated `FunctionKind` catalog entries (`TildeStartsWith`, `TildeEndsWith`) and are syntactically distinct from regular function calls. The leading `~` token is the null-denotation leader for the `CIFunctionCallExpression` expression form (ExpressionForms catalog). Completions, hover, and MCP vocabulary derive from `FunctionMeta` entries — not from the `HasCIVariant` flag on the base functions.
 | `toLower(s)` | `(string) → string` | `string` | Lowercase (invariant culture) |
 | `toUpper(s)` | `(string) → string` | `string` | Uppercase (invariant culture) |
 | `left(s, n)` | `(string, integer) → string` | `string` | Leftmost N code units (clamped to string length) |

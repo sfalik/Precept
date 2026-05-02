@@ -270,6 +270,29 @@ public static class Functions
         SnippetTemplate: "mid(${1:str}, ${2:start}, ${3:length})",
         HoverDescription: "Returns a substring starting at a 1-indexed position. Both start and length must be positive. Clamped to string bounds."),
 
+        // ── String: CI variants ──────────────────────────────────────────────────
+        FunctionKind.TildeStartsWith => new(kind, "~startsWith",
+            "Case-insensitive prefix test",
+        [
+            new([new(TypeKind.String, "str"), new(TypeKind.String, "prefix")], TypeKind.Boolean),
+        ],
+        FunctionCategory.String,
+        UsageExample: "~startsWith(email, \"info@\")",
+        SnippetTemplate: "~startsWith(${1:str}, ${2:prefix})",
+        HoverDescription: "Returns true if the text value begins with the given prefix, case-insensitively (OrdinalIgnoreCase). First argument must be a ~string field.",
+        CIVariantOf: FunctionKind.StartsWith),
+
+        FunctionKind.TildeEndsWith => new(kind, "~endsWith",
+            "Case-insensitive suffix test",
+        [
+            new([new(TypeKind.String, "str"), new(TypeKind.String, "suffix")], TypeKind.Boolean),
+        ],
+        FunctionCategory.String,
+        UsageExample: "~endsWith(domain, \".com\")",
+        SnippetTemplate: "~endsWith(${1:str}, ${2:suffix})",
+        HoverDescription: "Returns true if the text value ends with the given suffix, case-insensitively (OrdinalIgnoreCase). First argument must be a ~string field.",
+        CIVariantOf: FunctionKind.EndsWith),
+
         // ── Temporal ────────────────────────────────────────────────────────────
         FunctionKind.Now => new(kind, "now", "Current instant (UTC)",
         [

@@ -30,6 +30,10 @@ public enum FunctionKind
     Right        = 19,
     Mid          = 20,
 
+    // ── String (CI variants) ─────────────────────────────────────────────────
+    TildeStartsWith  = 22,
+    TildeEndsWith    = 23,
+
     // ── Temporal ────────────────────────────────────────────────────────────────
     Now          = 21,
 }

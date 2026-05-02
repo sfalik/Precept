@@ -9,7 +9,7 @@ Pre-TypeChecker audit — exhaustive consistency check of language docs, catalog
 - Obvious gap → agent rubber-ducks, applies fix, status = **Fixed**
 - Non-obvious gap → full analysis written, status = **Unresolved** (owner resolves on second pass)
 
-**Audit status: OPEN — 49 gaps total, 47 Fixed, 2 Unresolved (GAP-043–045 fixed inline 2026-05-02; GAP-046–047 pending owner decision)**
+**Audit status: OPEN — 49 gaps total, 48 Fixed, 1 Unresolved (GAP-043–045 fixed inline 2026-05-02; GAP-046 fixed 2026-05-02; GAP-047 pending owner decision)**
 
 ---
 
@@ -60,7 +60,7 @@ Pre-TypeChecker audit — exhaustive consistency check of language docs, catalog
 | GAP-043 | `catalog-system.md` inventory and prose say 12 catalogs; `ExpressionForms.cs` declares itself "The 13th catalog" | Doc-Doc | Fixed | 10 |
 | GAP-044 | Spec §1.2 reserved keyword list missing `queue` and `stack` (present in §1.1 vocabulary and lexer) | Doc-Doc | Fixed | 10 |
 | GAP-045 | Spec §2.3 `ChoiceValueExpr` uses undefined terminal `BooleanLiteral`; actual tokens are `true`/`false` | Doc-Doc | Fixed | 10 |
-| GAP-046 | Spec §3.7 function table lists `~startsWith`/`~endsWith` as function-catalog entries but no `FunctionKind` member exists for them; CI variants live in `ExpressionForms` | Doc-Catalog | Unresolved | 10 |
+| GAP-046 | Spec §3.7 function table lists `~startsWith`/`~endsWith` as function-catalog entries but no `FunctionKind` member exists for them; CI variants live in `ExpressionForms` | Doc-Catalog | Fixed | 10 |
 | GAP-047 | Spec §3.7 `round(value,places)`, `min`, `max`, `abs`, `clamp` missing money/quantity overloads present in `Functions` catalog | Doc-Catalog | Unresolved | 10 |
 | GAP-021 | `is set`/`is not set` associativity: spec §2.1 says `left`, catalog says `NonAssociative (postfix)` | Doc-Impl | Fixed | 6 |
 | GAP-022 | Spec §2.1 null-denotation table names `StringLiteralExpression` — a node that does not exist; implementation uses `LiteralExpression` | Doc-Impl | Fixed | 6 |
@@ -1954,7 +1954,7 @@ Fixed (2026-05-02). Changed `ChoiceValueExpr := StringLiteral | NumberLiteral | 
 
 ## GAP-046: Spec §3.7 lists `~startsWith`/`~endsWith` as function-catalog entries; no `FunctionKind` exists for them
 
-**Status:** Unresolved  
+**Status:** Fixed  
 **Category:** Doc-Catalog  
 **Location:** `docs/language/precept-language-spec.md` §3.7 function catalog table; `src/Precept/Language/FunctionKind.cs`; `src/Precept/Language/ExpressionForms.cs`  
 **Found in iteration:** 10
@@ -1978,9 +1978,12 @@ The current design is internally consistent — `ExpressionFormKind.CIFunctionCa
 
 **Ownership:** Owner decision required. No C# changes made this iteration.
 
+**Design Decision (2026-05-02 — Shane → Option B):**  
+Add `FunctionKind.TildeStartsWith = 22` and `FunctionKind.TildeEndsWith = 23` to the Functions catalog. Add a `CIVariantOf: FunctionKind? = null` field to `FunctionMeta` to express the CI→base relationship in catalog metadata (inverse of `HasCIVariant`). The parser's Tilde null-denotation path does NOT change — it derives CI-capable names from `HasCIVariant` on the base functions and that does not change. `ExpressionForms.CIFunctionCall` is updated in HoverDocs only (cross-reference to new kinds). TypeChecker is a stub — no change. Spec §3.7 receives a footnote after the `~endsWith` row confirming CI functions now have dedicated catalog entries. Full implementation brief: `.squad/decisions/inbox/frank-gap046-design.md`.
+
 ---
 
-## GAP-047: Spec §3.7 function table missing money/quantity overloads for `min`, `max`, `abs`, `clamp`, `round(places)`
+## GAP-047:Spec §3.7 function table missing money/quantity overloads for `min`, `max`, `abs`, `clamp`, `round(places)`
 
 **Status:** Unresolved  
 **Category:** Doc-Catalog  

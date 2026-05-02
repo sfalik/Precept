@@ -44,8 +44,8 @@ public class FunctionsTests
     [Fact]
     public void Total_Count()
     {
-        // 12 numeric + 8 string + 1 temporal = 21
-        Functions.All.Should().HaveCount(21);
+        // 12 numeric + 8 string + 2 string CI variants + 1 temporal = 23
+        Functions.All.Should().HaveCount(23);
     }
 
     [Fact]
@@ -55,8 +55,9 @@ public class FunctionsTests
         // min(5) + max(5) + abs(5) + clamp(5) + floor(2) + ceil(2) +
         // truncate(2) + round(2) + roundPlaces(5) + approximate(1) +
         // pow(3) + sqrt(1) + trim(1) + startsWith(1) + endsWith(1) +
-        // toLower(1) + toUpper(1) + left(1) + right(1) + mid(1) + now(1) = 47
-        Functions.All.Sum(m => m.Overloads.Count).Should().Be(47);
+        // toLower(1) + toUpper(1) + left(1) + right(1) + mid(1) +
+        // ~startsWith(1) + ~endsWith(1) + now(1) = 49
+        Functions.All.Sum(m => m.Overloads.Count).Should().Be(49);
     }
 
     // ── Every overload references valid types ───────────────────────────────────
@@ -104,8 +105,8 @@ public class FunctionsTests
     [Fact]
     public void ByName_UniqueNames()
     {
-        // 21 FunctionKind members, but "round" appears twice → 20 unique names
-        Functions.ByName.Should().HaveCount(20);
+        // 23 FunctionKind members, but "round" appears twice → 22 unique names
+        Functions.ByName.Should().HaveCount(22);
     }
 
     [Fact]
@@ -128,8 +129,8 @@ public class FunctionsTests
     {
         foreach (var meta in Functions.All)
         {
-            meta.Name.Should().MatchRegex(@"^[a-z][a-zA-Z]*$",
-                $"{meta.Kind} name '{meta.Name}' should be lowerCamelCase");
+            meta.Name.Should().MatchRegex(@"^~?[a-z][a-zA-Z]*$",
+                $"{meta.Kind} name '{meta.Name}' should be lowerCamelCase (with optional leading ~)");
         }
     }
 
