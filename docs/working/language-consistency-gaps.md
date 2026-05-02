@@ -9,7 +9,7 @@ Pre-TypeChecker audit — exhaustive consistency check of language docs, catalog
 - Obvious gap → agent rubber-ducks, applies fix, status = **Fixed**
 - Non-obvious gap → full analysis written, status = **Unresolved** (owner resolves on second pass)
 
-**Audit status: OPEN — 33 gaps total, 28 Fixed, 5 Unresolved (Iter 8 runtime/parser audit + catalog audit)**
+**Audit status: OPEN — 35 gaps total, 34 Fixed, 1 Unresolved (Iter 9 Catalog-Impl audit)**
 
 ---
 
@@ -45,7 +45,8 @@ Pre-TypeChecker audit — exhaustive consistency check of language docs, catalog
 | GAP-031 | Unary/postfix binding powers hardcoded in `Parser.Expressions.cs` (`not`→25, negate→65, `is set`→60) instead of reading from `Operators.ByToken`/`ByTokenSequence` | Catalog-Impl | Fixed | 8 |
 | GAP-032 | `Functions.cs` `pow(integer, integer)` overload missing `ProofRequirement` for `exp >= 0`; spec §0.6 item 4 explicitly lists this alongside `sqrt` as a non-negative proof obligation | Doc-Catalog | Fixed | 8 |
 | GAP-033 | `ModifierKind.cs` `Notempty` XML doc comment reads "Flag: string is non-empty" — stale after GAP-025 expanded applicability to string + 8 collection types (analogous to GAP-027 in Tokens.cs) | Doc-Catalog | Fixed | 8 |
-| GAP-020 |`contains` associativity: spec §2.1 says `left`, `Operators.cs` enforces `NonAssociative`; spec left-denotation shows `ParseExpression(40)` instead of `ParseExpression(41)` | Doc-Impl | Fixed | 6 |
+| GAP-034 | `ParseTypeRef` hardcodes `is TokenKind.Set or TokenKind.QueueType or …` (6-kind collection test) instead of deriving from `Types.All.Where(Collection && not Lookup)` | Catalog-Impl | Fixed | 9 |
+| GAP-035 | `ParseChoiceValue` hardcodes `is TokenKind.IntegerType or TokenKind.DecimalType or TokenKind.NumberType` for "numeric choice type" — no catalog property captures this semantic | Catalog-Impl | Unresolved | 9 |
 | GAP-021 | `is set`/`is not set` associativity: spec §2.1 says `left`, catalog says `NonAssociative (postfix)` | Doc-Impl | Fixed | 6 |
 | GAP-022 | Spec §2.1 null-denotation table names `StringLiteralExpression` — a node that does not exist; implementation uses `LiteralExpression` | Doc-Impl | Fixed | 6 |
 | GAP-023 | Spec §2.1 precedence table has `is` row (60) appearing before `+/-` row (50); two rows at level 60 without ordering explanation | Doc-Spec | Fixed | 6 |
@@ -1383,6 +1384,104 @@ Fixed (iter 7, Frank). Removed the `Integer→Number` and `Decimal→Number` ove
 <!-- Iteration 7 complete: Final pre-TypeChecker language consistency audit pass. Phase A verification — confirmed 22 of 24 prior gaps are genuinely fixed; identified 2 false-Fixed entries: GAP-017 (C# changes written in iter 5 but never applied — applied now in iter 7) and GAP-003 (docs updated but Modifiers.cs not updated — filed as new GAP-025). 4 new gaps filed: GAP-025 (Unresolved → Fixed in iter 7 by Frank — GAP-003 incomplete; Modifiers.cs Notempty ApplicableTo updated from StringOnly to StringAndCollectionTypes; spec §3.8 9-type set applied, Lookup excluded), GAP-026 (Unresolved → Fixed in iter 7 by Frank — Modifiers.cs CollectionTypes extended from 3 to 9 members; Lookup included for mincount/maxcount), GAP-027 (Fixed — Tokens.cs Notempty description updated), GAP-028 (Unresolved → Fixed in iter 7 by Frank — Functions.cs sqrt Integer/Decimal overloads removed per spec §3.7; sqrt is Number-lane only). C# changes applied this iteration: Tokens.cs Arrow Cat_Str → Cat_Op, TwoCharOperators filter simplified, Notempty description updated, Modifiers.cs CollectionTypes extended + StringAndCollectionTypes added + Notempty.ApplicableTo updated, Functions.cs sqrt Integer/Decimal overloads + PSqrtInteger/PSqrtDecimal fields removed. Tests updated: ModifiersTests.cs (StringModifiers_ApplyToStringOnly theory, CollectionModifiers renamed+extended, new Notempty_AppliesToStringAndCollectionTypes fact), FunctionsTests.cs (OverloadCount Sqrt 3→1, Total_OverloadCount 49→47, Sqrt_AllOverloads_HaveNonNegativeRequirement trimmed to overload 0 only, Sqrt_RequirementCount_IsOnePerOverload asserts 1 overload). Final state: 28 gaps total, 28 Fixed, 0 Unresolved. Pre-TypeChecker language consistency audit CLOSED. -->
 
 
+
+
+
+---
+
+## GAP-034: `ParseTypeRef` hardcodes 6-token collection-type test instead of deriving from `Types.All`
+
+**Status:** Fixed  
+**Category:** Catalog-Impl  
+**Location:** `src/Precept/Pipeline/Parser.Declarations.cs` `ParseTypeRef()`, line ~995  
+**Found in iteration:** 9
+
+**Description:**  
+`ParseTypeRef` dispatches to the collection-type parsing branch using a hardcoded token-kind disjunction:
+
+```csharp
+if (current.Kind is TokenKind.Set or TokenKind.QueueType or TokenKind.StackType
+                 or TokenKind.BagType or TokenKind.ListType or TokenKind.LogType)
+```
+
+The six token kinds listed are exactly the non-Lookup collection-type leaders — the set of all `TypeMeta` entries where `Category == TypeCategory.Collection` and the token kind is not `TokenKind.LookupType`. That invariant is already encoded in `Types.All`; the parser needs only to derive it. If a new collection type is added to the catalog, this `if` guard must be updated manually, or the new type will fall through to an error/fallback.
+
+`LookupType` is correctly excluded: `lookup of K to V` uses a different multi-keyword syntax (handled by the preceding `if (current.Kind == TokenKind.LookupType)` branch at lines ~965–992).
+
+**Rubber-Duck Analysis:**  
+The catalog already encodes collection membership via `TypeCategory.Collection`. The derivation is:
+```csharp
+Types.All
+    .Where(t => t.Category == TypeCategory.Collection
+             && t.Token is not null
+             && t.Token.Kind != TokenKind.LookupType)
+    .Select(t => t.Token!.Kind)
+    .ToFrozenSet()
+```
+This produces exactly `{Set, QueueType, StackType, BagType, ListType, LogType}` today — a safe substitution. New collection types will automatically appear in the set when their catalog entries carry `TypeCategory.Collection`.
+
+Note on `TokenKind.Set` vs `TokenKind.SetType`: the lexer emits `TokenKind.Set` (the keyword token) for the word "set". `TokenKind.SetType` is a parser-synthesized alias present in `Types.ByToken` but never emitted by the lexer. `TypeKind.Set.Token.Kind` returns `TokenKind.Set`, so the derived set correctly uses the lexer-emitted token kind. ✅
+
+**Fix:**  
+Added `SimpleCollectionTypeLeaders` static field to `Parser.cs` (outer class):
+
+```csharp
+/// <summary>
+/// Token kinds that lead a "standard" collection type reference using <c>X of T</c> syntax.
+/// Excludes <see cref="TokenKind.LookupType"/> — lookup uses <c>lookup of K to V</c> and is
+/// handled by a dedicated path in <c>ParseTypeRef</c>. Derived from
+/// <see cref="Types.All"/> filtered by <see cref="TypeCategory.Collection"/> — never hardcoded.
+/// </summary>
+internal static readonly FrozenSet<TokenKind> SimpleCollectionTypeLeaders =
+    Types.All
+        .Where(t => t.Category == TypeCategory.Collection
+                 && t.Token is not null
+                 && t.Token.Kind != TokenKind.LookupType)
+        .Select(t => t.Token!.Kind)
+        .ToFrozenSet();
+```
+
+Replaced the hardcoded `is TokenKind.Set or TokenKind.QueueType or ...` condition in `ParseTypeRef` with:
+
+```csharp
+if (SimpleCollectionTypeLeaders.Contains(current.Kind))
+```
+
+---
+
+## GAP-035: `ParseChoiceValue` hardcodes `IntegerType | DecimalType | NumberType` for "numeric choice type"
+
+**Status:** Unresolved  
+**Category:** Catalog-Impl  
+**Location:** `src/Precept/Pipeline/Parser.Declarations.cs` `ParseChoiceValue()`, line ~1147  
+**Found in iteration:** 9
+
+**Description:**  
+`ParseChoiceValue` checks whether a choice element's declared type requires a `NumberLiteral` input (as opposed to a `StringLiteral` or `True`/`False`) using a hardcoded disjunction:
+
+```csharp
+if (elemToken.Kind is TokenKind.IntegerType or TokenKind.DecimalType or TokenKind.NumberType)
+{
+    // optional leading minus + NumberLiteral; fold signed literal
+    ...
+}
+```
+
+This check means "the value for this choice element is expressed as a numeric literal (possibly signed)." No `TypeTrait`, `TypeCategory`, or other catalog property currently expresses this semantic. The closest proxy — `TypeTrait.Orderable & TypeCategory.Scalar` — identifies the same three types today, but is semantically wrong: it means "this type supports ordinal comparison" rather than "this type's literal representation is a number."
+
+**Rubber-Duck Analysis:**  
+The parser is making a domain decision: "For which types is the choice literal a `NumberLiteral` token (possibly prefixed by `-`)?" The answer — `integer`, `decimal`, `number` — is language-level knowledge that belongs in the catalog. Four possible resolutions:
+
+1. **New `TypeTrait.NumericLiteral` flag** — add a trait to `TypeMeta` that marks types whose choice-position literal is a number. Semantically precise. Requires a catalog change and adds a new trait concept.
+2. **`LiteralTokenKind` property on `TypeMeta`** — each type declares which `TokenKind` it expects in literal/choice position (e.g., `NumberLiteral`, `StringLiteral`, `True`/`False`). Most general; allows full dispatch from the catalog. Significant catalog API change.
+3. **`TypeCategory.Numeric` (new category or repurpose)** — rename/add a category specifically for numeric types. Workable but requires designing the category taxonomy more carefully.
+4. **Leave as-is** — the three-type set is stable; no new numeric types are planned. Acceptable as a documented exception to the catalog-derivation rule.
+
+The current proxy `TypeTrait.Orderable & TypeCategory.Scalar` would work today (only Integer/Decimal/Number are both Orderable and Scalar), but using it as a proxy for "accepts NumberLiteral" would break if a future type (e.g., a `ratio` type) is Orderable+Scalar but uses a different literal form, or if `string` gains orderable semantics.
+
+**Ownership:** Requires a catalog design decision before a fix can be applied. No C# changes made this iteration.
+
+<!-- Iteration 9 complete: George's Catalog-Impl audit of lexer + parser. Lexer fully catalog-driven — no violations. Prior fixes verified: GAP-029 (IsOutcomeAhead uses OutcomeKeywords.Contains ✅), GAP-030 (KeywordsUsableAsFunctionNames derived from Functions.All ∩ Tokens.Keywords ✅), GAP-031 (binding powers read from Operators.ByToken/ByTokenSequence ✅), GAP-032 (PPowIntExp ProofRequirement on integer pow overload ✅), GAP-033 (ModifierKind.cs Notempty comment updated ✅). New gaps: GAP-034 (Fixed — ParseTypeRef hardcoded 6-token collection-type guard → SimpleCollectionTypeLeaders derived from Types.All(Collection, not Lookup)), GAP-035 (Unresolved — ParseChoiceValue hardcodes IntegerType|DecimalType|NumberType for numeric choice literal; no catalog property encodes "accepts NumberLiteral"; requires owner decision on TypeTrait.NumericLiteral or LiteralTokenKind). Status: 35 gaps total, 34 Fixed, 1 Unresolved. -->
 
 ## Schema Reference
 

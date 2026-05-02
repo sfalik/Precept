@@ -992,8 +992,9 @@ public static partial class Parser
             }
 
             // Collection type refs: set|queue|stack|bag|list|log of T [by P] [ascending|descending]
-            if (current.Kind is TokenKind.Set or TokenKind.QueueType or TokenKind.StackType
-                             or TokenKind.BagType or TokenKind.ListType or TokenKind.LogType)
+            // Catalog-derived: SimpleCollectionTypeLeaders covers all collection types with
+            // "X of T" syntax (excludes Lookup, which uses "lookup of K to V" above).
+            if (SimpleCollectionTypeLeaders.Contains(current.Kind))
             {
                 var collectionToken = Advance();
                 Expect(TokenKind.Of);

@@ -162,6 +162,20 @@ public static partial class Parser
             .ToFrozenSet();
 
     /// <summary>
+    /// Token kinds that lead a "standard" collection type reference using <c>X of T</c> syntax.
+    /// Excludes <see cref="TokenKind.LookupType"/> — lookup uses <c>lookup of K to V</c> and is
+    /// handled by a dedicated path in <c>ParseTypeRef</c>. Derived from
+    /// <see cref="Types.All"/> filtered by <see cref="TypeCategory.Collection"/> — never hardcoded.
+    /// </summary>
+    internal static readonly FrozenSet<TokenKind> SimpleCollectionTypeLeaders =
+        Types.All
+            .Where(t => t.Category == TypeCategory.Collection
+                     && t.Token is not null
+                     && t.Token.Kind != TokenKind.LookupType)
+            .Select(t => t.Token!.Kind)
+            .ToFrozenSet();
+
+    /// <summary>
     /// All preposition tokens that may introduce a type qualifier.
     /// Derived from <see cref="QualifierSlot.Preposition"/> across all <see cref="TypeMeta.QualifierShape"/>
     /// entries — never hardcoded.
