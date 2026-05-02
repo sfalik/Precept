@@ -367,6 +367,8 @@ Every token the lexer can produce. Organized by category to match the `TokenKind
 
 **Scan order for operators:** Multi-character operators must be attempted before their single-character prefixes: `!~` before `!=` before `!` (if ever reintroduced), `~=` before `~`, `->` before `-`, `==` before `=`, `>=` before `>`, `<=` before `<`. A standalone `~` is valid immediately before `string` in a collection inner type position (`set of ~string`) and as a scalar field type qualifier (`field Email as ~string`) — elsewhere it is a lexer error.
 
+**`~startsWith` and `~endsWith`** are not single tokens. They lex as two tokens: `Tilde` followed by the identifier `startsWith` or `endsWith`. The parser recognizes `Tilde` in null-denotation (prefix) position immediately before one of these identifiers as a CI function call. This is distinct from `~=` and `!~`, which are single compound tokens scanned as units. The Tilde token in expression prefix position is only valid before `startsWith`/`endsWith` identifiers — any other identifier after a lone `Tilde` in expression position is a parse error.
+
 #### Punctuation
 
 | Token | Text |
@@ -534,15 +536,18 @@ Operators and punctuation are scanned after attempting keyword/identifier matche
 **Scan priority (highest first):**
 
 1. `->` (Arrow)
-2. `==` (DoubleEquals)
-3. `!=` (NotEquals)
-4. `>=` (GreaterThanOrEqual)
-5. `<=` (LessThanOrEqual)
-6. `=` (Assign)
-7. `>` (GreaterThan)
-8. `<` (LessThan)
-9. `+`, `-`, `*`, `/`, `%` (Arithmetic)
-10. `.`, `,`, `(`, `)`, `[`, `]` (Punctuation)
+2. `~=` (CaseInsensitiveEquals) — before lone `~`
+3. `!~` (CaseInsensitiveNotEquals) — before `!=`
+4. `==` (DoubleEquals)
+5. `!=` (NotEquals)
+6. `>=` (GreaterThanOrEqual)
+7. `<=` (LessThanOrEqual)
+8. `~` (Tilde) — after `~=`, so lone tilde is only reached when `~=` did not match
+9. `=` (Assign)
+10. `>` (GreaterThan)
+11. `<` (LessThan)
+12. `+`, `-`, `*`, `/`, `%` (Arithmetic)
+13. `.`, `,`, `(`, `)`, `[`, `]` (Punctuation)
 
 ### 1.6 Dual-Use Token Disambiguation
 
@@ -697,6 +702,7 @@ The parser always runs to end-of-source. On malformed input it emits diagnostics
 | `Not` | `UnaryExpression(Not, ParseExpression(25))` |
 | `Minus` | `UnaryExpression(Negate, ParseExpression(65))` |
 | `If` | `ConditionalExpression` (`if` Expr `then` Expr `else` Expr) |
+| `Tilde` (when next token is `startsWith` or `endsWith` identifier) | `CIFunctionCallExpression` — consumes the identifier and `(` Expr `,` Expr `)` to produce `~startsWith(arg1, arg2)` or `~endsWith(arg1, arg2)`. Return type: `boolean`. First argument must be `~string`; compile error otherwise (`CaseInsensitiveFieldRequiresTildeStartsWith` / `CaseInsensitiveFieldRequiresTildeEndsWith` if `startsWith`/`endsWith` was used without `~`; `TypeMismatch` if `~startsWith`/`~endsWith` is used with a plain `string` first arg). |
 | _other_ | missing `IdentifierExpression` + diagnostic |
 
 #### Left-denotation (infix and postfix)
@@ -887,7 +893,7 @@ TypeRef  :=  ScalarType TypeQualifier?
           |  CollectionType
           |  ChoiceType
 
-ScalarType  :=  string | number | integer | decimal | boolean
+ScalarType  :=  ~string | string | number | integer | decimal | boolean
              |  date | time | instant | duration | period
              |  timezone | zoneddatetime | datetime
              |  money | currency | quantity | unitofmeasure
@@ -900,7 +906,11 @@ ChoiceValueExpr   :=  StringLiteral | NumberLiteral | BooleanLiteral
 TypeQualifier   :=  (in | of | to) Expr
 ```
 
+> **`~string` is not a valid `ChoiceElementType`.** The `choice` type guarantees the stored value IS the canonical declared string; `~string`'s storage-preserving model cannot be reconciled with this guarantee without new surface. Use `toLower()` normalization at the ingestion boundary before assigning to a choice field.
+
 Type qualifiers narrow the value domain: `in '<unit>'` pins to a specific unit or currency, `of '<family>'` constrains to a dimension family. A field may use `in` or `of`, not both.
+
+**`~string` in `ScalarType` position.** `~string` is valid in field declarations (`field Email as ~string`) and event argument declarations (`event Foo(Email as ~string)`). It is not valid in `ChoiceElementType` position (see note above). The parser recognizes `~string` via a new additive `Tilde`-handling path in `ParseTypeRef()` — the existing collection inner type path is unchanged. `~string` is `TypeKind.String` with `CaseInsensitive = true` on the type reference node; it is not a new `TypeKind`.
 
 **`ChoiceType` delimiter note:** The `(...)` enclosing choice values is a type-level constraint parameter — those values define the allowed domain and are part of the type itself, not a value being assigned. This is intentionally distinct from the `[...]` list literal syntax used in `default` clauses, which is a value expression. Using `(...)` here signals type parameterization; using `[...]` would create a visual collision in compound forms like `set of choice of string(...) ... default [...]` where both delimiters would appear in the same declaration for different purposes.
 
@@ -1127,10 +1137,14 @@ Event args are accessed via dotted notation: `EventName.ArgName`. The type check
 |----------|-----------|------------|-------------|-----------|
 | `+` `-` `*` `/` `%` | numeric | numeric | common numeric type | Yes — widen to common |
 | `+` | `string` | `string` | `string` | No (concatenation) |
+| `+` | `~string` | `~string` | `string` | No (concatenation — CI qualifier not preserved through transformation) |
+| `+` | `~string` | `string` | `string` | No (concatenation — CI qualifier not preserved) |
 | `==` `!=` | any T | same T | `boolean` | Yes — `integer` widens to `decimal` or `number`; `decimal` vs `number` is a type error (see §3.2) |
-| `~=` `!~` | `string` | `string` | `boolean` | No — case-insensitive ordinal comparison (`OrdinalIgnoreCase`); type error on non-string operands |
+| `~=` `!~` | `string` or `~string` | `string` or `~string` | `boolean` | No — case-insensitive ordinal comparison (`OrdinalIgnoreCase`); type error on non-string operands |
+| `~startsWith` | `~string` | `string` | `boolean` | No — CI prefix test; compile error if first arg is not `~string` |
+| `~endsWith` | `~string` | `string` | `boolean` | No — CI suffix test; compile error if first arg is not `~string` |
 | `<` `>` `<=` `>=` | numeric | numeric | `boolean` | Yes — `integer` widens to `decimal` or `number`; `decimal` vs `number` is a type error (see §3.2) |
-| `<` `>` `<=` `>=` | `string` | `string` | `boolean` | No (lexicographic) |
+| `<` `>` `<=` `>=` | `string` or `~string` | `string` or `~string` | `boolean` | No — ordinal lexicographic; `~string` ordering is ordinal same as `string`; no CI ordering variant |
 | `<` `>` `<=` `>=` | `choice of T` (ordered) | `choice of T` (ordered, same element type, order-preserving subsequence) | `boolean` | No (declaration-position rank) |
 | `and` `or` | `boolean` | `boolean` | `boolean` | No |
 
@@ -1212,6 +1226,16 @@ Event args are accessed via dotted notation: `EventName.ArgName`. The type check
 
 The `then` and `else` branches must have compatible types (same type, or one widens to the other). The result type is the common type.
 
+**`~string` unification rules:**
+
+| Branches | Result type | Rationale |
+|---------|------------|-----------|
+| `~string` + `~string` | `~string` | Both branches carry CI semantics; the result inherits them |
+| `~string` + `string` | `~string` | CI preserved — `if/then/else` is selection, not transformation; when the `~string` branch wins, the result IS that field with its CI semantics intact |
+| `string` + `string` | `string` | Ordinal, no CI semantics |
+
+> **Concatenation is different.** `~string + string → string` under the `+` operator — concatenation produces a new value with no lineage claim, so the CI qualifier does not survive transformation operations. This is distinct from conditional selection, which preserves the CI qualifier.
+
 #### Member access (`.`)
 
 **Collection and core accessors:**
@@ -1269,8 +1293,10 @@ Functions are validated against a closed catalog. There are no user-defined func
 | `pow(base, exp)` | `(numeric, integer) → numeric` | Same numeric type as `base` | `exp` must be non-negative for integer lane |
 | `sqrt(value)` | `(numeric) → number` | `number` | Number-lane only; proof engine checks non-negativity |
 | `trim(value)` | `(string) → string` | `string` | — |
-| `startsWith(s, prefix)` | `(string, string) → boolean` | `boolean` | Case-sensitive prefix test |
-| `endsWith(s, suffix)` | `(string, string) → boolean` | `boolean` | Case-sensitive suffix test |
+| `startsWith(s, prefix)` | `(string, string) → boolean` | `boolean` | Case-sensitive. Compile error when first arg is `~string` — use `~startsWith` instead. See `CaseInsensitiveFieldRequiresTildeStartsWith`. |
+| `endsWith(s, suffix)` | `(string, string) → boolean` | `boolean` | Case-sensitive. Compile error when first arg is `~string` — use `~endsWith` instead. See `CaseInsensitiveFieldRequiresTildeEndsWith`. |
+| `~startsWith(s, prefix)` | `(~string, string) → boolean` | `boolean` | CI prefix test using `OrdinalIgnoreCase`. First arg must be `~string`; compile error otherwise. |
+| `~endsWith(s, suffix)` | `(~string, string) → boolean` | `boolean` | CI suffix test using `OrdinalIgnoreCase`. First arg must be `~string`; compile error otherwise. |
 | `toLower(s)` | `(string) → string` | `string` | Lowercase (invariant culture) |
 | `toUpper(s)` | `(string) → string` | `string` | Uppercase (invariant culture) |
 | `left(s, n)` | `(string, integer) → string` | `string` | Leftmost N code units (clamped to string length) |
@@ -1306,6 +1332,22 @@ Functions are validated against a closed catalog. There are no user-defined func
 | Default value type mismatch | `default Expr` where `Expr`'s type is incompatible with the field type | `TypeMismatch` |
 | Collection element type mismatch | `add Field Expr` where `Expr`'s type doesn't match the collection's element type | `TypeMismatch` |
 | Numeric literal incompatible | Fractional literal in `integer` context, or exponent literal in `integer`/`decimal` context | `TypeMismatch` |
+
+#### `~string` enforcement
+
+All three rules below ship together — the enforcement model is not separable. Checks fire at the comparison or call site, not at the declaration site. The CI flag is carried per field reference in the semantic index.
+
+| Context | Condition | Diagnostic |
+|---------|-----------|------------|
+| Binary equality (`==`) | Either operand is `~string` | `CaseInsensitiveFieldRequiresTildeEquals` |
+| Binary inequality (`!=`) | Either operand is `~string` | `CaseInsensitiveFieldRequiresTildeNotEquals` |
+| Collection `contains` | Collection is case-sensitive (`set`/`list`/`log`/`queue`/`stack`/`bag` of `string`) and value is `~string` | `CaseInsensitiveValueInCaseSensitiveContains` |
+| `startsWith(s, ...)` call | First arg `s` resolves to `~string` | `CaseInsensitiveFieldRequiresTildeStartsWith` |
+| `endsWith(s, ...)` call | First arg `s` resolves to `~string` | `CaseInsensitiveFieldRequiresTildeEndsWith` |
+
+Enforcement fires in all expression positions where `==`/`!=`/`contains`/`startsWith`/`endsWith` appear, including `when` guards, `rule` expressions, `ensure` expressions, and quantifier predicates. The enforcement checks both operand positions for binary operators (e.g., `"admin@example.com" == Email` where `Email` is `~string` also fires).
+
+`string` and `~string` are fully assignment-compatible in both directions. The enforcement is comparison-site only, never assignment-site.
 
 #### Modifier validation
 
@@ -1493,6 +1535,18 @@ The type checker emits diagnostics for root causes only. When `ErrorType` is flo
 | `AmbiguousTypedConstant` | Error | "'{0}' could be a {1} or {2} — add context to disambiguate" | Multi-member family, no context to narrow |
 | `DefaultForwardReference` | Error | "Default value for '{0}' cannot reference '{1}', which is declared later" | Field default references later field |
 | `EventHandlerInStatefulPrecept` | Error | "Event handlers cannot appear in a precept with state declarations" | `on Event ->` mixed with `state` declarations |
+
+#### `~string` enforcement diagnostics
+
+| Code | Severity | Message template | Fires when |
+|------|----------|-----------------|------------|
+| `CaseInsensitiveFieldRequiresTildeEquals` (66) | Error | `'Email' is declared ~string (case-insensitive). Use ~= instead of == to avoid treating 'admin@example.com' and 'Admin@example.com' as different values.` | Either operand of `==` is `~string` |
+| `CaseInsensitiveFieldRequiresTildeNotEquals` | Error | `'Email' is declared ~string (case-insensitive). Use !~ instead of != to avoid treating 'admin@example.com' and 'Admin@example.com' as different values.` | Either operand of `!=` is `~string` |
+| `CaseInsensitiveValueInCaseSensitiveContains` | Error | `'Email' is ~string but 'Roles' is set of string (case-sensitive). A value like 'Admin' stored as 'admin' would not be found. Either change 'Roles' to set of ~string, or use a quantifier to test membership explicitly.` | Collection is case-sensitive (`set`/`list`/`log`/`queue`/`stack`/`bag` of `string`) and the value being tested is `~string` |
+| `CaseInsensitiveFieldRequiresTildeStartsWith` | Error | `'Email' is declared ~string (case-insensitive). Use ~startsWith instead of startsWith to avoid treating 'admin@...' and 'Admin@...' as different prefixes.` | First arg of `startsWith(s, ...)` call resolves to `~string` |
+| `CaseInsensitiveFieldRequiresTildeEndsWith` | Error | `'Email' is declared ~string (case-insensitive). Use ~endsWith instead of endsWith to avoid treating '.com' and '.COM' as different suffixes.` | First arg of `endsWith(s, ...)` call resolves to `~string` |
+
+> **Code 66 reassignment.** `CaseInsensitiveStringOnNonCollection` (code 66) exists in `DiagnosticCode.cs` and was defined in anticipation of scalar `~string`, but was **never emitted** by the parser — scalar `~string` in non-collection position fell into `ExpectedToken` instead. When scalar `~string` ships, code 66 is **reassigned** to `CaseInsensitiveFieldRequiresTildeEquals`. Since it was never emitted, no external artifacts reference it, making reassignment safe.
 
 ---
 

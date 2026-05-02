@@ -110,11 +110,19 @@ Three rules apply when `field F as ~string` is declared. All three are required;
 | `~string` + `string` | `~string` (CI preserved — selection, not transformation) |
 | `string` + `string` | `string` |
 
-**String functions unaffected:** `trim`, `left`, `right`, `mid`, `toLower`, `toUpper` are always ordinal. CI semantics do not apply to these functions; no enforcement check.
+> **Concatenation is different.** The table above applies to `if/then/else` branch unification (selection). The `+` concatenation operator follows a distinct rule: `~string + string → string` — concatenation produces a new value with no lineage from its operands, so the CI qualifier does not survive. The `if/then/else` result IS one of the operands (selection), which is why CI is preserved; `+` creates a new string (transformation), which is why it is not.
+
+**String functions unaffected:**`trim`, `left`, `right`, `mid`, `toLower`, `toUpper` are always ordinal. CI semantics do not apply to these functions; no enforcement check.
 
 **Ordering operators:** `<`/`>`/`<=`/`>=` on a `~string` field use ordinal, case-sensitive lexicographic ordering — the same semantics as on any `string` field. The `~` modifier applies only to equality operators (`==`/`!=` → required to use `~=`/`!~`). There is no CI ordering variant; case-insensitive ordering is not part of the Precept operator surface.
 
 **`choice of ~string` is excluded.** `~string` is not a valid `ChoiceElementType`. `choice` guarantees the stored value IS the declared canonical string; `~string` never normalizes storage. These contracts are irreconcilable without new surface. Use `toLower(event.Arg)` at the ingestion boundary before assigning to a choice field.
+
+**Assignment compatibility.** `string` values are assignable to `~string` fields, and `~string` values are assignable to `string` fields. The `~` modifier affects comparison obligations only — not the storage format. Storage is always case-preserving in both directions. Bidirectional assignment is always valid; the CI constraint layer activates only at comparison sites.
+
+**Implementation model.** `~string` does not introduce a new `TypeKind`. It is `TypeKind.String` with a `CaseInsensitive = true` flag on the type reference node. `ScalarTypeRefNode` must gain a `CaseInsensitive` property (currently only `CollectionTypeRefNode` has it). The parser change is additive: a new `Tilde`-handling path is added to `ParseTypeRef()` in the scalar branch — the existing collection inner type path is unchanged. The parser does not "remove a guard"; it adds a new code path.
+
+> **Diagnostic code 66 reassignment.** `CaseInsensitiveStringOnNonCollection` (code 66) exists in `DiagnosticCode.cs` and was defined in anticipation of scalar `~string`, but was **never emitted** by the parser — scalar `~string` fell into `ExpectedToken` instead. When scalar `~string` ships, code 66 is **reassigned** to `CaseInsensitiveFieldRequiresTildeEquals` (the primary equality enforcement diagnostic). Since code 66 was never emitted, no external artifacts reference it, making reassignment safe.
 
 ---
 
@@ -394,15 +402,18 @@ Numeric literals do not carry an inherent lane. Context determines the type.
 
 ## Type Operator Surface Summary
 
-| Type | `==` `!=` | `~=` `!~` | `<` `>` `<=` `>=` | `+` `-` `*` `/` `%` | `and` `or` `not` | `.length` / `.count` |
+| Type | `==` `!=` | `~=` `!~` | `< > <= >=` | `+` `-` `*` `/` `%` | `and` `or` `not` | `.length` / `.count` |
 |---|---|---|---|---|---|---|
 | `string` | ✓ ordinal | ✓ ordinal ignore-case | ✓ ordinal, lex | `+` only (concat) | ✗ | `.length → integer` |
+| `~string` | ✗ compile error — use `~=`/`!~` | ✓ | ✓ ordinal, lex | `+` → `string` (CI not preserved) | ✗ | `.length → integer` |
 | `integer` | ✓ | ✗ type error | ✓ | ✓ (stays integer) | ✗ | — |
 | `decimal` | ✓ exact | ✗ type error | ✓ exact | ✓ (stays decimal) | ✗ | — |
 | `number` | ✓ IEEE 754 | ✗ type error | ✓ IEEE 754 | ✓ (stays number) | ✗ | — |
 | `boolean` | ✓ | ✗ type error | ✗ | ✗ | ✓ short-circuit | — |
 | `choice` (unordered) | ✓ ordinal | ✗ type error | ✗ | ✗ | ✗ | — |
 | `choice` (ordered) | ✓ ordinal | ✗ type error | ✓ rank | ✗ | ✗ | — |
+
+> **`~string` additional enforcement:** `startsWith(~string, ...)` and `endsWith(~string, ...)` are compile errors — use `~startsWith` and `~endsWith` instead (see `CaseInsensitiveFieldRequiresTildeStartsWith` / `CaseInsensitiveFieldRequiresTildeEndsWith`). `~startsWith(field, prefix)` and `~endsWith(field, suffix)` are valid only when the first argument is `~string`.
 
 **No truthy/falsy coercion.** `0` and `""` are not boolean. Conditions require `boolean`-typed expressions.
 

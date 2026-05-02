@@ -454,6 +454,10 @@ field Labels as set of ~string   # OrdinalIgnoreCase — "Apple" and "apple" are
 
 **`~string` as a scalar field type.** `field Email as ~string` is valid. The type checker enforces that equality comparisons (`==`/`!=`) are replaced with `~=`/`!~`, that `startsWith`/`endsWith` are replaced with `~startsWith`/`~endsWith`, and that a `~string` field is not tested against a case-sensitive collection with `contains`. See [Primitive Types](primitive-types.md) §`~string` for the full scalar enforcement rules, type unification, event arg declarations, and the `choice of ~string` exclusion.
 
+**`lookup of ~string to V`.** When the key type is `~string`, the lookup must be constructed with `ImmutableDictionary.Create(StringComparer.OrdinalIgnoreCase)`. Behavioral consequence: `put "MEDICAL" = 100` followed by `put "medical" = 200` is an **overwrite** (not an error) — the keys compare equal under `OrdinalIgnoreCase`, so the second `put` replaces the first. This is consistent with `set of ~string` deduplication and with `put` being an explicit upsert by design. `contains` on `lookup of ~string to V` uses `OrdinalIgnoreCase` for key membership, consistent with all other CI collection kinds.
+
+> **Diagnostic code 66 reassignment.** `CaseInsensitiveStringOnNonCollection` (code 66) existed to guard against scalar `~string` in a non-collection context. It was defined in `DiagnosticCode.cs` but was **never emitted** by the parser — the parser fell into `ExpectedToken` instead. When scalar `~string` ships, code 66 is **reassigned** to `CaseInsensitiveFieldRequiresTildeEquals`. Since it was never emitted, reassignment is safe.
+
 **`~string` in queue, stack, and log.** While `~string` is most meaningful for sets (where deduplication and membership benefit from case-insensitive comparison), it is also valid as the inner type for `queue of ~string`, `stack of ~string`, and `log of ~string`. The `contains` operator on these collections uses `OrdinalIgnoreCase` matching.
 
 ### Temporal and Business-Domain Inner Types
@@ -562,7 +566,7 @@ add Charges $50 EUR     # TypeMismatch — expected money in 'USD', got money in
 | `LogType` | `log` | Log collection type |
 | `Of` | `of` | Collection inner type connector |
 | `By` | `by` | Ordering key connector in `log of T by P` and `queue of T by P` (contextual keyword) |
-| `Tilde` | `~` | Case-insensitive inner type prefix |
+| `Tilde` | `~` | Case-insensitive modifier — collection inner type (`set of ~string`) or scalar field type qualifier (`field Email as ~string`) |
 | `Append` | `append` | Append action keyword for log |
 | `Into` | `into` | Dequeue/pop target keyword |
 | `Contains` | `contains` | Membership operator |
@@ -608,7 +612,7 @@ when Tags contains "urgent"
 | `bag of T` | `T` | `boolean` — value membership (count ≥ 1) |
 | `list of T` | `T` | `boolean` |
 | `queue of T by P` | `T` | `boolean` — value membership |
-| `lookup of K to V` | `K` | `boolean` — key membership |
+| `lookup of K to V` | `K` | `boolean` — key membership; when `K = ~string`, uses `OrdinalIgnoreCase` (consistent with all CI collection kinds) |
 | non-collection | — | type error |
 
 **Case sensitivity:** `contains` on `set of string` is case-sensitive (ordinal). `contains` on `set of ~string` is case-insensitive (`OrdinalIgnoreCase`). `contains` on `queue of ~string` and `stack of ~string` is also case-insensitive.
