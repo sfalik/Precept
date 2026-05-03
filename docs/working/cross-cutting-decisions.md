@@ -1,14 +1,21 @@
-# Cross-Cutting Decisions Register
+# Cross-Cutting Decisions — Execution Driver
 
-> Decisions that affect multiple pipeline stages or canonical docs simultaneously.
-> These cannot be made in isolation — each decision ripples across the stages listed.
-> Resolve these before stage-specific gaps can be closed.
+> Primary execution driver for gap resolution. Organized by dependency wave per Frank's gap-sequencing analysis (2026-05-03).
+> Cross-cutting decisions gate everything — resolve waves 0–2 before any catalog/structural gap resolution.
+
+**Legend:** 🔴 Shane Decision Required | 🔵 Team-Autonomous | ✅ Resolved
 
 ---
 
-## Priority 1 — Must Resolve First (Blocking Multiple Stages)
+## Wave 0 — Foundational (Shane Required — Must Resolve First)
 
-### 1. Expression Tree Design
+> These 3 decisions block everything downstream. Every catalog shape, every structural type, every stage implementation cascades from these. Shane must lock these before any other work proceeds.
+
+---
+
+### CC#1. Expression Tree Design
+
+**Status:** ✅ Resolved
 
 **Affects:** Parser, Type Checker, Proof Engine, Evaluator, Precept Builder
 **Gap register refs:** #14, #45, #53
@@ -21,16 +28,22 @@
 - **Evaluator** — needs to walk typed expressions (currently uses ExecutionPlan opcodes, which are compiled FROM expression trees).
 - **Precept Builder** — compiles `TypedExpression` trees into flat opcode arrays.
 
-**Options / known design space:**
-1. **Roslyn-style** — Per-expression-kind node types with full fidelity
-2. **S-expression** — Uniform `(op, args...)` structure
-3. **Span + lazy parse** — Keep span, parse on demand
+**Ruling: Option A — Roslyn-style typed nodes. Approved 2026-05-03.**
 
-**Resolution path:** Design decision required before any expression-related implementation can proceed. This is the single most blocking cross-cutting decision.
+**Design:**
+- `ParsedExpression` — sealed abstract record base + per-kind sealed subtypes (~10 forms). Parser produces these.
+- `TypedExpression` — sealed abstract record base + per-kind sealed subtypes with resolved types. Type checker produces these.
+- Expression tree is the strongly-typed layer. The rest of the parser AST (constructs, declarations, statements) stays generic.
+- Closed set by design: new expression form requires C# code change. This is intentional — the DU IS the enforcement boundary.
+- **Exhaustiveness enforcement:** (1) sealed class hierarchy gives compiler-level exhaustiveness checking on switches; (2) a Roslyn analyzer test in the test suite verifies all expression-DU switch arms are exhaustive — any new subtype addition breaks failing tests at compile time, forcing all consumers to be updated.
+
+**Blocked items now unblocked:** Parser expression slots, TC §7.2, Proof Engine strategies 3 & 4, Builder compilation.
 
 ---
 
-### 2. SlotValue Subtype Shapes
+### CC#2. SlotValue Subtype Shapes
+
+**Status:** 🔴 Pending Shane decision
 
 **Affects:** Parser, Type Checker
 **Gap register refs:** #6, #7, #40, #41, #42, #43, #44
@@ -60,7 +73,38 @@ Additionally, parser.md lists 17 subtypes while catalog-system.md shows 15 `Cons
 
 ---
 
-### 3. SemanticIndex Reference-Tracking Collections
+### CC#25. Execution Dispatch Delegate Design
+
+**Status:** 🔴 Pending Shane decision
+
+**Affects:** Evaluator, Operations Catalog, Functions Catalog, Actions Catalog
+**Gap register refs:** Audit item C
+**The decision:** What catalog-defined execution delegate contract should drive operation, function, and action dispatch at runtime?
+
+**Why it's cross-cutting:**
+- **Evaluator** — needs a canonical invocation contract for expression execution and action application.
+- **Operations Catalog** — must declare how unary/binary operator implementations are surfaced to the evaluator.
+- **Functions Catalog** — must declare callable signatures, argument binding, and execution delegates.
+- **Actions Catalog** — must declare how action payloads are executed without evaluator-owned per-action switches.
+
+**Options / known design space:**
+1. **Per-catalog delegate properties** — each catalog family exposes its own strongly typed execution delegate shape.
+2. **Shared invocation descriptor** — catalogs expose a common execution-contract DU or descriptor that the evaluator interprets generically.
+3. **Evaluator adapter layer** — catalogs stay descriptive only and the evaluator owns the dispatch mapping (least aligned with the catalog-first architecture).
+
+**Resolution path:** Lock the dispatch contract before evaluator execution work proceeds further; this is the highest-priority uncaptured catalog-system decision from the audit.
+
+---
+
+## Wave 1 — Shape-Defining (Shane Required for Most)
+
+> Once Wave 0 is locked, these set the type shapes everything else conforms to. Most require Shane decisions; CC#9 follows mechanically from CC#7.
+
+---
+
+### CC#3. SemanticIndex Reference-Tracking Collections
+
+**Status:** 🔴 Pending Shane decision
 
 **Affects:** Type Checker, Language Server, Tooling Surface
 **Gap register refs:** #16, #47, #48, #49, #50
@@ -80,7 +124,9 @@ Additionally, parser.md lists 17 subtypes while catalog-system.md shows 15 `Cons
 
 ---
 
-### 4. Compilation.Tokens Field
+### CC#4. Compilation.Tokens Field
+
+**Status:** 🔴 Pending Shane decision
 
 **Affects:** Precept Builder, Language Server, Tooling Surface
 **Gap register refs:** #61
@@ -100,7 +146,182 @@ Additionally, parser.md lists 17 subtypes while catalog-system.md shows 15 `Cons
 
 ---
 
-### 5. FieldModifierMeta.ProofDischarges
+### CC#6. FaultSiteLink to FaultSiteDescriptor Transformation
+
+**Status:** 🔴 Pending Shane decision
+
+**Affects:** Proof Engine, Precept Builder, Evaluator
+**Gap register refs:** #11, #23, #56, #57, #60
+**The decision:** How does the proof engine's `FaultSiteLink` (compile-time span) transform into the Precept Builder's `FaultSiteDescriptor` (runtime location)?
+
+**Why it's cross-cutting:**
+- **Proof Engine** — Produces `FaultSiteLink.Site` as `SourceSpan`
+- **Precept Builder** — Needs to plant `FaultSiteDescriptor` at specific `ExecutionRow` or opcode offset
+- **Evaluator** — Must locate fault sites for defense-in-depth routing
+
+**Current gap:** Neither `ExecutionRow` nor `ConstraintDescriptor` carries a fault site field. `Precept.FaultBackstops` is a flat array with no mechanism to associate backstops with specific opcodes.
+
+**Options / known design space:**
+1. **Opcode annotation** — Each opcode carries optional fault site reference
+2. **Span-to-opcode map** — Precept Builder builds span→opcode index, evaluator looks up
+3. **Inline fault checks** — Compiler injects guard opcodes at fault sites
+
+**Resolution path:** The transformation mechanism is unspecified across all three stages.
+
+---
+
+### CC#7. ConstraintMeta DU Subtype Count
+
+**Status:** 🔴 Pending Shane decision
+
+**Affects:** Type Checker, Precept Builder
+**Gap register refs:** #22, #62
+**The decision:** How many subtypes does the `ConstraintMeta` discriminated union have?
+
+**Why it's cross-cutting:**
+- **Precept Builder** — Uses 5 concrete subtypes for constraint bucket routing (`Invariant`, `StateResident`, `StateEntry`, `StateExit`, `EventPrecondition`)
+- **Catalog-system.md** — Shows only 4 subtypes in the DU hierarchy
+
+**Current discrepancy:** Precept-builder.md's bucket dispatch switch uses 5 subtypes. Are `StateEntry` and `StateExit` separate top-level subtypes, or subtypes of `StateAnchored`?
+
+**Resolution path:** Catalog-system.md must specify the exact DU hierarchy.
+
+---
+
+### CC#9. ConstraintFieldRefs.ConstraintIdentity Type
+
+**Status:** 🔵 Pending team resolution (follows from CC#7)
+
+**Affects:** Type Checker, Proof Engine
+**Gap register refs:** #15, #51
+**The decision:** Should `ConstraintFieldRefs.ConstraintIdentity` be typed `object` or use the proof-engine.md's `ConstraintIdentity` DU?
+
+**Why it's cross-cutting:**
+- **Type Checker** — Produces `ConstraintFieldRefs` with identity field typed as `object`
+- **Proof Engine** — Defines a proper `ConstraintIdentity` DU with `RuleIdentity` and `EnsureIdentity` subtypes
+
+**Resolution path:** Align on the proof-engine.md DU shape for type safety.
+
+---
+
+## Wave 2 — Outcome & Evaluator (Shane Required for Initial Direction)
+
+> These form a cluster around evaluator output shapes. Lock CC#8 first (defines the outcome DU shape), then CC#12, CC#23, CC#24 follow. CC#11 is independent but simple.
+
+---
+
+### CC#8. EventInspection Shape
+
+**Status:** 🔴 Pending Shane decision
+
+**Affects:** Evaluator, Language Server, MCP
+**Gap register refs:** #33, #64
+**The decision:** What is the canonical shape of `EventInspection`?
+
+**Why it's cross-cutting:**
+- **Evaluator** (evaluator.md) — Uses `EventEnsures`, `ConstraintResult`, `RowInspection`
+- **Language Server** (language-server.md) — Uses `BeforeFields`, `AfterFields`, `TransitionRowInspection`
+
+These are different shapes for the same concept. Downstream consumers cannot implement until the shape is resolved.
+
+**Resolution path:** Evaluator.md should be authoritative for runtime shapes; other docs should reference it.
+
+---
+
+### CC#11. ExecutionRow.RejectReason Field
+
+**Status:** 🔵 Pending team resolution (obvious add — no design ambiguity)
+
+**Affects:** Type Checker, Precept Builder, Evaluator
+**Gap register refs:** #20, #59
+**The decision:** Where is the `because` clause from a `reject` transition row stored?
+
+**Why it's cross-cutting:**
+- **Type Checker** — Produces `TypedTransitionRow` (needs field for reject reason)
+- **Precept Builder** — Transforms to `ExecutionRow` (needs field)
+- **Evaluator** — Returns `Rejected(reason)` outcome (reads field)
+
+**Current gap:** Evaluator.md references `winningRow.RejectReason` but no such field is defined on `ExecutionRow`.
+
+**Resolution path:** Add `string? RejectReason` to both `TypedTransitionRow` and `ExecutionRow`.
+
+---
+
+### CC#12. Faulted(Fault) as EventOutcome Variant
+
+**Status:** 🔵 Pending team resolution (follows from CC#8)
+
+**Affects:** Evaluator, MCP
+**Gap register refs:** #21, #63
+**The decision:** Should `Faulted(Fault)` be added as an `EventOutcome` DU variant?
+
+**Why it's cross-cutting:**
+- **Evaluator** — `Fail()` returns a `Fault`, but `Fault` is not currently a subtype of `EventOutcome`
+- **MCP** — `precept_fire` needs to serialize fault outcomes
+
+**Resolution path:** Add `Faulted(Fault)` variant to the `EventOutcome` DU.
+
+---
+
+### CC#23. `EventOutcome.mutations` Payload
+
+**Status:** 🔴 Pending Shane decision
+
+**Affects:** Evaluator, MCP
+**Gap register refs:** #28, #65
+**The decision:** Should `EventOutcome` carry a canonical `mutations` payload describing the field/state changes produced by execution?
+
+**Why it's cross-cutting:**
+- **Evaluator** — must compute and attach mutation details as part of outcome production.
+- **MCP** — must serialize the payload into `precept_fire`/inspection responses for tooling consumers.
+
+**Options / known design space:**
+1. **Shared outcome payload** — attach `mutations` to the relevant successful `EventOutcome` variants.
+2. **Dedicated mutation wrapper/result shape** — separate execution result data from the existing DU variants.
+3. **Consumer reconstruction** — keep evaluator output lean and let MCP/tooling compute diffs independently.
+
+**Resolution path:** Lock the ownership and shape of mutation diffs before evolving the `EventOutcome` discriminated union.
+
+---
+
+### CC#24. Unmatched Guard Trace Enrichment
+
+**Status:** 🔴 Pending Shane decision
+
+**Affects:** Evaluator, MCP
+**Gap register refs:** #29, #66
+**The decision:** How much evaluated guard-trace detail should an `Unmatched` event outcome carry for tooling consumers?
+
+**Why it's cross-cutting:**
+- **Evaluator** — must capture candidate-row guard evaluations instead of returning a minimal unmatched result.
+- **MCP** — must serialize that trace data for debugging, preview, and inspection callers.
+
+**Options / known design space:**
+1. **Full per-candidate trace** — every evaluated guard and its result is attached to `Unmatched`.
+2. **Best-explanation summary** — only the most relevant failed guard or row explanation is carried.
+3. **Consumer reconstruction** — evaluator stays minimal and tooling derives explanations elsewhere.
+
+**Resolution path:** Decide the required diagnostic richness before changing the `Unmatched` outcome shape and its MCP serialization.
+
+**Navigation note:** The audit considered a separate umbrella decision for evaluator-output richness. I did not add one here because #22–#24 already form a tight, directly actionable cluster, and an umbrella entry would add indirection without introducing a separate design choice.
+
+---
+
+## Wave 3 — Catalog + Structural Resolution (Team-Autonomous — Run After Waves 0–2)
+
+> Wave 3 items are not tracked here — they are the catalog and structural gaps that become mechanically resolvable once Waves 0–2 lock the upstream shapes. They live in the canonical pipeline docs as Open Questions. See the pipeline docs in `docs/pipeline/` for specifics.
+
+---
+
+## Wave 4 — Tooling & Minor Decisions (Team-Autonomous — No Upstream Blockers)
+
+> These have no upstream blockers. Can proceed in parallel with anything. Some require Shane decisions (CC#21, CC#26) but are non-blocking for the core pipeline.
+
+---
+
+### CC#5. FieldModifierMeta.ProofDischarges
+
+**Status:** 🔵 Pending team resolution (already designed — implement when ready)
 
 **Affects:** Proof Engine, Modifiers Catalog
 **Gap register refs:** #1
@@ -132,77 +353,9 @@ public sealed record ProofDischarge(
 
 ---
 
-## Priority 2 — Significant Cross-Stage Impact
+### CC#10. GraphState Modifier Representation
 
-### 6. FaultSiteLink to FaultSiteDescriptor Transformation
-
-**Affects:** Proof Engine, Precept Builder, Evaluator
-**Gap register refs:** #11, #23, #56, #57, #60
-**The decision:** How does the proof engine's `FaultSiteLink` (compile-time span) transform into the Precept Builder's `FaultSiteDescriptor` (runtime location)?
-
-**Why it's cross-cutting:**
-- **Proof Engine** — Produces `FaultSiteLink.Site` as `SourceSpan`
-- **Precept Builder** — Needs to plant `FaultSiteDescriptor` at specific `ExecutionRow` or opcode offset
-- **Evaluator** — Must locate fault sites for defense-in-depth routing
-
-**Current gap:** Neither `ExecutionRow` nor `ConstraintDescriptor` carries a fault site field. `Precept.FaultBackstops` is a flat array with no mechanism to associate backstops with specific opcodes.
-
-**Options / known design space:**
-1. **Opcode annotation** — Each opcode carries optional fault site reference
-2. **Span-to-opcode map** — Precept Builder builds span→opcode index, evaluator looks up
-3. **Inline fault checks** — Compiler injects guard opcodes at fault sites
-
-**Resolution path:** The transformation mechanism is unspecified across all three stages.
-
----
-
-### 7. ConstraintMeta DU Subtype Count
-
-**Affects:** Type Checker, Precept Builder
-**Gap register refs:** #22, #62
-**The decision:** How many subtypes does the `ConstraintMeta` discriminated union have?
-
-**Why it's cross-cutting:**
-- **Precept Builder** — Uses 5 concrete subtypes for constraint bucket routing (`Invariant`, `StateResident`, `StateEntry`, `StateExit`, `EventPrecondition`)
-- **Catalog-system.md** — Shows only 4 subtypes in the DU hierarchy
-
-**Current discrepancy:** Precept-builder.md's bucket dispatch switch uses 5 subtypes. Are `StateEntry` and `StateExit` separate top-level subtypes, or subtypes of `StateAnchored`?
-
-**Resolution path:** Catalog-system.md must specify the exact DU hierarchy.
-
----
-
-### 8. EventInspection Shape
-
-**Affects:** Evaluator, Language Server, MCP
-**Gap register refs:** #33, #64
-**The decision:** What is the canonical shape of `EventInspection`?
-
-**Why it's cross-cutting:**
-- **Evaluator** (evaluator.md) — Uses `EventEnsures`, `ConstraintResult`, `RowInspection`
-- **Language Server** (language-server.md) — Uses `BeforeFields`, `AfterFields`, `TransitionRowInspection`
-
-These are different shapes for the same concept. Downstream consumers cannot implement until the shape is resolved.
-
-**Resolution path:** Evaluator.md should be authoritative for runtime shapes; other docs should reference it.
-
----
-
-### 9. ConstraintFieldRefs.ConstraintIdentity Type
-
-**Affects:** Type Checker, Proof Engine
-**Gap register refs:** #15, #51
-**The decision:** Should `ConstraintFieldRefs.ConstraintIdentity` be typed `object` or use the proof-engine.md's `ConstraintIdentity` DU?
-
-**Why it's cross-cutting:**
-- **Type Checker** — Produces `ConstraintFieldRefs` with identity field typed as `object`
-- **Proof Engine** — Defines a proper `ConstraintIdentity` DU with `RuleIdentity` and `EnsureIdentity` subtypes
-
-**Resolution path:** Align on the proof-engine.md DU shape for type safety.
-
----
-
-### 10. GraphState Modifier Representation
+**Status:** 🔵 Pending team resolution
 
 **Affects:** Graph Analyzer, Modifiers Catalog
 **Gap register refs:** #9, #54
@@ -220,40 +373,9 @@ These are different shapes for the same concept. Downstream consumers cannot imp
 
 ---
 
-### 11. ExecutionRow.RejectReason Field
+### CC#13. FaultCode.AmbiguousDispatch
 
-**Affects:** Type Checker, Precept Builder, Evaluator
-**Gap register refs:** #20, #59
-**The decision:** Where is the `because` clause from a `reject` transition row stored?
-
-**Why it's cross-cutting:**
-- **Type Checker** — Produces `TypedTransitionRow` (needs field for reject reason)
-- **Precept Builder** — Transforms to `ExecutionRow` (needs field)
-- **Evaluator** — Returns `Rejected(reason)` outcome (reads field)
-
-**Current gap:** Evaluator.md references `winningRow.RejectReason` but no such field is defined on `ExecutionRow`.
-
-**Resolution path:** Add `string? RejectReason` to both `TypedTransitionRow` and `ExecutionRow`.
-
----
-
-### 12. Faulted(Fault) as EventOutcome Variant
-
-**Affects:** Evaluator, MCP
-**Gap register refs:** #21, #63
-**The decision:** Should `Faulted(Fault)` be added as an `EventOutcome` DU variant?
-
-**Why it's cross-cutting:**
-- **Evaluator** — `Fail()` returns a `Fault`, but `Fault` is not currently a subtype of `EventOutcome`
-- **MCP** — `precept_fire` needs to serialize fault outcomes
-
-**Resolution path:** Add `Faulted(Fault)` variant to the `EventOutcome` DU.
-
----
-
-## Priority 3 — Minor Cross-Stage Coordination
-
-### 13. FaultCode.AmbiguousDispatch
+**Status:** 🔵 Pending team resolution
 
 **Affects:** Evaluator, Faults Catalog, Diagnostics Catalog
 **Gap register refs:** #4
@@ -263,7 +385,9 @@ These are different shapes for the same concept. Downstream consumers cannot imp
 
 ---
 
-### 14. SlotContext vs SlotKind Enum Naming
+### CC#14. SlotContext vs SlotKind Enum Naming
+
+**Status:** 🔵 Pending team resolution
 
 **Affects:** Language Server, Tooling Surface
 **Gap register refs:** #38, #69
@@ -271,7 +395,9 @@ These are different shapes for the same concept. Downstream consumers cannot imp
 
 ---
 
-### 15. precept/inspect vs precept/preview Naming
+### CC#15. precept/inspect vs precept/preview Naming
+
+**Status:** 🔵 Pending team resolution
 
 **Affects:** Language Server, Tooling Surface
 **Gap register refs:** #32, #68
@@ -279,7 +405,9 @@ These are different shapes for the same concept. Downstream consumers cannot imp
 
 ---
 
-### 16. TypeMeta.IsUserFacing for Completions
+### CC#16. TypeMeta.IsUserFacing for Completions
+
+**Status:** 🔵 Pending team resolution
 
 **Affects:** Language Server, Types Catalog
 **Gap register refs:** #30
@@ -287,7 +415,9 @@ These are different shapes for the same concept. Downstream consumers cannot imp
 
 ---
 
-### 17. TypedArg.EventName Back-Reference
+### CC#17. TypedArg.EventName Back-Reference
+
+**Status:** 🔵 Pending team resolution
 
 **Affects:** Type Checker, Language Server
 **Gap register refs:** #31, #52
@@ -295,7 +425,9 @@ These are different shapes for the same concept. Downstream consumers cannot imp
 
 ---
 
-### 18. ConstructMeta Outline Properties
+### CC#18. ConstructMeta Outline Properties
+
+**Status:** 🔵 Pending team resolution
 
 **Affects:** Language Server, Constructs Catalog
 **Gap register refs:** #34, #70, #71
@@ -303,7 +435,9 @@ These are different shapes for the same concept. Downstream consumers cannot imp
 
 ---
 
-### 19. TokenMeta.HoverDescription Strategy
+### CC#19. TokenMeta.HoverDescription Strategy
+
+**Status:** 🔵 Pending team resolution
 
 **Affects:** Language Server, Tooling Surface, Tokens Catalog
 **Gap register refs:** #5, #35
@@ -311,7 +445,9 @@ These are different shapes for the same concept. Downstream consumers cannot imp
 
 ---
 
-### 20. Diagnostic Related Locations
+### CC#20. Diagnostic Related Locations
+
+**Status:** 🔵 Pending team resolution
 
 **Affects:** Diagnostic System, Language Server
 **Gap register refs:** #39
@@ -319,34 +455,9 @@ These are different shapes for the same concept. Downstream consumers cannot imp
 
 ---
 
-## 2026-05-03 Audit Additions
+### CC#21. Event "optional" Modifier
 
-### Priority 1 — Must Resolve First (Blocking Multiple Stages)
-
-### 25. Execution Dispatch Delegate Design
-
-**Affects:** Evaluator, Operations Catalog, Functions Catalog, Actions Catalog
-**Gap register refs:** Audit item C
-**The decision:** What catalog-defined execution delegate contract should drive operation, function, and action dispatch at runtime?
-
-**Why it's cross-cutting:**
-- **Evaluator** — needs a canonical invocation contract for expression execution and action application.
-- **Operations Catalog** — must declare how unary/binary operator implementations are surfaced to the evaluator.
-- **Functions Catalog** — must declare callable signatures, argument binding, and execution delegates.
-- **Actions Catalog** — must declare how action payloads are executed without evaluator-owned per-action switches.
-
-**Options / known design space:**
-1. **Per-catalog delegate properties** — each catalog family exposes its own strongly typed execution delegate shape.
-2. **Shared invocation descriptor** — catalogs expose a common execution-contract DU or descriptor that the evaluator interprets generically.
-3. **Evaluator adapter layer** — catalogs stay descriptive only and the evaluator owns the dispatch mapping (least aligned with the catalog-first architecture).
-
-**Resolution path:** Lock the dispatch contract before evaluator execution work proceeds further; this is the highest-priority uncaptured catalog-system decision from the audit.
-
----
-
-### Priority 2 — Significant Cross-Stage Impact
-
-### 21. Event "optional" Modifier
+**Status:** 🔴 Pending Shane decision (non-blocking for core pipeline)
 
 **Affects:** Parser, Type Checker, Graph Analyzer, Evaluator, Grammar, Completions, Hover, MCP
 **Gap register refs:** #10
@@ -368,7 +479,9 @@ These are different shapes for the same concept. Downstream consumers cannot imp
 
 ---
 
-### 22. `SemanticIndex.EnsuresByState`
+### CC#22. `SemanticIndex.EnsuresByState`
+
+**Status:** 🔵 Pending team resolution (follows from CC#3)
 
 **Affects:** Type Checker, Language Server, MCP
 **Gap register refs:** #26, #73
@@ -388,49 +501,9 @@ These are different shapes for the same concept. Downstream consumers cannot imp
 
 ---
 
-### 23. `EventOutcome.mutations` Payload
+### CC#26. Stateless Precepts `CreateInitialVersion` Semantics
 
-**Affects:** Evaluator, MCP
-**Gap register refs:** #28, #65
-**The decision:** Should `EventOutcome` carry a canonical `mutations` payload describing the field/state changes produced by execution?
-
-**Why it's cross-cutting:**
-- **Evaluator** — must compute and attach mutation details as part of outcome production.
-- **MCP** — must serialize the payload into `precept_fire`/inspection responses for tooling consumers.
-
-**Options / known design space:**
-1. **Shared outcome payload** — attach `mutations` to the relevant successful `EventOutcome` variants.
-2. **Dedicated mutation wrapper/result shape** — separate execution result data from the existing DU variants.
-3. **Consumer reconstruction** — keep evaluator output lean and let MCP/tooling compute diffs independently.
-
-**Resolution path:** Lock the ownership and shape of mutation diffs before evolving the `EventOutcome` discriminated union.
-
----
-
-### 24. Unmatched Guard Trace Enrichment
-
-**Affects:** Evaluator, MCP
-**Gap register refs:** #29, #66
-**The decision:** How much evaluated guard-trace detail should an `Unmatched` event outcome carry for tooling consumers?
-
-**Why it's cross-cutting:**
-- **Evaluator** — must capture candidate-row guard evaluations instead of returning a minimal unmatched result.
-- **MCP** — must serialize that trace data for debugging, preview, and inspection callers.
-
-**Options / known design space:**
-1. **Full per-candidate trace** — every evaluated guard and its result is attached to `Unmatched`.
-2. **Best-explanation summary** — only the most relevant failed guard or row explanation is carried.
-3. **Consumer reconstruction** — evaluator stays minimal and tooling derives explanations elsewhere.
-
-**Resolution path:** Decide the required diagnostic richness before changing the `Unmatched` outcome shape and its MCP serialization.
-
-**Navigation note:** The audit considered a separate umbrella decision for evaluator-output richness. I did not add one here because #22–#24 already form a tight, directly actionable cluster, and an umbrella entry would add indirection without introducing a separate design choice.
-
----
-
-### Priority 3 — Minor Cross-Stage Coordination
-
-### 26. Stateless Precepts `CreateInitialVersion` Semantics
+**Status:** 🔴 Pending Shane decision (non-blocking for core pipeline)
 
 **Affects:** Runtime API, Evaluator, Graph Analyzer
 **Gap register refs:** Audit item E
@@ -447,6 +520,12 @@ These are different shapes for the same concept. Downstream consumers cannot imp
 3. **Disallow API path** — require a separate creation path for stateless precepts instead of `CreateInitialVersion`.
 
 **Resolution path:** Lock the stateless creation contract before runtime API, evaluator, and analyzer behavior diverge.
+
+---
+
+## Wave 5 — Doc Sync & Stale Cleanup (Team-Autonomous)
+
+> Wave 5 is pure documentation work — updating canonical docs for already-resolved items and closing out stale gap entries. Tracked in canonical docs, not here.
 
 ---
 

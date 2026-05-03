@@ -65,11 +65,11 @@ The parser produces these slot value types:
 | `RuleExpressionSlot` | `SourceSpan Span` | **Deferred — span only** |
 | `InitialMarkerSlot` | *(empty)* | N/A |
 
-### Blocking Dependency: Expression Trees
+### Blocking Dependency: Expression Trees (RESOLVED)
 
-Expression-carrying slots (`ComputeExpressionSlot`, `GuardClauseSlot`, `EnsureClauseSlot`, `RuleExpressionSlot`, `OutcomeSlot`) currently carry only `SourceSpan` — the parser captures the span but does not yet produce expression trees. This means the type checker's expression resolution sub-engine cannot be exercised on these slots until expression tree design completes.
+Expression-carrying slots (`ComputeExpressionSlot`, `GuardClauseSlot`, `EnsureClauseSlot`, `RuleExpressionSlot`, `OutcomeSlot`) now carry `ParsedExpression` — a sealed abstract record DU with ~10 per-form sealed subtypes. The parser produces these; the type checker's expression resolution sub-engine consumes them and produces `TypedExpression`.
 
-> **Open Question (unresolved):** The expression resolution strategy documented in this spec (§7.2) is complete and validated against research precedents. Implementation is blocked pending the parser's expression tree output. What is the timeline for expression tree design?
+> **CC#1 (resolved 2026-05-03):** The expression tree is a closed, strongly-typed DU. `ParsedExpression` is the parser-side counterpart to `TypedExpression`. The set is closed by design — new expression form requires C# code change. Exhaustiveness is enforced via sealed hierarchy + Roslyn analyzer test. See `docs/working/cross-cutting-decisions.md` CC#1.
 
 ---
 
@@ -192,9 +192,9 @@ Pass 2 has three generic sub-passes.
 
 #### Sub-pass 2a: Expression Resolution Engine
 
-**Blocked:** Expression-carrying slots currently carry only `SourceSpan`. The expression resolution engine is designed and documented below, but cannot be exercised until the parser produces expression trees.
+**Unblocked** (CC#1 resolved 2026-05-03). Expression-carrying slots now carry `ParsedExpression` — the expression resolution engine can proceed.
 
-The core of the checker will be a single recursive function (~250–350 lines) that resolves any expression node to a `TypedExpression`. The function dispatches on expression form (once available) and delegates to catalog lookups for operator semantics, function signatures, and type accessors.
+The core of the checker will be a single recursive function (~250–350 lines) that resolves any `ParsedExpression` node to a `TypedExpression`. The function dispatches on expression form and delegates to catalog lookups for operator semantics, function signatures, and type accessors.
 
 This function has no per-type-kind branching for operators or functions. It doesn't know what `+` means for money vs integers — it asks the Operations catalog. It doesn't know what `min` accepts — it asks the Functions catalog. It doesn't know what `.count` returns — it asks the Types catalog.
 
@@ -428,6 +428,8 @@ public enum ActionSecondaryRole
 
 #### Typed Expressions (DU)
 
+> **CC#1 (resolved 2026-05-03):** `TypedExpression` is a sealed abstract record DU — the type checker's output for expressions. Its parser-side counterpart is `ParsedExpression` (same closed DU pattern, unresolved types). The set is closed by design: adding a new expression form requires a new catalog entry + new DU subtype + updating all consumer switch arms. Exhaustiveness is enforced by: (1) sealed class hierarchy (compiler-level exhaustiveness checking), (2) Roslyn analyzer test verifying all expression-DU switches are exhaustive at build time.
+
 ```csharp
 public abstract record TypedExpression(
     TypeKind ResultType,
@@ -597,13 +599,13 @@ Scope is managed by setting `CurrentEventArgs` when entering a transition row, e
 
 ---
 
-### 7.3 Expression Resolution (BLOCKED)
+### 7.3 Expression Resolution (UNBLOCKED)
 
-> **Implementation blocked** pending parser expression tree output. The design below is complete and validated against research precedents.
+> **CC#1 resolved 2026-05-03.** Parser now produces `ParsedExpression` DU nodes. The design below is complete and ready for implementation.
 
 #### The Core Resolve Function
 
-The `Resolve(ExpressionNode expr, TypeKind? expectedType)` function (once expression trees exist) will be the metadata interpreter core. The `expectedType` parameter enables top-down context propagation for numeric literal resolution and typed constants.
+The `Resolve(ParsedExpression expr, TypeKind? expectedType)` function is the metadata interpreter core. The `expectedType` parameter enables top-down context propagation for numeric literal resolution and typed constants.
 
 ### Catalog Lookup Strategy
 
@@ -941,9 +943,9 @@ The type checker dispatches on `ConstructKind` enum values via exhaustive switch
 
 ## 13. Open Questions / Implementation Notes
 
-### Implementation Plan (BLOCKED)
+### Implementation Plan (UNBLOCKED)
 
-Implementation is blocked pending parser expression tree output. When expression trees become available, the following slices can proceed:
+Implementation unblocked by CC#1 (2026-05-03). Parser now produces `ParsedExpression` DU nodes. The following slices can proceed:
 
 **Pre-Slice 0: Shape Commit (unblocks everything)**
 - All `TypedField`, `TypedState`, `TypedEvent`, `TypedArg` record definitions

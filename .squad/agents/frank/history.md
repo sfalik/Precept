@@ -26,6 +26,8 @@
 
 - Gap register deprecation (2026-05-03): `catalog-gap-register.md` (#1–43) and `structural-gap-register.md` (#44–85) served as discovery artifacts and are now archived under `docs/working/Archived/`. Their content was migrated to canonical pipeline docs as Open Questions, making each stage doc self-contained. Nearly all gaps were already captured inline during canonical doc writing. The only genuinely missing gap was #55 (GraphEvent.IsInitial derivation) — added to graph-analyzer.md. The execution model going forward: `cross-cutting-decisions.md` drives wave-sequenced resolution (Waves 0–2 = Shane decisions, Waves 3–5 = team-autonomous). Separate gap registers are superseded.
 
+- **CC#1 resolved (2026-05-03):** Shane ruled Option A — Roslyn-style typed expression nodes. Key requirements: (1) `ParsedExpression` is a sealed DU (~10 subtypes), parser output; `TypedExpression` is the corresponding sealed DU with resolved types, type checker output. (2) The expression tree is the ONLY strongly-typed layer — rest of parser AST stays generic `ParsedConstruct`. (3) The set is closed by design — new expression form requires C# code changes (new DU subtype + update all switch arms). (4) **Exhaustiveness enforcement** via sealed class hierarchy (compiler warnings) PLUS a Roslyn analyzer test that verifies all expression-DU switches are exhaustive at build time. This is the pattern: sealed hierarchy + analyzer test = compiler as correctness partner.
+
 ## Recent Updates
 
 ### 2026-05-03T14:28:59Z — ConstructManifest rename shipped
