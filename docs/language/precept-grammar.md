@@ -209,7 +209,7 @@ These examples are chosen to cover every distinct slot shape and routing pattern
 - an event-scoped action handler (`on ... ->`)
 - the richest routed declaration with guard, action chain, and terminal outcome (`from ... on`)
 
-`OmitDeclaration` and `EventEnsure` are omitted — their slot shapes are covered by `AccessMode` and `StateEnsure` respectively. See §4 for construct family routing and disambiguation details.
+`OmitDeclaration` is omitted — its slot shape is covered by `AccessMode`. `EventEnsure` is shown explicitly because its `EnsureClause` + `BecauseClause` split mirrors `StateEnsure`. See §4 for construct family routing and disambiguation details.
 
 ```
 field  ClaimAmount  as  decimal  default 0  nonnegative  maxplaces 2
@@ -256,13 +256,24 @@ event  Submit  (Amount as number, Note as string optional)
 
 ```
 in  Approved  ensure  ApprovedAmount > 0  because  "…"
- │     │        ↑           │                       │
-[1]   [2]   disambig.      [3]─────────────────────[3] (continued)
-            token
+ │     │        ↑           │               ↑        │
+[1]   [2]   disambig.      [3]             slot     [4]
+            token                          marker
 [1] Leading token: `in`   ← shared with AccessMode, OmitDeclaration
 [2] StateTarget slot — the anchor state name
-[3] EnsureClause slot — contains both the expression condition and the `because` reason
-    (the `because` clause is part of the EnsureClause slot content, not a separate slot)
+[3] EnsureClause slot — the expression condition (`ensure <expression>`)
+[4] BecauseClause slot — the mandatory explanatory reason
+```
+
+```
+on  Submit  ensure  Amount > 0  because  "…"
+ │    │       ↑          │          ↑        │
+[1]  [2]  disambig.     [3]        slot     [4]
+          token                     marker
+[1] Leading token: `on`   ← shared with EventHandler
+[2] EventTarget slot — the anchor event name
+[3] EnsureClause slot — the expression condition (`ensure <expression>`)
+[4] BecauseClause slot — the mandatory explanatory reason
 ```
 
 ```
@@ -469,7 +480,7 @@ The 17 `ConstructSlotKind` values cover every distinct slot type in the language
 | `Outcome` | Terminal transition outcome | `-> transition Approved` / `-> reject "..."` / `-> no transition` |
 | `StateTarget` | A state name reference | `from Draft`, `to Approved` |
 | `EventTarget` | An event name reference | `on Submit` |
-| `EnsureClause` | Constraint expression with mandatory reason | `ensure ApprovedAmount > 0 because "..."` |
+| `EnsureClause` | Constraint expression | `ensure ApprovedAmount > 0` |
 | `BecauseClause` | Mandatory reason string literal | `because "Approved amount must be positive"` |
 | `AccessModeKeyword` | Access mode for a field | `editable`, `readonly` |
 | `FieldTarget` | A field name reference | `modify DecisionNote` |
@@ -524,7 +535,7 @@ Expressions appear **only** in expression-typed slots. The six expression-typed 
 |-----------|-----------------|---------|
 | `ComputeExpression` | Computed field body | `field Subtotal as number -> UnitPrice * Quantity` |
 | `GuardClause` | Transition row guard, rule scope | `when DocumentsVerified and CreditScore >= 680` |
-| `EnsureClause` | State/event constraint | `ensure ApprovedAmount > 0 because "..."` |
+| `EnsureClause` | State/event constraint expression | `ensure ApprovedAmount > 0` |
 | `RuleExpression` | Rule body | `rule ExistingDebt <= AnnualIncome * 3` |
 | `ActionChain` | Action assignments | `-> set ApprovedAmount = min(Approve.Amount, RequestedAmount)` |
 | `Outcome` | Terminal transition outcome | `-> transition Approved` / `-> reject "reason"` |
