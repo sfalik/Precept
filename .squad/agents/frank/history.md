@@ -6,6 +6,8 @@
 
 ## Learnings
 
+- LS enrichment features (did you mean? / code actions) require three catalog structure changes before LS implementation: (1) `Diagnostic.Args: ImmutableArray<string>` to carry raw template args through the compiler artifact; (2) `DiagnosticMeta.SuggestionSources: SuggestionSource[]?` to bind naming diagnostics to their fuzzy-match sources without per-code switches in the LS; (3) `ConstructMeta.ModifierDomain: ModifierDomain` to bind construct kinds to modifier DU subtypes without per-kind switches in the LS code action provider. Both `SuggestionSource` and `ModifierDomain` stay bare enums — no per-member metadata, classification axes only. Naming-error "did you mean?" candidates: `UndeclaredField` → `SemanticIndex.Fields`; `UndeclaredState` → `SemanticIndex.States`; `UndeclaredEvent` → `SemanticIndex.Events`; `UndeclaredFunction` → `Functions.All`. `SemanticIndex` is unavailable for Lex/Parse-stage diagnostics; LS must guard accordingly.
+
 - The `tree` variable name sweep (2026-05-03) found stale references in 7 files: `Compiler.cs`, `CompileRunner/Program.cs`, `ConstructsTests.cs`, `compiler-and-runtime-design.md`, `precept-language-spec.md`, `tooling-surface.md`, and `language-server.md`. All Roslyn `SyntaxTree` usages in analyzer tests/code are legitimate and left alone. Archived docs are not updated. The `docs/compiler/type-checker.md` still has many `SyntaxTree` type-name references (not caught by `\btree\b` word boundary) that will need a separate pass.
 
 - `docs/compiler-and-runtime-design.md` is the narrative overview layer over the 11 canonical stage docs; it inherits open questions and cross-references the stage docs rather than silently resolving them.
@@ -44,9 +46,16 @@
 ### 2026-05-03T14:37:24Z — Grammar doc accuracy confirmed against catalog
 - Frank-27 completed a full review of docs/language/precept-grammar.md and corrected 9 material errors across slot-bearing examples, slot-kind totals, and invariant references.
 - Durable baseline: the grammar doc now matches catalog reality for StateEntryList, InitialMarker, GuardClause, and the distinct ActionChain + Outcome slot shape in TransitionRow.
-- The active grammar reference should now be treated as accurate on the reviewed slot/routing details unless a later catalog change reopens them.
-
+- The active grammar reference should now be treated as accurate on the reviewed slot/routing details unless a later catalog change reopens them.
+
+
+
 ### 2026-05-03T14:59:24Z — ConstructManifest doc cleanup and slot rulings recorded
 - Frank-29 swept stale `SyntaxTree` type-name references from the requested compiler docs and adjacent surfaces; build stayed clean. Commit `8baca9f`.
 - Frank-30 locked `because` as a separate `BecauseClause` slot for ensure syntax; `RuleDeclaration` is the correct reference shape and `StateEnsure` / `EventEnsure` are the defect sites.
-- Frank-31 locked the event-modifier shape to an individual `InitialMarker` slot and confirmed `terminal` remains a state modifier, not an event modifier.
+- Frank-31 locked the event-modifier shape to an individual `InitialMarker` slot and confirmed `terminal` remains a state modifier, not an event modifier.
+
+### 2026-05-03T15:18:05Z — Catalog diagram baseline and ownership routing recorded
+- Frank-34's research memo is now the durable baseline for schema-diagram work: the live catalog system is 13 catalogs because `ExpressionForms` is in scope, and `ConstructSlotKind` is supporting schema rather than a catalog.
+- User routing directive updated: Elaine owns both Mermaid and ASCII diagram rendering. Frank remains the architectural analyst/decision source for what the diagrams should communicate.
+- The because-clause ledger closeout is also recorded: grammar docs already match the separate `EnsureClause` + `BecauseClause` slot anatomy, and George's optional-slot follow-up closed the last catalog-red defect.

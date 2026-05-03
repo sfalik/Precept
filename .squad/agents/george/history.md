@@ -1,4 +1,4 @@
-﻿## Core Context
+## Core Context
 
 
 
@@ -40,6 +40,8 @@
 - **GAP-065 rule:** `QualifierMatch.Same` enforcement is a real correctness hole. The catalog declares it; the TypeChecker must honor it. File as Slice 1 TypeChecker work, not a deferred item.
 
 - **BecauseClause catalog defect fix (2026-05-03):** `StateEnsure` and `EventEnsure` were missing `SlotBecauseClause` — a catalog defect inconsistent with `RuleDeclaration`. Fix: added `SlotBecauseClause` to both slot arrays; corrected `EnsureClause = 12` comment to `"ensure expression"` only. Parser is still a stub — when implemented, both parse paths must emit a standalone `BecauseClauseSlot` (not embedded in `EnsureClauseSlot`). LS and MCP need no immediate changes; both derive from catalog automatically. 2316 tests pass.
+
+- **BecauseClause optional slot follow-up fix (2026-05-03):** The prior fix added `SlotBecauseClause` (required) to `StateEnsure` and `EventEnsure`. Defect: `because` is optional in ensure statements — `ensure Expr` is valid DSL without a reason clause. Fix: added `SlotOptBecauseClause = new(ConstructSlotKind.BecauseClause, IsRequired: false)` alongside the required variant; `StateEnsure` and `EventEnsure` now use the optional variant. `RuleDeclaration` retains the required variant unchanged — every rule must supply a reason. Pattern: when a slot kind appears in two constructs with different optionality, introduce a named optional sibling slot (prefix `SlotOpt`) rather than mutating the shared instance. 2340 tests pass; 11 RED-P/RED-R stubs unchanged.
 
 
 
@@ -134,4 +136,7 @@
 
 - Use the archive for the Phase 2 closeout trail, parser-gap implementation sequence, and earlier analyzer-shipping notes.
 
-
+### 2026-05-03T15:18:05Z — BecauseClause fix closed and routing corrections recorded
+- The ensure-slot follow-up is now the durable baseline: `StateEnsure` and `EventEnsure` use `SlotOptBecauseClause`, `RuleDeclaration` stays required, and the 2 catalog-red tests are now green inside the 2340-pass run.
+- Team-wide correction to retain: catalog schema diagrams must count 13 catalogs including `ExpressionForms`; `ConstructSlotKind` is supporting schema, not a 14th catalog.
+- User routing directive: Elaine owns both ASCII and Mermaid diagram authoring; Frank supplies architectural analysis and diagram content decisions, not final rendering ownership.

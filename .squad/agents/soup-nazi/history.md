@@ -40,3 +40,8 @@
 - A real defect was surfaced: `BecauseClause` slot is `IsRequired: true` on both constructs but must be `IsRequired: false` (ensures without `because` are valid DSL). Two RED-C tests document this.
 - 7 RED-P tests document expected parser behavior (stub returns empty manifest); 4 RED-R tests document expected runtime behavior (not yet implemented). All 13 red tests are intentionally honest — no skips.
 - Finding: When George uses the shared `SlotBecauseClause` instance (required=true) for StateEnsure/EventEnsure, a new optional variant (`SlotOptBecauseClause = new(ConstructSlotKind.BecauseClause, IsRequired: false)`) is required to match the design intent.
+
+### 2026-05-03T15:18:05Z — Ensure-slot test matrix closed over George's fix
+- The because-clause test batch is now durably closed at the catalog layer: 35 tests exist, George cleared the 2 RED-C optional-slot defects, and the remaining 11 red tests stay as honest parser/runtime stubs.
+- Cross-team correction to preserve in future diagram-related testing/docs work: schema diagrams should count 13 catalogs including `ExpressionForms`; `ConstructSlotKind` is helper schema only.
+- User routing directive: Elaine owns diagram authoring across both ASCII and Mermaid, so future diagram polish or anatomy rendering requests should route there rather than treating diagrams as Frank-only follow-through.

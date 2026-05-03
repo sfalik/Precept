@@ -1,0 +1,3 @@
+# Session Log — squad record sync
+
+On 2026-05-03T15:18:05Z UTC, Scribe measured `decisions.md` at 727554 bytes with 9 inbox files, ran the hard archive gate at the 7-day threshold and moved 0 qualifying entries to `decisions-archive.md`, merged 9 inbox notes into 4 durable ledger entries with deduplication (including a summary-only record for Frank's large catalog memo), deleted the processed inbox files, wrote orchestration records for george-1, soup-nazi, and frank-34, updated George/Soup-Nazi/Frank shared histories with the because-clause closeout plus the 13-catalog and Elaine-diagram directives, summarized 0 history files, and left `decisions.md` at 750859 bytes.
