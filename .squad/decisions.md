@@ -6,6 +6,62 @@
 
 ---
 
+### 2026-05-03T14:02:40Z: Grammar design reference established as the canonical language-design guide
+
+**By:** Scribe
+
+**Status:** Merged, inbox cleared (1 file)
+
+**Merged sources:** `elaine-grammar-doc`.
+
+- `docs/language/precept-grammar.md` is now the durable grammar reference for Precept language developers and designers.
+- Durable document-shape rules: lead with what the grammar is not, use flat constructs / keyword anchoring / named slots as the structural spine, keep the linguistic model and grammar invariants in their own sections, and preserve a quick-reference appendix for lookup mode.
+- Presentation rule: syntax-rich grammar references should prefer ASCII hierarchy/anatomy diagrams over Mermaid-style node graphs.
+
+---
+
+### 2026-05-03T14:02:40Z: Catalog-driven thesis deviations remain explicit tooling gaps only
+
+**By:** Scribe
+
+**Status:** Merged, inbox cleared (1 file)
+
+**Merged sources:** `frank-thesis-deviation-audit`.
+
+- Frank's full sweep across the 11 canonical stage docs found no silent architectural drift: the catalog-driven thesis is thoroughly embedded across the design set.
+- The only real deviations remain explicit tooling gaps already called out in source docs: the hand-authored TextMate grammar and the hardcoded MCP `firePipeline` array.
+- Carry-forward follow-up: modifier grouping in MCP should derive from metadata shape instead of hardcoded grouping keys, and the grammar generator remains the highest-leverage cleanup.
+
+---
+
+### 2026-05-03T14:02:40Z: compiler-and-runtime overview synced to the canonical stage docs
+
+**By:** Scribe
+
+**Status:** Merged, inbox cleared (1 file)
+
+**Merged sources:** `frank-compiler-doc-sync`.
+
+- `docs/compiler-and-runtime-design.md` is now durably framed as the narrative overview layer over the 11 canonical stage docs rather than a competing stage-spec source.
+- The live parser contract is the generic `ParsedConstruct(ConstructMeta, SlotValue[], SourceSpan)` shape; `TypeKind` resolves in the type checker, SemanticIndex back-pointers target `ParsedConstruct`, and the overview now counts 13 catalogs including `ExpressionForms`.
+- Open questions are inherited rather than silently resolved here, including the expression-tree shape and the remaining SlotValue/catalog reconciliation items.
+
+---
+
+### 2026-05-03T14:02:40Z: Catalog-first wording corrected in compiler-and-runtime-design.md
+
+**By:** Scribe
+
+**Status:** Merged, inbox cleared (1 file)
+
+**Merged sources:** `frank-catalog-description-fix`.
+
+- The catastrophic stale sentence that described Precept extension as “add an enum member and fill an exhaustive switch” is now durably rejected.
+- Correct wording: adding a language feature means adding a catalog entry (structured metadata); pipeline stages stay generic; C# completeness enforcement lives at catalog declaration time through metadata shape completeness, not downstream per-feature switches.
+- Explicit follow-up remains open: the “Precept Innovations” callout box in the same document still carries similar stale wording and needs a separate cleanup pass.
+
+---
+
 ### 2026-05-03T02:52:51Z: Catalog-driven consumers stay generic; accessor layer deferred
 
 **By:** Scribe

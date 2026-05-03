@@ -62,3 +62,7 @@
 - Design principles (flat/combinator-friendly, IntelliSense-friendly, AI-authoring-friendly, noun-verb-adjective grammar, consistency as a value) are effectively distributed across §1, §7, §8, and §9 rather than collected in one explicit "Grammar Design Principles" section. The content is complete; future maintainers may wish to consolidate into a dedicated principles section if the document is extended.
 - Decisions inbox (`elaine-grammar-doc.md`) and learnings already captured from prior session; no duplicate entries needed.
 
+### 2026-05-03T14:02:40Z — Grammar reference batch logged
+
+- Elaine-4's grammar-doc pass is now durably recorded: `docs/language/precept-grammar.md` is the active grammar design reference, with negative-first orientation, the flat/keyword-anchored/named-slot spine, dedicated linguistic-model + invariants sections, and a quick-reference appendix.
+- Elaine-5's duplicate verification adds no new work item; treat the current grammar doc as complete unless a later scope expansion justifies consolidating the distributed design-principles content into a dedicated section.

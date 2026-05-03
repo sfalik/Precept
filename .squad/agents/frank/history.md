@@ -6,6 +6,8 @@
 
 ## Learnings
 
+- The "catalog-first = adding a catalog entry" description is the single most load-bearing sentence in all public architecture documentation. If it ever reads "add an enum member and fill an exhaustive switch," it describes the traditional compiler model Precept explicitly inverts — that is the worst possible error in a document that exists to explain Precept's architectural identity. The correct claim: adding a language feature means adding a catalog entry (a structured metadata record); pipeline stages are generic and contain no per-member switches; DU record shapes enforce completeness at the catalog declaration site, not at switch branches in consumers. The C# exhaustiveness story lives at catalog declaration time, not at consumer dispatch time.
+
 - When all "Open Decisions" in a working doc are locked, collapse the section immediately — replace the full options/rationale body with a single cross-reference line. The locked section is the canonical record; the open section should not persist as a ghost of deliberation once decisions are final. Verdicts + brief rationale belong in the locked list; full options analysis does not.
 
 - Keep catalog metadata as the single language source of truth; parser/tooling sets and per-member consumer switches are mirrored truth unless the catalog cannot express the distinction.
@@ -26,6 +28,21 @@
 - Build result after deletions: 0 errors, 0 warnings.
 
 ## Recent Updates
+
+### 2026-05-03T09:44:20Z — compiler-and-runtime-design.md sync to catalog-first pipeline
+
+Synced the overview doc to the 11 canonical stage docs written in the prior session. Key changes made:
+
+- **Status header** updated from "Approved working architecture" to "Canonical design — catalog-first pipeline"
+- **Catalog count** corrected from 12 to 13 throughout; added `ExpressionForms` to the language-definition catalog list in §2
+- **§5 Parser** fully rewritten: old typed-node inventory (`FieldDeclarationSyntax`, `StateBlockSyntax`, `EventDeclarationSyntax`, etc.) replaced with `ParsedConstruct(ConstructMeta, ImmutableArray<SlotValue>, SourceSpan)` model; `MissingNode`/`SkippedTokens` terminology removed; parser/TypeChecker contract boundary updated to reflect that `TypeKind` is NOT stamped at parse time
+- **SemanticIndex back-pointers** in §6 updated: `→ FieldDeclarationSyntax` → `→ ParsedConstruct (FieldDeclaration)` throughout, symbols table `→ syntax` column updated
+- **Earliest-knowable kind table** in §6 updated: `TypeKind on TypeRef nodes` moved to type-checker row; parser row now lists `SlotValue` subtype stamps only
+- **Open questions inherited**: expression tree design open question from parser.md and type-checker.md surfaced in §5 and §6 with explicit "inherited from canonical doc" markers
+- **Cross-references** added to all canonical stage docs (lexer.md, parser.md, type-checker.md, graph-analyzer.md, proof-engine.md, precept-builder.md, tooling-surface.md, mcp.md, language-server.md)
+- **Grammar generation note** in §13 cross-reference: flagged that the generator is designed but not yet implemented — current `precept.tmLanguage.json` is hand-crafted
+
+Durable rule: the overview doc (`compiler-and-runtime-design.md`) is the narrative layer over the canonical stage docs — it summarizes and links, does not re-spec. Stage docs own their design details; the overview inherits open questions rather than resolving them.
 
 ### 2026-05-03T09:10:00Z — Catalog-Driven Thesis Deviation Audit
 
@@ -84,3 +101,8 @@ Audited all 11 canonical pipeline stage design docs against the catalog-driven t
 ### 2026-05-03T05:13:50Z — Durable coordination state after Option F stub batch
 - The live parser coordination surface is the generic Option F shape: `SyntaxTree.Constructs`, `ParsedConstruct`, and the 17-case `SlotValue` DU. Treat that as the downstream contract unless a later design decision replaces it.
 - Keep consumer follow-through aligned with that baseline: generic consumers should not grow fake per-`ExpressionFormKind` exhaustiveness stubs or reflection tests unless real per-member dispatch returns.
+
+### 2026-05-03T14:02:40Z — Compiler overview and catalog-first wording batch recorded
+- Frank synced `docs/compiler-and-runtime-design.md` to the canonical stage docs: the overview is narrative-only, the live parser contract is generic `ParsedConstruct`/`SlotValue`, `TypeKind` resolves in the checker, SemanticIndex back-pointers target `ParsedConstruct`, and the catalog count is 13 including `ExpressionForms`.
+- Frank also corrected the worst stale architecture sentence in the overview: Precept does **not** extend by “add an enum member and fill an exhaustive switch”; the durable rule is “add a catalog entry, keep stages generic, let metadata shape completeness enforce correctness at declaration time.”
+- Thesis-audit baseline stays active: the only real remaining deviations are the hand-authored TextMate grammar and the hardcoded MCP `firePipeline`, and the “Precept Innovations” callout box still needs the same wording cleanup in a later pass.
