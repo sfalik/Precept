@@ -271,3 +271,88 @@ Archived updates moved from `history.md` during Scribe summarization.
 ### 2026-05-03T01:07:30Z — Radical AST options note recorded
 - Scribe merged Frank's late-arriving AST design note into the ledger as a pending-owner-ruling record: Option F keeps generic `ParsedConstruct` internally, thin typed accessors at consumer call sites, and typed MCP DTOs at the boundary.
 - Durable tradeoff: the hybrid model preserves parser zero-touch growth but replaces node-type pattern matching with `ConstructKind` dispatch plus accessors; Option C remains the explicit fallback if that ergonomics cost is rejected.
+
+
+## Archive Batch — 2026-05-03T14:18:15Z (scribe compaction)
+
+---
+
+## Recent Updates (compacted from active history)
+
+### 2026-05-03T09:44:20Z — compiler-and-runtime-design.md sync to catalog-first pipeline
+
+Synced the overview doc to the 11 canonical stage docs written in the prior session. Key changes made:
+
+- **Status header** updated from "Approved working architecture" to "Canonical design — catalog-first pipeline"
+- **Catalog count** corrected from 12 to 13 throughout; added `ExpressionForms` to the language-definition catalog list in §2
+- **§5 Parser** fully rewritten: old typed-node inventory (`FieldDeclarationSyntax`, `StateBlockSyntax`, `EventDeclarationSyntax`, etc.) replaced with `ParsedConstruct(ConstructMeta, ImmutableArray<SlotValue>, SourceSpan)` model; `MissingNode`/`SkippedTokens` terminology removed; parser/TypeChecker contract boundary updated to reflect that `TypeKind` is NOT stamped at parse time
+- **SemanticIndex back-pointers** in §6 updated: `→ FieldDeclarationSyntax` → `→ ParsedConstruct (FieldDeclaration)` throughout, symbols table `→ syntax` column updated
+- **Earliest-knowable kind table** in §6 updated: `TypeKind on TypeRef nodes` moved to type-checker row; parser row now lists `SlotValue` subtype stamps only
+- **Open questions inherited**: expression tree design open question from parser.md and type-checker.md surfaced in §5 and §6 with explicit "inherited from canonical doc" markers
+- **Cross-references** added to all canonical stage docs (lexer.md, parser.md, type-checker.md, graph-analyzer.md, proof-engine.md, precept-builder.md, tooling-surface.md, mcp.md, language-server.md)
+- **Grammar generation note** in §13 cross-reference: flagged that the generator is designed but not yet implemented — current `precept.tmLanguage.json` is hand-crafted
+
+Durable rule: the overview doc (`compiler-and-runtime-design.md`) is the narrative layer over the canonical stage docs — it summarizes and links, does not re-spec. Stage docs own their design details; the overview inherits open questions rather than resolving them.
+
+### 2026-05-03T09:10:00Z — Catalog-Driven Thesis Deviation Audit
+
+Audited all 11 canonical pipeline stage design docs against the catalog-driven thesis. Findings:
+- **2 real deviations** (tooling-surface.md hand-crafted grammar, mcp.md hardcoded firePipeline)
+- **2 flagged open questions** that acknowledge the deviation (GraphState booleans, firePipeline)
+- **1 structural concern** (type-checker switches on ConstructKind for dispatch, which is structural routing not per-member behavior — acceptable)
+- All 11 docs are architecturally sound. The thesis is thoroughly embedded. Deviations are known gaps with explicit open questions, not silent drift.
+- Decision note written to `.squad/decisions/inbox/frank-thesis-deviation-audit.md`.
+
+### 2026-05-03T05:21:49Z — HandlesCatalog cleanup recorded
+- frank-18 locked the Option F verdict: remove `[HandlesCatalogExhaustively]` / `[HandlesCatalogMember]` from Parser.cs, TypeChecker.cs, and GraphAnalyzer.cs, but retain the attribute type definitions for catalog-side use.
+- frank-19 landed the cleanup: removed all 39 consumer annotations, deleted the two stale reflection enforcement tests, and left the repo building clean with 0 errors and 0 warnings.
+
+### 2026-05-03T05:08:28Z — AST clean-slate deletion recorded
+- Deleted the entire src/Precept/Pipeline/SyntaxNodes/ tree (38 files including Expressions/) plus test/Precept.Tests/AstNodeTests.cs.
+- SyntaxTree.cs, Parser.cs, and GraphAnalyzer.cs were trimmed to remove the remaining SyntaxNode references; build result is 0 errors, 0 warnings.
+- Supersedes the earlier "preserve SyntaxNodes as the AST contract" note: the AST surface is now intentionally absent until the catalog-driven replacement lands.
+
+
+### 2026-05-03T05:13:00Z — Option F AST stub implemented
+
+**Files created:**
+- `src/Precept/Pipeline/SlotValue.cs` — discriminated union with abstract `SlotValue` base + 17 sealed subtypes, one per `ConstructSlotKind` catalog member. Naming adjustments: `Language.Type` → `TypeMeta` (no bare `Type` class exists in `Precept.Language`); used `TypeMeta` for both `TypeExpressionSlot.Type` and `ArgumentListSlot.Args` tuple element. Expression-carrying stubs (`ComputeExpressionSlot`, `GuardClauseSlot`, `OutcomeSlot`, `EnsureClauseSlot`, `RuleExpressionSlot`) hold only `SourceSpan` with `// TODO: add typed Expression tree` comments.
+- `src/Precept/Pipeline/ParsedConstruct.cs` — `sealed record ParsedConstruct(ConstructMeta Meta, ImmutableArray<SlotValue> Slots, SourceSpan Span)`. Uses `ConstructMeta` (actual type name) not the task's placeholder `Construct`.
+
+**Files updated:**
+- `src/Precept/Pipeline/SyntaxTree.cs` — added `ImmutableArray<ParsedConstruct> Constructs` parameter.
+- `src/Precept/Pipeline/Parser.cs` — updated stub constructor call to pass `ImmutableArray<ParsedConstruct>.Empty`.
+- `src/Precept/Pipeline/GraphAnalyzer.cs` — `AnalyzeExpression()` now takes `ParsedConstruct construct` parameter.
+
+**Build result:** 0 errors, 0 warnings.
+
+
+- Deleted Parser.cs, Parser.Declarations.cs, Parser.Expressions.cs implementation (≈28KB of parsing logic).
+- Replaced with a 35-line stub matching TypeChecker pattern: returns empty SyntaxTree with no diagnostics.
+- Preserved all SyntaxNode type declarations (SyntaxNodes/ folder) — they remain the AST contract.
+- Deleted 5 test files testing parser internals/behavior (ExpressionParserTests, ParserInfrastructureTests, SlotParserTests, ParserTests, SampleFileIntegrationTests).
+- Trimmed 3 tests referencing deleted Parser fields from ConstructsTests, TokenMetaMemberNameTests, ExpressionFormCoverageTests.
+- Final state: build clean, 2603 tests pass (2348 + 255).
+
+### 2026-05-03T02:52:51Z — Catalog-driven pipeline follow-through recorded
+- Scribe merged Frank's consumer-architecture note plus Shane's accessor-layer ruling into the canonical ledger: keep consumers generic, keep MCP above raw parse output, and treat any accessor layer as YAGNI until a real caller proves otherwise.
+- Scribe also recorded Frank's upstream coverage pass: lexer/parser/builder now sit inside the same catalog-driven pipeline thesis, with the builder identified as the strongest candidate for a first generic proof-of-concept stage.
+- Detailed prior active-history entries were compacted into `history-archive.md` during this pass to bring Frank back under the 15 KB gate.
+
+### 2026-05-03T01:34:25Z — Radical AST options note recorded
+- The pending-owner-ruling record now keeps Option F (generic `ParsedConstruct` internals + thin typed accessors at boundaries) as the preferred radical AST path, with source generation as the explicit fallback if ergonomics win.
+
+### 2026-05-03T01:07:30Z — Outcomes catalog reversal recorded
+- The durable parser/type-checker rule remains: outcomes use the two-level catalog pattern while retaining `OutcomeNode` as the syntax-layer DU because `no transition` is an outcome-level abstraction that token categories cannot enumerate by themselves.
+
+### 2026-05-02T22:22:24Z — Iteration 11 audit session recorded
+- Keep the audit baseline in mind: the doc/catalog gap set now centers on declaration-shape metadata lag, queue-by clarification, and the canonical checker implementation gate already locked in `docs/compiler/type-checker.md`.
+
+### 2026-05-03T05:13:50Z — Durable coordination state after Option F stub batch
+- The live parser coordination surface is the generic Option F shape: `SyntaxTree.Constructs`, `ParsedConstruct`, and the 17-case `SlotValue` DU. Treat that as the downstream contract unless a later design decision replaces it.
+- Keep consumer follow-through aligned with that baseline: generic consumers should not grow fake per-`ExpressionFormKind` exhaustiveness stubs or reflection tests unless real per-member dispatch returns.
+
+### 2026-05-03T14:02:40Z — Compiler overview and catalog-first wording batch recorded
+- Frank synced `docs/compiler-and-runtime-design.md` to the canonical stage docs: the overview is narrative-only, the live parser contract is generic `ParsedConstruct`/`SlotValue`, `TypeKind` resolves in the checker, SemanticIndex back-pointers target `ParsedConstruct`, and the catalog count is 13 including `ExpressionForms`.
+- Frank also corrected the worst stale architecture sentence in the overview: Precept does **not** extend by “add an enum member and fill an exhaustive switch”; the durable rule is “add a catalog entry, keep stages generic, let metadata shape completeness enforce correctness at declaration time.”
+- Thesis-audit baseline stays active: the only real remaining deviations are the hand-authored TextMate grammar and the hardcoded MCP `firePipeline`, and the “Precept Innovations” callout box still needs the same wording cleanup in a later pass.
