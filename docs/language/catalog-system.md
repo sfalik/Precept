@@ -148,149 +148,128 @@ Three levels of detail. Use the overview map to see the full 13-catalog topology
 
 ### Level 1 — Catalog Overview Map
 
-Thirteen catalogs in four layers. Pipeline stages (solid arrows) and tooling consumers (dashed arrows) all read from catalog metadata — no parallel copies.
+Two views of the same system. The **topology** diagram shows the four-layer catalog structure and cross-catalog references. The **consumer landscape** diagram shows which pipeline stages and tooling derive from which layers.
+
+**Catalog topology**
 
 ```mermaid
 flowchart TB
-    %% ── Pipeline stages ──────────────────────────────────────────────────────
-    Lexer["Lexer"]
-    Parser["Parser"]
-    TypeChecker["TypeChecker"]
-    GraphAnalyzer["GraphAnalyzer"]
-    ProofEngine["ProofEngine"]
-    Evaluator["Evaluator"]
-
-    %% ── Tooling consumers ────────────────────────────────────────────────────
-    LS["Language Server"]
-    Grammar["TextMate Grammar"]
-    MCP["MCP precept_language"]
-
-    %% ── Catalog layers ───────────────────────────────────────────────────────
-    subgraph Lexical["Lexical foundation"]
-        Tokens["Tokens\n(TokenKind · 138)"]
+    subgraph L1["① Lexical foundation"]
+        Tokens["Tokens (138)"]
     end
 
-    subgraph GrammarSchema["Grammar / structure"]
-        Constructs["Constructs\n(ConstructKind · 12)"]
-        ExpressionForms["ExpressionForms\n(ExpressionFormKind · 13)"]
-        Constraints["Constraints\n(ConstraintKind · 5)"]
-        ConstructSlotKind["ConstructSlotKind\n⟨helper enum — not a catalog⟩"]
+    subgraph L2["② Grammar / structure"]
+        Constructs["Constructs (12)"]
+        ExpressionForms["ExpressionForms (13)"]
+        Constraints["Constraints (5)"]
     end
 
-    subgraph Semantic["Semantic / behavior"]
-        Types["Types\n(TypeKind · 32)"]
-        Operators["Operators\n(OperatorKind · 21)"]
-        Operations["Operations\n(OperationKind · 198)"]
-        Functions["Functions\n(FunctionKind · 23)"]
-        Modifiers["Modifiers\n(ModifierKind · 29)"]
-        Actions["Actions\n(ActionKind · 15)"]
-        ProofRequirements["ProofRequirements\n(ProofRequirementKind · 5)"]
+    subgraph L3["③ Semantic / behavior"]
+        Types["Types (32)"]
+        Operators["Operators (21)"]
+        Operations["Operations (198)"]
+        Functions["Functions (23)"]
+        Modifiers["Modifiers (29)"]
+        Actions["Actions (15)"]
+        ProofRequirements["ProofRequirements (5)"]
     end
 
-    subgraph Failure["Failure modes"]
-        Diagnostics["Diagnostics\n(DiagnosticCode · 106)"]
-        Faults["Faults\n(FaultCode · 13)"]
+    subgraph L4["④ Failure modes"]
+        Diagnostics["Diagnostics (106)"]
+        Faults["Faults (13)"]
     end
 
-    %% ── Cross-catalog reference edges ────────────────────────────────────────
-    Types           -->|Token| Tokens
-    Operators       -->|"Token(s)"| Tokens
-    Modifiers       -->|Token| Tokens
-    Actions         -->|Token| Tokens
-    Constructs      -->|"LeadingToken / DisambTokens"| Tokens
-    ExpressionForms -->|LeadTokens| Tokens
+    %% Six catalogs anchor to Tokens
+    Types       --> Tokens
+    Operators   --> Tokens
+    Modifiers   --> Tokens
+    Actions     --> Tokens
+    Constructs  --> Tokens
+    ExpressionForms --> Tokens
 
-    Types      -->|ImpliedModifiers| Modifiers
-    Modifiers  -->|ApplicableTo| Types
-    Actions    -->|ApplicableTo| Types
-    Functions  -->|"param + return types"| Types
-    Operations -->|"operand + result types"| Types
-    Operations -->|Op| Operators
+    %% Semantic wiring
+    Functions  -->|param/return types| Types
+    Operations -->|operand/result types| Types
+    Operations -->|op| Operators
+    Actions    -->|applicable to| Types
+    Types     <-->|"implied ↔ applicable"| Modifiers
 
-    Types      -->|"accessor ProofRequirements"| ProofRequirements
-    Functions  -->|"overload ProofRequirements"| ProofRequirements
-    Operations -->|"operation ProofRequirements"| ProofRequirements
-    Actions    -->|"action ProofRequirements"| ProofRequirements
+    %% Proof obligations
+    Types      --> ProofRequirements
+    Functions  --> ProofRequirements
+    Operations --> ProofRequirements
+    Actions    --> ProofRequirements
 
+    %% Grammar nesting
     Actions    -->|AllowedIn| Constructs
     Constructs -->|AllowedIn| Constructs
-    Constructs -->|Slots| ConstructSlotKind
 
-    Diagnostics -->|PreventsFault| Faults
-    Faults      -->|StaticallyPreventable| Diagnostics
-
-    %% ── Pipeline stage → catalog edges ──────────────────────────────────────
-    Lexer --> Tokens
-
-    Parser --> Tokens
-    Parser --> Constructs
-    Parser --> ExpressionForms
-    Parser --> Operators
-    Parser --> Actions
-    Parser --> Modifiers
-    Parser --> Types
-
-    TypeChecker --> Types
-    TypeChecker --> Functions
-    TypeChecker --> Operators
-    TypeChecker --> Operations
-    TypeChecker --> Modifiers
-    TypeChecker --> Actions
-    TypeChecker --> Constraints
-    TypeChecker --> ProofRequirements
-    TypeChecker --> Diagnostics
-
-    GraphAnalyzer --> Constructs
-    GraphAnalyzer --> Modifiers
-    GraphAnalyzer --> Constraints
-    GraphAnalyzer --> Diagnostics
-
-    ProofEngine --> ProofRequirements
-    ProofEngine --> Diagnostics
-
-    Evaluator --> Functions
-    Evaluator --> Operations
-    Evaluator --> Actions
-    Evaluator --> Faults
-
-    %% ── Tooling consumer → catalog edges (dashed) ────────────────────────────
-    LS -.-> Tokens
-    LS -.-> Types
-    LS -.-> Functions
-    LS -.-> Modifiers
-    LS -.-> Actions
-    LS -.-> Constructs
-    LS -.-> ExpressionForms
-    LS -.-> Diagnostics
-
-    Grammar -.-> Tokens
-    Grammar -.-> Types
-    Grammar -.-> Constructs
-    Grammar -.-> ExpressionForms
-    Grammar -.-> Operators
-
-    MCP -.-> Tokens
-    MCP -.-> Types
-    MCP -.-> Functions
-    MCP -.-> Operators
-    MCP -.-> Operations
-    MCP -.-> Modifiers
-    MCP -.-> Actions
-    MCP -.-> Constructs
-    MCP -.-> ExpressionForms
-    MCP -.-> Constraints
-    MCP -.-> ProofRequirements
-    MCP -.-> Diagnostics
-    MCP -.-> Faults
+    %% Failure link
+    Diagnostics <-->|"PreventsFault / StaticallyPreventable"| Faults
 ```
 
-**Reading the diagram:**
+**Consumer landscape**
+
+```mermaid
+flowchart LR
+    subgraph Pipeline["Pipeline stages"]
+        Lexer
+        Parser
+        TypeChecker["TypeChecker"]
+        GraphAnalyzer["GraphAnalyzer"]
+        ProofEngine["ProofEngine"]
+        Evaluator
+    end
+
+    subgraph Layers["Catalog layers"]
+        CL1["① Lexical\nTokens"]
+        CL2["② Grammar\nConstructs · ExprForms · Constraints"]
+        CL3["③ Semantic\nTypes · Operators · Operations\nFunctions · Modifiers · Actions\nProofRequirements"]
+        CL4["④ Failure\nDiagnostics · Faults"]
+    end
+
+    subgraph Tooling["Tooling consumers"]
+        LS["Language Server"]
+        Grammar["TextMate Grammar"]
+        MCP["MCP precept_language"]
+    end
+
+    Lexer         --> CL1
+    Parser        --> CL1
+    Parser        --> CL2
+    Parser        --> CL3
+    TypeChecker   --> CL2
+    TypeChecker   --> CL3
+    TypeChecker   --> CL4
+    GraphAnalyzer --> CL2
+    GraphAnalyzer --> CL3
+    GraphAnalyzer --> CL4
+    ProofEngine   --> CL3
+    ProofEngine   --> CL4
+    Evaluator     --> CL3
+    Evaluator     --> CL4
+
+    LS      -.-> CL1
+    LS      -.-> CL2
+    LS      -.-> CL3
+    LS      -.-> CL4
+    Grammar -.-> CL1
+    Grammar -.-> CL2
+    Grammar -.-> CL3
+    MCP     -.-> CL1
+    MCP     -.-> CL2
+    MCP     -.-> CL3
+    MCP     -.-> CL4
+```
+
+**Reading the diagrams:**
 
 - **Tokens** is the lexical foundation — six catalogs carry direct `TokenMeta` or `TokenKind` references upward to it.
 - **Types** and **Constructs** are the twin semantic hubs — Types for runtime behavior, Constructs for grammar schema.
 - **Operations** is the typed-legality hub — it ties Operators + Types + ProofRequirements together.
 - **Diagnostics ↔ Faults** is the only bidirectional pair — each points to the other via `PreventsFault` / `[StaticallyPreventable]`.
-- `ConstructSlotKind` is a helper enum embedded in the Constructs schema surface, not a catalog — it appears in the Grammar layer but carries no `GetMeta()` or `All`.
+- `ConstructSlotKind` is a helper enum embedded in the Constructs schema surface, not a catalog — it carries no `GetMeta()` or `All`; see Level 3 for its 17-member inventory.
+- In the consumer diagram, each layer box aggregates multiple catalogs. Solid arrows = pipeline stages; dashed arrows = tooling. No consumer maintains its own parallel list — all derive from catalog `All` properties.
 
 ---
 
