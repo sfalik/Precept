@@ -28,6 +28,11 @@
 
 ## Recent Updates
 
+### 2026-05-03T14:28:59Z — Grammar reference fixes recorded
+- Elaine-6 fixed the ASCII box right-wall alignment in `docs/language/precept-grammar.md`; all diagram rows now hold a 78-character width contract. Commit `9a3b657`.
+- Elaine-7 replaced the “five constructs” section with six principled examples spanning the major slot/routing shapes and added a computed-field `-> expression` example. Commit `fc54bac`.
+- Elaine-8 remains in flight verifying that the grammar doc's `in` disambiguation tokens (`readonly` / `editable`) still match the Constructs catalog.
+
 ### 2026-05-02 — Grammar hierarchy HTML prototype created
 - Built a fully self-contained dark-mode HTML reference at `design/prototypes/grammar-hierarchy.html`.
 - Used brand-spec color tokens throughout: gold (Header family), indigo (Direct), purple (StateScoped), cyan (EventScoped), emerald (actions), rose (outcomes).

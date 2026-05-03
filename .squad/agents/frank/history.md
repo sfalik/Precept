@@ -17,6 +17,10 @@
 
 ## Recent Updates
 
+### 2026-05-03T14:28:59Z — ConstructManifest rename shipped
+- Frank-26 completed the `SyntaxTree` → `ConstructManifest` rename across 5 source files and 2 docs.
+- Build succeeded after the rename and no test changes were needed for the batch.
+
 ### 2026-05-03T14:18:15Z — Scribe post-batch sync recorded
 - Merged the three Frank inbox files into `decisions.md`, deduplicating the overview-confirmation notes into the already-recorded compiler-overview sync while separately capturing Shane's `ConstructManifest` preference as the current rename target over Frank's `ParsedSource` recommendation.
 - Wrote orchestration records for frank-23, frank-24, and frank-25; frank-25's `to` classification verification remains in flight with no canonical ruling yet.
