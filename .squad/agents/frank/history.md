@@ -76,3 +76,13 @@
 ### 2026-05-02T22:14:44Z — GAP-047 closed
 - Spec §3.7 now explicitly documents the money/quantity overloads for `min`, `max`, `abs`, `clamp`, and `round(value, places)`, including same-qualifier requirements and qualifier-preserving results.
 - The working gap ledger is fully closed for this audit pass: GAP-047 is Fixed, and the primitive numeric-lane shorthand is now explicitly separated from domain-type overload semantics.
+
+### 2026-05-03T01:07:30Z — Outcomes catalog reversal recorded
+- Scribe corrected the canonical ledger to match Frank-5's reversed ruling: outcomes now use the two-level catalog pattern (`OutcomeKind` + `OutcomeMeta` + `Outcomes.cs`) while retaining `OutcomeNode` as the syntax-layer DU.
+- Durable reason to keep front-of-mind: `no transition` is one outcome-level abstraction composed from two tokens, so token-category derivation alone cannot provide complete outcome enumerability without hardcoded composition logic.
+
+- **Radical AST options explored (2026-05-02):** Explored 6 options for eliminating per-construct AST node classes (Universal bag, flat array, source-generated, no-AST, CST-only, hybrid generic+typed). The hybrid (Option F: generic `ParsedConstruct` internal + thin typed accessor functions at consumption boundaries) is the most promising — it makes the "parser is untouched" claim fully true while preserving type safety via ~5-line accessor functions per construct. The key tradeoff Shane is weighing: loss of C# pattern matching on node types (ergonomic regression) vs. elimination of per-construct AST classes (architectural purity). Option C (source generation) is the fallback if type safety cannot be compromised. CST-only (E) and raw array (B) are rejected as over-engineered or too fragile for Precept's problem size.
+
+### 2026-05-03T01:07:30Z — Radical AST options note recorded
+- Scribe merged Frank's late-arriving AST design note into the ledger as a pending-owner-ruling record: Option F keeps generic `ParsedConstruct` internally, thin typed accessors at consumer call sites, and typed MCP DTOs at the boundary.
+- Durable tradeoff: the hybrid model preserves parser zero-touch growth but replaces node-type pattern matching with `ConstructKind` dispatch plus accessors; Option C remains the explicit fallback if that ergonomics cost is rejected.
