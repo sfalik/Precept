@@ -58,7 +58,8 @@ public static class Constructs
             [],
             [SlotIdentifierList, SlotTypeExpression, SlotModifierList, SlotComputeExpression],
             [new(TokenKind.Field)],
-            RoutingFamily.Direct),
+            RoutingFamily.Direct,
+            ModifierDomain: ModifierDomain.Field),
 
         ConstructKind.StateDeclaration => new(
             kind,
@@ -68,7 +69,8 @@ public static class Constructs
             [],
             [SlotStateEntryList],
             [new(TokenKind.State)],
-            RoutingFamily.Direct),
+            RoutingFamily.Direct,
+            ModifierDomain: ModifierDomain.State),
 
         ConstructKind.EventDeclaration => new(
             kind,
@@ -78,7 +80,8 @@ public static class Constructs
             [],
             [SlotIdentifierList, SlotArgumentList, SlotInitialMarker],
             [new(TokenKind.Event)],
-            RoutingFamily.Direct),
+            RoutingFamily.Direct,
+            ModifierDomain: ModifierDomain.Event),
 
         ConstructKind.RuleDeclaration => new(
             kind,
@@ -118,7 +121,8 @@ public static class Constructs
             [],
             [SlotStateTarget, SlotFieldTarget, SlotAccessModeKeyword, SlotGuardClause],
             [new(TokenKind.In, [TokenKind.Modify])],
-            RoutingFamily.StateScoped),
+            RoutingFamily.StateScoped,
+            ModifierDomain: ModifierDomain.Access),
 
         ConstructKind.OmitDeclaration => new(
             kind,

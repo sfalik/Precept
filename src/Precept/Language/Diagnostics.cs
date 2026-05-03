@@ -1,6 +1,24 @@
+using System.Collections.Immutable;
+using System.Linq;
 using Precept.Pipeline;
 
 namespace Precept.Language;
+
+/// <summary>
+/// Identifies the symbol namespace the language server should search when
+/// building "did you mean?" suggestions for a diagnostic.
+/// </summary>
+public enum SuggestionSource
+{
+    /// <summary>User-declared fields in the precept.</summary>
+    UserFields    = 1,
+    /// <summary>User-declared states in the precept.</summary>
+    UserStates    = 2,
+    /// <summary>User-declared events in the precept.</summary>
+    UserEvents    = 3,
+    /// <summary>Built-in functions from <see cref="Functions"/>.</summary>
+    FunctionCatalog = 4,
+}
 
 public sealed record DiagnosticMeta(
     string             Code,
@@ -8,9 +26,10 @@ public sealed record DiagnosticMeta(
     Severity           Severity,
     string             MessageTemplate,
     DiagnosticCategory Category,
-    DiagnosticCode[]?  RelatedCodes  = null,
-    string?            FixHint       = null,
-    FaultCode?         PreventsFault = null
+    DiagnosticCode[]?  RelatedCodes      = null,
+    string?            FixHint           = null,
+    FaultCode?         PreventsFault     = null,
+    SuggestionSource[]? SuggestionSources = null
 );
 
 public static class Diagnostics
@@ -58,7 +77,8 @@ public static class Diagnostics
         DiagnosticCode.UndeclaredField                => new(nameof(DiagnosticCode.UndeclaredField),                DiagnosticStage.Type,  Severity.Error,   "Field '{0}' is not declared",                                                                                                          DiagnosticCategory.Naming,
             RelatedCodes: [DiagnosticCode.DuplicateFieldName],
             FixHint: "Declare the field at the top of the precept using 'field Name as Type'",
-            PreventsFault: FaultCode.UndeclaredField),
+            PreventsFault: FaultCode.UndeclaredField,
+            SuggestionSources: [SuggestionSource.UserFields]),
         DiagnosticCode.TypeMismatch                   => new(nameof(DiagnosticCode.TypeMismatch),                   DiagnosticStage.Type,  Severity.Error,   "Expected a {0} value here, but got '{1}'",                                                                                             DiagnosticCategory.TypeSystem,
             RelatedCodes: [DiagnosticCode.NullInNonNullableContext],
             PreventsFault: FaultCode.TypeMismatch),
@@ -88,13 +108,16 @@ public static class Diagnostics
             FixHint: "Rename one of the event arguments to a unique name"),
         DiagnosticCode.UndeclaredState                => new(nameof(DiagnosticCode.UndeclaredState),                DiagnosticStage.Type,  Severity.Error,   "State '{0}' is not declared",                                                                                                          DiagnosticCategory.Naming,
             RelatedCodes: [DiagnosticCode.UndeclaredEvent, DiagnosticCode.UndeclaredField],
-            FixHint: "Declare the state using 'state StateName' before referencing it"),
+            FixHint: "Declare the state using 'state StateName' before referencing it",
+            SuggestionSources: [SuggestionSource.UserStates]),
         DiagnosticCode.UndeclaredEvent                => new(nameof(DiagnosticCode.UndeclaredEvent),                DiagnosticStage.Type,  Severity.Error,   "Event '{0}' is not declared",                                                                                                          DiagnosticCategory.Naming,
             RelatedCodes: [DiagnosticCode.UndeclaredState, DiagnosticCode.UndeclaredField],
-            FixHint: "Declare the event using 'event EventName' before referencing it"),
+            FixHint: "Declare the event using 'event EventName' before referencing it",
+            SuggestionSources: [SuggestionSource.UserEvents]),
         DiagnosticCode.UndeclaredFunction             => new(nameof(DiagnosticCode.UndeclaredFunction),             DiagnosticStage.Type,  Severity.Error,   "'{0}' is not a recognized function",                                                                                                   DiagnosticCategory.Naming,
             RelatedCodes: [DiagnosticCode.InvalidCallTarget],
-            FixHint: "Use a recognized built-in function name, or check the function catalog"),
+            FixHint: "Use a recognized built-in function name, or check the function catalog",
+            SuggestionSources: [SuggestionSource.FunctionCatalog]),
         DiagnosticCode.MultipleInitialStates          => new(nameof(DiagnosticCode.MultipleInitialStates),          DiagnosticStage.Type,  Severity.Error,   "Only one state can be marked 'initial' — '{0}' and '{1}' both are",                                                                    DiagnosticCategory.Structure,
             RelatedCodes: [DiagnosticCode.NoInitialState],
             FixHint: "Remove 'initial' from all but one state"),
@@ -369,7 +392,10 @@ public static class Diagnostics
     public static Diagnostic Create(DiagnosticCode code, SourceSpan span, params object?[] args)
     {
         var meta = GetMeta(code);
-        return new(meta.Severity, meta.Stage, meta.Code, string.Format(meta.MessageTemplate, args), span);
+        var stringArgs = args.Length == 0
+            ? ImmutableArray<string>.Empty
+            : args.Select(a => a?.ToString() ?? string.Empty).ToImmutableArray();
+        return new(meta.Severity, meta.Stage, meta.Code, string.Format(meta.MessageTemplate, args), span, stringArgs);
     }
 
     public static IReadOnlyList<DiagnosticMeta> All { get; } =

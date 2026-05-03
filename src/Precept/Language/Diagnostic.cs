@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Precept.Pipeline;
 
 namespace Precept.Language;
@@ -51,6 +52,7 @@ public readonly record struct Diagnostic(
     /// </summary>
     string          Code,
     string          Message,
-    SourceSpan      Span
+    SourceSpan      Span,
+    ImmutableArray<string> Args = default
 );
 

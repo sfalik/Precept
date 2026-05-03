@@ -20,7 +20,8 @@ public sealed record ConstructMeta(
     IReadOnlyList<ConstructSlot>         Slots,
     ImmutableArray<DisambiguationEntry>  Entries,
     RoutingFamily                        RoutingFamily,
-    string?                              SnippetTemplate = null)
+    string?                              SnippetTemplate  = null,
+    ModifierDomain                       ModifierDomain   = ModifierDomain.None)
 {
     /// <summary>Slot sequence for this construct's declaration shape.</summary>
     public IReadOnlyList<ConstructSlot> Slots { get; } = Slots;
@@ -50,4 +51,25 @@ public enum RoutingFamily
     StateScoped,
     /// <summary>Shares the 'on' leading token; routed via DisambiguateAndParse().</summary>
     EventScoped,
+}
+
+/// <summary>
+/// Identifies which category of modifiers is applicable to a construct.
+/// Used by the language server to derive valid modifier suggestions without
+/// switching on <see cref="ConstructKind"/> values.
+/// </summary>
+public enum ModifierDomain
+{
+    /// <summary>No modifiers apply (or construct does not use a modifier slot).</summary>
+    None   = 0,
+    /// <summary>Field modifiers apply (e.g., nonnegative, optional, readonly).</summary>
+    Field  = 1,
+    /// <summary>State modifiers apply (e.g., initial, terminal).</summary>
+    State  = 2,
+    /// <summary>Event modifiers apply (e.g., initial).</summary>
+    Event  = 3,
+    /// <summary>Access mode keywords apply (editable, readonly).</summary>
+    Access = 4,
+    /// <summary>State entry modifiers (anchor, etc.) apply.</summary>
+    Anchor = 5,
 }
