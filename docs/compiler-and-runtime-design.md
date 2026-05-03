@@ -301,15 +301,10 @@ flowchart LR
     PAR(Parser):::stage
     OUT>"ConstructManifest"]:::out
 
-    subgraph CATS[" "]
-        direction TB
-        CCON("Constructs"):::catalog
-        CTOK("Tokens"):::catalog
-        COPR("Operators"):::catalog
-        CDIA("Diagnostics"):::catalog
-    end
-
-    style CATS fill:#ecfeff,stroke:#22d3ee,color:#164e63
+    CCON(Constructs):::catalog
+    CTOK(Tokens):::catalog
+    COPR(Operators):::catalog
+    CDIA(Diagnostics):::catalog
 
     TS --> PAR
     CCON --> PAR
@@ -405,20 +400,15 @@ flowchart LR
     TC(Type Checker):::stage
     OUT>"SemanticIndex"]:::out
 
-    subgraph CATS[" "]
-        direction TB
-        CTYP("Types"):::catalog
-        CFUN("Functions"):::catalog
-        COPR("Operators"):::catalog
-        COPN("Operations"):::catalog
-        CMOD("Modifiers"):::catalog
-        CACT("Actions"):::catalog
-        CCST("Constraints"):::catalog
-        CPRQ("ProofRequirements"):::catalog
-        CDIA("Diagnostics"):::catalog
-    end
-
-    style CATS fill:#ecfeff,stroke:#22d3ee,color:#164e63
+    CTYP(Types):::catalog
+    CFUN(Functions):::catalog
+    COPR(Operators):::catalog
+    COPN(Operations):::catalog
+    CMOD(Modifiers):::catalog
+    CACT(Actions):::catalog
+    CCST(Constraints):::catalog
+    CPRQ(ProofRequirements):::catalog
+    CDIA(Diagnostics):::catalog
 
     ST --> TC
     CTYP --> TC
@@ -593,14 +583,9 @@ flowchart LR
     GA(Graph Analyzer):::stage
     OUT>"StateGraph"]:::out
 
-    subgraph CATS[" "]
-        direction TB
-        CMOD("Modifiers"):::catalog
-        CACT("Actions"):::catalog
-        CDIA("Diagnostics"):::catalog
-    end
-
-    style CATS fill:#ecfeff,stroke:#22d3ee,color:#164e63
+    CMOD(Modifiers):::catalog
+    CACT(Actions):::catalog
+    CDIA(Diagnostics):::catalog
 
     TM --> GA
     CMOD --> GA
@@ -695,16 +680,11 @@ flowchart LR
     PE(Proof Engine):::stage
     OUT>"ProofLedger"]:::out
 
-    subgraph CATS[" "]
-        direction TB
-        COPN("Operations"):::catalog
-        CFUN("Functions"):::catalog
-        CTYP("Types"):::catalog
-        CDIA("Diagnostics"):::catalog
-        CFLT("Faults"):::catalog
-    end
-
-    style CATS fill:#ecfeff,stroke:#22d3ee,color:#164e63
+    COPN(Operations):::catalog
+    CFUN(Functions):::catalog
+    CTYP(Types):::catalog
+    CDIA(Diagnostics):::catalog
+    CFLT(Faults):::catalog
 
     TM --> PE
     COPN --> PE
