@@ -193,7 +193,18 @@ Every construct is a single-line statement, except where a block body is explici
 keyword [disambig] name  slot*             [block?]
 ```
 
-Concrete anatomy of five constructs:
+Concrete anatomy of six representative constructs:
+
+These examples are chosen for coverage, not because six is a magic number. Together they span the grammar's main surface patterns:
+
+- a direct declaration with type + modifier slots (`field`, stored form)
+- a direct declaration with a computed-expression slot (`field`, computed form)
+- a list-shaped declaration with construct-specific modifiers (`state`)
+- a direct declaration with a parenthesized argument list (`event`)
+- a family-routed declaration selected by a disambiguation token and carrying a reasoned constraint (`in ... ensure`)
+- the richest routed declaration, combining references, an optional guard, an action chain, and a terminal outcome (`from ... on`)
+
+That makes this section representative rather than exhaustive: it gives developers a compact map of the slot shapes and routing patterns they need to recognize when extending the catalog or parser, while later sections enumerate every construct family and slot kind.
 
 ```
 field  ClaimAmount  as  decimal  default 0  nonnegative  maxplaces 2
@@ -208,6 +219,18 @@ field  ClaimAmount  as  decimal  default 0  nonnegative  maxplaces 2
 ```
 
 ```
+field  LineTotal  as  number  ->  TaxableAmount + TaxAmount  nonnegative
+  │       │         ↑    │      ↑              │               │
+ [1]     [2]      slot  [3]   slot            [4]             [5]
+                  marker      marker
+[1] Leading token: `field`
+[2] IdentifierList slot — the field name
+[3] TypeExpression slot — `as` is the slot marker; `number` is the type
+[4] ComputeExpression slot — `->` is the slot marker; the expression computes the field value
+[5] ModifierList slot — optional trailing modifiers still apply to computed fields
+```
+
+```
 state  Draft  initial
   │      │       │
  [1]    [2]    [3]
@@ -217,20 +240,19 @@ state  Draft  initial
 ```
 
 ```
-rule  ApprovedAmount <= RequestedAmount  because  "Approved amount cannot exceed the request"
-  │              │                          ↑              │
- [1]            [2]                      slot             [3]
-                                        marker
-[1] Leading token: `rule`
-[2] RuleExpression slot — the constraint expression (parsed as expression tree)
-[3] BecauseClause slot — mandatory reason string
+event  Submit  (Amount as number, Note as string optional)
+  │       │                     │
+ [1]     [2]                  [3]
+[1] Leading token: `event`
+[2] IdentifierList slot — the event name
+[3] ArgumentList slot — the parenthesized typed parameter list
 ```
 
 ```
 in  Approved  ensure  ApprovedAmount > 0  because  "…"
  │     │        ↑           │                ↑       │
 [1]   [2]   disambig.      [3]            slot      [4]
-           token           marker
+            token           marker
 [1] Leading token: `in`   ← shared with AccessMode, OmitDeclaration
 [2] StateTarget slot — the anchor state name
 [3] EnsureClause slot — expression condition
