@@ -6,6 +6,34 @@
 
 ---
 
+### 2026-05-03T02:52:51Z: Catalog-driven consumers stay generic; accessor layer deferred
+
+**By:** Scribe
+
+**Status:** Merged, deduplicated, inbox cleared (2 files)
+
+**Merged sources:** `frank-catalog-driven-pipeline`, `copilot-directive-2026-05-02T22-52-51Z-accessor-layer-yagni`.
+
+- Option F remains the consumer-facing parser shape: generic `ParsedConstruct(ConstructMeta, SlotValue[], SourceSpan)` output is sufficient because downstream dispatch is by slot-value shape, not construct identity.
+- Durable consumer contract: the language server remains zero-per-construct and MCP stays above raw parse output, consuming catalogs, the semantic model, diagnostics, and runtime APIs rather than AST node classes.
+- Shane's ruling closes the remaining convenience-layer question: do not build typed accessor helpers speculatively; the accessor layer is YAGNI until a concrete consumer need appears, and alternatives must be reconsidered before adding it.
+
+---
+
+### 2026-05-03T02:52:51Z: Catalog-driven pipeline thesis extended through lexer, parser, and builder
+
+**By:** Scribe
+
+**Status:** Merged, inbox cleared (1 file)
+
+**Merged sources:** `frank-pipeline-upstream-coverage`.
+
+- The catalog-driven pipeline argument now explicitly covers the upstream stages: the lexer is already ~95% catalog-driven, and the radical parser reaches ~85% catalog-driven dispatch with the Pratt loop as the irreducible kernel.
+- The precept builder is the strongest proof-of-concept stage for the inversion because it is almost entirely structural assembly; its remaining irreducible work is cross-construct name resolution rather than per-construct domain logic.
+- If the builder is genericized, `ConstructMeta` may grow a `ModelContribution` metadata hook so construct-to-model projection stays catalog-native instead of being re-encoded in builder switches.
+
+---
+
 ### 2026-05-03T01:07:30Z: Outcomes catalog ruling reversed to DU + catalog two-level pattern
 
 **By:** Scribe
@@ -17,6 +45,8 @@
 - Frank's initial DU-only ruling for outcomes is now durably reversed: outcomes take the same two-level architecture as actions, with `OutcomeKind` + `OutcomeMeta` + `Outcomes.cs` at the metadata layer and the `OutcomeNode` discriminated union retained at the syntax-node layer.
 - The decisive catalog-system reason is the `no transition` composition gap: token-level outcome categories enumerate `No` and `Transition` separately, but consumers need one outcome-level abstraction for `no transition`; that composition rule is domain knowledge and therefore belongs in metadata rather than parser/tooling hardcodes.
 - Durable consumer contract: `Outcomes.All` must enumerate the three real outcome variants (`transition`, `no transition`, `reject`) with syntax/lead-token metadata, while parsing and typed-model work continue to use the DU for structural shape.
+
+---
 
 ---
 
@@ -34,6 +64,8 @@
 
 ---
 
+---
+
 ### 2026-05-03T01:07:30Z: Grammar-hierarchy markers split structural anchors from slot badges
 
 **By:** Scribe
@@ -45,6 +77,8 @@
 - Elaine locked the §0.9 icon revision: `◆` marks `ConstructFamily` sub-group headers as structural rows, while `[A]` and `[O]` mark per-construct action/outcome slot badges.
 - Durable readability rule: structural grouping markers and per-construct annotation badges must use different visual classes, not different members of the same circled-digit icon family.
 - Alignment contract: widening the badge column to `[A][O]` must keep the syntax column visually fixed across TransitionRow, StateAction, EventHandler, and non-badged rows.
+
+---
 
 ---
 
@@ -61,6 +95,9 @@
 - Recorded fallback: if exhaustive node-pattern ergonomics are judged non-negotiable, Option C (source-generated typed nodes) is the explicit backup path; owner ruling is still pending.
 
 ---
+
+---
+
 ### 2026-05-03T00:15:16Z: Radical parser drops `ConstructMeta.Slots` as a separate field
 
 **By:** Scribe
@@ -72,6 +109,8 @@
 - The radical parser design now explicitly removes `ImmutableArray<ConstructSlot> Slots` from `ConstructMeta`; named parse positions live only as `Tag("name", rule)` nodes in `Grammar`.
 - Tooling and documentation consumers must derive ordered named captures from the authoritative grammar tree via `ExtractNamedCaptures(ParseRule grammar)` at catalog startup instead of maintaining a parallel slot list.
 - Durable architecture rule: when the grammar tree already expresses named parse positions, a second catalog field is mirrored truth and should be deleted rather than synchronized.
+
+---
 
 ---
 
@@ -93,6 +132,8 @@
 
 ---
 
+---
+
 ### 2026-05-03T00:15:16Z: George pipeline cross-review corrections recorded
 
 **By:** Scribe
@@ -104,6 +145,8 @@
 - George's cross-review corrects the parser-analysis record: `is set` / `is not set` precedence is already catalog-derived, while `.` and `(` remain the intentional Pratt-loop hardcodes.
 - Ordering and priority are now durable: `StructuralBoundaryTokens` derivation is P0, uniform action-shape `Statement` nodes must land before checker Slice 5, and `ParseFieldDeclaration` unification waits on split-modifier metadata design.
 - Additional blockers stay explicit: outcome parsing still lacks a catalog path, `TypeMeta.LiteralRange?` plus `ContentValidation` still gate Slice 4, and variant-action shape parsers still carry inline kind-identity checks that need metadata.
+
+---
 
 ---
 
@@ -127,6 +170,8 @@
 
 ---
 
+---
+
 ### 2026-05-02T21:58:20Z: Canonical checker review resolutions D-15 through D-25 recorded
 
 **By:** Scribe
@@ -140,6 +185,8 @@
 - The response also locks the remaining checker-shape decisions George forced open: FieldScopeMode gates forward references, function overload resolution follows one deterministic pipeline, Slice 6 stays unsplit, TypedTransitionRow.ResolvedArgs stays rejected as anti-mirroring, and TypedEditDeclaration is placeholder-only for future stateless-edit work.
 
 - Net result: all 11 checker slices are implementation-ready with no unresolved design blockers.
+
+---
 
 ---
 
@@ -163,6 +210,8 @@
 
 ---
 
+---
+
 ### 2026-05-02T20:05:35Z: GAP-040 bag `countof` parameter locked to DU accessor metadata
 
 **By:** Scribe
@@ -176,6 +225,8 @@
 - The flat `ParameterType` axis is now explicitly treated as a three-shape problem (`no parameter`, `fixed parameter type`, `element-type parameter`); the element-type case does not get a boolean flag or `TypeKind.Element` sentinel because both would create illegal or non-language-level states.
 
 - Downstream consumers should pattern-match on the accessor subtype, keep MCP/tooling serialization as a thin projection of that metadata, and update bag-accessor assertions so `countof` renders as an element-typed accessor rather than `integer`.
+
+---
 
 ---
 
@@ -199,6 +250,8 @@
 
 ---
 
+---
+
 ### 2026-05-02T19:49:00Z: GAP-035 choice literal dispatch locked to ChoiceLiteralTokens metadata
 
 **By:** Scribe
@@ -212,6 +265,8 @@
 - `ParseChoiceValue` must derive both the signed numeric branch and literal-token validity from `Types.ByToken[elemToken.Kind].ChoiceLiteralTokens`, eliminating both remaining `elemToken.Kind` identity switches from parser choice-literal dispatch.
 
 - `TypeTrait.ChoiceElement` remains the declaration-validation gate, while `ChoiceLiteralTokens` becomes the parse-time dispatch contract; couple them with an invariant test and mark GAP-035 fixed only after the parser rewrite is verified.
+
+---
 
 ---
 
@@ -235,6 +290,8 @@
 
 ---
 
+---
+
 ### 2026-05-02T19:42:08Z: Collection-types plan review rounds R1/R2 synchronized
 
 **By:** Scribe
@@ -248,6 +305,8 @@
 - The revision chain now preserves exact downstream obligations: update `DiagnosticsTests.cs` stage-group member data, fix hardcoded token counts and member-name regressions for `countof` / `peekby`, keep prefix `~startsWith` / `~endsWith` syntax correct, and spell out the `Countof` / `Peekby` member-name exceptions wherever token metadata is asserted.
 
 - Durable planning rule: every slice must name real file targets, update existing hardcoded counts and member-data helpers, and keep plan/spec/catalog terminology synchronized before implementation begins.
+
+---
 
 ---
 
@@ -273,6 +332,8 @@
 
 ---
 
+---
+
 ### 2026-05-02T19:42:06Z: Collection-types catalog and parser design decisions locked
 
 **By:** Scribe
@@ -286,6 +347,8 @@
 - B2 is resolved as explicit switch-arm maintenance, not by stretching `[HandlesCatalogExhaustively]` onto `ActionSyntaxShape` or `ConstructSlotKind`; the annotation bridge remains the right tool for distributed handler coverage, not local parser shape switches.
 
 - C3/G5/slice-9 clarifications are durable: `remove F at N` is handled before value parsing rather than via unreachable shape routing, `AppendBy` disambiguation stays syntactic instead of adding redundant catalog metadata, lexer keyword recognition remains fully catalog-driven, and `countof` / `peekby` stay as member-name-legal compound accessors.
+
+---
 
 ---
 
@@ -309,6 +372,8 @@
 
 ---
 
+---
+
 ### 2026-05-02T19:42:04Z: Diagnostics semantics and emission for codes 11 and 12 locked
 
 **By:** Scribe
@@ -322,6 +387,8 @@
 - The recorded contract is parse-stage Error severity, catalog/spec wording sync, catalog-derived keyword detection from `Tokens.Keywords.Values`, and an explicit `InvalidCallTarget` emit in the infix `LeftParen` branch rather than a silent break.
 
 - The paired GAP-024 analysis stays with this bundle because it locked the same architectural principle: bag/list/log TypeQualifier support belongs in the spec surface, not as a parser rollback, since qualifier semantics are orthogonal to collection kind.
+
+---
 
 ---
 
@@ -345,6 +412,8 @@
 
 ---
 
+---
+
 ### 2026-05-02T19:42:02Z: Dapr hosting research and bounded-quantifier philosophy note merged
 
 **By:** Scribe
@@ -358,6 +427,8 @@
 - Frank's proposed §0.4.1 amendment stays an owner-review item only: bounded quantifiers are philosophically compatible because they unfold over statically finite collections, but philosophy text must not change without explicit sign-off.
 
 - Frank's `subset` / `disjoint` verdict is now durable alongside that philosophy note: keep them only for `set of <choice>` where the compiler can prove the closed-domain guarantee, and squash them for open types where quantifiers already cover the runtime-only case.
+
+---
 
 ---
 
@@ -381,6 +452,8 @@
 
 ---
 
+---
+
 ### 2026-05-01T19:50:46Z: Lexer exhaustiveness annotation scope resolved
 
 **By:** Scribe
@@ -394,6 +467,8 @@
 - The correct safety net already exists in catalog metadata and lookup tables (`Tokens.Keywords`, operator tables, punctuation tables); production coverage stays catalog-driven rather than method-annotation-driven.
 
 - The real follow-up remains the future evaluator implementation: when D8/R4 introduces expression-form dispatch in `Evaluator`, that same commit must add `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]` plus per-form handler annotations.
+
+---
 
 ---
 
@@ -419,6 +494,8 @@
 
 ---
 
+---
+
 ### 2026-05-01T18:17:13Z: Parser-gap Slice 4 corrections and recording directive synchronized
 
 **By:** Scribe
@@ -439,6 +516,8 @@
 
 ---
 
+---
+
 ### 2026-05-01T18:17:13Z: Multi-token presence operators escalated to proposal-scope catalog work
 
 **By:** Scribe
@@ -454,6 +533,8 @@
 - Frank recommends treating this as GitHub-issue/design-review work rather than a hotfix and prefers a full-fidelity catalog representation plus `ExpressionFormKind.PostfixOperation`; George supplied the bounded call-site inventory and the `ByToken` hazard that must be handled in the same commit.
 
 - Carry-forward state: proposal scope and rationale are locked, but the final `OperatorMeta` shape still needs owner sign-off.
+
+---
 
 ---
 
@@ -481,6 +562,8 @@
 
 ---
 
+---
+
 ### 2026-05-01T06:21:31Z: Parser-gap plan audit and coverage slice synchronized
 
 **By:** Scribe
@@ -494,6 +577,8 @@
 - Layer 1 compile-time coverage is locked to existing infrastructure: add `ExpressionFormKind` to `CatalogAnalysisHelpers.CatalogEnumNames` so PRECEPT0007 enforces explicit `GetMeta` arms. Standalone `GetLeadTokens()` + CS8509 and a new cross-method parser analyzer were both rejected.
 
 - George's audit found the remaining plan hygiene fixes still worth carrying forward: add `src/Precept/Language/Operators.cs` to Slice 3's file inventory and remove or correct the dead `frank-expression-form-catalog-placement.md` reference. The previous missing-coverage-slice gap is now closed by Slice 13.
+
+---
 
 ---
 
@@ -517,6 +602,8 @@
 
 ---
 
+---
+
 ### 2026-04-29T05:18:06Z: Collection types design doc authored and indexed
 
 **By:** Scribe
@@ -530,6 +617,8 @@
 - The new doc also preserves the current design frontier: proposed quantifier predicates plus collection-level modifiers such as `unique`, collection `notempty`, `subset`, and `disjoint`, with eight explicit owner-sign-off questions recorded before implementation.
 
 - `docs/language/README.md` now indexes the new reference in the Documents table and reading order so collection guidance is discoverable from the language-doc hub.
+
+---
 
 ---
 
@@ -557,6 +646,8 @@
 
 ---
 
+---
+
 ### 2026-04-29T04:47:14Z: No-runtime-faults principles aligned; philosophy gap flagged
 
 **By:** Scribe
@@ -574,6 +665,8 @@
 - Frank's philosophy-grounded follow-up endorsed those revisions but flagged a product-identity gap: `docs/philosophy.md` explicitly scopes "prevention, not detection" to invalid entity configurations and does not yet name evaluation-fault prevention with the same explicitness. Recommended wording was recorded for owner review only and was not applied.
 
 - Net result: the spec now clearly states the no-runtime-faults promise, while the philosophy gap is durably recorded as a flag for Shane rather than an auto-applied philosophy change.
+
+---
 
 ---
 
@@ -601,6 +694,8 @@
 
 ---
 
+---
+
 ### 2026-04-29T01:09:17Z: Catalog extensibility audit and parser design evaluation recorded
 
 **By:** Scribe
@@ -618,6 +713,8 @@
 - Frank's parser design evaluation across v5-v8 approved v8 as the closed canonical baseline: current code matches the parser spec, `OmitDeclaration` is correctly split from `AccessMode`, `FieldTargetNode` is a DU, and the 5-layer parser architecture is complete. Working docs are now audit trail, not pending design debt.
 
 - Frank's vision-versus-spec audit found two live contradictions (`with` still listed as a structural preposition in the vision doc, and stale “root editability” wording after `write all` removal) and concluded the vision doc should not be archived until its language-identity material is migrated into the spec.
+
+---
 
 ---
 
@@ -643,6 +740,8 @@
 
 ---
 
+---
+
 ### 2026-04-28T06:41:30Z: Access-mode vocabulary locked and catalog fix landed
 
 **By:** Scribe
@@ -658,6 +757,8 @@
 - Implementation follow-through is locked: the access-mode body shape is verb + field target + access adjective + optional guard, catalog/token work needs `modify`, `readonly`, and `editable`, and the `AccessMode` disambiguation family is now `modify`/`omit` rather than the retired `read`/`write`/`omit` set.
 
 - George's follow-through landed: `ConstructKind.AccessMode` now ends with `SlotGuardClause`, `DiagnosticCode.RedundantAccessMode` has catalog metadata, the stale `write all` description is removed, a regression test pins guard-slot presence/position, and the suite stayed green at 1809 passing tests.
+
+---
 
 ---
 
@@ -683,6 +784,8 @@
 
 ---
 
+---
+
 ### 2026-04-28T04:49:58Z: `write all` removed from language — stateless precepts use `writable` modifier
 
 **By:** Shane (owner directive)
@@ -698,6 +801,8 @@
 - Stale references called out in the inbox covered the spec, vision doc, working docs, samples, and token/tooling vocabulary that still described root-level bulk access as live syntax.
 
 - Canonical follow-through: language docs, samples, and downstream tooling must all treat field-level `writable` as the only stateless mutability opt-in.
+
+---
 
 ---
 
@@ -721,6 +826,8 @@
 
 ---
 
+---
+
 ### 2026-04-28T00:00:00Z: Combined Design v2 Gap Patch Complete
 
 **By:** Frank
@@ -732,6 +839,8 @@
 - Locked: three action shapes, precomputed constraint activation, closed proof strategies, explicit proof/fault chain ownership, five implementation action items.
 
 - No philosophy gaps surfaced; all changes are implementation domain only.
+
+---
 
 ---
 
@@ -758,4 +867,3 @@
 - Team pattern locked: dual-surface config work is only considered landed when the config artifact and at least one directly related doc land together.
 
 ---
-

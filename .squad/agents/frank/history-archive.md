@@ -204,3 +204,70 @@ Archived updates moved from `history.md` during Scribe summarization.
 ### 2026-05-02 — Historical Summary (recompacted)
 - Older recent-update detail was moved to history-archive.md during Scribe closeout to keep active context under the 15 KB gate.
 - Use the archive for the full early-May slice logs, audit notes, and prior branch closeout narrative.
+
+## Archive Batch — 2026-05-03T02:52:51Z
+
+---
+
+## Recent Updates
+
+### 2026-05-03T00:51:29Z — Outcomes catalog ruling recorded
+- Scribe merged Frank's outcomes-catalog batch into `.squad/decisions.md`, cleared both inbox variants, and recorded the manifest outcome as the durable team ruling.
+- Durable rule: outcomes stay DU-only; do not add `OutcomeKind` / `Outcomes.cs` unless Shane explicitly reopens the decision. If radical-parser outcome handling needs more structure, keep it at `OutcomeProd()` and token-level metadata.
+- The same batch carried forward the construct/action/outcome/slot explanation and noted the paired design-doc updates in `docs/compiler/parser-radical.md` and `docs/compiler/type-checker-radical.md`.
+
+### 2026-05-02T21:03:20-04:00 — Outcomes catalog ruling REVERSED
+- Reversed section 0.8 of `docs/compiler/parser-radical.md`: outcomes now get a catalog (`OutcomeKind` + `OutcomeMeta` + `Outcomes.cs`), same two-level pattern as Actions.
+- The `no transition` composition gap was the decisive argument — token-level enumeration cannot reconstruct outcome-level abstractions without hardcoding domain knowledge.
+- Updated section 0.7 and section 0.8 in `parser-radical.md`, cross-reference in `type-checker-radical.md`, and wrote decision to `.squad/decisions/inbox/frank-outcomes-catalog-revised.md`.
+### 2026-05-03T00:26:00Z — Grammar primer docs recorded
+- Added §0 "The Grammar of Precept" to docs/compiler/parser-radical.md and a concise cross-reference summary to docs/compiler/type-checker-radical.md.
+- Grounded the primer in samples/trafficlight.precept, samples/insurance-claim.precept, and samples/loan-application.precept; the pass confirmed the flat, keyword-anchored grammar thesis rather than changing the design.
+
+### 2026-05-03T00:15:16Z — Radical parser slot field removed
+- The radical parser doc now removes `ImmutableArray<ConstructSlot> Slots` from `ConstructMeta`; named parse positions live only as `Tag` nodes inside `Grammar`.
+- Tooling/documentation should derive ordered capture names via `ExtractNamedCaptures(ParseRule)` at startup rather than maintain a parallel slot list.
+- The parser rebuild recommendation remains Path C only on risk grounds; AI velocity collapses the schedule argument, so unresolved stashed-guard, split-modifier, and variant-action gaps are the only surviving case.
+
+### 2026-05-02T19:11:32-04:00 — Spec challenge response: implicit-knowledge argument withdrawn
+- Shane challenged the `implicit grammar knowledge'' regression argument: if the parser was built from spec with AI, a rebuild from the same spec reproduces the same result; any divergence is a spec gap, not a reason to preserve code.
+- Conceded fully. The regression argument is dead. Path C recommendation now rests solely on the three unsolved design gaps (stashed-guard, split-modifier, variant-action). If those are resolved on paper or shown to be spec-covered, Path C has no remaining case.
+- Response written to docs/working/frank-spec-challenge-response.md.
+
+### 2026-05-02T22:22:24Z — Iteration 11 audit session recorded
+- Scribe merged Frank's iteration-11 findings into the canonical ledger, cleared all current decision inbox files, and wrote the audit closeout logs.
+- Cross-agent context to retain: the durable batch now bundles the spike type-checker directive, both catalog-driven type-checker reviews, GAP-047 closure, Frank's GAP-048–056 doc/catalog gaps, and George's GAP-062–067 catalog-impl gaps.
+- Health gate result: decisions archive ran under the 7-day rule before merge; no history summarization was required after propagation.
+
+### 2026-05-02T22:22:24Z — Iteration 11 doc/catalog audit pass
+- Filed GAP-048 through GAP-056 in the language-consistency ledger; Frank's pass added 9 unresolved doc/catalog gaps. Combined ledger state now stands at 64 total gaps, 49 fixed / 15 unresolved after the parallel iteration 11 catalog-impl pass.
+- The dominant pattern is catalog lag behind the spec on declaration-shape metadata: guarded ensures, guarded state actions, and stateless event-hook trailing `ensure` all exist in the spec without matching `Constructs`/`Constraints` metadata.
+- Queue-by semantics now need owner clarification in two places: whether `ascending` / `descending` belongs in the type catalog, and whether `dequeue ... by H` means keyed selection or something else.
+
+### 2026-05-02T21:58:21Z — Canonical type checker batch closed
+- Frank's canonical response is now durable end-to-end: George's 5 concerns were accepted, 3 of 4 missing items were accepted, transitive widening stayed rejected, and the checker plan now marks all 11 slices implementation-ready.
+- Cross-agent follow-through is part of the active baseline: Kramer's tooling review remains non-blocking but derivation-first, and Soup-Nazi's 450-550 test estimate plus 3 non-negotiable gates define the expected checker validation bar.
+
+### 2026-05-02 — Active focus snapshot
+- Immediate open design work has shifted back to checker implementation: GAP-047 is now closed, while the rest of the checker shape questions are locked in docs/compiler/type-checker.md.
+- Use docs/working/type-checker-research-crossref.md, docs/working/kramer-tooling-review.md, and docs/working/soup-nazi-test-strategy-review.md as the supporting context set behind the canonical checker doc.
+
+### 2026-05-02 — Historical Summary (fully compacted)
+- Older active-history detail was moved to history-archive.md during Scribe closeout to keep Frank under the 15 KB gate.
+- Use the archive for the earlier Dapr research notes, gap-by-gap audit trail, and prior batch closeout sequence.
+
+### 2026-05-02T22:14:44Z — GAP-047 closed
+- Spec §3.7 now explicitly documents the money/quantity overloads for `min`, `max`, `abs`, `clamp`, and `round(value, places)`, including same-qualifier requirements and qualifier-preserving results.
+- The working gap ledger is fully closed for this audit pass: GAP-047 is Fixed, and the primitive numeric-lane shorthand is now explicitly separated from domain-type overload semantics.
+
+### 2026-05-03T01:07:30Z — Outcomes catalog reversal recorded
+- Scribe corrected the canonical ledger to match Frank-5's reversed ruling: outcomes now use the two-level catalog pattern (`OutcomeKind` + `OutcomeMeta` + `Outcomes.cs`) while retaining `OutcomeNode` as the syntax-layer DU.
+- Durable reason to keep front-of-mind: `no transition` is one outcome-level abstraction composed from two tokens, so token-category derivation alone cannot provide complete outcome enumerability without hardcoded composition logic.
+
+- **Upstream pipeline coverage completed (2026-05-02):** Extended `docs/working/catalog-driven-pipeline.md` with §3.0.1 (Lexer), §3.0.2 (Parser), §3.0.3 (Precept Builder) — the three stages that sit before the type checker. Key findings: the lexer is already ~95% catalog-driven (keyword/operator/punctuation tables derived from `Tokens.All`); the parser under the radical design achieves ~85% (construct dispatch generic, Pratt loop irreducible); the precept builder is the MOST catalog-drivable stage of all — pure structural assembly with a vanishingly small irreducible kernel (cross-construct name resolution only). The thesis update now lists all 8 pipeline stages. The builder is identified as the natural proof-of-concept stage for the catalog-driven inversion.
+
+- **Radical AST options explored (2026-05-02):** Explored 6 options for eliminating per-construct AST node classes (Universal bag, flat array, source-generated, no-AST, CST-only, hybrid generic+typed). The hybrid (Option F: generic `ParsedConstruct` internal + thin typed accessor functions at consumption boundaries) is the most promising — it makes the "parser is untouched" claim fully true while preserving type safety via ~5-line accessor functions per construct. The key tradeoff Shane is weighing: loss of C# pattern matching on node types (ergonomic regression) vs. elimination of per-construct AST classes (architectural purity). Option C (source generation) is the fallback if type safety cannot be compromised. CST-only (E) and raw array (B) are rejected as over-engineered or too fragile for Precept's problem size.
+
+### 2026-05-03T01:07:30Z — Radical AST options note recorded
+- Scribe merged Frank's late-arriving AST design note into the ledger as a pending-owner-ruling record: Option F keeps generic `ParsedConstruct` internally, thin typed accessors at consumer call sites, and typed MCP DTOs at the boundary.
+- Durable tradeoff: the hybrid model preserves parser zero-touch growth but replaces node-type pattern matching with `ConstructKind` dispatch plus accessors; Option C remains the explicit fallback if that ergonomics cost is rejected.
