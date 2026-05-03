@@ -85,7 +85,7 @@ flowchart TD
         end
         subgraph c2[ ]
             direction TB
-            PAR(Parser):::stage --> ST>"SyntaxTree"]:::out
+            PAR(Parser):::stage --> ST>"ConstructManifest"]:::out
         end
         subgraph c3[ ]
             direction TB
@@ -148,18 +148,18 @@ To see what that call actually does, zoom in on the compiler itself. Notice what
 ```csharp
 // Inside Compiler.Compile
 TokenStream   tokens    = Lexer.Lex(source);
-// SyntaxTree carries ImmutableArray<ParsedConstruct> Constructs — no per-construct AST node types.
+// ConstructManifest carries ImmutableArray<ParsedConstruct> Constructs — no per-construct AST node types.
 // ParsedConstruct: (ConstructMeta Meta, ImmutableArray<SlotValue> Slots, SourceSpan Span)
 // ⚠ SlotValue subtype field shapes have open mismatches between parser.md and type-checker.md — see parser.md open questions
-SyntaxTree    tree      = Parser.Parse(tokens);
-SemanticIndex semantics = TypeChecker.Check(tree);  // accepts SyntaxTree directly
+ConstructManifest tree      = Parser.Parse(tokens);
+SemanticIndex semantics = TypeChecker.Check(tree);
 StateGraph    graph     = GraphAnalyzer.Analyze(semantics);
 ProofLedger   proof     = ProofEngine.Prove(semantics, graph);
 
 ImmutableArray<Diagnostic> diagnostics =
 [
     ..tokens.Diagnostics,
-    ..tree.Diagnostics,      // parse-phase diagnostics on SyntaxTree.Diagnostics
+    ..tree.Diagnostics,      // parse-phase diagnostics on ConstructManifest.Diagnostics
     ..semantics.Diagnostics,
     ..graph.Diagnostics,
     ..proof.Diagnostics,
@@ -167,7 +167,7 @@ ImmutableArray<Diagnostic> diagnostics =
 
 return new Compilation(
     Tokens:      tokens,
-    SyntaxTree:  tree,       // Compilation.SyntaxTree field holds the ParsedConstruct-based tree
+    ConstructManifest:  tree,
     Semantics:   semantics,
     Graph:       graph,
     Proof:       proof,
@@ -178,7 +178,7 @@ return new Compilation(
 
 Every stage starts from two roots. The first root is the `.precept` source text: the program the author wrote. The second root is the catalogs: the language specification that supplies the identities and metadata the compiler must preserve. Those catalogs enter as soon as a stage can know something from them, and later stages carry that catalog-stamped identity forward instead of reconstructing it with hardcoded switches.
 
-The stages produce progressively richer artifacts. Lexing produces a `TokenStream`. Parsing produces a `SyntaxTree` of `ParsedConstruct` nodes — one uniform type per construct carrying `ConstructMeta`, slot values, and a source span, with no per-construct AST node types. Type checking produces a `SemanticIndex`. Graph analysis produces a `StateGraph`. Proof analysis produces a `ProofLedger`. `Compilation` is the aggregate over those artifacts plus the merged diagnostic stream and the `HasErrors` summary. It is the compiler's complete output, not a success token.
+The stages produce progressively richer artifacts. Lexing produces a `TokenStream`. Parsing produces a `ConstructManifest` of `ParsedConstruct` nodes — one uniform type per construct carrying `ConstructMeta`, slot values, and a source span, with no per-construct AST node types. Type checking produces a `SemanticIndex`. Graph analysis produces a `StateGraph`. Proof analysis produces a `ProofLedger`. `Compilation` is the aggregate over those artifacts plus the merged diagnostic stream and the `HasErrors` summary. It is the compiler's complete output, not a success token.
 
 `Compilation` is the last compile-time aggregate. Execution starts only when that aggregate is transformed into runtime-native structures.
 
@@ -286,7 +286,7 @@ See [`docs/compiler/lexer.md`](./compiler/lexer.md) for the full stage design.
 
 ## 5. Parser
 
-The parser transforms a token stream into a `SyntaxTree` containing `ParsedConstruct` nodes. Its key design choice: a **catalog-driven generic interpreter** — the parser contains no per-construct parsing logic encoded in source code. Instead, construct metadata in the `Constructs` catalog drives a single generic slot-walking engine. There are no per-construct AST node types.
+The parser transforms a token stream into a `ConstructManifest` containing `ParsedConstruct` nodes. Its key design choice: a **catalog-driven generic interpreter** — the parser contains no per-construct parsing logic encoded in source code. Instead, construct metadata in the `Constructs` catalog drives a single generic slot-walking engine. There are no per-construct AST node types.
 
 ```mermaid
 flowchart LR
@@ -298,14 +298,12 @@ flowchart LR
     TS>"TokenStream"]:::out
     CAT("Constructs · Tokens<br/>Operators · Diagnostics<br/>catalogs"):::catalog
     PAR(Parser):::stage
-    OUT>"SyntaxTree"]:::out
-
-    TS -->|"token stream"| PAR
+    OUT>"ConstructManifest"]:::out
     CAT --> PAR
     PAR --> OUT
 ```
 
-| **Output** | `SyntaxTree` — `ImmutableArray<ParsedConstruct> Constructs` (each node: `ConstructMeta Meta`, `ImmutableArray<SlotValue> Slots`, `SourceSpan Span`) plus parse-phase diagnostics |
+| **Output** | `ConstructManifest` — `ImmutableArray<ParsedConstruct> Constructs` (each node: `ConstructMeta Meta`, `ImmutableArray<SlotValue> Slots`, `SourceSpan Span`) plus parse-phase diagnostics |
 |---|---|
 | **Catalog role** | The parser stamps kind identities at parse time: `ConstructKind` via `Meta.Kind`, `ActionKind` into `ActionChainSlot`, `ModifierKind` into `ModifierListSlot`. `TypeKind` is NOT stamped at parse time — `TypeExpressionSlot` carries `SourceSpan`; the type checker resolves type references. |
 | **Consumers** | TypeChecker, LS syntax-facing features (outline, folding, span-based context) |
@@ -370,7 +368,7 @@ Precept's grammar calls for parser patterns scaled to a flat, keyword-anchored, 
 `set` appears as both an action keyword (`TokenCategory.Action` — e.g., `set Amount to 100`) and a type keyword (`TokenCategory.Type` — e.g., `field Tags as set of string`). The parser disambiguates by position context: after `->` or in action position = action; after `as`/`of` or in type position = type. This disambiguation is a parser responsibility, not a catalog lookup — the catalog correctly classifies `set` under both categories.
 
 > **Precept Innovations**
-> - **Flat, declaration-oriented grammar.** No nesting beyond expression-within-declaration. This makes the grammar trivially parseable, the error recovery model simple and predictable, and the `SyntaxTree` shape directly useful for tooling without the complexity budget of a general-purpose language parser.
+> - **Flat, declaration-oriented grammar.** No nesting beyond expression-within-declaration. This makes the grammar trivially parseable, the error recovery model simple and predictable, and the `ConstructManifest` shape directly useful for tooling without the complexity budget of a general-purpose language parser.
 > - **Precedence from catalog metadata.** Operator precedence and associativity are not hardcoded — they derive from `Operators.GetMeta()`. Changing precedence is a catalog edit, not a parser rewrite.
 > - **Catalog-driven generic interpreter.** The parser contains no per-construct parsing logic — it is a generic slot-walking engine driven by `Constructs` catalog metadata. There are no per-construct AST node types: a single `ParsedConstruct(ConstructMeta, ImmutableArray<SlotValue>, SourceSpan)` is the parser's universal output type. Adding a new construct requires only a catalog entry, not parser code changes.
 
@@ -387,12 +385,11 @@ flowchart LR
     classDef stage   fill:#ede9fe,stroke:#a78bfa,color:#3b1f7e
     classDef out     fill:#fef9c3,stroke:#f59e0b,color:#78350f
 
-    ST>"SyntaxTree"]:::out
-    CAT("Types · Functions · Operators<br/>Operations · Modifiers · Actions<br/>Constructs · Diagnostics<br/>catalogs"):::catalog
+    ST>"ConstructManifest"]:::out
     TC(Type Checker):::stage
     OUT>"SemanticIndex"]:::out
 
-    ST -->|"syntax tree"| TC
+    ST -->|"construct manifest"| TC
     CAT --> TC
     TC --> OUT
 ```
@@ -496,11 +493,11 @@ These rules constrain the `SemanticIndex` shape. They are architectural constrai
 1. **No parser layout inheritance.** `SemanticIndex` must not preserve parser child layout, missing-node shape, or recovery nullability as its primary contract. The semantic inventory is organized by semantic role, not by source structure.
 2. **Semantic LS features must not walk syntax.** Hover, go-to-definition, semantic tokens, and semantic completions must be satisfiable from `SemanticIndex` bindings plus back-pointers to originating syntax nodes. If an LS feature must walk parser structure to answer a semantic question, the `SemanticIndex` is underspecified — fix the inventory, not the LS feature.
 3. **Downstream stages consume semantic inventories.** Graph analysis, proof, and the Precept Builder consume normalized semantic inventories. They must not traverse syntax nodes via back-pointers. If a downstream stage needs source-structural information, the `SemanticIndex` is missing a semantic fact.
-4. **`SyntaxTree` retains sole ownership of source shape.** Recovery, construct ordering, span information, and parse-phase slot layout belong to `SyntaxTree`/`ParsedConstruct` exclusively. `SemanticIndex` entries hold back-pointers for navigation, not syntax fragments for reconstruction.
+4. **`ConstructManifest` retains sole ownership of source shape.** Recovery, construct ordering, span information, and parse-phase slot layout belong to `ConstructManifest`/`ParsedConstruct` exclusively. `SemanticIndex` entries hold back-pointers for navigation, not syntax fragments for reconstruction.
 
 ### Right-sized type checking: generic resolution passes
 
-The type checker should NOT have a `CheckFieldDeclaration()`, `CheckTransitionRow()`, `CheckRuleDeclaration()` method per construct kind. The surveyed DSL-scale type checkers confirm the right pattern for this scale: CEL's checker walks the AST once, resolving types against its `Env` environment with overload dispatch from a centralized function registry; OPA's type checker (`ast/check.go`) makes a single pass over rules against a `TypeEnv`. The correct model for Precept is the same — generic resolution passes that read construct metadata from catalogs. Catalog-resolvable checks are generic passes; only construct-specific structural validation that genuinely differs by kind (field declarations vs. transition rows have different type-checking needs) warrants per-kind methods. The type checker builds semantic symbol tables and binding indexes — a symbol-table-driven approach — not a parallel tree that mirrors `SyntaxTree` with type annotations added. Type widening rules and implied modifiers are catalog-declared: `TypeMeta.WidensTo` lists the types a given type automatically widens to (e.g., `integer` widens to `number`; `money` widens to a notempty context), and `TypeMeta.ImpliedModifiers` lists modifiers a type carries by virtue of its kind (e.g., `money` implies `notempty`). The type checker reads these from catalog metadata — there are no hardcoded widening chains or modifier-implication switches in the checker logic.
+The type checker should NOT have a `CheckFieldDeclaration()`, `CheckTransitionRow()`, `CheckRuleDeclaration()` method per construct kind. The surveyed DSL-scale type checkers confirm the right pattern for this scale: CEL's checker walks the AST once, resolving types against its `Env` environment with overload dispatch from a centralized function registry; OPA's type checker (`ast/check.go`) makes a single pass over rules against a `TypeEnv`. The correct model for Precept is the same — generic resolution passes that read construct metadata from catalogs. Catalog-resolvable checks are generic passes; only construct-specific structural validation that genuinely differs by kind (field declarations vs. transition rows have different type-checking needs) warrants per-kind methods. The type checker builds semantic symbol tables and binding indexes — a symbol-table-driven approach — not a parallel tree that mirrors `ConstructManifest` with type annotations added. Type widening rules and implied modifiers are catalog-declared: `TypeMeta.WidensTo` lists the types a given type automatically widens to (e.g., `integer` widens to `number`; `money` widens to a notempty context), and `TypeMeta.ImpliedModifiers` lists modifiers a type carries by virtue of its kind (e.g., `money` implies `notempty`). The type checker reads these from catalog metadata — there are no hardcoded widening chains or modifier-implication switches in the checker logic.
 
 ### Typed action family — three shapes only
 
@@ -530,7 +527,7 @@ The Precept Builder produces the matching executable family: `ExecutableAction`,
 | Parser | `ConstructKind`, `ActionKind`, `OperatorKind`, `ModifierKind` — stamped into `SlotValue` subtypes at parse time |
 | Type checker | `TypeKind`, `OperationKind`, `FunctionKind`, resolved `TypeAccessor`, resolved result types on typed expressions |
 
-The parser stamps everything that syntax alone can determine. The type checker stamps everything that requires name, type, or overload resolution. A kind that requires name resolution does not appear in `SyntaxTree`; a kind that syntax alone determines does not wait for the type checker. (See §5 open question on `SlotValue` subtype shapes — the `ModifierKind` entry above follows `parser.md`; `type-checker.md` lists `ImmutableArray<TokenKind>` for `ModifierListSlot`.)
+The parser stamps everything that syntax alone can determine. The type checker stamps everything that requires name, type, or overload resolution. A kind that requires name resolution does not appear in `ConstructManifest`; a kind that syntax alone determines does not wait for the type checker. (See §5 open question on `SlotValue` subtype shapes — the `ModifierKind` entry above follows `parser.md`; `type-checker.md` lists `ImmutableArray<TokenKind>` for `ModifierListSlot`.)
 
 > **Precept Innovations**
 > - **Catalog-driven resolution passes.** Type checking resolves against catalog metadata (`Operations`, `Functions`, `Types`, `Modifiers`, `Actions`, `Constraints`, `ProofRequirements`) rather than encoding per-construct behavior in checker logic. Adding a new operation or function to the catalog automatically makes it resolvable — no checker code changes required.
@@ -756,7 +753,7 @@ flowchart LR
 
     SRC([source text]):::input
     TS>"TokenStream"]:::out
-    ST>"SyntaxTree"]:::out
+    ST>"ConstructManifest"]:::out
     TM>"SemanticIndex"]:::out
     GR>"StateGraph"]:::out
     PM>"ProofLedger"]:::out
@@ -772,7 +769,7 @@ flowchart LR
     SNAP --> OUT
 ```
 
-| **Output** | `Compilation` — `TokenStream Tokens`, `SyntaxTree SyntaxTree`, `SemanticIndex Semantics`, `StateGraph Graph`, `ProofLedger Proof`, `ImmutableArray<Diagnostic> Diagnostics`, `bool HasErrors` |
+| **Output** | `Compilation` — `TokenStream Tokens`, `ConstructManifest ConstructManifest`, `SemanticIndex Semantics`, `StateGraph Graph`, `ProofLedger Proof`, `ImmutableArray<Diagnostic> Diagnostics`, `bool HasErrors` |
 |---|---|
 | **Consumers** | LS, MCP `precept_compile`, `Precept.From` |
 
@@ -781,7 +778,7 @@ flowchart LR
 | Artifact | Owner | Classification |
 |---|---|---|
 | `TokenStream` | Lexer | compile-time |
-| `SyntaxTree` | Parser | compile-time |
+| `ConstructManifest` | Parser | compile-time |
 | `SemanticIndex` | TypeChecker | compile-time |
 | `StateGraph` | GraphAnalyzer | compile-time |
 | `ProofLedger` | ProofEngine | compile-time |
@@ -1136,7 +1133,7 @@ The multi-span attribution pattern from the Rust borrow checker provides relevan
 
 All compile-time and runtime types in Precept are deeply immutable. This is not a style preference — it is a correctness requirement imposed by the language server's concurrency model. On every document edit, the LS runs the full pipeline and atomically swaps the held `Compilation` reference via `Interlocked.Exchange`. A handler thread that read the old reference before the swap must see a fully consistent snapshot, with no possibility of torn state. Deep immutability — `ImmutableArray<T>` and `ImmutableDictionary<TK,TV>` for all collections, `init`-only properties on all record types, no mutable types exposed — is what makes this guarantee structural rather than convention-dependent. The compilation-result-type survey reveals that immutability is not the DSL-scale consensus: OPA's `ast.Compiler` is mutated during compilation, Kotlin K2's FIR tree is mutated in phases, Swift's `ASTContext` is mutated by the type checker, Go's `types.Info` is caller-allocated mutable maps, and Dafny/Boogie mutate their program representations in place. Only CEL (`Ast`), Dhall, CUE (`cue.Value`), and Pkl (`PObject`) produce immutable compilation results. Precept's immutable `Compilation` is a deliberate, LS-driven choice — not inherited consensus.
 
-The choice of C# type kind for each artifact follows from its role. Stage artifacts (`TokenStream`, `SyntaxTree`, `SemanticIndex`, `StateGraph`, `ProofLedger`) and `Compilation` are `sealed record class` — immutable snapshots with value equality, making test assertions direct structural comparisons rather than field-by-field checks. `Diagnostic` is `readonly record struct` — small, value-typed, and zero-allocation when stored in collections, reflecting its high-volume, short-lived role. `Precept` is `sealed class`, not a record — it has factory methods (`From`) and carries behavior, making it a behavior-bearing object rather than a data bag. `Version` is `sealed record class` — an immutable entity snapshot with value equality, consistent with its role as the atomic unit of state that operations return. There are no standalone interfaces or abstract classes serving as abstraction boundaries: each concrete type has exactly one implementation. Abstract records serve only as discriminated union bases (`EventOutcome`, `UpdateOutcome`, `RestoreOutcome`, etc.) — not as open extension points. Interfaces are added only when a second implementation appears or a consumer requires substitution — never speculatively.
+The choice of C# type kind for each artifact follows from its role. Stage artifacts (`TokenStream`, `ConstructManifest`, `SemanticIndex`, `StateGraph`, `ProofLedger`) and `Compilation` are `sealed record class` — immutable snapshots with value equality, making test assertions direct structural comparisons rather than field-by-field checks. `Diagnostic` is `readonly record struct` — small, value-typed, and zero-allocation when stored in collections, reflecting its high-volume, short-lived role. `Precept` is `sealed class`, not a record — it has factory methods (`From`) and carries behavior, making it a behavior-bearing object rather than a data bag. `Version` is `sealed record class` — an immutable entity snapshot with value equality, consistent with its role as the atomic unit of state that operations return. There are no standalone interfaces or abstract classes serving as abstraction boundaries: each concrete type has exactly one implementation. Abstract records serve only as discriminated union bases (`EventOutcome`, `UpdateOutcome`, `RestoreOutcome`, etc.) — not as open extension points. Interfaces are added only when a second implementation appears or a consumer requires substitution — never speculatively.
 
 On every document edit, the language server runs the full pipeline (`Compiler.Compile(source)`) and atomically replaces its held `Compilation` reference. Incremental compilation infrastructure — Roslyn's red-green trees, rust-analyzer's salsa database — solves a problem that does not exist at Precept's DSL scale, where the full pipeline runs in microseconds. The surveyed DSL-scale systems uniformly confirm this: OPA/Regal recompiles the full module set on single-file edits; Dhall's LSP runs the full pipeline (parse → resolve → type check) on each save; Jsonnet's language server re-parses and re-evaluates on each change; CEL compiles single expressions in one call with no incremental infrastructure. None of these systems has found incremental recompilation necessary at their scale. The swap is safe for concurrent LSP requests because `Compilation` is fully immutable — no locks are needed beyond `Interlocked.Exchange` on the reference itself.
 
@@ -1214,15 +1211,15 @@ See [`docs/tooling/mcp.md`](../tooling/mcp.md) for the full MCP design including
 
 The language server consumes pipeline artifacts by responsibility — each LS feature reads from exactly the artifact that owns the information it needs, and nothing else. For contributors building LS features, this means: reach for the right artifact first. Using the wrong artifact does not just produce incorrect behavior — it creates coupling to structural concerns the feature should not depend on.
 
-**Lexical classification** (keyword, operator, punctuation, literal, comment) — reads `TokenStream` + `TokenMeta`. Not `SyntaxTree`, not `SemanticIndex`.
+**Lexical classification** (keyword, operator, punctuation, literal, comment) — reads `TokenStream` + `TokenMeta`. Not `ConstructManifest`, not `SemanticIndex`.
 
-**Syntax-aware features** (outline, folding, recovery) — reads `SyntaxTree`. Not `SemanticIndex`.
+**Syntax-aware features** (outline, folding, recovery) — reads `ConstructManifest`. Not `SemanticIndex`.
 
 **Diagnostics** — reads merged `Compilation.Diagnostics`. Not per-stage polling.
 
 **Semantic tokens for identifiers** — reads `SemanticIndex` symbol/reference bindings; source spans come from back-pointers to originating `ParsedConstruct` nodes (see §6). Not token categories alone.
 
-**Completions** — reads catalogs for candidate inventory, `SyntaxTree` for local parse context, `SemanticIndex` for scope/binding/expected type. Not `StateGraph` or `ProofLedger`.
+**Completions** — reads catalogs for candidate inventory, `ConstructManifest` for local parse context, `SemanticIndex` for scope/binding/expected type. Not `StateGraph` or `ProofLedger`.
 
 **Hover** — reads `SemanticIndex` semantic identity + catalog documentation/signatures; source location from the back-pointer to the originating `ParsedConstruct` node. Not raw syntax.
 
@@ -1232,7 +1229,7 @@ The language server consumes pipeline artifacts by responsibility — each LS fe
 
 **Graph/proof explanation** — reads `StateGraph` and `ProofLedger` when explicitly surfacing unreachable-state or proof information. Not for everyday completion/hover/tokenization.
 
-Two hard rules: (1) Do not make semantic LS features walk `SyntaxTree` to answer semantic questions — if the `SemanticIndex` plus its back-pointers cannot answer the question, the inventory is underspecified (see §6 anti-mirroring rules). (2) Do not make preview/runtime LS features consume `Compilation` after the Precept Builder succeeds.
+Two hard rules: (1) Do not make semantic LS features walk `ConstructManifest` to answer semantic questions — if the `SemanticIndex` plus its back-pointers cannot answer the question, the inventory is underspecified (see §6 anti-mirroring rules). (2) Do not make preview/runtime LS features consume `Compilation` after the Precept Builder succeeds.
 
 ### Consumer artifact map
 

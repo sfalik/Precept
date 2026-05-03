@@ -10,7 +10,7 @@
 
 ## Overview
 
-The parser transforms a token stream into a `SyntaxTree` containing `ParsedConstruct` nodes. It implements a **catalog-driven generic interpreter** architecture: the parser does not contain per-construct parsing logic encoded in source code. Instead, construct metadata in the `Constructs` catalog drives a single generic slot-walking engine.
+The parser transforms a token stream into a `ConstructManifest` containing `ParsedConstruct` nodes. It implements a **catalog-driven generic interpreter** architecture: the parser does not contain per-construct parsing logic encoded in source code. Instead, construct metadata in the `Constructs` catalog drives a single generic slot-walking engine.
 
 ### Output Shape
 
@@ -120,7 +120,7 @@ Token stream from lexer, including trivia tokens (whitespace, comments) for span
 ### Output
 
 ```csharp
-public sealed record SyntaxTree(
+public sealed record ConstructManifest(
     ImmutableArray<ParsedConstruct> Constructs,
     ImmutableArray<Diagnostic> Diagnostics);
 ```
@@ -277,10 +277,10 @@ Error recovery synchronizes on these boundaries.
 
 | Component | What It Receives |
 |-----------|------------------|
-| Type Checker | `SyntaxTree` with typed slots |
+| Type Checker | `ConstructManifest` with typed slots |
 | Language Server | Spans for diagnostics, hover, go-to-definition |
 
-> **Open Question (unresolved):** Graph analyzer consumes `SemanticIndex`, not `SyntaxTree`. Should the old "Graph Analyzer" row be removed, or does tooling need a SyntaxTree → graph-analyzer edge?
+> **Open Question (unresolved):** Graph analyzer consumes `SemanticIndex`, not `ConstructManifest`. Should the old "Graph Analyzer" row be removed, or does tooling need a ConstructManifest → graph-analyzer edge?
 
 ---
 
@@ -305,7 +305,7 @@ When a slot expects a specific token that's absent:
 When EOF arrives mid-construct:
 1. Emit diagnostic
 2. Complete partial construct with available slots
-3. Return partial `SyntaxTree`
+3. Return partial `ConstructManifest`
 
 ### Disambiguation Failure
 
@@ -454,7 +454,7 @@ Expressions are structural data. The evaluator interprets them against runtime s
 | `src/Precept/Pipeline/Parser.cs` | Parser entry point (currently stub) |
 | `src/Precept/Pipeline/ParsedConstruct.cs` | Output type definition |
 | `src/Precept/Pipeline/SlotValue.cs` | 17-subtype discriminated union |
-| `src/Precept/Pipeline/SyntaxTree.cs` | Parser output container |
+| `src/Precept/Pipeline/ConstructManifest.cs` | Parser output container |
 | `src/Precept/Language/Constructs.cs` | Construct catalog and indexes |
 | `src/Precept/Language/Construct.cs` | `ConstructMeta`, `ConstructKind`, `RoutingFamily` |
 | `src/Precept/Language/ConstructSlot.cs` | `ConstructSlotKind`, `ConstructSlot` |

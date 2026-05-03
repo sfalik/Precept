@@ -9,9 +9,9 @@ public static class Compiler
 {
     public static Compilation Compile(string source)
     {
-        TokenStream   tokens    = Lexer.Lex(source);
-        SyntaxTree    tree      = Parser.Parse(tokens);
-        SemanticIndex semantics = TypeChecker.Check(tree);
+        TokenStream      tokens    = Lexer.Lex(source);
+        ConstructManifest tree      = Parser.Parse(tokens);
+        SemanticIndex    semantics = TypeChecker.Check(tree);
         StateGraph    graph     = GraphAnalyzer.Analyze(semantics);
         ProofLedger   proof     = ProofEngine.Prove(semantics, graph);
 
@@ -26,7 +26,7 @@ public static class Compiler
 
         return new Compilation(
             Tokens:      tokens,
-            SyntaxTree:  tree,
+            ConstructManifest:  tree,
             Semantics:   semantics,
             Graph:       graph,
             Proof:       proof,
