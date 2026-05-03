@@ -27,6 +27,10 @@
 
 ## Recent Updates
 
+### 2026-05-03T05:21:49Z — HandlesCatalog cleanup recorded
+- frank-18 locked the Option F verdict: remove `[HandlesCatalogExhaustively]` / `[HandlesCatalogMember]` from Parser.cs, TypeChecker.cs, and GraphAnalyzer.cs, but retain the attribute type definitions for catalog-side use.
+- frank-19 landed the cleanup: removed all 39 consumer annotations, deleted the two stale reflection enforcement tests, and left the repo building clean with 0 errors and 0 warnings.
+
 ### 2026-05-03T05:08:28Z — AST clean-slate deletion recorded
 - Deleted the entire src/Precept/Pipeline/SyntaxNodes/ tree (38 files including Expressions/) plus test/Precept.Tests/AstNodeTests.cs.
 - SyntaxTree.cs, Parser.cs, and GraphAnalyzer.cs were trimmed to remove the remaining SyntaxNode references; build result is 0 errors, 0 warnings.
