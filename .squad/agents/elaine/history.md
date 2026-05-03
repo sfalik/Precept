@@ -101,3 +101,7 @@
 ### 2026-05-03T14:59:24Z — ASCII-safe topology box fix recorded
 - Elaine-14 replaced `▶` with `>` in the fixed-width topology box in `docs/compiler-and-runtime-design.md` §7. Commit `086434a`.
 - Durable diagram rule: box-drawing prose/ASCII layouts should avoid ambiguous-width Unicode arrowheads when column alignment is part of the design contract.
+
+### 2026-05-03T15:37:24Z — LS diagnostic enrichment spec relocated
+- Elaine relocated the LS diagnostic enrichment UX spec from design/system/surfaces/ls-diagnostic-enrichment-ux.md into docs/tooling/language-server.md, landing the content as §7.9 Diagnostic Enrichment and §7.10 Code Actions with the heading hierarchy normalized to the document's existing H3/H4 structure. Commit c5d5e77.
+- Durable doc rule: once a language-server UX spec becomes authoritative tooling guidance, keep it in docs/tooling/language-server.md rather than as a standalone design/system surface file.

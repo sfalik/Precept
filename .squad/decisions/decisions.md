@@ -40926,3 +40926,81 @@ Any test that enforces annotation presence via reflection must be removed alongs
 **What:** Any catalog-system schema diagram should model **13 catalogs**, not 12: `ExpressionForms` is the 13th live catalog, and `ConstructSlotKind` is a supporting enum, not a catalog. The full research memo was intentionally not copied into `decisions.md` to avoid ledger bloat; it was summarized here before inbox cleanup.
 
 **Reference:** `frank-catalog-schema-diagram.md` (inbox memo deleted after merge; recoverable from git history if the full inventory/mapping details are needed).
+
+# Frank — Catalog Schema Doc Complete
+
+**Date:** 2026-05-03T11:12:30.425-04:00
+**Commit:** `5675b23`
+**File modified:** `docs/language/catalog-system.md`
+
+## What was added
+
+A new `## Catalog Schema` section inserted between `### Derive, never duplicate` and `## Pattern Definition` — 423 lines, three levels.
+
+### Level 1 — Catalog Overview Map
+
+Mermaid `flowchart TB` with:
+- 4 subgraph layers: **Lexical foundation** (Tokens), **Grammar / structure** (Constructs, ExpressionForms, Constraints, ConstructSlotKind helper), **Semantic / behavior** (Types, Operators, Operations, Functions, Modifiers, Actions, ProofRequirements), **Failure modes** (Diagnostics, Faults)
+- All 13 catalogs as labeled nodes with `(KindEnum · count)` annotation
+- `ConstructSlotKind` shown as a helper node with explicit `⟨helper enum — not a catalog⟩` label
+- Cross-catalog reference edges with relationship labels (Token, ApplicableTo, ImpliedModifiers, Op, ProofRequirements, AllowedIn, PreventsFault, StaticallyPreventable)
+- Pipeline stage consumers (Lexer, Parser, TypeChecker, GraphAnalyzer, ProofEngine, Evaluator) with solid arrows
+- Tooling consumers (Language Server, TextMate Grammar, MCP `precept_language`) with dashed arrows
+- Explanatory callout: twin hubs (Types + Constructs), Operations as typed-legality hub, bidirectional Diagnostics ↔ Faults pair
+
+### Level 2 — Schema Anatomy
+
+#### Constructs
+ASCII anatomy box showing exact field names and types from `Construct.cs` / `ConstructSlot.cs` / `DisambiguationEntry.cs`:
+- `ConstructMeta` (8 fields including `AllowedIn`, `Slots`, `Entries`, `RoutingFamily`)
+- `ConstructSlot` (3 fields)
+- `DisambiguationEntry` (3 fields, anchors to Tokens catalog)
+- `RoutingFamily` values table (Header / Direct / StateScoped / EventScoped)
+- Note on `Constructs.ByLeadingToken` as the derived disambiguation index
+
+#### Modifiers
+Mermaid `classDiagram` showing the 5-subtype DU with exact field names from `Modifier.cs`:
+- Abstract `ModifierMeta` base (Kind, Token, Description, Category, MutuallyExclusiveWith)
+- `FieldModifierMeta` — 15 members, adds ApplicableTo, HasValue, Subsumes, hover/snippet fields
+- `StateModifierMeta` — 7 members, adds AllowsOutgoing, RequiresDominator, PreventsBackEdge
+- `EventModifierMeta` — 1 member, adds RequiredAnalysis
+- `AccessModifierMeta` — 4 members, adds IsPresent, IsWritable
+- `AnchorModifierMeta` — 3 members, adds Scope, Target
+- Subtype distribution table (29 total) with representative member names
+- Note on dual `initial` keyword resolution
+
+#### Operations
+Mermaid `classDiagram` with exact field names from `Operation.cs`:
+- Abstract `OperationMeta` base (Kind, Op, Result, Description)
+- `UnaryOperationMeta` — 9 members, adds Operand: ParameterMeta
+- `BinaryOperationMeta` — 189 members, adds Lhs/Rhs: ParameterMeta, BidirectionalLookup, Match, ProofRequirements
+- `ParameterMeta` (Kind: TypeKind, Name: string?)
+- Notes on object-identity reference safety, BidirectionalLookup, QualifierMatch
+
+#### ProofRequirements
+Two Mermaid `classDiagram`s (catalog meta vs. obligation instances) with exact field names from `ProofRequirement.cs`:
+- `ProofRequirementMeta` DU (5 identity-only subtypes)
+- `ProofRequirement` obligation DU: NumericProofRequirement (Subject + Comparison + Threshold), PresenceProofRequirement (Subject), DimensionProofRequirement (Subject + RequiredDimension), QualifierCompatibilityProofRequirement (LeftSubject + RightSubject + Axis — dual-subject), ModifierRequirement (Subject + Required)
+- Explanation of dual-subject pattern and where instances live in the catalog
+
+#### Diagnostics and Faults
+ASCII side-by-side showing `DiagnosticMeta` and `FaultMeta` field shapes with the bidirectional arrow annotation, plus a table of the two enforcement mechanisms (PreventsFault field + PRECEPT0002).
+
+### Level 3 — Member Inventories
+
+Reference table for all 13 catalogs with:
+- Enum name
+- Source-verified member count
+- Key groupings
+- Source file pointer
+- Footer noting ConstructSlotKind (17 members, source-verified from `ConstructSlot.cs`)
+
+**Source-verified corrections applied:**
+- `ActionKind`: 15 members (not 8 — the doc's Action section was outdated; source has 8 original + 7 extended compound actions)
+- `ConstructKind`: 12 members (resolves the doc's open question; source confirms 12)
+- `ConstructSlotKind`: 17 members (resolves the doc's open question; source confirms 17)
+
+## What was NOT changed
+
+No existing sections were restructured or rewritten. The new section was inserted as a clean block between `### Derive, never duplicate` and `## Pattern Definition`. All pre-existing open questions, implementation notes, and cross-references are untouched.
+
