@@ -20732,3 +20732,38 @@ This is **stronger** than the annotation bridge. The annotation bridge was a vol
 The annotation-bridge pattern was a scaffolding technique for a per-node-type consumer architecture. Option F eliminates per-node-type consumers. The scaffolding is not just unnecessary — it's actively misleading, because it implies consumer code must change when the language grows. It must not. That's the entire thesis of catalog-driven design.
 
 Remove from consumers. Retain in the catalog layer. The compiler's own exhaustiveness checking (CS8509) is the correct mechanism for catalog switches.
+
+---
+
+# Decision: Remove [HandlesCatalogExhaustively] / [HandlesCatalogMember] from pipeline consumer stubs
+
+**By:** Frank  
+**Date:** 2026-05-03  
+**Status:** Resolved
+
+## Decision
+
+Removed all `[HandlesCatalogExhaustively(typeof(ExpressionFormKind))]` class attributes and all `[HandlesCatalogMember(ExpressionFormKind.*)]` method attributes from the three pipeline consumer stubs: `Parser.cs`, `TypeChecker.cs`, and `GraphAnalyzer.cs`. Deleted the two reflection-based Group 2 tests from `test/Precept.Tests/ExpressionFormCoverageTests.cs` that enforced those annotations.
+
+The attribute type definitions (`HandlesCatalogExhaustivelyAttribute.cs`, `HandlesCatalogMemberAttribute.cs`) are **retained** — they remain valid on catalog types themselves.
+
+## Rationale
+
+Option F's generic dispatch (`ParsedConstruct(ConstructMeta, SlotValue[], SourceSpan)`) means pipeline consumers dispatch by `SlotValue` shape, not by `ExpressionFormKind` identity. When a consumer does not switch per-enum-member, the exhaustiveness contract these annotations impose is vacuous — there is no handler switch to be exhaustive over.
+
+The 39 stub annotations (13 per consumer × 3 consumers) created a false architectural signal: they implied consumer code must track every language growth event, which is precisely the catalog-driven pipeline thesis's argument against. Keeping them would have invited future maintainers to re-add per-member handler stubs on the wrong premise.
+
+## Corollary Rule
+
+Any test that enforces annotation presence via reflection must be removed alongside the annotations it asserts. Orphan tests asserting dead contracts are worse than no tests — they give false confidence and will begin failing on every new `ExpressionFormKind` member whether or not real dispatch is needed.
+
+## Files Changed
+
+- `src/Precept/Pipeline/Parser.cs` — stripped class + method annotations, removed private stub method
+- `src/Precept/Pipeline/TypeChecker.cs` — stripped class + method annotations, removed private stub method  
+- `src/Precept/Pipeline/GraphAnalyzer.cs` — stripped class + method annotations, removed private stub method
+- `test/Precept.Tests/ExpressionFormCoverageTests.cs` — removed Group 2 (reflection annotation tests), removed `using System.Reflection` and `using Precept`
+
+## Build Result
+
+0 errors, 0 warnings after changes.
