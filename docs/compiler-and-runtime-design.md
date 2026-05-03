@@ -250,12 +250,14 @@ flowchart LR
     classDef out     fill:#fef9c3,stroke:#f59e0b,color:#78350f
 
     SRC([source text]):::input
-    CAT("Tokens · Diagnostics<br/>catalogs"):::catalog
+    CTOK("Tokens"):::catalog
+    CDIA("Diagnostics"):::catalog
     LEX(Lexer):::stage
     OUT>"TokenStream"]:::out
 
     SRC --> LEX
-    CAT --> LEX
+    CTOK --> LEX
+    CDIA --> LEX
     LEX --> OUT
 ```
 
@@ -296,10 +298,24 @@ flowchart LR
     classDef out     fill:#fef9c3,stroke:#f59e0b,color:#78350f
 
     TS>"TokenStream"]:::out
-    CAT("Constructs · Tokens<br/>Operators · Diagnostics<br/>catalogs"):::catalog
     PAR(Parser):::stage
     OUT>"ConstructManifest"]:::out
-    CAT --> PAR
+
+    subgraph CATS[" "]
+        direction TB
+        CCON("Constructs"):::catalog
+        CTOK("Tokens"):::catalog
+        COPR("Operators"):::catalog
+        CDIA("Diagnostics"):::catalog
+    end
+
+    style CATS fill:#ecfeff,stroke:#22d3ee,color:#164e63
+
+    TS --> PAR
+    CCON --> PAR
+    CTOK --> PAR
+    COPR --> PAR
+    CDIA --> PAR
     PAR --> OUT
 ```
 
@@ -389,8 +405,31 @@ flowchart LR
     TC(Type Checker):::stage
     OUT>"SemanticIndex"]:::out
 
-    ST -->|"construct manifest"| TC
-    CAT --> TC
+    subgraph CATS[" "]
+        direction TB
+        CTYP("Types"):::catalog
+        CFUN("Functions"):::catalog
+        COPR("Operators"):::catalog
+        COPN("Operations"):::catalog
+        CMOD("Modifiers"):::catalog
+        CACT("Actions"):::catalog
+        CCST("Constraints"):::catalog
+        CPRQ("ProofRequirements"):::catalog
+        CDIA("Diagnostics"):::catalog
+    end
+
+    style CATS fill:#ecfeff,stroke:#22d3ee,color:#164e63
+
+    ST --> TC
+    CTYP --> TC
+    CFUN --> TC
+    COPR --> TC
+    COPN --> TC
+    CMOD --> TC
+    CACT --> TC
+    CCST --> TC
+    CPRQ --> TC
+    CDIA --> TC
     TC --> OUT
 ```
 
@@ -551,12 +590,22 @@ flowchart LR
     classDef out     fill:#fef9c3,stroke:#f59e0b,color:#78350f
 
     TM>"SemanticIndex"]:::out
-    CAT("Modifiers · Actions<br/>Diagnostics<br/>catalogs"):::catalog
     GA(Graph Analyzer):::stage
     OUT>"StateGraph"]:::out
 
-    TM -->|"semantic declarations"| GA
-    CAT --> GA
+    subgraph CATS[" "]
+        direction TB
+        CMOD("Modifiers"):::catalog
+        CACT("Actions"):::catalog
+        CDIA("Diagnostics"):::catalog
+    end
+
+    style CATS fill:#ecfeff,stroke:#22d3ee,color:#164e63
+
+    TM --> GA
+    CMOD --> GA
+    CACT --> GA
+    CDIA --> GA
     GA --> OUT
 ```
 
@@ -643,12 +692,26 @@ flowchart LR
     classDef out     fill:#fef9c3,stroke:#f59e0b,color:#78350f
 
     TM>"SemanticIndex + StateGraph"]:::out
-    CAT("Operations · Functions<br/>Types · Diagnostics · Faults<br/>catalogs"):::catalog
     PE(Proof Engine):::stage
     OUT>"ProofLedger"]:::out
 
-    TM -->|"semantic inventory + graph facts"| PE
-    CAT --> PE
+    subgraph CATS[" "]
+        direction TB
+        COPN("Operations"):::catalog
+        CFUN("Functions"):::catalog
+        CTYP("Types"):::catalog
+        CDIA("Diagnostics"):::catalog
+        CFLT("Faults"):::catalog
+    end
+
+    style CATS fill:#ecfeff,stroke:#22d3ee,color:#164e63
+
+    TM --> PE
+    COPN --> PE
+    CFUN --> PE
+    CTYP --> PE
+    CDIA --> PE
+    CFLT --> PE
     PE --> OUT
 ```
 
