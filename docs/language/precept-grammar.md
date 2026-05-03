@@ -66,10 +66,10 @@ field  →  FieldDeclaration
 state  →  StateDeclaration
 event  →  EventDeclaration
 rule   →  RuleDeclaration
-from   →  TransitionRow     (disambiguation: always TransitionRow for StateScoped `from`)
+from   →  TransitionRow | StateEnsure | StateAction   (disambiguated by 2nd keyword: on | ensure | ->)
 in     →  StateEnsure | AccessMode | OmitDeclaration  (disambiguated by 2nd keyword)
 on     →  EventEnsure | EventHandler                  (disambiguated by 2nd keyword)
-to     →  StateAction
+to     →  StateEnsure | StateAction                   (disambiguated by 2nd keyword: ensure | ->)
 ```
 
 **Why keyword anchoring?** Three reasons:
@@ -128,26 +128,26 @@ File
 │                                                                            │
 │  ┌──────────────────────────────────────────────────────────────────────┐  │
 │  │  CONSTRUCT                                                           │  │
-│  │  • A single declaration sentence, anchored by a leading keyword.    │  │
-│  │  • Maps to a ConstructMeta entry in the Constructs catalog.         │  │
-│  │  • Has a flat, ordered sequence of slots defined by that catalog.   │  │
+│  │  • A single declaration sentence, anchored by a leading keyword.     │  │
+│  │  • Maps to a ConstructMeta entry in the Constructs catalog.          │  │
+│  │  • Has a flat, ordered sequence of slots defined by that catalog.    │  │
 │  │                                                                      │  │
-│  │  ┌────────────────────────────────────────────────────────────────┐ │  │
-│  │  │  SLOT                                                          │ │  │
-│  │  │  • A named, typed position within a construct.                 │ │  │
-│  │  │  • May be required or optional; may be single or multi-valued. │ │  │
-│  │  │  • Kind determined by ConstructSlotKind enum.                  │ │  │
-│  │  │                                                                  │ │  │
-│  │  │  ┌──────────────────────────────────────────────────────────┐  │ │  │
-│  │  │  │  EXPRESSION                                              │  │ │  │
-│  │  │  │  • A computed value — appears only in expression-typed   │  │ │  │
-│  │  │  │    slots (ComputeExpression, GuardClause, EnsureClause,  │  │ │  │
-│  │  │  │    RuleExpression, Outcome).                             │  │ │  │
-│  │  │  │  • Never a top-level statement.                          │  │ │  │
-│  │  │  │  • Parsed by Pratt parser; precedence from Operators     │  │ │  │
-│  │  │  │    catalog.                                              │  │ │  │
-│  │  │  └──────────────────────────────────────────────────────────┘  │ │  │
-│  │  └────────────────────────────────────────────────────────────────┘ │  │
+│  │  ┌────────────────────────────────────────────────────────────────┐  │  │
+│  │  │  SLOT                                                          │  │  │
+│  │  │  • A named, typed position within a construct.                 │  │  │
+│  │  │  • May be required or optional; may be single or multi-valued. │  │  │
+│  │  │  • Kind determined by ConstructSlotKind enum.                  │  │  │
+│  │  │                                                                │  │  │
+│  │  │  ┌──────────────────────────────────────────────────────────┐  │  │  │
+│  │  │  │  EXPRESSION                                              │  │  │  │
+│  │  │  │  • A computed value — appears only in expression-typed   │  │  │  │
+│  │  │  │    slots (ComputeExpression, GuardClause, EnsureClause,  │  │  │  │
+│  │  │  │    RuleExpression, Outcome).                             │  │  │  │
+│  │  │  │  • Never a top-level statement.                          │  │  │  │
+│  │  │  │  • Parsed by Pratt parser; precedence from Operators     │  │  │  │
+│  │  │  │    catalog.                                              │  │  │  │
+│  │  │  └──────────────────────────────────────────────────────────┘  │  │  │
+│  │  └────────────────────────────────────────────────────────────────┘  │  │
 │  └──────────────────────────────────────────────────────────────────────┘  │
 └────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -169,11 +169,11 @@ A construct is a complete declaration — a "sentence" in the DSL. There are 12 
 | `StateDeclaration` | `state` | Declares lifecycle state(s) |
 | `EventDeclaration` | `event` | Declares an event with typed arguments |
 | `RuleDeclaration` | `rule` | Declares a global data constraint |
-| `TransitionRow` | `from` | Declares one transition in the state machine |
-| `StateEnsure` | `in` + `ensure` | Declares a state-scoped constraint |
+| `TransitionRow` | `from` + `on` | Declares one transition in the state machine |
+| `StateEnsure` | `in`/`to`/`from` + `ensure` | Declares a state-scoped constraint |
 | `AccessMode` | `in` + `modify`/`readonly`/`editable` | Declares field editability in a state |
 | `OmitDeclaration` | `in` + `omit` | Declares field omission in a state |
-| `StateAction` | `to` | Declares a state-entry action hook |
+| `StateAction` | `to`/`from` + `->` | Declares a state entry or exit action hook |
 | `EventEnsure` | `on` + `ensure` | Declares an event precondition |
 | `EventHandler` | `on` + `->` | Declares a stateless event handler |
 
@@ -272,8 +272,11 @@ Direct       field            none               FieldDeclaration
 StateScoped  in               peek at next kwd   StateEnsure (ensure)
                                                  AccessMode  (modify/readonly/editable)
                                                  OmitDeclaration (omit)
-             from             none within family TransitionRow
-             to               none within family StateAction
+             from             peek at next kwd   TransitionRow (on)
+                                                  StateEnsure (ensure)
+                                                  StateAction (->)
+             to               peek at next kwd   StateEnsure (ensure)
+                                                  StateAction (->)
 EventScoped  on               peek at next kwd   EventEnsure (ensure)
                                                  EventHandler (→)
 ────────────────────────────────────────────────────────────────────────────────────
@@ -327,6 +330,25 @@ on  EventName  ->  actions                         → EventHandler
 ```
 
 The second keyword (`ensure` vs `->`) is the disambiguation token.
+
+#### The `from` family (StateScoped)
+
+```
+from  [AnchorState]  on  EventName  [when Guard]  -> ActionChain -> Outcome  → TransitionRow
+from  [AnchorState]  ensure  Expr  because  "..."                             → StateEnsure
+from  [AnchorState]  ->  actions                                              → StateAction
+```
+
+The second keyword (`on`, `ensure`, or `->`) is the disambiguation token. `on` leads `TransitionRow`; `ensure` leads `StateEnsure` (exit constraint); `->` leads `StateAction` (exit hook).
+
+#### The `to` family (StateScoped)
+
+```
+to  [AnchorState]  ensure  Expr  because  "..."    → StateEnsure
+to  [AnchorState]  ->  actions                     → StateAction
+```
+
+The second keyword (`ensure` vs `->`) is the disambiguation token. `ensure` leads `StateEnsure` (entry constraint); `->` leads `StateAction` (entry hook).
 
 #### The `field` family (Direct — not a ConstructFamily)
 
@@ -685,9 +707,12 @@ Header     ─► precept
 Direct     ─► field  │  state  │  event  │  rule
 StateScoped─► from [state]   on [event] → TransitionRow
             ─► in  [state]   ensure     → StateEnsure
+            ─► to  [state]   ensure     → StateEnsure
+            ─► from [state]  ensure     → StateEnsure
             ─► in  [state]   modify     → AccessMode
             ─► in  [state]   omit       → OmitDeclaration
             ─► to  [state]   -> …       → StateAction
+            ─► from [state]  -> …       → StateAction
 EventScoped─► on  [event]   ensure     → EventEnsure
             ─► on  [event]   -> …       → EventHandler
 ```
