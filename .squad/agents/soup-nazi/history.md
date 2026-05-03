@@ -33,3 +33,10 @@
 - Soup-Nazi's checker test-strategy review is now part of the implementation baseline: expect roughly 450-550 tests, 3 non-negotiable validation gates, and 4 high-risk areas to anchor the slice-by-slice rollout.
 - The canonical checker design is now implementation-ready after Frank's response to George; treat the test review as required follow-through, not advisory commentary.
 - Future checker slices should keep error recovery, scope/binding behavior, qualifier-sensitive operations, and cross-consumer regression coverage explicitly pinned in tests.
+
+### 2026-05-03T11:11:04Z — BecauseClause slot split tests written
+- Added 35 tests in `EnsureBecauseClauseSlotTests.cs` covering the catalog defect fix that splits `BecauseClause` out of `EnsureClause` for `StateEnsure` and `EventEnsure`.
+- George had already applied the 3-slot structure by the time tests ran: `HasThreeSlots`, `SlotAtIndex2_IsBecauseClause`, and `SlotAtIndex0/1` tests all pass green.
+- A real defect was surfaced: `BecauseClause` slot is `IsRequired: true` on both constructs but must be `IsRequired: false` (ensures without `because` are valid DSL). Two RED-C tests document this.
+- 7 RED-P tests document expected parser behavior (stub returns empty manifest); 4 RED-R tests document expected runtime behavior (not yet implemented). All 13 red tests are intentionally honest — no skips.
+- Finding: When George uses the shared `SlotBecauseClause` instance (required=true) for StateEnsure/EventEnsure, a new optional variant (`SlotOptBecauseClause = new(ConstructSlotKind.BecauseClause, IsRequired: false)`) is required to match the design intent.
